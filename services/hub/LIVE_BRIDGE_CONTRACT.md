@@ -139,7 +139,25 @@ The pure, read-only projection policy is `services/hub/ApolloHubMediaPolicy.js`.
 
 A successful `HeadlessMediaController.snapshot` response advances freshness only when `pendingAction === "snapshot"` and `errorText` is empty. Search, inspection, and selection must not renew an old playback observation. Observed MPD state expires after **15 seconds** with no new successful snapshot; a five-second *clock-only timer* enforces expiry while attached. Loaded media and active playing media are kept separate. Neither `selection` nor `browse` are displayed as loaded or playing.
 
-**B4 playback observation fix (draft PR #443):** The Hi-Fi deck still polls its HeadlessMediaController only while open in MPD mode. The shared shell now also injects `mpdDockSource: sharedMediaDock` to reuse the **existing** Media dock's already-running `mpc` observation (2-second cadence). The Hub policy prioritizes a fresh dock MPD playback state and combined artist-title label for continuous closed-deck updates, while retaining HeadlessMediaController's independently observed last-loaded cassette, ownership and freshness. A 15-second expiry applies to both independent sources; neither source proves audible sound. A stopped/offline dock cannot masquerade as playing. No new MPD process or poller is created. This behavior is source/CI tested, **not yet runtime verified**.
+**B4 playback observation integration (merged PR #443):** The Hi-Fi deck still polls its HeadlessMediaController only while open in MPD mode. The shared shell now also injects `mpdDockSource: sharedMediaDock` to reuse the **existing** Media dock's already-running `mpc` observation (2-second cadence). The Hub policy prioritizes a fresh dock MPD playback state and combined artist-title label for continuous closed-deck updates, while retaining HeadlessMediaController's independently observed last-loaded cassette, ownership and freshness. A 15-second expiry applies to both independent sources; neither source proves audible sound. A stopped/offline dock cannot masquerade as playing. No new MPD process or poller is created. This behavior is source/CI tested, **not yet runtime verified**.
+
+### B4 MPD flicker correction (October 22, 2026)
+
+The Media dock's MPD subprocess runs every 2 seconds; the Hub's aging clock
+originally ticked only every 5 seconds. If a new observation arrived between
+clock ticks, its timestamp could be newer than the Hub clock. The media policy
+correctly rejects future timestamps, so the Hub briefly misreported playback
+as `STALE` or `UNAVAILABLE`.
+
+The dock now validates `mpc status` output before accepting it, ignores
+empty/unrecognized responses instead of treating them as a new `offline`
+reading, then publishes one atomic `hubMpdObservation` object containing
+state, title and timestamp. `ApolloHubLiveBridge` advances its freshness
+clock when the atomic observation changes. This **does not** add a poller,
+extend the 15-second stale threshold, modify MPRIS, or give the Hub transport
+authority. Genuine failure to obtain valid MPD output still ages to `stale`.
+The dock output parser is exercised against successful and failed real-format
+samples in Node CI. Live SwayFX/Quickshell acceptance remains open.
 
 ### MPRIS consumer properties
 

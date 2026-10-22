@@ -4,6 +4,11 @@ on:
   pull_request:
     paths:
       - "services/hub/ApolloHubLiveBridge.qml"
+      - "services/hub/ApolloHubMediaPolicy.js"
+      - "services/media/HeadlessMediaController.qml"
+      - "services/media/MprisPlaybackAdapter.qml"
+      - "tests/hub/test_apollo_hub_media_bridge.py"
+      - "tests/hub/test_apollo_hub_media_policy.cjs"
       - "services/hub/ApolloHubNetworkPolicy.js"
       - "modules/Network.qml"
       - "tests/hub/test_apollo_hub_network_policy.cjs"
@@ -26,6 +31,11 @@ on:
       - main
     paths:
       - "services/hub/ApolloHubLiveBridge.qml"
+      - "services/hub/ApolloHubMediaPolicy.js"
+      - "services/media/HeadlessMediaController.qml"
+      - "services/media/MprisPlaybackAdapter.qml"
+      - "tests/hub/test_apollo_hub_media_bridge.py"
+      - "tests/hub/test_apollo_hub_media_policy.cjs"
       - "services/hub/ApolloHubNetworkPolicy.js"
       - "modules/Network.qml"
       - "tests/hub/test_apollo_hub_network_policy.cjs"
@@ -64,3 +74,7 @@ jobs:
         run: python3 tests/hub/test_apollo_hub_network_bridge.py
       - name: Exercise network link and unknown states
         run: node tests/hub/test_apollo_hub_network_policy.cjs
+      - name: Guard B4 Media bridge against duplicate controllers
+        run: python3 tests/hub/test_apollo_hub_media_bridge.py
+      - name: Exercise B4 MPD/MPRIS snapshot semantics
+        run: node tests/hub/test_apollo_hub_media_policy.cjs

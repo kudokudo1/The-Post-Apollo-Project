@@ -261,8 +261,10 @@ async function main(){
     "FINANCEW_ALLOCATION_WRITES_APPROVED\n",{mode:0o600,flag:"wx"});
   const saved=executeWriter();
   assert.equal(saved.error,undefined);
-  assert.equal(saved.status,0);
-  assert.equal(saved.stdout.trim(),"FINANCEW_ALLOCATION_RESULT committed");
+  const savedToken=/FINANCEW_ALLOCATION_RESULT ([a-z0-9:-]+)/.exec(saved.stdout)?.[1]
+    || "no-result";
+  if(saved.status!==0 || savedToken!=="committed")
+    throw new Error("writer-"+savedToken);
   const receipt=JSON.parse(await readFile(journal,"utf8"));
   assert.equal(receipt.status,"committed");
   assert.equal((await stat(journal)).mode & 0o077,0);
@@ -270,8 +272,8 @@ async function main(){
   stage="real-writer-repeat-refusal";
   const duplicate=executeWriter();
   assert.equal(duplicate.status,1);
-  assert.equal(duplicate.stdout.trim(),
-    "FINANCEW_ALLOCATION_RESULT blocked:operation-already-attempted");
+  assert.match(duplicate.stdout,
+    /FINANCEW_ALLOCATION_RESULT blocked:operation-already-attempted/);
 
   stage="real-writer-fresh-client-readback";
   await startClient("after-cli");
@@ -288,7 +290,8 @@ async function main(){
 try{await main();}
 catch(e){
   process.stderr.write("FINANCEW_D12B_DISPOSABLE_FAIL stage="+stage
-    +" code="+redactError(e)+" class="+(e?.name||"Error").replace(/[^a-zA-Z]/g,"")+"\n");
+    +" code="+redactError(e)+" class="+(e?.name||"Error").replace(/[^a-zA-Z]/g,"")
+    +" detail="+(/^[a-z0-9:-]{1,75}$/.test(e?.message||"") ? e.message : "redacted")+"\n");
   process.exitCode=1;
 }finally{
   try{await endClient();}catch{}

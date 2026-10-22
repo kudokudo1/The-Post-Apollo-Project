@@ -2,6 +2,7 @@ import QtQuick
 import Quickshell
 import Quickshell.Wayland
 import "../components"
+import "../services/hub/ApolloHubTimePolicy.js" as LocalTimePolicy
 
 // TimeW M1: standalone temporal window foundation.
 // No timers, activity recording, screenshots or restoration are active here.
@@ -26,6 +27,12 @@ PanelWindow {
     // TimeW identity is white. Universal magenta header, cyan dividers and
     // destructive red Close keep their independent semantic roles.
     readonly property color semanticColor: Colors.white
+
+    // Presentation choice is local to TimeW; it does not change the Clock
+    // dock or Hub preference. The Hub helper is pure and owns no clock tick.
+    property bool use24Hour: true
+    readonly property var localTimeSnapshot:
+        LocalTimePolicy.snapshot(localClock.date.getTime(), use24Hour)
 
     readonly property var modes: [
         { id: "clock", name: "CLOCK" },
@@ -302,21 +309,58 @@ PanelWindow {
                     }
 
                     Column {
+                        id: localClockPane
                         visible: timew.selectedMode === "clock"
+                        width: parent.width
                         spacing: 10
 
-                        GohuText {
-                            text: Qt.formatDateTime(localClock.date, "HH:mm:ss")
-                            color: timew.semanticColor
-                            font.pixelSize: 20
+                        Row {
+                            width: parent.width
+                            height: 34
+                            spacing: 8
+
+                            GohuText {
+                                width: Math.max(0, parent.width
+                                                - hourFormatButton.width
+                                                - parent.spacing)
+                                height: parent.height
+                                verticalAlignment: Text.AlignVCenter
+                                text: timew.localTimeSnapshot.displayTime
+                                color: timew.semanticColor
+                                font.pixelSize: timew.use24Hour ? 22 : 19
+                                elide: Text.ElideRight
+                            }
+
+                            ActionButton {
+                                id: hourFormatButton
+                                width: 60
+                                height: 30
+                                label: timew.use24Hour ? "24H" : "12H"
+                                labelPixelSize: 11
+                                trackLabelGlowLocally: true
+                                accentColor: timew.semanticColor
+                                onLeftClicked: timew.use24Hour = !timew.use24Hour
+                            }
                         }
+
                         GohuText {
-                            text: Qt.formatDateTime(localClock.date, "ddd, yyyy-MM-dd")
+                            width: parent.width
+                            text: timew.localTimeSnapshot.dateLabel
                             color: Colors.white
                             font.pixelSize: 18
                         }
+
                         GohuText {
-                            text: "LOCAL CLOCK // READ ONLY"
+                            width: parent.width
+                            text: timew.localTimeSnapshot.utcOffsetLabel
+                            color: Colors.orange
+                            font.pixelSize: 11
+                        }
+
+                        GohuText {
+                            text: timew.localTimeSnapshot.state === "ready"
+                                  ? "LOCAL CLOCK // SYSTEM TIME"
+                                  : "LOCAL CLOCK // UNAVAILABLE"
                             color: Colors.orange
                             font.pixelSize: 11
                         }

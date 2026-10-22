@@ -3,7 +3,8 @@
 // TimeW zone directory parser/search. Caller supplies a trusted system
 // tzdata listing; this pure helper never launches a process or writes data.
 var MAX_ZONES = 1200;
-var MAX_RESULTS = 120;
+// The ListView virtualizes rows, so searches can expose the full bounded catalog.
+var MAX_RESULTS = MAX_ZONES;
 
 // Keep only well-formed IANA zone IDs. These are later checked for membership
 // in the listing before they can become the existing date process's TZ env.
@@ -94,7 +95,7 @@ function search(catalog, query, limit, countryIndex) {
     if (!Array.isArray(catalog) || typeof query !== "string")
         return [];
     var needle = normalize(query);
-    if (!needle || needle.length > 100)
+    if (needle.length > 100)
         return [];
 
     var max = typeof limit === "number" && isFinite(limit)
@@ -110,7 +111,7 @@ function search(catalog, query, limit, countryIndex) {
             continue;
         var full = normalize(id);
         var city = normalize(cityName(id));
-        var score = -1;
+        var score = needle === "" ? 0 : -1;
         var countryList = countryIndex && Array.isArray(countryIndex[id])
                           ? countryIndex[id] : [];
         var countryMatched = -1;
@@ -126,7 +127,11 @@ function search(catalog, query, limit, countryIndex) {
                      && (countryMatched < 0 || countryMatched > 2))
                 countryMatched = 2;
         }
-        if (full === needle || city === needle)
+        if (!needle) {
+            // Browse all installed zones. Country-first sorting below
+            // makes the empty-query directory more useful to navigate.
+            score = 0;
+        } else if (full === needle || city === needle)
             score = 0;
         else if (city.indexOf(needle) === 0)
             score = 1;
@@ -156,6 +161,14 @@ function search(catalog, query, limit, countryIndex) {
             });
     }
     scored.sort(function(a, b) {
+        if (!needle) {
+            // Country groups first. Zones without a country mapping remain
+            // browseable at the end (UTC, Etc/* and other system aliases).
+            var countryA = a.country || "\uffff";
+            var countryB = b.country || "\uffff";
+            var countryCompare = countryA.localeCompare(countryB);
+            if (countryCompare !== 0) return countryCompare;
+        }
         return a.rank - b.rank || a.label.localeCompare(b.label);
     });
     return scored.slice(0, max);

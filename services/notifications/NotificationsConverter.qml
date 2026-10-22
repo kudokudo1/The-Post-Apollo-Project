@@ -3,6 +3,7 @@ pragma Singleton
 import QtQuick
 import Quickshell
 import Quickshell.Services.Notifications
+import "BrowserSiteIdentity.js" as BrowserSiteIdentity
 
 Singleton {
     id: root
@@ -32,12 +33,19 @@ Singleton {
     }
 
     function convert(notification) {
+        const website = BrowserSiteIdentity.fromNotification(notification);
         return {
             // A missing desktop entry is legitimate, especially for browsers.
             // Keep the sender's actual app name; policy keys continue to use
             // the original desktopEntry when one was provided.
             "source": String(notification.appName || notification.desktopEntry || "UNKNOWN APP"),
             "sourceId": String(notification.desktopEntry || ""),
+            // Website identity is optional display metadata, not the policy
+            // key or category. No title/message parsing outside Chromium's
+            // explicit origin context prefix.
+            "website": website.label,
+            "websiteHost": website.host,
+            "websiteIcon": website.icon,
             "title": notification.summary,
             "message": notification.body,
             "originalTitle": notification.summary,

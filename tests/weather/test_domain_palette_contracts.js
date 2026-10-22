@@ -136,7 +136,8 @@ for (const token of [
 const meterSpecs = [
     {
         source: groundSource,
-        accent: "green",
+        objectName: "ground",
+        fill: "green",
         meters: {
             aqi: "aqiValue / 500",
             pm25: "pm25Value / 100",
@@ -148,7 +149,8 @@ const meterSpecs = [
     },
     {
         source: skySource,
-        accent: "cyan",
+        objectName: "sky",
+        fill: "orange",
         meters: {
             temperature: "temperatureValue / 120",
             aqi: "aqiValue / 500",
@@ -160,7 +162,8 @@ const meterSpecs = [
     },
     {
         source: spaceSource,
-        accent: "magenta",
+        objectName: "space",
+        fill: "magenta",
         meters: {
             kp: "kpValue / 9",
             solarWind: "solarWindValue / 1000",
@@ -189,11 +192,34 @@ for (const spec of meterSpecs) {
         );
     }
 
-    const fillColor = "color: Colors." + spec.accent;
+    assert.match(
+        spec.source,
+        new RegExp(
+            "readonly property color meterBorderColor:\\s*Colors\\.cyan"
+        )
+    );
+    assert.match(
+        spec.source,
+        new RegExp(
+            "readonly property color meterFillColor:\\s*Colors\\."
+            + spec.fill
+        )
+    );
+
+    const borderBinding =
+        "border.color: " + spec.objectName + ".meterBorderColor";
+    const fillBinding =
+        "color: " + spec.objectName + ".meterFillColor";
+
     assert.ok(
-        spec.source.split(fillColor).length - 1 >=
+        spec.source.split(borderBinding).length - 1 >=
             Object.keys(spec.meters).length,
-        spec.accent + " meter fill identity"
+        spec.objectName + " meter border identity"
+    );
+    assert.ok(
+        spec.source.split(fillBinding).length - 1 >=
+            Object.keys(spec.meters).length,
+        spec.objectName + " meter fill identity"
     );
 }
 
@@ -207,6 +233,14 @@ assert.match(
 assert.ok(
     skySource.split("sky.chanceMeter(").length - 1 >= 2,
     "hourly and daily rain chance meters"
+);
+assert.ok(
+    skySource.split("border.color: sky.meterBorderColor").length - 1 >= 8,
+    "all SKY meter exteriors use cyan"
+);
+assert.ok(
+    skySource.split("color: sky.meterFillColor").length - 1 >= 8,
+    "all SKY meter interiors use orange"
 );
 
 // Fields without a defensible intrinsic/provider scale stay numeric for now.

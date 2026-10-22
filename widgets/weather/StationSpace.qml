@@ -80,6 +80,9 @@ Rectangle {
         return text.replace("T", " ").replace("Z", "").slice(5, 16);
     }
 
+    readonly property color meterBorderColor: Colors.cyan
+    readonly property color meterFillColor: Colors.magenta
+
     color: Colors.black
 
     Column {
@@ -141,14 +144,14 @@ Rectangle {
                     height: 8
                     color: Colors.black
                     border.width: 1
-                    border.color: Colors.magenta
+                    border.color: space.meterBorderColor
 
                     Rectangle {
                         x: 2
                         anchors.verticalCenter: parent.verticalCenter
                         width: (parent.width - 4) * space.kpMeter
                         height: parent.height - 4
-                        color: Colors.magenta
+                        color: space.meterFillColor
                     }
                 }
             }
@@ -174,14 +177,14 @@ Rectangle {
                     height: 8
                     color: Colors.black
                     border.width: 1
-                    border.color: Colors.magenta
+                    border.color: space.meterBorderColor
 
                     Rectangle {
                         x: 2
                         anchors.verticalCenter: parent.verticalCenter
                         width: (parent.width - 4) * space.solarWindMeter
                         height: parent.height - 4
-                        color: Colors.magenta
+                        color: space.meterFillColor
                     }
                 }
             }
@@ -212,14 +215,14 @@ Rectangle {
                     height: 8
                     color: Colors.black
                     border.width: 1
-                    border.color: Colors.magenta
+                    border.color: space.meterBorderColor
 
                     Rectangle {
                         x: 2
                         anchors.verticalCenter: parent.verticalCenter
                         width: (parent.width - 4) * space.bzMeter
                         height: parent.height - 4
-                        color: Colors.magenta
+                        color: space.meterFillColor
                     }
                 }
             }
@@ -245,14 +248,14 @@ Rectangle {
                     height: 8
                     color: Colors.black
                     border.width: 1
-                    border.color: Colors.magenta
+                    border.color: space.meterBorderColor
 
                     Rectangle {
                         x: 2
                         anchors.verticalCenter: parent.verticalCenter
                         width: (parent.width - 4) * space.solarFluxMeter
                         height: parent.height - 4
-                        color: Colors.magenta
+                        color: space.meterFillColor
                     }
                 }
             }
@@ -283,14 +286,14 @@ Rectangle {
                     height: 8
                     color: Colors.black
                     border.width: 1
-                    border.color: Colors.magenta
+                    border.color: space.meterBorderColor
 
                     Rectangle {
                         x: 2
                         anchors.verticalCenter: parent.verticalCenter
                         width: (parent.width - 4) * space.btMeter
                         height: parent.height - 4
-                        color: Colors.magenta
+                        color: space.meterFillColor
                     }
                 }
 

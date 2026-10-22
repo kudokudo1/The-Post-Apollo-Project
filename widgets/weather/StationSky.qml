@@ -99,6 +99,9 @@ Rectangle {
         return at < 0 ? 0 : at * 22.5;
     }
 
+    readonly property color meterBorderColor: Colors.cyan
+    readonly property color meterFillColor: Colors.orange
+
     color: Colors.black
 
     Column {
@@ -163,14 +166,14 @@ Rectangle {
                     height: 8
                     color: Colors.black
                     border.width: 1
-                    border.color: Colors.cyan
+                    border.color: sky.meterBorderColor
 
                     Rectangle {
                         x: 2
                         anchors.verticalCenter: parent.verticalCenter
                         width: (parent.width - 4) * sky.temperatureMeter
                         height: parent.height - 4
-                        color: Colors.cyan
+                        color: sky.meterFillColor
                     }
                 }
             }
@@ -223,14 +226,14 @@ Rectangle {
                     height: 8
                     color: Colors.black
                     border.width: 1
-                    border.color: Colors.cyan
+                    border.color: sky.meterBorderColor
 
                     Rectangle {
                         x: 2
                         anchors.verticalCenter: parent.verticalCenter
                         width: (parent.width - 4) * sky.aqiMeter
                         height: parent.height - 4
-                        color: Colors.cyan
+                        color: sky.meterFillColor
                     }
                 }
             }
@@ -256,14 +259,14 @@ Rectangle {
                     height: 8
                     color: Colors.black
                     border.width: 1
-                    border.color: Colors.cyan
+                    border.color: sky.meterBorderColor
 
                     Rectangle {
                         x: 2
                         anchors.verticalCenter: parent.verticalCenter
                         width: (parent.width - 4) * sky.humidityMeter
                         height: parent.height - 4
-                        color: Colors.cyan
+                        color: sky.meterFillColor
                     }
                 }
             }
@@ -303,14 +306,14 @@ Rectangle {
                         height: 8
                         color: Colors.black
                         border.width: 1
-                        border.color: Colors.cyan
+                        border.color: sky.meterBorderColor
 
                         Rectangle {
                             x: 2
                             anchors.verticalCenter: parent.verticalCenter
                             width: (parent.width - 4) * sky.windMeter
                             height: parent.height - 4
-                            color: Colors.cyan
+                            color: sky.meterFillColor
                         }
                     }
                 }
@@ -378,14 +381,14 @@ Rectangle {
                     height: 8
                     color: Colors.black
                     border.width: 1
-                    border.color: Colors.cyan
+                    border.color: sky.meterBorderColor
 
                     Rectangle {
                         x: 2
                         anchors.verticalCenter: parent.verticalCenter
                         width: (parent.width - 4) * sky.cloudCoverMeter
                         height: parent.height - 4
-                        color: Colors.cyan
+                        color: sky.meterFillColor
                     }
                 }
             }
@@ -435,14 +438,14 @@ Rectangle {
                     height: 8
                     color: Colors.black
                     border.width: 1
-                    border.color: Colors.cyan
+                    border.color: sky.meterBorderColor
 
                     Rectangle {
                         x: 2
                         anchors.verticalCenter: parent.verticalCenter
                         width: (parent.width - 4) * sky.uvMeter
                         height: parent.height - 4
-                        color: Colors.cyan
+                        color: sky.meterFillColor
                     }
                 }
             }
@@ -502,7 +505,7 @@ Rectangle {
                             height: 6
                             color: Colors.black
                             border.width: 1
-                            border.color: Colors.cyan
+                            border.color: sky.meterBorderColor
 
                             Rectangle {
                                 x: 2
@@ -512,7 +515,7 @@ Rectangle {
                                            modelData.chanceRain
                                        )
                                 height: parent.height - 4
-                                color: Colors.cyan
+                                color: sky.meterFillColor
                             }
                         }
                     }
@@ -572,7 +575,7 @@ Rectangle {
                             height: 6
                             color: Colors.black
                             border.width: 1
-                            border.color: Colors.cyan
+                            border.color: sky.meterBorderColor
 
                             Rectangle {
                                 x: 2
@@ -582,7 +585,7 @@ Rectangle {
                                            modelData.chanceRain
                                        )
                                 height: parent.height - 4
-                                color: Colors.cyan
+                                color: sky.meterFillColor
                             }
                         }
 

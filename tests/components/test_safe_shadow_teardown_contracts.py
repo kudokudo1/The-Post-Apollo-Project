@@ -29,7 +29,6 @@ SURFACES = {
     "components/ConversationFeed.qml": 6,
     "components/NeonScrollBar.qml": 1,
     "widgets/notifications/NotificationsHubW.qml": 11,
-    "widgets/weather/StationHome.qml": 3,
 }
 
 for relative, minimum_safe_count in SURFACES.items():
@@ -39,6 +38,19 @@ for relative, minimum_safe_count in SURFACES.items():
         f"{relative} must keep its direct effects on SafeDropShadow "
         f"(expected at least {minimum_safe_count}, found {safe_count})"
     )
+    assert not re.search(r"(?m)^\s*DropShadow\s*\{", text), (
+        f"{relative} reintroduced an unguarded direct DropShadow source"
+    )
+
+WEATHER_PAGES = (
+    "widgets/weather/StationHome.qml",
+    "widgets/weather/StationGround.qml",
+    "widgets/weather/StationSky.qml",
+    "widgets/weather/StationSpace.qml",
+)
+
+for relative in WEATHER_PAGES:
+    text = (ROOT / relative).read_text(encoding="utf-8")
     assert not re.search(r"(?m)^\s*DropShadow\s*\{", text), (
         f"{relative} reintroduced an unguarded direct DropShadow source"
     )

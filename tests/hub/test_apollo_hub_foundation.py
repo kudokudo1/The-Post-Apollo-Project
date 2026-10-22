@@ -8,6 +8,7 @@ shell = (ROOT / "shell.qml").read_text(encoding="utf-8")
 dock = (ROOT / "modules/ApolloHub.qml").read_text(encoding="utf-8")
 window = (ROOT / "widgets/ApolloHubW.qml").read_text(encoding="utf-8")
 tile = (ROOT / "widgets/hub/ApolloHubTile.qml").read_text(encoding="utf-8")
+media_mini = (ROOT / "widgets/hub/ApolloHubMediaMini.qml").read_text(encoding="utf-8")
 layout = (ROOT / "services/hub/ApolloHubLayout.js").read_text(encoding="utf-8")
 store = (ROOT / "services/hub/ApolloHubStore.qml").read_text(encoding="utf-8")
 module = (ROOT / "services/hub/qmldir").read_text(encoding="utf-8")
@@ -244,6 +245,39 @@ assert 'tile.moduleId !== "weather" && tile.moduleId !== "network"' in tile
 for forbidden in ("Network {", "Networking {", "Process {", "nmcli", "iw dev",
                   "ethtool", "checkConnectivity(", "Networking.devices"):
     assert forbidden not in window + tile, f"UI must not collect/control network: {forbidden}"
+
+# B4 UI projects the existing mediaSnapshot without creating controllers,
+# choosing a MPRIS player, polling MPD, or claiming audio output.
+assert "mediaSnapshot: hub.liveBridge" in window
+assert "hub.liveBridge.mediaSnapshot : null" in window
+assert "property var mediaSnapshot: null" in tile
+assert "ApolloHubMediaMini {" in tile
+assert "mediaSnapshot: tile.mediaSnapshot" in tile
+assert 'visible: tile.moduleId === "media"' in tile
+assert 'tile.moduleId !== "media"' in tile
+assert "MEDIA // READ ONLY // AUDIO OUTPUT NOT VERIFIED" in tile
+for phrase in (
+    "mediaSnapshot.mpd", "mediaSnapshot.mpris",
+    'mpdState === "playing"', 'mpdState === "paused"',
+    'mpdState === "stopped"', 'mpdState === "unloaded"',
+    "mpd.fresh === true", "mpd.lastKnownLoadedTitle",
+    'mprisState === "selection-required"',
+    'mprisState === "player-missing"',
+    'mprisState === "playing"', 'mprisState === "paused"',
+    'mprisState === "stopped"',
+    "mpris.selected === true", "mpris.title", "mpris.artist",
+    "NO TRACK LOADED", "LAST LOADED", "SELECT PLAYER IN HI-FI",
+    "NO SELECTED PLAYER",
+):
+    assert phrase in media_mini, f"Missing B4 MPD/MPRIS UI distinction: {phrase}"
+for forbidden in (
+    "HeadlessMediaController {", "MprisPlaybackAdapter {",
+    "Mpris {", "Process {", "Timer {", "playerctld",
+    "playPause(", "play(", "pause(", "next(", "previous(",
+    "selectedMprisBusName =", "startPolling(", "polling:",
+):
+    assert forbidden not in media_mini + tile + window, (
+        f"Hub UI must not own/poll/control players: {forbidden}")
 
 # Launchers and widget backends are unchanged in this first stage.
 print("ApolloHubW foundation source contracts passed")

@@ -10,8 +10,8 @@ function token(value) {
 function chromiumFamily(appName, desktopEntry) {
     const app = token(appName).toLowerCase();
     const desktop = token(desktopEntry).toLowerCase();
-    return /^(brave(?:-browser)?(?:-(?:beta|nightly))?|chromium|chromium-browser|google-chrome(?:-(?:stable|beta|unstable))?)$/.test(app)
-        || /^(brave(?:-browser)?(?:-(?:beta|nightly))?|chromium|chromium-browser|google-chrome(?:-(?:stable|beta|unstable))?)$/.test(desktop);
+    return /^(brave(?: browser| web browser|-browser)?(?:-(?:beta|nightly))?|chromium|chromium-browser|google-chrome(?:-(?:stable|beta|unstable))?)$/.test(app)
+        || /^(brave(?:-browser)?(?:-(?:beta|nightly))?|com\\.brave\\.browser|chromium|chromium-browser|google-chrome(?:-(?:stable|beta|unstable))?)$/.test(desktop);
 }
 
 // Treat only syntactically valid domain origins as site identities.

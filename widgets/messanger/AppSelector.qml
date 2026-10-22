@@ -13,6 +13,7 @@ Rectangle {
 
     property int selectedIndex: 0
     property bool keyboardActive: false
+    property string statusText: ""
 
     // Emitted ONLY when a button is actually clicked.
     signal appActivated(int index)
@@ -32,6 +33,10 @@ Rectangle {
         },
         {
             name: "TELEGRAM",
+            icon: ""
+        },
+        {
+            name: "X",
             icon: ""
         }
     ]
@@ -260,4 +265,20 @@ Rectangle {
             }
         }
     }
+    // Keep launch errors visible in the selector even when the external
+    // browser owns the rest of Social's click-through window.
+    Text {
+        anchors.left: parent.left
+        anchors.right: parent.right
+        anchors.bottom: parent.bottom
+        anchors.margins: 6
+        visible: appSelector.statusText !== ""
+        text: appSelector.statusText
+        wrapMode: Text.WrapAnywhere
+        font.pixelSize: 9
+        color: Colors.orange
+        maximumLineCount: 7
+        elide: Text.ElideRight
+    }
+
 }

@@ -75,7 +75,7 @@ PanelWindow {
         browserStatus = catalogSource === "youtube"
             ? "YOUTUBE CATALOG / REQUIRES API KEY / NO PLAYBACK"
             : catalogSource === "radio-browser"
-              ? "RADIO DIRECTORY / BROWSE ONLY / PLAYBACK NEEDS APPROVAL"
+              ? "RADIO DIRECTORY / SELECT THEN LOAD THEN PLAY"
               : catalogSource === "direct-stream"
                 ? "RADIO PRESET / SELECT THEN LOAD / NO AUTOPLAY"
                 : "LOCAL MPD LIBRARY";
@@ -95,7 +95,7 @@ PanelWindow {
             browseIndex = 0;
             navigationZone = 1;
             browserStatus = catalogSource === "radio-browser"
-                ? "RADIO DIRECTORY / BROWSE ONLY / LOAD NOT AVAILABLE"
+                ? "RADIO DIRECTORY / SELECT THEN LOAD THEN PLAY"
                 : "SEARCH REQUESTED / " + catalogSource.toUpperCase();
         } else {
             browserStatus = "SEARCH UNAVAILABLE / CONTROLLER BUSY";
@@ -123,7 +123,7 @@ PanelWindow {
         }
         if (headless.selectMedia(item.ref))
             browserStatus = item.ref.source === "radio-browser"
-                ? "STATION SELECTED / CATALOG ONLY / NO LOAD"
+                ? "STATION SELECTED / PRESS LOAD THEN PLAY"
                 : "SELECT REQUESTED / NOT LOADED";
         else
             browserStatus = "SELECT UNAVAILABLE";
@@ -132,7 +132,8 @@ PanelWindow {
     function loadStaged() {
         if (!headless.selection
                 || (headless.selection.source !== "local-mpd"
-                    && headless.selection.source !== "direct-stream")) {
+                    && headless.selection.source !== "direct-stream"
+                    && headless.selection.source !== "radio-browser")) {
             browserStatus = "STAGED SOURCE CANNOT LOAD INTO MPD";
             return;
         }
@@ -158,11 +159,6 @@ PanelWindow {
         }
         if (item.ref.source === "youtube") {
             browserStatus = "YOUTUBE IS CATALOG-ONLY / NO PLAYBACK";
-            return;
-        }
-        if (item.ref.source === "radio-browser") {
-            // Directory URLs are untrusted, not direct-stream refs.
-            browserStatus = "RADIO DIRECTORY / PLAYBACK REQUIRES APPROVAL";
             return;
         }
         const requested = item.ref.source === "direct-stream"
@@ -636,8 +632,10 @@ PanelWindow {
                         border.color: Colors.cyan
                         GohuText {
                             anchors.centerIn: parent
-                            text: headless.loaded && headless.loaded.ref.source === "direct-stream"
-                                ? "GROOVE SALAD / INSERTED" : "CASSETTE BAY / NOT INSERTED"
+                            text: headless.loaded && headless.loaded.ref.source === "radio-browser"
+                                ? String(headless.loaded.item.title || "RADIO") + " / INSERTED"
+                                : headless.loaded && headless.loaded.ref.source === "direct-stream"
+                                  ? "GROOVE SALAD / INSERTED" : "CASSETTE BAY / NOT INSERTED"
                             color: Colors.white
                             font.pixelSize: 12
                         }
@@ -645,8 +643,9 @@ PanelWindow {
 
                     GohuText {
                         width: parent.width
-                        text: headless.loaded && headless.loaded.ref.source === "direct-stream"
-                              ? "CASSETTE: HTTPS RADIO / QUEUED"
+                        text: headless.loaded && (headless.loaded.ref.source === "direct-stream"
+                                             || headless.loaded.ref.source === "radio-browser")
+                              ? "CASSETTE: RADIO / QUEUED"
                               : "CASSETTE: EMPTY / SELECT STATION"
                         font.pixelSize: 11
                         color: Colors.cyan

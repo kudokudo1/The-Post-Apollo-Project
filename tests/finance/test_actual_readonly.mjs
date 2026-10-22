@@ -27,9 +27,9 @@ const sample = {
   balances: new Map([["checking",25000]]),
   payees: [{id:"shop",name:"Corner Market"}],
   transactionSets: new Map([["checking",[
-    {date:"2026-10-18", account:"checking", amount:-1200, payee_id:"shop", cleared:true},
-    {date:"2026-10-19", account:"checking", amount:25000, imported_payee:"Payroll"},
-    {date:"2026-10-17", account:"checking", amount:-220, payee_id:"missing"}
+    {id:"txn-18",date:"2026-10-18", account:"checking", amount:-1200, payee_id:"shop", cleared:true},
+    {id:"txn-19",date:"2026-10-19", account:"checking", amount:25000, imported_payee:"Payroll"},
+    {id:"txn-17",date:"2026-10-17", account:"checking", amount:-220, payee_id:"missing"}
   ]]])
 };
 
@@ -38,7 +38,7 @@ test("snapshot contains the original fictional $250 / $50 / $200 values", () => 
   assert.equal(result.readOnly, true);
   assert.equal(result.toBudgetCents, 20000);
   assert.deepEqual(result.accounts, [
-    {name:"FinanceW Test Checking",balanceCents:25000}
+    {id:"checking",name:"FinanceW Test Checking",balanceCents:25000}
   ]);
   assert.deepEqual(result.categories, [{
     id:"spotify",name:"Spotify Subscription",group:"Usual Expenses",
@@ -49,6 +49,9 @@ test("snapshot contains the original fictional $250 / $50 / $200 values", () => 
   assert.deepEqual(result.transactions.map(x=>x.date),
     ["2026-10-19","2026-10-18","2026-10-17"]);
   assert.equal(result.transactions[1].description, "Corner Market");
+  assert.equal(result.accounts[0].id, "checking");
+  assert.equal(result.transactions[1].id, "txn-18");
+  assert.equal(result.transactions[1].accountId, "checking");
   assert.equal(result.transactions[1].amountCents, -1200);
   assert.equal(result.transactions[2].description, "TRANSACTION");
 });
@@ -98,6 +101,8 @@ test("transaction input validation refuses bad dates, amounts, and accounts", ()
   assert.throws(()=>normalizeSnapshot(bad({...row,date:"2026-09-30"})),
     /unexpected-transaction/);
   assert.throws(()=>normalizeSnapshot(bad({...row,account:"other"})),
+    /unexpected-transaction/);
+  assert.throws(()=>normalizeSnapshot(bad({...row,id:undefined})),
     /unexpected-transaction/);
   assert.throws(()=>normalizeSnapshot({...sample,
     transactionSets:new Map([["checking", "nope"]])}), /unexpected-transactions/);

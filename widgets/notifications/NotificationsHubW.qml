@@ -2676,23 +2676,11 @@ PanelWindow {
                                     fillMode: Image.PreserveAspectFit
 
                                     asynchronous: true
-                                    // Preserve luminance and transparent shapes
-                                    // while giving arbitrary native site favicons
-                                    // the same magenta/black treatment.
-                                    visible: notificationEntry.website === ""
-                                        || notificationEntry.website === "YouTube"
-                                }
-
-                                Colorize {
-                                    anchors.fill: appIconImage
-                                    source: appIconImage
-                                    visible: notificationEntry.website !== ""
-                                        && notificationEntry.website !== "YouTube"
-                                        && appIconImage.status === Image.Ready
-                                    hue: 0.8333
-                                    saturation: 0.65
-                                    lightness: -0.12
-                                    cached: true
+                                    // Native website icons may already contain
+                                    // opaque backgrounds or detailed artwork.
+                                    // Render their real pixels exactly once;
+                                    // forced HSL recoloring flattened some
+                                    // favicons into magenta/black blocks.
                                 }
 
                                 // ONE icon only:

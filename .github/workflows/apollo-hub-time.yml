@@ -1,0 +1,38 @@
+name: Apollo Hub B10 local Time contracts
+
+on:
+  pull_request:
+    paths:
+      - "services/hub/ApolloHubTimePolicy.js"
+      - "tests/hub/test_apollo_hub_time_policy.cjs"
+      - "tests/hub/test_apollo_hub_time_contract.py"
+      - ".github/workflows/apollo-hub-time.yml"
+  push:
+    branches:
+      - main
+    paths:
+      - "services/hub/ApolloHubTimePolicy.js"
+      - "tests/hub/test_apollo_hub_time_policy.cjs"
+      - "tests/hub/test_apollo_hub_time_contract.py"
+      - ".github/workflows/apollo-hub-time.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  contracts:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Guard pure time adapter and existing clock-tick ownership
+        run: python3 tests/hub/test_apollo_hub_time_contract.py
+      - name: Test local clock and DST transitions in New York
+        run: TZ=America/New_York node tests/hub/test_apollo_hub_time_policy.cjs
+      - name: Test zero UTC offset
+        run: TZ=UTC node tests/hub/test_apollo_hub_time_policy.cjs
+      - name: Test non-hour UTC offset
+        run: TZ=Asia/Kathmandu node tests/hub/test_apollo_hub_time_policy.cjs
+      - name: Test quarter-hour DST offset
+        run: TZ=Pacific/Chatham node tests/hub/test_apollo_hub_time_policy.cjs

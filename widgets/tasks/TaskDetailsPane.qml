@@ -1,6 +1,7 @@
 import QtQuick
 import "../../components"
 import "../../services/hub/ApolloHubTodoPolicy.js" as TodoPolicy
+import "TaskDateSegments.js" as DateSegments
 
 // TASKS M4: edits only the user's local task fields. No new writer.
 // Choosing a different task cannot silently discard an unsaved detail draft.
@@ -64,6 +65,29 @@ SectionFrame {
             descriptionInput.text = "";
         }
     }
+    function datePart(kind) {
+        return DateSegments.part(dueDateDraft, kind);
+    }
+    function stepDatePart(kind, direction) {
+        if (!selectedTask || !writable) return;
+        dueDateDraft = DateSegments.step(dueDateDraft, kind, direction);
+        feedback = "";
+    }
+    function commitDatePart(kind, typedValue) {
+        if (!selectedTask || !writable) return;
+        const result = DateSegments.setPart(dueDateDraft, kind, typedValue);
+        if (result.accepted) {
+            dueDateDraft = result.date;
+            feedback = "";
+        } else {
+            feedback = "INVALID DATE PART";
+        }
+    }
+    function clearDueDate() {
+        if (!selectedTask || !writable) return;
+        dueDateDraft = "";
+        feedback = "";
+    }
     function chooseTask(taskId) {
         if (pendingWrite) {
             feedback = "SAVE PENDING";
@@ -120,7 +144,9 @@ SectionFrame {
     }
     onVisibleChanged: {
         if (!visible) {
-            dueDateInput.focus = false;
+            monthDateInput.releaseFocus();
+            dayDateInput.releaseFocus();
+            yearDateInput.releaseFocus();
             descriptionInput.focus = false;
         }
     }
@@ -142,8 +168,9 @@ SectionFrame {
         Row {
             width: parent.width
             spacing: 5
+
             ActionButton {
-                width: Math.floor((parent.width - 5) / 2)
+                width: 84
                 height: 26
                 labelPixelSize: 9
                 label: "P: " + details.priorityDraft.toUpperCase()
@@ -156,36 +183,84 @@ SectionFrame {
                     details.feedback = "";
                 }
             }
-            Rectangle {
-                width: parent.width - Math.floor((parent.width - 5) / 2) - 5
+
+            // Three independent inputs, but still one YYYY-MM-DD draft and
+            // one deliberate SAVE. Up/down keys and arrow buttons step a part.
+            Row {
+                id: segmentedDueDate
+                width: parent.width - 84 - 5
                 height: 26
-                color: Colors.black
-                border.width: 1
-                border.color: dueDateInput.activeFocus ? Colors.magenta : Colors.cyan
-                TextInput {
-                    id: dueDateInput
-                    anchors.fill: parent
-                    anchors.leftMargin: 4
-                    anchors.rightMargin: 4
-                    verticalAlignment: TextInput.AlignVCenter
-                    text: details.dueDateDraft
-                    onTextEdited: details.dueDateDraft = text
-                    color: Colors.white
-                    font.family: "GohuFont 11 Nerd Font Mono"
-                    font.pixelSize: 10
-                    selectByMouse: true
-                    maximumLength: 10
-                    enabled: details.selectedTask !== null && details.writable
-                    clip: true
+                spacing: 3
+                readonly property real segmentSpace: Math.max(0, width - 18 - 9)
+
+                TaskDateSegment {
+                    id: monthDateInput
+                    width: segmentedDueDate.segmentSpace * 0.29
+                    part: "month"
+                    placeholder: "MM"
+                    digitCount: 2
+                    displayValue: details.datePart("month")
+                    canEdit: details.selectedTask !== null && details.writable
+                    onEditCommitted: function(part, value) {
+                        details.commitDatePart(part, value);
+                    }
+                    onStepRequested: function(part, direction) {
+                        details.stepDatePart(part, direction);
+                    }
                 }
-                GohuText {
-                    visible: dueDateInput.text.length === 0
-                             && !dueDateInput.activeFocus
-                    anchors.centerIn: parent
-                    text: "YYYY-MM-DD"
-                    color: Colors.cyan
-                    opacity: 0.6
-                    font.pixelSize: 10
+                TaskDateSegment {
+                    id: dayDateInput
+                    width: segmentedDueDate.segmentSpace * 0.29
+                    part: "day"
+                    placeholder: "DD"
+                    digitCount: 2
+                    displayValue: details.datePart("day")
+                    canEdit: details.selectedTask !== null && details.writable
+                    onEditCommitted: function(part, value) {
+                        details.commitDatePart(part, value);
+                    }
+                    onStepRequested: function(part, direction) {
+                        details.stepDatePart(part, direction);
+                    }
+                }
+                TaskDateSegment {
+                    id: yearDateInput
+                    width: segmentedDueDate.segmentSpace * 0.42
+                    part: "year"
+                    placeholder: "YYYY"
+                    digitCount: 4
+                    displayValue: details.datePart("year")
+                    canEdit: details.selectedTask !== null && details.writable
+                    onEditCommitted: function(part, value) {
+                        details.commitDatePart(part, value);
+                    }
+                    onStepRequested: function(part, direction) {
+                        details.stepDatePart(part, direction);
+                    }
+                }
+
+                Rectangle {
+                    width: 18
+                    height: 26
+                    color: clearDateArea.containsMouse
+                           && clearDateArea.enabled ? Colors.yellow : Colors.black
+                    border.width: 1
+                    border.color: Colors.cyan
+                    opacity: clearDateArea.enabled ? 1 : 0.5
+                    GohuText {
+                        anchors.centerIn: parent
+                        text: "×"
+                        color: clearDateArea.containsMouse ? Colors.orange : Colors.cyan
+                        font.pixelSize: 13
+                    }
+                    MouseArea {
+                        id: clearDateArea
+                        anchors.fill: parent
+                        hoverEnabled: true
+                        enabled: details.selectedTask !== null && details.writable
+                                 && details.dueDateDraft.length > 0
+                        onClicked: details.clearDueDate()
+                    }
                 }
             }
         }

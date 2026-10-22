@@ -58,6 +58,9 @@ function snapshot(epochMs, use24Hour) {
     // conventional east-positive offset as a signed integer instead.
     // It is an offset at this instant, NOT an IANA time-zone identifier.
     var utcOffsetMinutes = -date.getTimezoneOffset();
+    // Canonicalize negative zero: UTC is +00:00 with integer offset 0.
+    if (utcOffsetMinutes === 0)
+        utcOffsetMinutes = 0;
     var sign = utcOffsetMinutes < 0 ? "-" : "+";
     var absMinutes = Math.abs(utcOffsetMinutes);
     var offsetLabel = "UTC" + sign

@@ -107,7 +107,7 @@ Rectangle {
     Column {
         anchors.fill: parent
         anchors.margins: 24
-        spacing: 18
+        spacing: 20
 
         Row {
             width: parent.width
@@ -132,6 +132,11 @@ Rectangle {
                 font.pixelSize: 12
                 color: sky.weatherReady ? Colors.cyan : Colors.orange
             }
+        }
+
+        StationSectionDivider {
+            width: parent.width
+            title: "CURRENT // CONDITIONS"
         }
 
         Row {
@@ -320,6 +325,11 @@ Rectangle {
             }
         }
 
+        StationSectionDivider {
+            width: parent.width
+            title: "ATMOSPHERE // OBSERVATION"
+        }
+
         Row {
             spacing: 18
 
@@ -454,9 +464,9 @@ Rectangle {
         Column {
             spacing: 8
 
-            SecondaryText {
-                text: "FORECAST // NEXT HOURS"
-                font.pixelSize: 11
+            StationSectionDivider {
+                width: sky.width - 48
+                title: "FORECAST // NEXT HOURS"
             }
 
             Row {
@@ -526,9 +536,9 @@ Rectangle {
         Column {
             spacing: 8
 
-            SecondaryText {
-                text: "FORECAST // DAILY"
-                font.pixelSize: 11
+            StationSectionDivider {
+                width: sky.width - 48
+                title: "FORECAST // DAILY"
             }
 
             Row {

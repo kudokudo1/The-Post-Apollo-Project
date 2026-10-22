@@ -88,7 +88,7 @@ Rectangle {
     Column {
         anchors.fill: parent
         anchors.margins: 24
-        spacing: 20
+        spacing: 26
 
         Row {
             width: parent.width
@@ -113,6 +113,11 @@ Rectangle {
                 font.pixelSize: 12
                 color: space.spaceReady ? Colors.cyan : Colors.orange
             }
+        }
+
+        StationSectionDivider {
+            width: parent.width
+            title: "SOLAR // GEOMAGNETIC"
         }
 
         Row {
@@ -259,6 +264,11 @@ Rectangle {
                     }
                 }
             }
+        }
+
+        StationSectionDivider {
+            width: parent.width
+            title: "FIELD // SOURCE TIMES"
         }
 
         Row {

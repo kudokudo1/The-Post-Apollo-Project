@@ -32,8 +32,10 @@ Scope {
             // successful controller snapshot response proves observation.
             if (bridge.mediaControllerSource
                     && bridge.mediaControllerSource.pendingAction === "snapshot"
-                    && bridge.mediaControllerSource.errorText === "")
-                bridge.mediaObservedAtMs = Date.now();
+                    && bridge.mediaControllerSource.errorText === "") {
+                bridge.observationNowMs = Date.now();
+                bridge.mediaObservedAtMs = bridge.observationNowMs;
+            }
         }
     }
 

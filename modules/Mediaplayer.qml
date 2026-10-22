@@ -58,6 +58,18 @@ Item {
 
     readonly property color accentColor: mpdPlaying ? Colors.orange : Colors.cyan
 
+    // Follow the general height of CAVA without following individual spikes.
+    // The four tallest of 16 bars set a padded, bounded ambient envelope.
+    // This recalculates only when the deduplicated levels array changes.
+    readonly property real cavaAmbientTargetHeight: {
+        const peaks = levels.slice().sort(function(a, b) { return b - a; });
+        const upperAverage = (Number(peaks[0] || 0)
+                            + Number(peaks[1] || 0)
+                            + Number(peaks[2] || 0)
+                            + Number(peaks[3] || 0)) / 4;
+        return Math.max(14, Math.min(34, Math.round(12 + upperAverage * 27 / 7)));
+    }
+
     implicitHeight: 50
     implicitWidth: Math.max(200, Math.ceil(mediaArtwork.implicitWidth) + 24)
 
@@ -201,21 +213,29 @@ Item {
             height: 28
             anchors.verticalCenter: parent.verticalCenter
 
-            // Separate, wider ambient wash behind *only* the spectrum.
-            // Rounded, blurred, and faint so it tints the area rather than
-            // forming another rectangular cyan panel across the entire dock.
-            // Static geometry: this is NOT sampled from animated CAVA bars.
+            // Faint wash follows the broad spectrum envelope, not each bar.
+            // Extra height padding and a slower transition keep it loose.
+            // Only this one rounded geometry animates; no CAVA texture sample.
             RectangularShadow {
                 id: cavaAmbientWash
-                anchors.centerIn: parent
+                anchors.horizontalCenter: parent.horizontalCenter
+                anchors.bottom: parent.bottom
+                anchors.bottomMargin: -2
                 width: Math.max(0, spectrum.width - 4 * mediaDock.softGlowSpread)
-                height: Math.max(0, spectrum.height - 2 * mediaDock.softGlowSpread)
+                height: mediaDock.cavaAmbientTargetHeight
                 radius: height / 2
                 blur: mediaDock.contentGlowRadius
                 spread: 0
                 color: mediaDock.accentColor
                 opacity: 0.22
                 z: -1
+
+                Behavior on height {
+                    NumberAnimation {
+                        duration: 180
+                        easing.type: Easing.OutQuad
+                    }
+                }
             }
 
             Row {

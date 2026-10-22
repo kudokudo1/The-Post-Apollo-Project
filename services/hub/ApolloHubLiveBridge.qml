@@ -1,9 +1,11 @@
 import QtQuick
 import Quickshell
 import Quickshell.Networking
+import Quickshell.Services.Mpris
 import "../weather/WeatherDockPolicy.js" as WeatherPolicy
 import "ApolloHubSystemPolicy.js" as SystemPolicy
 import "ApolloHubNetworkPolicy.js" as NetworkPolicy
+import "ApolloHubMediaPolicy.js" as MediaPolicy
 
 // ApolloHubW live-data bridge. This owns NO weather fetch, subprocess,
 // credentials, writable controls, or duplicate WeatherService instance.
@@ -16,6 +18,61 @@ Scope {
     property var systemSource: null
     // Optional reference to the existing Network dock, not another collector.
     property var networkDockSource: null
+
+    // Existing Hi-Fi controller/adapter instances are injected by their
+    // owners. No second controller, player selection or CLI polling here.
+    property var mediaControllerSource: null
+    property string selectedMprisBusName: ""
+    property double mediaObservedAtMs: 0
+    onMediaControllerSourceChanged: mediaObservedAtMs = 0
+    Connections {
+        target: bridge.mediaControllerSource
+        function onSnapshotChanged() {
+            // Search/selection can also change source.snapshot. Only a
+            // successful controller snapshot response proves observation.
+            if (bridge.mediaControllerSource
+                    && bridge.mediaControllerSource.pendingAction === "snapshot"
+                    && bridge.mediaControllerSource.errorText === "")
+                bridge.mediaObservedAtMs = Date.now();
+        }
+    }
+
+    readonly property var mpdSnapshot: MediaPolicy.mpdSnapshot(
+        mediaControllerSource !== null,
+        mediaControllerSource ? mediaControllerSource.snapshot : null,
+        mediaControllerSource ? mediaControllerSource.errorText : "",
+        mediaObservedAtMs, observationNowMs)
+
+    // MPRIS is an in-process Quickshell singleton. Playerctld is only a
+    // repeater. No automatic player selection, even when exactly one exists.
+    readonly property var mprisPlayers: Mpris.players.values.filter(function(p) {
+        return p && p.dbusName
+               && p.dbusName.indexOf("org.mpris.MediaPlayer2.playerctld") !== 0;
+    })
+    readonly property var selectedMprisPlayer: mprisPlayers.find(function(p) {
+        return p.dbusName === bridge.selectedMprisBusName;
+    }) || null
+    readonly property var mprisSnapshot: MediaPolicy.mprisSnapshot({
+        selectedBusName: selectedMprisBusName,
+        playerCount: mprisPlayers.length,
+        player: selectedMprisPlayer ? {
+            identity: selectedMprisPlayer.identity,
+            title: selectedMprisPlayer.trackTitle,
+            artist: selectedMprisPlayer.trackArtist,
+            album: selectedMprisPlayer.trackAlbum,
+            playbackState:
+                selectedMprisPlayer.playbackState === MprisPlaybackState.Playing
+                ? "playing"
+                : selectedMprisPlayer.playbackState === MprisPlaybackState.Paused
+                  ? "paused"
+                  : selectedMprisPlayer.playbackState === MprisPlaybackState.Stopped
+                    ? "stopped" : "unknown"
+        } : null
+    })
+    readonly property var mediaSnapshot: ({
+        mpd: bridge.mpdSnapshot,
+        mpris: bridge.mprisSnapshot
+    })
 
     // Read the same Quickshell.Networking singleton already used by
     // modules/Network.qml. No second nmcli/iw/ethtool loop, and no writes.
@@ -88,6 +145,13 @@ Scope {
     // Timestamp freshness must age even when the provider is quiet.
     // This is one cheap clock tick per minute, NOT network/service polling.
     onWeatherSourceChanged: observationNowMs = Date.now()
+    Timer {
+        // Clock-only freshness check; does not poll MPD, MPRIS or a CLI.
+        interval: 5000
+        repeat: true
+        running: bridge.mediaControllerSource !== null
+        onTriggered: bridge.observationNowMs = Date.now()
+    }
     Timer {
         interval: 60000
         repeat: true

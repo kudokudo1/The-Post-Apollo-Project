@@ -54,6 +54,9 @@ class RelayFake:
     def owns(self, url):
         return url in self.registered
 
+    def revoke(self, url):
+        self.registered.pop(url, None)
+
 
 class GuardedFakeMpd(FakeMpd):
     required_kinds = ("mpd-local-track", "mpd-https-stream", "mpd-guarded-radio")
@@ -172,6 +175,12 @@ class RadioRelayTests(unittest.TestCase):
         with self.assertRaises(MediaBackendError):
             backend.cue({"requiredKind": "mpd-guarded-radio",
                          "uri": "http://127.0.0.1:9999/private"})
+        failed_uri = backend.radio_relay.register(URL_B)
+        with patch.object(backend, "command",
+                          side_effect=MediaBackendError("BACKEND_OFFLINE", "MPD down")):
+            with self.assertRaises(MediaBackendError):
+                backend.cue({"requiredKind": "mpd-guarded-radio", "uri": failed_uri})
+        self.assertFalse(backend.radio_relay.owns(failed_uri))
 
     def test_two_station_switch_load_then_play_without_autoplay(self):
         backend = GuardedFakeMpd()

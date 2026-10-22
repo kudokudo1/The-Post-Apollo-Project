@@ -35,6 +35,8 @@ PanelWindow {
     property bool writingLayout: false
     // In-session undo makes accidental tile deletion reversible.
     property var layoutUndoStack: []
+    readonly property string layoutStorageIssue:
+        Layout.storageIssue(ApolloHubStore.layoutJson)
     property var layout: Layout.defaultLayout()
     property int selectedModeIndex: 0
     property int selectedSubModeIndex: 0
@@ -65,6 +67,9 @@ PanelWindow {
     }
 
     function save(next) {
+        // A newer/corrupt saved schema must not be overwritten by fallback UI.
+        if (layoutStorageIssue.length > 0)
+            return;
         const normalized = Layout.normalize(next);
         const previous = JSON.stringify(layout);
         if (JSON.stringify(normalized) === previous)
@@ -81,7 +86,7 @@ PanelWindow {
     }
 
     function undoLastLayoutEdit() {
-        if (layoutUndoStack.length < 1)
+        if (layoutStorageIssue.length > 0 || layoutUndoStack.length < 1)
             return;
         const history = layoutUndoStack.slice();
         const previous = history.pop();
@@ -99,7 +104,8 @@ PanelWindow {
     }
 
     function removeEditedTile(index) {
-        if (!editMode || index < 0 || index >= activeTiles.length)
+        if (!editMode || layoutStorageIssue.length > 0
+                || index < 0 || index >= activeTiles.length)
             return;
         save(Layout.removeTile(layout, selectedModeIndex,
                                selectedSubModeIndex, index));
@@ -545,7 +551,8 @@ PanelWindow {
                     width: 65
                     height: 32
                     label: "UNDO"
-                    available: hub.layoutUndoStack.length > 0
+                    available: hub.layoutStorageIssue.length === 0
+                               && hub.layoutUndoStack.length > 0
                     onLeftClicked: hub.undoLastLayoutEdit()
                 }
                 GohuText {
@@ -684,7 +691,9 @@ PanelWindow {
                 color: Colors.cyan
                 opacity: 0.8
                 font.pixelSize: 11
-                text: hub.editMode
+                text: hub.layoutStorageIssue.length > 0
+                      ? "LAYOUT READ ONLY // " + hub.layoutStorageIssue
+                      : hub.editMode
                       ? "← → MOVE TILE    SWAP CHANGE MODULE    × REMOVE TILE    UNDO RESTORE"
                       : "APOLLO HUB  //  LIVE MODULES CONNECTED"
             }

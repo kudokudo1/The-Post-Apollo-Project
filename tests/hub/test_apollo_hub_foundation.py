@@ -303,10 +303,14 @@ for needle in (
     "!isFinite(value)",
     "value < 0 || value > 100",
     "return -1;",
-    "systemSnapshot.cpuPercent",
-    "systemSnapshot.memoryPercent",
-    "systemSnapshot.swapPercent",
-    "systemSnapshot.rootFilesystemPercent",
+    "sample.cpuPercent",
+    "sample.memoryPercent",
+    "sample.swapPercent",
+    "sample.rootFilesystemPercent",
+    "displaySample.cpuPercent",
+    "displaySample.memoryPercent",
+    "displaySample.swapPercent",
+    "displaySample.rootFilesystemPercent",
     'labelText: "CPU"',
     'labelText: "RAM"',
     'labelText: "SWAP"',
@@ -319,6 +323,28 @@ for needle in (
     "systemSnapshot.ageMinutes",
 ):
     assert needle in system_mini, f"B2 CPU++ mini missing {needle}"
+# W2 follow-up: one shared grid, common gauge baselines, no flashing to
+# empty during short telemetry refreshes. A cached observation is eligible
+# only while LOADING and only within the existing five-minute freshness limit.
+assert "Grid {" in system_mini
+assert "columns: 2" in system_mini
+assert "rowSpacing: 9" in system_mini
+assert "columnSpacing: 12" in system_mini
+assert "height: 19" in system_mini
+assert "height: 5" in system_mini
+assert "height: gauge.prominent ? 19 : 18" not in system_mini
+assert "height: gauge.prominent ? 5 : 4" not in system_mini
+assert 'property var lastReadySample: null' in system_mini
+assert "onSystemSnapshotChanged:" in system_mini
+assert 'sample.state === "ready" && sample.fresh === true' in system_mini
+assert "lastReadySample.observedAtMs === stamp" in system_mini
+assert 'sample.state !== "loading"' in system_mini
+assert 'systemState === "loading" && lastReadySample !== null' in system_mini
+assert "Date.now() - lastReadySample.observedAtMs <= 300000" in system_mini
+assert 'systemReady ? systemSnapshot' in system_mini
+assert 'holdingPrevious ? lastReadySample : null' in system_mini
+assert '"CPU++ // REFRESHING // LAST OBSERVATION"' in system_mini
+
 for forbidden in (
     "SystemTelemetry {", "HeadlessMediaController {",
     "Process {", "Timer {", "refresh(", "systemRows",

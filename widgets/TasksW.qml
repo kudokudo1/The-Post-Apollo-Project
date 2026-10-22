@@ -3,6 +3,7 @@ import Quickshell
 import Quickshell.Wayland
 import "../components"
 import "hub"
+import "tasks"
 import qs.services.hub
 
 // TASKS M3: reuses Hub's local checklist editor and single guarded store.
@@ -261,7 +262,25 @@ PanelWindow {
             // asynchronous writes. A pending write is never called "saved".
             ApolloHubTodoMini {
                 id: taskEditor
-                anchors.fill: parent
+                anchors.top: parent.top
+                anchors.left: parent.left
+                anchors.right: parent.right
+                height: Math.min(350, mainModeContent.height * 0.53)
+                visible: root.menuOpen && root.activeMode.id === "tasks"
+                todoStore: ApolloHubTodoStore
+                todoSnapshot: ApolloHubTodoStore.snapshot
+                onTaskSelected: function(taskId) {
+                    taskDetails.chooseTask(taskId);
+                }
+            }
+
+            TaskDetailsPane {
+                id: taskDetails
+                anchors.top: taskEditor.bottom
+                anchors.topMargin: 10
+                anchors.left: parent.left
+                anchors.right: parent.right
+                anchors.bottom: parent.bottom
                 visible: root.menuOpen && root.activeMode.id === "tasks"
                 todoStore: ApolloHubTodoStore
                 todoSnapshot: ApolloHubTodoStore.snapshot

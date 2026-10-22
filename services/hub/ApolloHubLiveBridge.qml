@@ -1,7 +1,9 @@
 import QtQuick
 import Quickshell
+import Quickshell.Networking
 import "../weather/WeatherDockPolicy.js" as WeatherPolicy
 import "ApolloHubSystemPolicy.js" as SystemPolicy
+import "ApolloHubNetworkPolicy.js" as NetworkPolicy
 
 // ApolloHubW live-data bridge. This owns NO weather fetch, subprocess,
 // credentials, writable controls, or duplicate WeatherService instance.
@@ -12,6 +14,40 @@ Scope {
 
     property var weatherSource: null
     property var systemSource: null
+
+    // Read the same Quickshell.Networking singleton already used by
+    // modules/Network.qml. No second nmcli/iw/ethtool loop, and no writes.
+    readonly property var networkDevices:
+        Networking.devices ? Networking.devices.values : []
+    readonly property var wifiNetworkDevice:
+        networkDevices.find(function(device) {
+            return device && device.type === DeviceType.Wifi;
+        }) || null
+    readonly property var ethernetNetworkDevice:
+        networkDevices.find(function(device) {
+            return device && device.type === DeviceType.Ethernet;
+        }) || null
+    readonly property var activeWifiNetwork:
+        wifiNetworkDevice && wifiNetworkDevice.networks
+        ? wifiNetworkDevice.networks.values.find(function(network) {
+            return network && network.connected === true;
+        }) || null : null
+    readonly property var networkSnapshot: NetworkPolicy.snapshot({
+        devicesKnown: !!Networking.devices,
+        wifiPresent: wifiNetworkDevice !== null,
+        wifiConnected: wifiNetworkDevice !== null
+                       && (wifiNetworkDevice.connected === true
+                           || activeWifiNetwork !== null),
+        wifiInterface: wifiNetworkDevice ? wifiNetworkDevice.name : "",
+        wifiName: activeWifiNetwork ? activeWifiNetwork.name : "",
+        wifiSignal: activeWifiNetwork ? activeWifiNetwork.signalStrength : null,
+        ethernetPresent: ethernetNetworkDevice !== null,
+        ethernetConnected: ethernetNetworkDevice !== null
+                           && ethernetNetworkDevice.connected === true,
+        ethernetInterface: ethernetNetworkDevice
+                           ? ethernetNetworkDevice.name : ""
+    })
+
     property double observationNowMs: Date.now()
     // Only observations completed AFTER attachment are known to be recent.
     property double systemObservedAtMs: 0

@@ -49,7 +49,7 @@ function snapshot(nowMs, monthOffset, weekStartsOn) {
     var now = Number(nowMs);
     // Do not coerce null/empty strings into a fake Unix epoch date.
     if (typeof nowMs !== "number" || !isFinite(now)
-            || now <= 0 || !integer(monthOffset,-MAX_MONTH_OFFSET,MAX_MONTH_OFFSET)
+            || !integer(monthOffset,-MAX_MONTH_OFFSET,MAX_MONTH_OFFSET)
             || (weekStartsOn !== 0 && weekStartsOn !== 1))
         return noCalendar("INVALID_INPUT");
 

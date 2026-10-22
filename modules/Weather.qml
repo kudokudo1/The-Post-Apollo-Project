@@ -328,11 +328,35 @@ DockButton {
                     }
                 }
 
+                // A small LOCAL liquid-only halo, layered between black
+                // vessel and colored fluid. The color stays linked to actual
+                // air temperature while idle and hovered; the intensity uses
+                // the shared DockButton state values. Press/open retain the
+                // established magenta glow rule without changing pressed fluid.
+                SafeDropShadow {
+                    id: thermometerLiquidGlow
+                    anchors.fill: thermometerLiquid
+                    safeSource: thermometerLiquid
+                    requestedVisible: weatherDock.thermometerState.valid
+                                      && weatherThermometer.animatedLevel > 0
+                    z: 1
+                    radius: 4
+                    samples: 9
+                    horizontalOffset: 0
+                    verticalOffset: 0
+                    transparentBorder: true
+                    opacity: weatherDock.contentGlowOpacity * 0.55
+                    color: weatherDock.open || weatherDock.pressed
+                           ? Colors.magenta : weatherThermometer.liquidColor
+                }
+
                 // The inner ellipse is centered with the glass and slightly
                 // narrower, keeping both side voids and bottom clearance even.
                 // A moving gradient stop drains through bulb and tube.
                 Shape {
+                    id: thermometerLiquid
                     anchors.fill: parent
+                    z: 2
                     visible: weatherThermometer.animatedLevel > 0
 
                     ShapePath {
@@ -418,9 +442,10 @@ DockButton {
                     }
                 }
 
-                // The white glass stays on top of the animated liquid.
+                // The white glass stays on top of liquid and its halo.
                 Shape {
                     anchors.fill: parent
+                    z: 3
                     opacity: weatherThermometer.glassOpacity
 
                     ShapePath {
@@ -493,6 +518,7 @@ DockButton {
                     model: 4
 
                     delegate: Rectangle {
+                        z: 4
                         readonly property bool majorTick: index % 2 === 0
                         width: majorTick ? 3 : 2
                         x: Math.round(weatherThermometer.tickRightX) - width

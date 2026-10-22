@@ -210,7 +210,8 @@ for marker in (
     'import "GitJournalSerialization.js" as JournalCodec',
     'encodedEntries = []',
     'JournalCodec.serializeJournal(',
-    'journalFile.setText(encoded.text)',
+    'journalFile.setText(data)',
+    'deltaFile.setText(serialized)',
     'encodedEntries = encoded.cache',
     'lastPersistWriteMs = written - writeStarted',
 ):

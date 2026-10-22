@@ -123,6 +123,42 @@ assert.deepEqual(toPlain(layout.resizeTile(taller,0,0,0,"large",2)),
 assert.deepEqual(toPlain(layout.resizeTile(taller,0,0,33,"half",1)),
                  toPlain(taller));
 
+// UI W:1/W:2 and H:1/H:2/H:3 cycle through the supported ranges.
+// A resize is layout metadata only. It never changes the module or its ID.
+const resizeBase = layout.defaultLayout();
+const originalFirst = resizeBase.modes[0].subModes[0].tiles[0];
+let stepped = resizeBase;
+for (const expected of [
+    ["wide",1], ["wide",2], ["wide",3], ["wide",1], ["half",1]
+]) {
+    stepped = layout.resizeTile(stepped,0,0,0,expected[0],expected[1]);
+    const tile = stepped.modes[0].subModes[0].tiles[0];
+    assert.equal(tile.size,expected[0]);
+    assert.equal(tile.rowSpan,expected[1]);
+    assert.equal(tile.id,originalFirst.id);
+    assert.equal(tile.module,originalFirst.module);
+    validateIds(stepped);
+    assert.deepEqual(toPlain(layout.parse(JSON.stringify(stepped))),
+                     toPlain(stepped));
+}
+assert.deepEqual(toPlain(stepped),toPlain(resizeBase));
+const alreadyTall=layout.resizeTile(resizeBase,0,0,2,"wide",3);
+const adjacent=alreadyTall.modes[0].subModes[0].tiles[3];
+assert.equal(adjacent.rowSpan,1); // no resizing siblings
+assert.equal(adjacent.size,"half");
+const moved=layout.swapTiles(alreadyTall,0,0,2,3);
+assert.equal(moved.modes[0].subModes[0].tiles[3].rowSpan,3);
+assert.equal(moved.modes[0].subModes[0].tiles[2].rowSpan,1);
+const reversed=layout.swapTiles(moved,0,0,3,2);
+assert.deepEqual(toPlain(reversed),toPlain(alreadyTall));
+assert.deepEqual(toPlain(resizeBase),toPlain(original));
+assert.equal(layout.MAX_ROW_SPAN,3);
+for(const badSpan of [-1,0,1.5,4,"2",null,Infinity,NaN]){
+    assert.deepEqual(toPlain(layout.resizeTile(resizeBase,0,0,0,"half",badSpan)),
+                     toPlain(resizeBase));
+}
+
+
 const duplicateIds=toPlain(taller);
 duplicateIds.modes[0].subModes[0].tiles[1].id=
     duplicateIds.modes[0].subModes[0].tiles[0].id;

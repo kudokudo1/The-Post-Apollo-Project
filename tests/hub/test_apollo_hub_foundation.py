@@ -141,7 +141,7 @@ for action in ('label: "←"', 'label: "→"', 'label: "SWAP"'):
     assert action in tile, f"Hub edit-tile action changed: {action}"
 
 shared_action = (ROOT / "components/ActionButton.qml").read_text(encoding="utf-8")
-assert "property bool trackLabelGlowLocally: false" in shared_action
+assert "property bool trackLabelGlowLocally: true" in shared_action
 assert "contentHost.x + labelText.x" in shared_action
 assert "contentHost.y + labelText.y" in shared_action
 

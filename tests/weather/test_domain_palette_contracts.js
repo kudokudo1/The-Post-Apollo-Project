@@ -79,6 +79,9 @@ for (const token of [
     "carbonMonoxide",
     "nitrogenDioxide",
     "ozone",
+    "carbonMonoxideAqi",
+    "nitrogenDioxideAqi",
+    "ozoneAqi",
     "dust",
     "grassPollen",
     "ragweedPollen",
@@ -138,6 +141,9 @@ const meterSpecs = [
             aqi: "aqiValue / 500",
             pm25: "pm25Value / 100",
             pm10: "pm10Value / 150",
+            ozone: "ozoneAqiValue / 500",
+            nitrogenDioxide: "nitrogenDioxideAqiValue / 500",
+            carbonMonoxide: "carbonMonoxideAqiValue / 500",
         },
     },
     {
@@ -148,6 +154,8 @@ const meterSpecs = [
             aqi: "aqiValue / 500",
             humidity: "humidityValue / 100",
             wind: "windValue / 50",
+            cloudCover: "cloudCoverValue / 100",
+            uv: "uvValue / 11",
         },
     },
     {
@@ -157,6 +165,7 @@ const meterSpecs = [
             kp: "kpValue / 9",
             solarWind: "solarWindValue / 1000",
             bz: "Math.abs(bzValue) / 20",
+            bt: "btValue / 20",
             solarFlux: "solarFluxValue / 300",
         },
     },
@@ -187,5 +196,32 @@ for (const spec of meterSpecs) {
         spec.accent + " meter fill identity"
     );
 }
+
+
+// Forecast probability bars use their intrinsic 0-100 percent scale. There
+// should be one meter path in each hourly and daily forecast delegate.
+assert.match(
+    skySource,
+    /function chanceMeter\(value\)[\s\S]*?number \/ 100/
+);
+assert.ok(
+    skySource.split("sky.chanceMeter(").length - 1 >= 2,
+    "hourly and daily rain chance meters"
+);
+
+// Fields without a defensible intrinsic/provider scale stay numeric for now.
+// Do not invent pressure, visibility, precipitation, dust, pollen, or sample-time meters.
+for (const forbidden of [
+    "pressureMeter",
+    "visibilityMeter",
+    "precipMeter",
+    "dustMeter",
+    "pollenMeter",
+    "sampleTimeMeter",
+])
+    assert.ok(!groundSource.includes(forbidden)
+              && !skySource.includes(forbidden)
+              && !spaceSource.includes(forbidden),
+              forbidden + " should not be an arbitrary meter");
 
 console.log("Weather Station domain palette contracts: PASS");

@@ -66,7 +66,7 @@ Item {
         Row {
             id: monthHeader
             width: parent.width
-            height: 21
+            height: 20
             spacing: 3
 
             ActionButton {
@@ -137,7 +137,7 @@ Item {
         Grid {
             id: weekdayGrid
             width: parent.width
-            height: 12
+            height: 11
             columns: 7
             columnSpacing: 1
             Repeater {
@@ -189,7 +189,8 @@ Item {
                         anchors.fill: parent
                         horizontalAlignment: Text.AlignHCenter
                         verticalAlignment: Text.AlignVCenter
-                        font.pixelSize: 10
+                        // Fit all six week rows without clipping the 140px tile.
+                        font.pixelSize: calendarMini.calendarSnapshot.weeks === 6 ? 9 : 10
                         color: dayCell.today ? Colors.black
                                : dayCell.currentMonth ? Colors.white : Colors.cyan
                         opacity: dayCell.today ? 1.0

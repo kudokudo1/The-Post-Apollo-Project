@@ -176,21 +176,32 @@ for needle, message in (
 ):
     require(POPUP, needle, message)
 
-# Browser website icons use the Post-Apollo magenta/black colors. The
-# bundled YouTube mark retains its black play glyph while site-supplied native
-# favicons receive a luminance-preserving Qt Colorize pass.
+# Site images must stay recognizable. Recoloring arbitrary opaque browser
+# payloads can flatten real favicons into a magenta/black checkerboard.
+# Keep Post-Apollo's black backing / magenta border and its intentionally
+# designed magenta/black YouTube asset, but render all other image pixels
+# without an additional effect pass.
 youtube_svg = (ROOT / "assets/notifications/youtube.svg").read_text(encoding="utf-8")
 assert 'fill="#C74EC7"' in youtube_svg, "YouTube icon background must be magenta"
 assert 'fill="#000000"' in youtube_svg, "YouTube play triangle must be black"
 for surface, name in ((HUB, "history"), (POPUP, "popup")):
-    assert "Colorize {" in surface, f"{name}: website icon colorization"
-    assert "hue: 0.8333" in surface and "saturation: 0.65" in surface, (
-        f"{name}: use the same magenta hue and saturation"
-    )
-    assert "lightness: -0.12" in surface, f"{name}: keep dark visual depth"
+    assert "Colorize {" not in surface, f"{name}: no HSL recolor of website images"
+    assert "ColorOverlay {" not in surface, f"{name}: no alpha-only tint squares"
     assert "Colors.black" in surface, f"{name}: website black backing"
 assert 'notificationEntry.website !== "" ? Colors.black : Colors.dark' in HUB
 assert 'notificationEntry.website !== ""\n                                    ? Colors.magenta : notificationEntry.sourceColor' in HUB
+hub_icon = HUB.split("id: appIconImage", 1)[1].split("// ONE icon only:", 1)[0]
+assert "source: notificationEntry.resolvedAppIcon" in hub_icon
+assert "fillMode: Image.PreserveAspectFit" in hub_icon
+assert "visible: notificationEntry.website" not in hub_icon, (
+    "Do not hide the site Image behind a separate image effect"
+)
+assert HUB.count("id: appIconImage") == 1, "history draws exactly one site image"
+popup_icon = POPUP.split("id: notificationIcon", 1)[1].split("// ===== TEXT", 1)[0]
+assert "notificationCard.websiteIcon" in popup_icon
+assert "fillMode: Image.PreserveAspectFit" in popup_icon
+assert "visible: notificationCard.website" not in popup_icon
+assert POPUP.count("id: notificationIcon") == 1, "popup draws exactly one site image"
 
 # Website SITE/APP scope goes next to the lower-right Bring Here arrow, not
 # into the top ZZ/DND/CLEAR/× row. Preserve card and action geometry.

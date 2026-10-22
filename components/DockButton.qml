@@ -73,9 +73,10 @@ Rectangle {
     // Attach to one meaningful cluster, not an indiscriminate module-wide wash.
     // Distinct semantic clusters may own separate SafeDropShadows.
     property Item contentGlowSource: contentHost
-    // Opt-in: when the dock mark is a direct child of the content host,
-    // resolve its position from reactive local x/y (preserve fallback).
-    property bool trackArtworkGlowLocally: false
+    // Track a directly hosted dock mark by default. Custom nested artwork
+    // retains the original cross-parent mapping until separately reviewed;
+    // explicit false remains a compatibility escape hatch for legacy cases.
+    property bool trackArtworkGlowLocally: true
 
     readonly property bool hovered: interactive && mouse.containsMouse
     readonly property bool pressed: interactive && mouse.pressed

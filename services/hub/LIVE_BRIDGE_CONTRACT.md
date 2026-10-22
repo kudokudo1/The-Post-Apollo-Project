@@ -149,7 +149,7 @@ A successful `HeadlessMediaController.snapshot` response advances freshness only
 
 A browser appearing in the MPRIS list is **not** permission to take it over. Even one discovered player stays `selection-required` until the existing Hi-Fi MPRIS selector intentionally supplies its `selectedBusName`. No controls or mutable references escape into the Hub snapshot.
 
-### Owner-mediated integration (NOT yet implemented)
+### Owner-mediated integration (proposed in draft PR; runtime unverified)
 
 The Media Deck currently creates **one** `HeadlessMediaController { id: headless }` and **one** `MprisPlaybackAdapter { id: mediaAdapter }` inside `widgets/MediaDeckW.qml`. They are not exposed to `shell.qml` or the Hub, so **do not construct another instance just to fill the Hub tile**.
 
@@ -160,7 +160,7 @@ mediaControllerSource: sharedMediaDock.hubMediaController
 selectedMprisBusName: sharedMediaDock.hubSelectedMprisBusName
 ```
 
-These properties are **illustrative proposed interface names, not currently implemented properties**. The media and shell owners must approve their exact names and ensure bindings stay reactive. The Hub UI owner can add `mediaSnapshot: hub.liveBridge ? hub.liveBridge.mediaSnapshot : null` to the mini Media tile, and choose which of the two independent sources to display without silently switching the deck's transport mode.
+**Draft integration:** the owner-facing properties `hubMediaController` and `hubSelectedMprisBusName` are now proposed in a dedicated B4 integration branch, forwarded through `MediaDeckW.qml` → `Mediaplayer.qml`. The shared-shell binding is in the same draft PR for owner coordination, **not yet merged or desktop accepted**. The Hub Media tile already consumes `mediaSnapshot`; no second tile or adapter is required. The shell owner should check concurrent edits and QML lifetime/binding behavior before merge.
 
 ### Tests and acceptance
 

@@ -215,14 +215,28 @@ assert.match(dock, /id:\s*weatherTemperatureValue[\s\S]*?text:\s*weatherDock\.te
 assert.match(dock, /id:\s*weatherTemperatureUnit[\s\S]*?text:\s*weatherDock\.temperatureLabel\.slice\(-1\)[\s\S]*?font\.pixelSize:\s*20/);
 assert.match(dock, /id:\s*weatherDegree[\s\S]*?text:\s*"°"[\s\S]*?font\.pixelSize:\s*20[\s\S]*?color:\s*weatherDock\.open\s*\?\s*Colors\.magenta[\s\S]*?weatherDock\.pressed\s*\?\s*Colors\.white[\s\S]*?weatherDock\.hovered\s*\?\s*Colors\.orange\s*:\s*Colors\.white/);
 assert.match(dock, /SafeDropShadow\s*\{[^}]*safeSource:\s*weatherDegree[^}]*color:\s*weatherDock\.open\s*\|\|\s*weatherDock\.pressed\s*\?\s*Colors\.magenta\s*:\s*Colors\.orange/s);
-assert.match(dock, /id:\s*weatherContent[\s\S]*?anchors\.centerIn:\s*parent[\s\S]*?spacing:\s*6/);
+assert.match(dock, /id:\s*weatherContent[\s\S]*?anchors\.centerIn:\s*parent[\s\S]*?spacing:\s*0/);
+assert.match(dock, /id:\s*weatherArtworkGlowFrame[\s\S]*?anchors\.verticalCenter:\s*parent\.verticalCenter[\s\S]*?implicitWidth:\s*weatherGlowArtwork\.implicitWidth/);
+assert.match(dock, /id:\s*weatherGlowArtwork\s+z:\s*1\s+spacing:\s*6/);
 assert.match(dock, /id:\s*weatherContent[\s\S]*?anchors\.centerIn:\s*parent\s+anchors\.horizontalCenterOffset:\s*2/);
 // The measured group width leaves 3px each side; a 2px optical shift
 // retains at least 1px on the tight (right) edge.
 assert.ok(6 / 2 - 2 >= 1, "optical offset fits content padding");
 assert.match(dock, /id:\s*weatherReadout[\s\S]*?spacing:\s*0/);
 assert.match(dock, /id:\s*weatherTemperature[\s\S]*?spacing:\s*0/);
-assert.match(dock, /contentGlowSource:\s*weatherContent/);
+assert.match(dock, /contentGlowSource:\s*weatherGlowArtwork/);
+assert.doesNotMatch(dock, /contentGlowSource:\s*weatherContent/);
+assert.match(dock, /contentGlowEnabled:\s*false/);
+assert.match(dock, /id:\s*weatherArtworkGlow\s+anchors\.fill:\s*weatherGlowArtwork/);
+assert.match(dock, /safeSource:\s*weatherGlowArtwork/);
+assert.match(dock, /radius:\s*weatherDock\.contentGlowRadius/);
+assert.match(dock, /opacity:\s*weatherDock\.contentGlowOpacity/);
+assert.match(dock, /color:\s*weatherDock\.contentGlowColor/);
+// The unshared artwork effect must be BEHIND its own source, rather
+// than drawn as a full-module overlay above the thermometer.
+const weatherArtShadow = dock.slice(dock.indexOf("id: weatherArtworkGlow"), dock.indexOf("id: weatherGlowArtwork"));
+assert.match(weatherArtShadow, /z:\s*0/);
+assert.match(dock, /id:\s*weatherGlowArtwork\s+z:\s*1/);
 assert.match(dock, /opacity:\s*weatherDock\.contentGlowOpacity/);
 assert.match(dock, /pressedContentGlowColor:\s*Colors\.magenta/);
 assert.match(dock, /pressedDockGlowColor:\s*Colors\.magenta/);
@@ -245,16 +259,47 @@ for (const [property, color] of [
 ]) {
     assert.ok(dock.includes(property + ": " + color), property + " should use " + color);
 }
-// The low dock/frame halo belongs to temperature at idle and hover;
-// the icon/readout content still keeps weather color and orange hover.
-assert.match(dock, /normalDockGlowColor:\s*thermometerState\.valid\s*\? thermometerLiquidColor : weatherColor/);
-assert.match(dock, /hoverDockGlowColor:\s*thermometerState\.valid\s*\? thermometerLiquidColor : Colors\.orange/);
+// Dock floor/perimeter must obey the WEATHER condition, independent of
+// the thermometer and its temperature-selected local glow.
+assert.match(dock, /normalDockGlowColor:\s*weatherColor/);
+assert.match(dock, /hoverDockGlowColor:\s*Colors\.orange/);
+assert.doesNotMatch(dock, /normalDockGlowColor:\s*thermometerState\.valid/);
+assert.doesNotMatch(dock, /hoverDockGlowColor:\s*thermometerState\.valid/);
 assert.match(dock, /normalContentGlowColor:\s*weatherColor/);
 assert.match(dock, /hoverContentGlowColor:\s*Colors\.orange/);
 assert.match(dock, /pressedDockGlowColor:\s*Colors\.magenta/);
 // No new effect should sample the white glass a second time.
 assert.equal((dock.match(/id:\s*thermometerLiquidGlow/g) || []).length, 1);
 assert.match(dock, /property color liquidColor:\s*weatherDock\.thermometerLiquidColor/);
+// DockButton samples only icon + readout, not the gauge. The 17x35
+// thermometer lives in a separate sibling after the sampled artwork group.
+const artworkStart = dock.indexOf("id: weatherGlowArtwork");
+const frameStart = dock.indexOf("id: thermometerGlowFrame");
+const thermometerStart = dock.indexOf("id: weatherThermometer");
+assert.ok(artworkStart > 0 && frameStart > artworkStart);
+assert.ok(thermometerStart > frameStart);
+const sampledArtwork = dock.slice(artworkStart, frameStart);
+assert.match(sampledArtwork, /id:\s*weatherConditionSlot/);
+assert.match(sampledArtwork, /id:\s*weatherTemperature/);
+assert.doesNotMatch(sampledArtwork, /id:\s*weatherThermometer/);
+// Rear halo must be external to the gauge's antialiasing layer, so
+// temperature-colored light extends behind the outline on idle/hover.
+const rearGlowStart = dock.indexOf("id: thermometerRearGlow");
+const rearGlowEnd = dock.indexOf("// Compact native scene-graph thermometer", rearGlowStart);
+assert.ok(rearGlowStart > frameStart && rearGlowEnd > rearGlowStart);
+assert.ok(rearGlowEnd < thermometerStart);
+const rearGlow = dock.slice(rearGlowStart, rearGlowEnd);
+assert.match(rearGlow, /anchors\.fill:\s*weatherThermometer/);
+assert.match(rearGlow, /safeSource:\s*thermometerLiquid/);
+assert.match(rearGlow, /requestedVisible:\s*weatherDock\.thermometerState\.valid\s*&&\s*weatherThermometer\.animatedLevel > 0/);
+assert.match(rearGlow, /z:\s*0/);
+assert.match(rearGlow, /radius:\s*6/);
+assert.match(rearGlow, /opacity:\s*weatherDock\.contentGlowOpacity \* 0\.75/);
+assert.match(rearGlow, /color:\s*weatherDock\.open \|\| weatherDock\.pressed\s*\? Colors\.magenta : weatherThermometer\.liquidColor/);
+assert.doesNotMatch(rearGlow, /weatherDock\.hovered/);
+// Geometry is unchanged and the thermometer remains in its own layer.
+assert.match(dock, /id:\s*weatherThermometer\s+z:\s*1[\s\S]*?implicitWidth:\s*17[\s\S]*?implicitHeight:\s*35/);
+
 // The fluid has its own temperature-colored glow, separate from the weather
 // condition's global orange-on-hover dock glow. No double glass halo.
 const liquidGlowStart = dock.indexOf("id: thermometerLiquidGlow");
@@ -276,7 +321,8 @@ assert.match(dock, /\/\/ The white glass stays on top of liquid and its halo\.\s
 assert.match(dock, /delegate:\s*Rectangle\s*\{\s*z:\s*4\s+readonly property bool majorTick/);
 assert.match(dock, /hoverContentGlowColor:\s*Colors\.orange/);
 
-assert.match(dock, /id:\s*weatherContent[\s\S]*?spacing:\s*6/);
+assert.match(dock, /id:\s*weatherContent[\s\S]*?spacing:\s*0/);
+assert.match(dock, /id:\s*weatherGlowArtwork[\s\S]*?spacing:\s*6/);
 assert.ok(dock.indexOf("id: weatherCondition") < dock.indexOf("id: weatherTemperature"));
 assert.ok(dock.indexOf("id: weatherTemperature") < dock.indexOf("id: weatherThermometer"));
 assert.ok(dock.indexOf("id: weatherTemperatureUnit") < dock.indexOf("id: weatherThermometer"));

@@ -107,16 +107,17 @@ DockButton {
     pressedContentGlowColor: Colors.magenta
     openGlowColor: Colors.magenta
 
-    // Dock floor/perimeter follows the thermometer's actual temperature,
-    // not the condition icon. Keep condition/text hover artwork orange.
-    // A missing reading falls back to the prior weather-state glow.
-    normalDockGlowColor: thermometerState.valid
-                         ? thermometerLiquidColor : weatherColor
-    hoverDockGlowColor: thermometerState.valid
-                        ? thermometerLiquidColor : Colors.orange
+    // The dock perimeter belongs to the weather condition; only the
+    // thermometer itself gets a temperature-colored halo.
+    normalDockGlowColor: weatherColor
+    hoverDockGlowColor: Colors.orange
     pressedDockGlowColor: Colors.magenta
 
-    contentGlowSource: weatherContent
+    // This module owns two independent, locally stacked glow planes.
+    // Disable DockButton's z=2 overlay, which otherwise spreads orange
+    // from the nearby readout across the temperature-colored thermometer.
+    contentGlowEnabled: false
+    contentGlowSource: weatherGlowArtwork
     trackArtworkGlowLocally: true
 
     Timer {
@@ -128,92 +129,151 @@ DockButton {
     }
 
     // Condition -> measured temperature -> active thermometer.
-    // Native glyph bearings leave the visible group a little left-heavy.
-    // Preserve responsive content width and shift the artwork 2px right.
+    // Keep the accepted 2px optical center, but divide glow ownership:
+    // condition+readout is sampled by DockButton; the gauge is not.
     Row {
         id: weatherContent
         anchors.centerIn: parent
         anchors.horizontalCenterOffset: 2
-        spacing: 6
+        spacing: 0
 
+        // Weather art glow stays behind its icon and readout, not over the
+        // separate thermometer. The wrapper preserves identical implicit
+        // width/height and the same 6px condition-to-readout gap.
         Item {
-            id: weatherConditionSlot
+            id: weatherArtworkGlowFrame
             anchors.verticalCenter: parent.verticalCenter
-            implicitWidth: Math.ceil(weatherCondition.implicitWidth)
-            implicitHeight: 46
+            implicitWidth: weatherGlowArtwork.implicitWidth
+            implicitHeight: weatherGlowArtwork.implicitHeight
 
-            Text {
-                id: weatherCondition
-                anchors.centerIn: parent
-                text: weatherDock.weatherState.icon
-                font.pixelSize: 42
-                color: weatherDock.foregroundColor
+            SafeDropShadow {
+                id: weatherArtworkGlow
+                anchors.fill: weatherGlowArtwork
+                safeSource: weatherGlowArtwork
+                requestedVisible: true
+                z: 0
+                radius: weatherDock.contentGlowRadius
+                samples: weatherDock.contentGlowSamples
+                horizontalOffset: 0
+                verticalOffset: 0
+                transparentBorder: true
+                opacity: weatherDock.contentGlowOpacity
+                color: weatherDock.contentGlowColor
+            }
+
+            Row {
+                id: weatherGlowArtwork
+                z: 1
+                spacing: 6
+
+                Item {
+                    id: weatherConditionSlot
+                    anchors.verticalCenter: parent.verticalCenter
+                    implicitWidth: Math.ceil(weatherCondition.implicitWidth)
+                    implicitHeight: 46
+
+                    Text {
+                        id: weatherCondition
+                        anchors.centerIn: parent
+                        text: weatherDock.weatherState.icon
+                        font.pixelSize: 42
+                        color: weatherDock.foregroundColor
+                    }
+                }
+
+                // Keep the icon-to-data gap at 6px; close only the readout-to-🌡 gap.
+                Row {
+                    id: weatherReadout
+                    anchors.verticalCenter: parent.verticalCenter
+                    spacing: 0
+
+                    Row {
+                        id: weatherTemperature
+                        anchors.verticalCenter: parent.verticalCenter
+                        spacing: 0
+
+                        GohuText {
+                            id: weatherTemperatureValue
+                            anchors.verticalCenter: parent.verticalCenter
+                            text: weatherDock.temperatureLabel.slice(0, -2)
+                            font.pixelSize: 20
+                            color: weatherDock.foregroundColor
+                        }
+
+                        Item {
+                            id: degreeSlot
+                            anchors.verticalCenter: parent.verticalCenter
+                            implicitWidth: weatherDegree.implicitWidth
+                            implicitHeight: weatherDegree.implicitHeight
+
+                            SafeDropShadow {
+                                anchors.fill: weatherDegree
+                                safeSource: weatherDegree
+                                requestedVisible: true
+                                z: -1
+                                radius: 8
+                                samples: 15
+                                horizontalOffset: 0
+                                verticalOffset: 0
+                                transparentBorder: true
+                                opacity: weatherDock.contentGlowOpacity
+                                color: weatherDock.open || weatherDock.pressed
+                                       ? Colors.magenta : Colors.orange
+                            }
+
+                            GohuText {
+                                id: weatherDegree
+                                text: "°"
+                                font.pixelSize: 20
+                                color: weatherDock.open ? Colors.magenta
+                                       : weatherDock.pressed ? Colors.white
+                                       : weatherDock.hovered ? Colors.orange : Colors.white
+                            }
+                        }
+
+                        GohuText {
+                            id: weatherTemperatureUnit
+                            anchors.verticalCenter: parent.verticalCenter
+                            text: weatherDock.temperatureLabel.slice(-1)
+                            font.pixelSize: 20
+                            color: weatherDock.foregroundColor
+                        }
+                    }
+                }
             }
         }
 
-        // Keep the icon-to-data gap at 6px; close only the readout-to-🌡 gap.
-        Row {
-            id: weatherReadout
+        // The rear halo is intentionally OUTSIDE the gauge's 17x35px
+        // antialiasing layer, so temperature-colored light can spill behind
+        // the white glass without sampling that glass a second time.
+        Item {
+            id: thermometerGlowFrame
             anchors.verticalCenter: parent.verticalCenter
-            spacing: 0
+            implicitWidth: 17
+            implicitHeight: 35
 
-            Row {
-                id: weatherTemperature
-                anchors.verticalCenter: parent.verticalCenter
-                spacing: 0
-
-                GohuText {
-                    id: weatherTemperatureValue
-                    anchors.verticalCenter: parent.verticalCenter
-                    text: weatherDock.temperatureLabel.slice(0, -2)
-                    font.pixelSize: 20
-                    color: weatherDock.foregroundColor
-                }
-
-                Item {
-                    id: degreeSlot
-                    anchors.verticalCenter: parent.verticalCenter
-                    implicitWidth: weatherDegree.implicitWidth
-                    implicitHeight: weatherDegree.implicitHeight
-
-                    SafeDropShadow {
-                        anchors.fill: weatherDegree
-                        safeSource: weatherDegree
-                        requestedVisible: true
-                        z: -1
-                        radius: 8
-                        samples: 15
-                        horizontalOffset: 0
-                        verticalOffset: 0
-                        transparentBorder: true
-                        opacity: weatherDock.contentGlowOpacity
-                        color: weatherDock.open || weatherDock.pressed
-                               ? Colors.magenta : Colors.orange
-                    }
-
-                    GohuText {
-                        id: weatherDegree
-                        text: "°"
-                        font.pixelSize: 20
-                        color: weatherDock.open ? Colors.magenta
-                               : weatherDock.pressed ? Colors.white
-                               : weatherDock.hovered ? Colors.orange : Colors.white
-                    }
-                }
-
-                GohuText {
-                    id: weatherTemperatureUnit
-                    anchors.verticalCenter: parent.verticalCenter
-                    text: weatherDock.temperatureLabel.slice(-1)
-                    font.pixelSize: 20
-                    color: weatherDock.foregroundColor
-                }
+            SafeDropShadow {
+                id: thermometerRearGlow
+                anchors.fill: weatherThermometer
+                safeSource: thermometerLiquid
+                requestedVisible: weatherDock.thermometerState.valid
+                                  && weatherThermometer.animatedLevel > 0
+                z: 0
+                radius: 6
+                samples: 9
+                horizontalOffset: 0
+                verticalOffset: 0
+                transparentBorder: true
+                opacity: weatherDock.contentGlowOpacity * 0.75
+                color: weatherDock.open || weatherDock.pressed
+                       ? Colors.magenta : weatherThermometer.liquidColor
             }
 
             // Compact native scene-graph thermometer: one smooth connected
             // tube and circular bulb. Original 20×42 scaled to 17×35.
             Item {
                 id: weatherThermometer
+                z: 1
                 anchors.verticalCenter: parent.verticalCenter
                 implicitWidth: 17
                 implicitHeight: 35

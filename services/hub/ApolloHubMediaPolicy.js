@@ -22,7 +22,8 @@ function mpdSnapshot(attached, observation, errorText, observedAtMs, nowMs) {
     var connected = attached === true;
     var error = connected ? shortText(errorText, 120) : "";
     var age = knownAge(observedAtMs, nowMs);
-    var fresh = connected && age >= 0 && age * 1000 <= MAX_MPD_AGE_MS;
+    var fresh = connected && age >= 0
+        && Number(nowMs) - Number(observedAtMs) <= MAX_MPD_AGE_MS;
     var payload = observation && typeof observation === "object"
         && !Array.isArray(observation) ? observation : null;
     var session = payload && payload.session && typeof payload.session === "object"

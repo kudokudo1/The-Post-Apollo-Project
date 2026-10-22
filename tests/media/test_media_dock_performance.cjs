@@ -32,6 +32,28 @@ function harness() {
     return {context, receive};
 }
 
+test("opening the Hi-Fi deck keeps the Media dock dark without removing its neon", () => {
+    // Shared DockButton defaults to a yellow open fill, but Media's stacked
+    // cyan/orange art illumination needs a dark background to remain visible.
+    assert.match(source, /open:\s*mediaRoot\.deckOpen/);
+    assert.match(source, /openFillColor:\s*Colors\.black/);
+    assert.match(dockButtonSource, /property color openFillColor:\s*Colors\.yellow/,
+        "the shared DockButton default remains untouched");
+    assert.match(dockButtonSource, /color:\s*open\s*\?\s*openFillColor\s*:\s*closedFillColor/);
+    assert.match(source, /mediaRoot\.deckOpen = !mediaRoot\.deckOpen;/);
+
+    // Only the solid fill is Media-specific. The canonical open magenta
+    // front wash, open-state rear priority, and CAVA accent stay as before.
+    assert.match(source, /normalDockGlowColor:\s*Colors\.magenta/);
+    assert.match(source, /hoverDockGlowColor:\s*Colors\.magenta/);
+    assert.match(source, /pressedDockGlowColor:\s*Colors\.magenta/);
+    assert.match(source, /color:\s*mediaDock\.open\s*\?\s*mediaDock\.openGlowColor\s*:\s*mediaDock\.accentColor/);
+    assert.match(source, /color:\s*mediaDock\.accentColor/);
+    assert.match(source, /id:\s*leadingStarsAura/);
+    assert.match(source, /id:\s*trailingStarAura/);
+    assert.match(source, /id:\s*cavaAmbientWash/);
+});
+
 test("sample only separate static glyphs, never the animated VU spectrum", () => {
     assert.match(source, /contentGlowEnabled:\s*false/);
     assert.match(source, /contentGlowSource:\s*null/);

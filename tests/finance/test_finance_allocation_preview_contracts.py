@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""D11 preview-only category allocation interface contracts."""
+"""D11 category preview remains pure after D12d guarded confirmation UI."""
 from pathlib import Path
 
 root = Path(__file__).resolve().parents[2]
@@ -23,12 +23,12 @@ assert 'PreviewRules.previewAllocation(snapshot, categoryId, targetText)' in pan
 assert 'onTargetTextChanged:' in pane
 assert 'label: "PREVIEW"' in pane
 assert 'label: "CANCEL"' in pane
-assert "SIMULATION ONLY // NO ACTUAL CHANGES" in pane
+assert "PREVIEW IS SAFE // SAVING REQUIRES OPERATOR ACTIVATION" in pane
 assert 'exceedsUnallocatedFunds' in pane
 assert 'categoryRemainsOverspent' in pane
 assert 'TextInput {' in pane
-assert pane.count('ActionButton {') == 2
-assert pane.count('trackLabelGlowLocally: true') == 2
+assert pane.count('ActionButton {') == 3
+assert pane.count('trackLabelGlowLocally: true') == 3
 assert 'category.availableCents + deltaCents' in math
 assert 'snapshot.toBudgetCents - deltaCents' in math
 assert 'Number.isSafeInteger' in math

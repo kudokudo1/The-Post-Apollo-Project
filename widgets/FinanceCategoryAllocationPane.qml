@@ -167,6 +167,7 @@ Item {
                 color: Colors.white
                 font.pixelSize: 12
                 selectByMouse: true
+                readOnly: allocation.writePending || allocation.writeUncertain
                 onTextEdited: allocation.targetText = text
             }
         }

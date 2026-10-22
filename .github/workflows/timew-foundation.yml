@@ -5,6 +5,7 @@ on:
     paths:
       - "widgets/TimeW.qml"
       - "services/time/WorldClockPolicy.js"
+      - "services/time/WorldZoneSearch.js"
       - "timew_click_preview.qml"
       - "modules/Clock.qml"
       - "shell.qml"
@@ -16,6 +17,7 @@ on:
     paths:
       - "widgets/TimeW.qml"
       - "services/time/WorldClockPolicy.js"
+      - "services/time/WorldZoneSearch.js"
       - "modules/Clock.qml"
       - "shell.qml"
       - "tests/timew/**"
@@ -33,3 +35,5 @@ jobs:
         run: python3 tests/timew/test_timew_foundation_contracts.py
       - name: Verify world-clock timezone and DST projections
         run: node tests/timew/test_world_clock_policy.cjs
+      - name: Verify searchable world-zone catalog
+        run: node tests/timew/test_world_zone_search.cjs

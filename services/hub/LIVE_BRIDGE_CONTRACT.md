@@ -1,6 +1,6 @@
 # ApolloHub // B1 live Weather bridge
 
-**Status:** Implemented backend type, not yet mounted by the UI/shell.
+**Status:** W1 shared-shell Weather connection implemented on `main`; live desktop acceptance pending.
 **Ownership:** Backend/live services. UI/editor and `shell.qml` remain with their respective owners.
 
 ## Existing source, no duplicate work
@@ -23,9 +23,9 @@ The backend uses `WeatherDockPolicy.fresh()` (one-hour limit, five-minute future
 
 When source data is missing, stale, or in error, temperature uses the unknown marker; UV and AQI use `-1`; condition/air-quality labels use `UNKNOWN`. Never infer a healthy reading from unavailable data.
 
-## Suggested owner-mediated wiring (NOT done in B1)
+## W1 Weather integration (implemented on `main`)
 
-The shared-shell owner may instantiate **one** bridge beside its current weather service:
+`shell.qml` now instantiates **one** bridge beside its existing weather service:
 
 ```qml
 ApolloHubLiveBridge {
@@ -34,13 +34,13 @@ ApolloHubLiveBridge {
 }
 ```
 
-The UI owner may accept a `liveBridge` property in `ApolloHubW.qml`, then pass `liveBridge.weatherSnapshot` into the Weather tile. This must be a live binding, not an untracked one-time JS copy. Do not edit the shared shell or UI components without coordinating with their owners.
+`ApolloHubW.qml` now receives `liveBridge: apolloHubLive` from `shell.qml`, and the Weather tile consumes the reactive `liveBridge.weatherSnapshot` binding. The backend still owns no polling or write actions.
 
 ## Verification and limits
 
 Run `python3 tests/hub/test_apollo_hub_live_bridge.py` for source contracts. GitHub workflow `apollo-hub-live-bridge.yml` checks it on relevant updates.
 
-**Not yet verified on Fedora/Quickshell:** module loading, reactive transitions for fresh/stale/error/air-quality, live tile rendering, and shared-shell wiring. These remain runtime acceptance checks. No local files or running service processes were touched.
+**Source wiring verification:** `tests/hub/test_apollo_hub_shell_weather_wiring.py` runs in `apollo-hub-live-bridge.yml` alongside existing Weather and CPU++ tests. **Not yet verified on Fedora/Quickshell:** module loading, reactive transitions for fresh/stale/error/air-quality, and rendered mini-card behavior. No local files or running service processes were touched.
 
 ## B2 // CPU++ shared system telemetry (read-only)
 

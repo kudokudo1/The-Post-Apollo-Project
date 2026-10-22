@@ -69,6 +69,19 @@ assert "Mediaplayer {" in shell
 assert "id: sharedMediaDock" in shell
 assert "mediaControllerSource: sharedMediaDock.hubMediaController" in shell
 assert "selectedMprisBusName: sharedMediaDock.hubSelectedMprisBusName" in shell
+assert "mpdDockSource: sharedMediaDock" in shell
+# Reuse the one dock's 2s mpc observation instead of adding another poller.
+for marker in ("readonly property string hubMpdPlaybackState:",
+               "readonly property string hubMpdCurrentTrack:",
+               "readonly property double hubMpdObservedAtMs:",
+               "lastMpdObservedAtMs = Date.now()",
+               'command: ["mpc", "-f", "%artist% - %title%", "status"]',
+               "interval: 2000"):
+    assert marker in media_dock, f"Existing MPD dock seam missing: {marker}"
+assert "property var mpdDockSource: null" in bridge
+assert "readonly property var dockMpdObservation:" in bridge
+assert "bridge.dockMpdObservation" in bridge
+assert "bridge.mpdDockSource !== null" in bridge
 assert "HeadlessMediaController {" not in media_dock
 assert "MprisPlaybackAdapter {" not in media_dock
 assert "HeadlessMediaController {" not in shell

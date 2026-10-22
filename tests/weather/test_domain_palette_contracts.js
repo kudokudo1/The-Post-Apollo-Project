@@ -18,6 +18,7 @@ const homeSource = read("widgets/weather/StationHome.qml");
 const groundSource = read("widgets/weather/StationGround.qml");
 const skySource = read("widgets/weather/StationSky.qml");
 const spaceSource = read("widgets/weather/StationSpace.qml");
+const dividerSource = read("widgets/weather/StationSectionDivider.qml");
 const weatherServiceSource = read("services/weather/WeatherService.qml");
 const spaceServiceSource = read("services/weather/SpaceService.qml");
 
@@ -43,6 +44,39 @@ assert.ok(homeSource.includes("FAVORITES // RELEVANT // AUTO"));
 assert.match(groundSource, /text: "⌁  GROUND"[\s\S]*?color: Colors\.green/);
 assert.match(skySource, /text: "☁  SKY"[\s\S]*?color: Colors\.cyan/);
 assert.match(spaceSource, /text: "✦  SPACE"[\s\S]*?color: Colors\.magenta/);
+
+// Station data groups use one reusable divider: orange section label with
+// the same 2 px cyan structural rule already used by the Weather header/footer.
+assert.match(dividerSource, /font\.pixelSize:\s*11/);
+assert.match(dividerSource, /property color labelColor:\s*Colors\.orange/);
+assert.match(dividerSource, /property color lineColor:\s*Colors\.cyan/);
+assert.match(dividerSource, /height:\s*2[\s\S]*?color:\s*divider\.lineColor/);
+
+for (const title of [
+    "AIR // PARTICULATES",
+    "GASES // POLLEN",
+])
+    assert.ok(groundSource.includes('title: "' + title + '"'), title);
+
+for (const title of [
+    "CURRENT // CONDITIONS",
+    "ATMOSPHERE // OBSERVATION",
+    "FORECAST // NEXT HOURS",
+    "FORECAST // DAILY",
+])
+    assert.ok(skySource.includes('title: "' + title + '"'), title);
+
+for (const title of [
+    "SOLAR // GEOMAGNETIC",
+    "FIELD // SOURCE TIMES",
+])
+    assert.ok(spaceSource.includes('title: "' + title + '"'), title);
+
+// Ground/Space get more breathing room than their former 20 px stack spacing;
+// Sky increases from 18 px while retaining enough room for both forecasts.
+assert.match(groundSource, /anchors\.margins:\s*24[\s\S]*?spacing:\s*26/);
+assert.match(skySource, /anchors\.margins:\s*24[\s\S]*?spacing:\s*20/);
+assert.match(spaceSource, /anchors\.margins:\s*24[\s\S]*?spacing:\s*26/);
 
 // Existing semantic telemetry severity remains independent from page identity.
 assert.match(groundSource, /readonly property color aqiColor:/);

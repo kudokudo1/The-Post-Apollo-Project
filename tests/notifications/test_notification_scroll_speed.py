@@ -32,6 +32,11 @@ assert 'scrollBarArea.wheelDelta(event)' in h
 assert 'accountForContentOrigin: true' in h
 assert 'wheelEnabled: false' in h
 assert 'root.requestHistoryScrollSpeed(' in h
+assert '(NotificationsService.scrollSpeedMultiplier - 0.5) / 6.5' in h
+assert 'NotificationsService.setScrollSpeed(0.5 + ratio * 6.5)' in h
+assert 'Math.max(0.5, Math.min(7.0, number))' in s
+assert '(NotificationsService.scrollSpeedMultiplier - 0.5) / 2.5' not in h
+
 assert 'enabled: !NotificationsService.scrollSpeedLocked' in h
 assert 'onTriggered: NotificationsService.toggleScrollSpeedLock()' in h
 assert 'text: NotificationsService.scrollSpeedMultiplier.toFixed(1) + "×"' in h
@@ -72,7 +77,11 @@ vm.runInNewContext(['normalizeScrollSpeed','setScrollSpeed',
  'toggleScrollSpeedLock','scheduleScrollSettingsSave',
  'saveScrollSettings','loadScrollSettings'].map(n=>extract(source,n)).join('\n'),State);
 assert.strictEqual(State.normalizeScrollSpeed(0),0.5);
-assert.strictEqual(State.normalizeScrollSpeed(500),3);
+assert.strictEqual(State.normalizeScrollSpeed(500),7);
+assert.strictEqual(State.normalizeScrollSpeed(7),7);
+assert.strictEqual(State.normalizeScrollSpeed(6.96),7);
+assert.strictEqual(State.normalizeScrollSpeed(3),3);
+assert.strictEqual(State.normalizeScrollSpeed(0.5),0.5);
 assert.strictEqual(State.normalizeScrollSpeed(1.26),1.3);
 assert.strictEqual(State.normalizeScrollSpeed('bad'),1);
 assert.strictEqual(State.setScrollSpeed(2.16),true);
@@ -96,11 +105,11 @@ assert.strictEqual(State.scrollSpeedMultiplier,2.2);
 assert.strictEqual(State.scrollSpeedLocked,true);
 State.fileContent='{"scrollSpeedMultiplier":8,"scrollSpeedLocked":false}';
 State.loadScrollSettings();
-assert.strictEqual(State.scrollSpeedMultiplier,3,'loaded values clamped');
+assert.strictEqual(State.scrollSpeedMultiplier,7,'loaded values clamped');
 assert.strictEqual(State.scrollSpeedLocked,false);
 State.fileContent='{invalid';
 State.loadScrollSettings();
-assert.strictEqual(State.scrollSpeedMultiplier,3,'malformed prefs retain last valid');
+assert.strictEqual(State.scrollSpeedMultiplier,7,'malformed prefs retain last valid');
 State.scrollSettingsReady=false;
 State.savesScheduled=2;
 State.toggleScrollSpeedLock();

@@ -95,17 +95,21 @@ export async function executeTransaction({api, input, recordAttempt}) {
     if (rows.some(r => r && r.imported_id === importedId))
       reject("already-exists");
     await recordAttempt(cmd);
-    const ids = await api.addTransactions(cmd.accountId, [{
-      id: stableUuidFromHex(cmd.requestId), account: cmd.accountId,
-      date: cmd.date, amount: cmd.amountCents, payee_name: cmd.description,
-      imported_id: importedId, cleared: false
-    }], false, false);
-    if (!Array.isArray(ids) || ids.length !== 1 || !ids[0])
+    // Actual 26.10.0 acknowledges addTransactions with "ok", not IDs.
+    // Supply its options object, and verify our deterministic ID by readback.
+    const id = stableUuidFromHex(cmd.requestId);
+    const acknowledgment = await api.addTransactions(cmd.accountId, [{
+      id, date: cmd.date, amount: cmd.amountCents,
+      payee_name: cmd.description, imported_id: importedId, cleared: false
+    }], {runTransfers: false, learnCategories: false});
+    if (acknowledgment !== "ok"
+        && !(Array.isArray(acknowledgment)
+          && acknowledgment.length === 1 && acknowledgment[0] === id))
       reject("uncertain-write");
     await api.sync();
     const after = await api.getTransactions(cmd.accountId,
       cmd.month + "-01", cmd.month + "-31");
-    if (!Array.isArray(after) || !after.some(t => t && t.id === ids[0]
+    if (!Array.isArray(after) || !after.some(t => t && t.id === id
         && t.date === cmd.date && t.amount === cmd.amountCents))
       reject("uncertain-write");
     return {status: "committed"};

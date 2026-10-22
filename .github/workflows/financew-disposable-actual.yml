@@ -1,0 +1,41 @@
+name: FinanceW disposable Actual server roundtrip
+
+on:
+  pull_request:
+    paths:
+      - "scripts/finance/write_transaction.mjs"
+      - "scripts/finance/transaction_guard.mjs"
+      - "scripts/finance/read_budget.mjs"
+      - "scripts/finance/disposable_actual_roundtrip.mjs"
+      - ".github/workflows/financew-disposable-actual.yml"
+  push:
+    branches: [main]
+    paths:
+      - "scripts/finance/write_transaction.mjs"
+      - "scripts/finance/transaction_guard.mjs"
+      - "scripts/finance/read_budget.mjs"
+      - "scripts/finance/disposable_actual_roundtrip.mjs"
+      - ".github/workflows/financew-disposable-actual.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  disposable-actual:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Install pinned Actual API and server in isolated CI checkout
+        run: |
+          npm install --prefix scripts/finance --no-save --package-lock=false --no-audit --no-fund @actual-app/api@26.10.0 @actual-app/sync-server@26.10.0
+      - name: End-to-end disposable server verification (fictional budget only)
+        env:
+          FINANCEW_DISPOSABLE_TEST: "yes"
+        run: |
+          node --check scripts/finance/disposable_actual_roundtrip.mjs
+          node scripts/finance/disposable_actual_roundtrip.mjs

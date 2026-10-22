@@ -14,11 +14,12 @@ function fake(rows=[]) {
   const api={
     getAccounts:async()=>[{id:base.accountId,offbudget:false,closed:false}],
     getTransactions:async()=>rows,
-    addTransactions:async(id,transactions,runTransfers,learnCategories)=>{
-      calls.push(["add",id,transactions,runTransfers,learnCategories]);
-      const row={...transactions[0]};
+    addTransactions:async(id,transactions,options)=>{
+      calls.push(["add",id,transactions,options]);
+      const row={account:id,...transactions[0]};
       rows.push(row);
-      return [row.id];
+      // Actual API 26.10.0 returns "ok" for a successful add.
+      return "ok";
     },
     updateTransaction:async(id,fields)=>{
       calls.push(["update",id,fields]);
@@ -49,8 +50,9 @@ test("verified fake creation syncs one operation, no transfers or learning",asyn
   assert.equal(attempts,1);
   assert.equal(f.calls[0][0],"add");
   assert.equal(f.calls[0][1],base.accountId);
-  assert.equal(f.calls[0][3],false);
-  assert.equal(f.calls[0][4],false);
+  assert.deepEqual(f.calls[0][3],
+    {runTransfers:false,learnCategories:false});
+  assert.equal(f.calls[0][2][0].account,undefined);
   assert.equal(f.calls[0][2][0].imported_id,"financew-"+base.requestId);
   assert.equal(f.calls[0][2][0].payee_name,base.description);
   assert.equal(f.calls[1][0],"sync");

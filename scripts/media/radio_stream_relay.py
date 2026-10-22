@@ -40,7 +40,10 @@ def public_endpoint(hostname: str, resolve=socket.getaddrinfo) -> str:
             address = ipaddress.ip_address(sockaddr[0])
         except ValueError:
             raise MediaBackendError("STREAM_DNS", "Invalid station DNS answer") from None
-        if not address.is_global:
+        # ipaddress.is_global alone counts multicast destinations as global.
+        # Public unicast is the only permissible remote audio endpoint.
+        if (not address.is_global or address.is_multicast
+                or address.is_unspecified or address.is_reserved):
             raise MediaBackendError("STREAM_DNS_BLOCKED",
                                     "Station DNS resolved to a restricted address")
         addresses.append(str(address))

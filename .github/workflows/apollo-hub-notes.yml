@@ -1,0 +1,36 @@
+name: Apollo Hub B8 local Notes contracts
+
+on:
+  pull_request:
+    paths:
+      - "services/hub/ApolloHubNotesPolicy.js"
+      - "services/hub/ApolloHubNotesStore.qml"
+      - "services/hub/qmldir"
+      - "tests/hub/test_apollo_hub_notes_policy.cjs"
+      - "tests/hub/test_apollo_hub_notes_store.py"
+      - ".github/workflows/apollo-hub-notes.yml"
+  push:
+    branches:
+      - main
+    paths:
+      - "services/hub/ApolloHubNotesPolicy.js"
+      - "services/hub/ApolloHubNotesStore.qml"
+      - "services/hub/qmldir"
+      - "tests/hub/test_apollo_hub_notes_policy.cjs"
+      - "tests/hub/test_apollo_hub_notes_store.py"
+      - ".github/workflows/apollo-hub-notes.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  contracts:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Test notes schema revisions and explicit mutation safety
+        run: node tests/hub/test_apollo_hub_notes_policy.cjs
+      - name: Guard single Notes store and no-autosave contract
+        run: python3 tests/hub/test_apollo_hub_notes_store.py

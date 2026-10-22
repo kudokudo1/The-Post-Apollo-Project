@@ -18,6 +18,14 @@ function signalPercent(value) {
            ? Math.round(strength * 100) : -1;
 }
 
+// The dock's iw rx bitrate is a link estimate, not Internet throughput.
+// Keep its units numeric and unknown on absent/invalid readings.
+function linkSpeedMbps(value) {
+    return typeof value === "number" && isFinite(value)
+           && value > 0 && value <= 100000
+           ? Math.round(value) : -1;
+}
+
 function snapshot(reading) {
     var data = reading && typeof reading === "object" ? reading : {};
     var wifiPresent = data.wifiPresent === true;
@@ -51,8 +59,10 @@ function snapshot(reading) {
             connected: ethernetConnected,
             interfaceName: ethernetPresent ? safeName(data.ethernetInterface) : ""
         },
-        // No trustworthy speed source exists in the passive Network API.
-        // The dock's nmcli/iw speed read is private to that dock for now.
-        linkSpeedMbps: -1
+        // Reuse the live dock's rx bitrate ONLY for the active Wi-Fi link.
+        // Ethernet stays unknown until a validated wired source is shared.
+        linkSpeedMbps: transport === "wifi"
+                       ? linkSpeedMbps(data.wifiLinkSpeedMbps) : -1,
+        linkSpeedApproximate: transport === "wifi"
     };
 }

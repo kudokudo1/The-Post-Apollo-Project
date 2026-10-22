@@ -222,7 +222,8 @@ PanelWindow {
             return;
         const row = filteredNotifications.get(index);
         if (row)
-            takeMeToApp(row.sourceId, row.source);
+            root.openNotificationDestination(
+                row.notificationId, row.sourceId, row.source, row.websiteHost);
     }
 
     // Scope Escape to this window's active keyboard ownership.
@@ -1131,6 +1132,29 @@ PanelWindow {
 
         NotificationsService.clearNotificationsForSource(root.pendingClearAllKey);
         root.cancelClearAll();
+    }
+
+    // ===== NOTIFICATION DESTINATION =============================
+    // Live native senders may provide an actual per-notification target
+    // through the freedesktop "default" action. Invoke the exact Qt action,
+    // not a guessed URL and not a serialized history callback.
+    // A historical website notification only identifies its ORIGIN, so
+    // opening that origin is a fallback, never an exact message deep link.
+    function openNotificationDestination(notificationId, sourceId, source, websiteHost) {
+        if (NotificationsService.invokeExternalDefaultAction(notificationId))
+            return "native-default";
+
+        if (BrowserSiteIdentity.chromiumFamily(source, sourceId)) {
+            const hostname = BrowserSiteIdentity.hostnameFor(websiteHost);
+            if (hostname !== "") {
+                // Direct argv, no shell evaluation or title/body URL scraping.
+                Quickshell.execDetached(["xdg-open", "https://" + hostname + "/"]);
+                return "site-home";
+            }
+        }
+
+        root.takeMeToApp(sourceId, source);
+        return "application";
     }
 
     // ===== APP NAVIGATION =======================================
@@ -2563,7 +2587,8 @@ PanelWindow {
                             wideGlowSpread: root.cardWideGlowSpread
                             wideGlowOpacity: root.cardWideGlowOpacity
 
-                            // Clicking the card means TAKE ME TO the app.
+                            // Open the exact native destination when live.
+                            // Otherwise website home, then app fallback.
                             MouseArea {
                                 id: cardClickArea
 
@@ -2576,7 +2601,11 @@ PanelWindow {
                                 z: 0
 
                                 onClicked: {
-                                    root.takeMeToApp(notificationEntry.sourceId, notificationEntry.source);
+                                    root.openNotificationDestination(
+                                        notificationEntry.notificationId,
+                                        notificationEntry.sourceId,
+                                        notificationEntry.source,
+                                        notificationEntry.websiteHost);
                                 }
                             }
 
@@ -3029,7 +3058,7 @@ PanelWindow {
                             // ===== BRING HERE / OPEN =============
                             //
                             // Card click:
-                            //     TAKE ME TO APP
+                            //     NATIVE DEFAULT / SITE HOME / APP FALLBACK
                             //
                             // This button:
                             //     BRING APP HERE / OPEN HERE

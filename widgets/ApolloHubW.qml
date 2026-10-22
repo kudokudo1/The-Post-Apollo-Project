@@ -659,8 +659,7 @@ PanelWindow {
                     onLeftClicked: hub.undoLastLayoutEdit()
                 }
                 ActionButton {
-                    // A request is not deletion: explicit second confirmation
-                    // is required before any layout is saved.
+                    // One click requests removal; separate CONFIRM persists it.
                     trackLabelGlowLocally: true
                     width: 84
                     height: 32

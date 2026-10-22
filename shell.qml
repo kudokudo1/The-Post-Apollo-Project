@@ -244,6 +244,8 @@ PanelWindow {
         weatherSource: weatherService
         // Share Network dock's live iw reading; no new speed observer.
         networkDockSource: sharedNetworkDock
+        // B2: same singleton already used by CPU++ and AppControl.
+        systemSource: sharedSystemTelemetry
         // B4: consume the ONE Media Dock's existing controller/selection.
         // Both references are read by the bridge; it never commands playback.
         mediaControllerSource: sharedMediaDock.hubMediaController
@@ -607,6 +609,31 @@ PanelWindow {
         id: apolloHubHost
         width: apolloHubButton.implicitWidth
         height: apolloHubButton.implicitHeight
+
+        // One on-demand request when the Hub shows a CPU tile.
+        // SystemTelemetry.refresh() already refuses overlapping sampling.
+        // No polling loop, separate collector, or mutation rights.
+        function refreshCpuTileWhenVisible() {
+            if (!apolloHubWindow.menuOpen)
+                return;
+            const tiles = apolloHubWindow.activeTiles;
+            if (!Array.isArray(tiles)
+                    || !tiles.some(function(tile) {
+                        return tile && tile.module === "cpu";
+                    }))
+                return;
+            sharedSystemTelemetry.refresh();
+        }
+
+        Connections {
+            target: apolloHubWindow
+            function onMenuOpenChanged() {
+                apolloHubHost.refreshCpuTileWhenVisible();
+            }
+            function onActiveTilesChanged() {
+                apolloHubHost.refreshCpuTileWhenVisible();
+            }
+        }
 
         anchors {
             top: parent.top

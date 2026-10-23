@@ -84,11 +84,14 @@ function inspect(lease,policy) {
     return {ok:true,revision:decoded.document.revision,
             document:decoded.document,sha256:sha256(original)};
 }
-function commit(lease,expectedRevision,newDocument,policy,stopAt) {
+function commit(lease,expectedRevision,expectedHash,newDocument,policy,stopAt) {
     requireOwner(lease);
     const old=inspect(lease,policy);
     if(!old.ok) return old;
     if(old.revision!==expectedRevision) return error("STALE_REVISION");
+    if(typeof expectedHash!=="string" || !/^[a-f0-9]{64}$/.test(expectedHash))
+        return error("EXPECTED_HASH_REQUIRED");
+    if(old.sha256!==expectedHash) return error("STALE_SOURCE_HASH");
     if(!newDocument || newDocument.revision!==expectedRevision+1)
         return error("REVISION_STEP_REQUIRED");
     const encoded=policy.encode(newDocument);

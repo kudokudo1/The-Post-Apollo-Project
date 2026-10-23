@@ -696,3 +696,60 @@ All existing write-lock files remain unchanged and no additional
 credentials or private financial data are added to GitHub. D17b acceptance
 is CI source and disposable-budget integration only; it is not operator
 approval for new-account creation or live income transactions.
+
+
+## FinanceW D17c // Guarded Funding Writer (UNACTIVATED)
+
+The separately protected \`write_funding.mjs\` command is committed as
+source, **not connected to FinanceW's user interface or automatic jobs**.
+It has NO automatic enrollment and does not create the operator's local
+authorization file. The writer is disabled unless a **separate operator-
+owned, regular, private mode-0600 file** exists at
+\`~/.config/financew/funding-writes-enabled\` with the exact marker
+\`FINANCEW_FUNDING_WRITES_APPROVED\`. Do **not** provision this on the
+personal budget until a separate operator-approved activation plan has
+passed live-state reconciliation and local UI acceptance.
+
+Only two strictly validated commands exist:
+
+- \`income\`: add a categorized, positive-amount income transaction to an
+  active, on-budget account in the chosen month. The current account and
+  the income-category membership are re-read before mutation. Matching
+  request identity or same-date/same-amount entries refuse as possible
+  duplicates. Actual's \`addTransactions\` call is followed by explicit
+  \`sync\` and a fresh readback of the unique imported ID and category.
+- \`new-account-opening\`: create **a previously absent account** with
+  Actual's initial-balance API, then sync and read back its account and
+  initial balance. It cannot alter an existing account. The date shown
+  in D17a's historical opening-balance planning UI is not an argument
+  to new-account creation.
+
+\`existing-account-opening\` is refused explicitly. The first step for an
+existing account is historical reconciliation, not creating the account
+again or treating its displayed current balance as its starting balance.
+
+D17c uses the same private operation ledger and exclusive \`.write-lock\`
+as FinanceW's transaction and allocation writers. Every unresolved
+journal blocks every new funding write; repeated request IDs are blocked
+even after a successful commit. Each new attempt is journaled with a
+command hash and fsynced **before** any Actual mutation. A completed
+operation is committed only after sync and readback. A crash, uncertain
+sync, incomplete journal or stale lock requires manual inspection. No
+automatic retry and **no journal/lock cleanup by the user interface**.
+
+The writer also binds each command to the authenticated loopback Actual
+source URL plus private Sync ID, refuses nonloopback write servers, reads
+private credentials only from mode-restricted files, and uses a disposable
+temporary client cache. Journal and status output omit transaction names,
+account names, amounts, and credentials.
+
+**Verification:** fake-data guard tests, missing/unsafe-permit CLI tests,
+and a pinned real Actual 26.10.0 disposable-budget integration that runs
+the production writer twice with strictly fictional data, tests missing
+authorization, replay and unresolved recovery, then uses an independent
+client to confirm the ledger and initial balance.
+
+**D17d still required:** an operator-reviewed UI contract plus end-to-end
+local acceptance before considering actual financial activation. Do not
+interpret passing tests or merging this isolated writer as permission to
+create a real-money authorization marker.

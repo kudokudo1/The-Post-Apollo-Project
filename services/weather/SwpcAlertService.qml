@@ -2,6 +2,7 @@ import QtQuick
 import Quickshell
 import Quickshell.Io
 import "SwpcAlertPolicy.js" as SwpcAlertPolicy
+import "SwpcValidityPolicy.js" as SwpcValidityPolicy
 
 // SWPC-issued bulletin ARCHIVE only. Recent != active warning. This reader
 // is mounted with SPACE, not an always-running system notification service.
@@ -14,6 +15,13 @@ Scope {
     property string errorText: ""
     property var bulletins: []
     property int count48h: 0
+    // Keep NOAA's last successful archive in memory so validity windows
+    // expire on the local minute clock without extra HTTP requests.
+    property var archive: []
+    property var validity: ({
+        windowCount: 0, uncertainCount: 0, endedCount: 0,
+        supersededCount: 0, windows: []
+    })
     property date lastUpdated
     property real receivedMs: 0
     property real clockMs: Date.now()
@@ -29,12 +37,31 @@ Scope {
             bulletinFetch.running = true;
     }
 
+    function reviewValidity() {
+        if (!ready || !Array.isArray(archive))
+            return;
+        try {
+            validity = SwpcValidityPolicy.assess(archive, clockMs, 168, 3);
+        } catch (error) {
+            console.log("SwpcAlertService validity review error:", error);
+            validity = {
+                windowCount: 0, uncertainCount: 0, endedCount: 0,
+                supersededCount: 0, windows: []
+            };
+        }
+    }
+
     function parseResponse(raw) {
         try {
             const now = Date.now();
+            const source = JSON.parse(raw);
             const result = SwpcAlertPolicy.parseBulletins(
-                JSON.parse(raw), now, 48, 3
+                source, now, 48, 3
             );
+            // Validate the entire source before updating cached displays.
+            const assessed = SwpcValidityPolicy.assess(source, now, 168, 3);
+            archive = source;
+            validity = assessed;
             bulletins = result.bulletins;
             count48h = result.count;
             receivedMs = now;
@@ -78,7 +105,10 @@ Scope {
         interval: 60000
         repeat: true
         running: alerts.active
-        onTriggered: alerts.clockMs = Date.now()
+        onTriggered: {
+            alerts.clockMs = Date.now();
+            alerts.reviewValidity();
+        }
     }
 
     onActiveChanged: {

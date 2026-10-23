@@ -108,7 +108,8 @@ function parseXraySeries(payload, nowMs) {
         if (buckets[i])
             trend.push({timeMs: buckets[i].timeMs,
                         flux: buckets[i].flux,
-                        level: logMeter(buckets[i].flux)});
+                        level: logMeter(buckets[i].flux),
+                        classLetter: fluxClass(buckets[i].flux).letter});
     }
 
     return {

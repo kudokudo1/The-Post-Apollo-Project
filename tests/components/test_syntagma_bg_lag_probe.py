@@ -61,6 +61,28 @@ assert "reportBgRebuild(traceStartMs" in notifications
 assert "notifications rebuild synchronous=" in notifications
 assert 'rendered=" + filteredNotifications.count' in notifications
 
+# Hidden-history UI isolation: opt-in, closed-window only. Incoming events
+# still land in NotificationsService; open/visible history must be caught up.
+assert 'Quickshell.env("POST_APOLLO_NOTIFICATIONS_HIDDEN_REBUILD_PAUSED")' in notifications
+assert 'readonly property bool hiddenHistoryRebuildPauseEnabled:' in notifications
+assert 'property bool hiddenHistoryRebuildDeferred: false' in notifications
+assert 'if (hiddenHistoryRebuildPauseEnabled && !menuOpen) {' in notifications
+assert 'hiddenHistoryRebuildDeferred = true;' in notifications
+assert 'filteredModelRefreshTimer.stop();' in notifications
+assert 'if (root.hiddenHistoryRebuildPauseEnabled && !root.menuOpen) {' in notifications
+assert 'if (menuOpen && hiddenHistoryRebuildPauseEnabled' in notifications
+assert '&& hiddenHistoryRebuildDeferred) {' in notifications
+assert 'hiddenHistoryRebuildDeferred = false;' in notifications
+assert 'root.rebuildFilteredNotifications();' in notifications
+assert 'notifications hidden-history rebuild PAUSED while closed' in notifications
+for original in ('function onNotificationsRevisionChanged()',
+                 'function onFavoritesRevisionChanged()',
+                 'function onPolicyRevisionChanged()',
+                 'root.rebuildManagerDndPolicies();',
+                 'visible: true',
+                 'target: NotificationsService'):
+    assert original in notifications, original
+
 # Probe log declarations must never interpolate private notification text,
 # raw CLI responses, financial records or music titles.
 for src in (media, network, notifications):

@@ -287,6 +287,77 @@ function cycleTile(layout, modeIndex, subIndex, tileIndex) {
     return next;
 }
 
+// Stage 4: search only the installed HUB module catalogue, not the
+// applications catalogue or the user's stored notes/tasks. Empty search
+// intentionally shows every supported module.
+function moduleChoices(layout, modeIndex, subIndex, tileIndex, rawQuery) {
+    var query = typeof rawQuery === "string"
+                ? rawQuery.trim().slice(0, 80).toLowerCase() : "";
+    var state = {state: "unavailable", query: query, total: MODULE_IDS.length,
+                 matchCount: 0, availableCount: 0, items: []};
+    if (!layout || !Array.isArray(layout.modes)
+            || !validIndex(modeIndex, layout.modes.length))
+        return state;
+    var groups = layout.modes[modeIndex].subModes;
+    if (!Array.isArray(groups) || !validIndex(subIndex, groups.length))
+        return state;
+    var tiles = groups[subIndex].tiles;
+    if (!Array.isArray(tiles) || !validIndex(tileIndex, tiles.length))
+        return state;
+
+    var currentId = tiles[tileIndex].module;
+    var used = {};
+    for (var i = 0; i < tiles.length; ++i) {
+        if (i !== tileIndex)
+            used["$" + tiles[i].module] = true;
+    }
+    var items = [];
+    var availableCount = 0;
+    for (var j = 0; j < MODULE_IDS.length; ++j) {
+        var id = MODULE_IDS[j];
+        var title = tileTitle(id);
+        if (query && id.indexOf(query) < 0
+                && title.toLowerCase().indexOf(query) < 0)
+            continue;
+        var selected = id === currentId;
+        var available = !selected
+                        && !Object.prototype.hasOwnProperty.call(used, "$" + id);
+        if (available)
+            availableCount++;
+        items.push({id: id, title: title, selected: selected,
+                    available: available,
+                    inUse: !selected && !available});
+    }
+    return {state: "ready", query: query, total: MODULE_IDS.length,
+            matchCount: items.length, availableCount: availableCount,
+            items: items};
+}
+
+// Change one specific tile to a selected module, never by cycling through
+// intermediate ones. Reject stale tile IDs and duplicate modules in the same
+// group; retain all existing tile identity and size metadata.
+function setTileModule(layout, modeIndex, subIndex, tileIndex,
+                       expectedTileId, moduleId) {
+    var next = normalize(clone(layout));
+    if (!validIndex(modeIndex, next.modes.length))
+        return next;
+    var groups = next.modes[modeIndex].subModes;
+    if (!validIndex(subIndex, groups.length))
+        return next;
+    var tiles = groups[subIndex].tiles;
+    if (!validIndex(tileIndex, tiles.length)
+            || typeof expectedTileId !== "string"
+            || tiles[tileIndex].id !== expectedTileId
+            || typeof moduleId !== "string" || !validModule(moduleId))
+        return next;
+    if (tiles.some(function(tile, i) {
+        return i !== tileIndex && tile.module === moduleId;
+    }))
+        return next;
+    tiles[tileIndex].module = moduleId;
+    return next;
+}
+
 // Remove only the requested TILE PLACEMENT, never the module's own data.
 // Explicit UI activation owns removal and records an undo snapshot.
 function removeTile(layout, modeIndex, subIndex, tileIndex) {

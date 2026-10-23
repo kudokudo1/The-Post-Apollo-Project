@@ -378,4 +378,58 @@ assert.throws(() => xray.parseXraySeries({}, sampleNow));
 assert.throws(() => xray.parseXraySeries([], sampleNow));
 assert.throws(() => xray.parseXraySeries(xrayPayload, NaN));
 
+
+// NOAA official alert products are recent issued BULLETINS, not inferred
+// active warnings. Verify class, cancellations, extension and time limits.
+const swpcSource = fs.readFileSync(
+    path.join(root, "services/weather/SwpcAlertPolicy.js"), "utf8"
+).replace(/^\.pragma library\s*/m, "");
+const swpc = {};
+vm.runInNewContext(swpcSource, swpc);
+assert.equal(typeof swpc.parseBulletins, "function");
+assert.equal(typeof swpc.classify, "function");
+const bulletinNow = Date.parse("2026-10-23T12:00:00Z");
+const bulletin = (id, when, body) => ({
+    product_id: id, issue_datetime: when,
+    message: "Space Weather Message Code: " + id + "\r\n"
+             + "Issue Time: 2026 Oct 23 0000 UTC\r\n\r\n" + body
+});
+const swpcFeed = [
+    bulletin("WATA20", "2026-10-23 10:20:00.000",
+             "CANCEL WATCH: Geomagnetic Storm Category G1 Predicted"),
+    bulletin("K04W", "2026-10-23 11:30:00.000",
+             "EXTENDED WARNING: Geomagnetic K-index of 4 expected\r\nNow Valid Until: 2026 Oct 24 0000 UTC"),
+    bulletin("K05A", "2026-10-23 11:50:00.000",
+             "ALERT: Geomagnetic K-index of 5\r\nNOAA Scale: G1 - Minor"),
+    bulletin("SUM10R", "2026-10-23 09:30:00.000",
+             "SUMMARY: 10cm Radio Burst"),
+    bulletin("A20F", "2026-10-22 11:00:00.000",
+             "WATCH: Geomagnetic Storm Category G2 Predicted"),
+    bulletin("K05A", "2026-10-23 11:50:00.000",
+             "ALERT: Geomagnetic K-index of 5\r\nNOAA Scale: G1 - Minor"), // duplicate
+    bulletin("OUTDATED", "2026-10-20 09:00:00.000",
+             "WARNING: Too old"),
+    bulletin("FUTURE", "2026-10-24 09:00:00.000",
+             "WATCH: Invalid future"),
+    bulletin("INVALID", "2026-10-23 11:45:00.000",
+             "Unclassified prose"),
+];
+const bulletinResult = swpc.parseBulletins(swpcFeed, bulletinNow, 48, 3);
+assert.equal(bulletinResult.count, 5);
+assert.equal(bulletinResult.bulletins.length, 3);
+assert.deepEqual(Array.from(bulletinResult.bulletins, b => b.kind),
+                 ["ALERT", "WARNING", "CANCELLATION"]);
+assert.equal(bulletinResult.bulletins[0].scale, "G1");
+assert.equal(bulletinResult.bulletins[0].issueUtc, "10-23 11:50 UTC");
+assert.equal(bulletinResult.bulletins[0].code, "K05A");
+assert.match(bulletinResult.bulletins[1].subject, /K-index of 4 expected/);
+assert.equal(bulletinResult.bulletins[2].originalType, "CANCEL WATCH");
+assert.equal(swpc.parseBulletins([], bulletinNow, 48, 3).count, 0);
+assert.equal(swpc.classify("NOAA Scale: G3"), null);
+assert.equal(swpc.issuedTime("2026-10-23 11:50:00.000"), bulletinNow - 600000);
+assert.equal(swpc.issuedTime("bad"), -1);
+assert.equal(swpc.utcLabel(0), "-- UTC");
+assert.throws(() => swpc.parseBulletins({}, bulletinNow, 48, 3));
+assert.throws(() => swpc.parseBulletins([], NaN, 48, 3));
+
 console.log("Weather data policy contracts: PASS");

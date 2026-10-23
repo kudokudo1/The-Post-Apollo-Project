@@ -286,6 +286,61 @@ function assignProject(doc, taskId, projectId, nowMs) {
     return {ok:true, reason:"", document:next};
 }
 
+// Project identities never change on rename; task assignments remain linked.
+function renameProject(doc, projectId, name, nowMs) {
+    var check = validate(doc);
+    if (!check.ok) return {ok:false, reason:check.reason};
+    if (doc.version !== 3 || typeof projectId !== "string")
+        return {ok:false, reason:"UNKNOWN_PROJECT"};
+    var index = doc.projects.findIndex(function(p) { return p.id === projectId; });
+    if (index < 0) return {ok:false, reason:"UNKNOWN_PROJECT"};
+    if (typeof name !== "string" || !validProjectName(name.trim()))
+        return {ok:false, reason:"INVALID_PROJECT_NAME"};
+    var cleanName = name.trim();
+    if (doc.projects[index].name === cleanName)
+        return {ok:false, reason:"NO_CHANGE"};
+    if (doc.projects.some(function(p) {
+        return p.id !== projectId && p.name.toLowerCase() === cleanName.toLowerCase();
+    })) return {ok:false, reason:"DUPLICATE_PROJECT_NAME"};
+    if (!isInteger(nowMs, doc.projects[index].updatedAtMs, Number.MAX_SAFE_INTEGER))
+        return {ok:false, reason:"INVALID_TIME"};
+    var next = clone(doc);
+    next.projects[index].name = cleanName;
+    next.projects[index].updatedAtMs = nowMs;
+    return {ok:true, reason:"", document:next};
+}
+
+// Delete ONLY the project after a direct YES confirmation.
+// Existing tasks are not deleted: each affected task becomes unassigned,
+// preserving its ID, status, title, description, priority and due date.
+function deleteProject(doc, projectId, nowMs, confirmed) {
+    var check = validate(doc);
+    if (!check.ok) return {ok:false, reason:check.reason};
+    if (doc.version !== 3 || typeof projectId !== "string")
+        return {ok:false, reason:"UNKNOWN_PROJECT"};
+    var index = doc.projects.findIndex(function(p) { return p.id === projectId; });
+    if (index < 0) return {ok:false, reason:"UNKNOWN_PROJECT"};
+    if (confirmed !== true)
+        return {ok:false, reason:"CONFIRM_REQUIRED"};
+    if (!isInteger(nowMs, doc.projects[index].updatedAtMs, Number.MAX_SAFE_INTEGER))
+        return {ok:false, reason:"INVALID_TIME"};
+    for (var i=0; i<doc.tasks.length; ++i) {
+        if (doc.tasks[i].projectId === projectId
+                && nowMs < doc.tasks[i].updatedAtMs)
+            return {ok:false, reason:"INVALID_TIME"};
+    }
+    var next = clone(doc);
+    next.projects.splice(index, 1);
+    for (var j=0; j<next.tasks.length; ++j) {
+        if (next.tasks[j].projectId === projectId) {
+            next.tasks[j].projectId = null;
+            next.tasks[j].updatedAtMs = nowMs;
+        }
+    }
+    // nextProjectId remains monotonically increasing, never reused.
+    return {ok:true, reason:"", document:next};
+}
+
 function view(storageState, doc, issue) {
     var state = storageState === "ready" || storageState === "empty"
         || storageState === "loading" || storageState === "saving"

@@ -54,6 +54,66 @@ Browser notification --> NotificationsService (history + notification id)
 - `integrations/proton/browser/`: **uninstalled**, read-only extension and native-host `PING/PONG` skeleton. User click on a Proton tab is required. It sends **no message identities, mail contents, credentials or mutation operations**. The host refuses all commands except a versioned PING and always reports `mailboxAccess:false`.
 - Offline tests for message binding, adapter preference, expiry, cross-account refusal, receipt matching and read-only handshake.
 
+## Private notification-to-message binding ledger foundation (2026-10-22)
+
+`services/notifications/mail/ProtonMailBindingLedger.js` now contains an
+**offline-only, memory-only** binding ledger for a *future* authenticated
+Proton adapter. It is intentionally **not imported or instantiated by
+NotificationsService** and not reachable from the MAIL controls or browser
+companion. The current native host still permits only `PING`; the V4 browser
+probe only reports counts and `identity NOT verified`.
+
+The ledger constructor requires **two independently owned trusted callbacks**:
+
+1. `verifyFromTrustedAdapter(proposal)` must authenticate the adapter source,
+   account, exact message and its association with the intended live native
+   notification, and return a *new, verified internal record*. It must never
+   merely echo a browser page observation, an arbitrary `attested:true` field,
+   a selected-row ID, notification title/subject, timestamp or guessed URL.
+2. `isLiveEvent(eventId)` must check the real transient
+   `NotificationsService.liveExternalNotifications` registry, not retained
+   notification history. There is currently **no approved transport or
+   production implementation** of either callback.
+
+Without both trusted callbacks, admission returns
+`transport-not-connected`. The ledger validates short-lived binding shape
+and account/reference consistency, caps a lease at **two minutes**, limits
+active leases to **64**, prevents a browser or Bridge reference from being
+bound to two simultaneous native events, revokes on notification expiry or
+closure, and temporarily tombstones revoked leases to reject stale replay.
+Lookups return private defensive copies. A disconnected/changed transport
+must call `reset()` to revoke current leases and must disable new admission.
+
+The only authorized use of `lookup()` will be inside a reviewed trusted
+notification/adapter controller, followed by the existing
+`ProtonMailActionPolicy.routeFor()`. Never serialize its result into a
+ListModel, notification history, log, shell/DBus notification payload or
+browser-extension console. The `attested` booleans in the **returned** record
+are not cryptographic proofs. The authenticating transport and exact
+event-to-message correlation remain separate prerequisites.
+
+Offline tests in `tests/notifications/test_proton_binding_ledger.py`
+exercise rejected self-asserted claims (including V4 browser results),
+account/ref mismatch, expiry, duplicate event and message, closed event,
+revoke/reset/replay, capacity, defensive copies and policy compatibility.
+They use synthetic trusted callbacks only, do not authenticate Proton, do
+not enable any MAIL action, and create no private mail content.
+
+### Next gated implementation
+
+- Decide and review how the approved browser/Bridge adapter proves a
+  **specific notification delivery** corresponds to an **individual email**
+  rather than a conversation, from an authenticated per-account source.
+- Implement exact browser-native host identity pinning, a private local
+  transport protocol, and message-proof validation with no credentials or
+  opaque references in notification history.
+- Integrate the trusted event liveness callback and ledger inside
+  `NotificationsService` only after end-to-end tests. A published
+  notification cannot confer its own binding just by claiming an ID.
+- Obtain an adapter-side provider-confirmed operation receipt and enforce
+  at-most-one dispatch, expiry, revocation and explicit destructive-action
+  confirmation. Activate a local writer only with operator permission.
+
 ## Remaining implementation gates
 
 1. Browser: test each supported browser family's extension API and the real Proton UI to establish a **stable account and exact message identity** from the authenticated page without capturing session secrets. Explicit local installation + validation required. Do not automate uncertain DOM selectors.

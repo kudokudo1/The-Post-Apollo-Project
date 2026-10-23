@@ -1061,6 +1061,115 @@ Rectangle {
 
         StationSectionDivider {
             width: parent.width
+            title: "NOAA // WARNING VALIDITY REVIEW"
+        }
+
+        Column {
+            width: parent.width
+            spacing: 8
+
+            Row {
+                width: parent.width
+                spacing: 16
+
+                SecondaryText {
+                    text: "EXPLICIT VALIDITY WINDOWS"
+                    font.pixelSize: 11
+                }
+
+                GohuText {
+                    text: alertService.ready
+                          ? String(alertService.validity.windowCount)
+                            + " OPEN // NOT VERIFIED ACTIVE"
+                          : "-- OPEN"
+                    font.pixelSize: 11
+                    color: alertService.fresh ? Colors.yellow : Colors.orange
+                }
+
+                QuietText {
+                    text: alertService.ready
+                          ? String(alertService.validity.uncertainCount)
+                            + " UNVERIFIABLE WATCHES / WARNINGS"
+                          : "ASSESSMENT PENDING"
+                    font.pixelSize: 10
+                }
+            }
+
+            Row {
+                id: warningWindowRow
+                width: parent.width
+                spacing: 10
+
+                Repeater {
+                    model: alertService.ready && alertService.fresh
+                           ? alertService.validity.windows : []
+
+                    delegate: Rectangle {
+                        required property var modelData
+                        width: Math.max(0, (warningWindowRow.width
+                                            - 2 * warningWindowRow.spacing) / 3)
+                        height: 108
+                        color: Colors.dark
+                        border.width: 1
+                        border.color: Colors.yellow
+
+                        Column {
+                            anchors.fill: parent
+                            anchors.margins: 8
+                            spacing: 6
+
+                            GohuText {
+                                text: "WINDOW OPEN // " + modelData.productId
+                                font.pixelSize: 12
+                                color: Colors.yellow
+                            }
+
+                            GohuText {
+                                width: parent.width
+                                height: 36
+                                wrapMode: Text.WordWrap
+                                elide: Text.ElideRight
+                                maximumLineCount: 2
+                                text: modelData.subject
+                                font.pixelSize: 11
+                                color: Colors.white
+                            }
+
+                            QuietText {
+                                text: "UNTIL " + modelData.untilUtc
+                                font.pixelSize: 10
+                            }
+
+                            QuietText {
+                                text: "VERIFY WITH NOAA"
+                                font.pixelSize: 10
+                            }
+                        }
+                    }
+                }
+            }
+
+            QuietText {
+                visible: !alertService.ready || !alertService.fresh
+                         || alertService.validity.windowCount === 0
+                width: parent.width
+                text: !alertService.ready
+                      ? "WAITING FOR NOAA BULLETIN FEED"
+                      : !alertService.fresh
+                        ? "REVIEW STALE // DO NOT INFER CURRENT WARNING STATUS"
+                        : "NO OPEN EXPLICIT WARNING WINDOWS FOUND // NOT AN ALL CLEAR"
+                font.pixelSize: 11
+            }
+
+            QuietText {
+                width: parent.width
+                text: "SWPC WINDOW CHECK // CANCELLATIONS + EXTENSIONS // WATCH DAYS UNVERIFIED"
+                font.pixelSize: 10
+            }
+        }
+
+        StationSectionDivider {
+            width: parent.width
             title: "SPACE WEATHER // NOAA BULLETINS"
         }
 

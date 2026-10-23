@@ -3647,7 +3647,7 @@ PanelWindow {
                                 width: Math.max(0, parent.width - 96)
                                 anchors.verticalCenter: parent.verticalCenter
                                 text: timew.machineSelectionValidation.status === "ready"
-                                      ? "SELECTION CONSISTENT // NOT SAVED"
+                                      ? "SELECTION CONSISTENT // READY TO SAVE"
                                       : timew.machineSelectionValidation.issues.length > 0
                                       ? "BLOCKED " + timew.machineSelectionValidation.issueCount
                                         + " // " + timew.machineSelectionValidation.issues[0].label

@@ -93,6 +93,16 @@ Scope {
                                               projectId, Date.now()));
     }
 
+    function renameProject(projectId, name) {
+        return stage(TodoPolicy.renameProject(document, projectId,
+                                             name, Date.now()));
+    }
+
+    function deleteProject(projectId, confirmed) {
+        return stage(TodoPolicy.deleteProject(document, projectId,
+                                             Date.now(), confirmed));
+    }
+
     function removeTask(id, confirmed) {
         return stage(TodoPolicy.update(document, id, "delete",
                                       null, Date.now(), confirmed));

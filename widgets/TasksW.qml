@@ -49,7 +49,8 @@ PanelWindow {
         ApolloHubTodoStore.snapshot
         ? ApolloHubTodoStore.snapshot.state : "loading"
     readonly property string feedStatus:
-        activeMode.id !== "tasks" && activeMode.id !== "today" ? "NO FEED"
+        activeMode.id !== "tasks" && activeMode.id !== "today"
+        && activeMode.id !== "projects" ? "NO FEED"
         : taskStoreState === "ready" || taskStoreState === "empty" ? "LOCAL"
         : taskStoreState === "saving" ? "SAVING"
         : taskStoreState === "loading" ? "READING"
@@ -93,9 +94,11 @@ PanelWindow {
     // TextInput needs keyboard focus, but only while the TASKS page is open.
     // OnDemand does not request an indefinite exclusive keyboard lock.
     WlrLayershell.keyboardFocus:
-        root.menuOpen && root.activeMode.id === "tasks"
+        root.menuOpen && (root.activeMode.id === "tasks"
+                          || root.activeMode.id === "projects")
         ? WlrKeyboardFocus.OnDemand : WlrKeyboardFocus.None
-    focusable: root.menuOpen && root.activeMode.id === "tasks"
+    focusable: root.menuOpen && (root.activeMode.id === "tasks"
+                                 || root.activeMode.id === "projects")
 
     color: "transparent"
     surfaceFormat.opaque: false
@@ -256,6 +259,7 @@ PanelWindow {
 
             Column {
                 visible: root.activeMode.id !== "tasks" && root.activeMode.id !== "today"
+                         && root.activeMode.id !== "projects"
                 anchors.centerIn: parent
                 width: parent.width
                 spacing: 12
@@ -314,6 +318,20 @@ PanelWindow {
                 id: taskToday
                 anchors.fill: parent
                 visible: root.menuOpen && root.activeMode.id === "today"
+                todoSnapshot: ApolloHubTodoStore.snapshot
+                onOpenTaskRequested: function(taskId) {
+                    root.selectMainMode(0);
+                    taskDetails.chooseTask(taskId);
+                }
+            }
+
+            // Local project groups and task assignment share the one Hub
+            // task store. These are not remote GitHub Projects records.
+            TaskProjectsPane {
+                id: taskProjects
+                anchors.fill: parent
+                visible: root.menuOpen && root.activeMode.id === "projects"
+                todoStore: ApolloHubTodoStore
                 todoSnapshot: ApolloHubTodoStore.snapshot
                 onOpenTaskRequested: function(taskId) {
                     root.selectMainMode(0);

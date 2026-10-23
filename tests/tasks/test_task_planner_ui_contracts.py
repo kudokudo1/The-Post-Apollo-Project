@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""PLANNER M1 remains read-only and independent of central store and host."""
+"""PLANNER remains read-only after M3 host mounting."""
 from pathlib import Path
 root=Path(__file__).resolve().parents[2]
 pane=(root/"widgets/tasks/TaskPlannerPane.qml").read_text()
@@ -12,7 +12,7 @@ assert 'Grid {' in pane and 'ListView {' in pane
 assert 'onLeftClicked: planner.openTaskRequested(modelData.id)' in pane
 assert 'function view(snapshot, monthKey, selectedKey, todayKey)' in policy
 assert 'days.push(' in policy and 'agenda=agenda.slice().sort(' in policy
-assert 'TaskPlannerPane {' not in host, "M1 must not edit shared host"
+assert host.count("TaskPlannerPane {") == 1, "M3 must mount PLANNER exactly once"
 for text in (pane,policy):
     for forbidden in ('FileView {','Process {','XmlHttpRequest','setTaskDone(',
                       'removeTask(','renameTask(','addTask(','ApolloHubTodoStore'):

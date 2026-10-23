@@ -1040,8 +1040,8 @@ for token in (
     ': calendarMini.densityLevel === 2 ? 12 : 9',
     ': calendarMini.densityLevel === 2 ? 13',
     'calendarMini.calendarSnapshot.weeks === 6 ? 9 : 10',
-    'calendarMini.calendarBridge.calendarMonthOffset',
-    'calendarMini.calendarBridge.calendarWeekStartsOn',
+    'calendarBridge.calendarMonthOffset = next;',
+    'calendarBridge.calendarWeekStartsOn = weekStart === 0 ? 1 : 0;',
 ):
     assert token in calendar_mini, f"Calendar H:2/H:3 contract missing: {token}"
 assert 'Timer {' not in calendar_mini

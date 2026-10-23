@@ -194,9 +194,17 @@ The initial Stage 7B polish targets the oversized **TIME** tile shown in the ope
 
 **Desktop acceptance:** Pull GitHub `main` and restart Quickshell. In Hub EDIT, set TIME to H:1, H:2 and H:3 in a half-width tile. The compact view should remain familiar, while medium and tall views show a substantially larger centered clock/date/offset block. Toggle 12H/24H and verify neither formatting clips. Try W:2 + H:3 to inspect readability at full width; confirm no new timer and that neighboring tile positions are unchanged. The time still updates every second.
 
+## P1 Stage 7C // Responsive CALENDAR typography
+
+Calendar already used the host tile's available height for its grid. Stage 7C now uses that space for larger, readable month headings, weekday labels, and day numbers at H:2 and H:3, while preserving the original compact H:1 sizes and six-week behavior. The thresholds are the same 180px / 300px heights as the accepted Stage 7B TIME presentation; no new state service, timer, event feed, disk write, or layout version is introduced. The existing previous/next month, Today and SUN/MON controls stay wired to the same calendar bridge.
+
+**VERIFY:** `tests/hub/test_apollo_hub_foundation.py` checks density thresholds, original compact styles, larger typography, preserved bridge properties, and no new timer/file view. Source contracts and validation passed.
+
+**Desktop acceptance:** Pull `main`, restart Quickshell, and set a CALENDAR tile to H:1, H:2 and H:3. Verify the month heading, weekdays, and date numbers become larger without overlapping the existing navigation buttons. Try months with five and six week rows and switch SUN/MON. Verify the active date remains highlighted. This is an appearance-only checkpoint.
+
 ## NEXT
 
-First accept Stage 7A keyboard navigation and Stage 7B TIME scaling on the actual desktop. Then continue **content-density polish on the next selected mini-widget**, using its own content and controls rather than indiscriminately scaling everything. Durable undo/presets and drag-and-drop remain separate operator decisions.
+Complete Stage 7A/7B/7C desktop acceptance. Next can be Notes and To-do internal density, but those contain editable user data, so changes must preserve editor focus, draft and save-confirmation behavior. Durable undo/presets and drag-and-drop remain separate operator decisions.
 
 ## DECISIONS
 

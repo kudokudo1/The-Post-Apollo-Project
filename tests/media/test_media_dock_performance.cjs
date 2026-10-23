@@ -511,7 +511,7 @@ test("large faded CAVA-only ambient wash follows a padded spectrum envelope", ()
     assert.match(wash, /blur:\s*mediaDock\.contentGlowRadius\s*\+\s*4/);
     assert.match(wash, /spread:\s*0/);
     assert.match(wash, /color:\s*mediaDock\.artworkAccentColor/);
-    assert.match(wash, /opacity:\s*0\.30/);
+    assert.match(wash, /opacity:\s*mediaDock\.open\s*\?\s*mediaDock\.softGlowOpacity\s*:\s*0\.30/);
     assert.match(wash, /z:\s*-1/);
     assert.match(wash, /Behavior on height\s*\{\s*NumberAnimation\s*\{\s*duration:\s*180\s*easing\.type:\s*Easing\.OutQuad/);
     assert.doesNotMatch(wash, /cavaBar|levels|frame|Repeater|safeSource|ShaderEffect|source:/,
@@ -526,6 +526,40 @@ test("large faded CAVA-only ambient wash follows a padded spectrum envelope", ()
     }
     assert.match(source, /contentGlowEnabled:\s*false/);
     assert.doesNotMatch(source, /contentGlowSource:\s*(?:spectrum|cavaBar|mediaArtwork)/);
+});
+
+test("open CAVA background wash matches static icon aura strength and stays magenta", () => {
+    const section = source.match(/RectangularShadow \{\s*id:\s*cavaAmbientWash([\s\S]*?)\n\s*\}/)?.[1];
+    assert.ok(section, "single ambient wash must remain present");
+    const opacityExpr = section.match(/opacity:\s*([^\n]+)/)?.[1];
+    assert.ok(opacityExpr, "ambient wash opacity must have one open/closed binding");
+    const resolvedSoftOpen = dockButtonSource.match(/property real softGlowOpenOpacity:\s*([0-9.]+)/);
+    assert.ok(resolvedSoftOpen, "read canonical open aura strength, not a new magic number");
+    const openAuraOpacity = Number(resolvedSoftOpen[1]);
+    const resolve = (open, softGlowOpacity) => vm.runInNewContext(opacityExpr, {
+        mediaDock: {open, softGlowOpacity}
+    });
+    assert.equal(resolve(false, openAuraOpacity), 0.30,
+        "closed CAVA ambient glow keeps its previous strength");
+    assert.equal(resolve(true, openAuraOpacity), openAuraOpacity,
+        "open CAVA glow must match the static glyph auras");
+    assert.ok(resolve(true, openAuraOpacity) > resolve(false, openAuraOpacity),
+        "open CAVA glow must be visibly stronger than its closed state");
+    assert.match(section, /color:\s*mediaDock\.artworkAccentColor/);
+    assert.match(source, /readonly property color artworkAccentColor:\s*open \? Colors\.magenta : accentColor/,
+        "CAVA ambient must turn magenta on open");
+    for (const id of ["leadingStarsAura", "trebleClefAura", "trailingStarAura"]) {
+        const match = source.match(new RegExp(
+            "RectangularShadow \\{\\s*id:\\s*" + id + "([\\s\\S]*?)\\n    \\}"
+        ));
+        assert.ok(match, id + " must remain independently lit");
+        assert.match(match[1], /opacity:\s*mediaDock\.softGlowOpacity/);
+        assert.match(match[1], /color:\s*mediaDock\.artworkAccentColor/);
+    }
+    assert.equal((source.match(/RectangularShadow \{/g) || []).length, 5);
+    assert.equal((source.match(/SafeDropShadow \{/g) || []).length, 3);
+    assert.doesNotMatch(section, /ShaderEffect|safeSource|layer\.enabled|Behavior on opacity/,
+        "no new sampled or animated glow layer may be introduced");
 });
 
 test("ambient height averages the four strongest CAVA bars with padding and smoothing", () => {

@@ -60,7 +60,7 @@ class DifferenceTests(unittest.TestCase):
         self.assertFalse(x["ambiguous_end"])
         self.assertEqual([option["total_minutes"] for option in x["options"]],
                          [120, 60])
-        self.assertEqual({o["start"][-12:] for o in x["options"]},
+        self.assertEqual({o["start"][-12:].strip() for o in x["options"]},
                          {"EDT (-0400)", "EST (-0500)"})
 
     def test_two_ambiguous_endpoints_have_four_combinations(self):

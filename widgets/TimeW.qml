@@ -50,9 +50,83 @@ PanelWindow {
           + "//" + localTimeSnapshot.meridiem
         : "--:--:--//--"
 
-    // Two CALC views preserve the existing converter geometry while adding
-    // manual elapsed duration arithmetic without a new persistent clock.
+    // Two CALC views, with MATH split into duration shift vs. interval.
     property string calcView: "convert"
+    property string mathView: "elapsed"
+    property string differenceEndZone: "UTC"
+    property string differenceEndDate: new Date().toISOString().slice(0, 10)
+    property string differenceEndTime: new Date().toISOString().slice(11, 16)
+    property bool differenceEnd24Hour: true
+    readonly property var differenceEndParsedTime:
+        ConverterFormat.parseInput(differenceEndTime, differenceEnd24Hour)
+    property var differenceResult: null
+    property bool differenceBusy: false
+    property string differenceSubmittedKey: ""
+    readonly property string differenceInputsKey:
+        [converterDate,
+         converterParsedTime.valid ? converterParsedTime.canonical
+                                   : "INVALID:" + converterTime,
+         converterSourceZone, differenceEndDate,
+         differenceEndParsedTime.valid ? differenceEndParsedTime.canonical
+                                       : "INVALID:" + differenceEndTime,
+         differenceEndZone].join("|")
+    onDifferenceInputsKeyChanged: differenceResult = null
+
+    function setMathView(which) {
+        if (which !== "elapsed" && which !== "between")
+            return;
+        closeConverterDropdowns();
+        mathView = which;
+    }
+
+    function cycleDifferenceEndZone() {
+        const choices = converterZones;
+        if (choices.length === 0) return;
+        const idx = choices.findIndex(function(zone) {
+            return zone.id === differenceEndZone;
+        });
+        differenceEndZone = choices[(idx + 1) % choices.length].id;
+        closeConverterDropdowns();
+    }
+
+    function toggleDifferenceEndFormat() {
+        const next24 = !differenceEnd24Hour;
+        const formatted = ConverterFormat.convertInput(
+                              differenceEndTime, differenceEnd24Hour, next24);
+        if (!formatted.valid) {
+            differenceResult = {status: formatted.error, options: []};
+            return;
+        }
+        differenceEnd24Hour = next24;
+        differenceEndTime = formatted.text;
+    }
+
+    function runTimeDifference() {
+        if (differenceBusy || !menuOpen || selectedMode !== "calc"
+                || calcView !== "math" || mathView !== "between")
+            return;
+        if (!converterZoneAllowed(converterSourceZone)
+                || !converterZoneAllowed(differenceEndZone)) {
+            differenceResult = {status: "ZONE_UNAVAILABLE", options: []};
+            return;
+        }
+        if (!converterParsedTime.valid || !differenceEndParsedTime.valid) {
+            differenceResult = {
+                status: "INVALID_INPUT_TIME", options: []
+            };
+            return;
+        }
+        differenceResult = null;
+        differenceSubmittedKey = differenceInputsKey;
+        differenceBusy = true;
+        differenceProcess.exec([
+            "python3", "-B", "-I",
+            Quickshell.shellPath("services/time/TimeDifference.py"),
+            converterSourceZone, converterDate, converterParsedTime.canonical,
+            differenceEndZone, differenceEndDate,
+            differenceEndParsedTime.canonical
+        ]);
+    }
     property string mathOperation: "add"
     property string mathDays: "0"
     property string mathHours: "1"
@@ -150,20 +224,26 @@ PanelWindow {
         converterSourcePicker.dropFocus();
         converterTargetPicker.dropFocus();
         mathZonePicker.dropFocus();
+        differenceEndPicker.dropFocus();
         Qt.callLater(restoreKeyboardFocus);
     }
 
     function openConverterDropdown(which) {
         if (!menuOpen || selectedMode !== "calc")
             return;
-        if (which !== "source" && which !== "target" && which !== "math")
+        if (which !== "source" && which !== "target"
+                && which !== "math" && which !== "difference")
             return;
         // CONVERT has independent FROM/TO selectors; MATH shares FROM's
         // selected zone but has its own popup and keyboard focus.
         if (which === "math" && calcView !== "math")
             return;
-        if (which !== "math" && calcView !== "convert")
+        if (which === "difference"
+                && (calcView !== "math" || mathView !== "between"))
             return;
+        if (which === "source" || which === "target") {
+            if (calcView !== "convert") return;
+        }
         activeConverterDropdown = which;
         loadWorldZoneCatalog();
     }
@@ -184,6 +264,8 @@ PanelWindow {
             converterSourceZone = zoneId;
         else if (which === "target")
             converterTargetZone = zoneId;
+        else if (which === "difference")
+            differenceEndZone = zoneId;
         else
             return;
         converterResult = null;
@@ -282,6 +364,9 @@ PanelWindow {
         && !converterSourcePicker.searchFocused
         && !converterTargetPicker.searchFocused
         && !mathZonePicker.searchFocused
+        && !differenceEndPicker.searchFocused
+        && !differenceEndDateInput.activeFocus
+        && !differenceEndTimeInput.activeFocus
         && !converterDateInput.activeFocus && !converterTimeInput.activeFocus
     property string worldLookupZone: ""
     property string worldValidZone: ""
@@ -498,6 +583,36 @@ PanelWindow {
         precision: SystemClock.Seconds
     }
 
+    // Difference comparisons are also one-shot. Existing inputs are kept
+    // private, argv is fixed, and stale results are discarded on every edit.
+    Process {
+        id: differenceProcess
+        running: false
+        stdout: StdioCollector {
+            onStreamFinished: {
+                if (timew.differenceSubmittedKey !== timew.differenceInputsKey)
+                    return;
+                try {
+                    const data = JSON.parse(this.text);
+                    timew.differenceResult =
+                        data && typeof data.status === "string"
+                        && Array.isArray(data.options)
+                        ? data : {status: "INVALID_RESULT", options: []};
+                } catch (e) {
+                    timew.differenceResult =
+                        {status: "INVALID_RESULT", options: []};
+                }
+            }
+        }
+        onExited: function(exitCode, exitStatus) {
+            timew.differenceBusy = false;
+            if (exitCode !== 0
+                    && timew.differenceSubmittedKey === timew.differenceInputsKey)
+                timew.differenceResult =
+                    {status: "DIFFERENCE_UNAVAILABLE", options: []};
+        }
+    }
+
     // Request-driven elapsed arithmetic. Keep it separate from the zone
     // converter so neither process nor result interferes with the other.
     Process {
@@ -707,6 +822,7 @@ PanelWindow {
                      || converterSourcePicker.searchFocused
                      || converterTargetPicker.searchFocused
                      || mathZonePicker.searchFocused
+                     || differenceEndPicker.searchFocused
             gesturePolicy: TapHandler.DragThreshold
             onTapped: function(point, button) {
                 if (button !== Qt.LeftButton)
@@ -732,7 +848,12 @@ PanelWindow {
                     // pickers remain instantiated while MATH is visible.
                     // Testing hidden pickers would incorrectly keep menus open.
                     if (timew.calcView === "math") {
-                        if (!mathZonePicker.containsFramePoint(timewFrame, px, py))
+                        const onMathZone = mathZonePicker.containsFramePoint(
+                                               timewFrame, px, py);
+                        const onEndZone = timew.mathView === "between"
+                                          && differenceEndPicker.containsFramePoint(
+                                                 timewFrame, px, py);
+                        if (!onMathZone && !onEndZone)
                             timew.closeConverterDropdowns();
                     } else {
                         const inSource = converterSourcePicker.containsFramePoint(
@@ -1549,12 +1670,16 @@ PanelWindow {
                         id: mathPane
                         visible: timew.selectedMode === "calc" && timew.calcView === "math"
                         // Keep the list above date/duration controls and footer.
-                        z: timew.activeConverterDropdown === "math" ? 20 : 0
+                        z: (timew.activeConverterDropdown === "math"
+                            || timew.activeConverterDropdown === "difference")
+                           ? 20 : 0
                         width: parent.width
                         spacing: 10
 
                         GohuText {
-                            text: "ELAPSED TIME // ADD OR SUBTRACT"
+                            text: timew.mathView === "elapsed"
+                                  ? "ELAPSED TIME // ADD OR SUBTRACT"
+                                  : "ELAPSED TIME // BETWEEN MOMENTS"
                             color: Colors.white
                             font.pixelSize: 13
                         }
@@ -1564,7 +1689,7 @@ PanelWindow {
                             width: parent.width
                             height: 34
                             spacing: 6
-                            z: 30
+                            z: 40
                             GohuText {
                                 width: 50
                                 height: parent.height
@@ -1676,7 +1801,314 @@ PanelWindow {
                         }
 
                         Row {
+                            id: mathTypeStrip
+                            width: parent.width
+                            height: 32
+                            spacing: 6
+                            ModeButton {
+                                width: (mathTypeStrip.width - mathTypeStrip.spacing) / 2
+                                height: parent.height
+                                bordered: false
+                                textOnly: true
+                                labelText: "ADD / SUB"
+                                labelFontSize: 11
+                                idlePrimaryColor: timew.semanticColor
+                                selected: timew.mathView === "elapsed"
+                                onTriggered: timew.setMathView("elapsed")
+                            }
+                            ModeButton {
+                                width: (mathTypeStrip.width - mathTypeStrip.spacing) / 2
+                                height: parent.height
+                                bordered: false
+                                textOnly: true
+                                labelText: "BETWEEN"
+                                labelFontSize: 11
+                                idlePrimaryColor: timew.semanticColor
+                                selected: timew.mathView === "between"
+                                onTriggered: timew.setMathView("between")
+                            }
+                        }
+
+                        Column {
+                            id: mathDifferencePane
+                            visible: timew.mathView === "between"
+                            width: parent.width
+                            spacing: 9
+                            z: timew.activeConverterDropdown === "difference" ? 30 : 0
+
+                            GohuText {
+                                text: "END // DATE + TIME"
+                                color: Colors.white
+                                font.pixelSize: 12
+                            }
+
+                            Row {
+                                id: differenceEndZoneRow
+                                width: parent.width
+                                height: 34
+                                spacing: 6
+                                z: 30
+
+                                GohuText {
+                                    width: 50
+                                    height: parent.height
+                                    verticalAlignment: Text.AlignVCenter
+                                    text: "ZONE"
+                                    color: Colors.cyan
+                                    font.pixelSize: 11
+                                }
+                                ActionButton {
+                                    width: 67
+                                    height: 30
+                                    label: "CHANGE"
+                                    labelPixelSize: 9
+                                    accentColor: Colors.white
+                                    onLeftClicked: timew.cycleDifferenceEndZone()
+                                }
+                                TimeZonePicker {
+                                    id: differenceEndPicker
+                                    width: Math.max(0, differenceEndZoneRow.width
+                                                    - 50 - 67
+                                                    - differenceEndZoneRow.spacing * 2)
+                                    height: differenceEndZoneRow.height
+                                    selectedZone: timew.differenceEndZone
+                                    catalog: timew.worldZoneCatalog
+                                    countryIndex: timew.worldCountryIndex
+                                    catalogLoading: timew.worldCatalogLoading
+                                    catalogFailed: timew.worldCatalogFailed
+                                    expanded: timew.activeConverterDropdown === "difference"
+                                    onOpenRequested:
+                                        timew.openConverterDropdown("difference")
+                                    onToggleRequested:
+                                        timew.toggleConverterDropdown("difference")
+                                    onZoneChosen: function(zoneId) {
+                                        timew.chooseConverterSearchZone("difference", zoneId);
+                                    }
+                                }
+                            }
+
+                            Row {
+                                id: differenceEndInputs
+                                width: parent.width
+                                height: 34
+                                spacing: 4
+                                TextField {
+                                    id: differenceEndDateInput
+                                    width: Math.max(0, (differenceEndInputs.width
+                                            - differenceEndFormatButton.width
+                                            - differenceEndInputs.spacing * 2) / 2)
+                                    height: parent.height
+                                    text: timew.differenceEndDate
+                                    placeholderText: "YYYY-MM-DD"
+                                    color: Colors.magenta
+                                    placeholderTextColor: Colors.cyan
+                                    selectionColor: Colors.magenta
+                                    selectedTextColor: Colors.black
+                                    font.family: "GohuFont 11 Nerd Font Mono"
+                                    font.pixelSize: 10
+                                    leftPadding: 3
+                                    rightPadding: 3
+                                    cursorDelegate: Rectangle {
+                                        width: 2
+                                        color: Colors.orange
+                                    }
+                                    background: Rectangle {
+                                        color: Colors.black
+                                        border.width: 1
+                                        border.color: differenceEndDateInput.activeFocus
+                                                      ? Colors.magenta : Colors.cyan
+                                    }
+                                    onTextEdited: timew.differenceEndDate = text
+                                }
+                                TextField {
+                                    id: differenceEndTimeInput
+                                    width: Math.max(0, differenceEndInputs.width
+                                            - differenceEndDateInput.width
+                                            - differenceEndFormatButton.width
+                                            - differenceEndInputs.spacing * 2)
+                                    height: parent.height
+                                    text: timew.differenceEndTime
+                                    placeholderText: timew.differenceEnd24Hour
+                                                     ? "HH:MM" : "HH:MM//PM"
+                                    color: Colors.magenta
+                                    placeholderTextColor: Colors.cyan
+                                    selectionColor: Colors.magenta
+                                    selectedTextColor: Colors.black
+                                    font.family: "GohuFont 11 Nerd Font Mono"
+                                    font.pixelSize: 10
+                                    leftPadding: 3
+                                    rightPadding: 3
+                                    cursorDelegate: Rectangle {
+                                        width: 2
+                                        color: Colors.orange
+                                    }
+                                    background: Rectangle {
+                                        color: Colors.black
+                                        border.width: 1
+                                        border.color: differenceEndTimeInput.activeFocus
+                                                      ? Colors.magenta : Colors.cyan
+                                    }
+                                    onTextEdited: timew.differenceEndTime = text
+                                }
+                                ActionButton {
+                                    id: differenceEndFormatButton
+                                    width: 44
+                                    height: parent.height
+                                    label: timew.differenceEnd24Hour ? "24H" : "12H"
+                                    labelPixelSize: 11
+                                    accentColor: timew.differenceEnd24Hour
+                                                 ? Colors.orange : Colors.cyan
+                                    onLeftClicked: timew.toggleDifferenceEndFormat()
+                                }
+                            }
+
+                            ActionButton {
+                                id: differenceRunButton
+                                width: parent.width
+                                height: 34
+                                label: timew.differenceBusy
+                                       ? "CALCULATING..." : "FIND ELAPSED DURATION"
+                                labelPixelSize: 11
+                                accentColor: Colors.white
+                                available: !timew.differenceBusy
+                                onLeftClicked: timew.runTimeDifference()
+                            }
+
+                            Rectangle {
+                                width: parent.width
+                                height: 2
+                                color: Colors.cyan
+                                opacity: 0.5
+                            }
+
+                            Row {
+                                id: differenceResultHeader
+                                width: parent.width
+                                height: 40
+                                spacing: 6
+                                GohuText {
+                                    width: parent.width - differenceOutputFormatButton.width
+                                           - differenceResultHeader.spacing
+                                    height: parent.height
+                                    verticalAlignment: Text.AlignVCenter
+                                    wrapMode: Text.Wrap
+                                    color: timew.differenceResult
+                                           && timew.differenceResult.status === "READY"
+                                           ? Colors.cyan : Colors.orange
+                                    font.pixelSize: 11
+                                    text: timew.differenceBusy ? "BETWEEN // WORKING"
+                                          : !timew.differenceResult
+                                          ? "BETWEEN // ENTER TWO MOMENTS"
+                                          : timew.differenceResult.status === "READY"
+                                          ? "BETWEEN // 1 DURATION"
+                                          : timew.differenceResult.status === "AMBIGUOUS_LOCAL_TIME"
+                                          ? "DST OVERLAP // MULTIPLE DURATIONS"
+                                          : timew.differenceResult.status.indexOf(
+                                                "NONEXISTENT_LOCAL_TIME") >= 0
+                                          ? "TIME DOES NOT EXIST // DST CLOCK JUMP"
+                                          : "BETWEEN // " + timew.differenceResult.status
+                                }
+                                ActionButton {
+                                    id: differenceOutputFormatButton
+                                    width: 44
+                                    height: 30
+                                    label: timew.converterOutput24Hour ? "24H" : "12H"
+                                    labelPixelSize: 11
+                                    accentColor: timew.converterOutputFormatColor
+                                    onLeftClicked: timew.toggleConverterOutputFormat()
+                                }
+                            }
+
+                            Item {
+                                id: differenceResultsArea
+                                width: parent.width
+                                height: timew.differenceResult
+                                        && timew.differenceResult.options
+                                        && timew.differenceResult.options.length > 0
+                                        ? Math.min(176,
+                                            timew.differenceResult.options.length * 90)
+                                        : 0
+
+                            Flickable {
+                                id: differenceResults
+                                width: Math.max(0, differenceResultsArea.width - 21)
+                                height: differenceResultsArea.height
+                                clip: true
+                                boundsBehavior: Flickable.StopAtBounds
+                                contentHeight: differenceResultsColumn.height
+                                interactive: contentHeight > height
+
+                                Column {
+                                    id: differenceResultsColumn
+                                    width: differenceResults.width - 18
+                                    spacing: 7
+                                    Repeater {
+                                        model: timew.differenceResult
+                                               && timew.differenceResult.options
+                                               ? timew.differenceResult.options : []
+                                        Column {
+                                            width: differenceResultsColumn.width
+                                            spacing: 3
+                                            GohuText {
+                                                width: parent.width
+                                                text: "PAIR " + (index + 1) + " // "
+                                                      + modelData.sign
+                                                      + modelData.days + "D "
+                                                      + modelData.hours + "H "
+                                                      + modelData.minutes + "M"
+                                                color: timew.converterOutputFormatColor
+                                                font.pixelSize: 13
+                                            }
+                                            GohuText {
+                                                width: parent.width
+                                                text: "START // " + ConverterFormat.formatResult(
+                                                          modelData.start,
+                                                          timew.converterOutput24Hour)
+                                                elide: Text.ElideRight
+                                                color: Colors.orange
+                                                font.pixelSize: 11
+                                            }
+                                            GohuText {
+                                                width: parent.width
+                                                text: "END // " + ConverterFormat.formatResult(
+                                                          modelData.end,
+                                                          timew.converterOutput24Hour)
+                                                elide: Text.ElideRight
+                                                color: Colors.white
+                                                font.pixelSize: 11
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                            NeonScrollBar {
+                                id: differenceResultsRail
+                                flickable: differenceResults
+                                geometryMode: "viewport"
+                                x: differenceResultsArea.width - width - 3
+                                y: 0
+                                height: differenceResults.height
+                                handleStyle: "star"
+                                railColor: Colors.cyan
+                                handleColor: Colors.magenta
+                                handleBorderColor: Colors.magenta
+                                containGlow: true
+                                visible: timew.mathView === "between" && scrollable
+                            }
+                            }
+
+                            GohuText {
+                                width: parent.width
+                                text: "ELAPSED DURATION // ZONES AND DST AWARE"
+                                color: Colors.white
+                                font.pixelSize: 11
+                                opacity: 0.72
+                            }
+                        }
+
+                        Row {
                             id: mathDurationRow
+                            visible: timew.mathView === "elapsed"
                             width: parent.width
                             height: 60
                             spacing: 6
@@ -1764,6 +2196,8 @@ PanelWindow {
                         }
 
                         Row {
+                            id: mathActionRow
+                            visible: timew.mathView === "elapsed"
                             width: parent.width
                             height: 34
                             spacing: 6
@@ -1796,6 +2230,7 @@ PanelWindow {
 
                         Row {
                             id: mathResultHeader
+                            visible: timew.mathView === "elapsed"
                             width: parent.width
                             height: 42
                             spacing: 6
@@ -1832,7 +2267,8 @@ PanelWindow {
                         }
 
                         Repeater {
-                            model: timew.mathResult && timew.mathResult.options
+                            model: timew.mathView === "elapsed" && timew.mathResult
+                                   && timew.mathResult.options
                                    ? timew.mathResult.options : []
                             Column {
                                 width: mathPane.width
@@ -1866,6 +2302,7 @@ PanelWindow {
 
                         GohuText {
                             width: parent.width
+                            visible: timew.mathView === "elapsed"
                             text: "ELAPSED // 1 DAY = 24 HOURS. "
                                   + "FROM zone comes from CONVERT."
                             color: Colors.white

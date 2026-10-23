@@ -125,7 +125,7 @@ assert "WorldClockPolicy.snapshot(localClock.date.getTime()," in window
 assert 'command: ["date", "+%z"]' in window
 assert 'environment: { TZ: worldLookupZone, LC_ALL: "C" }' in window
 assert "Process {" in window
-assert window.count("Process {") == 6
+assert window.count("Process {") == 7
 assert "worldLookup.running" in window
 assert 'onLeftClicked:' in window
 assert 'timew.chooseWorldZone(modelData.id)' in window
@@ -239,7 +239,7 @@ assert 'enabled: timew.navigationKeysAvailable' in window
 assert 'WORLD // SELECT A SEARCH RESULT' in window
 assert '"ZONE DIRECTORY UNAVAILABLE"' in window
 # CLOCK WORLD search + CONVERT date/time + MATH date/time/duration fields.
-assert window.count('onTextEdited:') == 8
+assert window.count('onTextEdited:') == 10
 # No dynamic command composition or arbitrary typed TZ values.
 assert 'command: ["date", "+%z"]' in window
 assert 'worldLookup.exec({' in window
@@ -344,7 +344,7 @@ assert 'selectedMode !== "clock" && selectedMode !== "calc"' in window
 assert 'selectedMode === "clock" || selectedMode === "calc"' in window
 assert 'id: converterSourcePicker' in window
 assert 'id: converterTargetPicker' in window
-assert window.count("TimeZonePicker {") == 3
+assert window.count("TimeZonePicker {") == 4
 assert 'selectedZone: timew.converterSourceZone' in window
 assert 'selectedZone: timew.converterTargetZone' in window
 assert 'expanded: timew.activeConverterDropdown === "source"' in window
@@ -353,7 +353,7 @@ assert 'onZoneChosen: function(zoneId)' in window
 assert 'timew.chooseConverterSearchZone("source", zoneId)' in window
 assert 'timew.chooseConverterSearchZone("target", zoneId)' in window
 # Two CONVERT CHANGE buttons + MATH source-zone quick-cycle button.
-assert window.count('label: "CHANGE"') == 3
+assert window.count('label: "CHANGE"') == 4
 assert 'onLeftClicked: timew.cycleConverterZone("source")' in window
 assert 'onLeftClicked: timew.cycleConverterZone("target")' in window
 assert 'converterSourcePicker.searchFocused' in window
@@ -361,7 +361,8 @@ assert 'converterTargetPicker.searchFocused' in window
 assert 'mathZonePicker.searchFocused' in window
 assert 'converterSourcePicker.containsFramePoint(' in window
 assert 'converterTargetPicker.containsFramePoint(' in window
-assert 'mathZonePicker.containsFramePoint(timewFrame, px, py)' in window
+assert 'mathZonePicker.containsFramePoint(' in window
+assert 'const onMathZone = mathZonePicker.containsFramePoint(' in window
 assert 'z: 40' in window and 'z: 30' in window
 assert 'z: timew.activeConverterDropdown !== "" ? 20 : 0' in window
 assert 'TIME ZONE CONVERTER // READ ONLY' in window
@@ -410,17 +411,20 @@ assert 'onOpenRequested: timew.openConverterDropdown("math")' in window
 assert 'onToggleRequested: timew.toggleConverterDropdown("math")' in window
 assert 'timew.chooseConverterSearchZone("math", zoneId)' in window
 assert 'if (which === "source" || which === "math")' in window
-assert 'if (which !== "source" && which !== "target" && which !== "math")' in window
+assert 'if (which !== "source" && which !== "target"' in window
+assert '&& which !== "math" && which !== "difference")' in window
 assert 'which === "math" && calcView !== "math"' in window
-assert 'which !== "math" && calcView !== "convert"' in window
+assert 'which === "difference"' in window
+assert 'which !== "math" && calcView !== "convert"' not in window
 assert 'mathZonePicker.dropFocus();' in window
 assert 'timew.calcView === "math"' in window
-assert 'z: timew.activeConverterDropdown === "math" ? 20 : 0' in window
+assert 'z: (timew.activeConverterDropdown === "math"' in window
+assert '|| timew.activeConverterDropdown === "difference")' in window
 assert 'id: mathZoneRow' in window
 assert 'mathZoneRow.spacing * 2' in window
 assert 'catalog: timew.worldZoneCatalog' in window
 assert 'countryIndex: timew.worldCountryIndex' in window
-assert window.count('label: "CHANGE"') == 3
+assert window.count('label: "CHANGE"') == 4
 assert 'id: mathDateInput' in window
 assert 'id: mathTimeInput' in window
 assert 'id: mathDaysInput' in window
@@ -461,6 +465,68 @@ assert 'NONEXISTENT_LOCAL_TIME' in arithmetic
 assert 'DURATION_OUT_OF_RANGE' in arithmetic
 assert 'operation == "subtract"' in arithmetic
 assert '3650' in arithmetic
+
+# MATH // BETWEEN compares two independently zoned civil times without
+# changing the existing ADD/SUB calculator or introducing a recurring timer.
+assert 'property string mathView: "elapsed"' in window
+assert 'function setMathView(which)' in window
+assert 'labelText: "ADD / SUB"' in window
+assert 'labelText: "BETWEEN"' in window
+assert 'id: mathTypeStrip' in window
+assert 'timew.setMathView("elapsed")' in window
+assert 'timew.setMathView("between")' in window
+assert 'id: mathDifferencePane' in window
+assert 'visible: timew.mathView === "between"' in window
+assert 'id: differenceEndZoneRow' in window
+assert 'id: differenceEndPicker' in window
+assert 'selectedZone: timew.differenceEndZone' in window
+assert 'expanded: timew.activeConverterDropdown === "difference"' in window
+assert 'timew.openConverterDropdown("difference")' in window
+assert 'timew.toggleConverterDropdown("difference")' in window
+assert 'timew.chooseConverterSearchZone("difference", zoneId)' in window
+assert 'differenceEndPicker.dropFocus();' in window
+assert 'differenceEndPicker.searchFocused' in window
+assert 'differenceEndPicker.containsFramePoint(' in window
+assert 'property string differenceEndZone: "UTC"' in window
+assert 'property bool differenceEnd24Hour: true' in window
+assert 'function toggleDifferenceEndFormat()' in window
+assert 'id: differenceEndDateInput' in window
+assert 'id: differenceEndTimeInput' in window
+assert 'id: differenceEndFormatButton' in window
+assert 'id: differenceRunButton' in window
+assert 'onLeftClicked: timew.runTimeDifference()' in window
+assert 'function runTimeDifference()' in window
+assert 'differenceEndParsedTime.canonical' in window
+assert 'converterParsedTime.canonical,' in window
+assert 'Quickshell.shellPath("services/time/TimeDifference.py")' in window
+assert 'id: differenceProcess' in window
+assert window.count('differenceProcess.exec([') == 1
+assert 'differenceSubmittedKey !== timew.differenceInputsKey' in window
+assert 'onDifferenceInputsKeyChanged: differenceResult = null' in window
+assert 'id: differenceResultHeader' in window
+assert 'id: differenceOutputFormatButton' in window
+assert 'id: differenceResultsArea' in window
+assert 'id: differenceResults' in window
+assert 'id: differenceResultsRail' in window
+assert 'flickable: differenceResults' in window
+assert 'x: differenceResultsArea.width - width - 3' in window
+assert 'handleColor: Colors.magenta' in window
+assert 'modelData.sign' in window
+assert 'modelData.days' in window
+assert 'modelData.hours' in window
+assert 'modelData.minutes' in window
+assert 'DST OVERLAP // MULTIPLE DURATIONS' in window
+assert 'ELAPSED DURATION // ZONES AND DST AWARE' in window
+assert 'visible: timew.mathView === "elapsed"' in window
+assert window.count("SystemClock {") == 1
+assert window.count("Timer {") == 1
+difference = (ROOT / "services/time/TimeDifference.py").read_text(encoding="utf-8")
+assert 'ZoneInfo(zone)' in difference
+assert 'for fold in (0, 1)' in difference
+assert 'roundtrip.replace(tzinfo=None) != naive' in difference
+assert 'end_utc - start_utc' in difference
+assert 'AMBIGUOUS_LOCAL_TIME' in difference
+assert 'START_' in difference and 'END_' in difference
 
 # Universal visual language remains: magenta header, cyan divider, borderless modes.
 assert 'text: "TIME // W"' in window

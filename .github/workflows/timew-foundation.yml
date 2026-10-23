@@ -8,6 +8,7 @@ on:
       - "services/time/WorldClockPolicy.js"
       - "services/time/TimeZoneConverter.py"
       - "services/time/TimeArithmetic.py"
+      - "services/time/TimeDifference.py"
       - "services/time/TimeConverterFormat.js"
       - "services/time/WorldZoneSearch.js"
       - "timew_click_preview.qml"
@@ -24,6 +25,7 @@ on:
       - "services/time/WorldClockPolicy.js"
       - "services/time/TimeZoneConverter.py"
       - "services/time/TimeArithmetic.py"
+      - "services/time/TimeDifference.py"
       - "services/time/TimeConverterFormat.js"
       - "services/time/WorldZoneSearch.js"
       - "modules/Clock.qml"
@@ -51,3 +53,5 @@ jobs:
         run: node tests/timew/test_time_converter_format.cjs
       - name: Verify elapsed time arithmetic and DST behavior
         run: python3 -B -I tests/timew/test_time_arithmetic.py
+      - name: Verify BETWEEN signed durations and time-zone DST edge cases
+        run: python3 -B -I tests/timew/test_time_difference.py

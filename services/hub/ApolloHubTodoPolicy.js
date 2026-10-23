@@ -1,6 +1,6 @@
 .pragma library
 
-// TASKS M4: local task v2, read-compatible with the established v1 checklist.
+// TASKS M4: local task v3, read-compatible with established v1/v2 checklists.
 // Pure policy. Only ApolloHubTodoStore owns disk writes and saves after a
 // deliberate action. Never turn malformed/unknown data into an empty file.
 var MAX_TASKS = 200;
@@ -8,10 +8,12 @@ var MAX_TITLE = 160;
 var MAX_DESCRIPTION = 2000;
 var MAX_FILE_LENGTH = 1048576;
 var MAX_NEXT_ID = 1000000000;
+var MAX_PROJECTS = 30;
+var MAX_PROJECT_NAME = 64;
 var PRIORITIES = ["none", "low", "medium", "high", "urgent"];
 
 function emptyDocument() {
-    return {version: 2, nextId: 1, tasks: []};
+    return {version: 3, nextId: 1, nextProjectId: 1, projects: [], tasks: []};
 }
 
 function isInteger(value, min, max) {
@@ -37,6 +39,19 @@ function validDescription(value) {
     return typeof value === "string"
            && value.length <= MAX_DESCRIPTION
            && !/[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]/.test(value);
+}
+function validProjectName(value) {
+    return typeof value === "string" && value === value.trim()
+           && value.length > 0 && value.length <= MAX_PROJECT_NAME
+           && !/[\x00-\x1f\x7f]/.test(value);
+}
+function validProject(p) {
+    return p && typeof p === "object" && !Array.isArray(p)
+           && typeof p.id === "string" && /^p[1-9][0-9]*$/.test(p.id)
+           && isInteger(Number(p.id.slice(1)), 1, MAX_NEXT_ID)
+           && validProjectName(p.name)
+           && isInteger(p.createdAtMs, 1, Number.MAX_SAFE_INTEGER)
+           && isInteger(p.updatedAtMs, p.createdAtMs, Number.MAX_SAFE_INTEGER);
 }
 function validDueDate(value) {
     if (value === null) return true;
@@ -64,23 +79,53 @@ function validTask(task, version) {
            && isInteger(task.updatedAtMs, task.createdAtMs, Number.MAX_SAFE_INTEGER)
            && (version === 1 || (validPriority(task.priority)
                && validDescription(task.description)
-               && validDueDate(task.dueDate)));
+               && validDueDate(task.dueDate)
+               && (version !== 3 || task.projectId === null
+                   || typeof task.projectId === "string"
+                   && /^p[1-9][0-9]*$/.test(task.projectId))));
 }
 function validate(doc) {
     if (!doc || typeof doc !== "object" || Array.isArray(doc))
         return {ok:false, reason:"INVALID_DOCUMENT"};
-    if (doc.version !== 1 && doc.version !== 2)
+    if (doc.version !== 1 && doc.version !== 2 && doc.version !== 3)
         return {ok:false, reason:"UNSUPPORTED_VERSION"};
     if (!isInteger(doc.nextId, 1, MAX_NEXT_ID))
         return {ok:false, reason:"INVALID_SEQUENCE"};
     if (!Array.isArray(doc.tasks) || doc.tasks.length > MAX_TASKS)
         return {ok:false, reason:"INVALID_TASK_LIST"};
+    var projectIds = {};
+    if (doc.version === 3) {
+        if (!isInteger(doc.nextProjectId, 1, MAX_NEXT_ID))
+            return {ok:false, reason:"INVALID_PROJECT_SEQUENCE"};
+        if (!Array.isArray(doc.projects) || doc.projects.length > MAX_PROJECTS)
+            return {ok:false, reason:"INVALID_PROJECT_LIST"};
+        var seenNames = {};
+        var maxPid = 0;
+        for (var j = 0; j < doc.projects.length; j++) {
+            var project = doc.projects[j];
+            if (!validProject(project))
+                return {ok:false, reason:"INVALID_PROJECT"};
+            if (Object.prototype.hasOwnProperty.call(projectIds, project.id))
+                return {ok:false, reason:"DUPLICATE_PROJECT_ID"};
+            var key = project.name.toLowerCase();
+            if (Object.prototype.hasOwnProperty.call(seenNames, key))
+                return {ok:false, reason:"DUPLICATE_PROJECT_NAME"};
+            projectIds[project.id] = true;
+            seenNames[key] = true;
+            maxPid = Math.max(maxPid, Number(project.id.slice(1)));
+        }
+        if (maxPid >= doc.nextProjectId)
+            return {ok:false, reason:"PROJECT_SEQUENCE_REWIND"};
+    }
     var ids = {};
     var maxId = 0;
     for (var i = 0; i < doc.tasks.length; ++i) {
         var task = doc.tasks[i];
         if (!validTask(task, doc.version))
             return {ok:false, reason:"INVALID_TASK"};
+        if (doc.version === 3 && task.projectId !== null
+                && !Object.prototype.hasOwnProperty.call(projectIds, task.projectId))
+            return {ok:false, reason:"UNKNOWN_PROJECT_REFERENCE"};
         if (Object.prototype.hasOwnProperty.call(ids, task.id))
             return {ok:false, reason:"DUPLICATE_ID"};
         ids[task.id] = true;
@@ -94,13 +139,20 @@ function validate(doc) {
 function clone(doc) {
     // In-memory upgrade only. Unrecognized persisted keys are deliberately
     // removed, not copied into the next disk write.
-    return {version:2, nextId:doc.nextId,
+    return {version:3, nextId:doc.nextId,
+            nextProjectId:doc.version === 3 ? doc.nextProjectId : 1,
+            projects:doc.version === 3 ? doc.projects.map(function(project) {
+                return {id:project.id, name:project.name,
+                        createdAtMs:project.createdAtMs,
+                        updatedAtMs:project.updatedAtMs};
+            }) : [],
             tasks:doc.tasks.map(function(task) {
                 return {id:task.id, title:task.title, done:task.done,
                         createdAtMs:task.createdAtMs, updatedAtMs:task.updatedAtMs,
                         priority:doc.version === 1 ? "none" : task.priority,
                         description:doc.version === 1 ? "" : task.description,
-                        dueDate:doc.version === 1 ? null : task.dueDate};
+                        dueDate:doc.version === 1 ? null : task.dueDate,
+                        projectId:doc.version === 3 ? task.projectId : null};
             })};
 }
 
@@ -131,7 +183,7 @@ function create(doc, value, nowMs) {
     var next = clone(doc);
     next.tasks.push({id:"t" + next.nextId, title:title, done:false,
                      createdAtMs:nowMs, updatedAtMs:nowMs,
-                     priority:"none", description:"", dueDate:null});
+                     priority:"none", description:"", dueDate:null, projectId:null});
     next.nextId++;
     return {ok:true, reason:"", document:next};
 }
@@ -191,6 +243,49 @@ function updateDetails(doc, id, priority, description, dueDate, nowMs) {
     return {ok:true, reason:"", document:next};
 }
 
+function createProject(doc, name, nowMs) {
+    var valid = validate(doc);
+    if (!valid.ok) return {ok:false, reason:valid.reason};
+    if (typeof name !== "string" || !validProjectName(name.trim()))
+        return {ok:false, reason:"INVALID_PROJECT_NAME"};
+    name = name.trim();
+    if (!isInteger(nowMs, 1, Number.MAX_SAFE_INTEGER))
+        return {ok:false, reason:"INVALID_TIME"};
+    var next = clone(doc);
+    if (next.projects.length >= MAX_PROJECTS)
+        return {ok:false, reason:"PROJECT_CAPACITY"};
+    if (next.nextProjectId >= MAX_NEXT_ID)
+        return {ok:false, reason:"PROJECT_ID_EXHAUSTED"};
+    for (var i=0;i<next.projects.length;i++)
+        if (next.projects[i].name.toLowerCase() === name.toLowerCase())
+            return {ok:false, reason:"DUPLICATE_PROJECT_NAME"};
+    next.projects.push({id:"p"+next.nextProjectId, name:name,
+                        createdAtMs:nowMs, updatedAtMs:nowMs});
+    next.nextProjectId++;
+    return {ok:true, reason:"", document:next};
+}
+
+function assignProject(doc, taskId, projectId, nowMs) {
+    var valid = validate(doc);
+    if (!valid.ok) return {ok:false, reason:valid.reason};
+    if (typeof taskId !== "string")
+        return {ok:false, reason:"UNKNOWN_ID"};
+    var index = doc.tasks.findIndex(function(t) { return t.id === taskId; });
+    if (index < 0) return {ok:false, reason:"UNKNOWN_ID"};
+    if (projectId !== null
+            && (typeof projectId !== "string" || doc.version !== 3
+                || !doc.projects.some(function(p) { return p.id === projectId; })))
+        return {ok:false, reason:"UNKNOWN_PROJECT"};
+    var next = clone(doc);
+    if (next.tasks[index].projectId === projectId)
+        return {ok:false, reason:"NO_CHANGE"};
+    if (!isInteger(nowMs, next.tasks[index].updatedAtMs, Number.MAX_SAFE_INTEGER))
+        return {ok:false, reason:"INVALID_TIME"};
+    next.tasks[index].projectId = projectId;
+    next.tasks[index].updatedAtMs = nowMs;
+    return {ok:true, reason:"", document:next};
+}
+
 function view(storageState, doc, issue) {
     var state = storageState === "ready" || storageState === "empty"
         || storageState === "loading" || storageState === "saving"
@@ -204,13 +299,19 @@ function view(storageState, doc, issue) {
     var rows = outstanding.concat(completed).map(function(task) {
         return {id:task.id, title:task.title, done:task.done,
                 priority:task.priority, description:task.description,
-                dueDate:task.dueDate};
+                dueDate:task.dueDate, projectId:task.projectId};
     });
     return {
         state:state, writable:state === "ready" || state === "empty",
         error:state === "error" || state === "unsupported"
               ? String(issue || "STORAGE_UNAVAILABLE").slice(0,80) : "",
         total:rows.length, remaining:outstanding.length,
-        completed:completed.length, items:rows
+        completed:completed.length, items:rows,
+        projects:safe.projects.map(function(p) {
+            var members = safe.tasks.filter(function(t) { return t.projectId === p.id; });
+            return {id:p.id, name:p.name, total:members.length,
+                    remaining:members.filter(function(t) { return !t.done; }).length,
+                    completed:members.filter(function(t) { return t.done; }).length};
+        })
     };
 }

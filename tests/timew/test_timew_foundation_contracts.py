@@ -93,7 +93,7 @@ assert 'import "../services/hub/ApolloHubTimePolicy.js" as LocalTimePolicy' in w
 assert "LocalTimePolicy.snapshot(localClock.date.getTime(), use24Hour)" in window
 assert window.count("SystemClock {") == 1
 assert window.count("\n    Timer {") == 3
-assert window.count("ElapsedTimer {") == 2
+assert window.count("ElapsedTimer {") == 3
 assert "interval: 30000" in window
 assert "running: timew.menuOpen && timew.selectedMode === \"clock\"" in window
 assert "property bool use24Hour: true" in window
@@ -240,7 +240,7 @@ assert 'enabled: timew.navigationKeysAvailable' in window
 assert 'WORLD // SELECT A SEARCH RESULT' in window
 assert '"ZONE DIRECTORY UNAVAILABLE"' in window
 # CLOCK WORLD search + CONVERT date/time + MATH date/time/duration fields.
-assert window.count('onTextEdited:') == 14
+assert window.count('onTextEdited:') == 15
 # No dynamic command composition or arbitrary typed TZ values.
 assert 'command: ["date", "+%z"]' in window
 assert 'worldLookup.exec({' in window
@@ -284,7 +284,7 @@ assert 'TIME CALCULATOR // NOT CONNECTED' not in window
 # Conversion adds one on-demand process, no persistent interval or clock tick.
 assert window.count("SystemClock {") == 1
 assert window.count("\n    Timer {") == 3
-assert window.count("ElapsedTimer {") == 2
+assert window.count("ElapsedTimer {") == 3
 
 # Two independent CALC 12/24-hour presentation controls. The input is
 # converted to backend-ready HH:MM; output formats the existing result only.
@@ -456,7 +456,7 @@ assert 'MATH // 1 RESULT' in window
 assert 'TIME DOES NOT EXIST // DST CLOCK JUMP' in window
 assert window.count("SystemClock {") == 1
 assert window.count("\n    Timer {") == 3
-assert window.count("ElapsedTimer {") == 2
+assert window.count("ElapsedTimer {") == 3
 assert window.count('arithmeticProcess.exec([') == 1
 assert window.count('converterProcess.exec([') == 1
 arithmetic = (ROOT / "services/time/TimeArithmetic.py").read_text(encoding="utf-8")
@@ -523,7 +523,7 @@ assert 'ELAPSED DURATION // ZONES AND DST AWARE' in window
 assert 'visible: timew.mathView === "elapsed"' in window
 assert window.count("SystemClock {") == 1
 assert window.count("\n    Timer {") == 3
-assert window.count("ElapsedTimer {") == 2
+assert window.count("ElapsedTimer {") == 3
 difference = (ROOT / "services/time/TimeDifference.py").read_text(encoding="utf-8")
 assert 'ZoneInfo(zone)' in difference
 assert 'for fold in (0, 1)' in difference
@@ -663,9 +663,65 @@ assert 'function act(entries, id, action, nowMs)' in countdown_policy
 assert 'function format(milliseconds)' in countdown_policy
 # No notifier side effects, wall-clock queries or new background processes.
 assert window.count("SystemClock {") == 1
-assert window.count("ElapsedTimer {") == 2
+assert window.count("ElapsedTimer {") == 3
 assert window.count("\n    Timer {") == 3
 assert 'property bool countdownStarted: false' not in window
+
+# MACHINE milestone: a read-only TimeW-instance timer plus user-initiated
+# session-only timestamp markers. These are NOT desktop/Sway snapshots,
+# Hospital checkpoints, screenshots, or restoration actions.
+machine_policy = (ROOT / "services/time/MachineTimelinePolicy.js").read_text(encoding="utf-8")
+assert 'import "../services/time/MachineTimelinePolicy.js" as MachineTimelinePolicy' in window
+assert 'id: machineLifetimeAnchor' in window
+assert 'readonly property string machineInstanceAge:' in window
+assert 'localClock.date' in window
+assert 'MachineTimelinePolicy.ageLabel(machineLifetimeAnchor.elapsed() * 1000)' in window
+assert 'MachineTimelinePolicy.utcStamp(localClock.date.getTime())' in window
+assert 'property string machineMarkerDraft: ""' in window
+assert 'property var machineMarkers: []' in window
+assert 'property int machineMarkerNextId: 1' in window
+assert 'function addMachineMarker()' in window
+assert 'function removeMachineMarker(id)' in window
+assert 'if (!menuOpen || selectedMode !== "machine")' in window
+assert 'MachineTimelinePolicy.createMarker(' in window
+assert 'MachineTimelinePolicy.appendMarker(machineMarkers, marker)' in window
+assert 'MachineTimelinePolicy.removeMarker(machineMarkers, id)' in window
+assert 'machineMarkerNextId += 1' in window
+assert 'id: machinePane' in window
+assert 'MACHINE // SESSION TIMELINE' in window
+assert 'WINDOW INSTANCE // ELAPSED' in window
+assert 'MANUAL TIME MARKERS // MEMORY ONLY' in window
+assert 'id: machineMarkerInput' in window
+assert 'maximumLength: MachineTimelinePolicy.MAX_NAME_LENGTH' in window
+assert 'machineMarkerInput.activeFocus' in window
+assert 'onTextEdited: timew.machineMarkerDraft = text' in window
+assert 'onAccepted: timew.addMachineMarker()' in window
+assert 'id: machineMarkButton' in window
+assert 'onLeftClicked: timew.addMachineMarker()' in window
+assert 'id: machineMarkerList' in window
+assert 'model: timew.machineMarkers' in window
+assert 'id: machineMarkerRail' in window
+assert 'flickable: machineMarkerList' in window
+assert 'rightMargin: machineMarkerRail.crossExtent + 6' in window
+assert 'x: machineMarkerArea.width - width - 3' in window
+assert 'handleStyle: "star"' in window
+assert 'handleColor: Colors.magenta' in window
+assert 'timew.removeMachineMarker(modelData.id)' in window
+assert 'MARKERS ARE TIMESTAMPS ONLY // LOST ON RESTART' in window
+assert 'NO SCREENSHOTS OR RESTORATION ACTIVE' in window
+assert 'SESSION TIMELINE // MEMORY ONLY' in window
+assert 'var MAX_MARKERS = 24;' in machine_policy
+assert 'var MAX_NAME_LENGTH = 48;' in machine_policy
+assert 'function createMarker(id, name, nowMs, elapsedMs)' in machine_policy
+assert 'function appendMarker(existing, marker)' in machine_policy
+assert 'function removeMarker(existing, id)' in machine_policy
+assert 'function ageLabel(elapsedMs)' in machine_policy
+assert 'function utcStamp(nowMs)' in machine_policy
+# Preserve the dedicated CLOCK/STOPWATCH/COUNTDOWN clock architecture.
+assert window.count("SystemClock {") == 1
+assert window.count("ElapsedTimer {") == 3
+assert window.count("\n    Timer {") == 3
+assert window.count("Process {") == 7
 
 # Universal visual language remains: magenta header, cyan divider, borderless modes.
 assert 'text: "TIME // W"' in window

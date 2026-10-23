@@ -23,6 +23,10 @@ function parseOvation(root) {
         const point = grid[i];
         if (!Array.isArray(point) || point.length < 3)
             continue;
+        // Null or blank cells must never be reported as zero probability.
+        if (point[0] === null || point[1] === null || point[2] === null
+                || point[0] === "" || point[1] === "" || point[2] === "")
+            continue;
         const longitude = Number(point[0]);
         const latitude = Number(point[1]);
         const intensity = Number(point[2]);

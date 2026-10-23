@@ -1244,20 +1244,6 @@ PanelWindow {
                     anchors.margins: 9
                     spacing: 7
 
-                    Item {
-                        id: transferFocusAnchor
-                        width: 0
-                        height: 0
-                        focus: hub.transferPickerOpen
-                        visible: false
-                        Keys.onPressed: function(event) {
-                            if (event.key === Qt.Key_Escape) {
-                                hub.closeTransferPicker();
-                                event.accepted = true;
-                            }
-                        }
-                    }
-
                     Row {
                         width: parent.width
                         height: 27
@@ -1331,6 +1317,20 @@ PanelWindow {
                         }
                     }
                 }
+                Item {
+                    id: transferFocusAnchor
+                    width: 0
+                    height: 0
+                    focus: hub.transferPickerOpen
+                    visible: false
+                    Keys.onPressed: function(event) {
+                        if (event.key === Qt.Key_Escape) {
+                            hub.closeTransferPicker();
+                            event.accepted = true;
+                        }
+                    }
+                }
+
                 NeonScrollBar {
                     id: transferPickerRail
                     flickable: transferPickerResults

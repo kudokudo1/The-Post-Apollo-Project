@@ -128,6 +128,41 @@ privacy opt-in rules remain in force.
 plus the existing multi-browser and Proton policy tests. These are simulated
 DOM/browser tests only, not live Proton certification.
 
+## Read-only diagnostic follow-up (2026-10-22)
+
+After selecting an unread Proton message, the original first-pass probe still
+logged `no unambiguous read-control candidate`. That string conflated **zero**
+and **two or more** recognized controls. The source does not establish which
+occurred; do not assume the page lacks a Mark Read action.
+
+The opt-in, exact-origin, active-tab-only `PROTON_READINESS_V2` probe now
+reports only bounded, non-content observations to the *extension's own console*:
+
+- `exactEnabled`: exact English `Mark as read` aria/title matches available.
+- `exactDisabled`: same exact match, but disabled.
+- `otherEnglishReadLabels`: differing read/unread label forms, not identities.
+- `unlabeledControls`: button-like controls missing both aria/title.
+- `checkedControls`: generic checked checkbox/checkbox-role count, **not**
+  proof of selected mail messages.
+- `inspected`: number of button-like controls examined, at most 500.
+- `truncated`: if there were over 500 and therefore the scan was incomplete.
+
+No raw strings, HTML, page URLs, message bodies, subjects, account identities
+or message IDs are passed back. No mailbox mutation or native host installation
+is required. The output always says **identity NOT verified**.
+
+To use: pull the updated repository, open `brave://extensions`, choose
+**Reload** on the unpacked Proton Companion, open its service-worker console,
+open Proton Mail, select exactly one unread message checkbox, click the
+companion icon, and inspect the new `read-only UI counts` line. The
+`native host not connected` warning is expected. Firefox-family installs
+need an equivalent reload.
+
+Results distinguish likely cases but do **not** grant permission to click or
+map a notification to mail. If there are zero controls or ambiguous UI
+semantics, live authorized research is still required; preserve fail-closed
+operation and do not infer identity from a subject, timestamp, or URI.
+
 ## Authoritative external references
 
 - Proton Bridge Linux paid requirement: https://proton.me/support/bridge-for-linux

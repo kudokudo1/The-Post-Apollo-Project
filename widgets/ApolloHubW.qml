@@ -38,11 +38,19 @@ PanelWindow {
     readonly property var modulePickerChoices: Layout.moduleChoices(
         layout, selectedModeIndex, selectedSubModeIndex,
         modulePickerTileIndex, modulePickerQuery)
+    property bool transferPickerOpen: false
+    property int transferTileIndex: -1
+    property string transferTileId: ""
+    property string transferModeId: ""
+    property string transferGroupId: ""
+    readonly property var transferTargets: Layout.moveTargets(
+        layout, selectedModeIndex, selectedSubModeIndex, transferTileIndex)
     readonly property bool standardKeysAvailable:
         menuOpen && keyboardActive
         && (!relationshipFocusModeActive || relationshipFocused)
         && !modeNameInput.activeFocus
         && !modulePickerOpen
+        && !transferPickerOpen
         && !todoInputFocused
         && !notesInputFocused
     property bool writingLayout: false
@@ -77,6 +85,7 @@ PanelWindow {
             return;
         cancelPendingRemoval();
         closeModulePicker();
+        closeTransferPicker();
         layout = Layout.parse(ApolloHubStore.layoutJson);
         selectedModeIndex = Math.min(selectedModeIndex, layout.modes.length - 1);
         selectedSubModeIndex = 0;
@@ -93,6 +102,7 @@ PanelWindow {
             return;
         cancelPendingRemoval();
         closeModulePicker();
+        closeTransferPicker();
         const history = layoutUndoStack.slice();
         history.push(previous);
         if (history.length > 10)
@@ -109,6 +119,7 @@ PanelWindow {
             return;
         cancelPendingRemoval();
         closeModulePicker();
+        closeTransferPicker();
         const history = layoutUndoStack.slice();
         const previous = history.pop();
         layoutUndoStack = history;
@@ -166,6 +177,7 @@ PanelWindow {
                 || !activeMode)
             return;
         closeModulePicker();
+        closeTransferPicker();
         if (kind === "mode") {
             if (layout.modes.length <= 1)
                 return;
@@ -297,6 +309,7 @@ PanelWindow {
             return;
         cancelPendingRemoval();
         closeModulePicker();
+        closeTransferPicker();
         selectedModeIndex = index;
         selectedSubModeIndex = 0;
         selectedTileIndex = 0;
@@ -315,6 +328,7 @@ PanelWindow {
             return;
         cancelPendingRemoval();
         closeModulePicker();
+        closeTransferPicker();
         selectedSubModeIndex = index;
         selectedTileIndex = 0;
     }
@@ -355,11 +369,13 @@ PanelWindow {
     onEditModeChanged: if (!editMode) {
         cancelPendingRemoval();
         closeModulePicker();
+        closeTransferPicker();
     }
     onMenuOpenChanged: {
         if (!menuOpen) {
             cancelPendingRemoval();
             closeModulePicker();
+            closeTransferPicker();
             todoInputFocused = false;
             notesInputFocused = false;
         }
@@ -534,11 +550,14 @@ PanelWindow {
         onActivated: hub.menuOpen = false
     }
     Shortcut {
-        // Cancel the picker even if a row took focus away from the search.
+        // Cancel the picker even if focus moves off the search/list.
         sequence: "Esc"
         context: Qt.WindowShortcut
-        enabled: hub.menuOpen && hub.modulePickerOpen
-        onActivated: hub.closeModulePicker()
+        enabled: hub.menuOpen && (hub.modulePickerOpen || hub.transferPickerOpen)
+        onActivated: {
+            hub.closeModulePicker();
+            hub.closeTransferPicker();
+        }
     }
 
     WindowPanelFrame {
@@ -947,6 +966,7 @@ PanelWindow {
                             onMoveLeft: hub.shiftTile(index, index - 1)
                             onMoveRight: hub.shiftTile(index, index + 1)
                             onChangeModule: hub.openModulePicker(index, sourceItem)
+                            onTransferTile: hub.openTransferPicker(index, sourceItem)
                             onRemoveTile: hub.removeEditedTile(index)
                             onToggleTileWidth: hub.toggleEditedTileWidth(index)
                             onCycleTileHeight: hub.cycleEditedTileHeight(index)
@@ -970,6 +990,8 @@ PanelWindow {
                         + " // " + hub.pendingRemoval.label + " // UNDO AVAILABLE"
                       : hub.modulePickerOpen
                       ? "MODULE PICKER // CLICK TO SELECT // ESC OR CLOSE TO CANCEL"
+                      : hub.transferPickerOpen
+                      ? "MOVE TILE // CHOOSE DESTINATION // ESC OR CLOSE TO CANCEL"
                       : hub.editMode
                       ? "← → MOVE    SWAP MODULE    W:1/2 WIDTH    H:1/2/3 HEIGHT    × REMOVE    UNDO"
                       : "APOLLO HUB  //  LIVE MODULES CONNECTED"
@@ -982,7 +1004,7 @@ PanelWindow {
             id: modulePickerOverlay
             anchors.fill: parent
             z: 200
-            visible: hub.modulePickerOpen
+            visible: hub.modulePickerOpen || hub.transferPickerOpen
 
             // A transparent input surface blocks underlying tile actions
             // while the dropdown is open. Consistent with TimeW's TapHandler.
@@ -990,7 +1012,10 @@ PanelWindow {
                 anchors.fill: parent
                 color: "transparent"
                 TapHandler {
-                    onTapped: hub.closeModulePicker()
+                    onTapped: {
+                        hub.closeModulePicker();
+                        hub.closeTransferPicker();
+                    }
                 }
             }
 
@@ -1012,6 +1037,7 @@ PanelWindow {
 
                 Column {
                     id: modulePickerDropdownContent
+                    visible: hub.modulePickerOpen
                     anchors.fill: parent
                     anchors.margins: 9
                     spacing: 7

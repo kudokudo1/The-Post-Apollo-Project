@@ -18,6 +18,9 @@ on:
       - "tests/finance/test_finance_opening_history_contracts.py"
       - "tests/finance/test_finance_income_preview_contracts.py"
       - "widgets/FinanceIncomeCategorizationPane.qml"
+      - "widgets/FinanceFundingSetupPane.qml"
+      - "services/finance/FinanceFundingSetupPlan.js"
+      - "tests/finance/test_finance_funding_setup_contracts.py"
       - "services/finance/**"
       - "tests/finance/test_finance_budget_ui_contracts.py"
       - "tests/finance/test_finance_transaction_draft_contracts.py"
@@ -39,6 +42,9 @@ on:
       - "tests/finance/test_finance_opening_history_contracts.py"
       - "tests/finance/test_finance_income_preview_contracts.py"
       - "widgets/FinanceIncomeCategorizationPane.qml"
+      - "widgets/FinanceFundingSetupPane.qml"
+      - "services/finance/FinanceFundingSetupPlan.js"
+      - "tests/finance/test_finance_funding_setup_contracts.py"
       - "services/finance/**"
       - "tests/finance/test_finance_budget_ui_contracts.py"
       - "tests/finance/test_finance_transaction_draft_contracts.py"
@@ -75,3 +81,5 @@ jobs:
         run: python3 tests/finance/test_finance_opening_history_contracts.py
       - name: Verify D16 read-only income categorization preview
         run: python3 tests/finance/test_finance_income_preview_contracts.py
+      - name: Verify D17 guided funding setup preview
+        run: python3 tests/finance/test_finance_funding_setup_contracts.py

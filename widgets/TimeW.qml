@@ -8,6 +8,7 @@ import "../services/hub/ApolloHubTimePolicy.js" as LocalTimePolicy
 import "../services/time/WorldClockPolicy.js" as WorldClockPolicy
 import "../services/time/WorldZoneSearch.js" as WorldZoneSearch
 import "../services/time/TimeConverterFormat.js" as ConverterFormat
+import "../services/time/StopwatchPolicy.js" as StopwatchPolicy
 
 // TimeW M1: standalone temporal window foundation.
 // No timers, activity recording, screenshots or restoration are active here.
@@ -485,6 +486,67 @@ PanelWindow {
         });
     }
 
+    // TOOLS / STOPWATCH. Monotonic measurement continues while the window
+    // is closed; only the visible readout refresh pauses to conserve CPU.
+    property bool stopwatchRunning: false
+    property bool stopwatchStarted: false
+    property real stopwatchAccumulatedMs: 0
+    property real stopwatchDisplayMs: 0
+    property real stopwatchLastLapMs: 0
+    property int stopwatchLapSequence: 0
+    property var stopwatchLaps: []
+    readonly property int stopwatchMaxLaps: StopwatchPolicy.MAX_LAPS
+
+    function refreshStopwatch() {
+        stopwatchDisplayMs = stopwatchRunning
+                             ? StopwatchPolicy.sample(
+                                   stopwatchAccumulatedMs,
+                                   stopwatchAnchor.elapsed() * 1000)
+                             : stopwatchAccumulatedMs;
+    }
+
+    function startStopwatch() {
+        if (stopwatchRunning)
+            return;
+        stopwatchAnchor.restart();
+        stopwatchRunning = true;
+        stopwatchStarted = true;
+        refreshStopwatch();
+    }
+
+    function pauseStopwatch() {
+        if (!stopwatchRunning)
+            return;
+        refreshStopwatch();
+        stopwatchAccumulatedMs = stopwatchDisplayMs;
+        stopwatchRunning = false;
+    }
+
+    function lapStopwatch() {
+        if (!stopwatchRunning)
+            return;
+        refreshStopwatch();
+        const newLap = StopwatchPolicy.appendLap(
+                           stopwatchLaps, stopwatchDisplayMs,
+                           stopwatchLastLapMs, stopwatchLapSequence + 1);
+        if (newLap === null)
+            return;
+        stopwatchLaps = newLap;
+        stopwatchLastLapMs = stopwatchDisplayMs;
+        stopwatchLapSequence += 1;
+    }
+
+    function resetStopwatch() {
+        if (stopwatchRunning)
+            return;
+        stopwatchAccumulatedMs = 0;
+        stopwatchDisplayMs = 0;
+        stopwatchLastLapMs = 0;
+        stopwatchLapSequence = 0;
+        stopwatchLaps = [];
+        stopwatchStarted = false;
+    }
+
     readonly property var modes: [
         { id: "clock", name: "CLOCK" },
         { id: "calc", name: "CALC" },
@@ -523,6 +585,8 @@ PanelWindow {
         }
         if (menuOpen) {
             Qt.callLater(restoreKeyboardFocus);
+            if (selectedMode === "tools")
+                refreshStopwatch();
             if (selectedMode === "clock")
                 Qt.callLater(refreshWorldClock);
             if (selectedMode === "clock" || selectedMode === "calc")
@@ -534,6 +598,8 @@ PanelWindow {
             dismissWorldSearchPopup();
         if (selectedMode !== "calc")
             closeConverterDropdowns();
+        if (menuOpen && selectedMode === "tools")
+            refreshStopwatch();
         if (menuOpen && selectedMode === "clock")
             Qt.callLater(refreshWorldClock);
         if (menuOpen && (selectedMode === "clock" || selectedMode === "calc"))
@@ -581,6 +647,12 @@ PanelWindow {
     SystemClock {
         id: localClock
         precision: SystemClock.Seconds
+    }
+
+    // Quickshell v0.2.1's native monotonic elapsed timer; no wall-clock
+    // wall-clock queries, network or subprocesses for stopwatch measurement.
+    ElapsedTimer {
+        id: stopwatchAnchor
     }
 
     // Difference comparisons are also one-shot. Existing inputs are kept
@@ -746,6 +818,16 @@ PanelWindow {
         repeat: true
         running: timew.menuOpen && timew.selectedMode === "clock"
         onTriggered: timew.refreshWorldClock()
+    }
+
+    Timer {
+        id: stopwatchDisplayTimer
+        // 10Hz presentation only; measurement is the ElapsedTimer.
+        interval: 100
+        repeat: true
+        running: timew.stopwatchRunning
+                 && timew.menuOpen && timew.selectedMode === "tools"
+        onTriggered: timew.refreshStopwatch()
     }
 
     Item {
@@ -2312,12 +2394,224 @@ PanelWindow {
                         }
                     }
 
-                    GohuText {
+                    Column {
+                        id: stopwatchPane
                         visible: timew.selectedMode === "tools"
-                                 || timew.selectedMode === "machine"
-                        text: timew.selectedMode === "tools"
-                              ? "STOPWATCH + TIMERS // NOT CONNECTED"
-                              : "DESKTOP CHECKPOINTS // NOT CONNECTED"
+                        width: parent.width
+                        spacing: 12
+
+                        GohuText {
+                            text: "STOPWATCH // ELAPSED TIME"
+                            color: timew.semanticColor
+                            font.pixelSize: 14
+                        }
+
+                        GohuText {
+                            width: parent.width
+                            text: StopwatchPolicy.format(timew.stopwatchDisplayMs)
+                            color: timew.stopwatchRunning ? Colors.orange
+                                   : timew.stopwatchStarted ? Colors.cyan
+                                   : timew.semanticColor
+                            font.pixelSize: 28
+                            horizontalAlignment: Text.AlignHCenter
+                        }
+
+                        Row {
+                            width: parent.width
+                            height: 22
+                            GohuText {
+                                width: parent.width
+                                horizontalAlignment: Text.AlignHCenter
+                                text: timew.stopwatchRunning ? "STATUS // RUNNING"
+                                      : timew.stopwatchStarted ? "STATUS // PAUSED"
+                                      : "STATUS // READY"
+                                color: timew.stopwatchRunning
+                                       ? Colors.orange : Colors.cyan
+                                font.pixelSize: 11
+                            }
+                        }
+
+                        Row {
+                            id: stopwatchActions
+                            width: parent.width
+                            height: 38
+                            spacing: 8
+
+                            ActionButton {
+                                id: stopwatchRunButton
+                                width: (stopwatchActions.width
+                                        - stopwatchActions.spacing) / 2
+                                height: parent.height
+                                label: timew.stopwatchRunning ? "PAUSE"
+                                       : timew.stopwatchStarted ? "RESUME" : "START"
+                                labelPixelSize: 12
+                                accentColor: timew.stopwatchRunning
+                                             ? Colors.cyan : Colors.orange
+                                trackLabelGlowLocally: true
+                                onLeftClicked: {
+                                    if (timew.stopwatchRunning)
+                                        timew.pauseStopwatch();
+                                    else
+                                        timew.startStopwatch();
+                                }
+                            }
+
+                            ActionButton {
+                                id: stopwatchSecondaryButton
+                                width: (stopwatchActions.width
+                                        - stopwatchActions.spacing) / 2
+                                height: parent.height
+                                label: timew.stopwatchRunning ? "LAP" : "RESET"
+                                labelPixelSize: 12
+                                accentColor: timew.semanticColor
+                                trackLabelGlowLocally: true
+                                available: timew.stopwatchStarted
+                                onLeftClicked: {
+                                    if (timew.stopwatchRunning)
+                                        timew.lapStopwatch();
+                                    else
+                                        timew.resetStopwatch();
+                                }
+                            }
+                        }
+
+                        Rectangle {
+                            width: parent.width
+                            height: 2
+                            color: Colors.cyan
+                            opacity: 0.55
+                        }
+
+                        Row {
+                            width: parent.width
+                            height: 25
+                            GohuText {
+                                width: parent.width * 0.55
+                                text: "LAPS // " + timew.stopwatchLapSequence
+                                color: Colors.white
+                                font.pixelSize: 12
+                            }
+                            GohuText {
+                                width: parent.width * 0.45
+                                horizontalAlignment: Text.AlignRight
+                                text: "SHOWN // " + timew.stopwatchLaps.length
+                                color: Colors.cyan
+                                font.pixelSize: 11
+                            }
+                        }
+
+                        Item {
+                            id: stopwatchLapArea
+                            width: parent.width
+                            height: 315
+
+                            ListView {
+                                id: stopwatchLapList
+                                anchors {
+                                    top: parent.top
+                                    bottom: parent.bottom
+                                    left: parent.left
+                                    right: parent.right
+                                    margins: 3
+                                    rightMargin: stopwatchLapRail.crossExtent + 6
+                                }
+                                model: timew.stopwatchLaps
+                                spacing: 4
+                                clip: true
+                                boundsBehavior: Flickable.StopAtBounds
+                                interactive: contentHeight > height
+
+                                delegate: Rectangle {
+                                    width: stopwatchLapList.width
+                                    height: 39
+                                    color: Colors.black
+                                    border.width: 1
+                                    border.color: Colors.cyan
+
+                                    Row {
+                                        anchors.fill: parent
+                                        anchors.margins: 5
+                                        spacing: 5
+                                        GohuText {
+                                            width: 60
+                                            height: parent.height
+                                            verticalAlignment: Text.AlignVCenter
+                                            text: "#" + modelData.index
+                                            color: Colors.white
+                                            font.pixelSize: 11
+                                        }
+                                        GohuText {
+                                            width: (parent.width - 70) * 0.48
+                                            height: parent.height
+                                            verticalAlignment: Text.AlignVCenter
+                                            text: StopwatchPolicy.format(modelData.splitMs)
+                                            color: Colors.cyan
+                                            font.pixelSize: 11
+                                            elide: Text.ElideRight
+                                        }
+                                        GohuText {
+                                            width: (parent.width - 70) * 0.52
+                                            height: parent.height
+                                            verticalAlignment: Text.AlignVCenter
+                                            horizontalAlignment: Text.AlignRight
+                                            text: StopwatchPolicy.format(modelData.totalMs)
+                                            color: Colors.orange
+                                            font.pixelSize: 11
+                                            elide: Text.ElideRight
+                                        }
+                                    }
+                                }
+                            }
+
+                            NeonScrollBar {
+                                id: stopwatchLapRail
+                                flickable: stopwatchLapList
+                                accountForContentOrigin: true
+                                geometryMode: "viewport"
+                                x: stopwatchLapArea.width - width - 3
+                                y: stopwatchLapList.y
+                                height: stopwatchLapList.height
+                                handleStyle: "star"
+                                railColor: Colors.cyan
+                                handleColor: Colors.magenta
+                                handleBorderColor: Colors.magenta
+                                railGlowColor: Colors.white
+                                containGlow: true
+                                visible: scrollable
+                            }
+
+                            GohuText {
+                                visible: timew.stopwatchLaps.length === 0
+                                anchors.centerIn: parent
+                                width: parent.width
+                                horizontalAlignment: Text.AlignHCenter
+                                text: "NO LAPS // START + LAP"
+                                color: Colors.white
+                                font.pixelSize: 11
+                                opacity: 0.7
+                            }
+                        }
+
+                        GohuText {
+                            width: parent.width
+                            wrapMode: Text.Wrap
+                            text: "MONOTONIC // CONTINUES WHILE WINDOW IS CLOSED"
+                            color: Colors.white
+                            font.pixelSize: 10
+                            opacity: 0.72
+                        }
+
+                        GohuText {
+                            width: parent.width
+                            text: "COUNTDOWN TIMERS // NEXT DEVELOPMENT STAGE"
+                            color: Colors.orange
+                            font.pixelSize: 11
+                        }
+                    }
+
+                    GohuText {
+                        visible: timew.selectedMode === "machine"
+                        text: "DESKTOP CHECKPOINTS // NOT CONNECTED"
                         color: Colors.orange
                         font.pixelSize: 11
                     }

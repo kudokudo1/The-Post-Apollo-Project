@@ -114,7 +114,7 @@ with tempfile.TemporaryDirectory(prefix="pa-task-sqlite-m10j-") as temp:
         assert con.execute("SELECT COUNT(*) FROM tasks").fetchone()[0] == 2
         assert con.execute("SELECT COUNT(*) FROM projects").fetchone()[0] == 2
         assert con.execute("SELECT COUNT(*) FROM operations").fetchone()[0] == 0
-    expect_error(lambda: store.commit(path, original), "INITIAL_BASELINE")
+    expect_error(lambda: store.commit(path, original), "STALE_BASELINE")
     proposed = candidate(original)
     assert store.validate(proposed)
     commit = store.commit(path, proposed,

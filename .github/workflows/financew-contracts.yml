@@ -21,6 +21,9 @@ on:
       - "widgets/FinanceFundingSetupPane.qml"
       - "widgets/FinanceBudgetGrid.qml"
       - "widgets/FinanceQuickAddPane.qml"
+      - "widgets/FinanceAccountsPane.qml"
+      - "widgets/FinanceCategoriesPane.qml"
+      - "tests/finance/test_finance_control_sections_contracts.py"
       - "tests/finance/test_finance_compact_grid_contracts.py"
       - "services/finance/FinanceSpreadsheetPolicy.js"
       - "widgets/FinanceDateInput.qml"
@@ -54,6 +57,9 @@ on:
       - "widgets/FinanceFundingSetupPane.qml"
       - "widgets/FinanceBudgetGrid.qml"
       - "widgets/FinanceQuickAddPane.qml"
+      - "widgets/FinanceAccountsPane.qml"
+      - "widgets/FinanceCategoriesPane.qml"
+      - "tests/finance/test_finance_control_sections_contracts.py"
       - "tests/finance/test_finance_compact_grid_contracts.py"
       - "services/finance/FinanceSpreadsheetPolicy.js"
       - "widgets/FinanceDateInput.qml"
@@ -105,5 +111,7 @@ jobs:
         run: python3 tests/finance/test_finance_funding_write_ui_contracts.py
       - name: Verify FinanceW compact spreadsheet budget and add money
         run: python3 tests/finance/test_finance_compact_grid_contracts.py
+      - name: Verify FinanceW budget control-center sections
+        run: python3 tests/finance/test_finance_control_sections_contracts.py
       - name: Verify shared FinanceW numeric and calendar input controls
         run: python3 tests/finance/test_finance_input_controls_contracts.py

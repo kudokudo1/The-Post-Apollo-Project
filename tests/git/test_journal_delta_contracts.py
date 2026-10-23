@@ -38,6 +38,29 @@ assert.equal(updated[3].id,base[2].id);
 assert.equal(updated[3].undoState,'UNDONE');
 assert.equal(updated[0].id,'op-501');
 
+// Large unchanged records retain their exact JSON without being encoded again.
+// A replacement object with the same ID must never replay stale evidence.
+const heavy = {...make(600), before:{payload:'x'.repeat(512 * 1024)}};
+const firstCache = d.encodeSidecarCached(0,[heavy],[]);
+assert.equal(firstCache.reusedCount,0);
+assert.equal(firstCache.text,d.encodeSidecar(0,[heavy]));
+const nextRow = {...make(601), after:{payload:'y'.repeat(256 * 1024)}};
+const appended = d.encodeSidecarCached(0,[heavy,nextRow],firstCache.cache);
+assert.equal(appended.reusedCount,1);
+assert.equal(appended.text,d.encodeSidecar(0,[heavy,nextRow]));
+const changed = {...nextRow,status:'FAILED',detail:'new evidence'};
+const updatedCache = d.encodeSidecarCached(0,[heavy,changed],appended.cache);
+assert.equal(updatedCache.reusedCount,1);
+assert.equal(JSON.parse(updatedCache.text).records[1].detail,'new evidence');
+assert.equal(updatedCache.text,d.encodeSidecar(0,[heavy,changed]));
+const coldCache = d.encodeSidecarCached(
+    0,[JSON.parse(JSON.stringify(heavy)),changed],updatedCache.cache
+);
+assert.equal(coldCache.reusedCount,1,'changed row remains reusable by identity');
+assert.equal(coldCache.text,updatedCache.text);
+assert.throws(()=>d.encodeSidecarCached(-1,[heavy],firstCache.cache));
+assert.throws(()=>d.encodeSidecarCached(0,[{id:''}],firstCache.cache));
+
 // Crash A: sidecar written but checkpoint not committed yet.
 const sidecar = d.encodeSidecar(0,rows);
 const oldView=d.overlay(base,d.readSidecar(sidecar,0).rows,500);

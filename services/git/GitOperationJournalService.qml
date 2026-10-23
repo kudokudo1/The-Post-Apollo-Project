@@ -36,6 +36,8 @@ Scope {
     property string deltaWriteError: ""
     property int checkpointGeneration: 0
     property var deltaRecords: []
+    // Internal-only serialized rows; never use this cache as recovery evidence.
+    property var encodedDeltaRecords: []
     property int maxDeltaRecords: 48
     property int lastPersistSerializationMs: 0
     property int lastPersistWriteMs: 0
@@ -258,6 +260,7 @@ Scope {
         storageReady = false;
         storageError = "";
         encodedEntries = [];
+        encodedDeltaRecords = [];
         const raw = String(journalFile.text() || "").trim();
         const overlayRaw = String(deltaFile.text() || "").trim();
         let source = [];
@@ -402,9 +405,10 @@ Scope {
             const start = Date.now();
             const revised = DeltaCodec.upsert(deltaRecords, record);
             if (revised.length < maxDeltaRecords) {
-                const serialized = DeltaCodec.encodeSidecar(
-                    checkpointGeneration, revised
+                const encoded = DeltaCodec.encodeSidecarCached(
+                    checkpointGeneration, revised, encodedDeltaRecords
                 );
+                const serialized = encoded.text;
                 const writeStarted = Date.now();
                 deltaWriteStatus = 0;
                 deltaWriteError = "";
@@ -413,9 +417,11 @@ Scope {
                     return false;
                 const written = Date.now();
                 deltaRecords = revised;
+                // Publish cache only after the synchronous sidecar save ack.
+                encodedDeltaRecords = encoded.cache;
                 lastPersistSerializationMs = writeStarted - start;
                 lastPersistWriteMs = written - writeStarted;
-                lastPersistReusedCount = 0;
+                lastPersistReusedCount = encoded.reusedCount;
                 return true;
             }
         }
@@ -454,6 +460,7 @@ Scope {
                 return false;
             checkpointGeneration = nextGeneration;
             deltaRecords = [];
+            encodedDeltaRecords = [];
         }
         const written = Date.now();
         encodedEntries = encoded.cache;

@@ -79,6 +79,11 @@ Scope {
     property bool pollenAvailable: false
     property string airQualitySourceTime: ""
 
+    // Forecast points ride along with the existing AQI request.
+    property var airQualityForecast: []
+    readonly property bool airQualityForecastReady:
+        airQualityForecast.some(function(entry) { return entry.aqi >= 0; })
+
     property string aqiErrorText: ""
     property date aqiLastUpdated
 
@@ -112,6 +117,8 @@ Scope {
                + "pm2_5,pm10,carbon_monoxide,"
                + "nitrogen_dioxide,ozone,dust,alder_pollen,birch_pollen,"
                + "grass_pollen,mugwort_pollen,olive_pollen,ragweed_pollen"
+               + "&hourly=us_aqi,pm2_5,pm10"
+               + "&forecast_hours=12"
                + "&timezone=auto";
     }
 
@@ -325,6 +332,8 @@ Scope {
             ragweedPollen = parsed.ragweedPollen;
             pollenAvailable = parsed.pollenAvailable;
             airQualitySourceTime = parsed.time;
+            airQualityForecast =
+                WeatherDataPolicy.parseAirQualityForecast(root.hourly, 12);
 
             aqiLabel = describeAqi(aqi);
 

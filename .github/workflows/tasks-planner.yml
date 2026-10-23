@@ -1,14 +1,16 @@
-name: Tasks Planner M1
+name: Tasks Planner
 on:
   pull_request:
     paths:
       - 'widgets/tasks/TaskPlanner*'
       - 'tests/tasks/test_task_planner*'
+      - 'tests/fixtures/TaskPlannerPreview.qml'
       - '.github/workflows/tasks-planner.yml'
   push:
     paths:
       - 'widgets/tasks/TaskPlanner*'
       - 'tests/tasks/test_task_planner*'
+      - 'tests/fixtures/TaskPlannerPreview.qml'
       - '.github/workflows/tasks-planner.yml'
 jobs:
   planner:
@@ -20,3 +22,4 @@ jobs:
           node-version: '22'
       - run: python3 tests/tasks/test_task_planner_ui_contracts.py
       - run: node tests/tasks/test_task_planner_policy.cjs
+      - run: python3 tests/tasks/test_task_planner_preview.py

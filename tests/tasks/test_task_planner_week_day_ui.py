@@ -20,9 +20,16 @@ for required in (
     'onClicked: planner.selectDate(parent.modelData.date)',
     'onLeftClicked: planner.openTaskRequested(modelData.id)',
     'function jumpToday()',
+    'if (modelData === "TODAY") planner.jumpToday();',
     'function selectDate(dateKey)',
 ):
     assert required in pane, required
+# TODAY must select the current date and visibly enter the DAY agenda.
+today_handler = pane.split("function jumpToday() {", 1)[1].split("\n    }", 1)[0]
+assert today_handler.index("refreshLocalDate();") < today_handler.index("selectDate(todayKey);")
+assert today_handler.index("selectDate(todayKey);") < today_handler.index('viewMode = "day";')
+# Left-rail TODAY is intentionally untouched and remains a separate pane.
+assert host.count("TaskTodayPane {") == 1
 assert "function moveDay(dateKey, delta)" in policy
 assert "function weekDays(snapshot, selectedKey, todayKey)" in policy
 assert host.count("TaskPlannerPane {") == 1

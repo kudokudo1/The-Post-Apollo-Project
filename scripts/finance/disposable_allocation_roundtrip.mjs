@@ -122,6 +122,8 @@ async function main(){
   const unfunded=await takeReadOnlySnapshot(api,month);
   assert.equal(unfunded.readOnly,true);
   assert.equal(unfunded.funding.openingBalancesVerified,false);
+  assert.equal(unfunded.incomeReview.readOnly,true);
+  assert.equal(unfunded.incomeReview.candidateCount,0);
   stage="fictional-income-category";
   // Actual's available-to-budget calculation uses the income category
   // subtotal, not every unclassified positive account transaction.
@@ -139,6 +141,9 @@ async function main(){
   const acknowledgment=await api.addTransactions(accountId,[{
     id:"a1111111-aaaa-4aaa-8aaa-aaaaaaaaaaaa",date,amount:10000,
     category:incomeCategoryId,payee_name:"FICTIONAL INCOME",cleared:false
+  },{
+    id:"b2222222-bbbb-4bbb-8bbb-bbbbbbbbbbbb",date,amount:200,
+    payee_name:"FICTIONAL UNCLASSIFIED RECEIPT",cleared:false
   }],{runTransfers:false,learnCategories:false});
   assert.equal(acknowledgment,"ok");
   await api.sync();
@@ -169,6 +174,13 @@ async function main(){
   const funded=await takeReadOnlySnapshot(api,month);
   assert.equal(funded.funding.toBudgetCents,funded.toBudgetCents);
   assert.equal(funded.funding.openingBalancesVerified,false);
+  assert.equal(funded.incomeReview.readOnly,true);
+  assert.equal(funded.incomeReview.candidateCount,
+    funded.funding.positiveUncategorizedCount);
+  assert.equal(funded.incomeReview.candidateCount,1);
+  assert.equal(funded.incomeReview.candidates[0].amountCents,200);
+  assert.equal(funded.incomeReview.categoriesOverflow,false);
+  assert.ok(funded.incomeReview.incomeCategories.some(x=>x.id===incomeCategoryId));
   stage="fresh-category-presence";
   assert.equal(findCategory(before,categoryId).length,1);
   const category=findCategory(before,categoryId)[0];

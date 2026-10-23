@@ -564,3 +564,35 @@ The report clears if the current budget fingerprint or month changes.
 For a true opening-balance reconciliation, compare original bank statements
 and historical Actual transactions. This feature **cannot validate external
 balances** and does not authorize real transactions or allocation writes.
+
+
+## FinanceW D16 // Read-only income categorization preview
+
+Inside **Budget → REVIEW FUNDING**, open **REVIEW INCOMING** to inspect the
+selected month's positive, currently uncategorized transactions. Identifiable
+transfers, split parent/child records, categorized deposits and expenses are
+excluded. A positive amount is *only a candidate to investigate*, not proof
+of income. Entries show their date, account and amount without raw payee
+descriptions.
+
+Select **REVIEW** for a candidate, then select a visible Actual income
+category to preview **UNCATEGORIZED → category**. This selection is
+**not saved, persisted, or transmitted**. The UI has no write action and
+does not calculate a hypothetical new To Budget. Actual may allocate the
+effect to different months or require additional reconciliation.
+
+At most 12 of the newest candidates are displayed. When more exist,
+the UI explicitly states the displayed/total count and directs the user
+to Actual for the remainder. If over 24 income categories exist, the UI
+fails closed for target selection rather than presenting an incomplete
+category set. Category details missing from Actual do not crash the
+Budget snapshot. Both selection and preview clear on snapshot changes.
+
+D16 includes fake-data tests, source contracts and real disposable Actual
+integration in CI. No new API calls are added to the regular Budget read,
+no credentials or raw sync IDs are exposed in the review and financial
+writes remain separately authorization-locked.
+
+Next milestones: D16 local Quickshell UI acceptance and guided legitimate
+starting-balance/income setup. Editing a real transaction's category must
+be designed, audited and authorized separately.

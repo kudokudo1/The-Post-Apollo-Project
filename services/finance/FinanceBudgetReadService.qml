@@ -132,6 +132,35 @@ Scope {
                       || Number.isSafeInteger(payload.funding.reportedIncomeCents))
                 || !Number.isSafeInteger(payload.funding.positiveUncategorizedCount)
                 || !Number.isSafeInteger(payload.funding.positiveUncategorizedCents)
+                || !payload.incomeReview || payload.incomeReview.readOnly !== true
+                || payload.incomeReview.month !== payload.month
+                || payload.incomeReview.completeness !== "selected-month-review"
+                || payload.incomeReview.categorizationVerified !== false
+                || !Number.isSafeInteger(payload.incomeReview.candidateCount)
+                || !Number.isSafeInteger(payload.incomeReview.showingCount)
+                || payload.incomeReview.candidateCount < 0
+                || payload.incomeReview.showingCount < 0
+                || typeof payload.incomeReview.truncated !== "boolean"
+                || typeof payload.incomeReview.categoriesOverflow !== "boolean"
+                || !Array.isArray(payload.incomeReview.candidates)
+                || !Array.isArray(payload.incomeReview.incomeCategories)
+                || payload.incomeReview.candidates.length>12
+                || payload.incomeReview.incomeCategories.length>24
+                || payload.incomeReview.candidates.length!==payload.incomeReview.showingCount
+                || payload.incomeReview.candidateCount!==payload.funding.positiveUncategorizedCount
+                || payload.incomeReview.truncated !== (payload.incomeReview.candidateCount>12)
+                || !payload.incomeReview.candidates.every(function(x) {
+                    return x && typeof x.id==="string" && !!x.id
+                        && typeof x.accountId==="string" && !!x.accountId
+                        && typeof x.accountName==="string"
+                        && typeof x.date==="string" && x.date.startsWith(payload.month+"-")
+                        && Number.isSafeInteger(x.amountCents) && x.amountCents>0
+                        && x.currentCategory==="UNCATEGORIZED";
+                })
+                || !payload.incomeReview.incomeCategories.every(function(x){
+                    return x && typeof x.id==="string" && !!x.id
+                        && typeof x.name==="string";
+                })
                 || !Array.isArray(payload.accounts)
                 || !Array.isArray(payload.categories)
                 || !Number.isSafeInteger(payload.transactionsCount)

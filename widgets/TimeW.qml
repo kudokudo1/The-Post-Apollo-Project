@@ -2019,8 +2019,8 @@ PanelWindow {
                                 }
                             }
 
-                            Flickable {
-                                id: differenceResults
+                            Item {
+                                id: differenceResultsArea
                                 width: parent.width
                                 height: timew.differenceResult
                                         && timew.differenceResult.options
@@ -2028,6 +2028,11 @@ PanelWindow {
                                         ? Math.min(176,
                                             timew.differenceResult.options.length * 90)
                                         : 0
+
+                            Flickable {
+                                id: differenceResults
+                                width: Math.max(0, differenceResultsArea.width - 21)
+                                height: differenceResultsArea.height
                                 clip: true
                                 boundsBehavior: Flickable.StopAtBounds
                                 contentHeight: differenceResultsColumn.height
@@ -2080,8 +2085,8 @@ PanelWindow {
                                 id: differenceResultsRail
                                 flickable: differenceResults
                                 geometryMode: "viewport"
-                                x: mathDifferencePane.width - width - 3
-                                y: differenceResults.y
+                                x: differenceResultsArea.width - width - 3
+                                y: 0
                                 height: differenceResults.height
                                 handleStyle: "star"
                                 railColor: Colors.cyan
@@ -2090,6 +2095,8 @@ PanelWindow {
                                 containGlow: true
                                 visible: timew.mathView === "between" && scrollable
                             }
+                            }
+
                             GohuText {
                                 width: parent.width
                                 text: "ELAPSED DURATION // ZONES AND DST AWARE"

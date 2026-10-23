@@ -22,6 +22,8 @@ on:
       - "widgets/tasks/TaskProjectsPane.qml"
       - "tests/tasks/test_task_projects_ui_contracts.py"
       - "tests/tasks/test_task_project_management_ui.py"
+      - "widgets/tasks/TaskProjectsAck.js"
+      - "tests/tasks/test_task_projects_ack.cjs"
       - ".github/workflows/tasks-dock-contracts.yml"
   push:
     branches:
@@ -46,6 +48,8 @@ on:
       - "widgets/tasks/TaskProjectsPane.qml"
       - "tests/tasks/test_task_projects_ui_contracts.py"
       - "tests/tasks/test_task_project_management_ui.py"
+      - "widgets/tasks/TaskProjectsAck.js"
+      - "tests/tasks/test_task_projects_ack.cjs"
       - ".github/workflows/tasks-dock-contracts.yml"
 
 permissions:
@@ -74,3 +78,5 @@ jobs:
         run: python3 tests/tasks/test_task_projects_ui_contracts.py
       - name: Validate PROJECTS rename and deletion UI safety
         run: python3 tests/tasks/test_task_project_management_ui.py
+      - name: Validate PROJECTS save acknowledgement ordering
+        run: node tests/tasks/test_task_projects_ack.cjs

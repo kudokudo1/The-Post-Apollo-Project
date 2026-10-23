@@ -3289,7 +3289,7 @@ PanelWindow {
                         id: machinePane
                         visible: timew.selectedMode === "machine"
                         width: parent.width
-                        spacing: 11
+                        spacing: 9
 
                         GohuText {
                             width: parent.width
@@ -3610,7 +3610,7 @@ PanelWindow {
                         Item {
                             id: machineMarkerArea
                             width: parent.width
-                            height: 54
+                            height: 67
 
                             ListView {
                                 id: machineMarkerList

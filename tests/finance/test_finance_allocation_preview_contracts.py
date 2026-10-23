@@ -26,7 +26,7 @@ assert 'label: "CANCEL"' in pane
 assert "PREVIEW IS SAFE // SAVING REQUIRES OPERATOR ACTIVATION" in pane
 assert 'exceedsUnallocatedFunds' in pane
 assert 'categoryRemainsOverspent' in pane
-assert 'TextInput {' in pane
+assert 'FinanceMoneyInput {' in pane
 assert pane.count('ActionButton {') == 3
 assert pane.count('trackLabelGlowLocally: true') == 3
 assert 'category.availableCents + deltaCents' in math

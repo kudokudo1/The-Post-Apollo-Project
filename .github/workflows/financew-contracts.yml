@@ -19,6 +19,9 @@ on:
       - "tests/finance/test_finance_income_preview_contracts.py"
       - "widgets/FinanceIncomeCategorizationPane.qml"
       - "widgets/FinanceFundingSetupPane.qml"
+      - "widgets/FinanceDateInput.qml"
+      - "widgets/FinanceMoneyInput.qml"
+      - "tests/finance/test_finance_input_controls_contracts.py"
       - "services/finance/FinanceFundingSetupPlan.js"
       - "tests/finance/test_finance_funding_setup_contracts.py"
       - "services/finance/**"
@@ -43,6 +46,9 @@ on:
       - "tests/finance/test_finance_income_preview_contracts.py"
       - "widgets/FinanceIncomeCategorizationPane.qml"
       - "widgets/FinanceFundingSetupPane.qml"
+      - "widgets/FinanceDateInput.qml"
+      - "widgets/FinanceMoneyInput.qml"
+      - "tests/finance/test_finance_input_controls_contracts.py"
       - "services/finance/FinanceFundingSetupPlan.js"
       - "tests/finance/test_finance_funding_setup_contracts.py"
       - "services/finance/**"
@@ -83,3 +89,5 @@ jobs:
         run: python3 tests/finance/test_finance_income_preview_contracts.py
       - name: Verify D17 guided funding setup preview
         run: python3 tests/finance/test_finance_funding_setup_contracts.py
+      - name: Verify shared FinanceW numeric and calendar input controls
+        run: python3 tests/finance/test_finance_input_controls_contracts.py

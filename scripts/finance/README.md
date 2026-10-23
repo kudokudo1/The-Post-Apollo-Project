@@ -632,3 +632,28 @@ D17b onward: plan guarded data entry on a **disposable Actual budget**,
 including reconciliation of pre-existing opening transactions, duplicate
 detection, and explicit operator approval. Do not enable real-budget
 funding writes based on a preview or a passed CI test.
+
+
+## FinanceW D17 input controls // Calendar & USD normalization
+
+FinanceW's three user-editable amount fields (transaction drafts/edits,
+category allocation and guided funding) now display a fixed dollar glyph
+outside the editable number. On leaving a money input, whole dollars
+normalize to two decimal digits: \`25\` → \`25.00\`; \`25.5\` → \`25.50\`.
+Backend amount semantics, cents limits, draft permissions and save locks
+are unchanged. Invalid money strings are not converted or submitted.
+
+FinanceW's two editable date fields (transaction drafts/edits and guided
+funding) are MONTH / DAY / YEAR numeric segments. Each has a text editor
+and up/down pointer controls; focused segments also accept keyboard
+Up/Down. A valid date is internally emitted in Actual's existing ISO
+YYYY-MM-DD format. Impossible dates are refused, while month/year changes
+clamp the day to the shorter month (including February leap years).
+Day stepping traverses calendar boundaries. Empty draft dates can be
+restored via a pointer step or valid typed segment using the selected
+month's first day as a starting reference.
+
+These editors reuse the established TaskDateSegment interaction, and
+are *not* connected to Actual API, local storage, or write activation.
+This is an input ergonomics change only. Continue to use preview and the
+separately controlled write gates; no real financial authorization changed.

@@ -18,6 +18,11 @@ Rectangle {
         active: space.visible
     }
 
+    WeatherServices.XrayFluxService {
+        id: xrayService
+        active: space.visible
+    }
+
     // Event classes are measured GOES X-ray peaks, not alert severity.
     function flareClassColor(letter) {
         if (letter === "X")
@@ -637,6 +642,184 @@ Rectangle {
             QuietText {
                 width: parent.width
                 text: "NOAA OVATION GRID // HIGHEST CELL PER HEMISPHERE // NOT LOCAL VISIBILITY"
+                font.pixelSize: 10
+            }
+        }
+
+        StationSectionDivider {
+            width: parent.width
+            title: "SOLAR // LIVE X-RAY FLUX"
+        }
+
+        Column {
+            width: parent.width
+            spacing: 7
+
+            Row {
+                width: parent.width
+                spacing: 14
+
+                Rectangle {
+                    width: 225
+                    height: 142
+                    color: Colors.dark
+                    border.width: 1
+                    border.color: Colors.cyan
+
+                    SecondaryText {
+                        anchors.left: parent.left
+                        anchors.top: parent.top
+                        anchors.margins: 10
+                        text: "LONG BAND // 0.1-0.8 NM"
+                        font.pixelSize: 11
+                    }
+
+                    GohuText {
+                        id: xrayEquivalentReading
+                        anchors.horizontalCenter: parent.horizontalCenter
+                        anchors.top: parent.top
+                        anchors.topMargin: 33
+                        text: xrayService.ready
+                              ? xrayService.classEquivalent.label : "--"
+                        font.pixelSize: 39
+                        color: xrayService.sampleFresh
+                               ? space.flareClassColor(
+                                     xrayService.classEquivalent.letter
+                                 ) : Colors.white
+                    }
+
+                    GohuText {
+                        anchors.horizontalCenter: parent.horizontalCenter
+                        anchors.bottom: parent.bottom
+                        anchors.bottomMargin: 30
+                        text: xrayService.ready
+                              ? xrayService.fluxLong.toExponential(2) + " W/m²"
+                              : "-- W/m²"
+                        font.pixelSize: 12
+                        color: Colors.white
+                    }
+
+                    Rectangle {
+                        anchors.left: parent.left
+                        anchors.right: parent.right
+                        anchors.bottom: parent.bottom
+                        anchors.margins: 10
+                        height: 8
+                        color: Colors.black
+                        border.width: 1
+                        border.color: space.meterBorderColor
+
+                        Rectangle {
+                            x: 2
+                            anchors.verticalCenter: parent.verticalCenter
+                            width: (parent.width - 4)
+                                   * (xrayService.ready
+                                      ? Math.max(0, Math.min(1,
+                                          (Math.log(xrayService.fluxLong)
+                                           / Math.LN10 + 9) / 5))
+                                      : 0)
+                            height: parent.height - 4
+                            color: space.meterFillColor
+                        }
+                    }
+                }
+
+                Column {
+                    width: 194
+                    spacing: 8
+
+                    SecondaryText {
+                        text: "SHORT BAND // 0.05-0.4 NM"
+                        font.pixelSize: 11
+                    }
+
+                    GohuText {
+                        text: xrayService.ready && xrayService.fluxShort > 0
+                              ? xrayService.fluxShort.toExponential(2)
+                              : "--"
+                        font.pixelSize: 21
+                        color: Colors.white
+                    }
+
+                    QuietText {
+                        text: "W/m² // PRIMARY GOES"
+                        font.pixelSize: 10
+                    }
+
+                    GohuText {
+                        text: xrayService.ready ? xrayService.satellite : "--"
+                        font.pixelSize: 13
+                        color: Colors.cyan
+                    }
+
+                    QuietText {
+                        text: "SAMPLE " + (xrayService.ready
+                                          ? xrayService.sampleUtc : "-- UTC")
+                        font.pixelSize: 10
+                    }
+
+                    GohuText {
+                        text: xrayService.failed
+                              ? (xrayService.ready
+                                 ? "FETCH FAILED // LAST DATA"
+                                 : "FETCH FAILED // NO DATA")
+                              : xrayService.loading && !xrayService.ready
+                                ? "RECEIVING"
+                                : xrayService.sampleFresh ? "SAMPLE CURRENT"
+                                  : xrayService.ready ? "SAMPLE STALE"
+                                    : "UNAVAILABLE"
+                        font.pixelSize: 11
+                        color: xrayService.sampleFresh
+                               ? Colors.cyan : Colors.orange
+                    }
+                }
+
+                Column {
+                    width: Math.max(0, parent.width - 225 - 194
+                                    - 2 * parent.spacing)
+                    spacing: 5
+
+                    SecondaryText {
+                        text: "LONG BAND // LAST 6 HOURS"
+                        font.pixelSize: 11
+                    }
+
+                    Item {
+                        width: parent.width
+                        height: 83
+
+                        Row {
+                            anchors.bottom: parent.bottom
+                            width: parent.width
+                            spacing: 4
+
+                            Repeater {
+                                model: xrayService.ready ? xrayService.trend : []
+
+                                delegate: Rectangle {
+                                    required property var modelData
+                                    width: Math.max(5, (parent.width
+                                                       - 11 * parent.spacing) / 12)
+                                    height: 5 + 58 * modelData.level
+                                    color: space.flareClassColor(
+                                               modelData.classLetter
+                                           )
+                                    opacity: xrayService.sampleFresh ? 1 : 0.45
+                                }
+                            }
+                        }
+                    }
+
+                    QuietText {
+                        text: "30-MIN SAMPLES // LOG SCALE"
+                        font.pixelSize: 9
+                    }
+                }
+            }
+
+            QuietText {
+                width: parent.width
+                text: "GOES XRS // 1-MIN OBSERVATIONS // FLUX-CLASS EQUIVALENT, NOT A FLARE ALERT"
                 font.pixelSize: 10
             }
         }

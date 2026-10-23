@@ -1,0 +1,40 @@
+name: TASKS Proxy 1 M10j SQLite storage prototype
+
+on:
+  pull_request:
+    paths:
+      - 'services/projects/ExperimentalTaskSqliteStore.py'
+      - 'tests/tasks/test_experimental_task_sqlite_store.py'
+      - 'docs/tasks-sqlite-storage-prototype-m10j.md'
+      - '.github/workflows/tasks-sqlite-prototype.yml'
+  push:
+    branches:
+      - main
+    paths:
+      - 'services/projects/ExperimentalTaskSqliteStore.py'
+      - 'tests/tasks/test_experimental_task_sqlite_store.py'
+      - 'docs/tasks-sqlite-storage-prototype-m10j.md'
+      - '.github/workflows/tasks-sqlite-prototype.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  sqlite-contract:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Verify SQLite atomic state, restart recovery, and corruption gates
+        run: python3 tests/tasks/test_experimental_task_sqlite_store.py
+      - name: Retain M10h typed model invariants
+        run: node tests/tasks/test_unified_project_model_v2.cjs
+      - name: Retain M10i atomic task and offline journal invariants
+        run: node tests/tasks/test_durable_edit_transaction.cjs
+      - name: Retain TimeW SQLite backend regressions
+        run: python3 tests/timew/test_machine_checkpoint_store.py

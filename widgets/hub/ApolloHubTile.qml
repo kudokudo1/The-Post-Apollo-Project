@@ -119,10 +119,11 @@ SectionFrame {
 
     signal moveLeft(int index)
     signal moveRight(int index)
-    signal changeModule(int index)
+    signal changeModule(int index, var sourceItem)
     signal removeTile(int index)
     signal toggleTileWidth(int index)
     signal cycleTileHeight(int index)
+    readonly property Item swapAnchor: swapAction
     signal pointerEntered(int index)
 
     HoverHandler {
@@ -180,10 +181,11 @@ SectionFrame {
         }
         ActionButton {
             trackLabelGlowLocally: true
+            id: swapAction
             width: 57
             height: 25
             label: "SWAP"
-            onLeftClicked: tile.changeModule(tile.tileIndex)
+            onLeftClicked: tile.changeModule(tile.tileIndex, swapAction)
         }
         ActionButton {
             // One/two grid columns; metadata lives in the v2 layout.

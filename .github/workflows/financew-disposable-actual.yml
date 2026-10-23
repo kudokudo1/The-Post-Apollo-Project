@@ -12,6 +12,8 @@ on:
       - "scripts/finance/read_opening_history.mjs"
       - "scripts/finance/disposable_actual_roundtrip.mjs"
       - "scripts/finance/disposable_allocation_roundtrip.mjs"
+      - "tests/finance/fixtures/funding_disposable_rehearsal.mjs"
+      - "tests/finance/test_funding_disposable_rehearsal.mjs"
       - "scripts/finance/allocation_guard.mjs"
       - "scripts/finance/write_allocation.mjs"
       - ".github/workflows/financew-disposable-actual.yml"
@@ -27,6 +29,8 @@ on:
       - "scripts/finance/read_opening_history.mjs"
       - "scripts/finance/disposable_actual_roundtrip.mjs"
       - "scripts/finance/disposable_allocation_roundtrip.mjs"
+      - "tests/finance/fixtures/funding_disposable_rehearsal.mjs"
+      - "tests/finance/test_funding_disposable_rehearsal.mjs"
       - "scripts/finance/allocation_guard.mjs"
       - "scripts/finance/write_allocation.mjs"
       - ".github/workflows/financew-disposable-actual.yml"
@@ -53,7 +57,7 @@ jobs:
         run: |
           node --check scripts/finance/disposable_actual_roundtrip.mjs
           node scripts/finance/disposable_actual_roundtrip.mjs
-      - name: D12b real Actual category allocation in a fictional budget
+      - name: D12b / D17b real Actual allocation and fictional funding rehearsal
         env:
           FINANCEW_DISPOSABLE_TEST: "yes"
         run: |

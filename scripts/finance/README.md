@@ -657,3 +657,42 @@ These editors reuse the established TaskDateSegment interaction, and
 are *not* connected to Actual API, local storage, or write activation.
 This is an input ergonomics change only. Continue to use preview and the
 separately controlled write gates; no real financial authorization changed.
+
+
+## FinanceW D17b // Disposable funding entry & recovery rehearsal
+
+**Scope: CI-only. No new FinanceW SAVE action, writer or authorization file.**
+D17b extends the pinned Actual 26.10.0 disposable-server integration tests
+with separate realistic funding pathways:
+
+1. **Existing-account opening balance**: refuse automatic creation, because
+   the account may already contain imported or historical transactions.
+   Original bank statements and existing Actual ledger must be reconciled
+   before any adjustment. This UI is still a plan, not a real account edit.
+2. **New account initial balance**: test the documented
+   \`createAccount(account, initialBalance)\` API using a *fictional new account*;
+   require an absent account name before creation and verify its initial
+   balance in an independently downloaded disposable budget.
+   This operation does not accept a historical reference date. Therefore
+   the D17a date field is NOT a supported write parameter for opening a
+   new account, and D17a MUST remain preview-only.
+3. **Categorized income entry**: test \`addTransactions\` using a stable
+   request identity, a known active on-budget account, an Actual income
+   category and positive integer cents. Preflight checks selected-month
+   date, live category membership and duplicate-looking ledger records.
+
+The test-only mutation harness is
+\`tests/finance/fixtures/funding_disposable_rehearsal.mjs\`.
+It refuses execution without **CI=true, GITHUB_ACTIONS=true,
+FINANCEW_DISPOSABLE_TEST=yes**. It has no launch path from FinanceW.
+It verifies **record-attempt before mutation** and duplicate refusal.
+If sync fails, the attempt is **uncertain**; inspection reports
+\`observed\`, \`not-seen\`, or \`ambiguous\`. *Even not-seen never authorizes
+an automatic retry*: manual investigation and durable journaling are
+requirements for the future D17c writer. Independent Actual readback
+confirms only fictional test changes.
+
+All existing write-lock files remain unchanged and no additional
+credentials or private financial data are added to GitHub. D17b acceptance
+is CI source and disposable-budget integration only; it is not operator
+approval for new-account creation or live income transactions.

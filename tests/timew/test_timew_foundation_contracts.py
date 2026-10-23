@@ -344,7 +344,7 @@ assert 'selectedMode !== "clock" && selectedMode !== "calc"' in window
 assert 'selectedMode === "clock" || selectedMode === "calc"' in window
 assert 'id: converterSourcePicker' in window
 assert 'id: converterTargetPicker' in window
-assert window.count("TimeZonePicker {") == 2
+assert window.count("TimeZonePicker {") == 3
 assert 'selectedZone: timew.converterSourceZone' in window
 assert 'selectedZone: timew.converterTargetZone' in window
 assert 'expanded: timew.activeConverterDropdown === "source"' in window
@@ -358,8 +358,10 @@ assert 'onLeftClicked: timew.cycleConverterZone("source")' in window
 assert 'onLeftClicked: timew.cycleConverterZone("target")' in window
 assert 'converterSourcePicker.searchFocused' in window
 assert 'converterTargetPicker.searchFocused' in window
+assert 'mathZonePicker.searchFocused' in window
 assert 'converterSourcePicker.containsFramePoint(' in window
 assert 'converterTargetPicker.containsFramePoint(' in window
+assert 'mathZonePicker.containsFramePoint(timewFrame, px, py)' in window
 assert 'z: 40' in window and 'z: 30' in window
 assert 'z: timew.activeConverterDropdown !== "" ? 20 : 0' in window
 assert 'TIME ZONE CONVERTER // READ ONLY' in window
@@ -398,6 +400,27 @@ assert 'onTriggered: timew.setCalcView("math")' in window
 assert 'timew.calcView === "convert"' in window
 assert 'timew.calcView === "math"' in window
 assert 'id: mathPane' in window
+# MATH has a dedicated popup, bound to the existing shared FROM zone;
+# tapping another part of MATH dismisses it without touching the active
+# source selection or the CONVERT target picker.
+assert 'id: mathZonePicker' in window
+assert 'selectedZone: timew.converterSourceZone' in window
+assert 'expanded: timew.activeConverterDropdown === "math"' in window
+assert 'onOpenRequested: timew.openConverterDropdown("math")' in window
+assert 'onToggleRequested: timew.toggleConverterDropdown("math")' in window
+assert 'timew.chooseConverterSearchZone("math", zoneId)' in window
+assert 'if (which === "source" || which === "math")' in window
+assert 'if (which !== "source" && which !== "target" && which !== "math")' in window
+assert 'which === "math" && calcView !== "math"' in window
+assert 'which !== "math" && calcView !== "convert"' in window
+assert 'mathZonePicker.dropFocus();' in window
+assert 'timew.calcView === "math"' in window
+assert 'z: timew.activeConverterDropdown === "math" ? 20 : 0' in window
+assert 'id: mathZoneRow' in window
+assert 'mathZoneRow.spacing * 2' in window
+assert 'catalog: timew.worldZoneCatalog' in window
+assert 'countryIndex: timew.worldCountryIndex' in window
+assert window.count('label: "CHANGE"') == 3
 assert 'id: mathDateInput' in window
 assert 'id: mathTimeInput' in window
 assert 'id: mathDaysInput' in window

@@ -49,7 +49,7 @@ PanelWindow {
         ApolloHubTodoStore.snapshot
         ? ApolloHubTodoStore.snapshot.state : "loading"
     readonly property string feedStatus:
-        activeMode.id !== "tasks" ? "NO FEED"
+        activeMode.id !== "tasks" && activeMode.id !== "today" ? "NO FEED"
         : taskStoreState === "ready" || taskStoreState === "empty" ? "LOCAL"
         : taskStoreState === "saving" ? "SAVING"
         : taskStoreState === "loading" ? "READING"
@@ -255,7 +255,7 @@ PanelWindow {
             anchors.bottomMargin: 14
 
             Column {
-                visible: root.activeMode.id !== "tasks"
+                visible: root.activeMode.id !== "tasks" && root.activeMode.id !== "today"
                 anchors.centerIn: parent
                 width: parent.width
                 spacing: 12
@@ -307,6 +307,18 @@ PanelWindow {
                 visible: root.menuOpen && root.activeMode.id === "tasks"
                 todoStore: ApolloHubTodoStore
                 todoSnapshot: ApolloHubTodoStore.snapshot
+            }
+
+            // TODAY is a view of existing due dates, not another task store.
+            TaskTodayPane {
+                id: taskToday
+                anchors.fill: parent
+                visible: root.menuOpen && root.activeMode.id === "today"
+                todoSnapshot: ApolloHubTodoStore.snapshot
+                onOpenTaskRequested: function(taskId) {
+                    root.selectMainMode(0);
+                    taskDetails.chooseTask(taskId);
+                }
             }
         }
     }

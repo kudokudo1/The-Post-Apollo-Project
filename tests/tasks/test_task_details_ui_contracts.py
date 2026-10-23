@@ -16,7 +16,10 @@ assert TASKS.count("ApolloHubTodoMini {") == 1
 assert "onTaskSelected: function(taskId)" in TASKS
 assert "taskDetails.chooseTask(taskId)" in TASKS
 assert TASKS.count("todoStore: ApolloHubTodoStore") == 2
-assert TASKS.count("todoSnapshot: ApolloHubTodoStore.snapshot") == 2
+# The two M4 editors still share one store; M5 adds a read-only TODAY consumer.
+assert TASKS.count("todoSnapshot: ApolloHubTodoStore.snapshot") == 3
+assert TASKS.count("todoStore: ApolloHubTodoStore") == 2
+assert "TaskTodayPane {" in TASKS
 assert "todoStore: ApolloHubTodoStore" in HUB
 assert "todoSnapshot: ApolloHubTodoStore.snapshot" in HUB
 assert "signal taskSelected(string taskId)" in MINI

@@ -15,6 +15,10 @@ on:
       - "widgets/hub/ApolloHubTodoMini.qml"
       - "tests/tasks/test_task_details_ui_contracts.py"
       - "tests/tasks/test_task_date_segments.cjs"
+      - "widgets/tasks/TaskTodayPane.qml"
+      - "widgets/tasks/TaskTodayPolicy.js"
+      - "tests/tasks/test_task_today_policy.cjs"
+      - "tests/tasks/test_task_today_ui_contracts.py"
       - ".github/workflows/tasks-dock-contracts.yml"
   push:
     branches:
@@ -32,6 +36,10 @@ on:
       - "widgets/hub/ApolloHubTodoMini.qml"
       - "tests/tasks/test_task_details_ui_contracts.py"
       - "tests/tasks/test_task_date_segments.cjs"
+      - "widgets/tasks/TaskTodayPane.qml"
+      - "widgets/tasks/TaskTodayPolicy.js"
+      - "tests/tasks/test_task_today_policy.cjs"
+      - "tests/tasks/test_task_today_ui_contracts.py"
       - ".github/workflows/tasks-dock-contracts.yml"
 
 permissions:
@@ -52,3 +60,7 @@ jobs:
         run: python3 tests/tasks/test_task_details_ui_contracts.py
       - name: Validate three-part Gregorian due date steppers
         run: node tests/tasks/test_task_date_segments.cjs
+      - name: Validate TODAY pure due-date projection
+        run: node tests/tasks/test_task_today_policy.cjs
+      - name: Validate TODAY menu wiring and single-store boundary
+        run: python3 tests/tasks/test_task_today_ui_contracts.py

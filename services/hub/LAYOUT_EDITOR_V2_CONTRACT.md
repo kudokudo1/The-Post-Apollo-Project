@@ -1,6 +1,6 @@
 # 🏥💜 ApolloHubW // P1 Layout Editor 2.0, stage 1
 
-**Status:** Stages 1 (tile ×/UNDO) and 2 (tile resizing) operator-accepted on the live desktop. Stage 3 mode/group removal with two-click confirmation is implemented in GitHub `main` and passes source/behavior CI; Stage 3 desktop acceptance is pending. Drag-and-drop, cross-mode transfer, module picker, and full preset management are not in scope.
+**Status:** Stages 1 (tile ×/UNDO), 2 (tile resizing), and 3 (confirmed mode/group removal) operator-accepted on the live desktop. Stage 4 searchable module picker is committed to GitHub `main`; desktop acceptance is pending. Drag-and-drop, cross-mode tile transfers and full preset management remain outside this stage.
 
 ## IMPLEMENTATION
 
@@ -74,8 +74,11 @@ The `×` is an **explicit one-click edit action**, not a destructive record dele
 - [x] Stage 2 operator runtime acceptance
 - [ ] Richer grid packing and tile content expansion
 - [x] Stage 3 mode/group removal with named confirmation and Undo
-- [ ] Stage 3 operator desktop acceptance
-- [ ] Searchable module picker, move between modes, and durable undo/presets
+- [x] Stage 3 operator desktop acceptance
+- [x] Stage 4 module picker: search, count, occupied-state hints, explicit selection
+- [ ] Stage 4 operator desktop acceptance
+- [ ] Move tiles between modes/groups
+- [ ] Durable undo/presets and full grid-packing polish
 
 ## P1 Stage 2 // Explicit width and height controls
 
@@ -112,9 +115,24 @@ The EDIT toolbar provides **− MODE** and **− GROUP** in addition to the prio
 
 **Desktop verification:** Sync `main`, restart Quickshell, add a disposable mode/group, test CANCEL, confirm removal, test UNDO, and verify the original named tabs and tile arrangement reappear. Check that the original Dashboard still opens if only one mode remains. This source checkpoint is **not** a live desktop PASS yet.
 
+## P1 Stage 4 // Searchable Hub module picker
+
+In EDIT, the tile's **SWAP** button (and EDIT + Enter on a keyboard-selected tile) now opens an in-Hub picker rather than silently cycling to the next module. The selected tile's current module, stable ID, W/H dimensions, and group ownership are retained until a new module is explicitly chosen.
+
+- **Full inventory on empty search:** 10 Hub module IDs from `ApolloHubLayout.MODULE_IDS`, not applications from the operating-system desktop catalog. A typed query filters by case-insensitive display name or module ID. The result line displays matches/total and the number selectable.
+- **Current and occupied choices:** The current module is labeled `CURRENT`. A module already occupying another tile in the same group is labeled `IN USE`. Both are visible but unavailable to select; choices used only in a *different* group remain available.
+- **Selection:** clicking an available row changes exactly that tile through `Layout.setTileModule(layout, modeIndex, subIndex, tileIndex, expectedTileId, moduleId)`. The policy rechecks the tile's stable ID, authorized module ID, and sibling uniqueness. Module changes do **not** alter saved Notes/To-do data or instantiate any source processes. Existing UNDO can restore the previous module.
+- **Keyboard safety:** Opening SWAP focuses the search field; ordinary typing and arrow keys stay in it, and the Hub's global mode-navigation shortcuts are disabled until the picker closes. Escape in the search field and the visible **CLOSE** action cancel without changing the layout. Enter only selects automatically when a *nonblank query* produces exactly one available choice; otherwise the user must click a specific row.
+- **Lifecycle:** Opening the picker does not write a layout. The picker closes on explicit selection, canceled search, switching mode/group, leaving EDIT, closing the Hub, undo, or reloading the saved layout. Selection also checks the original mode/group IDs to prevent stale actions.
+- **Layout/visual:** The existing tile region becomes the scrollable picker list while open, with the same chassis, header, toolbar, colors and shared ActionButton. The underlying tile components and shared data remain intact. No extra overlay window, timer, database, or calendar/desktop-app provider was introduced.
+
+The Stage 4 suite extends `tests/hub/test_apollo_hub_layout_v2.cjs` for filtering, empty-query show-all, duplication constraints, stale IDs, metadata/Undo round-trips and invalid indices. It also extends `tests/hub/test_apollo_hub_foundation.py` to guard search focus, close/escape, counts, selection and the absent cycling path.
+
+**Desktop acceptance:** On the operator's installed Quickshell, open a disposable tile's SWAP picker, verify all 10 choices with an empty search, filter by `cpu` or `app`, check `IN USE` and `CURRENT` states, cancel via Escape, then choose an available module and use UNDO. Confirm W/H settings are preserved, and ordinary text-entry keys do not move Hub modes. This test requires no destructive data operations.
+
 ## NEXT
 
-After Stage 3 desktop acceptance, the next P1 increment should implement a searchable module picker that replaces cyclic SWAP, followed by cross-mode tile moves. Full grid packing remains a separate geometry and visual review.
+After Stage 4 desktop acceptance, add explicit cross-mode and cross-group tile transfers, still preserving stable tile IDs and UNDO. More advanced grid packing, persistent revision history and layout presets remain later scope.
 
 ## DECISIONS
 

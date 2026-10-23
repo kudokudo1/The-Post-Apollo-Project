@@ -8,6 +8,9 @@ Item {
     id: uptimeMini
 
     property var uptimeSnapshot: null
+    // Stage 7D: fill existing height without another uptime reader.
+    readonly property int densityLevel: height >= 300 ? 3
+                                        : height >= 180 ? 2 : 1
 
     readonly property string uptimeState:
         uptimeSnapshot && uptimeSnapshot.state
@@ -38,12 +41,21 @@ Item {
         property string unitText: ""
         property string valueText: "--"
         property bool known: false
-        spacing: 2
+        readonly property int digitHeight:
+            uptimeMini.densityLevel === 3 ? 76
+            : uptimeMini.densityLevel === 2 ? 54 : 31
+        readonly property int unitHeight:
+            uptimeMini.densityLevel === 3 ? 24
+            : uptimeMini.densityLevel === 2 ? 18 : 13
+        spacing: uptimeMini.densityLevel === 3 ? 6
+                 : uptimeMini.densityLevel === 2 ? 4 : 2
+        height: digitHeight + spacing + unitHeight
 
         GohuText {
             width: parent.width
-            height: 31
-            font.pixelSize: 23
+            height: part.digitHeight
+            font.pixelSize: uptimeMini.densityLevel === 3 ? 55
+                            : uptimeMini.densityLevel === 2 ? 39 : 23
             verticalAlignment: Text.AlignVCenter
             horizontalAlignment: Text.AlignHCenter
             color: part.known ? Colors.white : Colors.orange
@@ -53,8 +65,9 @@ Item {
 
         GohuText {
             width: parent.width
-            height: 13
-            font.pixelSize: 10
+            height: part.unitHeight
+            font.pixelSize: uptimeMini.densityLevel === 3 ? 16
+                            : uptimeMini.densityLevel === 2 ? 13 : 10
             horizontalAlignment: Text.AlignHCenter
             color: Colors.cyan
             text: part.unitText
@@ -63,15 +76,20 @@ Item {
 
 
     Column {
-        anchors {
-            fill: parent
-        }
-        spacing: 8
+        id: uptimeContent
+        width: parent.width
+        height: childrenRect.height
+        y: uptimeMini.densityLevel > 1
+           ? Math.max(0, Math.floor((uptimeMini.height - height) / 2)) : 0
+        spacing: uptimeMini.densityLevel === 3 ? 18
+                 : uptimeMini.densityLevel === 2 ? 12 : 8
 
         GohuText {
             width: parent.width
-            height: 16
-            font.pixelSize: 10
+            height: uptimeMini.densityLevel === 3 ? 26
+                    : uptimeMini.densityLevel === 2 ? 21 : 16
+            font.pixelSize: uptimeMini.densityLevel === 3 ? 16
+                            : uptimeMini.densityLevel === 2 ? 13 : 10
             color: Colors.cyan
             elide: Text.ElideRight
             text: "LINUX // SINCE BOOT"
@@ -80,6 +98,7 @@ Item {
         Grid {
             id: uptimeDigits
             width: parent.width
+            height: childrenRect.height
             columns: 3
             columnSpacing: 6
 

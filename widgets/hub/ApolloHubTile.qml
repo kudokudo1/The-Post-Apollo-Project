@@ -466,6 +466,7 @@ SectionFrame {
         visible: tile.moduleId === "calendar"
         calendarSnapshot: tile.calendarSnapshot
         calendarBridge: tile.calendarBridge
+        todoSnapshot: tile.todoSnapshot
         anchors {
             left: parent.left
             right: parent.right

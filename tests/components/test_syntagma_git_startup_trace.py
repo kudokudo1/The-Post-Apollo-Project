@@ -32,8 +32,13 @@ assert "publishParts = publishPendingModels();" in service
 assert "if (publishParts)" in service
 for name in ("metadata=", "clears=", "local=", "remote=", "topology=", "total="):
     assert name in service
-assert service.count("localBranchRows.append({") == 1
-assert service.count("remoteBranchRows.append({") == 1
+# The branch-model publication was optimized to preserve unchanged rows.
+# Keep the startup-trace model paths guarded without requiring full rebuilds.
+assert "function branchModelMatches(model, rows, roles)" in service
+assert "if (!localUnchanged)" in service
+assert "if (!remoteUnchanged)" in service
+assert "localBranchRows.append(nextLocalRows[i]);" in service
+assert "remoteBranchRows.append(nextRemoteRows[i]);" in service
 # Preserve BranchMap delegates by SHA across repeated GitService publications.
 assert "function reconcileTopologyRows()" in service
 assert "const topologyDelta = reconcileTopologyRows();" in service

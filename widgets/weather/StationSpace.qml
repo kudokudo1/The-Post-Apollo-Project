@@ -1,10 +1,17 @@
 import QtQuick
 import "../../components"
+import "../../services/weather" as WeatherServices
 
 Rectangle {
     id: space
 
     property var spaceService: null
+
+    // OVATION's gridded model fetch exists only while SPACE is instantiated.
+    WeatherServices.AuroraService {
+        id: auroraService
+        active: space.visible
+    }
 
     readonly property bool spaceReady: spaceService && spaceService.ready
     readonly property bool spaceLoading: spaceService && spaceService.loading
@@ -87,12 +94,24 @@ Rectangle {
 
     // Compact observatory view: promote the existing NOAA readings without
     // introducing another refresh, provider, or invented severity scale.
-    Column {
+    // The original instruments stay in place. Scroll SPACE itself if the
+    // new model forecast extends beyond the station's fixed-height viewport.
+    Flickable {
+        id: spaceScroll
         anchors.fill: parent
-        anchors.margins: 20
-        spacing: 14
+        clip: true
+        boundsBehavior: Flickable.StopAtBounds
+        contentWidth: width
+        contentHeight: Math.max(height, spaceContent.y + spaceContent.implicitHeight + 12)
 
-        Row {
+        Column {
+            id: spaceContent
+            x: 20
+            y: 12
+            width: Math.max(0, spaceScroll.width - 40)
+            spacing: 10
+
+            Row {
             width: parent.width
 
             GohuText {
@@ -446,9 +465,175 @@ Rectangle {
             }
         }
 
+        StationSectionDivider {
+            width: parent.width
+            title: "AURORA // 30-90 MIN FORECAST"
+        }
+
+        Column {
+            width: parent.width
+            spacing: 7
+
+            Row {
+                width: parent.width
+                spacing: 14
+
+                Rectangle {
+                    width: 228
+                    height: 122
+                    color: Colors.dark
+                    border.width: 1
+                    border.color: Colors.cyan
+
+                    SecondaryText {
+                        anchors.left: parent.left
+                        anchors.top: parent.top
+                        anchors.margins: 10
+                        text: "BOREALIS // NORTH PEAK"
+                        font.pixelSize: 11
+                    }
+
+                    GohuText {
+                        anchors.horizontalCenter: parent.horizontalCenter
+                        anchors.top: parent.top
+                        anchors.topMargin: 28
+                        text: auroraService.ready
+                              ? Math.round(auroraService.northPeak) + "%" : "--%"
+                        font.pixelSize: 39
+                        color: auroraService.forecastFresh
+                               ? Colors.magenta : Colors.white
+                    }
+
+                    Rectangle {
+                        anchors.left: parent.left
+                        anchors.right: parent.right
+                        anchors.bottom: parent.bottom
+                        anchors.margins: 10
+                        height: 8
+                        color: Colors.black
+                        border.width: 1
+                        border.color: space.meterBorderColor
+
+                        Rectangle {
+                            x: 2
+                            anchors.verticalCenter: parent.verticalCenter
+                            width: (parent.width - 4)
+                                   * (auroraService.ready
+                                      ? auroraService.northPeak / 100 : 0)
+                            height: parent.height - 4
+                            color: space.meterFillColor
+                        }
+                    }
+                }
+
+                Rectangle {
+                    width: 228
+                    height: 122
+                    color: Colors.dark
+                    border.width: 1
+                    border.color: Colors.cyan
+
+                    SecondaryText {
+                        anchors.left: parent.left
+                        anchors.top: parent.top
+                        anchors.margins: 10
+                        text: "AUSTRALIS // SOUTH PEAK"
+                        font.pixelSize: 11
+                    }
+
+                    GohuText {
+                        anchors.horizontalCenter: parent.horizontalCenter
+                        anchors.top: parent.top
+                        anchors.topMargin: 28
+                        text: auroraService.ready
+                              ? Math.round(auroraService.southPeak) + "%" : "--%"
+                        font.pixelSize: 39
+                        color: auroraService.forecastFresh
+                               ? Colors.magenta : Colors.white
+                    }
+
+                    Rectangle {
+                        anchors.left: parent.left
+                        anchors.right: parent.right
+                        anchors.bottom: parent.bottom
+                        anchors.margins: 10
+                        height: 8
+                        color: Colors.black
+                        border.width: 1
+                        border.color: space.meterBorderColor
+
+                        Rectangle {
+                            x: 2
+                            anchors.verticalCenter: parent.verticalCenter
+                            width: (parent.width - 4)
+                                   * (auroraService.ready
+                                      ? auroraService.southPeak / 100 : 0)
+                            height: parent.height - 4
+                            color: space.meterFillColor
+                        }
+                    }
+                }
+
+                Column {
+                    width: Math.max(0, parent.width - 456 - 2 * parent.spacing)
+                    spacing: 8
+
+                    SecondaryText {
+                        text: "MODEL VALID // UTC"
+                        font.pixelSize: 11
+                    }
+
+                    GohuText {
+                        text: auroraService.ready
+                              ? auroraService.forecastLabel : "-- UTC"
+                        font.pixelSize: 17
+                        color: Colors.white
+                    }
+
+                    GohuText {
+                        width: parent.width
+                        wrapMode: Text.WordWrap
+                        text: auroraService.failed
+                              ? "FETCH ERROR // LAST DATA"
+                              : auroraService.loading && !auroraService.ready
+                                ? "RECEIVING"
+                                : auroraService.forecastFresh
+                                  ? "MODEL CURRENT"
+                                  : auroraService.ready ? "MODEL STALE"
+                                    : "UNAVAILABLE"
+                        font.pixelSize: 11
+                        color: auroraService.forecastFresh
+                               ? Colors.cyan : Colors.orange
+                    }
+
+                    QuietText {
+                        width: parent.width
+                        wrapMode: Text.WordWrap
+                        text: "OBS " + (auroraService.ready
+                                       ? auroraService.observationLabel : "-- UTC")
+                        font.pixelSize: 10
+                    }
+                }
+            }
+
+            QuietText {
+                width: parent.width
+                text: "NOAA OVATION GRID // HIGHEST CELL PER HEMISPHERE // NOT LOCAL VISIBILITY"
+                font.pixelSize: 10
+            }
+        }
+
         QuietText {
             text: "NOAA SWPC // FOUR LIVE PRODUCTS // INDEPENDENT SAMPLE TIMES"
             font.pixelSize: 11
         }
+        }
+    }
+
+    NeonScrollBar {
+        flickable: spaceScroll
+        handleStyle: "star"
+        geometryHost: space
+        visible: scrollable
     }
 }

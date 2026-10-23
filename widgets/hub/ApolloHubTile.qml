@@ -189,8 +189,8 @@ SectionFrame {
             onLeftClicked: tile.changeModule(tile.tileIndex, swapAction)
         }
         ActionButton {
-            id: moveAction
             trackLabelGlowLocally: true
+            id: moveAction
             width: 57
             height: 25
             label: "MOVE"

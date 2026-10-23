@@ -24,6 +24,8 @@ on:
       - "tests/finance/test_finance_input_controls_contracts.py"
       - "services/finance/FinanceFundingSetupPlan.js"
       - "tests/finance/test_finance_funding_setup_contracts.py"
+      - "tests/finance/test_finance_funding_write_ui_contracts.py"
+      - "services/finance/FinanceFundingWriteService.qml"
       - "services/finance/**"
       - "tests/finance/test_finance_budget_ui_contracts.py"
       - "tests/finance/test_finance_transaction_draft_contracts.py"
@@ -51,6 +53,8 @@ on:
       - "tests/finance/test_finance_input_controls_contracts.py"
       - "services/finance/FinanceFundingSetupPlan.js"
       - "tests/finance/test_finance_funding_setup_contracts.py"
+      - "tests/finance/test_finance_funding_write_ui_contracts.py"
+      - "services/finance/FinanceFundingWriteService.qml"
       - "services/finance/**"
       - "tests/finance/test_finance_budget_ui_contracts.py"
       - "tests/finance/test_finance_transaction_draft_contracts.py"
@@ -89,5 +93,7 @@ jobs:
         run: python3 tests/finance/test_finance_income_preview_contracts.py
       - name: Verify D17 guided funding setup preview
         run: python3 tests/finance/test_finance_funding_setup_contracts.py
+      - name: Verify D17d staged guarded income confirmation UI
+        run: python3 tests/finance/test_finance_funding_write_ui_contracts.py
       - name: Verify shared FinanceW numeric and calendar input controls
         run: python3 tests/finance/test_finance_input_controls_contracts.py

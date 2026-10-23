@@ -1783,9 +1783,10 @@ Scope {
                     || "CONTROL AFTER SNAPSHOT UNAVAILABLE"
             };
 
+        let journalRecorded = true;
         if (pendingJournalId && operationJournal) {
             if (success)
-                operationJournal.completeOperation(
+                journalRecorded = operationJournal.completeOperation(
                     pendingJournalId,
                     snapshot,
                     warning
@@ -1793,7 +1794,7 @@ Scope {
                     : detail
                 );
             else
-                operationJournal.failOperation(
+                journalRecorded = operationJournal.failOperation(
                     pendingJournalId,
                     snapshot,
                     warning
@@ -1814,6 +1815,19 @@ Scope {
                 + " ms / disk "
                 + (metrics ? metrics.lastPersistWriteMs : 0)
                 + " ms)";
+        }
+
+        if (!journalRecorded) {
+            // Git may have succeeded, but an unrecorded AFTER boundary is
+            // not a successfully finalized CONTROL operation.
+            actionExitCode = 1;
+            actionOutput += (actionOutput.length ? "\n" : "")
+                + "JOURNAL NOT RECORDED // Git subprocess "
+                + (success ? "succeeded" : "failed")
+                + "; AFTER journal save unconfirmed // "
+                + String(operationJournal
+                    ? operationJournal.storageError
+                    : "JOURNAL SERVICE UNAVAILABLE");
         }
 
         actionBusy = false;
@@ -2441,7 +2455,9 @@ Scope {
                 if (gitService.operationJournal
                         && !gitService.pendingJournalId) {
                     gitService.failBeforeSnapshot(
-                        "JOURNAL RECORD COULD NOT START"
+                        "JOURNAL RECORD COULD NOT START // "
+                        + String(gitService.operationJournal.storageError
+                            || "NO DURABLE BEFORE RECORD")
                     );
                     return;
                 }

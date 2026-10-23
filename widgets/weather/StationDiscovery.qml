@@ -9,6 +9,7 @@ Rectangle {
     id: stationDiscovery
 
     property string domain: "map"
+    property bool stationOpen: true
 
     readonly property string modeTitle:
         domain === "map" ? "⌖  MAP // EVENT SOURCES"
@@ -50,7 +51,7 @@ Rectangle {
     WeatherServices.StationDiscoveryService {
         id: source
         domain: stationDiscovery.domain
-        active: stationDiscovery.visible
+        active: stationDiscovery.stationOpen && stationDiscovery.visible
     }
 
     color: Colors.black

@@ -92,7 +92,8 @@ assert 'text: timew.selectedName + " // TIMEW"\n                        color: t
 assert 'import "../services/hub/ApolloHubTimePolicy.js" as LocalTimePolicy' in window
 assert "LocalTimePolicy.snapshot(localClock.date.getTime(), use24Hour)" in window
 assert window.count("SystemClock {") == 1
-assert window.count("Timer {") == 1
+assert window.count("\n    Timer {") == 2
+assert window.count("ElapsedTimer {") == 1
 assert "interval: 30000" in window
 assert "running: timew.menuOpen && timew.selectedMode === \"clock\"" in window
 assert "property bool use24Hour: true" in window
@@ -282,7 +283,8 @@ assert '!converterDateInput.activeFocus && !converterTimeInput.activeFocus' in w
 assert 'TIME CALCULATOR // NOT CONNECTED' not in window
 # Conversion adds one on-demand process, no persistent interval or clock tick.
 assert window.count("SystemClock {") == 1
-assert window.count("Timer {") == 1
+assert window.count("\n    Timer {") == 2
+assert window.count("ElapsedTimer {") == 1
 
 # Two independent CALC 12/24-hour presentation controls. The input is
 # converted to backend-ready HH:MM; output formats the existing result only.
@@ -453,7 +455,8 @@ assert 'REPEATED HOUR // 2 RESULTS' in window
 assert 'MATH // 1 RESULT' in window
 assert 'TIME DOES NOT EXIST // DST CLOCK JUMP' in window
 assert window.count("SystemClock {") == 1
-assert window.count("Timer {") == 1
+assert window.count("\n    Timer {") == 2
+assert window.count("ElapsedTimer {") == 1
 assert window.count('arithmeticProcess.exec([') == 1
 assert window.count('converterProcess.exec([') == 1
 arithmetic = (ROOT / "services/time/TimeArithmetic.py").read_text(encoding="utf-8")
@@ -519,7 +522,8 @@ assert 'DST OVERLAP // MULTIPLE DURATIONS' in window
 assert 'ELAPSED DURATION // ZONES AND DST AWARE' in window
 assert 'visible: timew.mathView === "elapsed"' in window
 assert window.count("SystemClock {") == 1
-assert window.count("Timer {") == 1
+assert window.count("\n    Timer {") == 2
+assert window.count("ElapsedTimer {") == 1
 difference = (ROOT / "services/time/TimeDifference.py").read_text(encoding="utf-8")
 assert 'ZoneInfo(zone)' in difference
 assert 'for fold in (0, 1)' in difference
@@ -527,6 +531,58 @@ assert 'roundtrip.replace(tzinfo=None) != naive' in difference
 assert 'end_utc - start_utc' in difference
 assert 'AMBIGUOUS_LOCAL_TIME' in difference
 assert 'START_' in difference and 'END_' in difference
+
+# TOOLS stopwatch: Quickshell's monotonic ElapsedTimer owns measurement;
+# the display's 100ms Timer cannot determine elapsed time by tick counting.
+stopwatch_policy = (ROOT / "services/time/StopwatchPolicy.js").read_text(encoding="utf-8")
+assert 'import "../services/time/StopwatchPolicy.js" as StopwatchPolicy' in window
+assert 'ElapsedTimer {' in window
+assert 'id: stopwatchAnchor' in window
+assert 'stopwatchAnchor.elapsed() * 1000' in window
+assert 'stopwatchAnchor.restart();' in window
+assert 'Date.now()' not in window
+assert 'property bool stopwatchRunning: false' in window
+assert 'property real stopwatchAccumulatedMs: 0' in window
+assert 'property var stopwatchLaps: []' in window
+assert 'readonly property int stopwatchMaxLaps: StopwatchPolicy.MAX_LAPS' in window
+for method in ('refreshStopwatch', 'startStopwatch', 'pauseStopwatch',
+               'lapStopwatch', 'resetStopwatch'):
+    assert 'function ' + method + '()' in window
+assert 'StopwatchPolicy.sample(' in window
+assert 'StopwatchPolicy.appendLap(' in window
+assert 'stopwatchLastLapMs = stopwatchDisplayMs' in window
+assert 'id: stopwatchDisplayTimer' in window
+assert 'interval: 100' in window
+assert 'timew.stopwatchRunning' in window
+assert '&& timew.menuOpen && timew.selectedMode === "tools"' in window
+assert 'onTriggered: timew.refreshStopwatch()' in window
+assert 'id: stopwatchPane' in window
+assert 'STOPWATCH // ELAPSED TIME' in window
+assert 'StopwatchPolicy.format(timew.stopwatchDisplayMs)' in window
+assert 'STATUS // RUNNING' in window
+assert 'STATUS // PAUSED' in window
+assert 'STATUS // READY' in window
+assert 'id: stopwatchRunButton' in window
+assert 'id: stopwatchSecondaryButton' in window
+assert '"PAUSE"' in window and '"RESUME"' in window and '"START"' in window
+assert '"LAP"' in window and '"RESET"' in window
+assert 'timew.pauseStopwatch();' in window
+assert 'timew.startStopwatch();' in window
+assert 'timew.lapStopwatch();' in window
+assert 'timew.resetStopwatch();' in window
+assert 'id: stopwatchLapList' in window
+assert 'id: stopwatchLapRail' in window
+assert 'x: stopwatchLapArea.width - width - 3' in window
+assert 'flickable: stopwatchLapList' in window
+assert 'handleColor: Colors.magenta' in window
+assert 'stopwatchLapRail.crossExtent + 6' in window
+assert 'model: timew.stopwatchLaps' in window
+assert 'modelData.splitMs' in window and 'modelData.totalMs' in window
+assert 'MONOTONIC // CONTINUES WHILE WINDOW IS CLOSED' in window
+assert 'var MAX_LAPS = 100;' in stopwatch_policy
+assert 'function sample(accumulatedMs, segmentMs)' in stopwatch_policy
+assert 'function appendLap(existing, totalMs, previousLapMs, sequence)' in stopwatch_policy
+assert 'return next.slice(0, MAX_LAPS);' in stopwatch_policy
 
 # Universal visual language remains: magenta header, cyan divider, borderless modes.
 assert 'text: "TIME // W"' in window
@@ -545,10 +601,11 @@ for prop in ('label: "×"', "labelPixelSize: 22", "destructive: true",
              "hoverBorderColor: Colors.red"):
     assert prop in close, prop
 
-# This milestone must not pretend to implement a timer, background capture,
-# Sway control or durable state. Future milestones must update these contracts.
+# Stopwatch is a session-local elapsed counter. Countdown timers,
+# background capture, Sway restoration and persistence remain unimplemented.
 assert "NO SCREENSHOTS OR RESTORATION ACTIVE" in window
-assert "STOPWATCH + TIMERS // NOT CONNECTED" in window
+assert "STOPWATCH + TIMERS // NOT CONNECTED" not in window
+assert "COUNTDOWN TIMERS // NEXT DEVELOPMENT STAGE" in window
 assert "FOUNDATION PREVIEW // UI ONLY" in window
 for primitive in ("JsonAdapter {", "FileView {", "swaymsg",
                   "grim ", "onTriggered: capture", "kill -",

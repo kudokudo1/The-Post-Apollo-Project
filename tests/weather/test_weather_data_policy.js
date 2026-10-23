@@ -189,4 +189,51 @@ assert.equal(context.parseAirQualityForecast({
     pm2_5: [null]
 }, 12)[0].aqi, -1);
 
+
+// The worldwide USGS GeoJSON feed is independent of AQI and location.
+// Validate sorting, missing data, coordinate order and distance calculations.
+const seismicSource = fs.readFileSync(
+    path.join(root, "services/weather/SeismicPolicy.js"), "utf8"
+).replace(/^\.pragma library\s*/m, "");
+const seismic = {};
+vm.runInNewContext(seismicSource, seismic);
+
+assert.equal(typeof seismic.parseFeed, "function");
+assert.equal(typeof seismic.distanceKm, "function");
+assert.equal(typeof seismic.formatUtc, "function");
+const earthquake = (id, mag, time, lon, lat, depth, place) => ({
+    type: "Feature",
+    id,
+    properties: { type: "earthquake", mag, time, place },
+    geometry: { type: "Point", coordinates: [lon, lat, depth] }
+});
+const feed = {
+    type: "FeatureCollection",
+    features: [
+        earthquake("a", 2.7, 1600000000000, -121.5, 38, 8.6, "Northern California"),
+        earthquake("b", 4.8, 1600001000000, -118, 34, 11.2, "Los Angeles"),
+        earthquake("ignored", null, 1600002000000, 140, -30, 2, "Unknown magnitude"),
+        earthquake("older", 3.1, 1500000000000, 135, 40, 21, "Japan"),
+        earthquake("c", 3.4, 1600003000000, -150, 61, 4.5, "Alaska"),
+        { type: "Feature", properties: { type: "quarry blast", mag: 3, time: 1600004000000 },
+          geometry: { type: "Point", coordinates: [-120, 40, 6] } }
+    ]
+};
+const latestQuakes = seismic.parseFeed(feed, 3);
+assert.equal(latestQuakes.length, 3);
+assert.deepEqual(Array.from(latestQuakes, v => v.id), ["c", "b", "a"]);
+assert.equal(latestQuakes[0].magnitude, 3.4);
+assert.equal(latestQuakes[0].latitude, 61);
+assert.equal(latestQuakes[0].longitude, -150);
+assert.equal(latestQuakes[0].depthKm, 4.5);
+assert.match(latestQuakes[0].utc, /^\d{2}:\d{2} UTC$/);
+assert.equal(seismic.parseFeed({type: "FeatureCollection", features: []}, 3).length, 0);
+assert.throws(() => seismic.parseFeed({features: []}, 3));
+assert.throws(() => seismic.parseFeed(null, 3));
+assert.ok(Math.abs(seismic.distanceKm(0, 0, 0, 1) - 111.195) < 0.2);
+assert.equal(seismic.distanceKm(0, 0, 0, 0), 0);
+assert.equal(seismic.distanceKm("", "", 0, 0), -1);
+assert.equal(seismic.distanceKm(91, 0, 0, 0), -1);
+assert.equal(seismic.distanceKm(0, 181, 0, 0), -1);
+
 console.log("Weather data policy contracts: PASS");

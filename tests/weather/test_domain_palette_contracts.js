@@ -150,7 +150,10 @@ for (const title of [
 
 // Ground/Space retain their stationary geometry. SKY scrolls its measured
 // expanded forecast so daily weather, rain and sunrise/sunset stay reachable.
-assert.match(groundSource, /anchors\.margins:\s*20[\s\S]*?spacing:\s*10/);
+assert.match(groundSource, /Flickable\s*\{\s*id:\s*groundScroll/);
+assert.match(groundSource, /clip:\s*true[\s\S]*?contentHeight:\s*Math\.max\(height, groundContent\.y \+ groundContent\.implicitHeight \+ 12\)/);
+assert.match(groundSource, /id:\s*groundContent[\s\S]*?x:\s*20[\s\S]*?y:\s*12[\s\S]*?spacing:\s*10/);
+assert.match(groundSource, /NeonScrollBar\s*\{[\s\S]*?flickable:\s*groundScroll[\s\S]*?handleStyle:\s*"star"/);
 assert.match(groundSource, /id:\s*airQualityInstrument[\s\S]*?width:\s*248[\s\S]*?height:\s*166/);
 assert.match(groundSource, /id:\s*aqiReadingText[\s\S]*?font\.pixelSize:\s*68/);
 assert.match(groundSource, /safeSource:\s*aqiReadingText/);
@@ -163,6 +166,11 @@ assert.match(groundSource, /title:\s*"AIR \/\/ NEXT 12 HOURS"/);
 assert.match(groundSource, /ground\.airQualityForecastReady/);
 assert.match(groundSource, /OPEN-METEO MODEL \/\/ LOCAL HOURS/);
 assert.match(groundSource, /FORECAST UNAVAILABLE/);
+assert.match(groundSource, /WeatherServices\.SeismicService\s*\{[\s\S]*?active:\s*ground\.visible/);
+assert.match(groundSource, /SEISMIC \/\/ WORLDWIDE 24H/);
+assert.match(groundSource, /quakeService\.events/);
+assert.match(groundSource, /ground\.distanceLabel\(/);
+assert.match(groundSource, /NOT AN EARTHQUAKE WARNING/);
 assert.match(groundSource, /aqiSeverityColor\(modelData\.aqi\)/);
 assert.match(weatherServiceSource, /&hourly=us_aqi,pm2_5,pm10/);
 assert.match(weatherServiceSource, /&forecast_hours=12/);

@@ -1,115 +1,145 @@
 #!/usr/bin/env python3
-"""Proton opt-in read-only page readiness probe: no identity, no mailbox writes."""
+"""Read-only Proton UI count diagnostics, including offline browser families."""
 from pathlib import Path
 import subprocess
 
 ROOT = Path(__file__).resolve().parents[2]
-ROOT_JS = ROOT / "integrations/proton/browser"
-PROBE = ROOT_JS / "readiness_probe.js"
-BACKGROUND = ROOT_JS / "background.js"
+DIRECTORY = ROOT / "integrations/proton/browser"
+PROBE = DIRECTORY / "readiness_probe.js"
+BACKGROUND = DIRECTORY / "background.js"
 
 probe = PROBE.read_text(encoding="utf8")
+background = BACKGROUND.read_text(encoding="utf8")
 for forbidden in ("textContent", "innerHTML", "outerHTML", "localStorage",
                   "sessionStorage", "document.cookie", "fetch(", "XMLHttpRequest",
                   "getAttribute('href')", 'getAttribute("href")',
                   ".click(", "mailboxAccess: true", "canMutate: true"):
-    assert forbidden not in probe, f"privacy/control forbidden in probe: {forbidden}"
+    assert forbidden not in probe, f"Forbidden in page probe: {forbidden}"
 assert "document.querySelectorAll" in probe
-assert '"PROTON_READINESS_V1"' in probe
+assert '"PROTON_READINESS_V2"' in probe
 assert "messageIdentityVerified: false" in probe
 assert "canMutate: false" in probe
-assert "querySelectorAll" not in BACKGROUND.read_text(encoding="utf8")
+assert "querySelectorAll" not in background
 
 NODE = r"""
 "use strict";
 const fs=require("fs"),vm=require("vm"),assert=require("assert");
 const probe=fs.readFileSync(process.argv[1],"utf8");
 const source=fs.readFileSync(process.argv[2],"utf8");
-const readButton=(aria,title,disabled=false,ariaDisabled=false)=>({
-  disabled,
-  getAttribute(n){
-    return n==="aria-label"?aria:n==="title"?title:
-       n==="aria-disabled"?(ariaDisabled?"true":null):null;
+const button=(aria,title,disabled=false,ariaDisabled=false)=>({
+  disabled,getAttribute(name){
+    if(name==="aria-label")return aria;
+    if(name==="title")return title;
+    if(name==="aria-disabled")return ariaDisabled?"true":null;
+    return null;
   }
 });
-function inspect(origin,buttons){
-  const scope={location:{origin},document:{querySelectorAll(q){
-    assert.strictEqual(q,"button, [role='button']");
-    return buttons;
+function runProbe(origin,buttons=[],checked=0){
+  const scope={location:{origin},document:{querySelectorAll(query){
+    if(query==="button, [role='button']")return buttons;
+    assert.strictEqual(query,
+      "input[type='checkbox']:checked, [role='checkbox'][aria-checked='true']");
+    return Array.from({length:checked},()=>({}));
   }}};
   return JSON.parse(JSON.stringify(vm.runInNewContext(probe,scope)));
 }
-const noMessage=(r)=>{
- assert.strictEqual(r.kind,"PROTON_READINESS_V1");
- assert.strictEqual(r.messageIdentityVerified,false);
- assert.strictEqual(r.canMutate,false);
- assert.deepStrictEqual(Object.keys(r).sort(),[
-   "canMutate","kind","markReadCandidates","messageIdentityVerified","originOk"
- ].sort());
-};
-let r=inspect("https://evil.test",[readButton("Mark as read","")]);
+const expectedKeys=[
+ "kind","originOk","inspectedControls","scanTruncated",
+ "exactReadEnabled","exactReadDisabled","otherReadLabels",
+ "unlabeledControls","checkedControls","messageIdentityVerified","canMutate"
+].sort();
+function checkPrivacy(result){
+ assert.deepStrictEqual(Object.keys(result).sort(),expectedKeys);
+ assert.strictEqual(result.kind,"PROTON_READINESS_V2");
+ assert.strictEqual(result.messageIdentityVerified,false);
+ assert.strictEqual(result.canMutate,false);
+ for(const value of Object.values(result))assert.ok(
+  typeof value==="boolean"||typeof value==="number"||value==="PROTON_READINESS_V2");
+}
+let r=runProbe("https://evil.test",[button("Mark as read","")],3);
+checkPrivacy(r);
 assert.strictEqual(r.originOk,false);
-assert.strictEqual(r.markReadCandidates,0);
-noMessage(r);
-r=inspect("https://mail.proton.me",[readButton("Mark as read","")]);
-assert.strictEqual(r.originOk,true);
-assert.strictEqual(r.markReadCandidates,1);
-noMessage(r);
-r=inspect("https://mail.proton.me",[readButton("","Mark as read")]);
-assert.strictEqual(r.markReadCandidates,1);
-r=inspect("https://mail.proton.me",[readButton("Mark as read","",true)]);
-assert.strictEqual(r.markReadCandidates,0);
-r=inspect("https://mail.proton.me",[readButton("Mark as read","",false,true)]);
-assert.strictEqual(r.markReadCandidates,0);
-r=inspect("https://mail.proton.me",[readButton("Move to trash",""),readButton("Mark as unread","")]);
-assert.strictEqual(r.markReadCandidates,0);
-r=inspect("https://mail.proton.me",[readButton("Mark as read",""),readButton("Mark as read","")]);
-assert.strictEqual(r.markReadCandidates,2);
-r=inspect("https://mail.proton.me",Array.from({length:600},()=>readButton("Archive","")));
-assert.strictEqual(r.markReadCandidates,0);
-async function background(family,goodTab=true,nativeError=false) {
- const calls={native:0,scripting:0}, logs=[];
- const response={protocol:1,kind:"PONG",origin:"https://mail.proton.me",
+assert.strictEqual(r.exactReadEnabled,0);
+r=runProbe("https://mail.proton.me");
+checkPrivacy(r);
+assert.strictEqual(r.inspectedControls,0);
+assert.strictEqual(r.exactReadEnabled,0);
+r=runProbe("https://mail.proton.me",[
+ button("Mark as read",""),button("Mark as read",""),
+ button("Mark as read","",true),button("Mark as read","",false,true),
+ button("Mark read",""),button("Mark as unread",""),button(null,null),
+ button(null,"Archive")
+],2);
+checkPrivacy(r);
+assert.strictEqual(r.inspectedControls,8);
+assert.strictEqual(r.exactReadEnabled,2);
+assert.strictEqual(r.exactReadDisabled,2);
+assert.strictEqual(r.otherReadLabels,2);
+assert.strictEqual(r.unlabeledControls,1);
+assert.strictEqual(r.checkedControls,2);
+r=runProbe("https://mail.proton.me",[
+ button("  MARK  AS  READ ",""),button("","Mark as read"),
+ button("Mark as read on Message 123","")
+],40);
+assert.strictEqual(r.exactReadEnabled,2);
+assert.strictEqual(r.otherReadLabels,1);
+assert.strictEqual(r.checkedControls,20);
+r=runProbe("https://mail.proton.me",Array.from({length:600},()=>button(null,null)));
+assert.strictEqual(r.inspectedControls,500);
+assert.strictEqual(r.unlabeledControls,500);
+assert.strictEqual(r.scanTruncated,true);
+
+async function runBackground(family,validTab=true,nativeError=false,counts){
+ const calls={native:0,probe:0},log=[];
+ const result=counts||runProbe("https://mail.proton.me",[
+   button("Mark as read",""),button("Mark as read","")],1);
+ const safe={protocol:1,kind:"PONG",origin:"https://mail.proton.me",
    mailboxAccess:false,messageIdentityVerified:false,capabilities:[]};
  const api={
-  action:{onClicked:{addListener(fn){api.click=fn}}},
+  action:{onClicked:{addListener(f){api.click=f}}},
   runtime:{lastError:null,sendNativeMessage(name,request,callback){
-    calls.native++;
-    assert.strictEqual(name,"org.postapollo.proton_mail");
-    assert.deepStrictEqual(JSON.parse(JSON.stringify(request)),{protocol:1,kind:"PING"});
-    if(family==="chromium") {
-      if(nativeError) api.runtime.lastError={message:"offline"};
-      callback(nativeError?undefined:response);
-      api.runtime.lastError=null;
-    } else return nativeError?Promise.reject(new Error("offline")):Promise.resolve(response);
+   calls.native++;
+   assert.strictEqual(name,"org.postapollo.proton_mail");
+   assert.deepStrictEqual(JSON.parse(JSON.stringify(request)),
+       {protocol:1,kind:"PING"});
+   if(family==="chromium"){
+     if(nativeError)api.runtime.lastError={message:"offline PRIVATE"};
+     callback(nativeError?undefined:safe);
+     api.runtime.lastError=null;
+   }else return nativeError?Promise.reject(new Error("offline PRIVATE")):
+                              Promise.resolve(safe);
   }},
   scripting:{executeScript(options,callback){
-    calls.scripting++;
-    assert.deepStrictEqual(JSON.parse(JSON.stringify(options)),{
-      target:{tabId:27},files:["readiness_probe.js"]
-    });
-    const results=[{result:inspect("https://mail.proton.me",[readButton("Mark as read","")])}];
-    if(family==="chromium")callback(results);else return Promise.resolve(results);
+   calls.probe++;
+   assert.deepStrictEqual(JSON.parse(JSON.stringify(options)),
+     {target:{tabId:27},files:["readiness_probe.js"]});
+   if(family==="chromium")callback([{result}]);
+   else return Promise.resolve([{result}]);
   }}
  };
- const scope={URL,console:{info(s){logs.push(s)},warn(s){logs.push(s)}}};
+ const scope={URL,console:{info:(s)=>log.push(s),warn:(s)=>log.push(s)}};
  scope[family==="chromium"?"chrome":"browser"]=api;
  vm.runInNewContext(source,scope,{filename:"background.js"});
- api.click({id:27,url:goodTab?"https://mail.proton.me/u/0/inbox":"https://evil.test"});
+ api.click({id:27,url:validTab?"https://mail.proton.me/u/0/inbox":"https://evil.test"});
  await Promise.resolve();await Promise.resolve();await Promise.resolve();
- assert.strictEqual(calls.native,goodTab?1:0);
- assert.strictEqual(calls.scripting,goodTab?1:0);
- assert.ok(!logs.some(m=>m.includes("Mark as read")||m.includes("https://evil.test")));
- if(goodTab)assert.ok(logs.some(m=>m.includes("identity NOT verified")));
+ assert.strictEqual(calls.probe,validTab?1:0);
+ assert.strictEqual(calls.native,validTab?1:0);
+ assert.ok(!log.some(s=>s.includes("PRIVATE")||s.includes("Message 123")));
+ if(validTab){
+   assert.ok(log.some(s=>s.includes("exactEnabled="+result.exactReadEnabled)));
+   assert.ok(log.some(s=>s.includes("checkedControls="+result.checkedControls)));
+   assert.ok(log.some(s=>s.includes("identity NOT verified")));
+ }
 }
 (async()=>{
- for(const family of ["chromium","firefox"]){
-   await background(family,true);
-   await background(family,true,true);
-   await background(family,false);
+ for(const browser of ["chromium","firefox"]){
+   await runBackground(browser);
+   await runBackground(browser,true,true);
+   await runBackground(browser,false);
+   await runBackground(browser,true,false,runProbe("https://mail.proton.me"));
  }
- console.log("Proton page readiness simulated browser checks: PASS");
+ console.log("Proton private UI counts and shared browser mocks: PASS");
 })().catch(e=>{console.error(e);process.exit(1)});
 """
 subprocess.run(["node", "-e", NODE, str(PROBE), str(BACKGROUND)], check=True)
-print("Proton read-only Mark Read readiness: PASS")
+print("Proton read-only readiness diagnostics: PASS")

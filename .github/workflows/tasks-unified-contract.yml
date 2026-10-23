@@ -1,0 +1,31 @@
+name: TASKS Proxy 1 M10 model contract
+
+on:
+  pull_request:
+    paths:
+      - 'services/projects/UnifiedProjectContract.js'
+      - 'tests/tasks/test_unified_project_contract.cjs'
+      - 'docs/tasks-unified-normal-git-architecture-m10.md'
+      - '.github/workflows/tasks-unified-contract.yml'
+  push:
+    branches:
+      - main
+    paths:
+      - 'services/projects/UnifiedProjectContract.js'
+      - 'tests/tasks/test_unified_project_contract.cjs'
+      - 'docs/tasks-unified-normal-git-architecture-m10.md'
+      - '.github/workflows/tasks-unified-contract.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  contract:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Validate read-only NORMAL/GIT project contract
+        run: node tests/tasks/test_unified_project_contract.cjs

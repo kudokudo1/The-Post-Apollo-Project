@@ -16,7 +16,7 @@ for forbidden in ("textContent", "innerHTML", "outerHTML", "localStorage",
                   ".click(", "mailboxAccess: true", "canMutate: true"):
     assert forbidden not in probe, f"Forbidden in page probe: {forbidden}"
 assert "document.querySelectorAll" in probe
-assert '"PROTON_READINESS_V2"' in probe
+assert '"PROTON_READINESS_V3"' in probe
 assert "messageIdentityVerified: false" in probe
 assert "canMutate: false" in probe
 assert "querySelectorAll" not in background
@@ -26,11 +26,12 @@ NODE = r"""
 const fs=require("fs"),vm=require("vm"),assert=require("assert");
 const probe=fs.readFileSync(process.argv[1],"utf8");
 const source=fs.readFileSync(process.argv[2],"utf8");
-const button=(aria,title,disabled=false,ariaDisabled=false)=>({
+const button=(aria,title,disabled=false,ariaDisabled=false,testid=null)=>({
   disabled,getAttribute(name){
     if(name==="aria-label")return aria;
     if(name==="title")return title;
     if(name==="aria-disabled")return ariaDisabled?"true":null;
+    if(name==="data-testid")return testid;
     return null;
   }
 });
@@ -46,20 +47,23 @@ function runProbe(origin,buttons=[],checked=0){
 const expectedKeys=[
  "kind","originOk","inspectedControls","scanTruncated",
  "exactReadEnabled","exactReadDisabled","otherReadLabels",
- "unlabeledControls","checkedControls","messageIdentityVerified","canMutate"
+ "unlabeledControls","checkedControls","messageIdentityVerified","canMutate",
+ "toolbarReadEnabled","toolbarReadDisabled","toolbarUnreadEnabled",
+ "toolbarUnreadDisabled"
 ].sort();
 function checkPrivacy(result){
  assert.deepStrictEqual(Object.keys(result).sort(),expectedKeys);
- assert.strictEqual(result.kind,"PROTON_READINESS_V2");
+ assert.strictEqual(result.kind,"PROTON_READINESS_V3");
  assert.strictEqual(result.messageIdentityVerified,false);
  assert.strictEqual(result.canMutate,false);
  for(const value of Object.values(result))assert.ok(
-  typeof value==="boolean"||typeof value==="number"||value==="PROTON_READINESS_V2");
+  typeof value==="boolean"||typeof value==="number"||value==="PROTON_READINESS_V3");
 }
 let r=runProbe("https://evil.test",[button("Mark as read","")],3);
 checkPrivacy(r);
 assert.strictEqual(r.originOk,false);
 assert.strictEqual(r.exactReadEnabled,0);
+assert.strictEqual(r.toolbarReadEnabled,0);
 r=runProbe("https://mail.proton.me");
 checkPrivacy(r);
 assert.strictEqual(r.inspectedControls,0);
@@ -68,14 +72,22 @@ r=runProbe("https://mail.proton.me",[
  button("Mark as read",""),button("Mark as read",""),
  button("Mark as read","",true),button("Mark as read","",false,true),
  button("Mark read",""),button("Mark as unread",""),button(null,null),
- button(null,"Archive")
+ button(null,"Archive"),
+ button(null,null,false,false,"toolbar:read"),
+ button(null,null,true,false,"toolbar:read"),
+ button(null,null,false,false,"toolbar:unread"),
+ button(null,null,false,true,"toolbar:unread")
 ],2);
 checkPrivacy(r);
-assert.strictEqual(r.inspectedControls,8);
+assert.strictEqual(r.inspectedControls,12);
+assert.strictEqual(r.toolbarReadEnabled,1);
+assert.strictEqual(r.toolbarReadDisabled,1);
+assert.strictEqual(r.toolbarUnreadEnabled,1);
+assert.strictEqual(r.toolbarUnreadDisabled,1);
 assert.strictEqual(r.exactReadEnabled,2);
 assert.strictEqual(r.exactReadDisabled,2);
 assert.strictEqual(r.otherReadLabels,2);
-assert.strictEqual(r.unlabeledControls,1);
+assert.strictEqual(r.unlabeledControls,5);
 assert.strictEqual(r.checkedControls,2);
 r=runProbe("https://mail.proton.me",[
  button("  MARK  AS  READ ",""),button("","Mark as read"),
@@ -92,7 +104,8 @@ assert.strictEqual(r.scanTruncated,true);
 async function runBackground(family,validTab=true,nativeError=false,counts){
  const calls={native:0,probe:0},log=[];
  const result=counts||runProbe("https://mail.proton.me",[
-   button("Mark as read",""),button("Mark as read","")],1);
+   button(null,null,false,false,"toolbar:read"),
+   button(null,null,false,false,"toolbar:unread")],1);
  const safe={protocol:1,kind:"PONG",origin:"https://mail.proton.me",
    mailboxAccess:false,messageIdentityVerified:false,capabilities:[]};
  const api={
@@ -128,6 +141,8 @@ async function runBackground(family,validTab=true,nativeError=false,counts){
  if(validTab){
    assert.ok(log.some(s=>s.includes("exactEnabled="+result.exactReadEnabled)));
    assert.ok(log.some(s=>s.includes("checkedControls="+result.checkedControls)));
+   assert.ok(log.some(s=>s.includes("toolbarReadEnabled="+result.toolbarReadEnabled)));
+   assert.ok(log.some(s=>s.includes("toolbarUnreadEnabled="+result.toolbarUnreadEnabled)));
    assert.ok(log.some(s=>s.includes("identity NOT verified")));
  }
 }

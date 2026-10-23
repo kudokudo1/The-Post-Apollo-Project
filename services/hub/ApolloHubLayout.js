@@ -618,9 +618,14 @@ function navigationTarget(grid, selectedIndex, direction) {
             continue;
         var score=[crossGap,primary,centerOffset,i];
         var wins=bestScore===null;
-        for (var k=0;k<score.length && !wins && score[k]===bestScore[k];k++) {}
-        if (!wins && k<score.length && score[k]<bestScore[k])
-            wins=true;
+        if (!wins) {
+            for (var k=0;k<score.length;k++) {
+                if (score[k]===bestScore[k])
+                    continue;
+                wins=score[k]<bestScore[k];
+                break;
+            }
+        }
         if (wins) {
             best=i;
             bestScore=score;

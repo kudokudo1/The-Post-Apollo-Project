@@ -18,7 +18,8 @@ assert "onOpenTaskRequested: function(taskId)" in TASKS
 assert "root.selectMainMode(0);" in TASKS
 assert "taskDetails.chooseTask(taskId);" in TASKS
 assert 'activeMode.id !== "tasks" && activeMode.id !== "today"' in TASKS
-assert '&& activeMode.id !== "projects" ? "NO FEED"' in TASKS
+assert '&& activeMode.id !== "projects"' in TASKS
+assert '&& activeMode.id !== "planner" ? "NO FEED"' in TASKS
 
 assert 'import "TaskDateSegments.js" as DateSegments' in PANE
 assert 'import "TaskTodayPolicy.js" as TodayPolicy' in PANE

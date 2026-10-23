@@ -3,12 +3,14 @@ on:
   pull_request:
     paths:
       - 'widgets/tasks/TaskPlanner*'
+      - 'widgets/TasksW.qml'
       - 'tests/tasks/test_task_planner*'
       - 'tests/fixtures/TaskPlannerPreview.qml'
       - '.github/workflows/tasks-planner.yml'
   push:
     paths:
       - 'widgets/tasks/TaskPlanner*'
+      - 'widgets/TasksW.qml'
       - 'tests/tasks/test_task_planner*'
       - 'tests/fixtures/TaskPlannerPreview.qml'
       - '.github/workflows/tasks-planner.yml'
@@ -24,3 +26,4 @@ jobs:
       - run: node tests/tasks/test_task_planner_policy.cjs
       - run: python3 tests/tasks/test_task_planner_preview.py
       - run: python3 tests/tasks/test_task_planner_layout.py
+      - run: python3 tests/tasks/test_task_planner_mount.py

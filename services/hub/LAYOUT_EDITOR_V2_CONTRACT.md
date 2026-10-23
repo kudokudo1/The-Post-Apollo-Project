@@ -202,9 +202,19 @@ Calendar already used the host tile's available height for its grid. Stage 7C no
 
 **Desktop acceptance:** Pull `main`, restart Quickshell, and set a CALENDAR tile to H:1, H:2 and H:3. Verify the month heading, weekdays, and date numbers become larger without overlapping the existing navigation buttons. Try months with five and six week rows and switch SUN/MON. Verify the active date remains highlighted. This is an appearance-only checkpoint.
 
+## P1 Stage 7D // CPU++ and Uptime height-aware presentation
+
+**Scope:** Two read-only Hub minis now adapt to H:1/H:2/H:3 without new sampling. H:1 preserves the original CPU++ 2x2 gauge arrangement, label/bar sizes, and three-column Uptime layout. H:2 increases typography and centers readings. Narrow H:3 CPU++ stacks all four gauges vertically, while wide H:3 retains two columns; Uptime grows its digits and unit labels.
+
+**Data ownership:** CPU++ still consumes only injected `systemSnapshot` and preserves unknown percentages, stale masking and five-minute last-observation-on-LOADING rule. Uptime still reads only `uptimeSnapshot` and reports Linux boot age, not desktop session age. No `FileView`, `Process`, `Timer`, service, controller, persistence, layout schema, or shell modification is added.
+
+**VERIFY:** `tests/hub/test_apollo_hub_foundation.py` guards H:1 defaults, H:2/H:3 responsive properties, data/view separation, and no new pollers or writes. GitHub CI and desktop rendering are separate acceptance gates.
+
+**Desktop acceptance:** After an operator-authorized merge and normal desktop sync/reload, try EDIT → H:1/H:2/H:3 for CPU++ and Uptime. Confirm readable content without overlapping the tile title or status footer. Try W:1 H:3 vs W:2 H:3 for CPU++ and verify its four gauges stack only in the narrow case. Confirm optional unknown readings remain `--` rather than fake 0%; refreshing data retains truthful last-sample labeling. Uptime remains since Linux boot.
+
 ## NEXT
 
-Complete Stage 7A/7B/7C desktop acceptance. Next can be Notes and To-do internal density, but those contain editable user data, so changes must preserve editor focus, draft and save-confirmation behavior. Durable undo/presets and drag-and-drop remain separate operator decisions.
+Complete Stage 7A/7B/7C/7D desktop acceptance. Next can be Notes and To-do internal density, but those contain editable user data, so changes must preserve editor focus, draft and save-confirmation behavior. Durable undo/presets and drag-and-drop remain separate operator decisions.
 
 ## DECISIONS
 

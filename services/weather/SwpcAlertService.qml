@@ -3,6 +3,7 @@ import Quickshell
 import Quickshell.Io
 import "SwpcAlertPolicy.js" as SwpcAlertPolicy
 import "SwpcValidityPolicy.js" as SwpcValidityPolicy
+import "SwpcWatchPolicy.js" as SwpcWatchPolicy
 
 // SWPC-issued bulletin ARCHIVE only. Recent != active warning. This reader
 // is mounted with SPACE, not an always-running system notification service.
@@ -18,6 +19,10 @@ Scope {
     // Keep NOAA's last successful archive in memory so validity windows
     // expire on the local minute clock without extra HTTP requests.
     property var archive: []
+    property var watchForecast: ({
+        days: [], projectedDays: 0, forecastDayCount: 0,
+        unresolvedCount: 0, canceledCount: 0, supersededCount: 0
+    })
     property var validity: ({
         windowCount: 0, uncertainCount: 0, endedCount: 0,
         supersededCount: 0, windows: []
@@ -42,11 +47,18 @@ Scope {
             return;
         try {
             validity = SwpcValidityPolicy.assess(archive, clockMs, 168, 3);
+            watchForecast = SwpcWatchPolicy.assessWatchDays(
+                archive, clockMs, 168, 3
+            );
         } catch (error) {
             console.log("SwpcAlertService validity review error:", error);
             validity = {
                 windowCount: 0, uncertainCount: 0, endedCount: 0,
                 supersededCount: 0, windows: []
+            };
+            watchForecast = {
+                days: [], projectedDays: 0, forecastDayCount: 0,
+                unresolvedCount: 0, canceledCount: 0, supersededCount: 0
             };
         }
     }
@@ -60,8 +72,10 @@ Scope {
             );
             // Validate the entire source before updating cached displays.
             const assessed = SwpcValidityPolicy.assess(source, now, 168, 3);
+            const watched = SwpcWatchPolicy.assessWatchDays(source, now, 168, 3);
             archive = source;
             validity = assessed;
+            watchForecast = watched;
             bulletins = result.bulletins;
             count48h = result.count;
             receivedMs = now;

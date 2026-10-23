@@ -126,7 +126,7 @@ assert "WorldClockPolicy.snapshot(localClock.date.getTime()," in window
 assert 'command: ["date", "+%z"]' in window
 assert 'environment: { TZ: worldLookupZone, LC_ALL: "C" }' in window
 assert "Process {" in window
-assert window.count("Process {") == 8
+assert window.count("Process {") == 9
 assert "worldLookup.running" in window
 assert 'onLeftClicked:' in window
 assert 'timew.chooseWorldZone(modelData.id)' in window
@@ -722,8 +722,9 @@ assert window.count("SystemClock {") == 1
 assert window.count("ElapsedTimer {") == 3
 assert window.count("\n    Timer {") == 3
 # One additional on-demand read-only Process belongs to MACHINE Capture Preview.
-assert window.count("Process {") == 8
+assert window.count("Process {") == 9
 assert "id: machineCaptureProcess" in window
+assert "id: machineStoreProcess" in window
 
 # Universal visual language remains: magenta header, cyan divider, borderless modes.
 assert 'text: "TIME // W"' in window

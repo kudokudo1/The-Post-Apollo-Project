@@ -33,6 +33,8 @@ PanelWindow {
     property string modulePickerModeId: ""
     property string modulePickerGroupId: ""
     property string modulePickerQuery: ""
+    property real modulePickerAnchorX: 12
+    property real modulePickerAnchorY: 12
     readonly property var modulePickerChoices: Layout.moduleChoices(
         layout, selectedModeIndex, selectedSubModeIndex,
         modulePickerTileIndex, modulePickerQuery)
@@ -238,11 +240,22 @@ PanelWindow {
             });
     }
 
-    function openModulePicker(index) {
+    function openModulePicker(index, sourceItem) {
         if (!menuOpen || !editMode || layoutStorageIssue.length > 0
                 || pendingRemoval !== null || !activeMode || !activeSubMode
-                || index < 0 || index >= activeTiles.length)
+                || index < 0 || index >= activeTiles.length || !sourceItem)
             return;
+        // Anchor to the actual SWAP button, not a guessed tile width/height.
+        // Keep the popup within the Hub chassis on either side of the button.
+        const below = sourceItem.mapToItem(
+            modulePickerOverlay, 0, sourceItem.height + 3);
+        const above = sourceItem.mapToItem(modulePickerOverlay, 0, 0);
+        modulePickerAnchorX = Math.max(10, Math.min(
+            modulePickerOverlay.width - modulePickerPopup.width - 10, below.x));
+        modulePickerAnchorY = below.y + modulePickerPopup.height
+                              <= modulePickerOverlay.height - 10
+                              ? below.y
+                              : Math.max(10, above.y - modulePickerPopup.height - 3);
         modulePickerTileIndex = index;
         modulePickerTileId = activeTiles[index].id;
         modulePickerModeId = activeMode.id;
@@ -250,7 +263,6 @@ PanelWindow {
         modulePickerQuery = "";
         modulePickerInput.text = "";
         modulePickerOpen = true;
-        tileScroll.contentY = 0;
         Qt.callLater(function() {
             if (hub.modulePickerOpen)
                 modulePickerInput.forceActiveFocus();
@@ -330,7 +342,8 @@ PanelWindow {
         if (!editMode || selectedTileIndex < 0
                 || selectedTileIndex >= activeTiles.length)
             return;
-        openModulePicker(selectedTileIndex);
+        const selected = tileRepeater.itemAt(selectedTileIndex);
+        openModulePicker(selectedTileIndex, selected ? selected.swapAnchor : null);
     }
 
     function shiftTile(fromIndex, toIndex) {
@@ -855,129 +868,18 @@ PanelWindow {
                                  - statusFooter.height
                                  - (hub.editMode ? 6 : 5) * hubColumn.spacing)
                 contentWidth: width
-                contentHeight: hub.modulePickerOpen ? modulePicker.height : tileFlow.height
+                contentHeight: tileFlow.height
                 clip: true
                 boundsBehavior: Flickable.StopAtBounds
 
-                // Stage 4: replace the tile flow with a searchable module list
-                // while editing. No second service, storage file or app index.
-                Column {
-                    id: modulePicker
-                    visible: hub.modulePickerOpen
-                    width: tileScroll.width
-                    height: childrenRect.height
-                    spacing: 7
-
-                    Row {
-                        width: parent.width
-                        height: 28
-                        spacing: 8
-                        GohuText {
-                            width: parent.width - 96
-                            height: parent.height
-                            verticalAlignment: Text.AlignVCenter
-                            elide: Text.ElideRight
-                            font.pixelSize: 13
-                            color: Colors.magenta
-                            text: "SWAP MODULE // "
-                                  + (hub.modulePickerTileIndex >= 0
-                                     && hub.modulePickerTileIndex < hub.activeTiles.length
-                                     ? Layout.tileTitle(
-                                         hub.activeTiles[hub.modulePickerTileIndex].module)
-                                     : "UNAVAILABLE")
-                        }
-                        ActionButton {
-                            trackLabelGlowLocally: true
-                            width: 88
-                            height: 27
-                            label: "CLOSE"
-                            onLeftClicked: hub.closeModulePicker()
-                        }
-                    }
-                    GohuText {
-                        width: parent.width
-                        height: 20
-                        verticalAlignment: Text.AlignVCenter
-                        color: Colors.cyan
-                        font.pixelSize: 11
-                        text: "SEARCH MODULE NAME / ID  //  TYPE TO FILTER"
-                    }
-                    SectionFrame {
-                        width: parent.width
-                        height: 35
-                        fillColor: Colors.black
-                        borderColor: Colors.magenta
-                        borderWidth: 1
-                        inset: 7
-                        TextInput {
-                            id: modulePickerInput
-                            anchors.fill: parent
-                            color: Colors.white
-                            font.pixelSize: 14
-                            selectByMouse: true
-                            text: ""
-                            onTextChanged: hub.modulePickerQuery = text
-                            Keys.onPressed: function(event) {
-                                if (event.key === Qt.Key_Escape) {
-                                    hub.closeModulePicker();
-                                    event.accepted = true;
-                                } else if (event.key === Qt.Key_Enter
-                                           || event.key === Qt.Key_Return) {
-                                    // Never launch or change an arbitrary module
-                                    // from Enter with a blank/ambiguous query.
-                                    if (hub.modulePickerQuery.trim().length > 0
-                                            && hub.modulePickerChoices.availableCount === 1) {
-                                        const match = hub.modulePickerChoices.items.find(
-                                            function(item) { return item.available; });
-                                        if (match)
-                                            hub.chooseModuleFromPicker(match.id);
-                                    }
-                                    event.accepted = true;
-                                }
-                            }
-                        }
-                    }
-                    GohuText {
-                        width: parent.width
-                        height: 20
-                        verticalAlignment: Text.AlignVCenter
-                        color: Colors.cyan
-                        font.pixelSize: 11
-                        text: hub.modulePickerChoices.state !== "ready"
-                              ? "MODULE LIST UNAVAILABLE"
-                              : hub.modulePickerChoices.matchCount + " / "
-                                + hub.modulePickerChoices.total
-                                + " MATCHES  //  "
-                                + hub.modulePickerChoices.availableCount
-                                + " SELECTABLE"
-                    }
-                    Repeater {
-                        model: hub.modulePickerChoices.items
-                        ActionButton {
-                            trackLabelGlowLocally: true
-                            width: modulePicker.width
-                            height: 33
-                            available: modelData.available
-                            selected: modelData.selected
-                            contentPadding: 8
-                            labelHorizontalAlignment: Text.AlignLeft
-                            labelPixelSize: 12
-                            label: modelData.title + "  //  " + modelData.id
-                                   + (modelData.selected ? "  [CURRENT]"
-                                      : modelData.inUse ? "  [IN USE]" : "")
-                            onLeftClicked: hub.chooseModuleFromPicker(modelData.id)
-                        }
-                    }
-                }
-
                 Flow {
-                    visible: !hub.modulePickerOpen
                     id: tileFlow
                     width: tileScroll.width
                     height: childrenRect.height
                     spacing: 8
 
                     Repeater {
+                        id: tileRepeater
                         model: hub.activeTiles.length
 
                         ApolloHubTile {
@@ -1044,7 +946,7 @@ PanelWindow {
                                     + tileFlow.spacing * ((tileConfig.rowSpan || 1) - 1)
                             onMoveLeft: hub.shiftTile(index, index - 1)
                             onMoveRight: hub.shiftTile(index, index + 1)
-                            onChangeModule: hub.openModulePicker(index)
+                            onChangeModule: hub.openModulePicker(index, sourceItem)
                             onRemoveTile: hub.removeEditedTile(index)
                             onToggleTileWidth: hub.toggleEditedTileWidth(index)
                             onCycleTileHeight: hub.cycleEditedTileHeight(index)

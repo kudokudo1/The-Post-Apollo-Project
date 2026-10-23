@@ -2,7 +2,8 @@
 
 // Shared Proton read-only companion for Chromium-family MV3 and Firefox MV3.
 // Browser-family manifests differ, but neither changes the wire protocol.
-// User click only; no content scripts, DOM, mail, credentials or mutations.
+// User-click only. No persistent content scripts or mail actions.
+// Optional MAIN-world notification-constructor counter is untrusted telemetry.
 const PROTON_ORIGIN = "https://mail.proton.me";
 const NATIVE_HOST = "org.postapollo.proton_mail";
 const firefoxApi = typeof browser !== "undefined" && browser.runtime && browser.action ? browser : null;
@@ -66,6 +67,64 @@ function reportReadiness(results) {
     + "; identity NOT verified");
 }
 
+// This result is page-realm telemetry, NEVER proof of message identity.
+// The page could forge or interfere with it. No page-provided value is logged.
+function reportEventPilot(results) {
+  const data = Array.isArray(results) && results.length === 1
+    ? results[0].result : null;
+  const stages = ["started", "stopped", "expired", "unavailable", "wrong-origin"];
+  if (!data || typeof data !== "object"
+      || Object.keys(data).length !== 8
+      || data.kind !== "PROTON_EVENT_PILOT_V1"
+      || !stages.includes(data.stage)
+      || typeof data.originOk !== "boolean"
+      || (data.stage === "wrong-origin") !== (data.originOk === false)
+      || !Number.isInteger(data.attempts)
+      || data.attempts < 0 || data.attempts > 20
+      || typeof data.capped !== "boolean"
+      || data.windowMs !== 90000
+      || data.messageIdentityVerified !== false
+      || data.canMutate !== false
+      || (data.stage === "started" &&
+          (data.attempts !== 0 || data.capped))) {
+    console.warn("Post-Apollo Proton: event pilot unavailable");
+    return;
+  }
+  // Fixed schema only. No Notification tag, title, body, ID or page URL.
+  console.info("Post-Apollo Proton: event pilot stage=" + data.stage
+    + " attempts=" + data.attempts
+    + " capped=" + data.capped
+    + "; page observation only; identity NOT verified");
+}
+
+function inspectNotificationEventPilot(tab) {
+  if (!tab || !Number.isSafeInteger(tab.id) || tab.id < 0)
+    return;
+  const api = firefoxApi || chromiumApi;
+  if (!api || !api.scripting
+      || typeof api.scripting.executeScript !== "function")
+    return;
+
+  const details = {
+    target: {tabId: tab.id},
+    files: ["notification_event_pilot.js"],
+    world: "MAIN"
+  };
+  if (firefoxApi) {
+    browser.scripting.executeScript(details)
+      .then(reportEventPilot,
+        () => console.warn("Post-Apollo Proton: event pilot unavailable"));
+  } else {
+    chrome.scripting.executeScript(details, (results) => {
+      if (chrome.runtime.lastError) {
+        console.warn("Post-Apollo Proton: event pilot unavailable");
+        return;
+      }
+      reportEventPilot(results);
+    });
+  }
+}
+
 function inspectReadiness(tab) {
   if (!tab || !Number.isSafeInteger(tab.id) || tab.id < 0)
     return;
@@ -117,6 +176,7 @@ function onCompanionClicked(tab) {
   // This observation is read-only and does not need native-host privileges.
   // It can be manually inspected before a host is installed/authorized.
   inspectReadiness(tab);
+  inspectNotificationEventPilot(tab);
   const request = { protocol: 1, kind: "PING" };
   if (firefoxApi) {
     // Firefox WebExtensions return a Promise from sendNativeMessage.

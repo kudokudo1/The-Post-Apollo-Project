@@ -234,6 +234,7 @@ Rectangle {
                         width: 110
                         height: parent.height
                         anchors.horizontalCenter: parent.horizontalCenter
+                        anchors.horizontalCenterOffset: -24
 
                         SafeDropShadow {
                             anchors.fill: conditionIconGlyph
@@ -555,8 +556,8 @@ Rectangle {
 
                         Item {
                             width: parent.width
-                            // Shrink only the empty vertical slot to lift the
-                            // probability bar; hold the sun at its old center.
+                            // Keep the slot and its rain meter stationary.
+                            // Raise only the icon toward its time/temperature.
                             height: 74
 
                             readonly property var forecastState:
@@ -578,7 +579,7 @@ Rectangle {
                             Text {
                                 id: hourlyIconGlyph
                                 anchors.centerIn: parent
-                                anchors.verticalCenterOffset: 8
+                                anchors.verticalCenterOffset: -8
                                 text: parent.forecastState.icon
                                 font.pixelSize: 80
                                 color: sky.iconColor(parent.forecastState.color)
@@ -670,9 +671,9 @@ Rectangle {
                             }
                         }
 
-                        // Reposition rain and sunrise/sunset at the TOP of
-                        // the existing icon slot. Its height and the sun center
-                        // stay unchanged, so lower content does not move down.
+                        // Keep the original 116px slot and icon position.
+                        // Sunrise stays under the date; the rain meter goes
+                        // below the large weather icon without growing the row.
                         Item {
                             id: dailyForecastArtwork
                             width: parent.width
@@ -686,42 +687,7 @@ Rectangle {
                                 anchors.top: parent.top
                                 anchors.horizontalCenter: parent.horizontalCenter
                                 width: parent.width
-                                spacing: 2
                                 z: 2
-
-                                Row {
-                                    anchors.horizontalCenter: parent.horizontalCenter
-                                    spacing: 8
-
-                                    QuietText {
-                                        text: modelData.chanceRain >= 0
-                                              ? "RAIN "
-                                                + Math.round(modelData.chanceRain)
-                                                + "%"
-                                              : "RAIN --"
-                                        font.pixelSize: 10
-                                    }
-
-                                    Rectangle {
-                                        anchors.verticalCenter: parent.verticalCenter
-                                        width: 120
-                                        height: 6
-                                        color: Colors.black
-                                        border.width: 1
-                                        border.color: sky.meterBorderColor
-
-                                        Rectangle {
-                                            x: 2
-                                            anchors.verticalCenter: parent.verticalCenter
-                                            width: (parent.width - 4)
-                                                   * sky.chanceMeter(
-                                                       modelData.chanceRain
-                                                   )
-                                            height: parent.height - 4
-                                            color: sky.meterFillColor
-                                        }
-                                    }
-                                }
 
                                 QuietText {
                                     width: parent.width
@@ -731,6 +697,44 @@ Rectangle {
                                           + " → "
                                           + modelData.sunset
                                     font.pixelSize: 9
+                                }
+                            }
+
+                            Row {
+                                id: dailyRainMeter
+                                anchors.bottom: parent.bottom
+                                anchors.bottomMargin: 2
+                                anchors.horizontalCenter: parent.horizontalCenter
+                                spacing: 8
+                                z: 2
+
+                                QuietText {
+                                    text: modelData.chanceRain >= 0
+                                          ? "RAIN "
+                                            + Math.round(modelData.chanceRain)
+                                            + "%"
+                                          : "RAIN --"
+                                    font.pixelSize: 10
+                                }
+
+                                Rectangle {
+                                    anchors.verticalCenter: parent.verticalCenter
+                                    width: 120
+                                    height: 6
+                                    color: Colors.black
+                                    border.width: 1
+                                    border.color: sky.meterBorderColor
+
+                                    Rectangle {
+                                        x: 2
+                                        anchors.verticalCenter: parent.verticalCenter
+                                        width: (parent.width - 4)
+                                               * sky.chanceMeter(
+                                                   modelData.chanceRain
+                                               )
+                                        height: parent.height - 4
+                                        color: sky.meterFillColor
+                                    }
                                 }
                             }
 

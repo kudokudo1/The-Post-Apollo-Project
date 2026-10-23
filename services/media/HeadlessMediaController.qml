@@ -9,6 +9,10 @@ Scope {
     id: bridge
 
     property bool polling: false
+    // Legacy Hi-Fi leaves default; Weather RADIO uses a scoped catalog.
+    // Only browsing/selection are per-client, MPD playback stays shared.
+    property string radioClient: "default"
+    property int pollingInterval: 2400
     property var snapshot: null
     property string message: "SELECT A STATION TO LOAD"
     property string errorText: ""
@@ -47,7 +51,10 @@ Scope {
     }
 
     function refresh() {
-        issue("snapshot", []);
+        if (radioClient === "default")
+            issue("snapshot", []);
+        else
+            issue("snapshot", ["--client", radioClient]);
     }
 
     // All browsing/selection requests use the same versioned CLI and private socket.
@@ -67,6 +74,8 @@ Scope {
                 return false;
             args.push("--cursor", cursor);
         }
+        if (source === "radio-browser" && radioClient !== "default")
+            args.push("--client", radioClient);
         return issue("search", args);
     }
 
@@ -77,7 +86,10 @@ Scope {
                     && ref.source !== "direct-stream"
                     && ref.source !== "radio-browser"))
             return null;
-        return [ref.id, "--source", ref.source];
+        const args = [ref.id, "--source", ref.source];
+        if (ref.source === "radio-browser" && radioClient !== "default")
+            args.push("--client", radioClient);
+        return args;
     }
 
     function inspectMedia(ref) {
@@ -92,6 +104,8 @@ Scope {
     }
 
     function loadSelectedMedia() {
+        if (radioClient !== "default")
+            return issue("load", ["--client", radioClient]);
         return issue("load", []);
     }
 
@@ -102,6 +116,9 @@ Scope {
         if (args === null || (ref.source !== "local-mpd"
                               && ref.source !== "radio-browser"))
             return false;
+        if (ref.source === "radio-browser" && radioClient !== "default")
+            return issue("load", ["--uri", ref.id, "--source", ref.source,
+                                  "--client", radioClient]);
         return issue("load", ["--uri", ref.id, "--source", ref.source]);
     }
 
@@ -193,7 +210,7 @@ Scope {
     }
 
     Timer {
-        interval: 2400
+        interval: bridge.pollingInterval
         repeat: true
         running: bridge.polling
         triggeredOnStart: true

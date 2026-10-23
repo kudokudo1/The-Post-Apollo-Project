@@ -194,3 +194,35 @@ test("radio directory supports paging and station-specific guarded loading", () 
     assert.match(bridge, /ref\.source !== "radio-browser"/);
     assert.match(bridge, /issue\("load", \["--uri", ref\.id, "--source", ref\.source\]\)/);
 });
+
+
+test("Weather RADIO opts into shared Hi-Fi client scope without new playback owner", () => {
+    const radio = fs.readFileSync(path.join(base, "widgets/weather/StationRadio.qml"), "utf8");
+    const weather = fs.readFileSync(path.join(base, "widgets/weather/WeatherStationW.qml"), "utf8");
+    assert.match(bridge, /property string radioClient:\s*"default"/);
+    assert.match(bridge, /radioClient === "default"[\s\S]*?issue\("snapshot", \[\]\)/);
+    assert.match(bridge, /issue\("snapshot", \["--client", radioClient\]\)/);
+    assert.match(bridge, /if \(source === "radio-browser" && radioClient !== "default"\)[\s\S]*?args\.push\("--client", radioClient\)/);
+    assert.match(bridge, /if \(ref\.source === "radio-browser" && radioClient !== "default"\)[\s\S]*?args\.push\("--client", radioClient\)/);
+    assert.match(bridge, /return issue\("load", \["--client", radioClient\]\)/);
+    assert.match(bridge, /"load", \["--uri", ref\.id, "--source", ref\.source,[\s\S]*?"--client", radioClient\]/);
+    assert.match(bridge, /interval:\s*bridge\.pollingInterval/);
+    assert.match(radio, /MediaServices\.HeadlessMediaController\s*\{[\s\S]*?radioClient:\s*"weather-radio"/);
+    assert.match(radio, /polling:\s*stationRadio\.stationOpen && stationRadio\.visible/);
+    assert.match(radio, /function broadcastTag\(item\)/);
+    assert.match(radio, /color:\s*Colors\.magenta/);
+    assert.match(radio, /tag:news/);
+    assert.match(radio, /tag:talk/);
+    assert.match(radio, /country:US/);
+    assert.match(radio, /function selectHighlighted\(\)/);
+    assert.match(radio, /function loadSelection\(\)/);
+    assert.match(radio, /function enterHighlighted\(\)/);
+    assert.match(radio, /function playbackAction\(action\)/);
+    assert.match(radio, /lastLoadRequestedId !== ""/);
+    assert.match(radio, /stationRadio\.canTransport/);
+    assert.doesNotMatch(radio, /StationDiscoveryService|Qt\.openUrlExternally|--autoplay|mpc |systemctl/);
+    assert.match(weather, /id: radioViewComponent[\s\S]*?StationRadio\s*\{/);
+    assert.doesNotMatch(weather, /domain:\s*"radio"/);
+    assert.match(weather, /id: mapViewComponent[\s\S]*?domain:\s*"map"/);
+    assert.match(weather, /id: newsViewComponent[\s\S]*?domain:\s*"news"/);
+});

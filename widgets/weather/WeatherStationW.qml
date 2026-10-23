@@ -822,6 +822,7 @@ PanelWindow {
             id: mapViewComponent
 
             StationDiscovery {
+                stationOpen: weatherStation.menuOpen
                 domain: "map"
             }
         }
@@ -830,6 +831,7 @@ PanelWindow {
             id: newsViewComponent
 
             StationDiscovery {
+                stationOpen: weatherStation.menuOpen
                 domain: "news"
             }
         }
@@ -838,6 +840,7 @@ PanelWindow {
             id: radioViewComponent
 
             StationDiscovery {
+                stationOpen: weatherStation.menuOpen
                 domain: "radio"
             }
         }

@@ -2,7 +2,7 @@
 
 **Patient:** `kudokudo1/The-Post-Apollo-Project`  
 **Owner:** Proxy 1 (external development assignment, not a live Hospital registration)  
-**Dependency:** M10h draft PR #635 (`feat/tasks-proxy1-m10h-typed-model-timestamp-edits-20261023`), currently not merged at branch creation.  
+**Dependency:** M10h PR #635 merged after this branch was created; M10i is proposed against current `main`.  
 **Scope:** Synthetic, CI-only Node transaction integration. Not deployed desktop storage.
 
 ## IMPLEMENTATION
@@ -53,7 +53,7 @@ All writes happen in OS-created, disposable `mkdtempSync` directories. No live T
 
 **An offline intent is not a GitHub operation authorization.** Project and item identity shape checks are not authentication. The future sync adapter needs verified identities, baseline reads, conflict handling, operator-approved permissions, and remote readback before claiming a remote ACK.
 
-The v2 schema introduced by M10h is itself still an unapproved prototype, and this branch is **stacked on PR #635**. It must not be landed as an independent production storage feature. The resulting PR is review-only until its dependency is merged or the branch is appropriately retargeted.
+The v2 schema introduced by merged PR #635 is still a **non-production prototype**. M10i's contract relies on that schema but neither change authorizes a production writer or migration.
 
 ## CHECKLIST
 
@@ -64,7 +64,7 @@ The v2 schema introduced by M10h is itself still an unapproved prototype, and th
 - [x] Verify reconciliation and stale retry protection
 - [x] Synthetic CI tests, no desktop or remote writes
 - [ ] GitHub CI success / independent source review
-- [ ] M10h dependency merge or reviewed retarget
+- [x] M10h PR #635 merged, dependency satisfied
 - [ ] Operator-authorized M10i merge
 - [ ] Actual Quickshell-compatible storage adapter + restart/power-loss acceptance
 

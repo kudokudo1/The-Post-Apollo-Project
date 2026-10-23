@@ -12,7 +12,7 @@ from youtube_catalog import YouTubeCatalogSource
 from media_intent_store import IntentStore
 from mpd_audio_probe import MpdAudioEvidenceProbe
 from direct_stream_source import DirectHttpsStreamSource
-from radio_browser_catalog import RadioBrowserCatalogSource
+from radio_browser_catalog import RadioBrowserCatalogSource, validate_browse_client
 
 
 class MediaController:
@@ -33,6 +33,9 @@ class MediaController:
         self.audio_probe = MpdAudioEvidenceProbe(mpd)
         self.browse_context: dict[str, Any] | None = None
         self.selection: dict[str, Any] | None = None
+        # Optional source-scoped radio clients; default Hi-Fi remains legacy.
+        self.browse_contexts: dict[str, dict[str, Any]] = {}
+        self.scoped_selections: dict[str, dict[str, Any]] = {}
         self.loaded: dict[str, Any] | None = None
         self.active_backend: str | None = None
         self.owned_active_id: str | None = None
@@ -194,14 +197,29 @@ class MediaController:
             return {"state": "unknown", "bytesReceived": 0, "errorCode": None}
         return observe(self.loaded.get("cueUri"))
 
-    def snapshot(self) -> dict[str, Any]:
+    def _client(self, args: dict[str, Any]) -> str:
+        return validate_browse_client(args.get("client", "default"))
+
+    def _selection_for(self, client: str) -> dict[str, Any] | None:
+        return self.selection if client == "default" else self.scoped_selections.get(client)
+
+    def _source_for_client(self, ref: dict[str, str], client: str) -> Any:
+        source = self._source(ref["source"])
+        if client != "default" and source.id != "radio-browser":
+            raise MediaBackendError("UNSUPPORTED",
+                                    "Scoped operations require Radio Browser")
+        return source
+
+    def snapshot(self, client: str = "default") -> dict[str, Any]:
+        client = validate_browse_client(client)
         return {
             "generation": self.generation,
             "persistence": {"enabled": self.intent_store is not None,
                             "error": self.persistence_error},
             "sources": [source.describe() for source in self.sources.values()],
-            "browse": self.browse_context,
-            "selection": self.selection,
+            "browse": (self.browse_context if client == "default"
+                       else self.browse_contexts.get(client)),
+            "selection": self._selection_for(client),
             "loaded": self.loaded,
             "session": self._session(),
             "radioHealth": self._loaded_radio_health(),
@@ -221,17 +239,23 @@ class MediaController:
         if op == "sources":
             return {"sources": [source.describe() for source in self.sources.values()]}
         if op == "snapshot":
-            return self.snapshot()
+            return self.snapshot(self._client(args))
         if op == "audio_evidence":
             return self.audio_probe.observe()
 
         if op == "search":
+            client = self._client(args)
             source = self._source(args.get("source", "local-mpd"))
+            if client != "default" and source.id != "radio-browser":
+                raise MediaBackendError("UNSUPPORTED",
+                                        "Scoped searches require Radio Browser")
             query = args.get("query")
             cursor = args.get("cursor")
             if not callable(getattr(source, "search", None)):
                 raise MediaBackendError("UNSUPPORTED", "Source does not support catalog search")
-            if source.id in ("youtube", "radio-browser"):
+            if source.id == "radio-browser":
+                result = source.search(query, cursor, client=client)
+            elif source.id == "youtube":
                 result = source.search(query, cursor)
             else:
                 if cursor is not None:
@@ -239,12 +263,16 @@ class MediaController:
                                             "MPD library search is not paginated")
                 result = source.search(query)
             # A search updates browsing only. Selection/loaded/MPD stay untouched.
-            self.browse_context = {"source": source.id, "query": query,
-                                   "items": result["items"], "truncated": result["truncated"],
-                                   "totalObserved": result["totalObserved"],
-                                   "nextCursor": result.get("nextCursor")}
+            browse = {"source": source.id, "query": query,
+                      "items": result["items"], "truncated": result["truncated"],
+                      "totalObserved": result["totalObserved"],
+                      "nextCursor": result.get("nextCursor")}
+            if client == "default":
+                self.browse_context = browse
+            else:
+                self.browse_contexts[client] = browse
             self._advance()
-            return {"browse": self.browse_context}
+            return {"browse": browse}
 
         if op == "list":
             source = self._source(args.get("source"))
@@ -259,24 +287,38 @@ class MediaController:
             return {"browse": self.browse_context}
 
         if op == "inspect":
+            client = self._client(args)
             ref = self._media_ref(args.get("ref"))
-            return {"item": self._source(ref["source"]).inspect(ref)}
+            source = self._source_for_client(ref, client)
+            return {"item": (source.inspect(ref, client=client)
+                             if source.id == "radio-browser" else source.inspect(ref))}
 
         if op == "select":
+            client = self._client(args)
             ref = self._media_ref(args.get("ref"))
-            item = self._source(ref["source"]).inspect(ref)
-            self.selection = item["ref"].copy()
+            source = self._source_for_client(ref, client)
+            item = (source.inspect(ref, client=client)
+                    if source.id == "radio-browser" else source.inspect(ref))
+            selected = item["ref"].copy()
+            if client == "default":
+                self.selection = selected
+                self._save_intent()
+            else:
+                self.scoped_selections[client] = selected
             self._advance()
-            self._save_intent()
-            return {"selection": self.selection}
+            return {"selection": selected}
 
         if op == "load":
-            ref = args.get("ref") if args.get("ref") is not None else self.selection
+            client = self._client(args)
+            ref = (args.get("ref") if args.get("ref") is not None
+                   else self._selection_for(client))
             ref = self._media_ref(ref)
+            source = self._source_for_client(ref, client)
             autoplay = args.get("autoplay", False)
             if not isinstance(autoplay, bool):
                 raise MediaBackendError("INVALID_ARGUMENT", "autoplay must be boolean")
-            prepared = self._source(ref["source"]).prepare(ref)
+            prepared = (source.prepare(ref, client=client)
+                        if source.id == "radio-browser" else source.prepare(ref))
             backend = self._backend_for(prepared)
             # Cue is only an addid: it does not call playid or interrupt MPD.
             queue_id = backend.cue(prepared)
@@ -306,8 +348,11 @@ class MediaController:
             return {"items": backend.queue()}
 
         if op == "queue_add":
+            client = self._client(args)
             ref = self._media_ref(args.get("ref"))
-            prepared = self._source(ref["source"]).prepare(ref)
+            source = self._source_for_client(ref, client)
+            prepared = (source.prepare(ref, client=client)
+                        if source.id == "radio-browser" else source.prepare(ref))
             backend = self._backend_for(prepared)
             queue_id = backend.cue(prepared)
             self._advance()

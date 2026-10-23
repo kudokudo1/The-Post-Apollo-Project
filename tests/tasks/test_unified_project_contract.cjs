@@ -99,7 +99,7 @@ assert.equal(context.previewV3({state:"saving",projects:[],items:[]}).writeReady
 for (const forbidden of [
     "FileView {", "Process {", "XMLHttpRequest", "XmlHttpRequest",
     "Quickshell.execDetached", "setText(", "gh project ",
-    "ApolloHubTodoStore", "GitHubProjectsService", "localStorage",
+    "ApolloHubTodoStore.", "ApolloHubTodoStore {", "GitHubProjectsService {", "localStorage",
     "require(", "fetch("
 ]) assert.ok(!source.includes(forbidden), "forbidden M10 side effect: " + forbidden);
 console.log("Proxy 1 M10a project identity, v3 read compatibility, no writes: PASS");

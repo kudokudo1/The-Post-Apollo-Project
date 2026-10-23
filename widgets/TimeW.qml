@@ -3309,6 +3309,46 @@ PanelWindow {
 
                         GohuText {
                             width: parent.width
+                            visible: timew.machineCapturePreview !== null
+                            text: timew.machineCapturePreview
+                                  ? "MONITORS // "
+                                    + timew.machineCapturePreview.outputs.map(function(x) {
+                                        return x.connector;
+                                      }).join(", ")
+                                  : ""
+                            color: Colors.cyan
+                            font.pixelSize: 10
+                            elide: Text.ElideRight
+                        }
+                        GohuText {
+                            width: parent.width
+                            visible: timew.machineCapturePreview !== null
+                            text: timew.machineCapturePreview
+                                  ? "WORKSPACES // "
+                                    + timew.machineCapturePreview.workspaces.map(function(x) {
+                                        return x.name + "@" + x.output;
+                                      }).join(", ")
+                                  : ""
+                            color: Colors.white
+                            font.pixelSize: 10
+                            elide: Text.ElideRight
+                        }
+                        GohuText {
+                            width: parent.width
+                            visible: timew.machineCapturePreview !== null
+                            text: timew.machineCapturePreview
+                                  ? "APPS // "
+                                    + timew.machineCapturePreview.windows.map(function(x) {
+                                        return x.app_id + "@" + x.workspace;
+                                      }).join(", ")
+                                  : ""
+                            color: Colors.white
+                            font.pixelSize: 10
+                            elide: Text.ElideRight
+                        }
+
+                        GohuText {
+                            width: parent.width
                             text: "MANUAL TIME MARKERS // MEMORY ONLY"
                             color: Colors.white
                             font.pixelSize: 12

@@ -23,6 +23,23 @@ Rectangle {
         active: space.visible
     }
 
+    WeatherServices.SwpcAlertService {
+        id: alertService
+        active: space.visible
+    }
+
+    function bulletinColor(kind) {
+        if (kind === "ALERT")
+            return Colors.magenta;
+        if (kind === "WARNING")
+            return Colors.orange;
+        if (kind === "WATCH")
+            return Colors.yellow;
+        if (kind === "CANCELLATION")
+            return Colors.cyan;
+        return Colors.white;
+    }
+
     // Event classes are measured GOES X-ray peaks, not alert severity.
     function flareClassColor(letter) {
         if (letter === "X")
@@ -1038,6 +1055,131 @@ Rectangle {
             QuietText {
                 width: parent.width
                 text: "GOES XRS // LAST 7D EVENTS // OBSERVATIONS, NOT ALERTS OR PREDICTIONS"
+                font.pixelSize: 10
+            }
+        }
+
+        StationSectionDivider {
+            width: parent.width
+            title: "SPACE WEATHER // NOAA BULLETINS"
+        }
+
+        Column {
+            width: parent.width
+            spacing: 8
+
+            Row {
+                width: parent.width
+                spacing: 16
+
+                SecondaryText {
+                    text: "OFFICIAL WATCHES // WARNINGS // ALERTS"
+                    font.pixelSize: 11
+                }
+
+                GohuText {
+                    text: alertService.ready
+                          ? String(alertService.count48h) + " ISSUED // 48H"
+                          : "-- ISSUED // 48H"
+                    font.pixelSize: 11
+                    color: Colors.cyan
+                }
+
+                GohuText {
+                    text: alertService.failed
+                          ? (alertService.ready
+                             ? "FETCH FAILED // SAVED ITEMS"
+                             : "FETCH FAILED // NO DATA")
+                          : alertService.loading && !alertService.ready
+                            ? "RECEIVING"
+                            : alertService.fresh
+                              ? "FEED CURRENT"
+                              : alertService.ready ? "FEED STALE"
+                                : "UNAVAILABLE"
+                    font.pixelSize: 11
+                    color: alertService.fresh ? Colors.cyan : Colors.orange
+                }
+            }
+
+            Row {
+                id: bulletinRow
+                width: parent.width
+                spacing: 10
+
+                Repeater {
+                    model: alertService.ready ? alertService.bulletins : []
+
+                    delegate: Rectangle {
+                        required property var modelData
+                        width: Math.max(0, (bulletinRow.width
+                                            - 2 * bulletinRow.spacing) / 3)
+                        height: 140
+                        color: Colors.dark
+                        border.width: 1
+                        border.color: space.bulletinColor(modelData.kind)
+
+                        Column {
+                            anchors.fill: parent
+                            anchors.margins: 9
+                            spacing: 7
+
+                            Row {
+                                width: parent.width
+                                spacing: 8
+
+                                GohuText {
+                                    text: modelData.kind
+                                    font.pixelSize: 14
+                                    color: space.bulletinColor(modelData.kind)
+                                }
+
+                                GohuText {
+                                    text: modelData.scale !== ""
+                                          ? modelData.scale : ""
+                                    font.pixelSize: 14
+                                    color: Colors.white
+                                }
+                            }
+
+                            GohuText {
+                                width: parent.width
+                                height: 46
+                                wrapMode: Text.WordWrap
+                                elide: Text.ElideRight
+                                maximumLineCount: 3
+                                text: modelData.subject
+                                font.pixelSize: 12
+                                color: Colors.white
+                            }
+
+                            QuietText {
+                                text: "ISSUED " + modelData.issueUtc
+                                font.pixelSize: 10
+                            }
+
+                            QuietText {
+                                text: modelData.productId
+                                      + (modelData.code !== ""
+                                         ? " // " + modelData.code : "")
+                                font.pixelSize: 10
+                            }
+                        }
+                    }
+                }
+            }
+
+            QuietText {
+                visible: !alertService.ready || alertService.bulletins.length === 0
+                text: alertService.failed ? alertService.errorText
+                      : alertService.loading ? "LOADING NOAA BULLETINS"
+                      : alertService.ready ? "NO NEW NOAA BULLETINS IN 48H"
+                        : "NOAA BULLETIN FEED UNAVAILABLE"
+                font.pixelSize: 11
+            }
+
+            QuietText {
+                width: parent.width
+                text: "NOAA SWPC // RECENT ISSUED BULLETINS // NOT NECESSARILY ACTIVE"
                 font.pixelSize: 10
             }
         }

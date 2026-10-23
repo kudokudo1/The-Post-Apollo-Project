@@ -1,5 +1,6 @@
 import QtQuick
 import "../../components"
+import "../tasks/TaskPlannerPolicy.js" as Planner
 
 // B9 local civil-date calendar presentation. The shared bridge already
 // computes month cells from its existing clock; do not create another
@@ -9,6 +10,10 @@ Item {
 
     property var calendarSnapshot: null
     property var calendarBridge: null
+    // Level 2 is a read-only projection over the existing TASKS store.
+    property var todoSnapshot: null
+    property string selectedView: "month"
+    property string selectedTaskDate: ""
     // Stage 7C: use the space already assigned by H:1/H:2/H:3.
     // No new time source, calendar service, or event data.
     readonly property int densityLevel: height >= 300 ? 3
@@ -35,11 +40,54 @@ Item {
         ? calendarBridge.calendarMonthOffset : 0
     readonly property int weekStart:
         calendarSnapshot && calendarSnapshot.weekStartsOn === 1 ? 1 : 0
+    readonly property string taskMonthKey:
+        calendarReady && typeof calendarSnapshot.month === "string"
+        ? calendarSnapshot.month + "-01" : ""
+    readonly property string taskTodayKey:
+        calendarReady && typeof calendarSnapshot.today === "string"
+        ? calendarSnapshot.today : ""
+    readonly property string taskFocusDateKey: {
+        if (!calendarReady)
+            return "";
+        if (Planner.parse(selectedTaskDate)
+                && selectedTaskDate.slice(0, 7) === calendarSnapshot.month)
+            return selectedTaskDate;
+        return taskTodayKey.slice(0, 7) === calendarSnapshot.month
+               ? taskTodayKey : taskMonthKey;
+    }
+    readonly property var taskView: Planner.view(
+        todoSnapshot, taskMonthKey, taskFocusDateKey, taskTodayKey)
+    readonly property bool agendaMode:
+        densityLevel >= 2 && selectedView === "agenda"
+    readonly property var agendaEntries:
+        taskView && taskView.available ? taskView.agenda : []
     readonly property string statusLine:
-        calendarReady ? "CALENDAR // EVENTS NOT CONNECTED"
+        agendaMode
+        ? (taskView.available
+           ? "TASKS // LOCAL DUE DATES // READ ONLY"
+           : "TASKS // " + String(taskView.state).toUpperCase())
+        : calendarReady ? "CALENDAR // EVENTS NOT CONNECTED"
         : "CALENDAR // " + calendarState.toUpperCase()
           + (calendarSnapshot && calendarSnapshot.error
              ? " // " + String(calendarSnapshot.error) : "")
+
+    function remainingTasksOn(dateKey) {
+        if (!taskView || !taskView.available || !Array.isArray(taskView.days))
+            return -1;
+        for (let i = 0; i < taskView.days.length; ++i) {
+            if (taskView.days[i].date === dateKey)
+                return taskView.days[i].remaining;
+        }
+        return 0;
+    }
+
+    // A date tap selects only the Hub view, never edits a task or event.
+    function selectTaskDate(dateKey) {
+        if (densityLevel < 2 || !calendarReady || !Planner.parse(dateKey)
+                || dateKey.slice(0, 7) !== calendarSnapshot.month)
+            return;
+        selectedTaskDate = dateKey;
+    }
 
     // These functions only run on an explicit button click. They alter the
     // bridge's view parameters, never the system clock or any calendar event.
@@ -50,11 +98,13 @@ Item {
         if (next < -120 || next > 120)
             return;
         calendarBridge.calendarMonthOffset = next;
+        selectedTaskDate = "";
     }
 
     function showToday() {
         if (calendarBridge && monthOffset !== 0)
             calendarBridge.calendarMonthOffset = 0;
+        selectedTaskDate = "";
     }
 
     function toggleWeekStart() {
@@ -63,8 +113,46 @@ Item {
         calendarBridge.calendarWeekStartsOn = weekStart === 0 ? 1 : 0;
     }
 
+    // H:1 remains the existing compact month grid. H:2/H:3 gain a
+    // transient MONTH / AGENDA selector without a second clock or store.
+    Row {
+        id: viewSelector
+        anchors.top: parent.top
+        anchors.left: parent.left
+        anchors.right: parent.right
+        height: calendarMini.densityLevel === 3 ? 29 : 25
+        spacing: 6
+        visible: calendarMini.densityLevel >= 2
+
+        ActionButton {
+            width: Math.min(94, (viewSelector.width - viewSelector.spacing) / 2)
+            height: parent.height
+            label: "MONTH"
+            selected: !calendarMini.agendaMode
+            trackLabelGlowLocally: true
+            softGlowEnabled: false
+            onLeftClicked: calendarMini.selectedView = "month"
+        }
+        ActionButton {
+            width: Math.min(94, (viewSelector.width - viewSelector.spacing) / 2)
+            height: parent.height
+            label: "AGENDA"
+            selected: calendarMini.agendaMode
+            available: calendarMini.calendarReady && calendarMini.taskView.available
+            trackLabelGlowLocally: true
+            softGlowEnabled: false
+            onLeftClicked: calendarMini.selectedView = "agenda"
+        }
+    }
+
     Column {
-        anchors.fill: parent
+        id: monthPane
+        visible: !calendarMini.agendaMode
+        anchors.left: parent.left
+        anchors.right: parent.right
+        anchors.bottom: parent.bottom
+        anchors.top: viewSelector.visible ? viewSelector.bottom : parent.top
+        anchors.topMargin: viewSelector.visible ? 5 : 0
         spacing: calendarMini.densityLevel === 3 ? 7
                  : calendarMini.densityLevel === 2 ? 5 : 2
 
@@ -191,8 +279,35 @@ Item {
                     height: dayGrid.dayHeight
                     radius: 0
                     color: today ? Colors.magenta : "transparent"
-                    border.width: today ? 1 : 0
-                    border.color: Colors.orange
+                    readonly property bool selectedTaskDay:
+                        calendarMini.densityLevel >= 2
+                        && calendarMini.taskView.available
+                        && currentMonth
+                        && modelData.date === calendarMini.taskFocusDateKey
+                    border.width: today || selectedTaskDay ? 1 : 0
+                    border.color: today ? Colors.orange : Colors.magenta
+
+                    TapHandler {
+                        enabled: calendarMini.densityLevel >= 2
+                                 && dayCell.currentMonth
+                        acceptedButtons: Qt.LeftButton
+                        onTapped: calendarMini.selectTaskDate(dayCell.modelData.date)
+                    }
+
+                    // Orange marks TASKS due dates, never appointment events.
+                    Rectangle {
+                        anchors.right: parent.right
+                        anchors.rightMargin: 2
+                        anchors.bottom: parent.bottom
+                        anchors.bottomMargin: 2
+                        width: 5
+                        height: 5
+                        radius: 0
+                        color: Colors.orange
+                        visible: calendarMini.densityLevel >= 2
+                                 && calendarMini.remainingTasksOn(
+                                     dayCell.modelData.date) > 0
+                    }
 
                     GohuText {
                         anchors.fill: parent
@@ -211,6 +326,77 @@ Item {
                     }
                 }
             }
+        }
+    }
+
+    Item {
+        id: agendaPane
+        visible: calendarMini.agendaMode
+        anchors.left: parent.left
+        anchors.right: parent.right
+        anchors.bottom: parent.bottom
+        anchors.top: viewSelector.bottom
+        anchors.topMargin: 6
+
+        Column {
+            anchors.fill: parent
+            spacing: 6
+            GohuText {
+                width: parent.width
+                height: 24
+                verticalAlignment: Text.AlignVCenter
+                font.pixelSize: calendarMini.densityLevel === 3 ? 17 : 13
+                color: Colors.magenta
+                elide: Text.ElideRight
+                text: "TASKS // " + calendarMini.taskFocusDateKey
+            }
+            GohuText {
+                width: parent.width
+                height: 19
+                font.pixelSize: 11
+                color: Colors.cyan
+                text: calendarMini.taskView.available
+                      ? calendarMini.agendaEntries.length + " DATED TASKS"
+                      : "TASK STORAGE // " + String(
+                          calendarMini.taskView.state).toUpperCase()
+            }
+            ListView {
+                id: agendaList
+                width: parent.width
+                height: Math.max(0, agendaPane.height - 24 - 19 - 12)
+                model: calendarMini.agendaEntries
+                clip: true
+                spacing: 3
+                boundsBehavior: Flickable.StopAtBounds
+                delegate: Rectangle {
+                    required property var modelData
+                    width: agendaList.width
+                    height: 29
+                    radius: 0
+                    color: "transparent"
+                    GohuText {
+                        anchors.fill: parent
+                        verticalAlignment: Text.AlignVCenter
+                        elide: Text.ElideRight
+                        font.pixelSize: 11
+                        color: parent.modelData.done ? Colors.cyan : Colors.white
+                        text: (parent.modelData.done ? "DONE // " : "OPEN // ")
+                              + parent.modelData.title
+                    }
+                }
+            }
+        }
+
+        GohuText {
+            anchors.centerIn: parent
+            width: parent.width
+            height: 22
+            visible: calendarMini.taskView.available
+                     && calendarMini.agendaEntries.length === 0
+            font.pixelSize: 11
+            horizontalAlignment: Text.AlignHCenter
+            color: Colors.orange
+            text: "NO TASKS DUE ON SELECTED DATE"
         }
     }
 

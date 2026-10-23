@@ -212,9 +212,21 @@ Calendar already used the host tile's available height for its grid. Stage 7C no
 
 **Desktop acceptance:** After an operator-authorized merge and normal desktop sync/reload, try EDIT → H:1/H:2/H:3 for CPU++ and Uptime. Confirm readable content without overlapping the tile title or status footer. Try W:1 H:3 vs W:2 H:3 for CPU++ and verify its four gauges stack only in the narrow case. Confirm optional unknown readings remain `--` rather than fake 0%; refreshing data retains truthful last-sample labeling. Uptime remains since Linux boot.
 
+## P1 Stage 8A // Calendar mini TASKS agenda bridge (Level 2 pilot)
+
+H:1 remains the original month grid. H:2/H:3 gain MONTH/AGENDA view controls. Calendar cells gain tap-to-select for the current month, and orange markers for outstanding locally dated **tasks**. AGENDA presents the selected day's due tasks read-only; it distinguishes task due dates from unconnected calendar appointments. The agenda reports empty dates and unavailable storage honestly.
+
+**Single source:** `widgets/hub/ApolloHubCalendarMini.qml` imports the TASKS owner's existing `../tasks/TaskPlannerPolicy.js` and calls `Planner.view()` over the already-injected `ApolloHubTodoStore.snapshot`. `ApolloHubTile.qml` passes the existing `todoSnapshot` to the calendar. No duplicate task store, event service, timer, polling, persistence, backend action, schedule modification, or TASKS-owned source edit is introduced.
+
+**VERIFY:** Hub source contracts guard the cross-widget import, old B9 month behavior, guarded read-only date selection, lack of writers, and the source/status boundary. CI is not desktop acceptance.
+
+**Desktop acceptance:** On an authorized, updated desktop, test H:1 month-only behavior, H:2/H:3 MONTH/AGENDA toggle, day taps, orange due-date markers, selected date's OPEN/DONE list, empty dates and unavailable store; check five/six-week months and SUN/MON toggles. This does not create calendar events or allow task edits.
+
+**NEXT boundary:** WEEK/DAY projections, opening a task in TASKS, and any Level 3 mutation require separate owner-coordinated navigation/focus and action contracts.
+
 ## NEXT
 
-Complete Stage 7A/7B/7C/7D desktop acceptance. Next can be Notes and To-do internal density, but those contain editable user data, so changes must preserve editor focus, draft and save-confirmation behavior. Durable undo/presets and drag-and-drop remain separate operator decisions.
+Complete Stage 7A/7B/7C/7D/8A desktop acceptance. Next can be Notes and To-do internal density, but those contain editable user data, so changes must preserve editor focus, draft and save-confirmation behavior. Durable undo/presets and drag-and-drop remain separate operator decisions.
 
 ## DECISIONS
 

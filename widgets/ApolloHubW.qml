@@ -1082,6 +1082,16 @@ PanelWindow {
                                 }
                             }
                         }
+                        GohuText {
+                            anchors.fill: parent
+                            verticalAlignment: Text.AlignVCenter
+                            font.pixelSize: 11
+                            color: Colors.cyan
+                            opacity: 0.6
+                            enabled: false
+                            visible: modulePickerInput.text.length === 0
+                            text: "SEARCH MODULE / ID"
+                        }
                     }
 
                     GohuText {

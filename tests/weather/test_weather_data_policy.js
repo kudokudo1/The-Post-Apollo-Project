@@ -646,4 +646,41 @@ assert.match(streams[0].detail, /MP3 128kbps/);
 assert.throws(() => discovery.parse("radio", {}));
 assert.throws(() => discovery.parse("unknown", []));
 
+
+// Sway is the compositor position authority: panel anchored top/right with a
+// 20px margin, header/rail offsets, and a QML-local terminal bay. Qt's
+// Wayland mapToGlobal is intentionally not used to move Kitty.
+const terminalGeometrySource = fs.readFileSync(
+    path.join(root, "widgets/weather/StationTerminalGeometry.js"), "utf8"
+).replace(/^\.pragma library\s*/m, "");
+const terminalGeometry = {};
+vm.runInNewContext(terminalGeometrySource, terminalGeometry);
+const terminalOutputs = [
+    {name: "DP-5", active: true,
+     rect: {x: 0, y: 0, width: 2560, height: 1440}},
+    {name: "HDMI-A-1", active: true,
+     rect: {x: -1360, y: 200, width: 1360, height: 768}},
+    {name: "OFF", active: false,
+     rect: {x: 5000, y: 0, width: 1000, height: 800}},
+];
+function stationBay(output) {
+    return terminalGeometry.position(
+        terminalOutputs, output, 1000, 20, 62, 160, 30, 70, 780, 416
+    );
+}
+assert.deepEqual(JSON.parse(JSON.stringify(stationBay("DP-5"))),
+                 {x: 1730, y: 132, width: 780, height: 416});
+assert.deepEqual(JSON.parse(JSON.stringify(stationBay("HDMI-A-1"))),
+                 {x: -830, y: 332, width: 780, height: 416});
+assert.equal(stationBay("OFF"), null);
+assert.equal(stationBay("WRONG-OUTPUT"), null);
+assert.equal(terminalGeometry.position([], "DP-5",
+    1000, 20, 62, 160, 30, 70, 780, 416), null);
+assert.equal(terminalGeometry.position(terminalOutputs, "DP-5",
+    3000, 20, 62, 160, 30, 70, 780, 416), null);
+assert.equal(terminalGeometry.position(terminalOutputs, "DP-5",
+    1000, 20, 62, 160, 30, 70, 1200, 416), null);
+assert.equal(terminalGeometry.position(terminalOutputs, "DP-5",
+    1000, 20, 62, 160, 30, 70, 780, Infinity), null);
+
 console.log("Weather data policy contracts: PASS");

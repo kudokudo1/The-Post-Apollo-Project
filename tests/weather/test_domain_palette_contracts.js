@@ -24,6 +24,20 @@ const dividerSource = read("widgets/weather/StationSectionDivider.qml");
 const weatherServiceSource = read("services/weather/WeatherService.qml");
 const spaceServiceSource = read("services/weather/SpaceService.qml");
 
+const weatherTerminalSource = read("widgets/weather/StationTerminal.qml");
+const geometrySource = read("widgets/weather/StationTerminalGeometry.js");
+assert.match(weatherTerminalSource, /SwayGeometry\.position\s*\(/);
+assert.match(weatherTerminalSource, /command:\s*\["swaymsg", "-t", "get_outputs"\]/);
+assert.match(weatherTerminalSource, /move absolute position /);
+assert.doesNotMatch(weatherTerminalSource, /terminalBay\.mapToGlobal\s*\(/);
+assert.doesNotMatch(weatherTerminalSource, /"\s*,\s*scratchpad show"/);
+for (const name of ["bayX", "bayY", "bayWidth", "bayHeight"])
+    assert.match(weatherTerminalSource, new RegExp("readonly property real " + name + ": terminalBay\\."));
+assert.match(windowSource, /mask:\s*Region[\s\S]*?terminalView\.bayX/);
+assert.match(windowSource, /terminalView\.bayWidth/);
+assert.match(geometrySource, /function position\(outputs, outputName/);
+
+
 const discoveryViewSource = read("widgets/weather/StationDiscovery.qml");
 const discoveryServiceSource = read("services/weather/StationDiscoveryService.qml");
 for (const [id, domain] of [

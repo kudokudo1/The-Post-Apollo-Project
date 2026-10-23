@@ -257,6 +257,7 @@ PanelWindow {
                 || pendingRemoval !== null || !activeMode || !activeSubMode
                 || index < 0 || index >= activeTiles.length || !sourceItem)
             return;
+        closeTransferPicker();
         // Anchor to the actual SWAP button, not a guessed tile width/height.
         // Keep the popup within the Hub chassis on either side of the button.
         const below = sourceItem.mapToItem(
@@ -302,6 +303,67 @@ PanelWindow {
                                   modulePickerTileId, moduleId));
         selectedTileIndex = index;
         closeModulePicker();
+    }
+
+    function closeTransferPicker() {
+        transferPickerOpen = false;
+        transferTileIndex = -1;
+        transferTileId = "";
+        transferModeId = "";
+        transferGroupId = "";
+    }
+
+    function openTransferPicker(index, sourceItem) {
+        if (!menuOpen || !editMode || layoutStorageIssue.length > 0
+                || pendingRemoval !== null || !activeMode || !activeSubMode
+                || index < 0 || index >= activeTiles.length || !sourceItem)
+            return;
+        closeModulePicker();
+        // Same floating overlay as SWAP, positioned from the actual MOVE
+        // button. Vertical flipping and horizontal clamping are shared.
+        const below = sourceItem.mapToItem(
+            modulePickerOverlay, 0, sourceItem.height + 3);
+        const above = sourceItem.mapToItem(modulePickerOverlay, 0, 0);
+        modulePickerAnchorX = Math.max(10, Math.min(
+            modulePickerOverlay.width - modulePickerPopup.width - 10, below.x));
+        modulePickerAnchorY = below.y + modulePickerPopup.height
+                              <= modulePickerOverlay.height - 10
+                              ? below.y
+                              : Math.max(10, above.y - modulePickerPopup.height - 3);
+        transferTileIndex = index;
+        transferTileId = activeTiles[index].id;
+        transferModeId = activeMode.id;
+        transferGroupId = activeSubMode.id;
+        transferPickerOpen = true;
+    }
+
+    function chooseTransferDestination(modeId, groupId) {
+        if (!transferPickerOpen || !menuOpen || !editMode
+                || layoutStorageIssue.length > 0 || pendingRemoval !== null
+                || !activeMode || !activeSubMode
+                || activeMode.id !== transferModeId
+                || activeSubMode.id !== transferGroupId
+                || transferTileIndex < 0 || transferTileIndex >= activeTiles.length
+                || activeTiles[transferTileIndex].id !== transferTileId)
+            return;
+        const target = transferTargets.items.find(function(row) {
+            return row.modeId === modeId && row.groupId === groupId;
+        });
+        if (!target || !target.available)
+            return;
+        const moved = Layout.transferTile(
+            layout, selectedModeIndex, selectedSubModeIndex, transferTileIndex,
+            transferTileId, transferModeId, transferGroupId,
+            target.modeIndex, target.groupIndex, target.modeId, target.groupId);
+        if (JSON.stringify(moved) === JSON.stringify(layout))
+            return;
+        save(moved);
+        // Show the destination and selected tile immediately after transfer;
+        // the same UNDO action restores the original layout document.
+        selectedModeIndex = target.modeIndex;
+        selectedSubModeIndex = target.groupIndex;
+        selectedTileIndex = Math.max(0, activeTiles.length - 1);
+        closeTransferPicker();
     }
 
     function chooseMode(index) {

@@ -2,11 +2,13 @@ import QtQuick
 import "../../components"
 import "TaskPlannerPolicy.js" as Planner
 
-// PLANNER M1 is an isolated read-only consumer of the existing snapshot.
-// Host wiring is intentionally deferred to the TasksW owner.
+// PLANNER M5a: calendar remains read-only; deliberate scheduling uses
+// the already-guarded shared todo writer passed by TASKS, never a new store.
 Item {
     id: planner
     property var todoSnapshot: null
+    property var todoStore: null
+    property bool scheduleMode: false
     property string monthKey: ""
     property string selectedDate: ""
     property string todayKey: ""
@@ -119,6 +121,27 @@ Item {
                 : "STORAGE // "+planner.calendar.state.toUpperCase()
             font.pixelSize: 10
             color: Colors.cyan
+        }
+        Row {
+            width: parent.width
+            height: 26
+            spacing: 5
+            ActionButton {
+                width: (parent.width - 5) / 2
+                height: 26
+                label: "AGENDA"
+                labelPixelSize: 10
+                selected: !planner.scheduleMode
+                onLeftClicked: planner.scheduleMode = false
+            }
+            ActionButton {
+                width: (parent.width - 5) / 2
+                height: 26
+                label: "SCHEDULE"
+                labelPixelSize: 10
+                selected: planner.scheduleMode
+                onLeftClicked: planner.scheduleMode = true
+            }
         }
     }
 
@@ -240,13 +263,14 @@ Item {
         anchors.topMargin: 8
         anchors.left: parent.left
         anchors.right: parent.right
-        text: "AGENDA // "+planner.selectedDate
+        text: (planner.scheduleMode ? "SCHEDULE // " : "AGENDA // ") + planner.selectedDate
         color: Colors.magenta
         font.pixelSize: 11
         font.bold: true
     }
     ListView {
         id: agendaList
+        visible: !planner.scheduleMode
         anchors.top: agendaTitle.bottom
         anchors.topMargin: 8
         anchors.left: parent.left
@@ -287,9 +311,22 @@ Item {
             }
         }
     }
+    TaskPlannerSchedulePane {
+        id: schedulePane
+        anchors.top: agendaTitle.bottom
+        anchors.topMargin: 8
+        anchors.left: parent.left
+        anchors.right: parent.right
+        anchors.bottom: parent.bottom
+        visible: planner.scheduleMode
+        todoSnapshot: planner.todoSnapshot
+        todoStore: planner.todoStore
+        selectedDate: planner.selectedDate
+    }
     GohuText {
         anchors.centerIn: agendaList
-        visible: planner.calendar.available && planner.calendar.agenda.length===0
+        visible: !planner.scheduleMode && planner.calendar.available
+                 && planner.calendar.agenda.length===0
         text: "NO TASKS ON SELECTED DATE"
         color: Colors.cyan
         font.pixelSize: 10

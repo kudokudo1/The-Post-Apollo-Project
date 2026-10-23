@@ -43,6 +43,9 @@ jobs:
       - name: Validate private Proton event-to-message binding ledger (offline)
         run: python3 tests/notifications/test_proton_binding_ledger.py
 
+      - name: Validate Proton independent notification/message correlation (offline)
+        run: python3 tests/notifications/test_proton_notification_correlation_policy.py
+
       - name: Validate read-only Proton browser native handshake
         run: python3 tests/notifications/test_proton_browser_handshake.py
 

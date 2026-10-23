@@ -150,7 +150,15 @@ for (const title of [
 
 // Ground/Space retain their stationary geometry. SKY scrolls its measured
 // expanded forecast so daily weather, rain and sunrise/sunset stay reachable.
-assert.match(groundSource, /anchors\.margins:\s*24[\s\S]*?spacing:\s*26/);
+assert.match(groundSource, /anchors\.margins:\s*20[\s\S]*?spacing:\s*14/);
+assert.match(groundSource, /id:\s*airQualityInstrument[\s\S]*?width:\s*248[\s\S]*?height:\s*166/);
+assert.match(groundSource, /id:\s*aqiReadingText[\s\S]*?font\.pixelSize:\s*68/);
+assert.match(groundSource, /safeSource:\s*aqiReadingText/);
+assert.match(groundSource, /TOP GAS SUBINDEX/);
+assert.match(groundSource, /function particulateText\(value\)/);
+assert.match(groundSource, /title:\s*"ENVIRONMENT \/\/ SOURCE"/);
+assert.match(groundSource, /weatherService\.airQualitySourceTime/);
+assert.match(groundSource, /OF OZONE \/ NO₂ \/ CO/);
 assert.match(skySource, /Flickable\s*\{\s*id:\s*skyScroll/);
 assert.match(skySource, /clip:\s*true[\s\S]*?contentHeight:\s*Math\.max\(height, skyContent\.y \+ skyContent\.implicitHeight \+ 12\)/);
 assert.match(skySource, /id:\s*skyContent[\s\S]*?x:\s*20[\s\S]*?y:\s*12[\s\S]*?spacing:\s*6/);

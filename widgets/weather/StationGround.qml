@@ -89,6 +89,30 @@ Rectangle {
         return Colors.red;
     }
 
+    // Only gas component AQI scores are available. This is NOT a claim
+    // about the primary pollutant driving overall AQI.
+    readonly property var gasLeader: {
+        if (!aqiReady)
+            return { "name": "UNAVAILABLE", "value": -1 };
+        const indices = [
+            ["OZONE", ozoneAqiValue],
+            ["NO₂", nitrogenDioxideAqiValue],
+            ["CO", carbonMonoxideAqiValue]
+        ];
+        let peak = { "name": "UNAVAILABLE", "value": -1 };
+        for (let i = 0; i < indices.length; i++) {
+            const index = Number(indices[i][1]);
+            if (isFinite(index) && index >= 0 && index > peak.value)
+                peak = { "name": indices[i][0], "value": index };
+        }
+        return peak;
+    }
+
+    function particulateText(value) {
+        return aqiReady && isFinite(value) && value >= 0
+               ? Number(value).toFixed(1) + " µg/m³" : "-- µg/m³";
+    }
+
     readonly property color meterBorderColor: Colors.cyan
     readonly property color meterFillColor: Colors.green
 
@@ -96,8 +120,8 @@ Rectangle {
 
     Column {
         anchors.fill: parent
-        anchors.margins: 24
-        spacing: 26
+        anchors.margins: 20
+        spacing: 14
 
         Row {
             width: parent.width
@@ -129,33 +153,68 @@ Rectangle {
             title: "AIR // PARTICULATES"
         }
 
+        // One large instrument, two particulate measurements and the
+        // highest available gas AQI component. No invented measurement.
         Row {
-            spacing: 35
+            width: parent.width
+            spacing: 14
 
-            Column {
-                width: 145
-                spacing: 6
+            Rectangle {
+                id: airQualityInstrument
+                width: 248
+                height: 166
+                color: Colors.dark
+                border.width: 1
+                border.color: Colors.cyan
 
                 SecondaryText {
-                    text: "AIR QUALITY"
+                    anchors.top: parent.top
+                    anchors.left: parent.left
+                    anchors.margins: 12
+                    text: "U.S. AIR QUALITY INDEX"
                     font.pixelSize: 11
                 }
 
-                GohuText {
-                    text: ground.aqiReady ? String(weatherService.aqi) : "--"
-                    font.pixelSize: 28
+                // Draw the halo behind its AQI glyph, not over the number.
+                SafeDropShadow {
+                    anchors.fill: aqiReadingText
+                    safeSource: aqiReadingText
+                    requestedVisible: ground.aqiReady
+                    radius: 10
+                    samples: 19
+                    horizontalOffset: 0
+                    verticalOffset: 0
+                    transparentBorder: true
+                    opacity: 0.68
                     color: ground.aqiColor
                 }
 
                 GohuText {
+                    id: aqiReadingText
+                    anchors.horizontalCenter: parent.horizontalCenter
+                    anchors.top: parent.top
+                    anchors.topMargin: 29
+                    text: ground.aqiReady ? String(weatherService.aqi) : "--"
+                    font.pixelSize: 68
+                    color: ground.aqiColor
+                }
+
+                GohuText {
+                    anchors.horizontalCenter: parent.horizontalCenter
+                    anchors.bottom: aqiTrack.top
+                    anchors.bottomMargin: 9
                     text: ground.aqiReady ? weatherService.aqiLabel : "OFFLINE"
-                    font.pixelSize: 11
+                    font.pixelSize: 12
                     color: ground.aqiColor
                 }
 
                 Rectangle {
-                    width: 130
-                    height: 8
+                    id: aqiTrack
+                    anchors.left: parent.left
+                    anchors.right: parent.right
+                    anchors.bottom: parent.bottom
+                    anchors.margins: 12
+                    height: 9
                     color: Colors.black
                     border.width: 1
                     border.color: ground.meterBorderColor
@@ -171,24 +230,22 @@ Rectangle {
             }
 
             Column {
-                width: 150
-                spacing: 6
+                width: 158
+                spacing: 10
 
                 SecondaryText {
-                    text: "PM2.5"
+                    text: "PM2.5 // FINE"
                     font.pixelSize: 11
                 }
 
                 GohuText {
-                    text: ground.aqiReady
-                          ? Number(weatherService.pm25).toFixed(1) + " µg/m³"
-                          : "-- µg/m³"
-                    font.pixelSize: 18
+                    text: ground.particulateText(ground.pm25Value)
+                    font.pixelSize: 19
                     color: Colors.white
                 }
 
                 Rectangle {
-                    width: 120
+                    width: 144
                     height: 8
                     color: Colors.black
                     border.width: 1
@@ -202,27 +259,30 @@ Rectangle {
                         color: ground.meterFillColor
                     }
                 }
+
+                QuietText {
+                    text: "FINE PARTICLES"
+                    font.pixelSize: 10
+                }
             }
 
             Column {
-                width: 150
-                spacing: 6
+                width: 158
+                spacing: 10
 
                 SecondaryText {
-                    text: "PM10"
+                    text: "PM10 // COARSE"
                     font.pixelSize: 11
                 }
 
                 GohuText {
-                    text: ground.aqiReady
-                          ? Number(weatherService.pm10).toFixed(1) + " µg/m³"
-                          : "-- µg/m³"
-                    font.pixelSize: 18
+                    text: ground.particulateText(ground.pm10Value)
+                    font.pixelSize: 19
                     color: Colors.white
                 }
 
                 Rectangle {
-                    width: 120
+                    width: 144
                     height: 8
                     color: Colors.black
                     border.width: 1
@@ -236,33 +296,40 @@ Rectangle {
                         color: ground.meterFillColor
                     }
                 }
+
+                QuietText {
+                    text: "COARSE PARTICLES"
+                    font.pixelSize: 10
+                }
             }
 
             Column {
-                width: 210
-                spacing: 6
+                width: Math.max(0, parent.width - 248 - 158 - 158 - 3 * parent.spacing)
+                spacing: 8
 
                 SecondaryText {
-                    text: "POSITION"
+                    text: "TOP GAS SUBINDEX"
                     font.pixelSize: 11
                 }
 
                 GohuText {
-                    text: "LAT  " + (
-                        weatherService && weatherService.latitude !== ""
-                        ? weatherService.latitude : "--"
-                    )
-                    font.pixelSize: 14
-                    color: Colors.white
+                    text: ground.gasLeader.name
+                    font.pixelSize: 18
+                    color: Colors.green
                 }
 
                 GohuText {
-                    text: "LON  " + (
-                        weatherService && weatherService.longitude !== ""
-                        ? weatherService.longitude : "--"
-                    )
-                    font.pixelSize: 14
+                    text: ground.gasLeader.value >= 0
+                          ? Math.round(ground.gasLeader.value) + " AQI" : "-- AQI"
+                    font.pixelSize: 19
                     color: Colors.white
+                }
+
+                QuietText {
+                    width: parent.width
+                    wrapMode: Text.WordWrap
+                    text: "OF OZONE / NO₂ / CO"
+                    font.pixelSize: 9
                 }
             }
         }
@@ -273,7 +340,7 @@ Rectangle {
         }
 
         Row {
-            spacing: 18
+            spacing: 14
 
             Column {
                 width: 135
@@ -420,9 +487,50 @@ Rectangle {
             }
         }
 
-        QuietText {
-            text: "surface / environment / events / infrastructure"
-            font.pixelSize: 13
+        StationSectionDivider {
+            width: parent.width
+            title: "ENVIRONMENT // SOURCE"
+        }
+
+        Row {
+            width: parent.width
+            spacing: 22
+
+            Column {
+                width: 248
+                spacing: 5
+
+                SecondaryText {
+                    text: "POSITION // WEATHER FIX"
+                    font.pixelSize: 11
+                }
+
+                GohuText {
+                    text: "LAT " + (weatherService && weatherService.latitude !== ""
+                                   ? weatherService.latitude : "--")
+                          + "   LON " + (weatherService && weatherService.longitude !== ""
+                                      ? weatherService.longitude : "--")
+                    font.pixelSize: 12
+                    color: Colors.white
+                }
+            }
+
+            Column {
+                width: Math.max(0, parent.width - 270)
+                spacing: 5
+
+                SecondaryText {
+                    text: "AIR QUALITY // SAMPLE"
+                    font.pixelSize: 11
+                }
+
+                GohuText {
+                    text: ground.aqiReady && weatherService.airQualitySourceTime !== ""
+                          ? weatherService.airQualitySourceTime : "--"
+                    font.pixelSize: 12
+                    color: Colors.white
+                }
+            }
         }
     }
 }

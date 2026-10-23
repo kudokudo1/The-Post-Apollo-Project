@@ -30,6 +30,15 @@ _MAX_OFFSET = 10_000
 _ALLOWED_SEARCH = re.compile(r"^[^\x00-\x1f\x7f]{0,120}$")
 _FILTERS = {"genre": "tag", "tag": "tag", "country": "countrycode",
             "name": "name", "language": "language"}
+_DEFAULT_CLIENT = "default"
+_MAX_BROWSE_CLIENTS = 4
+_CLIENT_ID = re.compile(r"^[A-Za-z][A-Za-z0-9_-]{0,31}$")
+
+
+def validate_browse_client(client: str) -> str:
+    if not isinstance(client, str) or not _CLIENT_ID.fullmatch(client):
+        raise MediaBackendError("INVALID_CLIENT", "Invalid radio browsing client")
+    return client
 
 
 class _RejectRedirects(HTTPRedirectHandler):
@@ -46,6 +55,9 @@ class RadioBrowserCatalogSource:
         # Tests inject a fake GET transport; production uses fixed trusted mirrors.
         self._fetch = fetch
         self._relay = relay
+        # Each consumer sees only its own latest search batch. The old default
+        # client remains the unscoped Hi-Fi API. Playback and relay are shared.
+        self._browse_batches: dict[str, tuple[dict[str, Any], dict[str, str]]] = {}
         self._known_stations: dict[str, dict[str, Any]] = {}
         self._station_urls: dict[str, str] = {}
 
@@ -61,7 +73,11 @@ class RadioBrowserCatalogSource:
             "note": "Listings are untrusted; stream support is not guaranteed",
         }
 
-    def search(self, query: str, cursor: str | None = None) -> dict[str, Any]:
+    def search(self, query: str, cursor: str | None = None,
+               client: str = _DEFAULT_CLIENT) -> dict[str, Any]:
+        client = validate_browse_client(client)
+        if client not in self._browse_batches and len(self._browse_batches) >= _MAX_BROWSE_CLIENTS:
+            raise MediaBackendError("CLIENT_LIMIT", "Too many radio browse clients")
         if not isinstance(query, str) or not _ALLOWED_SEARCH.fullmatch(query):
             raise MediaBackendError("INVALID_QUERY", "Radio search must be at most 120 printable characters")
         query = query.strip()
@@ -133,8 +149,11 @@ class RadioBrowserCatalogSource:
                 break
         # Cursor follows the number of rows actually consumed, not the
         # requested batch size: usable hits after row 50 must not be skipped.
-        self._known_stations = known
-        self._station_urls = station_urls
+        self._browse_batches[client] = (known, station_urls)
+        if client == _DEFAULT_CLIENT:
+            # Preserve the historical fields for older tests and consumers.
+            self._known_stations = known
+            self._station_urls = station_urls
         next_offset = offset + scanned
         return {
             "items": items, "truncated": len(payload) >= _REQUEST_ROWS,
@@ -175,25 +194,28 @@ class RadioBrowserCatalogSource:
             raise MediaBackendError("SOURCE_PROTOCOL", "Invalid radio directory response")
         return payload
 
-    def inspect(self, media_ref: Any) -> dict[str, Any]:
+    def inspect(self, media_ref: Any, client: str = _DEFAULT_CLIENT) -> dict[str, Any]:
+        client = validate_browse_client(client)
         if (not isinstance(media_ref, dict)
                 or media_ref.get("source") != self.id
                 or media_ref.get("kind") != "station"):
             raise MediaBackendError("INVALID_REF", "Expected radio-directory station")
         station_id = media_ref.get("id")
-        item = self._known_stations.get(station_id)
+        batch = self._browse_batches.get(client, ({}, {}))
+        item = batch[0].get(station_id)
         if item is None:
             raise MediaBackendError("INVALID_REF", "Station not in current radio results")
         return item.copy()
 
-    def prepare(self, media_ref: Any) -> dict[str, Any]:
-        # Loading requires a selected UUID already returned in this session;
-        # no caller-provided URL or local address is accepted here.
-        item = self.inspect(media_ref)
+    def prepare(self, media_ref: Any, client: str = _DEFAULT_CLIENT) -> dict[str, Any]:
+        # A UUID must have been returned to this particular browsing client.
+        # Other clients' stations and private origin URLs stay inaccessible.
+        client = validate_browse_client(client)
+        item = self.inspect(media_ref, client)
         if self._relay is None:
             raise MediaBackendError("PLAYBACK_UNAVAILABLE",
                                     "Guarded radio relay not available")
-        uri = self._station_urls.get(item["stationuuid"])
+        uri = self._browse_batches[client][1].get(item["stationuuid"])
         if not uri:
             raise MediaBackendError("INVALID_REF", "Station URI not in current results")
         return {"requiredKind": "mpd-guarded-radio",

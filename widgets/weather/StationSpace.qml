@@ -13,6 +13,24 @@ Rectangle {
         active: space.visible
     }
 
+    WeatherServices.SolarFlareService {
+        id: flareService
+        active: space.visible
+    }
+
+    // Event classes are measured GOES X-ray peaks, not alert severity.
+    function flareClassColor(letter) {
+        if (letter === "X")
+            return Colors.magenta;
+        if (letter === "M")
+            return Colors.orange;
+        if (letter === "C")
+            return Colors.yellow;
+        if (letter === "B")
+            return Colors.cyan;
+        return Colors.white;
+    }
+
     readonly property bool spaceReady: spaceService && spaceService.ready
     readonly property bool spaceLoading: spaceService && spaceService.loading
 
@@ -619,6 +637,222 @@ Rectangle {
             QuietText {
                 width: parent.width
                 text: "NOAA OVATION GRID // HIGHEST CELL PER HEMISPHERE // NOT LOCAL VISIBILITY"
+                font.pixelSize: 10
+            }
+        }
+
+        StationSectionDivider {
+            width: parent.width
+            title: "SOLAR // GOES X-RAY FLARES"
+        }
+
+        Column {
+            width: parent.width
+            spacing: 8
+
+            Row {
+                width: parent.width
+                spacing: 14
+
+                Rectangle {
+                    width: 235
+                    height: 125
+                    color: Colors.dark
+                    border.width: 1
+                    border.color: Colors.cyan
+
+                    SecondaryText {
+                        anchors.left: parent.left
+                        anchors.top: parent.top
+                        anchors.margins: 10
+                        text: "LATEST DETECTED // PEAK"
+                        font.pixelSize: 11
+                    }
+
+                    GohuText {
+                        anchors.horizontalCenter: parent.horizontalCenter
+                        anchors.top: parent.top
+                        anchors.topMargin: 30
+                        text: flareService.ready && flareService.latest
+                              ? flareService.latest.classLabel : "--"
+                        font.pixelSize: 36
+                        color: flareService.ready && flareService.latest
+                               ? space.flareClassColor(flareService.latest.classLetter)
+                               : Colors.white
+                    }
+
+                    QuietText {
+                        anchors.horizontalCenter: parent.horizontalCenter
+                        anchors.bottom: parent.bottom
+                        anchors.bottomMargin: 10
+                        text: flareService.ready && flareService.latest
+                              ? flareService.latest.peakUtc : "PEAK TIME --"
+                        font.pixelSize: 10
+                    }
+                }
+
+                Rectangle {
+                    width: 235
+                    height: 125
+                    color: Colors.dark
+                    border.width: 1
+                    border.color: Colors.cyan
+
+                    SecondaryText {
+                        anchors.left: parent.left
+                        anchors.top: parent.top
+                        anchors.margins: 10
+                        text: "OBSERVED // LAST 24H"
+                        font.pixelSize: 11
+                    }
+
+                    Row {
+                        anchors.top: parent.top
+                        anchors.topMargin: 36
+                        anchors.horizontalCenter: parent.horizontalCenter
+                        spacing: 14
+
+                        Column {
+                            spacing: 6
+
+                            GohuText {
+                                text: flareService.ready
+                                      ? String(flareService.count24h) : "--"
+                                font.pixelSize: 30
+                                color: Colors.cyan
+                            }
+
+                            QuietText {
+                                text: "ALL"
+                                font.pixelSize: 10
+                            }
+                        }
+
+                        Column {
+                            spacing: 6
+
+                            GohuText {
+                                text: flareService.ready
+                                      ? String(flareService.cPlus24h) : "--"
+                                font.pixelSize: 30
+                                color: Colors.yellow
+                            }
+
+                            QuietText {
+                                text: "C / M / X"
+                                font.pixelSize: 10
+                            }
+                        }
+                    }
+                }
+
+                Column {
+                    width: Math.max(0, parent.width - 470 - 2 * parent.spacing)
+                    spacing: 8
+
+                    SecondaryText {
+                        text: "EVENT FEED // NOAA GOES"
+                        font.pixelSize: 11
+                    }
+
+                    GohuText {
+                        width: parent.width
+                        wrapMode: Text.WordWrap
+                        text: flareService.failed
+                              ? "REQUEST FAILED // SAVED EVENTS"
+                              : flareService.loading && !flareService.ready
+                                ? "RECEIVING"
+                                : flareService.ready ? "EVENTS RECEIVED"
+                                  : "UNAVAILABLE"
+                        font.pixelSize: 12
+                        color: flareService.failed ? Colors.orange
+                               : flareService.ready ? Colors.cyan : Colors.white
+                    }
+
+                    QuietText {
+                        width: parent.width
+                        wrapMode: Text.WordWrap
+                        text: flareService.ready
+                              ? "FETCHED "
+                                + Qt.formatDateTime(flareService.lastUpdated, "hh:mm")
+                                + " LOCAL"
+                              : "--"
+                        font.pixelSize: 10
+                    }
+
+                    QuietText {
+                        width: parent.width
+                        wrapMode: Text.WordWrap
+                        text: "EVENT PEAKS // NOT LIVE X-RAY FLUX"
+                        font.pixelSize: 10
+                    }
+                }
+            }
+
+            Row {
+                id: flareEventRow
+                width: parent.width
+                spacing: 10
+
+                Repeater {
+                    model: flareService.ready ? flareService.events : []
+
+                    delegate: Rectangle {
+                        required property var modelData
+                        width: Math.max(0, (flareEventRow.width
+                                            - 2 * flareEventRow.spacing) / 3)
+                        height: 102
+                        color: Colors.dark
+                        border.width: 1
+                        border.color: Colors.cyan
+
+                        Column {
+                            anchors.fill: parent
+                            anchors.margins: 8
+                            spacing: 5
+
+                            Row {
+                                spacing: 10
+
+                                GohuText {
+                                    text: modelData.classLabel
+                                    font.pixelSize: 21
+                                    color: space.flareClassColor(modelData.classLetter)
+                                }
+
+                                QuietText {
+                                    text: modelData.satellite
+                                    font.pixelSize: 10
+                                }
+                            }
+
+                            GohuText {
+                                text: "PEAK " + modelData.peakUtc
+                                font.pixelSize: 11
+                                color: Colors.white
+                            }
+
+                            QuietText {
+                                text: modelData.ended ? "END REPORTED" : "END NOT REPORTED"
+                                font.pixelSize: 10
+                            }
+                        }
+                    }
+                }
+            }
+
+            QuietText {
+                visible: !flareService.ready || flareService.events.length === 0
+                text: flareService.failed ? flareService.errorText
+                      : flareService.loading ? "LOADING GOES EVENTS"
+                      : flareService.ready ? "NO VALID FLARE PEAKS IN 7-DAY FEED"
+                        : "GOES DATA UNAVAILABLE"
+                font.pixelSize: 11
+            }
+
+            QuietText {
+                width: parent.width
+                text: "GOES XRS // LAST 7D EVENTS // OBSERVATIONS, NOT ALERTS OR PREDICTIONS"
                 font.pixelSize: 10
             }
         }

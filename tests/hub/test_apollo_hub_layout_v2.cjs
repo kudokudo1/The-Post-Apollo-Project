@@ -441,4 +441,110 @@ const fullAttempt=moveTo(fullCase,0,0,0,
 assert.deepEqual(toPlain(fullAttempt),toPlain(fullCase));
 // Unchanged document means the UI must not add a new UNDO checkpoint.
 
+// Stage 6: packed 2-column grid fills cells next to taller tiles without
+// writing/reordering the persisted layout array or allocating identities.
+const packBase=layout.defaultLayout();
+const packJSON=JSON.stringify(packBase);
+const packedNormal=layout.packTiles(packBase.modes[0].subModes[0].tiles);
+assert.equal(packedNormal.state,"ready");
+assert.equal(packedNormal.columns,2);
+assert.equal(packedNormal.rows,3);
+assert.equal(packedNormal.items.length,6);
+assert.deepEqual(toPlain(packedNormal.items.map(p=>[p.column,p.row])),[
+    [0,0],[1,0],[0,1],[1,1],[0,2],[1,2]
+]);
+const tallGrid=layout.resizeTile(packBase,0,0,0,"half",3);
+const tallPack=layout.packTiles(tallGrid.modes[0].subModes[0].tiles);
+assert.equal(tallPack.rows,4); // old Flow required five full 148px rows
+assert.deepEqual(toPlain(tallPack.items.map(p=>[p.column,p.row])),[
+    [0,0],[1,0],[1,1],[1,2],[0,3],[1,3]
+]);
+assert.equal(tallPack.items[0].columnSpan,1);
+assert.equal(tallPack.items[0].rowSpan,3);
+assert.equal(JSON.stringify(packBase),packJSON);
+assert.deepEqual(toPlain(layout.parse(JSON.stringify(tallGrid))),
+                 toPlain(tallGrid));
+assert.deepEqual(toPlain(tallGrid.modes[0].subModes[0].tiles.map(t=>t.id)),
+                 toPlain(packBase.modes[0].subModes[0].tiles.map(t=>t.id)));
+const widePack=layout.packTiles(packBase.modes[1].subModes[0].tiles);
+assert.deepEqual(toPlain(widePack.items.map(p=>[p.column,p.row,p.columnSpan])),[
+    [0,0,2],[0,1,1],[1,1,1]
+]);
+assert.equal(widePack.rows,2);
+const wideTall=layout.resizeTile(packBase,1,0,1,"half",3);
+assert.equal(layout.packTiles(wideTall.modes[1].subModes[0].tiles).rows,4);
+
+// The same first-fit algorithm also backfills holes left by a wide tile
+// placed after a tall half-width tile. No tile overlaps another cell.
+const sparse=[
+    {id:"tile-1",module:"time",size:"half",rowSpan:3},
+    {id:"tile-2",module:"apps",size:"wide",rowSpan:1},
+    {id:"tile-3",module:"notes",size:"half",rowSpan:1},
+    {id:"tile-4",module:"weather",size:"half",rowSpan:1}
+];
+const sparseGrid=layout.packTiles(sparse);
+assert.deepEqual(toPlain(sparseGrid.items.map(p=>[p.column,p.row])),[
+    [0,0],[0,3],[1,0],[1,1]
+]);
+assert.equal(sparseGrid.rows,4);
+const ensureNoOverlap=(grid)=>{
+    const cells=new Set();
+    let maxRow=0;
+    for(const p of grid.items){
+        assert.ok(p.column>=0 && p.column+p.columnSpan<=2);
+        assert.ok(p.row>=0 && p.rowSpan>=1 && p.rowSpan<=3);
+        for(let y=p.row;y<p.row+p.rowSpan;y++){
+            for(let x=p.column;x<p.column+p.columnSpan;x++){
+                const cell=x+":"+y;
+                assert.equal(cells.has(cell),false,cell);
+                cells.add(cell);
+                maxRow=Math.max(maxRow,y+1);
+            }
+        }
+    }
+    assert.equal(maxRow,grid.rows);
+};
+for(const check of [packedNormal,tallPack,widePack,sparseGrid])
+    ensureNoOverlap(check);
+
+// Exhaustively probe all 2-column-width and three-row-height variants for
+// four tiles. The packing remains deterministic and has no overlap.
+for(let bits=0;bits<16;bits++){
+    for(let spans=0;spans<81;spans++){
+        let code=spans;
+        const records=[];
+        for(let i=0;i<4;i++){
+            records.push({
+                id:"tile-"+(i+1),
+                module:["time","apps","weather","notes"][i],
+                size:(bits&(1<<i))?"wide":"half",
+                rowSpan:code%3+1
+            });
+            code=Math.floor(code/3);
+        }
+        const before=JSON.stringify(records);
+        const grid=layout.packTiles(records);
+        assert.equal(grid.state,"ready");
+        assert.equal(grid.items.length,records.length);
+        ensureNoOverlap(grid);
+        assert.equal(JSON.stringify(records),before);
+        assert.deepEqual(toPlain(grid),toPlain(layout.packTiles(records)));
+    }
+}
+assert.deepEqual(toPlain(layout.packTiles([])),
+                 {state:"ready",columns:2,rows:0,items:[]});
+const maximal=Array.from({length:8},(_,i)=>({
+    id:"tile-"+(i+1),module:layout.MODULE_IDS[i],
+    size:"wide",rowSpan:3
+}));
+assert.equal(layout.packTiles(maximal).rows,24);
+for(const bad of [null,undefined,{},42,"",Array(9).fill(sparse[0]),
+                   [{module:"time",size:"oversized",rowSpan:1}],
+                   [{module:"time",size:"half",rowSpan:0}],
+                   [{module:"time",size:"half",rowSpan:4}],
+                   [{module:"unknown",size:"half",rowSpan:1}]]){
+    assert.equal(layout.packTiles(bad).state,"unavailable");
+    assert.equal(layout.packTiles(bad).items.length,0);
+}
+
 console.log("ApolloHub Layout v2 migration, stable tile IDs, guarded remove and sizing tests passed");

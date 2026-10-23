@@ -1,6 +1,7 @@
 import QtQuick
 import "../components"
 import "../services/finance/FinanceAllocationPreview.js" as AllocationRules
+import "../services/finance/FinanceSpreadsheetPolicy.js" as StepRules
 
 // Compact budget table. SET is editable; SPENT and LEFT come from Actual.
 // One explicit SAVE ROW uses the existing D12 allocation writer unchanged.
@@ -57,11 +58,9 @@ Item {
         if(!row || lockedForRecovery || submitted)return false;
         const source=selectedCategoryId===row.id ? draftText
             : (row.budgetedCents/100).toFixed(2);
-        const value=AllocationRules.parseAllocationCents(source);
-        if(value===null)return false;
-        const next=value+delta;
-        if(!Number.isSafeInteger(next) || next<0 || next>99999999999)return false;
-        return choose(row,(next/100).toFixed(2));
+        const next=StepRules.stepAmount(source,delta,true);
+        if(next===null)return false;
+        return choose(row,next);
     }
     function saveSelected() {
         if(!canSave || !selectedCategory)return false;

@@ -1,7 +1,7 @@
 import QtQuick
 import "../components"
 import "../services/finance/FinanceFundingSetupPlan.js" as FundingRules
-import "../services/finance/FinanceInputPolicy.js" as InputRules
+import "../services/finance/FinanceSpreadsheetPolicy.js" as StepRules
 
 // Fast entry surface. Back-end permit/recovery checks are unchanged.
 // Existing-account opening balance is intentionally never writable here.
@@ -64,11 +64,8 @@ Item {
     }
     function step(delta) {
         if(busy || submitted)return;
-        const amount=InputRules.normalizeAmount(amountText);
-        if(amount===null)return;
-        const cents=Math.round(Number(amount)*100)+delta;
-        if(!Number.isSafeInteger(cents) || cents<1 || cents>99999999999)return;
-        amountText=(cents/100).toFixed(2);
+        const next=StepRules.stepAmount(amountText,delta,false);
+        if(next!==null)amountText=next;
     }
     function submit(){
         if(!canSubmit)return false;

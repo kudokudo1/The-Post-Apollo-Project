@@ -236,4 +236,43 @@ assert.equal(seismic.distanceKm("", "", 0, 0), -1);
 assert.equal(seismic.distanceKm(91, 0, 0, 0), -1);
 assert.equal(seismic.distanceKm(0, 181, 0, 0), -1);
 
+
+// NOAA OVATION covers the globe at one-degree intervals. Its largest
+// hemispheric grid values are not an observer-specific viewing probability.
+const auroraSource = fs.readFileSync(
+    path.join(root, "services/weather/AuroraPolicy.js"), "utf8"
+).replace(/^\.pragma library\s*/m, "");
+const aurora = {};
+vm.runInNewContext(auroraSource, aurora);
+assert.equal(typeof aurora.parseOvation, "function");
+assert.equal(typeof aurora.utcLabel, "function");
+
+const ovation = {
+    "Observation Time": "2026-10-22T20:00:00Z",
+    "Forecast Time": "2026-10-22T21:00:00Z",
+    "Data Format": "[Longitude, Latitude, Aurora]",
+    coordinates: [
+        [0, 63, 24], [10, 65, 85], [20, 67, 18],
+        [1, -58, 5], [3, -72, 46], [4, -62, 34],
+        [5, 0, 100], [6, 43, null], [7, -30, -1],
+        [370, 44, 99], [9, -95, 92], [1, 55, 120],
+    ],
+};
+const ovationSummary = aurora.parseOvation(ovation);
+assert.equal(ovationSummary.northPeak, 85);
+assert.equal(ovationSummary.southPeak, 46);
+assert.equal(ovationSummary.northCells, 3);
+assert.equal(ovationSummary.southCells, 3);
+assert.equal(aurora.utcLabel(ovationSummary.forecastTimeMs), "21:00 UTC");
+assert.equal(aurora.utcLabel(ovationSummary.observationTimeMs), "20:00 UTC");
+assert.equal(aurora.utcLabel(0), "-- UTC");
+assert.throws(() => aurora.parseOvation(null));
+assert.throws(() => aurora.parseOvation({coordinates: []}));
+assert.throws(() => aurora.parseOvation({
+    ...ovation, "Forecast Time": "2026-10-22T19:59:00Z"
+}));
+assert.throws(() => aurora.parseOvation({
+    ...ovation, coordinates: [[0, 60, 40]]
+}));
+
 console.log("Weather data policy contracts: PASS");

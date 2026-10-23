@@ -23,7 +23,9 @@ MODEL describes architecture, ownership, contracts, services, and subsystem rela
 
 ### ✮˙๋࣭⭑ CONTRACT INDEX // EXISTING PATHS
 
-**Navigation / classification only.** These links identify contracts in their *current* paths; they do not rename, certify, relocate or supersede the originals. The [Syntagma rules entry](https://github.com/kudokudo1/Meta-Apollo-Logos-How-I-Think/blob/main/AGENTS.md) owns shared operator/semantic guidance; this repository owns QML implementation and local technical contracts.
+**Navigation / classification only.** These links identify contracts in their *current* paths; they do not rename, certify, relocate or supersede the originals.
+
+- **Weather Station / Observatory worker recovery (proposed plan):** [Backend-first master roadmap](../docs/weather-station-backend-first-roadmap.md) covers connected sources, shared Hi-Fi radio, terminal/viewer architecture, remaining domains and acceptance gates. It is a proposed staged plan, not a live Hospital Assignment or implementation certification. The [Syntagma rules entry](https://github.com/kudokudo1/Meta-Apollo-Logos-How-I-Think/blob/main/AGENTS.md) owns shared operator/semantic guidance; this repository owns QML implementation and local technical contracts.
 
 - **Control families:** [Selector family foundation](./components/selector-family-foundation.md); [SelectorDial variants](../docs/selector-dial-variants.md); [NeonScrollBar API](../docs/neon-scrollbar-syntagma-api.md).
 - **Visual behavior:** [Visual-language effects and recipes](./components/visual-language-recipes.md); consult [current QML components](../components/) before implementing changes.

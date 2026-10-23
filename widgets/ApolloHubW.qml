@@ -306,11 +306,17 @@ PanelWindow {
     }
 
     function closeTransferPicker() {
+        const wasOpen = transferPickerOpen;
         transferPickerOpen = false;
         transferTileIndex = -1;
         transferTileId = "";
         transferModeId = "";
         transferGroupId = "";
+        if (wasOpen && menuOpen && keyboardActive)
+            Qt.callLater(function() {
+                if (hub.standardKeysAvailable)
+                    hubKeyboardAnchor.forceActiveFocus();
+            });
     }
 
     function openTransferPicker(index, sourceItem) {
@@ -335,6 +341,10 @@ PanelWindow {
         transferModeId = activeMode.id;
         transferGroupId = activeSubMode.id;
         transferPickerOpen = true;
+        Qt.callLater(function() {
+            if (hub.transferPickerOpen)
+                transferFocusAnchor.forceActiveFocus();
+        });
     }
 
     function chooseTransferDestination(modeId, groupId) {
@@ -1055,7 +1065,7 @@ PanelWindow {
                       : hub.transferPickerOpen
                       ? "MOVE TILE // CHOOSE DESTINATION // ESC OR CLOSE TO CANCEL"
                       : hub.editMode
-                      ? "← → MOVE    SWAP MODULE    W:1/2 WIDTH    H:1/2/3 HEIGHT    × REMOVE    UNDO"
+                      ? "← → REORDER    SWAP MODULE    MOVE GROUP    W/H SIZE    × REMOVE    UNDO"
                       : "APOLLO HUB  //  LIVE MODULES CONNECTED"
             }
         }
@@ -1233,6 +1243,20 @@ PanelWindow {
                     anchors.fill: parent
                     anchors.margins: 9
                     spacing: 7
+
+                    Item {
+                        id: transferFocusAnchor
+                        width: 0
+                        height: 0
+                        focus: hub.transferPickerOpen
+                        visible: false
+                        Keys.onPressed: function(event) {
+                            if (event.key === Qt.Key_Escape) {
+                                hub.closeTransferPicker();
+                                event.accepted = true;
+                            }
+                        }
+                    }
 
                     Row {
                         width: parent.width

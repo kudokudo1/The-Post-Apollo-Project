@@ -12,6 +12,9 @@ Item {
     property bool pendingWrite: false
     property string pendingKind: ""
     property string pendingProjectName: ""
+    property string pendingProjectId: ""
+    property int pendingTaskTotal: 0
+    property bool confirmDeleteProject: false
     property string pendingTaskId: ""
     property var pendingTargetProjectId: null
     property string feedback: ""
@@ -42,6 +45,17 @@ Item {
         }
         return assigned.concat(other);
     }
+    readonly property bool renameDirty:
+        selectedProject !== null && renameInput.text.trim() !== selectedProject.name
+    readonly property bool validRename:
+        selectedProject !== null && renameDirty
+        && renameInput.text.trim().length > 0
+        && renameInput.text.trim().length <= 64
+        && !/[\x00-\x1f\x7f]/.test(renameInput.text)
+        && !projects.some(function(p) {
+            return p.id !== selectedProjectId
+                   && p.name.toLowerCase() === renameInput.text.trim().toLowerCase();
+        })
     readonly property bool validProjectName:
         newProjectInput.text.trim().length > 0
         && newProjectInput.text.trim().length <= 64
@@ -60,6 +74,55 @@ Item {
             pendingWrite = false;
             pendingKind = "";
             feedback = "CREATE REJECTED";
+        }
+    }
+    function chooseProject(projectId) {
+        if (pendingWrite) {
+            feedback = "SAVE PENDING";
+            return;
+        }
+        if (renameDirty) {
+            feedback = "SAVE OR RESET RENAME FIRST";
+            return;
+        }
+        confirmDeleteProject = false;
+        if (selectedProjectId !== projectId) {
+            selectedProjectId = projectId;
+            renameInput.text = selectedProject ? selectedProject.name : "";
+        }
+        feedback = "";
+    }
+    function renameSelectedProject() {
+        if (!writable || !validRename || !selectedProject)
+            return;
+        pendingKind = "rename";
+        pendingProjectId = selectedProjectId;
+        pendingProjectName = renameInput.text.trim();
+        pendingWrite = true;
+        confirmDeleteProject = false;
+        feedback = "SAVING";
+        if (!todoStore.renameProject(pendingProjectId, pendingProjectName)) {
+            pendingWrite = false;
+            pendingKind = "";
+            feedback = "RENAME REJECTED";
+        }
+    }
+    function discardRename() {
+        if (!writable || !selectedProject) return;
+        renameInput.text = selectedProject.name;
+        feedback = "RENAME RESET";
+    }
+    function deleteSelectedProject() {
+        if (!writable || !selectedProject || !confirmDeleteProject) return;
+        pendingKind = "delete";
+        pendingProjectId = selectedProjectId;
+        pendingTaskTotal = tasks.length;
+        pendingWrite = true;
+        feedback = "SAVING";
+        if (!todoStore.deleteProject(pendingProjectId, true)) {
+            pendingWrite = false;
+            pendingKind = "";
+            feedback = "DELETE REJECTED";
         }
     }
     function setProject(task) {
@@ -90,6 +153,7 @@ Item {
                     });
                     if (found) {
                         selectedProjectId = found.id;
+                        renameInput.text = found.name;
                         newProjectInput.text = "";
                         pendingWrite = false;
                         pendingKind = "";
@@ -104,6 +168,31 @@ Item {
                         pendingKind = "";
                         feedback = "SAVED";
                     }
+                } else if (pendingKind === "rename") {
+                    const renamed = projects.find(function(p) {
+                        return p.id === pendingProjectId;
+                    });
+                    if (renamed && renamed.name === pendingProjectName) {
+                        renameInput.text = renamed.name;
+                        pendingWrite = false;
+                        pendingKind = "";
+                        feedback = "SAVED";
+                    }
+                } else if (pendingKind === "delete") {
+                    const exists = projects.some(function(p) {
+                        return p.id === pendingProjectId;
+                    });
+                    const dangling = tasks.some(function(t) {
+                        return t.projectId === pendingProjectId;
+                    });
+                    if (!exists && !dangling && tasks.length === pendingTaskTotal) {
+                        pendingWrite = false;
+                        pendingKind = "";
+                        selectedProjectId = "";
+                        renameInput.text = "";
+                        confirmDeleteProject = false;
+                        feedback = "PROJECT REMOVED // TASKS UNASSIGNED";
+                    }
                 }
             }
         }
@@ -113,7 +202,10 @@ Item {
         }
     }
     onVisibleChanged: {
-        if (!visible) newProjectInput.focus = false;
+        if (!visible) {
+            newProjectInput.focus = false;
+            renameInput.focus = false;
+        }
     }
 
     Column {
@@ -215,7 +307,7 @@ Item {
                    + " OPEN / " + modelData.total
             labelPixelSize: 10
             selected: projectsPane.selectedProjectId === modelData.id
-            onLeftClicked: projectsPane.selectedProjectId = modelData.id
+            onLeftClicked: projectsPane.chooseProject(modelData.id)
         }
     }
 
@@ -233,9 +325,119 @@ Item {
               : "SELECT A LOCAL PROJECT ABOVE"
     }
 
+    // Rename the selected catalog entry, without changing its stable ID.
+    Row {
+        id: projectRenameRow
+        anchors.top: selectedLabel.bottom
+        anchors.topMargin: 6
+        anchors.left: parent.left
+        anchors.right: parent.right
+        height: 27
+        spacing: 4
+
+        Rectangle {
+            width: Math.max(45, parent.width - saveProjectButton.width
+                            - resetProjectButton.width - 2 * parent.spacing)
+            height: parent.height
+            color: Colors.black
+            border.width: 1
+            border.color: renameInput.activeFocus ? Colors.magenta : Colors.cyan
+            TextInput {
+                id: renameInput
+                anchors.fill: parent
+                anchors.leftMargin: 4
+                anchors.rightMargin: 4
+                verticalAlignment: TextInput.AlignVCenter
+                color: Colors.white
+                font.family: "GohuFont 11 Nerd Font Mono"
+                font.pixelSize: 10
+                maximumLength: 64
+                selectByMouse: true
+                clip: true
+                enabled: projectsPane.writable && projectsPane.selectedProject !== null
+                onAccepted: projectsPane.renameSelectedProject()
+            }
+        }
+        ActionButton {
+            id: saveProjectButton
+            width: 51
+            height: parent.height
+            label: "RENAME"
+            labelPixelSize: 9
+            available: projectsPane.writable && projectsPane.validRename
+            onLeftClicked: projectsPane.renameSelectedProject()
+        }
+        ActionButton {
+            id: resetProjectButton
+            width: 44
+            height: parent.height
+            label: "RESET"
+            labelPixelSize: 9
+            available: projectsPane.writable && projectsPane.renameDirty
+            onLeftClicked: projectsPane.discardRename()
+        }
+    }
+
+    // Explicit two-step confirmation. Removing a project does NOT remove tasks.
+    Row {
+        id: projectDeleteRow
+        anchors.top: projectRenameRow.bottom
+        anchors.topMargin: 5
+        anchors.left: parent.left
+        anchors.right: parent.right
+        height: 26
+        spacing: 5
+
+        ActionButton {
+            id: deleteProjectButton
+            width: projectsPane.confirmDeleteProject ? 63 : 94
+            height: parent.height
+            destructive: true
+            accentColor: Colors.red
+            label: projectsPane.confirmDeleteProject ? "YES" : "DEL PROJECT"
+            labelPixelSize: 9
+            available: projectsPane.writable
+                       && projectsPane.selectedProject !== null
+                       && !projectsPane.renameDirty
+            onLeftClicked: {
+                if (projectsPane.confirmDeleteProject)
+                    projectsPane.deleteSelectedProject();
+                else {
+                    projectsPane.confirmDeleteProject = true;
+                    projectsPane.feedback = "DELETE PROJECT? TASKS KEPT";
+                }
+            }
+        }
+        ActionButton {
+            id: cancelDeleteButton
+            width: 47
+            height: parent.height
+            label: "NO"
+            labelPixelSize: 9
+            visible: projectsPane.confirmDeleteProject
+            available: projectsPane.writable
+            onLeftClicked: {
+                projectsPane.confirmDeleteProject = false;
+                projectsPane.feedback = "DELETE CANCELED";
+            }
+        }
+        GohuText {
+            width: Math.max(20, parent.width - deleteProjectButton.width
+                            - (cancelDeleteButton.visible ? cancelDeleteButton.width : 0)
+                            - 2 * parent.spacing)
+            height: parent.height
+            verticalAlignment: Text.AlignVCenter
+            font.pixelSize: 9
+            color: projectsPane.confirmDeleteProject ? Colors.orange : Colors.cyan
+            text: projectsPane.confirmDeleteProject
+                  ? "TASKS BECOME UNASSIGNED" : "PROJECT ONLY"
+            elide: Text.ElideRight
+        }
+    }
+
     ListView {
         id: taskList
-        anchors.top: selectedLabel.bottom
+        anchors.top: projectDeleteRow.bottom
         anchors.topMargin: 8
         anchors.left: parent.left
         anchors.right: parent.right

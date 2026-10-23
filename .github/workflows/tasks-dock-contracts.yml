@@ -19,6 +19,8 @@ on:
       - "widgets/tasks/TaskTodayPolicy.js"
       - "tests/tasks/test_task_today_policy.cjs"
       - "tests/tasks/test_task_today_ui_contracts.py"
+      - "widgets/tasks/TaskProjectsPane.qml"
+      - "tests/tasks/test_task_projects_ui_contracts.py"
       - ".github/workflows/tasks-dock-contracts.yml"
   push:
     branches:
@@ -40,6 +42,8 @@ on:
       - "widgets/tasks/TaskTodayPolicy.js"
       - "tests/tasks/test_task_today_policy.cjs"
       - "tests/tasks/test_task_today_ui_contracts.py"
+      - "widgets/tasks/TaskProjectsPane.qml"
+      - "tests/tasks/test_task_projects_ui_contracts.py"
       - ".github/workflows/tasks-dock-contracts.yml"
 
 permissions:
@@ -64,3 +68,5 @@ jobs:
         run: node tests/tasks/test_task_today_policy.cjs
       - name: Validate TODAY menu wiring and single-store boundary
         run: python3 tests/tasks/test_task_today_ui_contracts.py
+      - name: Validate PROJECTS group UI and shared-store boundary
+        run: python3 tests/tasks/test_task_projects_ui_contracts.py

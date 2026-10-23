@@ -1,6 +1,6 @@
 # 🏥💜 ApolloHubW // B7 To-do backend contract
 
-**Status:** B7 v1 contract is historical baseline. TASKS M4 v2 extension proposed in a separate draft PR; deployment and runtime acceptance pending.
+**Status:** B7 v1 is the historical baseline; TASKS M4 v2 is merged. M6 v3 local grouping is proposed in a separate draft PR; live acceptance remains pending.
 
 **Ownership boundary:** This is a tiny personal checklist **inside ApolloHub**, not a Hospital Room/Assignment/Worker/Session, AppControl process list, Koinoikos task, calendar service, or Notes/The Study. It changes none of those systems. `shell.qml` and Hub UI are unmodified by B7. Features beyond this first local checklist require separate scope and operator decisions.
 
@@ -127,3 +127,20 @@ create/edit/complete/reopen/delete; persistence through Quickshell restart;
 correct leap day and invalid date handling; disk save failure preserving draft;
 Hub and TASKS simultaneous editing; no typing captured by unrelated widgets.
 Live operator acceptance is not implied by source tests.
+
+## TASKS M6 // Local Projects v3 (2026-10-22)
+
+**Status:** Draft implementation; requires CI and operator runtime acceptance.  
+**Scope:** local grouping only. This does NOT yet create, query, or edit GitHub Projects.
+
+- One singleton, one `FileView`, one existing storage path (`apollo-hub-todo-v1.json`). No other file is automatically created and no network synchronization occurs.
+- v1/v2 on-disk documents are **read as v3 in memory**, keeping task IDs, timestamps, status, priority, descriptions and due dates. No automatic rewrite simply from opening TASKS/PROJECTS.
+- The next explicit local mutation writes **v3** using the existing guarded atomic writer. **Older v1/v2-only policies cannot read a v3 document.** Preserve a verified backup before downgrading.
+- v3 documents add `nextProjectId`, `projects[]`, and a nullable `projectId` on each task. Project entries have stable `pN` IDs, name, creation and update timestamps. Task IDs remain independently stable `tN`.
+- Capacity is **30 projects**, with **1–64 character names**. Names are unique ignoring case. A task can belong to at most one local project in this initial version; changing assignment is an explicit user click.
+- The store validates all project references, rejects unknown IDs, duplicated IDs/names and sequence rewind, and strips unrecognized fields when parsing. It continues to report `saving` until the file's `onSaved` event, never when writing merely begins.
+- The read-only UI snapshot now includes `projects:[{id,name,total,remaining,completed}]` and each task's `projectId`. It does **not** expose project timestamps, internal sequences, or the writable raw document.
+- PROJECTS mode provides **Create project**, project selection, assignment/clear of tasks, and OPEN navigation back into the existing TASKS details editor. **Rename/delete projects, subtasks, multiple project memberships, GitHub Projects, and sync** are separate milestones.
+- M5 TODAY continues to use the unchanged task due-date snapshot. Apollo Hub task editing preserves project assignment on rename/complete/delete, all through the existing store.
+- On-device acceptance needed: v2→v3 read/restart, actual creation, assignment/reassignment, clear, preservation after restart, no data loss on disk failure, and cross-view consistency with Apollo Hub. CI alone is not runtime approval.
+

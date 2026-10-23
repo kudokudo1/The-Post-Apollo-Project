@@ -83,6 +83,16 @@ Scope {
                                               description, dueDate, Date.now()));
     }
 
+    // The only filesystem writer also owns project creation/assignment.
+    function createProject(name) {
+        return stage(TodoPolicy.createProject(document, name, Date.now()));
+    }
+
+    function assignTaskProject(taskId, projectId) {
+        return stage(TodoPolicy.assignProject(document, taskId,
+                                              projectId, Date.now()));
+    }
+
     function removeTask(id, confirmed) {
         return stage(TodoPolicy.update(document, id, "delete",
                                       null, Date.now(), confirmed));

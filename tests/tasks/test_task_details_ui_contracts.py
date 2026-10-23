@@ -15,10 +15,10 @@ assert TASKS.count("TaskDetailsPane {") == 1
 assert TASKS.count("ApolloHubTodoMini {") == 1
 assert "onTaskSelected: function(taskId)" in TASKS
 assert "taskDetails.chooseTask(taskId)" in TASKS
-assert TASKS.count("todoStore: ApolloHubTodoStore") == 2
+assert TASKS.count("todoStore: ApolloHubTodoStore") == 3
 # The two M4 editors still share one store; M5 adds a read-only TODAY consumer.
-assert TASKS.count("todoSnapshot: ApolloHubTodoStore.snapshot") == 3
-assert TASKS.count("todoStore: ApolloHubTodoStore") == 2
+assert TASKS.count("todoSnapshot: ApolloHubTodoStore.snapshot") == 4
+assert TASKS.count("todoStore: ApolloHubTodoStore") == 3
 assert "TaskTodayPane {" in TASKS
 assert "todoStore: ApolloHubTodoStore" in HUB
 assert "todoSnapshot: ApolloHubTodoStore.snapshot" in HUB
@@ -61,8 +61,8 @@ assert "TodoPolicy.updateDetails(document, id, priority," in STORE
 assert "function updateDetails(doc, id, priority, description, dueDate, nowMs)" in POLICY
 assert "var MAX_DESCRIPTION = 2000;" in POLICY
 assert "var MAX_FILE_LENGTH = 1048576;" in POLICY
-assert "return {version: 2, nextId: 1, tasks: []};" in POLICY
-assert "doc.version !== 1 && doc.version !== 2" in POLICY
+assert "return {version: 3, nextId: 1, nextProjectId: 1, projects: [], tasks: []};" in POLICY
+assert "doc.version !== 1 && doc.version !== 2 && doc.version !== 3" in POLICY
 assert "if (!result.ok) {" in STORE
 assert "todoFile.setText(JSON.stringify(pendingDocument, null, 2)" in STORE
 assert "atomicWrites: true" in STORE
@@ -73,6 +73,6 @@ assert STORE.count("FileView {") == 1
 for src in (TASKS, DETAILS, MINI):
     for token in ("FileView {", "Process {", "JsonAdapter {", "Quickshell.execDetached(", "HttpClient"):
         assert token not in src, token
-assert 'focusable: root.menuOpen && root.activeMode.id === "tasks"' in TASKS
+assert 'focusable: root.menuOpen && (root.activeMode.id === "tasks"' in TASKS
 
 print("TASKS M4 UI/single-writer contracts: PASS")

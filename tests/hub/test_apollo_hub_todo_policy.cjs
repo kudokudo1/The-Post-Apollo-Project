@@ -112,7 +112,7 @@ const max=p.emptyDocument();
 max.nextId=202;
 max.tasks=Array.from({length:200},(_,i)=>({
     id:"t"+(i+1),title:"Task "+i,done:false,createdAtMs:1,updatedAtMs:1,
-    priority:"none", description:"", dueDate:null
+    priority:"none", description:"", dueDate:null, projectId:null
 }));
 assert.equal(p.validate(max).ok,true);
 assert.equal(p.create(max,"Overflow",t).reason,"CAPACITY");

@@ -435,3 +435,29 @@ function addLocalField(document,request) {
     return {ok:true,reason:"",writeReady:false,remoteIntentCreated:false,
             remoteWriteAuthorized:false,fieldId:id,document:next};
 }
+
+// Converts v2 to an M10b-shaped *read-only projection* for the already
+// reviewed M10g bridge. All local field values/remote identity metadata stay
+// in the source v2 object. Projection MUST NOT be used for persistence.
+function legacyReadProjection(document,oldPolicy) {
+    var checked=verify(document);
+    if(!checked.ok) return checked;
+    if(!oldPolicy || typeof oldPolicy.verify!=="function")
+        return fail("MISSING_OLD_POLICY");
+    var projects=document.projects.map(function(p) {
+        return {id:p.id,name:p.name,family:p.family,remote:p.remote,
+            createdAtMs:p.createdAtMs,updatedAtMs:p.updatedAtMs};
+    });
+    var tasks=document.tasks.map(function(t) {
+        return {id:t.id,title:t.title,done:t.done,priority:t.priority,
+            description:t.description,dueDate:t.dueDate,projectId:t.projectId,
+            createdAtMs:t.createdAtMs,updatedAtMs:t.updatedAtMs};
+    });
+    var result={version:1,revision:document.revision,
+        projects:projects,tasks:tasks,operations:clone(document.operations),
+        nextId:document.nextId,nextProjectId:document.nextProjectId};
+    var oldCheck=oldPolicy.verify(result);
+    if(!oldCheck.ok) return fail("OLD_PROJECTION_"+oldCheck.reason);
+    return {ok:true,reason:"",writeReady:false,
+            candidate:result,sourceVersion:VERSION};
+}

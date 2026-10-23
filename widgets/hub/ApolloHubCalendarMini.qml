@@ -9,6 +9,10 @@ Item {
 
     property var calendarSnapshot: null
     property var calendarBridge: null
+    // Stage 7C: use the space already assigned by H:1/H:2/H:3.
+    // No new time source, calendar service, or event data.
+    readonly property int densityLevel: height >= 300 ? 3
+                                        : height >= 180 ? 2 : 1
 
     readonly property string calendarState:
         calendarSnapshot && calendarSnapshot.state
@@ -61,12 +65,14 @@ Item {
 
     Column {
         anchors.fill: parent
-        spacing: 2
+        spacing: calendarMini.densityLevel === 3 ? 7
+                 : calendarMini.densityLevel === 2 ? 5 : 2
 
         Row {
             id: monthHeader
             width: parent.width
-            height: 20
+            height: calendarMini.densityLevel === 3 ? 32
+                    : calendarMini.densityLevel === 2 ? 26 : 20
             spacing: 3
 
             ActionButton {
@@ -88,7 +94,8 @@ Item {
                 height: parent.height
                 verticalAlignment: Text.AlignVCenter
                 horizontalAlignment: Text.AlignHCenter
-                font.pixelSize: 11
+                font.pixelSize: calendarMini.densityLevel === 3 ? 17
+                                : calendarMini.densityLevel === 2 ? 14 : 11
                 color: Colors.white
                 elide: Text.ElideRight
                 text: calendarMini.calendarReady
@@ -137,7 +144,8 @@ Item {
         Grid {
             id: weekdayGrid
             width: parent.width
-            height: 11
+            height: calendarMini.densityLevel === 3 ? 21
+                    : calendarMini.densityLevel === 2 ? 17 : 11
             columns: 7
             columnSpacing: 1
             Repeater {
@@ -149,7 +157,8 @@ Item {
                     height: weekdayGrid.height
                     horizontalAlignment: Text.AlignHCenter
                     verticalAlignment: Text.AlignVCenter
-                    font.pixelSize: 9
+                    font.pixelSize: calendarMini.densityLevel === 3 ? 14
+                                    : calendarMini.densityLevel === 2 ? 12 : 9
                     color: Colors.cyan
                     text: String(modelData)
                 }
@@ -189,8 +198,11 @@ Item {
                         anchors.fill: parent
                         horizontalAlignment: Text.AlignHCenter
                         verticalAlignment: Text.AlignVCenter
-                        // Fit all six week rows without clipping the 140px tile.
-                        font.pixelSize: calendarMini.calendarSnapshot.weeks === 6 ? 9 : 10
+                        // Preserve original compact six-week typography;
+                        // taller layouts spend their extra room on legibility.
+                        font.pixelSize: calendarMini.densityLevel === 3 ? 17
+                                        : calendarMini.densityLevel === 2 ? 13
+                                        : calendarMini.calendarSnapshot.weeks === 6 ? 9 : 10
                         color: dayCell.today ? Colors.black
                                : dayCell.currentMonth ? Colors.white : Colors.cyan
                         opacity: dayCell.today ? 1.0

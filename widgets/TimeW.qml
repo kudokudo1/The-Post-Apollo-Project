@@ -650,7 +650,7 @@ PanelWindow {
     }
 
     // Quickshell v0.2.1's native monotonic elapsed timer; no wall-clock
-    // Date.now() calls, network, or subprocesses for stopwatch measurement.
+    // wall-clock queries, network or subprocesses for stopwatch measurement.
     ElapsedTimer {
         id: stopwatchAnchor
     }

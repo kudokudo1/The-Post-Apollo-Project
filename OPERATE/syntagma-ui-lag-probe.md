@@ -268,3 +268,94 @@ these specific closed-history rebuilds and Network subprocess polls as
 *necessary* causes. Fewer stalls in one session alone do not prove causality;
 compare similar intervals. This does not isolate notification service I/O,
 popup rendering, or shared Qt/QML work outside the filtered history model.
+
+## October 22 // first-stall out-of-process thread sampler
+
+**State:** proposed diagnostic, synthetic tests only; live operator run pending.
+**Ownership:** this script and runbook are independent of actively edited
+`modules/Mediaplayer.qml`; do not change the Media worker's source in this pass.
+
+The earlier opt-in 100ms QML timer cannot run *during* a blocked Qt event
+loop. `scripts/syntagma_quickshell_thread_sampler.py` instead reads
+`/proc/<pid>/task/<tid>/stat` (plus advisory `wchan`) every 250ms from an
+**independent Python process**, writing one JSON record per sample to
+stdout. It can therefore observe Quickshell's thread CPU consumption while
+QML timers are not firing. It measures kernel thread scheduling information,
+**not QML functions, user text, GPU utilization, or stack traces**.
+
+- Default duration: 180 seconds; interval: 250ms. CLI constraints are
+  1–1800 seconds and 100–5000ms per sample.
+- Auto-selects the most recently started same-user process whose comm is
+  `quickshell`. It can be overridden with `--pid` for verified cases.
+- `main.cpuPct` is the process-leader thread's percent of one logical core
+  (100%=one fully occupied logical CPU); `totalCpuPct` sums all read threads.
+- `sampleIntervalMs` helps identify whether *the external sampler* also
+  experienced a scheduling gap; thread `state` and `wchan` are advisory.
+- If Quickshell exits or PID identity changes, the capture stops. It never
+  automatically restarts Quickshell, mutates a source file, runs `qs log
+  --follow`, signals any process, or needs elevated privileges.
+- Does not store track names, notification bodies, network data or argv.
+
+### Operator procedure
+
+Verify the script is present in the actual local checkout after review,
+merge, and pull. If the current Quickshell runtime already has the previous
+`POST_APOLLO_UI_LAG_PROBE=1`, `POST_APOLLO_NETWORK_POLL_PAUSED=1`,
+and `POST_APOLLO_NOTIFICATIONS_HIDDEN_REBUILD_PAUSED=1` flags, preserve
+that runtime. **Do not restart merely to start this external sampler.**
+
+```bash
+qsdir="$(readlink -f ~/.config/quickshell)"
+python3 -B "$qsdir/scripts/syntagma_quickshell_thread_sampler.py" \
+  --duration 180 --interval 0.25 > "$HOME/quickshell-thread-sample.jsonl" &
+echo "SAMPLER_PID=$!"
+```
+
+Use the desktop normally and note the approximate time of any visible
+freeze. The script writes for three minutes and stops on its own. Later,
+capture the corresponding existing Quickshell diagnostics without a
+persistent log-reader process:
+
+```bash
+qs log --tail 3000 > "$HOME/quickshell-first-stall.log"
+```
+
+Share both files for timestamp alignment. The event-loop log `tsMs` and
+sampler JSONL `tsMs` are Unix milliseconds; process CPU percentages are
+computed using actual monotonic elapsed time between samples.
+
+**Interpretation:** near-100% main-thread CPU immediately before or during
+a stall strengthens a QML/main-thread computation hypothesis. A sleeping
+main thread with an active render thread strengthens a different avenue.
+If the independent sampler also has long `sampleIntervalMs`, investigate
+OS scheduling, resource contention, or machine-wide stalls. Neither
+case names the responsible QML function without deeper profiling.
+
+### Media worker coordination // proposed CAVA recovery mitigation
+
+The prior freeze capture with Network and Notifications both paused
+recorded a **33,993ms** delayed event-loop tick and **265 slow CAVA
+callbacks (8.52 seconds total)**, many clustered around recovery.
+These measurements support checking whether buffered CAVA stdout and
+repeated scene updates amplify recovery latency, **not** a claim that CAVA
+caused the initial unresponsive period. The operator had already reproduced
+freezes while CAVA's process was SIGSTOP'ed.
+
+Proposed bounded Media-owned implementation (not changed by this PR):
+
+1. Keep the 20-bar default, PipeWire input, MPD independence, and 15fps
+   output intent. Do not change radio playback or palette/glow ownership.
+2. Make CAVA stdout ingestion cheap and latest-wins: retain only the most
+   recent well-formed raw frame; discard obsolete intermediate visual states.
+3. At most once per visual tick (~67ms), parse/apply the most recent
+   pending frame to `levels`. Prevent queued frame bursts from spawning
+   hundreds of distinct bar/halo updates.
+4. Report **aggregate** accepted/dropped/input counts instead of emitting
+   a synchronous warning per slow frame during recovery.
+5. Use a separate opt-in flag and compare stall time plus recovery time
+   before promoting any behavior change to the default.
+
+**Collision boundary:** the other Media chat owns `modules/Mediaplayer.qml`
+and has been making rapid commits. No Media files or CAVA config were
+modified in this diagnostic branch. Coordinate integration before touching
+the shared `stdout: SplitParser` or `receiveCavaFrame` seam.

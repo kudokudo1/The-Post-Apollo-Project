@@ -11,6 +11,8 @@ on:
       - "widgets/HospitalW.qml"
       - "tests/components/test_syntagma_ui_lag_probe.py"
       - "tests/components/test_syntagma_bg_lag_probe.py"
+      - "tests/components/test_syntagma_quickshell_thread_sampler.py"
+      - "scripts/syntagma_quickshell_thread_sampler.py"
       - "docs/syntagma-ui-lag-probe.md"
       - ".github/workflows/syntagma-ui-lag-probe.yml"
   push:
@@ -24,6 +26,8 @@ on:
       - "widgets/HospitalW.qml"
       - "tests/components/test_syntagma_ui_lag_probe.py"
       - "tests/components/test_syntagma_bg_lag_probe.py"
+      - "tests/components/test_syntagma_quickshell_thread_sampler.py"
+      - "scripts/syntagma_quickshell_thread_sampler.py"
       - ".github/workflows/syntagma-ui-lag-probe.yml"
   workflow_dispatch:
 
@@ -39,3 +43,4 @@ jobs:
         run: |
           python3 tests/components/test_syntagma_ui_lag_probe.py
           python3 tests/components/test_syntagma_bg_lag_probe.py
+          python3 tests/components/test_syntagma_quickshell_thread_sampler.py

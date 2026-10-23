@@ -40,8 +40,10 @@ function utcTime(timeMs) {
 // The meter is NOT an official severity scale.
 function logMeter(flux) {
     const value = numeric(flux);
-    if (value <= 0)
+    if (value <= 1e-9)
         return 0;
+    if (value >= 1e-4)
+        return 1;
     return Math.max(0, Math.min(1, (Math.log(value) / Math.LN10 + 9) / 5));
 }
 

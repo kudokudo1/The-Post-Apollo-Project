@@ -214,3 +214,57 @@ Avoid changing the MPD, CAVA, and Network conditions together: use
 comparable windows before and after, and distinguish a genuinely quiet
 interval from evidence that the issue was fixed. Neither mode changes the
 operator's network configuration.
+
+## October 22 controlled isolation // hidden Notifications history model
+
+**State:** opt-in diagnostic experiment, not an optimization or verified fix.
+
+`POST_APOLLO_NOTIFICATIONS_HIDDEN_REBUILD_PAUSED=1` at Quickshell
+launch prevents the persistent-but-closed Notifications Hub from clearing,
+filtering, sorting, and refilling its 300-entry filtered HISTORY ListModel.
+When the menu opens, it immediately rebuilds that model from the current
+NotificationsService state, then resumes the normal revision-driven updates.
+A queued zero-delay timer that fires *after* closing is also suppressed.
+The default without the flag preserves the original behavior.
+
+The switch does **not** pause NotificationsService, events received from
+browsers/apps, popup delivery, history persistence, other consumers of
+NotificationsService, or the separately updated Manager DND policy model.
+It changes only the hidden window's derived history ListModel. The panel
+remains mapped throughout; do not toggle `visible` to isolate this work.
+
+On startup with the flag, logs show exactly one:
+`SYNTAGMA_BG_PROBE // notifications hidden-history rebuild PAUSED while closed`.
+While the menu remains closed, the prior `notifications rebuild synchronous=`
+entries should disappear. An intentional menu open should refresh history
+to include notifications received while closed. Do not log private content.
+
+For a direct comparison to the preceding **Network-polling-paused** capture,
+leave both isolation flags enabled and keep MPD stopped, CAVA running, and
+the Hi-Fi and Notifications panels closed:
+
+```bash
+qsdir="$(readlink -f ~/.config/quickshell)"
+POST_APOLLO_UI_LAG_PROBE=1 \
+POST_APOLLO_NETWORK_POLL_PAUSED=1 \
+POST_APOLLO_NOTIFICATIONS_HIDDEN_REBUILD_PAUSED=1 \
+  bash "$qsdir/scripts/restart_quickshell_safe.sh" "$qsdir"
+```
+
+Save temporary UI state first. After a measured interval, snapshot with
+`qs log --tail 3000 > "$HOME/notifications-hidden-pause-test.log"`.
+Unlike `qs log --follow`, this does not leave a log reader running.
+
+To restore the Network-only test condition while retaining the lag probe:
+
+```bash
+POST_APOLLO_UI_LAG_PROBE=1 \
+POST_APOLLO_NETWORK_POLL_PAUSED=1 \
+  bash "$qsdir/scripts/restart_quickshell_safe.sh" "$qsdir"
+```
+
+**Interpretation:** long event-loop stalls despite both pauses rule out
+these specific closed-history rebuilds and Network subprocess polls as
+*necessary* causes. Fewer stalls in one session alone do not prove causality;
+compare similar intervals. This does not isolate notification service I/O,
+popup rendering, or shared Qt/QML work outside the filtered history model.

@@ -900,6 +900,7 @@ assert "ApolloHubCalendarMini {" in tile
 assert 'visible: tile.moduleId === "calendar"' in tile
 assert "calendarSnapshot: tile.calendarSnapshot" in tile
 assert "calendarBridge: tile.calendarBridge" in tile
+assert "todoSnapshot: tile.todoSnapshot" in tile
 assert 'tile.moduleId !== "calendar"' in tile
 assert "calendarMini.statusLine" in tile
 
@@ -1083,6 +1084,42 @@ for token in (
     'columns: 3',
 ):
     assert token in uptime_mini, f"Stage 7D Uptime layout missing {token}"
+
+
+# Level 2 Hub Calendar agenda reuses TASKS policy and the single
+# TodoStore snapshot. It is not an event feed or another task writer.
+for needle in (
+    'import "../tasks/TaskPlannerPolicy.js" as Planner',
+    'property var todoSnapshot: null',
+    'property string selectedView: "month"',
+    'property string selectedTaskDate: ""',
+    'Planner.view(',
+    'todoSnapshot, taskMonthKey, taskFocusDateKey, taskTodayKey',
+    'densityLevel >= 2 && selectedView === "agenda"',
+    'id: viewSelector',
+    'visible: calendarMini.densityLevel >= 2',
+    'label: "MONTH"',
+    'label: "AGENDA"',
+    'available: calendarMini.calendarReady && calendarMini.taskView.available',
+    'function selectTaskDate(dateKey)',
+    'selectedTaskDate = dateKey;',
+    'TapHandler {',
+    'onTapped: calendarMini.selectTaskDate(dayCell.modelData.date)',
+    'calendarMini.remainingTasksOn(',
+    'id: agendaPane',
+    'model: calendarMini.agendaEntries',
+    '"TASKS // LOCAL DUE DATES // READ ONLY"',
+    '"NO TASKS DUE ON SELECTED DATE"',
+    'parent.modelData.done',
+):
+    assert needle in calendar_mini, f"Level 2 agenda missing {needle}"
+for forbidden in (
+    'ApolloHubTodoStore {', 'FileView {', 'Process {',
+    'Timer {', 'Date.now(', 'new Date(', 'Qt.openUrlExternally(',
+    'addTask(', 'removeTask(', 'updateTask(', 'setDone(',
+):
+    assert forbidden not in calendar_mini, (
+        f"Level 2 agenda cannot collect or write: {forbidden}")
 
 # Launchers and widget backends are unchanged in this first stage.
 print("ApolloHubW foundation source contracts passed")

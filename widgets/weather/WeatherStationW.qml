@@ -23,6 +23,23 @@ PanelWindow {
     property bool relationshipFocused: false
 
     property string currentView: "home"
+
+    // The SAME geometry drives the layer-shell input mask and the actual
+    // transparent visual opening. Sway owns Kitty's global positioning.
+    readonly property real terminalHoleX: modeRail.width + terminalView.bayX
+    readonly property real terminalHoleY: header.height + terminalView.bayY
+    readonly property real terminalHoleWidth: terminalView.bayWidth
+    readonly property real terminalHoleHeight: terminalView.bayHeight
+    readonly property bool terminalHoleValid:
+        terminalHoleX >= 0 && terminalHoleY >= 0
+        && terminalHoleWidth > 0 && terminalHoleHeight > 0
+        && terminalHoleX + terminalHoleWidth <= stationBackground.width
+        && terminalHoleY + terminalHoleHeight <= stationBackground.height
+    readonly property bool terminalHoleActive:
+        menuOpen && currentView === "terminal"
+        && terminalView.terminalState === "VISIBLE"
+        && terminalHoleValid
+
     // A keyboard cursor previews rail controls; Enter activates it.
     property int navigationIndex: 0
     readonly property bool standardKeysAvailable:
@@ -322,13 +339,15 @@ PanelWindow {
         height: weatherStation.menuOpen ? 700 : 0
 
         Region {
-            x: modeRail.width + terminalView.bayX
+            x: weatherStation.terminalHoleX
 
-            y: header.height + terminalView.bayY
+            y: weatherStation.terminalHoleY
 
-            width: weatherStation.menuOpen && weatherStation.currentView === "terminal" && terminalView.terminalState === "VISIBLE" ? terminalView.bayWidth : 0
+            width: weatherStation.terminalHoleActive
+                   ? weatherStation.terminalHoleWidth : 0
 
-            height: weatherStation.menuOpen && weatherStation.currentView === "terminal" && terminalView.terminalState === "VISIBLE" ? terminalView.bayHeight : 0
+            height: weatherStation.terminalHoleActive
+                    ? weatherStation.terminalHoleHeight : 0
 
             intersection: Intersection.Subtract
         }
@@ -494,7 +513,10 @@ PanelWindow {
 
         visible: weatherStation.menuOpen
 
-        fillVisible: true
+        // Full chassis fill would obscure Kitty through the overlay layer.
+        // When the terminal is positioned, four strips paint everywhere
+        // EXCEPT the terminal viewport. No cutout while launch is pending.
+        fillVisible: !weatherStation.terminalHoleActive
         fillColor: Colors.black
         fillOpacity: 0.96
         borderVisible: true
@@ -510,6 +532,18 @@ PanelWindow {
         wideGlowSpread: 14
         wideGlowOpacity: relationshipFocusModeActive
                          ? (relationshipFocused ? 0.20 : 0.02) : 0.10
+
+        StationChassisCutout {
+            id: terminalChassisCutout
+            anchors.fill: parent
+            visible: weatherStation.terminalHoleActive
+            holeX: weatherStation.terminalHoleX
+            holeY: weatherStation.terminalHoleY
+            holeWidth: weatherStation.terminalHoleWidth
+            holeHeight: weatherStation.terminalHoleHeight
+            panelColor: Colors.black
+            panelOpacity: 0.96
+        }
 
         // ─────────────────────────────────────────
         // HEADER

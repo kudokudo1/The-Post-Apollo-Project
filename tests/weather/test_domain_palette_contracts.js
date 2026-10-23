@@ -24,6 +24,30 @@ const dividerSource = read("widgets/weather/StationSectionDivider.qml");
 const weatherServiceSource = read("services/weather/WeatherService.qml");
 const spaceServiceSource = read("services/weather/SpaceService.qml");
 
+const discoveryViewSource = read("widgets/weather/StationDiscovery.qml");
+const discoveryServiceSource = read("services/weather/StationDiscoveryService.qml");
+for (const [id, domain] of [
+    ["mapViewComponent", "map"],
+    ["newsViewComponent", "news"],
+    ["radioViewComponent", "radio"]
+]) {
+    assert.match(windowSource, new RegExp("id: " + id
+        + "[\\s\\S]*?StationDiscovery\\s*\\{\\s*domain: \\"" + domain + "\\""));
+}
+assert.match(windowSource, /weatherStation\.currentView === "map"[\s\S]*?\? mapViewComponent/);
+assert.match(windowSource, /weatherStation\.currentView === "news"[\s\S]*?\? newsViewComponent/);
+assert.match(windowSource, /weatherStation\.currentView === "radio"[\s\S]*?\? radioViewComponent/);
+assert.match(discoveryViewSource, /SOURCE RACK \/\/ WHAT IS CONNECTED/);
+assert.match(discoveryViewSource, /STATION DIRECTORY \/\/ PERSISTENT PLAYBACK NOT YET WIRED/);
+assert.match(discoveryViewSource, /SPATIAL MAP CANVAS NOT YET WIRED/);
+assert.match(discoveryViewSource, /WeatherServices\.StationDiscoveryService/);
+assert.match(discoveryServiceSource, /eonet\.gsfc\.nasa\.gov\/api\/v3\/events/);
+assert.match(discoveryServiceSource, /gdeltproject\.org\/api\/v2\/doc\/doc/);
+assert.match(discoveryServiceSource, /de1\.api\.radio-browser\.info\/json\/stations\/topvote/);
+assert.match(discoveryServiceSource, /interval:\s*900000/);
+assert.match(discoveryServiceSource, /running:\s*discovery\.active/);
+
+
 const mainHeaderStart = windowSource.indexOf("id: header");
 const mainHeaderEnd = windowSource.indexOf("// NAVIGATION", mainHeaderStart);
 assert.ok(mainHeaderStart >= 0 && mainHeaderEnd > mainHeaderStart);

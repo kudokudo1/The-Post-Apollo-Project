@@ -490,77 +490,88 @@ PanelWindow {
     // TOOLS subview selection is local and does not affect the other modes.
     property string toolsView: "stopwatch"
 
-    // One session-local countdown. Time fields lock after START until RESET.
-    // Monotonic measurement continues with the menu closed, with a low-rate
-    // heartbeat to detect completion and set a visible FINISHED status.
-    property string countdownHours: "0"
-    property string countdownMinutes: "5"
-    property string countdownSeconds: "0"
-    readonly property var countdownParsed:
-        CountdownPolicy.parseDuration(countdownHours,
-                                      countdownMinutes, countdownSeconds)
-    property bool countdownRunning: false
-    property bool countdownStarted: false
-    property bool countdownFinished: false
-    property string countdownError: ""
-    property real countdownTotalMs: 0
-    property real countdownRemainingMs: 0
-    property real countdownSegmentBudgetMs: 0
+    // COUNTDOWN // up to eight independent, named session-local timers.
+    // One monotonic ElapsedTimer supplies timestamps for all records.
+    // Their immutable collection survives closing the TimeW surface, but
+    // intentionally does not survive restarting Quickshell.
+    property var countdownTimers: [CountdownPolicy.createTimer(1)]
+    property int countdownNextId: 2
+    property int selectedCountdownId: 1
+    readonly property var selectedCountdown:
+        CountdownPolicy.byId(countdownTimers, selectedCountdownId)
+    readonly property int countdownRunningCount:
+        CountdownPolicy.runningCount(countdownTimers)
 
-    function refreshCountdown() {
-        if (!countdownRunning)
+    function countdownNowMs() {
+        return countdownAnchor.elapsed() * 1000;
+    }
+
+    function refreshCountdowns() {
+        countdownTimers = CountdownPolicy.tick(countdownTimers, countdownNowMs());
+    }
+
+    function selectCountdown(id) {
+        if (!CountdownPolicy.byId(countdownTimers, id))
             return;
-        const left = CountdownPolicy.remaining(
-                         countdownSegmentBudgetMs,
-                         countdownAnchor.elapsed() * 1000);
-        countdownRemainingMs = left;
-        if (left <= 0) {
-            countdownRunning = false;
-            countdownFinished = true;
+        selectedCountdownId = id;
+    }
+
+    function createCountdown() {
+        if (countdownTimers.length >= CountdownPolicy.MAX_TIMERS)
+            return;
+        const newTimer = CountdownPolicy.createTimer(countdownNextId);
+        if (!newTimer) return;
+        countdownTimers = countdownTimers.concat([newTimer]);
+        selectedCountdownId = countdownNextId;
+        countdownNextId += 1;
+    }
+
+    function editCountdown(field, value) {
+        const timer = selectedCountdown;
+        if (!timer) return;
+        if (field === "name") {
+            if (typeof value !== "string" || value.length > CountdownPolicy.MAX_NAME_LENGTH)
+                return;
+        } else {
+            if ((field !== "hours" && field !== "minutes" && field !== "seconds")
+                    || timer.status !== "ready")
+                return;
         }
+        const patch = {};
+        patch[field] = value;
+        patch.error = "";
+        countdownTimers = CountdownPolicy.update(countdownTimers, timer.id, patch);
     }
 
     function startCountdown() {
-        if (countdownRunning)
-            return;
-        if (countdownStarted && !countdownFinished) {
-            // Resume the paused, fixed remaining duration.
-            countdownSegmentBudgetMs = countdownRemainingMs;
-        } else {
-            if (!countdownParsed.valid) {
-                countdownError = countdownParsed.error;
-                return;
-            }
-            countdownTotalMs = countdownParsed.milliseconds;
-            countdownRemainingMs = countdownTotalMs;
-            countdownSegmentBudgetMs = countdownTotalMs;
-            countdownStarted = true;
-            countdownFinished = false;
-        }
-        countdownError = "";
-        countdownAnchor.restart();
-        countdownRunning = true;
-        refreshCountdown();
+        const timer = selectedCountdown;
+        if (!timer) return;
+        countdownTimers = CountdownPolicy.act(
+                              countdownTimers, timer.id, "start", countdownNowMs());
     }
 
     function pauseCountdown() {
-        if (!countdownRunning)
-            return;
-        refreshCountdown();
-        if (countdownFinished)
-            return;
-        countdownRunning = false;
-        countdownSegmentBudgetMs = countdownRemainingMs;
+        const timer = selectedCountdown;
+        if (!timer) return;
+        countdownTimers = CountdownPolicy.act(
+                              countdownTimers, timer.id, "pause", countdownNowMs());
     }
 
     function resetCountdown() {
-        countdownRunning = false;
-        countdownStarted = false;
-        countdownFinished = false;
-        countdownError = "";
-        countdownTotalMs = 0;
-        countdownSegmentBudgetMs = 0;
-        countdownRemainingMs = 0;
+        const timer = selectedCountdown;
+        if (!timer) return;
+        countdownTimers = CountdownPolicy.act(
+                              countdownTimers, timer.id, "reset", countdownNowMs());
+    }
+
+    function removeCountdown() {
+        if (countdownTimers.length <= 1) return;
+        const timer = selectedCountdown;
+        if (!timer) return;
+        countdownTimers = countdownTimers.filter(function(entry) {
+            return entry.id !== timer.id;
+        });
+        selectedCountdownId = countdownTimers[0].id;
     }
 
     // TOOLS / STOPWATCH. Monotonic measurement continues while the window
@@ -664,7 +675,7 @@ PanelWindow {
             Qt.callLater(restoreKeyboardFocus);
             if (selectedMode === "tools") {
                 refreshStopwatch();
-                refreshCountdown();
+                refreshCountdowns();
             }
             if (selectedMode === "clock")
                 Qt.callLater(refreshWorldClock);
@@ -679,7 +690,7 @@ PanelWindow {
             closeConverterDropdowns();
         if (menuOpen && selectedMode === "tools") {
             refreshStopwatch();
-            refreshCountdown();
+            refreshCountdowns();
         }
         if (menuOpen && selectedMode === "clock")
             Qt.callLater(refreshWorldClock);
@@ -738,6 +749,7 @@ PanelWindow {
 
     ElapsedTimer {
         id: countdownAnchor
+        Component.onCompleted: restart()
     }
 
     // Difference comparisons are also one-shot. Existing inputs are kept
@@ -923,8 +935,8 @@ PanelWindow {
         interval: timew.menuOpen && timew.selectedMode === "tools"
                   && timew.toolsView === "countdown" ? 100 : 1000
         repeat: true
-        running: timew.countdownRunning
-        onTriggered: timew.refreshCountdown()
+        running: timew.countdownRunningCount > 0
+        onTriggered: timew.refreshCountdowns()
     }
 
     Item {
@@ -2526,7 +2538,7 @@ PanelWindow {
                             selected: timew.toolsView === "countdown"
                             onTriggered: {
                                 timew.toolsView = "countdown";
-                                timew.refreshCountdown();
+                                timew.refreshCountdowns();
                             }
                         }
                     }

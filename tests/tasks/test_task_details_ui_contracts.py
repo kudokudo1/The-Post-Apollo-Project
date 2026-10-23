@@ -17,7 +17,10 @@ assert "onTaskSelected: function(taskId)" in TASKS
 assert "taskDetails.chooseTask(taskId)" in TASKS
 assert TASKS.count("todoStore: ApolloHubTodoStore") == 3
 # The two M4 editors still share one store; M5 adds a read-only TODAY consumer.
-assert TASKS.count("todoSnapshot: ApolloHubTodoStore.snapshot") == 4
+# M8 SYNC is the fifth read-only projection; only the three editors can write.
+assert TASKS.count("todoSnapshot: ApolloHubTodoStore.snapshot") == 5
+assert TASKS.count("todoStore: ApolloHubTodoStore") == 3
+assert TASKS.count("TaskSyncPreviewPane {") == 1
 assert TASKS.count("todoStore: ApolloHubTodoStore") == 3
 assert "TaskTodayPane {" in TASKS
 assert "todoStore: ApolloHubTodoStore" in HUB

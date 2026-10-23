@@ -19,6 +19,10 @@ on:
       - "tests/finance/test_finance_income_preview_contracts.py"
       - "widgets/FinanceIncomeCategorizationPane.qml"
       - "widgets/FinanceFundingSetupPane.qml"
+      - "widgets/FinanceBudgetGrid.qml"
+      - "widgets/FinanceQuickAddPane.qml"
+      - "tests/finance/test_finance_compact_grid_contracts.py"
+      - "services/finance/FinanceSpreadsheetPolicy.js"
       - "widgets/FinanceDateInput.qml"
       - "widgets/FinanceMoneyInput.qml"
       - "tests/finance/test_finance_input_controls_contracts.py"
@@ -48,6 +52,10 @@ on:
       - "tests/finance/test_finance_income_preview_contracts.py"
       - "widgets/FinanceIncomeCategorizationPane.qml"
       - "widgets/FinanceFundingSetupPane.qml"
+      - "widgets/FinanceBudgetGrid.qml"
+      - "widgets/FinanceQuickAddPane.qml"
+      - "tests/finance/test_finance_compact_grid_contracts.py"
+      - "services/finance/FinanceSpreadsheetPolicy.js"
       - "widgets/FinanceDateInput.qml"
       - "widgets/FinanceMoneyInput.qml"
       - "tests/finance/test_finance_input_controls_contracts.py"
@@ -95,5 +103,7 @@ jobs:
         run: python3 tests/finance/test_finance_funding_setup_contracts.py
       - name: Verify D17d staged guarded income confirmation UI
         run: python3 tests/finance/test_finance_funding_write_ui_contracts.py
+      - name: Verify FinanceW compact spreadsheet budget and add money
+        run: python3 tests/finance/test_finance_compact_grid_contracts.py
       - name: Verify shared FinanceW numeric and calendar input controls
         run: python3 tests/finance/test_finance_input_controls_contracts.py

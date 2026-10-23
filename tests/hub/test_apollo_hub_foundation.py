@@ -432,7 +432,24 @@ assert 'sequence: "Ctrl+Left"' not in window
 assert 'sequence: "Ctrl+Right"' not in window
 assert "function cycleMainMode(direction)" in window
 assert "function cycleTopSubMode(direction)" in window
-assert "function moveNavigationCursor(delta)" in window
+assert "function moveNavigationCursor(direction)" in window
+assert "Layout.navigationTarget(tileGrid, selectedTileIndex," in window
+assert "const card = tileRepeater.itemAt(next);" in window
+assert "tileScroll.contentHeight - tileScroll.height" in window
+assert "tileScroll.contentY = Math.max(0, card.y - margin);" in window
+assert "tileScroll.contentY = Math.min(maxScroll," in window
+assert "selectedTileIndex + delta" not in window
+for direction in ("left", "right", "up", "down"):
+    assert window.count('hub.moveNavigationCursor("' + direction + '")') == 2
+for token in (
+    'function navigationTarget(grid, selectedIndex, direction)',
+    'source.column+source.columnSpan',
+    'source.row+source.rowSpan',
+    'candidate.column+candidate.columnSpan',
+    'candidate.row+candidate.rowSpan',
+    'if (primary<0)',
+):
+    assert token in layout, f"Missing pure spatial navigation helper: {token}"
 assert "function activateNavigationCursor()" in window
 assert "Keys.onShortcutOverride" in window
 assert "Keys.onPressed" in window

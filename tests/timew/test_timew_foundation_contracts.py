@@ -721,7 +721,9 @@ assert 'function utcStamp(nowMs)' in machine_policy
 assert window.count("SystemClock {") == 1
 assert window.count("ElapsedTimer {") == 3
 assert window.count("\n    Timer {") == 3
-assert window.count("Process {") == 7
+# One additional on-demand read-only Process belongs to MACHINE Capture Preview.
+assert window.count("Process {") == 8
+assert "id: machineCaptureProcess" in window
 
 # Universal visual language remains: magenta header, cyan divider, borderless modes.
 assert 'text: "TIME // W"' in window

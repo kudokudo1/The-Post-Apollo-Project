@@ -36,6 +36,19 @@ assert '"JOURNAL NOT RECORDED // Git subprocess "' in finalize
 assert 'actionExitCode = 1;' in finalize.split('if (!journalRecorded)', 1)[1], (
     "the UI must warn even if Git itself succeeded"
 )
+# The timing line is diagnostic only. It must not turn into an apparent
+# Git completion message or move the durable-before-unlock boundary.
+assert 'function journalProfileLine(stage, snapshotCloneMs)' in service
+assert '"JOURNAL PROFILE // "' in service
+assert 'value.indexOf("JOURNAL PROFILE //") === 0' in service
+before = service.split('if (gitService.snapshotPhase === "BEFORE")', 1)[1].split(
+    'if (gitService.snapshotPhase === "AFTER")', 1
+)[0]
+assert 'const snapshotCloneMs = Date.now() - journalStartedMs;' in before
+assert 'gitService.journalProfileLine(' in before
+assert 'journalProfileLine(' in finalize
+assert 'const snapshotCloneMs = Date.now() - finalizationStarted;' in finalize
+
 local_actions = widget.split('label: "FETCH"', 1)[1].split('label: "STATUS"', 1)[0]
 fetch = local_actions.split('label: "FETCH"', 1)[-1].split('onTriggered: gitService.runSyncAction("fetch")', 1)[0]
 pull = local_actions.split('gitService.runSyncAction("pull");', 1)[0]

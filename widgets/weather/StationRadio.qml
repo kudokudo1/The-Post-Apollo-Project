@@ -52,6 +52,18 @@ Rectangle {
         pollingInterval: 6000
     }
 
+    // Directory tags are community-supplied, not editorial certification.
+    function broadcastTag(item) {
+        const tags = String(item && (item.genre || item.album) || "").toLowerCase();
+        if (/(^|[,\s])(news|current affairs)([,\s]|$)/.test(tags))
+            return "NEWS";
+        if (/(^|[,\s])(talk|politics)([,\s]|$)/.test(tags))
+            return "TALK";
+        if (/(^|[,\s])(weather)([,\s]|$)/.test(tags))
+            return "WX";
+        return "";
+    }
+
     function search(query, cursor) {
         if (!canOperate)
             return false;
@@ -323,7 +335,7 @@ Rectangle {
                         }
 
                         Column {
-                            width: Math.max(80, parent.width - 200)
+                            width: Math.max(80, parent.width - 258)
                             anchors.verticalCenter: parent.verticalCenter
                             spacing: 5
 
@@ -342,6 +354,15 @@ Rectangle {
                                 elide: Text.ElideRight
                                 font.pixelSize: 10
                             }
+                        }
+
+                        GohuText {
+                            width: 52
+                            anchors.verticalCenter: parent.verticalCenter
+                            visible: stationRadio.broadcastTag(modelData) !== ""
+                            text: stationRadio.broadcastTag(modelData)
+                            font.pixelSize: 10
+                            color: Colors.magenta
                         }
 
                         GohuText {

@@ -75,7 +75,10 @@ Item {
     readonly property bool mpdOnline: playbackState !== "offline"
     readonly property bool mpdPlaying: playbackState === "playing"
 
-    readonly property color accentColor: mpdPlaying ? Colors.orange : Colors.cyan
+    // Both the note image and the shared Media glow accent follow the CAVA
+    // playback palette: MPD playing = cool cyan; idle = warm orange.
+    // The canonical open-state highlight remains magenta.
+    readonly property color accentColor: mpdPlaying ? Colors.cyan : Colors.orange
     // Appearance-only open priority: opening the deck magenta-energizes all
     // stars, clef, CAVA cores, individual halos and CAVA ambient light.
     // Keep accentColor tied to playback for normal/closed presentation.
@@ -302,8 +305,8 @@ Item {
                 source: mediaDock.open
                     ? Qt.resolvedUrl("../assets/media/treble-clef.png")
                     : mediaDock.mpdPlaying
-                      ? Qt.resolvedUrl("../assets/media/treble-clef-orange.png")
-                      : Qt.resolvedUrl("../assets/media/treble-clef-cyan.png")
+                      ? Qt.resolvedUrl("../assets/media/treble-clef-cyan.png")
+                      : Qt.resolvedUrl("../assets/media/treble-clef-orange.png")
                 sourceSize: Qt.size(45, 102)
                 fillMode: Image.PreserveAspectFit
                 smooth: true

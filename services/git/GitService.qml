@@ -1463,7 +1463,7 @@ Scope {
                 const gitMs = syncCommandFinishedMs - syncCommandStartedMs;
                 const finalizeMs = pipelineRefreshStartedMs - syncCommandFinishedMs;
                 const refreshMs = end - pipelineRefreshStartedMs;
-                actionOutput += "\\nSYNC TIMELINE // prepare " + prepareMs
+                actionOutput += "\nSYNC TIMELINE // prepare " + prepareMs
                     + " ms // git " + gitMs
                     + " ms // finalize " + finalizeMs
                     + " ms // refresh " + refreshMs

@@ -65,7 +65,7 @@ test("no write rehearsal can run without GitHub disposable CI guard",async()=>{
 });
 test("existing-account opening balance is refused without bank reconciliation",()=>{
  assert.throws(()=>validateRehearsalPlan({
-  mode:"existing-account-opening",...income
+  ...income,mode:"existing-account-opening"
  }),/existing-opening-requires-bank-reconciliation/);
 });
 test("strict command and date/amount/category validation",()=>{

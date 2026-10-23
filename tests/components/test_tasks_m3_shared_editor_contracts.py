@@ -26,7 +26,7 @@ assert 'visible: root.activeMode.id !== "tasks"' in MENU
 # clears pointer capture and disables keyboard capture.
 assert 'root.menuOpen && root.activeMode.id === "tasks"' in MENU
 assert "WlrKeyboardFocus.OnDemand : WlrKeyboardFocus.None" in MENU
-assert 'focusable: root.menuOpen && root.activeMode.id === "tasks"' in MENU
+assert 'focusable: root.menuOpen && (root.activeMode.id === "tasks"' in MENU
 assert "width: root.menuOpen ? root.frameWidth : 0" in MENU
 assert "height: root.menuOpen ? root.frameHeight : 0" in MENU
 assert "onLeftClicked: root.menuOpen = false" in MENU

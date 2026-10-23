@@ -152,6 +152,10 @@ function createLedger(verifyFromTrustedAdapter, isLiveEvent) {
         } catch (_) {
             return "untrusted-binding";
         }
+        // A pass-through verifier must never turn its caller's self-asserted
+        // "attested" object into an authoritative mailbox binding.
+        if (!verified || verified === proposal)
+            return "untrusted-binding";
         const candidate = normalized(verified, nowMs);
         if (!candidate)
             return "untrusted-binding";

@@ -759,7 +759,9 @@ Rectangle {
                         width: parent.width
                         wrapMode: Text.WordWrap
                         text: flareService.failed
-                              ? "REQUEST FAILED // SAVED EVENTS"
+                              ? (flareService.ready
+                                 ? "REQUEST FAILED // SAVED EVENTS"
+                                 : "REQUEST FAILED // NO DATA")
                               : flareService.loading && !flareService.ready
                                 ? "RECEIVING"
                                 : flareService.ready ? "EVENTS RECEIVED"

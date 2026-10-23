@@ -200,6 +200,46 @@ reports `toolbarReadEnabled`, `toolbarReadDisabled`,
 test only; the six Notifications MAIL buttons remain disabled. Do not use
 the presence of `toolbar:read` to modify a saved notification's message.
 
+## Source-backed selected-row structural probe (2026-10-22)
+
+Live Brave V3 evidence after operator-selected Proton mail: three repeated
+`toolbarReadEnabled=1`, `toolbarUnreadEnabled=0` observations. The
+`checkedControls=3` count also included unrelated page checkboxes, and
+**must not be treated as the number of selected emails**.
+
+Additional source inspection of the public ProtonMail/WebClients code found:
+- `applications/mail/src/app/components/list/Item.tsx` adds
+  `data-element-id={element.ID}` to the containing mail-list row.
+- `packages/components/containers/items/ItemCheckbox.tsx` sets
+  `data-testid="item-checkbox"` and `data-item-id={ID}` on each row
+  checkbox. This ID can refer to a **conversation** in conversation mode,
+  not necessarily one message.
+
+`PROTON_READINESS_V4` adds two safe observations after an explicit click on
+the companion in a `https://mail.proton.me` tab:
+
+- `selectedMailRows` counts checked native list checkboxes that carry the
+  expected literal `item-checkbox` test ID (bounded to 20).
+- `selectedRowStructureOk` is true only when there is exactly one checked
+  mail-list checkbox and its private `data-item-id` equals its owning row's
+  private `data-element-id`. Both ID values are only **compared inside the
+  page** and never sent to the background, native host, terminal, history,
+  Quickshell or operator output.
+
+The count does not establish message identity, account ownership, notification
+correlation or authorization for MAIL actions. `identity NOT verified` stays
+mandatory. If a deployed Proton version changes this DOM structure, the
+structural check fails closed.
+
+Sources:
+- https://github.com/ProtonMail/WebClients/blob/main/applications/mail/src/app/components/list/Item.tsx
+- https://github.com/ProtonMail/WebClients/blob/main/packages/components/containers/items/ItemCheckbox.tsx
+
+After review/merge, pull and reload the unpacked browser companion in
+`brave://extensions`, select one unread mail row, click the extension icon,
+and compare only `selectedMailRows` and `selectedRowStructureOk`.
+A disconnected native host remains expected.
+
 ## Authoritative external references
 
 - Proton Bridge Linux paid requirement: https://proton.me/support/bridge-for-linux

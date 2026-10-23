@@ -30,6 +30,50 @@ function moveMonth(monthKey, delta) {
     if (index < 0 || index >= 9999*12) return monthKey;
     return key(Math.floor(index/12)+1, index%12+1, 1);
 }
+// M4: civil-day navigation and a seven-day read-only task projection.
+function moveDay(dateKey, delta) {
+    var p=parse(dateKey);
+    if (!p || !Number.isInteger(delta)) return dateKey;
+    var d=civilDate(p.year,p.month,p.day);
+    d.setUTCDate(d.getUTCDate()+delta);
+    var y=d.getUTCFullYear();
+    if (y < 1 || y > 9999) return dateKey;
+    return key(y,d.getUTCMonth()+1,d.getUTCDate());
+}
+function weekDays(snapshot, selectedKey, todayKey) {
+    var p=parse(selectedKey);
+    if (!p || !snapshot || !Array.isArray(snapshot.items)
+        || (snapshot.state!=="ready" && snapshot.state!=="empty"
+            && snapshot.state!=="saving")) return [];
+    var counts={};
+    snapshot.items.forEach(function(t) {
+        if (!t || typeof t.id!=="string" || typeof t.title!=="string"
+            || typeof t.done!=="boolean") return;
+        var due=parse(t.dueDate);
+        if (!due) return;
+        var k=key(due.year,due.month,due.day);
+        if (!counts[k]) counts[k]={total:0,remaining:0};
+        counts[k].total++;
+        if (!t.done) counts[k].remaining++;
+    });
+    var first=civilDate(p.year,p.month,p.day);
+    first.setUTCDate(first.getUTCDate()-((first.getUTCDay()+6)%7));
+    var names=["MO","TU","WE","TH","FR","SA","SU"];
+    var days=[];
+    for (var i=0;i<7;i++) {
+        var d=civilDate(first.getUTCFullYear(),first.getUTCMonth()+1,first.getUTCDate());
+        d.setUTCDate(d.getUTCDate()+i);
+        var y=d.getUTCFullYear();
+        var date=y>=1 && y<=9999
+            ? key(y,d.getUTCMonth()+1,d.getUTCDate()) : "";
+        var count=counts[date] || {total:0,remaining:0};
+        days.push({weekday:names[i],date:date,day:date ? d.getUTCDate() : "",
+            total:count.total,remaining:count.remaining,
+            selected:date!=="" && date===selectedKey,
+            today:date!=="" && date===todayKey});
+    }
+    return days;
+}
 function view(snapshot, monthKey, selectedKey, todayKey) {
     var m=parse(monthKey), selected=parse(selectedKey), today=parse(todayKey);
     var state=snapshot && snapshot.state ? String(snapshot.state) : "unavailable";

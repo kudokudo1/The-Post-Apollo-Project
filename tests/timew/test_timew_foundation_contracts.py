@@ -352,7 +352,8 @@ assert 'expanded: timew.activeConverterDropdown === "target"' in window
 assert 'onZoneChosen: function(zoneId)' in window
 assert 'timew.chooseConverterSearchZone("source", zoneId)' in window
 assert 'timew.chooseConverterSearchZone("target", zoneId)' in window
-assert window.count('label: "CHANGE"') == 2
+# Two CONVERT CHANGE buttons + MATH source-zone quick-cycle button.
+assert window.count('label: "CHANGE"') == 3
 assert 'onLeftClicked: timew.cycleConverterZone("source")' in window
 assert 'onLeftClicked: timew.cycleConverterZone("target")' in window
 assert 'converterSourcePicker.searchFocused' in window

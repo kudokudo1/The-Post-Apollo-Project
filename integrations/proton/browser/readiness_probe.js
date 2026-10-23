@@ -1,41 +1,68 @@
 "use strict";
 
-// Executed ONLY after a click on the companion icon in an exact Proton-origin
-// tab, using activeTab + scripting. This is a PAGE-SHAPE PROBE, not mailbox
-// authentication or message identity. No mailbox operation is performed.
-//
-// Read only ARIA/title attributes of button-like controls. Never copy page
-// contents, subject, addresses, URLs, message IDs, tokens or form fields.
+// Runs only following an explicit companion click on the exact Proton origin.
+// Read-only count telemetry: never export DOM, labels, subjects, addresses,
+// message IDs, URLs, session data or credentials. No action is dispatched.
 (() => {
   const empty = {
-    kind: "PROTON_READINESS_V1",
+    kind: "PROTON_READINESS_V2",
     originOk: false,
-    markReadCandidates: 0,
+    inspectedControls: 0,
+    scanTruncated: false,
+    exactReadEnabled: 0,
+    exactReadDisabled: 0,
+    otherReadLabels: 0,
+    unlabeledControls: 0,
+    checkedControls: 0,
     messageIdentityVerified: false,
     canMutate: false
   };
   if (location.origin !== "https://mail.proton.me")
     return empty;
 
-  let count = 0;
   const buttons = document.querySelectorAll("button, [role='button']");
-  for (let i = 0; i < buttons.length && i < 500; i++) {
+  const count = Math.min(500, buttons.length);
+  let enabled = 0, disabled = 0, other = 0, unlabeled = 0;
+  function normalize(value) {
+    return (typeof value === "string" ? value : "")
+      .trim().toLowerCase().replace(/\s+/g, " ");
+  }
+  for (let i = 0; i < count; ++i) {
     const element = buttons[i];
     if (!element || typeof element.getAttribute !== "function")
       continue;
-    const aria = element.getAttribute("aria-label") || "";
-    const title = element.getAttribute("title") || "";
-    if ((aria === "Mark as read" || title === "Mark as read")
-        && !element.disabled && element.getAttribute("aria-disabled") !== "true")
-      count++;
-    // Result is intentionally capped, and never identifies a clicked button.
-    if (count >= 2)
-      break;
+    const aria = normalize(element.getAttribute("aria-label"));
+    const title = normalize(element.getAttribute("title"));
+    if (!aria && !title)
+      unlabeled++;
+    const isExactRead = aria === "mark as read" || title === "mark as read";
+    if (isExactRead) {
+      if (element.disabled || element.getAttribute("aria-disabled") === "true")
+        disabled++;
+      else
+        enabled++;
+    } else if (/\bmark\s+(?:as\s+)?(?:un)?read\b/.test(aria)
+               || /\bmark\s+(?:as\s+)?(?:un)?read\b/.test(title)) {
+      // Counts potentially relevant English labels without exposing them.
+      other++;
+    }
   }
+  // Checked controls are only an observation, NOT proof that an email is
+  // selected. A page may have unrelated checkboxes or custom row widgets.
+  const checked = document.querySelectorAll(
+    "input[type='checkbox']:checked, [role='checkbox'][aria-checked='true']"
+  ).length;
+
   return {
-    kind: "PROTON_READINESS_V1",
+    kind: "PROTON_READINESS_V2",
     originOk: true,
-    markReadCandidates: Math.min(2, count),
+    inspectedControls: count,
+    scanTruncated: buttons.length > 500,
+    exactReadEnabled: Math.min(500, enabled),
+    exactReadDisabled: Math.min(500, disabled),
+    otherReadLabels: Math.min(500, other),
+    unlabeledControls: Math.min(500, unlabeled),
+    checkedControls: Math.min(20, checked),
     messageIdentityVerified: false,
     canMutate: false
   };

@@ -275,4 +275,53 @@ assert.throws(() => aurora.parseOvation({
     ...ovation, coordinates: [[0, 60, 40]]
 }));
 
+
+// NOAA GOES XRS flares are peak-class event observations, not a solar
+// prediction, an R-scale radio blackout warning or live X-ray flux.
+const flareSource = fs.readFileSync(
+    path.join(root, "services/weather/SolarFlarePolicy.js"), "utf8"
+).replace(/^\.pragma library\s*/m, "");
+const flares = {};
+vm.runInNewContext(flareSource, flares);
+
+assert.equal(typeof flares.parseFlares, "function");
+assert.equal(typeof flares.parseClass, "function");
+assert.equal(flares.parseClass("M5.3").label, "M5.3");
+assert.equal(flares.parseClass("x1.0").letter, "X");
+assert.equal(flares.parseClass("C0.0"), null);
+assert.equal(flares.parseClass("G2"), null);
+assert.equal(flares.parseClass(null), null);
+const now = Date.parse("2026-10-23T12:00:00Z");
+const flare = (peak, magnitude, satellite = 18, end = null) => ({
+    satellite: satellite,
+    begin_time: "2026-10-23T06:00:00Z",
+    max_time: peak,
+    max_class: magnitude,
+    end_time: end,
+    max_xrlong: 0.00001,
+});
+const records = [
+    flare("2026-10-23T07:00:00Z", "C2.1"),
+    flare("2026-10-23T11:00:00Z", "M5.3", 19, "2026-10-23T11:14:00Z"),
+    flare("2026-10-23T10:00:00Z", "B8.7"),
+    flare("2026-10-22T10:00:00Z", "X1.1"),
+    flare("2026-10-23T11:00:00Z", "M5.3", 19), // duplicate
+    flare("2026-10-23T09:00:00Z", null),       // unclassified
+    flare("2026-10-24T08:00:00Z", "X2.0"),     // invalid future
+    flare("not-a-time", "C3.0"),                // invalid timestamp
+];
+const result = flares.parseFlares(records, now);
+assert.equal(result.events.length, 3);
+assert.deepEqual(Array.from(result.events, f => f.classLabel),
+                 ["M5.3", "B8.7", "C2.1"]);
+assert.equal(result.latest.satellite, "GOES-19");
+assert.equal(result.latest.ended, true);
+assert.equal(result.latest.peakUtc, "10-23 11:00 UTC");
+assert.equal(result.count24h, 3);
+assert.equal(result.cPlus24h, 2);
+assert.equal(flares.parseFlares([], now).latest, null);
+assert.equal(flares.parseFlares([], now).count24h, 0);
+assert.throws(() => flares.parseFlares({}, now));
+assert.throws(() => flares.parseFlares([], NaN));
+
 console.log("Weather data policy contracts: PASS");

@@ -665,6 +665,53 @@ PanelWindow {
         machineInspectIndex >= 0 && machineInspectIndex < machineInspectItems.length
         ? machineInspectItems[machineInspectIndex] : null
 
+    // Exclusion keys are preview-local indexes scoped to each fresh capture.
+    // Duplicate app IDs remain individually selectable, without PID/title keys.
+    property var machineExcludedItems: ({})
+    function machineSelectionKey(kind, index) {
+        return kind + ":" + index;
+    }
+    function machineItemIncluded(kind, index) {
+        return machineExcludedItems[machineSelectionKey(kind, index)] !== true;
+    }
+    function toggleMachineItemSelection() {
+        if (!machineCapturePreview || !machineInspectItem)
+            return;
+        const key = machineSelectionKey(machineInspectKind, machineInspectIndex);
+        const next = Object.assign({}, machineExcludedItems);
+        if (next[key] === true)
+            delete next[key];
+        else
+            next[key] = true;
+        machineExcludedItems = next;
+    }
+    function machineIncludedCount(kind) {
+        const items = machineCapturePreview ? (machineCapturePreview[kind] || []) : [];
+        let count = 0;
+        for (let i = 0; i < items.length; i++)
+            if (machineItemIncluded(kind, i))
+                count++;
+        return count;
+    }
+    function machineSelectionPreview() {
+        if (!machineCapturePreview)
+            return null;
+        const source = machineCapturePreview;
+        return {
+            preview_only: true,
+            kind: "sway-layout-selection-preview",
+            outputs: source.outputs.filter(function(_, i) {
+                return timew.machineItemIncluded("outputs", i);
+            }),
+            workspaces: source.workspaces.filter(function(_, i) {
+                return timew.machineItemIncluded("workspaces", i);
+            }),
+            windows: source.windows.filter(function(_, i) {
+                return timew.machineItemIncluded("windows", i);
+            })
+        };
+    }
+
     function selectMachineInspectKind(kind) {
         if (kind !== "outputs" && kind !== "workspaces" && kind !== "windows")
             return;
@@ -682,6 +729,7 @@ PanelWindow {
         if (!menuOpen || selectedMode !== "machine" || machineCaptureBusy)
             return;
         machineCapturePreview = null;
+        machineExcludedItems = ({});
         machineInspectIndex = 0;
         machineCaptureStatus = "READING SWAY";
         machineCaptureBusy = true;
@@ -3407,6 +3455,41 @@ PanelWindow {
                             elide: Text.ElideRight
                         }
 
+                        Row {
+                            width: parent.width
+                            height: 29
+                            spacing: 7
+                            visible: timew.machineCapturePreview !== null
+                            ActionButton {
+                                width: 142
+                                height: parent.height
+                                label: timew.machineItemIncluded(timew.machineInspectKind,
+                                                                timew.machineInspectIndex)
+                                       ? "EXCLUDE ITEM" : "INCLUDE ITEM"
+                                labelPixelSize: 10
+                                accentColor: timew.semanticColor
+                                available: timew.machineInspectItem !== null
+                                onLeftClicked: timew.toggleMachineItemSelection()
+                            }
+                            GohuText {
+                                width: parent.width - 149
+                                anchors.verticalCenter: parent.verticalCenter
+                                text: "INCLUDED // "
+                                      + timew.machineIncludedCount(timew.machineInspectKind)
+                                      + " / " + timew.machineInspectItems.length
+                                color: Colors.cyan
+                                font.pixelSize: 10
+                                elide: Text.ElideRight
+                            }
+                        }
+                        GohuText {
+                            width: parent.width
+                            visible: timew.machineCapturePreview !== null
+                            text: "SELECTION PREVIEW ONLY // NOTHING SAVED"
+                            color: Colors.orange
+                            font.pixelSize: 10
+                        }
+
                         GohuText {
                             width: parent.width
                             text: "MANUAL TIME MARKERS // MEMORY ONLY"
@@ -3479,7 +3562,7 @@ PanelWindow {
                         Item {
                             id: machineMarkerArea
                             width: parent.width
-                            height: 113
+                            height: 67
 
                             ListView {
                                 id: machineMarkerList

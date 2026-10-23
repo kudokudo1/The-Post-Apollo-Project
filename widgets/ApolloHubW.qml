@@ -986,9 +986,10 @@ PanelWindow {
                             // Pure first-fit coordinates in the existing two
                             // columns. Width, row span and identity are saved
                             // exactly as before; only x/y are derived.
-                            x: gridCell.column * ((tileFlow.width - tileFlow.spacing) / 2
-                                                  + tileFlow.spacing)
-                            y: gridCell.row * (140 + tileFlow.spacing)
+                            x: gridCell ? gridCell.column
+                               * ((tileFlow.width - tileFlow.spacing) / 2
+                                  + tileFlow.spacing) : 0
+                            y: gridCell ? gridCell.row * (140 + tileFlow.spacing) : 0
                             moduleId: tileConfig.module
                             // Live QML binding; changes to the shared bridge's
                             // weatherSnapshot update the tile without copying data.

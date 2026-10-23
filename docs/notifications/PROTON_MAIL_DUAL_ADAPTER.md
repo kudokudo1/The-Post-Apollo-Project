@@ -114,6 +114,63 @@ not enable any MAIL action, and create no private mail content.
   at-most-one dispatch, expiry, revocation and explicit destructive-action
   confirmation. Activate a local writer only with operator permission.
 
+## Native host ↔ Quickshell local probe transport (2026-10-22)
+
+GitHub development stage **only**. The existing browser companion continues to
+send its original read-only PING. The browser extension is not modified and
+the desktop's live NotificationsService is not modified by this stage.
+
+**Server (dormant)**: \`services/notifications/mail/ProtonRelayPilot.qml\`
+uses the Quickshell 0.2.1 \`Quickshell.Io.SocketServer\` / \`Socket\` /
+\`SplitParser\` Unix-socket API. It is neither instantiated nor imported and
+has literal \`active: false\`, including when independently loaded. It accepts
+only a constant \`{"protocol":1,"kind":"PROTON_RELAY_PROBE"}\` request and
+replies with \`PROTON_RELAY_ACK\`, \`mailboxAccess:false\`,
+\`messageIdentityVerified:false\` and zero capabilities. It exposes no
+notification counts, references, message IDs, mail subjects or credentials.
+
+**Client (native host)**: \`integrations/proton/browser/proton_native_host.py\`
+preserves its exact caller-pinned browser PING/PONG. Its *additional*
+\`{"protocol":1,"kind":"RELAY_PING"}\` request can only attempt the local
+socket when the native-host **process** has
+\`POST_APOLLO_PROTON_RELAY_ENABLE=1\`. The endpoint is restricted to the
+canonical \`$XDG_RUNTIME_DIR/post-apollo-proton-relay.sock\`, never a caller-
+supplied path. The runtime directory and socket must be owned by the current
+user, deny group/other permissions, and not be symlinks. The host uses a
+500 ms timeout and Linux Unix-domain \`SO_PEERCRED\` to verify the other
+endpoint belongs to the current UID, then sends only the constant probe.
+Any missing endpoint, bad response, untrusted browser caller or mismatched
+permissions fails closed without activating mailbox capabilities.
+
+A successful optional relay roundtrip returns only \`RELAY_PONG\` with
+\`desktopConnected:true\`, \`mailboxAccess:false\`,
+\`messageIdentityVerified:false\`, \`capabilities:[]\`.
+**This is transport reachability, NOT proof of a Proton account, a mail
+message, or its relation to a specific notification.** Same-UID local process
+impersonation is not solved by file permissions and \`SO_PEERCRED\`, so future
+mail-operation protocols need their own reviewed authorization,
+replay protection and event-specific authenticated evidence.
+
+The dormant receiver currently cannot actually accept a connection; this
+is intentional. The only executable end-to-end test is the Python fixture
+in \`tests/notifications/test_proton_local_relay_pilot.py\`, which creates
+a temporary private Unix socket with a simulated peer. CI verifies the
+same-UID check, exact byte protocol, bad replies, wrong caller, default off,
+endpoint mode and symlink rejection.
+
+**Future explicit operator approvals** are required to register the native
+host on the actual machine; activate the Quickshell socket; connect it to
+NotificationsService's live event lifecycle; and separately enable verified
+message identity, account authentication, action dispatch and receipts.
+Merging this patch does none of those things. The six MAIL buttons remain
+gated, and the private binding ledger is still not imported into the live
+NotificationsService.
+
+Documentation for the version already in use:
+- https://quickshell.org/docs/v0.2.1/types/Quickshell.Io/SocketServer/
+- https://quickshell.org/docs/v0.2.1/types/Quickshell.Io/Socket/
+- https://quickshell.org/docs/v0.2.1/types/Quickshell.Io/SplitParser/
+
 ## Remaining implementation gates
 
 1. Browser: test each supported browser family's extension API and the real Proton UI to establish a **stable account and exact message identity** from the authenticated page without capturing session secrets. Explicit local installation + validation required. Do not automate uncertain DOM selectors.

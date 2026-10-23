@@ -97,8 +97,10 @@ function parseXraySeries(payload, nowMs) {
         const point = longBand[i];
         if (point.satellite !== latest.satellite || point.timeMs < from)
             continue;
-        const bucket = Math.floor((point.timeMs - from) / 1800000);
-        if (bucket >= 0 && bucket < 12)
+        // Include the newest sample in the final bucket rather than
+        // dropping the exact six-hour endpoint at bucket 12.
+        const bucket = Math.min(11, Math.floor((point.timeMs - from) / 1800000));
+        if (bucket >= 0)
             buckets[bucket] = point;
     }
     const trend = [];

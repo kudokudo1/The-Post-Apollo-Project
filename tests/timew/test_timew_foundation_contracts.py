@@ -92,8 +92,8 @@ assert 'text: timew.selectedName + " // TIMEW"\n                        color: t
 assert 'import "../services/hub/ApolloHubTimePolicy.js" as LocalTimePolicy' in window
 assert "LocalTimePolicy.snapshot(localClock.date.getTime(), use24Hour)" in window
 assert window.count("SystemClock {") == 1
-assert window.count("\n    Timer {") == 2
-assert window.count("ElapsedTimer {") == 1
+assert window.count("\n    Timer {") == 3
+assert window.count("ElapsedTimer {") == 2
 assert "interval: 30000" in window
 assert "running: timew.menuOpen && timew.selectedMode === \"clock\"" in window
 assert "property bool use24Hour: true" in window
@@ -240,7 +240,7 @@ assert 'enabled: timew.navigationKeysAvailable' in window
 assert 'WORLD // SELECT A SEARCH RESULT' in window
 assert '"ZONE DIRECTORY UNAVAILABLE"' in window
 # CLOCK WORLD search + CONVERT date/time + MATH date/time/duration fields.
-assert window.count('onTextEdited:') == 10
+assert window.count('onTextEdited:') == 13
 # No dynamic command composition or arbitrary typed TZ values.
 assert 'command: ["date", "+%z"]' in window
 assert 'worldLookup.exec({' in window
@@ -283,8 +283,8 @@ assert '!converterDateInput.activeFocus && !converterTimeInput.activeFocus' in w
 assert 'TIME CALCULATOR // NOT CONNECTED' not in window
 # Conversion adds one on-demand process, no persistent interval or clock tick.
 assert window.count("SystemClock {") == 1
-assert window.count("\n    Timer {") == 2
-assert window.count("ElapsedTimer {") == 1
+assert window.count("\n    Timer {") == 3
+assert window.count("ElapsedTimer {") == 2
 
 # Two independent CALC 12/24-hour presentation controls. The input is
 # converted to backend-ready HH:MM; output formats the existing result only.
@@ -455,8 +455,8 @@ assert 'REPEATED HOUR // 2 RESULTS' in window
 assert 'MATH // 1 RESULT' in window
 assert 'TIME DOES NOT EXIST // DST CLOCK JUMP' in window
 assert window.count("SystemClock {") == 1
-assert window.count("\n    Timer {") == 2
-assert window.count("ElapsedTimer {") == 1
+assert window.count("\n    Timer {") == 3
+assert window.count("ElapsedTimer {") == 2
 assert window.count('arithmeticProcess.exec([') == 1
 assert window.count('converterProcess.exec([') == 1
 arithmetic = (ROOT / "services/time/TimeArithmetic.py").read_text(encoding="utf-8")
@@ -522,8 +522,8 @@ assert 'DST OVERLAP // MULTIPLE DURATIONS' in window
 assert 'ELAPSED DURATION // ZONES AND DST AWARE' in window
 assert 'visible: timew.mathView === "elapsed"' in window
 assert window.count("SystemClock {") == 1
-assert window.count("\n    Timer {") == 2
-assert window.count("ElapsedTimer {") == 1
+assert window.count("\n    Timer {") == 3
+assert window.count("ElapsedTimer {") == 2
 difference = (ROOT / "services/time/TimeDifference.py").read_text(encoding="utf-8")
 assert 'ZoneInfo(zone)' in difference
 assert 'for fold in (0, 1)' in difference
@@ -584,6 +584,65 @@ assert 'function sample(accumulatedMs, segmentMs)' in stopwatch_policy
 assert 'function appendLap(existing, totalMs, previousLapMs, sequence)' in stopwatch_policy
 assert 'return next.slice(0, MAX_LAPS);' in stopwatch_policy
 
+# TOOLS COUNTDOWN reuses the monotonic stopwatch pattern but has an
+# independent ElapsedTimer and a heartbeat that remains active when hidden.
+countdown_policy = (ROOT / "services/time/CountdownPolicy.js").read_text(encoding="utf-8")
+assert 'import "../services/time/CountdownPolicy.js" as CountdownPolicy' in window
+assert 'property string toolsView: "stopwatch"' in window
+assert 'id: toolsSubModeStrip' in window
+assert 'labelText: "STOPWATCH"' in window
+assert 'labelText: "COUNTDOWN"' in window
+assert 'selected: timew.toolsView === "stopwatch"' in window
+assert 'selected: timew.toolsView === "countdown"' in window
+assert 'timew.toolsView = "countdown";' in window
+assert 'timew.toolsView = "stopwatch";' in window
+assert 'id: countdownAnchor' in window
+assert 'id: countdownHeartbeat' in window
+assert 'timew.countdownRunning' in window
+assert 'running: timew.countdownRunning' in window
+assert 'onTriggered: timew.refreshCountdown()' in window
+assert '&& timew.toolsView === "countdown" ? 100 : 1000' in window
+assert 'id: stopwatchDisplayTimer' in window
+assert '&& timew.toolsView === "stopwatch"' in window
+assert 'property bool countdownRunning: false' in window
+assert 'property bool countdownStarted: false' in window
+assert 'property bool countdownFinished: false' in window
+assert 'property real countdownRemainingMs: 0' in window
+assert 'readonly property var countdownParsed:' in window
+assert 'CountdownPolicy.parseDuration(countdownHours,' in window
+assert 'CountdownPolicy.remaining(' in window
+assert 'countdownAnchor.elapsed() * 1000' in window
+assert 'countdownAnchor.restart();' in window
+for method in ('refreshCountdown', 'startCountdown', 'pauseCountdown',
+               'resetCountdown'):
+    assert 'function ' + method + '()' in window
+assert 'countdownFinished = true;' in window
+assert 'countdownSegmentBudgetMs = countdownRemainingMs;' in window
+assert 'id: countdownPane' in window
+assert 'id: countdownHoursField' in window
+assert 'id: countdownMinutesField' in window
+assert 'id: countdownSecondsField' in window
+assert 'readOnly: timew.countdownStarted' in window
+assert 'id: countdownRunButton' in window
+assert 'id: countdownResetButton' in window
+assert '"PAUSE"' in window and '"RESUME"' in window
+assert '"RESTART"' in window and '"START"' in window
+assert 'onLeftClicked: timew.resetCountdown()' in window
+assert 'timew.pauseCountdown();' in window
+assert 'timew.startCountdown();' in window
+assert 'CountdownPolicy.format(' in window
+assert 'COUNTDOWN // FINISHED' in window
+assert 'NO AUDIO OR DESKTOP NOTIFICATION // INITIAL SLICE' in window
+assert 'RESTARTING QUICKSHELL RESETS IT.' in window
+assert 'function parseDuration(hours, minutes, seconds)' in countdown_policy
+assert 'function remaining(segmentBudgetMs, segmentElapsedMs)' in countdown_policy
+assert 'function format(milliseconds)' in countdown_policy
+assert 'var MAX_HOURS = 99;' in countdown_policy
+# No notifier side effects, network calls or persistent files were added.
+assert window.count("SystemClock {") == 1
+assert window.count("ElapsedTimer {") == 2
+assert window.count("\n    Timer {") == 3
+
 # Universal visual language remains: magenta header, cyan divider, borderless modes.
 assert 'text: "TIME // W"' in window
 assert "color: Colors.magenta" in window
@@ -601,11 +660,12 @@ for prop in ('label: "×"', "labelPixelSize: 22", "destructive: true",
              "hoverBorderColor: Colors.red"):
     assert prop in close, prop
 
-# Stopwatch is a session-local elapsed counter. Countdown timers,
-# background capture, Sway restoration and persistence remain unimplemented.
+# Both TOOLS clocks are session-local elapsed counters. Desktop alarms,
+# system notifications, Sway restoration and persistence remain unimplemented.
 assert "NO SCREENSHOTS OR RESTORATION ACTIVE" in window
 assert "STOPWATCH + TIMERS // NOT CONNECTED" not in window
-assert "COUNTDOWN TIMERS // NEXT DEVELOPMENT STAGE" in window
+assert "COUNTDOWN TIMERS // NEXT DEVELOPMENT STAGE" not in window
+assert "NO AUDIO OR DESKTOP NOTIFICATION // INITIAL SLICE" in window
 assert "FOUNDATION PREVIEW // UI ONLY" in window
 for primitive in ("JsonAdapter {", "FileView {", "swaymsg",
                   "grim ", "onTriggered: capture", "kill -",

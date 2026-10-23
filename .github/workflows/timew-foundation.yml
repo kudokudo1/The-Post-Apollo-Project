@@ -10,6 +10,7 @@ on:
       - "services/time/TimeArithmetic.py"
       - "services/time/TimeDifference.py"
       - "services/time/StopwatchPolicy.js"
+      - "services/time/CountdownPolicy.js"
       - "services/time/TimeConverterFormat.js"
       - "services/time/WorldZoneSearch.js"
       - "timew_click_preview.qml"
@@ -28,6 +29,7 @@ on:
       - "services/time/TimeArithmetic.py"
       - "services/time/TimeDifference.py"
       - "services/time/StopwatchPolicy.js"
+      - "services/time/CountdownPolicy.js"
       - "services/time/TimeConverterFormat.js"
       - "services/time/WorldZoneSearch.js"
       - "modules/Clock.qml"
@@ -59,3 +61,5 @@ jobs:
         run: python3 -B -I tests/timew/test_time_difference.py
       - name: Verify stopwatch accumulation, formatting and bounded laps
         run: node tests/timew/test_stopwatch_policy.cjs
+      - name: Verify countdown validation, pause/resume and expiry
+        run: node tests/timew/test_countdown_policy.cjs

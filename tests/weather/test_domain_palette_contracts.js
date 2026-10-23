@@ -154,19 +154,32 @@ assert.match(groundSource, /anchors\.margins:\s*24[\s\S]*?spacing:\s*26/);
 assert.match(skySource, /Flickable\s*\{\s*id:\s*skyScroll/);
 assert.match(skySource, /clip:\s*true[\s\S]*?contentHeight:\s*Math\.max\(height, skyContent\.y \+ skyContent\.implicitHeight \+ 12\)/);
 assert.match(skySource, /id:\s*skyContent[\s\S]*?x:\s*20[\s\S]*?y:\s*12[\s\S]*?spacing:\s*6/);
-assert.match(skySource, /height:\s*90[\s\S]*?id:\s*hourlyIconGlyph/);
+assert.match(skySource, /height:\s*74[\s\S]*?id:\s*hourlyIconGlyph/);
+assert.match(skySource, /id:\s*hourlyIconGlyph\s+anchors\.centerIn:\s*parent\s+anchors\.verticalCenterOffset:\s*8/);
+assert.match(skySource, /id:\s*dailyForecastArtwork[\s\S]*?height:\s*116/);
+assert.match(skySource, /id:\s*dailyWeatherDetails[\s\S]*?anchors\.top:\s*parent\.top/);
+assert.match(skySource, /id:\s*dailyWeatherDetails[\s\S]*?text:\s*"SUN "/);
 assert.match(skySource, /height:\s*116[\s\S]*?id:\s*dailyIconGlyph/);
 assert.match(skySource, /id:\s*hourlyRainLabel/);
 assert.ok(!skySource.includes("weather / atmosphere / radar / aviation"));
 assert.match(skySource, /NeonScrollBar\s*\{[\s\S]*?flickable:\s*skyScroll[\s\S]*?handleStyle:\s*"star"/);
 assert.match(spaceSource, /anchors\.margins:\s*24[\s\S]*?spacing:\s*26/);
 
-for (const [id, size] of [["conditionIconGlyph", 80], ["hourlyIconGlyph", 80], ["dailyIconGlyph", 100]]) {
+for (const [id, size] of [["conditionIconGlyph", 104], ["hourlyIconGlyph", 80], ["dailyIconGlyph", 100]]) {
     assert.match(skySource, new RegExp("id: " + id + "[\\s\\S]*?font\\.pixelSize: " + size));
 }
 for (const id of ["conditionIconGlyph", "hourlyIconGlyph", "dailyIconGlyph"])
     assert.match(skySource, new RegExp("safeSource: " + id));
 assert.match(skySource, /Row\s*\{\s*anchors\.horizontalCenter:\s*parent\.horizontalCenter\s+spacing:\s*12[\s\S]*?text:\s*modelData\.date/);
+assert.match(skySource, /height:\s*88[\s\S]*?anchors\.horizontalCenter:\s*parent\.horizontalCenter[\s\S]*?id:\s*conditionIconGlyph/);
+assert.match(skySource, /width:\s*110[\s\S]*?font\.pixelSize:\s*104/);
+// Daily rain and SUN belong inside the unchanged 116px icon frame,
+// not below it where they push the next section out of view.
+const dailySlice = skySource.slice(skySource.indexOf("id: dailyForecastArtwork"));
+assert.ok(dailySlice.includes("modelData.chanceRain"));
+assert.ok(dailySlice.includes("modelData.sunrise"));
+assert.ok(dailySlice.includes("modelData.sunset"));
+assert.ok(dailySlice.indexOf("dailyWeatherDetails") < dailySlice.indexOf("dailyIconGlyph"));
 
 // Existing semantic telemetry severity remains independent from page identity.
 assert.match(groundSource, /readonly property color aqiColor:/);

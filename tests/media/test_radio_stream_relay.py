@@ -261,6 +261,96 @@ class RadioRelayTests(unittest.TestCase):
         with self.assertRaises(MediaBackendError):
             controller.dispatch("play")
 
+    def test_scoped_clients_keep_station_identity_and_staged_selection_isolated(self):
+        backend = GuardedFakeMpd()
+        relay = RelayFake()
+        ctl = MediaController(backend=backend, radio_relay=relay)
+        def fetch(params):
+            if params.get("tag") == "news":
+                return [station(URL_B, "News Station")]
+            return [station(URL_A, "Jazz Station")]
+        ctl.sources["radio-browser"] = RadioBrowserCatalogSource(
+            fetch=fetch, relay=relay
+        )
+
+        # Legacy Hi-Fi, then new Weather RADIO browse, via one controller.
+        jazz = ctl.dispatch("search", {"source": "radio-browser",
+                                      "query": "tag:jazz"})["browse"]["items"][0]["ref"]
+        ctl.dispatch("select", {"ref": jazz})
+        news = ctl.dispatch("search", {"source": "radio-browser",
+                                      "query": "tag:news",
+                                      "client": "weather-radio"})["browse"]["items"][0]["ref"]
+        self.assertEqual(ctl.snapshot()["browse"]["query"], "tag:jazz")
+        self.assertEqual(ctl.snapshot()["selection"], jazz)
+        self.assertEqual(ctl.snapshot("weather-radio")["browse"]["query"], "tag:news")
+        self.assertIsNone(ctl.snapshot("weather-radio")["selection"])
+
+        # A station only belongs to the exact client that searched for it.
+        denied = ctl.request({"version": 1, "op": "inspect",
+                              "args": {"client": "weather-radio", "ref": jazz}})
+        self.assertFalse(denied["ok"])
+        self.assertEqual(denied["error"]["code"], "INVALID_REF")
+        denied = ctl.request({"version": 1, "op": "load",
+                              "args": {"ref": news}})
+        self.assertFalse(denied["ok"])
+        self.assertEqual(denied["error"]["code"], "INVALID_REF")
+
+        ctl.dispatch("select", {"client": "weather-radio", "ref": news})
+        self.assertEqual(ctl.snapshot()["selection"], jazz)
+        self.assertEqual(ctl.snapshot("weather-radio")["selection"], news)
+        self.assertFalse(any(cmd[0] in ("addid", "playid") for cmd in backend.calls))
+
+        # The weather client loads its OWN selected station, without autoplay.
+        queued = ctl.dispatch("load", {"client": "weather-radio"})
+        self.assertFalse(queued["autoplay"])
+        self.assertEqual(queued["loaded"]["ref"], news)
+        self.assertEqual(queued["loaded"]["item"]["title"], "News Station")
+        self.assertEqual(backend.status, "stop")
+        self.assertFalse(any(cmd[0] == "playid" for cmd in backend.calls))
+        self.assertNotIn(URL_B, str(queued["loaded"]))
+        ctl.dispatch("play")
+        self.assertEqual(backend.playing_id, queued["loaded"]["queueId"])
+        self.assertTrue(ctl.snapshot()["session"]["ownedByController"])
+
+        # Hi-Fi can still inspect and reselect its earlier station.
+        self.assertEqual(ctl.dispatch("inspect", {"ref": jazz})["item"]["title"],
+                         "Jazz Station")
+        self.assertEqual(ctl.snapshot()["browse"]["query"], "tag:jazz")
+        self.assertEqual(ctl.snapshot("weather-radio")["selection"], news)
+
+    def test_scoped_catalog_is_bounded_and_a_search_does_not_interrupt_audio(self):
+        backend = GuardedFakeMpd()
+        relay = RelayFake()
+        ctl = MediaController(backend=backend, radio_relay=relay)
+        ctl.sources["radio-browser"] = RadioBrowserCatalogSource(
+            fetch=lambda p: [station(URL_A, "News Station")], relay=relay
+        )
+        ref = ctl.dispatch("search", {"source": "radio-browser",
+                                      "query": "tag:news",
+                                      "client": "weather-radio"})["browse"]["items"][0]["ref"]
+        ctl.dispatch("load", {"client": "weather-radio", "ref": ref,
+                              "autoplay": True})
+        owned = ctl.owned_active_id
+        before = len([c for c in backend.calls if c[0] == "playid"])
+        for client in ("default", "hifi-alt", "station-check"):
+            ctl.dispatch("search", {"source": "radio-browser",
+                                    "query": "tag:news", "client": client})
+        self.assertEqual(ctl.owned_active_id, owned)
+        self.assertEqual(len([c for c in backend.calls if c[0] == "playid"]), before)
+        denied = ctl.request({"version": 1, "op": "search", "args": {
+            "source": "radio-browser", "query": "tag:news",
+            "client": "fifth-client"}})
+        self.assertEqual(denied["error"]["code"], "CLIENT_LIMIT")
+        self.assertTrue(ctl.snapshot("weather-radio")["session"]["ownedByController"])
+        for invalid in ("", "a/b", "a" * 33, 5, None):
+            denied = ctl.request({"version": 1, "op": "snapshot",
+                                  "args": {"client": invalid}})
+            self.assertFalse(denied["ok"])
+            self.assertEqual(denied["error"]["code"], "INVALID_CLIENT")
+        self.assertEqual(ctl.request({"version": 1, "op": "search",
+            "args": {"client": "weather-radio", "source": "local-mpd",
+                     "query": "test"}})["error"]["code"], "UNSUPPORTED")
+
     def test_without_relay_directory_browsing_stays_catalog_only(self):
         catalog = RadioBrowserCatalogSource(fetch=lambda p: [station(URL_A, "Jazz")])
         ref = catalog.search("")["items"][0]["ref"]

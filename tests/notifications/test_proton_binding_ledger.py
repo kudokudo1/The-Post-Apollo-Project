@@ -53,6 +53,10 @@ grants.set(keyB,make(e2,readRef(ACC,"browser.message.0002")));
 grants.set(keyC,make(e2)); // same message as e1, must be denied
 assert.strictEqual(ledger.admit({eventId:e1,attested:true,references:{
   browser:readRef()}},NOW),"untrusted-binding");
+// A callback that simply passes user-controlled fields through cannot mint
+// authority, even if it is present and the event is still live.
+const unsafeEcho=L.createLedger(claim=>claim,live);
+assert.strictEqual(unsafeEcho.admit(make(e1),NOW),"untrusted-binding");
 assert.strictEqual(ledger.admit({kind:"PROTON_READINESS_V4",
   selectedMailRows:1,selectedRowStructureOk:true},NOW),"untrusted-binding");
 assert.strictEqual(ledger.admit(keyA,-1),"invalid-clock");

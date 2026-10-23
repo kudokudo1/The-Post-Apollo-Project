@@ -40,6 +40,7 @@ Item {
     function jumpToday() {
         refreshLocalDate();
         selectDate(todayKey);
+        viewMode = "day";
     }
     onVisibleChanged: { if (visible) refreshLocalDate(); }
     Component.onCompleted: refreshLocalDate()

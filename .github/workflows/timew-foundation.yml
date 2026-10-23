@@ -79,5 +79,7 @@ jobs:
         run: python3 -B -I tests/timew/test_machine_sway_read.py
       - name: Verify MACHINE interactive read-only preview inspector
         run: python3 -B -I tests/timew/test_machine_preview_inspector.py
+      - name: Verify MACHINE memory-only selection controls
+        run: python3 -B -I tests/timew/test_machine_selection_ui_contract.py
       - name: Verify MACHINE desktop checkpoint draft remains non-operative
         run: python3 -B -I tests/timew/test_machine_checkpoint_contract.py

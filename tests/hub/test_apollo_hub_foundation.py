@@ -232,7 +232,9 @@ for token in (
     'visible: hub.pendingRemoval !== null',
     'visible: hub.pendingRemoval === null',
     'destructive: true',
-    'onEditModeChanged: if (!editMode) cancelPendingRemoval()',
+    'onEditModeChanged: if (!editMode) {',
+    'cancelPendingRemoval();',
+    'closeModulePicker();',
 ):
     assert token in window, f"Hub staged deletion contract missing: {token}"
 assert 'confirmed !== true || next.modes.length <= 1' in layout

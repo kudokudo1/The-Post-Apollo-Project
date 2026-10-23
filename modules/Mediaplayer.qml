@@ -82,26 +82,26 @@ Item {
     readonly property color artworkAccentColor: open ? Colors.magenta : accentColor
 
     // Share one vertical palette among all 20 bars and both existing halos.
-    // Qt Quick GradientStop positions run top (0) to bottom (1), so reverse
-    // the named progression here: cool cyan→blue→magenta rises bottom→top;
-    // playing yellow→orange→red likewise rises bottom→top.
-    // The open Hi-Fi state still forces uniform magenta on all three stops.
+    // Qt Quick GradientStop positions run top (0) to bottom (1).
+    // MPD playing reveals cyan→blue→magenta from bottom to top; when not
+    // playing, yellow→orange→red rises instead. Opening the Hi-Fi deck still
+    // forces uniform magenta at every stop.
     readonly property Gradient cavaVerticalGradient: Gradient {
         orientation: Gradient.Vertical
         GradientStop {
             position: 0.0
             color: mediaDock.open ? Colors.magenta
-                : (mediaDock.mpdPlaying ? Colors.red : Colors.magenta)
+                : (mediaDock.mpdPlaying ? Colors.magenta : Colors.red)
         }
         GradientStop {
             position: 0.5
             color: mediaDock.open ? Colors.magenta
-                : (mediaDock.mpdPlaying ? Colors.orange : Colors.blue)
+                : (mediaDock.mpdPlaying ? Colors.blue : Colors.orange)
         }
         GradientStop {
             position: 1.0
             color: mediaDock.open ? Colors.magenta
-                : (mediaDock.mpdPlaying ? Colors.yellow : Colors.cyan)
+                : (mediaDock.mpdPlaying ? Colors.cyan : Colors.yellow)
         }
     }
 

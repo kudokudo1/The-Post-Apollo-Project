@@ -1,6 +1,6 @@
 # 🏥💜 ApolloHubW // P1 Layout Editor 2.0
 
-**Status:** Stages 1–3, 5 MOVE, and Stage 6 grid packing have operator desktop acceptance (Stage 6 visual arrangement shown in screenshot); Stage 4 SWAP dropdown is in use. Stage 7A spatial keyboard navigation is implemented on GitHub `main` with passing CI; its live desktop acceptance is pending. Stage 7B mini-widget content-density polish, persistent undo, drag-and-drop, and layout presets remain later scope.
+**Status:** Stages 1–3, 5 MOVE, and Stage 6 grid packing have operator desktop acceptance (Stage 6 visual arrangement shown in screenshot); Stage 4 SWAP dropdown is in use. Stage 7A spatial keyboard navigation passes CI but still needs keyboard desktop acceptance. Stage 7B has begun with height-aware TIME presentation on GitHub `main`, with Hub source/validation CI green and desktop acceptance pending. Other mini-widgets, persistent undo, drag-and-drop and presets remain later scope.
 
 ## IMPLEMENTATION
 
@@ -73,7 +73,9 @@ The `×` is an **explicit one-click edit action**, not a destructive record dele
 - [x] Stage 2 edit controls for one/two-column width and one/two/three-row chassis heights
 - [x] Stage 2 operator runtime acceptance
 - [x] Gap-filling grid packing (Stage 6)
-- [ ] Internal tile-content expansion / density (Stage 7B)
+- [x] Stage 7B TIME mini H:1/H:2/H:3 presentation foundation
+- [ ] Stage 7B TIME mini desktop acceptance
+- [ ] Stage 7B content-density variants for other mini-widgets
 - [x] Stage 3 mode/group removal with named confirmation and Undo
 - [x] Stage 3 operator desktop acceptance
 - [x] Stage 4 module picker: search, count, occupied-state hints, explicit selection
@@ -179,9 +181,22 @@ The Stage 4 suite extends `tests/hub/test_apollo_hub_layout_v2.cjs` for filterin
 
 **Desktop acceptance:** After pulling `main` and restarting Quickshell, open Apollo Hub and enable keyboard focus as usual. Try a H:3 half-width tile beside three H:1 tiles, then navigate with Left/Right/Up/Down. The selection border should move to the nearest card in that actual direction, never to a card that appears on the opposite side. Try a W:2 tile and verify Left/Right stay put at the outer edges. Scroll to lower tiles with Down and verify the focused tile/header becomes visible. Confirm that typing in Notes, To-do and the SWAP filter is not intercepted.
 
+## P1 Stage 7B // Height-aware TIME mini presentation
+
+The initial Stage 7B polish targets the oversized **TIME** tile shown in the operator's Stage 6 screenshot. Before this change, TIME remained a compact clock at the very top of even an H:3 tile, leaving most of the otherwise correctly packed card blank.
+
+- **No saved-data change:** `widgets/hub/ApolloHubTimeMini.qml` reads its allocated content height and derives a presentation-only `densityLevel` 1/2/3. H:1 stays top-aligned with its original 23/20px 24/12-hour clock, date, offset, row spacing, and format toggle.
+- **Medium/tall cards:** At available content heights of 180px and 300px, the mini scales clock text, date, offset, and format-button geometry. Its content block is vertically centered within the already allocated tile height. Larger clocks stay color-coded white or orange for unavailable states, while date stays cyan and offset orange.
+- **Behavior preserved:** The original tile's 1-second timer remains the only timer; the mini still consumes `TimePolicy.snapshot`, provides the existing 12H/24H toggle, and reports the same statusLine. No new clock service, process, second collector, editor state, persistence, or network access is introduced.
+- **Scope:** This is specifically responsive **TIME** content inside larger H:2/H:3 cards, not a blanket scaling rule for other mini-widgets. Calendar, Notes, To-do, Media and CPU++ are separate follow-up layouts because they have interactive lists or specialized controls.
+
+**Verification:** `tests/hub/test_apollo_hub_foundation.py` now checks the three height thresholds, original H:1 typography, centered tall layout, color/status paths, and unchanged source/toggle wiring. Hub source contracts and repository validation passed. An independent, pre-existing TimeW contract test still fails because it forbids the already-used `ApolloHubTimePolicy.js` import in `TimeW.qml`; Stage 7B does not change or claim to repair that unrelated assertion.
+
+**Desktop acceptance:** Pull GitHub `main` and restart Quickshell. In Hub EDIT, set TIME to H:1, H:2 and H:3 in a half-width tile. The compact view should remain familiar, while medium and tall views show a substantially larger centered clock/date/offset block. Toggle 12H/24H and verify neither formatting clips. Try W:2 + H:3 to inspect readability at full width; confirm no new timer and that neighboring tile positions are unchanged. The time still updates every second.
+
 ## NEXT
 
-After Stage 7A desktop acceptance, continue **Stage 7B mini-widget content-density polish**, based on measured tile geometry and the operator's visual priorities. Preserve each widget's existing data ownership, typography and control semantics. Durable undo/presets and drag-and-drop remain separate operator decisions.
+First accept Stage 7A keyboard navigation and Stage 7B TIME scaling on the actual desktop. Then continue **content-density polish on the next selected mini-widget**, using its own content and controls rather than indiscriminately scaling everything. Durable undo/presets and drag-and-drop remain separate operator decisions.
 
 ## DECISIONS
 

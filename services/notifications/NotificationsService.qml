@@ -8,6 +8,7 @@ import "." as NotificationsBackend
 import "BrowserSiteIdentity.js" as BrowserSiteIdentity
 import "ApolloNotificationRoute.js" as ApolloNotificationRoute
 import "EmailNotificationActions.js" as EmailNotificationActions
+import "mail/ProtonNativeDeliveryAudit.js" as ProtonNativeDeliveryAudit
 
 Singleton {
     id: root
@@ -21,6 +22,12 @@ Singleton {
     // persistent JSON history. They exist only while the sender is live.
     property var liveExternalNotifications: ({})
     property int externalActionsRevision: 0
+    // Optional, metadata-presence-only feasibility check. Off by default;
+    // never serialized, never an authenticated mailbox binding.
+    readonly property bool protonNativeAuditEnabled:
+        String(Quickshell.env("POST_APOLLO_PROTON_DELIVERY_AUDIT") || "") === "1"
+    property int protonNativeAuditSamples: 0
+    property double protonNativeAuditLastMs: 0
     property ListModel sourcePolicies: ListModel {}
     // Independent from DND/snooze: starring a source never suppresses it.
     property ListModel favoriteSources: ListModel {}
@@ -328,6 +335,24 @@ Singleton {
             markPoliciesChanged();
     }
 
+    // Opt-in browser notification provenance audit, NOT an action gateway.
+    // The helper yields a fixed-format line of booleans and capped counts.
+    // No titles, bodies, IDs, hints, URLs or account data ever reach logs.
+    function auditProtonNativeDelivery(notification) {
+        if (!protonNativeAuditEnabled || protonNativeAuditSamples >= 12)
+            return;
+        const nowMs = Date.now();
+        if (nowMs - protonNativeAuditLastMs < 1000)
+            return;
+        const observed = ProtonNativeDeliveryAudit.collect(notification);
+        const line = ProtonNativeDeliveryAudit.safeLine(observed);
+        if (line === "")
+            return;
+        protonNativeAuditSamples += 1;
+        protonNativeAuditLastMs = nowMs;
+        console.info(line);
+    }
+
     // ===== EXTERNAL NOTIFICATIONS ===============================
 
     NotificationServer {
@@ -346,6 +371,7 @@ Singleton {
         bodyMarkupSupported: false
 
         onNotification: function (notification) {
+            root.auditProtonNativeDelivery(notification);
             notification.tracked = true;
 
             // Each native delivery gets an independent history ID. The live

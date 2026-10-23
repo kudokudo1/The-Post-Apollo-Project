@@ -98,10 +98,12 @@ PanelWindow {
     // OnDemand does not request an indefinite exclusive keyboard lock.
     WlrLayershell.keyboardFocus:
         root.menuOpen && (root.activeMode.id === "tasks"
-                          || root.activeMode.id === "projects")
+                          || root.activeMode.id === "projects"
+                          || root.activeMode.id === "planner")
         ? WlrKeyboardFocus.OnDemand : WlrKeyboardFocus.None
     focusable: root.menuOpen && (root.activeMode.id === "tasks"
-                                 || root.activeMode.id === "projects")
+                                 || root.activeMode.id === "projects"
+                                 || root.activeMode.id === "planner")
 
     color: "transparent"
     surfaceFormat.opaque: false
@@ -351,6 +353,7 @@ PanelWindow {
                 anchors.fill: parent
                 visible: root.menuOpen && root.activeMode.id === "planner"
                 todoSnapshot: ApolloHubTodoStore.snapshot
+                todoStore: ApolloHubTodoStore
                 onOpenTaskRequested: function(taskId) {
                     root.selectMainMode(0);
                     taskDetails.chooseTask(taskId);

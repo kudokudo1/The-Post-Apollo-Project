@@ -175,16 +175,7 @@ Rectangle {
                     font.pixelSize: 11
                 }
 
-                GohuText {
-                    id: aqiReadingText
-                    anchors.horizontalCenter: parent.horizontalCenter
-                    anchors.top: parent.top
-                    anchors.topMargin: 29
-                    text: ground.aqiReady ? String(weatherService.aqi) : "--"
-                    font.pixelSize: 68
-                    color: ground.aqiColor
-                }
-
+                // Draw the halo behind its AQI glyph, not over the number.
                 SafeDropShadow {
                     anchors.fill: aqiReadingText
                     safeSource: aqiReadingText
@@ -195,6 +186,16 @@ Rectangle {
                     verticalOffset: 0
                     transparentBorder: true
                     opacity: 0.68
+                    color: ground.aqiColor
+                }
+
+                GohuText {
+                    id: aqiReadingText
+                    anchors.horizontalCenter: parent.horizontalCenter
+                    anchors.top: parent.top
+                    anchors.topMargin: 29
+                    text: ground.aqiReady ? String(weatherService.aqi) : "--"
+                    font.pixelSize: 68
                     color: ground.aqiColor
                 }
 

@@ -62,6 +62,9 @@ Scope {
     property bool actionProcessDoneSeen: false
     property double syncAfterSnapshotStartedMs: 0
     property double syncAfterRefreshStartedMs: 0
+    // Git menu pipeline timing only. No changes to the journal safety gate.
+    property double syncCommandStartedMs: 0
+    property double syncCommandFinishedMs: 0
     property bool actionOverdueNotified: false
     property string clonePendingQuery: ""
     property bool pendingCloneCreated: false
@@ -1404,6 +1407,7 @@ Scope {
 
             refreshing = false;
             refreshWatchdog.stop();
+            const pipelineRefreshStartedMs = syncAfterRefreshStartedMs;
             if (syncAfterRefreshStartedMs > 0) {
                 const refreshElapsed =
                     Math.max(0, Date.now() - syncAfterRefreshStartedMs);
@@ -1444,6 +1448,28 @@ Scope {
                 refreshed();
                 if (trace)
                     refreshedSignalMs = Date.now() - started;
+            }
+
+            // End-to-end timing is emitted only after refreshing the UI
+            // models; unlike the legacy REFRESHED line it includes their
+            // synchronous publication. Never uses the timing to unlock or
+            // report a Git result, which remains journal-acknowledged above.
+            if (pipelineRefreshStartedMs > 0
+                    && syncCommandStartedMs >= syncStartedMs
+                    && syncCommandFinishedMs >= syncCommandStartedMs
+                    && pipelineRefreshStartedMs >= syncCommandFinishedMs) {
+                const end = Date.now();
+                const prepareMs = syncCommandStartedMs - syncStartedMs;
+                const gitMs = syncCommandFinishedMs - syncCommandStartedMs;
+                const finalizeMs = pipelineRefreshStartedMs - syncCommandFinishedMs;
+                const refreshMs = end - pipelineRefreshStartedMs;
+                actionOutput += "\nSYNC TIMELINE // prepare " + prepareMs
+                    + " ms // git " + gitMs
+                    + " ms // finalize " + finalizeMs
+                    + " ms // refresh " + refreshMs
+                    + " ms // total " + (end - syncStartedMs) + " ms";
+                syncCommandStartedMs = 0;
+                syncCommandFinishedMs = 0;
             }
 
             if (trace) started = Date.now();
@@ -1740,6 +1766,9 @@ Scope {
             + "RUNNING // Git subprocess started";
         traceSyncPhase("GIT_STARTED");
         actionWatchdog.restart();
+        if (pendingProcessAction === "fetch"
+                || pendingProcessAction === "pull")
+            syncCommandStartedMs = Date.now();
         actionProcess.exec(pendingActionCommand);
         return true;
     }
@@ -1905,6 +1934,10 @@ Scope {
         if (!actionBusy)
             return;
 
+        if ((pendingProcessAction === "fetch"
+                    || pendingProcessAction === "pull")
+                && syncCommandStartedMs > 0)
+            syncCommandFinishedMs = Date.now();
         traceSyncPhase("GIT_PROCESS_COMPLETE");
         actionStage = "FINALIZING";
         actionWatchdog.stop();
@@ -2288,6 +2321,8 @@ Scope {
         if (processAction === "fetch" || processAction === "pull") {
             syncStartedMs = Date.now();
             syncPhaseMs = syncStartedMs;
+            syncCommandStartedMs = 0;
+            syncCommandFinishedMs = 0;
             traceSyncPhase("REQUESTED");
         }
 

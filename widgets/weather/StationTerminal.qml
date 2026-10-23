@@ -2,6 +2,7 @@ import QtQuick
 import Quickshell
 import Quickshell.Io
 import "../../components"
+import "StationTerminalGeometry.js" as SwayGeometry
 
 Rectangle {
     id: terminalView
@@ -22,6 +23,17 @@ Rectangle {
 
     property string terminalState: "IDLE"
     property string terminalAppId: "weather-screen"
+
+    // Coordinates and cut-out are LOCAL to the panel. These properties
+    // were referenced by WeatherStationW's mask but previously absent.
+    readonly property real bayX: terminalBay.x
+    readonly property real bayY: terminalBay.y
+    readonly property real bayWidth: terminalBay.width
+    readonly property real bayHeight: terminalBay.height
+
+    readonly property string outputName:
+        targetScreen ? String(targetScreen.name || "") : ""
+    property var swayOutputs: []
 
     // Last geometry sent to Sway.
     property int lastX: -99999
@@ -68,9 +80,59 @@ Rectangle {
     }
 
     // ─────────────────────────────────────────────
-    // GEOMETRY SYNC
+    // SWAY OUTPUT GEOMETRY
     //
-    // Kitty follows the ACTUAL QML bay position.
+    // Wayland layer-shell mapToGlobal() can be surface-local and is NOT
+    // reliable for swaymsg move absolute. Query the target output's logical
+    // global rect from the compositor and anchor the bay inside that rect.
+    // ─────────────────────────────────────────────
+
+    Process {
+        id: outputProcess
+        command: ["swaymsg", "-t", "get_outputs"]
+
+        stdout: StdioCollector {
+            onStreamFinished: {
+                try {
+                    const parsed = JSON.parse(String(text || ""));
+                    if (!Array.isArray(parsed))
+                        throw new Error("Missing Sway output list");
+                    terminalView.swayOutputs = parsed;
+                    if (terminalView.revealAfterSync)
+                        terminalView.syncGeometry(true);
+                    else if (terminalView.terminalState === "VISIBLE")
+                        terminalView.syncGeometry(false);
+                } catch (error) {
+                    terminalView.terminalState = "OUTPUT ERROR";
+                    console.log("Weather terminal output geometry:", error);
+                }
+            }
+        }
+        onExited: function(exitCode, exitStatus) {
+            if (exitCode !== 0)
+                terminalView.terminalState = "OUTPUT ERROR";
+        }
+    }
+
+    Timer {
+        // A low-frequency output refresh handles hotplug/scale/move. The
+        // existing fast geometry timer emits no Sway command if unchanged.
+        interval: 2000
+        repeat: true
+        running: terminalView.terminalState === "VISIBLE"
+        onTriggered: {
+            if (!outputProcess.running)
+                outputProcess.running = true;
+        }
+    }
+
+    onOutputNameChanged: {
+        if (terminalState !== "IDLE" && !outputProcess.running)
+            outputProcess.running = true;
+    }
+
+    // ─────────────────────────────────────────────
+    // GEOMETRY SYNC
     // ─────────────────────────────────────────────
 
     Process {
@@ -81,7 +143,9 @@ Rectangle {
         property int targetWidth: 0
         property int targetHeight: 0
 
-        command: ["swaymsg", "[app_id=\"^weather-screen$\"] " + "floating enable, " + "border none, " + "resize set " + targetWidth + " " + targetHeight + ", " + "move absolute position " + targetX + " " + targetY + (terminalView.revealAfterSync ? ", scratchpad show" : "")]
+        // Do NOT run "scratchpad show" after placing: it can move/hide
+        // an already-visible scratchpad window or fail for normal Kitty.
+        command: ["swaymsg", "[app_id=\"^weather-screen$\"] " + "floating enable, " + "border none, " + "resize set " + targetWidth + " " + targetHeight + ", " + "move absolute position " + targetX + " " + targetY]
 
         onExited: function (exitCode, exitStatus) {
             if (exitCode === 0) {
@@ -108,17 +172,19 @@ Rectangle {
             return;
         }
 
-        // THIS is the important part:
-        // ask Qt where the bay actually is globally.
-        const point = terminalBay.mapToGlobal(0, 0);
+        const box = SwayGeometry.position(
+            swayOutputs, outputName,
+            stationWidth, stationRightMargin, stationHeaderHeight,
+            stationRailWidth, terminalBay.x, terminalBay.y,
+            terminalBay.width, terminalBay.height
+        );
+        if (!box)
+            return;
 
-        const gx = Math.round(point.x);
-
-        const gy = Math.round(point.y);
-
-        const gw = Math.round(terminalBay.width);
-
-        const gh = Math.round(terminalBay.height);
+        const gx = box.x;
+        const gy = box.y;
+        const gw = box.width;
+        const gh = box.height;
 
         if (!force && gx === lastX && gy === lastY && gw === lastWidth && gh === lastHeight) {
             return;
@@ -177,8 +243,14 @@ Rectangle {
             return;
         }
 
+        if (!outputName) {
+            terminalState = "OUTPUT ERROR";
+            return;
+        }
         terminalState = "STARTING";
-
+        swayOutputs = [];
+        if (!outputProcess.running)
+            outputProcess.running = true;
         if (!launchProcess.running)
             launchProcess.running = true;
     }

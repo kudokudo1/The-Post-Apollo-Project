@@ -11,6 +11,7 @@ import "../services/time/TimeConverterFormat.js" as ConverterFormat
 import "../services/time/StopwatchPolicy.js" as StopwatchPolicy
 import "../services/time/CountdownPolicy.js" as CountdownPolicy
 import "../services/time/MachineTimelinePolicy.js" as MachineTimelinePolicy
+import "../services/time/MachineSelectionPolicy.js" as MachineSelectionPolicy
 
 // TimeW: standalone temporal window. Manual MACHINE timeline markers are
 // session-local; no screenshots or desktop restoration are implemented.
@@ -694,7 +695,8 @@ PanelWindow {
         return count;
     }
     function machineSelectionPreview() {
-        if (!machineCapturePreview)
+        if (!machineCapturePreview
+                || machineSelectionValidation.status !== "ready")
             return null;
         const source = machineCapturePreview;
         return {
@@ -710,6 +712,23 @@ PanelWindow {
                 return timew.machineItemIncluded("windows", i);
             })
         };
+    }
+
+    // Fail-closed selection review. No dependencies are automatically excluded:
+    // the operator decides whether to include a parent or omit its children.
+    readonly property var machineSelectionValidation:
+        MachineSelectionPolicy.validate(machineCapturePreview, machineExcludedItems)
+
+    function machineLocateSelectionIssue() {
+        const issues = machineSelectionValidation.issues;
+        if (!issues || issues.length === 0)
+            return;
+        const first = issues[0];
+        if (first.kind !== "outputs"
+                && first.kind !== "workspaces" && first.kind !== "windows")
+            return;
+        machineInspectKind = first.kind;
+        machineInspectIndex = first.index;
     }
 
     function selectMachineInspectKind(kind) {
@@ -3482,6 +3501,35 @@ PanelWindow {
                                 elide: Text.ElideRight
                             }
                         }
+                        Row {
+                            width: parent.width
+                            height: 27
+                            spacing: 6
+                            visible: timew.machineCapturePreview !== null
+                            GohuText {
+                                width: Math.max(0, parent.width - 96)
+                                anchors.verticalCenter: parent.verticalCenter
+                                text: timew.machineSelectionValidation.status === "ready"
+                                      ? "SELECTION CONSISTENT // NOT SAVED"
+                                      : timew.machineSelectionValidation.issues.length > 0
+                                      ? "BLOCKED " + timew.machineSelectionValidation.issueCount
+                                        + " // " + timew.machineSelectionValidation.issues[0].label
+                                      : "BLOCKED // INVALID PREVIEW"
+                                color: timew.machineSelectionValidation.status === "ready"
+                                       ? Colors.cyan : Colors.orange
+                                font.pixelSize: 10
+                                elide: Text.ElideRight
+                            }
+                            ActionButton {
+                                width: 90
+                                height: parent.height
+                                label: "LOCATE"
+                                labelPixelSize: 10
+                                accentColor: timew.semanticColor
+                                available: timew.machineSelectionValidation.issues.length > 0
+                                onLeftClicked: timew.machineLocateSelectionIssue()
+                            }
+                        }
                         GohuText {
                             width: parent.width
                             visible: timew.machineCapturePreview !== null
@@ -3562,7 +3610,7 @@ PanelWindow {
                         Item {
                             id: machineMarkerArea
                             width: parent.width
-                            height: 67
+                            height: 54
 
                             ListView {
                                 id: machineMarkerList

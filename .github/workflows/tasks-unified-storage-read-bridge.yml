@@ -1,0 +1,35 @@
+name: TASKS Proxy 1 M10g read bridge and cutover
+
+on:
+  pull_request:
+    paths:
+      - 'services/projects/UnifiedStorageReadBridge.js'
+      - 'tests/tasks/test_unified_storage_read_bridge.cjs'
+      - 'docs/tasks-unified-storage-integration-m10g.md'
+      - '.github/workflows/tasks-unified-storage-read-bridge.yml'
+  push:
+    branches:
+      - main
+    paths:
+      - 'services/projects/UnifiedStorageReadBridge.js'
+      - 'tests/tasks/test_unified_storage_read_bridge.cjs'
+      - 'docs/tasks-unified-storage-integration-m10g.md'
+      - '.github/workflows/tasks-unified-storage-read-bridge.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  contract:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Validate M10g read-only v3 downstream compatibility
+        run: node tests/tasks/test_unified_storage_read_bridge.cjs
+      - name: Retain M10d legacy-migration contract
+        run: node tests/tasks/test_legacy_migration_dryrun.cjs
+      - name: Retain M10b offline-journal contract
+        run: node tests/tasks/test_offline_operation_journal.cjs

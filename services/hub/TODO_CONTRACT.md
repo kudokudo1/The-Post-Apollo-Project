@@ -200,3 +200,34 @@ Restart and on-disk persistence acceptance remain operator checks.
 
 **Verification:** pure mapping policy regression and UI source contract run in the TASKS workflow; local window layout and user acceptance remain pending.
 
+
+## TASKS M9a // SYNC Connections navigation (2026-10-22)
+
+**Status:** Isolated draft implementation. This is a navigation bridge and
+UI organization step, **not yet live GitHub project data inside TASKS**.
+
+- SYNC has four local submodes: OVERVIEW, MAP, REVIEW, HISTORY.
+  MAP embeds the unchanged M8 read-only identity/field preview.
+- OVERVIEW reports the current local checklist counts and explicitly says
+  `TASKS LINK // NOT ATTACHED`, `REMOTE PROJECTS // NOT READ HERE`,
+  `REMOTE LINKS // 0 VERIFIED`, and `WRITE READY // 0`.
+- `OPEN GITHUB PROJECTS` is a user action forwarded to `shell.qml`.
+  It closes TASKS, opens the existing GitW GitHub Projects view and grants
+  GitW its existing keyboard owner. **GitW's existing project-list service
+  may perform its regular read-only project discovery**. TASKS does not
+  receive any returned project IDs, credentials or mutation authority.
+- The first Review and History submodes are intentionally honest empty
+  states. No sync comparison has been performed and no TASKS sync history
+  has been recorded. No PULL, PUSH or automatic synchronization exists.
+- Direct display of GitW's remotely verified project IDs inside TASKS will
+  require an explicit read-only service exposure/bridge across the Git-owned
+  widget boundary. This seam is **not changed** in M9a because separate
+  Git/GitHub workstreams exist. Mapping, sync authorization, remote write
+  operations and conflict resolution are future independent milestones.
+- No shared store/schema edits, no background timer, no new GitHub service,
+  and no local machine changes. The only cross-widget code added in this
+  stage is the explicit shell navigation route.
+
+**Verify:** M8 policy tests, M9a source navigation contract and the current
+TASKS suite in GitHub CI. In the desktop, check tabs and opening GitW, then
+confirm no data synchronization occurs. Real on-device acceptance required.

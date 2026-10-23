@@ -99,6 +99,11 @@ PanelWindow {
     function selectBudgetSection(section) {
         if(["budget","transactions","accounts","categories"].indexOf(section)<0)
             return false;
+        // Never hide an unfinished transaction editor or an active write.
+        if((transactionDraftPane.open && section!=="transactions")
+                || financeWrite.state==="pending"
+                || financeWrite.state==="uncertain")
+            return false;
         budgetSection=section;
         budgetScroll.contentY=0;
         return true;
@@ -1035,6 +1040,9 @@ PanelWindow {
             accentColor: root.budgetSection===modelData.key
                 ? Colors.magenta : Colors.cyan
             trackLabelGlowLocally: true
+            available: !transactionDraftPane.open
+                || root.budgetSection!=="transactions"
+                || modelData.key==="transactions"
             onLeftClicked: root.selectBudgetSection(modelData.key)
         }
     }

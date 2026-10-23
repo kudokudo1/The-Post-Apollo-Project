@@ -173,7 +173,15 @@ assert.match(skySource, /height:\s*116[\s\S]*?id:\s*dailyIconGlyph/);
 assert.match(skySource, /id:\s*hourlyRainLabel/);
 assert.ok(!skySource.includes("weather / atmosphere / radar / aviation"));
 assert.match(skySource, /NeonScrollBar\s*\{[\s\S]*?flickable:\s*skyScroll[\s\S]*?handleStyle:\s*"star"/);
-assert.match(spaceSource, /anchors\.margins:\s*24[\s\S]*?spacing:\s*26/);
+assert.match(spaceSource, /anchors\.margins:\s*20[\s\S]*?spacing:\s*14/);
+assert.match(spaceSource, /id:\s*kpInstrument[\s\S]*?width:\s*236[\s\S]*?height:\s*184/);
+assert.match(spaceSource, /id:\s*kpHeroReading[\s\S]*?font\.pixelSize:\s*74/);
+assert.match(spaceSource, /safeSource:\s*kpHeroReading/);
+assert.match(spaceSource, /PLANETARY \/\/ KP INDEX/);
+assert.match(spaceSource, /STREAM SPEED/);
+assert.match(spaceSource, /10\.7 CM RADIO FLUX/);
+assert.match(spaceSource, /font\.pixelSize:\s*30[\s\S]*?TOTAL FIELD/);
+assert.match(spaceSource, /NOAA SWPC \/\/ FOUR LIVE PRODUCTS/);
 
 for (const [id, size] of [["conditionIconGlyph", 104], ["hourlyIconGlyph", 80], ["dailyIconGlyph", 100]]) {
     assert.match(skySource, new RegExp("id: " + id + "[\\s\\S]*?font\\.pixelSize: " + size));

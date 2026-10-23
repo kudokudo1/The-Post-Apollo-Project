@@ -85,10 +85,12 @@ Rectangle {
 
     color: Colors.black
 
+    // Compact observatory view: promote the existing NOAA readings without
+    // introducing another refresh, provider, or invented severity scale.
     Column {
         anchors.fill: parent
-        anchors.margins: 24
-        spacing: 26
+        anchors.margins: 20
+        spacing: 14
 
         Row {
             width: parent.width
@@ -121,32 +123,66 @@ Rectangle {
         }
 
         Row {
-            spacing: 30
+            width: parent.width
+            spacing: 14
 
-            Column {
-                width: 150
-                spacing: 6
+            Rectangle {
+                id: kpInstrument
+                width: 236
+                height: 184
+                color: Colors.dark
+                border.width: 1
+                border.color: space.meterBorderColor
 
                 SecondaryText {
-                    text: "KP INDEX"
+                    anchors.left: parent.left
+                    anchors.top: parent.top
+                    anchors.margins: 12
+                    text: "PLANETARY // KP INDEX"
                     font.pixelSize: 11
                 }
 
-                GohuText {
-                    text: spaceService ? spaceService.kpText : "--"
-                    font.pixelSize: 28
+                // Glow behind the live Kp value, respecting the established
+                // warning palette and the SafeDropShadow teardown behavior.
+                SafeDropShadow {
+                    anchors.fill: kpHeroReading
+                    safeSource: kpHeroReading
+                    requestedVisible: spaceService && spaceService.kpReady
+                    radius: 11
+                    samples: 21
+                    horizontalOffset: 0
+                    verticalOffset: 0
+                    transparentBorder: true
+                    opacity: 0.72
                     color: space.kpColor
                 }
 
                 GohuText {
+                    id: kpHeroReading
+                    anchors.top: parent.top
+                    anchors.topMargin: 29
+                    anchors.horizontalCenter: parent.horizontalCenter
+                    text: spaceService ? spaceService.kpText : "--"
+                    font.pixelSize: 74
+                    color: space.kpColor
+                }
+
+                GohuText {
+                    anchors.horizontalCenter: parent.horizontalCenter
+                    anchors.bottom: kpTrack.top
+                    anchors.bottomMargin: 11
                     text: spaceService ? spaceService.kpLabel : "OFFLINE"
-                    font.pixelSize: 11
+                    font.pixelSize: 12
                     color: space.kpColor
                 }
 
                 Rectangle {
-                    width: 135
-                    height: 8
+                    id: kpTrack
+                    anchors.left: parent.left
+                    anchors.right: parent.right
+                    anchors.bottom: parent.bottom
+                    anchors.margins: 12
+                    height: 9
                     color: Colors.black
                     border.width: 1
                     border.color: space.meterBorderColor
@@ -161,106 +197,122 @@ Rectangle {
                 }
             }
 
-            Column {
-                width: 165
-                spacing: 6
+            Row {
+                width: Math.max(0, parent.width - kpInstrument.width - parent.spacing)
+                spacing: 14
 
-                SecondaryText {
-                    text: "SOLAR WIND"
-                    font.pixelSize: 11
-                }
+                Column {
+                    width: Math.max(0, (parent.width - 2 * parent.spacing) / 3)
+                    spacing: 9
 
-                GohuText {
-                    text: spaceService
-                          ? spaceService.solarWindText : "-- KM/S"
-                    font.pixelSize: 19
-                    color: space.solarWindColor
-                }
+                    SecondaryText {
+                        text: "SOLAR WIND"
+                        font.pixelSize: 11
+                    }
 
-                Rectangle {
-                    width: 135
-                    height: 8
-                    color: Colors.black
-                    border.width: 1
-                    border.color: space.meterBorderColor
+                    GohuText {
+                        text: spaceService
+                              ? spaceService.solarWindText : "-- KM/S"
+                        font.pixelSize: 28
+                        color: space.solarWindColor
+                    }
 
                     Rectangle {
-                        x: 2
-                        anchors.verticalCenter: parent.verticalCenter
-                        width: (parent.width - 4) * space.solarWindMeter
-                        height: parent.height - 4
-                        color: space.meterFillColor
+                        width: parent.width - 10
+                        height: 9
+                        color: Colors.black
+                        border.width: 1
+                        border.color: space.meterBorderColor
+
+                        Rectangle {
+                            x: 2
+                            anchors.verticalCenter: parent.verticalCenter
+                            width: (parent.width - 4) * space.solarWindMeter
+                            height: parent.height - 4
+                            color: space.meterFillColor
+                        }
+                    }
+
+                    QuietText {
+                        text: "STREAM SPEED"
+                        font.pixelSize: 10
                     }
                 }
-            }
 
-            Column {
-                width: 170
-                spacing: 6
+                Column {
+                    width: Math.max(0, (parent.width - 2 * parent.spacing) / 3)
+                    spacing: 9
 
-                SecondaryText {
-                    text: "IMF BZ"
-                    font.pixelSize: 11
-                }
+                    SecondaryText {
+                        text: "IMF BZ"
+                        font.pixelSize: 11
+                    }
 
-                GohuText {
-                    text: spaceService ? spaceService.bzText : "-- nT"
-                    font.pixelSize: 19
-                    color: space.bzColor
-                }
-
-                GohuText {
-                    text: spaceService ? spaceService.bzLabel : "OFFLINE"
-                    font.pixelSize: 10
-                    color: space.bzColor
-                }
-
-                Rectangle {
-                    width: 145
-                    height: 8
-                    color: Colors.black
-                    border.width: 1
-                    border.color: space.meterBorderColor
+                    GohuText {
+                        text: spaceService ? spaceService.bzText : "-- nT"
+                        font.pixelSize: 28
+                        color: space.bzColor
+                    }
 
                     Rectangle {
-                        x: 2
-                        anchors.verticalCenter: parent.verticalCenter
-                        width: (parent.width - 4) * space.bzMeter
-                        height: parent.height - 4
-                        color: space.meterFillColor
+                        width: parent.width - 10
+                        height: 9
+                        color: Colors.black
+                        border.width: 1
+                        border.color: space.meterBorderColor
+
+                        Rectangle {
+                            x: 2
+                            anchors.verticalCenter: parent.verticalCenter
+                            width: (parent.width - 4) * space.bzMeter
+                            height: parent.height - 4
+                            color: space.meterFillColor
+                        }
+                    }
+
+                    GohuText {
+                        width: parent.width
+                        text: spaceService ? spaceService.bzLabel : "OFFLINE"
+                        font.pixelSize: 11
+                        color: space.bzColor
                     }
                 }
-            }
 
-            Column {
-                width: 170
-                spacing: 6
+                Column {
+                    width: Math.max(0, (parent.width - 2 * parent.spacing) / 3)
+                    spacing: 9
 
-                SecondaryText {
-                    text: "F10.7 FLUX"
-                    font.pixelSize: 11
-                }
+                    SecondaryText {
+                        text: "F10.7 FLUX"
+                        font.pixelSize: 11
+                    }
 
-                GohuText {
-                    text: spaceService
-                          ? spaceService.solarFluxText : "-- SFU"
-                    font.pixelSize: 19
-                    color: Colors.white
-                }
-
-                Rectangle {
-                    width: 135
-                    height: 8
-                    color: Colors.black
-                    border.width: 1
-                    border.color: space.meterBorderColor
+                    GohuText {
+                        text: spaceService
+                              ? spaceService.solarFluxText : "-- SFU"
+                        font.pixelSize: 28
+                        color: Colors.white
+                    }
 
                     Rectangle {
-                        x: 2
-                        anchors.verticalCenter: parent.verticalCenter
-                        width: (parent.width - 4) * space.solarFluxMeter
-                        height: parent.height - 4
-                        color: space.meterFillColor
+                        width: parent.width - 10
+                        height: 9
+                        color: Colors.black
+                        border.width: 1
+                        border.color: space.meterBorderColor
+
+                        Rectangle {
+                            x: 2
+                            anchors.verticalCenter: parent.verticalCenter
+                            width: (parent.width - 4) * space.solarFluxMeter
+                            height: parent.height - 4
+                            color: space.meterFillColor
+                        }
+                    }
+
+                    QuietText {
+                        text: "10.7 CM RADIO FLUX"
+                        font.pixelSize: 10
                     }
                 }
             }
@@ -272,11 +324,12 @@ Rectangle {
         }
 
         Row {
-            spacing: 18
+            width: parent.width
+            spacing: 14
 
             Column {
-                width: 150
-                spacing: 5
+                width: 180
+                spacing: 6
 
                 SecondaryText {
                     text: "IMF BT"
@@ -287,13 +340,13 @@ Rectangle {
                     text: space.btValue >= 0
                           ? space.btValue.toFixed(1) + " nT"
                           : "-- nT"
-                    font.pixelSize: 18
+                    font.pixelSize: 30
                     color: Colors.white
                 }
 
                 Rectangle {
-                    width: 125
-                    height: 8
+                    width: 158
+                    height: 9
                     color: Colors.black
                     border.width: 1
                     border.color: space.meterBorderColor
@@ -309,88 +362,93 @@ Rectangle {
 
                 QuietText {
                     text: "TOTAL FIELD"
-                    font.pixelSize: 9
+                    font.pixelSize: 10
                 }
             }
 
-            Column {
-                width: 135
-                spacing: 5
+            Row {
+                width: Math.max(0, parent.width - 180 - parent.spacing)
+                spacing: 10
 
-                SecondaryText {
-                    text: "KP SAMPLE"
-                    font.pixelSize: 11
+                Column {
+                    width: Math.max(0, (parent.width - 3 * parent.spacing) / 4)
+                    spacing: 6
+
+                    SecondaryText {
+                        text: "KP SAMPLE"
+                        font.pixelSize: 11
+                    }
+
+                    GohuText {
+                        text: spaceService
+                              ? space.shortSampleTime(spaceService.kpTime)
+                              : "--"
+                        font.pixelSize: 12
+                        color: Colors.cyan
+                    }
                 }
 
-                GohuText {
-                    text: spaceService
-                          ? space.shortSampleTime(spaceService.kpTime)
-                          : "--"
-                    font.pixelSize: 12
-                    color: Colors.cyan
-                }
-            }
+                Column {
+                    width: Math.max(0, (parent.width - 3 * parent.spacing) / 4)
+                    spacing: 6
 
-            Column {
-                width: 135
-                spacing: 5
+                    SecondaryText {
+                        text: "WIND SAMPLE"
+                        font.pixelSize: 11
+                    }
 
-                SecondaryText {
-                    text: "WIND SAMPLE"
-                    font.pixelSize: 11
-                }
-
-                GohuText {
-                    text: spaceService
-                          ? space.shortSampleTime(spaceService.solarWindTime)
-                          : "--"
-                    font.pixelSize: 12
-                    color: Colors.cyan
-                }
-            }
-
-            Column {
-                width: 135
-                spacing: 5
-
-                SecondaryText {
-                    text: "IMF SAMPLE"
-                    font.pixelSize: 11
+                    GohuText {
+                        text: spaceService
+                              ? space.shortSampleTime(spaceService.solarWindTime)
+                              : "--"
+                        font.pixelSize: 12
+                        color: Colors.cyan
+                    }
                 }
 
-                GohuText {
-                    text: spaceService
-                          ? space.shortSampleTime(
-                                spaceService.magneticFieldTime
-                            )
-                          : "--"
-                    font.pixelSize: 12
-                    color: Colors.cyan
+                Column {
+                    width: Math.max(0, (parent.width - 3 * parent.spacing) / 4)
+                    spacing: 6
+
+                    SecondaryText {
+                        text: "IMF SAMPLE"
+                        font.pixelSize: 11
+                    }
+
+                    GohuText {
+                        text: spaceService
+                              ? space.shortSampleTime(
+                                    spaceService.magneticFieldTime
+                                )
+                              : "--"
+                        font.pixelSize: 12
+                        color: Colors.cyan
+                    }
                 }
-            }
 
-            Column {
-                width: 135
-                spacing: 5
+                Column {
+                    width: Math.max(0, (parent.width - 3 * parent.spacing) / 4)
+                    spacing: 6
 
-                SecondaryText {
-                    text: "FLUX SAMPLE"
-                    font.pixelSize: 11
-                }
+                    SecondaryText {
+                        text: "FLUX SAMPLE"
+                        font.pixelSize: 11
+                    }
 
-                GohuText {
-                    text: spaceService
-                          ? space.shortSampleTime(spaceService.solarFluxTime)
-                          : "--"
-                    font.pixelSize: 12
-                    color: Colors.cyan
+                    GohuText {
+                        text: spaceService
+                              ? space.shortSampleTime(spaceService.solarFluxTime)
+                              : "--"
+                        font.pixelSize: 12
+                        color: Colors.cyan
+                    }
                 }
             }
         }
 
         QuietText {
-            text: "solar / geomagnetic / astronomy / orbital"
-            font.pixelSize: 13
+            text: "NOAA SWPC // FOUR LIVE PRODUCTS // INDEPENDENT SAMPLE TIMES"
+            font.pixelSize: 11
         }
     }
 }

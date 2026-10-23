@@ -2463,8 +2463,7 @@ PanelWindow {
                                 height: parent.height
                                 label: timew.stopwatchRunning ? "LAP" : "RESET"
                                 labelPixelSize: 12
-                                accentColor: timew.stopwatchRunning
-                                             ? Colors.white : Colors.red
+                                accentColor: timew.semanticColor
                                 trackLabelGlowLocally: true
                                 available: timew.stopwatchStarted
                                 onLeftClicked: {

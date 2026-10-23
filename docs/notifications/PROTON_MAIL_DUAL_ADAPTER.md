@@ -171,6 +171,71 @@ Documentation for the version already in use:
 - https://quickshell.org/docs/v0.2.1/types/Quickshell.Io/Socket/
 - https://quickshell.org/docs/v0.2.1/types/Quickshell.Io/SplitParser/
 
+## Notification-to-message correlation proof gate (2026-10-23)
+
+**Current issue observed:** The operator has verified a single selected Proton row
+(\`selectedMailRows=1\`, \`selectedRowStructureOk=true\`) and a real enabled
+\`toolbar:read\` button. That does not connect this row to any Quickshell
+notification.
+
+**Upstream source finding:** Proton WebClients' current web-mail
+\`applications/mail/src/app/hooks/mailbox/notifications/notificationHelpers.ts\`
+calls \`create(title, { tag: notificationData.ID, ... })\`, where
+\`notificationData.ID\` is the actual \`message.ID\`. In conversation mode its
+click-through location may instead use a conversation \`elementID\` plus a
+separate \`messageID\`; grouped notifications do not represent one message.
+The helper in \`packages/shared/lib/helpers/desktopNotification.ts\`
+creates a browser \`new Notification(...)\`. However, **the existing
+Quickshell notification intake does not expose a verified link to the
+web Notification's \`tag\`**: \`NotificationsConverter.qml\` only maps app
+metadata and displayed fields, while \`NotificationsService.qml\` generates
+its own \`eventId\` upon receiving an OS notification. A notification title,
+sender, timestamp, website host, browser click-through URL or hypothetical
+string-equal \`tag\` is therefore insufficient and must never be used as an
+authentication shortcut.
+
+- https://github.com/ProtonMail/WebClients/blob/main/applications/mail/src/app/hooks/mailbox/notifications/notificationHelpers.ts
+- https://github.com/ProtonMail/WebClients/blob/main/packages/shared/lib/helpers/desktopNotification.ts
+
+**New offline policy:** \`services/notifications/mail/ProtonNotificationCorrelationPolicy.js\`
+exports \`makeVerifier(nativeDeliveryFor, providerMessageFor, isLiveEvent,
+now)\`. This can be supplied to the existing memory-only
+\`ProtonMailBindingLedger.createLedger()\` only by a trusted controller.
+
+- \`nativeDeliveryFor(eventId)\` must retrieve an independently authenticated
+  record, generated *at the notification-delivery boundary*, with exact
+  provider provenance, stable source-event correlation key, account, **single**
+  message identity and delivery time. It must not merely reconstruct a record
+  from the OS notification's summary/body/app name.
+- \`providerMessageFor(adapterTicket)\` must retrieve an independently
+  provider-verified single-message record containing the **same** source event
+  key, account and exact message reference. A user-selected row ID or an
+  externally asserted \`attested:true\` field is not a verified provider
+  witness, and a conversation record is not a single message.
+- Only when both independently authenticated records agree, the event is
+  still live, and both records are fresh does this pure policy return a
+  private ledger-compatible binding. It exports no subject, body, link,
+  native event source key or adapter ticket.
+- Without either trusted provider, it fails closed and returns no binding.
+  Neither callback has a real implementation today. A shared key copied from
+  untrusted data is **not** proof: real producers still must establish the
+  origin/authority of each record.
+
+**No new permissions, native host messages, Quickshell wiring, mailbox
+actions or local install.** Tests simulate separate evidence registries,
+correct and mismatched keys/account/message, grouped/conversation events,
+expired and revoked events, forged proposals and compatibility with the
+existing routing/ledger policy. They are *not* a successful live provider
+correlation test.
+
+**Operator choice needed before live pairing:** Determine which *actual
+supported* mechanism will provide trustworthy event-level evidence for
+Brave/free Proton. A reviewed provider-side notification producer or an
+explicit verified, single-message pairing UX are candidates, but neither
+is approved or implemented. Do not assume browser Web Notifications expose
+their per-message \`tag\` through the desktop notification protocol.
+Paid Bridge is another adapter, not an automatic browser-event match.
+
 ## Remaining implementation gates
 
 1. Browser: test each supported browser family's extension API and the real Proton UI to establish a **stable account and exact message identity** from the authenticated page without capturing session secrets. Explicit local installation + validation required. Do not automate uncertain DOM selectors.

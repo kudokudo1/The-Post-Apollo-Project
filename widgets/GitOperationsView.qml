@@ -12,8 +12,12 @@ Item {
     property int selectedIndex: 0
     property string statusText: ""
 
+    // Do not materialize a 500-record journal list or recompute guarded
+    // previews while this page is hidden. Rebind to the current complete
+    // repository history immediately when the Operations page opens.
+    // The journal service and its synchronous durability remain unchanged.
     readonly property var entries:
-        operationJournal
+        root.visible && operationJournal
         ? operationJournal.repositoryEntries
         : []
     readonly property var selectedRecord:

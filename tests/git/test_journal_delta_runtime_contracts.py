@@ -29,6 +29,13 @@ refresh_at = finalize.rindex('refresh();')
 assert journal_at < unlock_at < refresh_at, (
     "completion must be journaled before unlocking, with refresh afterward"
 )
+assert 'journalRecorded = operationJournal.completeOperation(' in finalize
+assert 'journalRecorded = operationJournal.failOperation(' in finalize
+assert 'if (!journalRecorded)' in finalize
+assert '"JOURNAL NOT RECORDED // Git subprocess "' in finalize
+assert 'actionExitCode = 1;' in finalize.split('if (!journalRecorded)', 1)[1], (
+    "the UI must warn even if Git itself succeeded"
+)
 local_actions = widget.split('label: "FETCH"', 1)[1].split('label: "STATUS"', 1)[0]
 fetch = local_actions.split('label: "FETCH"', 1)[-1].split('onTriggered: gitService.runSyncAction("fetch")', 1)[0]
 pull = local_actions.split('gitService.runSyncAction("pull");', 1)[0]

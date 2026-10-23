@@ -33,7 +33,7 @@ function extract(name) {
 const names=[
     "nowIso","cloneValue","nextOperationId","entryIndex","beginOperation",
     "completedRecoveryClass","completeOperation","failOperation","load",
-    "markUndoResult","persist"
+    "markUndoResult","blockStorage","requireWriteAck","persist"
 ];
 const funcs=names.map(extract).join("\n");
 const delta=fs.readFileSync("services/git/GitJournalDelta.js","utf8");
@@ -47,19 +47,43 @@ function create(disk, requested=true, limit=48) {
         maxEntries:500, serial:0, entries:[], encodedEntries:[],
         deltaRequested:requested, deltaActive:false,
         storageReady:false, storageError:"", checkpointGeneration:0,
+        journalWriteStatus:0, journalWriteError:"",
+        deltaWriteStatus:0, deltaWriteError:"",
         deltaRecords:[],maxDeltaRecords:limit,
         lastPersistSerializationMs:0,lastPersistWriteMs:0,lastPersistReusedCount:0,
         operationStarted(id,record){events.push(["start",id,record.status]);},
         operationFinished(id,ok,record){events.push(["finish",id,ok,record.status]);},
         journalFile:{
             text(){return disk.main||"";},
-            setText(content){disk.main=content;
-                if(disk.failAfterBaseWrite){disk.failAfterBaseWrite=false;throw Error("SIMULATED_CRASH_AFTER_CHECKPOINT");}
+            setText(content){
+                if(disk.failBaseWrite){
+                    disk.failBaseWrite=false;
+                    context.journalWriteStatus=-1;
+                    context.journalWriteError="SIMULATED_BASE_SAVE_FAILED";
+                    return;
+                }
+                disk.main=content;
+                context.journalWriteStatus=1;
+                if(disk.failAfterBaseWrite){
+                    disk.failAfterBaseWrite=false;
+                    throw Error("SIMULATED_CRASH_AFTER_CHECKPOINT");
+                }
             }
         },
         deltaFile:{
             text(){return disk.delta||"";},
-            setText(content){disk.delta=content;}
+            setText(content){
+                const clearing=JSON.parse(content).records.length===0;
+                if(disk.failDeltaWrite || (clearing && disk.failSidecarClear)){
+                    disk.failDeltaWrite=false;
+                    disk.failSidecarClear=false;
+                    context.deltaWriteStatus=-1;
+                    context.deltaWriteError="SIMULATED_DELTA_SAVE_FAILED";
+                    return;
+                }
+                disk.delta=content;
+                context.deltaWriteStatus=1;
+            }
         }
     };
     context.DeltaCodec=vm.createContext({});
@@ -129,10 +153,9 @@ const cp=create(cpDisk,true,2);
 let first=cp.call("beginOperation","CONTROL/FETCH",snapshot(),meta());
 assert(first);
 cpDisk.failAfterBaseWrite=true;
-let threw=false;
-try {cp.call("beginOperation","CONTROL/PULL",snapshot(),meta());}
-catch(e){threw=true;}
-assert(threw,"must simulate a crash after durable base, before clear");
+assert.equal(cp.call("beginOperation","CONTROL/PULL",snapshot(),meta()),"");
+assert.equal(cp.scope.storageReady,false,"uncertain checkpoint acknowledgement blocks writes");
+assert.match(cp.scope.storageError,/SIMULATED_CRASH_AFTER_CHECKPOINT/);
 assert.equal(JSON.parse(cpDisk.main).checkpointGeneration,1);
 assert.equal(JSON.parse(cpDisk.delta).baseGeneration,0);
 const replay=create(cpDisk,false,2);
@@ -142,6 +165,55 @@ assert.equal(replay.scope.entries[0].kind,"CONTROL/PULL");
 assert.equal(replay.scope.entries[1].id,first);
 assert.equal(replay.scope.entries[0].status,"INTERRUPTED");
 assert.equal(replay.scope.entries[1].status,"INTERRUPTED");
+
+// A failed BEFORE write must not launch Git or emit operationStarted.
+const deniedDisk={};
+const denied=create(deniedDisk,true);
+deniedDisk.failDeltaWrite=true;
+assert.equal(denied.call("beginOperation","CONTROL/FETCH",snapshot(),meta()),"");
+assert.equal(denied.scope.storageReady,false);
+assert.equal(denied.events.length,0);
+assert.equal(deniedDisk.delta,undefined);
+assert.match(denied.scope.storageError,/DELTA WRITE FAILED/);
+assert.equal(denied.call("beginOperation","CONTROL/FETCH",snapshot(),meta()),"");
+
+// Successful Git execution does not make a failed AFTER save successful.
+const afterDisk={};
+const afterService=create(afterDisk,true);
+const afterId=afterService.call("beginOperation","CONTROL/PULL",snapshot(),meta());
+assert(afterId);
+afterDisk.failDeltaWrite=true;
+assert.equal(afterService.call("completeOperation",afterId,snapshot(),"git succeeded"),false);
+assert.equal(afterService.events.length,1,"no false operationFinished on failed save");
+assert.equal(afterService.scope.storageReady,false);
+assert.equal(JSON.parse(afterDisk.delta).records[0].status,"RUNNING");
+assert.equal(create(afterDisk,true).scope.entries[0].status,"INTERRUPTED");
+
+// Default full-checkpoint mode must also honor failed save acknowledgements.
+const legacyWriteFailure={};
+const oldWriter=create(legacyWriteFailure,false);
+legacyWriteFailure.failBaseWrite=true;
+assert.equal(oldWriter.call("beginOperation","CONTROL/FETCH",snapshot(),meta()),"");
+assert.equal(oldWriter.scope.storageReady,false);
+assert.equal(oldWriter.events.length,0);
+assert.equal(legacyWriteFailure.main,undefined);
+
+// Failing to clear the sidecar after a committed checkpoint is uncertain;
+// block writes and recover the already-committed generation after restart.
+const clearDisk={};
+const clearing=create(clearDisk,true,2);
+const clearId=clearing.call("beginOperation","CONTROL/FETCH",snapshot(),meta());
+assert(clearId);
+clearDisk.failSidecarClear=true;
+assert.equal(clearing.call("beginOperation","CONTROL/PULL",snapshot(),meta()),"");
+assert.equal(clearing.scope.storageReady,false);
+assert.match(clearing.scope.storageError,/DELTA WRITE FAILED/);
+assert.equal(JSON.parse(clearDisk.main).checkpointGeneration,1);
+assert.equal(JSON.parse(clearDisk.delta).baseGeneration,0);
+const clearReload=create(clearDisk,false,2);
+assert.equal(clearReload.scope.storageReady,true);
+assert.equal(clearReload.scope.entries.length,2);
+assert.equal(clearReload.scope.entries[0].kind,"CONTROL/PULL");
 
 // Corrupt or incompatible storage must never admit a new operation.
 for(const storage of [

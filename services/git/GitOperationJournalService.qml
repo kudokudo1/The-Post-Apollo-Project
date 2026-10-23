@@ -28,6 +28,12 @@ Scope {
     property bool deltaActive: false
     property bool storageReady: false
     property string storageError: ""
+    // FileView.setText() returns void. With blockWrites enabled, these
+    // statuses are synchronously set by saved()/saveFailed() before it returns.
+    property int journalWriteStatus: 0
+    property string journalWriteError: ""
+    property int deltaWriteStatus: 0
+    property string deltaWriteError: ""
     property int checkpointGeneration: 0
     property var deltaRecords: []
     property int maxDeltaRecords: 48
@@ -108,7 +114,8 @@ Scope {
             next.length = maxEntries;
 
         entries = next;
-        persist(record);
+        if (!persist(record))
+            return "";
         operationStarted(operationId, cloneValue(record));
         return operationId;
     }
@@ -164,7 +171,8 @@ Scope {
 
         next[index] = record;
         entries = next;
-        persist(record);
+        if (!persist(record))
+            return false;
         operationFinished(operationId, true, cloneValue(record));
         return true;
     }
@@ -195,7 +203,8 @@ Scope {
 
         next[index] = record;
         entries = next;
-        persist(record);
+        if (!persist(record))
+            return false;
         operationFinished(operationId, false, cloneValue(record));
         return true;
     }
@@ -318,7 +327,23 @@ Scope {
 
         next[index] = record;
         entries = next;
-        persist();
+        return persist();
+    }
+
+    function blockStorage(reason) {
+        storageReady = false;
+        storageError = "JOURNAL STORAGE BLOCKED // " + String(reason);
+        console.warn(storageError);
+        return false;
+    }
+
+    function requireWriteAck(channel) {
+        const checkpoint = channel === "CHECKPOINT";
+        const status = checkpoint ? journalWriteStatus : deltaWriteStatus;
+        const error = checkpoint ? journalWriteError : deltaWriteError;
+        if (status !== 1)
+            return blockStorage(channel + " WRITE FAILED // "
+                + (error || "NO SYNCHRONOUS SAVED SIGNAL"));
         return true;
     }
 
@@ -326,6 +351,7 @@ Scope {
         if (!storageReady)
             return false;
 
+        try {
         const deltaEligible = record
             && (record.kind === "CONTROL/FETCH"
                 || record.kind === "CONTROL/PULL");
@@ -337,7 +363,11 @@ Scope {
                     checkpointGeneration, revised
                 );
                 const writeStarted = Date.now();
+                deltaWriteStatus = 0;
+                deltaWriteError = "";
                 deltaFile.setText(serialized);
+                if (!requireWriteAck("DELTA"))
+                    return false;
                 const written = Date.now();
                 deltaRecords = revised;
                 lastPersistSerializationMs = writeStarted - start;
@@ -366,11 +396,19 @@ Scope {
             })
             : encoded.text;
         const writeStarted = Date.now();
+        journalWriteStatus = 0;
+        journalWriteError = "";
         journalFile.setText(data);
+        if (!requireWriteAck("CHECKPOINT"))
+            return false;
         if (deltaActive) {
+            deltaWriteStatus = 0;
+            deltaWriteError = "";
             deltaFile.setText(
                 DeltaCodec.encodeSidecar(nextGeneration, [])
             );
+            if (!requireWriteAck("DELTA"))
+                return false;
             checkpointGeneration = nextGeneration;
             deltaRecords = [];
         }
@@ -380,6 +418,9 @@ Scope {
         lastPersistWriteMs = written - writeStarted;
         lastPersistReusedCount = encoded.reusedCount;
         return true;
+        } catch (error) {
+            return blockStorage("PERSIST EXCEPTION // " + String(error));
+        }
     }
 
     FileView {
@@ -390,7 +431,11 @@ Scope {
         blockWrites: true
         atomicWrites: true
         printErrors: false
-
+        onSaved: root.journalWriteStatus = 1
+        onSaveFailed: function(error) {
+            root.journalWriteStatus = -1;
+            root.journalWriteError = String(error);
+        }
     }
 
     FileView {
@@ -400,6 +445,11 @@ Scope {
         blockWrites: true
         atomicWrites: true
         printErrors: false
+        onSaved: root.deltaWriteStatus = 1
+        onSaveFailed: function(error) {
+            root.deltaWriteStatus = -1;
+            root.deltaWriteError = String(error);
+        }
     }
 
     Component.onCompleted: {

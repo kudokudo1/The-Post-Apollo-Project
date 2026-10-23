@@ -1,4 +1,4 @@
-name: Tasks Planner M1
+name: Tasks Planner
 on:
   pull_request:
     paths:
@@ -10,6 +10,7 @@ on:
     paths:
       - 'widgets/tasks/TaskPlanner*'
       - 'tests/tasks/test_task_planner*'
+      - 'tests/fixtures/TaskPlannerPreview.qml'
       - '.github/workflows/tasks-planner.yml'
 jobs:
   planner:

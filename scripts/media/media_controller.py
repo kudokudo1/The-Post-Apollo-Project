@@ -185,6 +185,15 @@ class MediaController:
                     "observed": False, "reason": exc.reason,
                     "ownedByController": False, "current": None}
 
+    def _loaded_radio_health(self) -> dict[str, Any] | None:
+        if not self.loaded or self.loaded.get("ref", {}).get("source") != "radio-browser":
+            return None
+        relay = getattr(self.backends["mpd"], "radio_relay", None)
+        observe = getattr(relay, "health", None)
+        if not callable(observe):
+            return {"state": "unknown", "bytesReceived": 0, "errorCode": None}
+        return observe(self.loaded.get("cueUri"))
+
     def snapshot(self) -> dict[str, Any]:
         return {
             "generation": self.generation,
@@ -195,6 +204,7 @@ class MediaController:
             "selection": self.selection,
             "loaded": self.loaded,
             "session": self._session(),
+            "radioHealth": self._loaded_radio_health(),
             "visualization": {"mode": "desktop", "playerAvailable": False},
             "audio": {"playerVolume": "unavailable", "playerCava": "unavailable"},
         }

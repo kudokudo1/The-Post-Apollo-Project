@@ -310,6 +310,106 @@ Manual per-message pairing is an alternative only with a deliberate user
 confirmation and a clear distinction between user-attested selection and
 provider-verified message identity. Neither path is approved for activation.
 
+## Click-only browser Notification event observation pilot (2026-10-23)
+
+**Problem addressed:** The operator's live Brave/Quickshell audit reported
+`hintCount=4`, `desktopEntryHint=true`, `tagHint=false`,
+`actionCount=2`, and **identity NOT verified** for a browser-originated
+notification. Proton's public mail client creates a Web Notification with
+`tag: notificationData.ID`, but Brave's native desktop notification bridge
+does not show the message tag in any of the recognized hint fields. Further
+native metadata guessing is not warranted.
+
+**This stage is observation only, NOT a producer or mailbox adapter.** No
+host permissions, all-sites registration, content-script manifest entries,
+mailbox APIs, provider credentials, desktop notification creation or mailbox
+mutations are added.
+
+The shared Chromium/Firefox extension adds an optional **user-click-scoped**
+`notification_event_pilot.js` launched by `background.js` into **only
+the exact active `https://mail.proton.me` top-level tab**, using the already
+granted `activeTab` and `scripting` permissions and `world: "MAIN"`.
+
+1. On the **first** companion toolbar click, the page-realm script temporarily
+   wraps the page's `window.Notification` constructor with a pass-through
+   `Proxy`, tracking **only the capped number of construction attempts**.
+   It never inspects or stores constructor arguments, title, body, tags,
+   message IDs, email addresses, URLs, cookies or page storage.
+2. The wrapper calls the original constructor with unchanged arguments and
+   new-target; static properties remain delegated through the Proxy.
+   **This is instrumenting page JavaScript, not passive observation**.
+   Proton can detect or interfere with it; site behavior may differ. No
+   result is authoritative identity evidence.
+3. A **second** companion click within 90 seconds stops counting, restores
+   the original constructor if nobody else replaced it, and logs a line
+   containing only `stage=stopped attempts=N capped=false/true` plus
+   `identity NOT verified` to the **extension service-worker console**.
+   After 90 seconds the script automatically restores the constructor;
+   the next click reports `stage=expired` and the count. Further clicks
+   can begin a fresh window. A page reload or navigation discards the
+   in-page state. The cap is 20 attempts.
+4. If there is no writable `window.Notification`, an unsupported injection
+   context, a property collision or a browser API error, report only
+   `unavailable`. No attempt is made to force an injection, bypass CSP,
+   change browser permissions or restore over another script's replacement.
+
+The original V4 readiness probe and native `PING` still run on each click;
+a missing native host remains expected. The new event data is never sent to
+the native host, the OS notification service, the Quickshell history/ledger
+or the Post-Apollo MAIL actions.
+
+**Limits that materially affect interpretation:**
+
+- `attempts>0` proves only that the current page-realm wrapper was invoked,
+  not that an email was received, the notification appeared, or its message
+  identity was authenticated. The Proton page is itself untrusted as a source
+  of security assertions.
+- `attempts=0` does NOT prove Proton creates no notifications. The pilot
+  misses notifications that happened before the first click, calls through
+  a cached constructor, other tabs/windows, and service-worker
+  `registration.showNotification()`. A notification still appearing in
+  Post-Apollo with zero page attempts would be useful architectural evidence
+  of an alternate path, not a test failure.
+- This uses MAIN-world interception and should be treated as a security and
+  compatibility experiment. Firefox-family MAIN-world support must be
+  tested on the actual browser before claiming live compatibility.
+- **No message ID is available** and no existing Post-Apollo notification
+  becomes an actionable mail binding. All six provider MAIL buttons remain
+  disabled. The relay, private ledger and independent correlation policy
+  remain unactivated by this change.
+
+**Operator review/use after explicit merge and local extension reload:**
+
+- Visit Proton Mail in Brave, open `brave://extensions`, reload the unpacked
+  companion, and open its **service-worker developer console**.
+- Click the companion once while the Proton tab is active and verify
+  `Post-Apollo Proton: event pilot stage=started attempts=0 ...`.
+- During the 90-second window, allow a naturally arriving *new* Proton web
+  notification (for example, a GitHub PR email). Do not intentionally fail
+  work or disclose the email content for testing.
+- Click the companion again, inspect the `event pilot stage=stopped` line.
+  Do not interpret any count as account/message identification. If a
+  notification is not delivered during the window, the result is inconclusive.
+
+Browser API documentation:
+- https://developer.chrome.com/docs/extensions/reference/api/scripting
+- https://developer.mozilla.org/en-US/docs/Mozilla/Add-ons/WebExtensions/API/scripting/ExecutionWorld
+
+**Verification:** `python3
+tests/notifications/test_proton_notification_event_pilot.py`
+tests constructor delegation and restoration, explicit toggle, expiry,
+count cap, wrong-origin blocking, unsupported property, tampering and
+Chromium/Firefox extension service-worker mocks. These are synthetic tests,
+not a live Proton account or desktop notification test.
+
+**NEXT:** Observe a real Proton browser notification within the explicit
+window and determine whether the page constructor is an accessible
+event source. If it is not, do not guess message IDs. Evaluate supported,
+separately authorized opt-in provider message events or manual pairing
+instead. If it is, establishing **authenticated individual message identity**
+and private native-event provenance remains a separate implementation and
+operator-approval milestone.
+
 ## Remaining implementation gates
 
 1. Browser: test each supported browser family's extension API and the real Proton UI to establish a **stable account and exact message identity** from the authenticated page without capturing session secrets. Explicit local installation + validation required. Do not automate uncertain DOM selectors.

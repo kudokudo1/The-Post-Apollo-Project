@@ -401,7 +401,7 @@ Item {
                                 height: spectrum.height + 6
                                 radius: 0
                                 gradient: mediaDock.cavaVerticalGradient
-                                opacity: 0.30 + 0.24 * glowActivity
+                                opacity: 0.30 + 0.24 * parent.parent.glowActivity
                             }
                         }
 
@@ -420,7 +420,7 @@ Item {
                                 height: spectrum.height + 2
                                 radius: 0
                                 gradient: mediaDock.cavaVerticalGradient
-                                opacity: 0.50 + 0.30 * glowActivity
+                                opacity: 0.50 + 0.30 * parent.parent.glowActivity
                             }
                         }
 

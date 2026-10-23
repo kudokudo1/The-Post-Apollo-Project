@@ -205,7 +205,8 @@ with tempfile.TemporaryDirectory(prefix="pa-task-sqlite-m10j-") as temp:
     finally:
         con.close()
     expect_error(lambda: store.read(path), "INDEX_DIVERGENCE")
-    expect_error(lambda: store.commit(path, candidate(sending),
+    expect_error(lambda: store.commit(path, candidate(sending, field="description",
+            value="Would rewrite corrupted index"),
             expected_revision=restart["revision"],
             expected_hash=restart["hash"]), "INDEX_DIVERGENCE")
 

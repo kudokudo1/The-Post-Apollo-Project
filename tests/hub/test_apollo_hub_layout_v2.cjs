@@ -271,7 +271,8 @@ assert.equal(chooser.query,"");
 assert.equal(chooser.total,10);
 assert.equal(chooser.matchCount,10);
 assert.equal(chooser.items.length,10);
-assert.deepEqual(chooser.items.map(row=>row.id),Array.from(layout.MODULE_IDS));
+// The policy runs in a separate VM realm, so convert its array to plain JS.
+assert.deepEqual(toPlain(chooser.items.map(row=>row.id)),Array.from(layout.MODULE_IDS));
 assert.equal(chooser.items.filter(row=>row.selected).length,1);
 assert.equal(chooser.items.find(row=>row.selected).id,"time");
 assert.equal(chooser.items.find(row=>row.id==="todo").inUse,true);

@@ -16,6 +16,10 @@ on:
       - "tests/finance/test_funding_disposable_rehearsal.mjs"
       - "scripts/finance/allocation_guard.mjs"
       - "scripts/finance/write_allocation.mjs"
+      - "scripts/finance/funding_guard.mjs"
+      - "scripts/finance/write_funding.mjs"
+      - "tests/finance/test_funding_guard.mjs"
+      - "tests/finance/test_funding_write_gate.mjs"
       - ".github/workflows/financew-disposable-actual.yml"
   push:
     branches: [main]
@@ -33,6 +37,10 @@ on:
       - "tests/finance/test_funding_disposable_rehearsal.mjs"
       - "scripts/finance/allocation_guard.mjs"
       - "scripts/finance/write_allocation.mjs"
+      - "scripts/finance/funding_guard.mjs"
+      - "scripts/finance/write_funding.mjs"
+      - "tests/finance/test_funding_guard.mjs"
+      - "tests/finance/test_funding_write_gate.mjs"
       - ".github/workflows/financew-disposable-actual.yml"
   workflow_dispatch:
 
@@ -57,7 +65,7 @@ jobs:
         run: |
           node --check scripts/finance/disposable_actual_roundtrip.mjs
           node scripts/finance/disposable_actual_roundtrip.mjs
-      - name: D12b / D17b real Actual allocation and fictional funding rehearsal
+      - name: D12b / D17b / D17c real Actual disposable financial writer checks
         env:
           FINANCEW_DISPOSABLE_TEST: "yes"
         run: |

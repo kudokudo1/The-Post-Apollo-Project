@@ -27,6 +27,7 @@ if(process.env.GITHUB_ACTIONS!=="true" || process.env.CI!=="true"
 const here=dirname(fileURLToPath(import.meta.url));
 const binary=join(here,"node_modules",".bin","actual-server");
 const writer=join(here,"write_allocation.mjs");
+const fundingWriter=join(here,"write_funding.mjs");
 const host="http://127.0.0.1:5006";
 const password="FICTIONAL-ONLY-D12-TEST-2026";
 const date=new Date().toISOString().slice(0,7)+"-01";
@@ -372,7 +373,78 @@ async function main(){
   const verifyAccounts=await api.getAccounts();
   assert.equal(verifyAccounts.filter(a=>a.id===openingResult.accountId).length,1);
   assert.equal(await api.getAccountBalance(openingResult.accountId),5555);
+  // D17c production CLI is only exercised against this disposable
+  // server/budget. The permit is made inside the disposable temporary HOME.
+  await endClient();
+  const writerIncome={
+    mode:"income",requestId:"2".repeat(32),sourceKey,
+    accountId,month,date,amountCents:912,categoryId:incomeCategoryId,
+    description:"D17C FICTIONAL Income"
+  };
+  const writerOpening={
+    mode:"new-account-opening",requestId:"3".repeat(32),sourceKey,
+    accountName:"D17C FICTIONAL New Account",amountCents:6500
+  };
+  const runFunding=cmd=>spawnSync(process.execPath,[fundingWriter],{
+    encoding:"utf8",timeout:45000,
+    input:JSON.stringify(cmd)+"\n",
+    env:{...process.env,HOME:writerHome,ACTUAL_SERVER_URL:"",
+      ACTUAL_SYNC_ID:"",ACTUAL_PASSWORD_FILE:"",
+      ACTUAL_SYNC_ID_FILE:"",ACTUAL_ENCRYPTION_PASSWORD_FILE:""}
+  });
+  const receiptPath=cmd=>join(writerHome,".local","state","financew",
+    "operations","funding-"+cmd.requestId+".json");
+  stage="d17c-permit-missing";
+  const refused=runFunding(writerIncome);
+  assert.equal(refused.status,1);
+  assert.equal(refused.stdout.trim(),"FINANCEW_FUNDING_RESULT blocked:writes-disabled");
+  assert.equal(existsSync(receiptPath(writerIncome)),false);
+  stage="d17c-fictional-operator-permit";
+  await writeFile(join(config,"funding-writes-enabled"),
+    "FINANCEW_FUNDING_WRITES_APPROVED\n",{mode:0o600,flag:"wx"});
+  stage="d17c-production-income-commit";
+  const committed=runFunding(writerIncome);
+  assert.equal(committed.error,undefined);
+  const incomeStatus=/FINANCEW_FUNDING_RESULT ([a-z0-9:-]+)/.exec(committed.stdout)?.[1] || "missing-status";
+  if(committed.status!==0 || incomeStatus!=="committed")
+    throw new Error("funding-income-"+incomeStatus+"-exit-"+committed.status);
+  const incomeReceipt=JSON.parse(await readFile(receiptPath(writerIncome),"utf8"));
+  assert.equal(incomeReceipt.status,"committed");
+  assert.equal((await stat(receiptPath(writerIncome))).mode & 0o077,0);
+  assert.equal((await readFile(receiptPath(writerIncome),"utf8")).includes(writerIncome.description),false);
+  stage="d17c-income-replay-refusal";
+  const replay=runFunding(writerIncome);
+  assert.equal(replay.status,1);
+  assert.match(replay.stdout,/FINANCEW_FUNDING_RESULT blocked:operation-already-attempted/);
+  stage="d17c-production-new-account";
+  const accountSave=runFunding(writerOpening);
+  assert.equal(accountSave.error,undefined);
+  const openingStatus=/FINANCEW_FUNDING_RESULT ([a-z0-9:-]+)/.exec(accountSave.stdout)?.[1] || "missing-status";
+  if(accountSave.status!==0 || openingStatus!=="committed")
+    throw new Error("funding-opening-"+openingStatus+"-exit-"+accountSave.status);
+  assert.equal(JSON.parse(await readFile(receiptPath(writerOpening),"utf8")).status,"committed");
+  stage="d17c-recovery-blocks-other-modes";
+  const unresolved=join(writerHome,".local","state","financew","operations",
+    "simulated-unresolved.json");
+  await writeFile(unresolved,JSON.stringify({version:1,status:"attempted"})+"\n",
+    {mode:0o600,flag:"wx"});
+  const blocked=runFunding({...writerIncome,requestId:"4".repeat(32),amountCents:313});
+  assert.equal(blocked.status,1);
+  assert.match(blocked.stdout,/FINANCEW_FUNDING_RESULT blocked:recovery-needed/);
+  await rm(unresolved);
+  stage="d17c-independent-readback";
+  await startClient("d17c-readback");
+  await api.downloadBudget(syncId);
+  const incomeRows=await api.getTransactions(accountId,month+"-01",month+"-31");
+  assert.equal(incomeRows.filter(t=>t.amount===912
+    && t.category===incomeCategoryId
+    && t.imported_id==="financew-funding-"+writerIncome.requestId).length,1);
+  const allAccounts=await api.getAccounts();
+  const created=allAccounts.filter(a=>a.name===writerOpening.accountName);
+  assert.equal(created.length,1);
+  assert.equal(await api.getAccountBalance(created[0].id),6500);
   stage="pass";
+  process.stdout.write("FINANCEW_D17C_DISPOSABLE_PASS locked/income/opening/replay/recovery/readback\n");
   process.stdout.write("FINANCEW_D17B_DISPOSABLE_PASS income/opening/replay/reconciliation/readback\n");
   process.stdout.write("FINANCEW_D12B_D12C_DISPOSABLE_PASS real-server/gate/allocation/replay/readback\n");
 }

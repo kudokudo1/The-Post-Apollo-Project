@@ -596,3 +596,39 @@ writes remain separately authorization-locked.
 Next milestones: D16 local Quickshell UI acceptance and guided legitimate
 starting-balance/income setup. Editing a real transaction's category must
 be designed, audited and authorized separately.
+
+
+## FinanceW D17a // Guided Funding Setup Preview (NO WRITES)
+
+Budget → REVIEW FUNDING → **GUIDED FUNDING SETUP** adds two guarded,
+read-only planning paths, **OPENING BALANCE** and **INCOME**. This
+first-stage UI deliberately does not expose SAVE, WRITE, APPLY, a
+payment operation, an Actual mutation API or local persistence.
+
+For OPENING BALANCE, choose an existing on-budget account, enter a
+reference date and positive USD amount, then PREVIEW SETUP. The plan
+reminds the user that this is an **existing account** and its opening
+balance must be compared with historical transactions and original bank
+statements before making any adjustment. Entered numbers are *not*
+treated as a new transaction, verified starting balance, or added funds.
+
+For INCOME, choose an existing on-budget account, a date in the selected
+month, a positive amount and an existing income category from the
+authenticated read-only snapshot. PREVIEW SETUP shows the proposed
+account/date/amount/category, without changing or creating any Actual
+transaction. The relevant income category must exist, and a truncated
+category list refuses a proposal.
+
+Both previews are bound to the budget's source fingerprint and selected
+month. Harmless snapshot refreshes invalidate the preview but preserve
+the unsaved inputs; source/month changes close the editor. Input dates
+must be actual calendar dates, monetary amounts must be positive integer
+cents, and the selected account must exist uniquely in the snapshot.
+A read-only account balance is shown for context but **To Budget after
+is always UNKNOWN**, never invented from a positive amount. No local
+financial state, settings file, or authorization is written.
+
+D17b onward: plan guarded data entry on a **disposable Actual budget**,
+including reconciliation of pre-existing opening transactions, duplicate
+detection, and explicit operator approval. Do not enable real-budget
+funding writes based on a preview or a passed CI test.

@@ -1061,6 +1061,132 @@ Rectangle {
 
         StationSectionDivider {
             width: parent.width
+            title: "GEOMAGNETIC // WATCH-DAY OUTLOOK"
+        }
+
+        Column {
+            width: parent.width
+            spacing: 8
+
+            Row {
+                width: parent.width
+                spacing: 16
+
+                SecondaryText {
+                    text: "NOAA // UTC FORECAST DAYS"
+                    font.pixelSize: 11
+                }
+
+                GohuText {
+                    text: alertService.ready
+                          ? String(alertService.watchForecast.projectedDays)
+                            + " G1+ DAYS FORECAST"
+                          : "-- G1+ DAYS"
+                    font.pixelSize: 11
+                    color: Colors.yellow
+                }
+
+                QuietText {
+                    text: alertService.ready
+                          ? String(alertService.watchForecast.unresolvedCount)
+                            + " UNPARSED WATCH ITEMS"
+                          : "FORECAST PENDING"
+                    font.pixelSize: 10
+                }
+            }
+
+            Row {
+                id: watchForecastRow
+                width: parent.width
+                spacing: 10
+
+                Repeater {
+                    model: alertService.ready && alertService.fresh
+                           ? alertService.watchForecast.days : []
+
+                    delegate: Rectangle {
+                        required property var modelData
+                        width: Math.max(0, (watchForecastRow.width
+                                            - 2 * watchForecastRow.spacing) / 3)
+                        height: 116
+                        color: Colors.dark
+                        border.width: 1
+                        border.color: modelData.level >= 3 ? Colors.magenta
+                                      : modelData.level >= 2 ? Colors.orange
+                                        : modelData.level >= 1 ? Colors.yellow
+                                          : Colors.cyan
+
+                        Column {
+                            anchors.fill: parent
+                            anchors.margins: 9
+                            spacing: 7
+
+                            Row {
+                                width: parent.width
+                                spacing: 8
+
+                                GohuText {
+                                    text: modelData.dateUtc
+                                    font.pixelSize: 12
+                                    color: Colors.white
+                                }
+
+                                GohuText {
+                                    text: modelData.levelLabel
+                                    font.pixelSize: 15
+                                    color: modelData.level >= 3 ? Colors.magenta
+                                           : modelData.level >= 2 ? Colors.orange
+                                             : modelData.level >= 1 ? Colors.yellow
+                                               : Colors.cyan
+                                }
+                            }
+
+                            GohuText {
+                                width: parent.width
+                                height: 33
+                                wrapMode: Text.WordWrap
+                                maximumLineCount: 2
+                                elide: Text.ElideRight
+                                text: modelData.subject
+                                font.pixelSize: 11
+                                color: Colors.white
+                            }
+
+                            QuietText {
+                                text: modelData.productId + " // WATCH FORECAST"
+                                font.pixelSize: 10
+                            }
+
+                            QuietText {
+                                text: "NOT OBSERVED STORM"
+                                font.pixelSize: 10
+                            }
+                        }
+                    }
+                }
+            }
+
+            QuietText {
+                visible: !alertService.ready || !alertService.fresh
+                         || alertService.watchForecast.forecastDayCount === 0
+                width: parent.width
+                text: !alertService.ready
+                      ? "WAITING FOR NOAA WATCH PRODUCTS"
+                      : !alertService.fresh
+                        ? "WATCH OUTLOOK STALE // FORECAST HIDDEN"
+                        : "NO CURRENT WATCH-DAY PRODUCTS FOUND // NOT AN ALL CLEAR"
+                font.pixelSize: 11
+            }
+
+            QuietText {
+                width: parent.width
+                text: "NOAA WATCH FORECAST // SUPERSESSION + CANCELLATION // NOT AN ALL CLEAR"
+                font.pixelSize: 10
+            }
+        }
+
+        StationSectionDivider {
+            width: parent.width
             title: "NOAA // WARNING VALIDITY REVIEW"
         }
 
@@ -1089,7 +1215,7 @@ Rectangle {
                 QuietText {
                     text: alertService.ready
                           ? String(alertService.validity.uncertainCount)
-                            + " UNVERIFIABLE WATCHES / WARNINGS"
+                            + " UNRESOLVED IN WARNING REVIEW"
                           : "ASSESSMENT PENDING"
                     font.pixelSize: 10
                 }
@@ -1163,7 +1289,7 @@ Rectangle {
 
             QuietText {
                 width: parent.width
-                text: "SWPC WINDOW CHECK // CANCELLATIONS + EXTENSIONS // WATCH DAYS UNVERIFIED"
+                text: "SWPC WARNING WINDOW CHECK // CANCELLATIONS + EXTENSIONS // NOT ACTIVE STATUS"
                 font.pixelSize: 10
             }
         }

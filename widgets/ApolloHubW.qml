@@ -70,6 +70,8 @@ PanelWindow {
         activeMode && activeMode.subModes.length > selectedSubModeIndex
         ? activeMode.subModes[selectedSubModeIndex] : null
     readonly property var activeTiles: activeSubMode ? activeSubMode.tiles : []
+    // Derived presentation only. Packing never changes the stored tile order.
+    readonly property var tileGrid: Layout.packTiles(activeTiles)
 
     readonly property int frameWidth: 1000
     readonly property int frameHeight: 700
@@ -963,11 +965,16 @@ PanelWindow {
                 clip: true
                 boundsBehavior: Flickable.StopAtBounds
 
-                Flow {
+                Item {
                     id: tileFlow
                     width: tileScroll.width
-                    height: childrenRect.height
-                    spacing: 8
+                    property int spacing: 8
+                    // Same 140px base and 8px gap used by the original Flow,
+                    // but computed grid cells can be filled beside tall tiles.
+                    height: hub.tileGrid.rows > 0
+                            ? hub.tileGrid.rows * 140
+                              + (hub.tileGrid.rows - 1) * spacing
+                            : 0
 
                     Repeater {
                         id: tileRepeater
@@ -975,6 +982,13 @@ PanelWindow {
 
                         ApolloHubTile {
                             readonly property var tileConfig: hub.activeTiles[index]
+                            readonly property var gridCell: hub.tileGrid.items[index]
+                            // Pure first-fit coordinates in the existing two
+                            // columns. Width, row span and identity are saved
+                            // exactly as before; only x/y are derived.
+                            x: gridCell.column * ((tileFlow.width - tileFlow.spacing) / 2
+                                                  + tileFlow.spacing)
+                            y: gridCell.row * (140 + tileFlow.spacing)
                             moduleId: tileConfig.module
                             // Live QML binding; changes to the shared bridge's
                             // weatherSnapshot update the tile without copying data.

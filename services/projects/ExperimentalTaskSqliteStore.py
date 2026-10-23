@@ -297,7 +297,7 @@ def connect(file: Path, *, initialize=False):
             con.execute("PRAGMA synchronous=FULL")
             con.execute("BEGIN IMMEDIATE")
             try:
-                con.executescript("""CREATE TABLE IF NOT EXISTS state (
+                ddl = """CREATE TABLE IF NOT EXISTS state (
                     singleton INTEGER PRIMARY KEY CHECK (singleton=1),
                     revision INTEGER NOT NULL,
                     payload TEXT NOT NULL,
@@ -317,7 +317,10 @@ def connect(file: Path, *, initialize=False):
                     task_id TEXT NOT NULL REFERENCES tasks(task_id),
                     project_id TEXT NOT NULL REFERENCES projects(project_id),
                     state TEXT NOT NULL, created_revision INTEGER NOT NULL);
-                CREATE INDEX IF NOT EXISTS idx_ops_state ON operations(state);""")
+                CREATE INDEX IF NOT EXISTS idx_ops_state ON operations(state);"""
+                for statement in ddl.split(";"):
+                    if statement.strip():
+                        con.execute(statement)
                 con.execute("PRAGMA user_version=1")
                 con.commit()
             except Exception:
@@ -381,6 +384,10 @@ def read(file: Path):
     if con is None:
         return {"status": "ABSENT", "available": False}
     try:
+        # BEGIN establishes one WAL read snapshot for state, indexes and
+        # integrity checks; otherwise a concurrent commit between SELECTs
+        # could generate a false INDEX_DIVERGENCE.
+        con.execute("BEGIN")
         result = _read(con)
         if result is None:
             return {"status": "EMPTY", "available": False}
@@ -389,6 +396,8 @@ def read(file: Path):
         return {"status": "RECOVERY_REVIEW" if blocked else "READY",
                 "available": True, "blockedOperations": blocked, **result}
     finally:
+        if con.in_transaction:
+            con.rollback()
         con.close()
 
 

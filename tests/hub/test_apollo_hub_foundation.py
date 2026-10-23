@@ -127,7 +127,7 @@ assert "onLeftClicked: hub.menuOpen = false" in window[close_start:close_end + 4
 import re
 
 for path, source, count in (
-    ("widgets/ApolloHubW.qml", window, 11),
+    ("widgets/ApolloHubW.qml", window, 13),
     ("widgets/hub/ApolloHubTile.qml", tile, 6),
 ):
     actions = len(re.findall(r"\bActionButton\s*\{", source))
@@ -175,7 +175,8 @@ assert 'nextTileId' in layout
 assert 'function assignId(input)' in layout
 assert "onMoveLeft: hub.shiftTile(" in window
 assert "onMoveRight: hub.shiftTile(" in window
-assert "Layout.cycleTile(" in window
+assert "Layout.setTileModule(" in window
+assert "Layout.cycleTile(" not in window
 assert "signal removeTile(int index)" in tile
 assert 'label: "×"' in tile
 assert 'accentColor: Colors.red' in tile
@@ -251,6 +252,55 @@ assert 'layoutStorageIssue.length > 0' in window
 assert 'Layout.storageIssue(ApolloHubStore.layoutJson)' in window
 assert 'height: 140 * (tileConfig.rowSpan || 1)' in window
 assert 'APOLLO HUB  //  LIVE MODULES CONNECTED' in window
+# Stage 4 picker must search the ten HUB module IDs (not desktop apps),
+# show all on empty search, keep keyboard typing isolated and require explicit
+# nonduplicate targeted selection. SWAP must not cycle behind the user's back.
+for token in (
+    'function moduleChoices(layout, modeIndex, subIndex, tileIndex, rawQuery)',
+    'function setTileModule(layout, modeIndex, subIndex, tileIndex,',
+    'matchCount: items.length',
+    'availableCount: availableCount',
+    'selected: selected',
+    'inUse: !selected && !available',
+    'tiles[tileIndex].id !== expectedTileId',
+    'tile.module === moduleId',
+):
+    assert token in layout, f"Missing module-picker policy contract: {token}"
+for token in (
+    'property bool modulePickerOpen: false',
+    'property string modulePickerQuery: ""',
+    'readonly property var modulePickerChoices: Layout.moduleChoices(',
+    'function openModulePicker(index)',
+    'function closeModulePicker()',
+    'function chooseModuleFromPicker(moduleId)',
+    'modulePickerInput.forceActiveFocus()',
+    'modulePickerInput.text = ""',
+    'tileScroll.contentY = 0',
+    'id: modulePicker',
+    'id: modulePickerInput',
+    'onTextChanged: hub.modulePickerQuery = text',
+    'hub.modulePickerChoices.matchCount + " / "',
+    'model: hub.modulePickerChoices.items',
+    'onLeftClicked: hub.chooseModuleFromPicker(modelData.id)',
+    'onChangeModule: hub.openModulePicker(index)',
+    'openModulePicker(selectedTileIndex);',
+    'onLeftClicked: hub.closeModulePicker()',
+    'available: modelData.available',
+    'selected: modelData.selected',
+    '&& !modulePickerOpen',
+    'visible: !hub.modulePickerOpen',
+    'contentHeight: hub.modulePickerOpen ? modulePicker.height : tileFlow.height',
+    'event.key === Qt.Key_Escape',
+    'hub.modulePickerChoices.availableCount === 1',
+    'activeTiles[modulePickerTileIndex].id !== modulePickerTileId',
+    'activeMode.id !== modulePickerModeId',
+    'activeSubMode.id !== modulePickerGroupId',
+):
+    assert token in window, f"Missing Hub picker UI contract: {token}"
+assert 'modulePickerOpen = true' in window
+assert 'modulePickerOpen = false' in window
+assert window.count('onChangeModule: hub.openModulePicker(index)') == 1
+
 assert 'TimePolicy.snapshot(tile.now.getTime(), tile.use24Hour)' in tile
 assert "Qt.formatDate(tile.now" not in tile
 

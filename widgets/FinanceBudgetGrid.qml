@@ -12,6 +12,11 @@ Item {
     property string writeMessage: ""
     property string selectedCategoryId: ""
     property string draftText: ""
+    property string selectedSource: ""
+    property string selectedMonth: ""
+    property int originalSet: 0
+    property int originalLeft: 0
+    property int originalFunds: 0
     property bool submitted: false
     signal saveRequested(var payload)
     readonly property bool lockedForRecovery: writeState==="pending"
@@ -41,15 +46,35 @@ Item {
     function reset(){
         selectedCategoryId="";
         draftText="";
+        selectedSource="";
+        selectedMonth="";
         submitted=false;
     }
-    onSnapshotChanged: reset()
+    onSnapshotChanged: {
+        if(!selectedCategoryId)return;
+        const match=snapshot && Array.isArray(snapshot.categories)
+            ? snapshot.categories.filter(function(c){
+                return c && c.id===selectedCategoryId;
+            }) : [];
+        if(!snapshot || snapshot.sourceKey!==selectedSource
+                || snapshot.month!==selectedMonth
+                || match.length!==1
+                || match[0].budgetedCents!==originalSet
+                || match[0].availableCents!==originalLeft
+                || snapshot.toBudgetCents!==originalFunds)
+            reset();
+    }
     function choose(row,text) {
         if(lockedForRecovery || submitted || !row || !snapshot
                 || !Array.isArray(snapshot.categories))return false;
         const found=snapshot.categories.filter(function(c){return c && c.id===row.id;});
         if(found.length!==1)return false;
         selectedCategoryId=row.id;
+        selectedSource=snapshot.sourceKey;
+        selectedMonth=snapshot.month;
+        originalSet=row.budgetedCents;
+        originalLeft=row.availableCents;
+        originalFunds=snapshot.toBudgetCents;
         draftText=text===undefined
             ? (row.budgetedCents/100).toFixed(2) : text;
         return true;

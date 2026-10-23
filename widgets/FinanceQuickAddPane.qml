@@ -9,6 +9,8 @@ Item {
     id: quick
     property var snapshot: null
     property bool open: false
+    property string sourceAtOpen: ""
+    property string monthAtOpen: ""
     property string kind: "income"
     property string accountId: ""
     property string categoryId: ""
@@ -42,6 +44,8 @@ Item {
     function clear(){
         if(busy)return false;
         open=false;
+        sourceAtOpen="";
+        monthAtOpen="";
         submitted=false;
         accountId="";
         categoryId="";
@@ -59,6 +63,8 @@ Item {
         dateText=today.startsWith(snapshot.month+"-") ? today : snapshot.month+"-01";
         accountId=accounts.length===1 ? accounts[0].id : "";
         categoryId=incomeCategories.length===1 ? incomeCategories[0].id : "";
+        sourceAtOpen=snapshot.sourceKey;
+        monthAtOpen=snapshot.month;
         open=true;
         return true;
     }
@@ -81,7 +87,13 @@ Item {
         return true;
     }
     onSnapshotChanged: {
-        if(!busy && open)clear();
+        if(!open)return;
+        // Keep unsaved inputs through harmless same-source refreshes.
+        // Switching the budget source or month closes the form.
+        if(!snapshot || snapshot.sourceKey!==sourceAtOpen
+                || snapshot.month!==monthAtOpen) {
+            if(!busy)clear();
+        }
     }
 
     Rectangle {

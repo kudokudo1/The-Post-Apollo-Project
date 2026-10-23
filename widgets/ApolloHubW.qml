@@ -975,5 +975,174 @@ PanelWindow {
                       : "APOLLO HUB  //  LIVE MODULES CONNECTED"
             }
         }
+
+        // The selector floats above the scrollable grid. Unlike the old
+        // full-page picker, neither the grid nor its scroll position changes.
+        Item {
+            id: modulePickerOverlay
+            anchors.fill: parent
+            z: 200
+            visible: hub.modulePickerOpen
+
+            // Outside click dismisses without touching another tile/action.
+            MouseArea {
+                anchors.fill: parent
+                onClicked: hub.closeModulePicker()
+            }
+
+            Rectangle {
+                id: modulePickerPopup
+                x: hub.modulePickerAnchorX
+                y: hub.modulePickerAnchorY
+                width: 368
+                height: 342
+                color: Colors.black
+                border.width: 1
+                border.color: Colors.magenta
+                z: 1
+
+                // Consume empty-space clicks within the dropdown.
+                MouseArea {
+                    anchors.fill: parent
+                    onClicked: {}
+                }
+
+                Column {
+                    id: modulePickerDropdownContent
+                    anchors.fill: parent
+                    anchors.margins: 9
+                    spacing: 7
+
+                    Row {
+                        width: parent.width
+                        height: 27
+                        spacing: 6
+                        GohuText {
+                            width: parent.width - 78
+                            height: parent.height
+                            verticalAlignment: Text.AlignVCenter
+                            elide: Text.ElideRight
+                            color: Colors.magenta
+                            font.pixelSize: 12
+                            text: "SWAP // "
+                                + (hub.modulePickerTileIndex >= 0
+                                   && hub.modulePickerTileIndex < hub.activeTiles.length
+                                   ? Layout.tileTitle(
+                                       hub.activeTiles[hub.modulePickerTileIndex].module)
+                                   : "UNAVAILABLE")
+                        }
+                        ActionButton {
+                            trackLabelGlowLocally: true
+                            width: 72
+                            height: 26
+                            label: "CLOSE"
+                            onLeftClicked: hub.closeModulePicker()
+                        }
+                    }
+
+                    Rectangle {
+                        width: parent.width
+                        height: 1
+                        color: Colors.cyan
+                        opacity: 0.7
+                    }
+
+                    SectionFrame {
+                        width: parent.width
+                        height: 34
+                        fillColor: Colors.black
+                        borderColor: Colors.cyan
+                        borderWidth: 1
+                        inset: 6
+
+                        TextInput {
+                            id: modulePickerInput
+                            anchors.fill: parent
+                            color: Colors.white
+                            font.pixelSize: 13
+                            selectByMouse: true
+                            text: ""
+                            onTextChanged: hub.modulePickerQuery = text
+                            Keys.onPressed: function(event) {
+                                if (event.key === Qt.Key_Escape) {
+                                    hub.closeModulePicker();
+                                    event.accepted = true;
+                                } else if (event.key === Qt.Key_Enter
+                                           || event.key === Qt.Key_Return) {
+                                    // Only a single unambiguous, nonblank
+                                    // result may be selected using Enter.
+                                    if (hub.modulePickerQuery.trim().length > 0
+                                            && hub.modulePickerChoices.availableCount === 1) {
+                                        const match = hub.modulePickerChoices.items.find(
+                                            function(item) { return item.available; });
+                                        if (match)
+                                            hub.chooseModuleFromPicker(match.id);
+                                    }
+                                    event.accepted = true;
+                                }
+                            }
+                        }
+                    }
+
+                    GohuText {
+                        width: parent.width
+                        height: 19
+                        verticalAlignment: Text.AlignVCenter
+                        font.pixelSize: 11
+                        color: Colors.cyan
+                        text: hub.modulePickerChoices.state !== "ready"
+                              ? "MODULE LIST UNAVAILABLE"
+                              : hub.modulePickerChoices.matchCount + " / "
+                                + hub.modulePickerChoices.total
+                                + " MATCHES  //  "
+                                + hub.modulePickerChoices.availableCount
+                                + " SELECTABLE"
+                    }
+
+                    ListView {
+                        id: modulePickerResults
+                        width: parent.width - modulePickerRail.crossExtent - 4
+                        height: 212
+                        clip: true
+                        spacing: 2
+                        model: hub.modulePickerChoices.items
+                        boundsBehavior: Flickable.StopAtBounds
+                        interactive: contentHeight > height
+
+                        delegate: ActionButton {
+                            trackLabelGlowLocally: true
+                            width: modulePickerResults.width
+                            height: 30
+                            contentPadding: 7
+                            labelPixelSize: 11
+                            labelHorizontalAlignment: Text.AlignLeft
+                            available: modelData.available
+                            selected: modelData.selected
+                            label: modelData.title + "  //  " + modelData.id
+                                   + (modelData.selected ? "  [CURRENT]"
+                                      : modelData.inUse ? "  [IN USE]" : "")
+                            onLeftClicked: hub.chooseModuleFromPicker(modelData.id)
+                        }
+                    }
+                }
+
+                NeonScrollBar {
+                    id: modulePickerRail
+                    flickable: modulePickerResults
+                    accountForContentOrigin: true
+                    geometryMode: "viewport"
+                    x: modulePickerPopup.width - width - 4
+                    y: modulePickerResults.mapToItem(modulePickerPopup, 0, 0).y
+                    height: modulePickerResults.height
+                    handleStyle: "star"
+                    railColor: Colors.cyan
+                    handleColor: Colors.magenta
+                    handleBorderColor: Colors.magenta
+                    railGlowColor: Colors.white
+                    visible: hub.modulePickerOpen
+                             && modulePickerResults.contentHeight > modulePickerResults.height
+                }
+            }
+        }
     }
 }

@@ -14,7 +14,7 @@ for term in (
     'kind: "sway-layout-selection-preview"',
     '? "EXCLUDE ITEM" : "INCLUDE ITEM"',
     'onLeftClicked: timew.toggleMachineItemSelection()',
-    'SELECTION PREVIEW ONLY // NOTHING SAVED',
+    'onLeftClicked: timew.machineSaveCheckpoint()',
     'onLeftClicked: timew.requestMachineCapturePreview()',
     'id: machineMarkerList'
 ):

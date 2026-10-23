@@ -393,6 +393,37 @@ assert window.count('onTransferTile: hub.openTransferPicker(index, sourceItem)')
 assert 'modulePickerOverlay.width - modulePickerPopup.width - 10' in window
 assert window.count('closeTransferPicker();') >= 5
 
+# P1 Stage 6: only view coordinates change, not saved tile sequence.
+# The original Flow made every short neighbor inherit its tallest row's height.
+for token in (
+    'function packTiles(tiles)',
+    'MAX_TILES*MAX_ROW_SPAN',
+    'for (var row=0;row<MAX_TILES*MAX_ROW_SPAN && !placed;row++)',
+    'columnSpan:width',
+    'rowSpan:tile.rowSpan',
+    'state:"ready", columns:2, rows:highestRow',
+):
+    assert token in layout, f"Gap-filling grid policy missing: {token}"
+for token in (
+    'readonly property var tileGrid: Layout.packTiles(activeTiles)',
+    'Item {\\n                    id: tileFlow',
+    'property int spacing: 8',
+    'height: hub.tileGrid.rows > 0',
+    'hub.tileGrid.rows * 140',
+    '(hub.tileGrid.rows - 1) * spacing',
+    'readonly property var gridCell: hub.tileGrid.items[index]',
+    'x: gridCell ? gridCell.column',
+    'y: gridCell ? gridCell.row * (140 + tileFlow.spacing) : 0',
+    'height: 140 * (tileConfig.rowSpan || 1)',
+    'contentHeight: tileFlow.height',
+    'onTransferTile: hub.openTransferPicker(index, sourceItem)',
+):
+    assert token in window, f"Gap-filling QML geometry missing: {token}"
+assert 'Flow {\\n                    id: tileFlow' not in window
+# Grid output must remain derived data: never serialize positions into layout.
+assert 'gridCell.column' not in layout
+assert 'tileGrid' not in (ROOT / "services/hub/ApolloHubStore.qml").read_text(encoding="utf-8")
+
 # Standard window-local key grammar, without inventing a bottom rail.
 for key in ("Tab", "Shift+Tab", "Shift+Left", "Shift+Right",
             "Left", "Right", "Up", "Down", "Enter", "Return", "Esc"):

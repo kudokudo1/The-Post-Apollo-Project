@@ -17,6 +17,12 @@ PanelWindow {
         String(Quickshell.env("POST_APOLLO_UI_LAG_PROBE") || "").trim() === "1"
     property double bgLastRebuildReportMs: 0
 
+    // Opt-in freeze isolation. Keep the durable notification service and
+    // popups live; only defer THIS closed window's filtered history ListModel.
+    readonly property bool hiddenHistoryRebuildPauseEnabled:
+        String(Quickshell.env("POST_APOLLO_NOTIFICATIONS_HIDDEN_REBUILD_PAUSED") || "").trim() === "1"
+    property bool hiddenHistoryRebuildDeferred: false
+
     function reportBgRebuild(startedAtMs, scanned) {
         const now = Date.now();
         const elapsed = now - startedAtMs;
@@ -75,6 +81,14 @@ PanelWindow {
     }
 
     onMenuOpenChanged: {
+        // Reconcile every deferred revision before the panel is shown.
+        // Never unmap/remap the persistent PanelWindow.
+        if (menuOpen && hiddenHistoryRebuildPauseEnabled
+                && hiddenHistoryRebuildDeferred) {
+            filteredModelRefreshTimer.stop();
+            hiddenHistoryRebuildDeferred = false;
+            root.rebuildFilteredNotifications();
+        }
         if (menuOpen && keyboardActive) {
             Qt.callLater(root.restoreKeyboardNavigationAnchor);
             notificationOpenFocusRetry.restart();
@@ -360,6 +374,12 @@ PanelWindow {
         repeat: false
 
         onTriggered: {
+            // A zero-delay timer can still fire after a close. Suppress that
+            // race as well as rebuild requests issued while already hidden.
+            if (root.hiddenHistoryRebuildPauseEnabled && !root.menuOpen) {
+                root.hiddenHistoryRebuildDeferred = true;
+                return;
+            }
             root.rebuildFilteredNotifications();
         }
     }
@@ -392,6 +412,8 @@ PanelWindow {
     }
 
     Component.onCompleted: {
+        if (hiddenHistoryRebuildPauseEnabled)
+            console.warn("SYNTAGMA_BG_PROBE // notifications hidden-history rebuild PAUSED while closed");
         root.scheduleFilteredModelRebuild();
         root.rebuildManagerDndPolicies();
     }
@@ -904,6 +926,11 @@ PanelWindow {
     }
 
     function scheduleFilteredModelRebuild() {
+        if (hiddenHistoryRebuildPauseEnabled && !menuOpen) {
+            hiddenHistoryRebuildDeferred = true;
+            filteredModelRefreshTimer.stop();
+            return;
+        }
         filteredModelRefreshTimer.restart();
     }
 

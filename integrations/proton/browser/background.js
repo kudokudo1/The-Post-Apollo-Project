@@ -22,18 +22,23 @@ function reportReadiness(results) {
     ? results[0].result : null;
   const counters = [
     "inspectedControls", "exactReadEnabled", "exactReadDisabled",
-    "otherReadLabels", "unlabeledControls", "checkedControls"
+    "otherReadLabels", "unlabeledControls", "checkedControls",
+    "toolbarReadEnabled", "toolbarReadDisabled",
+    "toolbarUnreadEnabled", "toolbarUnreadDisabled"
   ];
-  if (!state || state.kind !== "PROTON_READINESS_V2"
+  if (!state || state.kind !== "PROTON_READINESS_V3"
       || state.originOk !== true
       || state.messageIdentityVerified !== false
       || state.canMutate !== false
       || typeof state.scanTruncated !== "boolean"
-      || Object.keys(state).length !== 11
+      || Object.keys(state).length !== 15
       || !counters.every((key) => Number.isInteger(state[key])
          && state[key] >= 0 && state[key] <= 500)
       || state.exactReadEnabled + state.exactReadDisabled
          + state.otherReadLabels > state.inspectedControls
+      || state.toolbarReadEnabled + state.toolbarReadDisabled
+         + state.toolbarUnreadEnabled + state.toolbarUnreadDisabled
+         > state.inspectedControls
       || state.unlabeledControls > state.inspectedControls
       || state.checkedControls > 20) {
     console.warn("Post-Apollo Proton: readiness probe unavailable");
@@ -47,6 +52,10 @@ function reportReadiness(results) {
     + " otherEnglishReadLabels=" + state.otherReadLabels
     + " unlabeledControls=" + state.unlabeledControls
     + " checkedControls=" + state.checkedControls
+    + " toolbarReadEnabled=" + state.toolbarReadEnabled
+    + " toolbarReadDisabled=" + state.toolbarReadDisabled
+    + " toolbarUnreadEnabled=" + state.toolbarUnreadEnabled
+    + " toolbarUnreadDisabled=" + state.toolbarUnreadDisabled
     + " inspected=" + state.inspectedControls
     + " truncated=" + state.scanTruncated
     + "; identity NOT verified");

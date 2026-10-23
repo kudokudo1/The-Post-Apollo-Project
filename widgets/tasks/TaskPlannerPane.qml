@@ -10,9 +10,11 @@ Item {
     property string monthKey: ""
     property string selectedDate: ""
     property string todayKey: ""
+    property string viewMode: "month"
     signal openTaskRequested(string taskId)
 
     readonly property var calendar: Planner.view(todoSnapshot, monthKey, selectedDate, todayKey)
+    readonly property var weekRows: Planner.weekDays(todoSnapshot, selectedDate, todayKey)
     readonly property var weekdays: ["MO", "TU", "WE", "TH", "FR", "SA", "SU"]
 
     function refreshLocalDate() {
@@ -25,6 +27,19 @@ Item {
     function changeMonth(amount) {
         monthKey=Planner.moveMonth(monthKey,amount);
         selectedDate=monthKey;
+    }
+    function selectDate(dateKey) {
+        if (!Planner.parse(dateKey)) return;
+        selectedDate = dateKey;
+        monthKey = dateKey.slice(0,7) + "-01";
+    }
+    function navigate(amount) {
+        if (viewMode === "month") changeMonth(amount);
+        else selectDate(Planner.moveDay(selectedDate, amount*(viewMode === "week" ? 7 : 1)));
+    }
+    function jumpToday() {
+        refreshLocalDate();
+        selectDate(todayKey);
     }
     onVisibleChanged: { if (visible) refreshLocalDate(); }
     Component.onCompleted: refreshLocalDate()
@@ -48,6 +63,28 @@ Item {
             font.bold: true
             color: Colors.magenta
         }
+        // Read-only view selection. Operator has deferred cosmetic polish.
+        Row {
+            id: viewSwitcher
+            width: parent.width
+            height: 27
+            spacing: 4
+            Repeater {
+                model: ["MONTH", "WEEK", "DAY", "TODAY"]
+                ActionButton {
+                    required property string modelData
+                    width: (viewSwitcher.width - 12) / 4
+                    height: 26
+                    label: modelData
+                    labelPixelSize: 9
+                    selected: modelData.toLowerCase() === planner.viewMode
+                    onLeftClicked: {
+                        if (modelData === "TODAY") planner.jumpToday();
+                        else planner.viewMode = modelData.toLowerCase();
+                    }
+                }
+            }
+        }
         Row {
             width: parent.width
             height: 29
@@ -55,21 +92,23 @@ Item {
             ActionButton {
                 width: 32; height: 27
                 label: "‹"; labelPixelSize: 18
-                onLeftClicked: planner.changeMonth(-1)
+                onLeftClicked: planner.navigate(-1)
             }
             GohuText {
                 width: parent.width-74
                 height: parent.height
                 verticalAlignment: Text.AlignVCenter
                 horizontalAlignment: Text.AlignHCenter
-                text: planner.monthKey.slice(0,7)
+                text: planner.viewMode === "month" ? planner.monthKey.slice(0,7)
+                      : planner.viewMode === "week" ? "WEEK // " + planner.selectedDate
+                      : planner.selectedDate
                 font.pixelSize: 13
                 color: Colors.white
             }
             ActionButton {
                 width: 32; height: 27
                 label: "›"; labelPixelSize: 18
-                onLeftClicked: planner.changeMonth(1)
+                onLeftClicked: planner.navigate(1)
             }
         }
         GohuText {
@@ -89,10 +128,12 @@ Item {
         anchors.left: parent.left
         anchors.right: parent.right
         // Keep a useful agenda viewport when the host is shorter than the M1 pilot.
-        height: Math.min(237, Math.max(150, planner.height * 0.38))
+        height: planner.viewMode === "day" ? 0
+                : Math.min(237, Math.max(150, planner.height * 0.38))
 
         Grid {
             id: weekdays
+            visible: planner.viewMode === "month"
             columns: 7
             width: parent.width
             height: 22
@@ -110,6 +151,7 @@ Item {
         }
         Grid {
             id: monthGrid
+            visible: planner.viewMode === "month"
             anchors.top: weekdays.bottom
             columns: 7
             width: parent.width
@@ -145,7 +187,46 @@ Item {
                     MouseArea {
                         anchors.fill: parent
                         enabled: parent.modelData.inMonth
-                        onClicked: planner.selectedDate=parent.modelData.date
+                        onClicked: planner.selectDate(parent.modelData.date)
+                    }
+                }
+            }
+        }
+        Column {
+            id: weekColumn
+            anchors.fill: parent
+            spacing: 2
+            visible: planner.viewMode === "week"
+            Repeater {
+                model: planner.calendar.available ? planner.weekRows : []
+                Rectangle {
+                    id: weekRow
+                    required property var modelData
+                    width: weekColumn.width
+                    height: Math.max(0, (calendarArea.height - 12) / 7)
+                    color: modelData.selected ? Colors.dark : "transparent"
+                    border.width: modelData.selected || modelData.today ? 1 : 0
+                    border.color: modelData.today ? Colors.orange : Colors.magenta
+                    GohuText {
+                        anchors.left: parent.left
+                        anchors.leftMargin: 5
+                        anchors.verticalCenter: parent.verticalCenter
+                        text: weekRow.modelData.weekday + " // " + weekRow.modelData.date
+                        font.pixelSize: 10
+                        color: weekRow.modelData.selected ? Colors.white : Colors.cyan
+                    }
+                    GohuText {
+                        anchors.right: parent.right
+                        anchors.rightMargin: 5
+                        anchors.verticalCenter: parent.verticalCenter
+                        text: weekRow.modelData.remaining + " OPEN"
+                        font.pixelSize: 9
+                        color: weekRow.modelData.remaining > 0 ? Colors.orange : Colors.cyan
+                    }
+                    MouseArea {
+                        anchors.fill: parent
+                        enabled: weekRow.modelData.date !== ""
+                        onClicked: planner.selectDate(weekRow.modelData.date)
                     }
                 }
             }

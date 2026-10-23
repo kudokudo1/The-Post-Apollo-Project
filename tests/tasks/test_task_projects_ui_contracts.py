@@ -27,7 +27,7 @@ for phrase in (
     "pendingWrite = true",
     'feedback = "SAVING"',
     'feedback = "SAVE FAILED // INPUT KEPT"',
-    'feedback = "SAVED"',
+    'feedback = wasDelete ? "PROJECT REMOVED // TASKS UNASSIGNED" : "SAVED"',
     "onTodoSnapshotChanged:",
     "selectedProjectId = found.id",
     "projectsPane.selectedProjectId === modelData.id",

@@ -1,6 +1,6 @@
-# 🏥💜 ApolloHubW // P1 Layout Editor 2.0, stage 1
+# 🏥💜 ApolloHubW // P1 Layout Editor 2.0
 
-**Status:** Stages 1–3 and Stage 5 MOVE operator-accepted on the live desktop. Stage 4 SWAP dropdown is in use. Stage 6 compact grid packing is implemented on GitHub `main`, with source and behavior verification; desktop acceptance remains pending. Drag-and-drop, persistent undo, content-specific expansion, and full layout presets remain later scope.
+**Status:** Stages 1–3, 5 MOVE, and Stage 6 grid packing have operator desktop acceptance (Stage 6 visual arrangement shown in screenshot); Stage 4 SWAP dropdown is in use. Stage 7A spatial keyboard navigation is implemented on GitHub `main` with passing CI; its live desktop acceptance is pending. Stage 7B mini-widget content-density polish, persistent undo, drag-and-drop, and layout presets remain later scope.
 
 ## IMPLEMENTATION
 
@@ -69,10 +69,11 @@ The `×` is an **explicit one-click edit action**, not a destructive record dele
 - [x] In-session Undo for layout edits
 - [x] Guard against overwriting unsupported saved layout
 - [x] Add source-level behavior and UI wiring tests
-- [ ] Operator runtime acceptance after syncing
+- [x] Operator runtime acceptance for Stage 1
 - [x] Stage 2 edit controls for one/two-column width and one/two/three-row chassis heights
 - [x] Stage 2 operator runtime acceptance
-- [ ] Richer grid packing and tile content expansion
+- [x] Gap-filling grid packing (Stage 6)
+- [ ] Internal tile-content expansion / density (Stage 7B)
 - [x] Stage 3 mode/group removal with named confirmation and Undo
 - [x] Stage 3 operator desktop acceptance
 - [x] Stage 4 module picker: search, count, occupied-state hints, explicit selection
@@ -80,7 +81,9 @@ The `×` is an **explicit one-click edit action**, not a destructive record dele
 - [x] Stage 5 cross-mode/cross-group MOVE dropdown and ID-safe backend
 - [x] Stage 5 operator desktop acceptance
 - [x] Stage 6 packed two-column tile geometry with no saved-layout migration
-- [ ] Stage 6 operator desktop acceptance
+- [x] Stage 6 visual desktop acceptance
+- [x] Stage 7A source-level spatial keyboard navigation
+- [ ] Stage 7A desktop keyboard acceptance
 - [ ] Durable undo/presets and full grid-packing polish
 
 ## P1 Stage 2 // Explicit width and height controls
@@ -155,7 +158,7 @@ The Stage 4 suite extends `tests/hub/test_apollo_hub_layout_v2.cjs` for filterin
 - **First available cell:** Each saved tile is considered in saved array order, and placed in the first free rectangle of cells that fits its **one-/two-column width** and **one-/two-/three-row height**. Short half-width tiles can stack beside a tall half-width tile. A full-width tile always occupies both columns; no overlapping rectangles are allowed.
 - **Source of truth unchanged:** The stored `ApolloHubStore.layoutJson` stays at version 2. `tileGrid` is a computed QML property; column/row coordinates are **never persisted**. The stable tile IDs, module data, W/H dimensions, saved order, capacity limits, and previous UNDO behavior remain intact.
 - **Geometry:** The original **140px row height** and **8px gap** are unchanged. Half-width card widths remain `(availableWidth - 8)/2`; full-width cards continue filling the available width. The scrollable region measures the highest occupied grid row rather than inheriting Flow's extra height.
-- **Visual order note:** A wide tile that cannot fit an early one-column gap may land beneath a tall tile, while subsequent half-width tiles backfill that gap. The saved array order is unchanged, but the resulting on-screen reading order can differ for some mixed W/H arrangements. Keyboard arrows still use the existing saved-index navigation; spatial-arrow refinement is deferred until it can be verified against mixed-size layouts.
+- **Visual order note:** A wide tile that cannot fit an early one-column gap may land beneath a tall tile, while subsequent half-width tiles backfill that gap. The saved array order is unchanged, but the resulting on-screen reading order can differ for some mixed W/H arrangements. Stage 7A now derives keyboard-arrow targets from the packed rectangles, rather than saved indexes; runtime arrow testing remains pending.
 - **No hidden controls:** SWAP, MOVE, X, W/H, UNDO, navigation tabs and the existing star-scrollbars remain. The new grid does not add menus, settings, services, timers, file IO, an extra layout version, or any new QML parent window.
 - **Scope limit:** Enlarged card chassis do not automatically make every mini-widget render more internal content. Internal widget density/expansion is a separate UI polish task.
 
@@ -163,9 +166,22 @@ The Stage 4 suite extends `tests/hub/test_apollo_hub_layout_v2.cjs` for filterin
 
 **Desktop acceptance:** After syncing `main` and restarting Quickshell, set one disposable half-width tile to H:3 beside H:1 tiles. Check that the shorter tiles fill the column beside it rather than leaving a tall hole. Test W:2, MOVE, SWAP, UNDO and scrolling; verify all tile frames remain distinct, controls remain clickable, and closing/reopening Hub does not change the saved tile sequence. A screenshot is useful if any layout overlaps or clips.
 
+## P1 Stage 7A // Spatial keyboard navigation
+
+**Why:** After Stage 6 first-fit packing, the visible tile positions no longer necessarily match the source array's fixed `±1 / ±2` navigation. For example, a H:3 half-width tile can have three H:1 cards to its right, and a full-width card spans both columns. Stage 7A makes directional keyboard selection use the **same derived grid rectangles** as on-screen placement.
+
+- **Pure selection:** `Layout.navigationTarget(grid, selectedIndex, "left"|"right"|"up"|"down")` selects a neighboring tile that actually lies beyond the source tile's edge in the requested direction, prioritizing perpendicular overlap, nearest edge, and center alignment, then a stable index for ties. At an edge without a matching candidate, selection stays on the same tile. This helper never modifies tile data, order, positions or storage.
+- **One route for keys:** Both `hubKeyboardAnchor.Keys.onPressed` and the guarded `Shortcut` handlers call `hub.moveNavigationCursor(direction)`. The original typing guards for To-do/Notes and SWAP/MOVE dropdown focus still prevent global Hub arrows from intercepting text input.
+- **Scroll tracking:** When arrows select a card outside the visible portion of `tileScroll`, its existing Flickable shifts to reveal the card; very tall cards prioritize showing their header first. Mouse-hover selection still works, and selection never activates a module by itself.
+- **Safety:** The layout remains version 2 with no saved selection coordinates or new services. EDIT + Enter still opens SWAP for the selected tile; Tab and Shift+Tab continue changing main modes, and Shift+Left/Right continue changing submodes.
+
+**Verification:** `tests/hub/test_apollo_hub_layout_v2.cjs` checks ordinary, tall, wide and hole-filling arrow behavior, invalid directions, nonmutation, and directional-edge invariants across **1,296 mixed W/H configurations**. `tests/hub/test_apollo_hub_foundation.py` checks all eight keyboard call sites and the scroll/header rules. Source-level tests and GitHub validation passed.
+
+**Desktop acceptance:** After pulling `main` and restarting Quickshell, open Apollo Hub and enable keyboard focus as usual. Try a H:3 half-width tile beside three H:1 tiles, then navigate with Left/Right/Up/Down. The selection border should move to the nearest card in that actual direction, never to a card that appears on the opposite side. Try a W:2 tile and verify Left/Right stay put at the outer edges. Scroll to lower tiles with Down and verify the focused tile/header becomes visible. Confirm that typing in Notes, To-do and the SWAP filter is not intercepted.
+
 ## NEXT
 
-After Stage 6 desktop acceptance, prioritize **directional keyboard navigation that follows actual grid cells** and responsive mini-widget internal content density. Continue visual/spacing normalization based on existing, measured control geometry. Durable undo/presets and drag-and-drop remain separate operator decisions.
+After Stage 7A desktop acceptance, continue **Stage 7B mini-widget content-density polish**, based on measured tile geometry and the operator's visual priorities. Preserve each widget's existing data ownership, typography and control semantics. Durable undo/presets and drag-and-drop remain separate operator decisions.
 
 ## DECISIONS
 

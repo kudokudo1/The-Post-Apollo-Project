@@ -10,9 +10,10 @@ import "../services/time/WorldZoneSearch.js" as WorldZoneSearch
 import "../services/time/TimeConverterFormat.js" as ConverterFormat
 import "../services/time/StopwatchPolicy.js" as StopwatchPolicy
 import "../services/time/CountdownPolicy.js" as CountdownPolicy
+import "../services/time/MachineTimelinePolicy.js" as MachineTimelinePolicy
 
-// TimeW M1: standalone temporal window foundation.
-// No timers, activity recording, screenshots or restoration are active here.
+// TimeW: standalone temporal window. Manual MACHINE timeline markers are
+// session-local; no screenshots or desktop restoration are implemented.
 // The clock dock and shell wiring are intentionally separate integration steps.
 PanelWindow {
     id: timew
@@ -373,6 +374,7 @@ PanelWindow {
         && !countdownHoursField.activeFocus
         && !countdownMinutesField.activeFocus
         && !countdownSecondsField.activeFocus
+        && !machineMarkerInput.activeFocus
         && !converterDateInput.activeFocus && !converterTimeInput.activeFocus
     property string worldLookupZone: ""
     property string worldValidZone: ""
@@ -639,6 +641,42 @@ PanelWindow {
         stopwatchStarted = false;
     }
 
+    // MACHINE / TEMPORAL MARKERS. Manual in-memory timestamps only;
+    // not a screenshot, session save, Hospital checkpoint or restore point.
+    property string machineMarkerDraft: ""
+    property var machineMarkers: []
+    property int machineMarkerNextId: 1
+    readonly property string machineInstanceAge: {
+        const refresh = localClock.date;
+        return MachineTimelinePolicy.ageLabel(machineLifetimeAnchor.elapsed() * 1000);
+    }
+    readonly property string machineUtcNow:
+        MachineTimelinePolicy.utcStamp(localClock.date.getTime())
+
+    function addMachineMarker() {
+        if (!menuOpen || selectedMode !== "machine")
+            return;
+        const marker = MachineTimelinePolicy.createMarker(
+            machineMarkerNextId, machineMarkerDraft,
+            localClock.date.getTime(), machineLifetimeAnchor.elapsed() * 1000);
+        if (!marker)
+            return;
+        const next = MachineTimelinePolicy.appendMarker(machineMarkers, marker);
+        if (next === null)
+            return;
+        machineMarkers = next;
+        machineMarkerNextId += 1;
+        machineMarkerDraft = "";
+        machineMarkerInput.focus = false;
+        Qt.callLater(restoreKeyboardFocus);
+    }
+
+    function removeMachineMarker(id) {
+        if (!Number.isInteger(id))
+            return;
+        machineMarkers = MachineTimelinePolicy.removeMarker(machineMarkers, id);
+    }
+
     readonly property var modes: [
         { id: "clock", name: "CLOCK" },
         { id: "calc", name: "CALC" },
@@ -753,6 +791,11 @@ PanelWindow {
 
     ElapsedTimer {
         id: countdownAnchor
+        Component.onCompleted: restart()
+    }
+
+    ElapsedTimer {
+        id: machineLifetimeAnchor
         Component.onCompleted: restart()
     }
 

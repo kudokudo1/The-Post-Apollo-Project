@@ -406,7 +406,7 @@ for token in (
     assert token in layout, f"Gap-filling grid policy missing: {token}"
 for token in (
     'readonly property var tileGrid: Layout.packTiles(activeTiles)',
-    'Item {\\n                    id: tileFlow',
+    'Item {\n                    id: tileFlow',
     'property int spacing: 8',
     'height: hub.tileGrid.rows > 0',
     'hub.tileGrid.rows * 140',
@@ -419,7 +419,7 @@ for token in (
     'onTransferTile: hub.openTransferPicker(index, sourceItem)',
 ):
     assert token in window, f"Gap-filling QML geometry missing: {token}"
-assert 'Flow {\\n                    id: tileFlow' not in window
+assert 'Flow {\n                    id: tileFlow' not in window
 # Grid output must remain derived data: never serialize positions into layout.
 assert 'gridCell.column' not in layout
 assert 'tileGrid' not in (ROOT / "services/hub/ApolloHubStore.qml").read_text(encoding="utf-8")

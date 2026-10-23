@@ -1084,6 +1084,30 @@ PanelWindow {
                                     wrapMode: Text.WordWrap
                                 }
                                 ActionButton {
+                                    id: reviewIncoming
+                                    width: parent.width
+                                    height: 28
+                                    label: incomeCategoryPane.expanded
+                                          ? "HIDE INCOME PREVIEW" : "REVIEW INCOMING"
+                                    labelPixelSize: 9
+                                    accentColor: Colors.cyan
+                                    trackLabelGlowLocally: true
+                                    available: financeBudget.state === "ready"
+                                               && !!financeBudget.snapshot
+                                               && !!financeBudget.snapshot.incomeReview
+                                    onLeftClicked: {
+                                        if (incomeCategoryPane.expanded)
+                                            incomeCategoryPane.clear();
+                                        else
+                                            incomeCategoryPane.openReview();
+                                    }
+                                }
+                                FinanceIncomeCategorizationPane {
+                                    id: incomeCategoryPane
+                                    width: parent.width
+                                    snapshot: financeBudget.snapshot
+                                }
+                                ActionButton {
                                     id: inspectOpeningBalances
                                     width: parent.width
                                     height: 28

@@ -381,40 +381,66 @@ Item {
                         readonly property real glowActivity: Math.max(0, Math.min(1,
                             Number(mediaDock.levels[index] || 0) / 7))
 
-                        // Two existing geometry-only halos follow the core.
-                        // Their opacity also rises with activity, so tall
-                        // bars keep a visible glow even at maximum height.
-                        Rectangle {
+                        // Reveal a full-spectrum-height gradient from the
+                        // bottom: low activity stays near cyan/yellow, and
+                        // only taller bars reach blue/orange then magenta/red.
+                        // Avoid stretching the entire palette into each
+                        // short bar. Preserve both existing geometry halos.
+                        Item {
                             anchors.horizontalCenter: parent.horizontalCenter
                             anchors.bottom: parent.bottom
                             anchors.bottomMargin: -3
                             width: parent.width + 8
                             height: cavaBar.height + 6
-                            radius: 0
-                            gradient: mediaDock.cavaVerticalGradient
-                            opacity: 0.30 + 0.24 * parent.glowActivity
+                            clip: true
+
+                            Rectangle {
+                                anchors.left: parent.left
+                                anchors.right: parent.right
+                                anchors.bottom: parent.bottom
+                                height: spectrum.height + 6
+                                radius: 0
+                                gradient: mediaDock.cavaVerticalGradient
+                                opacity: 0.30 + 0.24 * glowActivity
+                            }
                         }
 
-                        Rectangle {
+                        Item {
                             anchors.horizontalCenter: parent.horizontalCenter
                             anchors.bottom: parent.bottom
                             anchors.bottomMargin: -1
                             width: parent.width + 4
                             height: cavaBar.height + 2
-                            radius: 0
-                            gradient: mediaDock.cavaVerticalGradient
-                            opacity: 0.50 + 0.30 * parent.glowActivity
+                            clip: true
+
+                            Rectangle {
+                                anchors.left: parent.left
+                                anchors.right: parent.right
+                                anchors.bottom: parent.bottom
+                                height: spectrum.height + 2
+                                radius: 0
+                                gradient: mediaDock.cavaVerticalGradient
+                                opacity: 0.50 + 0.30 * glowActivity
+                            }
                         }
 
-                        Rectangle {
+                        Item {
                             id: cavaBar
                             anchors.bottom: parent.bottom
                             width: parent.width
                             height: Math.max(2, Math.round(
                                 (Number(mediaDock.levels[index] || 0) / 7) * 27
                             ))
-                            radius: 0
-                            gradient: mediaDock.cavaVerticalGradient
+                            clip: true
+
+                            Rectangle {
+                                anchors.left: parent.left
+                                anchors.right: parent.right
+                                anchors.bottom: parent.bottom
+                                height: spectrum.height
+                                radius: 0
+                                gradient: mediaDock.cavaVerticalGradient
+                            }
 
                             Behavior on height {
                                 NumberAnimation {

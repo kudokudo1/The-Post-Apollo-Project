@@ -226,3 +226,39 @@ function parseAirQuality(current) {
 
     return result;
 }
+
+// Same Open-Meteo response as current AQI. Use six two-hour samples from
+// forecast_hours=12; no current observation is silently used as a forecast.
+function parseAirQualityForecast(hourly, hours) {
+    const source = hourly || {};
+    const times = Array.isArray(source.time) ? source.time : [];
+    const aqi = Array.isArray(source.us_aqi) ? source.us_aqi : [];
+    const fine = Array.isArray(source.pm2_5) ? source.pm2_5 : [];
+    const coarse = Array.isArray(source.pm10) ? source.pm10 : [];
+    const requested = Number(hours);
+    const length = isFinite(requested) && requested > 0
+                   ? Math.min(12, Math.floor(requested)) : 12;
+    const output = [];
+
+    for (let i = 0; i < Math.min(length, times.length)
+            && output.length < 6; i += 2) {
+        const timestamp = textValue(times[i], "");
+        if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/.test(timestamp))
+            continue;
+        const hour = Number(timestamp.slice(11, 13));
+        if (!isFinite(hour) || hour < 0 || hour > 23)
+            continue;
+
+        const value = finiteNumber(aqi[i], -1);
+        const pm25 = finiteNumber(fine[i], -1);
+        const pm10 = finiteNumber(coarse[i], -1);
+        output.push({
+            time: timestamp,
+            label: (hour % 12 || 12) + (hour >= 12 ? " PM" : " AM"),
+            aqi: value >= 0 && value <= 500 ? value : -1,
+            pm25: pm25 >= 0 ? pm25 : -1,
+            pm10: pm10 >= 0 ? pm10 : -1
+        });
+    }
+    return output;
+}

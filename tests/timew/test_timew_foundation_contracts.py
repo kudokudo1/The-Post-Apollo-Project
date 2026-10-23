@@ -125,7 +125,7 @@ assert "WorldClockPolicy.snapshot(localClock.date.getTime()," in window
 assert 'command: ["date", "+%z"]' in window
 assert 'environment: { TZ: worldLookupZone, LC_ALL: "C" }' in window
 assert "Process {" in window
-assert window.count("Process {") == 5
+assert window.count("Process {") == 6
 assert "worldLookup.running" in window
 assert 'onLeftClicked:' in window
 assert 'timew.chooseWorldZone(modelData.id)' in window
@@ -379,6 +379,63 @@ assert 'picker.openRequested()' in picker
 assert 'picker.zoneChosen(modelData.id)' in picker
 assert 'function containsFramePoint(frame, px, py)' in picker
 assert 'function dropFocus()' in picker
+
+# CALC MATH introduces a manually triggered, separate Python zoneinfo
+# elapsed-duration calculation. CONVERT and MATH are independent views and
+# retain the user's shared civil date/time, input/output formats, FROM zone.
+assert 'property string calcView: "convert"' in window
+assert 'function setCalcView(which)' in window
+assert 'function toggleMathOperation()' in window
+assert 'function runTimeArithmetic()' in window
+assert 'calcView !== "math"' in window
+assert 'id: calcSubModeStrip' in window
+assert 'labelText: "CONVERT"' in window
+assert 'labelText: "MATH"' in window
+assert 'onTriggered: timew.setCalcView("convert")' in window
+assert 'onTriggered: timew.setCalcView("math")' in window
+assert 'timew.calcView === "convert"' in window
+assert 'timew.calcView === "math"' in window
+assert 'id: mathPane' in window
+assert 'id: mathDateInput' in window
+assert 'id: mathTimeInput' in window
+assert 'id: mathDaysInput' in window
+assert 'id: mathHoursInput' in window
+assert 'id: mathMinutesInput' in window
+assert 'id: mathTimeFormatButton' in window
+assert 'id: mathResultFormatButton' in window
+assert 'property string mathDays: "0"' in window
+assert 'property string mathHours: "1"' in window
+assert 'property string mathMinutes: "0"' in window
+assert 'property string mathOperation: "add"' in window
+assert 'mathOperation === "add" ? "subtract" : "add"' in window
+assert 'onLeftClicked: timew.toggleMathOperation()' in window
+assert 'onLeftClicked: timew.runTimeArithmetic()' in window
+assert 'mathSubmittedKey !== timew.mathInputsKey' in window
+assert 'property bool mathBusy: false' in window
+assert 'onMathInputsKeyChanged: mathResult = null' in window
+assert 'id: arithmeticProcess' in window
+assert 'arithmeticProcess.exec([' in window
+assert 'Quickshell.shellPath("services/time/TimeArithmetic.py")' in window
+assert 'converterSourceZone, converterDate,' in window
+assert 'converterParsedTime.canonical, mathOperation,' in window
+assert 'mathDays, mathHours, mathMinutes' in window
+assert 'ELAPSED // 1 DAY = 24 HOURS' in window
+assert 'REPEATED HOUR // 2 RESULTS' in window
+assert 'MATH // 1 RESULT' in window
+assert 'TIME DOES NOT EXIST // DST CLOCK JUMP' in window
+assert window.count("SystemClock {") == 1
+assert window.count("Timer {") == 1
+assert window.count('arithmeticProcess.exec([') == 1
+assert window.count('converterProcess.exec([') == 1
+arithmetic = (ROOT / "services/time/TimeArithmetic.py").read_text(encoding="utf-8")
+assert 'ZoneInfo(zone)' in arithmetic
+assert 'utc + duration' in arithmetic
+assert 'original.replace(tzinfo=None) != naive' in arithmetic
+assert 'AMBIGUOUS_LOCAL_TIME' in arithmetic
+assert 'NONEXISTENT_LOCAL_TIME' in arithmetic
+assert 'DURATION_OUT_OF_RANGE' in arithmetic
+assert 'operation == "subtract"' in arithmetic
+assert '3650' in arithmetic
 
 # Universal visual language remains: magenta header, cyan divider, borderless modes.
 assert 'text: "TIME // W"' in window

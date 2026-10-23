@@ -998,5 +998,34 @@ assert "function snapshot(epochMs, use24Hour)" in time_policy
 assert 'utcOffsetLabel: offsetLabel' in time_policy
 assert 'displayTime: use24Hour ? time24 : time12' in time_policy
 
+# P1 Stage 7B: Time expands presentation ONLY when the allocated tile
+# chassis is taller. H:1 retains original compact type/spacing and position.
+# Layout sizing is owned by the tile; the mini cannot start another clock.
+for token in (
+    'readonly property int densityLevel: height >= 300 ? 3',
+    ': height >= 180 ? 2 : 1',
+    'id: timeContent',
+    'height: childrenRect.height',
+    'y: timeMini.densityLevel > 1',
+    '(timeMini.height - height) / 2',
+    'height: timeMini.densityLevel === 3 ? 58',
+    'font.pixelSize: timeMini.densityLevel === 3',
+    '(timeMini.use24Hour ? 42 : 34)',
+    '(timeMini.use24Hour ? 32 : 28)',
+    '(timeMini.use24Hour ? 23 : 20)',
+    'horizontalAlignment: timeMini.densityLevel > 1',
+    'width: timeMini.densityLevel > 1 ? 54 : 44',
+    'label: timeMini.use24Hour ? "24H" : "12H"',
+    'onLeftClicked: timeMini.toggleHourFormat()',
+    'timeMini.timeSnapshot.displayTime',
+    'timeMini.timeSnapshot.dateLabel',
+    'timeMini.timeSnapshot.utcOffsetLabel',
+):
+    assert token in time_mini, f"Stage 7B Time presentation missing {token}"
+assert "anchors.fill: parent" not in time_mini
+assert "Timer {" not in time_mini
+assert tile.count("Timer {") == 1
+assert "ApolloHubTimeMini {" in tile
+
 # Launchers and widget backends are unchanged in this first stage.
 print("ApolloHubW foundation source contracts passed")

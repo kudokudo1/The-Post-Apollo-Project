@@ -13,6 +13,7 @@ on:
       - "services/time/StopwatchPolicy.js"
       - "services/time/CountdownPolicy.js"
       - "services/time/MachineTimelinePolicy.js"
+      - "services/time/MachineCheckpointModel.py"
       - "services/time/TimeConverterFormat.js"
       - "services/time/WorldZoneSearch.js"
       - "timew_click_preview.qml"
@@ -34,6 +35,7 @@ on:
       - "services/time/StopwatchPolicy.js"
       - "services/time/CountdownPolicy.js"
       - "services/time/MachineTimelinePolicy.js"
+      - "services/time/MachineCheckpointModel.py"
       - "services/time/TimeConverterFormat.js"
       - "services/time/WorldZoneSearch.js"
       - "modules/Clock.qml"
@@ -69,5 +71,7 @@ jobs:
         run: node tests/timew/test_countdown_policy.cjs
       - name: Verify MACHINE session marker time policy and bounds
         run: node tests/timew/test_machine_timeline_policy.cjs
+      - name: Verify MACHINE isolated metadata preview policy
+        run: python3 -B -I tests/timew/test_machine_checkpoint_model.py
       - name: Verify MACHINE desktop checkpoint draft remains non-operative
         run: python3 -B -I tests/timew/test_machine_checkpoint_contract.py

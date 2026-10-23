@@ -6,8 +6,8 @@ import subprocess
 
 root = Path(__file__).resolve().parents[2]
 service = (root / "services/git/GitService.qml").read_text()
-body = service.split(
-    "// End-to-end timing is emitted only after refreshing the UI", 1
+body = "if (pipelineRefreshStartedMs > 0" + service.split(
+    "if (pipelineRefreshStartedMs > 0", 1
 )[1].split("if (trace) started = Date.now();", 1)[0]
 assert body.count("SYNC TIMELINE // prepare") == 1
 assert "const refreshMs = end - pipelineRefreshStartedMs;" in body

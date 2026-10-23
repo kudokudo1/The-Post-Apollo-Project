@@ -15,6 +15,8 @@ assert 'POST_APOLLO_GIT_JOURNAL_DELTA' in journal
 assert 'property bool storageReady: false' in journal
 assert 'if (!repo || !operationKind || !storageReady)' in journal
 assert 'deltaActive = deltaRequested || overlay.present;' in journal
+assert 'property var encodedDeltaRecords: []' in journal
+assert 'encodedDeltaRecords = [];' in journal
 assert 'storageReady = false;' in journal and 'storageReady = true;' in journal
 assert 'JOURNAL STORAGE BLOCKED' in journal
 assert 'const record = Object.assign({}, row, {' in journal
@@ -32,6 +34,12 @@ save=section('function persist(record) {','\n    FileView {')
 assert 'record.kind === "CONTROL/FETCH"' in save
 assert 'record.kind === "CONTROL/PULL"' in save
 assert 'DeltaCodec.upsert(deltaRecords, record)' in save
+assert 'DeltaCodec.encodeSidecarCached(' in save
+assert 'checkpointGeneration, revised, encodedDeltaRecords' in save
+assert 'lastPersistReusedCount = encoded.reusedCount;' in save
+assert save.index('deltaFile.setText(serialized)') < save.index('encodedDeltaRecords = encoded.cache;')
+assert save.index('if (!requireWriteAck("DELTA"))') < save.index('encodedDeltaRecords = encoded.cache;')
+assert save.index('checkpointGeneration = nextGeneration;') < save.index('encodedDeltaRecords = [];')
 assert 'if (revised.length < maxDeltaRecords)' in save
 assert 'deltaFile.setText(serialized)' in save
 assert 'journalFile.setText(data)' in save

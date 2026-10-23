@@ -13,7 +13,7 @@ Item {
     signal openTaskRequested(string taskId)
 
     readonly property var calendar: Planner.view(todoSnapshot, monthKey, selectedDate, todayKey)
-    readonly property var weekdays: ["M", "T", "W", "T", "F", "S", "S"]
+    readonly property var weekdays: ["MO", "TU", "WE", "TH", "FR", "SA", "SU"]
 
     function refreshLocalDate() {
         var d=new Date();
@@ -88,7 +88,8 @@ Item {
         anchors.topMargin: 12
         anchors.left: parent.left
         anchors.right: parent.right
-        height: 237
+        // Keep a useful agenda viewport when the host is shorter than the M1 pilot.
+        height: Math.min(237, Math.max(150, planner.height * 0.38))
 
         Grid {
             id: weekdays
@@ -119,7 +120,7 @@ Item {
                 Rectangle {
                     required property var modelData
                     width: (monthGrid.width-12)/7
-                    height: 32
+                    height: Math.max(19, Math.min(32, (calendarArea.height - weekdays.height - 10) / 6))
                     color: modelData.selected ? Colors.dark : "transparent"
                     border.width: modelData.selected || modelData.today ? 1 : 0
                     border.color: modelData.today ? Colors.orange : Colors.magenta

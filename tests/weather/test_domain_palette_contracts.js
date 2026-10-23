@@ -28,12 +28,21 @@ const discoveryViewSource = read("widgets/weather/StationDiscovery.qml");
 const discoveryServiceSource = read("services/weather/StationDiscoveryService.qml");
 for (const [id, domain] of [
     ["mapViewComponent", "map"],
-    ["newsViewComponent", "news"],
-    ["radioViewComponent", "radio"]
+    ["newsViewComponent", "news"]
 ]) {
     assert.ok(windowSource.includes("id: " + id), id);
     assert.ok(windowSource.includes('domain: "' + domain + '"'), domain);
 }
+assert.ok(windowSource.includes("id: radioViewComponent"));
+assert.match(windowSource, /id:\s*radioViewComponent[\s\S]*?StationRadio\s*\{/);
+assert.ok(!windowSource.includes('domain: "radio"'));
+const stationRadioSource = read("widgets/weather/StationRadio.qml");
+const mediaBridgeSource = read("services/media/HeadlessMediaController.qml");
+assert.match(stationRadioSource, /SHARED HI-FI \/\/ RADIO BROWSER \/\/ MPD/);
+assert.match(stationRadioSource, /NEWS FIRST/);
+assert.match(stationRadioSource, /pollingInterval:\s*6000/);
+assert.match(stationRadioSource, /radioClient:\s*"weather-radio"/);
+assert.match(mediaBridgeSource, /property string radioClient:\s*"default"/);
 assert.match(windowSource, /weatherStation\.currentView === "map"[\s\S]*?\? mapViewComponent/);
 assert.match(windowSource, /weatherStation\.currentView === "news"[\s\S]*?\? newsViewComponent/);
 assert.match(windowSource, /weatherStation\.currentView === "radio"[\s\S]*?\? radioViewComponent/);

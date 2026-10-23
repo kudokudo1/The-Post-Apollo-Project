@@ -27,3 +27,4 @@ jobs:
       - run: python3 tests/tasks/test_task_planner_preview.py
       - run: python3 tests/tasks/test_task_planner_layout.py
       - run: python3 tests/tasks/test_task_planner_mount.py
+      - run: python3 tests/tasks/test_task_planner_week_day_ui.py

@@ -238,7 +238,8 @@ assert 'standardKeysAvailable && !worldSearchInput.activeFocus' in window
 assert 'enabled: timew.navigationKeysAvailable' in window
 assert 'WORLD // SELECT A SEARCH RESULT' in window
 assert '"ZONE DIRECTORY UNAVAILABLE"' in window
-assert window.count('onTextEdited:') == 3
+# CLOCK WORLD search + CONVERT date/time + MATH date/time/duration fields.
+assert window.count('onTextEdited:') == 8
 # No dynamic command composition or arbitrary typed TZ values.
 assert 'command: ["date", "+%z"]' in window
 assert 'worldLookup.exec({' in window

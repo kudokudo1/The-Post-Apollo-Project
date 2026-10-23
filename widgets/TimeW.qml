@@ -1048,7 +1048,7 @@ PanelWindow {
         stdinEnabled: true
         onStarted: {
             if (timew.machineStoreAction === "save" && timew.machineStorePayload)
-                machineStoreProcess.write(timew.machineStorePayload + "\\n");
+                machineStoreProcess.write(timew.machineStorePayload + String.fromCharCode(10));
             timew.machineStorePayload = "";
         }
         stdout: StdioCollector {

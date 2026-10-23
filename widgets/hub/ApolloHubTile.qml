@@ -120,6 +120,7 @@ SectionFrame {
     signal moveLeft(int index)
     signal moveRight(int index)
     signal changeModule(int index, var sourceItem)
+    signal transferTile(int index, var sourceItem)
     signal removeTile(int index)
     signal toggleTileWidth(int index)
     signal cycleTileHeight(int index)
@@ -186,6 +187,14 @@ SectionFrame {
             height: 25
             label: "SWAP"
             onLeftClicked: tile.changeModule(tile.tileIndex, swapAction)
+        }
+        ActionButton {
+            id: moveAction
+            trackLabelGlowLocally: true
+            width: 57
+            height: 25
+            label: "MOVE"
+            onLeftClicked: tile.transferTile(tile.tileIndex, moveAction)
         }
         ActionButton {
             // One/two grid columns; metadata lives in the v2 layout.

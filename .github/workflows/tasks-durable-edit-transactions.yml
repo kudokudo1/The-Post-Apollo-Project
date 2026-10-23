@@ -1,0 +1,37 @@
+name: TASKS Proxy 1 M10i durable edit transactions
+
+on:
+  pull_request:
+    paths:
+      - 'tests/tasks/fixtures/durable_edit_transaction_fixture.cjs'
+      - 'tests/tasks/test_durable_edit_transaction.cjs'
+      - 'docs/tasks-durable-edit-transactions-m10i.md'
+      - '.github/workflows/tasks-durable-edit-transactions.yml'
+  push:
+    branches:
+      - main
+    paths:
+      - 'tests/tasks/fixtures/durable_edit_transaction_fixture.cjs'
+      - 'tests/tasks/test_durable_edit_transaction.cjs'
+      - 'docs/tasks-durable-edit-transactions-m10i.md'
+      - '.github/workflows/tasks-durable-edit-transactions.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  contract:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: M10i atomic v2 local+journal edit
+        run: node tests/tasks/test_durable_edit_transaction.cjs
+      - name: M10h model regression
+        run: node tests/tasks/test_unified_project_model_v2.cjs
+      - name: M10f cooperative writer regression
+        run: node tests/tasks/test_single_writer_gate.cjs
+      - name: M10e backup/restore regression
+        run: node tests/tasks/test_verified_backup_restore.cjs

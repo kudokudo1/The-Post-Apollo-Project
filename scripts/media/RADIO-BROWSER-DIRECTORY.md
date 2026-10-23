@@ -45,6 +45,46 @@ are supported. A failed MPD queue insertion releases its unneeded token.
 No playlist fetch, subprocess player, Quickshell audio worker, or disk cache
 is introduced.
 
+## Scoped clients // Weather RADIO groundwork (M1)
+
+The private media controller now accepts an optional `args.client` on
+`search`, `snapshot`, `inspect`, `select`, `load`, and `queue_add` for
+`radio-browser`. Old clients omit it and retain the `default` Hi-Fi scope.
+The new Weather RADIO client will use `weather-radio`. At most **four**
+named/default radio browse batches are kept in the controller; this is not
+an unbounded general session store.
+
+- Every client has its **own current Radio Browser result UUIDs and private
+  candidate-URI table**. Inspect, SELECT and LOAD refuse a UUID that was not
+  obtained by that client; searching from another client does not invalidate
+  previously returned refs.
+- Each client has its own **staged selection and browsing snapshot**. The
+  actual loaded cassette, MPD queue and playback-owner verification remain
+  **global/shared**, so only explicit LOAD and PLAY change that state.
+- Searching again **within the same client** replaces that client's current
+  result batch. A stale selection from that replaced batch is rejected at
+  LOAD rather than silently cueing a different station.
+- Client IDs must be 1–32 characters matching
+  `[A-Za-z][A-Za-z0-9_-]*`; invalid or excessive clients are refused.
+- Scoped operations are currently **only for Radio Browser**, not arbitrary
+  MPD/YouTube source operations or separate MPRIS control.
+- The CLI exposes `--client weather-radio` on the relevant commands, for
+  example:
+
+```sh
+python3 scripts/media/media_controller_cli.py search "tag:news" --source radio-browser --client weather-radio
+python3 scripts/media/media_controller_cli.py snapshot --client weather-radio
+# SELECT a returned UUID, then LOAD. Neither operation starts audio.
+python3 scripts/media/media_controller_cli.py select UUID --source radio-browser --client weather-radio
+python3 scripts/media/media_controller_cli.py load --client weather-radio
+# PLAY remains an explicit, shared MPD transport command.
+```
+
+This milestone is **controller source groundwork only**. Weather Station's
+RADIO page has **not** yet been switched from external URLs to this controller
+client; no user service installation/restart or live playback acceptance is
+implied by a passing CI run.
+
 The controller preserves source-qualified station identity, MPD queue ID and
 the relay URI for queue ownership verification. Only selection survives the
 controller restart; temporary radio relay URLs do not. A service restart

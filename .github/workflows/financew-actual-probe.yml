@@ -38,6 +38,8 @@ jobs:
           node --check scripts/finance/income_categorization_preview.mjs
           node --check tests/finance/test_income_categorization_preview.mjs
           node --check tests/finance/test_funding_setup_plan.mjs
+          node --check tests/finance/fixtures/funding_disposable_rehearsal.mjs
+          node --check tests/finance/test_funding_disposable_rehearsal.mjs
           node --check tests/finance/test_finance_input_policy.mjs
           node --check tests/finance/test_funding_reconciliation.mjs
           node --check scripts/finance/read_budget.mjs
@@ -68,4 +70,4 @@ jobs:
       - name: Validate standalone server installer Bash syntax
         run: bash -n scripts/finance/install_standalone_server.sh
       - name: Read-only, fake-data snapshot tests
-        run: node --test tests/finance/test_actual_readonly.mjs tests/finance/test_opening_history.mjs tests/finance/test_finance_source_config.mjs tests/finance/test_funding_reconciliation.mjs tests/finance/test_income_categorization_preview.mjs tests/finance/test_funding_setup_plan.mjs tests/finance/test_finance_input_policy.mjs tests/finance/test_transaction_guard.mjs tests/finance/test_finance_write_gate.mjs tests/finance/test_write_cli_recovery.mjs tests/finance/test_local_drafts.mjs tests/finance/test_allocation_preview.mjs tests/finance/test_allocation_guard.mjs tests/finance/test_allocation_cli_recovery.mjs tests/finance/test_allocation_gate.mjs
+        run: node --test tests/finance/test_actual_readonly.mjs tests/finance/test_opening_history.mjs tests/finance/test_finance_source_config.mjs tests/finance/test_funding_reconciliation.mjs tests/finance/test_income_categorization_preview.mjs tests/finance/test_funding_setup_plan.mjs tests/finance/test_funding_disposable_rehearsal.mjs tests/finance/test_finance_input_policy.mjs tests/finance/test_transaction_guard.mjs tests/finance/test_finance_write_gate.mjs tests/finance/test_write_cli_recovery.mjs tests/finance/test_local_drafts.mjs tests/finance/test_allocation_preview.mjs tests/finance/test_allocation_guard.mjs tests/finance/test_allocation_cli_recovery.mjs tests/finance/test_allocation_gate.mjs

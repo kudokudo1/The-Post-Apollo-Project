@@ -16,6 +16,9 @@ import {takeOpeningHistory} from "./opening_history.mjs";
 import {takeReadOnlySnapshot} from "./actual_readonly.mjs";
 import {executeAllocation,preflightAllocation,AllocationRefusal}
   from "./allocation_guard.mjs";
+import {executeRehearsal,preflightRehearsal,inspectUncertainIncome,
+  FundingRehearsalRefusal}
+  from "../../tests/finance/fixtures/funding_disposable_rehearsal.mjs";
 
 if(process.env.GITHUB_ACTIONS!=="true" || process.env.CI!=="true"
     || process.env.FINANCEW_DISPOSABLE_TEST!=="yes")
@@ -313,7 +316,64 @@ async function main(){
   assert.equal(updated[0].budgeted,newTarget);
   assert.equal(updated[0].balance,rows[0].balance+writerDelta);
   assert.equal(confirmed.toBudget,after.toBudget-writerDelta);
+  // D17b: real pinned Actual engine, fictional funding ONLY. These routines
+  // are isolated test fixtures; no FinanceW runtime import or real permit.
+  stage="d17b-disposable-existing-opening-refusal";
+  const sourceKey=createHash("sha256").update(host+"\0"+syncId).digest("hex");
+  let fundingAttempts=0;
+  const incomePlan={
+    mode:"income",requestId:"e".repeat(32),sourceKey,accountId,month,date,
+    amountCents:347,categoryId:incomeCategoryId,
+    description:"D17 FICTIONAL INCOME REHEARSAL"
+  };
+  await assert.rejects(()=>preflightRehearsal({api,input:{
+    ...incomePlan,mode:"existing-account-opening"
+  },expectedSourceKey:sourceKey}),
+    error=>error instanceof FundingRehearsalRefusal
+      && error.code==="existing-opening-requires-bank-reconciliation");
+  stage="d17b-disposable-income-preflight";
+  await preflightRehearsal({api,input:incomePlan,expectedSourceKey:sourceKey});
+  await assert.rejects(()=>preflightRehearsal({api,input:incomePlan,
+    expectedSourceKey:"0".repeat(64)}),
+    error=>error instanceof FundingRehearsalRefusal
+      && error.code==="budget-source-changed");
+  stage="d17b-disposable-income";
+  const incomeResult=await executeRehearsal({api,input:incomePlan,
+    expectedSourceKey:sourceKey,recordAttempt:async()=>{fundingAttempts++;}});
+  assert.equal(incomeResult.status,"committed");
+  assert.equal(fundingAttempts,1);
+  assert.equal((await inspectUncertainIncome({api,input:incomePlan})).status,"observed");
+  await assert.rejects(()=>preflightRehearsal({api,input:{
+    ...incomePlan,requestId:"f".repeat(32)
+  },expectedSourceKey:sourceKey}),
+    error=>error instanceof FundingRehearsalRefusal
+      && error.code==="possible-duplicate-income");
+  stage="d17b-disposable-new-account";
+  const openingPlan={
+    mode:"new-account-opening",requestId:"c".repeat(32),sourceKey,
+    accountName:"D17 FICTIONAL New Account",amountCents:5555
+  };
+  const openingResult=await executeRehearsal({api,input:openingPlan,
+    expectedSourceKey:sourceKey,recordAttempt:async()=>{fundingAttempts++;}});
+  assert.equal(openingResult.status,"committed");
+  assert.equal(fundingAttempts,2);
+  await assert.rejects(()=>preflightRehearsal({api,input:{
+    ...openingPlan,requestId:"1".repeat(32)
+  },expectedSourceKey:sourceKey}),
+    error=>error instanceof FundingRehearsalRefusal
+      && error.code==="possible-existing-account");
+  stage="d17b-disposable-independent-readback";
+  await endClient();
+  await startClient("d17b-independent");
+  await api.downloadBudget(syncId);
+  const verifyIncome=await api.getTransactions(accountId,month+"-01",month+"-31");
+  assert.equal(verifyIncome.filter(r=>r.id===incomeResult.transactionId
+    && r.amount===347 && r.category===incomeCategoryId).length,1);
+  const verifyAccounts=await api.getAccounts();
+  assert.equal(verifyAccounts.filter(a=>a.id===openingResult.accountId).length,1);
+  assert.equal(await api.getAccountBalance(openingResult.accountId),5555);
   stage="pass";
+  process.stdout.write("FINANCEW_D17B_DISPOSABLE_PASS income/opening/replay/reconciliation/readback\n");
   process.stdout.write("FINANCEW_D12B_D12C_DISPOSABLE_PASS real-server/gate/allocation/replay/readback\n");
 }
 try{await main();}

@@ -4,7 +4,7 @@
 // projects and typed LOCAL-ONLY fields. This is not Todo v4, not a writer,
 // not a GitHub identity verifier, and not a network/sync executor.
 var VERSION=2;
-var MAX_BYTES=1048576;
+var MAX_CHARS=1048576;
 var MAX_REVISION=1000000000;
 var PROJECT_FIELDS=["id","name","createdAtMs","updatedAtMs","family","remote","fields"];
 var TASK_FIELDS=["id","title","done","createdAtMs","updatedAtMs","priority",
@@ -40,7 +40,8 @@ function identifier(x,prefix) {
 function text(x,max,required) {
     return typeof x==="string" && x.length<=max
         && (!required || (x.length>0 && x===x.trim()))
-        && !/[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]/.test(x);
+        && !(/[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]/.test(x))
+        && (!required || !/[\x00-\x1f\x7f]/.test(x));
 }
 function date(x) {
     if(x===null) return true;
@@ -191,7 +192,7 @@ function encode(document) {
     var check=verify(document);
     if(!check.ok) return check;
     var raw=JSON.stringify(document);
-    if(raw.length>MAX_BYTES) return fail("DOCUMENT_TOO_LARGE");
+    if(raw.length>MAX_CHARS) return fail("DOCUMENT_TOO_LARGE");
     return {ok:true,reason:"",writeReady:false,raw:raw};
 }
 // A valid JSON text still may contain two members with the same decoded key.
@@ -251,7 +252,7 @@ function hasDuplicateKeys(raw) {
     return duplicates;
 }
 function decode(raw) {
-    if(typeof raw!=="string" || raw.length===0 || raw.length>MAX_BYTES)
+    if(typeof raw!=="string" || raw.length===0 || raw.length>MAX_CHARS)
         return fail("INVALID_FILE");
     var doc;
     try { doc=JSON.parse(raw); }
@@ -370,4 +371,67 @@ function editCustomValue(document,request) {
     if(!checked.ok) return checked;
     return {ok:true,reason:"",writeReady:false,
         remoteIntentCreated:false,remoteWriteAuthorized:false,document:next};
+}
+
+// Only NORMAL project names are locally mutable for now; GIT project
+// renames would need a separately designed, verified remote intent.
+function renameProject(document,request) {
+    var check=verify(document);
+    if(!check.ok) return check;
+    if(!obj(request) || !identifier(request.projectId,"p")
+        || !text(request.name,64,true)
+        || !integer(request.nowMs,1,Number.MAX_SAFE_INTEGER))
+        return fail("INVALID_PROJECT_EDIT");
+    if(document.revision>=MAX_REVISION) return fail("REVISION_EXHAUSTED");
+    var next=clone(document), project=null;
+    for(var i=0;i<next.projects.length;i++)
+        if(next.projects[i].id===request.projectId) project=next.projects[i];
+    if(!project) return fail("UNKNOWN_PROJECT");
+    if(project.family==="git") return fail("REMOTE_PROJECT_RENAME_UNSUPPORTED");
+    if(project.name===request.name) return fail("NO_CHANGE");
+    if(request.nowMs<project.updatedAtMs
+        || project.updatedAtMs>=Number.MAX_SAFE_INTEGER)
+        return fail("STALE_EDIT_TIME");
+    project.name=request.name;
+    project.updatedAtMs=Math.max(request.nowMs,project.updatedAtMs+1);
+    next.revision++;
+    var checked=verify(next);
+    if(!checked.ok) return checked;
+    return {ok:true,reason:"",writeReady:false,remoteIntentCreated:false,
+            remoteWriteAuthorized:false,document:next};
+}
+// New definitions are explicitly LOCAL ONLY. Even on a Git-linked project,
+// a new field is never silently mapped to a GitHub ProjectV2 field.
+function addLocalField(document,request) {
+    var check=verify(document);
+    if(!check.ok) return check;
+    if(!obj(request) || !identifier(request.projectId,"p")
+        || !text(request.label,64,true)
+        || FIELD_KINDS.indexOf(request.kind)<0
+        || !integer(request.nowMs,1,Number.MAX_SAFE_INTEGER))
+        return fail("INVALID_FIELD_REQUEST");
+    if(document.revision>=MAX_REVISION) return fail("REVISION_EXHAUSTED");
+    var next=clone(document),project=null;
+    for(var i=0;i<next.projects.length;i++)
+        if(next.projects[i].id===request.projectId) project=next.projects[i];
+    if(!project) return fail("UNKNOWN_PROJECT");
+    if(project.fields.length>=24) return fail("FIELD_CAPACITY");
+    if(request.nowMs<project.updatedAtMs
+        || project.updatedAtMs>=Number.MAX_SAFE_INTEGER)
+        return fail("STALE_EDIT_TIME");
+    var max=0;
+    for(var k=0;k<project.fields.length;k++) {
+        if(project.fields[k].label.toLowerCase()===request.label.toLowerCase())
+            return fail("DUPLICATE_FIELD_LABEL");
+        max=Math.max(max,Number(project.fields[k].id.slice(1)));
+    }
+    if(max>=MAX_REVISION) return fail("FIELD_ID_EXHAUSTED");
+    var id="f"+(max+1);
+    project.fields.push({id:id,label:request.label,kind:request.kind,scope:"local"});
+    project.updatedAtMs=Math.max(request.nowMs,project.updatedAtMs+1);
+    next.revision++;
+    var checked=verify(next);
+    if(!checked.ok) return checked;
+    return {ok:true,reason:"",writeReady:false,remoteIntentCreated:false,
+            remoteWriteAuthorized:false,fieldId:id,document:next};
 }

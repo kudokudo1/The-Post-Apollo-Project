@@ -760,7 +760,9 @@ Rectangle {
 
                     GohuText {
                         text: xrayService.failed
-                              ? "FETCH FAILED // LAST DATA"
+                              ? (xrayService.ready
+                                 ? "FETCH FAILED // LAST DATA"
+                                 : "FETCH FAILED // NO DATA")
                               : xrayService.loading && !xrayService.ready
                                 ? "RECEIVING"
                                 : xrayService.sampleFresh ? "SAMPLE CURRENT"
@@ -800,7 +802,7 @@ Rectangle {
                                                        - 11 * parent.spacing) / 12)
                                     height: 5 + 58 * modelData.level
                                     color: space.flareClassColor(
-                                               xrayService.classEquivalent.letter
+                                               modelData.classLetter
                                            )
                                     opacity: xrayService.sampleFresh ? 1 : 0.45
                                 }

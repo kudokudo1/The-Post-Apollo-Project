@@ -583,7 +583,8 @@ assert.deepEqual(toPlain(layout.packTiles(navBase.modes[0].subModes[0].tiles)),
 
 // When a wide tile is below a tall half-width tile, arrows must only
 // move into cards that really lie beyond the appropriate outer edge.
-assert.equal(layout.navigationTarget(sparseGrid,0,"right"),2);
+// The middle right tile is nearest to the tall tile's vertical center.
+assert.equal(layout.navigationTarget(sparseGrid,0,"right"),3);
 assert.equal(layout.navigationTarget(sparseGrid,0,"down"),1);
 assert.equal(layout.navigationTarget(sparseGrid,1,"up"),0);
 assert.equal(layout.navigationTarget(sparseGrid,2,"down"),3);

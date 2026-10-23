@@ -716,6 +716,18 @@ PanelWindow {
                              + tasksHost.x + tasksButton.width / 2
                 chassisTopY: hospitalWindow.panelTopMargin
                              + hospitalWindow.topGlowGutter
+
+                // Navigation only. GitW owns its GitHub service and decides
+                // when to READ the remote project list; TASKS never receives
+                // GitHub credentials or permission to mutate remote state.
+                onOpenGithubProjectsRequested: {
+                    tasksWindow.menuOpen = false;
+                    if (!gitWindow.menuOpen)
+                        gitWindow.open();
+                    gitWindow.showGithubPage();
+                    gitWindow.showGithubProjects();
+                    shellRoot.requestControlKeyboard("git", "cross-widget");
+                }
             }
         }
     }

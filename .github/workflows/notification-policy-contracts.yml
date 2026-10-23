@@ -46,6 +46,9 @@ jobs:
       - name: Validate read-only Proton browser native handshake
         run: python3 tests/notifications/test_proton_browser_handshake.py
 
+      - name: Validate default-off native-to-desktop Proton Unix relay
+        run: python3 tests/notifications/test_proton_local_relay_pilot.py
+
       - name: Validate Chromium and Firefox shared Proton companion
         run: python3 tests/notifications/test_proton_multibrowser_companion.py
 

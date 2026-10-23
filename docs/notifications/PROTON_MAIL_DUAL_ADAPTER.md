@@ -163,6 +163,43 @@ map a notification to mail. If there are zero controls or ambiguous UI
 semantics, live authorized research is still required; preserve fail-closed
 operation and do not infer identity from a subject, timestamp, or URI.
 
+## Source-verified read/unread toolbar identifiers (2026-10-22)
+
+The operator's live Brave V2 diagnostics showed 359 controls (347 unlabeled),
+then 362 controls (350 unlabeled), zero text-label read matches in both,
+and checked-control count increasing from zero to one after a single
+unread-message selection. This verifies only a generic checkbox change,
+**not** a message ID.
+
+Source inspection of Proton's public maintained WebClients repository confirms
+`applications/mail/src/app/components/toolbar/actions/ReadUnreadButtons.tsx`
+supplies `data-testid="toolbar:read"` and `data-testid="toolbar:unread"`
+to its shared `ToolbarButton`. The shared component forwards attributes
+to a native button and renders the human-readable `title` via a separate
+Tooltip. Thus our earlier button `aria-label` / native `title` scan can
+miss the correct control even when the button exists.
+
+The V3 diagnostic **only compares those two literal test IDs** and returns
+separate bounded counts for enabled and disabled read/unread toolbar buttons.
+It continues to report the previous non-sensitive counts; no arbitrary
+`data-testid`, DOM, text or IDs are exposed to the native host, logs,
+desktop notifications, or history. No clicking, no mutation, no confirmed
+message identity, and no assumption that every deployed Proton release uses
+the same source version. An absent toolbar button may reflect read state,
+selection state, UI version, or that element not being in the scanned document.
+
+Source references:
+- https://github.com/ProtonMail/WebClients/blob/main/applications/mail/src/app/components/toolbar/actions/ReadUnreadButtons.tsx
+- https://github.com/ProtonMail/WebClients/blob/main/packages/components/components/toolbar/ToolbarButton.tsx
+
+For operator retest, merge and pull the reviewed change, **Reload** the
+unpacked extension in `brave://extensions`, select one unread email on the
+Proton page, then click the extension icon. The service-worker console now
+reports `toolbarReadEnabled`, `toolbarReadDisabled`,
+`toolbarUnreadEnabled`, and `toolbarUnreadDisabled`. This is a discovery
+test only; the six Notifications MAIL buttons remain disabled. Do not use
+the presence of `toolbar:read` to modify a saved notification's message.
+
 ## Authoritative external references
 
 - Proton Bridge Linux paid requirement: https://proton.me/support/bridge-for-linux

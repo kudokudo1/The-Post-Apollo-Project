@@ -7,6 +7,9 @@ Item {
     id: systemMini
 
     property var systemSnapshot: null
+    // Stage 7D: only presentation follows the existing tile geometry.
+    readonly property int densityLevel: height >= 300 ? 3
+                                        : height >= 180 ? 2 : 1
     // During a shared telemetry refresh, B2 intentionally masks numeric
     // output. Hold only the most recent valid observation for presentation
     // while LOADING, never for errors, disconnection, or stale states.
@@ -90,16 +93,26 @@ Item {
         property string labelText: ""
         property real percentValue: -1
         property bool prominent: false
-
-        spacing: 3
+        readonly property int labelHeight:
+            systemMini.densityLevel === 3 ? 40
+            : systemMini.densityLevel === 2 ? 29 : 19
+        readonly property int trackHeight:
+            systemMini.densityLevel === 3 ? 13
+            : systemMini.densityLevel === 2 ? 9 : 5
+        height: labelHeight + spacing + trackHeight
+        spacing: systemMini.densityLevel === 3 ? 10
+                 : systemMini.densityLevel === 2 ? 6 : 3
 
         GohuText {
             width: gauge.width
-            // Shared label/bar geometry: both columns now use the same
-            // baseline, with larger type only for primary CPU/RAM.
-            height: 19
+            // Preserve the shared baseline and compact H:1 typography.
+            height: gauge.labelHeight
             verticalAlignment: Text.AlignVCenter
-            font.pixelSize: gauge.prominent ? 14 : 12
+            font.pixelSize: systemMini.densityLevel === 3
+                            ? (gauge.prominent ? 26 : 22)
+                            : systemMini.densityLevel === 2
+                            ? (gauge.prominent ? 19 : 17)
+                            : (gauge.prominent ? 14 : 12)
             color: gauge.percentValue >= 0 ? Colors.white : Colors.orange
             elide: Text.ElideRight
             text: gauge.labelText + "  "
@@ -110,7 +123,7 @@ Item {
         Rectangle {
             id: track
             width: gauge.width
-            height: 5
+            height: gauge.trackHeight
             color: Colors.dark
             border.width: 1
             border.color: Colors.cyan
@@ -130,34 +143,45 @@ Item {
         }
     }
 
-    // One Grid owns row baselines. Independent Columns had different
-    // prominent label/bar heights and offset RAM from ROOT FS by 2px.
+    // H:1 keeps the original two-column gauge order and baselines.
+    // A tall narrow tile stacks four gauges; wide tiles retain two columns.
     Grid {
         id: metrics
-        anchors.fill: parent
-        columns: 2
+        width: parent.width
+        height: childrenRect.height
+        y: systemMini.densityLevel > 1
+           ? Math.max(0, Math.floor((systemMini.height - height) / 2)) : 0
+        columns: systemMini.densityLevel === 3 && width < 500 ? 1 : 2
         columnSpacing: 12
         rowSpacing: 9
 
         UsageGauge {
-            width: Math.max(0, (metrics.width - metrics.columnSpacing) / 2)
+            width: Math.max(0, (metrics.width
+                                - metrics.columnSpacing * (metrics.columns - 1))
+                                / metrics.columns)
             labelText: "CPU"
             prominent: true
             percentValue: systemMini.cpuUsage
         }
         UsageGauge {
-            width: Math.max(0, (metrics.width - metrics.columnSpacing) / 2)
+            width: Math.max(0, (metrics.width
+                                - metrics.columnSpacing * (metrics.columns - 1))
+                                / metrics.columns)
             labelText: "SWAP"
             percentValue: systemMini.swapUsage
         }
         UsageGauge {
-            width: Math.max(0, (metrics.width - metrics.columnSpacing) / 2)
+            width: Math.max(0, (metrics.width
+                                - metrics.columnSpacing * (metrics.columns - 1))
+                                / metrics.columns)
             labelText: "RAM"
             prominent: true
             percentValue: systemMini.ramUsage
         }
         UsageGauge {
-            width: Math.max(0, (metrics.width - metrics.columnSpacing) / 2)
+            width: Math.max(0, (metrics.width
+                                - metrics.columnSpacing * (metrics.columns - 1))
+                                / metrics.columns)
             labelText: "ROOT FS"
             percentValue: systemMini.rootUsage
         }

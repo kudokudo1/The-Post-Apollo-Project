@@ -612,11 +612,11 @@ for needle in (
 # empty during short telemetry refreshes. A cached observation is eligible
 # only while LOADING and only within the existing five-minute freshness limit.
 assert "Grid {" in system_mini
-assert "columns: 2" in system_mini
+assert "columns: systemMini.densityLevel === 3 && width < 500 ? 1 : 2" in system_mini
 assert "rowSpacing: 9" in system_mini
 assert "columnSpacing: 12" in system_mini
-assert "height: 19" in system_mini
-assert "height: 5" in system_mini
+assert ": systemMini.densityLevel === 2 ? 29 : 19" in system_mini
+assert ": systemMini.densityLevel === 2 ? 9 : 5" in system_mini
 assert "height: gauge.prominent ? 19 : 18" not in system_mini
 assert "height: gauge.prominent ? 5 : 4" not in system_mini
 assert 'property var lastReadySample: null' in system_mini
@@ -1047,6 +1047,42 @@ for token in (
 assert 'Timer {' not in calendar_mini
 assert 'FileView {' not in calendar_mini
 assert 'ApolloHubCalendarMini {' in tile
+
+
+# Stage 7D: CPU++ and Uptime grow into allocated H:2/H:3 space while
+# H:1 stays compact. No new data source, writer, service or timer.
+for mini in (system_mini, uptime_mini):
+    assert 'readonly property int densityLevel: height >= 300 ? 3' in mini
+    assert ': height >= 180 ? 2 : 1' in mini
+    assert 'height: childrenRect.height' in mini
+    for forbidden in ('Timer {', 'Process {', 'FileView {',
+                      'SystemTelemetry {', 'Qt.openUrlExternally('):
+        assert forbidden not in mini, f"Stage 7D unsafe mini source: {forbidden}"
+for token in (
+    'height: labelHeight + spacing + trackHeight',
+    'height: gauge.labelHeight',
+    'height: gauge.trackHeight',
+    'systemMini.densityLevel === 3 ? 40',
+    'systemMini.densityLevel === 3 ? 13',
+    '(gauge.prominent ? 14 : 12)',
+    'y: systemMini.densityLevel > 1',
+    'width < 500 ? 1 : 2',
+    'metrics.columnSpacing * (metrics.columns - 1)',
+):
+    assert token in system_mini, f"Stage 7D CPU++ layout missing {token}"
+for token in (
+    'id: uptimeContent',
+    'y: uptimeMini.densityLevel > 1',
+    'height: digitHeight + spacing + unitHeight',
+    'height: part.digitHeight',
+    'height: part.unitHeight',
+    ': uptimeMini.densityLevel === 2 ? 54 : 31',
+    ': uptimeMini.densityLevel === 2 ? 18 : 13',
+    ': uptimeMini.densityLevel === 2 ? 39 : 23',
+    ': uptimeMini.densityLevel === 2 ? 13 : 10',
+    'columns: 3',
+):
+    assert token in uptime_mini, f"Stage 7D Uptime layout missing {token}"
 
 # Launchers and widget backends are unchanged in this first stage.
 print("ApolloHubW foundation source contracts passed")

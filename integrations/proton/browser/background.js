@@ -24,14 +24,17 @@ function reportReadiness(results) {
     "inspectedControls", "exactReadEnabled", "exactReadDisabled",
     "otherReadLabels", "unlabeledControls", "checkedControls",
     "toolbarReadEnabled", "toolbarReadDisabled",
-    "toolbarUnreadEnabled", "toolbarUnreadDisabled"
+    "toolbarUnreadEnabled", "toolbarUnreadDisabled", "selectedMailRows"
   ];
-  if (!state || state.kind !== "PROTON_READINESS_V3"
+  if (!state || state.kind !== "PROTON_READINESS_V4"
       || state.originOk !== true
       || state.messageIdentityVerified !== false
       || state.canMutate !== false
       || typeof state.scanTruncated !== "boolean"
-      || Object.keys(state).length !== 15
+      || Object.keys(state).length !== 17
+      || typeof state.selectedRowStructureOk !== "boolean"
+      || (state.selectedRowStructureOk && state.selectedMailRows !== 1)
+      || state.selectedMailRows > state.checkedControls
       || !counters.every((key) => Number.isInteger(state[key])
          && state[key] >= 0 && state[key] <= 500)
       || state.exactReadEnabled + state.exactReadDisabled
@@ -52,6 +55,8 @@ function reportReadiness(results) {
     + " otherEnglishReadLabels=" + state.otherReadLabels
     + " unlabeledControls=" + state.unlabeledControls
     + " checkedControls=" + state.checkedControls
+    + " selectedMailRows=" + state.selectedMailRows
+    + " selectedRowStructureOk=" + state.selectedRowStructureOk
     + " toolbarReadEnabled=" + state.toolbarReadEnabled
     + " toolbarReadDisabled=" + state.toolbarReadDisabled
     + " toolbarUnreadEnabled=" + state.toolbarUnreadEnabled

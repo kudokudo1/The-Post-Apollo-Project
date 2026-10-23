@@ -1084,6 +1084,29 @@ PanelWindow {
                                     wrapMode: Text.WordWrap
                                 }
                                 ActionButton {
+                                    id: guidedFundingSetup
+                                    width: parent.width
+                                    height: 28
+                                    label: guidedFundingPane.expanded
+                                           ? "HIDE FUNDING SETUP" : "GUIDED FUNDING SETUP"
+                                    labelPixelSize: 9
+                                    accentColor: Colors.cyan
+                                    trackLabelGlowLocally: true
+                                    available: financeBudget.state === "ready"
+                                               && !!financeBudget.snapshot
+                                    onLeftClicked: {
+                                        if(guidedFundingPane.expanded)
+                                            guidedFundingPane.clear();
+                                        else
+                                            guidedFundingPane.begin();
+                                    }
+                                }
+                                FinanceFundingSetupPane {
+                                    id: guidedFundingPane
+                                    width: parent.width
+                                    snapshot: financeBudget.snapshot
+                                }
+                                ActionButton {
                                     id: reviewIncoming
                                     width: parent.width
                                     height: 28

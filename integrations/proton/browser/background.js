@@ -20,20 +20,36 @@ function isProtonTab(tab) {
 function reportReadiness(results) {
   const state = Array.isArray(results) && results.length === 1
     ? results[0].result : null;
-  if (!state || state.kind !== "PROTON_READINESS_V1"
+  const counters = [
+    "inspectedControls", "exactReadEnabled", "exactReadDisabled",
+    "otherReadLabels", "unlabeledControls", "checkedControls"
+  ];
+  if (!state || state.kind !== "PROTON_READINESS_V2"
       || state.originOk !== true
       || state.messageIdentityVerified !== false
       || state.canMutate !== false
-      || !Number.isInteger(state.markReadCandidates)
-      || state.markReadCandidates < 0 || state.markReadCandidates > 2) {
+      || typeof state.scanTruncated !== "boolean"
+      || Object.keys(state).length !== 11
+      || !counters.every((key) => Number.isInteger(state[key])
+         && state[key] >= 0 && state[key] <= 500)
+      || state.exactReadEnabled + state.exactReadDisabled
+         + state.otherReadLabels > state.inspectedControls
+      || state.unlabeledControls > state.inspectedControls
+      || state.checkedControls > 20) {
     console.warn("Post-Apollo Proton: readiness probe unavailable");
     return;
   }
-  // We cannot derive an authenticated email identity from a button's label.
-  // Zero/two candidates mean unrecognised or ambiguous UI; one is just a hint.
-  console.info(state.markReadCandidates === 1
-    ? "Post-Apollo Proton: one read-control candidate; identity NOT verified"
-    : "Post-Apollo Proton: no unambiguous read-control candidate");
+  // Numeric, bounded counts only. No raw labels, page state, or mailbox data.
+  // An exact match (even just one) is never a verified message identity.
+  console.info("Post-Apollo Proton: read-only UI counts"
+    + " exactEnabled=" + state.exactReadEnabled
+    + " exactDisabled=" + state.exactReadDisabled
+    + " otherEnglishReadLabels=" + state.otherReadLabels
+    + " unlabeledControls=" + state.unlabeledControls
+    + " checkedControls=" + state.checkedControls
+    + " inspected=" + state.inspectedControls
+    + " truncated=" + state.scanTruncated
+    + "; identity NOT verified");
 }
 
 function inspectReadiness(tab) {

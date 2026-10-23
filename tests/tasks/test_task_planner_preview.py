@@ -12,7 +12,7 @@ assert 'onOpenTaskRequested: function(taskId)' in h
 assert 'id:"t3"' in h and 'dueDate:null' in h
 assert 'FileView {' not in h and 'Process {' not in h
 assert 'ApolloHubTodoStore' not in h
-assert 'TaskPlannerPane {' not in host
+assert host.count('TaskPlannerPane {') == 1
 assert 'anchors.bottom: parent.bottom' in p
 assert 'boundsBehavior: Flickable.StopAtBounds' in p
 print("PLANNER M2 isolated preview contracts: PASS")

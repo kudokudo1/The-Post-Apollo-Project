@@ -5998,7 +5998,10 @@ PanelWindow {
                             bottomMargin: 8
                         }
 
-                        visible: root.gitView === "operations"
+                        // An inactive Git tab should not keep the heavy
+                        // operation-history model active behind other pages.
+                        visible: root.activePage === "git"
+                            && root.gitView === "operations"
 
                         operationJournal: operationJournalService
                         recoveryService: operationRecoveryService

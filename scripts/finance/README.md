@@ -785,3 +785,34 @@ Local acceptance should test the confirmation/refusal sequence with
 \`funding-writes-enabled\` **absent** and avoid changing a real budget.
 A disposable fictional budget has already exercised D17c's guarded
 writer in CI. **Real funding activation is a separate operator decision.**
+
+
+## FinanceW // Compact spreadsheet UX first pass
+
+The default Budget view now shows **+ ADD MONEY**, followed by an
+editable **BUDGET** grid. Each category has a direct-edit **SET** field
+with \`− / +\` buttons stepping by $1.00, alongside Actual-derived
+**SPENT** and **LEFT** cells. SPENT and LEFT are calculated observations
+and intentionally cannot be typed into as independent transactions.
+Users can select and edit any row, then click a single **SAVE ROW**.
+All existing D12 account/category/To-Budget validation, allocation writer
+authorization and crash recovery remain in effect. A fake multi-row
+"Save All" is **not** provided without an atomic batch writer.
+
+**+ ADD MONEY** opens a compact income editor: select account, date,
+amount with \`− / +\` controls, income category and short description;
+click **ADD** once. The D17c writer still refuses real changes unless
+independently activated; this UI does not create its permit or perform
+Actual mutations itself.
+
+**START BALANCE** is clearly view-only for existing accounts; changing
+an existing opening balance requires historical reconciliation and a
+separate reviewed workflow. A new account is not created from this
+compact form.
+
+The prior detailed funding review, opening-balance history, income
+categorization preview, legacy ALLOCATE pane, and manual gate checks
+are retained under a collapsed **ADVANCED** control. They have not been
+removed and the existing services are unchanged. This is the first
+on-desktop UX iteration; not a final design approval. No personal
+financial data is modified by CI or by installing these locked controls.

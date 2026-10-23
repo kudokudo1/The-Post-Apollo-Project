@@ -103,7 +103,7 @@ test("opening the Hi-Fi deck gives Media the canonical yellow fill without remov
     assert.match(source, /mediaRoot\.deckOpen = !mediaRoot\.deckOpen;/);
 
     // Only the Media fill changes. The magenta front wash, open-state rear
-    // priority, and closed CAVA cyan/orange accent remain as before.
+    // priority, and swapped closed CAVA cyan/orange accent remain distinct.
     assert.match(source, /normalDockGlowColor:\s*Colors\.magenta/);
     assert.match(source, /hoverDockGlowColor:\s*Colors\.magenta/);
     assert.match(source, /pressedDockGlowColor:\s*Colors\.magenta/);
@@ -117,7 +117,7 @@ test("opening the Hi-Fi deck gives Media the canonical yellow fill without remov
 test("open state magenta-energizes every Media icon and CAVA visual without affecting MPD", () => {
     assert.match(source, /open:\s*mediaRoot\.deckOpen/);
     assert.match(source, /openFillColor:\s*Colors\.yellow/);
-    assert.match(source, /readonly property color accentColor:\s*mpdPlaying \? Colors\.orange : Colors\.cyan/);
+    assert.match(source, /readonly property color accentColor:\s*mpdPlaying \? Colors\.cyan : Colors\.orange/);
     assert.match(source, /readonly property color artworkAccentColor:\s*open \? Colors\.magenta : accentColor/);
 
     // Evaluate the QML binding's actual conditional: closed is driven by
@@ -127,11 +127,11 @@ test("open state magenta-energizes every Media icon and CAVA visual without affe
     const expression = match[1];
     const visual = (open, playing) => vm.runInNewContext(expression, {
         open,
-        accentColor: playing ? "#ED981A" : "#55CFCA",
+        accentColor: playing ? "#55CFCA" : "#ED981A",
         Colors: {magenta: "#C74EC7"}
     });
-    assert.equal(visual(false, false), "#55CFCA");
-    assert.equal(visual(false, true), "#ED981A");
+    assert.equal(visual(false, false), "#ED981A");
+    assert.equal(visual(false, true), "#55CFCA");
     assert.equal(visual(true, false), "#C74EC7");
     assert.equal(visual(true, true), "#C74EC7");
 
@@ -228,7 +228,7 @@ test("magenta front wash and CAVA-colored static music mark stay independent", (
         "original decorative text remains, while the treble clef is vector art");
     assert.equal((mark.match(/Image \{/g) || []).length, 1);
     assert.match(mark, /id:\s*trebleClef\s*width:\s*15\s*height:\s*34/);
-    assert.match(mark, /source:\s*mediaDock\.open\s*\?\s*Qt\.resolvedUrl\("\.\.\/assets\/media\/treble-clef\.png"\)\s*:\s*mediaDock\.mpdPlaying\s*\?\s*Qt\.resolvedUrl\("\.\.\/assets\/media\/treble-clef-orange\.png"\)\s*:\s*Qt\.resolvedUrl\("\.\.\/assets\/media\/treble-clef-cyan\.png"\)/);
+    assert.match(mark, /source:\s*mediaDock\.open\s*\?\s*Qt\.resolvedUrl\("\.\.\/assets\/media\/treble-clef\.png"\)\s*:\s*mediaDock\.mpdPlaying\s*\?\s*Qt\.resolvedUrl\("\.\.\/assets\/media\/treble-clef-cyan\.png"\)\s*:\s*Qt\.resolvedUrl\("\.\.\/assets\/media\/treble-clef-orange\.png"\)/);
     assert.match(mark, /sourceSize:\s*Qt\.size\(45,\s*102\)/);
     assert.match(mark, /onStatusChanged:[\s\S]*?Image\.Error/);
     assert.match(mark, /textFormat:\s*Text\.PlainText[\s\S]*?text:\s*"‧₊˚"/);
@@ -266,10 +266,51 @@ test("magenta front wash and CAVA-colored static music mark stay independent", (
 
 
 
-    // The animated bars keep their original accent and are never sampled.
-    assert.match(source, /readonly property color accentColor:\s*mpdPlaying \? Colors\.orange : Colors\.cyan/);
+    // All static Media glows and the note now share the swapped cool/idle palette.
+    assert.match(source, /readonly property color accentColor:\s*mpdPlaying \? Colors\.cyan : Colors\.orange/);
     assert.match(source, /color:\s*mediaDock\.artworkAccentColor/);
     assert.doesNotMatch(source, /contentGlowSource:\s*(?:spectrum|mediaArtwork)/);
+});
+
+test("note PNG, rear halo and static music glows follow the same swapped playback accent", () => {
+    const match = source.match(/readonly property color accentColor:\s*([^\n]+)/);
+    assert.ok(match, "Media accent must remain a single playback-bound color");
+    const accent = playing => vm.runInNewContext(match[1], {
+        mpdPlaying: playing,
+        Colors: {cyan: "#55CFCA", orange: "#ED981A"}
+    });
+    assert.equal(accent(false), "#ED981A", "idle Media glows must be orange");
+    assert.equal(accent(true), "#55CFCA", "playing Media glows must be cyan");
+
+    // No dynamic tint shader: both pre-rendered PNGs continue to use
+    // the matching audio state, with the existing open-magenta priority.
+    const pngSource = source.match(
+        /id:\s*trebleClef[\s\S]*?source:\s*mediaDock\.open\s*\?\s*Qt\.resolvedUrl\("([^"]+)"\)\s*:\s*mediaDock\.mpdPlaying\s*\?\s*Qt\.resolvedUrl\("([^"]+)"\)\s*:\s*Qt\.resolvedUrl\("([^"]+)"\)/
+    );
+    assert.ok(pngSource, "music note must retain the open/playing/idle image selection");
+    assert.match(pngSource[1], /treble-clef\.png$/);
+    assert.match(pngSource[2], /treble-clef-cyan\.png$/);
+    assert.match(pngSource[3], /treble-clef-orange\.png$/);
+
+    const rear = source.match(/RectangularShadow \{\s*id:\s*mediaRearHalo([\s\S]*?)\n    \}/)?.[1];
+    assert.ok(rear);
+    assert.match(rear, /color:\s*mediaDock\.open\s*\?\s*mediaDock\.openGlowColor\s*:\s*mediaDock\.accentColor/);
+    assert.match(source, /readonly property color artworkAccentColor:\s*open \? Colors\.magenta : accentColor/);
+    for (const mode of ["normal", "hover", "pressed"]) {
+        assert.match(source, new RegExp(mode + "ContentGlowColor:\\s*accentColor"));
+    }
+    for (const id of ["leadingStarsAura", "trebleClefAura", "trailingStarAura",
+                      "leadingStarsGlow", "trebleClefGlow", "trailingStarGlow",
+                      "cavaAmbientWash"]) {
+        const start = source.indexOf("id: " + id);
+        assert.ok(start > 0, id + " must remain present");
+        const next = source.indexOf("\n    }", start);
+        assert.ok(next > start, id + " must have a bounded visual section");
+        assert.match(source.slice(start, next), /color:\s*mediaDock\.artworkAccentColor/,
+            id + " must inherit the swapped color and open-magenta priority");
+    }
+    assert.match(source, /normalDockGlowColor:\s*Colors\.magenta/,
+        "the canonical front wash remains magenta");
 });
 
 test("Media's rear halo follows CAVA while DockButton's front wash stays magenta", () => {
@@ -293,7 +334,7 @@ test("Media's rear halo follows CAVA while DockButton's front wash stays magenta
     assert.match(source, /normalDockGlowColor:\s*Colors\.magenta/);
     assert.match(source, /hoverDockGlowColor:\s*Colors\.magenta/);
     assert.match(source, /pressedDockGlowColor:\s*Colors\.magenta/);
-    assert.match(source, /readonly property color accentColor:\s*mpdPlaying \? Colors\.orange : Colors\.cyan/);
+    assert.match(source, /readonly property color accentColor:\s*mpdPlaying \? Colors\.cyan : Colors\.orange/);
 
     // The shared component retains the default identity and numeric rules
     // for other modules; only this module disables its built-in rear halo.

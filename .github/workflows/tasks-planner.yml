@@ -1,0 +1,22 @@
+name: Tasks Planner M1
+on:
+  pull_request:
+    paths:
+      - 'widgets/tasks/TaskPlanner*'
+      - 'tests/tasks/test_task_planner*'
+      - '.github/workflows/tasks-planner.yml'
+  push:
+    paths:
+      - 'widgets/tasks/TaskPlanner*'
+      - 'tests/tasks/test_task_planner*'
+      - '.github/workflows/tasks-planner.yml'
+jobs:
+  planner:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: python3 tests/tasks/test_task_planner_ui_contracts.py
+      - run: node tests/tasks/test_task_planner_policy.cjs

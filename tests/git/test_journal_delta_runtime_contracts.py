@@ -39,7 +39,7 @@ assert 'actionExitCode = 1;' in finalize.split('if (!journalRecorded)', 1)[1], (
 # The timing line is diagnostic only. It must not turn into an apparent
 # Git completion message or move the durable-before-unlock boundary.
 assert 'function journalProfileLine(stage, snapshotCloneMs)' in service
-assert '"JOURNAL PROFILE // "' in service
+assert 'JOURNAL PROFILE // ' in service  # Prefix includes an escaped newline.
 assert 'value.indexOf("JOURNAL PROFILE //") === 0' in service
 before = service.split('if (gitService.snapshotPhase === "BEFORE")', 1)[1].split(
     'if (gitService.snapshotPhase === "AFTER")', 1

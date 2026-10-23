@@ -42,9 +42,14 @@ assert 'checkpointGeneration = nextGeneration' in save
 assert 'return true;' in save
 
 for fragment in (
-    'if (!persist(record))\n            return "";\n        operationStarted',
-    'if (!persist(record))\n            return false;\n        operationFinished(operationId, true',
-    'if (!persist(record))\n            return false;\n        operationFinished(operationId, false',
+    'const saved = persist(record);',
+    'if (!saved) {',
+    'markMutationProfile("BEGIN_FAILED"',
+    'markMutationProfile("COMPLETE_FAILED"',
+    'markMutationProfile("FAIL_FAILED"',
+    'operationStarted(operationId, cloneValue(record));',
+    'operationFinished(operationId, true, cloneValue(record));',
+    'operationFinished(operationId, false, cloneValue(record));',
     'if (repairedInterrupted)\n            persist();',
     'next[index] = record;\n        entries = next;\n        return persist();',
 ):
@@ -66,6 +71,18 @@ for fragment in (
     assert fragment in journal, fragment
 assert journal.count('onSaveFailed: function(error)') == 2
 assert 'return blockStorage("PERSIST EXCEPTION //' in journal
+
+# Phase instrumentation must not copy operation contents or touch disk.
+for token in (
+    'property var lastMutationProfile: ({})',
+    'function markMutationProfile(stage, started, built, published, saved, notified)',
+    'recordMs: Math.max(0, built - started)',
+    'entriesMs: Math.max(0, published - built)',
+    'persistMs: Math.max(0, saved - published)',
+    'notifyMs: Math.max(0, notified - saved)',
+    'totalMs: Math.max(0, notified - started)',
+):
+    assert token in journal, token
 
 # Keep every Undo / recovery consumer's public contract unchanged.
 for fragment in (

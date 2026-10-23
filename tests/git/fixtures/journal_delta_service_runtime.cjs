@@ -33,7 +33,7 @@ function extract(name) {
 const names=[
     "nowIso","cloneValue","nextOperationId","entryIndex","beginOperation",
     "completedRecoveryClass","completeOperation","failOperation","load",
-    "markUndoResult","blockStorage","requireWriteAck","persist"
+    "markUndoResult","blockStorage","requireWriteAck","markMutationProfile","persist"
 ];
 const funcs=names.map(extract).join("\n");
 const delta=fs.readFileSync("services/git/GitJournalDelta.js","utf8");
@@ -51,6 +51,7 @@ function create(disk, requested=true, limit=48) {
         deltaWriteStatus:0, deltaWriteError:"",
         deltaRecords:[],maxDeltaRecords:limit,
         lastPersistSerializationMs:0,lastPersistWriteMs:0,lastPersistReusedCount:0,
+        lastMutationProfile:{},
         operationStarted(id,record){events.push(["start",id,record.status]);},
         operationFinished(id,ok,record){events.push(["finish",id,ok,record.status]);},
         journalFile:{
@@ -106,10 +107,18 @@ assert.equal(s.scope.storageReady,true);
 assert.equal(s.scope.deltaActive,true);
 const id=s.call("beginOperation","CONTROL/FETCH",snapshot(),meta());
 assert(id);
+assert.equal(s.scope.lastMutationProfile.stage,"BEGIN");
+assert(s.scope.lastMutationProfile.totalMs>=0);
+assert.equal(s.scope.lastMutationProfile.totalMs,
+    s.scope.lastMutationProfile.recordMs
+    +s.scope.lastMutationProfile.entriesMs
+    +s.scope.lastMutationProfile.persistMs
+    +s.scope.lastMutationProfile.notifyMs);
 assert.equal(disk.main,undefined);
 assert.equal(JSON.parse(disk.delta).records[0].status,"RUNNING");
 assert.equal(s.events.length,1);
 assert.equal(s.call("completeOperation",id,snapshot(),"fetch done"),true);
+assert.equal(s.scope.lastMutationProfile.stage,"COMPLETE");
 assert.equal(JSON.parse(disk.delta).records[0].status,"COMPLETE");
 assert.equal(s.events[1][2],true);
 const cold=create(disk,false);
@@ -172,6 +181,7 @@ const denied=create(deniedDisk,true);
 deniedDisk.failDeltaWrite=true;
 assert.equal(denied.call("beginOperation","CONTROL/FETCH",snapshot(),meta()),"");
 assert.equal(denied.scope.storageReady,false);
+assert.equal(denied.scope.lastMutationProfile.stage,"BEGIN_FAILED");
 assert.equal(denied.events.length,0);
 assert.equal(deniedDisk.delta,undefined);
 assert.match(denied.scope.storageError,/DELTA WRITE FAILED/);
@@ -184,6 +194,7 @@ const afterId=afterService.call("beginOperation","CONTROL/PULL",snapshot(),meta(
 assert(afterId);
 afterDisk.failDeltaWrite=true;
 assert.equal(afterService.call("completeOperation",afterId,snapshot(),"git succeeded"),false);
+assert.equal(afterService.scope.lastMutationProfile.stage,"COMPLETE_FAILED");
 assert.equal(afterService.events.length,1,"no false operationFinished on failed save");
 assert.equal(afterService.scope.storageReady,false);
 assert.equal(JSON.parse(afterDisk.delta).records[0].status,"RUNNING");

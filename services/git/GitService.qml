@@ -1588,6 +1588,22 @@ Scope {
         return out;
     }
 
+    function journalProfileLine(stage, snapshotCloneMs) {
+        const timing = operationJournal
+            ? operationJournal.lastMutationProfile : null;
+        if (!timing || timing.stage !== stage)
+            return "";
+        // Keep the breakdown inline with the existing Git Menu output.
+        // The persistence phase includes both encoding and FileView writes.
+        return "\nJOURNAL PROFILE // " + stage
+            + " clone " + snapshotCloneMs + " ms"
+            + " // record " + timing.recordMs + " ms"
+            + " // entries " + timing.entriesMs + " ms"
+            + " // persist " + timing.persistMs + " ms"
+            + " // notify " + timing.notifyMs + " ms"
+            + " // mutation " + timing.totalMs + " ms";
+    }
+
     function clearPendingControlAction() {
         pendingJournalId = "";
         pendingSnapshotRequest = "";
@@ -1735,6 +1751,7 @@ Scope {
             const value = String(lines[i] || "").trim();
 
             if (value.indexOf("PREPARING //") === 0
+                    || value.indexOf("JOURNAL PROFILE //") === 0
                     || value.indexOf("PREPARED //") === 0
                     || value.indexOf("RUNNING // Git subprocess") === 0
                     || value.indexOf("FINALIZING //") === 0
@@ -1782,6 +1799,7 @@ Scope {
                     warning
                     || "CONTROL AFTER SNAPSHOT UNAVAILABLE"
             };
+        const snapshotCloneMs = Date.now() - finalizationStarted;
 
         let journalRecorded = true;
         if (pendingJournalId && operationJournal) {
@@ -1814,7 +1832,10 @@ Scope {
                 + (metrics ? metrics.lastPersistSerializationMs : 0)
                 + " ms / disk "
                 + (metrics ? metrics.lastPersistWriteMs : 0)
-                + " ms)";
+                + " ms)"
+                + journalProfileLine(
+                    success ? "COMPLETE" : "FAIL", snapshotCloneMs
+                );
         }
 
         if (!journalRecorded) {
@@ -2439,6 +2460,7 @@ Scope {
                 const journalStartedMs = Date.now();
                 const beforeSnapshot =
                     gitService.journalSnapshot(snapshot);
+                const snapshotCloneMs = Date.now() - journalStartedMs;
 
                 gitService.pendingJournalId =
                     gitService.operationJournal
@@ -2472,7 +2494,10 @@ Scope {
                         + (metrics ? metrics.lastPersistSerializationMs : 0)
                         + " ms / disk "
                         + (metrics ? metrics.lastPersistWriteMs : 0)
-                        + " ms)";
+                        + " ms)"
+                        + gitService.journalProfileLine(
+                            "BEGIN", snapshotCloneMs
+                        );
                 }
                 gitService.startPendingActionProcess();
                 return;

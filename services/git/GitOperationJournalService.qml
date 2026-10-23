@@ -40,6 +40,8 @@ Scope {
     property int lastPersistSerializationMs: 0
     property int lastPersistWriteMs: 0
     property int lastPersistReusedCount: 0
+    // Most recent mutation phase timings. No record payloads are copied here.
+    property var lastMutationProfile: ({})
 
     signal operationStarted(string operationId, var record)
     signal operationFinished(string operationId, bool success, var record)
@@ -83,6 +85,17 @@ Scope {
         return -1;
     }
 
+    function markMutationProfile(stage, started, built, published, saved, notified) {
+        lastMutationProfile = {
+            stage: String(stage),
+            recordMs: Math.max(0, built - started),
+            entriesMs: Math.max(0, published - built),
+            persistMs: Math.max(0, saved - published),
+            notifyMs: Math.max(0, notified - saved),
+            totalMs: Math.max(0, notified - started)
+        };
+    }
+
     function beginOperation(kind, beforeState, metadata) {
         const repo = String(repositoryPath || "").trim();
         const operationKind = String(kind || "").trim();
@@ -90,6 +103,7 @@ Scope {
         if (!repo || !operationKind || !storageReady)
             return "";
 
+        const mutationStarted = Date.now();
         const operationId = nextOperationId();
         const record = {
             schemaVersion: schemaVersion,
@@ -108,15 +122,24 @@ Scope {
             undoState: "NOT_IMPLEMENTED"
         };
 
+        const recordBuiltAt = Date.now();
         const next = [record].concat(entries);
 
         if (next.length > maxEntries)
             next.length = maxEntries;
 
         entries = next;
-        if (!persist(record))
+        const entriesPublishedAt = Date.now();
+        const saved = persist(record);
+        const persistedAt = Date.now();
+        if (!saved) {
+            markMutationProfile("BEGIN_FAILED", mutationStarted,
+                recordBuiltAt, entriesPublishedAt, persistedAt, persistedAt);
             return "";
+        }
         operationStarted(operationId, cloneValue(record));
+        markMutationProfile("BEGIN", mutationStarted,
+            recordBuiltAt, entriesPublishedAt, persistedAt, Date.now());
         return operationId;
     }
 
@@ -145,6 +168,7 @@ Scope {
     }
 
     function completeOperation(operationId, afterState, detail) {
+        const mutationStarted = Date.now();
         const index = entryIndex(operationId);
 
         if (index < 0)
@@ -169,15 +193,25 @@ Scope {
             undoState: "NOT_IMPLEMENTED"
         };
 
+        const recordBuiltAt = Date.now();
         next[index] = record;
         entries = next;
-        if (!persist(record))
+        const entriesPublishedAt = Date.now();
+        const saved = persist(record);
+        const persistedAt = Date.now();
+        if (!saved) {
+            markMutationProfile("COMPLETE_FAILED", mutationStarted,
+                recordBuiltAt, entriesPublishedAt, persistedAt, persistedAt);
             return false;
+        }
         operationFinished(operationId, true, cloneValue(record));
+        markMutationProfile("COMPLETE", mutationStarted,
+            recordBuiltAt, entriesPublishedAt, persistedAt, Date.now());
         return true;
     }
 
     function failOperation(operationId, afterState, detail) {
+        const mutationStarted = Date.now();
         const index = entryIndex(operationId);
 
         if (index < 0)
@@ -201,11 +235,20 @@ Scope {
             undoState: "NOT_IMPLEMENTED"
         };
 
+        const recordBuiltAt = Date.now();
         next[index] = record;
         entries = next;
-        if (!persist(record))
+        const entriesPublishedAt = Date.now();
+        const saved = persist(record);
+        const persistedAt = Date.now();
+        if (!saved) {
+            markMutationProfile("FAIL_FAILED", mutationStarted,
+                recordBuiltAt, entriesPublishedAt, persistedAt, persistedAt);
             return false;
+        }
         operationFinished(operationId, false, cloneValue(record));
+        markMutationProfile("FAIL", mutationStarted,
+            recordBuiltAt, entriesPublishedAt, persistedAt, Date.now());
         return true;
     }
 

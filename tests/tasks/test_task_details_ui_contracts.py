@@ -15,15 +15,15 @@ assert TASKS.count("TaskDetailsPane {") == 1
 assert TASKS.count("ApolloHubTodoMini {") == 1
 assert "onTaskSelected: function(taskId)" in TASKS
 assert "taskDetails.chooseTask(taskId)" in TASKS
-assert TASKS.count("todoStore: ApolloHubTodoStore") == 3
-# The two M4 editors still share one store; M5 adds a read-only TODAY consumer.
+assert TASKS.count("todoStore: ApolloHubTodoStore") == 4
+# The original editors and PLANNER schedule pane share the same singleton store.
 # M9 SYNC is the fifth; M3 PLANNER adds a sixth read-only snapshot consumer.
 assert TASKS.count("todoSnapshot: ApolloHubTodoStore.snapshot") == 6
-assert TASKS.count("todoStore: ApolloHubTodoStore") == 3
+assert TASKS.count("todoStore: ApolloHubTodoStore") == 4
 assert TASKS.count("TaskSyncConnectionsPane {") == 1
 SYNC=(ROOT/"widgets/tasks/TaskSyncConnectionsPane.qml").read_text(encoding="utf-8")
 assert SYNC.count("TaskSyncPreviewPane {") == 1
-assert TASKS.count("todoStore: ApolloHubTodoStore") == 3
+assert TASKS.count("todoStore: ApolloHubTodoStore") == 4
 assert "TaskTodayPane {" in TASKS
 assert "todoStore: ApolloHubTodoStore" in HUB
 assert "todoSnapshot: ApolloHubTodoStore.snapshot" in HUB

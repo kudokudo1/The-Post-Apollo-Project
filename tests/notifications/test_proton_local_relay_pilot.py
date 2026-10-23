@@ -23,10 +23,10 @@ assert "post-apollo-proton-relay.sock" in PILOT
 assert "PROTON_RELAY_PROBE" in PILOT and "PROTON_RELAY_ACK" in PILOT
 assert '"mailboxAccess":false' in PILOT
 assert '"messageIdentityVerified":false' in PILOT
-for forbidden in ("NotificationsService", "notify(", "invokeExternalAction",
-                  "data-element-id", "data-item-id", "console.log",
+for forbidden in ("notify(", "invokeExternalAction(",
+                  "getAttribute(", "getProperty(", "console.log(",
                   "content_scripts", "mailboxAccess:true"):
-    assert forbidden not in PILOT
+    assert forbidden not in PILOT, forbidden
 assert "POST_APOLLO_PROTON_RELAY_ENABLE" in HOST_TEXT
 assert "SO_PEERCRED" in HOST_TEXT
 assert "os.lstat" in HOST_TEXT

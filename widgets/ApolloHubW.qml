@@ -1227,6 +1227,103 @@ PanelWindow {
                     }
                 }
 
+                Column {
+                    id: transferPickerDropdownContent
+                    visible: hub.transferPickerOpen
+                    anchors.fill: parent
+                    anchors.margins: 9
+                    spacing: 7
+
+                    Row {
+                        width: parent.width
+                        height: 27
+                        spacing: 6
+                        GohuText {
+                            width: parent.width - 78
+                            height: parent.height
+                            verticalAlignment: Text.AlignVCenter
+                            elide: Text.ElideRight
+                            color: Colors.magenta
+                            font.pixelSize: 12
+                            text: "MOVE // "
+                                  + (hub.transferTileIndex >= 0
+                                     && hub.transferTileIndex < hub.activeTiles.length
+                                     ? Layout.tileTitle(
+                                         hub.activeTiles[hub.transferTileIndex].module)
+                                     : "UNAVAILABLE")
+                        }
+                        ActionButton {
+                            trackLabelGlowLocally: true
+                            width: 72
+                            height: 26
+                            label: "CLOSE"
+                            onLeftClicked: hub.closeTransferPicker()
+                        }
+                    }
+                    Rectangle {
+                        width: parent.width
+                        height: 1
+                        color: Colors.cyan
+                        opacity: 0.7
+                    }
+                    GohuText {
+                        width: parent.width
+                        height: 37
+                        verticalAlignment: Text.AlignVCenter
+                        color: Colors.cyan
+                        font.pixelSize: 11
+                        wrapMode: Text.WordWrap
+                        text: hub.transferTargets.state !== "ready"
+                              ? "DESTINATIONS UNAVAILABLE"
+                              : "CHOOSE A MODE / GROUP  //  "
+                                + hub.transferTargets.availableCount
+                                + " / " + hub.transferTargets.total
+                                + " AVAILABLE"
+                    }
+                    ListView {
+                        id: transferPickerResults
+                        width: parent.width - transferPickerRail.crossExtent - 4
+                        height: 235
+                        clip: true
+                        spacing: 3
+                        model: hub.transferTargets.items
+                        boundsBehavior: Flickable.StopAtBounds
+                        interactive: contentHeight > height
+
+                        delegate: ActionButton {
+                            trackLabelGlowLocally: true
+                            width: transferPickerResults.width
+                            height: 33
+                            contentPadding: 7
+                            labelPixelSize: 11
+                            labelHorizontalAlignment: Text.AlignLeft
+                            available: modelData.available
+                            label: modelData.label
+                                   + "  [" + modelData.count + "/8]"
+                                   + (modelData.reason.length > 0
+                                      ? "  " + modelData.reason : "")
+                            onLeftClicked: hub.chooseTransferDestination(
+                                modelData.modeId, modelData.groupId)
+                        }
+                    }
+                }
+                NeonScrollBar {
+                    id: transferPickerRail
+                    flickable: transferPickerResults
+                    accountForContentOrigin: true
+                    geometryMode: "viewport"
+                    x: modulePickerPopup.width - width - 4
+                    y: transferPickerResults.mapToItem(modulePickerPopup, 0, 0).y
+                    height: transferPickerResults.height
+                    handleStyle: "star"
+                    railColor: Colors.cyan
+                    handleColor: Colors.magenta
+                    handleBorderColor: Colors.magenta
+                    railGlowColor: Colors.white
+                    visible: hub.transferPickerOpen
+                             && transferPickerResults.contentHeight > transferPickerResults.height
+                }
+
                 NeonScrollBar {
                     id: modulePickerRail
                     flickable: modulePickerResults

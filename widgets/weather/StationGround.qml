@@ -1,10 +1,27 @@
 import QtQuick
 import "../../components"
+import "../../services/weather" as WeatherServices
+import "../../services/weather/SeismicPolicy.js" as SeismicPolicy
 
 Rectangle {
     id: ground
 
     property var weatherService: null
+
+    // View-scoped service: no USGS polling while GROUND is unmounted.
+    WeatherServices.SeismicService {
+        id: quakeService
+        active: ground.visible
+    }
+
+    function distanceLabel(latitude, longitude) {
+        const km = SeismicPolicy.distanceKm(
+            weatherService ? weatherService.latitude : "",
+            weatherService ? weatherService.longitude : "",
+            latitude, longitude
+        );
+        return km >= 0 ? Math.round(km) + " KM FROM FIX" : "DISTANCE --";
+    }
 
     readonly property bool aqiReady: weatherService && weatherService.aqiReady
     readonly property bool aqiLoading: weatherService && weatherService.aqiLoading
@@ -126,12 +143,24 @@ Rectangle {
 
     color: Colors.black
 
-    Column {
+    // Leave the existing forecast intact; expose new rows with a scrollbar
+    // if the fixed-height window cannot contain everything at once.
+    Flickable {
+        id: groundScroll
         anchors.fill: parent
-        anchors.margins: 20
-        spacing: 10
+        clip: true
+        boundsBehavior: Flickable.StopAtBounds
+        contentWidth: width
+        contentHeight: Math.max(height, groundContent.y + groundContent.implicitHeight + 12)
 
-        Row {
+        Column {
+            id: groundContent
+            x: 20
+            y: 12
+            width: Math.max(0, groundScroll.width - 40)
+            spacing: 10
+
+            Row {
             width: parent.width
 
             GohuText {
@@ -579,6 +608,114 @@ Rectangle {
 
         StationSectionDivider {
             width: parent.width
+            title: "SEISMIC // WORLDWIDE 24H"
+        }
+
+        Column {
+            width: parent.width
+            spacing: 5
+
+            Row {
+                spacing: 12
+
+                SecondaryText {
+                    text: "USGS // M2.5+"
+                    font.pixelSize: 11
+                    color: Colors.green
+                }
+
+                QuietText {
+                    text: quakeService.failed
+                          ? "FEED ERROR // PREVIOUS EVENTS MAY BE STALE"
+                          : quakeService.loading && !quakeService.ready
+                            ? "RECEIVING"
+                            : quakeService.ready ? "LATEST PUBLISHED EVENTS"
+                              : "OFFLINE"
+                    font.pixelSize: 10
+                }
+            }
+
+            Row {
+                id: seismicEventRow
+                width: parent.width
+                spacing: 10
+
+                Repeater {
+                    model: quakeService.ready ? quakeService.events : []
+
+                    delegate: Rectangle {
+                        required property var modelData
+                        width: Math.max(0, (seismicEventRow.width
+                                            - 2 * seismicEventRow.spacing) / 3)
+                        height: 112
+                        color: Colors.dark
+                        border.width: 1
+                        border.color: Colors.cyan
+
+                        Column {
+                            anchors.fill: parent
+                            anchors.margins: 8
+                            spacing: 4
+
+                            Row {
+                                width: parent.width
+                                spacing: 8
+
+                                GohuText {
+                                    text: "M " + modelData.magnitude.toFixed(1)
+                                    font.pixelSize: 23
+                                    color: Colors.green
+                                }
+
+                                QuietText {
+                                    text: modelData.utc
+                                    font.pixelSize: 10
+                                }
+                            }
+
+                            GohuText {
+                                width: parent.width
+                                elide: Text.ElideRight
+                                text: modelData.place
+                                font.pixelSize: 12
+                                color: Colors.white
+                            }
+
+                            QuietText {
+                                text: modelData.depthKm >= 0
+                                      ? "DEPTH " + modelData.depthKm.toFixed(1) + " KM"
+                                      : "DEPTH --"
+                                font.pixelSize: 10
+                            }
+
+                            QuietText {
+                                text: ground.distanceLabel(
+                                    modelData.latitude, modelData.longitude
+                                )
+                                font.pixelSize: 10
+                            }
+                        }
+                    }
+                }
+            }
+
+            QuietText {
+                visible: !quakeService.ready || quakeService.events.length === 0
+                text: quakeService.failed ? quakeService.errorText
+                      : quakeService.loading ? "LOADING USGS EVENTS"
+                      : quakeService.ready ? "NO M2.5+ EVENTS IN FEED"
+                        : "USGS DATA UNAVAILABLE"
+                font.pixelSize: 11
+            }
+
+            QuietText {
+                text: "USGS GEOJSON // MOST RECENT GLOBAL EVENTS // NOT AN EARTHQUAKE WARNING"
+                font.pixelSize: 9
+            }
+        }
+
+        StationSectionDivider {
+            width: parent.width
             title: "ENVIRONMENT // SOURCE"
         }
 
@@ -622,5 +759,13 @@ Rectangle {
                 }
             }
         }
+        }
+    }
+
+    NeonScrollBar {
+        flickable: groundScroll
+        handleStyle: "star"
+        geometryHost: ground
+        visible: scrollable
     }
 }

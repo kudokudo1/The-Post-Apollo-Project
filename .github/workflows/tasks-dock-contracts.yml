@@ -28,6 +28,8 @@ on:
       - "widgets/tasks/TaskSyncPreviewPane.qml"
       - "tests/tasks/test_task_github_mapping_policy.cjs"
       - "tests/tasks/test_task_github_mapping_ui_contracts.py"
+      - "widgets/tasks/TaskSyncConnectionsPane.qml"
+      - "tests/tasks/test_task_sync_connections_ui_contracts.py"
       - ".github/workflows/tasks-dock-contracts.yml"
   push:
     branches:
@@ -58,6 +60,8 @@ on:
       - "widgets/tasks/TaskSyncPreviewPane.qml"
       - "tests/tasks/test_task_github_mapping_policy.cjs"
       - "tests/tasks/test_task_github_mapping_ui_contracts.py"
+      - "widgets/tasks/TaskSyncConnectionsPane.qml"
+      - "tests/tasks/test_task_sync_connections_ui_contracts.py"
       - ".github/workflows/tasks-dock-contracts.yml"
 
 permissions:
@@ -92,3 +96,5 @@ jobs:
         run: node tests/tasks/test_task_github_mapping_policy.cjs
       - name: Validate SYNC mapping preview has no external side effects
         run: python3 tests/tasks/test_task_github_mapping_ui_contracts.py
+      - name: Validate SYNC Connections and safe navigation to GitW
+        run: python3 tests/tasks/test_task_sync_connections_ui_contracts.py

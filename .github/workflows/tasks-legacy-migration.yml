@@ -1,0 +1,33 @@
+name: TASKS Proxy 1 M10d legacy migration dry run
+
+on:
+  pull_request:
+    paths:
+      - "services/projects/LegacyMigrationDryRun.js"
+      - "tests/tasks/test_legacy_migration_dryrun.cjs"
+      - "docs/tasks-legacy-migration-m10d.md"
+      - ".github/workflows/tasks-legacy-migration.yml"
+  push:
+    branches:
+      - main
+    paths:
+      - "services/projects/LegacyMigrationDryRun.js"
+      - "tests/tasks/test_legacy_migration_dryrun.cjs"
+      - "docs/tasks-legacy-migration-m10d.md"
+      - ".github/workflows/tasks-legacy-migration.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  contract:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Validate legacy v1/v2/v3 dry-run preservation
+        run: node tests/tasks/test_legacy_migration_dryrun.cjs
+      - name: Retain existing M10 offline operation contract
+        run: node tests/tasks/test_offline_operation_journal.cjs

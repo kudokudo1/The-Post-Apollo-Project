@@ -1027,5 +1027,26 @@ assert "Timer {" not in time_mini
 assert tile.count("Timer {") == 1
 assert "ApolloHubTimeMini {" in tile
 
+# Stage 7C: Calendar gains responsive typography only. The existing
+# bridge, event-not-connected state and explicit month/week actions remain.
+for token in (
+    'readonly property int densityLevel: height >= 300 ? 3',
+    ': height >= 180 ? 2 : 1',
+    'spacing: calendarMini.densityLevel === 3 ? 7',
+    'height: calendarMini.densityLevel === 3 ? 32',
+    'font.pixelSize: calendarMini.densityLevel === 3 ? 17',
+    'height: calendarMini.densityLevel === 3 ? 21',
+    'font.pixelSize: calendarMini.densityLevel === 3 ? 14',
+    ': calendarMini.densityLevel === 2 ? 12 : 9',
+    ': calendarMini.densityLevel === 2 ? 13',
+    'calendarMini.calendarSnapshot.weeks === 6 ? 9 : 10',
+    'calendarMini.calendarBridge.calendarMonthOffset',
+    'calendarMini.calendarBridge.calendarWeekStartsOn',
+):
+    assert token in calendar_mini, f"Calendar H:2/H:3 contract missing: {token}"
+assert 'Timer {' not in calendar_mini
+assert 'FileView {' not in calendar_mini
+assert 'ApolloHubCalendarMini {' in tile
+
 # Launchers and widget backends are unchanged in this first stage.
 print("ApolloHubW foundation source contracts passed")

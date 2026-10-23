@@ -42,11 +42,11 @@ assert 'checkpointGeneration = nextGeneration' in save
 assert 'return true;' in save
 
 for fragment in (
-    'if (!persist(record))\\n            return "";\\n        operationStarted',
-    'if (!persist(record))\\n            return false;\\n        operationFinished(operationId, true',
-    'if (!persist(record))\\n            return false;\\n        operationFinished(operationId, false',
-    'if (repairedInterrupted)\\n            persist();',
-    'next[index] = record;\\n        entries = next;\\n        return persist();',
+    'if (!persist(record))\n            return "";\n        operationStarted',
+    'if (!persist(record))\n            return false;\n        operationFinished(operationId, true',
+    'if (!persist(record))\n            return false;\n        operationFinished(operationId, false',
+    'if (repairedInterrupted)\n            persist();',
+    'next[index] = record;\n        entries = next;\n        return persist();',
 ):
     assert fragment in journal, fragment
 

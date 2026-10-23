@@ -587,4 +587,63 @@ assert.throws(() => watches.assessWatchDays([], NaN, 168, 3));
 assert.equal(watches.predictedDays("NOAA bulletin", watchNow).length, 0);
 
 
+
+// Source racks: MAP/NASA EONET, NEWS/GDELT and RADIO/Radio Browser.
+const discoverySource = fs.readFileSync(
+    path.join(root, "services/weather/StationDiscoveryPolicy.js"), "utf8"
+).replace(/^\.pragma library\s*/m, "");
+const discovery = {};
+vm.runInNewContext(discoverySource, discovery);
+assert.equal(typeof discovery.parse, "function");
+assert.equal(discovery.safeUrl("javascript:alert(1)"), "");
+assert.equal(discovery.safeUrl("https://example.org/item"), "https://example.org/item");
+
+const mapped = discovery.parse("map", {
+    events: [{
+        id: "EONET-1",
+        title: "Tropical Storm Sample",
+        link: "https://eonet.gsfc.nasa.gov/api/v3/events/EONET-1",
+        categories: [{id:"severeStorms", title:"Severe Storms"}],
+        geometry: [{
+            date: "2026-10-23T12:00:00Z",
+            type: "Point", coordinates: [-70.2, 20.4]
+        }]
+    }]
+});
+assert.equal(mapped.length, 1);
+assert.equal(mapped[0].title, "Tropical Storm Sample");
+assert.match(mapped[0].detail, /20\.40, -70\.20/);
+assert.equal(mapped[0].action, "OPEN NASA EVENT");
+assert.throws(() => discovery.parse("map", {}));
+
+const headlines = discovery.parse("news", {
+    articles: [
+        {title:"Weather report", url:"https://news.test/article",
+         domain:"example.com", sourcecountry:"United States",
+         seendate:"20261023T113000Z"},
+        {title:"Duplicate", url:"https://news.test/article"},
+        {title:"Unsafe", url:"javascript:alert(1)"}
+    ]
+});
+assert.equal(headlines.length, 1);
+assert.equal(headlines[0].time, "10-23 11:30 UTC");
+assert.equal(headlines[0].action, "READ ARTICLE");
+assert.throws(() => discovery.parse("news", null));
+
+const streams = discovery.parse("radio", [
+    {stationuuid:"one", name:"Public Radio", url_resolved:"https://radio.test/live",
+     country:"US", codec:"MP3", bitrate:128, lastcheckok:1, language:"English"},
+    {stationuuid:"one", name:"Duplicate", url_resolved:"https://radio.test/a",
+     lastcheckok:1},
+    {stationuuid:"two", name:"Down", url_resolved:"https://radio.test/b",
+     lastcheckok:0},
+    {stationuuid:"three", name:"Invalid", url_resolved:"file:///tmp/a",
+     lastcheckok:1}
+]);
+assert.equal(streams.length, 1);
+assert.equal(streams[0].action, "OPEN STREAM URL");
+assert.match(streams[0].detail, /MP3 128kbps/);
+assert.throws(() => discovery.parse("radio", {}));
+assert.throws(() => discovery.parse("unknown", []));
+
 console.log("Weather data policy contracts: PASS");

@@ -760,6 +760,12 @@ PanelWindow {
                     ? skyViewComponent
                     : weatherStation.currentView === "space"
                     ? spaceViewComponent
+                    : weatherStation.currentView === "map"
+                    ? mapViewComponent
+                    : weatherStation.currentView === "news"
+                    ? newsViewComponent
+                    : weatherStation.currentView === "radio"
+                    ? radioViewComponent
                     : placeholderViewComponent
             }
 
@@ -813,6 +819,33 @@ PanelWindow {
         }
 
         Component {
+            id: mapViewComponent
+
+            StationDiscovery {
+                stationOpen: weatherStation.menuOpen
+                domain: "map"
+            }
+        }
+
+        Component {
+            id: newsViewComponent
+
+            StationDiscovery {
+                stationOpen: weatherStation.menuOpen
+                domain: "news"
+            }
+        }
+
+        Component {
+            id: radioViewComponent
+
+            StationDiscovery {
+                stationOpen: weatherStation.menuOpen
+                domain: "radio"
+            }
+        }
+
+        Component {
             id: placeholderViewComponent
 
             Rectangle {
@@ -831,15 +864,7 @@ PanelWindow {
 
                     SecondaryText {
                         anchors.horizontalCenter: parent.horizontalCenter
-                        text: {
-                            if (weatherStation.currentView === "map")
-                                return "map display offline...";
-                            if (weatherStation.currentView === "news")
-                                return "news receiver offline...";
-                            if (weatherStation.currentView === "radio")
-                                return "radio receiver offline...";
-                            return "";
-                        }
+                        text: "SOURCE NOT YET CONNECTED"
                         font.pixelSize: 16
                     }
                 }

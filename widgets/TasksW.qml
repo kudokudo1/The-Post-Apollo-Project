@@ -15,6 +15,7 @@ PanelWindow {
     property bool menuOpen: false
     property real dockCenterX: 0
     property real chassisTopY: 0
+    signal openGithubProjectsRequested()
 
     // Reuse the FinanceW/TimeW 9:16 pilot geometry until live review.
     readonly property int frameWidth: 432
@@ -49,7 +50,8 @@ PanelWindow {
         ApolloHubTodoStore.snapshot
         ? ApolloHubTodoStore.snapshot.state : "loading"
     readonly property string feedStatus:
-        activeMode.id !== "tasks" && activeMode.id !== "today"
+        activeMode.id === "sync" ? "PREVIEW"
+        : activeMode.id !== "tasks" && activeMode.id !== "today"
         && activeMode.id !== "projects" ? "NO FEED"
         : taskStoreState === "ready" || taskStoreState === "empty" ? "LOCAL"
         : taskStoreState === "saving" ? "SAVING"
@@ -57,7 +59,7 @@ PanelWindow {
         : taskStoreState === "unsupported" ? "UNSUP"
         : "LOCKED"
     readonly property color feedColor:
-        feedStatus === "LOCAL" ? Colors.cyan
+        feedStatus === "LOCAL" || feedStatus === "PREVIEW" ? Colors.cyan
         : feedStatus === "SAVING" ? Colors.magenta
         : Colors.orange
 
@@ -340,13 +342,15 @@ PanelWindow {
                 }
             }
 
-            // SYNC is currently a LOCAL read-only map of future integration
-            // requirements, never a second GitHub service or writer.
-            TaskSyncPreviewPane {
-                id: taskSyncPreview
+            // M9a SYNC Overview exposes local mapping and a navigation route
+            // to GitW's EXISTING GitHub Projects surface. No remote service
+            // or write capability is attached to this window.
+            TaskSyncConnectionsPane {
+                id: taskSyncConnections
                 anchors.fill: parent
                 visible: root.menuOpen && root.activeMode.id === "sync"
                 todoSnapshot: ApolloHubTodoStore.snapshot
+                onOpenGithubProjectsRequested: root.openGithubProjectsRequested()
             }
         }
     }

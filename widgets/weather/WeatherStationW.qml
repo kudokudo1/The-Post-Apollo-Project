@@ -839,9 +839,8 @@ PanelWindow {
         Component {
             id: radioViewComponent
 
-            StationDiscovery {
+            StationRadio {
                 stationOpen: weatherStation.menuOpen
-                domain: "radio"
             }
         }
 

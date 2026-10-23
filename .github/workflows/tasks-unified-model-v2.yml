@@ -1,0 +1,35 @@
+name: TASKS Proxy 1 M10h strict unified model
+
+on:
+  pull_request:
+    paths:
+      - 'services/projects/UnifiedProjectModelV2.js'
+      - 'tests/tasks/test_unified_project_model_v2.cjs'
+      - 'docs/tasks-unified-model-v2-m10h.md'
+      - '.github/workflows/tasks-unified-model-v2.yml'
+  push:
+    branches:
+      - main
+    paths:
+      - 'services/projects/UnifiedProjectModelV2.js'
+      - 'tests/tasks/test_unified_project_model_v2.cjs'
+      - 'docs/tasks-unified-model-v2-m10h.md'
+      - '.github/workflows/tasks-unified-model-v2.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  contract:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Validate M10h strict schema, timestamps and typed fields
+        run: node tests/tasks/test_unified_project_model_v2.cjs
+      - name: Retain M10g read-only bridge contract
+        run: node tests/tasks/test_unified_storage_read_bridge.cjs
+      - name: Retain M10d migration contract
+        run: node tests/tasks/test_legacy_migration_dryrun.cjs

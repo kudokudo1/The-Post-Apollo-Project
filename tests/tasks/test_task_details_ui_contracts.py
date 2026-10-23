@@ -17,10 +17,12 @@ assert "onTaskSelected: function(taskId)" in TASKS
 assert "taskDetails.chooseTask(taskId)" in TASKS
 assert TASKS.count("todoStore: ApolloHubTodoStore") == 3
 # The two M4 editors still share one store; M5 adds a read-only TODAY consumer.
-# M8 SYNC is the fifth read-only projection; only the three editors can write.
+# M9 SYNC consumes the fifth read-only snapshot via its Connections wrapper.
 assert TASKS.count("todoSnapshot: ApolloHubTodoStore.snapshot") == 5
 assert TASKS.count("todoStore: ApolloHubTodoStore") == 3
-assert TASKS.count("TaskSyncPreviewPane {") == 1
+assert TASKS.count("TaskSyncConnectionsPane {") == 1
+SYNC=(ROOT/"widgets/tasks/TaskSyncConnectionsPane.qml").read_text(encoding="utf-8")
+assert SYNC.count("TaskSyncPreviewPane {") == 1
 assert TASKS.count("todoStore: ApolloHubTodoStore") == 3
 assert "TaskTodayPane {" in TASKS
 assert "todoStore: ApolloHubTodoStore" in HUB

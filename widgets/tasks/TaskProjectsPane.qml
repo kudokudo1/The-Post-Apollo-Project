@@ -1,5 +1,6 @@
 import QtQuick
 import "../../components"
+import "TaskProjectsAck.js" as ProjectAck
 
 // M6 local Projects. One injected ApolloHubTodoStore remains the only writer.
 // Project IDs are local, never implied to be GitHub Project identifiers.
@@ -140,67 +141,76 @@ Item {
         }
     }
 
-    onTodoSnapshotChanged: {
-        if (pendingWrite) {
-            if (storeState === "error" || storeState === "unsupported") {
-                pendingWrite = false;
-                pendingKind = "";
-                feedback = "SAVE FAILED // INPUT KEPT";
-            } else if (storeState === "ready" || storeState === "empty") {
-                if (pendingKind === "create") {
-                    const found = projects.find(function(p) {
-                        return p.name === pendingProjectName;
-                    });
-                    if (found) {
-                        selectedProjectId = found.id;
-                        renameInput.text = found.name;
-                        newProjectInput.text = "";
-                        pendingWrite = false;
-                        pendingKind = "";
-                        feedback = "SAVED";
-                    }
-                } else if (pendingKind === "assign") {
-                    const task = tasks.find(function(t) {
-                        return t.id === pendingTaskId;
-                    });
-                    if (task && task.projectId === pendingTargetProjectId) {
-                        pendingWrite = false;
-                        pendingKind = "";
-                        feedback = "SAVED";
-                    }
-                } else if (pendingKind === "rename") {
-                    const renamed = projects.find(function(p) {
-                        return p.id === pendingProjectId;
-                    });
-                    if (renamed && renamed.name === pendingProjectName) {
-                        renameInput.text = renamed.name;
-                        pendingWrite = false;
-                        pendingKind = "";
-                        feedback = "SAVED";
-                    }
-                } else if (pendingKind === "delete") {
-                    const exists = projects.some(function(p) {
-                        return p.id === pendingProjectId;
-                    });
-                    const dangling = tasks.some(function(t) {
-                        return t.projectId === pendingProjectId;
-                    });
-                    if (!exists && !dangling && tasks.length === pendingTaskTotal) {
-                        pendingWrite = false;
-                        pendingKind = "";
-                        selectedProjectId = "";
-                        renameInput.text = "";
-                        confirmDeleteProject = false;
-                        feedback = "PROJECT REMOVED // TASKS UNASSIGNED";
-                    }
-                }
+    // Reconcile only the actual incoming snapshot. Reading projects/tasks
+    // through separate QML derived properties could miss a successful save
+    // and leave pendingWrite stuck true after a project rename.
+    function reconcilePending() {
+        const snap = todoSnapshot;
+        if (!snap) return;
+        const state = String(snap.state || "loading");
+        const rawProjects = Array.isArray(snap.projects) ? snap.projects : [];
+        if (!pendingWrite) {
+            // Don't clear the selection just because the store is loading.
+            if ((state === "ready" || state === "empty")
+                    && selectedProjectId
+                    && !rawProjects.some(function(p) {
+                        return p.id === selectedProjectId;
+                    })) {
+                selectedProjectId = "";
+                feedback = "PROJECT UNAVAILABLE";
             }
+            return;
         }
-        if (selectedProjectId && !selectedProject && !pendingWrite) {
+        const outcome = ProjectAck.status(
+            snap, pendingKind, pendingProjectId, pendingProjectName,
+            pendingTaskId, pendingTargetProjectId, pendingTaskTotal);
+        if (outcome === "waiting")
+            return;
+        if (outcome === "failed") {
+            pendingWrite = false;
+            pendingKind = "";
+            feedback = "SAVE FAILED // INPUT KEPT";
+            return;
+        }
+        if (outcome !== "confirmed") {
+            // Fail open for editing, fail closed for "SAVED": a completed
+            // store lifecycle with a mismatched result must not disable
+            // the editor forever or silently pretend to have committed.
+            pendingWrite = false;
+            pendingKind = "";
+            feedback = "SAVE NOT VERIFIED // INPUT KEPT";
+            return;
+        }
+
+        if (pendingKind === "create") {
+            const found = rawProjects.find(function(p) {
+                return p.name === pendingProjectName;
+            });
+            if (found) {
+                selectedProjectId = found.id;
+                renameInput.text = found.name;
+                newProjectInput.text = "";
+            }
+        } else if (pendingKind === "rename") {
+            const renamed = rawProjects.find(function(p) {
+                return p.id === pendingProjectId;
+            });
+            if (renamed) renameInput.text = renamed.name;
+        } else if (pendingKind === "delete") {
             selectedProjectId = "";
-            feedback = "PROJECT UNAVAILABLE";
+            renameInput.text = "";
+            confirmDeleteProject = false;
         }
+        const wasDelete = pendingKind === "delete";
+        pendingWrite = false;
+        pendingKind = "";
+        feedback = wasDelete ? "PROJECT REMOVED // TASKS UNASSIGNED" : "SAVED";
     }
+
+    onTodoSnapshotChanged: reconcilePending()
+    // Extra signal protects against property-notification ordering within
+    // QML. reconcilePending still inspects only todoSnapshot itself.
+    onStoreStateChanged: reconcilePending()
     onVisibleChanged: {
         if (!visible) {
             newProjectInput.focus = false;

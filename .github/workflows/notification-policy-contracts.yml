@@ -40,6 +40,9 @@ jobs:
       - name: Validate dual Proton Browser + Bridge action policy
         run: python3 tests/notifications/test_proton_dual_adapter_policy.py
 
+      - name: Validate private Proton event-to-message binding ledger (offline)
+        run: python3 tests/notifications/test_proton_binding_ledger.py
+
       - name: Validate read-only Proton browser native handshake
         run: python3 tests/notifications/test_proton_browser_handshake.py
 

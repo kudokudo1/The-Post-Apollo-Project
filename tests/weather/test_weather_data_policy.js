@@ -501,4 +501,90 @@ assert.equal(swpcValidity.assess([], validityNow, 168, 3).windowCount, 0);
 assert.throws(() => swpcValidity.assess(null, validityNow, 168, 3));
 assert.throws(() => swpcValidity.assess([], NaN, 168, 3));
 
+
+// SWPC geomagnetic watch products forecast UTC calendar days. Explicit
+// cancellations and any/all supersession must prevent stale watch cards.
+const watchSource = fs.readFileSync(
+    path.join(root, "services/weather/SwpcWatchPolicy.js"), "utf8"
+).replace(/^\.pragma library\s*/m, "");
+const watches = {};
+vm.runInNewContext(watchSource, watches);
+assert.equal(typeof watches.assessWatchDays, "function");
+assert.equal(typeof watches.predictedDays, "function");
+const watchMsg = (id, issue, serial, heading, days, supersede) => ({
+    product_id: id,
+    issue_datetime: issue,
+    message: "Space Weather Message Code: WAT" + id + "\r\n"
+        + "Serial Number: " + serial + "\r\n"
+        + "Issue Time: 2026 Oct 23 0000 UTC\r\n\r\n"
+        + heading + "\r\n"
+        + (days ? "Highest Storm Level Predicted by Day:\r\n" + days + "\r\n" : "")
+        + (supersede ? "THIS SUPERSEDES ANY/ALL PRIOR WATCHES IN EFFECT\r\n" : "")
+});
+const watchNow = Date.parse("2026-10-23T13:00:00Z");
+const watchArchive = [
+    watchMsg("A30F", "2026-10-22 18:00:00.000", "91",
+        "WATCH: Geomagnetic Storm Category G2 Predicted",
+        "Oct 23: G2 (Moderate) Oct 24: G2 (Moderate) Oct 25: None (Below G1)",
+        true),
+    watchMsg("A20F", "2026-10-23 10:00:00.000", "92",
+        "WATCH: Geomagnetic Storm Category G1 Predicted",
+        "Oct 23: None (Below G1)   Oct 24: G1 (Minor)   Oct 25: G1 (Minor)",
+        true)
+];
+const watchState = watches.assessWatchDays(watchArchive, watchNow, 168, 3);
+assert.equal(watchState.forecastDayCount, 3);
+assert.equal(watchState.projectedDays, 2);
+assert.deepEqual(Array.from(watchState.days, d => d.level), [0, 1, 1]);
+assert.deepEqual(Array.from(watchState.days, d => d.dateUtc),
+                 ["10-23 UTC", "10-24 UTC", "10-25 UTC"]);
+assert.equal(watchState.days[0].levelLabel, "BELOW G1");
+assert.equal(watchState.supersededCount, 1);
+
+const cancelWatch = watchMsg("A30F", "2026-10-23 11:00:00.000", "93",
+    "CANCEL WATCH: Geomagnetic Storm Category G2 Predicted",
+    "Oct 23: None (Below G1)", false);
+const cancelled = watches.assessWatchDays([
+    watchArchive[0], cancelWatch
+], watchNow, 168, 3);
+assert.equal(cancelled.forecastDayCount, 0);
+assert.equal(cancelled.canceledCount, 1);
+
+const unaffected = watches.assessWatchDays([
+    watchMsg("A20F", "2026-10-23 07:00:00.000", "94",
+        "WATCH: Geomagnetic Storm Category G1 Predicted",
+        "Oct 23: G1 (Minor) Oct 24: None (Below G1)", false),
+    watchMsg("A30F", "2026-10-23 08:00:00.000", "95",
+        "WATCH: Geomagnetic Storm Category G2 Predicted",
+        "Oct 23: G2 (Moderate) Oct 24: None (Below G1)", false),
+    cancelWatch
+], watchNow, 168, 3);
+assert.equal(unaffected.forecastDayCount, 2);
+assert.equal(unaffected.days[0].level, 1);
+assert.equal(unaffected.days[1].level, 0);
+
+const crossover = watches.assessWatchDays([
+    watchMsg("A40F", "2026-12-31 22:00:00.000", "96",
+        "WATCH: Geomagnetic Storm Category G4 Predicted",
+        "Jan 01: G4 (Severe)\nJan 02: G2 (Moderate)\nJan 03: None (Below G1)",
+        true)
+], Date.parse("2027-01-01T03:00:00Z"), 168, 3);
+assert.equal(crossover.forecastDayCount, 3);
+assert.deepEqual(Array.from(crossover.days, d => d.dateUtc),
+                 ["01-01 UTC", "01-02 UTC", "01-03 UTC"]);
+assert.equal(crossover.days[0].levelLabel, "G4");
+
+const malformedNew = watches.assessWatchDays([
+    watchArchive[0],
+    watchMsg("A20F", "2026-10-23 11:00:00.000", "97",
+             "WATCH: Geomagnetic Storm Category G1 Predicted",
+             "Oct 32: G1 (Minor)", true)
+], watchNow, 168, 3);
+assert.equal(malformedNew.forecastDayCount, 0);
+assert.equal(malformedNew.unresolvedCount, 1);
+assert.throws(() => watches.assessWatchDays(null, watchNow, 168, 3));
+assert.throws(() => watches.assessWatchDays([], NaN, 168, 3));
+assert.equal(watches.predictedDays("NOAA bulletin", watchNow).length, 0);
+
+
 console.log("Weather data policy contracts: PASS");

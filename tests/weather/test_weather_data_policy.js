@@ -324,4 +324,58 @@ assert.equal(flares.parseFlares([], now).count24h, 0);
 assert.throws(() => flares.parseFlares({}, now));
 assert.throws(() => flares.parseFlares([], NaN));
 
+
+// NOAA GOES primary XRS 1-minute readings. The sample's class equivalent
+// is a descriptive flux level, not a flare detection or NOAA alert.
+const xraySource = fs.readFileSync(
+    path.join(root, "services/weather/XrayFluxPolicy.js"), "utf8"
+).replace(/^\.pragma library\s*/m, "");
+const xray = {};
+vm.runInNewContext(xraySource, xray);
+assert.equal(typeof xray.parseXraySeries, "function");
+assert.equal(xray.fluxClass(1e-4).label, "X1.0");
+assert.equal(xray.fluxClass(5e-5).label, "M5.0");
+assert.equal(xray.fluxClass(1e-6).label, "C1.0");
+assert.equal(xray.fluxClass(2e-7).label, "B2.0");
+assert.equal(xray.fluxClass(1e-8).label, "A1.0");
+assert.equal(xray.fluxClass(null).label, "--");
+assert.equal(xray.logMeter(1e-9), 0);
+assert.equal(xray.logMeter(1e-4), 1);
+assert.equal(xray.utcTime(0), "-- UTC");
+
+const sampleNow = Date.parse("2026-10-23T12:00:00Z");
+const sample = (time, energy, flux, satellite = 19) => ({
+    time_tag: time, energy, flux, satellite
+});
+const xrayPayload = [
+    sample("2026-10-23T06:10:00Z", "0.1-0.8nm", 2e-7),
+    sample("2026-10-23T07:10:00Z", "0.1-0.8nm", 5e-7),
+    sample("2026-10-23T08:10:00Z", "0.1-0.8nm", 2e-6),
+    sample("2026-10-23T09:10:00Z", "0.1-0.8nm", 5e-6),
+    sample("2026-10-23T10:10:00Z", "0.1-0.8nm", 9e-6),
+    sample("2026-10-23T11:59:00Z", "0.1-0.8nm", 2e-5),
+    sample("2026-10-23T11:59:00Z", "0.05-0.4nm", 1.5e-6),
+    sample("2026-10-23T11:59:00Z", "0.05-0.4nm", 7e-6, 18),
+    sample("2026-10-23T12:12:00Z", "0.1-0.8nm", 2e-4), // Future
+    sample("2026-10-23T11:58:00Z", "0.1-0.8nm", null), // Missing
+    sample("2026-10-23T11:58:00Z", "other", 1e-4), // Wrong band
+    sample("2026-10-23T01:59:00Z", "0.1-0.8nm", 1e-4), // Outside window
+];
+const xrayResult = xray.parseXraySeries(xrayPayload, sampleNow);
+assert.equal(xrayResult.fluxLong, 2e-5);
+assert.equal(xrayResult.fluxShort, 1.5e-6);
+assert.equal(xrayResult.satellite, "GOES-19");
+assert.equal(xrayResult.classEquivalent.label, "M2.0");
+assert.equal(xrayResult.sampleUtc, "11:59 UTC");
+assert.equal(xrayResult.trend.length, 6);
+assert.equal(xrayResult.trend[xrayResult.trend.length - 1].flux, 2e-5);
+assert.ok(xrayResult.trend.every(entry => entry.level >= 0 && entry.level <= 1));
+assert.equal(xray.parseXraySeries([
+    sample("2026-10-23T11:59:00Z", "0.1-0.8nm", 1e-6),
+    sample("2026-10-23T11:59:00Z", "0.05-0.4nm", 2e-7, 18)
+], sampleNow).fluxShort, -1);
+assert.throws(() => xray.parseXraySeries({}, sampleNow));
+assert.throws(() => xray.parseXraySeries([], sampleNow));
+assert.throws(() => xray.parseXraySeries(xrayPayload, NaN));
+
 console.log("Weather data policy contracts: PASS");

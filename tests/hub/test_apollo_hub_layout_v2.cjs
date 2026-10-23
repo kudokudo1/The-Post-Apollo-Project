@@ -345,4 +345,100 @@ assert.equal(resultSized.modes[0].subModes[0].tiles[0].size,"wide");
 assert.equal(resultSized.modes[0].subModes[0].tiles[0].rowSpan,3);
 assert.equal(resultSized.modes[0].subModes[0].tiles[0].id,firstTile.id);
 
+// Stage 5: MOVE transports a tile RECORD (never recreates it).
+// Destination chooser is read-only; no target includes the source group.
+const moveBase=layout.defaultLayout();
+const moveSource=moveBase.modes[0].subModes[0].tiles[0];
+const moveBaseJSON=JSON.stringify(moveBase);
+const moveList=layout.moveTargets(moveBase,0,0,0);
+assert.equal(moveList.state,"ready");
+assert.equal(moveList.total,2);
+assert.equal(moveList.availableCount,1);
+assert.equal(moveList.items.some(row=>row.modeId==="dashboard"
+        && row.groupId==="overview"),false);
+const toConsole=moveList.items.find(row=>row.modeId==="console");
+const toMedia=moveList.items.find(row=>row.modeId==="media");
+assert.equal(toConsole.available,true);
+assert.equal(toConsole.label,"Console / Quick");
+assert.equal(toMedia.available,false);
+assert.equal(toMedia.reason,"IN USE");
+assert.equal(layout.moveTargets(moveBase,99,0,0).state,"unavailable");
+assert.equal(layout.moveTargets(moveBase,0,99,0).state,"unavailable");
+assert.equal(layout.moveTargets(moveBase,0,0,99).state,"unavailable");
+assert.equal(layout.moveTargets(null,0,0,0).state,"unavailable");
+const moveTo=(value,sm,sg,si,tileId,sourceModeId,sourceGroupId,
+              dm,dg,destModeId,destGroupId)=>layout.transferTile(
+    value,sm,sg,si,tileId,sourceModeId,sourceGroupId,
+    dm,dg,destModeId,destGroupId);
+const originalMode=moveBase.modes[0];
+const sourceGroup=originalMode.subModes[0];
+const destinationMode=moveBase.modes[1];
+const destinationGroup=destinationMode.subModes[0];
+const movedCrossMode=moveTo(moveBase,0,0,0,moveSource.id,
+    originalMode.id,sourceGroup.id,1,0,destinationMode.id,destinationGroup.id);
+assert.equal(movedCrossMode.modes[0].subModes[0].tiles.length,5);
+assert.equal(movedCrossMode.modes[1].subModes[0].tiles.length,4);
+assert.equal(JSON.stringify(moveBase),moveBaseJSON);
+assert.equal(movedCrossMode.nextTileId,moveBase.nextTileId);
+assert.deepEqual(toPlain(movedCrossMode.modes[1].subModes[0].tiles[3]),
+                 toPlain(moveSource));
+assert.equal(movedCrossMode.modes[0].subModes[0].tiles.some(t=>t.id===moveSource.id),false);
+assert.deepEqual(toPlain(layout.parse(JSON.stringify(movedCrossMode))),
+                 toPlain(movedCrossMode));
+assert.deepEqual(toPlain(layout.parse(moveBaseJSON)),toPlain(moveBase));
+validateIds(movedCrossMode);
+
+// The same module cannot be duplicated within a destination group.
+const duplicateRejected=moveTo(moveBase,0,0,0,moveSource.id,
+    originalMode.id,sourceGroup.id,2,0,"media","player");
+assert.deepEqual(toPlain(duplicateRejected),toPlain(moveBase));
+// Invalid/stale references, same group, and fake confirmation remain no-ops.
+for(const [sm,sg,si,id,mid,gid,dm,dg,dmid,dgid] of [
+    [0,0,0,"old-tile","dashboard","overview",1,0,"console","quick"],
+    [0,0,0,moveSource.id,"wrong","overview",1,0,"console","quick"],
+    [0,0,0,moveSource.id,"dashboard","wrong",1,0,"console","quick"],
+    [0,0,0,moveSource.id,"dashboard","overview",1,0,"wrong","quick"],
+    [0,0,0,moveSource.id,"dashboard","overview",1,0,"console","wrong"],
+    [0,0,0,moveSource.id,"dashboard","overview",0,0,"dashboard","overview"],
+    [0,0,99,moveSource.id,"dashboard","overview",1,0,"console","quick"],
+    [99,0,0,moveSource.id,"dashboard","overview",1,0,"console","quick"],
+    [0,99,0,moveSource.id,"dashboard","overview",1,0,"console","quick"],
+    [0,0,0,moveSource.id,"dashboard","overview",99,0,"console","quick"],
+    [0,0,0,moveSource.id,"dashboard","overview",1,99,"console","quick"],
+    [0,0,"0",moveSource.id,"dashboard","overview",1,0,"console","quick"],
+]){
+    assert.deepEqual(toPlain(moveTo(moveBase,sm,sg,si,id,mid,gid,dm,dg,dmid,dgid)),
+                     toPlain(moveBase));
+}
+
+// Moving within the SAME main mode, to another submode, is supported.
+const extraGroup=layout.addSubMode(moveBase,0);
+const extraGroupId=extraGroup.modes[0].subModes[1].id;
+const tallBefore=layout.resizeTile(extraGroup,0,0,0,"wide",3);
+const beforeTall=tallBefore.modes[0].subModes[0].tiles[0];
+const movedGroup=moveTo(tallBefore,0,0,0,beforeTall.id,
+    "dashboard","overview",0,1,"dashboard",extraGroupId);
+assert.deepEqual(toPlain(movedGroup.modes[0].subModes[1].tiles[0]),
+                 toPlain(beforeTall));
+assert.equal(movedGroup.modes[0].subModes[1].tiles[0].rowSpan,3);
+assert.equal(movedGroup.modes[0].subModes[1].tiles[0].size,"wide");
+assert.equal(movedGroup.nextTileId,tallBefore.nextTileId);
+assert.equal(layout.moveTargets(tallBefore,0,0,0).total,3);
+
+// A completely full destination refuses transfer, even with no duplicate.
+// Use the existing policy to fill a dedicated empty group with eight tiles.
+let fullCase=layout.addSubMode(moveBase,1);
+const fullId=fullCase.modes[1].subModes[1].id;
+for(let i=0;i<8;i++) fullCase=layout.addTile(fullCase,1,1);
+assert.equal(fullCase.modes[1].subModes[1].tiles.length,8);
+const fullChoices=layout.moveTargets(fullCase,0,0,0);
+const blocked=fullChoices.items.find(t=>t.groupId===fullId);
+assert.equal(blocked.available,false);
+assert.equal(blocked.reason,"FULL");
+const fullAttempt=moveTo(fullCase,0,0,0,
+    fullCase.modes[0].subModes[0].tiles[0].id,
+    "dashboard","overview",1,1,"console",fullId);
+assert.deepEqual(toPlain(fullAttempt),toPlain(fullCase));
+// Unchanged document means the UI must not add a new UNDO checkpoint.
+
 console.log("ApolloHub Layout v2 migration, stable tile IDs, guarded remove and sizing tests passed");

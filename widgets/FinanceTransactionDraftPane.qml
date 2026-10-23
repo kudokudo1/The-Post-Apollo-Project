@@ -237,30 +237,21 @@ Item {
 
         GohuText {
             width: parent.width
-            text: "DATE // YYYY-MM-DD"
+            text: "DATE // MONTH / DAY / YEAR"
             font.pixelSize: 9
             color: Colors.cyan
         }
 
-        Rectangle {
+        FinanceDateInput {
             width: parent.width
-            height: 28
-            color: Colors.dark
-            border.color: Colors.cyan
-            TextInput {
-                anchors.fill: parent
-                anchors.margins: 6
-                text: draft.dateText
-                color: Colors.white
-                font.pixelSize: 12
-                selectByMouse: true
-                onTextEdited: {
-                    draft.dateText = text;
-                    draft.reviewed = false;
-                }
+            value: draft.dateText
+            fallbackDate: draft.selectedMonth ? draft.selectedMonth+"-01" : ""
+            canEdit: !draft.savePending
+            onValueEdited: function(value) {
+                draft.dateText=value;
+                draft.reviewed=false;
             }
         }
-
         GohuText {
             width: parent.width
             text: "DESCRIPTION"
@@ -296,22 +287,13 @@ Item {
             color: Colors.cyan
         }
 
-        Rectangle {
+        FinanceMoneyInput {
             width: parent.width
-            height: 28
-            color: Colors.dark
-            border.color: Colors.cyan
-            TextInput {
-                anchors.fill: parent
-                anchors.margins: 6
-                text: draft.amountText
-                color: Colors.white
-                font.pixelSize: 12
-                selectByMouse: true
-                onTextEdited: {
-                    draft.amountText = text;
-                    draft.reviewed = false;
-                }
+            value: draft.amountText
+            canEdit: !draft.savePending
+            onValueEdited: function(value) {
+                draft.amountText=value;
+                draft.reviewed=false;
             }
         }
 

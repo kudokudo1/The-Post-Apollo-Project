@@ -155,21 +155,11 @@ Item {
             font.pixelSize: 9
             color: Colors.cyan
         }
-        Rectangle {
+        FinanceMoneyInput {
             width: parent.width
-            height: 28
-            color: Colors.dark
-            border.color: Colors.cyan
-            TextInput {
-                anchors.fill: parent
-                anchors.margins: 6
-                text: allocation.targetText
-                color: Colors.white
-                font.pixelSize: 12
-                selectByMouse: true
-                readOnly: allocation.writePending || allocation.writeUncertain
-                onTextEdited: allocation.targetText = text
-            }
+            value: allocation.targetText
+            canEdit: !allocation.writePending && !allocation.writeUncertain
+            onValueEdited: function(value) {allocation.targetText=value;}
         }
         GohuText {
             width: parent.width

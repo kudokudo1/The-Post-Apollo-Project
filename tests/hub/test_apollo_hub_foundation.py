@@ -127,8 +127,8 @@ assert "onLeftClicked: hub.menuOpen = false" in window[close_start:close_end + 4
 import re
 
 for path, source, count in (
-    ("widgets/ApolloHubW.qml", window, 13),
-    ("widgets/hub/ApolloHubTile.qml", tile, 6),
+    ("widgets/ApolloHubW.qml", window, 15),
+    ("widgets/hub/ApolloHubTile.qml", tile, 7),
 ):
     actions = len(re.findall(r"\bActionButton\s*\{", source))
     tracked = len(re.findall(
@@ -151,7 +151,7 @@ for action in (
     'label: "CANCEL"',
 ):
     assert action in window, f"Hub button behavior changed: {action}"
-for action in ('label: "←"', 'label: "→"', 'label: "SWAP"', 'label: "×"'):
+for action in ('label: "←"', 'label: "→"', 'label: "SWAP"', 'label: "MOVE"', 'label: "×"'):
     assert action in tile, f"Hub edit-tile action changed: {action}"
 
 shared_action = (ROOT / "components/ActionButton.qml").read_text(encoding="utf-8")
@@ -163,7 +163,7 @@ assert "contentHost.y + labelText.y" in shared_action
 for name in ("defaultLayout", "normalize", "parse", "swapTiles",
              "renameMode", "addMode", "addSubMode", "addTile", "cycleTile",
              "removeTile", "resizeTile", "storageIssue",
-             "removeMode", "removeSubMode"):
+             "removeMode", "removeSubMode", "moveTargets", "transferTile"):
     assert "function " + name + "(" in layout
 assert 'var LAYOUT_VERSION = 2' in layout
 assert 'version: LAYOUT_VERSION' in layout
@@ -304,8 +304,9 @@ for token in (
     'contentHeight: tileFlow.height',
     'clip: true',
     'event.key === Qt.Key_Escape',
-    'enabled: hub.menuOpen && hub.modulePickerOpen',
-    'onActivated: hub.closeModulePicker()',
+    'enabled: hub.menuOpen && (hub.modulePickerOpen || hub.transferPickerOpen)',
+    'hub.closeModulePicker();',
+    'hub.closeTransferPicker();',
     'hub.modulePickerChoices.availableCount === 1',
     'activeTiles[modulePickerTileIndex].id !== modulePickerTileId',
     'activeMode.id !== modulePickerModeId',
@@ -313,7 +314,9 @@ for token in (
     'id: tileRepeater',
     'tileRepeater.itemAt(selectedTileIndex)',
     'visible: hub.modulePickerOpen',
-    'onTapped: hub.closeModulePicker()',
+    'onTapped: {',
+    'hub.closeModulePicker();',
+    'hub.closeTransferPicker();',
     'TapHandler {',
     'id: modulePickerRail',
     'accountForContentOrigin: true',
@@ -338,6 +341,57 @@ assert 'interactive: contentHeight > height' in window
 
 assert 'TimePolicy.snapshot(tile.now.getTime(), tile.use24Hour)' in tile
 assert "Qt.formatDate(tile.now" not in tile
+
+# Stage 5: MOVE is a separate destination dropdown, not SWAP or a
+# destructive delete. Both policy and UI preserve identities and bounds.
+for token in (
+    'function moveTargets(layout, fromMode, fromGroup, fromIndex)',
+    'function transferTile(layout, fromMode, fromGroup, fromIndex, expectedTileId,',
+    'validIndex(fromIndex,source.tiles.length)',
+    'source.tiles[fromIndex].id !== expectedTileId',
+    'sourceMode.id !== expectedModeId',
+    'destinationMode.id !== expectedDestinationModeId',
+    'destination.id !== expectedDestinationGroupId',
+    'destination.tiles.length >= MAX_TILES',
+    'tile.module === source.tiles[fromIndex].module',
+    'source.tiles.splice(fromIndex,1)[0]',
+    'destination.tiles.push(moved)',
+    'reason:full ? "FULL" : duplicate ? "IN USE" : ""',
+):
+    assert token in layout, f"Missing cross-group MOVE policy: {token}"
+for token in (
+    'property bool transferPickerOpen: false',
+    'readonly property var transferTargets: Layout.moveTargets(',
+    'function openTransferPicker(index, sourceItem)',
+    'function closeTransferPicker()',
+    'function chooseTransferDestination(modeId, groupId)',
+    'activeTiles[transferTileIndex].id !== transferTileId',
+    'activeMode.id !== transferModeId',
+    'activeSubMode.id !== transferGroupId',
+    'Layout.transferTile(',
+    'save(moved);',
+    'selectedModeIndex = target.modeIndex;',
+    'selectedSubModeIndex = target.groupIndex;',
+    'selectedTileIndex = Math.max(0, activeTiles.length - 1);',
+    'onTransferTile: hub.openTransferPicker(index, sourceItem)',
+    'id: transferPickerDropdownContent',
+    'id: transferPickerResults',
+    'model: hub.transferTargets.items',
+    'modelData.label',
+    'modelData.reason.length > 0',
+    'onLeftClicked: hub.chooseTransferDestination(',
+    'id: transferPickerRail',
+    'visible: hub.modulePickerOpen || hub.transferPickerOpen',
+    'hub.transferTargets.availableCount',
+    'z: 200',
+):
+    assert token in window, f"Missing MOVE dropdown/interaction: {token}"
+assert 'signal transferTile(int index, var sourceItem)' in tile
+assert 'onLeftClicked: tile.transferTile(tile.tileIndex, moveAction)' in tile
+assert tile.index('label: "SWAP"') < tile.index('label: "MOVE"') < tile.index('label: "W:"') < tile.index('label: "H:"') < tile.index('label: "×"')
+assert window.count('onTransferTile: hub.openTransferPicker(index, sourceItem)') == 1
+assert 'modulePickerOverlay.width - modulePickerPopup.width - 10' in window
+assert window.count('closeTransferPicker();') >= 5
 
 # Standard window-local key grammar, without inventing a bottom rail.
 for key in ("Tab", "Shift+Tab", "Shift+Left", "Shift+Right",

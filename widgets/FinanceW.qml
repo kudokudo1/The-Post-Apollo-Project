@@ -1532,7 +1532,10 @@ FinanceAccountsPane {
     snapshot: financeBudget.snapshot
     onNewTransactionRequested: {
         root.selectBudgetSection("transactions");
-        transactionDraftPane.begin();
+        if(financeAccountsPane.selectedAccountId)
+            transactionDraftPane.beginForAccount(financeAccountsPane.selectedAccountId);
+        else
+            transactionDraftPane.begin();
     }
 }
 FinanceCategoriesPane {

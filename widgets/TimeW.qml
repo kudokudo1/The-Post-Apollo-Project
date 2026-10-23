@@ -50,9 +50,83 @@ PanelWindow {
           + "//" + localTimeSnapshot.meridiem
         : "--:--:--//--"
 
-    // Two CALC views preserve the existing converter geometry while adding
-    // manual elapsed duration arithmetic without a new persistent clock.
+    // Two CALC views, with MATH split into duration shift vs. interval.
     property string calcView: "convert"
+    property string mathView: "elapsed"
+    property string differenceEndZone: "UTC"
+    property string differenceEndDate: new Date().toISOString().slice(0, 10)
+    property string differenceEndTime: new Date().toISOString().slice(11, 16)
+    property bool differenceEnd24Hour: true
+    readonly property var differenceEndParsedTime:
+        ConverterFormat.parseInput(differenceEndTime, differenceEnd24Hour)
+    property var differenceResult: null
+    property bool differenceBusy: false
+    property string differenceSubmittedKey: ""
+    readonly property string differenceInputsKey:
+        [converterDate,
+         converterParsedTime.valid ? converterParsedTime.canonical
+                                   : "INVALID:" + converterTime,
+         converterSourceZone, differenceEndDate,
+         differenceEndParsedTime.valid ? differenceEndParsedTime.canonical
+                                       : "INVALID:" + differenceEndTime,
+         differenceEndZone].join("|")
+    onDifferenceInputsKeyChanged: differenceResult = null
+
+    function setMathView(which) {
+        if (which !== "elapsed" && which !== "between")
+            return;
+        closeConverterDropdowns();
+        mathView = which;
+    }
+
+    function cycleDifferenceEndZone() {
+        const choices = converterZones;
+        if (choices.length === 0) return;
+        const idx = choices.findIndex(function(zone) {
+            return zone.id === differenceEndZone;
+        });
+        differenceEndZone = choices[(idx + 1) % choices.length].id;
+        closeConverterDropdowns();
+    }
+
+    function toggleDifferenceEndFormat() {
+        const next24 = !differenceEnd24Hour;
+        const formatted = ConverterFormat.convertInput(
+                              differenceEndTime, differenceEnd24Hour, next24);
+        if (!formatted.valid) {
+            differenceResult = {status: formatted.error, options: []};
+            return;
+        }
+        differenceEnd24Hour = next24;
+        differenceEndTime = formatted.text;
+    }
+
+    function runTimeDifference() {
+        if (differenceBusy || !menuOpen || selectedMode !== "calc"
+                || calcView !== "math" || mathView !== "between")
+            return;
+        if (!converterZoneAllowed(converterSourceZone)
+                || !converterZoneAllowed(differenceEndZone)) {
+            differenceResult = {status: "ZONE_UNAVAILABLE", options: []};
+            return;
+        }
+        if (!converterParsedTime.valid || !differenceEndParsedTime.valid) {
+            differenceResult = {
+                status: "INVALID_INPUT_TIME", options: []
+            };
+            return;
+        }
+        differenceResult = null;
+        differenceSubmittedKey = differenceInputsKey;
+        differenceBusy = true;
+        differenceProcess.exec([
+            "python3", "-B", "-I",
+            Quickshell.shellPath("services/time/TimeDifference.py"),
+            converterSourceZone, converterDate, converterParsedTime.canonical,
+            differenceEndZone, differenceEndDate,
+            differenceEndParsedTime.canonical
+        ]);
+    }
     property string mathOperation: "add"
     property string mathDays: "0"
     property string mathHours: "1"
@@ -496,6 +570,36 @@ PanelWindow {
     SystemClock {
         id: localClock
         precision: SystemClock.Seconds
+    }
+
+    // Difference comparisons are also one-shot. Existing inputs are kept
+    // private, argv is fixed, and stale results are discarded on every edit.
+    Process {
+        id: differenceProcess
+        running: false
+        stdout: StdioCollector {
+            onStreamFinished: {
+                if (timew.differenceSubmittedKey !== timew.differenceInputsKey)
+                    return;
+                try {
+                    const data = JSON.parse(this.text);
+                    timew.differenceResult =
+                        data && typeof data.status === "string"
+                        && Array.isArray(data.options)
+                        ? data : {status: "INVALID_RESULT", options: []};
+                } catch (e) {
+                    timew.differenceResult =
+                        {status: "INVALID_RESULT", options: []};
+                }
+            }
+        }
+        onExited: function(exitCode, exitStatus) {
+            timew.differenceBusy = false;
+            if (exitCode !== 0
+                    && timew.differenceSubmittedKey === timew.differenceInputsKey)
+                timew.differenceResult =
+                    {status: "DIFFERENCE_UNAVAILABLE", options: []};
+        }
     }
 
     // Request-driven elapsed arithmetic. Keep it separate from the zone

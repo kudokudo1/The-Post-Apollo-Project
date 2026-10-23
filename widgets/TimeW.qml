@@ -2491,9 +2491,50 @@ PanelWindow {
                         }
                     }
 
+                    Row {
+                        id: toolsSubModeStrip
+                        visible: timew.selectedMode === "tools"
+                        width: parent.width
+                        height: 34
+                        spacing: 6
+
+                        ModeButton {
+                            width: (toolsSubModeStrip.width
+                                    - toolsSubModeStrip.spacing) / 2
+                            height: parent.height
+                            bordered: false
+                            textOnly: true
+                            labelText: "STOPWATCH"
+                            labelFontSize: 11
+                            idlePrimaryColor: timew.semanticColor
+                            selected: timew.toolsView === "stopwatch"
+                            onTriggered: {
+                                timew.toolsView = "stopwatch";
+                                timew.refreshStopwatch();
+                            }
+                        }
+
+                        ModeButton {
+                            width: (toolsSubModeStrip.width
+                                    - toolsSubModeStrip.spacing) / 2
+                            height: parent.height
+                            bordered: false
+                            textOnly: true
+                            labelText: "COUNTDOWN"
+                            labelFontSize: 11
+                            idlePrimaryColor: timew.semanticColor
+                            selected: timew.toolsView === "countdown"
+                            onTriggered: {
+                                timew.toolsView = "countdown";
+                                timew.refreshCountdown();
+                            }
+                        }
+                    }
+
                     Column {
                         id: stopwatchPane
                         visible: timew.selectedMode === "tools"
+                                 && timew.toolsView === "stopwatch"
                         width: parent.width
                         spacing: 12
 
@@ -2698,11 +2739,256 @@ PanelWindow {
                             opacity: 0.72
                         }
 
+                    }
+
+                    Column {
+                        id: countdownPane
+                        visible: timew.selectedMode === "tools"
+                                 && timew.toolsView === "countdown"
+                        width: parent.width
+                        spacing: 13
+
+                        GohuText {
+                            text: "COUNTDOWN // SESSION TIMER"
+                            color: timew.semanticColor
+                            font.pixelSize: 14
+                        }
+
                         GohuText {
                             width: parent.width
-                            text: "COUNTDOWN TIMERS // NEXT DEVELOPMENT STAGE"
-                            color: Colors.orange
+                            text: CountdownPolicy.format(
+                                      timew.countdownStarted
+                                      ? timew.countdownRemainingMs
+                                      : timew.countdownParsed.valid
+                                      ? timew.countdownParsed.milliseconds : 0)
+                            color: timew.countdownFinished ? Colors.magenta
+                                   : timew.countdownRunning ? Colors.orange
+                                   : timew.countdownStarted ? Colors.cyan
+                                   : timew.semanticColor
+                            font.pixelSize: 28
+                            horizontalAlignment: Text.AlignHCenter
+                        }
+
+                        GohuText {
+                            width: parent.width
+                            horizontalAlignment: Text.AlignHCenter
+                            text: timew.countdownError !== ""
+                                  ? "COUNTDOWN // " + timew.countdownError
+                                  : timew.countdownFinished
+                                  ? "COUNTDOWN // FINISHED"
+                                  : timew.countdownRunning
+                                  ? "COUNTDOWN // RUNNING"
+                                  : timew.countdownStarted
+                                  ? "COUNTDOWN // PAUSED"
+                                  : "COUNTDOWN // READY"
+                            color: timew.countdownFinished ? Colors.magenta
+                                   : timew.countdownRunning ? Colors.orange
+                                   : timew.countdownError !== "" ? Colors.orange
+                                   : Colors.cyan
+                            font.pixelSize: 12
+                        }
+
+                        Row {
+                            id: countdownInputRow
+                            width: parent.width
+                            height: 69
+                            spacing: 8
+
+                            Column {
+                                width: (countdownInputRow.width
+                                        - countdownInputRow.spacing * 2) / 3
+                                spacing: 5
+                                GohuText {
+                                    text: "HOURS"
+                                    color: Colors.cyan
+                                    font.pixelSize: 11
+                                }
+                                TextField {
+                                    id: countdownHoursField
+                                    width: parent.width
+                                    height: 36
+                                    text: timew.countdownHours
+                                    placeholderText: "00"
+                                    color: Colors.magenta
+                                    placeholderTextColor: Colors.cyan
+                                    selectionColor: Colors.magenta
+                                    selectedTextColor: Colors.black
+                                    font.family: "GohuFont 11 Nerd Font Mono"
+                                    font.pixelSize: 15
+                                    horizontalAlignment: Text.AlignHCenter
+                                    readOnly: timew.countdownStarted
+                                    cursorDelegate: Rectangle {
+                                        width: 2
+                                        color: Colors.orange
+                                    }
+                                    background: Rectangle {
+                                        color: Colors.black
+                                        border.width: 1
+                                        border.color: countdownHoursField.activeFocus
+                                                      ? Colors.magenta : Colors.cyan
+                                    }
+                                    onTextEdited: {
+                                        timew.countdownHours = text;
+                                        timew.countdownError = "";
+                                    }
+                                }
+                            }
+
+                            Column {
+                                width: (countdownInputRow.width
+                                        - countdownInputRow.spacing * 2) / 3
+                                spacing: 5
+                                GohuText {
+                                    text: "MINUTES"
+                                    color: Colors.cyan
+                                    font.pixelSize: 11
+                                }
+                                TextField {
+                                    id: countdownMinutesField
+                                    width: parent.width
+                                    height: 36
+                                    text: timew.countdownMinutes
+                                    placeholderText: "00"
+                                    color: Colors.magenta
+                                    placeholderTextColor: Colors.cyan
+                                    selectionColor: Colors.magenta
+                                    selectedTextColor: Colors.black
+                                    font.family: "GohuFont 11 Nerd Font Mono"
+                                    font.pixelSize: 15
+                                    horizontalAlignment: Text.AlignHCenter
+                                    readOnly: timew.countdownStarted
+                                    cursorDelegate: Rectangle {
+                                        width: 2
+                                        color: Colors.orange
+                                    }
+                                    background: Rectangle {
+                                        color: Colors.black
+                                        border.width: 1
+                                        border.color: countdownMinutesField.activeFocus
+                                                      ? Colors.magenta : Colors.cyan
+                                    }
+                                    onTextEdited: {
+                                        timew.countdownMinutes = text;
+                                        timew.countdownError = "";
+                                    }
+                                }
+                            }
+
+                            Column {
+                                width: (countdownInputRow.width
+                                        - countdownInputRow.spacing * 2) / 3
+                                spacing: 5
+                                GohuText {
+                                    text: "SECONDS"
+                                    color: Colors.cyan
+                                    font.pixelSize: 11
+                                }
+                                TextField {
+                                    id: countdownSecondsField
+                                    width: parent.width
+                                    height: 36
+                                    text: timew.countdownSeconds
+                                    placeholderText: "00"
+                                    color: Colors.magenta
+                                    placeholderTextColor: Colors.cyan
+                                    selectionColor: Colors.magenta
+                                    selectedTextColor: Colors.black
+                                    font.family: "GohuFont 11 Nerd Font Mono"
+                                    font.pixelSize: 15
+                                    horizontalAlignment: Text.AlignHCenter
+                                    readOnly: timew.countdownStarted
+                                    cursorDelegate: Rectangle {
+                                        width: 2
+                                        color: Colors.orange
+                                    }
+                                    background: Rectangle {
+                                        color: Colors.black
+                                        border.width: 1
+                                        border.color: countdownSecondsField.activeFocus
+                                                      ? Colors.magenta : Colors.cyan
+                                    }
+                                    onTextEdited: {
+                                        timew.countdownSeconds = text;
+                                        timew.countdownError = "";
+                                    }
+                                }
+                            }
+                        }
+
+                        Row {
+                            id: countdownActions
+                            width: parent.width
+                            height: 38
+                            spacing: 8
+                            ActionButton {
+                                id: countdownRunButton
+                                width: (countdownActions.width
+                                        - countdownActions.spacing) / 2
+                                height: parent.height
+                                label: timew.countdownRunning ? "PAUSE"
+                                       : timew.countdownFinished ? "RESTART"
+                                       : timew.countdownStarted ? "RESUME"
+                                       : "START"
+                                labelPixelSize: 12
+                                accentColor: timew.countdownRunning
+                                             ? Colors.cyan : Colors.orange
+                                trackLabelGlowLocally: true
+                                onLeftClicked: {
+                                    if (timew.countdownRunning)
+                                        timew.pauseCountdown();
+                                    else
+                                        timew.startCountdown();
+                                }
+                            }
+                            ActionButton {
+                                id: countdownResetButton
+                                width: (countdownActions.width
+                                        - countdownActions.spacing) / 2
+                                height: parent.height
+                                label: "RESET"
+                                labelPixelSize: 12
+                                accentColor: timew.semanticColor
+                                trackLabelGlowLocally: true
+                                available: timew.countdownStarted
+                                           || timew.countdownError !== ""
+                                onLeftClicked: timew.resetCountdown()
+                            }
+                        }
+
+                        Rectangle {
+                            width: parent.width
+                            height: 2
+                            color: Colors.cyan
+                            opacity: 0.55
+                        }
+
+                        GohuText {
+                            width: parent.width
+                            text: "MONOTONIC // ONE TIMER // 00:00:01 TO 99:59:59"
+                            color: Colors.white
                             font.pixelSize: 11
+                            wrapMode: Text.Wrap
+                        }
+
+                        GohuText {
+                            width: parent.width
+                            text: timew.countdownFinished
+                                  ? "FINISHED // OPEN THIS VIEW TO ACKNOWLEDGE"
+                                  : "NO AUDIO OR DESKTOP NOTIFICATION // INITIAL SLICE"
+                            color: timew.countdownFinished
+                                   ? Colors.magenta : Colors.orange
+                            font.pixelSize: 11
+                            wrapMode: Text.Wrap
+                        }
+
+                        GohuText {
+                            width: parent.width
+                            text: "RUNNING TIMER CONTINUES WHILE WINDOW IS CLOSED. "
+                                  + "RESTARTING QUICKSHELL RESETS IT."
+                            color: Colors.white
+                            opacity: 0.72
+                            font.pixelSize: 10
+                            wrapMode: Text.Wrap
                         }
                     }
 

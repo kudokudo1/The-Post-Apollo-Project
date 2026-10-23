@@ -40,6 +40,15 @@ PanelWindow {
         id: allocationGateCheck
     }
 
+    FinanceServices.FinanceFundingWriteService {
+        id: financeFundingWrite
+        onSaved: {
+            guidedFundingPane.clear();
+            if(root.menuOpen)
+                financeBudget.refresh();
+        }
+    }
+
     FinanceServices.FinanceAllocationWriteService {
         id: financeAllocationWrite
         onSaved: {
@@ -1105,6 +1114,18 @@ PanelWindow {
                                     id: guidedFundingPane
                                     width: parent.width
                                     snapshot: financeBudget.snapshot
+                                    writeState: financeFundingWrite.state
+                                    writeMessage: financeFundingWrite.message
+                                    onSaveRequested: function(payload) {
+                                        if(financeBudget.state === "ready"
+                                                && financeBudget.snapshot
+                                                && payload && payload.mode === "income"
+                                                && payload.sourceKey === financeBudget.snapshot.sourceKey
+                                                && payload.month === financeBudget.snapshot.month
+                                                && financeFundingWrite.state !== "pending"
+                                                && financeFundingWrite.state !== "uncertain")
+                                            financeFundingWrite.submit(payload);
+                                    }
                                 }
                                 ActionButton {
                                     id: reviewIncoming

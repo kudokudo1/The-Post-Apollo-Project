@@ -9,6 +9,7 @@ on:
       - "tests/hub/test_apollo_hub_todo_policy.cjs"
       - "tests/hub/test_apollo_hub_todo_store.py"
       - "tests/tasks/test_task_details_policy.cjs"
+      - "tests/tasks/test_task_projects_policy.cjs"
       - ".github/workflows/apollo-hub-todo.yml"
   push:
     branches:
@@ -20,6 +21,7 @@ on:
       - "tests/hub/test_apollo_hub_todo_policy.cjs"
       - "tests/hub/test_apollo_hub_todo_store.py"
       - "tests/tasks/test_task_details_policy.cjs"
+      - "tests/tasks/test_task_projects_policy.cjs"
       - ".github/workflows/apollo-hub-todo.yml"
   workflow_dispatch:
 
@@ -38,3 +40,5 @@ jobs:
         run: python3 tests/hub/test_apollo_hub_todo_store.py
       - name: Validate TASKS v2 fields and legacy v1 compatibility
         run: node tests/tasks/test_task_details_policy.cjs
+      - name: Validate TASKS v3 local Projects and legacy migration
+        run: node tests/tasks/test_task_projects_policy.cjs

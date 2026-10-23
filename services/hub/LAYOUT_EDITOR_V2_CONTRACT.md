@@ -1,6 +1,6 @@
 # 🏥💜 ApolloHubW // P1 Layout Editor 2.0, stage 1
 
-**Status:** Stages 1–3 operator-accepted on the live desktop. Stage 4 SWAP dropdown and Stage 5 MOVE-between-groups dropdown are implemented in GitHub `main` with source/CI verification; their desktop acceptance is pending. Drag-and-drop, arbitrary grid packing, persistent undo and full layout presets remain later scope.
+**Status:** Stages 1–3 and Stage 5 MOVE operator-accepted on the live desktop. Stage 4 SWAP dropdown is in use. Stage 6 compact grid packing is implemented on GitHub `main`, with source and behavior verification; desktop acceptance remains pending. Drag-and-drop, persistent undo, content-specific expansion, and full layout presets remain later scope.
 
 ## IMPLEMENTATION
 
@@ -78,7 +78,9 @@ The `×` is an **explicit one-click edit action**, not a destructive record dele
 - [x] Stage 4 module picker: search, count, occupied-state hints, explicit selection
 - [ ] Stage 4 operator desktop acceptance
 - [x] Stage 5 cross-mode/cross-group MOVE dropdown and ID-safe backend
-- [ ] Stage 5 live desktop acceptance
+- [x] Stage 5 operator desktop acceptance
+- [x] Stage 6 packed two-column tile geometry with no saved-layout migration
+- [ ] Stage 6 operator desktop acceptance
 - [ ] Durable undo/presets and full grid-packing polish
 
 ## P1 Stage 2 // Explicit width and height controls
@@ -146,9 +148,24 @@ The Stage 4 suite extends `tests/hub/test_apollo_hub_layout_v2.cjs` for filterin
 
 **Desktop acceptance:** After syncing and restarting Quickshell, test EDIT → MOVE on a disposable tile, verify two or more destinations, try an unavailable destination, cancel once, move into a different main mode, and press UNDO. Confirm the tile moves as a placement without losing its module or W/H dimensions. Then create a second group in the same main mode and verify a move between those groups. Reopen the Hub and inspect the saved arrangement. Do not delete or modify personal notes/tasks for this test.
 
+## P1 Stage 6 // Gap-filling tile grid
+
+**What changed:** The existing two-column `Flow` previously made a whole visual row as tall as its tallest tile. A H:3 half-width tile next to H:1 would create a 296px empty block underneath the smaller tile. P1 Stage 6 replaces only the view-positioning container with a deterministic two-column `Item` and a pure `Layout.packTiles(tiles)` projection.
+
+- **First available cell:** Each saved tile is considered in saved array order, and placed in the first free rectangle of cells that fits its **one-/two-column width** and **one-/two-/three-row height**. Short half-width tiles can stack beside a tall half-width tile. A full-width tile always occupies both columns; no overlapping rectangles are allowed.
+- **Source of truth unchanged:** The stored `ApolloHubStore.layoutJson` stays at version 2. `tileGrid` is a computed QML property; column/row coordinates are **never persisted**. The stable tile IDs, module data, W/H dimensions, saved order, capacity limits, and previous UNDO behavior remain intact.
+- **Geometry:** The original **140px row height** and **8px gap** are unchanged. Half-width card widths remain `(availableWidth - 8)/2`; full-width cards continue filling the available width. The scrollable region measures the highest occupied grid row rather than inheriting Flow's extra height.
+- **Visual order note:** A wide tile that cannot fit an early one-column gap may land beneath a tall tile, while subsequent half-width tiles backfill that gap. The saved array order is unchanged, but the resulting on-screen reading order can differ for some mixed W/H arrangements. Keyboard arrows still use the existing saved-index navigation; spatial-arrow refinement is deferred until it can be verified against mixed-size layouts.
+- **No hidden controls:** SWAP, MOVE, X, W/H, UNDO, navigation tabs and the existing star-scrollbars remain. The new grid does not add menus, settings, services, timers, file IO, an extra layout version, or any new QML parent window.
+- **Scope limit:** Enlarged card chassis do not automatically make every mini-widget render more internal content. Internal widget density/expansion is a separate UI polish task.
+
+**Source verification:** `tests/hub/test_apollo_hub_layout_v2.cjs` now checks ordinary layouts, tall-half hole filling, wide tile spans, read-only deterministic projections, invalid inputs, and **1,296 combinations of four mixed-size tiles** for collisions. `tests/hub/test_apollo_hub_foundation.py` requires the computed grid and disallows returning to the old height-wasting Flow. GitHub CI validates both.
+
+**Desktop acceptance:** After syncing `main` and restarting Quickshell, set one disposable half-width tile to H:3 beside H:1 tiles. Check that the shorter tiles fill the column beside it rather than leaving a tall hole. Test W:2, MOVE, SWAP, UNDO and scrolling; verify all tile frames remain distinct, controls remain clickable, and closing/reopening Hub does not change the saved tile sequence. A screenshot is useful if any layout overlaps or clips.
+
 ## NEXT
 
-After Stage 5 desktop acceptance, review practical MOVE/SWAP menu behavior and refine grid packing, module density, and layout presets. Do not add drag-and-drop or a new persistent history system without separate operator authorization.
+After Stage 6 desktop acceptance, prioritize **directional keyboard navigation that follows actual grid cells** and responsive mini-widget internal content density. Continue visual/spacing normalization based on existing, measured control geometry. Durable undo/presets and drag-and-drop remain separate operator decisions.
 
 ## DECISIONS
 

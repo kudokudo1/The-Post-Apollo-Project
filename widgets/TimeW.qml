@@ -224,20 +224,26 @@ PanelWindow {
         converterSourcePicker.dropFocus();
         converterTargetPicker.dropFocus();
         mathZonePicker.dropFocus();
+        differenceEndPicker.dropFocus();
         Qt.callLater(restoreKeyboardFocus);
     }
 
     function openConverterDropdown(which) {
         if (!menuOpen || selectedMode !== "calc")
             return;
-        if (which !== "source" && which !== "target" && which !== "math")
+        if (which !== "source" && which !== "target"
+                && which !== "math" && which !== "difference")
             return;
         // CONVERT has independent FROM/TO selectors; MATH shares FROM's
         // selected zone but has its own popup and keyboard focus.
         if (which === "math" && calcView !== "math")
             return;
-        if (which !== "math" && calcView !== "convert")
+        if (which === "difference"
+                && (calcView !== "math" || mathView !== "between"))
             return;
+        if (which === "source" || which === "target") {
+            if (calcView !== "convert") return;
+        }
         activeConverterDropdown = which;
         loadWorldZoneCatalog();
     }
@@ -258,6 +264,8 @@ PanelWindow {
             converterSourceZone = zoneId;
         else if (which === "target")
             converterTargetZone = zoneId;
+        else if (which === "difference")
+            differenceEndZone = zoneId;
         else
             return;
         converterResult = null;
@@ -356,6 +364,9 @@ PanelWindow {
         && !converterSourcePicker.searchFocused
         && !converterTargetPicker.searchFocused
         && !mathZonePicker.searchFocused
+        && !differenceEndPicker.searchFocused
+        && !differenceEndDateInput.activeFocus
+        && !differenceEndTimeInput.activeFocus
         && !converterDateInput.activeFocus && !converterTimeInput.activeFocus
     property string worldLookupZone: ""
     property string worldValidZone: ""
@@ -811,6 +822,7 @@ PanelWindow {
                      || converterSourcePicker.searchFocused
                      || converterTargetPicker.searchFocused
                      || mathZonePicker.searchFocused
+                     || differenceEndPicker.searchFocused
             gesturePolicy: TapHandler.DragThreshold
             onTapped: function(point, button) {
                 if (button !== Qt.LeftButton)
@@ -836,7 +848,12 @@ PanelWindow {
                     // pickers remain instantiated while MATH is visible.
                     // Testing hidden pickers would incorrectly keep menus open.
                     if (timew.calcView === "math") {
-                        if (!mathZonePicker.containsFramePoint(timewFrame, px, py))
+                        const onMathZone = mathZonePicker.containsFramePoint(
+                                               timewFrame, px, py);
+                        const onEndZone = timew.mathView === "between"
+                                          && differenceEndPicker.containsFramePoint(
+                                                 timewFrame, px, py);
+                        if (!onMathZone && !onEndZone)
                             timew.closeConverterDropdowns();
                     } else {
                         const inSource = converterSourcePicker.containsFramePoint(
@@ -1653,7 +1670,9 @@ PanelWindow {
                         id: mathPane
                         visible: timew.selectedMode === "calc" && timew.calcView === "math"
                         // Keep the list above date/duration controls and footer.
-                        z: timew.activeConverterDropdown === "math" ? 20 : 0
+                        z: (timew.activeConverterDropdown === "math"
+                            || timew.activeConverterDropdown === "difference")
+                           ? 20 : 0
                         width: parent.width
                         spacing: 10
 

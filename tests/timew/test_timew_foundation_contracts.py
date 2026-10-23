@@ -361,7 +361,8 @@ assert 'converterTargetPicker.searchFocused' in window
 assert 'mathZonePicker.searchFocused' in window
 assert 'converterSourcePicker.containsFramePoint(' in window
 assert 'converterTargetPicker.containsFramePoint(' in window
-assert 'mathZonePicker.containsFramePoint(timewFrame, px, py)' in window
+assert 'mathZonePicker.containsFramePoint(' in window
+assert 'const onMathZone = mathZonePicker.containsFramePoint(' in window
 assert 'z: 40' in window and 'z: 30' in window
 assert 'z: timew.activeConverterDropdown !== "" ? 20 : 0' in window
 assert 'TIME ZONE CONVERTER // READ ONLY' in window

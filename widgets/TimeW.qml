@@ -3147,18 +3147,257 @@ PanelWindow {
                         }
                     }
 
-                    GohuText {
+                    Column {
+                        id: machinePane
                         visible: timew.selectedMode === "machine"
-                        text: "DESKTOP CHECKPOINTS // NOT CONNECTED"
-                        color: Colors.orange
-                        font.pixelSize: 11
-                    }
+                        width: parent.width
+                        spacing: 11
 
-                    GohuText {
-                        visible: timew.selectedMode === "machine"
-                        text: "NO SCREENSHOTS OR RESTORATION ACTIVE"
-                        color: Colors.white
-                        font.pixelSize: 11
+                        GohuText {
+                            width: parent.width
+                            text: "MACHINE // SESSION TIMELINE"
+                            color: timew.semanticColor
+                            font.pixelSize: 14
+                        }
+
+                        GohuText {
+                            width: parent.width
+                            text: "WINDOW INSTANCE // ELAPSED"
+                            color: Colors.cyan
+                            font.pixelSize: 11
+                        }
+
+                        GohuText {
+                            width: parent.width
+                            text: timew.machineInstanceAge
+                            color: Colors.orange
+                            font.pixelSize: 24
+                            horizontalAlignment: Text.AlignHCenter
+                        }
+
+                        GohuText {
+                            width: parent.width
+                            text: "UTC // " + timew.machineUtcNow
+                            color: Colors.white
+                            font.pixelSize: 11
+                            elide: Text.ElideRight
+                        }
+
+                        Rectangle {
+                            width: parent.width
+                            height: 2
+                            color: Colors.cyan
+                            opacity: 0.55
+                        }
+
+                        Row {
+                            id: machineActivityRow
+                            width: parent.width
+                            height: 24
+                            spacing: 8
+                            GohuText {
+                                width: (parent.width - machineActivityRow.spacing) / 2
+                                text: "STOPWATCH // "
+                                      + (timew.stopwatchRunning ? "RUNNING"
+                                         : timew.stopwatchStarted ? "PAUSED" : "READY")
+                                color: timew.stopwatchRunning ? Colors.orange : Colors.cyan
+                                font.pixelSize: 11
+                                elide: Text.ElideRight
+                            }
+                            GohuText {
+                                width: (parent.width - machineActivityRow.spacing) / 2
+                                text: "TIMERS // " + timew.countdownRunningCount
+                                      + " ACTIVE"
+                                color: timew.countdownRunningCount > 0
+                                       ? Colors.orange : Colors.cyan
+                                font.pixelSize: 11
+                                elide: Text.ElideRight
+                            }
+                        }
+
+                        GohuText {
+                            width: parent.width
+                            text: "MANUAL TIME MARKERS // MEMORY ONLY"
+                            color: Colors.white
+                            font.pixelSize: 12
+                        }
+
+                        Row {
+                            id: machineMarkerRow
+                            width: parent.width
+                            height: 35
+                            spacing: 7
+
+                            TextField {
+                                id: machineMarkerInput
+                                width: Math.max(0, parent.width
+                                        - machineMarkButton.width
+                                        - machineMarkerRow.spacing)
+                                height: parent.height
+                                text: timew.machineMarkerDraft
+                                maximumLength: MachineTimelinePolicy.MAX_NAME_LENGTH
+                                placeholderText: "NAME THIS MOMENT"
+                                color: Colors.magenta
+                                placeholderTextColor: Colors.cyan
+                                selectionColor: Colors.magenta
+                                selectedTextColor: Colors.black
+                                font.family: "GohuFont 11 Nerd Font Mono"
+                                font.pixelSize: 12
+                                leftPadding: 8
+                                rightPadding: 8
+                                cursorDelegate: Rectangle {
+                                    width: 2
+                                    color: Colors.orange
+                                }
+                                background: Rectangle {
+                                    color: Colors.black
+                                    border.width: 1
+                                    border.color: machineMarkerInput.activeFocus
+                                                  ? Colors.magenta : Colors.cyan
+                                }
+                                onTextEdited: timew.machineMarkerDraft = text
+                                onAccepted: timew.addMachineMarker()
+                            }
+
+                            ActionButton {
+                                id: machineMarkButton
+                                width: 75
+                                height: parent.height
+                                label: "MARK"
+                                labelPixelSize: 11
+                                accentColor: timew.semanticColor
+                                available: timew.machineMarkers.length
+                                           < MachineTimelinePolicy.MAX_MARKERS
+                                onLeftClicked: timew.addMachineMarker()
+                            }
+                        }
+
+                        Row {
+                            width: parent.width
+                            height: 22
+                            GohuText {
+                                width: parent.width
+                                text: "MARKERS // " + timew.machineMarkers.length
+                                      + " / " + MachineTimelinePolicy.MAX_MARKERS
+                                color: Colors.cyan
+                                font.pixelSize: 11
+                            }
+                        }
+
+                        Item {
+                            id: machineMarkerArea
+                            width: parent.width
+                            height: 226
+
+                            ListView {
+                                id: machineMarkerList
+                                anchors {
+                                    top: parent.top
+                                    bottom: parent.bottom
+                                    left: parent.left
+                                    right: parent.right
+                                    margins: 3
+                                    rightMargin: machineMarkerRail.crossExtent + 6
+                                }
+                                model: timew.machineMarkers
+                                spacing: 4
+                                clip: true
+                                interactive: contentHeight > height
+                                boundsBehavior: Flickable.StopAtBounds
+
+                                delegate: Rectangle {
+                                    width: machineMarkerList.width
+                                    height: 52
+                                    color: Colors.black
+                                    border.width: 1
+                                    border.color: Colors.cyan
+
+                                    Row {
+                                        anchors.fill: parent
+                                        anchors.margins: 6
+                                        spacing: 5
+                                        Column {
+                                            width: Math.max(0, parent.width
+                                                    - removeMachineMarkerButton.width
+                                                    - parent.spacing)
+                                            spacing: 4
+                                            GohuText {
+                                                width: parent.width
+                                                text: "#" + modelData.id + " // " + modelData.label
+                                                color: Colors.white
+                                                font.pixelSize: 11
+                                                elide: Text.ElideRight
+                                            }
+                                            GohuText {
+                                                width: parent.width
+                                                text: modelData.utc
+                                                color: Colors.orange
+                                                font.pixelSize: 10
+                                                elide: Text.ElideRight
+                                            }
+                                        }
+                                        ActionButton {
+                                            id: removeMachineMarkerButton
+                                            width: 65
+                                            height: parent.height
+                                            label: "REMOVE"
+                                            labelPixelSize: 10
+                                            accentColor: timew.semanticColor
+                                            onLeftClicked:
+                                                timew.removeMachineMarker(modelData.id)
+                                        }
+                                    }
+                                }
+                            }
+
+                            NeonScrollBar {
+                                id: machineMarkerRail
+                                flickable: machineMarkerList
+                                accountForContentOrigin: true
+                                geometryMode: "viewport"
+                                x: machineMarkerArea.width - width - 3
+                                y: machineMarkerList.y
+                                height: machineMarkerList.height
+                                handleStyle: "star"
+                                railColor: Colors.cyan
+                                handleColor: Colors.magenta
+                                handleBorderColor: Colors.magenta
+                                railGlowColor: Colors.white
+                                containGlow: true
+                                visible: scrollable
+                            }
+
+                            GohuText {
+                                visible: timew.machineMarkers.length === 0
+                                anchors.centerIn: parent
+                                text: "NO MARKERS // NAME A MOMENT"
+                                color: Colors.white
+                                opacity: 0.72
+                                font.pixelSize: 11
+                            }
+                        }
+
+                        Rectangle {
+                            width: parent.width
+                            height: 2
+                            color: Colors.cyan
+                            opacity: 0.55
+                        }
+
+                        GohuText {
+                            width: parent.width
+                            text: "NO SCREENSHOTS OR RESTORATION ACTIVE"
+                            color: Colors.orange
+                            font.pixelSize: 11
+                        }
+                        GohuText {
+                            width: parent.width
+                            text: "MARKERS ARE TIMESTAMPS ONLY // LOST ON RESTART"
+                            color: Colors.white
+                            opacity: 0.74
+                            font.pixelSize: 10
+                            wrapMode: Text.Wrap
+                        }
                     }
 
                     GohuText {
@@ -3172,6 +3411,8 @@ PanelWindow {
                               ? "LOCAL + WORLD // LIVE // CALC HAS CONVERTER"
                               : timew.selectedMode === "calc"
                               ? "TIME ZONE CONVERTER // READ ONLY"
+                              : timew.selectedMode === "machine"
+                              ? "SESSION TIMELINE // MEMORY ONLY"
                               : "FOUNDATION PREVIEW // UI ONLY"
                         color: Colors.white
                         font.pixelSize: 11

@@ -436,7 +436,7 @@ assert "function moveNavigationCursor(direction)" in window
 assert "Layout.navigationTarget(tileGrid, selectedTileIndex," in window
 assert "const card = tileRepeater.itemAt(next);" in window
 assert "tileScroll.contentHeight - tileScroll.height" in window
-assert "tileScroll.contentY = Math.max(0, card.y - margin);" in window
+assert "tileScroll.contentY = Math.min(maxScroll, Math.max(0, card.y - margin));" in window
 assert "tileScroll.contentY = Math.min(maxScroll," in window
 assert "card.height + 2 * margin > tileScroll.height" in window
 assert "Math.min(maxScroll, Math.max(0, card.y - margin))" in window

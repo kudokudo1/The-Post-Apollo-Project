@@ -753,3 +753,35 @@ client to confirm the ledger and initial balance.
 local acceptance before considering actual financial activation. Do not
 interpret passing tests or merging this isolated writer as permission to
 create a real-money authorization marker.
+
+
+## FinanceW D17d // Staged funding UI (LOCKED BY DEFAULT)
+
+After merging, in **Finance → Budget → Budget → REVIEW FUNDING →
+GUIDED FUNDING SETUP → INCOME**, select an existing on-budget account,
+enter a month date, a positive amount, a real income category, and a
+description/payee. Use **PREVIEW SETUP → ARM SAVE → CONFIRM SAVE**.
+
+The UI constructs one single-use source/month/account/category-bound command
+and passes it over process stdin to the separately protected
+\`write_funding.mjs\` writer. The UI never provisions a permission file,
+changes Actual directly, or auto-retries. Missing funding authorization
+must produce **FUNDING WRITES LOCKED // OPERATOR ACTIVATION REQUIRED**,
+with no Actual mutation or durable transaction attempt. If the operation
+is uncertain or a nontrivial writer refusal is received, the interface
+requires independent Actual/journal recovery review and disables retry.
+
+Every source refresh, changed date/amount/account/category/description,
+or changed source/month invalidates the local preview and disarms approval.
+The writer independently validates and re-reads Actual before any mutation.
+
+The **OPENING BALANCE** tab is still **PREVIEW ONLY** for an existing
+account, and has no save operation. D17c can initialize a *new*
+account, but the D17a form does not create new accounts and its historical
+reference date is not a valid new-account initialization parameter.
+Do not silently connect this existing-account form to new-account creation.
+
+Local acceptance should test the confirmation/refusal sequence with
+\`funding-writes-enabled\` **absent** and avoid changing a real budget.
+A disposable fictional budget has already exercised D17c's guarded
+writer in CI. **Real funding activation is a separate operator decision.**

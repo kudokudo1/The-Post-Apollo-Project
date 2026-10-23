@@ -45,7 +45,7 @@ assert 'RECONCILE_EXISTING_ACCOUNT' in calc
 assert 'REVIEW_NEW_INCOME_ENTRY' in calc
 for content in (pane,calc):
     for forbidden in (
-      'Process {','saveRequested','writeFile(','addTransactions(',
+      'Process {','writeFile(','addTransactions(',
       'updateTransaction(','setBudgetAmount(','allocation-writes-enabled',
       'transaction-writes-enabled','createAccount(','Qt.openUrlExternally'
     ):

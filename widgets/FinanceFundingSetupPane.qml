@@ -14,6 +14,27 @@ Item {
     property string categoryId: ""
     property string dateText: ""
     property string amountText: ""
+    property string descriptionText: ""
+    property string writeState: "idle"
+    property string writeMessage: ""
+    property bool approvalArmed: false
+    property bool submitted: false
+    property string requestId: ""
+    signal saveRequested(var payload)
+    readonly property bool writePending: writeState === "pending"
+    readonly property bool writeUncertain: writeState === "uncertain"
+    readonly property bool incomeProposalEligible: !!proposal && proposal.ok
+        && proposal.mode === "income" && proposal.writeAllowed === false
+        && !!snapshot && snapshot.sourceKey === anchoredSource
+        && snapshot.month === anchoredMonth
+        && proposal.sourceKey === snapshot.sourceKey
+        && proposal.month === snapshot.month
+        && proposal.accountId === accountId
+        && proposal.categoryId === categoryId
+        && proposal.date === dateText
+        && FundingRules.parseFundingAmountCents(amountText) === proposal.amountCents
+        && descriptionText.trim().length > 0
+        && descriptionText.trim().length <= 120
     property var proposal: null
     property string errorText: ""
     readonly property var selectedAccount: {
@@ -32,6 +53,7 @@ Item {
     visible: expanded
 
     function clear() {
+        if(writePending || writeUncertain)return false;
         expanded=false;
         anchoredSource="";
         anchoredMonth="";
@@ -40,11 +62,22 @@ Item {
         categoryId="";
         dateText="";
         amountText="";
+        descriptionText="";
         proposal=null;
         errorText="";
+        approvalArmed=false;
+        submitted=false;
+        requestId="";
+        return true;
+    }
+    function newRequestId() {
+        let result="";
+        for(let i=0;i<32;i++)
+            result+=Math.floor(Math.random()*16).toString(16);
+        return result;
     }
     function begin() {
-        if(!snapshot || snapshot.readOnly!==true
+        if(writePending || writeUncertain || !snapshot || snapshot.readOnly!==true
                 || snapshot.source!=="actual-budget"
                 || !/^[a-f0-9]{64}$/.test(snapshot.sourceKey||""))
             return false;
@@ -55,22 +88,34 @@ Item {
         return true;
     }
     function chooseMode(nextMode) {
-        if(!expanded || (nextMode!=="opening" && nextMode!=="income"))
+        if(writePending || writeUncertain || !expanded
+                || (nextMode!=="opening" && nextMode!=="income"))
             return false;
         setupMode=nextMode;
         accountId="";
         categoryId="";
         dateText="";
         amountText="";
+        descriptionText="";
         proposal=null;
+        approvalArmed=false;
+        submitted=false;
+        requestId="";
         errorText="";
         return true;
     }
-    function calculate() {
+    function invalidatePreview() {
         proposal=null;
+        approvalArmed=false;
+        requestId="";
+        // Submitted requests cannot be undone by changing local fields.
+    }
+    function calculate() {
+        if(writePending || writeUncertain || submitted)return false;
+        invalidatePreview();
         if(!expanded || !snapshot
                 || snapshot.sourceKey!==anchoredSource
-                || snapshot.month!==anchoredMonth) {
+                || snapshot.month!==anchoredMonth){
             errorText="SOURCE CHANGED // OPEN GUIDED SETUP AGAIN";
             return false;
         }
@@ -82,22 +127,44 @@ Item {
         }
         errorText="";
         proposal=next;
+        if(next.mode==="income")requestId=newRequestId();
+        return true;
+    }
+    function requestSave() {
+        if(!expanded || !incomeProposalEligible || !approvalArmed
+                || submitted || writePending || writeUncertain || !requestId)
+            return false;
+        submitted=true;
+        approvalArmed=false;
+        saveRequested({
+            mode:"income",requestId:requestId,
+            sourceKey:proposal.sourceKey,accountId:proposal.accountId,
+            month:proposal.month,date:proposal.date,
+            amountCents:proposal.amountCents,categoryId:proposal.categoryId,
+            description:descriptionText.trim()
+        });
         return true;
     }
     onSnapshotChanged: {
         if(!expanded)return;
         if(!snapshot || snapshot.sourceKey!==anchoredSource
-                || snapshot.month!==anchoredMonth){
-            clear();
-        }else{
-            proposal=null;
+                || snapshot.month!==anchoredMonth) {
+            if(!writePending && !writeUncertain)clear();
+            else invalidatePreview();
+        } else {
+            invalidatePreview();
             errorText="SOURCE REFRESHED // PREVIEW AGAIN BEFORE CONTINUING";
         }
     }
-    onAccountIdChanged: proposal=null
-    onCategoryIdChanged: proposal=null
-    onDateTextChanged: proposal=null
-    onAmountTextChanged: proposal=null
+    onAccountIdChanged: invalidatePreview()
+    onCategoryIdChanged: invalidatePreview()
+    onDateTextChanged: invalidatePreview()
+    onAmountTextChanged: invalidatePreview()
+    onDescriptionTextChanged: invalidatePreview()
+    onWriteStateChanged: {
+        if(writeState==="uncertain" || writeState==="committed")
+            approvalArmed=false;
+    }
 
     Rectangle {
         anchors.fill: parent
@@ -262,6 +329,32 @@ Item {
         }
         GohuText {
             width: parent.width
+            visible: setup.setupMode==="income"
+            text: "DESCRIPTION / PAYEE // REQUIRED FOR NEW INCOME"
+            font.pixelSize: 9
+            color: Colors.cyan
+            textFormat: Text.PlainText
+            wrapMode: Text.WordWrap
+        }
+        Rectangle {
+            width: parent.width
+            height: 29
+            visible: setup.setupMode==="income"
+            color: Colors.dark
+            border.color: Colors.cyan
+            TextInput {
+                anchors.fill: parent
+                anchors.margins: 6
+                text: setup.descriptionText
+                readOnly: setup.writePending || setup.writeUncertain || setup.submitted
+                color: Colors.white
+                font.pixelSize: 11
+                selectByMouse: true
+                onTextEdited: setup.descriptionText=text
+            }
+        }
+        GohuText {
+            width: parent.width
             visible: setup.setupMode==="income" && setup.categoryOptions.length===0
             text: "NO COMPLETE INCOME CATEGORY LIST // REVIEW IN ACTUAL"
             font.pixelSize: 9
@@ -277,6 +370,7 @@ Item {
             accentColor: Colors.cyan
             trackLabelGlowLocally: true
             available: !!setup.setupMode && !!setup.selectedAccount
+                       && !setup.writePending && !setup.writeUncertain && !setup.submitted
             onLeftClicked: setup.calculate()
         }
         GohuText {
@@ -321,9 +415,40 @@ Item {
                 wrapMode: Text.WordWrap
             }
         }
+        ActionButton {
+            width: parent.width
+            height: 29
+            visible: setup.setupMode==="income"
+            label: setup.submitted ? "REQUEST SUBMITTED"
+                : setup.approvalArmed ? "CONFIRM SAVE" : "ARM SAVE"
+            labelPixelSize: 10
+            accentColor: setup.approvalArmed ? Colors.magenta : Colors.orange
+            trackLabelGlowLocally: true
+            available: setup.incomeProposalEligible && !setup.submitted
+                       && !setup.writePending && !setup.writeUncertain
+            onLeftClicked: {
+                if(setup.approvalArmed)
+                    setup.requestSave();
+                else
+                    setup.approvalArmed=true;
+            }
+        }
         GohuText {
             width: parent.width
-            text: "NO SAVE / NO WRITES // CHECK EXISTING RECORDS IN ACTUAL"
+            visible: setup.setupMode==="income"
+            text: setup.writeMessage
+            font.pixelSize: 9
+            color: Colors.orange
+            textFormat: Text.PlainText
+            wrapMode: Text.WordWrap
+        }
+        GohuText {
+            width: parent.width
+            text: setup.setupMode==="opening"
+                ? "OPENING BALANCE // NO SAVE / NO WRITES // EXISTING ACCOUNT REQUIRES RECONCILIATION"
+                : setup.approvalArmed
+                ? "NEXT STEP MAY CHANGE ACTUAL IF SEPARATELY AUTHORIZED"
+                : "FUNDING PREVIEW SAFE // SAVE REQUIRES SEPARATE OPERATOR PERMISSION"
             font.pixelSize: 9
             color: Colors.orange
             textFormat: Text.PlainText
@@ -336,6 +461,7 @@ Item {
             labelPixelSize: 9
             accentColor: Colors.orange
             trackLabelGlowLocally: true
+            available: !setup.writePending && !setup.writeUncertain
             onLeftClicked: setup.clear()
         }
     }

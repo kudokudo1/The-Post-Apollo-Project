@@ -144,3 +144,17 @@ Live operator acceptance is not implied by source tests.
 - M5 TODAY continues to use the unchanged task due-date snapshot. Apollo Hub task editing preserves project assignment on rename/complete/delete, all through the existing store.
 - On-device acceptance needed: v2→v3 read/restart, actual creation, assignment/reassignment, clear, preservation after restart, no data loss on disk failure, and cross-view consistency with Apollo Hub. CI alone is not runtime approval.
 
+
+## TASKS M7 // Local Project management (2026-10-22)
+
+**Status:** GitHub draft development; automated and live acceptance are separate.
+Scope is deliberately local: no GitHub Projects sync or external action.
+
+- Renaming a project changes its name and update time, **never the stable `pN` ID**. Tasks retain their project links, IDs, priorities, descriptions, and due dates.
+- Rename rejects invalid names (empty, control characters, longer than 64) and collisions regardless of lettercase; editing a name requires deliberate RENAME. RESET abandons an uncommitted name. Changing project selection while a rename is dirty is blocked.
+- DEL PROJECT presents a separate YES / NO confirmation. **NO performs no mutation**. YES invokes the existing singleton's guarded `deleteProject(id, true)` operation.
+- Confirmed project deletion removes only its catalog entry. Existing member tasks are atomically **detached to `projectId:null`**, retaining all other task data and stable task IDs. The project ID sequence remains monotonic and is never reused.
+- During either mutation, the PROJECTS controls stay read-only while `saving`; success is announced only when the shared snapshot confirms the result. Errors keep the rename input intact and leave the last confirmed project/task state unchanged.
+- No new FileView or storage path; task data retains version 3. No background cleanup, implicit deletion, or automatic GitHub mutation.
+- Verification needs an operator's on-device project rename, rename cancellation, DEL → NO, DEL → YES with existing tasks, restart/reload persistence, Hub consistency and simulated save failures.
+

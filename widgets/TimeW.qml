@@ -149,13 +149,20 @@ PanelWindow {
         activeConverterDropdown = "";
         converterSourcePicker.dropFocus();
         converterTargetPicker.dropFocus();
+        mathZonePicker.dropFocus();
         Qt.callLater(restoreKeyboardFocus);
     }
 
     function openConverterDropdown(which) {
         if (!menuOpen || selectedMode !== "calc")
             return;
-        if (which !== "source" && which !== "target")
+        if (which !== "source" && which !== "target" && which !== "math")
+            return;
+        // CONVERT has independent FROM/TO selectors; MATH shares FROM's
+        // selected zone but has its own popup and keyboard focus.
+        if (which === "math" && calcView !== "math")
+            return;
+        if (which !== "math" && calcView !== "convert")
             return;
         activeConverterDropdown = which;
         loadWorldZoneCatalog();
@@ -173,7 +180,7 @@ PanelWindow {
         // belong to the trusted catalog from timedatectl.
         if (!WorldZoneSearch.contains(worldZoneCatalog, zoneId))
             return;
-        if (which === "source")
+        if (which === "source" || which === "math")
             converterSourceZone = zoneId;
         else if (which === "target")
             converterTargetZone = zoneId;
@@ -274,6 +281,7 @@ PanelWindow {
         standardKeysAvailable && !worldSearchInput.activeFocus
         && !converterSourcePicker.searchFocused
         && !converterTargetPicker.searchFocused
+        && !mathZonePicker.searchFocused
         && !converterDateInput.activeFocus && !converterTimeInput.activeFocus
     property string worldLookupZone: ""
     property string worldValidZone: ""
@@ -698,6 +706,7 @@ PanelWindow {
                      || timew.activeConverterDropdown !== ""
                      || converterSourcePicker.searchFocused
                      || converterTargetPicker.searchFocused
+                     || mathZonePicker.searchFocused
             gesturePolicy: TapHandler.DragThreshold
             onTapped: function(point, button) {
                 if (button !== Qt.LeftButton)
@@ -719,12 +728,20 @@ PanelWindow {
                     if (!withinSearch && !withinPopup)
                         timew.dismissWorldSearchPopup();
                 } else if (timew.selectedMode === "calc") {
-                    const inSource = converterSourcePicker.containsFramePoint(
-                                         timewFrame, px, py);
-                    const inTarget = converterTargetPicker.containsFramePoint(
-                                         timewFrame, px, py);
-                    if (!inSource && !inTarget)
-                        timew.closeConverterDropdowns();
+                    // Only inspect the active CALC subview; the two CONVERT
+                    // pickers remain instantiated while MATH is visible.
+                    // Testing hidden pickers would incorrectly keep menus open.
+                    if (timew.calcView === "math") {
+                        if (!mathZonePicker.containsFramePoint(timewFrame, px, py))
+                            timew.closeConverterDropdowns();
+                    } else {
+                        const inSource = converterSourcePicker.containsFramePoint(
+                                             timewFrame, px, py);
+                        const inTarget = converterTargetPicker.containsFramePoint(
+                                             timewFrame, px, py);
+                        if (!inSource && !inTarget)
+                            timew.closeConverterDropdowns();
+                    }
                 }
             }
         }
@@ -1531,6 +1548,8 @@ PanelWindow {
                     Column {
                         id: mathPane
                         visible: timew.selectedMode === "calc" && timew.calcView === "math"
+                        // Keep the list above date/duration controls and footer.
+                        z: timew.activeConverterDropdown === "math" ? 20 : 0
                         width: parent.width
                         spacing: 10
 
@@ -1543,8 +1562,9 @@ PanelWindow {
                         Row {
                             id: mathZoneRow
                             width: parent.width
-                            height: 32
+                            height: 34
                             spacing: 6
+                            z: 30
                             GohuText {
                                 width: 50
                                 height: parent.height
@@ -1561,14 +1581,23 @@ PanelWindow {
                                 accentColor: Colors.white
                                 onLeftClicked: timew.cycleConverterZone("source")
                             }
-                            GohuText {
-                                width: parent.width - 50 - 67 - 12
-                                height: parent.height
-                                verticalAlignment: Text.AlignVCenter
-                                text: timew.converterSourceZone
-                                elide: Text.ElideRight
-                                color: Colors.white
-                                font.pixelSize: 11
+                            TimeZonePicker {
+                                id: mathZonePicker
+                                width: Math.max(0, mathZoneRow.width
+                                                - 50 - 67
+                                                - mathZoneRow.spacing * 2)
+                                height: mathZoneRow.height
+                                selectedZone: timew.converterSourceZone
+                                catalog: timew.worldZoneCatalog
+                                countryIndex: timew.worldCountryIndex
+                                catalogLoading: timew.worldCatalogLoading
+                                catalogFailed: timew.worldCatalogFailed
+                                expanded: timew.activeConverterDropdown === "math"
+                                onOpenRequested: timew.openConverterDropdown("math")
+                                onToggleRequested: timew.toggleConverterDropdown("math")
+                                onZoneChosen: function(zoneId) {
+                                    timew.chooseConverterSearchZone("math", zoneId);
+                                }
                             }
                         }
 

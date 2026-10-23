@@ -153,12 +153,53 @@ class RadioRelayTests(unittest.TestCase):
             with urlopen(endpoint, timeout=2) as response:
                 self.assertEqual(response.read(), b"example mp3 bytes")
             self.assertEqual(opened, [URL_A])
+            evidence = relay.health(endpoint)
+            self.assertEqual(evidence["state"], "ended")
+            self.assertEqual(evidence["bytesReceived"], len(b"example mp3 bytes"))
+            self.assertIsNone(evidence["errorCode"])
+            self.assertNotIn("token", str(evidence).lower())
+            self.assertNotIn("example.net", str(evidence))
             with self.assertRaises(Exception):
                 urlopen(endpoint + "?redirect=http://127.0.0.1/", timeout=2)
             self.assertFalse(relay.owns(endpoint.replace("127.0.0.1", "localhost")))
         finally:
             relay.close()
         self.assertFalse(relay.owns(endpoint))
+
+    def test_relay_records_failed_connection_without_leaking_origin(self):
+        def failing(uri):
+            raise MediaBackendError("STREAM_DNS_BLOCKED", "private destination")
+        relay = RadioStreamRelay(opener=failing)
+        try:
+            endpoint = relay.register(URL_A)
+            from urllib.error import HTTPError
+            from urllib.request import urlopen
+            with self.assertRaises(HTTPError) as err:
+                urlopen(endpoint, timeout=2)
+            self.assertEqual(err.exception.code, 502)
+            observed = relay.health(endpoint)
+            self.assertEqual(observed["state"], "failed")
+            self.assertEqual(observed["errorCode"], "STREAM_DNS_BLOCKED")
+            self.assertEqual(observed["bytesReceived"], 0)
+            self.assertNotIn(URL_A, str(observed))
+        finally:
+            relay.close()
+        self.assertIsNone(relay.health(endpoint))
+
+    def test_empty_stream_has_explicit_status(self):
+        class Noop:
+            def close(self):
+                pass
+        relay = RadioStreamRelay(opener=lambda uri: (Noop(), StubResponse(content=b"")))
+        try:
+            endpoint = relay.register(URL_A)
+            from urllib.request import urlopen
+            with urlopen(endpoint, timeout=2) as response:
+                self.assertEqual(response.read(), b"")
+            self.assertEqual(relay.health(endpoint)["errorCode"], "STREAM_EMPTY")
+            self.assertEqual(relay.health(endpoint)["state"], "empty")
+        finally:
+            relay.close()
 
     def test_mpd_requires_active_registered_loopback_capability(self):
         backend = MpdBackend()

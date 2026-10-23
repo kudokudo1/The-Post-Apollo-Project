@@ -52,7 +52,8 @@ PanelWindow {
     readonly property string feedStatus:
         activeMode.id === "sync" ? "PREVIEW"
         : activeMode.id !== "tasks" && activeMode.id !== "today"
-        && activeMode.id !== "projects" ? "NO FEED"
+        && activeMode.id !== "projects"
+        && activeMode.id !== "planner" ? "NO FEED"
         : taskStoreState === "ready" || taskStoreState === "empty" ? "LOCAL"
         : taskStoreState === "saving" ? "SAVING"
         : taskStoreState === "loading" ? "READING"
@@ -262,6 +263,7 @@ PanelWindow {
             Column {
                 visible: root.activeMode.id !== "tasks" && root.activeMode.id !== "today"
                          && root.activeMode.id !== "projects"
+                         && root.activeMode.id !== "planner"
                          && root.activeMode.id !== "sync"
                 anchors.centerIn: parent
                 width: parent.width
@@ -335,6 +337,19 @@ PanelWindow {
                 anchors.fill: parent
                 visible: root.menuOpen && root.activeMode.id === "projects"
                 todoStore: ApolloHubTodoStore
+                todoSnapshot: ApolloHubTodoStore.snapshot
+                onOpenTaskRequested: function(taskId) {
+                    root.selectMainMode(0);
+                    taskDetails.chooseTask(taskId);
+                }
+            }
+
+            // PLANNER M3 is a read-only local calendar over the existing Hub
+            // task snapshot. OPEN reuses TASKS details, without new persistence.
+            TaskPlannerPane {
+                id: taskPlanner
+                anchors.fill: parent
+                visible: root.menuOpen && root.activeMode.id === "planner"
                 todoSnapshot: ApolloHubTodoStore.snapshot
                 onOpenTaskRequested: function(taskId) {
                     root.selectMainMode(0);

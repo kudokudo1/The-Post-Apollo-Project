@@ -240,7 +240,7 @@ assert 'enabled: timew.navigationKeysAvailable' in window
 assert 'WORLD // SELECT A SEARCH RESULT' in window
 assert '"ZONE DIRECTORY UNAVAILABLE"' in window
 # CLOCK WORLD search + CONVERT date/time + MATH date/time/duration fields.
-assert window.count('onTextEdited:') == 13
+assert window.count('onTextEdited:') == 14
 # No dynamic command composition or arbitrary typed TZ values.
 assert 'command: ["date", "+%z"]' in window
 assert 'worldLookup.exec({' in window
@@ -584,8 +584,8 @@ assert 'function sample(accumulatedMs, segmentMs)' in stopwatch_policy
 assert 'function appendLap(existing, totalMs, previousLapMs, sequence)' in stopwatch_policy
 assert 'return next.slice(0, MAX_LAPS);' in stopwatch_policy
 
-# TOOLS COUNTDOWN reuses the monotonic stopwatch pattern but has an
-# independent ElapsedTimer and a heartbeat that remains active when hidden.
+# TOOLS countdown now owns a bounded collection of independent named
+# timers, sharing one monotonic elapsed timeline and one heartbeat.
 countdown_policy = (ROOT / "services/time/CountdownPolicy.js").read_text(encoding="utf-8")
 assert 'import "../services/time/CountdownPolicy.js" as CountdownPolicy' in window
 assert 'property string toolsView: "stopwatch"' in window
@@ -597,51 +597,75 @@ assert 'selected: timew.toolsView === "countdown"' in window
 assert 'timew.toolsView = "countdown";' in window
 assert 'timew.toolsView = "stopwatch";' in window
 assert 'id: countdownAnchor' in window
+assert 'Component.onCompleted: restart()' in window
 assert 'id: countdownHeartbeat' in window
-assert 'timew.countdownRunning' in window
-assert 'running: timew.countdownRunning' in window
-assert 'onTriggered: timew.refreshCountdown()' in window
+assert 'running: timew.countdownRunningCount > 0' in window
+assert 'onTriggered: timew.refreshCountdowns()' in window
 assert '&& timew.toolsView === "countdown" ? 100 : 1000' in window
 assert 'id: stopwatchDisplayTimer' in window
 assert '&& timew.toolsView === "stopwatch"' in window
-assert 'property bool countdownRunning: false' in window
-assert 'property bool countdownStarted: false' in window
-assert 'property bool countdownFinished: false' in window
-assert 'property real countdownRemainingMs: 0' in window
-assert 'readonly property var countdownParsed:' in window
-assert 'CountdownPolicy.parseDuration(countdownHours,' in window
-assert 'CountdownPolicy.remaining(' in window
-assert 'countdownAnchor.elapsed() * 1000' in window
-assert 'countdownAnchor.restart();' in window
-for method in ('refreshCountdown', 'startCountdown', 'pauseCountdown',
-               'resetCountdown'):
+assert 'property var countdownTimers: [CountdownPolicy.createTimer(1)]' in window
+assert 'property int countdownNextId: 2' in window
+assert 'property int selectedCountdownId: 1' in window
+assert 'readonly property var selectedCountdown:' in window
+assert 'readonly property int countdownRunningCount:' in window
+assert 'CountdownPolicy.byId(countdownTimers, selectedCountdownId)' in window
+assert 'CountdownPolicy.runningCount(countdownTimers)' in window
+assert 'CountdownPolicy.tick(countdownTimers, countdownNowMs())' in window
+assert 'return countdownAnchor.elapsed() * 1000' in window
+for method in ('countdownNowMs', 'refreshCountdowns', 'createCountdown',
+               'startCountdown', 'pauseCountdown', 'resetCountdown',
+               'removeCountdown'):
     assert 'function ' + method + '()' in window
-assert 'countdownFinished = true;' in window
-assert 'countdownSegmentBudgetMs = countdownRemainingMs;' in window
+assert 'function selectCountdown(id)' in window
+assert 'function editCountdown(field, value)' in window
+assert 'timer.status !== "ready"' in window
+assert 'countdownTimers.length >= CountdownPolicy.MAX_TIMERS' in window
+assert 'countdownTimers.length <= 1' in window
+assert 'selectedCountdownId = countdownTimers[0].id' in window
+assert 'CountdownPolicy.act(' in window
+assert 'countdownTimers = countdownTimers.concat([newTimer])' in window
 assert 'id: countdownPane' in window
+assert 'id: countdownTimerList' in window
+assert 'id: countdownListRail' in window
+assert 'flickable: countdownTimerList' in window
+assert 'x: countdownListArea.width - width - 3' in window
+assert 'rightMargin: countdownListRail.crossExtent + 6' in window
+assert 'handleColor: Colors.magenta' in window
+assert 'id: newCountdownButton' in window
+assert 'id: countdownNameField' in window
 assert 'id: countdownHoursField' in window
 assert 'id: countdownMinutesField' in window
 assert 'id: countdownSecondsField' in window
-assert 'readOnly: timew.countdownStarted' in window
+assert 'readOnly: timew.selectedCountdown.status !== "ready"' in window
 assert 'id: countdownRunButton' in window
 assert 'id: countdownResetButton' in window
-assert '"PAUSE"' in window and '"RESUME"' in window
-assert '"RESTART"' in window and '"START"' in window
+assert 'id: countdownRemoveButton' in window
+assert 'onLeftClicked: timew.createCountdown()' in window
 assert 'onLeftClicked: timew.resetCountdown()' in window
+assert 'onLeftClicked: timew.removeCountdown()' in window
 assert 'timew.pauseCountdown();' in window
 assert 'timew.startCountdown();' in window
-assert 'CountdownPolicy.format(' in window
-assert 'COUNTDOWN // FINISHED' in window
+assert 'STATUS // ' in window
+assert 'MAX 8 TIMERS // MONOTONIC // SESSION ONLY' in window
 assert 'NO AUDIO OR DESKTOP NOTIFICATION // INITIAL SLICE' in window
-assert 'RESTARTING QUICKSHELL RESETS IT.' in window
+assert 'countdownNameField.activeFocus' in window
+assert 'countdownHoursField.activeFocus' in window
+assert 'countdownMinutesField.activeFocus' in window
+assert 'countdownSecondsField.activeFocus' in window
+assert 'var MAX_TIMERS = 8;' in countdown_policy
+assert 'var MAX_NAME_LENGTH = 32;' in countdown_policy
 assert 'function parseDuration(hours, minutes, seconds)' in countdown_policy
 assert 'function remaining(segmentBudgetMs, segmentElapsedMs)' in countdown_policy
+assert 'function createTimer(id)' in countdown_policy
+assert 'function tick(entries, nowMs)' in countdown_policy
+assert 'function act(entries, id, action, nowMs)' in countdown_policy
 assert 'function format(milliseconds)' in countdown_policy
-assert 'var MAX_HOURS = 99;' in countdown_policy
-# No notifier side effects, network calls or persistent files were added.
+# No notifier side effects, wall-clock queries or new background processes.
 assert window.count("SystemClock {") == 1
 assert window.count("ElapsedTimer {") == 2
 assert window.count("\n    Timer {") == 3
+assert 'property bool countdownStarted: false' not in window
 
 # Universal visual language remains: magenta header, cyan divider, borderless modes.
 assert 'text: "TIME // W"' in window

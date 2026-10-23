@@ -432,8 +432,11 @@ PanelWindow {
             return;
         const margin = tileFlow.spacing;
         const maxScroll = Math.max(0, tileScroll.contentHeight - tileScroll.height);
-        if (card.y < tileScroll.contentY + margin)
-            tileScroll.contentY = Math.max(0, card.y - margin);
+        // A H:3 card may be taller than this viewport. Favor its header
+        // rather than scrolling directly to the bottom of the card.
+        if (card.height + 2 * margin > tileScroll.height
+                || card.y < tileScroll.contentY + margin)
+            tileScroll.contentY = Math.min(maxScroll, Math.max(0, card.y - margin));
         else if (card.y + card.height > tileScroll.contentY + tileScroll.height - margin)
             tileScroll.contentY = Math.min(maxScroll,
                 card.y + card.height - tileScroll.height + margin);

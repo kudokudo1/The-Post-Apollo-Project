@@ -16,7 +16,7 @@ for forbidden in ("textContent", "innerHTML", "outerHTML", "localStorage",
                   ".click(", "mailboxAccess: true", "canMutate: true"):
     assert forbidden not in probe, f"Forbidden in page probe: {forbidden}"
 assert "document.querySelectorAll" in probe
-assert '"PROTON_READINESS_V3"' in probe
+assert '"PROTON_READINESS_V4"' in probe
 assert "messageIdentityVerified: false" in probe
 assert "canMutate: false" in probe
 assert "querySelectorAll" not in background
@@ -35,11 +35,24 @@ const button=(aria,title,disabled=false,ariaDisabled=false,testid=null)=>({
     return null;
   }
 });
-function runProbe(origin,buttons=[],checked=0){
+function mailRow(checkboxID, rowID) {
+  return {
+    getAttribute(name){return name==="data-item-id"?checkboxID:null;},
+    closest(selector){
+      assert.strictEqual(selector,"[data-element-id]");
+      return rowID===null?null:{
+        getAttribute(name){return name==="data-element-id"?rowID:null;}
+      };
+    }
+  };
+}
+function runProbe(origin,buttons=[],checked=0,mailRows=[]){
   const scope={location:{origin},document:{querySelectorAll(query){
     if(query==="button, [role='button']")return buttons;
     assert.strictEqual(query,
       "input[type='checkbox']:checked, [role='checkbox'][aria-checked='true']");
+    if(query==="input[type='checkbox'][data-testid='item-checkbox']:checked")
+      return mailRows;
     return Array.from({length:checked},()=>({}));
   }}};
   return JSON.parse(JSON.stringify(vm.runInNewContext(probe,scope)));
@@ -49,21 +62,23 @@ const expectedKeys=[
  "exactReadEnabled","exactReadDisabled","otherReadLabels",
  "unlabeledControls","checkedControls","messageIdentityVerified","canMutate",
  "toolbarReadEnabled","toolbarReadDisabled","toolbarUnreadEnabled",
- "toolbarUnreadDisabled"
+ "toolbarUnreadDisabled","selectedMailRows","selectedRowStructureOk"
 ].sort();
 function checkPrivacy(result){
  assert.deepStrictEqual(Object.keys(result).sort(),expectedKeys);
- assert.strictEqual(result.kind,"PROTON_READINESS_V3");
+ assert.strictEqual(result.kind,"PROTON_READINESS_V4");
  assert.strictEqual(result.messageIdentityVerified,false);
  assert.strictEqual(result.canMutate,false);
+ assert.strictEqual(typeof result.selectedRowStructureOk,"boolean");
  for(const value of Object.values(result))assert.ok(
-  typeof value==="boolean"||typeof value==="number"||value==="PROTON_READINESS_V3");
+  typeof value==="boolean"||typeof value==="number"||value==="PROTON_READINESS_V4");
 }
 let r=runProbe("https://evil.test",[button("Mark as read","")],3);
 checkPrivacy(r);
 assert.strictEqual(r.originOk,false);
 assert.strictEqual(r.exactReadEnabled,0);
 assert.strictEqual(r.toolbarReadEnabled,0);
+assert.strictEqual(r.selectedMailRows,0);
 r=runProbe("https://mail.proton.me");
 checkPrivacy(r);
 assert.strictEqual(r.inspectedControls,0);
@@ -89,6 +104,27 @@ assert.strictEqual(r.exactReadDisabled,2);
 assert.strictEqual(r.otherReadLabels,2);
 assert.strictEqual(r.unlabeledControls,5);
 assert.strictEqual(r.checkedControls,2);
+assert.strictEqual(r.selectedMailRows,0);
+assert.strictEqual(r.selectedRowStructureOk,false);
+// Page-level checkbox count is NOT the number of mail rows. Only matching
+// native checked item-checkboxes under their owning data-element-id qualify.
+r=runProbe("https://mail.proton.me",[],3,[mailRow("opaque-row-1","opaque-row-1")]);
+checkPrivacy(r);
+assert.strictEqual(r.checkedControls,3);
+assert.strictEqual(r.selectedMailRows,1);
+assert.strictEqual(r.selectedRowStructureOk,true);
+r=runProbe("https://mail.proton.me",[],2,[mailRow("row-a","row-b")]);
+assert.strictEqual(r.selectedMailRows,1);
+assert.strictEqual(r.selectedRowStructureOk,false);
+r=runProbe("https://mail.proton.me",[],2,[
+  mailRow("row-a","row-a"),mailRow("row-b","row-b")]);
+assert.strictEqual(r.selectedMailRows,2);
+assert.strictEqual(r.selectedRowStructureOk,false);
+r=runProbe("https://mail.proton.me",[],2,[mailRow("","")]);
+assert.strictEqual(r.selectedRowStructureOk,false);
+r=runProbe("https://mail.proton.me",[],2,[mailRow("row-a",null)]);
+assert.strictEqual(r.selectedRowStructureOk,false);
+
 r=runProbe("https://mail.proton.me",[
  button("  MARK  AS  READ ",""),button("","Mark as read"),
  button("Mark as read on Message 123","")
@@ -137,10 +173,13 @@ async function runBackground(family,validTab=true,nativeError=false,counts){
  await Promise.resolve();await Promise.resolve();await Promise.resolve();
  assert.strictEqual(calls.probe,validTab?1:0);
  assert.strictEqual(calls.native,validTab?1:0);
- assert.ok(!log.some(s=>s.includes("PRIVATE")||s.includes("Message 123")));
+ assert.ok(!log.some(s=>s.includes("PRIVATE")||s.includes("Message 123")
+   ||s.includes("secret-private-id")));
  if(validTab){
    assert.ok(log.some(s=>s.includes("exactEnabled="+result.exactReadEnabled)));
    assert.ok(log.some(s=>s.includes("checkedControls="+result.checkedControls)));
+   assert.ok(log.some(s=>s.includes("selectedMailRows="+result.selectedMailRows)));
+   assert.ok(log.some(s=>s.includes("selectedRowStructureOk="+result.selectedRowStructureOk)));
    assert.ok(log.some(s=>s.includes("toolbarReadEnabled="+result.toolbarReadEnabled)));
    assert.ok(log.some(s=>s.includes("toolbarUnreadEnabled="+result.toolbarUnreadEnabled)));
    assert.ok(log.some(s=>s.includes("identity NOT verified")));
@@ -152,6 +191,8 @@ async function runBackground(family,validTab=true,nativeError=false,counts){
    await runBackground(browser,true,true);
    await runBackground(browser,false);
    await runBackground(browser,true,false,runProbe("https://mail.proton.me"));
+   await runBackground(browser,true,false,runProbe(
+     "https://mail.proton.me",[],3,[mailRow("secret-private-id","secret-private-id")]));
  }
  console.log("Proton private UI counts and shared browser mocks: PASS");
 })().catch(e=>{console.error(e);process.exit(1)});

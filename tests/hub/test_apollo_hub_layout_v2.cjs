@@ -547,4 +547,94 @@ for(const bad of [null,undefined,{},42,"",Array(9).fill(sparse[0]),
     assert.equal(layout.packTiles(bad).items.length,0);
 }
 
+// P1 Stage 7: spatial navigation follows actual packed rectangles,
+// not the saved array offsets. It must never alter the original document.
+const navBase = layout.defaultLayout();
+const navSaved = JSON.stringify(navBase);
+const navPlain = layout.packTiles(navBase.modes[0].subModes[0].tiles);
+assert.equal(layout.navigationTarget(navPlain,0,"right"),1);
+assert.equal(layout.navigationTarget(navPlain,0,"down"),2);
+assert.equal(layout.navigationTarget(navPlain,0,"left"),0);
+assert.equal(layout.navigationTarget(navPlain,0,"up"),0);
+assert.equal(layout.navigationTarget(navPlain,1,"left"),0);
+assert.equal(layout.navigationTarget(navPlain,1,"down"),3);
+assert.equal(layout.navigationTarget(navPlain,2,"right"),3);
+assert.equal(layout.navigationTarget(navPlain,2,"up"),0);
+assert.equal(layout.navigationTarget(navPlain,5,"down"),5);
+const navTallGrid=layout.packTiles(
+    layout.resizeTile(navBase,0,0,0,"half",3).modes[0].subModes[0].tiles);
+assert.equal(layout.navigationTarget(navTallGrid,0,"right"),2);
+assert.equal(layout.navigationTarget(navTallGrid,0,"down"),4);
+assert.equal(layout.navigationTarget(navTallGrid,1,"left"),0);
+assert.equal(layout.navigationTarget(navTallGrid,2,"left"),0);
+assert.equal(layout.navigationTarget(navTallGrid,3,"left"),0);
+assert.equal(layout.navigationTarget(navTallGrid,3,"down"),5);
+assert.equal(layout.navigationTarget(navTallGrid,4,"up"),0);
+assert.equal(layout.navigationTarget(navTallGrid,4,"right"),5);
+const navWide=layout.packTiles(navBase.modes[1].subModes[0].tiles);
+assert.equal(layout.navigationTarget(navWide,0,"right"),0);
+assert.equal(layout.navigationTarget(navWide,0,"left"),0);
+assert.equal(layout.navigationTarget(navWide,0,"down"),1);
+assert.equal(layout.navigationTarget(navWide,1,"right"),2);
+assert.equal(layout.navigationTarget(navWide,1,"up"),0);
+assert.equal(JSON.stringify(navBase),navSaved);
+assert.deepEqual(toPlain(layout.packTiles(navBase.modes[0].subModes[0].tiles)),
+                 toPlain(navPlain));
+
+// When a wide tile is below a tall half-width tile, arrows must only
+// move into cards that really lie beyond the appropriate outer edge.
+assert.equal(layout.navigationTarget(sparseGrid,0,"right"),2);
+assert.equal(layout.navigationTarget(sparseGrid,0,"down"),1);
+assert.equal(layout.navigationTarget(sparseGrid,1,"up"),0);
+assert.equal(layout.navigationTarget(sparseGrid,2,"down"),3);
+assert.equal(layout.navigationTarget(sparseGrid,2,"left"),0);
+// Empty, invalid direction, and malformed grid inputs fail closed.
+assert.equal(layout.navigationTarget({state:"ready",items:[]},0,"right"),0);
+assert.equal(layout.navigationTarget(null,0,"right"),0);
+assert.equal(layout.navigationTarget({state:"unavailable",items:[]},0,"down"),0);
+assert.equal(layout.navigationTarget(navPlain,0,"diagonal"),0);
+assert.equal(layout.navigationTarget(navPlain,-1,"up"),-1);
+assert.equal(layout.navigationTarget(navPlain,0.4,"left"),0.4);
+
+// Exercise every combination of four tile W/H sizes (1296 layouts). Every
+// directional result is deterministic, is a real tile index, obeys its edge
+// constraint, and does not mutate the grid or the source tile placements.
+for(let flags=0; flags<16; flags++){
+    for(let heightCode=0; heightCode<81; heightCode++){
+        let code=heightCode;
+        const tiles=[];
+        for(let i=0;i<4;i++){
+            tiles.push({
+                id:"tile-"+(i+1),
+                module:["time","apps","weather","notes"][i],
+                size:(flags&(1<<i))?"wide":"half",
+                rowSpan:code%3+1
+            });
+            code=Math.floor(code/3);
+        }
+        const tileBefore=JSON.stringify(tiles);
+        const packed=layout.packTiles(tiles);
+        const gridBefore=JSON.stringify(packed);
+        for(let selected=0;selected<4;selected++){
+            for(const direction of ["left","right","up","down"]){
+                const chosen=layout.navigationTarget(packed,selected,direction);
+                assert.ok(Number.isInteger(chosen) && chosen>=0 && chosen<4);
+                assert.equal(chosen,layout.navigationTarget(packed,selected,direction));
+                if(chosen!==selected){
+                    const from=packed.items[selected], to=packed.items[chosen];
+                    if(direction==="left")
+                        assert.ok(to.column+to.columnSpan<=from.column);
+                    if(direction==="right")
+                        assert.ok(to.column>=from.column+from.columnSpan);
+                    if(direction==="up")
+                        assert.ok(to.row+to.rowSpan<=from.row);
+                    if(direction==="down")
+                        assert.ok(to.row>=from.row+from.rowSpan);
+                }
+            }
+        }
+        assert.equal(JSON.stringify(tiles),tileBefore);
+        assert.equal(JSON.stringify(packed),gridBefore);
+    }
+}
 console.log("ApolloHub Layout v2 migration, stable tile IDs, guarded remove and sizing tests passed");

@@ -1,0 +1,33 @@
+name: TASKS Proxy 1 M10e verified backup and restore
+
+on:
+  pull_request:
+    paths:
+      - 'tests/tasks/fixtures/verified_backup_restore_fixture.cjs'
+      - 'tests/tasks/test_verified_backup_restore.cjs'
+      - 'docs/tasks-verified-backup-restore-m10e.md'
+      - '.github/workflows/tasks-verified-backup-restore.yml'
+  push:
+    branches:
+      - main
+    paths:
+      - 'tests/tasks/fixtures/verified_backup_restore_fixture.cjs'
+      - 'tests/tasks/test_verified_backup_restore.cjs'
+      - 'docs/tasks-verified-backup-restore-m10e.md'
+      - '.github/workflows/tasks-verified-backup-restore.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  contract:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Verify isolated raw-byte backup and guarded restore
+        run: node tests/tasks/test_verified_backup_restore.cjs
+      - name: Retain M10d migration integrity regression
+        run: node tests/tasks/test_legacy_migration_dryrun.cjs

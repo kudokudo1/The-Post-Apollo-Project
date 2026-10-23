@@ -941,10 +941,24 @@ Scope {
         };
     }
 
+    // Keep branch delegates intact when a no-op Fetch yields identical rows.
+    // ListModel.clear() notifies every consumer even when values don't change.
+    function branchModelMatches(model, rows, roles) {
+        if (model.count !== rows.length)
+            return false;
+        for (let i = 0; i < rows.length; ++i) {
+            const current = model.get(i);
+            const next = rows[i];
+            for (let j = 0; j < roles.length; ++j) {
+                const role = roles[j];
+                if (current[role] !== next[role])
+                    return false;
+            }
+        }
+        return true;
+    }
+
     function publishPendingModels() {
-        // Read-only timing receipts, computed only during an opted-in trace.
-        // Return to the DONE handler rather than publishing an extra QML
-        // property or logging inside model mutation loops.
         const trace = syntagmaStartupTraceEnabled;
         let started = trace ? Date.now() : 0;
         let metadataMs = 0;
@@ -969,23 +983,52 @@ Scope {
             started = Date.now();
         }
 
-        localBranchRows.clear();
-        remoteBranchRows.clear();
+        const nextLocalRows = [];
+        for (let i = 0; i < pendingLocalBranches.length; ++i) {
+            const row = pendingLocalBranches[i] || {};
+            nextLocalRows.push({
+                name: String(row.name || ""),
+                head: String(row.head || ""),
+                upstream: String(row.upstream || ""),
+                unpulledCount: Number(row.unpulledCount || 0),
+                lastChangedEpoch: Number(row.lastChangedEpoch || 0)
+            });
+        }
+        const nextRemoteRows = [];
+        for (let i = 0; i < pendingRemoteBranches.length; ++i) {
+            const row = pendingRemoteBranches[i] || {};
+            const remoteName = String(row.name || "");
+            if (!isRemoteBranchTarget(remoteName))
+                continue;
+            nextRemoteRows.push({
+                name: remoteName,
+                unpulledCount: Number(row.unpulledCount || 0),
+                remoteOnly: Boolean(row.remoteOnly),
+                lastChangedEpoch: Number(row.lastChangedEpoch || 0)
+            });
+        }
+        const localUnchanged = branchModelMatches(localBranchRows,
+            nextLocalRows, ["name", "head", "upstream", "unpulledCount",
+                "lastChangedEpoch"]);
+        const remoteUnchanged = branchModelMatches(remoteBranchRows,
+            nextRemoteRows, ["name", "unpulledCount", "remoteOnly",
+                "lastChangedEpoch"]);
+
+        // On a changed list, preserve the original full rebuild behavior.
+        // On identical data, skip all ListModel mutation notifications.
+        if (!localUnchanged)
+            localBranchRows.clear();
+        if (!remoteUnchanged)
+            remoteBranchRows.clear();
 
         if (trace) {
             clearsMs = Date.now() - started;
             started = Date.now();
         }
 
-        for (let i = 0; i < pendingLocalBranches.length; ++i) {
-            const localRow = pendingLocalBranches[i] || {};
-            localBranchRows.append({
-                name: String(localRow.name || ""),
-                head: String(localRow.head || ""),
-                upstream: String(localRow.upstream || ""),
-                unpulledCount: Number(localRow.unpulledCount || 0),
-                lastChangedEpoch: Number(localRow.lastChangedEpoch || 0)
-            });
+        if (!localUnchanged) {
+            for (let i = 0; i < nextLocalRows.length; ++i)
+                localBranchRows.append(nextLocalRows[i]);
         }
 
         if (trace) {
@@ -993,19 +1036,9 @@ Scope {
             started = Date.now();
         }
 
-        for (let i = 0; i < pendingRemoteBranches.length; ++i) {
-            const remoteRow = pendingRemoteBranches[i] || {};
-            const remoteName = String(remoteRow.name || "");
-
-            if (!isRemoteBranchTarget(remoteName))
-                continue;
-
-            remoteBranchRows.append({
-                name: remoteName,
-                unpulledCount: Number(remoteRow.unpulledCount || 0),
-                remoteOnly: Boolean(remoteRow.remoteOnly),
-                lastChangedEpoch: Number(remoteRow.lastChangedEpoch || 0)
-            });
+        if (!remoteUnchanged) {
+            for (let i = 0; i < nextRemoteRows.length; ++i)
+                remoteBranchRows.append(nextRemoteRows[i]);
         }
 
         if (trace) {

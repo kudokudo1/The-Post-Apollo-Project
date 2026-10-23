@@ -11,7 +11,7 @@ const policy = vm.createContext({});
 vm.runInContext(src, policy, {filename: "ApolloHubTodoPolicy.js"});
 const t = 1000000;
 
-// Read v1 into memory as v2, retain IDs/titles/done/timestamps, no file write.
+// Read v1 into memory as v3, retain IDs/titles/done/timestamps, no file write.
 const legacy = {version:1, nextId:3, tasks:[
     {id:"t1", title:"Legacy task", done:false, createdAtMs:100, updatedAtMs:120},
     {id:"t2", title:"Finished task", done:true, createdAtMs:110, updatedAtMs:130}
@@ -19,7 +19,7 @@ const legacy = {version:1, nextId:3, tasks:[
 const original = JSON.stringify(legacy);
 const migrated = policy.parse(original);
 assert.equal(migrated.ok,true);
-assert.equal(migrated.document.version,2);
+assert.equal(migrated.document.version,3);
 assert.equal(migrated.document.nextId,3);
 assert.equal(migrated.document.tasks[0].id,"t1");
 assert.equal(migrated.document.tasks[1].done,true);
@@ -36,7 +36,7 @@ const details = policy.updateDetails(d,"t1","high",
 assert.equal(details.ok,true);
 assert.equal(d.tasks[0].priority,"none"); // immutable
 d = details.document;
-assert.equal(d.version,2);
+assert.equal(d.version,3);
 assert.equal(d.tasks[0].priority,"high");
 assert.equal(d.tasks[0].description,"Paragraph one\nParagraph two");
 assert.equal(d.tasks[0].dueDate,"2028-02-29");
@@ -97,4 +97,4 @@ for(const bad of ["extraRoot","externalCommand","privateToken","DO_NOT_EXPOSE"])
 assert.equal(policy.view("saving",d).writable,false);
 assert.equal(policy.view("unsupported",d).items.length,0);
 
-console.log("TASKS v2 details policy + v1 compatibility: PASS");
+console.log("TASKS details policy + v1/v2 compatibility: PASS");

@@ -1829,6 +1829,276 @@ PanelWindow {
                             }
                         }
 
+                        Column {
+                            id: mathDifferencePane
+                            visible: timew.mathView === "between"
+                            width: parent.width
+                            spacing: 9
+                            z: timew.activeConverterDropdown === "difference" ? 30 : 0
+
+                            GohuText {
+                                text: "END // DATE + TIME"
+                                color: Colors.white
+                                font.pixelSize: 12
+                            }
+
+                            Row {
+                                id: differenceEndZoneRow
+                                width: parent.width
+                                height: 34
+                                spacing: 6
+                                z: 30
+
+                                GohuText {
+                                    width: 50
+                                    height: parent.height
+                                    verticalAlignment: Text.AlignVCenter
+                                    text: "ZONE"
+                                    color: Colors.cyan
+                                    font.pixelSize: 11
+                                }
+                                ActionButton {
+                                    width: 67
+                                    height: 30
+                                    label: "CHANGE"
+                                    labelPixelSize: 9
+                                    accentColor: Colors.white
+                                    onLeftClicked: timew.cycleDifferenceEndZone()
+                                }
+                                TimeZonePicker {
+                                    id: differenceEndPicker
+                                    width: Math.max(0, differenceEndZoneRow.width
+                                                    - 50 - 67
+                                                    - differenceEndZoneRow.spacing * 2)
+                                    height: differenceEndZoneRow.height
+                                    selectedZone: timew.differenceEndZone
+                                    catalog: timew.worldZoneCatalog
+                                    countryIndex: timew.worldCountryIndex
+                                    catalogLoading: timew.worldCatalogLoading
+                                    catalogFailed: timew.worldCatalogFailed
+                                    expanded: timew.activeConverterDropdown === "difference"
+                                    onOpenRequested:
+                                        timew.openConverterDropdown("difference")
+                                    onToggleRequested:
+                                        timew.toggleConverterDropdown("difference")
+                                    onZoneChosen: function(zoneId) {
+                                        timew.chooseConverterSearchZone("difference", zoneId);
+                                    }
+                                }
+                            }
+
+                            Row {
+                                id: differenceEndInputs
+                                width: parent.width
+                                height: 34
+                                spacing: 4
+                                TextField {
+                                    id: differenceEndDateInput
+                                    width: Math.max(0, (differenceEndInputs.width
+                                            - differenceEndFormatButton.width
+                                            - differenceEndInputs.spacing * 2) / 2)
+                                    height: parent.height
+                                    text: timew.differenceEndDate
+                                    placeholderText: "YYYY-MM-DD"
+                                    color: Colors.magenta
+                                    placeholderTextColor: Colors.cyan
+                                    selectionColor: Colors.magenta
+                                    selectedTextColor: Colors.black
+                                    font.family: "GohuFont 11 Nerd Font Mono"
+                                    font.pixelSize: 10
+                                    leftPadding: 3
+                                    rightPadding: 3
+                                    cursorDelegate: Rectangle {
+                                        width: 2
+                                        color: Colors.orange
+                                    }
+                                    background: Rectangle {
+                                        color: Colors.black
+                                        border.width: 1
+                                        border.color: differenceEndDateInput.activeFocus
+                                                      ? Colors.magenta : Colors.cyan
+                                    }
+                                    onTextEdited: timew.differenceEndDate = text
+                                }
+                                TextField {
+                                    id: differenceEndTimeInput
+                                    width: Math.max(0, differenceEndInputs.width
+                                            - differenceEndDateInput.width
+                                            - differenceEndFormatButton.width
+                                            - differenceEndInputs.spacing * 2)
+                                    height: parent.height
+                                    text: timew.differenceEndTime
+                                    placeholderText: timew.differenceEnd24Hour
+                                                     ? "HH:MM" : "HH:MM//PM"
+                                    color: Colors.magenta
+                                    placeholderTextColor: Colors.cyan
+                                    selectionColor: Colors.magenta
+                                    selectedTextColor: Colors.black
+                                    font.family: "GohuFont 11 Nerd Font Mono"
+                                    font.pixelSize: 10
+                                    leftPadding: 3
+                                    rightPadding: 3
+                                    cursorDelegate: Rectangle {
+                                        width: 2
+                                        color: Colors.orange
+                                    }
+                                    background: Rectangle {
+                                        color: Colors.black
+                                        border.width: 1
+                                        border.color: differenceEndTimeInput.activeFocus
+                                                      ? Colors.magenta : Colors.cyan
+                                    }
+                                    onTextEdited: timew.differenceEndTime = text
+                                }
+                                ActionButton {
+                                    id: differenceEndFormatButton
+                                    width: 44
+                                    height: parent.height
+                                    label: timew.differenceEnd24Hour ? "24H" : "12H"
+                                    labelPixelSize: 11
+                                    accentColor: timew.differenceEnd24Hour
+                                                 ? Colors.orange : Colors.cyan
+                                    onLeftClicked: timew.toggleDifferenceEndFormat()
+                                }
+                            }
+
+                            ActionButton {
+                                id: differenceRunButton
+                                width: parent.width
+                                height: 34
+                                label: timew.differenceBusy
+                                       ? "CALCULATING..." : "FIND ELAPSED DURATION"
+                                labelPixelSize: 11
+                                accentColor: Colors.white
+                                available: !timew.differenceBusy
+                                onLeftClicked: timew.runTimeDifference()
+                            }
+
+                            Rectangle {
+                                width: parent.width
+                                height: 2
+                                color: Colors.cyan
+                                opacity: 0.5
+                            }
+
+                            Row {
+                                id: differenceResultHeader
+                                width: parent.width
+                                height: 40
+                                spacing: 6
+                                GohuText {
+                                    width: parent.width - differenceOutputFormatButton.width
+                                           - differenceResultHeader.spacing
+                                    height: parent.height
+                                    verticalAlignment: Text.AlignVCenter
+                                    wrapMode: Text.Wrap
+                                    color: timew.differenceResult
+                                           && timew.differenceResult.status === "READY"
+                                           ? Colors.cyan : Colors.orange
+                                    font.pixelSize: 11
+                                    text: timew.differenceBusy ? "BETWEEN // WORKING"
+                                          : !timew.differenceResult
+                                          ? "BETWEEN // ENTER TWO MOMENTS"
+                                          : timew.differenceResult.status === "READY"
+                                          ? "BETWEEN // 1 DURATION"
+                                          : timew.differenceResult.status === "AMBIGUOUS_LOCAL_TIME"
+                                          ? "DST OVERLAP // MULTIPLE DURATIONS"
+                                          : timew.differenceResult.status.indexOf(
+                                                "NONEXISTENT_LOCAL_TIME") >= 0
+                                          ? "TIME DOES NOT EXIST // DST CLOCK JUMP"
+                                          : "BETWEEN // " + timew.differenceResult.status
+                                }
+                                ActionButton {
+                                    id: differenceOutputFormatButton
+                                    width: 44
+                                    height: 30
+                                    label: timew.converterOutput24Hour ? "24H" : "12H"
+                                    labelPixelSize: 11
+                                    accentColor: timew.converterOutputFormatColor
+                                    onLeftClicked: timew.toggleConverterOutputFormat()
+                                }
+                            }
+
+                            Flickable {
+                                id: differenceResults
+                                width: parent.width
+                                height: timew.differenceResult
+                                        && timew.differenceResult.options
+                                        && timew.differenceResult.options.length > 0
+                                        ? Math.min(176,
+                                            timew.differenceResult.options.length * 90)
+                                        : 0
+                                clip: true
+                                boundsBehavior: Flickable.StopAtBounds
+                                contentHeight: differenceResultsColumn.height
+                                interactive: contentHeight > height
+
+                                Column {
+                                    id: differenceResultsColumn
+                                    width: differenceResults.width - 18
+                                    spacing: 7
+                                    Repeater {
+                                        model: timew.differenceResult
+                                               && timew.differenceResult.options
+                                               ? timew.differenceResult.options : []
+                                        Column {
+                                            width: differenceResultsColumn.width
+                                            spacing: 3
+                                            GohuText {
+                                                width: parent.width
+                                                text: "PAIR " + (index + 1) + " // "
+                                                      + modelData.sign
+                                                      + modelData.days + "D "
+                                                      + modelData.hours + "H "
+                                                      + modelData.minutes + "M"
+                                                color: timew.converterOutputFormatColor
+                                                font.pixelSize: 13
+                                            }
+                                            GohuText {
+                                                width: parent.width
+                                                text: "START // " + ConverterFormat.formatResult(
+                                                          modelData.start,
+                                                          timew.converterOutput24Hour)
+                                                elide: Text.ElideRight
+                                                color: Colors.orange
+                                                font.pixelSize: 11
+                                            }
+                                            GohuText {
+                                                width: parent.width
+                                                text: "END // " + ConverterFormat.formatResult(
+                                                          modelData.end,
+                                                          timew.converterOutput24Hour)
+                                                elide: Text.ElideRight
+                                                color: Colors.white
+                                                font.pixelSize: 11
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                            NeonScrollBar {
+                                id: differenceResultsRail
+                                flickable: differenceResults
+                                geometryMode: "viewport"
+                                x: mathDifferencePane.width - width - 3
+                                y: differenceResults.y
+                                height: differenceResults.height
+                                handleStyle: "star"
+                                railColor: Colors.cyan
+                                handleColor: Colors.magenta
+                                handleBorderColor: Colors.magenta
+                                containGlow: true
+                                visible: timew.mathView === "between" && scrollable
+                            }
+                            GohuText {
+                                width: parent.width
+                                text: "ELAPSED DURATION // ZONES AND DST AWARE"
+                                color: Colors.white
+                                font.pixelSize: 11
+                                opacity: 0.72
+                            }
+                        }
+
                         Row {
                             id: mathDurationRow
                             visible: timew.mathView === "elapsed"

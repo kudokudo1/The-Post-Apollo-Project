@@ -1078,7 +1078,8 @@ Rectangle {
                 }
 
                 GohuText {
-                    text: alertService.ready
+                    text: alertService.ready && alertService.fresh
+                          && alertService.watchForecast.forecastDayCount > 0
                           ? String(alertService.watchForecast.projectedDays)
                             + " G1+ DAYS FORECAST"
                           : "-- G1+ DAYS"

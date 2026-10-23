@@ -33,6 +33,18 @@ function harness() {
     return {context, receive};
 }
 
+
+// Extract the entire delegate rather than assuming a fixed number of nested
+// braces: clipping a fixed-height gradient adds wrapper Items to each bar.
+function cavaDelegateSource() {
+    const start = source.indexOf(
+        "                    Item {\n                        width: 5\n                        height: spectrum.height"
+    );
+    const end = source.indexOf("\n    function receiveCavaFrame(frame)", start);
+    assert.ok(start >= 0 && end > start, "CAVA delegate must be findable");
+    return source.slice(start, end);
+}
+
 test("left taskbar places Media before Tray without duplicating either instance", () => {
     const left = shellSource.split("// ===== LEFT MODULES", 2)[1]
         ?.split("// ===== CENTER MODULE", 2)[0];
@@ -499,24 +511,31 @@ test("ambient height averages the four strongest CAVA bars with padding and smoo
     assert.doesNotMatch(source, /safeSource:\s*(?:spectrum|cavaBar)/);
 });
 
-test("CAVA neon tracks the animated bar using geometry only", () => {
-    const match = source.match(/Item \{\s*width:\s*5\s*height:\s*spectrum\.height([\s\S]*?)\n\s*\}\n\s*\}\n\s*\}\n\s*\}\n\s*\}/);
-    assert.ok(match, "expected a bounded bar item inside the 20-bar Repeater");
-    const bar = match[1];
+test("CAVA reveals fixed-height gradient from the bottom without new glow shaders", () => {
+    const bar = cavaDelegateSource();
     assert.match(bar, /id:\s*cavaBar/);
     assert.match(bar, /height:\s*cavaBar\.height\s*\+\s*6/);
     assert.match(bar, /height:\s*cavaBar\.height\s*\+\s*2/);
     assert.match(bar, /width:\s*parent\.width\s*\+\s*8/);
     assert.match(bar, /width:\s*parent\.width\s*\+\s*4/);
-    assert.match(bar, /opacity:\s*0\.30\s*\+\s*0\.24\s*\*\s*parent\.glowActivity/);
-    assert.match(bar, /opacity:\s*0\.50\s*\+\s*0\.30\s*\*\s*parent\.glowActivity/);
+    assert.equal((bar.match(/\bclip:\s*true/g) || []).length, 3,
+        "core and two existing halos reveal only the low-to-high portion attained");
     assert.equal((bar.match(/gradient:\s*mediaDock\.cavaVerticalGradient/g) || []).length, 3,
-        "both glow layers and the bar must share the same vertical palette");
-    assert.doesNotMatch(bar, /barPaletteColor|barColor|GradientStop/,
-        "do not create separate gradients or horizontal band colors per bar");
+        "the same shared palette covers three clipped full-height rectangles");
+    assert.equal((bar.match(/anchors\.bottom:\s*parent\.bottom/g) || []).length, 6,
+        "three clipping masks and three full-height fills remain bottom-aligned");
+    assert.match(bar, /height:\s*spectrum\.height\s*\+\s*6/,
+        "outer halo gradient stays fixed to spectrum height");
+    assert.match(bar, /height:\s*spectrum\.height\s*\+\s*2/,
+        "inner halo gradient stays fixed to spectrum height");
+    assert.match(bar, /height:\s*spectrum\.height\s*[\r\n]+\s*radius:\s*0/,
+        "core gradient stays full-height as the clipping mask grows");
+    assert.match(bar, /opacity:\s*0\.30\s*\+\s*0\.24\s*\*\s*parent\.parent\.glowActivity/);
+    assert.match(bar, /opacity:\s*0\.50\s*\+\s*0\.30\s*\*\s*parent\.parent\.glowActivity/);
     assert.equal((bar.match(/Behavior on height/g) || []).length, 1,
-        "only the actual bar animates; halos follow bindings");
-    assert.doesNotMatch(bar, /DropShadow|RectangularShadow|ShaderEffect|layer\.enabled/);
+        "only the existing core height animates; masks follow its binding");
+    assert.doesNotMatch(bar, /barPaletteColor|barColor|GradientStop|DropShadow|RectangularShadow|ShaderEffect|layer\.enabled/,
+        "do not introduce per-frame gradients or texture-sampled glow effects");
     assert.doesNotMatch(source, /contentGlowSource:\s*(?:spectrum|mediaArtwork|cavaBar)/);
 });
 
@@ -560,10 +579,7 @@ test("20 CAVA bars share a vertical cool/warm gradient with magenta open priorit
             "color progresses bottom→top and open magenta overrides playback");
     }
 
-    const delegate = source.match(
-        /Item \{\s*width:\s*5\s*height:\s*spectrum\.height([\s\S]*?)\n\s*\}\n\s*\}\n\s*\}\n\s*\}\n\s*\}/
-    )?.[1];
-    assert.ok(delegate, "only existing per-bar rectangles should draw the gradient");
+    const delegate = cavaDelegateSource();
     assert.equal((delegate.match(/gradient:\s*mediaDock\.cavaVerticalGradient/g) || []).length, 3,
         "the bar core and both existing halos use identical vertical stops");
     assert.equal((delegate.match(/Behavior on height/g) || []).length, 1,
@@ -575,24 +591,43 @@ test("20 CAVA bars share a vertical cool/warm gradient with magenta open priorit
         "the larger ambient wash remains a single low-cost color");
 });
 
+test("small waves reveal only the bottom colors while tall waves reach upper stops", () => {
+    const bar = cavaDelegateSource();
+    const heightExpr = bar.match(
+        /id:\s*cavaBar[\s\S]*?height:\s*(Math\.max\(2,\s*Math\.round\(\s*\(Number\(mediaDock\.levels\[index\] \|\| 0\) \/ 7\) \* 27\s*\)\))/
+    )?.[1];
+    assert.ok(heightExpr, "use the actual core bar height formula");
+    const heightFor = level => vm.runInNewContext(heightExpr, {
+        Math, Number, index: 0, mediaDock: {levels: [level]}
+    });
+    // A fill of height 28px stays anchored to the bottom of a mask growing
+    // from 2px to 27px. Its visible top moves through fixed palette stops.
+    const visibleTop = level => (28 - heightFor(level)) / 28;
+    assert.ok(visibleTop(0) > 0.9, "silence exposes only the cyan/yellow end");
+    assert.ok(visibleTop(1) > 0.8, "short bars remain predominantly cyan/yellow");
+    assert.ok(visibleTop(3) > 0.5, "modest bars stay below the middle blue/orange stop");
+    assert.ok(visibleTop(4) < 0.5, "rising bars begin to reveal blue/orange");
+    assert.ok(visibleTop(7) < 0.1, "tall peaks can reach magenta/red at the top");
+    assert.match(bar, /id:\s*cavaBar[\s\S]*?clip:\s*true\s*Rectangle/,
+        "core mask must grow without rescaling its inner gradient");
+});
+
 test("CAVA's two existing halos get brighter with taller bars at no added render cost", () => {
     // One normalized scalar per delegate, fed only by the existing
     // deduplicated 0–7 CAVA levels, not by the animated bar height.
-    const item = source.match(/Item \{\s*width:\s*5\s*height:\s*spectrum\.height([\s\S]*?)\n\s*\}\n\s*\}\n\s*\}\n\s*\}\n\s*\}/);
-    assert.ok(item, "expected a single geometry-only CAVA bar delegate");
-    const body = item[1];
+    const body = cavaDelegateSource();
     const activityMatch = body.match(/readonly property real glowActivity:\s*(Math\.max\(0,\s*Math\.min\(1,\s*Number\(mediaDock\.levels\[index\] \|\| 0\)\s*\/\s*7\)\))/);
     assert.ok(activityMatch, "activity must be normalized from the existing CAVA frame levels");
 
     const activityFor = level => vm.runInNewContext(activityMatch[1], {
         Math, Number, index: 0, mediaDock: {levels: [level]}
     });
-    const outerOpacityMatch = body.match(/opacity:\s*(0\.30\s*\+\s*0\.24\s*\*\s*parent\.glowActivity)/);
-    const innerOpacityMatch = body.match(/opacity:\s*(0\.50\s*\+\s*0\.30\s*\*\s*parent\.glowActivity)/);
+    const outerOpacityMatch = body.match(/opacity:\s*(0\.30\s*\+\s*0\.24\s*\*\s*parent\.parent\.glowActivity)/);
+    const innerOpacityMatch = body.match(/opacity:\s*(0\.50\s*\+\s*0\.30\s*\*\s*parent\.parent\.glowActivity)/);
     assert.ok(outerOpacityMatch);
     assert.ok(innerOpacityMatch);
     const opacityFor = (expr, level) => vm.runInNewContext(expr, {
-        parent: {glowActivity: activityFor(level)}
+        parent: {parent: {glowActivity: activityFor(level)}}
     });
     for (const [low, high] of [
         [0.30, 0.54],

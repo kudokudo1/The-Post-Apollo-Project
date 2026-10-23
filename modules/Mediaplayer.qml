@@ -81,6 +81,27 @@ Item {
     // Keep accentColor tied to playback for normal/closed presentation.
     readonly property color artworkAccentColor: open ? Colors.magenta : accentColor
 
+    // One static color per frequency band. No new animated gradient layer,
+    // frame callback, shader, or sampled texture. Playback changes palettes,
+    // and the open state overrides every bar with canonical magenta.
+    function blendBarColor(from, to, amount) {
+        const t = Math.max(0, Math.min(1, amount));
+        return Qt.rgba(from.r + (to.r - from.r) * t,
+                       from.g + (to.g - from.g) * t,
+                       from.b + (to.b - from.b) * t,
+                       from.a + (to.a - from.a) * t);
+    }
+
+    function barPaletteColor(barIndex) {
+        const position = barCount > 1 ? barIndex / (barCount - 1) : 0;
+        const start = mpdPlaying ? Colors.yellow : Colors.cyan;
+        const middle = mpdPlaying ? Colors.orange : Colors.blue;
+        const end = mpdPlaying ? Colors.red : Colors.magenta;
+        return position <= 0.5
+            ? blendBarColor(start, middle, position * 2)
+            : blendBarColor(middle, end, (position - 0.5) * 2);
+    }
+
     // Follow the general height of CAVA without following individual spikes.
     // The four tallest of 20 bars set a padded, bounded ambient envelope.
     // This recalculates only when the deduplicated levels array changes.
@@ -356,6 +377,8 @@ Item {
                         // animation, shader, texture sampling or CAVA process.
                         readonly property real glowActivity: Math.max(0, Math.min(1,
                             Number(mediaDock.levels[index] || 0) / 7))
+                        readonly property color barColor: mediaDock.open
+                            ? Colors.magenta : mediaDock.barPaletteColor(index)
 
                         // Two existing geometry-only halos follow the core.
                         // Their opacity also rises with activity, so tall
@@ -367,7 +390,7 @@ Item {
                             width: parent.width + 8
                             height: cavaBar.height + 6
                             radius: 0
-                            color: mediaDock.artworkAccentColor
+                            color: parent.barColor
                             opacity: 0.30 + 0.24 * parent.glowActivity
                         }
 
@@ -378,7 +401,7 @@ Item {
                             width: parent.width + 4
                             height: cavaBar.height + 2
                             radius: 0
-                            color: mediaDock.artworkAccentColor
+                            color: parent.barColor
                             opacity: 0.50 + 0.30 * parent.glowActivity
                         }
 
@@ -390,7 +413,7 @@ Item {
                                 (Number(mediaDock.levels[index] || 0) / 7) * 27
                             ))
                             radius: 0
-                            color: mediaDock.artworkAccentColor
+                            color: parent.barColor
 
                             Behavior on height {
                                 NumberAnimation {

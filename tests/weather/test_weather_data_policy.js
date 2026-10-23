@@ -19,6 +19,7 @@ for (const name of [
     "currentAtmosphere",
     "parseForecast",
     "parseAirQuality",
+    "parseAirQualityForecast",
 ])
     assert.equal(typeof context[name], "function", name);
 
@@ -162,5 +163,30 @@ const noPollen = context.parseAirQuality({
     pm10: 4,
 });
 assert.equal(noPollen.pollenAvailable, false);
+
+const hourlyForecast = context.parseAirQualityForecast({
+    time: Array.from({length: 12}, (_, i) => "2026-10-22T" + String(i + 10).padStart(2, "0") + ":00"),
+    us_aqi: [30, 31, 50, 51, null, 76, 120, 121, 160, 161, 200, 201],
+    pm2_5: [8.2, 8.3, 9.3, 9.4, null, 10.1, 14.4, 14.5, 21, 21.1, 28, 29],
+    pm10: [12.1, 12.2, 14, 14.1, null, 16, 22, 23, 26, 27, 34, 35],
+}, 12);
+assert.equal(hourlyForecast.length, 6);
+assert.deepEqual(Array.from(hourlyForecast, x => x.label), ["10 AM", "12 PM", "2 PM", "4 PM", "6 PM", "8 PM"]);
+assert.equal(hourlyForecast[0].aqi, 30);
+assert.equal(hourlyForecast[1].aqi, 50);
+assert.equal(hourlyForecast[2].aqi, -1);
+assert.equal(hourlyForecast[2].pm25, -1);
+assert.equal(hourlyForecast[5].pm10, 34);
+assert.equal(context.parseAirQualityForecast(null, 12).length, 0);
+assert.equal(context.parseAirQualityForecast({time: [], us_aqi: []}, 12).length, 0);
+assert.equal(context.parseAirQualityForecast({
+    time: ["bad", "2026-10-22T13:00"],
+    us_aqi: [0, 22]
+}, 12).length, 0);
+assert.equal(context.parseAirQualityForecast({
+    time: ["2026-10-22T07:00"],
+    us_aqi: [null],
+    pm2_5: [null]
+}, 12)[0].aqi, -1);
 
 console.log("Weather data policy contracts: PASS");

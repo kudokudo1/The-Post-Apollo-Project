@@ -8,6 +8,10 @@ Rectangle {
 
     readonly property bool aqiReady: weatherService && weatherService.aqiReady
     readonly property bool aqiLoading: weatherService && weatherService.aqiLoading
+    readonly property var airQualityForecast:
+        weatherService ? weatherService.airQualityForecast : []
+    readonly property bool airQualityForecastReady:
+        weatherService && weatherService.airQualityForecastReady
     readonly property real aqiValue: aqiReady ? Number(weatherService.aqi) : 0
     readonly property real pm25Value:
         aqiReady ? Number(weatherService.pm25) : 0
@@ -77,17 +81,21 @@ Rectangle {
     readonly property real carbonMonoxideMeter:
         Math.max(0, Math.min(1, carbonMonoxideAqiValue / 500))
 
-    readonly property color aqiColor: {
-        if (!aqiReady)
+    function aqiSeverityColor(value) {
+        const reading = Number(value);
+        if (!isFinite(reading) || reading < 0 || reading > 500)
             return Colors.white;
-        if (aqiValue <= 50)
+        if (reading <= 50)
             return Colors.cyan;
-        if (aqiValue <= 100)
+        if (reading <= 100)
             return Colors.yellow;
-        if (aqiValue <= 150)
+        if (reading <= 150)
             return Colors.orange;
         return Colors.red;
     }
+
+    readonly property color aqiColor: aqiReady
+                                      ? aqiSeverityColor(aqiValue) : Colors.white
 
     // Only gas component AQI scores are available. This is NOT a claim
     // about the primary pollutant driving overall AQI.
@@ -121,7 +129,7 @@ Rectangle {
     Column {
         anchors.fill: parent
         anchors.margins: 20
-        spacing: 14
+        spacing: 10
 
         Row {
             width: parent.width
@@ -484,6 +492,88 @@ Rectangle {
                     text: ground.pollenPeak.name
                     font.pixelSize: 10
                 }
+            }
+        }
+
+        StationSectionDivider {
+            width: parent.width
+            title: "AIR // NEXT 12 HOURS"
+        }
+
+        Column {
+            width: parent.width
+            spacing: 4
+
+            Row {
+                width: parent.width
+                spacing: 8
+
+                Repeater {
+                    model: ground.airQualityForecastReady
+                           ? ground.airQualityForecast : []
+
+                    delegate: Column {
+                        required property var modelData
+                        width: 116
+                        spacing: 4
+
+                        SecondaryText {
+                            width: parent.width
+                            horizontalAlignment: Text.AlignHCenter
+                            text: modelData.label
+                            font.pixelSize: 11
+                        }
+
+                        GohuText {
+                            width: parent.width
+                            horizontalAlignment: Text.AlignHCenter
+                            text: modelData.aqi >= 0
+                                  ? Math.round(modelData.aqi) + " AQI" : "-- AQI"
+                            font.pixelSize: 22
+                            color: ground.aqiSeverityColor(modelData.aqi)
+                        }
+
+                        Rectangle {
+                            width: parent.width - 12
+                            anchors.horizontalCenter: parent.horizontalCenter
+                            height: 7
+                            color: Colors.black
+                            border.width: 1
+                            border.color: ground.meterBorderColor
+
+                            Rectangle {
+                                x: 2
+                                anchors.verticalCenter: parent.verticalCenter
+                                width: (parent.width - 4)
+                                       * (modelData.aqi >= 0
+                                          ? Math.max(0, Math.min(1, modelData.aqi / 500))
+                                          : 0)
+                                height: parent.height - 4
+                                color: ground.aqiSeverityColor(modelData.aqi)
+                            }
+                        }
+
+                        QuietText {
+                            width: parent.width
+                            horizontalAlignment: Text.AlignHCenter
+                            text: modelData.pm25 >= 0
+                                  ? "PM2.5 " + modelData.pm25.toFixed(1)
+                                  : "PM2.5 --"
+                            font.pixelSize: 10
+                        }
+                    }
+                }
+            }
+
+            QuietText {
+                visible: !ground.airQualityForecastReady
+                text: "FORECAST UNAVAILABLE // CURRENT AIR QUALITY REMAINS ABOVE"
+                font.pixelSize: 11
+            }
+
+            QuietText {
+                text: "OPEN-METEO MODEL // LOCAL HOURS // 2H STEPS // PM2.5 IN µg/m³"
+                font.pixelSize: 9
             }
         }
 

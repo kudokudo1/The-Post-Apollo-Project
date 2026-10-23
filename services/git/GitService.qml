@@ -1285,6 +1285,14 @@ Scope {
                 'printf "UPSTREAM\\t%s\\n" "$upstream"',
                 'printf "AHEAD\\t%s\\n" "$ahead"',
                 'printf "BEHIND\\t%s\\n" "$behind"',
+                // A ref already reachable from HEAD cannot produce a '+'
+                // from git cherry. Compute merged tips in one Git invocation
+                // and retain the original patch-equivalence check elsewhere.
+                'merged_remote_refs="|"',
+                'while IFS= read -r ref; do',
+                '  [ -n "$ref" ] || continue',
+                '  merged_remote_refs="${merged_remote_refs}${ref}|"',
+                'done < <(git -C "$root" for-each-ref --merged=HEAD --format="%(refname:short)" refs/remotes/origin 2>/dev/null)',
                 'pending_refs="|"',
                 'pending_count=0',
                 'while IFS="$(printf "\\t")" read -r ref changed; do',
@@ -1292,6 +1300,7 @@ Scope {
                 '  [ "$ref" = "origin" ] && continue',
                 '  [ "$ref" = "origin/HEAD" ] && continue',
                 '  case "$ref" in */*) ;; *) continue ;; esac',
+                '  case "$merged_remote_refs" in *"|$ref|"*) continue ;; esac',
                 '  if git -C "$root" cherry HEAD "$ref" 2>/dev/null | grep -q "^+"; then',
                 '    pending_refs="${pending_refs}${ref}|"',
                 '    pending_count=$((pending_count + 1))',

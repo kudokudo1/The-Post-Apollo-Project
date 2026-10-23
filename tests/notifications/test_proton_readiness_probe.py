@@ -49,10 +49,10 @@ function mailRow(checkboxID, rowID) {
 function runProbe(origin,buttons=[],checked=0,mailRows=[]){
   const scope={location:{origin},document:{querySelectorAll(query){
     if(query==="button, [role='button']")return buttons;
-    assert.strictEqual(query,
-      "input[type='checkbox']:checked, [role='checkbox'][aria-checked='true']");
     if(query==="input[type='checkbox'][data-testid='item-checkbox']:checked")
       return mailRows;
+    assert.strictEqual(query,
+      "input[type='checkbox']:checked, [role='checkbox'][aria-checked='true']");
     return Array.from({length:checked},()=>({}));
   }}};
   return JSON.parse(JSON.stringify(vm.runInNewContext(probe,scope)));

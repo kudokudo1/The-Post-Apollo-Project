@@ -405,8 +405,9 @@ async function main(){
   stage="d17c-production-income-commit";
   const committed=runFunding(writerIncome);
   assert.equal(committed.error,undefined);
-  if(committed.status!==0 || committed.stdout.trim()!=="FINANCEW_FUNDING_RESULT committed")
-    throw new Error("funding-income-write-failed");
+  const incomeStatus=/FINANCEW_FUNDING_RESULT ([a-z0-9:-]+)/.exec(committed.stdout)?.[1] || "missing-status";
+  if(committed.status!==0 || incomeStatus!=="committed")
+    throw new Error("funding-income-"+incomeStatus+"-exit-"+committed.status);
   const incomeReceipt=JSON.parse(await readFile(receiptPath(writerIncome),"utf8"));
   assert.equal(incomeReceipt.status,"committed");
   assert.equal((await stat(receiptPath(writerIncome))).mode & 0o077,0);
@@ -418,8 +419,9 @@ async function main(){
   stage="d17c-production-new-account";
   const accountSave=runFunding(writerOpening);
   assert.equal(accountSave.error,undefined);
-  if(accountSave.status!==0 || accountSave.stdout.trim()!=="FINANCEW_FUNDING_RESULT committed")
-    throw new Error("funding-opening-write-failed");
+  const openingStatus=/FINANCEW_FUNDING_RESULT ([a-z0-9:-]+)/.exec(accountSave.stdout)?.[1] || "missing-status";
+  if(accountSave.status!==0 || openingStatus!=="committed")
+    throw new Error("funding-opening-"+openingStatus+"-exit-"+accountSave.status);
   assert.equal(JSON.parse(await readFile(receiptPath(writerOpening),"utf8")).status,"committed");
   stage="d17c-recovery-blocks-other-modes";
   const unresolved=join(writerHome,".local","state","financew","operations",

@@ -61,6 +61,9 @@ jobs:
       - name: Validate Proton Mark Read page readiness (read-only)
         run: python3 tests/notifications/test_proton_readiness_probe.py
 
+      - name: Validate click-only Proton browser Notification event pilot
+        run: python3 tests/notifications/test_proton_notification_event_pilot.py
+
       - name: Validate email action deck live sender capabilities
         run: python3 tests/notifications/test_notification_email_actions.py
 

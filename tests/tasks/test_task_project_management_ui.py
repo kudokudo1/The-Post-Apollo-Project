@@ -5,6 +5,7 @@ from pathlib import Path
 ROOT=Path(__file__).resolve().parents[2]
 PANE=(ROOT/"widgets/tasks/TaskProjectsPane.qml").read_text(encoding="utf-8")
 POLICY=(ROOT/"services/hub/ApolloHubTodoPolicy.js").read_text(encoding="utf-8")
+ACK=(ROOT/"widgets/tasks/TaskProjectsAck.js").read_text(encoding="utf-8")
 STORE=(ROOT/"services/hub/ApolloHubTodoStore.qml").read_text(encoding="utf-8")
 
 for phrase in (
@@ -23,7 +24,13 @@ for phrase in (
     "DELETE REJECTED",
     "pendingWrite = true",
     "pendingTaskTotal = tasks.length",
-    "tasks.length === pendingTaskTotal",
+    "ProjectAck.status(",
+    "onStoreStateChanged: reconcilePending()",
+    'feedback = "SAVE NOT VERIFIED // INPUT KEPT"',
+    "const snap = todoSnapshot;",
+    "const rawProjects = Array.isArray(snap.projects)",
+    "const wasDelete = pendingKind === \"delete\";",
+    "onTodoSnapshotChanged: reconcilePending()",
     "pendingProjectId = selectedProjectId",
     "todoStore.renameProject(pendingProjectId, pendingProjectName)",
     "todoStore.deleteProject(pendingProjectId, true)",
@@ -38,6 +45,15 @@ for phrase in (
 ):
     assert phrase in PANE, phrase
 
+assert 'import "TaskProjectsAck.js" as ProjectAck' in PANE
+assert "function status(snapshot, kind, projectId, projectName, taskId," in ACK
+assert "snapshot.state === \"saving\"" in ACK
+assert 'return "unconfirmed"' in ACK
+assert 'return "confirmed"' in ACK
+assert 'return "failed"' in ACK
+assert "tasks.length !== expectedTaskCount" in ACK
+assert "ProjectAck.status(" in PANE
+assert "onStoreStateChanged: reconcilePending()" in PANE
 assert "if (!writable || !selectedProject || !confirmDeleteProject) return;" in PANE
 assert 'feedback = "DELETE CANCELED"' in PANE
 assert "onLeftClicked: projectsPane.chooseProject(modelData.id)" in PANE

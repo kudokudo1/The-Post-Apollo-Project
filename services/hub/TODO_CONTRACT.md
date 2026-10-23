@@ -158,3 +158,30 @@ Scope is deliberately local: no GitHub Projects sync or external action.
 - No new FileView or storage path; task data retains version 3. No background cleanup, implicit deletion, or automatic GitHub mutation.
 - Verification needs an operator's on-device project rename, rename cancellation, DEL → NO, DEL → YES with existing tasks, restart/reload persistence, Hub consistency and simulated save failures.
 
+
+## TASKS PROJECTS // save-acknowledgement freeze recovery (2026-10-22)
+
+**Symptom reported:** After renaming a local project, the UI can leave ADD,
+RENAME, input, and DELETE disabled despite the store having finished its write.
+
+**Cause isolated in source:** PROJECTS set `pendingWrite=true` and its
+`onTodoSnapshotChanged` handler checked multiple **independently bound**
+`storeState`, `projects`, and `tasks` values. QML binding reevaluation can
+make these disagree momentarily when the shared store publishes its confirmed
+result. A missed match left `pendingWrite` true indefinitely.
+
+**Scoped mitigation:** Compare the pending operation against **one incoming
+snapshot object**, never a mixture of separately cached projections; reevaluate
+on snapshot and store-state signals. State `saving` or `loading` remains
+locked for write safety. State `error` or `unsupported` unlocks with
+`SAVE FAILED // INPUT KEPT`. If the store is ready again but the expected
+change cannot be verified, unlock the PROJECTS controls with
+`SAVE NOT VERIFIED // INPUT KEPT`, **not** `SAVED`. Successful commits
+are acknowledged only when the snapshot proves the expected change.
+
+No task policy, local data schema, store, file path, atomic write contract,
+remote connector, or task/project deletion semantics changed. If the store
+itself never exits `saving`, do **not** unlock it by bypassing its guard;
+investigate FileView completion and storage errors before further edits.
+Restart and on-disk persistence acceptance remain operator checks.
+

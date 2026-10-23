@@ -17,11 +17,15 @@ assert "syncCommandStartedMs = 0;" in body
 assert "syncCommandFinishedMs = 0;" in body
 
 # The timing is presentation-only, not a substitute for the BEFORE/AFTER gate.
-before = service.index('operationJournal.beginOperation(')
-after = service.index('operationJournal.completeOperation(')
-unlock = service.index('actionBusy = false;', after)
-refresh = service.index('refresh();', unlock)
-assert before < after < unlock < refresh
+before = service.split('if (gitService.snapshotPhase === "BEFORE")', 1)[1]
+assert 'operationJournal.beginOperation(' in before
+finalize = service.split("function finalizeControlAction(", 1)[1].split(
+    "function finishActionProcess(", 1
+)[0]
+after = finalize.index('operationJournal.completeOperation(')
+unlock = finalize.index('actionBusy = false;', after)
+refresh = finalize.rindex('refresh();')
+assert after < unlock < refresh
 assert service.index('syncCommandStartedMs = Date.now();') < service.index(
     'actionProcess.exec(pendingActionCommand);'
 )

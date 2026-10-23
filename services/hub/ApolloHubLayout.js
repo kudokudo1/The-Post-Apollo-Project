@@ -561,3 +561,70 @@ function packTiles(tiles) {
     }
     return {state:"ready", columns:2, rows:highestRow, items:positions};
 }
+
+// P1 Stage 7: arrow navigation follows the rectangles from packTiles.
+// This is a pure view selection helper; it never changes tile order or data.
+// A candidate must be beyond the source's edge in the requested direction.
+// Prefer the nearest edge, then an overlapping perpendicular span, then
+// proximity to the source center, with stable index for ties.
+function navigationTarget(grid, selectedIndex, direction) {
+    if (!grid || grid.state !== "ready" || !Array.isArray(grid.items)
+            || !validIndex(selectedIndex, grid.items.length)
+            || ["left","right","up","down"].indexOf(direction) === -1)
+        return selectedIndex;
+    var source = grid.items[selectedIndex];
+    if (!source || typeof source.column !== "number"
+            || typeof source.row !== "number"
+            || typeof source.columnSpan !== "number"
+            || typeof source.rowSpan !== "number")
+        return selectedIndex;
+    function intervalGap(a0,a1,b0,b1) {
+        return Math.max(0,Math.max(a0,b0)-Math.min(a1,b1));
+    }
+    var sx0=source.column, sx1=source.column+source.columnSpan;
+    var sy0=source.row, sy1=source.row+source.rowSpan;
+    var best=selectedIndex;
+    var bestScore=null;
+    for (var i=0;i<grid.items.length;i++) {
+        if (i===selectedIndex)
+            continue;
+        var candidate=grid.items[i];
+        if (!candidate || typeof candidate.column !== "number"
+                || typeof candidate.row !== "number"
+                || typeof candidate.columnSpan !== "number"
+                || typeof candidate.rowSpan !== "number")
+            continue;
+        var cx0=candidate.column,cx1=cx0+candidate.columnSpan;
+        var cy0=candidate.row,cy1=cy0+candidate.rowSpan;
+        var primary=-1, crossGap=0, centerOffset=0;
+        if (direction==="left" && cx1<=sx0) {
+            primary=sx0-cx1;
+            crossGap=intervalGap(sy0,sy1,cy0,cy1);
+            centerOffset=Math.abs((sy0+sy1)-(cy0+cy1));
+        } else if (direction==="right" && cx0>=sx1) {
+            primary=cx0-sx1;
+            crossGap=intervalGap(sy0,sy1,cy0,cy1);
+            centerOffset=Math.abs((sy0+sy1)-(cy0+cy1));
+        } else if (direction==="up" && cy1<=sy0) {
+            primary=sy0-cy1;
+            crossGap=intervalGap(sx0,sx1,cx0,cx1);
+            centerOffset=Math.abs((sx0+sx1)-(cx0+cx1));
+        } else if (direction==="down" && cy0>=sy1) {
+            primary=cy0-sy1;
+            crossGap=intervalGap(sx0,sx1,cx0,cx1);
+            centerOffset=Math.abs((sx0+sx1)-(cx0+cx1));
+        }
+        if (primary<0)
+            continue;
+        var score=[crossGap,primary,centerOffset,i];
+        var wins=bestScore===null;
+        for (var k=0;k<score.length && !wins && score[k]===bestScore[k];k++) {}
+        if (!wins && k<score.length && score[k]<bestScore[k])
+            wins=true;
+        if (wins) {
+            best=i;
+            bestScore=score;
+        }
+    }
+    return best;
+}

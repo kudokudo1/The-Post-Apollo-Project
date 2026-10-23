@@ -49,7 +49,7 @@ function create(disk, requested=true, limit=48) {
         storageReady:false, storageError:"", checkpointGeneration:0,
         journalWriteStatus:0, journalWriteError:"",
         deltaWriteStatus:0, deltaWriteError:"",
-        deltaRecords:[],maxDeltaRecords:limit,
+        deltaRecords:[],encodedDeltaRecords:[],maxDeltaRecords:limit,
         lastPersistSerializationMs:0,lastPersistWriteMs:0,lastPersistReusedCount:0,
         lastMutationProfile:{},
         operationStarted(id,record){events.push(["start",id,record.status]);},
@@ -127,6 +127,40 @@ assert.equal(cold.scope.deltaActive,true,"pending sidecar must replay with flag 
 assert.equal(cold.scope.entries[0].status,"COMPLETE");
 assert.equal(cold.scope.entries[0].id,id);
 assert.equal(cold.scope.entries[0].detail,"fetch done");
+
+// The real extracted service must reuse only unchanged committed rows.
+const cacheDisk={};
+const cached=create(cacheDisk,true);
+const one=cached.call("beginOperation","CONTROL/FETCH",snapshot(),meta());
+assert(one);
+assert.equal(cached.scope.lastPersistReusedCount,0);
+const two=cached.call("beginOperation","CONTROL/PULL",snapshot(),meta());
+assert(two);
+assert.equal(cached.scope.lastPersistReusedCount,1);
+assert.equal(cached.scope.encodedDeltaRecords.length,2);
+assert.equal(cached.call("completeOperation",two,snapshot(),"pull done"),true);
+assert.equal(cached.scope.lastPersistReusedCount,1);
+assert.equal(JSON.parse(cacheDisk.delta).records[1].status,"COMPLETE");
+assert.equal(cached.call("completeOperation",one,snapshot(),"fetch done"),true);
+assert.equal(cached.scope.lastPersistReusedCount,1);
+const cacheReload=create(cacheDisk,true);
+assert.equal(cacheReload.scope.encodedDeltaRecords.length,0,
+    "cache must not be trusted across cold journal loads");
+const three=cacheReload.call("beginOperation","CONTROL/FETCH",snapshot(),meta());
+assert(three);
+assert.equal(cacheReload.scope.lastPersistReusedCount,0);
+assert.equal(JSON.parse(cacheDisk.delta).records.length,3);
+assert.equal(JSON.parse(cacheDisk.delta).records[0].status,"COMPLETE");
+
+const checkpointDisk={};
+const checkpoint=create(checkpointDisk,true,2);
+assert(checkpoint.call("beginOperation","CONTROL/FETCH",snapshot(),meta()));
+assert.equal(checkpoint.scope.encodedDeltaRecords.length,1);
+assert(checkpoint.call("beginOperation","CONTROL/PULL",snapshot(),meta()));
+assert.equal(checkpoint.scope.encodedDeltaRecords.length,0,
+    "successful full checkpoint invalidates sidecar cache");
+assert.equal(JSON.parse(checkpointDisk.main).entries.length,2);
+assert.equal(JSON.parse(checkpointDisk.delta).records.length,0);
 
 // A real crash after RUNNING receipt must not invent a COMPLETE result.
 const interruptedDisk={};

@@ -816,3 +816,36 @@ are retained under a collapsed **ADVANCED** control. They have not been
 removed and the existing services are unchanged. This is the first
 on-desktop UX iteration; not a final design approval. No personal
 financial data is modified by CI or by installing these locked controls.
+
+
+## FinanceW Budget Control Center // Section Navigation
+
+The accepted compact spreadsheet remains the **BUDGET** page. Its
+Budget subsection now exposes four 2×2 tabs in the existing narrow menu:
+
+- **BUDGET**: the accepted editable SET / SPENT / LEFT grid, plus
+  compact ADD MONEY. Advanced diagnostics and legacy allocation
+  controls remain collapsed underneath.
+- **TRANSACTIONS**: promotes the existing guarded NEW/EDIT transaction
+  form, saved local drafts and up to 24 latest monthly transactions
+  out of the bottom of the long Budget page. No new financial mutator,
+  bypass, or permit is introduced. The user must complete/cancel an
+  open transaction form before switching sections.
+- **ACCOUNTS**: a current snapshot-backed account list with recorded
+  balances and recent displayed-month activity. Selecting an account
+  and NEW TRANSACTION launches the existing editor preselected for
+  that account, subject to the existing transaction writer lock.
+- **CATEGORIES**: search existing category names/group names, review
+  allocated and remaining balances, and use **EDIT SET** to jump to
+  the category's existing editable Budget spreadsheet row.
+
+This checkpoint does **not** create unsupported account/category
+mutations or misrepresent selected-month activity as complete account
+history. **Account create/rename, category create/rename/delete,
+transaction delete and transaction category reassignment** need
+separately designed, testable Actual writers and are upcoming jobs.
+
+Existing D9/D12/D17 independent financial write gates and journal
+recovery remain unchanged. The actual balances and categories come from
+the authenticated read-only snapshot; the new panes never call Actual
+or persist data directly. No local host changes were made by this PR.

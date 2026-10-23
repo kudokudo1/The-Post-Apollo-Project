@@ -173,6 +173,17 @@ Item {
         return true;
     }
 
+    function beginForAccount(selectedAccountId) {
+        if(!Array.isArray(accounts))return false;
+        const selected=accounts.findIndex(function(a){
+            return a && a.id===selectedAccountId;
+        });
+        if(selected<0 || !begin())return false;
+        accountIndex=selected;
+        reviewed=false;
+        return true;
+    }
+
     function begin() {
         if (!Array.isArray(accounts) || accounts.length === 0)
             return false;

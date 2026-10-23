@@ -12,6 +12,7 @@ PanelWindow {
     property bool menuOpen: false
     property bool fundingReviewOpen: false
     property bool advancedOpen: false
+    property string budgetSection: "budget"
     property bool keyboardActive: false
     property bool keyboardLock: false
     property bool relationshipFocusModeActive: false
@@ -94,6 +95,19 @@ PanelWindow {
     readonly property color feedBorderColor:
         feedStatus === "OFFLINE" || feedStatus === "ERROR"
         || feedStatus === "NO FEED" ? feedStatusColor : Colors.omnitrix
+
+    function selectBudgetSection(section) {
+        if(["budget","transactions","accounts","categories"].indexOf(section)<0)
+            return false;
+        // Never hide an unfinished transaction editor or an active write.
+        if((transactionDraftPane.open && section!=="transactions")
+                || financeWrite.state==="pending"
+                || financeWrite.state==="uncertain")
+            return false;
+        budgetSection=section;
+        budgetScroll.contentY=0;
+        return true;
+    }
 
     function accountTotalCents() {
         const data = financeBudget.snapshot;
@@ -1005,7 +1019,40 @@ PanelWindow {
                             width: budgetScroll.width
                             spacing: 7
 
-                            ActionButton {
+                            Grid {
+    id: budgetSectionTabs
+    width: parent.width
+    columns: 2
+    spacing: 5
+    Repeater {
+        model: [
+            {key:"budget",label:"BUDGET"},
+            {key:"transactions",label:"TRANSACTIONS"},
+            {key:"accounts",label:"ACCOUNTS"},
+            {key:"categories",label:"CATEGORIES"}
+        ]
+        delegate: ActionButton {
+            required property var modelData
+            width: (budgetSectionTabs.width-5)/2
+            height: 28
+            label: modelData.label
+            labelPixelSize: 9
+            accentColor: root.budgetSection===modelData.key
+                ? Colors.magenta : Colors.cyan
+            trackLabelGlowLocally: true
+            available: !transactionDraftPane.open
+                || root.budgetSection!=="transactions"
+                || modelData.key==="transactions"
+            onLeftClicked: root.selectBudgetSection(modelData.key)
+        }
+    }
+}
+Column {
+    id: budgetSectionContent
+    width: parent.width
+    spacing: 7
+    visible: root.budgetSection==="budget"
+ActionButton {
     id: quickAddMoney
     width: parent.width
     height: 30
@@ -1485,6 +1532,35 @@ ActionButton {
                             }
 
                             }
+}
+FinanceAccountsPane {
+    id: financeAccountsPane
+    width: parent.width
+    visible: root.budgetSection==="accounts"
+    snapshot: financeBudget.snapshot
+    onNewTransactionRequested: {
+        root.selectBudgetSection("transactions");
+        if(financeAccountsPane.selectedAccountId)
+            transactionDraftPane.beginForAccount(financeAccountsPane.selectedAccountId);
+        else
+            transactionDraftPane.begin();
+    }
+}
+FinanceCategoriesPane {
+    id: financeCategoriesPane
+    width: parent.width
+    visible: root.budgetSection==="categories"
+    snapshot: financeBudget.snapshot
+    onEditBudgetRequested: function(category) {
+        root.selectBudgetSection("budget");
+        financeBudgetGrid.choose(category);
+    }
+}
+Column {
+    id: transactionsSectionContent
+    width: parent.width
+    spacing: 7
+    visible: root.budgetSection==="transactions"
 Row {
                                 width: parent.width
                                 spacing: 7
@@ -1727,6 +1803,7 @@ Row {
                                 textFormat: Text.PlainText
                                 font.pixelSize: 9
                                 color: Colors.orange
+                            }
                             }
                         }
                     }

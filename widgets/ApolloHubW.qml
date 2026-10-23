@@ -230,6 +230,7 @@ PanelWindow {
         modulePickerModeId = "";
         modulePickerGroupId = "";
         modulePickerQuery = "";
+        modulePickerInput.text = "";
         if (menuOpen && keyboardActive)
             Qt.callLater(function() {
                 if (hub.standardKeysAvailable)
@@ -247,6 +248,7 @@ PanelWindow {
         modulePickerModeId = activeMode.id;
         modulePickerGroupId = activeSubMode.id;
         modulePickerQuery = "";
+        modulePickerInput.text = "";
         modulePickerOpen = true;
         tileScroll.contentY = 0;
         Qt.callLater(function() {
@@ -906,7 +908,7 @@ PanelWindow {
                             color: Colors.white
                             font.pixelSize: 14
                             selectByMouse: true
-                            text: hub.modulePickerQuery
+                            text: ""
                             onTextChanged: hub.modulePickerQuery = text
                             Keys.onPressed: function(event) {
                                 if (event.key === Qt.Key_Escape) {

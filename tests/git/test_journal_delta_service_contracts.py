@@ -42,13 +42,30 @@ assert 'checkpointGeneration = nextGeneration' in save
 assert 'return true;' in save
 
 for fragment in (
-    'persist(record);\n        operationStarted',
-    'persist(record);\n        operationFinished(operationId, true',
-    'persist(record);\n        operationFinished(operationId, false',
-    'if (repairedInterrupted)\n            persist();',
-    'next[index] = record;\n        entries = next;\n        persist();',
+    'if (!persist(record))\\n            return "";\\n        operationStarted',
+    'if (!persist(record))\\n            return false;\\n        operationFinished(operationId, true',
+    'if (!persist(record))\\n            return false;\\n        operationFinished(operationId, false',
+    'if (repairedInterrupted)\\n            persist();',
+    'next[index] = record;\\n        entries = next;\\n        return persist();',
 ):
     assert fragment in journal, fragment
+
+# Blocking FileView writes report void; journal success needs a synchronous
+# saved() acknowledgement and must fail closed on saveFailed().
+for fragment in (
+    'property int journalWriteStatus: 0',
+    'property int deltaWriteStatus: 0',
+    'function requireWriteAck(channel)',
+    'if (!requireWriteAck("DELTA"))',
+    'if (!requireWriteAck("CHECKPOINT"))',
+    'onSaved: root.journalWriteStatus = 1',
+    'onSaved: root.deltaWriteStatus = 1',
+    'onSaveFailed: function(error)',
+    'function blockStorage(reason)',
+):
+    assert fragment in journal, fragment
+assert journal.count('onSaveFailed: function(error)') == 2
+assert 'return blockStorage("PERSIST EXCEPTION //' in journal
 
 # Keep every Undo / recovery consumer's public contract unchanged.
 for fragment in (

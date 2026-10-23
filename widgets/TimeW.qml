@@ -2973,7 +2973,7 @@ PanelWindow {
                         GohuText {
                             width: parent.width
                             text: timew.countdownFinished
-                                  ? "FINISHED // OPEN THIS VIEW TO ACKNOWLEDGE"
+                                  ? "FINISHED // PRESS RESET OR RESTART"
                                   : "NO AUDIO OR DESKTOP NOTIFICATION // INITIAL SLICE"
                             color: timew.countdownFinished
                                    ? Colors.magenta : Colors.orange

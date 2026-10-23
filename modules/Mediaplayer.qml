@@ -81,25 +81,28 @@ Item {
     // Keep accentColor tied to playback for normal/closed presentation.
     readonly property color artworkAccentColor: open ? Colors.magenta : accentColor
 
-    // One static color per frequency band. No new animated gradient layer,
-    // frame callback, shader, or sampled texture. Playback changes palettes,
-    // and the open state overrides every bar with canonical magenta.
-    function blendBarColor(from, to, amount) {
-        const t = Math.max(0, Math.min(1, amount));
-        return Qt.rgba(from.r + (to.r - from.r) * t,
-                       from.g + (to.g - from.g) * t,
-                       from.b + (to.b - from.b) * t,
-                       from.a + (to.a - from.a) * t);
-    }
-
-    function barPaletteColor(barIndex) {
-        const position = barCount > 1 ? barIndex / (barCount - 1) : 0;
-        const start = mpdPlaying ? Colors.yellow : Colors.cyan;
-        const middle = mpdPlaying ? Colors.orange : Colors.blue;
-        const end = mpdPlaying ? Colors.red : Colors.magenta;
-        return position <= 0.5
-            ? blendBarColor(start, middle, position * 2)
-            : blendBarColor(middle, end, (position - 0.5) * 2);
+    // Share one vertical palette among all 20 bars and both existing halos.
+    // Qt Quick GradientStop positions run top (0) to bottom (1), so reverse
+    // the named progression here: cool cyan→blue→magenta rises bottom→top;
+    // playing yellow→orange→red likewise rises bottom→top.
+    // The open Hi-Fi state still forces uniform magenta on all three stops.
+    readonly property Gradient cavaVerticalGradient: Gradient {
+        orientation: Gradient.Vertical
+        GradientStop {
+            position: 0.0
+            color: mediaDock.open ? Colors.magenta
+                : (mediaDock.mpdPlaying ? Colors.red : Colors.magenta)
+        }
+        GradientStop {
+            position: 0.5
+            color: mediaDock.open ? Colors.magenta
+                : (mediaDock.mpdPlaying ? Colors.orange : Colors.blue)
+        }
+        GradientStop {
+            position: 1.0
+            color: mediaDock.open ? Colors.magenta
+                : (mediaDock.mpdPlaying ? Colors.yellow : Colors.cyan)
+        }
     }
 
     // Follow the general height of CAVA without following individual spikes.
@@ -377,8 +380,6 @@ Item {
                         // animation, shader, texture sampling or CAVA process.
                         readonly property real glowActivity: Math.max(0, Math.min(1,
                             Number(mediaDock.levels[index] || 0) / 7))
-                        readonly property color barColor: mediaDock.open
-                            ? Colors.magenta : mediaDock.barPaletteColor(index)
 
                         // Two existing geometry-only halos follow the core.
                         // Their opacity also rises with activity, so tall
@@ -390,7 +391,7 @@ Item {
                             width: parent.width + 8
                             height: cavaBar.height + 6
                             radius: 0
-                            color: parent.barColor
+                            gradient: mediaDock.cavaVerticalGradient
                             opacity: 0.30 + 0.24 * parent.glowActivity
                         }
 
@@ -401,7 +402,7 @@ Item {
                             width: parent.width + 4
                             height: cavaBar.height + 2
                             radius: 0
-                            color: parent.barColor
+                            gradient: mediaDock.cavaVerticalGradient
                             opacity: 0.50 + 0.30 * parent.glowActivity
                         }
 
@@ -413,7 +414,7 @@ Item {
                                 (Number(mediaDock.levels[index] || 0) / 7) * 27
                             ))
                             radius: 0
-                            color: parent.barColor
+                            gradient: mediaDock.cavaVerticalGradient
 
                             Behavior on height {
                                 NumberAnimation {

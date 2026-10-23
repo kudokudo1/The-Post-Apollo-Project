@@ -50,6 +50,60 @@ PanelWindow {
           + "//" + localTimeSnapshot.meridiem
         : "--:--:--//--"
 
+    // Two CALC views preserve the existing converter geometry while adding
+    // manual elapsed duration arithmetic without a new persistent clock.
+    property string calcView: "convert"
+    property string mathOperation: "add"
+    property string mathDays: "0"
+    property string mathHours: "1"
+    property string mathMinutes: "0"
+    property var mathResult: null
+    property bool mathBusy: false
+    property string mathSubmittedKey: ""
+    readonly property string mathInputsKey:
+        [converterDate,
+         converterParsedTime.valid ? converterParsedTime.canonical
+                                   : "INVALID:" + converterTime,
+         converterSourceZone, mathOperation, mathDays,
+         mathHours, mathMinutes].join("|")
+
+    onMathInputsKeyChanged: mathResult = null
+
+    function setCalcView(which) {
+        if (which !== "convert" && which !== "math")
+            return;
+        closeConverterDropdowns();
+        calcView = which;
+    }
+
+    function toggleMathOperation() {
+        mathOperation = mathOperation === "add" ? "subtract" : "add";
+    }
+
+    function runTimeArithmetic() {
+        if (mathBusy || !menuOpen || selectedMode !== "calc"
+                || calcView !== "math")
+            return;
+        if (!converterZoneAllowed(converterSourceZone)) {
+            mathResult = {status: "ZONE_UNAVAILABLE", options: []};
+            return;
+        }
+        if (!converterParsedTime.valid) {
+            mathResult = {status: converterParsedTime.error, options: []};
+            return;
+        }
+        mathResult = null;
+        mathSubmittedKey = mathInputsKey;
+        mathBusy = true;
+        arithmeticProcess.exec([
+            "python3", "-B", "-I",
+            Quickshell.shellPath("services/time/TimeArithmetic.py"),
+            converterSourceZone, converterDate,
+            converterParsedTime.canonical, mathOperation,
+            mathDays, mathHours, mathMinutes
+        ]);
+    }
+
     // CALC // Time-zone conversion is deliberately request-driven, not a
     // new background clock. UTC initial values avoid ambiguous local defaults.
     property string converterDate: new Date().toISOString().slice(0, 10)
@@ -434,6 +488,34 @@ PanelWindow {
     SystemClock {
         id: localClock
         precision: SystemClock.Seconds
+    }
+
+    // Request-driven elapsed arithmetic. Keep it separate from the zone
+    // converter so neither process nor result interferes with the other.
+    Process {
+        id: arithmeticProcess
+        running: false
+        stdout: StdioCollector {
+            onStreamFinished: {
+                if (timew.mathSubmittedKey !== timew.mathInputsKey)
+                    return;
+                try {
+                    const result = JSON.parse(this.text);
+                    timew.mathResult =
+                        result && typeof result.status === "string"
+                        && Array.isArray(result.options)
+                        ? result : {status: "INVALID_RESULT", options: []};
+                } catch (e) {
+                    timew.mathResult = {status: "INVALID_RESULT", options: []};
+                }
+            }
+        }
+        onExited: function(exitCode, exitStatus) {
+            timew.mathBusy = false;
+            if (exitCode !== 0
+                    && timew.mathSubmittedKey === timew.mathInputsKey)
+                timew.mathResult = {status: "MATH_UNAVAILABLE", options: []};
+        }
     }
 
     // Manual conversion only. Output is structured JSON from our Python
@@ -1112,9 +1194,41 @@ PanelWindow {
                         }
                     }
 
+                    Row {
+                        id: calcSubModeStrip
+                        visible: timew.selectedMode === "calc"
+                        width: parent.width
+                        height: 34
+                        spacing: 6
+
+                        ModeButton {
+                            width: (calcSubModeStrip.width - calcSubModeStrip.spacing) / 2
+                            height: parent.height
+                            bordered: false
+                            textOnly: true
+                            labelText: "CONVERT"
+                            labelFontSize: 11
+                            idlePrimaryColor: timew.semanticColor
+                            selected: timew.calcView === "convert"
+                            onTriggered: timew.setCalcView("convert")
+                        }
+
+                        ModeButton {
+                            width: (calcSubModeStrip.width - calcSubModeStrip.spacing) / 2
+                            height: parent.height
+                            bordered: false
+                            textOnly: true
+                            labelText: "MATH"
+                            labelFontSize: 11
+                            idlePrimaryColor: timew.semanticColor
+                            selected: timew.calcView === "math"
+                            onTriggered: timew.setCalcView("math")
+                        }
+                    }
+
                     Column {
                         id: converterPane
-                        visible: timew.selectedMode === "calc"
+                        visible: timew.selectedMode === "calc" && timew.calcView === "convert"
                         // Overlay either dropdown above following inputs,
                         // results, and the footer, without shifting the page.
                         z: timew.activeConverterDropdown !== "" ? 20 : 0
@@ -1411,6 +1525,324 @@ PanelWindow {
                             color: Colors.white
                             opacity: 0.72
                             font.pixelSize: 11
+                        }
+                    }
+
+                    Column {
+                        id: mathPane
+                        visible: timew.selectedMode === "calc" && timew.calcView === "math"
+                        width: parent.width
+                        spacing: 10
+
+                        GohuText {
+                            text: "ELAPSED TIME // ADD OR SUBTRACT"
+                            color: Colors.white
+                            font.pixelSize: 13
+                        }
+
+                        Row {
+                            id: mathZoneRow
+                            width: parent.width
+                            height: 32
+                            spacing: 6
+                            GohuText {
+                                width: 50
+                                height: parent.height
+                                verticalAlignment: Text.AlignVCenter
+                                text: "ZONE"
+                                color: Colors.cyan
+                                font.pixelSize: 11
+                            }
+                            ActionButton {
+                                width: 67
+                                height: 30
+                                label: "CHANGE"
+                                labelPixelSize: 9
+                                accentColor: Colors.white
+                                onLeftClicked: timew.cycleConverterZone("source")
+                            }
+                            GohuText {
+                                width: parent.width - 50 - 67 - 12
+                                height: parent.height
+                                verticalAlignment: Text.AlignVCenter
+                                text: timew.converterSourceZone
+                                elide: Text.ElideRight
+                                color: Colors.white
+                                font.pixelSize: 11
+                            }
+                        }
+
+                        Row {
+                            id: mathDateTimeRow
+                            width: parent.width
+                            height: 34
+                            spacing: 4
+                            TextField {
+                                id: mathDateInput
+                                width: Math.max(0, (mathDateTimeRow.width
+                                        - mathTimeFormatButton.width
+                                        - mathDateTimeRow.spacing * 2) / 2)
+                                height: parent.height
+                                text: timew.converterDate
+                                placeholderText: "YYYY-MM-DD"
+                                color: Colors.magenta
+                                placeholderTextColor: Colors.cyan
+                                selectionColor: Colors.magenta
+                                selectedTextColor: Colors.black
+                                font.family: "GohuFont 11 Nerd Font Mono"
+                                font.pixelSize: 10
+                                leftPadding: 3
+                                rightPadding: 3
+                                cursorDelegate: Rectangle {
+                                    width: 2
+                                    color: Colors.orange
+                                }
+                                background: Rectangle {
+                                    color: Colors.black
+                                    border.color: mathDateInput.activeFocus
+                                                  ? Colors.magenta : Colors.cyan
+                                    border.width: 1
+                                }
+                                onTextEdited: timew.converterDate = text
+                            }
+                            TextField {
+                                id: mathTimeInput
+                                width: Math.max(0, mathDateTimeRow.width
+                                       - mathDateInput.width
+                                       - mathTimeFormatButton.width
+                                       - mathDateTimeRow.spacing * 2)
+                                height: parent.height
+                                text: timew.converterTime
+                                placeholderText: timew.converterInput24Hour
+                                                 ? "HH:MM" : "HH:MM//PM"
+                                color: Colors.magenta
+                                placeholderTextColor: Colors.cyan
+                                selectionColor: Colors.magenta
+                                selectedTextColor: Colors.black
+                                font.family: "GohuFont 11 Nerd Font Mono"
+                                font.pixelSize: 10
+                                leftPadding: 3
+                                rightPadding: 3
+                                cursorDelegate: Rectangle {
+                                    width: 2
+                                    color: Colors.orange
+                                }
+                                background: Rectangle {
+                                    color: Colors.black
+                                    border.color: mathTimeInput.activeFocus
+                                                  ? Colors.magenta : Colors.cyan
+                                    border.width: 1
+                                }
+                                onTextEdited: timew.converterTime = text
+                            }
+                            ActionButton {
+                                id: mathTimeFormatButton
+                                width: 44
+                                height: parent.height
+                                label: timew.converterInput24Hour ? "24H" : "12H"
+                                labelPixelSize: 11
+                                accentColor: timew.converterInputFormatColor
+                                onLeftClicked: timew.toggleConverterInputFormat()
+                            }
+                        }
+
+                        Row {
+                            id: mathDurationRow
+                            width: parent.width
+                            height: 60
+                            spacing: 6
+                            Column {
+                                width: (mathDurationRow.width - mathDurationRow.spacing * 2) / 3
+                                spacing: 4
+                                GohuText {
+                                    text: "DAYS"
+                                    color: Colors.cyan
+                                    font.pixelSize: 11
+                                }
+                                TextField {
+                                    id: mathDaysInput
+                                    width: parent.width
+                                    height: 34
+                                    text: timew.mathDays
+                                    color: Colors.magenta
+                                    placeholderText: "0"
+                                    font.family: "GohuFont 11 Nerd Font Mono"
+                                    font.pixelSize: 12
+                                    cursorDelegate: Rectangle { width: 2; color: Colors.orange }
+                                    background: Rectangle {
+                                        color: Colors.black
+                                        border.color: mathDaysInput.activeFocus
+                                                      ? Colors.magenta : Colors.cyan
+                                        border.width: 1
+                                    }
+                                    onTextEdited: timew.mathDays = text
+                                }
+                            }
+                            Column {
+                                width: (mathDurationRow.width - mathDurationRow.spacing * 2) / 3
+                                spacing: 4
+                                GohuText {
+                                    text: "HOURS"
+                                    color: Colors.cyan
+                                    font.pixelSize: 11
+                                }
+                                TextField {
+                                    id: mathHoursInput
+                                    width: parent.width
+                                    height: 34
+                                    text: timew.mathHours
+                                    color: Colors.magenta
+                                    placeholderText: "1"
+                                    font.family: "GohuFont 11 Nerd Font Mono"
+                                    font.pixelSize: 12
+                                    cursorDelegate: Rectangle { width: 2; color: Colors.orange }
+                                    background: Rectangle {
+                                        color: Colors.black
+                                        border.color: mathHoursInput.activeFocus
+                                                      ? Colors.magenta : Colors.cyan
+                                        border.width: 1
+                                    }
+                                    onTextEdited: timew.mathHours = text
+                                }
+                            }
+                            Column {
+                                width: (mathDurationRow.width - mathDurationRow.spacing * 2) / 3
+                                spacing: 4
+                                GohuText {
+                                    text: "MINUTES"
+                                    color: Colors.cyan
+                                    font.pixelSize: 11
+                                }
+                                TextField {
+                                    id: mathMinutesInput
+                                    width: parent.width
+                                    height: 34
+                                    text: timew.mathMinutes
+                                    color: Colors.magenta
+                                    placeholderText: "0"
+                                    font.family: "GohuFont 11 Nerd Font Mono"
+                                    font.pixelSize: 12
+                                    cursorDelegate: Rectangle { width: 2; color: Colors.orange }
+                                    background: Rectangle {
+                                        color: Colors.black
+                                        border.color: mathMinutesInput.activeFocus
+                                                      ? Colors.magenta : Colors.cyan
+                                        border.width: 1
+                                    }
+                                    onTextEdited: timew.mathMinutes = text
+                                }
+                            }
+                        }
+
+                        Row {
+                            width: parent.width
+                            height: 34
+                            spacing: 6
+                            ActionButton {
+                                width: 90
+                                height: parent.height
+                                label: timew.mathOperation === "add" ? "+ ADD" : "- SUB"
+                                labelPixelSize: 11
+                                accentColor: timew.mathOperation === "add"
+                                             ? Colors.orange : Colors.cyan
+                                onLeftClicked: timew.toggleMathOperation()
+                            }
+                            ActionButton {
+                                width: parent.width - 96
+                                height: parent.height
+                                label: timew.mathBusy ? "CALCULATING..." : "CALCULATE"
+                                labelPixelSize: 11
+                                available: !timew.mathBusy
+                                accentColor: Colors.white
+                                onLeftClicked: timew.runTimeArithmetic()
+                            }
+                        }
+
+                        Rectangle {
+                            width: parent.width
+                            height: 2
+                            color: Colors.cyan
+                            opacity: 0.5
+                        }
+
+                        Row {
+                            id: mathResultHeader
+                            width: parent.width
+                            height: 42
+                            spacing: 6
+                            GohuText {
+                                width: parent.width - mathResultFormatButton.width
+                                       - mathResultHeader.spacing
+                                height: parent.height
+                                verticalAlignment: Text.AlignVCenter
+                                wrapMode: Text.Wrap
+                                color: timew.mathResult
+                                       && timew.mathResult.status === "READY"
+                                       ? Colors.cyan : Colors.orange
+                                font.pixelSize: 11
+                                text: timew.mathBusy
+                                      ? "MATH // WORKING"
+                                      : !timew.mathResult ? "MATH // ENTER DURATION"
+                                      : timew.mathResult.status === "READY"
+                                      ? "MATH // 1 RESULT"
+                                      : timew.mathResult.status === "AMBIGUOUS_LOCAL_TIME"
+                                      ? "REPEATED HOUR // 2 RESULTS"
+                                      : timew.mathResult.status === "NONEXISTENT_LOCAL_TIME"
+                                      ? "TIME DOES NOT EXIST // DST CLOCK JUMP"
+                                      : "MATH // " + timew.mathResult.status
+                            }
+                            ActionButton {
+                                id: mathResultFormatButton
+                                width: 44
+                                height: 30
+                                label: timew.converterOutput24Hour ? "24H" : "12H"
+                                labelPixelSize: 11
+                                accentColor: timew.converterOutputFormatColor
+                                onLeftClicked: timew.toggleConverterOutputFormat()
+                            }
+                        }
+
+                        Repeater {
+                            model: timew.mathResult && timew.mathResult.options
+                                   ? timew.mathResult.options : []
+                            Column {
+                                width: mathPane.width
+                                spacing: 4
+                                GohuText {
+                                    text: "RESULT " + (index + 1)
+                                          + (index === 0 ? " // EARLIER" : " // LATER")
+                                    color: Colors.white
+                                    font.pixelSize: 11
+                                }
+                                GohuText {
+                                    width: parent.width
+                                    text: ConverterFormat.formatResult(
+                                              modelData.result,
+                                              timew.converterOutput24Hour)
+                                    color: timew.converterOutputFormatColor
+                                    font.pixelSize: 13
+                                    elide: Text.ElideRight
+                                }
+                                GohuText {
+                                    width: parent.width
+                                    text: "SOURCE // " + ConverterFormat.formatResult(
+                                              modelData.source,
+                                              timew.converterOutput24Hour)
+                                    color: Colors.orange
+                                    font.pixelSize: 11
+                                    elide: Text.ElideRight
+                                }
+                            }
+                        }
+
+                        GohuText {
+                            width: parent.width
+                            text: "ELAPSED // 1 DAY = 24 HOURS. "
+                                  + "FROM zone comes from CONVERT."
+                            color: Colors.white
+                            opacity: 0.72
+                            font.pixelSize: 11
+                            wrapMode: Text.Wrap
                         }
                     }
 

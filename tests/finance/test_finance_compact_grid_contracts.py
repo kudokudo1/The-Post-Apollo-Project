@@ -47,7 +47,9 @@ for phrase in (
  'text: "LEFT"',
  'modelData.spentCents',
  'modelData.availableCents',
- 'onSnapshotChanged: reset()',
+ 'onSnapshotChanged: {',
+ 'snapshot.sourceKey!==selectedSource',
+ 'snapshot.month!==selectedMonth',
 ): assert phrase in grid,phrase
 assert grid.count('FinanceMoneyInput {') == 1
 assert grid.count('ActionButton {') == 3

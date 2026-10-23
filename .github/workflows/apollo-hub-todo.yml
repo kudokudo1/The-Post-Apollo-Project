@@ -10,6 +10,7 @@ on:
       - "tests/hub/test_apollo_hub_todo_store.py"
       - "tests/tasks/test_task_details_policy.cjs"
       - "tests/tasks/test_task_projects_policy.cjs"
+      - "tests/tasks/test_task_project_management.cjs"
       - ".github/workflows/apollo-hub-todo.yml"
   push:
     branches:
@@ -22,6 +23,7 @@ on:
       - "tests/hub/test_apollo_hub_todo_store.py"
       - "tests/tasks/test_task_details_policy.cjs"
       - "tests/tasks/test_task_projects_policy.cjs"
+      - "tests/tasks/test_task_project_management.cjs"
       - ".github/workflows/apollo-hub-todo.yml"
   workflow_dispatch:
 
@@ -42,3 +44,5 @@ jobs:
         run: node tests/tasks/test_task_details_policy.cjs
       - name: Validate TASKS v3 local Projects and legacy migration
         run: node tests/tasks/test_task_projects_policy.cjs
+      - name: Validate PROJECTS rename and confirmed non-destructive deletion
+        run: node tests/tasks/test_task_project_management.cjs

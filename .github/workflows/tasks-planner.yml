@@ -23,3 +23,4 @@ jobs:
       - run: python3 tests/tasks/test_task_planner_ui_contracts.py
       - run: node tests/tasks/test_task_planner_policy.cjs
       - run: python3 tests/tasks/test_task_planner_preview.py
+      - run: python3 tests/tasks/test_task_planner_layout.py

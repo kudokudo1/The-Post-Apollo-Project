@@ -846,11 +846,123 @@ PanelWindow {
                                  - statusFooter.height
                                  - (hub.editMode ? 6 : 5) * hubColumn.spacing)
                 contentWidth: width
-                contentHeight: tileFlow.height
+                contentHeight: hub.modulePickerOpen ? modulePicker.height : tileFlow.height
                 clip: true
                 boundsBehavior: Flickable.StopAtBounds
 
+                // Stage 4: replace the tile flow with a searchable module list
+                // while editing. No second service, storage file or app index.
+                Column {
+                    id: modulePicker
+                    visible: hub.modulePickerOpen
+                    width: tileScroll.width
+                    height: childrenRect.height
+                    spacing: 7
+
+                    Row {
+                        width: parent.width
+                        height: 28
+                        spacing: 8
+                        GohuText {
+                            width: parent.width - 96
+                            height: parent.height
+                            verticalAlignment: Text.AlignVCenter
+                            elide: Text.ElideRight
+                            font.pixelSize: 13
+                            color: Colors.magenta
+                            text: "SWAP MODULE // "
+                                  + (hub.modulePickerTileIndex >= 0
+                                     && hub.modulePickerTileIndex < hub.activeTiles.length
+                                     ? Layout.tileTitle(
+                                         hub.activeTiles[hub.modulePickerTileIndex].module)
+                                     : "UNAVAILABLE")
+                        }
+                        ActionButton {
+                            trackLabelGlowLocally: true
+                            width: 88
+                            height: 27
+                            label: "CLOSE"
+                            onLeftClicked: hub.closeModulePicker()
+                        }
+                    }
+                    GohuText {
+                        width: parent.width
+                        height: 20
+                        verticalAlignment: Text.AlignVCenter
+                        color: Colors.cyan
+                        font.pixelSize: 11
+                        text: "SEARCH MODULE NAME / ID  //  TYPE TO FILTER"
+                    }
+                    SectionFrame {
+                        width: parent.width
+                        height: 35
+                        fillColor: Colors.black
+                        borderColor: Colors.magenta
+                        borderWidth: 1
+                        inset: 7
+                        TextInput {
+                            id: modulePickerInput
+                            anchors.fill: parent
+                            color: Colors.white
+                            font.pixelSize: 14
+                            selectByMouse: true
+                            text: hub.modulePickerQuery
+                            onTextChanged: hub.modulePickerQuery = text
+                            Keys.onPressed: function(event) {
+                                if (event.key === Qt.Key_Escape) {
+                                    hub.closeModulePicker();
+                                    event.accepted = true;
+                                } else if (event.key === Qt.Key_Enter
+                                           || event.key === Qt.Key_Return) {
+                                    // Never launch or change an arbitrary module
+                                    // from Enter with a blank/ambiguous query.
+                                    if (hub.modulePickerQuery.trim().length > 0
+                                            && hub.modulePickerChoices.availableCount === 1) {
+                                        const match = hub.modulePickerChoices.items.find(
+                                            function(item) { return item.available; });
+                                        if (match)
+                                            hub.chooseModuleFromPicker(match.id);
+                                    }
+                                    event.accepted = true;
+                                }
+                            }
+                        }
+                    }
+                    GohuText {
+                        width: parent.width
+                        height: 20
+                        verticalAlignment: Text.AlignVCenter
+                        color: Colors.cyan
+                        font.pixelSize: 11
+                        text: hub.modulePickerChoices.state !== "ready"
+                              ? "MODULE LIST UNAVAILABLE"
+                              : hub.modulePickerChoices.matchCount + " / "
+                                + hub.modulePickerChoices.total
+                                + " MATCHES  //  "
+                                + hub.modulePickerChoices.availableCount
+                                + " SELECTABLE"
+                    }
+                    Repeater {
+                        model: hub.modulePickerChoices.items
+                        ActionButton {
+                            trackLabelGlowLocally: true
+                            width: modulePicker.width
+                            height: 33
+                            available: modelData.available
+                            selected: modelData.selected
+                            contentPadding: 8
+                            labelHorizontalAlignment: Text.AlignLeft
+                            labelPixelSize: 12
+                            label: modelData.title + "  //  " + modelData.id
+                                   + (modelData.selected ? "  [CURRENT]"
+                                      : modelData.inUse ? "  [IN USE]" : "")
+                            onLeftClicked: hub.chooseModuleFromPicker(modelData.id)
+                        }
+                    }
+                }
+
                 Flow {
+                    visible: !hub.modulePickerOpen
                     id: tileFlow
                     width: tileScroll.width
                     height: childrenRect.height
@@ -945,6 +1057,8 @@ PanelWindow {
                       : hub.pendingRemoval !== null
                       ? "CONFIRM REMOVE " + hub.pendingRemoval.kind.toUpperCase()
                         + " // " + hub.pendingRemoval.label + " // UNDO AVAILABLE"
+                      : hub.modulePickerOpen
+                      ? "MODULE PICKER // CLICK TO SELECT // ESC OR CLOSE TO CANCEL"
                       : hub.editMode
                       ? "← → MOVE    SWAP MODULE    W:1/2 WIDTH    H:1/2/3 HEIGHT    × REMOVE    UNDO"
                       : "APOLLO HUB  //  LIVE MODULES CONNECTED"

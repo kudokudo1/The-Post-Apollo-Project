@@ -1,9 +1,9 @@
 # TASKS // Proxy 1 M10c Disposable Atomic Storage Probe
 
 **Status:** Isolated GitHub CI test design, not a storage engine deployed on
-a desktop. **Dependency:** M10b draft PR #604 remains unmerged as of creation.
-This M10c branch and PR are stacked on M10b. The M10c PR must not merge
-before M10b is integrated and the branch is rebased/retargeted as appropriate.
+a desktop. **Dependency:** M10b PR #604 was merged into main during this work.
+This M10c branch began at the reviewed M10b commit and is now proposed
+against main. GitHub mergeability and final CI must be checked before merge.
 
 ## Goal
 
@@ -82,7 +82,7 @@ directly generalized to Quickshell's `FileView.atomicWrites` semantics.
 ## Proxy ownership
 
 Proxy 1 owns pure storage/journal prototypes. Proxy 2 independently owns
-PLANNER QML, its date policies, and tests (including PR #602). No changes
+PLANNER QML, its date policies, and tests (including the merged PR #602). No changes
 to the shared TASKS menu, GitW, live ApolloHubTodoStore/Policy, or desktop
 are made in M10c.
 

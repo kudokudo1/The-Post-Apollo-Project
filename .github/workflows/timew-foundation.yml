@@ -13,6 +13,7 @@ on:
       - "services/time/StopwatchPolicy.js"
       - "services/time/CountdownPolicy.js"
       - "services/time/MachineTimelinePolicy.js"
+      - "services/time/MachineSelectionPolicy.js"
       - "services/time/MachineCheckpointModel.py"
       - "services/time/MachineSwayRead.py"
       - "services/time/TimeConverterFormat.js"
@@ -36,6 +37,7 @@ on:
       - "services/time/StopwatchPolicy.js"
       - "services/time/CountdownPolicy.js"
       - "services/time/MachineTimelinePolicy.js"
+      - "services/time/MachineSelectionPolicy.js"
       - "services/time/MachineCheckpointModel.py"
       - "services/time/MachineSwayRead.py"
       - "services/time/TimeConverterFormat.js"
@@ -81,5 +83,9 @@ jobs:
         run: python3 -B -I tests/timew/test_machine_preview_inspector.py
       - name: Verify MACHINE memory-only selection controls
         run: python3 -B -I tests/timew/test_machine_selection_ui_contract.py
+      - name: Verify MACHINE selection dependencies and conflict scenarios
+        run: node tests/timew/test_machine_selection_policy.cjs
+      - name: Verify MACHINE validation UI remains read-only
+        run: python3 -B -I tests/timew/test_machine_selection_validation_contract.py
       - name: Verify MACHINE desktop checkpoint draft remains non-operative
         run: python3 -B -I tests/timew/test_machine_checkpoint_contract.py

@@ -293,6 +293,8 @@ for token in (
     'visible: !hub.modulePickerOpen',
     'contentHeight: hub.modulePickerOpen ? modulePicker.height : tileFlow.height',
     'event.key === Qt.Key_Escape',
+    'enabled: hub.menuOpen && hub.modulePickerOpen',
+    'onActivated: hub.closeModulePicker()',
     'hub.modulePickerChoices.availableCount === 1',
     'activeTiles[modulePickerTileIndex].id !== modulePickerTileId',
     'activeMode.id !== modulePickerModeId',

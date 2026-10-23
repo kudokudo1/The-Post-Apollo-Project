@@ -12,11 +12,13 @@ STORE = (ROOT / "services/hub/ApolloHubTodoStore.qml").read_text(encoding="utf-8
 assert TASKS.count("TaskTodayPane {") == 1
 assert "visible: root.menuOpen && root.activeMode.id === \"today\"" in TASKS
 assert 'visible: root.activeMode.id !== "tasks" && root.activeMode.id !== "today"' in TASKS
+assert '&& root.activeMode.id !== "projects"' in TASKS
 assert "todoSnapshot: ApolloHubTodoStore.snapshot" in TASKS
 assert "onOpenTaskRequested: function(taskId)" in TASKS
 assert "root.selectMainMode(0);" in TASKS
 assert "taskDetails.chooseTask(taskId);" in TASKS
-assert 'activeMode.id !== "tasks" && activeMode.id !== "today" ? "NO FEED"' in TASKS
+assert 'activeMode.id !== "tasks" && activeMode.id !== "today"' in TASKS
+assert '&& activeMode.id !== "projects" ? "NO FEED"' in TASKS
 
 assert 'import "TaskDateSegments.js" as DateSegments' in PANE
 assert 'import "TaskTodayPolicy.js" as TodayPolicy' in PANE

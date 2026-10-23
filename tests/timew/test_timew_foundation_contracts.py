@@ -126,7 +126,7 @@ assert "WorldClockPolicy.snapshot(localClock.date.getTime()," in window
 assert 'command: ["date", "+%z"]' in window
 assert 'environment: { TZ: worldLookupZone, LC_ALL: "C" }' in window
 assert "Process {" in window
-assert window.count("Process {") == 7
+assert window.count("Process {") == 8
 assert "worldLookup.running" in window
 assert 'onLeftClicked:' in window
 assert 'timew.chooseWorldZone(modelData.id)' in window

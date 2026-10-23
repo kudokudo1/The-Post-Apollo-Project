@@ -984,10 +984,14 @@ PanelWindow {
             z: 200
             visible: hub.modulePickerOpen
 
-            // Outside click dismisses without touching another tile/action.
-            MouseArea {
+            // A transparent input surface blocks underlying tile actions
+            // while the dropdown is open. Consistent with TimeW's TapHandler.
+            Rectangle {
                 anchors.fill: parent
-                onClicked: hub.closeModulePicker()
+                color: "transparent"
+                TapHandler {
+                    onTapped: hub.closeModulePicker()
+                }
             }
 
             Rectangle {
@@ -1001,10 +1005,9 @@ PanelWindow {
                 border.color: Colors.magenta
                 z: 1
 
-                // Consume empty-space clicks within the dropdown.
-                MouseArea {
-                    anchors.fill: parent
-                    onClicked: {}
+                // Empty-space taps inside the popup never dismiss it.
+                TapHandler {
+                    onTapped: {}
                 }
 
                 Column {

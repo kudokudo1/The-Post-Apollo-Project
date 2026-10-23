@@ -46,6 +46,9 @@ jobs:
       - name: Validate Proton independent notification/message correlation (offline)
         run: python3 tests/notifications/test_proton_notification_correlation_policy.py
 
+      - name: Validate privacy-only Proton native delivery audit
+        run: python3 tests/notifications/test_proton_native_delivery_audit.py
+
       - name: Validate read-only Proton browser native handshake
         run: python3 tests/notifications/test_proton_browser_handshake.py
 

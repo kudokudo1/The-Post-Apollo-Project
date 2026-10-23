@@ -356,7 +356,10 @@ Item {
                 blur: mediaDock.contentGlowRadius + 4
                 spread: 0
                 color: mediaDock.artworkAccentColor
-                opacity: 0.30
+                // Keep the existing closed-state wash, but when Hi-Fi opens
+                // match the three static glyph auras' canonical open glow.
+                // One existing shadow, no extra rendering effects or timers.
+                opacity: mediaDock.open ? mediaDock.softGlowOpacity : 0.30
                 z: -1
 
                 Behavior on height {

@@ -32,7 +32,7 @@ assert.match(weatherTerminalSource, /move absolute position /);
 assert.doesNotMatch(weatherTerminalSource, /terminalBay\.mapToGlobal\s*\(/);
 assert.doesNotMatch(weatherTerminalSource, /"\s*,\s*scratchpad show"/);
 for (const name of ["bayX", "bayY", "bayWidth", "bayHeight"])
-    assert.match(weatherTerminalSource, new RegExp("readonly property real " + name + ": terminalBay\\\\."));
+    assert.match(weatherTerminalSource, new RegExp("readonly property real " + name + ": terminalBay\\."));
 assert.match(windowSource, /mask:\s*Region[\s\S]*?terminalView\.bayX/);
 assert.match(windowSource, /terminalView\.bayWidth/);
 assert.match(geometrySource, /function position\(outputs, outputName/);

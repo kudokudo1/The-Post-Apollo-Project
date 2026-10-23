@@ -56,7 +56,6 @@ assert.match(chassisCutout, /y:\s*chassis\.holeY \+ chassis\.holeHeight/);
 assert.match(chassisCutout, /color:\s*chassis\.panelColor/);
 assert.match(chassisCutout, /opacity:\s*chassis\.panelOpacity/);
 assert.match(weatherTerminalSource, /color:\s*terminalView\.terminalState === "VISIBLE"\s*\? "transparent" : Colors\.black/);
-assert.match(weatherTerminalSource, /color:\s*terminalView\.terminalState === "VISIBLE" \? "transparent" : Colors\.black/);
 assert.match(geometrySource, /function position\(outputs, outputName/);
 
 

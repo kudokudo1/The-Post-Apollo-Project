@@ -657,10 +657,32 @@ PanelWindow {
     property bool machineCaptureBusy: false
     property var machineCapturePreview: null
     property string machineCaptureStatus: "NOT CAPTURED"
+    property string machineInspectKind: "outputs"
+    property int machineInspectIndex: 0
+    readonly property var machineInspectItems: machineCapturePreview
+        ? (machineCapturePreview[machineInspectKind] || []) : []
+    readonly property var machineInspectItem:
+        machineInspectIndex >= 0 && machineInspectIndex < machineInspectItems.length
+        ? machineInspectItems[machineInspectIndex] : null
+
+    function selectMachineInspectKind(kind) {
+        if (kind !== "outputs" && kind !== "workspaces" && kind !== "windows")
+            return;
+        machineInspectKind = kind;
+        machineInspectIndex = 0;
+    }
+    function stepMachineInspect(delta) {
+        const count = machineInspectItems.length;
+        if (count === 0)
+            return;
+        machineInspectIndex = (machineInspectIndex + delta + count) % count;
+    }
+
     function requestMachineCapturePreview() {
         if (!menuOpen || selectedMode !== "machine" || machineCaptureBusy)
             return;
         machineCapturePreview = null;
+        machineInspectIndex = 0;
         machineCaptureStatus = "READING SWAY";
         machineCaptureBusy = true;
         machineCaptureProcess.exec(["python3", "-B", "-I",
@@ -3307,41 +3329,79 @@ PanelWindow {
                             wrapMode: Text.Wrap
                         }
 
-                        GohuText {
+                        Row {
                             width: parent.width
+                            height: 27
+                            spacing: 4
                             visible: timew.machineCapturePreview !== null
-                            text: timew.machineCapturePreview
-                                  ? "MONITORS // "
-                                    + timew.machineCapturePreview.outputs.map(function(x) {
-                                        return x.connector;
-                                      }).join(", ")
-                                  : ""
-                            color: Colors.cyan
-                            font.pixelSize: 10
-                            elide: Text.ElideRight
+                            Repeater {
+                                model: [
+                                    {name: "MONITORS", kind: "outputs"},
+                                    {name: "WORKSPACES", kind: "workspaces"},
+                                    {name: "WINDOWS", kind: "windows"}
+                                ]
+                                delegate: ActionButton {
+                                    width: (machinePane.width - 8) / 3
+                                    height: 27
+                                    label: modelData.name
+                                    labelPixelSize: 9
+                                    accentColor: timew.machineInspectKind === modelData.kind
+                                                 ? Colors.magenta : timew.semanticColor
+                                    onLeftClicked: timew.selectMachineInspectKind(modelData.kind)
+                                }
+                            }
+                        }
+                        Row {
+                            width: parent.width
+                            height: 29
+                            spacing: 5
+                            visible: timew.machineCapturePreview !== null
+                            ActionButton {
+                                width: 43
+                                height: parent.height
+                                label: "<"
+                                labelPixelSize: 12
+                                accentColor: timew.semanticColor
+                                available: timew.machineInspectItems.length > 1
+                                onLeftClicked: timew.stepMachineInspect(-1)
+                            }
+                            GohuText {
+                                width: Math.max(0, parent.width - 96)
+                                anchors.verticalCenter: parent.verticalCenter
+                                text: timew.machineInspectItems.length
+                                      ? (timew.machineInspectIndex + 1) + " / "
+                                        + timew.machineInspectItems.length
+                                      : "0 / 0"
+                                horizontalAlignment: Text.AlignHCenter
+                                color: Colors.cyan
+                                font.pixelSize: 12
+                            }
+                            ActionButton {
+                                width: 43
+                                height: parent.height
+                                label: ">"
+                                labelPixelSize: 12
+                                accentColor: timew.semanticColor
+                                available: timew.machineInspectItems.length > 1
+                                onLeftClicked: timew.stepMachineInspect(1)
+                            }
                         }
                         GohuText {
                             width: parent.width
                             visible: timew.machineCapturePreview !== null
-                            text: timew.machineCapturePreview
-                                  ? "WORKSPACES // "
-                                    + timew.machineCapturePreview.workspaces.map(function(x) {
-                                        return x.name + "@" + x.output;
-                                      }).join(", ")
-                                  : ""
-                            color: Colors.white
-                            font.pixelSize: 10
-                            elide: Text.ElideRight
-                        }
-                        GohuText {
-                            width: parent.width
-                            visible: timew.machineCapturePreview !== null
-                            text: timew.machineCapturePreview
-                                  ? "APPS // "
-                                    + timew.machineCapturePreview.windows.map(function(x) {
-                                        return x.app_id + "@" + x.workspace;
-                                      }).join(", ")
-                                  : ""
+                            text: !timew.machineInspectItem
+                                  ? "NO ITEMS IN THIS CATEGORY"
+                                  : timew.machineInspectKind === "outputs"
+                                  ? timew.machineInspectItem.connector + " // "
+                                    + timew.machineInspectItem.rect.width + "x"
+                                    + timew.machineInspectItem.rect.height
+                                  : timew.machineInspectKind === "workspaces"
+                                  ? timew.machineInspectItem.name + " // "
+                                    + timew.machineInspectItem.output
+                                  : timew.machineInspectItem.app_id + " // "
+                                    + timew.machineInspectItem.workspace
+                                    + (timew.machineInspectItem.floating
+                                       ? " // FLOATING" : " // TILED")
                             color: Colors.white
                             font.pixelSize: 10
                             elide: Text.ElideRight
@@ -3419,7 +3479,7 @@ PanelWindow {
                         Item {
                             id: machineMarkerArea
                             width: parent.width
-                            height: 143
+                            height: 113
 
                             ListView {
                                 id: machineMarkerList

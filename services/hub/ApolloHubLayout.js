@@ -422,3 +422,85 @@ function removeSubMode(layout, modeIndex, subIndex, expectedGroupId, confirmed) 
     groups.splice(subIndex, 1);
     return next;
 }
+
+// P1 Stage 5: a destination is any OTHER group, including groups in the
+// same main mode. Capacity and same-group module uniqueness are enforced
+// both in this preview and again at the final transfer boundary.
+function moveTargets(layout, fromMode, fromGroup, fromIndex) {
+    var failure = {state:"unavailable", total:0, availableCount:0, items:[]};
+    if (!layout || !Array.isArray(layout.modes)
+            || !validIndex(fromMode, layout.modes.length))
+        return failure;
+    var sourceGroups = layout.modes[fromMode].subModes;
+    if (!Array.isArray(sourceGroups) || !validIndex(fromGroup, sourceGroups.length))
+        return failure;
+    var fromTiles = sourceGroups[fromGroup].tiles;
+    if (!Array.isArray(fromTiles) || !validIndex(fromIndex, fromTiles.length))
+        return failure;
+    var moduleId = fromTiles[fromIndex].module;
+    var targets = [];
+    var availableCount = 0;
+    for (var m = 0; m < layout.modes.length; m++) {
+        var mode = layout.modes[m];
+        if (!mode || !Array.isArray(mode.subModes))
+            continue;
+        for (var g = 0; g < mode.subModes.length; g++) {
+            if (m === fromMode && g === fromGroup)
+                continue;
+            var group = mode.subModes[g];
+            if (!group || !Array.isArray(group.tiles))
+                continue;
+            var full = group.tiles.length >= MAX_TILES;
+            var duplicate = group.tiles.some(function(tile) {
+                return tile.module === moduleId;
+            });
+            var available = !full && !duplicate;
+            if (available)
+                availableCount++;
+            targets.push({
+                modeIndex:m, groupIndex:g, modeId:mode.id, groupId:group.id,
+                label:mode.name + " / " + group.name,
+                available:available,
+                reason:full ? "FULL" : duplicate ? "IN USE" : "",
+                count:group.tiles.length
+            });
+        }
+    }
+    return {state:"ready", total:targets.length,
+            availableCount:availableCount, items:targets};
+}
+
+// Transfer the original tile record, not a new tile. Never allocate an ID,
+// destroy its dimensions, or mutate either source/destination on rejection.
+// Source and destination stable IDs are both checked against a fresh layout.
+function transferTile(layout, fromMode, fromGroup, fromIndex, expectedTileId,
+                      expectedModeId, expectedGroupId,
+                      toMode, toGroup, expectedDestinationModeId,
+                      expectedDestinationGroupId) {
+    var next = normalize(clone(layout));
+    if (!validIndex(fromMode,next.modes.length)
+            || !validIndex(toMode,next.modes.length))
+        return next;
+    var sourceMode = next.modes[fromMode];
+    var destinationMode = next.modes[toMode];
+    if (sourceMode.id !== expectedModeId
+            || destinationMode.id !== expectedDestinationModeId
+            || !validIndex(fromGroup,sourceMode.subModes.length)
+            || !validIndex(toGroup,destinationMode.subModes.length)
+            || (fromMode === toMode && fromGroup === toGroup))
+        return next;
+    var source = sourceMode.subModes[fromGroup];
+    var destination = destinationMode.subModes[toGroup];
+    if (source.id !== expectedGroupId
+            || destination.id !== expectedDestinationGroupId
+            || !validIndex(fromIndex,source.tiles.length)
+            || source.tiles[fromIndex].id !== expectedTileId
+            || destination.tiles.length >= MAX_TILES
+            || destination.tiles.some(function(tile) {
+                return tile.module === source.tiles[fromIndex].module;
+            }))
+        return next;
+    var moved = source.tiles.splice(fromIndex,1)[0];
+    destination.tiles.push(moved);
+    return next;
+}

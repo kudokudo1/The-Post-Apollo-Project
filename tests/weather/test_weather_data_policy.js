@@ -432,4 +432,73 @@ assert.equal(swpc.utcLabel(0), "-- UTC");
 assert.throws(() => swpc.parseBulletins({}, bulletinNow, 48, 3));
 assert.throws(() => swpc.parseBulletins([], NaN, 48, 3));
 
+
+// NOAA notifications timeline: ordinary warnings have Valid From/Valid To,
+// extensions have Issue Time/Now Valid Until. Watches forecast calendar days;
+// neither source age nor issue time alone establishes "active".
+const swpcValiditySource = fs.readFileSync(
+    path.join(root, "services/weather/SwpcValidityPolicy.js"), "utf8"
+).replace(/^\.pragma library\s*/m, "");
+const swpcValidity = {};
+vm.runInNewContext(swpcValiditySource, swpcValidity);
+assert.equal(typeof swpcValidity.assess, "function");
+assert.equal(swpcValidity.noaaTime("2026 Oct 23 1400 UTC"),
+             Date.parse("2026-10-23T14:00:00Z"));
+assert.equal(swpcValidity.noaaTime("2026 Feb 30 1000 UTC"), -1);
+assert.equal(swpcValidity.noaaTime("2026 Oct 23 2460 UTC"), -1);
+assert.equal(swpcValidity.noaaTime("2026 Oct 23 14:00 UTC"), -1);
+
+const validityNow = Date.parse("2026-10-23T12:00:00Z");
+const issued = (id, timestamp, heading, extra) => ({
+    product_id: id,
+    issue_datetime: timestamp,
+    message: "Space Weather Message Code: " + id + "\r\n" +
+             "Serial Number: 123\r\n\r\n" + heading +
+             (extra ? "\r\n" + extra : "")
+});
+const validityFeed = [
+    issued("K04W", "2026-10-22 18:00:00.000",
+           "WARNING: Geomagnetic K-index of 4 expected",
+           "Valid From: 2026 Oct 22 1800 UTC\r\nValid To: 2026 Oct 23 1400 UTC"),
+    issued("K04W", "2026-10-23 09:00:00.000",
+           "EXTENDED WARNING: Geomagnetic K-index of 4 expected",
+           "Valid From: 2026 Oct 22 1800 UTC\r\nNow Valid Until: 2026 Oct 23 1500 UTC"),
+    issued("K05W", "2026-10-23 07:00:00.000",
+           "WARNING: Geomagnetic K-index of 5 expected",
+           "Valid From: 2026 Oct 23 0700 UTC\r\nValid To: 2026 Oct 23 1600 UTC"),
+    issued("K05W", "2026-10-23 11:00:00.000",
+           "CANCEL WARNING: Geomagnetic K-index of 5 expected"),
+    issued("K06W", "2026-10-22 04:00:00.000",
+           "WARNING: Geomagnetic K-index of 6 expected",
+           "Valid From: 2026 Oct 22 0500 UTC\r\nValid To: 2026 Oct 22 1000 UTC"),
+    issued("K07W", "2026-10-23 08:00:00.000",
+           "WARNING: Sudden Impulse expected"), // unknown validity
+    issued("A20F", "2026-10-22 07:00:00.000",
+           "WATCH: Geomagnetic Storm Category G2 Predicted"),
+    issued("A20F", "2026-10-23 08:00:00.000",
+           "WATCH: Geomagnetic Storm Category G1 Predicted",
+           "THIS SUPERSEDES ANY/ALL PRIOR WATCHES IN EFFECT"),
+    issued("K05A", "2026-10-23 10:00:00.000",
+           "ALERT: Geomagnetic K-index of 5\r\nActive Warning: YES"),
+    issued("SUM10R", "2026-10-23 10:00:00.000",
+           "SUMMARY: 10cm Radio Burst"),
+    issued("OLD", "2026-10-09 10:00:00.000",
+           "WARNING: out of lookback",
+           "Valid From: 2026 Oct 09 1000 UTC\r\nValid To: 2026 Oct 25 1200 UTC"),
+];
+const assessed = swpcValidity.assess(validityFeed, validityNow, 168, 3);
+assert.equal(assessed.windowCount, 1);
+assert.equal(assessed.windows.length, 1);
+assert.equal(assessed.windows[0].productId, "K04W");
+assert.equal(assessed.windows[0].state, "WINDOW OPEN");
+assert.equal(assessed.windows[0].untilUtc, "10-23 15:00 UTC");
+assert.equal(assessed.uncertainCount, 2);
+assert.equal(assessed.endedCount, 1);
+assert.ok(assessed.supersededCount >= 3);
+assert.equal(swpcValidity.assess(validityFeed,
+    Date.parse("2026-10-23T16:00:00Z"), 168, 3).windowCount, 0);
+assert.equal(swpcValidity.assess([], validityNow, 168, 3).windowCount, 0);
+assert.throws(() => swpcValidity.assess(null, validityNow, 168, 3));
+assert.throws(() => swpcValidity.assess([], NaN, 168, 3));
+
 console.log("Weather data policy contracts: PASS");

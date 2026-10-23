@@ -653,6 +653,20 @@ PanelWindow {
     readonly property string machineUtcNow:
         MachineTimelinePolicy.utcStamp(localClock.date.getTime())
 
+    // Capture requires a deliberate click, never menu-open or background polling.
+    property bool machineCaptureBusy: false
+    property var machineCapturePreview: null
+    property string machineCaptureStatus: "NOT CAPTURED"
+    function requestMachineCapturePreview() {
+        if (!menuOpen || selectedMode !== "machine" || machineCaptureBusy)
+            return;
+        machineCapturePreview = null;
+        machineCaptureStatus = "READING SWAY";
+        machineCaptureBusy = true;
+        machineCaptureProcess.exec(["python3", "-B", "-I",
+            Quickshell.shellPath("services/time/MachineSwayRead.py")]);
+    }
+
     function addMachineMarker() {
         if (!menuOpen || selectedMode !== "machine")
             return;
@@ -797,6 +811,41 @@ PanelWindow {
     ElapsedTimer {
         id: machineLifetimeAnchor
         Component.onCompleted: restart()
+    }
+
+    // Explicit, read-only IPC capture; its JSON is already allowlisted by the
+    // Python adapter. No checkpoint saving, restoration or persistent storage.
+    Process {
+        id: machineCaptureProcess
+        running: false
+        stdout: StdioCollector {
+            onStreamFinished: {
+                try {
+                    const data = JSON.parse(this.text);
+                    if (data && data.preview_only === true
+                            && data.kind === "sway-layout-metadata-preview"
+                            && Array.isArray(data.outputs)
+                            && Array.isArray(data.workspaces)
+                            && Array.isArray(data.windows)) {
+                        timew.machineCapturePreview = data;
+                        timew.machineCaptureStatus = "PREVIEW READY // MEMORY ONLY";
+                    } else {
+                        timew.machineCapturePreview = null;
+                        timew.machineCaptureStatus = "CAPTURE UNAVAILABLE";
+                    }
+                } catch (error) {
+                    timew.machineCapturePreview = null;
+                    timew.machineCaptureStatus = "INVALID PREVIEW";
+                }
+            }
+        }
+        onExited: function(exitCode, exitStatus) {
+            timew.machineCaptureBusy = false;
+            if (exitCode !== 0) {
+                timew.machineCapturePreview = null;
+                timew.machineCaptureStatus = "CAPTURE UNAVAILABLE";
+            }
+        }
     }
 
     // Difference comparisons are also one-shot. Existing inputs are kept
@@ -3215,6 +3264,49 @@ PanelWindow {
                             }
                         }
 
+                        Rectangle {
+                            width: parent.width
+                            height: 2
+                            color: Colors.cyan
+                            opacity: 0.55
+                        }
+
+                        Row {
+                            id: machineCaptureRow
+                            width: parent.width
+                            height: 34
+                            spacing: 8
+                            ActionButton {
+                                width: 150
+                                height: parent.height
+                                label: "CAPTURE PREVIEW"
+                                labelPixelSize: 10
+                                accentColor: timew.semanticColor
+                                available: !timew.machineCaptureBusy
+                                onLeftClicked: timew.requestMachineCapturePreview()
+                            }
+                            GohuText {
+                                width: parent.width - 158
+                                anchors.verticalCenter: parent.verticalCenter
+                                text: timew.machineCaptureStatus
+                                color: timew.machineCaptureBusy ? Colors.orange : Colors.cyan
+                                font.pixelSize: 10
+                                wrapMode: Text.Wrap
+                            }
+                        }
+
+                        GohuText {
+                            width: parent.width
+                            text: timew.machineCapturePreview
+                                  ? ("OUTPUTS // " + timew.machineCapturePreview.outputs.length
+                                     + "     WORKSPACES // " + timew.machineCapturePreview.workspaces.length
+                                     + "     WINDOWS // " + timew.machineCapturePreview.windows.length)
+                                  : "CLICK TO READ LAYOUT // NO SAVE OR RESTORE"
+                            color: Colors.white
+                            font.pixelSize: 10
+                            wrapMode: Text.Wrap
+                        }
+
                         GohuText {
                             width: parent.width
                             text: "MANUAL TIME MARKERS // MEMORY ONLY"
@@ -3287,7 +3379,7 @@ PanelWindow {
                         Item {
                             id: machineMarkerArea
                             width: parent.width
-                            height: 226
+                            height: 143
 
                             ListView {
                                 id: machineMarkerList

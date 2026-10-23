@@ -1,0 +1,35 @@
+name: TASKS Proxy 1 M10f single-writer gate
+
+on:
+  pull_request:
+    paths:
+      - 'tests/tasks/fixtures/single_writer_gate_fixture.cjs'
+      - 'tests/tasks/test_single_writer_gate.cjs'
+      - 'docs/tasks-single-writer-gate-m10f.md'
+      - '.github/workflows/tasks-single-writer-gate.yml'
+  push:
+    branches:
+      - main
+    paths:
+      - 'tests/tasks/fixtures/single_writer_gate_fixture.cjs'
+      - 'tests/tasks/test_single_writer_gate.cjs'
+      - 'docs/tasks-single-writer-gate-m10f.md'
+      - '.github/workflows/tasks-single-writer-gate.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  contract:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Validate isolated cross-process lock and recovery
+        run: node tests/tasks/test_single_writer_gate.cjs
+      - name: Preserve M10c atomic interruption regressions
+        run: node tests/tasks/test_offline_atomic_storage_crash_windows.cjs
+      - name: Preserve M10e backup/restore invariants
+        run: node tests/tasks/test_verified_backup_restore.cjs

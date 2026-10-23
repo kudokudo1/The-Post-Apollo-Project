@@ -1677,7 +1677,9 @@ PanelWindow {
                         spacing: 10
 
                         GohuText {
-                            text: "ELAPSED TIME // ADD OR SUBTRACT"
+                            text: timew.mathView === "elapsed"
+                                  ? "ELAPSED TIME // ADD OR SUBTRACT"
+                                  : "ELAPSED TIME // BETWEEN MOMENTS"
                             color: Colors.white
                             font.pixelSize: 13
                         }
@@ -1687,7 +1689,7 @@ PanelWindow {
                             width: parent.width
                             height: 34
                             spacing: 6
-                            z: 30
+                            z: 40
                             GohuText {
                                 width: 50
                                 height: parent.height
@@ -1799,7 +1801,37 @@ PanelWindow {
                         }
 
                         Row {
+                            id: mathTypeStrip
+                            width: parent.width
+                            height: 32
+                            spacing: 6
+                            ModeButton {
+                                width: (mathTypeStrip.width - mathTypeStrip.spacing) / 2
+                                height: parent.height
+                                bordered: false
+                                textOnly: true
+                                labelText: "ADD / SUB"
+                                labelFontSize: 11
+                                idlePrimaryColor: timew.semanticColor
+                                selected: timew.mathView === "elapsed"
+                                onTriggered: timew.setMathView("elapsed")
+                            }
+                            ModeButton {
+                                width: (mathTypeStrip.width - mathTypeStrip.spacing) / 2
+                                height: parent.height
+                                bordered: false
+                                textOnly: true
+                                labelText: "BETWEEN"
+                                labelFontSize: 11
+                                idlePrimaryColor: timew.semanticColor
+                                selected: timew.mathView === "between"
+                                onTriggered: timew.setMathView("between")
+                            }
+                        }
+
+                        Row {
                             id: mathDurationRow
+                            visible: timew.mathView === "elapsed"
                             width: parent.width
                             height: 60
                             spacing: 6
@@ -1887,6 +1919,8 @@ PanelWindow {
                         }
 
                         Row {
+                            id: mathActionRow
+                            visible: timew.mathView === "elapsed"
                             width: parent.width
                             height: 34
                             spacing: 6
@@ -1919,6 +1953,7 @@ PanelWindow {
 
                         Row {
                             id: mathResultHeader
+                            visible: timew.mathView === "elapsed"
                             width: parent.width
                             height: 42
                             spacing: 6
@@ -1955,7 +1990,8 @@ PanelWindow {
                         }
 
                         Repeater {
-                            model: timew.mathResult && timew.mathResult.options
+                            model: timew.mathView === "elapsed" && timew.mathResult
+                                   && timew.mathResult.options
                                    ? timew.mathResult.options : []
                             Column {
                                 width: mathPane.width
@@ -1989,6 +2025,7 @@ PanelWindow {
 
                         GohuText {
                             width: parent.width
+                            visible: timew.mathView === "elapsed"
                             text: "ELAPSED // 1 DAY = 24 HOURS. "
                                   + "FROM zone comes from CONVERT."
                             color: Colors.white

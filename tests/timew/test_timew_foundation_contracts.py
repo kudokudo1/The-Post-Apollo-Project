@@ -126,7 +126,7 @@ assert "WorldClockPolicy.snapshot(localClock.date.getTime()," in window
 assert 'command: ["date", "+%z"]' in window
 assert 'environment: { TZ: worldLookupZone, LC_ALL: "C" }' in window
 assert "Process {" in window
-assert window.count("Process {") == 8
+assert window.count("Process {") == 9
 assert "worldLookup.running" in window
 assert 'onLeftClicked:' in window
 assert 'timew.chooseWorldZone(modelData.id)' in window
@@ -709,7 +709,7 @@ assert 'handleColor: Colors.magenta' in window
 assert 'timew.removeMachineMarker(modelData.id)' in window
 assert 'MARKERS ARE TIMESTAMPS ONLY // LOST ON RESTART' in window
 assert 'NO SCREENSHOTS OR RESTORATION ACTIVE' in window
-assert 'SESSION TIMELINE // MEMORY ONLY' in window
+assert 'MACHINE // LOCAL CHECKPOINTS' in window
 assert 'var MAX_MARKERS = 24;' in machine_policy
 assert 'var MAX_NAME_LENGTH = 48;' in machine_policy
 assert 'function createMarker(id, name, nowMs, elapsedMs)' in machine_policy
@@ -721,9 +721,10 @@ assert 'function utcStamp(nowMs)' in machine_policy
 assert window.count("SystemClock {") == 1
 assert window.count("ElapsedTimer {") == 3
 assert window.count("\n    Timer {") == 3
-# One additional on-demand read-only Process belongs to MACHINE Capture Preview.
-assert window.count("Process {") == 8
+# MACHINE now has one read-only Sway capture Process and one guarded SQLite store Process.
+assert window.count("Process {") == 9
 assert "id: machineCaptureProcess" in window
+assert "id: machineStoreProcess" in window
 
 # Universal visual language remains: magenta header, cyan divider, borderless modes.
 assert 'text: "TIME // W"' in window

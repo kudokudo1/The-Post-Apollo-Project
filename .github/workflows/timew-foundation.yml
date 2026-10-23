@@ -14,6 +14,7 @@ on:
       - "services/time/CountdownPolicy.js"
       - "services/time/MachineTimelinePolicy.js"
       - "services/time/MachineSelectionPolicy.js"
+      - "services/time/MachineCheckpointStore.py"
       - "services/time/MachineCheckpointModel.py"
       - "services/time/MachineSwayRead.py"
       - "services/time/TimeConverterFormat.js"
@@ -38,6 +39,7 @@ on:
       - "services/time/CountdownPolicy.js"
       - "services/time/MachineTimelinePolicy.js"
       - "services/time/MachineSelectionPolicy.js"
+      - "services/time/MachineCheckpointStore.py"
       - "services/time/MachineCheckpointModel.py"
       - "services/time/MachineSwayRead.py"
       - "services/time/TimeConverterFormat.js"
@@ -87,5 +89,9 @@ jobs:
         run: node tests/timew/test_machine_selection_policy.cjs
       - name: Verify MACHINE validation UI remains read-only
         run: python3 -B -I tests/timew/test_machine_selection_validation_contract.py
+      - name: Verify MACHINE private SQLite persistence with temporary database
+        run: python3 -B -I tests/timew/test_machine_checkpoint_store.py
+      - name: Verify MACHINE explicit save/open UI contracts
+        run: python3 -B -I tests/timew/test_machine_checkpoint_store_ui.py
       - name: Verify MACHINE desktop checkpoint draft remains non-operative
         run: python3 -B -I tests/timew/test_machine_checkpoint_contract.py

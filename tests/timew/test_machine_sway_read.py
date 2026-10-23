@@ -43,7 +43,9 @@ assert preview["windows"] == [{"app_id": "browser", "workspace": "1", "floating"
 assert preview["excluded_counts"]["windows"] == 1
 assert preview["preview_only"]
 for secret in ("private", "pid", "42", "43", "title"):
-    assert secret not in str(preview), secret
+    # Timestamp digits can coincidentally match container IDs (e.g. 22:43).
+    # Check the actual serialized window allowlist instead of the UTC clock.
+    assert secret not in json.dumps(preview["windows"], sort_keys=True), secret
 
 for broken in ({"type": "root", "nodes": "invalid"},
                {"type": "root", "nodes": [{"type": "con", "nodes": []}],

@@ -685,6 +685,7 @@ PanelWindow {
         else
             next[key] = true;
         machineExcludedItems = next;
+        machineStoreStatus = "SELECTION CHANGED // NOT SAVED";
     }
     function machineIncludedCount(kind) {
         const items = machineCapturePreview ? (machineCapturePreview[kind] || []) : [];
@@ -748,12 +749,115 @@ PanelWindow {
         if (!menuOpen || selectedMode !== "machine" || machineCaptureBusy)
             return;
         machineCapturePreview = null;
+        machineStoreStatus = "NEW CAPTURE // NOT SAVED";
         machineExcludedItems = ({});
         machineInspectIndex = 0;
         machineCaptureStatus = "READING SWAY";
         machineCaptureBusy = true;
         machineCaptureProcess.exec(["python3", "-B", "-I",
             Quickshell.shellPath("services/time/MachineSwayRead.py")]);
+    }
+
+    // The saved database is separate from Hospital and the current desktop.
+    // Only SAVE writes; list/load are explicitly requested and read-only.
+    property bool machineStoredViewOpen: false
+    property bool machineStoreBusy: false
+    property string machineStoreAction: ""
+    property string machineStorePayload: ""
+    property var machineStoreResponse: null
+    property string machineStoreStatus: "NOT LOADED"
+    property var machineSavedCheckpoints: []
+    property int machineSavedIndex: 0
+    property var machineOpenedCheckpoint: null
+    readonly property var machineSavedItem:
+        machineSavedIndex >= 0 && machineSavedIndex < machineSavedCheckpoints.length
+        ? machineSavedCheckpoints[machineSavedIndex] : null
+
+    function machineStoreRequest(action, data, id) {
+        if (!menuOpen || selectedMode !== "machine" || machineStoreBusy)
+            return;
+        if (action !== "save" && action !== "list" && action !== "load")
+            return;
+        machineStoreAction = action;
+        machineStorePayload = action === "save" ? JSON.stringify(data) : "";
+        machineStoreResponse = null;
+        machineStoreBusy = true;
+        machineStoreStatus = action === "save" ? "SAVING CHECKPOINT"
+                           : action === "list" ? "READING STORED"
+                           : "OPENING METADATA";
+        const argv = ["python3", "-B", "-I",
+            Quickshell.shellPath("services/time/MachineCheckpointStore.py"), action];
+        if (action === "load")
+            argv.push(id);
+        machineStoreProcess.exec(argv);
+    }
+
+    function machineSaveCheckpoint() {
+        if (machineCaptureBusy || machineSelectionValidation.status !== "ready")
+            return;
+        const chosen = machineSelectionPreview();
+        if (!chosen)
+            return;
+        chosen.schema_version = 1;
+        chosen.captured_at_utc = machineCapturePreview.captured_at_utc;
+        chosen.label = "MACHINE // " + machineCapturePreview.captured_at_utc.slice(0, 19);
+        machineStoreRequest("save", chosen, "");
+    }
+
+    function machineShowSavedCheckpoints() {
+        machineStoredViewOpen = true;
+        machineListCheckpoints();
+    }
+    function machineListCheckpoints() {
+        machineStoreRequest("list", null, "");
+    }
+    function machineOpenSavedCheckpoint() {
+        if (!machineSavedItem)
+            return;
+        machineOpenedCheckpoint = null;
+        machineStoreRequest("load", null, machineSavedItem.id);
+    }
+    function machineStepSavedCheckpoint(delta) {
+        const n = machineSavedCheckpoints.length;
+        if (n > 0)
+            machineSavedIndex = (machineSavedIndex + delta + n) % n;
+        machineOpenedCheckpoint = null;
+    }
+    function machineAcceptStoreResponse(data) {
+        if (!data || typeof data.status !== "string") {
+            machineStoreStatus = "INVALID STORE RESPONSE";
+            return;
+        }
+        if (data.status === "error") {
+            machineStoreStatus = "STORAGE ERROR // " + String(data.reason || "UNKNOWN");
+            return;
+        }
+        if (machineStoreAction === "save" && data.status === "saved"
+                && data.checkpoint && typeof data.checkpoint.id === "string") {
+            machineSavedCheckpoints = [data.checkpoint].concat(
+                machineSavedCheckpoints.filter(function(x) {
+                    return x.id !== data.checkpoint.id;
+                })).slice(0, 30);
+            machineSavedIndex = 0;
+            machineStoreStatus = "SAVED // LOCAL SQLITE";
+            return;
+        }
+        if (machineStoreAction === "list" && data.status === "listed"
+                && Array.isArray(data.checkpoints)) {
+            machineSavedCheckpoints = data.checkpoints.slice(0, 30);
+            machineSavedIndex = 0;
+            machineOpenedCheckpoint = null;
+            machineStoreStatus = "STORED // " + machineSavedCheckpoints.length;
+            return;
+        }
+        if (machineStoreAction === "load" && data.status === "loaded"
+                && data.read_only === true && data.document
+                && data.document.preview_only === true) {
+            machineOpenedCheckpoint = data;
+            machineStoreStatus = "OPENED // METADATA ONLY";
+            return;
+        }
+        machineStoreStatus = "UNEXPECTED STORE RESPONSE";
     }
 
     function addMachineMarker() {
@@ -934,6 +1038,39 @@ PanelWindow {
                 timew.machineCapturePreview = null;
                 timew.machineCaptureStatus = "CAPTURE UNAVAILABLE";
             }
+        }
+    }
+
+    // CLI save uses stdin; checkpoint contents never appear in argv.
+    Process {
+        id: machineStoreProcess
+        running: false
+        stdinEnabled: true
+        onStarted: {
+            if (timew.machineStoreAction === "save" && timew.machineStorePayload)
+                machineStoreProcess.write(timew.machineStorePayload + String.fromCharCode(10));
+            timew.machineStorePayload = "";
+        }
+        stdout: StdioCollector {
+            onStreamFinished: {
+                try {
+                    const data = JSON.parse(this.text);
+                    timew.machineStoreResponse = data;
+                    timew.machineAcceptStoreResponse(data);
+                } catch (error) {
+                    timew.machineStoreStatus = "INVALID STORE RESPONSE";
+                }
+            }
+        }
+        onExited: function(exitCode, exitStatus) {
+            timew.machineStoreBusy = false;
+            timew.machineStorePayload = "";
+            if (exitCode !== 0)
+                timew.machineStoreStatus = timew.machineStoreResponse
+                    && timew.machineStoreResponse.status === "error"
+                    ? "STORAGE ERROR // "
+                      + String(timew.machineStoreResponse.reason || "UNKNOWN")
+                    : "STORAGE UNAVAILABLE";
         }
     }
 
@@ -3287,7 +3424,7 @@ PanelWindow {
 
                     Column {
                         id: machinePane
-                        visible: timew.selectedMode === "machine"
+                        visible: timew.selectedMode === "machine" && !timew.machineStoredViewOpen
                         width: parent.width
                         spacing: 9
 
@@ -3510,7 +3647,7 @@ PanelWindow {
                                 width: Math.max(0, parent.width - 96)
                                 anchors.verticalCenter: parent.verticalCenter
                                 text: timew.machineSelectionValidation.status === "ready"
-                                      ? "SELECTION CONSISTENT // NOT SAVED"
+                                      ? "SELECTION CONSISTENT // READY TO SAVE"
                                       : timew.machineSelectionValidation.issues.length > 0
                                       ? "BLOCKED " + timew.machineSelectionValidation.issueCount
                                         + " // " + timew.machineSelectionValidation.issues[0].label
@@ -3530,12 +3667,36 @@ PanelWindow {
                                 onLeftClicked: timew.machineLocateSelectionIssue()
                             }
                         }
+                        Row {
+                            width: parent.width
+                            height: 34
+                            spacing: 6
+                            ActionButton {
+                                width: (parent.width - 12) / 2
+                                height: parent.height
+                                label: "SAVE CHECKPOINT"
+                                labelPixelSize: 10
+                                accentColor: timew.semanticColor
+                                available: !timew.machineStoreBusy && !timew.machineCaptureBusy
+                                           && timew.machineSelectionValidation.status === "ready"
+                                onLeftClicked: timew.machineSaveCheckpoint()
+                            }
+                            ActionButton {
+                                width: (parent.width - 12) / 2
+                                height: parent.height
+                                label: "STORED"
+                                labelPixelSize: 11
+                                accentColor: timew.semanticColor
+                                available: !timew.machineStoreBusy
+                                onLeftClicked: timew.machineShowSavedCheckpoints()
+                            }
+                        }
                         GohuText {
                             width: parent.width
-                            visible: timew.machineCapturePreview !== null
-                            text: "SELECTION PREVIEW ONLY // NOTHING SAVED"
+                            text: timew.machineStoreStatus
                             color: Colors.orange
                             font.pixelSize: 10
+                            elide: Text.ElideRight
                         }
 
                         GohuText {
@@ -3723,6 +3884,139 @@ PanelWindow {
                         }
                     }
 
+                    Column {
+                        id: machineStoredPane
+                        visible: timew.selectedMode === "machine" && timew.machineStoredViewOpen
+                        width: parent.width
+                        spacing: 14
+
+                        GohuText {
+                            width: parent.width
+                            text: "MACHINE // STORED CHECKPOINTS"
+                            color: timew.semanticColor
+                            font.pixelSize: 14
+                        }
+                        Row {
+                            width: parent.width
+                            height: 35
+                            spacing: 8
+                            ActionButton {
+                                width: (parent.width - 8) / 2
+                                height: parent.height
+                                label: "BACK TO CAPTURE"
+                                labelPixelSize: 10
+                                accentColor: timew.semanticColor
+                                onLeftClicked: timew.machineStoredViewOpen = false
+                            }
+                            ActionButton {
+                                width: (parent.width - 8) / 2
+                                height: parent.height
+                                label: "REFRESH STORED"
+                                labelPixelSize: 10
+                                accentColor: timew.semanticColor
+                                available: !timew.machineStoreBusy
+                                onLeftClicked: timew.machineListCheckpoints()
+                            }
+                        }
+                        Row {
+                            width: parent.width
+                            height: 32
+                            spacing: 5
+                            ActionButton {
+                                width: 48
+                                height: parent.height
+                                label: "<"
+                                accentColor: timew.semanticColor
+                                available: timew.machineSavedCheckpoints.length > 1
+                                onLeftClicked: timew.machineStepSavedCheckpoint(-1)
+                            }
+                            GohuText {
+                                width: Math.max(0, parent.width - 106)
+                                anchors.verticalCenter: parent.verticalCenter
+                                text: timew.machineSavedCheckpoints.length
+                                      ? (timew.machineSavedIndex + 1) + " / "
+                                        + timew.machineSavedCheckpoints.length
+                                      : "NO SAVED CHECKPOINTS"
+                                color: Colors.cyan
+                                horizontalAlignment: Text.AlignHCenter
+                                font.pixelSize: 12
+                            }
+                            ActionButton {
+                                width: 48
+                                height: parent.height
+                                label: ">"
+                                accentColor: timew.semanticColor
+                                available: timew.machineSavedCheckpoints.length > 1
+                                onLeftClicked: timew.machineStepSavedCheckpoint(1)
+                            }
+                        }
+                        GohuText {
+                            width: parent.width
+                            text: timew.machineSavedItem ? timew.machineSavedItem.label
+                                                          : "NO SAVED RECORD SELECTED"
+                            color: Colors.orange
+                            font.pixelSize: 12
+                            elide: Text.ElideRight
+                        }
+                        GohuText {
+                            width: parent.width
+                            text: timew.machineSavedItem
+                                  ? "SAVED // " + timew.machineSavedItem.saved_at_utc
+                                  : "RECORDS SURVIVE RESTARTS IF LOCAL STORAGE REMAINS"
+                            color: Colors.white
+                            font.pixelSize: 10
+                            elide: Text.ElideRight
+                        }
+                        GohuText {
+                            width: parent.width
+                            text: timew.machineSavedItem
+                                  ? "OUTPUTS " + timew.machineSavedItem.counts.outputs
+                                    + " // WORKSPACES " + timew.machineSavedItem.counts.workspaces
+                                    + " // WINDOWS " + timew.machineSavedItem.counts.windows
+                                  : "READ ONLY UNTIL SAVE CHECKPOINT IS PRESSED"
+                            color: Colors.cyan
+                            font.pixelSize: 11
+                            elide: Text.ElideRight
+                        }
+                        ActionButton {
+                            width: parent.width
+                            height: 35
+                            label: "OPEN SAVED METADATA"
+                            labelPixelSize: 11
+                            accentColor: timew.semanticColor
+                            available: !!timew.machineSavedItem && !timew.machineStoreBusy
+                            onLeftClicked: timew.machineOpenSavedCheckpoint()
+                        }
+                        GohuText {
+                            width: parent.width
+                            text: timew.machineStoreStatus
+                            color: Colors.orange
+                            font.pixelSize: 11
+                            elide: Text.ElideRight
+                        }
+                        GohuText {
+                            width: parent.width
+                            text: timew.machineOpenedCheckpoint
+                                  ? "OPENED // "
+                                    + timew.machineOpenedCheckpoint.document.outputs.length
+                                    + " MONITORS, "
+                                    + timew.machineOpenedCheckpoint.document.workspaces.length
+                                    + " WORKSPACES, "
+                                    + timew.machineOpenedCheckpoint.document.windows.length
+                                    + " WINDOWS"
+                                  : "OPEN READS ONLY // DOES NOT CHANGE DESKTOP"
+                            color: Colors.white
+                            font.pixelSize: 11
+                            wrapMode: Text.Wrap
+                        }
+                        GohuText {
+                            width: parent.width
+                            text: "NO SCREENSHOTS OR RESTORATION ACTIVE"
+                            color: Colors.orange
+                            font.pixelSize: 11
+                        }
+                    }
+
                     GohuText {
                         // The floating result sheet owns this space while it
                         // is open; the footer must not overlap its entries.
@@ -3735,7 +4029,7 @@ PanelWindow {
                               : timew.selectedMode === "calc"
                               ? "TIME ZONE CONVERTER // READ ONLY"
                               : timew.selectedMode === "machine"
-                              ? "SESSION TIMELINE // MEMORY ONLY"
+                              ? "MACHINE // LOCAL CHECKPOINTS"
                               : "FOUNDATION PREVIEW // UI ONLY"
                         color: Colors.white
                         font.pixelSize: 11

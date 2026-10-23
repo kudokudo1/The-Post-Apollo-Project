@@ -81,6 +81,16 @@ Related source-of-truth and reading:
 - [ ] **B7 // Restore / continuity:** reselect previous item, remember filter/query and dock/expanded state where authorized. Playback state belongs to the shared controller, not a transient terminal.
 - [ ] **B8 // Visual and lifecycle acceptance:** simultaneous browsing/playing, resizing, mode switching, menu close/reopen, focus from other windows, multiple outputs, failure cleanup, and recovery after Quickshell reload. Do not infer success from static CI.
 
+### B9 // 2026-10-23 SwayPX Stage Director integration boundary
+
+**Operator-observed:** after Weather Terminal position fix [#645](https://github.com/kudokudo1/The-Post-Apollo-Project/pull/645), Kitty `weather-screen` occupies the correct geometric Star Map bay. It remains obscured by the Weather Station's overlay fill until the separately reviewed **visual transparency cutout** is merged and verified. The operator reports their SwayPX repository likely matches the live binary; binary/revision identity was not independently verified.
+
+**SwayPX source check:** `Post-Apollo-SwayPx` branch `stage-director/scene-registry-v1` implements Stage Director **SD0** as a shadow-only compositor scene observer. Its Weather Station profile classifies `weather-screen` as a `weather-station/star-map` actor with scene 1000×700 and declared bay 780×416 @ (190,132). SD0 explicitly has **NO geometry, focus, stacking, or lifecycle mutation authority**. That branch is not SwayPX `master` as inspected on 2026-10-23. This is not proof of the operator's currently running compositor build.
+
+**Near-term ownership:** Quickshell Weather Station owns painted chassis alpha and the matching input Region mask. `StationTerminalGeometry.js` uses `swaymsg -t get_outputs` to compute Kitty's global position; Sway executes floating placement. A **four-rectangle visual chassis fill** outside the bay and a transparent local terminal background should reveal Kitty despite Weather Station's Overlay layer. This is a source-level cutout until operator confirms actual desktop visibility.
+
+**Future boundary:** Stage Director may observe/coordinate the parent layer-shell surface, its Kitty child, and their scene relationships. Moving placement authority from Weather-specific `swaymsg` to SwayPX requires an explicit later Stage Director design/authorization gate. Avoid two simultaneous position writers. When adding MAP/NEWS/RADIO terminal actors, use unique app/window identities and keep the visual alpha hole, input Region, and compositor positioning synchronized to the *same viewport rectangle*.
+
 ## 4 // Domain family C: MAP and world/environmental layers
 
 Current EONET is an event index only. Planned:

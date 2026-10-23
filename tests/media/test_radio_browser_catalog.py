@@ -95,6 +95,28 @@ class RadioCatalogTests(unittest.TestCase):
             with self.assertRaises(MediaBackendError):
                 RadioBrowserCatalogSource(fetch=lambda params: bad).search("")
 
+    def test_per_client_search_batches_cannot_cross_inspect_or_prepare(self):
+        def fetch(params):
+            if params.get("tag") == "news":
+                return [station(url="https://radio.example.com/news", name="News")]
+            return [station(url="https://radio.example.com/jazz", name="Jazz")]
+        cat = RadioBrowserCatalogSource(fetch=fetch)
+        jazz = cat.search("tag:jazz")["items"][0]["ref"]
+        news = cat.search("tag:news", client="weather-radio")["items"][0]["ref"]
+        self.assertEqual(cat.inspect(jazz)["title"], "Jazz")
+        self.assertEqual(cat.inspect(news, client="weather-radio")["title"], "News")
+        for reference, wrong_client in ((news, "default"),
+                                        (jazz, "weather-radio")):
+            with self.assertRaises(MediaBackendError) as denied:
+                cat.inspect(reference, client=wrong_client)
+            self.assertEqual(denied.exception.code, "INVALID_REF")
+        # Refreshing a single client's catalog invalidates only its own
+        # prior batch, never another view's station references.
+        cat.search("tag:ambient", client="weather-radio")
+        self.assertEqual(cat.inspect(jazz)["title"], "Jazz")
+        with self.assertRaises(MediaBackendError):
+            cat.inspect(news, client="weather-radio")
+
     def test_radio_browsing_does_not_touch_playback(self):
         backend = FakeMpd()
         ctl = MediaController(backend=backend)

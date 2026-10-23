@@ -43,8 +43,11 @@ def main() -> int:
     subs = parser.add_subparsers(dest="action", required=True)
     for name in ("health", "sources", "snapshot", "audio-evidence", "queue", "play",
                  "pause", "stop", "next", "previous"):
-        subs.add_parser(name)
+        command = subs.add_parser(name)
+        if name == "snapshot":
+            command.add_argument("--client", default="default")
     search = subs.add_parser("search")
+    search.add_argument("--client", default="default", help="Radio browse client scope")
     search.add_argument("query")
     search.add_argument("--source", choices=["local-mpd", "youtube", "radio-browser"], default="local-mpd")
     search.add_argument("--cursor", default=None, help="YouTube or Radio Browser pagination token")
@@ -53,9 +56,11 @@ def main() -> int:
     playlist.add_argument("--cursor", default=None)
     for name in ("inspect", "select", "queue-add"):
         sub = subs.add_parser(name)
+        sub.add_argument("--client", default="default", help="Radio browse client scope")
         sub.add_argument("uri", help="Exact source-qualified media ID returned by search")
         sub.add_argument("--source", choices=["local-mpd", "youtube", "direct-stream", "radio-browser"], default="local-mpd")
     load = subs.add_parser("load")
+    load.add_argument("--client", default="default", help="Radio selection scope")
     load.add_argument("--uri", default=None,
                       help="Exact MPD library file or approved HTTPS stream URL; otherwise selected media")
     load.add_argument("--source", choices=["local-mpd", "youtube", "direct-stream", "radio-browser"], default="local-mpd")
@@ -90,6 +95,10 @@ def main() -> int:
         data = {"seconds": args.seconds}
     elif op == "queue_remove":
         data = {"queueId": args.queue_id}
+
+    if args.action in ("search", "snapshot", "inspect", "select", "queue-add", "load"):
+        if args.client != "default":
+            data["client"] = args.client
 
     try:
         result = send(args.socket or default_socket(), op, data)

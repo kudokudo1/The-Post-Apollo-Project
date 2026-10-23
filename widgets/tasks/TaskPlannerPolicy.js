@@ -3,12 +3,19 @@
 // PLANNER M1: pure, read-only calendar projection over the existing task snapshot.
 // Civil dates use local YYYY-MM-DD labels. No storage, timers, or remote services.
 function pad(n) { return n < 10 ? "0" + n : String(n); }
-function key(y,m,d) { return String(y) + "-" + pad(m) + "-" + pad(d); }
+function key(y,m,d) { return ("0000" + y).slice(-4) + "-" + pad(m) + "-" + pad(d); }
+function civilDate(y,m,d) {
+    // setUTCFullYear preserves literal years 0001..0099 instead of 1901..1999.
+    var date = new Date(0);
+    date.setUTCFullYear(y,m-1,d);
+    date.setUTCHours(0,0,0,0);
+    return date;
+}
 function valid(y,m,d) {
     return Number.isInteger(y) && y >= 1 && y <= 9999
         && Number.isInteger(m) && m >= 1 && m <= 12
         && Number.isInteger(d) && d >= 1
-        && d <= new Date(y, m, 0).getDate();
+        && d <= civilDate(y, m+1, 0).getUTCDate();
 }
 function parse(s) {
     if (typeof s !== "string" || !/^[0-9]{4}-[0-9]{2}-[0-9]{2}$/.test(s))
@@ -41,9 +48,9 @@ function view(snapshot, monthKey, selectedKey, todayKey) {
             priority:typeof t.priority==="string"?t.priority:"none",
             projectId:typeof t.projectId==="string"?t.projectId:""});
     });
-    var count=new Date(m.year,m.month,0).getDate(), days=[];
+    var count=civilDate(m.year,m.month+1,0).getUTCDate(), days=[];
     // Monday-first, unlike JS's Sunday-first weekday.
-    var offset=(new Date(m.year,m.month-1,1).getDay()+6)%7;
+    var offset=(civilDate(m.year,m.month,1).getUTCDay()+6)%7;
     for(var cell=0;cell<42;cell++) {
         var day=cell-offset+1, inMonth=day>=1 && day<=count;
         var date=inMonth?key(m.year,m.month,day):"";

@@ -11,6 +11,15 @@ assert.equal(ctx.moveMonth(month,-1),"2026-09-01");
 assert.equal(ctx.moveMonth("2026-01-01",-1),"2025-12-01");
 assert.equal(ctx.parse("2026-02-29"),null);
 assert.ok(ctx.parse("2024-02-29"));
+assert.ok(ctx.parse("0004-02-29"));
+assert.equal(ctx.parse("0001-02-29"),null);
+assert.equal(ctx.key(1,2,3),"0001-02-03");
+assert.equal(ctx.moveMonth("0001-01-01",-1),"0001-01-01");
+assert.equal(ctx.moveMonth("0099-12-01",1),"0100-01-01");
+const early=ctx.view({state:"empty",items:[]},"0001-01-01","0001-01-01","0001-01-01");
+assert.equal(early.days.length,42);
+assert.equal(early.days.find(d=>d.date==="0001-01-01").day,1);
+assert.equal(early.days[0].date,"0001-01-01");
 const sample={state:"ready",items:[
  {id:"t1",title:"Review",done:false,dueDate:"2026-10-23",priority:"high",projectId:"p1"},
  {id:"t2",title:"Finished",done:true,dueDate:"2026-10-23"},

@@ -4,6 +4,7 @@ on:
   pull_request:
     paths:
       - "widgets/TimeW.qml"
+      - "docs/timew-machine-checkpoint-contract.md"
       - "widgets/TimeZonePicker.qml"
       - "services/time/WorldClockPolicy.js"
       - "services/time/TimeZoneConverter.py"
@@ -24,6 +25,7 @@ on:
       - main
     paths:
       - "widgets/TimeW.qml"
+      - "docs/timew-machine-checkpoint-contract.md"
       - "widgets/TimeZonePicker.qml"
       - "services/time/WorldClockPolicy.js"
       - "services/time/TimeZoneConverter.py"
@@ -67,3 +69,5 @@ jobs:
         run: node tests/timew/test_countdown_policy.cjs
       - name: Verify MACHINE session marker time policy and bounds
         run: node tests/timew/test_machine_timeline_policy.cjs
+      - name: Verify MACHINE desktop checkpoint draft remains non-operative
+        run: python3 -B -I tests/timew/test_machine_checkpoint_contract.py

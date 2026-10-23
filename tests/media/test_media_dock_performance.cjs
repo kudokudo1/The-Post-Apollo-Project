@@ -132,13 +132,12 @@ test("open state magenta-energizes every Media icon and CAVA visual without affe
     assert.match(source, /hoverDockGlowColor:\s*Colors\.magenta/);
     assert.match(source, /pressedDockGlowColor:\s*Colors\.magenta/);
 
-    // Each star underlight + source shadow, clef source shadow, CAVA ambient,
-    // Static glyph glows + ambient keep their original accent binding.
-    // Each of 20 animated bar cores and its two geometry halos now share
-    // a position-derived palette color, overridden by magenta when open.
+    // Static glyph glows and the ambient wash retain their single-color
+    // accent binding. The 20 bar cores and both halos reuse one vertical
+    // gradient that turns solid magenta while the Hi-Fi menu is open.
     assert.equal((source.match(/color:\s*mediaDock\.artworkAccentColor/g) || []).length, 7);
-    assert.equal((source.match(/color:\s*parent\.barColor/g) || []).length, 3);
-    assert.match(source, /readonly property color barColor:\s*mediaDock\.open\s*\?\s*Colors\.magenta\s*:\s*mediaDock\.barPaletteColor\(index\)/);
+    assert.equal((source.match(/gradient:\s*mediaDock\.cavaVerticalGradient/g) || []).length, 3);
+    assert.match(source, /readonly property Gradient cavaVerticalGradient:\s*Gradient\s*\{/);
     assert.doesNotMatch(source, /^\s*color:\s*mediaDock\.accentColor\s*$/m);
     assert.equal((source.match(/SafeDropShadow \{/g) || []).length, 3);
     assert.equal((source.match(/RectangularShadow \{/g) || []).length, 5);
@@ -511,81 +510,69 @@ test("CAVA neon tracks the animated bar using geometry only", () => {
     assert.match(bar, /width:\s*parent\.width\s*\+\s*4/);
     assert.match(bar, /opacity:\s*0\.30\s*\+\s*0\.24\s*\*\s*parent\.glowActivity/);
     assert.match(bar, /opacity:\s*0\.50\s*\+\s*0\.30\s*\*\s*parent\.glowActivity/);
-    assert.equal((bar.match(/color:\s*parent\.barColor/g) || []).length, 3,
-        "both glow layers and the bar must share the frequency palette color");
-    assert.match(bar, /readonly property color barColor:\s*mediaDock\.open\s*\?\s*Colors\.magenta\s*:\s*mediaDock\.barPaletteColor\(index\)/);
+    assert.equal((bar.match(/gradient:\s*mediaDock\.cavaVerticalGradient/g) || []).length, 3,
+        "both glow layers and the bar must share the same vertical palette");
+    assert.doesNotMatch(bar, /barPaletteColor|barColor|GradientStop/,
+        "do not create separate gradients or horizontal band colors per bar");
     assert.equal((bar.match(/Behavior on height/g) || []).length, 1,
         "only the actual bar animates; halos follow bindings");
     assert.doesNotMatch(bar, /DropShadow|RectangularShadow|ShaderEffect|layer\.enabled/);
     assert.doesNotMatch(source, /contentGlowSource:\s*(?:spectrum|mediaArtwork|cavaBar)/);
 });
 
-test("20 CAVA bars interpolate cool/warm frequency palettes with open-magenta override", () => {
-    const mix = source.match(/function blendBarColor\(from, to, amount\) \{([\s\S]*?)\n    \}/);
-    const palette = source.match(/function barPaletteColor\(barIndex\) \{([\s\S]*?)\n    \}/);
-    assert.ok(mix && palette, "static bar colors need both small helpers");
+test("20 CAVA bars share a vertical cool/warm gradient with magenta open priority", () => {
+    const gradient = source.match(
+        /readonly property Gradient cavaVerticalGradient:\s*Gradient\s*\{([\s\S]*?)\n    \}/
+    )?.[1];
+    assert.ok(gradient, "one shared vertical QML Gradient exists on mediaDock");
+    assert.match(gradient, /orientation:\s*Gradient\.Vertical/);
+    assert.equal((source.match(/readonly property Gradient cavaVerticalGradient/g) || []).length, 1,
+        "all bar delegates should reuse one gradient object");
+    assert.doesNotMatch(source, /function blendBarColor|function barPaletteColor|readonly property color barColor/,
+        "horizontal frequency-index palette should be fully removed");
+
+    const stopPattern = /GradientStop \{\s*position:\s*(0\.0|0\.5|1\.0)\s*color:\s*([^\n]+)\n\s*:\s*([^\n]+)\n\s*\}/g;
+    const stops = Array.from(gradient.matchAll(stopPattern),
+        match => ({position: Number(match[1]), expression: match[2].trim() + " : " + match[3].trim()}));
+    assert.equal(stops.length, 3, "shared gradient needs top/middle/bottom stops");
+    assert.deepEqual(stops.map(stop => stop.position), [0, 0.5, 1]);
 
     const colorsSource = fs.readFileSync(path.join(root, "components/Colors.qml"), "utf8");
-    const names = ["cyan", "blue", "magenta", "yellow", "orange", "red"];
     const colors = {};
-    for (const name of names) {
+    for (const colorName of ["cyan", "blue", "magenta", "yellow", "orange", "red"]) {
         const match = colorsSource.match(new RegExp(
-            "readonly property color " + name + ': "(#[A-Fa-f0-9]{6})"'
+            "readonly property color " + colorName + ': "(#[A-Fa-f0-9]{6})"'
         ));
-        assert.ok(match, "palette color must remain canonical: " + name);
-        const hex = match[1];
-        colors[name] = {
-            r: parseInt(hex.slice(1, 3), 16) / 255,
-            g: parseInt(hex.slice(3, 5), 16) / 255,
-            b: parseInt(hex.slice(5, 7), 16) / 255,
-            a: 1
-        };
+        assert.ok(match, "canonical palette color exists: " + colorName);
+        colors[colorName] = match[1];
     }
-    const context = vm.createContext({
-        Qt: {rgba: (r, g, b, a) => ({r, g, b, a})},
-        Colors: colors, Math, mpdPlaying: false, barCount: 20
+    const evaluate = (stop, open, playing) => vm.runInNewContext(stop.expression, {
+        mediaDock: {open, mpdPlaying: playing}, Colors: colors
     });
-    const blend = vm.runInContext(
-        "(function(from, to, amount) {" + mix[1] + "\n})", context
-    );
-    context.blendBarColor = blend;
-    const band = vm.runInContext(
-        "(function(barIndex) {" + palette[1] + "\n})", context
-    );
-    const close = (actual, expected) =>
-        ["r", "g", "b", "a"].every(key => Math.abs(actual[key] - expected[key]) < 1e-9);
-    const distance = (actual, target) => ["r", "g", "b"]
-        .reduce((total, key) => total + Math.abs(actual[key] - target[key]), 0);
+    for (const [open, playing, expected] of [
+        [false, false, ["magenta", "blue", "cyan"]],
+        [false, true, ["red", "orange", "yellow"]],
+        [true, false, ["magenta", "magenta", "magenta"]],
+        [true, true, ["magenta", "magenta", "magenta"]]
+    ]) {
+        assert.deepEqual(stops.map(stop => evaluate(stop, open, playing)),
+            expected.map(name => colors[name]),
+            "color progresses bottom→top and open magenta overrides playback");
+    }
 
-    assert.ok(close(blend(colors.cyan, colors.blue, -1), colors.cyan),
-        "blend clamps low values");
-    assert.ok(close(blend(colors.cyan, colors.blue, 2), colors.blue),
-        "blend clamps high values");
-
-    assert.ok(close(band(0), colors.cyan), "cool low bands begin cyan");
-    assert.ok(close(band(19), colors.magenta), "cool high bands finish magenta");
-    assert.ok(distance(band(9), colors.blue) < distance(band(9), colors.cyan));
-    assert.ok(distance(band(10), colors.blue) < distance(band(10), colors.magenta));
-    assert.ok(!close(band(1), band(2)), "neighboring bands must have distinct colors");
-
-    context.mpdPlaying = true;
-    assert.ok(close(band(0), colors.yellow), "playing low bands begin yellow");
-    assert.ok(close(band(19), colors.red), "playing high bands finish red");
-    assert.ok(distance(band(9), colors.orange) < distance(band(9), colors.yellow));
-    assert.ok(distance(band(10), colors.orange) < distance(band(10), colors.red));
-
-    const section = source.match(/Item \{\s*width:\s*5\s*height:\s*spectrum\.height([\s\S]*?)\n\s*\}\n\s*\}\n\s*\}\n\s*\}\n\s*\}/);
-    assert.ok(section, "color computation belongs to a single per-bar delegate");
-    assert.match(section[1], /readonly property color barColor:\s*mediaDock\.open\s*\?\s*Colors\.magenta\s*:\s*mediaDock\.barPaletteColor\(index\)/);
-    assert.equal((section[1].match(/color:\s*parent\.barColor/g) || []).length, 3,
-        "bar core and both existing glow rectangles share the band color");
-    assert.equal((section[1].match(/Behavior on height/g) || []).length, 1,
-        "do not animate a palette or add glow effects per frame");
-    assert.doesNotMatch(section[1], /ShaderEffect|DropShadow|Behavior on color|Behavior on opacity/);
-    assert.match(source, /id:\s*cavaAmbientWash[\s\S]*?color:\s*mediaDock\.artworkAccentColor/,
-        "the wide ambient wash keeps its original single cyan/orange/magenta color");
+    const delegate = source.match(
+        /Item \{\s*width:\s*5\s*height:\s*spectrum\.height([\s\S]*?)\n\s*\}\n\s*\}\n\s*\}\n\s*\}\n\s*\}/
+    )?.[1];
+    assert.ok(delegate, "only existing per-bar rectangles should draw the gradient");
+    assert.equal((delegate.match(/gradient:\s*mediaDock\.cavaVerticalGradient/g) || []).length, 3,
+        "the bar core and both existing halos use identical vertical stops");
+    assert.equal((delegate.match(/Behavior on height/g) || []).length, 1,
+        "only the existing core height animates");
+    assert.doesNotMatch(delegate, /GradientStop|ShaderEffect|DropShadow|Behavior on color|Behavior on opacity/);
     assert.equal((source.match(/RectangularShadow \{/g) || []).length, 5);
     assert.equal((source.match(/SafeDropShadow \{/g) || []).length, 3);
+    assert.match(source, /id:\s*cavaAmbientWash[\s\S]*?color:\s*mediaDock\.artworkAccentColor/,
+        "the larger ambient wash remains a single low-cost color");
 });
 
 test("CAVA's two existing halos get brighter with taller bars at no added render cost", () => {

@@ -205,8 +205,8 @@ Rectangle {
                 }
             }
 
-            // The 80px condition glyph now shares the line with the name,
-            // reclaiming empty height without reducing the artwork.
+            // Center the enlarged sun in the fixed-height condition bay.
+            // Neither the bay height nor the divider below it moves.
             Column {
                 width: 190
                 spacing: 2
@@ -216,10 +216,13 @@ Rectangle {
                     font.pixelSize: 11
                 }
 
-                Row {
-                    spacing: 4
+                Item {
+                    width: parent.width
+                    height: 88
 
                     GohuText {
+                        anchors.left: parent.left
+                        anchors.top: parent.top
                         width: 98
                         text: sky.conditionText
                         font.pixelSize: 14
@@ -228,8 +231,9 @@ Rectangle {
                     }
 
                     Item {
-                        width: 88
-                        height: 88
+                        width: 110
+                        height: parent.height
+                        anchors.horizontalCenter: parent.horizontalCenter
 
                         SafeDropShadow {
                             anchors.fill: conditionIconGlyph
@@ -248,7 +252,7 @@ Rectangle {
                             id: conditionIconGlyph
                             anchors.centerIn: parent
                             text: sky.conditionState.icon
-                            font.pixelSize: 80
+                            font.pixelSize: 104
                             color: sky.iconColor(sky.conditionState.color)
                         }
                     }
@@ -551,7 +555,9 @@ Rectangle {
 
                         Item {
                             width: parent.width
-                            height: 90
+                            // Shrink only the empty vertical slot to lift the
+                            // probability bar; hold the sun at its old center.
+                            height: 74
 
                             readonly property var forecastState:
                                 sky.iconState(modelData.condition, modelData.weatherCode, false)
@@ -572,6 +578,7 @@ Rectangle {
                             Text {
                                 id: hourlyIconGlyph
                                 anchors.centerIn: parent
+                                anchors.verticalCenterOffset: 8
                                 text: parent.forecastState.icon
                                 font.pixelSize: 80
                                 color: sky.iconColor(parent.forecastState.color)
@@ -663,12 +670,69 @@ Rectangle {
                             }
                         }
 
+                        // Reposition rain and sunrise/sunset at the TOP of
+                        // the existing icon slot. Its height and the sun center
+                        // stay unchanged, so lower content does not move down.
                         Item {
+                            id: dailyForecastArtwork
                             width: parent.width
                             height: 116
 
                             readonly property var forecastState:
                                 sky.iconState(modelData.condition, modelData.weatherCode, false)
+
+                            Column {
+                                id: dailyWeatherDetails
+                                anchors.top: parent.top
+                                anchors.horizontalCenter: parent.horizontalCenter
+                                width: parent.width
+                                spacing: 2
+                                z: 2
+
+                                Row {
+                                    anchors.horizontalCenter: parent.horizontalCenter
+                                    spacing: 8
+
+                                    QuietText {
+                                        text: modelData.chanceRain >= 0
+                                              ? "RAIN "
+                                                + Math.round(modelData.chanceRain)
+                                                + "%"
+                                              : "RAIN --"
+                                        font.pixelSize: 10
+                                    }
+
+                                    Rectangle {
+                                        anchors.verticalCenter: parent.verticalCenter
+                                        width: 120
+                                        height: 6
+                                        color: Colors.black
+                                        border.width: 1
+                                        border.color: sky.meterBorderColor
+
+                                        Rectangle {
+                                            x: 2
+                                            anchors.verticalCenter: parent.verticalCenter
+                                            width: (parent.width - 4)
+                                                   * sky.chanceMeter(
+                                                       modelData.chanceRain
+                                                   )
+                                            height: parent.height - 4
+                                            color: sky.meterFillColor
+                                        }
+                                    }
+                                }
+
+                                QuietText {
+                                    width: parent.width
+                                    horizontalAlignment: Text.AlignHCenter
+                                    text: "SUN "
+                                          + modelData.sunrise
+                                          + " → "
+                                          + modelData.sunset
+                                    font.pixelSize: 9
+                                }
+                            }
 
                             SafeDropShadow {
                                 anchors.fill: dailyIconGlyph
@@ -690,50 +754,6 @@ Rectangle {
                                 font.pixelSize: 100
                                 color: sky.iconColor(parent.forecastState.color)
                             }
-                        }
-
-                        Row {
-                            anchors.horizontalCenter: parent.horizontalCenter
-                            spacing: 8
-
-                            QuietText {
-                                text: modelData.chanceRain >= 0
-                                      ? "RAIN "
-                                        + Math.round(modelData.chanceRain)
-                                        + "%"
-                                      : "RAIN --"
-                                font.pixelSize: 10
-                            }
-
-                            Rectangle {
-                                anchors.verticalCenter: parent.verticalCenter
-                                width: 120
-                                height: 6
-                                color: Colors.black
-                                border.width: 1
-                                border.color: sky.meterBorderColor
-
-                                Rectangle {
-                                    x: 2
-                                    anchors.verticalCenter: parent.verticalCenter
-                                    width: (parent.width - 4)
-                                           * sky.chanceMeter(
-                                               modelData.chanceRain
-                                           )
-                                    height: parent.height - 4
-                                    color: sky.meterFillColor
-                                }
-                            }
-                        }
-
-                        QuietText {
-                            width: parent.width
-                            horizontalAlignment: Text.AlignHCenter
-                            text: "SUN "
-                                  + modelData.sunrise
-                                  + " → "
-                                  + modelData.sunset
-                            font.pixelSize: 9
                         }
                     }
                 }

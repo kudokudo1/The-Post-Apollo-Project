@@ -153,6 +153,7 @@ Item {
                     });
                     if (found) {
                         selectedProjectId = found.id;
+                        renameInput.text = found.name;
                         newProjectInput.text = "";
                         pendingWrite = false;
                         pendingKind = "";

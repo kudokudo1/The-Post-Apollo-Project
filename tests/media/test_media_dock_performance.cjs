@@ -539,7 +539,7 @@ test("CAVA reveals fixed-height gradient from the bottom without new glow shader
     assert.doesNotMatch(source, /contentGlowSource:\s*(?:spectrum|mediaArtwork|cavaBar)/);
 });
 
-test("20 CAVA bars share a vertical cool/warm gradient with magenta open priority", () => {
+test("20 CAVA bars use warm idle, cool playing, and solid magenta when open", () => {
     const gradient = source.match(
         /readonly property Gradient cavaVerticalGradient:\s*Gradient\s*\{([\s\S]*?)\n    \}/
     )?.[1];
@@ -569,14 +569,14 @@ test("20 CAVA bars share a vertical cool/warm gradient with magenta open priorit
         mediaDock: {open, mpdPlaying: playing}, Colors: colors
     });
     for (const [open, playing, expected] of [
-        [false, false, ["magenta", "blue", "cyan"]],
-        [false, true, ["red", "orange", "yellow"]],
+        [false, false, ["red", "orange", "yellow"]],
+        [false, true, ["magenta", "blue", "cyan"]],
         [true, false, ["magenta", "magenta", "magenta"]],
         [true, true, ["magenta", "magenta", "magenta"]]
     ]) {
         assert.deepEqual(stops.map(stop => evaluate(stop, open, playing)),
             expected.map(name => colors[name]),
-            "color progresses bottom→top and open magenta overrides playback");
+            "warm idle, cool playing, and open-magenta must all reveal from bottom→top");
     }
 
     const delegate = cavaDelegateSource();

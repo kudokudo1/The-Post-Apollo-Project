@@ -12,7 +12,7 @@ for term in (
     'function machineSelectionPreview()',
     'machineExcludedItems = ({});',
     'kind: "sway-layout-selection-preview"',
-    'label: "EXCLUDE ITEM" : "INCLUDE ITEM"',
+    '? "EXCLUDE ITEM" : "INCLUDE ITEM"',
     'onLeftClicked: timew.toggleMachineItemSelection()',
     'SELECTION PREVIEW ONLY // NOTHING SAVED',
     'onLeftClicked: timew.requestMachineCapturePreview()',

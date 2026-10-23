@@ -260,6 +260,7 @@ PanelWindow {
             Column {
                 visible: root.activeMode.id !== "tasks" && root.activeMode.id !== "today"
                          && root.activeMode.id !== "projects"
+                         && root.activeMode.id !== "sync"
                 anchors.centerIn: parent
                 width: parent.width
                 spacing: 12
@@ -337,6 +338,15 @@ PanelWindow {
                     root.selectMainMode(0);
                     taskDetails.chooseTask(taskId);
                 }
+            }
+
+            // SYNC is currently a LOCAL read-only map of future integration
+            // requirements, never a second GitHub service or writer.
+            TaskSyncPreviewPane {
+                id: taskSyncPreview
+                anchors.fill: parent
+                visible: root.menuOpen && root.activeMode.id === "sync"
+                todoSnapshot: ApolloHubTodoStore.snapshot
             }
         }
     }

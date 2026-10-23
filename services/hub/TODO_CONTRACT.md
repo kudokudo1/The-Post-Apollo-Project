@@ -185,3 +185,18 @@ itself never exits `saving`, do **not** unlock it by bypassing its guard;
 investigate FileView completion and storage errors before further edits.
 Restart and on-disk persistence acceptance remain operator checks.
 
+
+## TASKS M8 // GitHub Projects mapping preview (2026-10-22)
+
+**Status:** read-only draft feature; no remote account access or sync authorization.
+
+- Existing `services/github/GitHubProjectsService.qml` and its GitW instance own the live GitHub Projects API/CLI boundary. TASKS must **reuse that ownership** through an explicitly reviewed adapter later; this milestone does not instantiate the service or call GitHub.
+- TASKS → SYNC now shows a **local-only** projection of current checklist inventory and field-level prerequisites. The preview is calculated from `ApolloHubTodoStore.snapshot` and creates **no new store**, task schema, file, network request, token access, or remote mutation.
+- Local `pN` identifiers are **not** GitHub ProjectV2 identifiers; local `tN` identifiers are **not** GitHub Project item IDs. Matching titles, project numbers, or names are never proof of identity.
+- Priority requires a verified remote single-select field ID and exact option mapping. Due date requires a verified DATE field ID. Local `done` is not assumed equivalent to a GitHub status column. Description to draft body requires a verified item/content type and ownership rules.
+- The preview displays counts and item titles to its local user. It never serializes full description bodies or local credentials into mapping proposals. All fields remain `NEEDS_*` and `writeReady:0` until a later approved identity/field resolution workflow exists.
+- No background polling, automatic linking, upload/download, conflict resolution or write authority is implied. The existing Git widget continues managing GitHub Projects independently.
+- Before actual integration: inspect project owner scope and authenticated `gh project` permissions; agree on explicit project/item links, field IDs/options, directions (pull vs push), per-field conflict winners, deletion semantics, opt-in UI, rollback and audit trail. Do not encode guessed connections into v3 data.
+
+**Verification:** pure mapping policy regression and UI source contract run in the TASKS workflow; local window layout and user acceptance remain pending.
+

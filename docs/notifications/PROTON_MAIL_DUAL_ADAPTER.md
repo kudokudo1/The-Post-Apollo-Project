@@ -236,6 +236,80 @@ is approved or implemented. Do not assume browser Web Notifications expose
 their per-message \`tag\` through the desktop notification protocol.
 Paid Bridge is another adapter, not an automatic browser-event match.
 
+## Chromium/Brave native notification provenance feasibility (2026-10-23)
+
+### Why this is a blocker
+
+Proton's public WebClients notification helper uses \`message.ID\` as the
+\`tag\` of the **web** Notification. The **OS desktop** notification seen by
+Quickshell travels through Brave/Chromium's Linux
+\`org.freedesktop.Notifications.Notify\` bridge. A public Chromium Linux
+implementation sends the title, body, actions, app metadata and limited
+hints to D-Bus, but does **not obviously forward the Web Notification's
+per-message tag or internal browser notification ID as a usable hint**.
+Chromium stores its own notification ID behind the Linux bridge's
+\`dbus_id\` correlation. This is evidence of a likely architectural
+limitation, NOT yet live proof about the operator's installed Brave build.
+
+Relevant sources:
+- Proton's notification creation:
+  https://github.com/ProtonMail/WebClients/blob/main/applications/mail/src/app/hooks/mailbox/notifications/notificationHelpers.ts
+- Chromium Linux D-Bus adapter:
+  https://chromium.googlesource.com/chromium/src/+/512a3a91af1b57f0be8c0e2e5dc88e4b6cac1248/chrome/browser/notifications/notification_platform_bridge_linux.cc
+- Freedesktop D-Bus notification protocol:
+  https://specifications.freedesktop.org/notification/latest-single/
+
+Do not assign a trusted message identity from a notification title/body,
+sender, origin text, timestamp, guessed web tag, or numeric D-Bus ID.
+\`ProtonNotificationCorrelationPolicy.js\` remains fail-closed until a
+genuine producer establishes exact account/message/event provenance.
+
+### Privacy-bounded experiment (NOT auto-activated)
+
+To distinguish Brave's actual desktop metadata capabilities,
+\`services/notifications/mail/ProtonNativeDeliveryAudit.js\` adds an opt-in
+helper to \`NotificationsService.qml\`. When the **Quickshell process**
+starts with \`POST_APOLLO_PROTON_DELIVERY_AUDIT=1\`, it logs only the presence
+of fixed named hints and small counts, at most **12** browser-candidate
+deliveries per shell session, separated by at least one second. It never
+logs raw hint keys or values, the browser's app name, titles, addresses,
+subjects, URLs, message IDs, action labels, cookies or page content.
+
+Illustrative diagnostic format (values shown are examples only):
+
+\`\`\`text
+PA_PROTON_DELIVERY_AUDIT hintCount=3 categoryHint=false desktopEntryHint=true kdeOriginHint=true tagHint=false actionCount=2 identity NOT verified
+\`\`\`
+
+The fixed-name \`tagHint\` flag only detects explicitly named tag-style
+keys. Even \`tagHint=true\` is NOT an authenticated per-message reference,
+and \`false\` does NOT prove that no other implementation-specific field
+exists. Note that an unrelated browser notification may also produce
+a sample; the user should correlate the result with the arrival of a
+new Proton mail notification by time alone, without posting its text.
+
+**Default is OFF.** No installation, service restart, environment changes
+or local write is part of this GitHub code change. Before testing live,
+obtain separate operator permission to update the local working tree and
+restart/reload Quickshell with the temporary opt-in environment variable;
+preserve the existing running shell and rollback option.
+
+### Architecture decision after live audit
+
+If Brave does not deliver authenticated message-event provenance, **stop
+trying to infer it from native notifications**. Preferred practical route:
+Post-Apollo-owned opt-in notification producer, where a browser-side adapter
+first verifies a single message, then registers a generated event reference
+through a reviewed native channel *before* publishing its own desktop
+notification. In that design, Post-Apollo controls the event and reference
+registry. Requires explicit operator review of browser site permissions,
+producer UX, identity proof, duplicated native notifications, account
+transitions, and provider-confirmed actions.
+
+Manual per-message pairing is an alternative only with a deliberate user
+confirmation and a clear distinction between user-attested selection and
+provider-verified message identity. Neither path is approved for activation.
+
 ## Remaining implementation gates
 
 1. Browser: test each supported browser family's extension API and the real Proton UI to establish a **stable account and exact message identity** from the authenticated page without capturing session secrets. Explicit local installation + validation required. Do not automate uncertain DOM selectors.

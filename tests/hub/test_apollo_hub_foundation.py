@@ -445,8 +445,8 @@ for token in (
     'function navigationTarget(grid, selectedIndex, direction)',
     'source.column+source.columnSpan',
     'source.row+source.rowSpan',
-    'candidate.column+candidate.columnSpan',
-    'candidate.row+candidate.rowSpan',
+    'cx0+candidate.columnSpan',
+    'cy0+candidate.rowSpan',
     'if (primary<0)',
 ):
     assert token in layout, f"Missing pure spatial navigation helper: {token}"

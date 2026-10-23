@@ -9,6 +9,7 @@ import "../services/time/WorldClockPolicy.js" as WorldClockPolicy
 import "../services/time/WorldZoneSearch.js" as WorldZoneSearch
 import "../services/time/TimeConverterFormat.js" as ConverterFormat
 import "../services/time/StopwatchPolicy.js" as StopwatchPolicy
+import "../services/time/CountdownPolicy.js" as CountdownPolicy
 
 // TimeW M1: standalone temporal window foundation.
 // No timers, activity recording, screenshots or restoration are active here.
@@ -486,6 +487,82 @@ PanelWindow {
         });
     }
 
+    // TOOLS subview selection is local and does not affect the other modes.
+    property string toolsView: "stopwatch"
+
+    // One session-local countdown. Time fields lock after START until RESET.
+    // Monotonic measurement continues with the menu closed, with a low-rate
+    // heartbeat to detect completion and set a visible FINISHED status.
+    property string countdownHours: "0"
+    property string countdownMinutes: "5"
+    property string countdownSeconds: "0"
+    readonly property var countdownParsed:
+        CountdownPolicy.parseDuration(countdownHours,
+                                      countdownMinutes, countdownSeconds)
+    property bool countdownRunning: false
+    property bool countdownStarted: false
+    property bool countdownFinished: false
+    property string countdownError: ""
+    property real countdownTotalMs: 0
+    property real countdownRemainingMs: 0
+    property real countdownSegmentBudgetMs: 0
+
+    function refreshCountdown() {
+        if (!countdownRunning)
+            return;
+        const left = CountdownPolicy.remaining(
+                         countdownSegmentBudgetMs,
+                         countdownAnchor.elapsed() * 1000);
+        countdownRemainingMs = left;
+        if (left <= 0) {
+            countdownRunning = false;
+            countdownFinished = true;
+        }
+    }
+
+    function startCountdown() {
+        if (countdownRunning)
+            return;
+        if (countdownStarted && !countdownFinished) {
+            // Resume the paused, fixed remaining duration.
+            countdownSegmentBudgetMs = countdownRemainingMs;
+        } else {
+            if (!countdownParsed.valid) {
+                countdownError = countdownParsed.error;
+                return;
+            }
+            countdownTotalMs = countdownParsed.milliseconds;
+            countdownRemainingMs = countdownTotalMs;
+            countdownSegmentBudgetMs = countdownTotalMs;
+            countdownStarted = true;
+            countdownFinished = false;
+        }
+        countdownError = "";
+        countdownAnchor.restart();
+        countdownRunning = true;
+        refreshCountdown();
+    }
+
+    function pauseCountdown() {
+        if (!countdownRunning)
+            return;
+        refreshCountdown();
+        if (countdownFinished)
+            return;
+        countdownRunning = false;
+        countdownSegmentBudgetMs = countdownRemainingMs;
+    }
+
+    function resetCountdown() {
+        countdownRunning = false;
+        countdownStarted = false;
+        countdownFinished = false;
+        countdownError = "";
+        countdownTotalMs = 0;
+        countdownSegmentBudgetMs = 0;
+        countdownRemainingMs = 0;
+    }
+
     // TOOLS / STOPWATCH. Monotonic measurement continues while the window
     // is closed; only the visible readout refresh pauses to conserve CPU.
     property bool stopwatchRunning: false
@@ -585,8 +662,10 @@ PanelWindow {
         }
         if (menuOpen) {
             Qt.callLater(restoreKeyboardFocus);
-            if (selectedMode === "tools")
+            if (selectedMode === "tools") {
                 refreshStopwatch();
+                refreshCountdown();
+            }
             if (selectedMode === "clock")
                 Qt.callLater(refreshWorldClock);
             if (selectedMode === "clock" || selectedMode === "calc")
@@ -598,8 +677,10 @@ PanelWindow {
             dismissWorldSearchPopup();
         if (selectedMode !== "calc")
             closeConverterDropdowns();
-        if (menuOpen && selectedMode === "tools")
+        if (menuOpen && selectedMode === "tools") {
             refreshStopwatch();
+            refreshCountdown();
+        }
         if (menuOpen && selectedMode === "clock")
             Qt.callLater(refreshWorldClock);
         if (menuOpen && (selectedMode === "clock" || selectedMode === "calc"))
@@ -653,6 +734,10 @@ PanelWindow {
     // wall-clock queries, network or subprocesses for stopwatch measurement.
     ElapsedTimer {
         id: stopwatchAnchor
+    }
+
+    ElapsedTimer {
+        id: countdownAnchor
     }
 
     // Difference comparisons are also one-shot. Existing inputs are kept
@@ -827,7 +912,19 @@ PanelWindow {
         repeat: true
         running: timew.stopwatchRunning
                  && timew.menuOpen && timew.selectedMode === "tools"
+                 && timew.toolsView === "stopwatch"
         onTriggered: timew.refreshStopwatch()
+    }
+
+    Timer {
+        id: countdownHeartbeat
+        // Always monitor a running timer, even with TOOLS closed.
+        // Refresh at 10Hz only while visible; once per second otherwise.
+        interval: timew.menuOpen && timew.selectedMode === "tools"
+                  && timew.toolsView === "countdown" ? 100 : 1000
+        repeat: true
+        running: timew.countdownRunning
+        onTriggered: timew.refreshCountdown()
     }
 
     Item {

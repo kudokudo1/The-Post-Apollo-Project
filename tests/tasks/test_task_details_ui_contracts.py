@@ -61,8 +61,8 @@ assert "TodoPolicy.updateDetails(document, id, priority," in STORE
 assert "function updateDetails(doc, id, priority, description, dueDate, nowMs)" in POLICY
 assert "var MAX_DESCRIPTION = 2000;" in POLICY
 assert "var MAX_FILE_LENGTH = 1048576;" in POLICY
-assert "return {version: 2, nextId: 1, tasks: []};" in POLICY
-assert "doc.version !== 1 && doc.version !== 2" in POLICY
+assert "return {version: 3, nextId: 1, nextProjectId: 1, projects: [], tasks: []};" in POLICY
+assert "doc.version !== 1 && doc.version !== 2 && doc.version !== 3" in POLICY
 assert "if (!result.ok) {" in STORE
 assert "todoFile.setText(JSON.stringify(pendingDocument, null, 2)" in STORE
 assert "atomicWrites: true" in STORE

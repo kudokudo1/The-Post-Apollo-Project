@@ -50,6 +50,60 @@ PanelWindow {
           + "//" + localTimeSnapshot.meridiem
         : "--:--:--//--"
 
+    // Two CALC views preserve the existing converter geometry while adding
+    // manual elapsed duration arithmetic without a new persistent clock.
+    property string calcView: "convert"
+    property string mathOperation: "add"
+    property string mathDays: "0"
+    property string mathHours: "1"
+    property string mathMinutes: "0"
+    property var mathResult: null
+    property bool mathBusy: false
+    property string mathSubmittedKey: ""
+    readonly property string mathInputsKey:
+        [converterDate,
+         converterParsedTime.valid ? converterParsedTime.canonical
+                                   : "INVALID:" + converterTime,
+         converterSourceZone, mathOperation, mathDays,
+         mathHours, mathMinutes].join("|")
+
+    onMathInputsKeyChanged: mathResult = null
+
+    function setCalcView(which) {
+        if (which !== "convert" && which !== "math")
+            return;
+        closeConverterDropdowns();
+        calcView = which;
+    }
+
+    function toggleMathOperation() {
+        mathOperation = mathOperation === "add" ? "subtract" : "add";
+    }
+
+    function runTimeArithmetic() {
+        if (mathBusy || !menuOpen || selectedMode !== "calc"
+                || calcView !== "math")
+            return;
+        if (!converterZoneAllowed(converterSourceZone)) {
+            mathResult = {status: "ZONE_UNAVAILABLE", options: []};
+            return;
+        }
+        if (!converterParsedTime.valid) {
+            mathResult = {status: converterParsedTime.error, options: []};
+            return;
+        }
+        mathResult = null;
+        mathSubmittedKey = mathInputsKey;
+        mathBusy = true;
+        arithmeticProcess.exec([
+            "python3", "-B", "-I",
+            Quickshell.shellPath("services/time/TimeArithmetic.py"),
+            converterSourceZone, converterDate,
+            converterParsedTime.canonical, mathOperation,
+            mathDays, mathHours, mathMinutes
+        ]);
+    }
+
     // CALC // Time-zone conversion is deliberately request-driven, not a
     // new background clock. UTC initial values avoid ambiguous local defaults.
     property string converterDate: new Date().toISOString().slice(0, 10)
@@ -434,6 +488,34 @@ PanelWindow {
     SystemClock {
         id: localClock
         precision: SystemClock.Seconds
+    }
+
+    // Request-driven elapsed arithmetic. Keep it separate from the zone
+    // converter so neither process nor result interferes with the other.
+    Process {
+        id: arithmeticProcess
+        running: false
+        stdout: StdioCollector {
+            onStreamFinished: {
+                if (timew.mathSubmittedKey !== timew.mathInputsKey)
+                    return;
+                try {
+                    const result = JSON.parse(this.text);
+                    timew.mathResult =
+                        result && typeof result.status === "string"
+                        && Array.isArray(result.options)
+                        ? result : {status: "INVALID_RESULT", options: []};
+                } catch (e) {
+                    timew.mathResult = {status: "INVALID_RESULT", options: []};
+                }
+            }
+        }
+        onExited: function(exitCode, exitStatus) {
+            timew.mathBusy = false;
+            if (exitCode !== 0
+                    && timew.mathSubmittedKey === timew.mathInputsKey)
+                timew.mathResult = {status: "MATH_UNAVAILABLE", options: []};
+        }
     }
 
     // Manual conversion only. Output is structured JSON from our Python
@@ -1112,9 +1194,41 @@ PanelWindow {
                         }
                     }
 
+                    Row {
+                        id: calcSubModeStrip
+                        visible: timew.selectedMode === "calc"
+                        width: parent.width
+                        height: 34
+                        spacing: 6
+
+                        ModeButton {
+                            width: (calcSubModeStrip.width - calcSubModeStrip.spacing) / 2
+                            height: parent.height
+                            bordered: false
+                            textOnly: true
+                            labelText: "CONVERT"
+                            labelFontSize: 11
+                            idlePrimaryColor: timew.semanticColor
+                            selected: timew.calcView === "convert"
+                            onTriggered: timew.setCalcView("convert")
+                        }
+
+                        ModeButton {
+                            width: (calcSubModeStrip.width - calcSubModeStrip.spacing) / 2
+                            height: parent.height
+                            bordered: false
+                            textOnly: true
+                            labelText: "MATH"
+                            labelFontSize: 11
+                            idlePrimaryColor: timew.semanticColor
+                            selected: timew.calcView === "math"
+                            onTriggered: timew.setCalcView("math")
+                        }
+                    }
+
                     Column {
                         id: converterPane
-                        visible: timew.selectedMode === "calc"
+                        visible: timew.selectedMode === "calc" && timew.calcView === "convert"
                         // Overlay either dropdown above following inputs,
                         // results, and the footer, without shifting the page.
                         z: timew.activeConverterDropdown !== "" ? 20 : 0

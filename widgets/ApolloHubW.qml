@@ -26,10 +26,21 @@ PanelWindow {
     property bool relationshipFocused: false
     signal keyboardOwnershipRequested()
     property int selectedTileIndex: 0
+    // The Hub picker is transient; it never changes the app catalog or file.
+    property bool modulePickerOpen: false
+    property int modulePickerTileIndex: -1
+    property string modulePickerTileId: ""
+    property string modulePickerModeId: ""
+    property string modulePickerGroupId: ""
+    property string modulePickerQuery: ""
+    readonly property var modulePickerChoices: Layout.moduleChoices(
+        layout, selectedModeIndex, selectedSubModeIndex,
+        modulePickerTileIndex, modulePickerQuery)
     readonly property bool standardKeysAvailable:
         menuOpen && keyboardActive
         && (!relationshipFocusModeActive || relationshipFocused)
         && !modeNameInput.activeFocus
+        && !modulePickerOpen
         && !todoInputFocused
         && !notesInputFocused
     property bool writingLayout: false
@@ -63,6 +74,7 @@ PanelWindow {
         if (writingLayout)
             return;
         cancelPendingRemoval();
+        closeModulePicker();
         layout = Layout.parse(ApolloHubStore.layoutJson);
         selectedModeIndex = Math.min(selectedModeIndex, layout.modes.length - 1);
         selectedSubModeIndex = 0;
@@ -78,6 +90,7 @@ PanelWindow {
         if (JSON.stringify(normalized) === previous)
             return;
         cancelPendingRemoval();
+        closeModulePicker();
         const history = layoutUndoStack.slice();
         history.push(previous);
         if (history.length > 10)
@@ -93,6 +106,7 @@ PanelWindow {
         if (layoutStorageIssue.length > 0 || layoutUndoStack.length < 1)
             return;
         cancelPendingRemoval();
+        closeModulePicker();
         const history = layoutUndoStack.slice();
         const previous = history.pop();
         layoutUndoStack = history;
@@ -149,6 +163,7 @@ PanelWindow {
         if (!menuOpen || !editMode || layoutStorageIssue.length > 0
                 || !activeMode)
             return;
+        closeModulePicker();
         if (kind === "mode") {
             if (layout.modes.length <= 1)
                 return;
@@ -208,10 +223,66 @@ PanelWindow {
         cancelPendingRemoval();
     }
 
+    function closeModulePicker() {
+        modulePickerOpen = false;
+        modulePickerTileIndex = -1;
+        modulePickerTileId = "";
+        modulePickerModeId = "";
+        modulePickerGroupId = "";
+        modulePickerQuery = "";
+        if (menuOpen && keyboardActive)
+            Qt.callLater(function() {
+                if (hub.standardKeysAvailable)
+                    hubKeyboardAnchor.forceActiveFocus();
+            });
+    }
+
+    function openModulePicker(index) {
+        if (!menuOpen || !editMode || layoutStorageIssue.length > 0
+                || pendingRemoval !== null || !activeMode || !activeSubMode
+                || index < 0 || index >= activeTiles.length)
+            return;
+        modulePickerTileIndex = index;
+        modulePickerTileId = activeTiles[index].id;
+        modulePickerModeId = activeMode.id;
+        modulePickerGroupId = activeSubMode.id;
+        modulePickerQuery = "";
+        modulePickerOpen = true;
+        tileScroll.contentY = 0;
+        Qt.callLater(function() {
+            if (hub.modulePickerOpen)
+                modulePickerInput.forceActiveFocus();
+        });
+    }
+
+    function chooseModuleFromPicker(moduleId) {
+        if (!modulePickerOpen || !menuOpen || !editMode
+                || layoutStorageIssue.length > 0
+                || pendingRemoval !== null || !activeMode || !activeSubMode
+                || activeMode.id !== modulePickerModeId
+                || activeSubMode.id !== modulePickerGroupId
+                || modulePickerTileIndex < 0
+                || modulePickerTileIndex >= activeTiles.length
+                || activeTiles[modulePickerTileIndex].id !== modulePickerTileId)
+            return;
+        const choice = modulePickerChoices.items.find(function(item) {
+            return item.id === moduleId;
+        });
+        if (!choice || !choice.available)
+            return;
+        const index = modulePickerTileIndex;
+        save(Layout.setTileModule(layout, selectedModeIndex,
+                                  selectedSubModeIndex, index,
+                                  modulePickerTileId, moduleId));
+        selectedTileIndex = index;
+        closeModulePicker();
+    }
+
     function chooseMode(index) {
         if (index < 0 || index >= layout.modes.length)
             return;
         cancelPendingRemoval();
+        closeModulePicker();
         selectedModeIndex = index;
         selectedSubModeIndex = 0;
         selectedTileIndex = 0;
@@ -229,6 +300,7 @@ PanelWindow {
         if (!activeMode || index < 0 || index >= activeMode.subModes.length)
             return;
         cancelPendingRemoval();
+        closeModulePicker();
         selectedSubModeIndex = index;
         selectedTileIndex = 0;
     }
@@ -252,12 +324,11 @@ PanelWindow {
 
     function activateNavigationCursor() {
         // View-mode modules without real action adapters are deliberately inert.
-        // EDIT + Enter performs only the same safe module-cycle as SWAP.
+        // EDIT + Enter opens the same safe selector as SWAP.
         if (!editMode || selectedTileIndex < 0
                 || selectedTileIndex >= activeTiles.length)
             return;
-        save(Layout.cycleTile(layout, selectedModeIndex,
-                              selectedSubModeIndex, selectedTileIndex));
+        openModulePicker(selectedTileIndex);
     }
 
     function shiftTile(fromIndex, toIndex) {
@@ -266,10 +337,14 @@ PanelWindow {
     }
 
     Component.onCompleted: restore()
-    onEditModeChanged: if (!editMode) cancelPendingRemoval()
+    onEditModeChanged: if (!editMode) {
+        cancelPendingRemoval();
+        closeModulePicker();
+    }
     onMenuOpenChanged: {
         if (!menuOpen) {
             cancelPendingRemoval();
+            closeModulePicker();
             todoInputFocused = false;
             notesInputFocused = false;
         }
@@ -848,9 +923,7 @@ PanelWindow {
                                     + tileFlow.spacing * ((tileConfig.rowSpan || 1) - 1)
                             onMoveLeft: hub.shiftTile(index, index - 1)
                             onMoveRight: hub.shiftTile(index, index + 1)
-                            onChangeModule: hub.save(Layout.cycleTile(
-                                hub.layout, hub.selectedModeIndex,
-                                hub.selectedSubModeIndex, index))
+                            onChangeModule: hub.openModulePicker(index)
                             onRemoveTile: hub.removeEditedTile(index)
                             onToggleTileWidth: hub.toggleEditedTileWidth(index)
                             onCycleTileHeight: hub.cycleEditedTileHeight(index)

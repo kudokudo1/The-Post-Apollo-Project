@@ -271,27 +271,38 @@ for token in (
 for token in (
     'property bool modulePickerOpen: false',
     'property string modulePickerQuery: ""',
+    'property real modulePickerAnchorX: 12',
+    'property real modulePickerAnchorY: 12',
     'readonly property var modulePickerChoices: Layout.moduleChoices(',
-    'function openModulePicker(index)',
+    'function openModulePicker(index, sourceItem)',
     'function closeModulePicker()',
     'function chooseModuleFromPicker(moduleId)',
+    'sourceItem.mapToItem(',
+    'modulePickerOverlay, 0, sourceItem.height + 3',
+    'modulePickerAnchorX = Math.max(10, Math.min(',
+    'modulePickerAnchorY = below.y + modulePickerPopup.height',
     'modulePickerInput.forceActiveFocus()',
     'modulePickerInput.text = ""',
-    'tileScroll.contentY = 0',
-    'id: modulePicker',
+    'id: modulePickerOverlay',
+    'anchors.fill: parent',
+    'z: 200',
+    'id: modulePickerPopup',
+    'x: hub.modulePickerAnchorX',
+    'y: hub.modulePickerAnchorY',
     'id: modulePickerInput',
     'onTextChanged: hub.modulePickerQuery = text',
+    'SEARCH MODULE / ID',
     'hub.modulePickerChoices.matchCount + " / "',
+    'id: modulePickerResults',
     'model: hub.modulePickerChoices.items',
     'onLeftClicked: hub.chooseModuleFromPicker(modelData.id)',
-    'onChangeModule: hub.openModulePicker(index)',
-    'openModulePicker(selectedTileIndex);',
+    'onChangeModule: hub.openModulePicker(index, sourceItem)',
     'onLeftClicked: hub.closeModulePicker()',
     'available: modelData.available',
     'selected: modelData.selected',
     '&& !modulePickerOpen',
-    'visible: !hub.modulePickerOpen',
-    'contentHeight: hub.modulePickerOpen ? modulePicker.height : tileFlow.height',
+    'contentHeight: tileFlow.height',
+    'clip: true',
     'event.key === Qt.Key_Escape',
     'enabled: hub.menuOpen && hub.modulePickerOpen',
     'onActivated: hub.closeModulePicker()',
@@ -299,11 +310,30 @@ for token in (
     'activeTiles[modulePickerTileIndex].id !== modulePickerTileId',
     'activeMode.id !== modulePickerModeId',
     'activeSubMode.id !== modulePickerGroupId',
+    'id: tileRepeater',
+    'tileRepeater.itemAt(selectedTileIndex)',
+    'visible: hub.modulePickerOpen',
+    'onClicked: hub.closeModulePicker()',
+    'id: modulePickerRail',
+    'accountForContentOrigin: true',
+    'handleStyle: "star"',
 ):
-    assert token in window, f"Missing Hub picker UI contract: {token}"
+    assert token in window, f"Missing Hub dropdown contract: {token}"
 assert 'modulePickerOpen = true' in window
 assert 'modulePickerOpen = false' in window
-assert window.count('onChangeModule: hub.openModulePicker(index)') == 1
+assert window.count('onChangeModule: hub.openModulePicker(index, sourceItem)') == 1
+assert 'signal changeModule(int index, var sourceItem)' in tile
+assert 'readonly property Item swapAnchor: swapAction' in tile
+assert 'onLeftClicked: tile.changeModule(tile.tileIndex, swapAction)' in tile
+assert 'visible: !hub.modulePickerOpen' not in window
+assert 'id: modulePicker\\n' not in window
+assert 'tileScroll.contentY = 0' not in window
+# The dropdown must mount after the grid's clipped Flickable, not inside it.
+assert window.index('id: tileScroll') < window.index('id: modulePickerOverlay')
+assert window.index('id: modulePickerPopup') > window.index('id: modulePickerOverlay')
+assert 'width: 368' in window
+assert 'height: 342' in window
+assert 'interactive: contentHeight > height' in window
 
 assert 'TimePolicy.snapshot(tile.now.getTime(), tile.use24Hour)' in tile
 assert "Qt.formatDate(tile.now" not in tile

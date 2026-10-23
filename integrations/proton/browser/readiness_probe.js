@@ -5,7 +5,7 @@
 // message IDs, URLs, session data or credentials. No action is dispatched.
 (() => {
   const empty = {
-    kind: "PROTON_READINESS_V3",
+    kind: "PROTON_READINESS_V4",
     originOk: false,
     inspectedControls: 0,
     scanTruncated: false,
@@ -18,6 +18,8 @@
     toolbarUnreadDisabled: 0,
     unlabeledControls: 0,
     checkedControls: 0,
+    selectedMailRows: 0,
+    selectedRowStructureOk: false,
     messageIdentityVerified: false,
     canMutate: false
   };
@@ -72,8 +74,33 @@
     "input[type='checkbox']:checked, [role='checkbox'][aria-checked='true']"
   ).length;
 
+  // Proton's public Item.tsx and ItemCheckbox.tsx use matching
+  // data-element-id on a mail-list row and data-item-id on its checkbox.
+  // Compare them privately in-page; NEVER export either value. Note that
+  // a list element can be a conversation, not necessarily one message.
+  const mailCheckboxes = document.querySelectorAll(
+    "input[type='checkbox'][data-testid='item-checkbox']:checked"
+  );
+  let coherentRows = 0;
+  const mailCount = mailCheckboxes.length;
+  const rowScan = Math.min(500, mailCount);
+  for (let i = 0; i < rowScan; ++i) {
+    const checkbox = mailCheckboxes[i];
+    if (!checkbox || typeof checkbox.getAttribute !== "function"
+        || typeof checkbox.closest !== "function")
+      continue;
+    const selectedID = checkbox.getAttribute("data-item-id");
+    const row = checkbox.closest("[data-element-id]");
+    if (!row || typeof row.getAttribute !== "function")
+      continue;
+    const rowID = row.getAttribute("data-element-id");
+    if (typeof selectedID === "string" && selectedID.length > 0
+        && selectedID.length <= 256 && rowID === selectedID)
+      coherentRows++;
+  }
+
   return {
-    kind: "PROTON_READINESS_V3",
+    kind: "PROTON_READINESS_V4",
     originOk: true,
     inspectedControls: count,
     scanTruncated: buttons.length > 500,
@@ -86,6 +113,8 @@
     toolbarUnreadDisabled: Math.min(500, toolbarUnreadDisabled),
     unlabeledControls: Math.min(500, unlabeled),
     checkedControls: Math.min(20, checked),
+    selectedMailRows: Math.min(20, mailCount),
+    selectedRowStructureOk: mailCount === 1 && coherentRows === 1,
     messageIdentityVerified: false,
     canMutate: false
   };

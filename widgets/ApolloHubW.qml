@@ -415,13 +415,28 @@ PanelWindow {
         selectSubMode((selectedSubModeIndex + step + count) % count);
     }
 
-    // The initial tile grid is two columns wide. Keep navigation bounded;
-    // selection previews a card, it does not activate its action.
-    function moveNavigationCursor(delta) {
-        if (activeTiles.length < 1)
+    // Stage 7: follow the packed tiles' actual rectangles, never saved-index
+    // +/-1 or +/-2. Selection previews a card; it never activates its action.
+    function moveNavigationCursor(direction) {
+        if (activeTiles.length < 1 || tileGrid.state !== "ready")
             return;
-        selectedTileIndex = Math.max(0, Math.min(
-            activeTiles.length - 1, selectedTileIndex + delta));
+        const next = Layout.navigationTarget(tileGrid, selectedTileIndex,
+                                             direction);
+        if (next === selectedTileIndex)
+            return;
+        selectedTileIndex = next;
+        // Keep the selected card visible within the existing Flickable.
+        // This does not change tile positions or saved layout JSON.
+        const card = tileRepeater.itemAt(next);
+        if (!card)
+            return;
+        const margin = tileFlow.spacing;
+        const maxScroll = Math.max(0, tileScroll.contentHeight - tileScroll.height);
+        if (card.y < tileScroll.contentY + margin)
+            tileScroll.contentY = Math.max(0, card.y - margin);
+        else if (card.y + card.height > tileScroll.contentY + tileScroll.height - margin)
+            tileScroll.contentY = Math.min(maxScroll,
+                card.y + card.height - tileScroll.height + margin);
     }
 
     function activateNavigationCursor() {
@@ -539,13 +554,13 @@ PanelWindow {
                        && (event.key === Qt.Key_Left || event.key === Qt.Key_Right)) {
                 hub.cycleTopSubMode(event.key === Qt.Key_Left ? -1 : 1);
             } else if (event.key === Qt.Key_Left) {
-                hub.moveNavigationCursor(-1);
+                hub.moveNavigationCursor("left");
             } else if (event.key === Qt.Key_Right) {
-                hub.moveNavigationCursor(1);
+                hub.moveNavigationCursor("right");
             } else if (event.key === Qt.Key_Up) {
-                hub.moveNavigationCursor(-2);
+                hub.moveNavigationCursor("up");
             } else if (event.key === Qt.Key_Down) {
-                hub.moveNavigationCursor(2);
+                hub.moveNavigationCursor("down");
             } else if (event.key === Qt.Key_Enter || event.key === Qt.Key_Return) {
                 hub.activateNavigationCursor();
             } else if (event.key === Qt.Key_Escape) {
@@ -585,25 +600,25 @@ PanelWindow {
         sequence: "Left"
         context: Qt.WindowShortcut
         enabled: hub.standardKeysAvailable
-        onActivated: hub.moveNavigationCursor(-1)
+        onActivated: hub.moveNavigationCursor("left")
     }
     Shortcut {
         sequence: "Right"
         context: Qt.WindowShortcut
         enabled: hub.standardKeysAvailable
-        onActivated: hub.moveNavigationCursor(1)
+        onActivated: hub.moveNavigationCursor("right")
     }
     Shortcut {
         sequence: "Up"
         context: Qt.WindowShortcut
         enabled: hub.standardKeysAvailable
-        onActivated: hub.moveNavigationCursor(-2)
+        onActivated: hub.moveNavigationCursor("up")
     }
     Shortcut {
         sequence: "Down"
         context: Qt.WindowShortcut
         enabled: hub.standardKeysAvailable
-        onActivated: hub.moveNavigationCursor(2)
+        onActivated: hub.moveNavigationCursor("down")
     }
     Shortcut {
         sequence: "Enter"

@@ -1,6 +1,6 @@
 # 🏥💜 ApolloHubW // P1 Layout Editor 2.0, stage 1
 
-**Status:** Stages 1 (tile ×/UNDO), 2 (tile resizing), and 3 (confirmed mode/group removal) operator-accepted on the live desktop. Stage 4 searchable module picker is committed to GitHub `main`; desktop acceptance is pending. Drag-and-drop, cross-mode tile transfers and full preset management remain outside this stage.
+**Status:** Stages 1–3 operator-accepted on the live desktop. Stage 4 SWAP dropdown and Stage 5 MOVE-between-groups dropdown are implemented in GitHub `main` with source/CI verification; their desktop acceptance is pending. Drag-and-drop, arbitrary grid packing, persistent undo and full layout presets remain later scope.
 
 ## IMPLEMENTATION
 
@@ -77,7 +77,8 @@ The `×` is an **explicit one-click edit action**, not a destructive record dele
 - [x] Stage 3 operator desktop acceptance
 - [x] Stage 4 module picker: search, count, occupied-state hints, explicit selection
 - [ ] Stage 4 operator desktop acceptance
-- [ ] Move tiles between modes/groups
+- [x] Stage 5 cross-mode/cross-group MOVE dropdown and ID-safe backend
+- [ ] Stage 5 live desktop acceptance
 - [ ] Durable undo/presets and full grid-packing polish
 
 ## P1 Stage 2 // Explicit width and height controls
@@ -130,9 +131,24 @@ The Stage 4 suite extends `tests/hub/test_apollo_hub_layout_v2.cjs` for filterin
 
 **Desktop acceptance:** On the operator's installed Quickshell, open a disposable tile's SWAP dropdown, verify **the tile grid remains visible**, verify all 10 choices with an empty search, filter by `cpu` or `app`, check `IN USE` and `CURRENT`, and scroll the results with the star rail. Test CLOSE, Escape, an outside click, and flipping the dropdown above SWAP for tiles near the bottom of the Hub. Then choose an available module and use UNDO. Confirm W/H settings are preserved, clicking a blank area of the dropdown does not dismiss it, and typing never moves Hub modes. No destructive data operations are required.
 
+## P1 Stage 5 // Move tiles across modes and groups
+
+**What changed:** A compact **MOVE** button appears immediately after SWAP inside each tile's EDIT controls. Like SWAP, MOVE opens a floating dropdown anchored to its own real button; the tile grid stays visible and its scroll position is unchanged. The dropdown lists all *other* submodes, including groups in the current main mode and groups in other main modes, as `Mode / Group` destinations with `[used/8]` capacity counts.
+
+- **Selectable destinations** have room for another tile and do not already contain the selected tile's module. Destinations labeled `FULL` or `IN USE` cannot be selected. The source group is intentionally omitted.
+- **Transfer** moves the **original saved tile object** into the destination as its final placement. Stable tile ID, module, size (`half`/`wide`), `rowSpan` and the layout's `nextTileId` remain unchanged. No copy or new tile ID is allocated; the source loses one placement.
+- **Selection safety:** `Layout.transferTile()` separately verifies source tile ID, source/destination mode IDs, group IDs, indexes, target capacity and module uniqueness against the current layout. A stale/invalid transfer returns the unchanged layout, without creating an UNDO event.
+- **One-step UNDO:** Both source removal and destination insertion are persisted as **one** layout change through the existing `save()` and ten-entry session UNDO. The Hub navigates to the destination group and selects the moved tile after a successful transfer. UNDO restores the previous complete layout; it does not recreate source widget data.
+- **Cancellation:** CLOSE, Escape, outside taps, leaving EDIT, closing the Hub, switching modes/groups, restoring layout and starting SWAP/removal cancel the MOVE picker without writing anything. Both pickers use the same floating overlay, flipping above the trigger when needed, and retain the same star-handle scrollbar grammar.
+- **Scope:** These are *Hub placements* only. There is no new service, data store, network connection, background timer or modification to To-do, Notes, Media, Clock or other widget-local data. The v2 layout schema and capacity limits (6 main modes, 6 groups/mode, 8 tiles/group) remain the same.
+
+**Source verification:** The extended `tests/hub/test_apollo_hub_layout_v2.cjs` covers same-mode cross-group moves, cross-main-mode moves, invalid IDs and indexes, duplicates, fully occupied targets, metadata preservation, JSON round-trip and UNDO document fidelity. `tests/hub/test_apollo_hub_foundation.py` checks MOVE button placement, dropdown lifecycle, shared overlay, source/destination ID guards, and canonical glow/scrollbar patterns. The foundation workflow runs both tests.
+
+**Desktop acceptance:** After syncing and restarting Quickshell, test EDIT → MOVE on a disposable tile, verify two or more destinations, try an unavailable destination, cancel once, move into a different main mode, and press UNDO. Confirm the tile moves as a placement without losing its module or W/H dimensions. Then create a second group in the same main mode and verify a move between those groups. Reopen the Hub and inspect the saved arrangement. Do not delete or modify personal notes/tasks for this test.
+
 ## NEXT
 
-After Stage 4 desktop acceptance, add explicit cross-mode and cross-group tile transfers, still preserving stable tile IDs and UNDO. More advanced grid packing, persistent revision history and layout presets remain later scope.
+After Stage 5 desktop acceptance, review practical MOVE/SWAP menu behavior and refine grid packing, module density, and layout presets. Do not add drag-and-drop or a new persistent history system without separate operator authorization.
 
 ## DECISIONS
 

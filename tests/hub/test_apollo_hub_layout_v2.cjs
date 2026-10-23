@@ -260,4 +260,88 @@ assert.deepEqual(toPlain(layout.parse(JSON.stringify(modeRemoved))),
 assert.deepEqual(toPlain(layout.parse(JSON.stringify(afterGroupRemoval))),
                  toPlain(afterGroupRemoval));
 
+// P1 Stage 4: the full module list appears when search is empty.
+// Choices preserve order, identify the current module, and exclude duplicates
+// already placed elsewhere in the SAME group, not across other groups.
+const chooserLayout=layout.defaultLayout();
+const firstTile=chooserLayout.modes[0].subModes[0].tiles[0];
+const chooser=layout.moduleChoices(chooserLayout,0,0,0,"");
+assert.equal(chooser.state,"ready");
+assert.equal(chooser.query,"");
+assert.equal(chooser.total,10);
+assert.equal(chooser.matchCount,10);
+assert.equal(chooser.items.length,10);
+assert.deepEqual(chooser.items.map(row=>row.id),Array.from(layout.MODULE_IDS));
+assert.equal(chooser.items.filter(row=>row.selected).length,1);
+assert.equal(chooser.items.find(row=>row.selected).id,"time");
+assert.equal(chooser.items.find(row=>row.id==="todo").inUse,true);
+assert.equal(chooser.items.find(row=>row.id==="todo").available,false);
+assert.equal(chooser.items.find(row=>row.id==="apps").available,true);
+assert.equal(chooser.items.find(row=>row.id==="time").available,false);
+assert.equal(chooser.availableCount,4);
+assert.equal(chooser.items.find(row=>row.id==="cpu").title,"CPU++");
+
+const queryCpu=layout.moduleChoices(chooserLayout,0,0,0," CpU ");
+assert.equal(queryCpu.state,"ready");
+assert.equal(queryCpu.query,"cpu");
+assert.equal(queryCpu.matchCount,1);
+assert.equal(queryCpu.availableCount,1);
+assert.equal(queryCpu.items[0].id,"cpu");
+assert.equal(queryCpu.items[0].available,true);
+const queryDisplay=layout.moduleChoices(chooserLayout,0,0,0,"app launcher");
+assert.equal(queryDisplay.matchCount,1);
+assert.equal(queryDisplay.items[0].id,"apps");
+assert.equal(layout.moduleChoices(chooserLayout,0,0,0,"").matchCount,10);
+assert.equal(layout.moduleChoices(chooserLayout,0,0,0,"zzzzz").matchCount,0);
+assert.equal(layout.moduleChoices(chooserLayout,0,0,0,42).matchCount,10);
+assert.equal(layout.moduleChoices(chooserLayout,0,0,0,"x".repeat(120)).query.length,80);
+assert.equal(layout.moduleChoices(chooserLayout,0,0,99,"").state,"unavailable");
+assert.equal(layout.moduleChoices(chooserLayout,0,99,0,"").state,"unavailable");
+assert.equal(layout.moduleChoices(chooserLayout,99,0,0,"").state,"unavailable");
+assert.equal(layout.moduleChoices(null,0,0,0,"").state,"unavailable");
+assert.equal(layout.moduleChoices({},0,0,0,"").state,"unavailable");
+
+// Selecting an available module changes only one placement; undo restores.
+const chooserBefore=JSON.stringify(chooserLayout);
+const selected=layout.setTileModule(chooserLayout,0,0,0,firstTile.id,"apps");
+assert.equal(selected.modes[0].subModes[0].tiles[0].module,"apps");
+assert.equal(selected.modes[0].subModes[0].tiles[0].id,firstTile.id);
+assert.equal(selected.modes[0].subModes[0].tiles[0].size,firstTile.size);
+assert.equal(selected.modes[0].subModes[0].tiles[0].rowSpan,firstTile.rowSpan);
+assert.equal(selected.nextTileId,chooserLayout.nextTileId);
+assert.equal(JSON.stringify(chooserLayout),chooserBefore);
+validateIds(selected);
+assert.deepEqual(toPlain(layout.parse(JSON.stringify(selected))),toPlain(selected));
+assert.deepEqual(toPlain(layout.parse(chooserBefore)),toPlain(chooserLayout));
+assert.equal(layout.moduleChoices(selected,0,0,0,"apps").items[0].selected,true);
+
+// Selecting used/unrecognized modules or stale targets does not mutate.
+for(const [mode,group,tile,id,candidate] of [
+    [0,0,0,firstTile.id,"todo"], // already in the same group
+    [0,0,0,firstTile.id,"weather"],
+    [0,0,0,firstTile.id,"not-a-module"],
+    [0,0,0,"wrong-id","apps"],
+    [0,0,0,"","apps"],
+    [0,0,99,firstTile.id,"apps"],
+    [0,99,0,firstTile.id,"apps"],
+    [99,0,0,firstTile.id,"apps"],
+    [0,0,0,firstTile.id,null],
+]){
+    assert.deepEqual(
+        toPlain(layout.setTileModule(chooserLayout,mode,group,tile,id,candidate)),
+        toPlain(chooserLayout));
+}
+// A module used in ANOTHER mode remains selectable here.
+assert.equal(layout.moduleChoices(chooserLayout,0,0,0,"apps").availableCount,1);
+// No-op current selection must not generate an undo change.
+assert.deepEqual(toPlain(layout.setTileModule(
+    chooserLayout,0,0,0,firstTile.id,"time")),toPlain(chooserLayout));
+// ID plus width/height must survive changing the same tile a second time.
+const resizedChoice=layout.resizeTile(chooserLayout,0,0,0,"wide",3);
+const resultSized=layout.setTileModule(
+    resizedChoice,0,0,0,firstTile.id,"network");
+assert.equal(resultSized.modes[0].subModes[0].tiles[0].size,"wide");
+assert.equal(resultSized.modes[0].subModes[0].tiles[0].rowSpan,3);
+assert.equal(resultSized.modes[0].subModes[0].tiles[0].id,firstTile.id);
+
 console.log("ApolloHub Layout v2 migration, stable tile IDs, guarded remove and sizing tests passed");

@@ -103,6 +103,8 @@ class RadioStreamRelay:
         self._opener = opener
         self._now = now
         self._entries: dict[str, tuple[str, float]] = {}
+        # Token-scoped observations only: never expose origin URLs or tokens.
+        self._health: dict[str, dict] = {}
         self._lock = threading.RLock()
         self._capacity = threading.BoundedSemaphore(_MAX_ACTIVE_STREAMS)
         self._server: ThreadingHTTPServer | None = None
@@ -125,28 +127,42 @@ class RadioStreamRelay:
                     self.send_error(503, "Audio relay busy")
                     return
                 connection = None
+                token_path = self.path
+                bytes_received = 0
+                headers_sent = False
                 try:
-                    uri = relay._resolve(self.path)
+                    uri = relay._resolve(token_path)
                     if uri is None:
                         self.send_error(404, "Unknown or expired audio token")
                         return
+                    relay._record(token_path, "connecting")
                     connection, response = relay._opener(uri)
                     self.send_response(200)
                     self.send_header("Content-Type", "audio/mpeg")
                     self.send_header("Cache-Control", "no-store")
                     self.end_headers()
+                    headers_sent = True
+                    relay._record(token_path, "connected")
                     while True:
                         frame = response.read(16_384)
                         if not frame:
+                            relay._record(token_path, "ended" if bytes_received else "empty",
+                                          "STREAM_EMPTY" if not bytes_received else None)
                             break
                         self.wfile.write(frame)
+                        bytes_received += len(frame)
+                        relay._record(token_path, "streaming", bytes_received=bytes_received)
                 except (OSError, ssl.SSLError, BrokenPipeError, ConnectionResetError,
-                        MediaBackendError, http.client.HTTPException):
-                    # No destination details are sent back to MPD or logged.
-                    if not self.wfile.closed:
+                        MediaBackendError, http.client.HTTPException) as exc:
+                    # Never expose origin URLs, exception strings or relay tokens.
+                    error_code = (exc.code if isinstance(exc, MediaBackendError)
+                                  else "STREAM_INTERRUPTED" if bytes_received
+                                  else "STREAM_CONNECTION")
+                    relay._record(token_path, "failed", error_code,
+                                  bytes_received=bytes_received)
+                    if not headers_sent:
                         try:
-                            if connection is None:
-                                self.send_error(502, "Audio stream unavailable")
+                            self.send_error(502, "Audio stream unavailable")
                         except (BrokenPipeError, OSError):
                             pass
                 finally:
@@ -176,6 +192,29 @@ class RadioStreamRelay:
                 return None
             return item[0]
 
+    def _record(self, path: str, state: str, error_code=None, bytes_received=None):
+        token = path[len("/radio/"):] if path.startswith("/radio/") else ""
+        with self._lock:
+            if token not in self._entries:
+                return
+            record = self._health.setdefault(token, {"state": "queued",
+                                                       "bytesReceived": 0,
+                                                       "errorCode": None})
+            record["state"] = state
+            record["errorCode"] = error_code
+            if bytes_received is not None:
+                record["bytesReceived"] = bytes_received
+
+    def health(self, uri: str) -> dict | None:
+        """Sanitized evidence for a registered local relay URI; no URL/token."""
+        with self._lock:
+            if not self.owns(uri):
+                return None
+            token = uri.rsplit("/", 1)[-1]
+            return self._health.get(token, {"state": "queued",
+                                            "bytesReceived": 0,
+                                            "errorCode": None}).copy()
+
     def register(self, uri: str) -> str:
         uri = validate_https_audio_url(uri)
         with self._lock:
@@ -184,11 +223,15 @@ class RadioStreamRelay:
                 token: item for token, item in self._entries.items()
                 if self._now() - item[1] <= _TOKEN_LIFETIME_SECONDS
             }
+            self._health = {token: value for token, value in self._health.items()
+                            if token in self._entries}
             if len(self._entries) >= _MAX_REGISTERED_STATIONS:
                 raise MediaBackendError("RELAY_FULL", "Radio relay requires cleanup")
             self._start()
             token = secrets.token_hex(32)
             self._entries[token] = (uri, self._now())
+            self._health[token] = {"state": "queued", "bytesReceived": 0,
+                                   "errorCode": None}
             assert self._server is not None
             return f"http://127.0.0.1:{self._server.server_port}/radio/{token}"
 
@@ -208,6 +251,7 @@ class RadioStreamRelay:
                 return
             token = uri.rsplit("/", 1)[-1]
             self._entries.pop(token, None)
+            self._health.pop(token, None)
 
     def close(self):
         with self._lock:
@@ -215,6 +259,7 @@ class RadioStreamRelay:
             self._server = None
             self._thread = None
             self._entries.clear()
+            self._health.clear()
         if server is not None:
             server.shutdown()
             server.server_close()

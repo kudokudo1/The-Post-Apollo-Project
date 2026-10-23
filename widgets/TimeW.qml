@@ -8,6 +8,7 @@ import "../services/hub/ApolloHubTimePolicy.js" as LocalTimePolicy
 import "../services/time/WorldClockPolicy.js" as WorldClockPolicy
 import "../services/time/WorldZoneSearch.js" as WorldZoneSearch
 import "../services/time/TimeConverterFormat.js" as ConverterFormat
+import "../services/time/StopwatchPolicy.js" as StopwatchPolicy
 
 // TimeW M1: standalone temporal window foundation.
 // No timers, activity recording, screenshots or restoration are active here.
@@ -485,6 +486,67 @@ PanelWindow {
         });
     }
 
+    // TOOLS / STOPWATCH. Monotonic measurement continues while the window
+    // is closed; only the visible readout refresh pauses to conserve CPU.
+    property bool stopwatchRunning: false
+    property bool stopwatchStarted: false
+    property real stopwatchAccumulatedMs: 0
+    property real stopwatchDisplayMs: 0
+    property real stopwatchLastLapMs: 0
+    property int stopwatchLapSequence: 0
+    property var stopwatchLaps: []
+    readonly property int stopwatchMaxLaps: StopwatchPolicy.MAX_LAPS
+
+    function refreshStopwatch() {
+        stopwatchDisplayMs = stopwatchRunning
+                             ? StopwatchPolicy.sample(
+                                   stopwatchAccumulatedMs,
+                                   stopwatchAnchor.elapsed() * 1000)
+                             : stopwatchAccumulatedMs;
+    }
+
+    function startStopwatch() {
+        if (stopwatchRunning)
+            return;
+        stopwatchAnchor.restart();
+        stopwatchRunning = true;
+        stopwatchStarted = true;
+        refreshStopwatch();
+    }
+
+    function pauseStopwatch() {
+        if (!stopwatchRunning)
+            return;
+        refreshStopwatch();
+        stopwatchAccumulatedMs = stopwatchDisplayMs;
+        stopwatchRunning = false;
+    }
+
+    function lapStopwatch() {
+        if (!stopwatchRunning)
+            return;
+        refreshStopwatch();
+        const newLap = StopwatchPolicy.appendLap(
+                           stopwatchLaps, stopwatchDisplayMs,
+                           stopwatchLastLapMs, stopwatchLapSequence + 1);
+        if (newLap === null)
+            return;
+        stopwatchLaps = newLap;
+        stopwatchLastLapMs = stopwatchDisplayMs;
+        stopwatchLapSequence += 1;
+    }
+
+    function resetStopwatch() {
+        if (stopwatchRunning)
+            return;
+        stopwatchAccumulatedMs = 0;
+        stopwatchDisplayMs = 0;
+        stopwatchLastLapMs = 0;
+        stopwatchLapSequence = 0;
+        stopwatchLaps = [];
+        stopwatchStarted = false;
+    }
+
     readonly property var modes: [
         { id: "clock", name: "CLOCK" },
         { id: "calc", name: "CALC" },
@@ -523,6 +585,8 @@ PanelWindow {
         }
         if (menuOpen) {
             Qt.callLater(restoreKeyboardFocus);
+            if (selectedMode === "tools")
+                refreshStopwatch();
             if (selectedMode === "clock")
                 Qt.callLater(refreshWorldClock);
             if (selectedMode === "clock" || selectedMode === "calc")
@@ -534,6 +598,8 @@ PanelWindow {
             dismissWorldSearchPopup();
         if (selectedMode !== "calc")
             closeConverterDropdowns();
+        if (menuOpen && selectedMode === "tools")
+            refreshStopwatch();
         if (menuOpen && selectedMode === "clock")
             Qt.callLater(refreshWorldClock);
         if (menuOpen && (selectedMode === "clock" || selectedMode === "calc"))
@@ -581,6 +647,12 @@ PanelWindow {
     SystemClock {
         id: localClock
         precision: SystemClock.Seconds
+    }
+
+    // Quickshell v0.2.1's native monotonic elapsed timer; no wall-clock
+    // Date.now() calls, network, or subprocesses for stopwatch measurement.
+    ElapsedTimer {
+        id: stopwatchAnchor
     }
 
     // Difference comparisons are also one-shot. Existing inputs are kept
@@ -746,6 +818,16 @@ PanelWindow {
         repeat: true
         running: timew.menuOpen && timew.selectedMode === "clock"
         onTriggered: timew.refreshWorldClock()
+    }
+
+    Timer {
+        id: stopwatchDisplayTimer
+        // 10Hz presentation only; measurement is the ElapsedTimer.
+        interval: 100
+        repeat: true
+        running: timew.stopwatchRunning
+                 && timew.menuOpen && timew.selectedMode === "tools"
+        onTriggered: timew.refreshStopwatch()
     }
 
     Item {

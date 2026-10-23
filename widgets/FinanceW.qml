@@ -11,6 +11,7 @@ PanelWindow {
 
     property bool menuOpen: false
     property bool fundingReviewOpen: false
+    property bool advancedOpen: false
     property bool keyboardActive: false
     property bool keyboardLock: false
     property bool relationshipFocusModeActive: false
@@ -43,6 +44,7 @@ PanelWindow {
     FinanceServices.FinanceFundingWriteService {
         id: financeFundingWrite
         onSaved: {
+            quickAddPane.clear();
             guidedFundingPane.clear();
             if(root.menuOpen)
                 financeBudget.refresh();
@@ -52,6 +54,7 @@ PanelWindow {
     FinanceServices.FinanceAllocationWriteService {
         id: financeAllocationWrite
         onSaved: {
+            financeBudgetGrid.reset();
             allocationPreviewPane.clear();
             if (root.menuOpen)
                 financeBudget.refresh();
@@ -1003,6 +1006,68 @@ PanelWindow {
                             spacing: 7
 
                             ActionButton {
+    id: quickAddMoney
+    width: parent.width
+    height: 30
+    label: quickAddPane.open ? "HIDE ADD MONEY" : "+ ADD MONEY"
+    labelPixelSize: 11
+    accentColor: Colors.orange
+    trackLabelGlowLocally: true
+    available: financeBudget.state==="ready" && !!financeBudget.snapshot
+        && financeFundingWrite.state!=="pending"
+        && financeFundingWrite.state!=="uncertain"
+    onLeftClicked: {
+        if(quickAddPane.open)quickAddPane.clear();
+        else quickAddPane.begin();
+    }
+}
+FinanceQuickAddPane {
+    id: quickAddPane
+    width: parent.width
+    snapshot: financeBudget.snapshot
+    writeState: financeFundingWrite.state
+    writeMessage: financeFundingWrite.message
+    onSaveRequested: function(payload) {
+        if(financeBudget.state==="ready" && financeBudget.snapshot
+                && payload && payload.mode==="income"
+                && payload.sourceKey===financeBudget.snapshot.sourceKey
+                && payload.month===financeBudget.snapshot.month
+                && financeFundingWrite.state!=="pending"
+                && financeFundingWrite.state!=="uncertain")
+            financeFundingWrite.submit(payload);
+    }
+}
+FinanceBudgetGrid {
+    id: financeBudgetGrid
+    width: parent.width
+    snapshot: financeBudget.snapshot
+    writeState: financeAllocationWrite.state
+    writeMessage: financeAllocationWrite.message
+    onSaveRequested: function(payload) {
+        if(financeBudget.state==="ready" && financeBudget.snapshot
+                && payload
+                && payload.sourceKey===financeBudget.snapshot.sourceKey
+                && payload.month===financeBudget.snapshot.month
+                && financeAllocationWrite.state!=="pending"
+                && financeAllocationWrite.state!=="uncertain")
+            financeAllocationWrite.submit(payload);
+    }
+}
+ActionButton {
+    id: advancedToggle
+    width: parent.width
+    height: 26
+    label: root.advancedOpen ? "HIDE ADVANCED" : "ADVANCED"
+    labelPixelSize: 9
+    accentColor: Colors.cyan
+    trackLabelGlowLocally: true
+    onLeftClicked: root.advancedOpen=!root.advancedOpen
+}
+Column {
+    width: parent.width
+    spacing: 7
+    visible: root.advancedOpen
+ActionButton {
                                 id: reviewFunding
                                 width: parent.width
                                 height: 28
@@ -1419,7 +1484,8 @@ PanelWindow {
                                 }
                             }
 
-                            Row {
+                            }
+Row {
                                 width: parent.width
                                 spacing: 7
                                 GohuText {

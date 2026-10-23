@@ -212,25 +212,17 @@ Item {
             width: parent.width
             visible: !!setup.setupMode
             text: setup.setupMode==="opening"
-                ? "REFERENCE DATE // YYYY-MM-DD" : "INCOME DATE // YYYY-MM-DD"
+                ? "REFERENCE DATE // MONTH / DAY / YEAR" : "INCOME DATE // MONTH / DAY / YEAR"
             font.pixelSize: 9
             color: Colors.cyan
         }
-        Rectangle {
+        FinanceDateInput {
             width: parent.width
-            height: 27
             visible: !!setup.setupMode
-            color: Colors.dark
-            border.color: Colors.cyan
-            TextInput {
-                anchors.fill: parent
-                anchors.margins: 6
-                text: setup.dateText
-                color: Colors.white
-                font.pixelSize: 11
-                selectByMouse: true
-                onTextEdited: setup.dateText=text
-            }
+            value: setup.dateText
+            fallbackDate: setup.anchoredMonth
+                          ? setup.anchoredMonth + "-01" : ""
+            onValueEdited: function(value) {setup.dateText=value;}
         }
         GohuText {
             width: parent.width
@@ -239,21 +231,11 @@ Item {
             font.pixelSize: 9
             color: Colors.cyan
         }
-        Rectangle {
+        FinanceMoneyInput {
             width: parent.width
-            height: 27
             visible: !!setup.setupMode
-            color: Colors.dark
-            border.color: Colors.cyan
-            TextInput {
-                anchors.fill: parent
-                anchors.margins: 6
-                text: setup.amountText
-                color: Colors.white
-                font.pixelSize: 11
-                selectByMouse: true
-                onTextEdited: setup.amountText=text
-            }
+            value: setup.amountText
+            onValueEdited: function(value) {setup.amountText=value;}
         }
         GohuText {
             width: parent.width

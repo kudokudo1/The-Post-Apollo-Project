@@ -5,12 +5,15 @@ from pathlib import Path
 ROOT=Path(__file__).resolve().parents[2]
 MENU=(ROOT/"widgets/TasksW.qml").read_text(encoding="utf-8")
 PANE=(ROOT/"widgets/tasks/TaskSyncPreviewPane.qml").read_text(encoding="utf-8")
+WRAPPER=(ROOT/"widgets/tasks/TaskSyncConnectionsPane.qml").read_text(encoding="utf-8")
 POLICY=(ROOT/"widgets/tasks/TaskGitHubMappingPolicy.js").read_text(encoding="utf-8")
 GITHUB=(ROOT/"services/github/GitHubProjectsService.qml").read_text(encoding="utf-8")
 STORE=(ROOT/"services/hub/ApolloHubTodoStore.qml").read_text(encoding="utf-8")
 
-assert MENU.count("TaskSyncPreviewPane {")==1
+assert MENU.count("TaskSyncConnectionsPane {")==1
+assert WRAPPER.count("TaskSyncPreviewPane {")==1
 assert 'visible: root.menuOpen && root.activeMode.id === "sync"' in MENU
+assert 'visible: syncConnections.selectedSubmode === "mappings"' in WRAPPER
 assert 'todoSnapshot: ApolloHubTodoStore.snapshot' in MENU
 assert '&& root.activeMode.id !== "sync"' in MENU
 assert 'import "TaskGitHubMappingPolicy.js" as MappingPolicy' in PANE

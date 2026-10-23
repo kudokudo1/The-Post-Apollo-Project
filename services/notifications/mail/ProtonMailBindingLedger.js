@@ -14,6 +14,8 @@
 // reviewed trusted boundary. Do not expose ledger contents to QML models.
 function createLedger(verifyFromTrustedAdapter, isLiveEvent) {
     const entries = Object.create(null);
+    // Rejected/revoked event leases cannot be replayed before their expiry.
+    const revoked = Object.create(null);
     const maxEntries = 64;
     const maxAgeMs = 2 * 60 * 1000;
     const origin = "https://mail.proton.me";
@@ -111,6 +113,10 @@ function createLedger(verifyFromTrustedAdapter, isLiveEvent) {
         if (!clock(nowMs))
             return 0;
         let removed = 0;
+        for (const id of Object.keys(revoked)) {
+            if (revoked[id] <= nowMs || !live(id))
+                delete revoked[id];
+        }
         for (const id of Object.keys(entries)) {
             if (entries[id].expiresAtMs <= nowMs || !live(id)) {
                 delete entries[id];
@@ -151,9 +157,12 @@ function createLedger(verifyFromTrustedAdapter, isLiveEvent) {
             return "untrusted-binding";
         if (!live(candidate.eventId))
             return "event-not-live";
+        if (Object.prototype.hasOwnProperty.call(revoked, candidate.eventId))
+            return "event-revoked";
         if (Object.prototype.hasOwnProperty.call(entries, candidate.eventId))
             return "event-already-bound";
-        if (Object.keys(entries).length >= maxEntries)
+        if (Object.keys(entries).length >= maxEntries
+                || Object.keys(revoked).length >= maxEntries)
             return "capacity-exceeded";
 
         const incomingAliases = aliases(candidate);
@@ -182,13 +191,18 @@ function createLedger(verifyFromTrustedAdapter, isLiveEvent) {
         if (!opaque(eventId)
                 || !Object.prototype.hasOwnProperty.call(entries, eventId))
             return false;
+        revoked[eventId] = entries[eventId].expiresAtMs;
         delete entries[eventId];
         return true;
     }
 
     function reset() {
-        for (const id of Object.keys(entries))
+        // Transport disconnect revokes, rather than frees for reuse, every
+        // current lease. A reconnect must never reuse an old event binding.
+        for (const id of Object.keys(entries)) {
+            revoked[id] = entries[id].expiresAtMs;
             delete entries[id];
+        }
     }
 
     function size(nowMs) {

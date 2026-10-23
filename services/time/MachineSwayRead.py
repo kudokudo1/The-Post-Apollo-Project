@@ -7,7 +7,10 @@ from __future__ import annotations
 import json
 import subprocess
 import sys
+from pathlib import Path
 
+# Python isolated mode (-I) does not add the script directory to sys.path.
+sys.path.insert(0, str(Path(__file__).resolve().parent))
 from MachineCheckpointModel import PreviewError, project
 
 MAX_IPC_BYTES = 4_000_000
@@ -47,7 +50,6 @@ def normalize(outputs, workspaces, tree):
             raise PreviewError("invalid workspace")
         simplified["workspaces"].append({"name": ws.get("name"), "output": ws.get("output")})
 
-    seen = set()
     def walk(node, workspace=None, floating=False, depth=0):
         if depth > MAX_TREE_DEPTH:
             raise PreviewError("Sway tree too deep")
@@ -60,8 +62,7 @@ def normalize(outputs, workspaces, tree):
         app = node.get("app_id")
         if app is None and isinstance(node.get("window_properties"), dict):
             app = node["window_properties"].get("class")
-        if kind == "con" and node.get("window") is not None or (
-            kind == "con" and isinstance(app, str) and app):
+        if kind == "con" and isinstance(app, str) and app:
             if workspace is not None and isinstance(app, str) and app:
                 simplified["windows"].append({
                     "app_id": app, "workspace": workspace,

@@ -1,0 +1,25 @@
+name: Social Email Readonly Contracts
+
+on:
+  pull_request:
+    paths:
+      - "services/messaging/email/**"
+      - "tests/messaging/test_email_account_bridge.py"
+      - ".github/workflows/social-email-readonly-contracts.yml"
+  push:
+    branches: [main]
+    paths:
+      - "services/messaging/email/**"
+      - "tests/messaging/test_email_account_bridge.py"
+      - ".github/workflows/social-email-readonly-contracts.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  contracts:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run read-only email bridge contracts
+        run: python3 tests/messaging/test_email_account_bridge.py

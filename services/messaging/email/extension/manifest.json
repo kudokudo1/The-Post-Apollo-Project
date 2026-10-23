@@ -1,0 +1,21 @@
+{
+  "manifest_version": 2,
+  "name": "Post-Apollo Social Email Bridge",
+  "version": "0.1.0",
+  "description": "Read-only Thunderbird account inventory bridge for Post-Apollo.",
+  "browser_specific_settings": {
+    "gecko": {
+      "id": "social-email-bridge@post-apollo.local",
+      "strict_min_version": "128.0"
+    }
+  },
+  "background": {
+    "scripts": [
+      "background.js"
+    ]
+  },
+  "permissions": [
+    "accountsRead",
+    "nativeMessaging"
+  ]
+}

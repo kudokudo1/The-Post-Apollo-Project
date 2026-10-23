@@ -520,6 +520,13 @@ PanelWindow {
         enabled: hub.standardKeysAvailable
         onActivated: hub.menuOpen = false
     }
+    Shortcut {
+        // Cancel the picker even if a row took focus away from the search.
+        sequence: "Esc"
+        context: Qt.WindowShortcut
+        enabled: hub.menuOpen && hub.modulePickerOpen
+        onActivated: hub.closeModulePicker()
+    }
 
     WindowPanelFrame {
         anchors.fill: parent

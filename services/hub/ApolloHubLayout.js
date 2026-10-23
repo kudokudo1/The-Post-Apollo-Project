@@ -504,3 +504,60 @@ function transferTile(layout, fromMode, fromGroup, fromIndex, expectedTileId,
     destination.tiles.push(moved);
     return next;
 }
+
+// P1 Stage 6: deterministic, read-only 2-column packing. This is computed
+// presentation geometry, not a layout migration or a saved tile reorder.
+// Place each tile at the first available row/column rectangle. Short tiles
+// may fill otherwise wasted cells beside taller half-width tiles.
+function packTiles(tiles) {
+    var invalid = {state:"unavailable", columns:2, rows:0, items:[]};
+    if (!Array.isArray(tiles) || tiles.length > MAX_TILES)
+        return invalid;
+    var occupied = [];
+    var positions = [];
+    var highestRow = 0;
+    for (var i=0;i<tiles.length;i++) {
+        var tile = tiles[i];
+        if (!tile || typeof tile !== "object" || !validModule(tile.module)
+                || (tile.size !== "wide" && tile.size !== "half")
+                || !validRowSpan(tile.rowSpan))
+            return invalid;
+        var width = tile.size === "wide" ? 2 : 1;
+        var placed = false;
+        // Eight tiles each at most three rows high always fit within 24 rows.
+        for (var row=0;row<MAX_TILES*MAX_ROW_SPAN && !placed;row++) {
+            for (var column=0;column<=2-width && !placed;column++) {
+                var free = true;
+                for (var dy=0;dy<tile.rowSpan && free;dy++) {
+                    for (var dx=0;dx<width;dx++) {
+                        if (occupied[row+dy] && occupied[row+dy][column+dx]) {
+                            free = false;
+                            break;
+                        }
+                    }
+                }
+                if (!free)
+                    continue;
+                for (var markY=0;markY<tile.rowSpan;markY++) {
+                    var occupiedRow = row+markY;
+                    if (!occupied[occupiedRow])
+                        occupied[occupiedRow] = [false,false];
+                    for (var markX=0;markX<width;markX++)
+                        occupied[occupiedRow][column+markX] = true;
+                }
+                positions.push({
+                    id:tile.id,
+                    column:column,
+                    row:row,
+                    columnSpan:width,
+                    rowSpan:tile.rowSpan
+                });
+                highestRow = Math.max(highestRow,row+tile.rowSpan);
+                placed = true;
+            }
+        }
+        if (!placed)
+            return invalid;
+    }
+    return {state:"ready", columns:2, rows:highestRow, items:positions};
+}

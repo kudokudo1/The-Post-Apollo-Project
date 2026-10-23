@@ -138,7 +138,7 @@ assert.strictEqual(r.unlabeledControls,500);
 assert.strictEqual(r.scanTruncated,true);
 
 async function runBackground(family,validTab=true,nativeError=false,counts){
- const calls={native:0,probe:0},log=[];
+ const calls={native:0,probe:0,event:0},log=[];
  const result=counts||runProbe("https://mail.proton.me",[
    button(null,null,false,false,"toolbar:read"),
    button(null,null,false,false,"toolbar:unread")],1);
@@ -159,11 +159,23 @@ async function runBackground(family,validTab=true,nativeError=false,counts){
                               Promise.resolve(safe);
   }},
   scripting:{executeScript(options,callback){
-   calls.probe++;
-   assert.deepStrictEqual(JSON.parse(JSON.stringify(options)),
-     {target:{tabId:27},files:["readiness_probe.js"]});
-   if(family==="chromium")callback([{result}]);
-   else return Promise.resolve([{result}]);
+   const details=JSON.parse(JSON.stringify(options));
+   if(details.world==="MAIN") {
+     calls.event++;
+     assert.deepStrictEqual(details,
+       {target:{tabId:27},files:["notification_event_pilot.js"],world:"MAIN"});
+     const event={kind:"PROTON_EVENT_PILOT_V1",stage:"started",
+       originOk:true,attempts:0,capped:false,windowMs:90000,
+       messageIdentityVerified:false,canMutate:false};
+     if(family==="chromium")callback([{result:event}]);
+     else return Promise.resolve([{result:event}]);
+   } else {
+     calls.probe++;
+     assert.deepStrictEqual(details,
+       {target:{tabId:27},files:["readiness_probe.js"]});
+     if(family==="chromium")callback([{result}]);
+     else return Promise.resolve([{result}]);
+   }
   }}
  };
  const scope={URL,console:{info:(s)=>log.push(s),warn:(s)=>log.push(s)}};
@@ -172,6 +184,7 @@ async function runBackground(family,validTab=true,nativeError=false,counts){
  api.click({id:27,url:validTab?"https://mail.proton.me/u/0/inbox":"https://evil.test"});
  await Promise.resolve();await Promise.resolve();await Promise.resolve();
  assert.strictEqual(calls.probe,validTab?1:0);
+ assert.strictEqual(calls.event,validTab?1:0);
  assert.strictEqual(calls.native,validTab?1:0);
  assert.ok(!log.some(s=>s.includes("PRIVATE")||s.includes("Message 123")
    ||s.includes("secret-private-id")));

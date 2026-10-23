@@ -1,0 +1,31 @@
+name: TASKS Proxy 1 M10c atomic storage fixtures
+
+on:
+  pull_request:
+    paths:
+      - "tests/tasks/fixtures/atomic_envelope_fixture.cjs"
+      - "tests/tasks/test_offline_atomic_storage_crash_windows.cjs"
+      - "docs/tasks-offline-storage-probe-m10c.md"
+      - ".github/workflows/tasks-offline-atomic-storage.yml"
+  push:
+    branches:
+      - main
+    paths:
+      - "tests/tasks/fixtures/atomic_envelope_fixture.cjs"
+      - "tests/tasks/test_offline_atomic_storage_crash_windows.cjs"
+      - "docs/tasks-offline-storage-probe-m10c.md"
+      - ".github/workflows/tasks-offline-atomic-storage.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  contract:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Verify disposable atomic-envelope interruption and recovery
+        run: node tests/tasks/test_offline_atomic_storage_crash_windows.cjs

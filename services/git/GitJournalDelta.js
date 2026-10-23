@@ -96,3 +96,44 @@ function encodeSidecar(checkpointGeneration, rows) {
         records: input
     });
 }
+
+
+// Cache JSON for unchanged immutable operation records. Each journal mutation
+// replaces its record object, so reference equality is the reuse boundary.
+// The on-disk sidecar remains byte-for-byte compatible with encodeSidecar().
+function encodeSidecarCached(checkpointGeneration, rows, previous) {
+    const generation = checkGeneration(checkpointGeneration);
+    const input = Array.isArray(rows) ? rows : [];
+    const old = Array.isArray(previous) ? previous : [];
+    const known = Object.create(null);
+    for (let i = 0; i < old.length; ++i) {
+        const item = old[i];
+        if (item && typeof item.id === "string" && item.id)
+            known[item.id] = item;
+    }
+
+    const payloads = [];
+    const cache = [];
+    let reusedCount = 0;
+    for (let i = 0; i < input.length; ++i) {
+        const record = requireRecord(input[i]);
+        const prior = known[record.id];
+        const reuse = Boolean(prior && prior.record === record
+            && typeof prior.text === "string");
+        const encoded = reuse ? prior.text : JSON.stringify(record);
+        if (typeof encoded !== "string")
+            throw new Error("INVALID JOURNAL DELTA RECORD // CANNOT SERIALIZE");
+        payloads.push(encoded);
+        cache.push({ id: record.id, record: record, text: encoded });
+        if (reuse)
+            reusedCount += 1;
+    }
+
+    return {
+        text: '{"deltaVersion":1,"baseGeneration":'
+            + JSON.stringify(generation)
+            + ',"records":[' + payloads.join(",") + ']}',
+        cache: cache,
+        reusedCount: reusedCount
+    };
+}

@@ -1500,8 +1500,8 @@ for token in (
     'label: "RESTART"',
     'label: "APPLY MEMORY LIMIT"',
     'processActionGate.prepare(',
-    'processExplore.processActionGate.confirm()',
-    'processExplore.processActionGate.cancel()',
+    'processActionGate.confirm()',
+    'processActionGate.cancel()',
     'NOT GUARANTEED CURRENT',
 ):
     assert token in process_explore, f"Process UI missing {token}"

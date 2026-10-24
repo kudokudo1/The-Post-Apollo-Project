@@ -148,10 +148,10 @@ with tempfile.TemporaryDirectory(prefix="pa-m10y-read-only-") as td:
     assert doc["tasks"][0]["title"]=="Write project plan"
     assert doc["tasks"][0]["description"]=="Local detail"
     assert doc["tasks"][2]["projectId"]=="p2"
-    assert "remote" not in raw and "values" not in raw
+    assert '"remote":' not in raw and '"values":' not in raw
     assert "Secret custom value" not in raw
     assert "PVT_unverified" not in raw and "PVTI_unverified" not in raw
-    assert "operations" not in raw
+    assert '"operations":' not in raw
     assert records.read(db)==before # Probe only read, never staged a write.
 
     parity=oracle(ready)

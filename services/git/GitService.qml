@@ -1409,7 +1409,13 @@ Scope {
                 'git -C "$root" log --all --topo-order --date-order -n 48 --pretty=format:"COMMIT%x09%H%x09%P%x09%D%x09%ct%x09%an%x09%s"',
                 'trace_refresh_stage "history"',
                 'trace_refresh_total',
-                'printf "\\nDONE\\t\\n"'
+                // The opt-in PROFILE rows already terminate with a newline.
+                // Preserve the exact same regular-output bytes as when off.
+                'if [ "$refresh_stage_trace" = "1" ]; then',
+                '  printf "DONE\\t\\n"',
+                'else',
+                '  printf "\\nDONE\\t\\n"',
+                'fi'
             ].join("\n"),
             "pa-git-refresh",
             refreshRepoPath,

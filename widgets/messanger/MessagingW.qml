@@ -296,8 +296,8 @@ PanelWindow {
 
     readonly property bool discordSelected: activeAppIndex === 1
     // xSelected retains the existing external-browser focus contract.
-    readonly property bool xSelected: activeAppIndex === 3 || activeAppIndex === 4 || activeAppIndex === 5 || activeAppIndex === 6
-    readonly property string browserSite: activeAppIndex === 4 ? "instagram" : activeAppIndex === 5 ? "facebook" : activeAppIndex === 6 ? "reddit" : "x"
+    readonly property bool xSelected: activeAppIndex >= 3 && activeAppIndex <= 8
+    readonly property string browserSite: activeAppIndex === 4 ? "instagram" : activeAppIndex === 5 ? "facebook" : activeAppIndex === 6 ? "reddit" : activeAppIndex === 7 ? "reels" : activeAppIndex === 8 ? "pinterest" : "x"
     readonly property bool externalSelected: discordSelected || xSelected
     onBrowserSiteChanged: updateGeometryHelperMode()
 
@@ -937,7 +937,7 @@ PanelWindow {
             return;
         }
 
-        if (index >= 3 && index <= 6) {
+        if (index >= 3 && index <= 8) {
             hideDiscord();
             restoreSelectorAfterXShow = retainSelectorFocus === true;
             showX();

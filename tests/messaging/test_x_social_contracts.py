@@ -124,7 +124,10 @@ assert 'name: "SESSIONS"' in selector
 assert 'name: "DISCORD"' in selector
 assert 'name: "TELEGRAM"' in selector
 assert 'name: "X"' in selector
-assert 'activeAppIndex === 3' in social
+# The X browser remains index 3, even though the browser lane is now a range.
+assert 'activeAppIndex >= 3 && activeAppIndex <= 8' in social
+assert 'activeAppIndex === 4 ? "instagram"' in social
+assert ': "x"' in social
 assert "readonly property bool externalSelected" in social
 assert "function showX()" in social
 assert "function hideX()" in social

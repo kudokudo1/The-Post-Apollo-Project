@@ -52,7 +52,7 @@ Rectangle {
             icon: ""
         },
         {
-            name: "REELS",
+            name: "THREADS",
             icon: ""
         },
         {

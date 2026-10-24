@@ -879,3 +879,38 @@ wire save only after explicit operator review. Deletion and group
 reorganization are separately scoped, because existing transactions and
 historical budget allocations may depend on categories. No local machine
 modifications or personal-budget writes are performed by this milestone.
+
+
+## FinanceW Categories M2 // Dormant guarded create/rename writer
+
+The Category Management M1 interface remains **PREVIEW ONLY**. This
+checkpoint introduces separate `scripts/finance/category_guard.mjs` policy
+and `write_category.mjs` worker, **not called by the widget**.
+
+The policy uses current Actual `getCategoryGroups()` and `getCategories()`
+to validate the stable group ID, target category ID, original category name,
+and absence of same-group duplicate names, including hidden categories.
+Only **create** and **rename in the same group** are supported. The worker
+calls `createCategory({name,group_id,is_income:false})` or
+`updateCategory(categoryId,{name})` once, then Actual `sync()` and
+independent getter readback. Deletion, group moves, and transaction category
+changes are not supported.
+
+A separate private `category-writes-enabled` authorization marker is
+required and **is not created, installed, set, or enabled here**. Do not
+provision it on your real budget. Actual access requires the existing
+authenticated loopback standalone server; source fingerprint mismatches
+refuse. Requests travel through one strict JSON line on stdin, never argv.
+The writer shares FinanceW's existing exclusive
+`~/.local/state/financew/operations/.write-lock` and durable global journal
+with D9/D12/D17, refusing all unresolved operations. Each attempt is fsynced
+before mutation; any failure after attempted status remains **UNCERTAIN**
+and prevents further writes until manually reconciled. Journals store only
+hash, status, action and timestamps, not category names or account secrets.
+
+CI uses a fictional API fixture and isolated HOME to test missing/unsafe
+permits, duplicate and stale refusals, single-use IDs, global lock, privacy,
+and sync interruption. This is *not* operator authorization or live Quickshell
+acceptance. Next: disposable Actual 26.10 category create/rename roundtrip,
+then independently reviewed UI wiring and operator desktop verification
+while the write authorization marker remains absent.

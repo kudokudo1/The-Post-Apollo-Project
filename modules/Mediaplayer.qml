@@ -66,10 +66,12 @@ Item {
     property int bgMaxFrameMs: 0
     property double bgLastFrameSummaryMs: 0
 
-    // Operator-controlled A/B experiment; both gates default OFF.
-    // Reuse the existing CAVA process and stdout parser. No audio mutation.
+    // Recovery-safe latest-frame CAVA processing is the normal startup path.
+    // Set POST_APOLLO_CAVA_COALESCE=0 for the original every-frame behavior.
+    // No extra CAVA process, MPD control, or audio routing is introduced.
     readonly property bool cavaCoalesceEnabled:
-        String(Quickshell.env("POST_APOLLO_CAVA_COALESCE") || "").trim() === "1"
+        String(Quickshell.env("POST_APOLLO_CAVA_COALESCE") || "").trim() !== "0"
+    // Optional performance measurements stay OFF on ordinary launches.
     readonly property bool cavaTrialProbeEnabled:
         String(Quickshell.env("POST_APOLLO_CAVA_TRIAL_PROBE") || "").trim() === "1"
     property string cavaLatestPendingFrame: ""
@@ -657,7 +659,7 @@ Item {
     Timer {
         id: cavaCoalescedRenderTimer
         // The source is 15 FPS; render at most once every ~67ms. No timer
-        // exists in the original behavior because this gate is default-off.
+        // stops when the operator explicitly selects legacy mode (flag = 0).
         interval: 67
         repeat: true
         running: mediaDock.cavaCoalesceEnabled

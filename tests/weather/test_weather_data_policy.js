@@ -728,12 +728,24 @@ assert.equal(terminalGeometry.visibleIntersection(desired,
 assert.equal(terminalGeometry.observedWindow(treeExample, "weather-screen-news"), null);
 assert.equal(terminalGeometry.observedWindow(treeExample, "malicious-name"), null);
 const nextBay = terminalGeometry.position(
-    terminalOutputs, "DP-5", 1000, 20, 62, 160, 8, 78, 824, 494);
+    terminalOutputs, "DP-5", 1000, 20, 62, 160, 8, 74, 824, 494);
 assert.deepEqual(JSON.parse(JSON.stringify(nextBay)),
-                 {x: 1708, y: 140, width: 824, height: 494});
+                 {x: 1708, y: 136, width: 824, height: 494});
 const otherBay = terminalGeometry.position(
-    terminalOutputs, "HDMI-A-1", 1000, 20, 62, 160, 8, 78, 824, 494);
+    terminalOutputs, "HDMI-A-1", 1000, 20, 62, 160, 8, 74, 824, 494);
 assert.deepEqual(JSON.parse(JSON.stringify(otherBay)),
-                 {x: -852, y: 340, width: 824, height: 494});
+                 {x: -852, y: 336, width: 824, height: 494});
+
+
+// Center bay between the divider (y=64+2) and footer boundary. At the
+// current 576px view height, the 494px bay stays exactly the same size.
+const dividerBottom = 64 + 2;
+const clearance = 8;
+const centeredY = dividerBottom + clearance;
+const viewHeight = 576;
+const centeredHeight = viewHeight - centeredY - clearance;
+assert.equal(centeredY, 74);
+assert.equal(centeredHeight, 494);
+assert.equal(centeredY - dividerBottom, viewHeight - (centeredY + centeredHeight));
 
 console.log("Weather data policy contracts: PASS");

@@ -1,0 +1,280 @@
+import QtQuick
+import "../components"
+
+// FinanceW Research SEC M2: official EDGAR issuer filings, not trade signals.
+// Source dates are filing dates; transaction direction is not inferred.
+Item {
+    id: pane
+    property var secFeed: null
+    property int selectedIndex: 0
+    readonly property bool wide: width >= 650
+    readonly property var filings: secFeed && secFeed.snapshot ? secFeed.snapshot.filings : []
+    readonly property var selected: selectedIndex >= 0 && selectedIndex < filings.length
+                                     ? filings[selectedIndex] : null
+    onFilingsChanged: selectedIndex = 0
+
+    GohuText {
+        id: title
+        anchors.top: parent.top
+        anchors.topMargin: 9
+        anchors.left: parent.left
+        anchors.right: refreshButton.left
+        anchors.rightMargin: 6
+        text: "SEC EDGAR // DISCLOSURES"
+        font.pixelSize: 13
+        font.bold: true
+        color: Colors.orange
+        elide: Text.ElideRight
+    }
+
+    ActionButton {
+        id: refreshButton
+        anchors.top: parent.top
+        anchors.topMargin: 4
+        anchors.right: parent.right
+        width: 78
+        height: 28
+        label: secFeed && secFeed.loading ? "READING" : "REFRESH"
+        labelPixelSize: 9
+        accentColor: Colors.cyan
+        available: secFeed && secFeed.monitoring && !secFeed.loading
+        onLeftClicked: secFeed.refresh()
+    }
+
+    Row {
+        id: issuerRow
+        anchors.top: title.bottom
+        anchors.topMargin: 10
+        anchors.left: parent.left
+        anchors.right: parent.right
+        height: 31
+        spacing: 5
+        ActionButton {
+            width: Math.max(70, (issuerRow.width - 10) / 3)
+            height: 28
+            label: "APPLE"
+            labelPixelSize: 9
+            selected: secFeed && secFeed.selectedCik === "0000320193"
+            accentColor: Colors.cyan
+            onLeftClicked: secFeed.selectIssuer("0000320193")
+        }
+        ActionButton {
+            width: Math.max(70, (issuerRow.width - 10) / 3)
+            height: 28
+            label: "MICROSOFT"
+            labelPixelSize: 9
+            selected: secFeed && secFeed.selectedCik === "0000789019"
+            accentColor: Colors.cyan
+            onLeftClicked: secFeed.selectIssuer("0000789019")
+        }
+        ActionButton {
+            width: Math.max(70, (issuerRow.width - 10) / 3)
+            height: 28
+            label: "NVIDIA"
+            labelPixelSize: 9
+            selected: secFeed && secFeed.selectedCik === "0001045810"
+            accentColor: Colors.cyan
+            onLeftClicked: secFeed.selectIssuer("0001045810")
+        }
+    }
+
+    GohuText {
+        id: status
+        anchors.top: issuerRow.bottom
+        anchors.topMargin: 8
+        anchors.left: parent.left
+        anchors.right: parent.right
+        text: secFeed ? secFeed.message : "SEC SOURCE UNAVAILABLE"
+        textFormat: Text.PlainText
+        font.pixelSize: 9
+        color: secFeed && secFeed.state === "failed" ? Colors.red : Colors.orange
+        wrapMode: Text.WordWrap
+    }
+
+    GohuText {
+        id: counts
+        anchors.top: status.bottom
+        anchors.topMargin: 8
+        anchors.left: parent.left
+        anchors.right: parent.right
+        text: "FILINGS " + pane.filings.length
+              + "  //  " + (secFeed && secFeed.snapshot ? secFeed.snapshot.issuer : "NO ISSUER DATA")
+        textFormat: Text.PlainText
+        font.pixelSize: 10
+        color: Colors.white
+        elide: Text.ElideRight
+    }
+
+    Item {
+        id: body
+        anchors.top: counts.bottom
+        anchors.topMargin: 8
+        anchors.left: parent.left
+        anchors.right: parent.right
+        anchors.bottom: footer.top
+        anchors.bottomMargin: 6
+
+        Rectangle {
+            id: filingList
+            anchors.top: parent.top
+            anchors.left: parent.left
+            width: pane.wide ? Math.max(230, parent.width * 0.38) : parent.width
+            height: pane.wide ? parent.height : Math.max(130, parent.height * 0.48)
+            color: Colors.dark
+            border.width: 1
+            border.color: Colors.cyan
+            GohuText {
+                id: listTitle
+                anchors.top: parent.top
+                anchors.left: parent.left
+                anchors.right: parent.right
+                anchors.margins: 7
+                font.pixelSize: 10
+                color: Colors.white
+                text: "OFFICIAL FILING INDEX"
+            }
+            Flickable {
+                id: filingScroll
+                anchors.left: parent.left
+                anchors.right: parent.right
+                anchors.top: listTitle.bottom
+                anchors.bottom: parent.bottom
+                anchors.margins: 4
+                clip: true
+                contentWidth: width
+                contentHeight: filingRows.height
+                boundsBehavior: Flickable.StopAtBounds
+                Column {
+                    id: filingRows
+                    width: filingScroll.width
+                    spacing: 3
+                    Repeater {
+                        model: pane.filings
+                        delegate: Rectangle {
+                            id: filingRow
+                            required property var modelData
+                            required property int index
+                            width: filingRows.width
+                            height: 60
+                            color: pane.selectedIndex === index ? Colors.dark : Colors.black
+                            border.width: 1
+                            border.color: pane.selectedIndex === index ? Colors.magenta : Colors.cyan
+                            GohuText {
+                                anchors.top: parent.top
+                                anchors.topMargin: 7
+                                anchors.left: parent.left
+                                anchors.leftMargin: 6
+                                text: filingRow.modelData.form + " // " + filingRow.modelData.category
+                                font.pixelSize: 10
+                                color: Colors.white
+                            }
+                            GohuText {
+                                anchors.bottom: parent.bottom
+                                anchors.bottomMargin: 6
+                                anchors.left: parent.left
+                                anchors.leftMargin: 6
+                                text: filingRow.modelData.filedAt
+                                font.pixelSize: 10
+                                color: Colors.orange
+                            }
+                            GohuText {
+                                anchors.bottom: parent.bottom
+                                anchors.bottomMargin: 6
+                                anchors.right: parent.right
+                                anchors.rightMargin: 6
+                                text: filingRow.modelData.accession
+                                font.pixelSize: 9
+                                color: Colors.cyan
+                            }
+                            TapHandler {
+                                onTapped: pane.selectedIndex = filingRow.index
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        Rectangle {
+            id: detail
+            anchors.top: pane.wide ? parent.top : filingList.bottom
+            anchors.topMargin: pane.wide ? 0 : 8
+            anchors.left: pane.wide ? filingList.right : parent.left
+            anchors.leftMargin: pane.wide ? 8 : 0
+            anchors.right: parent.right
+            anchors.bottom: parent.bottom
+            color: Colors.dark
+            border.width: 1
+            border.color: Colors.cyan
+            clip: true
+            Flickable {
+                anchors.fill: parent
+                anchors.margins: 9
+                contentWidth: width
+                contentHeight: detailItems.height
+                clip: true
+                boundsBehavior: Flickable.StopAtBounds
+                Column {
+                    id: detailItems
+                    width: parent.width
+                    spacing: 10
+                    GohuText {
+                        width: parent.width
+                        text: pane.selected ? pane.selected.category : "SELECT A DISCLOSURE"
+                        font.pixelSize: 12
+                        color: Colors.magenta
+                    }
+                    GohuText {
+                        width: parent.width
+                        text: pane.selected
+                            ? "FORM " + pane.selected.form + " // FILED " + pane.selected.filedAt
+                            : ""
+                        font.pixelSize: 10
+                        color: Colors.white
+                    }
+                    GohuText {
+                        width: parent.width
+                        text: pane.selected && pane.selected.acceptedAt
+                            ? "ACCEPTED " + pane.selected.acceptedAt : ""
+                        font.pixelSize: 9
+                        color: Colors.white
+                    }
+                    GohuText {
+                        width: parent.width
+                        text: pane.selected ? "SEC ORIGINAL DOCUMENT" : ""
+                        font.pixelSize: 10
+                        color: Colors.orange
+                    }
+                    GohuText {
+                        width: parent.width
+                        text: pane.selected ? pane.selected.documentUrl : ""
+                        textFormat: Text.PlainText
+                        wrapMode: Text.WrapAnywhere
+                        font.pixelSize: 9
+                        color: Colors.cyan
+                    }
+                    GohuText {
+                        width: parent.width
+                        text: "INDEX ONLY. Form 4 direction, deal size, and signal strength are not yet parsed."
+                        textFormat: Text.PlainText
+                        wrapMode: Text.WordWrap
+                        font.pixelSize: 10
+                        color: Colors.orange
+                    }
+                }
+            }
+        }
+    }
+
+    GohuText {
+        id: footer
+        anchors.left: parent.left
+        anchors.right: parent.right
+        anchors.bottom: parent.bottom
+        height: 25
+        text: "SEC DATA.SEC.GOV // PUBLIC SNAPSHOT // NOT LIVE"
+        textFormat: Text.PlainText
+        font.pixelSize: 9
+        color: Colors.orange
+        elide: Text.ElideRight
+    }
+}

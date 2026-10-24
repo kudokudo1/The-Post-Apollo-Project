@@ -193,12 +193,14 @@ Rectangle {
                     label: "RETRY NEWS"
                     labelPixelSize: 11
                     available: source.canRetry
-                    onClicked: source.refresh()
+                    onClicked: source.refresh(true)
                 }
                 QuietText {
                     anchors.verticalCenter: parent.verticalCenter
                     text: source.retryWaitSeconds > 0
-                          ? "NEXT REQUEST IN " + source.retryWaitSeconds + "s"
+                          ? "EARLIEST RETRY IN " + source.retryWaitSeconds + "s"
+                          : source.failed && source.errorText === "RATE LIMITED"
+                            ? "RETRY MAY STILL BE THROTTLED"
                           : source.failed ? "REQUEST FAILED // RETRY AVAILABLE"
                           : source.loading ? "REQUEST IN PROGRESS"
                           : "ON DEMAND // 15-MIN REFRESH"

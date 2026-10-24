@@ -8,12 +8,12 @@ import Quickshell.Io
 Scope {
     id: gate
 
-    required property var taskRows
-    required property var taskSafety
-    required property var taskController
-    required property var processControl
-    required property var processLimits
-    required property var refreshTimer
+    required property var ownerRows
+    required property var safetyOwner
+    required property var presentationOwner
+    required property var controlOwner
+    required property var limitsOwner
+    required property var refreshOwner
 
     property var pending: null
     property bool busy: false
@@ -21,12 +21,12 @@ Scope {
     property string probeReply: ""
 
     function exactRow(pid, startTicks, name) {
-        if (!Array.isArray(taskRows) || !Number.isSafeInteger(pid)
+        if (!Array.isArray(ownerRows) || !Number.isSafeInteger(pid)
                 || pid <= 1 || !Number.isSafeInteger(startTicks)
                 || startTicks <= 0 || typeof name !== "string" || !name)
             return null;
-        for (let i = 0; i < taskRows.length; i++) {
-            const row = taskRows[i];
+        for (let i = 0; i < ownerRows.length; i++) {
+            const row = ownerRows[i];
             if (!row || row._taskRecord !== true)
                 continue;
             if (row.pid === pid && row.startTicks === startTicks
@@ -38,29 +38,29 @@ Scope {
 
     function isProtected(pid, startTicks, name) {
         const row = exactRow(pid, startTicks, name);
-        return row ? taskSafety.requiresDangerUnlock(row) : true;
+        return row ? safetyOwner.requiresDangerUnlock(row) : true;
     }
 
     function isUnlocked(pid, startTicks, name, action) {
         const row = exactRow(pid, startTicks, name);
         if (!row) return false;
-        if (!taskSafety.requiresDangerUnlock(row)) return true;
+        if (!safetyOwner.requiresDangerUnlock(row)) return true;
         const kind = action === "freeze" || action === "resume" ? "freeze"
                      : action === "limit" ? "limit" : "kill";
-        return taskSafety.dangerActionUnlocked(row, kind);
+        return safetyOwner.dangerActionUnlocked(row, kind);
     }
 
     function currentLimitPercent(pid, startTicks, name) {
         const row = exactRow(pid, startTicks, name);
-        return row ? Math.round(taskController.limitPercent(row)) : 100;
+        return row ? Math.round(presentationOwner.limitPercent(row)) : 100;
     }
 
     function toggleOneShotUnlock(pid, startTicks, name) {
         const row = exactRow(pid, startTicks, name);
-        if (!row || busy || pending || !taskSafety.requiresDangerUnlock(row))
+        if (!row || busy || pending || !safetyOwner.requiresDangerUnlock(row))
             return false;
-        taskSafety.toggleDangerUnlock(row); // existing AppControl safety state
-        feedback = taskSafety.dangerUnlocked(row)
+        safetyOwner.toggleDangerUnlock(row); // existing AppControl safety state
+        feedback = safetyOwner.dangerUnlocked(row)
                    ? "PROTECTED TARGET // UNLOCKED ONCE"
                    : "PROTECTED TARGET // LOCKED";
         return true;
@@ -78,16 +78,16 @@ Scope {
                     || percent < 0 || percent > 100)) {
             feedback = "INVALID LIMIT"; return false;
         }
-        if (action === "freeze" && taskController.isFrozen(row)) {
+        if (action === "freeze" && presentationOwner.isFrozen(row)) {
             feedback = "ALREADY STOPPED"; return false;
         }
-        if (action === "resume" && !taskController.isFrozen(row)) {
+        if (action === "resume" && !presentationOwner.isFrozen(row)) {
             feedback = "NOT STOPPED"; return false;
         }
         const key = action === "freeze" || action === "resume"
                     ? "freeze" : action === "limit" ? "limit" : "kill";
-        if (taskSafety.requiresDangerUnlock(row)
-                && !taskSafety.dangerActionUnlocked(row, key)) {
+        if (safetyOwner.requiresDangerUnlock(row)
+                && !safetyOwner.dangerActionUnlocked(row, key)) {
             feedback = "PROTECTED PROCESS // UNLOCK ONCE FIRST"; return false;
         }
         pending = {pid:pid,startTicks:startTicks,name:name,action:action,
@@ -101,7 +101,7 @@ Scope {
         if (pending) {
             const row = exactRow(pending.pid,pending.startTicks,pending.name);
             if (row)
-                taskSafety.relockDangerAction(row,
+                safetyOwner.relockDangerAction(row,
                     pending.action === "freeze" || pending.action === "resume"
                     ? "freeze" : pending.action === "limit" ? "limit" : "kill");
         }
@@ -117,8 +117,8 @@ Scope {
         if (!row) { pending=null; feedback="PROCESS CHANGED // REFUSED"; return false; }
         const kind = req.action === "freeze" || req.action === "resume" ? "freeze"
                      : req.action === "limit" ? "limit" : "kill";
-        if (taskSafety.requiresDangerUnlock(row)
-                && !taskSafety.dangerActionUnlocked(row,kind)) {
+        if (safetyOwner.requiresDangerUnlock(row)
+                && !safetyOwner.dangerActionUnlocked(row,kind)) {
             pending=null; feedback="SAFETY LOCK RE-ENGAGED // REFUSED"; return false;
         }
         probeReply = "";
@@ -151,30 +151,30 @@ Scope {
         if (!row) { feedback="PROCESS CHANGED SINCE VERIFICATION // REFUSED"; return; }
         const kind = req.action === "freeze" || req.action === "resume" ? "freeze"
                      : req.action === "limit" ? "limit" : "kill";
-        if (taskSafety.requiresDangerUnlock(row)
-                && !taskSafety.dangerActionUnlocked(row,kind)) {
+        if (safetyOwner.requiresDangerUnlock(row)
+                && !safetyOwner.dangerActionUnlocked(row,kind)) {
             feedback="SAFETY LOCK LOST // REFUSED"; return;
         }
         // Existing AppControl owners dispatch every change. No new
         // kill/prlimit backend. Detached commands are requests, not proof.
         if (req.action === "freeze") {
-            if (taskController.isFrozen(row)) { feedback="ALREADY STOPPED"; return; }
-            if (!processControl.sendSignal(req.pid,"-STOP")) { feedback="REQUEST REJECTED"; return; }
-            taskController.markFrozen(row,true);
+            if (presentationOwner.isFrozen(row)) { feedback="ALREADY STOPPED"; return; }
+            if (!controlOwner.sendSignal(req.pid,"-STOP")) { feedback="REQUEST REJECTED"; return; }
+            presentationOwner.markFrozen(row,true);
         } else if (req.action === "resume") {
-            if (!taskController.isFrozen(row)) { feedback="NOT STOPPED"; return; }
-            if (!processControl.sendSignal(req.pid,"-CONT")) { feedback="REQUEST REJECTED"; return; }
-            taskController.markFrozen(row,false);
+            if (!presentationOwner.isFrozen(row)) { feedback="NOT STOPPED"; return; }
+            if (!controlOwner.sendSignal(req.pid,"-CONT")) { feedback="REQUEST REJECTED"; return; }
+            presentationOwner.markFrozen(row,false);
         } else if (req.action === "end") {
-            if (!processControl.sendSignal(req.pid,"-TERM")) { feedback="REQUEST REJECTED"; return; }
+            if (!controlOwner.sendSignal(req.pid,"-TERM")) { feedback="REQUEST REJECTED"; return; }
         } else if (req.action === "restart") {
-            if (!processControl.restart(req.pid)) { feedback="REQUEST REJECTED"; return; }
+            if (!controlOwner.restart(req.pid)) { feedback="REQUEST REJECTED"; return; }
         } else if (req.action === "limit") {
-            taskController.setLimitPercent(req.percent,row);
+            presentationOwner.setLimitPercent(req.percent,row);
         }
-        taskSafety.relockDangerAction(row,kind);
+        safetyOwner.relockDangerAction(row,kind);
         feedback = req.action.toUpperCase() + " // REQUEST ISSUED // VERIFY OWNER STATE";
-        refreshTimer.restart();
+        refreshOwner.restart();
     }
 
     Process {

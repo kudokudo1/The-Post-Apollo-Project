@@ -771,13 +771,26 @@ test("bad frames cannot reset or replace the current visualizer reading", () => 
     }
 });
 
-test("CAVA trial is default-off, opt-in, and the original frame handler remains active", () => {
-    assert.match(source, /POST_APOLLO_CAVA_COALESCE/);
+test("latest-frame CAVA is the normal startup; explicit zero restores original behavior", () => {
+    const binding = source.match(/readonly property bool cavaCoalesceEnabled:\s*\n\s*(String\(Quickshell\.env\("POST_APOLLO_CAVA_COALESCE"\)[^\n]+)/)?.[1];
+    assert.ok(binding, "coalescing switch must remain directly testable");
+    const evaluate = (env) => vm.runInNewContext(binding, {
+        Quickshell: { env: (name) => {
+            assert.equal(name, "POST_APOLLO_CAVA_COALESCE");
+            return env;
+        }}
+    });
+    assert.equal(evaluate(""), true, "normal boot defaults to coalesced");
+    assert.equal(evaluate(undefined), true);
+    assert.equal(evaluate("1"), true, "old experiment command still works");
+    assert.equal(evaluate("0"), false, "legacy behavior is a deliberate rollback");
     assert.match(source, /POST_APOLLO_CAVA_TRIAL_PROBE/);
+    assert.match(source, /readonly property bool cavaTrialProbeEnabled:\s*\n\s*String\(Quickshell\.env\("POST_APOLLO_CAVA_TRIAL_PROBE"\) \|\| ""\)\.trim\(\) === "1"/);
     assert.match(source, /running:\s*mediaDock\.cavaCoalesceEnabled/);
     assert.match(source, /interval:\s*67/);
     assert.match(source, /onRead: function\(frame\) \{\s*mediaDock\.receiveCavaFrame\(frame\);/);
     assert.match(source, /SYNTAGMA_CAVA_TRIAL/);
+    // The original event-per-frame branch remains available after opt-out.
     const {context, receive} = harness();
     receive(Array(20).fill("3").join(";") + ";");
     assert.equal(context.levels[0], 3);

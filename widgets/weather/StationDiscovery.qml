@@ -14,6 +14,28 @@ Rectangle {
     property bool viewerOpen: false
     property var selectedNews: null
 
+    // Expose the child provider's actual NEWS state to the Station header.
+    // Configured is not the same thing as received articles.
+    readonly property string feedBadge: {
+        if (source.failed)
+            return source.errorText
+                   + (source.retryWaitSeconds > 0
+                      ? " // RETRY " + source.retryWaitSeconds + "s" : "");
+        if (source.loading)
+            return "READING // NEWS";
+        if (source.ready)
+            return (source.usingCache ? "NEWS CACHED // " : "NEWS RECEIVED // ")
+                   + source.rows.length;
+        if (source.retryWaitSeconds > 0)
+            return "WAIT // RETRY " + source.retryWaitSeconds + "s";
+        return "CONNECTING // NEWS";
+    }
+    readonly property color feedBadgeColor:
+        source.failed ? Colors.orange
+        : source.loading ? Colors.orange
+        : source.ready ? Colors.magenta : Colors.orange
+
+
     // NEWS selection stays in the Station. GDELT supplies a headline record,
     // not verified article body text.
     function openRow(row) {
@@ -61,7 +83,7 @@ Rectangle {
             ];
         if (domain === "news")
             return [
-                {name:"GDELT DOC // ARTICLE LIST", state:"SOURCE CONNECTED"},
+                {name:"GDELT DOC // ARTICLE LIST", state:"ENDPOINT CONFIGURED"},
                 {name:"TOPICS / SOURCES / REGIONS", state:"NOT WIRED"},
                 {name:"LIVE NEWS / VIDEO", state:"NOT WIRED"},
                 {name:"STORY CLUSTERS / DOSSIERS", state:"NOT WIRED"}
@@ -110,10 +132,10 @@ Rectangle {
                 }
 
                 GohuText {
-                    text: source.failed ? "FETCH FAILED"
-                          : source.loading && !source.ready ? "RECEIVING"
+                    text: source.failed ? source.errorText
+                          : source.loading ? "RECEIVING"
                           : source.ready ? "RECEIVED " + source.rows.length
-                            : "OFFLINE"
+                            : source.retryWaitSeconds > 0 ? "WAITING" : "OFFLINE"
                     font.pixelSize: 12
                     color: source.failed ? Colors.orange
                            : source.ready ? Colors.cyan : Colors.white
@@ -160,6 +182,30 @@ Rectangle {
                 title: stationDiscovery.providerTitle
             }
 
+            Row {
+                width: parent.width
+                height: stationDiscovery.domain === "news" ? 34 : 0
+                visible: stationDiscovery.domain === "news"
+                spacing: 12
+                ActionButton {
+                    width: 102
+                    height: 30
+                    label: "RETRY NEWS"
+                    labelPixelSize: 11
+                    available: source.canRetry
+                    onClicked: source.refresh()
+                }
+                QuietText {
+                    anchors.verticalCenter: parent.verticalCenter
+                    text: source.retryWaitSeconds > 0
+                          ? "NEXT REQUEST IN " + source.retryWaitSeconds + "s"
+                          : source.failed ? "REQUEST FAILED // RETRY AVAILABLE"
+                          : source.loading ? "REQUEST IN PROGRESS"
+                          : "ON DEMAND // 15-MIN REFRESH"
+                    font.pixelSize: 11
+                }
+            }
+
             QuietText {
                 width: parent.width
                 text: stationDiscovery.sourceCaution
@@ -172,6 +218,8 @@ Rectangle {
                 text: source.failed
                       ? source.errorText + " // PRIOR DATA MAY BE STALE"
                       : source.loading ? "RECEIVING REMOTE RECORDS"
+                      : source.retryWaitSeconds > 0
+                        ? "REQUEST HELD // PROVIDER COOLDOWN"
                       : source.ready ? "NO RECORDS RETURNED"
                         : "BACKEND NOT YET AVAILABLE"
                 font.pixelSize: 12

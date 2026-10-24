@@ -159,6 +159,16 @@ Operator ran `swaymsg -t get_tree` on the live Weather Station STAR MAP actor an
 
 **Boundary:** no changes to Kitty/SwayPX/Stage Director, Weather Station chassis, mapped source service, MAP external route yet, shared Radio playback ownership, external OS/browser setup or local files. Website content may be paywalled, blocked or visually inconsistent. Actual local QtWebEngine compatibility is not established by CI; read-only source contracts plus operator visual/runtime test are separate. This is **M3a**, not completed full M3 viewer host. Do not mark all internal renderers connected.
 
+### B18 // 2026-10-24 NEWS GDELT 429 / header status repair
+
+**Operator runtime evidence:** the NEWS page showed no articles and the Station top badge said `NO FEED // NOT WIRED`, even though NEWS has a configured GDELT DOC source. The operator ran the exact request and received **HTTP 429** with `Please limit requests to one every 5 seconds`. This verifies a provider-side throttle for the tested request, not that the network is broken or that the viewer caused it.
+
+**Observed source mechanism:** `StationDiscoveryService.qml` lives inside the per-mode `StationDiscovery.qml` loaded only for NEWS. Re-entering NEWS can remount the component and trigger a fresh GDELT request independently of its 15-minute periodic timer. The original `curl -fsSL` hid HTTP error bodies, parsing reported an indistinct failure, and `WeatherStationW.qml` fell back to `NO FEED // NOT WIRED` for all NEWS modes.
+
+**Scoped fix:** share a NEWS-only, in-memory 30-second admission gate and 60-second backoff after 429 using the existing `.pragma library` discovery policy; retain previously successful rows across tab remounts, labeled **CACHED**. Curl now reports HTTP status without suppressing 429, and the service differentiates provider throttle, HTTP failure, malformed response, reading and received states. The page shows an explicit manual RETRY only when permitted; no automatic aggressive retry loop is introduced. The Station header derives NEWS state from its existing loaded discovery service, not a new poller. The source rack says **ENDPOINT CONFIGURED**, not falsely **SOURCE CONNECTED**.
+
+**Verification / boundaries:** regression tests cover 429 text, conservative admission/backoff, cached records and UI links. Do not claim service health from code/CI, and do not spam GDELT to validate throttling. The session cache clears on full Quickshell restart and cannot prevent requests made by other applications sharing the provider/IP. No Kitty, SwayPX, MAP, RADIO, local machine file or browser viewer change; any local reload requires explicit operator authorization.
+
 ## 4 // Domain family C: MAP and world/environmental layers
 
 Current EONET is an event index only. Planned:

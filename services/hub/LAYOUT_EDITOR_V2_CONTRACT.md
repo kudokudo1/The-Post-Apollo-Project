@@ -240,9 +240,19 @@ H:1 retains the original compact Weather card. H:2/H:3 mount `widgets/hub/Apollo
 
 **Verify:** Hub foundation source contract guards compact presentation, domain selectors, independent weather/AQI readiness, intentional unavailable states and zero new collectors. Workflow now tracks the new Hub-only component. After operator-approved merge and normal desktop sync, compare H:1/H:2/H:3 and W:1/W:2; select all four tabs and verify title, readings, status footer and clipping. Test stale weather versus fresh AQI and the converse. No runtime acceptance or performance proof is inferred from CI.
 
+## P1 Stage 8D // Network Level 2 STATUS / WI-FI / ETHERNET
+
+The H:1 Network card retains the existing compact local-link display. Taller H:2/H:3 cards mount `widgets/hub/ApolloHubNetworkExplore.qml` with transient STATUS, WI-FI and ETHERNET views using the existing injected `ApolloHubNetworkPolicy.snapshot`. STATUS distinguishes active transport and both local links; WI-FI shows guarded SSID, interface, signal and **approximate received Wi-Fi link bitrate** only, not an internet speed test. ETHERNET shows wired presence/connection/interface and explicitly unobserved wired speed. Every mode displays **INTERNET UNVERIFIED**, including locally connected devices.
+
+**Boundary:** No NetworkManager/network device observer, `nmcli`/`Process`/`FileView`/`Timer`, internet probing, connection mutation, shell integration or layout persistence. H:1 remains old presentation. Test unknown adapter/signal/rate, disconnected link, Wi-Fi-only, Ethernet-only, both connected, W:1/W:2, H:1/H:2/H:3, clipping and the status footer on the live desktop.
+
+## DEFERRED WEATHER + RESOLVED TIME CONTRACT
+
+Stage 8C's deeper shared solar, seismic, pollen, gas and forecast feeds are still **owner-dependent**, not silently populated. [Weather deferred-source checkpoint](WEATHER_DEFERRED_SOURCES_20261024.md) records the missing fields, freshness/status rules, service-lifetime constraint and reentry tests. The B10 TimeW CI contract repair was merged in PR #680; earlier PR #675 red checks are historical.
+
 ## NEXT
 
-Complete Stage 7A/7B/7C/7D/8A/8B/8C desktop acceptance. Next can be Notes and To-do internal density, but those contain editable user data, so changes must preserve editor focus, draft and save-confirmation behavior. Durable undo/presets and drag-and-drop remain separate operator decisions.
+Complete Stage 7A/7B/7C/7D/8A/8B/8C/8D desktop acceptance. Next can be Notes and To-do internal density, but those contain editable user data, so changes must preserve editor focus, draft and save-confirmation behavior. Durable undo/presets and drag-and-drop remain separate operator decisions.
 
 ## DECISIONS
 

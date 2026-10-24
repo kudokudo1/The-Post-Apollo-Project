@@ -35,6 +35,7 @@ PanelWindow {
     readonly property int frameWidth: 432
     readonly property int frameHeight: 768
     readonly property int glowGutter: 12
+    readonly property int frameTopInset: 9 // shared visible top line
     // TimeW identity is white. Universal magenta header, cyan dividers and
     // destructive red Close keep their independent semantic roles.
     readonly property color semanticColor: Colors.white
@@ -1063,7 +1064,7 @@ PanelWindow {
     // The window stays mapped to avoid the existing layer-shell remap crash.
     // A zero-sized closed mask prevents invisible pointer interception.
     implicitWidth: frameWidth + glowGutter * 2
-    implicitHeight: frameHeight + glowGutter * 2
+    implicitHeight: frameHeight + frameTopInset + glowGutter
     color: "transparent"
     surfaceFormat.opaque: false
     visible: true
@@ -1073,10 +1074,9 @@ PanelWindow {
         standardKeysAvailable ? WlrKeyboardFocus.OnDemand : WlrKeyboardFocus.None
     focusable: standardKeysAvailable
 
-    // Match the right dock's 8px top inset. The earlier formula adding the
-    // dock's 50px height placed the window too low in the live screenshot.
-    // Keep the existing frame glow gutter and compensate only by moving the
-    // owning PanelWindow up; visual acceptance remains a separate check.
+    // The time dock remains in its existing slot, but TimeW's visible frame
+    // follows the same 9px screen-top line as FinanceW and other menus.
+    // Keep the side/bottom glow gutters and frame/input mask in alignment.
     anchors {
         top: true
         bottom: false
@@ -1084,12 +1084,12 @@ PanelWindow {
         right: true
     }
     margins {
-        top: 8
+        top: 0
         right: 13
     }
     mask: Region {
         x: timew.glowGutter
-        y: timew.glowGutter
+        y: timew.frameTopInset
         width: timew.menuOpen ? timew.frameWidth : 0
         height: timew.menuOpen ? timew.frameHeight : 0
     }
@@ -1467,6 +1467,7 @@ PanelWindow {
         id: timewFrame
         anchors.fill: parent
         anchors.margins: timew.glowGutter
+        anchors.topMargin: timew.frameTopInset
         visible: timew.menuOpen
         glowVisible: timew.menuOpen
         glowColor: timew.semanticColor

@@ -15,7 +15,7 @@ service = (root / "services/git/GitService.qml").read_text()
 a = view.index("                            function compactGitTimingLine(line) {")
 b = view.index("                            SharedComponents.ActionButton {", a)
 formatter = view[a:b].strip()
-assert "function normalGitOutput(output, isSync)" in formatter
+assert "function normalGitOutput(output, isSync, repoViewMs)" in formatter
 assert "return compactGitTimingLine(line);" in formatter
 assert 'gitOutputPanel.showDetails\n                                        ? gitService.actionOutput' in view
 assert "JOURNAL PROFILE // " in service
@@ -71,6 +71,12 @@ const expected = [
 assert.equal(normalGitOutput(raw, true), expected,
  'all stage identities, units, labels, values, Git results and safety messages must survive');
 assert.equal(normalGitOutput(raw, false), raw, 'non-sync output is untouched');
+assert.equal(normalGitOutput(raw, false, 1345), raw, 'DETAILS is raw');
+assert.equal(normalGitOutput(raw, true, 1345), expected.replace(
+ 'REFRESHED │ repository view 1345ms\\n', ''),
+ 'NORMAL moves the exact repository-view value to the pinned header');
+assert.equal(normalGitOutput(raw, true, 1344), expected,
+ 'wrong header value must not suppress a distinct measurement');
 assert.ok(expected.length < raw.length, 'less wrapped text without omitting fields');
 assert.equal(compactGitTimingLine(complete),
  'JOURNAL PROFILE COMPLETE [ms] │ clone 1 · record 5 · entries 2 · persist 105 · notify 3 · mutation 115');

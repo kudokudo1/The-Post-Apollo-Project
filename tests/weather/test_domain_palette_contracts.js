@@ -84,14 +84,18 @@ assert.match(weatherTerminalSource, /"weather-screen-" \+ sessionMode/);
 assert.match(weatherTerminalSource, /weatherstation-starmap/);
 assert.match(weatherTerminalSource, /"\/usr\/bin\/bash -l"/);
 assert.match(weatherTerminalSource, /sessionMode = terminalMode/);
-assert.match(weatherTerminalSource, /x:\s*8\s+y:\s*78/);
+assert.match(weatherTerminalSource, /y:\s*terminalTitleDivider\.y \+ terminalTitleDivider\.height \+ verticalClearance/);
 assert.match(weatherTerminalSource, /parent\.width - 16/);
-assert.match(weatherTerminalSource, /parent\.height - 82/);
+assert.match(weatherTerminalSource, /parent\.height - y - verticalClearance/);
 
 // Shared terminal title header appears on STAR MAP and all other context
 // consoles via the SAME StationTerminal, not a one-off STAR MAP exception.
 assert.match(weatherTerminalSource, /text:\s*terminalView\.sessionTitle/);
 assert.match(weatherTerminalSource, /id:\s*terminalTitleDivider/);
+assert.match(weatherTerminalSource, /readonly property real verticalClearance:\s*8/);
+assert.match(weatherTerminalSource, /x:\s*8/);
+assert.match(weatherTerminalSource, /terminalTitleDivider\.y \+ terminalTitleDivider\.height \+ verticalClearance/);
+assert.match(weatherTerminalSource, /height:\s*Math\.max\(0, parent\.height - y - verticalClearance\)/);
 assert.match(weatherTerminalSource, /id:\s*terminalTitleDivider[\s\S]*?x:\s*14[\s\S]*?y:\s*64[\s\S]*?height:\s*2[\s\S]*?color:\s*Colors\.cyan/);
 const titleDividerAt = weatherTerminalSource.indexOf("id: terminalTitleDivider");
 const bayAt = weatherTerminalSource.indexOf("id: terminalBay");

@@ -51,9 +51,21 @@ function groupFor(form) {
   return "FINANCIAL REPORT";
 }
 
+// SEC submissions may encode their CIK as a number, an unpadded decimal
+// string, or a zero-padded 10-digit string. Validate digits before comparing
+// the canonical 10-digit key, rather than using lossy Number coercion.
+export function normalizeCik(value) {
+  if (typeof value === "number") {
+    if (!Number.isSafeInteger(value) || value < 0) return null;
+    value = String(value);
+  }
+  if (typeof value !== "string" || !/^\d{1,10}$/.test(value)) return null;
+  return value.padStart(10, "0");
+}
+
 export function normalizeSubmissions(raw, cik, retrievedAt) {
   if (!ISSUERS[cik] || !raw || typeof raw !== "object") throw new Error("invalid-sec-data");
-  if (String(raw.cik) !== String(Number(cik))) throw new Error("wrong-issuer");
+  if (normalizeCik(raw.cik) !== cik) throw new Error("wrong-issuer");
   const recent = raw.filings?.recent;
   const required = ["accessionNumber","filingDate","form","primaryDocument"];
   if (!recent || !required.every(k => Array.isArray(recent[k]))) throw new Error("invalid-sec-data");

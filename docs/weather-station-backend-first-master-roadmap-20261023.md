@@ -151,6 +151,14 @@ Operator ran `swaymsg -t get_tree` on the live Weather Station STAR MAP actor an
 
 **Acceptance:** static regression tests cover both operator outputs, negative global coordinates and malformed/missing workarea. This is a hypothesis supported by geometry, not verified layer-surface pixels; operator live visual confirmation remains required. Separate stale shell DP-5 bindings are not part of this patch.
 
+### B17 // 2026-10-24 NEWS M3a internal destination (scoped implementation)
+
+**Operator direction:** stop automatically redirecting the user from Weather Station to an external browser. Deliver useful in-Station content now; do not block this on the future Stage Director oversized-terminal / viewport experiments. NEWS is the first bounded route, MAP event and RADIO detail adapters can follow independently.
+
+**Implementation branch:** NEWS GDELT result click creates a structured, display-only report selection with title, source, time and an HTTPS article URL when usable. `StationDiscovery.qml` swaps its list for `StationViewerHost.qml`, retaining provider and list position; BACK returns without creating a new terminal. `StationViewerPolicy.js` validates article host/URL and rejects shell/JS/file, credentialed, plain HTTP, local/IP or malformed links. The viewer immediately shows truthful discovery metadata and an optional **READ ARTICLE** button that dynamically loads guarded `StationNewsWebView.qml` inside the same Station area. Its WebEngine dependency is not imported at startup. Popups, unrelated main-frame hosts, permission requests and unexpected browser launches are blocked. When WebEngine or the article fails, the header/source metadata remains visible; we do not claim fetched article body from GDELT.
+
+**Boundary:** no changes to Kitty/SwayPX/Stage Director, Weather Station chassis, mapped source service, MAP external route yet, shared Radio playback ownership, external OS/browser setup or local files. Website content may be paywalled, blocked or visually inconsistent. Actual local QtWebEngine compatibility is not established by CI; read-only source contracts plus operator visual/runtime test are separate. This is **M3a**, not completed full M3 viewer host. Do not mark all internal renderers connected.
+
 ## 4 // Domain family C: MAP and world/environmental layers
 
 Current EONET is an event index only. Planned:

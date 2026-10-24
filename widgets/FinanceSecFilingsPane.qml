@@ -8,6 +8,7 @@ Item {
     id: pane
     property var secFeed: null
     property var documentFeed: null
+    property var priceFeed: null
     property int selectedIndex: 0
     property string filterMode: "all"
     property var pinnedEvidence: []
@@ -40,13 +41,16 @@ Item {
         selectedIndex = 0;
         clearEvidence();
         if (documentFeed) documentFeed.clear();
+        if (priceFeed) priceFeed.clear();
     }
     onFilterModeChanged: {
         selectedIndex = 0;
         if (documentFeed) documentFeed.clear();
+        if (priceFeed) priceFeed.clear();
     }
     onSelectedIndexChanged: {
         if (documentFeed) documentFeed.clear();
+        if (priceFeed) priceFeed.clear();
     }
 
     GohuText {
@@ -276,6 +280,7 @@ Item {
                 filing: pane.selected
                 secFeed: pane.secFeed
                 documentFeed: pane.documentFeed
+                priceFeed: pane.priceFeed
                 evidenceSlots: pane.pinnedEvidence
                 pinMessage: pane.pinMessage
                 onPinRequested: pane.pinCurrentEvidence()

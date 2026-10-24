@@ -36,6 +36,13 @@ PanelWindow {
     FinanceServices.FinanceCrawlReadService {
         id: crawlService
         monitoring: root.menuOpen && root.selectedMainMode === "research"
+                    && root.researchTool === "crawl"
+    }
+
+    FinanceServices.FinanceSecReadService {
+        id: secService
+        monitoring: root.menuOpen && root.selectedMainMode === "research"
+                    && root.researchTool === "sec"
     }
 
     Component {
@@ -106,7 +113,12 @@ PanelWindow {
     // NO FEED for reserved/unimplemented pages. LIVE means an authenticated
     // read succeeded AND the local source remains reachable.
     readonly property string feedStatus:
-        selectedMainMode === "research"
+        selectedMainMode === "research" && researchTool === "sec"
+          ? (!menuOpen ? "IDLE"
+             : secService.loading ? "READING"
+             : secService.state === "failed" ? "ERROR"
+             : secService.state === "ready" ? "SNAPSHOT" : "NO FEED")
+        : selectedMainMode === "research"
           ? (!menuOpen ? "IDLE"
              : crawlService.loading ? "READING"
              : crawlService.state === "failed" ? "ERROR"
@@ -191,6 +203,7 @@ PanelWindow {
         { id: "schedules", name: "Schedules", icon: "⋆$🗓₊˚" }
     ]
     property string selectedMainMode: "budget"
+    property string researchTool: "crawl"
     property string selectedBudgetSubMode: "budget"
 
 
@@ -1941,13 +1954,57 @@ Row {
                                  : root.mainModeName().toUpperCase()
                 }
 
-                // Research has its own persistent reader and page inspector.
-                // Existing market tool host and Budget layout are unchanged.
-                FinanceResearchCrawlPane {
-                    id: crawlPane
+                // Research tools share an in-place surface; the crawl and SEC
+                // readers remain independent and no new PanelWindow is added.
+                Item {
+                    id: researchTools
                     anchors.fill: parent
                     visible: root.selectedMainMode === "research"
-                    crawlFeed: crawlService
+
+                    Row {
+                        id: researchToolStrip
+                        anchors.top: parent.top
+                        anchors.topMargin: 4
+                        anchors.left: parent.left
+                        height: 32
+                        spacing: 6
+                        ActionButton {
+                            width: 120
+                            height: 28
+                            label: "SOURCE CRAWL"
+                            labelPixelSize: 9
+                            accentColor: Colors.cyan
+                            selected: root.researchTool === "crawl"
+                            onLeftClicked: root.researchTool = "crawl"
+                        }
+                        ActionButton {
+                            width: 92
+                            height: 28
+                            label: "SEC EDGAR"
+                            labelPixelSize: 9
+                            accentColor: Colors.orange
+                            selected: root.researchTool === "sec"
+                            onLeftClicked: root.researchTool = "sec"
+                        }
+                    }
+                    FinanceResearchCrawlPane {
+                        id: crawlPane
+                        anchors.top: researchToolStrip.bottom
+                        anchors.left: parent.left
+                        anchors.right: parent.right
+                        anchors.bottom: parent.bottom
+                        visible: root.researchTool === "crawl"
+                        crawlFeed: crawlService
+                    }
+                    FinanceSecFilingsPane {
+                        id: secPane
+                        anchors.top: researchToolStrip.bottom
+                        anchors.left: parent.left
+                        anchors.right: parent.right
+                        anchors.bottom: parent.bottom
+                        visible: root.researchTool === "sec"
+                        secFeed: secService
+                    }
                 }
             }
         }

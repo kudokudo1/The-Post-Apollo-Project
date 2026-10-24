@@ -6,6 +6,9 @@ on:
       - 'services/projects/ExperimentalTaskSqliteCrudM10s.py'
       - 'services/projects/ExperimentalTaskSqliteProjectsM10t.py'
       - 'services/projects/ExperimentalTaskSqliteCustomM10u.py'
+      - 'services/projects/ExperimentalTaskSqliteGitM10v.py'
+      - 'tests/tasks/test_task_sqlite_m10v_git_intents.py'
+      - 'docs/tasks-sqlite-git-field-intents-m10v.md'
       - 'tests/tasks/test_task_sqlite_m10u_custom_fields.py'
       - 'docs/tasks-sqlite-local-custom-fields-m10u.md'
       - 'tests/tasks/test_task_sqlite_m10t_project_lifecycle.py'
@@ -20,6 +23,9 @@ on:
       - 'services/projects/ExperimentalTaskSqliteCrudM10s.py'
       - 'services/projects/ExperimentalTaskSqliteProjectsM10t.py'
       - 'services/projects/ExperimentalTaskSqliteCustomM10u.py'
+      - 'services/projects/ExperimentalTaskSqliteGitM10v.py'
+      - 'tests/tasks/test_task_sqlite_m10v_git_intents.py'
+      - 'docs/tasks-sqlite-git-field-intents-m10v.md'
       - 'tests/tasks/test_task_sqlite_m10u_custom_fields.py'
       - 'docs/tasks-sqlite-local-custom-fields-m10u.md'
       - 'tests/tasks/test_task_sqlite_m10t_project_lifecycle.py'
@@ -45,6 +51,8 @@ jobs:
         run: python3 tests/tasks/test_task_sqlite_m10t_project_lifecycle.py
       - name: M10u LOCAL typed-field writes and GIT no-sync journal safety
         run: python3 tests/tasks/test_task_sqlite_m10u_custom_fields.py
+      - name: M10v atomic GIT field intents and journal recovery
+        run: python3 tests/tasks/test_task_sqlite_m10v_git_intents.py
       - name: M10l existing normalized record and journal regression
         run: python3 tests/tasks/test_task_sqlite_records_v2.py
       - name: M10r compatibility and production isolation guards

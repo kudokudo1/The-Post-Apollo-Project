@@ -21292,7 +21292,7 @@ PanelWindow {
                                 required property int index
                                 required property var modelData
                                 width: fileControlBody.width
-                                height: 34
+                                height: 36
                                 selected: appControlWindow.detailFocused
                                     && appControlWindow.selectedDetailActionIndex === index
                                 showLabel: false

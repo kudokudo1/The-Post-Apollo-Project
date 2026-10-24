@@ -31,7 +31,6 @@ for banned in (
 assert '"app_id", "workspace", "floating"' in store
 assert 'choices.add_parser("save")' in store
 assert 'choices.add_parser("list")' in store
-assert 'choices.add_parser("load")' not in store  # load parser has variable assignment
 assert 'load_parser = choices.add_parser("load")' in store
 assert "MachineWindowMultiplicity.py" not in qml
 for required in ("REVIVE", "RESTORE", "17 Brave", "Kitty",

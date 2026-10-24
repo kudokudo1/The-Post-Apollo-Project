@@ -60,7 +60,7 @@ assert "property real dockCenterX: 0" in MENU
 assert "property real chassisTopY: 0" in MENU
 assert "FinanceChassisPolicy.leftMargin(" in MENU
 assert "FinanceChassisPolicy.topMargin(" in MENU
-assert "root.chassisTopY - root.glowGutter" in MENU
+assert "root.chassisLevel, root.chassisTopY," in MENU
 assert "dockBottomY" not in MENU
 assert "buttonGap" not in MENU
 assert "visible: true" in MENU  # do not remap layer-shell for toggles

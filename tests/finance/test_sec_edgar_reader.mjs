@@ -2,10 +2,19 @@
 // Fictional SEC submissions fixture. No SEC network request or real contact data.
 import assert from "node:assert/strict";
 import {
-  validateAgent, normalizeSubmissions, loadSec, ISSUERS
+  validateAgent, normalizeCik, normalizeSubmissions, loadSec, ISSUERS
 } from "../../scripts/finance/read_sec_filings.mjs";
 
 assert.equal(ISSUERS["0000320193"], "Apple");
+assert.equal(normalizeCik(320193), "0000320193");
+assert.equal(normalizeCik("320193"), "0000320193");
+assert.equal(normalizeCik("0000320193"), "0000320193");
+assert.equal(normalizeCik("0000320194"), "0000320194");
+for (const invalid of [null, undefined, {}, false, -1, 320193.5, NaN,
+  Infinity, "3.20193e5", " 320193", "320193 ", "0000000320193",
+  "0000320193\\n", "abc320193"]) {
+  assert.equal(normalizeCik(invalid), null, String(invalid));
+}
 assert.equal(validateAgent("PostApollo Finance Research analyst@testing.invalid\n"),
   "PostApollo Finance Research analyst@testing.invalid");
 assert.equal(validateAgent("PostApollo Finance Research test@example.com"), null);
@@ -25,6 +34,13 @@ const submission = {
   }}
 };
 const data = normalizeSubmissions(submission, "0000320193", "2026-10-24T16:00:00Z");
+// SEC may return a zero-padded CIK string rather than an integer.
+// The pre-fix implementation failed with wrong-issuer for this valid form.
+const padded = normalizeSubmissions({...submission,cik:"0000320193"}, "0000320193", "now");
+assert.equal(padded.filings.length, 3);
+assert.equal(normalizeSubmissions({...submission,cik:"320193"}, "0000320193", "now").filings.length, 3);
+assert.throws(()=>normalizeSubmissions({...submission,cik:"0000320194"},"0000320193","now"),/wrong-issuer/);
+assert.throws(()=>normalizeSubmissions({...submission,cik:"garbage"},"0000320193","now"),/wrong-issuer/);
 assert.equal(data.source, "sec-edgar-submissions");
 assert.equal(data.readOnly,true);
 assert.equal(data.filings.length,3);
@@ -55,6 +71,11 @@ const out=await loadSec("0000320193",async (url,opts)=>{
 },async()=> "PostApollo Finance Research analyst@testing.invalid");
 assert.equal(calls,1);
 assert.equal(out.filings.length,3);
+const paddedOut = await loadSec("0000320193",async()=>({
+  ok:true, headers:{get:()=>null},
+  text:async()=>JSON.stringify({...submission, cik:"0000320193"})
+}),async()=> "PostApollo Finance Research analyst@testing.invalid");
+assert.equal(paddedOut.filings.length,3);
 await assert.rejects(loadSec("0000320193",async()=>({
   ok:false,headers:{get:()=>null}
 }),async()=>"PostApollo Finance Research analyst@testing.invalid"),/sec-unavailable/);

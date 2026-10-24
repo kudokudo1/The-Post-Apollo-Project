@@ -138,7 +138,9 @@ def create_task(file, *, expected_revision, expected_hash, title, due_date,
                 "dueDate": due_date, "createdAtMs": now_ms,
                 "updatedAtMs": now_ms, "remote": None, "values": {}}
         doc["nextId"] += 1
-        records._insert_task(con, item, len(doc["tasks"]))
+        # Preserve positional uniqueness when a prior deletion left a gap.
+        next_pos = con.execute("SELECT COALESCE(MAX(position),-1)+1 FROM tasks").fetchone()[0]
+        records._insert_task(con, item, next_pos)
         doc["tasks"].append(item)
         return tid
     return _transaction(file, expected_revision, expected_hash, update, stop_at)

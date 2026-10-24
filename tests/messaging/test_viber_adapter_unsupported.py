@@ -47,7 +47,7 @@ def strip_qml_comments(source):
 
         if quote is not None:
             out.append(char)
-            if char == "\\\\" and index + 1 < len(source):
+            if char == "\\" and index + 1 < len(source):
                 out.append(source[index + 1])
                 index += 2
                 continue
@@ -64,7 +64,7 @@ def strip_qml_comments(source):
 
         if char == "/" and next_char == "/":
             index += 2
-            while index < len(source) and source[index] != "\\n":
+            while index < len(source) and source[index] != "\n":
                 index += 1
             continue
 

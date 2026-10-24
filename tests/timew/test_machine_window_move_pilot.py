@@ -15,6 +15,7 @@ spec = importlib.util.spec_from_file_location("machine_move", root / "MachineWin
 mod = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(mod)
 from MachineMoveJournal import JournalError
+from MachineMoveJournal import JournalError
 
 rect = {"x": 0, "y": 0, "width": 1920, "height": 1080}
 document = {
@@ -220,7 +221,7 @@ try:
     mod.execute_one(document, request, read_runner=fake.read,
                     command_runner=fake.command, journal=broken)
     raise AssertionError("moved without committing dispatch")
-except mod.JournalError:
+except JournalError:
     pass
 assert not any(x[3] == "command" for x in fake.calls)
 assert broken.pending()[0]["phase"] == "prepared"
@@ -228,7 +229,7 @@ assert broken.pending()[0]["phase"] == "prepared"
 # If outcome persistence fails AFTER dispatch, no verified result escapes.
 class CannotFinish(mod.MoveJournal):
     def finish(self, operation_id, status, observed=None):
-        raise mod.JournalError("SIMULATED FINISH FAILURE")
+        raise JournalError("SIMULATED FINISH FAILURE")
 
 path = Path(_tmp.name) / "fail-post-dispatch" / "move-operations.db"
 fake = FakeSway()
@@ -237,7 +238,7 @@ try:
     mod.execute_one(document, request, read_runner=fake.read,
                     command_runner=fake.command, journal=broken)
     raise AssertionError("success claimed without durable completion")
-except mod.JournalError:
+except JournalError:
     pass
 assert sum(x[3] == "command" for x in fake.calls) == 1
 assert broken.pending()[0]["phase"] == "dispatching"

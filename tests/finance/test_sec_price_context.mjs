@@ -71,7 +71,7 @@ await assert.rejects(loadPrices("0000789019","2026-10-22",
   async()=>{calls++;return {ok:false,status:403,headers:{get:()=>null}};},
   async()=>null,"2026-10-24"),/demo-not-authorized/);
 await assert.rejects(loadPrices("0000789019","2026-10-22",
-  async()=>{calls++;return {ok:true,headers:{get:()=>null},text:async()=>"Unauthenticated";};},
+  async()=>{calls++;return {ok:true,headers:{get:()=>null},text:async()=>"Unauthenticated"};},
   async()=>null,"2026-10-24"),/demo-not-authorized/);
 assert.equal(calls,4);
 // A ticker not documented as demo-eligible must never consume a trial request.

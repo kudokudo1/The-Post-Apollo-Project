@@ -115,6 +115,11 @@ with tempfile.TemporaryDirectory(prefix="pa-m10x-lifecycle-") as td:
     assert create["remoteSent"] is False
     assert source==original
     assert store.read(db)["revision"]==1
+    # A repeated create proposal for the same task must never silently
+    # reserve a second remote create, even if its dependency is explicit.
+    denied(lambda:append(CREATE,proposals["create"],depends=("lx1",)),
+           "DUPLICATE_CREATE_PROPOSAL")
+    assert store.read(db)["revision"]==1
 
     # Append an independent GIT move; then require an explicit dependency
     # before a later DELETE proposal may be retained for the same task.
@@ -149,6 +154,8 @@ with tempfile.TemporaryDirectory(prefix="pa-m10x-lifecycle-") as td:
     denied(lambda:append(DELETE_OTHER,proposals["other"],depends=("lx99",)),
            "UNKNOWN_DEPENDENCY")
     denied(lambda:append(DELETE_OTHER,proposals["other"],depends=("lx2","lx2")),
+           "INVALID_INTENT_DEPENDENCIES")
+    denied(lambda:append(DELETE_OTHER,proposals["other"],depends=([1],)),
            "INVALID_INTENT_DEPENDENCIES")
     denied(lambda:append(DELETE_OTHER,proposals["other"],depends=("lx5",)),
            "UNKNOWN_DEPENDENCY")
@@ -228,5 +235,10 @@ with tempfile.TemporaryDirectory(prefix="pa-m10x-lifecycle-") as td:
     symlink=base/"linked"
     symlink.symlink_to(db)
     denied(lambda:store.read(symlink),"EXPLICIT_TEST_DB_PATH_REQUIRED")
+    linked_dir=base/"linked-private"
+    linked_dir.mkdir(mode=0o700)
+    linked_file=linked_dir/"lifecycle-test.db"
+    linked_file.symlink_to(db)
+    denied(lambda:store.read(linked_file),"UNSAFE_DB_LINK")
     assert source==original
     print("M10x isolated lifecycle HELD journal, dependencies, tombstones and crash recovery: PASS")

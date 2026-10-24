@@ -81,7 +81,7 @@ with tempfile.TemporaryDirectory(prefix="pa-m10p-fixtures-") as dirname:
         assert first["sqliteWriteAuthorized"] is False
         assert first["liveChangePerformed"] is False
 
-        contender=subprocess.run([sys.executable,"-B",child_code,str(FIX),str(db)],
+        contender=subprocess.run([sys.executable,"-B","-c",child_code,str(FIX),str(db)],
              capture_output=True,text=True,timeout=10)
         assert contender.returncode==0,(contender.stdout,contender.stderr)
         assert "OTHER_PROCESS_OWNS_HANDOFF" in contender.stdout
@@ -147,7 +147,7 @@ with tempfile.TemporaryDirectory(prefix="pa-m10p-fixtures-") as dirname:
     # process with os._exit(). Persistent SQLite gate reopens fail closed.
     for scenario in ("idle","pending"):
         db=root_at(base)
-        child=subprocess.run([sys.executable,"-B",crash_code,str(FIX),
+        child=subprocess.run([sys.executable,"-B","-c",crash_code,str(FIX),
                               str(db),scenario],
                              capture_output=True,text=True,timeout=10)
         assert child.returncode==0,(scenario,child.stderr)

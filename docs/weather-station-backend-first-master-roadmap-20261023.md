@@ -135,6 +135,14 @@ Operator ran `swaymsg -t get_tree` on the live Weather Station STAR MAP actor an
 
 **Tests and acceptance:** verify source-level launch overrides and retry bounds, pure geometry on the operator's 780×400 example (fallback global center at (1730,183) for the current primary target 824×494), null/oversized guards, negative-origin secondary output, and GitHub CI. Full-screen Kitty/SwayFX runtime fit, keyboard focus, and exact alpha boundaries need operator visual acceptance. No local Kitty config edits, local restarts or SwayPX Stage Director mutation.
 
+### B15 // 2026-10-24 Sway content rectangle vs floating frame
+
+**Operator screenshot:** the Weather Station terminal bay is centered and considered the correct size. STAR MAP's visible Kitty content still appears too high, with more unused space below it. The operator specifically wants the **terminal** aligned, not another movement or resize of the accepted bay.
+
+**Source hypothesis and scoped fix:** existing `StationTerminalGeometry.observedWindow()` measures `get_tree.nodes[].rect` (the absolute Sway **container** rectangle). Sway also reports `window_rect` (the **content** rectangle relative to that container). A resize may leave the outer container matching the requested 824×494 while the visible content is still smaller; the old fit policy can incorrectly conclude `ALIGNED`. Add `observedContentWindow()` to convert positive, bounded `window_rect` into output-global coordinates, with an outer-rect fallback for missing/malformed entries. Use this content rectangle for the existing measured alpha cutout and **single bounded centering fallback**. If the content remains smaller after the existing resize retry, first normalize the floating Sway frame to the *already observed content dimensions*, then center it within the unchanged 824×494 viewport and re-verify. No unbounded polling, no changes to Kitty program/config, no Stage Director mutation, and no change to Weather Station menu/rail/footer geometry.
+
+**Verification distinction:** Sway documentation defines the separate `rect` and `window_rect` geometries, but actual live Kitty content geometry after this change remains to be measured on the operator's SwayFX build. If the compositor already reports a full content rectangle while pixels still appear clipped, diagnose the client surface/scene rendering separately; don't keep blindly changing the panel position.
+
 ## 4 // Domain family C: MAP and world/environmental layers
 
 Current EONET is an event index only. Planned:

@@ -41,7 +41,12 @@ assert "SystemClock {" in clock
 assert "SystemClock {" in timew
 assert shell.count("ApolloHubLiveBridge {")==1
 assert "ApolloHubTimePolicy.js" not in bridge
-assert "ApolloHubTimePolicy.js" not in timew
+# TimeW later adopted the shared pure formatter, but still owns its own
+# SystemClock. Sharing formatting does not transfer timer/clock ownership.
+assert 'import "../services/hub/ApolloHubTimePolicy.js" as LocalTimePolicy' in timew
+assert 'LocalTimePolicy.snapshot(localClock.date.getTime(), use24Hour)' in timew
+assert timew.count("SystemClock {") == 1
+assert 'property bool use24Hour: true' in timew
 
 for forbidden in (
     "Process {", "FileView {", "Timer {", "SystemClock {",

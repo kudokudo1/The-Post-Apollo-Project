@@ -92,7 +92,8 @@ Item {
     function createTask() {
         if (pendingWrite || !SchedulePolicy.canCreate(todoSnapshot, newTaskInput.text)
             || todoStore === null) return;
-        if (originalTask && selectedProposal.ok) {
+        // Creation must never replace an existing scheduling draft.
+        if (originalTask !== null) {
             feedback = "CANCEL DRAFT FIRST";
             return;
         }
@@ -200,7 +201,7 @@ Item {
                 label: "ADD"
                 labelPixelSize: 10
                 available: schedule.writable
-                    && !(schedule.originalTask && schedule.selectedProposal.ok)
+                    && schedule.originalTask === null
                     && SchedulePolicy.canCreate(schedule.todoSnapshot,newTaskInput.text)
                 onLeftClicked: schedule.createTask()
             }

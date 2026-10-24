@@ -72,10 +72,9 @@ Scope {
             if (line.indexOf("FINANCE_SEC_PRICE ") !== 0) continue;
             try {
                 const data=JSON.parse(line.slice("FINANCE_SEC_PRICE ".length));
-                const requiredKey = data.cik + "/"
-                    + desiredKey.split("/")[1] + "/" + data.filingDate;
                 if (!data || data.schemaVersion !== 1 || data.source !== "eodhd-eod"
-                    || data.readOnly !== true || requiredKey !== desiredKey
+                    || data.readOnly !== true
+                    || data.cik + "/" + desiredKey.split("/")[1] + "/" + data.filingDate !== desiredKey
                     || data.cik !== secFeed.snapshot.cik
                     || !["AAPL.US","MSFT.US","NVDA.US"].includes(data.symbol)
                     || !["ADJUSTED CLOSE","CLOSE"].includes(data.priceBasis)

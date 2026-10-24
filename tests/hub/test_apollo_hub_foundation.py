@@ -1141,7 +1141,8 @@ for needle in (
     'calendarMini.selectedView === "day" ? 47 : 29',
     'parent.modelData.priority',
     'parent.modelData.projectId',
-    'dateNavigation.visible ? dateNavigation.height + 6 : 0',
+    'dateNavigation.visible',
+    '? dateNavigation.height + 6 : 0',
     'weekStrip.visible ? weekStrip.height + 6 : 0',
 ):
     assert needle in calendar_mini, f"Stage 8B navigation missing {needle}"

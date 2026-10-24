@@ -63,9 +63,12 @@ Scope {
             if (line.indexOf("FINANCE_SEC_PRICE_ERROR ") === 0) {
                 snapshot = null;
                 const reason=line.slice("FINANCE_SEC_PRICE_ERROR ".length);
-                state = reason==="provider-key-required" ? "setup" : "failed";
-                message = reason==="provider-key-required"
-                    ? "PRICE PROVIDER KEY REQUIRED FOR THIS ISSUER"
+                state = (reason === "provider-key-required"
+                         || reason === "demo-not-authorized") ? "setup" : "failed";
+                message = reason === "provider-key-required"
+                    ? "NVIDIA PRICE HISTORY REQUIRES AN EODHD KEY"
+                    : reason === "demo-not-authorized"
+                    ? "MICROSOFT DEMO ACCESS DENIED // PROVIDER KEY REQUIRED"
                     : "HISTORICAL PRICE DATA UNAVAILABLE // NO ESTIMATE DISPLAYED";
                 return;
             }

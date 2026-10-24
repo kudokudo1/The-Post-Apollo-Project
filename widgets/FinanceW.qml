@@ -270,10 +270,15 @@ PanelWindow {
     // navigation are not recreated on Compact / Expanded / Fullscreen changes.
     property string chassisLevel: "compact"
     readonly property int glowGutter: 12
+    // Git's visible frame starts 12px below its window top. Compact Finance
+    // moves its visible frame up 2px while retaining the bottom glow gutter.
+    readonly property int compactTopLift: 2
+    readonly property int frameTopInset:
+        chassisLevel === "compact" ? glowGutter - compactTopLift : glowGutter
     readonly property var chassisFrame: FinanceChassisPolicy.frame(
         chassisLevel,
         root.screen ? root.screen.width : 456,
-        root.screen ? root.screen.height : 792,
+        root.screen ? root.screen.height : 814,
         glowGutter
     )
     readonly property int frameWidth: chassisFrame.width
@@ -305,7 +310,7 @@ PanelWindow {
     }
 
     implicitWidth: frameWidth + glowGutter * 2
-    implicitHeight: frameHeight + glowGutter * 2
+    implicitHeight: frameHeight + frameTopInset + glowGutter
 
     anchors {
         top: true
@@ -348,7 +353,7 @@ PanelWindow {
     visible: true
     mask: Region {
         x: root.glowGutter
-        y: root.glowGutter
+        y: root.frameTopInset
         width: root.menuOpen ? root.frameWidth : 0
         height: root.menuOpen ? root.frameHeight : 0
     }
@@ -457,6 +462,7 @@ PanelWindow {
         id: financeFrame
         anchors.fill: parent
         anchors.margins: root.glowGutter
+        anchors.topMargin: root.frameTopInset
         visible: root.menuOpen
 
         fillColor: Colors.black

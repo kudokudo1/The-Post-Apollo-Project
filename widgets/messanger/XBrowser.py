@@ -31,6 +31,11 @@ SITES = {
     # Its independent profile provides a reliably Sway-addressable window.
     "threads": ("https://www.threads.com/", "post-apollo-threads", "threads-browser"),
     "pinterest": ("https://www.pinterest.com/", "post-apollo-pinterest", "pinterest-browser"),
+    "truthsocial": ("https://truthsocial.com/", "post-apollo-truthsocial", "truthsocial-browser"),
+    "bluesky": ("https://bsky.app/", "post-apollo-bluesky", "bluesky-browser"),
+    "tumblr": ("https://www.tumblr.com/", "post-apollo-tumblr", "tumblr-browser"),
+    "tiktok": ("https://www.tiktok.com/", "post-apollo-tiktok", "tiktok-browser"),
+    "snapchat": ("https://web.snapchat.com/", "post-apollo-snapchat", "snapchat-browser"),
 }
 
 

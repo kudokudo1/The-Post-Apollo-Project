@@ -46,6 +46,11 @@ on:
       - "widgets/FinanceSecFilingsPane.qml"
       - "widgets/FinanceSecDocumentInspector.qml"
       - "widgets/FinanceSecEvidenceCompare.qml"
+      - "widgets/FinanceSecPriceContext.qml"
+      - "scripts/finance/read_sec_price_context.mjs"
+      - "scripts/finance/SEC_PRICE_CONTEXT_README.md"
+      - "tests/finance/test_sec_price_context.mjs"
+      - "tests/finance/test_finance_sec_price_contracts.py"
       - "widgets/FinanceSecEvidencePolicy.js"
       - "tests/finance/test_sec_evidence_policy.mjs"
       - "tests/finance/test_finance_sec_evidence_contracts.py"
@@ -115,6 +120,11 @@ on:
       - "widgets/FinanceSecFilingsPane.qml"
       - "widgets/FinanceSecDocumentInspector.qml"
       - "widgets/FinanceSecEvidenceCompare.qml"
+      - "widgets/FinanceSecPriceContext.qml"
+      - "scripts/finance/read_sec_price_context.mjs"
+      - "scripts/finance/SEC_PRICE_CONTEXT_README.md"
+      - "tests/finance/test_sec_price_context.mjs"
+      - "tests/finance/test_finance_sec_price_contracts.py"
       - "widgets/FinanceSecEvidencePolicy.js"
       - "tests/finance/test_sec_evidence_policy.mjs"
       - "tests/finance/test_finance_sec_evidence_contracts.py"
@@ -181,6 +191,10 @@ jobs:
         run: python3 tests/finance/test_finance_sec_evidence_contracts.py
       - name: Test Finance SEC evidence filtering and paired view on fictional filings
         run: node tests/finance/test_sec_evidence_policy.mjs
+      - name: Verify SEC dated historical-price context integration
+        run: python3 tests/finance/test_finance_sec_price_contracts.py
+      - name: Test historical closing sessions with fictional EODHD prices
+        run: node tests/finance/test_sec_price_context.mjs
       - name: Verify local read-only FinanceW Budget UI
         run: python3 tests/finance/test_finance_budget_ui_contracts.py
       - name: Verify transaction draft stays non-mutating

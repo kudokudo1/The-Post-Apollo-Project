@@ -9,6 +9,9 @@ Item {
     id: host
     property string domainTitle: ""
     property Component embeddedComponent: null
+    // A mounted tool can be hidden while another mode is selected, without
+    // tearing down its selection, source state, or animation engine.
+    property bool showEmbedded: true
     readonly property bool toolConnected: embeddedComponent !== null
 
     Loader {
@@ -16,7 +19,7 @@ Item {
         anchors.fill: parent
         active: host.toolConnected
         sourceComponent: host.embeddedComponent
-        visible: host.toolConnected
+        visible: host.toolConnected && host.showEmbedded
     }
 
     Column {
@@ -25,7 +28,7 @@ Item {
         anchors.horizontalCenter: parent.horizontalCenter
         width: Math.max(0, parent.width - 12)
         spacing: 12
-        visible: !host.toolConnected
+        visible: !host.toolConnected || !host.showEmbedded
 
         GohuText {
             width: parent.width

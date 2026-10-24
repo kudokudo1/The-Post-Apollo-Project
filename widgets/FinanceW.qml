@@ -26,6 +26,20 @@ PanelWindow {
         month: financeBudget.selectedMonth
     }
 
+    // A separate public source; never shares Actual credentials or mutation services.
+    FinanceServices.FinanceMarketReadService {
+        id: marketService
+        monitoring: root.menuOpen && root.selectedMainMode === "market"
+    }
+
+    Component {
+        id: marketPaneComponent
+        FinanceMarketPane {
+            marketFeed: marketService
+            displayLevel: root.chassisLevel
+        }
+    }
+
     FinanceServices.FinanceBudgetReadService {
         id: financeBudget
         monitoring: root.menuOpen
@@ -86,7 +100,12 @@ PanelWindow {
     // NO FEED for reserved/unimplemented pages. LIVE means an authenticated
     // read succeeded AND the local source remains reachable.
     readonly property string feedStatus:
-        !hasBudgetFeed ? "NO FEED"
+        selectedMainMode === "market"
+          ? (!menuOpen ? "IDLE"
+             : marketService.loading ? "READING"
+             : marketService.state === "failed" ? "ERROR"
+             : marketService.live ? "SNAPSHOT" : "NO FEED")
+        : !hasBudgetFeed ? "NO FEED"
         : !menuOpen ? "IDLE"
         : financeBudget.healthStatus === "offline" ? "OFFLINE"
         : financeBudget.state === "failed" ? "ERROR"
@@ -1902,6 +1921,9 @@ Row {
                     id: financeToolHost
                     anchors.fill: parent
                     visible: !actualBudgetPage.visible
+                    // Component persists while navigating/resizing, not just while Market is selected.
+                    embeddedComponent: marketPaneComponent
+                    showEmbedded: root.selectedMainMode === "market"
                     domainTitle: root.selectedMainMode === "budget"
                                  ? root.selectedBudgetSubMode.toUpperCase()
                                  : root.mainModeName().toUpperCase()

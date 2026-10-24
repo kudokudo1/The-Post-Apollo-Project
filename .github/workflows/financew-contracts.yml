@@ -41,6 +41,10 @@ on:
       - "tests/finance/test_finance_funding_write_ui_contracts.py"
       - "services/finance/FinanceFundingWriteService.qml"
       - "services/finance/**"
+      - "widgets/FinanceMarketPane.qml"
+      - "scripts/finance/read_polymarket.mjs"
+      - "tests/finance/test_polymarket_readonly.mjs"
+      - "tests/finance/test_finance_market_contracts.py"
       - "tests/finance/test_finance_budget_ui_contracts.py"
       - "tests/finance/test_finance_transaction_draft_contracts.py"
       - "shell.qml"
@@ -84,6 +88,10 @@ on:
       - "tests/finance/test_finance_funding_write_ui_contracts.py"
       - "services/finance/FinanceFundingWriteService.qml"
       - "services/finance/**"
+      - "widgets/FinanceMarketPane.qml"
+      - "scripts/finance/read_polymarket.mjs"
+      - "tests/finance/test_polymarket_readonly.mjs"
+      - "tests/finance/test_finance_market_contracts.py"
       - "tests/finance/test_finance_budget_ui_contracts.py"
       - "tests/finance/test_finance_transaction_draft_contracts.py"
       - "shell.qml"
@@ -107,6 +115,10 @@ jobs:
         run: python3 tests/finance/test_finance_adaptive_chassis_contracts.py
       - name: Verify FinanceW M0 responsive geometry policy
         run: node tests/finance/test_finance_chassis_policy.mjs
+      - name: Verify FinanceW Market M1 in-window read-only contracts
+        run: python3 tests/finance/test_finance_market_contracts.py
+      - name: Test FinanceW Market M1 public-feed normalizer (fictional fixtures)
+        run: node tests/finance/test_polymarket_readonly.mjs
       - name: Verify local read-only FinanceW Budget UI
         run: python3 tests/finance/test_finance_budget_ui_contracts.py
       - name: Verify transaction draft stays non-mutating

@@ -258,9 +258,17 @@ The H:1 MEDIA tile retains the original two-column MPD/MPRIS status. H:2/H:3 mou
 
 **VERIFY:** Hub foundation source contracts validate H:1 preservation, H:2/H:3 mount, MPD/MPRIS identity and stale behavior, provenance and nonactionable layout. Operator desktop acceptance checks W:1/W:2 H:1/H:2/H:3, idle/playing/paused/stopped/stale MPD, selection-required/player-missing MPRIS, title truncation, audio status footer, live media changes and freezes. CI is not a live desktop rendering check.
 
+## P1 Stage 8F // Apps Level 2 catalog inspection
+
+H:1 retains the existing `ApolloHubAppsMini` and its explicit exact-ID tap-to-launch. The H:2/H:3 `ApolloHubAppsExplore.qml` offers **CATALOG / DETAILS**. A tap on a visible entry selects its exact indexed ID and shows app icon, name, generic name and desktop-entry ID **within the Hub**, with BACK TO CATALOG to return. It does not activate an app, create a launch action or open a browser. If the selected indexed ID disappears, the details become unavailable, not stale.
+
+**Dataset honesty:** the single existing `ApolloHubAppsPolicy.snapshot` projects only up to **24** sanitized desktop entries. The bigger tile reports installed count, matches, shown count and **FIRST N OF M MATCHES** when truncated; it does not pretend to show the complete catalog, add an independent scanner, perform filtering of unseen apps or infer active-window state.
+
+**Boundary:** No changes to shared AppsPolicy, ApolloHubLiveBridge, the compact launch function, Quickshell DesktopEntries collection or saved layout. No subprocess, timer, disk access, autostart, implicit launch, program switch or focus action. Source contracts and CI guard the original H:1 launch separately from Level 2 browsing. Live acceptance must check W:1/W:2 H:1/H:2/H:3, selection/back, first-24 indication, app disappearance, empty/unavailable catalog, large names/IDs, scroll and no accidental launch.
+
 ## NEXT
 
-Complete Stage 7A/7B/7C/7D/8A/8B/8C/8D/8E desktop acceptance. Next can be Notes and To-do internal density, but those contain editable user data, so changes must preserve editor focus, draft and save-confirmation behavior. Durable undo/presets and drag-and-drop remain separate operator decisions.
+Complete Stage 7A/7B/7C/7D/8A/8B/8C/8D/8E/8F desktop acceptance. Next can be Notes and To-do internal density, but those contain editable user data, so changes must preserve editor focus, draft and save-confirmation behavior. Durable undo/presets and drag-and-drop remain separate operator decisions.
 
 ## DECISIONS
 

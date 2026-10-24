@@ -15,6 +15,7 @@ media_explore = (ROOT / "widgets/hub/ApolloHubMediaExplore.qml").read_text(encod
 system_mini = (ROOT / "widgets/hub/ApolloHubSystemMini.qml").read_text(encoding="utf-8")
 uptime_mini = (ROOT / "widgets/hub/ApolloHubUptimeMini.qml").read_text(encoding="utf-8")
 apps_mini = (ROOT / "widgets/hub/ApolloHubAppsMini.qml").read_text(encoding="utf-8")
+apps_explore = (ROOT / "widgets/hub/ApolloHubAppsExplore.qml").read_text(encoding="utf-8")
 todo_mini = (ROOT / "widgets/hub/ApolloHubTodoMini.qml").read_text(encoding="utf-8")
 todo_store = (ROOT / "services/hub/ApolloHubTodoStore.qml").read_text(encoding="utf-8")
 notes_mini = (ROOT / "widgets/hub/ApolloHubNotesMini.qml").read_text(encoding="utf-8")
@@ -1279,6 +1280,55 @@ for forbidden in (
 ):
     assert forbidden not in media_explore, (
         f"Stage 8E Hub Media must not control playback: {forbidden}")
+
+
+# Stage 8F: app taps in taller tiles inspect metadata, never launch.
+for token in (
+    'visible: tile.moduleId === "apps" && tile.tileRowSpan === 1',
+    'ApolloHubAppsExplore {',
+    'visible: tile.moduleId === "apps" && tile.tileRowSpan > 1',
+    'appsSnapshot: tile.appsSnapshot',
+    'appsExplore.statusLine',
+):
+    assert token in tile, f"Stage 8F tile mounting missing {token}"
+for token in (
+    'property var appsSnapshot: null',
+    'property string selectedView: "catalog"',
+    'property string selectedId: ""',
+    'model: appsExplore.entries',
+    'appsSnapshot.truncated === true',
+    'appsSnapshot.matchCount',
+    'Array.isArray(appsSnapshot.items)',
+    'function inspectEntry(item)',
+    'entries.some(function(entry)',
+    'entry.id === id',
+    'selectedId = id;',
+    'selectedView = "details";',
+    'onTapped: appsExplore.inspectEntry(appRow.modelData)',
+    'readonly property var selectedEntry:',
+    'entry.id === selectedId',
+    'label: "CATALOG"',
+    'label: "DETAILS"',
+    'available: appsExplore.detailReady',
+    'label: "BACK TO CATALOG"',
+    'String(appsExplore.selectedEntry.name)',
+    'String(appsExplore.selectedEntry.genericName',
+    'String(appsExplore.selectedEntry.id)',
+    'READ ONLY // NO APP LAUNCHED',
+    'FIRST ',
+    'Quickshell.iconPath(',
+):
+    assert token in apps_explore, f"Stage 8F inspector missing {token}"
+for forbidden in (
+    'DesktopEntries.byId(', 'target.execute(', 'launchApp(',
+    'DesktopEntries.applications', 'DesktopEntries {', 'Process {',
+    'FileView {', 'Timer {', 'scanDesktopFiles(', 'execDetached(',
+    'Qt.openUrlExternally(', 'onCompleted:', 'onVisibleChanged:',
+    'onAppsSnapshotChanged:', 'onDoubleClicked:',
+):
+    assert forbidden not in apps_explore, f"Stage 8F must not activate apps: {forbidden}"
+assert apps_explore.count('onTapped:') == 1
+assert apps_mini.count('target.execute();') == 1
 
 # Launchers and widget backends are unchanged in this first stage.
 print("ApolloHubW foundation source contracts passed")

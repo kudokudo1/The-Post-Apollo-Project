@@ -5,7 +5,8 @@
 // authoritative on Wayland. The station is anchored top/right with a
 // right margin; the terminal bay lives after its rail/header offsets.
 function position(outputs, outputName, stationWidth, rightMargin,
-                  headerHeight, railWidth, bayX, bayY, bayWidth, bayHeight) {
+                  headerHeight, railWidth, bayX, bayY, bayWidth, bayHeight,
+                  reservedTopInset) {
     if (!Array.isArray(outputs) || typeof outputName !== "string"
             || !outputName)
         return null;
@@ -21,13 +22,15 @@ function position(outputs, outputName, stationWidth, rightMargin,
     if (fields.some(function(v) { return !isFinite(v); }))
         return null;
     const [ox, oy, ow, oh, sw, rm, hh, rw, bx, by, bw, bh] = fields;
+    const inset = reservedTopInset === undefined ? 0 : Number(reservedTopInset);
+    if (!isFinite(inset) || inset < 0) return null;
     if (ow <= 0 || oh <= 0 || sw <= 0 || bw <= 0 || bh <= 0
             || rm < 0 || hh < 0 || rw < 0 || bx < 0 || by < 0
             || sw + rm > ow || hh + by + bh > oh
             || rw + bx + bw > sw)
         return null;
     const x = Math.round(ox + ow - rm - sw + rw + bx);
-    const y = Math.round(oy + hh + by);
+    const y = Math.round(oy + inset + hh + by);
     const width = Math.round(bw);
     const height = Math.round(bh);
     const maxX = ox + ow;
@@ -147,4 +150,55 @@ function observedContentWindow(tree, appId) {
         return outer;
     return {x: outer.x + window.x, y: outer.y + window.y,
             width: window.width, height: window.height};
+}
+
+
+// A zero-exclusive-zone layer-shell panel is offset by Sway's reserved top
+// area. get_workspaces includes both that region and ordinary client gaps.
+// Subtract only the configured gaps to obtain the exclusive top displacement.
+function parseSwayTopGaps(configText) {
+    if (typeof configText !== "string") return null;
+    let inner = null, outer = 0, top = null;
+    const lines = configText.split(/\r?\n/);
+    for (let i = 0; i < lines.length; ++i) {
+        const match = lines[i].match(
+            /^\s*gaps\s+(inner|outer|top)\s+(\d+)(?:px)?\s*(?:#.*)?$/
+        );
+        if (!match) continue;
+        const n = Number(match[2]);
+        if (!isFinite(n) || n < 0) return null;
+        if (match[1] === "inner") inner = n;
+        if (match[1] === "outer") outer = n;
+        if (match[1] === "top") top = n;
+    }
+    // Without actual gap data, never guess an exclusive-zone offset.
+    if (inner === null) return null;
+    return {inner: inner, top: top === null ? outer : top};
+}
+
+function reservedTopInset(outputs, workspaces, outputName, gaps) {
+    if (!Array.isArray(outputs) || !Array.isArray(workspaces)
+            || typeof outputName !== "string" || !outputName
+            || !gaps || !isFinite(gaps.inner) || !isFinite(gaps.top)
+            || gaps.inner < 0 || gaps.top < 0)
+        return null;
+    const output = outputs.find(function(o) {
+        return o && o.name === outputName && o.active === true;
+    });
+    const workspace = workspaces.find(function(w) {
+        return w && w.output === outputName && w.visible === true;
+    });
+    if (!output || !workspace || !output.rect || !workspace.rect)
+        return null;
+    const o = output.rect, w = workspace.rect;
+    if (![o.x, o.y, o.width, o.height, w.x, w.y, w.width, w.height]
+            .every(function(n) { return typeof n === "number" && isFinite(n); })
+            || o.width <= 0 || o.height <= 0 || w.width <= 0 || w.height <= 0
+            || w.x < o.x || w.y < o.y || w.x + w.width > o.x + o.width + 1
+            || w.y + w.height > o.y + o.height + 1)
+        return null;
+    const exclusive = w.y - o.y - gaps.inner - gaps.top;
+    if (exclusive < 0 || exclusive > o.height)
+        return null;
+    return Math.round(exclusive);
 }

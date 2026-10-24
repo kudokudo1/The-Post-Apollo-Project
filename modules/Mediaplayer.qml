@@ -81,6 +81,13 @@ Item {
     })
     property double cavaTrialLastReportMs: 0
 
+    Component.onCompleted: {
+        if (cavaTrialProbeEnabled)
+            console.warn("SYNTAGMA_CAVA_TRIAL // startup mode="
+                         + (cavaCoalesceEnabled ? "coalesced" : "original")
+                         + " tsMs=" + Date.now());
+    }
+
     function reportCavaTrial() {
         if (!cavaTrialProbeEnabled)
             return;

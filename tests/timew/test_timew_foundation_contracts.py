@@ -49,9 +49,14 @@ assert 'console.log("clockButton clicked");' in clock
 assert "SystemClock.Seconds" in clock
 assert "implicitHeight: 50" in clock
 
-# The M1 window uses a known existing size rather than a new global metric.
+# TimeW retains its known M1 dimensions. FinanceW's chassis now uses
+# its own dynamic `chassisFrame.width/height`, so do not require FinanceW
+# to embed TimeW's literal dimensions as a cross-widget source contract.
 for dim in ("frameWidth: 432", "frameHeight: 768", "glowGutter: 12"):
-    assert dim in finance and dim in window, dim
+    assert dim in window, dim
+for dim in ("readonly property int frameWidth:", "readonly property int frameHeight:",
+            "glowGutter: 12"):
+    assert dim in finance, dim
 assert "visible: true" in window
 assert "width: timew.menuOpen ? timew.frameWidth : 0" in window
 assert "height: timew.menuOpen ? timew.frameHeight : 0" in window

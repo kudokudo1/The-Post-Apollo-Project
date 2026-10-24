@@ -8,6 +8,10 @@ on:
     paths:
       - "modules/Finance.qml"
       - "widgets/FinanceW.qml"
+      - "widgets/FinanceChassisPolicy.js"
+      - "widgets/FinanceToolHost.qml"
+      - "tests/finance/test_finance_adaptive_chassis_contracts.py"
+      - "tests/finance/test_finance_chassis_policy.mjs"
       - "widgets/FinanceTransactionDraftPane.qml"
       - "widgets/FinanceCategoryAllocationPane.qml"
       - "services/finance/FinanceAllocationPreview.js"
@@ -46,6 +50,10 @@ on:
     paths:
       - "modules/Finance.qml"
       - "widgets/FinanceW.qml"
+      - "widgets/FinanceChassisPolicy.js"
+      - "widgets/FinanceToolHost.qml"
+      - "tests/finance/test_finance_adaptive_chassis_contracts.py"
+      - "tests/finance/test_finance_chassis_policy.mjs"
       - "widgets/FinanceTransactionDraftPane.qml"
       - "widgets/FinanceCategoryAllocationPane.qml"
       - "services/finance/FinanceAllocationPreview.js"
@@ -93,6 +101,10 @@ jobs:
         run: python3 tests/components/test_finance_dock_contracts.py
       - name: Validate FinanceW navigation and reserved slots
         run: python3 tests/components/test_finance_navigation_contracts.py
+      - name: Verify FinanceW M0 adaptive chassis and in-process tool host
+        run: python3 tests/finance/test_finance_adaptive_chassis_contracts.py
+      - name: Verify FinanceW M0 responsive geometry policy
+        run: node tests/finance/test_finance_chassis_policy.mjs
       - name: Verify local read-only FinanceW Budget UI
         run: python3 tests/finance/test_finance_budget_ui_contracts.py
       - name: Verify transaction draft stays non-mutating

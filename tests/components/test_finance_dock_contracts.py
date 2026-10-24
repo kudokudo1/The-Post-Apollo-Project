@@ -50,16 +50,17 @@ for forbidden in (
 ):
     assert forbidden not in FINANCE, forbidden
 
-# 9:16 portrait is a blank, independent window with a safe input mask.
+# FinanceW begins at 9:16 compact, then resizes its one mapped window.
 assert "PanelWindow {" in MENU
-assert "readonly property int frameWidth: 432" in MENU
-assert "readonly property int frameHeight: 768" in MENU
+assert "readonly property int frameWidth: chassisFrame.width" in MENU
+assert "readonly property int frameHeight: chassisFrame.height" in MENU
 assert "implicitWidth: frameWidth + glowGutter * 2" in MENU
 assert "implicitHeight: frameHeight + glowGutter * 2" in MENU
 assert "property real dockCenterX: 0" in MENU
 assert "property real chassisTopY: 0" in MENU
-assert "root.dockCenterX - root.implicitWidth / 2" in MENU
-assert "root.chassisTopY - root.glowGutter" in MENU
+assert "FinanceChassisPolicy.leftMargin(" in MENU
+assert "FinanceChassisPolicy.topMargin(" in MENU
+assert "root.chassisLevel, root.chassisTopY," in MENU
 assert "dockBottomY" not in MENU
 assert "buttonGap" not in MENU
 assert "visible: true" in MENU  # do not remap layer-shell for toggles

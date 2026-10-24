@@ -2,6 +2,7 @@ import QtQuick
 import QtQuick.Effects
 import Quickshell
 import Quickshell.Wayland
+import "FinanceChassisPolicy.js" as FinanceChassisPolicy
 import "../components"
 import "../services/finance" as FinanceServices
 
@@ -254,11 +255,25 @@ PanelWindow {
     property real dockCenterX: 0
     property real chassisTopY: 0
 
-    // The visible chassis is exactly 9:16; gutter belongs to its glow.
-    readonly property int frameWidth: 432
-    readonly property int frameHeight: 768
+    // The one mapped layer-shell surface resizes; editors, services and
+    // navigation are not recreated on Compact / Expanded / Fullscreen changes.
+    property string chassisLevel: "compact"
     readonly property int glowGutter: 12
+    readonly property var chassisFrame: FinanceChassisPolicy.frame(
+        chassisLevel,
+        root.screen ? root.screen.width : 456,
+        root.screen ? root.screen.height : 792,
+        glowGutter
+    )
+    readonly property int frameWidth: chassisFrame.width
+    readonly property int frameHeight: chassisFrame.height
 
+    function expandChassis() {
+        chassisLevel = FinanceChassisPolicy.step(chassisLevel, 1);
+    }
+    function collapseChassis() {
+        chassisLevel = FinanceChassisPolicy.step(chassisLevel, -1);
+    }
     function toggle() {
         menuOpen = !menuOpen;
     }
@@ -288,14 +303,17 @@ PanelWindow {
         right: false
     }
 
-    // Clamp the panel to its screen if the dock layout becomes wider.
+    // Compact remains dock-centered; Expanded is screen-clamped; Fullscreen
+    // occupies the screen with the existing 12px inset/glow safety gutter.
     margins {
-        // Match Hospital/Git's visible frame top, not the Finance dock bottom.
-        top: Math.max(0, Math.round(root.chassisTopY - root.glowGutter))
-        left: Math.max(0, Math.min(
-            Math.max(0, root.screen ? root.screen.width - root.implicitWidth : 0),
-            Math.round(root.dockCenterX - root.implicitWidth / 2)
-        ))
+        top: FinanceChassisPolicy.topMargin(
+            root.chassisLevel, root.chassisTopY,
+            root.screen ? root.screen.height : root.implicitHeight,
+            root.implicitHeight, root.glowGutter)
+        left: FinanceChassisPolicy.leftMargin(
+            root.chassisLevel, root.dockCenterX,
+            root.screen ? root.screen.width : root.implicitWidth,
+            root.implicitWidth)
     }
 
     exclusiveZone: 0
@@ -461,13 +479,48 @@ PanelWindow {
                 anchors.left: parent.left
                 anchors.leftMargin: 14
                 anchors.verticalCenter: parent.verticalCenter
-                anchors.right: financeFeedIndicator.left
+                anchors.right: collapseChassisButton.left
                 anchors.rightMargin: 8
                 text: "FINANCE // " + root.mainModeName().toUpperCase()
                 font.pixelSize: 17
                 font.bold: true
                 color: Colors.magenta
                 elide: Text.ElideRight
+            }
+
+            // Size controls stay inside FinanceW; they never open another app.
+            // They only update the window geometry, not financial or edit state.
+            ActionButton {
+                id: collapseChassisButton
+                anchors.right: expandChassisButton.left
+                anchors.rightMargin: 4
+                anchors.verticalCenter: parent.verticalCenter
+                width: 30
+                height: 30
+                label: "↓"
+                labelPixelSize: 17
+                accentColor: Colors.cyan
+                available: root.chassisLevel !== "compact"
+                onLeftClicked: {
+                    root.collapseChassis();
+                    root.keyboardOwnershipRequested();
+                }
+            }
+            ActionButton {
+                id: expandChassisButton
+                anchors.right: financeFeedIndicator.left
+                anchors.rightMargin: 7
+                anchors.verticalCenter: parent.verticalCenter
+                width: 30
+                height: 30
+                label: "↑"
+                labelPixelSize: 17
+                accentColor: Colors.magenta
+                available: root.chassisLevel !== "fullscreen"
+                onLeftClicked: {
+                    root.expandChassis();
+                    root.keyboardOwnershipRequested();
+                }
             }
 
             // Git/Hospital-style source badge, constrained to the header.
@@ -1809,18 +1862,15 @@ Row {
                     }
                 }
 
-                GohuText {
+                // Non-Budget pages reserve a stable local host. Future
+                // adapters stay mounted across chassis size transitions.
+                FinanceToolHost {
+                    id: financeToolHost
+                    anchors.fill: parent
                     visible: !actualBudgetPage.visible
-                    anchors.top: parent.top
-                    anchors.topMargin: 16
-                    anchors.horizontalCenter: parent.horizontalCenter
-                    width: parent.width - 12
-                    horizontalAlignment: Text.AlignHCenter
-                    font.pixelSize: 11
-                    color: Colors.white
-                    text: root.selectedMainMode === "budget"
-                          ? root.selectedBudgetSubMode.toUpperCase()
-                          : root.mainModeName().toUpperCase()
+                    domainTitle: root.selectedMainMode === "budget"
+                                 ? root.selectedBudgetSubMode.toUpperCase()
+                                 : root.mainModeName().toUpperCase()
                 }
             }
         }

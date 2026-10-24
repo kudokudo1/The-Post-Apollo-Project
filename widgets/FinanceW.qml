@@ -26,7 +26,7 @@ PanelWindow {
         month: financeBudget.selectedMonth
     }
 
-    // A separate public source; never shares Actual credentials or mutation services.
+    // Public Market source is isolated from the protected Budget services.
     FinanceServices.FinanceMarketReadService {
         id: marketService
         monitoring: root.menuOpen && root.selectedMainMode === "market"

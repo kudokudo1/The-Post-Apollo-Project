@@ -27,6 +27,8 @@ Rectangle {
     property string terminalMode: "terminal"
     property string sessionMode: "terminal"
     property bool pendingClose: false
+    // Only true after the compositor registered this exact Kitty actor.
+    property bool kittyActorConfirmed: false
     readonly property string terminalAppId:
         sessionMode === "terminal" ? "weather-screen"
         : "weather-screen-" + sessionMode
@@ -127,6 +129,7 @@ Rectangle {
 
         onExited: function (exitCode, exitStatus) {
             if (exitCode === 0) {
+                terminalView.kittyActorConfirmed = true;
                 if (terminalView.pendingClose) {
                     if (!closeProcess.running)
                         closeProcess.running = true;
@@ -402,6 +405,7 @@ Rectangle {
         onExited: function (exitCode, exitStatus) {
             terminalView.terminalState = "IDLE";
             terminalView.pendingClose = false;
+            terminalView.kittyActorConfirmed = false;
             terminalView.revealAfterSync = false;
             verifyDelay.stop();
             terminalView.fitResizeRetries = 0;
@@ -434,6 +438,7 @@ Rectangle {
             return false;
         }
         sessionMode = terminalMode;
+        kittyActorConfirmed = false;
         fitResizeRetries = 0;
         fitCenterAttempted = false;
         verifiedWidth = 0;
@@ -451,12 +456,14 @@ Rectangle {
     function closeTerminal() {
         if (terminalState === "IDLE" || closeProcess.running)
             return;
-        if (terminalState === "STARTING") {
-            // Launch may still be racing compositor registration.
-            // Let waitForKitty finish, then kill the exact session actor.
+        if (terminalState === "STARTING" && !kittyActorConfirmed) {
+            // Actor isn't yet registered; the exact-app-id wait callback
+            // will close it as soon as Sway confirms the window exists.
             pendingClose = true;
             return;
         }
+        // Confirmed actor can be closed immediately even while delayed
+        // geometry resize / verification / centering is still pending.
         pendingClose = false;
         closeProcess.running = true;
     }

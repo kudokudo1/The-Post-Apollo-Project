@@ -17,6 +17,8 @@ on:
       - "services/time/MachineLayoutDiffPolicy.js"
       - "services/time/MachineRestorePreviewPolicy.js"
       - "services/time/MachineWindowResolver.py"
+      - "services/time/MachineWindowMovePilot.py"
+      - "docs/timew-machine-m1k-single-window-pilot.md"
       - "services/time/MachineCheckpointStore.py"
       - "services/time/MachineCheckpointModel.py"
       - "services/time/MachineSwayRead.py"
@@ -45,6 +47,8 @@ on:
       - "services/time/MachineLayoutDiffPolicy.js"
       - "services/time/MachineRestorePreviewPolicy.js"
       - "services/time/MachineWindowResolver.py"
+      - "services/time/MachineWindowMovePilot.py"
+      - "docs/timew-machine-m1k-single-window-pilot.md"
       - "services/time/MachineCheckpointStore.py"
       - "services/time/MachineCheckpointModel.py"
       - "services/time/MachineSwayRead.py"
@@ -111,5 +115,9 @@ jobs:
         run: python3 -B -I tests/timew/test_machine_window_resolver.py
       - name: Verify MACHINE manual resolver UI never executes recovery
         run: python3 -B -I tests/timew/test_machine_window_resolver_ui.py
+      - name: Verify MACHINE injected single-window move pilot with synthetic Sway
+        run: python3 -B -I tests/timew/test_machine_window_move_pilot.py
+      - name: Verify MACHINE move pilot cannot activate from TimeW
+        run: python3 -B -I tests/timew/test_machine_window_move_pilot_contract.py
       - name: Verify MACHINE desktop checkpoint draft remains non-operative
         run: python3 -B -I tests/timew/test_machine_checkpoint_contract.py

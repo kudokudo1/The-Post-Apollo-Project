@@ -41,5 +41,7 @@ jobs:
         run: node tests/weather/test_station_terminal_geometry.js
       - name: Validate internal NEWS viewer and URL boundary contracts
         run: node tests/weather/test_station_news_viewer.js
+      - name: Validate GDELT NEWS rate limit, cache and live source reporting
+        run: node tests/weather/test_station_discovery_rate_limit.js
       - name: Validate Weather Station domain palette and live meter contracts
         run: node tests/weather/test_domain_palette_contracts.js

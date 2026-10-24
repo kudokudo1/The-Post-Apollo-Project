@@ -1,0 +1,43 @@
+name: Widget top-edge alignment contracts
+
+on:
+  pull_request:
+    paths:
+      - "widgets/HospitalW.qml"
+      - "widgets/GitW.qml"
+      - "widgets/TasksW.qml"
+      - "widgets/TimeW.qml"
+      - "widgets/MediaDeckW.qml"
+      - "widgets/FinanceW.qml"
+      - "shell.qml"
+      - "tests/components/test_widget_top_edge_alignment_contracts.py"
+      - ".github/workflows/widget-top-edge-alignment.yml"
+  push:
+    branches: [main]
+    paths:
+      - "widgets/HospitalW.qml"
+      - "widgets/GitW.qml"
+      - "widgets/TasksW.qml"
+      - "widgets/TimeW.qml"
+      - "widgets/MediaDeckW.qml"
+      - "widgets/FinanceW.qml"
+      - "shell.qml"
+      - "tests/components/test_widget_top_edge_alignment_contracts.py"
+      - ".github/workflows/widget-top-edge-alignment.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  source-contracts:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify five widgets align their visible top to FinanceW 9px
+        run: python3 tests/components/test_widget_top_edge_alignment_contracts.py
+      - name: Verify dependent FinanceW top-edge contract
+        run: python3 tests/finance/test_finance_adaptive_chassis_contracts.py
+      - name: Verify existing TasksW menu contract
+        run: python3 tests/components/test_tasks_menu_contracts.py
+      - name: Verify TimeW foundation contract
+        run: python3 tests/timew/test_timew_foundation_contracts.py

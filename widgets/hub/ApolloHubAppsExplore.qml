@@ -10,6 +10,7 @@ Item {
     // AppControl already owns and refreshes its ProcessTelemetry.
     property var processSnapshot: null
     property var processActionGate: null
+    signal inputFocusChanged(bool focused)
     property bool appControlAvailable: false
     signal openAppControlRequested()
     property string selectedView: "catalog"
@@ -112,6 +113,9 @@ Item {
         visible: appsExplore.runningMode
         processSnapshot: appsExplore.processSnapshot
         processActionGate: appsExplore.processActionGate
+        onInputFocusChanged: function(focused) {
+            appsExplore.inputFocusChanged(focused);
+        }
         onOpenAppControlRequested: appsExplore.openAppControlRequested()
         anchors.top: selector.bottom
         anchors.topMargin: 6

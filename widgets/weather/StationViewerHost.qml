@@ -15,6 +15,9 @@ Rectangle {
         selectedRecord ? ViewerPolicy.safeArticleUrl(selectedRecord.url) : ""
     readonly property bool canReadWeb: articleUrl !== ""
     property bool webRequested: false
+    property bool audioAllowed: false
+    readonly property bool isChannel:
+        selectedRecord && selectedRecord.kind === "channel"
     readonly property bool webFailed:
         webRequested && (webLoader.status === Loader.Error
                          || (webLoader.item
@@ -42,7 +45,8 @@ Rectangle {
 
             GohuText {
                 anchors.verticalCenter: parent.verticalCenter
-                text: "NEWS // INTERNAL VIEWER"
+                text: stationViewer.isChannel ? "NEWS // CHANNEL VIEW"
+                      : "NEWS // INTERNAL VIEWER"
                 color: Colors.cyan
                 font.pixelSize: 17
             }
@@ -50,7 +54,8 @@ Rectangle {
 
         StationSectionDivider {
             width: parent.width
-            title: "GDELT DISCOVERY // SELECTED REPORT"
+            title: stationViewer.isChannel ? "SELECTED SOURCE // REGISTERED DESTINATION"
+                                          : "GDELT DISCOVERY // SELECTED REPORT"
         }
 
         Rectangle {
@@ -96,7 +101,9 @@ Rectangle {
             ActionButton {
                 width: 155
                 height: 34
-                label: stationViewer.webRequested ? "CLOSE ARTICLE" : "READ ARTICLE"
+                label: stationViewer.webRequested
+                       ? (stationViewer.isChannel ? "CLOSE CHANNEL" : "CLOSE ARTICLE")
+                       : (stationViewer.isChannel ? "WATCH IN STATION" : "READ ARTICLE")
                 labelPixelSize: 12
                 available: stationViewer.canReadWeb || stationViewer.webRequested
                 onClicked: {
@@ -104,15 +111,31 @@ Rectangle {
                 }
             }
 
+            ActionButton {
+                width: 114
+                height: 34
+                visible: stationViewer.isChannel
+                label: stationViewer.audioAllowed ? "MUTE" : "ENABLE AUDIO"
+                labelPixelSize: 10
+                available: stationViewer.webRequested
+                onClicked: {
+                    stationViewer.audioAllowed = !stationViewer.audioAllowed;
+                    if (webLoader.item)
+                        webLoader.item.audioAllowed = stationViewer.audioAllowed;
+                }
+            }
+
             QuietText {
                 anchors.verticalCenter: parent.verticalCenter
-                width: Math.max(90, parent.width - 165)
+                width: Math.max(90, parent.width - (stationViewer.isChannel ? 290 : 165))
                 font.pixelSize: 11
                 elide: Text.ElideRight
                 text: stationViewer.webRequested
                       ? "GUARDED WEB RENDERER // NO POPUPS OR EXTERNAL TABS"
                       : stationViewer.canReadWeb
-                      ? "WEBPAGE LOADS HERE ONLY WHEN REQUESTED"
+                      ? (stationViewer.isChannel
+                         ? "OFFICIAL SITE // PLAYBACK DEPENDS ON PROVIDER"
+                         : "WEBPAGE LOADS HERE ONLY WHEN REQUESTED")
                       : "FULL ARTICLE URL UNAVAILABLE"
             }
         }
@@ -134,7 +157,10 @@ Rectangle {
                 active: stationViewer.webRequested && stationViewer.canReadWeb
                 source: "StationNewsWebView.qml"
                 onLoaded: {
-                    if (item) item.articleUrl = stationViewer.articleUrl;
+                    if (item) {
+                        item.articleUrl = stationViewer.articleUrl;
+                        item.audioAllowed = stationViewer.audioAllowed;
+                    }
                 }
             }
 
@@ -161,10 +187,15 @@ Rectangle {
                     text: stationViewer.webFailed
                           ? "This site could not be loaded here. The report title,"
                             + " source and time remain available above."
-                          : "This record contains a headline and source information."
-                            + " Select READ ARTICLE to try the original webpage"
-                            + " inside Weather Station. A headline is not the"
-                            + " full article."
+                          : stationViewer.isChannel
+                            ? "This entry is a source directory record, not proof"
+                              + " of live playback. WATCH IN STATION attempts"
+                              + " the provider website here. Restricted players"
+                              + " may refuse embedded playback."
+                            : "This record contains a headline and source information."
+                              + " Select READ ARTICLE to try the original webpage"
+                              + " inside Weather Station. A headline is not the"
+                              + " full article."
                 }
             }
         }
@@ -172,7 +203,9 @@ Rectangle {
         QuietText {
             width: parent.width
             font.pixelSize: 10
-            text: "EXTERNAL BROWSER NOT OPENED // ARTICLE CONTENT MAY BE RESTRICTED"
+            text: stationViewer.isChannel
+                  ? "INTERNAL VIEW ONLY // NO AUTOPLAY // PROVIDER ACCESS RULES APPLY"
+                  : "EXTERNAL BROWSER NOT OPENED // ARTICLE CONTENT MAY BE RESTRICTED"
             elide: Text.ElideRight
         }
     }

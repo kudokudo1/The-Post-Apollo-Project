@@ -268,7 +268,7 @@ PanelWindow {
     property int panelLeftMargin: 600
     property int frameInset: 8
     property int glowGutter: 14
-    property int topGlowGutter: 12
+    property int topGlowGutter: 9
 
     implicitWidth: panelWidth + glowGutter * 2
     implicitHeight: panelHeight + topGlowGutter + glowGutter

@@ -13,10 +13,10 @@ assert 'property string chassisLevel: "compact"' in menu
 assert 'readonly property var chassisFrame: FinanceChassisPolicy.frame(' in menu
 assert 'readonly property int frameWidth: chassisFrame.width' in menu
 assert 'readonly property int frameHeight: chassisFrame.height' in menu
-# The compact visible frame follows Git's 790px height, with a 3px lift
-# from Git's 12px visible top line. Insets and the input mask move together.
+# Compact Finance and Git share a 9px top line; Finance's 3px lift is
+# against its own 12px glow gutter, not the current Git chassis inset.
 assert 'property int panelHeight: 790' in git
-assert 'property int topGlowGutter: 12' in git
+assert 'property int topGlowGutter: 9' in git
 assert 'mode === "expanded" ? 900 : 790' in policy
 assert 'readonly property int compactTopLift: 3' in menu
 assert 'chassisLevel === "compact" ? glowGutter - compactTopLift : glowGutter' in menu

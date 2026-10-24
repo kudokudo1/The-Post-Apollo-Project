@@ -14,8 +14,11 @@ assert 'import "../components"' in MENU
 assert "readonly property int frameWidth: 432" in MENU
 assert "readonly property int frameHeight: 768" in MENU
 assert "readonly property int glowGutter: 12" in MENU
+assert "readonly property int frameTopInset: 9" in MENU
 assert "implicitWidth: frameWidth + glowGutter * 2" in MENU
-assert "implicitHeight: frameHeight + glowGutter * 2" in MENU
+assert "implicitHeight: frameHeight + frameTopInset + glowGutter" in MENU
+assert "y: root.frameTopInset" in MENU
+assert "anchors.topMargin: root.frameTopInset" in MENU
 assert "dockCenterX - root.implicitWidth / 2" in MENU
 assert "root.chassisTopY - root.glowGutter" in MENU
 assert "root.screen ? root.screen.width - root.implicitWidth : 0" in MENU

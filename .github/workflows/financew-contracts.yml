@@ -42,6 +42,9 @@ on:
       - "services/finance/FinanceFundingWriteService.qml"
       - "services/finance/**"
       - "widgets/FinanceMarketPane.qml"
+      - "widgets/FinanceOsirisPane.qml"
+      - "widgets/FinanceOsirisWebView.qml"
+      - "tests/finance/test_finance_osiris_globe_contracts.py"
       - "scripts/finance/read_polymarket.mjs"
       - "tests/finance/test_polymarket_readonly.mjs"
       - "tests/finance/test_finance_market_contracts.py"
@@ -89,6 +92,9 @@ on:
       - "services/finance/FinanceFundingWriteService.qml"
       - "services/finance/**"
       - "widgets/FinanceMarketPane.qml"
+      - "widgets/FinanceOsirisPane.qml"
+      - "widgets/FinanceOsirisWebView.qml"
+      - "tests/finance/test_finance_osiris_globe_contracts.py"
       - "scripts/finance/read_polymarket.mjs"
       - "tests/finance/test_polymarket_readonly.mjs"
       - "tests/finance/test_finance_market_contracts.py"
@@ -119,6 +125,8 @@ jobs:
         run: python3 tests/finance/test_finance_market_contracts.py
       - name: Test FinanceW Market M1 public-feed normalizer (fictional fixtures)
         run: node tests/finance/test_polymarket_readonly.mjs
+      - name: Verify opt-in OSIRIS globe does not affect FinanceW startup
+        run: python3 tests/finance/test_finance_osiris_globe_contracts.py
       - name: Verify local read-only FinanceW Budget UI
         run: python3 tests/finance/test_finance_budget_ui_contracts.py
       - name: Verify transaction draft stays non-mutating

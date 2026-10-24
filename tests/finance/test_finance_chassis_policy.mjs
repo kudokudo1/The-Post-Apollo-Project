@@ -22,8 +22,8 @@ function frame(mode, width, height) {
 }
 assert.deepEqual(frame('compact', 2560, 1440), [432, 790]);
 assert.deepEqual(frame('expanded', 2560, 1440), [1000, 900]);
-assert.deepEqual(frame('fullscreen', 2560, 1440), [2536, 1344]);
-assert.deepEqual(frame('fullscreen', 2560, 1600), [2536, 1344]);
+assert.deepEqual(frame('fullscreen', 2560, 1440), [2536, 1345]);
+assert.deepEqual(frame('fullscreen', 2560, 1600), [2536, 1345]);
 assert.deepEqual(frame('expanded', 1360, 768), [1000, 751]);
 assert.deepEqual(frame('fullscreen', 1360, 768), [1336, 751]);
 assert.deepEqual(frame('compact', 320, 480), [296, 463]);
@@ -39,7 +39,7 @@ assert.equal(policy.topMargin('fullscreen', 82, 1440, 1440, 12), 0);
 
 // The same mapped window must fit inside its output for all modes.
 // The visible frame never extends below the 8px minimum bottom clearance.
-// Large caps at Social's default 1355px minus 11px; short screens shrink.
+// Large caps at Social's default 1355px minus 10px; short screens shrink.
 for (const screen of [[2560, 1440], [1360, 768], [1024, 600], [320, 480]]) {
   for (const mode of ['compact', 'expanded', 'fullscreen']) {
     const [w, h] = frame(mode, ...screen);
@@ -47,11 +47,11 @@ for (const screen of [[2560, 1440], [1360, 768], [1024, 600], [320, 480]]) {
     assert.ok(9 + h + 8 <= screen[1], mode + ' window height overflow');
     assert.ok(screen[1] - (9 + h) >= 8, mode + ' missing bottom gap');
     if (mode === 'fullscreen')
-      assert.equal(h, Math.min(1344, screen[1] - 17),
+      assert.equal(h, Math.min(1345, screen[1] - 17),
         'large height cap or minimum bottom clearance');
   }
 }
-assert.equal(1440 - (9 + frame('fullscreen', 2560, 1440)[1]), 87);
+assert.equal(1440 - (9 + frame('fullscreen', 2560, 1440)[1]), 86);
 assert.equal(768 - (9 + frame('fullscreen', 1360, 768)[1]), 8);
 assert.equal(policy.topMargin('expanded', 9, 768, 768, 9), 0);
 assert.equal(policy.topMargin('compact', 9, 768, 768, 9), 0);

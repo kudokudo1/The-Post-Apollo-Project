@@ -235,7 +235,7 @@ SectionFrame {
     // right. Leave the 25px edit controls and footer in their own lanes.
     Row {
         id: weatherInfo
-        visible: tile.moduleId === "weather"
+        visible: tile.moduleId === "weather" && tile.tileRowSpan === 1
         anchors {
             left: parent.left
             right: parent.right
@@ -305,6 +305,21 @@ SectionFrame {
                 elide: Text.ElideRight
                 text: "AQI  " + tile.airQualityText
             }
+        }
+    }
+
+    // Stage 8C uses only the established Hub bridge snapshot.
+    ApolloHubWeatherExplore {
+        id: weatherExplore
+        visible: tile.moduleId === "weather" && tile.tileRowSpan > 1
+        weatherSnapshot: tile.weatherSnapshot
+        anchors {
+            left: parent.left
+            right: parent.right
+            top: parent.top
+            bottom: parent.bottom
+            topMargin: tile.editing ? 32 : 22
+            bottomMargin: 23
         }
     }
 
@@ -561,6 +576,8 @@ SectionFrame {
               ? timeMini.statusLine
               : tile.moduleId === "calendar"
               ? calendarMini.statusLine
+              : tile.moduleId === "weather" && tile.tileRowSpan > 1
+              ? weatherExplore.statusLine
               : tile.moduleId === "weather"
               ? (tile.weatherReady
                  ? (Number(tile.weatherSnapshot.ageMinutes) >= 0

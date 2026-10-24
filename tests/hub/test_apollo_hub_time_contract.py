@@ -67,4 +67,5 @@ for needle in (
     "TZ=Pacific/Chatham node tests/hub/test_apollo_hub_time_policy.cjs",
 ):
     assert needle in workflow, "B10 CI registration missing: "+needle
+assert workflow.count('      - "widgets/TimeW.qml"') == 2, "TimeW ownership changes must trigger B10 CI"
 print("ApolloHub B10 pure time projection / reuse-existing-tick contracts passed")

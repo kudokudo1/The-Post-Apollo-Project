@@ -117,12 +117,20 @@ var _newsNextAllowedMs = 0;
 var _newsThrottleUntilMs = 0;
 var _newsCachedRows = [];
 var _newsCachedAtMs = 0;
+var _news429Count = 0;
+var _newsNeedsManualRetry = false;
 
 function newsWaitMs(nowMs) {
     return Math.max(0, _newsNextAllowedMs - Number(nowMs));
 }
 function newsThrottled(nowMs) {
     return Number(nowMs) < _newsThrottleUntilMs;
+}
+function newsManualRetryRequired() {
+    return _newsNeedsManualRetry;
+}
+function newsThrottleCount() {
+    return _news429Count;
 }
 function reserveNewsRequest(nowMs) {
     const now = Number(nowMs);
@@ -135,10 +143,17 @@ function reserveNewsRequest(nowMs) {
 }
 function recordNewsThrottle(nowMs) {
     const now = Number(nowMs);
-    if (!isFinite(now) || now <= 0) return;
-    // 429: a longer, bounded pause. Do not queue a retry or hammer GDELT.
-    _newsThrottleUntilMs = Math.max(_newsThrottleUntilMs, now + 60000);
+    if (!isFinite(now) || now <= 0) return 0;
+    // The advertised "one request every 5 seconds" is not a guaranteed
+    // recovery deadline after 429. Progressively cool down (5m,15m,30m,60m)
+    // and never issue automatic GDELT retries after a provider rejection.
+    _news429Count = Math.min(4, _news429Count + 1);
+    const delays = [300000, 900000, 1800000, 3600000];
+    const delayMs = delays[_news429Count - 1];
+    _newsThrottleUntilMs = Math.max(_newsThrottleUntilMs, now + delayMs);
     _newsNextAllowedMs = Math.max(_newsNextAllowedMs, _newsThrottleUntilMs);
+    _newsNeedsManualRetry = true;
+    return delayMs;
 }
 function storeNewsRows(rows, nowMs) {
     if (!Array.isArray(rows) || !isFinite(nowMs) || Number(nowMs) <= 0)
@@ -146,6 +161,11 @@ function storeNewsRows(rows, nowMs) {
     _newsCachedRows = rows.slice(0, 30);
     _newsCachedAtMs = Number(nowMs);
     _newsThrottleUntilMs = 0;
+    _news429Count = 0;
+    _newsNeedsManualRetry = false;
+    // Successful GDELT results are stable enough to reuse in the panel
+    // rather than refetching on every NEWS tab remount after 30 seconds.
+    _newsNextAllowedMs = Math.max(_newsNextAllowedMs, Number(nowMs) + 900000);
 }
 function cachedNewsRows() {
     return {rows: _newsCachedRows.slice(), updatedAtMs: _newsCachedAtMs};

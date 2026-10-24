@@ -359,3 +359,70 @@ Proposed bounded Media-owned implementation (not changed by this PR):
 and has been making rapid commits. No Media files or CAVA config were
 modified in this diagnostic branch. Coordinate integration before touching
 the shared `stdout: SplitParser` or `receiveCavaFrame` seam.
+
+## October 23 // opt-in JavaScript array-copy hotspot observations
+
+**Status:** source-only diagnostic on review branch. The operator's `eu-stack`
+capture (Quickshell PID 3586090, TID 3586090) found Qt V4 inside
+`ArrayPrototype::method_slice` during a QML signal evaluation. That stack
+does NOT name the QML expression or show that the same operation explains
+every long UI stall. It suggests a narrow measurement, not a fix.
+
+The new launch flag `POST_APOLLO_ARRAY_COPY_PROBE=1` is disabled by default.
+It adds only guarded, in-process measurements to two unowned copy paths:
+
+- `services/system/GraphHistory.qml`: the `linePoints`, `downsampleHistory`,
+  and `appendBounded` helpers. Five-second *activity-driven* aggregates
+  report function, call count, longest input-array size, sum of copy times,
+  total function time, maximum function time and timestamp. Uses no timer
+  or new subprocess. Each `GraphHistory` instance aggregates separately;
+  if no calls occur, no graph report is emitted.
+- `services/notifications/NotificationsService.qml`: **one-shot on-load**
+  timing of `entries.slice()` and the surrounding history parse/normalize/
+  prune path. Reports only scanned/retained counts and milliseconds.
+  Notification content, IDs, URLs and history JSON are never logged.
+
+Existing `POST_APOLLO_UI_LAG_PROBE=1` measures CAVA receive callbacks and
+event-loop gaps. We intentionally do NOT change `modules/Mediaplayer.qml`
+here: its CAVA ambient-height binding includes `levels.slice().sort()`,
+but the Media worker actively owns that surface. Its existing probe
+reports overall callback cost, not the inner slice duration. Therefore
+**absence of graph/history hotspots does not clear Media**.
+
+### Controlled trial
+
+After review, merge and pull, verify the changed source is in the real
+Quickshell checkout, save temporary UI state, and restart once with both
+array and event-loop probes enabled. To reproduce the previous
+Network/Notifications-paused conditions, keep their two opt-in flags:
+
+```bash
+qsdir="$(readlink -f ~/.config/quickshell)"
+POST_APOLLO_UI_LAG_PROBE=1 \
+POST_APOLLO_ARRAY_COPY_PROBE=1 \
+POST_APOLLO_NETWORK_POLL_PAUSED=1 \
+POST_APOLLO_NOTIFICATIONS_HIDDEN_REBUILD_PAUSED=1 \
+  bash "$qsdir/scripts/restart_quickshell_safe.sh" "$qsdir"
+```
+
+Then use the desktop under a comparable audio workload. Save the log:
+
+```bash
+qs log --tail 3000 > "$HOME/quickshell-array-copy-test.log"
+```
+
+Expected diagnostic prefix: `SYNTAGMA_ARRAY_PROBE //`. Startup history
+loading should emit one notification-history record if valid saved history
+is available. Graph records appear only when those helper functions run.
+Match `tsMs` with `SYNTAGMA_LAG_PROBE` intervals but do not claim temporal
+correlation proves causation. Aggregate `workTotalMs` and `copyTotalMs`
+overlap, so do not add them as independent workloads.
+
+**Rollback:** relaunch without `POST_APOLLO_ARRAY_COPY_PROBE=1`; the
+underlying graph and notification-history behavior is otherwise unchanged.
+To restore baseline Network and Notifications behavior as well, also
+omit their two pause flags. No persistent state or schema changes.
+
+**Media handoff:** Only after coordination with the Media owner, consider
+a separate gated counter around `cavaAmbientTargetHeight` and its
+20-value slice/sort binding, rather than modifying it in this branch.

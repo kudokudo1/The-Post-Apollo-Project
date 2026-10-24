@@ -27,6 +27,10 @@ Singleton {
     readonly property bool protonNativeAuditEnabled:
         String(Quickshell.env("POST_APOLLO_PROTON_DELIVERY_AUDIT") || "") === "1"
     property int protonNativeAuditSamples: 0
+    // One-shot startup history copy measurement; off by default and never
+    // reports stored message content, IDs, source names, or raw file text.
+    readonly property bool arrayCopyProbeEnabled:
+        String(Quickshell.env("POST_APOLLO_ARRAY_COPY_PROBE") || "").trim() === "1"
     property double protonNativeAuditLastMs: 0
     property ListModel sourcePolicies: ListModel {}
     // Independent from DND/snooze: starring a source never suppresses it.
@@ -951,6 +955,7 @@ Singleton {
     }
 
     function loadHistory() {
+        const probeStartMs = arrayCopyProbeEnabled ? Date.now() : 0;
         const raw = historyFile.text().trim();
 
         if (raw === "")
@@ -971,7 +976,9 @@ Singleton {
         // Work only with the newest retained slice. This prevents a very
         // large legacy history file from inflating the live QML model before
         // pruning can happen.
+        const copyStartMs = probeStartMs ? Date.now() : 0;
         const retainedEntries = entries.slice();
+        const copyMs = copyStartMs ? Date.now() - copyStartMs : 0;
 
         retainedEntries.sort(function (a, b) {
             const aTime = Number((a && (a.updatedAt || a.createdAt)) || 0);
@@ -1010,6 +1017,13 @@ Singleton {
         pruneHistory();
         markNotificationsChanged();
 
+        if (probeStartMs)
+            console.warn("SYNTAGMA_ARRAY_PROBE // notifications-history load"
+                         + " scanned=" + entries.length
+                         + " retained=" + retainedEntries.length
+                         + " copyMs=" + copyMs
+                         + " totalMs=" + (Date.now() - probeStartMs)
+                         + " tsMs=" + Date.now());
         return entries.length > notifications.count;
     }
 

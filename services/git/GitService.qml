@@ -65,6 +65,14 @@ Scope {
     // Git menu pipeline timing only. No changes to the journal safety gate.
     property double syncCommandStartedMs: 0
     property double syncCommandFinishedMs: 0
+    // Read-only current Fetch/Pull timing. -1 means this phase has not
+    // finished. The existing durable journal remains the source of truth.
+    property string syncTimingAction: ""
+    property int syncTimingPrepareMs: -1
+    property int syncTimingGitMs: -1
+    property int syncTimingFinalizeMs: -1
+    property int syncTimingRefreshMs: -1
+    property int syncTimingTotalMs: -1
     property bool actionOverdueNotified: false
     property string clonePendingQuery: ""
     property bool pendingCloneCreated: false
@@ -1505,11 +1513,14 @@ Scope {
                 const gitMs = syncCommandFinishedMs - syncCommandStartedMs;
                 const finalizeMs = pipelineRefreshStartedMs - syncCommandFinishedMs;
                 const refreshMs = end - pipelineRefreshStartedMs;
-                actionOutput += "\nSYNC TIMELINE // prepare " + prepareMs
-                    + " ms // git " + gitMs
-                    + " ms // finalize " + finalizeMs
-                    + " ms // refresh " + refreshMs
-                    + " ms // total " + (end - syncStartedMs) + " ms";
+                // Publish into the existing output header, not a duplicate
+                // log line. The journal's BEGIN/COMPLETE profiles remain in
+                // the scrollable log because they measure different work.
+                syncTimingPrepareMs = prepareMs;
+                syncTimingGitMs = gitMs;
+                syncTimingFinalizeMs = finalizeMs;
+                syncTimingRefreshMs = refreshMs;
+                syncTimingTotalMs = end - syncStartedMs;
                 syncCommandStartedMs = 0;
                 syncCommandFinishedMs = 0;
             }
@@ -1809,8 +1820,10 @@ Scope {
         traceSyncPhase("GIT_STARTED");
         actionWatchdog.restart();
         if (pendingProcessAction === "fetch"
-                || pendingProcessAction === "pull")
+                || pendingProcessAction === "pull") {
             syncCommandStartedMs = Date.now();
+            syncTimingPrepareMs = syncCommandStartedMs - syncStartedMs;
+        }
         actionProcess.exec(pendingActionCommand);
         return true;
     }
@@ -1966,8 +1979,12 @@ Scope {
         }
 
         clearPendingControlAction();
-        if (processAction === "fetch" || processAction === "pull")
+        if (processAction === "fetch" || processAction === "pull") {
             syncAfterRefreshStartedMs = Date.now();
+            if (syncCommandFinishedMs > 0)
+                syncTimingFinalizeMs =
+                    syncAfterRefreshStartedMs - syncCommandFinishedMs;
+        }
         syncAfterSnapshotStartedMs = 0;
         refresh();
     }
@@ -1978,8 +1995,10 @@ Scope {
 
         if ((pendingProcessAction === "fetch"
                     || pendingProcessAction === "pull")
-                && syncCommandStartedMs > 0)
+                && syncCommandStartedMs > 0) {
             syncCommandFinishedMs = Date.now();
+            syncTimingGitMs = syncCommandFinishedMs - syncCommandStartedMs;
+        }
         traceSyncPhase("GIT_PROCESS_COMPLETE");
         actionStage = "FINALIZING";
         actionWatchdog.stop();
@@ -2365,6 +2384,12 @@ Scope {
             syncPhaseMs = syncStartedMs;
             syncCommandStartedMs = 0;
             syncCommandFinishedMs = 0;
+            syncTimingAction = processAction;
+            syncTimingPrepareMs = -1;
+            syncTimingGitMs = -1;
+            syncTimingFinalizeMs = -1;
+            syncTimingRefreshMs = -1;
+            syncTimingTotalMs = -1;
             traceSyncPhase("REQUESTED");
         }
 

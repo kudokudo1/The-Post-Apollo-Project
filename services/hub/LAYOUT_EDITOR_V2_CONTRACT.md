@@ -281,3 +281,16 @@ Complete Stage 7A/7B/7C/7D/8A/8B/8C/8D/8E/8F/8G desktop acceptance. Next can be 
 ## DECISIONS
 
 No new widget services, polling, external sync, unrelated UI change, local desktop action, or merge operation. GitHub is the source of truth; the operator remains responsible for pulling and accepting changes.
+
+
+## P2-A // Social and AppControl owner-routed actions (2026-10-24)
+
+**Functionality-first.** The `social` module is an opt-in eleventh tile type, not added automatically to saved layouts. At H:1 it has OPEN SOCIAL; H:2/H:3 additionally have SESSIONS, DISCORD, TELEGRAM and X buttons. A direct click emits a typed selection index 0..3. The existing `MessagingW` instance is the only owner of `menuOpen`, `activateApp(index,false)`, SessionAdapter, native Discord/X/Sway geometry, focus and messaging. Hub receives only `{menuOpen, activeAppIndex}` metadata, with no contact names, conversations, tokens, messages or account records. Selected mode is **not** proof of a successful connection or external window activation.
+
+The expanded Apps DETAILS view now exposes a separate APP CONTROL button alongside BACK. Only a direct click opens the existing `AppControlW` window, then closes Hub; it does not select a process, freeze, terminate, restart, grant a safety unlock or otherwise run an AppControl action. The compact H:1 launcher and the desktop-entry index are unchanged. If owner windows are not bound (e.g., standalone Hub preview), these controls remain disabled.
+
+**Implementation boundary:** `shell.qml` binds owner availability and a minimal Social mode snapshot and routes validated user-originated signals. The Hub does not instantiate additional owner windows or services. The `social` module ID is allowed under existing layout v2 and the same 6-mode / 6-submode / 8-tile capacity; no saved layout migration or automatic tile insertion. Existing audio/Media/Hi-Fi code is deliberately untouched by operator direction. This PR does not touch the Social or AppControl owner's source components.
+
+**VERIFY:** Source tests confirm one owner action seam, bounded mode indexes, no secondary SessionAdapter/process/file backend, opt-in layout ID, unchanged Media mount and unchanged B6 H:1 launching. Live acceptance must test H:1/H:2/H:3, W:1/W:2, social OFF/ON, platform buttons, Discord/X focus and geometry, AppControl window opening, Hub-close behavior, Koinoikos keyboard mode, and original Sessions and AppControl dock buttons. Source contracts cannot verify those runtime behaviors.
+
+**NEXT:** P2-B owner-coordinated identity-pinned AppControl running-process snapshot and guarded PAUSE/FREEZE / RESUME / END / RESTART, not Media playback. Independently consider system-level audio volume/mute, Weather owner-published detailed forecasts/Ground/Sky/Space, task planning, clock utilities, and Notifications. Media/Hi-Fi controls stay deferred until operator says otherwise.

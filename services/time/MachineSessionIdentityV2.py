@@ -79,7 +79,11 @@ def validate_sidecar(document, *, v1_checkpoint=None):
                          separators=(",", ":"))
     except (TypeError, ValueError, RecursionError) as exc:
         raise SidecarError("INVALID SIDECAR JSON") from exc
-    if len(raw.encode("utf-8")) > MAX_BYTES:
+    try:
+        encoded_length = len(raw.encode("utf-8"))
+    except UnicodeError as exc:
+        raise SidecarError("INVALID SIDECAR TEXT") from exc
+    if encoded_length > MAX_BYTES:
         raise SidecarError("OVERSIZED SIDECAR")
 
     _fields(document, ("schema_version", "kind", "checkpoint_id", "windows"))
@@ -157,6 +161,7 @@ def validate_sidecar(document, *, v1_checkpoint=None):
             raise SidecarError("INNER ITEMS NOT AVAILABLE")
         cleaned_items = []
         seen_positions = set()
+        seen_adapter_items = set()
         for item in items:
             _fields(item, ("item_key", "kind", "position", "adapter_item_key"))
             item_key = _id(item["item_key"])
@@ -164,7 +169,7 @@ def validate_sidecar(document, *, v1_checkpoint=None):
                 raise SidecarError("DUPLICATE INNER ITEM KEY")
             all_item_keys.add(item_key)
             kind = item["kind"]
-            if kind not in ITEM_KINDS:
+            if not isinstance(kind, str) or kind not in ITEM_KINDS:
                 raise SidecarError("UNSUPPORTED INNER ITEM KIND")
             if adapter == "brave" and kind != "browser_tab":
                 raise SidecarError("WRONG INNER ITEM ADAPTER")
@@ -175,6 +180,10 @@ def validate_sidecar(document, *, v1_checkpoint=None):
                 raise SidecarError("DUPLICATE INNER ITEM POSITION")
             seen_positions.add(position)
             adapter_item_key = _maybe_id(item["adapter_item_key"])
+            if adapter_item_key is not None:
+                if adapter_item_key in seen_adapter_items:
+                    raise SidecarError("DUPLICATE ADAPTER INNER ITEM")
+                seen_adapter_items.add(adapter_item_key)
             cleaned_items.append({
                 "item_key": item_key, "kind": kind,
                 "position": position, "adapter_item_key": adapter_item_key})

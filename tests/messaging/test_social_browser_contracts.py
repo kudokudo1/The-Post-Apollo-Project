@@ -185,7 +185,7 @@ assert "function ensureSelectedVisible()" in selector
 assert "Flickable {" in selector
 
 # Existing sessions/Telegram are still in the native QML conversation lane.
-assert "sessionAdapter.conversations" in social
+assert "messageRouter.conversations" in social
 assert "function showX()" in social
 assert '"show", browserSite' in social
 assert '"hide", "all"' in social

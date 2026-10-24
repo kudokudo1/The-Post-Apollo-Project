@@ -1,0 +1,47 @@
+name: Social Native Adapter Contracts
+
+on:
+  pull_request:
+    paths:
+      - "services/messaging/SocialMessageRouter.qml"
+      - "services/messaging/SessionAdapter.qml"
+      - "services/messaging/adapters/**"
+      - "services/messaging/bridges/telegram/**"
+      - "widgets/messanger/MessagingW.qml"
+      - "components/ConversationFeed.qml"
+      - "tests/messaging/**"
+      - "MODEL/contracts/social-messaging-schema-v1.1-proposal.md"
+      - ".github/workflows/social-native-adapters.yml"
+  push:
+    branches:
+      - main
+    paths:
+      - "services/messaging/SocialMessageRouter.qml"
+      - "services/messaging/SessionAdapter.qml"
+      - "services/messaging/adapters/**"
+      - "services/messaging/bridges/telegram/**"
+      - "widgets/messanger/MessagingW.qml"
+      - "components/ConversationFeed.qml"
+      - "tests/messaging/**"
+      - ".github/workflows/social-native-adapters.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  contracts:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate native messaging and browser contracts offline
+        run: |
+          set -euo pipefail
+          python3 tests/messaging/test_social_native_router_contracts.py
+          python3 tests/messaging/test_session_adapter_contracts.py
+          python3 tests/messaging/test_telegram_adapter_contracts.py
+          python3 tests/messaging/test_signal_adapter_unsupported.py
+          python3 tests/messaging/test_messenger_adapter_unsupported.py
+          python3 tests/messaging/test_viber_adapter_unsupported.py
+          python3 tests/messaging/test_x_social_contracts.py
+          python3 tests/messaging/test_social_browser_contracts.py
+          python3 tests/messaging/test_conversation_contracts.py

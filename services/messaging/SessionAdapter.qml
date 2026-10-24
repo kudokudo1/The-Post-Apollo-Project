@@ -5,6 +5,9 @@ import Quickshell.Io
 Item {
     id: adapter
 
+    // Router pauses Sessions polling while another native service is selected.
+    // Default true retains standalone Sessions behavior.
+    property bool active: true
     property string pythonPath: "/usr/bin/python3"
     readonly property string bridgePath: Quickshell.shellPath("services/messaging/SessionBridge.py")
 
@@ -53,6 +56,7 @@ Item {
     property string messagesError: ""
 
     property bool messageRefreshPending: false
+    property string messageRequestConversationId: ""
 
     // ---------------------------------------------------------
     // SENDING
@@ -68,8 +72,16 @@ Item {
 
     signal messageSent
 
+    onActiveChanged: {
+        if (active) {
+            refresh();
+            if (selectedConversationId !== "")
+                refreshMessages();
+        }
+    }
+
     function refresh() {
-        if (conversationProcess.running)
+        if (!active || conversationProcess.running)
             return;
 
         loading = true;
@@ -81,16 +93,19 @@ Item {
     }
 
     function loadMessages(conversationId) {
-        if (!conversationId || conversationId === "")
+        if (!active || !conversationId || conversationId === "")
             return;
 
-        selectedConversationId = conversationId;
-
+        if (String(selectedConversationId) !== String(conversationId)) {
+            messages = [];
+            messagesError = "";
+        }
+        selectedConversationId = String(conversationId);
         refreshMessages();
     }
 
     function refreshMessages() {
-        if (!selectedConversationId || selectedConversationId === "") {
+        if (!active || !selectedConversationId || selectedConversationId === "") {
             return;
         }
 
@@ -107,6 +122,7 @@ Item {
         messagesError = "";
         messageStderr = "";
 
+        messageRequestConversationId = selectedConversationId;
         messageProcess.command = bridgeCommand([
             "--json",
             "messages",
@@ -119,7 +135,7 @@ Item {
     }
 
     function sendMessage(conversationId, text) {
-        if (!conversationId || conversationId === "")
+        if (!active || !conversationId || conversationId === "")
             return false;
 
         const trimmed = text.trim();
@@ -275,7 +291,10 @@ Item {
                         return aTime - bTime;
                     });
 
-                    adapter.messages = sorted;
+                    // Ignore a stale thread result after selection changes.
+                    if (adapter.active && String(adapter.messageRequestConversationId)
+                            === String(adapter.selectedConversationId))
+                        adapter.messages = sorted;
                     adapter.messagesError = "";
 
                     console.log(
@@ -377,7 +396,7 @@ Item {
 
     Timer {
         interval: 5000
-        running: true
+        running: adapter.active
         repeat: true
 
         onTriggered: adapter.refresh()
@@ -386,7 +405,7 @@ Item {
     Timer {
         interval: 3000
 
-        running: adapter.selectedConversationId !== ""
+        running: adapter.active && adapter.selectedConversationId !== ""
 
         repeat: true
 
@@ -395,9 +414,10 @@ Item {
 
     Component.onCompleted: {
         healthStderr = "";
-        healthProcess.command = bridgeCommand(["--json", "health"]);
-        healthProcess.running = true;
-
-        adapter.refresh();
+        if (active) {
+            healthProcess.command = bridgeCommand(["--json", "health"]);
+            healthProcess.running = true;
+            adapter.refresh();
+        }
     }
 }

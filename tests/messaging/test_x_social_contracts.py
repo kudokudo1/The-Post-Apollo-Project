@@ -134,7 +134,7 @@ assert "function hideX()" in social
 assert "function syncXGeometry(focusWindow)" in social
 assert 'Quickshell.shellPath("widgets/messanger/XBrowser.py")' in social
 assert "messagingWindow.externalSelected" in social
-assert "sessionAdapter.sendMessage(conversationId, text);" in social
+assert "messageRouter.sendMessage(conversationId, text);" in social
 assert 'target: "messaging"' in social
 
 print("Social X browser/geometry source contracts: PASS")

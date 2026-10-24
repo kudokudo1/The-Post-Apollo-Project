@@ -32,9 +32,31 @@ def _session_path() -> Path:
     return root / "post-apollo" / "telegram" / "personal.session"
 
 
+def _app_config_path() -> Path:
+    root = Path(os.environ.get("XDG_CONFIG_HOME") or (Path.home() / ".config"))
+    return root / "post-apollo" / "telegram" / "client.json"
+
+
+def _app_credentials_from_private_file() -> dict[str, str]:
+    path = _app_config_path()
+    if not path.exists():
+        return {}
+    if path.is_symlink() or (path.stat().st_mode & 0o077):
+        raise BridgeError("AUTH_REQUIRED", "Telegram application key file permissions are unsafe")
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        raise BridgeError("AUTH_REQUIRED", "Telegram application key file is unreadable")
+    return data if isinstance(data, dict) else {}
+
+
 def _credentials() -> tuple[int, str]:
     id_text = os.environ.get("POST_APOLLO_TELEGRAM_API_ID", "").strip()
     api_hash = os.environ.get("POST_APOLLO_TELEGRAM_API_HASH", "").strip()
+    if not id_text or not api_hash:
+        config = _app_credentials_from_private_file()
+        id_text = id_text or str(config.get("apiId", "")).strip()
+        api_hash = api_hash or str(config.get("apiHash", "")).strip()
     if not id_text or not api_hash:
         raise BridgeError("AUTH_REQUIRED", "Configure Telegram API ID/hash, then run explicit login")
     try:

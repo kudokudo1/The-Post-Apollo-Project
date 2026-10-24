@@ -47,6 +47,10 @@ Item {
         || (appIndex === 2 && telegram.backendMode === "READY"
             && telegram.capabilities.sendText === true)
 
+    readonly property var telegramBackend: telegram
+    readonly property bool telegramNeedsSetup: appIndex === 2
+        && (telegram.backendMode !== "READY" || telegram.loginInProgress)
+
     readonly property string telegramStatus: appIndex === 2
         && telegram.backendMode !== "READY"
         ? "TELEGRAM // " + telegram.backendMode + " // " + telegram.backendDetail

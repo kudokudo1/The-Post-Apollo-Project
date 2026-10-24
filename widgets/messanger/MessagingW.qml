@@ -1270,6 +1270,22 @@ PanelWindow {
         }
 
         // ========================================================
+        // IN-MENU TELEGRAM ACCOUNT CONNECTION
+        // ========================================================
+
+        TelegramConnectPanel {
+            id: telegramConnectPanel
+            adapter: messageRouter.telegramBackend
+            x: messagingWindow.appSelectorWidth + messagingWindow.contactListWidth
+            y: 0
+            width: Math.max(1, messagingContent.width - x)
+            height: messagingContent.height
+            visible: messagingWindow.menuOpen && messagingWindow.activeAppIndex === 2
+                     && messageRouter.telegramNeedsSetup
+            z: 2
+        }
+
+        // ========================================================
         // CHAT FEED
         // ========================================================
 
@@ -1284,7 +1300,7 @@ PanelWindow {
 
             height: messagingContent.height
 
-            visible: messagingWindow.menuOpen
+            visible: messagingWindow.menuOpen && !telegramConnectPanel.visible
 
             discordMode: messagingWindow.externalSelected
 

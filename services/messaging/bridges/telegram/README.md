@@ -83,3 +83,49 @@ through a temporary `PYTHONPATH`. It tests `health`, `list`, `messages`,
 It never imports the real provider client or opens a network connection.
 Passing these tests does **not** prove login, live network transport or Sway
 display behavior.
+
+## In-menu Telegram connection (new proposed flow)
+
+The Social menu can now display `TelegramConnectPanel.qml` instead of an
+empty conversation pane when Telegram is not yet connected.
+
+1. Select **Social → Telegram → CONNECT WITH QR**. After the operator has
+   configured client application keys, the pane presents a rotating QR code.
+   Use the **Telegram phone app → Settings → Devices → Link Desktop Device** to
+   scan. **The Post-Apollo Social pane stays open**.
+2. If QR is unavailable, choose **USE PHONE NUMBER**. Enter the international
+   number, then the verification code Telegram sends, and any required
+   two-step verification password **inside the same panel**.
+3. Upon provider-authorized success, the adapter rechecks `health` and loads
+   the real conversation list via the existing router.
+
+**First-time application keys:** Without configured API credentials, selecting
+Connect shows an **APP_REQUIRED** panel with API ID and API hash fields.
+Telegram requires registering a client at <https://my.telegram.org/> to obtain
+these keys. That external registration is an upstream requirement until a
+release-approved Post-Apollo client identity is provisioned. Copy keys into
+the Social panel once. They are never placed in command-line arguments or
+GitHub; the adapter sends them via process stdin and the bridge atomically
+stores them at `${XDG_CONFIG_HOME:-$HOME/.config}/post-apollo/telegram/client.json`
+with parent mode `0700` and file mode `0600`. The old private process
+environment variables take precedence when already configured.
+
+**Dependencies:** The selected `TelegramAdapter.qml` Python interpreter
+needs Telethon 1.x for login. QR image generation also requires
+`qrcode[pil]` (the Python `qrcode` module plus Pillow). Without the QR
+dependency, choose phone verification instead. These are application
+dependencies, not account credentials; bundling them in Post-Apollo would be
+the polished deployment path.
+
+**Safety:** Only direct button interactions initiate the new login subprocess.
+Neither the health probe nor selecting another Social mode submits credentials,
+prompts for codes or starts new provider authentication. Switching away from
+Telegram cancels pending login and clears the QR image. Login codes, app hash,
+password, and the QR token are not recorded in stdout/stderr diagnostics, PR
+artifacts or the QML console. The QR image itself is an ephemeral authorization
+secret, so avoid screenshots while pairing.
+
+**Acceptance status:** The in-menu code is a candidate until operator review,
+merge, offline checks, and a separately approved desktop/Telegram live test.
+Do not assume a QR image or a mocked success proves Telegram has authorized a
+real account. Do not automatically restart Quickshell or alter a live session.

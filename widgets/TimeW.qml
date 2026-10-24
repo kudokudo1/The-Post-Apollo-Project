@@ -13,6 +13,7 @@ import "../services/time/CountdownPolicy.js" as CountdownPolicy
 import "../services/time/MachineTimelinePolicy.js" as MachineTimelinePolicy
 import "../services/time/MachineSelectionPolicy.js" as MachineSelectionPolicy
 import "../services/time/MachineLayoutDiffPolicy.js" as MachineLayoutDiffPolicy
+import "../services/time/MachineRestorePreviewPolicy.js" as MachineRestorePreviewPolicy
 
 // TimeW: standalone temporal window. Manual MACHINE timeline markers are
 // session-local; no screenshots or desktop restoration are implemented.
@@ -751,6 +752,7 @@ PanelWindow {
             return;
         machineCapturePreview = null;
         machineLayoutComparison = null;
+        machineRestorePlan = null;
         machineStoreStatus = "NEW CAPTURE // NOT SAVED";
         machineExcludedItems = ({});
         machineInspectIndex = 0;
@@ -788,6 +790,7 @@ PanelWindow {
                 || !machineOpenedCheckpoint || !machineSavedItem
                 || machineOpenedCheckpoint.checkpoint.id !== machineSavedItem.id)
             return;
+        machineRestorePlan = null;
         machineLayoutComparison = MachineLayoutDiffPolicy.compare(
             machineOpenedCheckpoint.document, machineCapturePreview);
         machineLayoutDifferenceIndex = 0;
@@ -798,6 +801,29 @@ PanelWindow {
         if (n)
             machineLayoutDifferenceIndex =
                 (machineLayoutDifferenceIndex + delta + n) % n;
+    }
+
+    // Read-only planning: never infer process identity, never run an action.
+    property var machineRestorePlan: null
+    property int machineRestorePlanIndex: 0
+    readonly property var machineRestorePlanItem:
+        machineRestorePlan && machineRestorePlanIndex >= 0
+        && machineRestorePlanIndex < machineRestorePlan.items.length
+        ? machineRestorePlan.items[machineRestorePlanIndex] : null
+    function machinePreviewRestorePlan() {
+        if (machineStoreBusy || machineCaptureBusy || !machineCapturePreview
+                || !machineOpenedCheckpoint || !machineSavedItem
+                || machineOpenedCheckpoint.checkpoint.id !== machineSavedItem.id)
+            return;
+        machineLayoutComparison = null;
+        machineRestorePlan = MachineRestorePreviewPolicy.plan(
+            machineOpenedCheckpoint.document, machineCapturePreview);
+        machineRestorePlanIndex = 0;
+    }
+    function machineStepRestorePlanItem(delta) {
+        const n = machineRestorePlan ? machineRestorePlan.items.length : 0;
+        if (n > 0)
+            machineRestorePlanIndex = (machineRestorePlanIndex + delta + n) % n;
     }
 
     function machineStoreRequest(action, data, id) {
@@ -843,6 +869,7 @@ PanelWindow {
             return;
         machineOpenedCheckpoint = null;
         machineLayoutComparison = null;
+        machineRestorePlan = null;
         machineStoreRequest("load", null, machineSavedItem.id);
     }
     function machineStepSavedCheckpoint(delta) {
@@ -851,6 +878,7 @@ PanelWindow {
             machineSavedIndex = (machineSavedIndex + delta + n) % n;
         machineOpenedCheckpoint = null;
         machineLayoutComparison = null;
+        machineRestorePlan = null;
     }
     function machineAcceptStoreResponse(data) {
         if (!data || typeof data.status !== "string") {
@@ -870,6 +898,7 @@ PanelWindow {
             machineSavedIndex = 0;
             machineOpenedCheckpoint = null;
             machineLayoutComparison = null;
+            machineRestorePlan = null;
             machineStoreStatus = "SAVED // LOCAL SQLITE";
             return;
         }
@@ -879,6 +908,7 @@ PanelWindow {
             machineSavedIndex = 0;
             machineOpenedCheckpoint = null;
             machineLayoutComparison = null;
+            machineRestorePlan = null;
             machineStoreStatus = "STORED // " + machineSavedCheckpoints.length;
             return;
         }
@@ -887,6 +917,7 @@ PanelWindow {
                 && data.document.preview_only === true) {
             machineOpenedCheckpoint = data;
             machineLayoutComparison = null;
+            machineRestorePlan = null;
             machineStoreStatus = "OPENED // METADATA ONLY";
             return;
         }
@@ -4047,10 +4078,10 @@ PanelWindow {
                             height: 35
                             spacing: 8
                             ActionButton {
-                                width: 163
+                                width: (parent.width - parent.spacing) / 2
                                 height: parent.height
                                 label: "COMPARE TO CAPTURE"
-                                labelPixelSize: 10
+                                labelPixelSize: 9
                                 accentColor: timew.semanticColor
                                 available: !!timew.machineOpenedCheckpoint
                                            && !!timew.machineCapturePreview
@@ -4061,17 +4092,20 @@ PanelWindow {
                                            && !timew.machineStoreBusy
                                 onLeftClicked: timew.machineCompareSavedToCapture()
                             }
-                            GohuText {
-                                width: parent.width - 171
-                                anchors.verticalCenter: parent.verticalCenter
-                                text: !timew.machineCapturePreview
-                                      ? "CAPTURE CURRENT FIRST"
-                                      : !timew.machineOpenedCheckpoint
-                                      ? "OPEN SAVED FIRST"
-                                      : "READ ONLY // NO APPLY"
-                                color: Colors.cyan
-                                font.pixelSize: 10
-                                wrapMode: Text.Wrap
+                            ActionButton {
+                                width: (parent.width - parent.spacing) / 2
+                                height: parent.height
+                                label: "RESTORE PREVIEW"
+                                labelPixelSize: 9
+                                accentColor: timew.semanticColor
+                                available: !!timew.machineOpenedCheckpoint
+                                           && !!timew.machineCapturePreview
+                                           && !!timew.machineSavedItem
+                                           && timew.machineOpenedCheckpoint.checkpoint.id
+                                              === timew.machineSavedItem.id
+                                           && !timew.machineCaptureBusy
+                                           && !timew.machineStoreBusy
+                                onLeftClicked: timew.machinePreviewRestorePlan()
                             }
                         }
                         GohuText {
@@ -4139,6 +4173,83 @@ PanelWindow {
                             visible: !!timew.machineLayoutComparison
                                      && timew.machineLayoutComparison.truncated === true
                             text: "SHOWING FIRST 40 DIFFERENCES"
+                            color: Colors.orange
+                            font.pixelSize: 10
+                        }
+                        GohuText {
+                            width: parent.width
+                            visible: !!timew.machineRestorePlan
+                            text: !timew.machineRestorePlan ? ""
+                                  : timew.machineRestorePlan.status === "unavailable"
+                                  ? "RESTORE PLAN UNAVAILABLE // INVALID DATA"
+                                  : "RESTORE PLAN // " + timew.machineRestorePlan.status.toUpperCase()
+                                    + " // REVIEW " + timew.machineRestorePlan.counts.manual
+                                    + " / AMBIG " + timew.machineRestorePlan.counts.ambiguous
+                                    + " / BLOCK " + timew.machineRestorePlan.counts.blocked
+                            color: timew.machineRestorePlan
+                                   && timew.machineRestorePlan.status === "aligned"
+                                   ? Colors.cyan : Colors.orange
+                            font.pixelSize: 10
+                            elide: Text.ElideRight
+                        }
+                        Row {
+                            width: parent.width
+                            height: 29
+                            spacing: 6
+                            visible: !!timew.machineRestorePlan
+                                     && timew.machineRestorePlan.items.length > 0
+                            ActionButton {
+                                width: 43
+                                height: parent.height
+                                label: "<"
+                                accentColor: timew.semanticColor
+                                available: timew.machineRestorePlan
+                                           && timew.machineRestorePlan.items.length > 1
+                                onLeftClicked: timew.machineStepRestorePlanItem(-1)
+                            }
+                            GohuText {
+                                width: Math.max(0, parent.width - 98)
+                                anchors.verticalCenter: parent.verticalCenter
+                                text: timew.machineRestorePlanItem
+                                      ? (timew.machineRestorePlanIndex + 1) + " / "
+                                        + timew.machineRestorePlan.items.length
+                                        + " // " + timew.machineRestorePlanItem.label
+                                      : ""
+                                color: Colors.white
+                                font.pixelSize: 10
+                                elide: Text.ElideRight
+                            }
+                            ActionButton {
+                                width: 43
+                                height: parent.height
+                                label: ">"
+                                accentColor: timew.semanticColor
+                                available: timew.machineRestorePlan
+                                           && timew.machineRestorePlan.items.length > 1
+                                onLeftClicked: timew.machineStepRestorePlanItem(1)
+                            }
+                        }
+                        GohuText {
+                            width: parent.width
+                            visible: !!timew.machineRestorePlanItem
+                            text: timew.machineRestorePlanItem
+                                  ? timew.machineRestorePlanItem.note : ""
+                            color: Colors.cyan
+                            font.pixelSize: 10
+                            wrapMode: Text.Wrap
+                        }
+                        GohuText {
+                            width: parent.width
+                            visible: !!timew.machineRestorePlan
+                                     && timew.machineRestorePlan.truncated === true
+                            text: "SHOWING FIRST 40 RESTORE REVIEW ITEMS"
+                            color: Colors.orange
+                            font.pixelSize: 10
+                        }
+                        GohuText {
+                            width: parent.width
+                            visible: !!timew.machineRestorePlan
+                            text: "PLAN ONLY // NO ACTIONS OR RESTARTS"
                             color: Colors.orange
                             font.pixelSize: 10
                         }

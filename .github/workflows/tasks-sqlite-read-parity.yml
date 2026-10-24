@@ -1,0 +1,44 @@
+name: TASKS Proxy 1 M10k SQLite read bridge and parity
+
+on:
+  pull_request:
+    paths:
+      - 'services/projects/TaskSqliteReadProbe.py'
+      - 'services/projects/TaskSqliteReadBridge.qml'
+      - 'tests/tasks/fixtures/model_v2_parity_oracle.cjs'
+      - 'tests/tasks/test_task_sqlite_read_parity.py'
+      - 'docs/tasks-sqlite-read-bridge-parity-m10k.md'
+      - '.github/workflows/tasks-sqlite-read-parity.yml'
+  push:
+    branches:
+      - main
+    paths:
+      - 'services/projects/TaskSqliteReadProbe.py'
+      - 'services/projects/TaskSqliteReadBridge.qml'
+      - 'tests/tasks/fixtures/model_v2_parity_oracle.cjs'
+      - 'tests/tasks/test_task_sqlite_read_parity.py'
+      - 'docs/tasks-sqlite-read-bridge-parity-m10k.md'
+      - '.github/workflows/tasks-sqlite-read-parity.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  parity:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: M10k compare JavaScript and SQLite model and read-only probe
+        run: python3 tests/tasks/test_task_sqlite_read_parity.py
+      - name: Retain M10j atomic SQLite regression
+        run: python3 tests/tasks/test_experimental_task_sqlite_store.py
+      - name: Retain M10h model validation
+        run: node tests/tasks/test_unified_project_model_v2.cjs
+      - name: Retain TimeW SQLite storage regression
+        run: python3 tests/timew/test_machine_checkpoint_store.py

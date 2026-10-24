@@ -100,6 +100,15 @@ assert.equal(normalGitOutput(raw, false, 1400), raw,
     'DETAILS and nonsync output remain entirely raw');
 assert.ok(normalGitOutput(raw, true, 1399).includes('REFRESHED │ repository view 1400ms'),
     'different / stale header metric must not hide raw evidence');
+const repeatedRefresh = 'REFRESHED // repository view 1400 ms\n'
+    + 'REFRESHED // repository view 1400 ms';
+assert.equal(normalGitOutput(repeatedRefresh, true, 1400),
+    'REFRESHED │ repository view 1400ms\n'
+    + 'REFRESHED │ repository view 1400ms',
+    'two separate refresh events must remain, even with equal measurements');
+assert.equal(normalGitOutput('REFRESHED // repository view 01400 ms', true, 1400),
+    'REFRESHED │ repository view 01400ms',
+    'only exact evidence may be moved into the header');
 assert.ok(!compact.includes('RUNNING // Git subprocess started'));
 assert.ok(!compact.includes('FINALIZING // collecting repository evidence'));
 const failed = normalGitOutput([

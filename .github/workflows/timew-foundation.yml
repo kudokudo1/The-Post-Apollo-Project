@@ -17,6 +17,8 @@ on:
       - "services/time/MachineLayoutDiffPolicy.js"
       - "services/time/MachineRestorePreviewPolicy.js"
       - "services/time/MachineWindowResolver.py"
+      - "services/time/MachineWindowMultiplicity.py"
+      - "docs/timew-machine-revive-restore-worker-plan.md"
       - "services/time/MachineWindowMovePilot.py"
       - "services/time/MachineMoveJournal.py"
       - "services/time/MachineMoveApproval.py"
@@ -56,6 +58,8 @@ on:
       - "services/time/MachineLayoutDiffPolicy.js"
       - "services/time/MachineRestorePreviewPolicy.js"
       - "services/time/MachineWindowResolver.py"
+      - "services/time/MachineWindowMultiplicity.py"
+      - "docs/timew-machine-revive-restore-worker-plan.md"
       - "services/time/MachineWindowMovePilot.py"
       - "services/time/MachineMoveJournal.py"
       - "services/time/MachineMoveApproval.py"
@@ -133,6 +137,10 @@ jobs:
         run: python3 -B -I tests/timew/test_machine_window_resolver.py
       - name: Verify MACHINE manual resolver UI never executes recovery
         run: python3 -B -I tests/timew/test_machine_window_resolver_ui.py
+      - name: Verify MACHINE 17-Brave and 4-Kitty multiset layout identity inventory
+        run: python3 -B -I tests/timew/test_machine_window_multiplicity.py
+      - name: Verify MACHINE v1-safe, read-only identity inventory contract
+        run: python3 -B -I tests/timew/test_machine_window_multiplicity_contract.py
       - name: Verify MACHINE durable move journal crash and permissions
         run: python3 -B -I tests/timew/test_machine_move_journal.py
       - name: Verify MACHINE single-use approval and read-only reconciliation

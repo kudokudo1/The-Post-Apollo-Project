@@ -88,6 +88,13 @@ PanelWindow {
     readonly property bool usesSpaceSource:
         currentView === "space"
 
+    readonly property bool usesNewsSource: currentView === "news"
+    // The NEWS provider belongs to the loaded StationDiscovery instance.
+    // Read its exposed status rather than invent a parallel NEWS poller.
+    readonly property var newsSourceItem:
+        usesNewsSource && weatherContentLoader.item
+        ? weatherContentLoader.item : null
+
     readonly property int weatherAgeMinutes: {
         sourceStatusClock;
 
@@ -198,6 +205,8 @@ PanelWindow {
                 return "OFFLINE";
             return "PARTIAL";
         }
+        if (usesNewsSource)
+            return newsSourceItem ? newsSourceItem.feedBadge : "CONNECTING // NEWS";
 
         return "NO FEED";
     }
@@ -235,7 +244,7 @@ PanelWindow {
             return sourceStatusText + " // " + ageText;
         }
 
-        if (usesSpaceSource)
+        if (usesSpaceSource || usesNewsSource)
             return sourceStatusText;
 
         return "NO FEED // NOT WIRED";
@@ -278,6 +287,8 @@ PanelWindow {
                 return Colors.red;
             return Colors.yellow;
         }
+        if (usesNewsSource)
+            return newsSourceItem ? newsSourceItem.feedBadgeColor : Colors.orange;
 
         return Colors.orange;
     }
@@ -844,6 +855,7 @@ PanelWindow {
             clip: true
 
             Loader {
+                id: weatherContentLoader
                 anchors.fill: parent
                 visible: weatherStation.currentView !== "terminal"
                          && !weatherStation.contextTerminalRequested

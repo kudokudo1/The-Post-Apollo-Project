@@ -31,7 +31,7 @@ WebEngineView {
         request.reject();
     }
 
-    // No openIn() call: popups are not granted a separate view/window.
+    // Popup requests have no target view; no new window is granted.
     onNewWindowRequested: function(request) {}
 
     // OSIRIS can request microphone, camera, or geolocation. These

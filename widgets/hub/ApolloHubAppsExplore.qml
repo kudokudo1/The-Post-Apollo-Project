@@ -7,6 +7,8 @@ import "../../components"
 Item {
     id: appsExplore
     property var appsSnapshot: null
+    property bool appControlAvailable: false
+    signal openAppControlRequested()
     property string selectedView: "catalog"
     property string selectedId: ""
     readonly property int densityLevel: height >= 300 ? 3 : 2
@@ -269,14 +271,31 @@ Item {
                 horizontalAlignment: Text.AlignHCenter
                 text: "READ ONLY // NO APP LAUNCHED"
             }
-            ActionButton {
-                width: Math.min(190, parent.width)
+            Row {
+                width: parent.width
                 height: 29
-                anchors.horizontalCenter: parent.horizontalCenter
-                label: "BACK TO CATALOG"
-                trackLabelGlowLocally: true
-                softGlowEnabled: false
-                onLeftClicked: appsExplore.selectedView = "catalog"
+                spacing: 5
+                ActionButton {
+                    width: Math.max(1, (parent.width - parent.spacing) / 2)
+                    height: parent.height
+                    label: "APP CONTROL"
+                    labelPixelSize: 10
+                    available: appsExplore.appControlAvailable
+                    trackLabelGlowLocally: true
+                    softGlowEnabled: false
+                    // Deliberate navigation into the original owner window;
+                    // does NOT target a PID or freeze/kill anything.
+                    onLeftClicked: appsExplore.openAppControlRequested()
+                }
+                ActionButton {
+                    width: Math.max(1, (parent.width - parent.spacing) / 2)
+                    height: parent.height
+                    label: "BACK TO CATALOG"
+                    labelPixelSize: 10
+                    trackLabelGlowLocally: true
+                    softGlowEnabled: false
+                    onLeftClicked: appsExplore.selectedView = "catalog"
+                }
             }
         }
     }

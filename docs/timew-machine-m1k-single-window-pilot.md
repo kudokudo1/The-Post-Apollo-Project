@@ -12,8 +12,9 @@ known workspace to a different **existing numbered workspace** (1 through 999)
 on an active output. The saved checkpoint's expected app class, workspace,
 floating state and destination output must match freshly read Sway metadata.
 
-Sway documents the selector `[con_id=N]` and `move container to workspace
-number N`. The pilot produces exactly one no-shell argv command, and the
+Sway documents the selector `[con_id=N]` and `move container to workspace N`.
+The pilot uses `--no-auto-back-and-forth` and targets the exact existing
+workspace name, not a numeric alias. It produces one no-shell argv command; the
 command runner is **required by the caller** (only synthetic runners are used
 in CI). The source does not provide a CLI, Qt/Quickshell action, background
 polling, a privileged helper or an automatic mode.

@@ -53,10 +53,10 @@ def inspect_pending(journal, *, read_runner):
             same_id = [x for x in windows if x["con_id"] == before["con_id"]]
             if len(same_app) > 1 or len(same_id) > 1:
                 status = "ambiguous_candidate"
+            elif len(same_id) == 1 and same_id[0]["app_id"] != before["app_id"]:
+                status = "identity_conflict"
             elif len(same_id) != 1 or len(same_app) == 0:
                 status = "saved_window_not_identified"
-            elif same_id[0]["app_id"] != before["app_id"] or len(same_app) != 1:
-                status = "identity_conflict"
             else:
                 win = same_id[0]
                 observed = win["workspace"]

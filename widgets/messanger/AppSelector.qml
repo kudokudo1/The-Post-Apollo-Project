@@ -38,6 +38,18 @@ Rectangle {
         {
             name: "X",
             icon: ""
+        },
+        {
+            name: "INSTAGRAM",
+            icon: ""
+        },
+        {
+            name: "FACEBOOK",
+            icon: ""
+        },
+        {
+            name: "REDDIT",
+            icon: ""
         }
     ]
 

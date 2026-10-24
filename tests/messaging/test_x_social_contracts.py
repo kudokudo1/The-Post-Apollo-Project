@@ -50,7 +50,7 @@ assert any(
 
 # The launcher never opens a new process if the X application already exists.
 commands = []
-with patch.object(browser, "x_exists", return_value=True):
+with patch.object(browser, "site_exists", side_effect=lambda site: site == "x"):
     with patch.object(browser, "sway_command", side_effect=commands.append):
         with patch.object(browser.subprocess, "Popen") as spawn:
             browser.show()

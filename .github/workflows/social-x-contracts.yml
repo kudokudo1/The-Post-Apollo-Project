@@ -1,4 +1,4 @@
-name: Social X Contracts
+name: Social Browser Contracts
 
 on:
   pull_request:
@@ -8,6 +8,7 @@ on:
       - "widgets/messanger/DiscordGeometry.py"
       - "widgets/messanger/XBrowser.py"
       - "tests/messaging/test_x_social_contracts.py"
+      - "tests/messaging/test_social_browser_contracts.py"
       - ".github/workflows/social-x-contracts.yml"
   push:
     branches:
@@ -18,6 +19,7 @@ on:
       - "widgets/messanger/DiscordGeometry.py"
       - "widgets/messanger/XBrowser.py"
       - "tests/messaging/test_x_social_contracts.py"
+      - "tests/messaging/test_social_browser_contracts.py"
       - ".github/workflows/social-x-contracts.yml"
 
 permissions:
@@ -29,5 +31,7 @@ jobs:
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
-      - name: Validate X Social contracts
-        run: python3 tests/messaging/test_x_social_contracts.py
+      - name: Validate Social browser family contracts
+        run: |
+          python3 tests/messaging/test_x_social_contracts.py
+          python3 tests/messaging/test_social_browser_contracts.py

@@ -16,6 +16,8 @@ SectionFrame {
     property var uptimeSnapshot: null
     property var appsSnapshot: null
     property var processSnapshot: null
+    property var processActionGate: null
+    signal processInputFocusChanged(bool focused)
     property bool appControlAvailable: false
     property var socialSnapshot: null
     property bool socialActionsAvailable: false
@@ -485,6 +487,10 @@ SectionFrame {
         visible: tile.moduleId === "apps" && tile.tileRowSpan > 1
         appsSnapshot: tile.appsSnapshot
         processSnapshot: tile.processSnapshot
+        processActionGate: tile.processActionGate
+        onInputFocusChanged: function(focused) {
+            tile.processInputFocusChanged(focused);
+        }
         appControlAvailable: tile.appControlAvailable
         onOpenAppControlRequested: tile.openAppControlRequested()
         anchors {

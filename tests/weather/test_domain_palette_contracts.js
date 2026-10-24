@@ -170,13 +170,13 @@ assert.match(weatherTerminalSource, /SwayGeometry\.visibleIntersection\(requeste
 
 const discoveryViewSource = read("widgets/weather/StationDiscovery.qml");
 const discoveryServiceSource = read("services/weather/StationDiscoveryService.qml");
-for (const [id, domain] of [
-    ["mapViewComponent", "map"],
-    ["newsViewComponent", "news"]
-]) {
-    assert.ok(windowSource.includes("id: " + id), id);
-    assert.ok(windowSource.includes('domain: "' + domain + '"'), domain);
-}
+// MAP remains the direct discovery page. NEWS now mounts an expandable
+// catalog, while keeping the same GDELT discovery service under REPORTS.
+assert.match(windowSource, /id:\s*mapViewComponent[\s\S]*?StationDiscovery\s*\{[\s\S]*?domain: "map"/);
+assert.match(windowSource, /id:\s*newsViewComponent[\s\S]*?StationNewsHub\s*\{/);
+const newsHubSource = read("widgets/weather/StationNewsHub.qml");
+assert.match(newsHubSource, /StationDiscovery\s*\{[\s\S]*?domain: "news"/);
+assert.match(newsHubSource, /section === "REPORTS"/);
 assert.ok(windowSource.includes("id: radioViewComponent"));
 assert.match(windowSource, /id:\s*radioViewComponent[\s\S]*?StationRadio\s*\{/);
 assert.ok(!windowSource.includes('domain: "radio"'));

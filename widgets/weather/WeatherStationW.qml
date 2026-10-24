@@ -941,9 +941,8 @@ PanelWindow {
         Component {
             id: newsViewComponent
 
-            StationDiscovery {
+            StationNewsHub {
                 stationOpen: weatherStation.menuOpen
-                domain: "news"
             }
         }
 

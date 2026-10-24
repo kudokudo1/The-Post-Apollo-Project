@@ -88,7 +88,9 @@ assert.match(web, /request\.reject\(\)/);
 assert.match(web, /onNewWindowRequested/);
 assert.match(web, /onPermissionRequested/);
 assert.match(web, /permission\.deny\(\)/);
-assert.match(web, /audioMuted: true/);
+assert.match(web, /property bool audioAllowed: false/);
+assert.match(web, /audioMuted: !newsWeb.audioAllowed/);
+assert.match(viewer, /label: stationViewer.audioAllowed \? "MUTE" : "ENABLE AUDIO"/);
 
 // No new radio backend, terminal launcher or compositor control in this stage.
 assert.doesNotMatch(viewer, /\bProcess\s*\{/);

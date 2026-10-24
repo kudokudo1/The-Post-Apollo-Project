@@ -5801,15 +5801,15 @@ PanelWindow {
 
                                 return full.split("\n").filter(function(line) {
                                     const value = String(line || "").trim();
-                                    // Only hide known diagnostic repetition;
-                                    // keep PREPARED, FINISHED, Git output,
-                                    // warnings, errors and recovery failures.
-                                    if (/^JOURNAL PROFILE \/\/ (BEGIN|COMPLETE|FAIL)(\s|$)/.test(value))
-                                        return false;
+                                    // The journal profiles contain *unique*
+                                    // timings, not the P/G/F/R/TOTAL phases.
+                                    // REFRESHED measures a separate boundary
+                                    // (before synchronous model publication).
+                                    // Preserve both, plus all Git results and
+                                    // errors; only suppress status-only echoes
+                                    // already represented by actionStage.
                                     if (value === "RUNNING // Git subprocess started"
                                             || value === "FINALIZING // collecting repository evidence")
-                                        return false;
-                                    if (/^REFRESHED \/\/ repository view [0-9]+ ms$/.test(value))
                                         return false;
                                     return true;
                                 }).join("\n");

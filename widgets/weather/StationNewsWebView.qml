@@ -9,12 +9,15 @@ WebEngineView {
     id: newsWeb
 
     property string articleUrl: ""
+    // Audio stays muted until the operator explicitly enables it for the
+    // selected source. The viewer host only permits one active web instance.
+    property bool audioAllowed: false
     property string loadState: "WAITING"
     property bool blockedNavigation: false
 
     anchors.fill: parent
     backgroundColor: "#1B0623"
-    audioMuted: true
+    audioMuted: !newsWeb.audioAllowed
     url: articleUrl
 
     settings.javascriptEnabled: true

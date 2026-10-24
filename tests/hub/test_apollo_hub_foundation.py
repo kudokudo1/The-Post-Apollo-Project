@@ -1499,7 +1499,7 @@ for token in (
     'label: "END"',
     'label: "RESTART"',
     'label: "APPLY MEMORY LIMIT"',
-    'processExplore.processActionGate.prepare(',
+    'processActionGate.prepare(',
     'processExplore.processActionGate.confirm()',
     'processExplore.processActionGate.cancel()',
     'NOT GUARANTEED CURRENT',

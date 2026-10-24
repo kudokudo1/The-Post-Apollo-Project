@@ -85,6 +85,12 @@ Scope {
                               && typeof f.filedAt === "string"
                               && /^\d{4}-\d{2}-\d{2}$/.test(f.filedAt)
                               && typeof f.category === "string"
+                              && typeof f.primaryDocument === "string"
+                              && /^(?:xslF345X\d{2}\/)?[A-Za-z0-9][A-Za-z0-9_.-]{0,170}$/.test(f.primaryDocument)
+                              && Array.isArray(f.items) && f.items.length <= 12
+                              && f.items.every(function(item) {
+                                  return typeof item === "string" && /^[1-9]\.\d{2}$/.test(item);
+                              })
                               && typeof f.documentUrl === "string"
                               && f.documentUrl.indexOf("https://www.sec.gov/Archives/edgar/data/") === 0
                               && (f.acceptedAt === null || typeof f.acceptedAt === "string");

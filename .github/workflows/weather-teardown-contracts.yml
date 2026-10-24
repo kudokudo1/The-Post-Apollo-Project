@@ -41,6 +41,10 @@ jobs:
         run: node tests/weather/test_station_terminal_geometry.js
       - name: Validate internal NEWS viewer and URL boundary contracts
         run: node tests/weather/test_station_news_viewer.js
+      - name: Validate NEWS source catalog and creator subscriptions
+        run: node tests/weather/test_station_news_channel_hub.js
+      - name: Validate optional YouTube creator feed parser offline
+        run: python3 tests/weather/test_station_youtube_feed.py
       - name: Validate GDELT NEWS rate limit, cache and live source reporting
         run: node tests/weather/test_station_discovery_rate_limit.js
       - name: Validate Weather Station domain palette and live meter contracts

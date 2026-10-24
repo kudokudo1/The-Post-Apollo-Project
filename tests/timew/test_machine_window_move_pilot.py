@@ -11,9 +11,7 @@ from types import SimpleNamespace
 
 root = Path(__file__).resolve().parents[2] / "services" / "time"
 sys.path.insert(0, str(root))
-spec = importlib.util.spec_from_file_location("machine_move", root / "MachineWindowMovePilot.py")
-mod = importlib.util.module_from_spec(spec)
-spec.loader.exec_module(mod)
+import MachineWindowMovePilot as mod
 from MachineMoveJournal import JournalError
 from MachineMoveApproval import MoveApprovalGate
 

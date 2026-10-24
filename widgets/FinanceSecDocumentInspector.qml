@@ -8,6 +8,7 @@ Item {
     property var filing: null
     property var secFeed: null
     property var documentFeed: null
+    property var priceFeed: null
     property var evidenceSlots: []
     property string pinMessage: "PIN TWO INSPECTED FILINGS TO COMPARE"
     property bool compareActive: false
@@ -211,6 +212,13 @@ Item {
                 wrapMode: Text.WrapAnywhere
                 font.pixelSize: 9
                 color: Colors.cyan
+            }
+
+            FinanceSecPriceContext {
+                width: parent.width
+                height: implicitHeight
+                filing: inspector.filing
+                priceFeed: inspector.priceFeed
             }
 
             FinanceSecEvidenceCompare {

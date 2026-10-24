@@ -28,7 +28,7 @@ assert "height: 112" in view
 node = r"""
 const assert = require('node:assert/strict');
 const vm = require('node:vm');
-vm.runInThisContext(SOURCE);
+SOURCE
 
 const before = 'PREPARED // snapshot 123 ms // journal 98 ms (encode 27 ms / disk 8 ms)';
 const begin = 'JOURNAL PROFILE // BEGIN clone 0 ms // record 2 ms // entries 1 ms // persist 90 ms // notify 3 ms // mutation 96 ms';

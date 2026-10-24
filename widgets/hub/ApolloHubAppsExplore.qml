@@ -7,6 +7,8 @@ import "../../components"
 Item {
     id: appsExplore
     property var appsSnapshot: null
+    // AppControl already owns and refreshes its ProcessTelemetry.
+    property var processSnapshot: null
     property bool appControlAvailable: false
     signal openAppControlRequested()
     property string selectedView: "catalog"
@@ -45,8 +47,10 @@ Item {
     }
     readonly property bool detailReady: selectedEntry !== null
     readonly property bool detailMode: selectedView === "details"
+    readonly property bool runningMode: selectedView === "running"
     readonly property string statusLine:
-        detailMode ? (detailReady
+        runningMode ? processExplore.statusLine
+        : detailMode ? (detailReady
                       ? "APPS // DETAILS ONLY // NO APP LAUNCHED"
                       : "APPS // SELECTED ENTRY UNAVAILABLE")
         : !catalogReady ? "APPS // " + catalogState.toUpperCase()
@@ -73,7 +77,7 @@ Item {
         height: appsExplore.densityLevel === 3 ? 30 : 26
         spacing: 5
         ActionButton {
-            width: Math.max(1, (selector.width - selector.spacing) / 2)
+            width: Math.max(1, (selector.width - selector.spacing * 2) / 3)
             height: parent.height
             label: "CATALOG"
             selected: !appsExplore.detailMode
@@ -82,7 +86,7 @@ Item {
             onLeftClicked: appsExplore.selectedView = "catalog"
         }
         ActionButton {
-            width: Math.max(1, (selector.width - selector.spacing) / 2)
+            width: Math.max(1, (selector.width - selector.spacing * 2) / 3)
             height: parent.height
             label: "DETAILS"
             selected: appsExplore.detailMode
@@ -91,11 +95,33 @@ Item {
             softGlowEnabled: false
             onLeftClicked: appsExplore.selectedView = "details"
         }
+        ActionButton {
+            width: Math.max(1, (selector.width - selector.spacing * 2) / 3)
+            height: parent.height
+            label: "RUNNING"
+            selected: appsExplore.runningMode
+            trackLabelGlowLocally: true
+            softGlowEnabled: false
+            onLeftClicked: appsExplore.selectedView = "running"
+        }
+    }
+
+    ApolloHubProcessesExplore {
+        id: processExplore
+        visible: appsExplore.runningMode
+        processSnapshot: appsExplore.processSnapshot
+        appControlAvailable: appsExplore.appControlAvailable
+        onOpenAppControlRequested: appsExplore.openAppControlRequested()
+        anchors.top: selector.bottom
+        anchors.topMargin: 6
+        anchors.left: parent.left
+        anchors.right: parent.right
+        anchors.bottom: parent.bottom
     }
 
     Item {
         id: catalogPane
-        visible: !appsExplore.detailMode
+        visible: !appsExplore.detailMode && !appsExplore.runningMode
         anchors.top: selector.bottom
         anchors.topMargin: 5
         anchors.left: parent.left

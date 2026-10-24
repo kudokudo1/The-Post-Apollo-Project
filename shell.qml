@@ -14,6 +14,7 @@ import "widgets/notifications"
 import "services/weather"
 import "services/system"
 import qs.services.hub
+import "services/hub/ApolloHubProcessesPolicy.js" as HubProcessesPolicy
 import qs.services.notifications
 
 import QtQuick.Effects
@@ -788,6 +789,15 @@ PanelWindow {
             // geometry. Hub receives only a tiny state projection and
             // explicit typed action routing at direct button presses.
             appControlAvailable: appControlWindow !== null
+            // The existing AppControl sampler runs with its own cadence.
+            // Clone only bounded display fields, no argv, user, command or
+            // mutation handles and no new ProcessTelemetry instance.
+            processSnapshot: appControlWindow
+                             ? HubProcessesPolicy.snapshot(
+                                   appControlWindow.taskRows,
+                                   appControlWindow.taskSnapshotLoading,
+                                   appControlWindow.taskSnapshotError)
+                             : null
             socialActionsAvailable: messagingWindow !== null
             socialSnapshot: messagingWindow
                             ? ({ menuOpen: messagingWindow.menuOpen,

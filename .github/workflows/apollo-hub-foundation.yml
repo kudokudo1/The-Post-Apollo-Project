@@ -17,6 +17,9 @@ on:
       - "widgets/hub/ApolloHubUptimeMini.qml"
       - "widgets/hub/ApolloHubAppsMini.qml"
       - "widgets/hub/ApolloHubAppsExplore.qml"
+      - "widgets/hub/ApolloHubProcessesExplore.qml"
+      - "services/hub/ApolloHubProcessesPolicy.js"
+      - "tests/hub/test_apollo_hub_processes_policy.cjs"
       - "widgets/hub/ApolloHubSocialMini.qml"
       - "widgets/hub/ApolloHubTodoMini.qml"
       - "widgets/hub/ApolloHubTodoExplore.qml"
@@ -45,6 +48,9 @@ on:
       - "widgets/hub/ApolloHubUptimeMini.qml"
       - "widgets/hub/ApolloHubAppsMini.qml"
       - "widgets/hub/ApolloHubAppsExplore.qml"
+      - "widgets/hub/ApolloHubProcessesExplore.qml"
+      - "services/hub/ApolloHubProcessesPolicy.js"
+      - "tests/hub/test_apollo_hub_processes_policy.cjs"
       - "widgets/hub/ApolloHubSocialMini.qml"
       - "widgets/hub/ApolloHubTodoMini.qml"
       - "widgets/hub/ApolloHubTodoExplore.qml"
@@ -68,3 +74,5 @@ jobs:
         run: python3 tests/hub/test_apollo_hub_foundation.py
       - name: Exercise layout v1 migration, v2 tile identity and guarded remove
         run: node tests/hub/test_apollo_hub_layout_v2.cjs
+      - name: Verify sanitized AppControl process projection
+        run: node tests/hub/test_apollo_hub_processes_policy.cjs

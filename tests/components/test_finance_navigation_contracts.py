@@ -170,10 +170,16 @@ for row_id, ornament_px, expected_color in (
         marker = 'text: modelData.' + ornament + ' || ""'
         pos = row.index(marker)
         block = row[row.rfind("GohuText {", 0, pos):row.index("}", pos)]
-        assert "anchors.verticalCenter: parent.verticalCenter" in block, (row_id, ornament)
+        expected_anchor = (
+            "anchors.verticalCenter: mainCoreGlyph.verticalCenter"
+            if row_id == "mainGlyphParts" and ornament == "suffix"
+            else "anchors.verticalCenter: parent.verticalCenter"
+        )
+        assert expected_anchor in block, (row_id, ornament)
         assert f"font.pixelSize: {ornament_px}" in block, (row_id, ornament)
         assert f"color: {expected_color}" in block, (row_id, ornament)
-assert menu.count('anchors.verticalCenter: parent.verticalCenter') >= 6
+assert menu.count('anchors.verticalCenter: parent.verticalCenter') >= 5
+assert "anchors.verticalCenter: mainCoreGlyph.verticalCenter" in menu
 
 
 # Permanent Omnitrix vertical line with independent, source-safe glow.

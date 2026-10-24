@@ -471,14 +471,16 @@ Rectangle {
     Rectangle {
         id: terminalBay
 
-        // Shift the whole Sway/alpha viewport 12 logical pixels upward
-        // beneath the common cyan title divider. Maintain the lower edge
-        // at the same distance from the Station footer.
+        // Center the viewport vertically between the shared title rule
+        // and Station footer, with the SAME 8px clearance on each side.
+        // Keep height unchanged at the current Station size; Sway positioning,
+        // observed-geometry alpha cutout and input mask all follow this bay.
+        readonly property real verticalClearance: 8
         x: 8
-        y: 78
+        y: terminalTitleDivider.y + terminalTitleDivider.height + verticalClearance
 
         width: Math.max(0, parent.width - 16)
-        height: Math.max(0, parent.height - 82)
+        height: Math.max(0, parent.height - y - verticalClearance)
 
         color: terminalView.terminalState === "VISIBLE" ? "transparent" : Colors.black
 

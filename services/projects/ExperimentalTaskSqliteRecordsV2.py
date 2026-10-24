@@ -109,7 +109,7 @@ def _path(file):
     return file
 
 
-def _connect(file, *, create=False):
+def _connect(file, *, create=False, writable=False):
     file = _path(file)
     if not file.parent.exists():
         if create:
@@ -120,6 +120,8 @@ def _connect(file, *, create=False):
         raise StoreError("UNSAFE_DATABASE_LINK")
     exists = file.exists()
     if not exists and not create:
+        if writable:
+            raise StoreError("DATABASE_ABSENT")
         return None
     if not exists:
         flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL | getattr(os, "O_NOFOLLOW", 0)
@@ -129,7 +131,9 @@ def _connect(file, *, create=False):
     if create:
         con = sqlite3.connect(str(file), timeout=0.2, isolation_level=None)
     else:
-        con = sqlite3.connect("file:" + quote(str(file), safe="/") + "?mode=ro",
+        # Existing DB only: writable=True MUST NOT create a new database.
+        mode = "rw" if writable else "ro"
+        con = sqlite3.connect("file:" + quote(str(file), safe="/") + "?mode=" + mode,
                               uri=True, timeout=0.2, isolation_level=None)
     try:
         con.row_factory = sqlite3.Row
@@ -143,6 +147,8 @@ def _connect(file, *, create=False):
             con.execute("PRAGMA synchronous=FULL")
         elif version != DB_SCHEMA_VERSION:
             raise StoreError("UNSUPPORTED_SQLITE_SCHEMA")
+        if writable:
+            con.execute("PRAGMA synchronous=FULL")
         return con
     except Exception:
         con.close()
@@ -279,9 +285,7 @@ def edit_task(file, *, expected_revision, expected_hash,
             and _validator._task_value(field, value)
             and type(now_ms) is int and 1 <= now_ms <= MAX_SAFE_MS):
         raise StoreError("INVALID_EDIT_REQUEST")
-    con = _connect(file, create=False)
-    if con is None:
-        raise StoreError("DATABASE_ABSENT")
+    con = _connect(file, writable=True)
     try:
         con.execute("BEGIN IMMEDIATE")
         try:

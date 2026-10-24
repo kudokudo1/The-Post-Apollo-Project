@@ -52,7 +52,7 @@ def review_candidate(payload, *, read_runner):
                          checkpoint_id=payload["checkpoint_id"],
                          read_runner=read_runner)
     # Crucial boundary: never return confirmation text or a review ID that
-    # could be mistaken for a still-live ticket. Do not call gate.approve().
+    # could be mistaken for a still-live ticket. No approval is ever issued.
     return {
         "kind": "machine-m1o-action-review",
         "status": "review_only",

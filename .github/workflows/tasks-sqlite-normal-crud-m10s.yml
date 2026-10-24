@@ -4,6 +4,9 @@ on:
   pull_request:
     paths:
       - 'services/projects/ExperimentalTaskSqliteCrudM10s.py'
+      - 'services/projects/ExperimentalTaskSqliteProjectsM10t.py'
+      - 'tests/tasks/test_task_sqlite_m10t_project_lifecycle.py'
+      - 'docs/tasks-sqlite-normal-project-lifecycle-m10t.md'
       - 'tests/tasks/test_task_sqlite_m10s_normal_crud.py'
       - 'docs/tasks-sqlite-normal-crud-m10s.md'
       - '.github/workflows/tasks-sqlite-normal-crud-m10s.yml'
@@ -12,6 +15,9 @@ on:
       - main
     paths:
       - 'services/projects/ExperimentalTaskSqliteCrudM10s.py'
+      - 'services/projects/ExperimentalTaskSqliteProjectsM10t.py'
+      - 'tests/tasks/test_task_sqlite_m10t_project_lifecycle.py'
+      - 'docs/tasks-sqlite-normal-project-lifecycle-m10t.md'
       - 'tests/tasks/test_task_sqlite_m10s_normal_crud.py'
       - 'docs/tasks-sqlite-normal-crud-m10s.md'
       - '.github/workflows/tasks-sqlite-normal-crud-m10s.yml'
@@ -29,6 +35,8 @@ jobs:
           python-version: '3.12'
       - name: M10s NORMAL task/project SQL transactions
         run: python3 tests/tasks/test_task_sqlite_m10s_normal_crud.py
+      - name: M10t NORMAL project rename/delete lifecycle
+        run: python3 tests/tasks/test_task_sqlite_m10t_project_lifecycle.py
       - name: M10l existing normalized record and journal regression
         run: python3 tests/tasks/test_task_sqlite_records_v2.py
       - name: M10r compatibility and production isolation guards

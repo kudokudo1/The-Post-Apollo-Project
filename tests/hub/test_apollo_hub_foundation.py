@@ -1095,12 +1095,13 @@ for needle in (
     'property string selectedTaskDate: ""',
     'Planner.view(',
     'todoSnapshot, taskMonthKey, taskFocusDateKey, taskTodayKey',
-    'densityLevel >= 2 && selectedView === "agenda"',
+    'densityLevel >= 2 && (selectedView === "agenda"',
     'id: viewSelector',
     'visible: calendarMini.densityLevel >= 2',
-    'label: "MONTH"',
-    'label: "AGENDA"',
-    'available: calendarMini.calendarReady && calendarMini.taskView.available',
+    'model: ["MONTH", "WEEK", "DAY", "AGENDA"]',
+    'label: modelData',
+    'modelData === "MONTH"',
+    'calendarMini.calendarReady && calendarMini.taskView.available',
     'function selectTaskDate(dateKey)',
     'selectedTaskDate = dateKey;',
     'TapHandler {',
@@ -1120,6 +1121,34 @@ for forbidden in (
 ):
     assert forbidden not in calendar_mini, (
         f"Level 2 agenda cannot collect or write: {forbidden}")
+
+# Stage 8B: WEEK/DAY are view-only extensions to the existing TASKS
+# source projection, using its pure day/week arithmetic and existing data.
+for needle in (
+    'Planner.weekDays(todoSnapshot, taskFocusDateKey, taskTodayKey)',
+    'model: ["MONTH", "WEEK", "DAY", "AGENDA"]',
+    'function stepTaskDate(direction)',
+    'Planner.moveDay(taskFocusDateKey, step)',
+    'selectedView === "week" ? direction * 7 : direction',
+    'const delta = (to.year - from.year) * 12',
+    'newOffset < -120 || newOffset > 120',
+    'calendarBridge.calendarMonthOffset = newOffset;',
+    'id: dateNavigation',
+    'id: weekStrip',
+    'model: calendarMini.weekEntries',
+    'weekDay.modelData.remaining',
+    'onTapped: calendarMini.selectedTaskDate = weekDay.modelData.date',
+    'calendarMini.selectedView === "day" ? 47 : 29',
+    'parent.modelData.priority',
+    'parent.modelData.projectId',
+    'dateNavigation.visible',
+    '? dateNavigation.height + 6 : 0',
+    'weekStrip.visible ? weekStrip.height + 6 : 0',
+):
+    assert needle in calendar_mini, f"Stage 8B navigation missing {needle}"
+for forbidden in ('Timer {', 'FileView {', 'Process {', 'new Date(',
+                  'Date.now(', 'addTask(', 'reschedule(', 'setDone('):
+    assert forbidden not in calendar_mini, f"Stage 8B unowned action: {forbidden}"
 
 # Launchers and widget backends are unchanged in this first stage.
 print("ApolloHubW foundation source contracts passed")

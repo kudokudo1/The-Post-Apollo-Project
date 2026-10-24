@@ -109,6 +109,14 @@ Operator ran `swaymsg -t get_tree` on the live Weather Station STAR MAP actor an
 
 **Stage Director future reconciliation:** the Stage Director SD0 declarative profile still describes 780×416 at (190,132), and has no mutating geometry authority. After confirming the desired viewer geometry, coordinate separately with the SwayPX owner to update the scene declaration; do not change compositor branch in this Weather UI PR.
 
+### B12 // Shared terminal subheader and viewport alignment (2026-10-23)
+
+**Operator UI request:** shift the terminal viewing hole upward slightly and give the STAR MAP title row a cyan horizontal divider. Apply the same title-line grammar across all other Weather Station context consoles (MAP, NEWS, RADIO, etc.), not only STAR MAP.
+
+**Scoped implementation:** common `StationTerminal.qml` receives a two-pixel cyan divider at local y=64, inset x=14 / width minus 28, under the existing dynamic `sessionTitle` and state. Move `terminalBay` from local (8,90) / 824×482 to (8,78) / **824×494**, moving its top **12 logical pixels higher** while keeping the same lower edge. On the previously reported DP-5 2560×1440 Sway layout, desired global Kitty rect becomes (1708,140) / 824×494; a negative-origin HDMI-A-1 output gets (-852,340) / 824×494. The existing Sway position, compositor-observed size check, four-sided alpha cutout, and input-region mask all derive from the same bay values. A successful Sway resize is **still not proof** of exact window dimensions; verify the visual result and actual tree on the operator's machine.
+
+**Stage Director continuity:** SwayPX's SD0 observer profile may retain previous scene dimensions. It was NOT modified by this UI adjustment. Once the operator accepts the final location and size, hand the observed and requested geometry to the Stage Director owner for reconciliation. No new authority to force compositor window geometry is implied by this note.
+
 ## 4 // Domain family C: MAP and world/environmental layers
 
 Current EONET is an event index only. Planned:

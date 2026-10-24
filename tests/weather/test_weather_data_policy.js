@@ -728,12 +728,12 @@ assert.equal(terminalGeometry.visibleIntersection(desired,
 assert.equal(terminalGeometry.observedWindow(treeExample, "weather-screen-news"), null);
 assert.equal(terminalGeometry.observedWindow(treeExample, "malicious-name"), null);
 const nextBay = terminalGeometry.position(
-    terminalOutputs, "DP-5", 1000, 20, 62, 160, 8, 90, 824, 482);
+    terminalOutputs, "DP-5", 1000, 20, 62, 160, 8, 78, 824, 494);
 assert.deepEqual(JSON.parse(JSON.stringify(nextBay)),
-                 {x: 1708, y: 152, width: 824, height: 482});
+                 {x: 1708, y: 140, width: 824, height: 494});
 const otherBay = terminalGeometry.position(
-    terminalOutputs, "HDMI-A-1", 1000, 20, 62, 160, 8, 90, 824, 482);
+    terminalOutputs, "HDMI-A-1", 1000, 20, 62, 160, 8, 78, 824, 494);
 assert.deepEqual(JSON.parse(JSON.stringify(otherBay)),
-                 {x: -852, y: 352, width: 824, height: 482});
+                 {x: -852, y: 340, width: 824, height: 494});
 
 console.log("Weather data policy contracts: PASS");

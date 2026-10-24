@@ -449,6 +449,19 @@ Rectangle {
         z: 5
     }
 
+    // The shared title/status row serves STAR MAP and every domain
+    // console (MAP, NEWS, RADIO, SKY, etc.). Keep one cyan inset
+    // divider here rather than duplicating it in each mode.
+    Rectangle {
+        id: terminalTitleDivider
+        x: 14
+        y: 64
+        width: Math.max(0, parent.width - 28)
+        height: 2
+        color: Colors.cyan
+        z: 5
+    }
+
     // ─────────────────────────────────────────────
     // ACTUAL INSTRUMENT BAY
     //
@@ -458,13 +471,14 @@ Rectangle {
     Rectangle {
         id: terminalBay
 
-        // Lower top edge, substantially larger reading area after moving
-        // launch/close controls to the Weather Station header.
+        // Shift the whole Sway/alpha viewport 12 logical pixels upward
+        // beneath the common cyan title divider. Maintain the lower edge
+        // at the same distance from the Station footer.
         x: 8
-        y: 90
+        y: 78
 
         width: Math.max(0, parent.width - 16)
-        height: Math.max(0, parent.height - 94)
+        height: Math.max(0, parent.height - 82)
 
         color: terminalView.terminalState === "VISIBLE" ? "transparent" : Colors.black
 

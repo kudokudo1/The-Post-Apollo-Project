@@ -45,7 +45,7 @@ function valid(s) {
         && (s.shadowModelSha256===null || hash(s.shadowModelSha256))
         && typeof s.reason==="string" && s.reason.length<=80
         && (s.phase==="JSON_ACTIVE" || s.phase==="FREEZE_REQUESTED"
-            || s.sourceSha256!==null)
+            || s.phase==="RECOVERY_REVIEW" || s.sourceSha256!==null)
         && (s.phase!=="SHADOW_VERIFIED" && s.phase!=="AWAITING_OPERATOR"
             || s.shadowModelSha256!==null)
         && (s.phase!=="JSON_ACTIVE" || s.sequence===0

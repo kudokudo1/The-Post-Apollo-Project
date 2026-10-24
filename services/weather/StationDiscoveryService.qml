@@ -11,6 +11,7 @@ Scope {
     property string domain: "map"
     property bool active: true
     property bool ready: false
+    property bool usingCache: false
     property bool failed: false
     property string errorText: ""
     property var rows: []
@@ -42,6 +43,7 @@ Scope {
             rows = snapshot.rows;
             lastUpdated = new Date(snapshot.updatedAtMs);
             ready = true;
+            usingCache = true;
         }
     }
     function refresh() {
@@ -86,6 +88,7 @@ Scope {
             const parsed = DiscoveryPolicy.parse(domain, JSON.parse(received.body));
             rows = parsed;
             ready = true;
+            usingCache = false;
             failed = false;
             errorText = "";
             lastUpdated = new Date(now);

@@ -841,6 +841,7 @@ PanelWindow {
         && machineResolverIndex < machineWindowResolution.candidates.length
         ? machineWindowResolution.candidates[machineResolverIndex] : null
     function machineInvalidateResolver() {
+        machineInvalidateMoveReview();
         machineResolverCheckpointId = "";
         machineWindowResolution = null;
         machineResolverIndex = 0;
@@ -852,6 +853,7 @@ PanelWindow {
                 || !machineOpenedCheckpoint || !machineSavedItem
                 || machineOpenedCheckpoint.checkpoint.id !== machineSavedItem.id)
             return;
+        machineInvalidateMoveReview();
         machineResolverCheckpointId = machineSavedItem.id;
         machineResolverPayload = JSON.stringify(machineOpenedCheckpoint.document);
         machineWindowResolution = null;
@@ -863,8 +865,81 @@ PanelWindow {
     }
     function machineStepResolverItem(delta) {
         const n = machineWindowResolution ? machineWindowResolution.candidates.length : 0;
-        if (n)
+        if (n) {
             machineResolverIndex = (machineResolverIndex + delta + n) % n;
+            machineInvalidateMoveReview();
+        }
+    }
+
+    // M1o read-only review is distinct from M1n operator approval. Never
+    // issue a token, move a window, change the journal, or start a restore.
+    property bool machineMoveReviewBusy: false
+    property string machineMoveReviewMode: ""
+    property string machineMoveReviewPayload: ""
+    property string machineMoveReviewKey: ""
+    property string machineMoveReviewStatus: "NOT REVIEWED"
+    property var machineMoveReviewResult: null
+    property int machineMoveReviewIndex: 0
+    readonly property string machineMoveCandidateKey:
+        machineSavedItem && machineOpenedCheckpoint && machineResolverItem
+        && machineOpenedCheckpoint.checkpoint.id === machineSavedItem.id
+        ? JSON.stringify([machineSavedItem.id, machineResolverItem.app_id,
+            machineResolverItem.live_con_id,
+            machineResolverItem.current_workspace,
+            machineResolverItem.target_workspace]) : ""
+    readonly property var machineMovePendingItem:
+        machineMoveReviewResult
+        && machineMoveReviewResult.kind === "machine-m1o-interruption-review"
+        && machineMoveReviewIndex >= 0
+        && machineMoveReviewIndex < machineMoveReviewResult.items.length
+        ? machineMoveReviewResult.items[machineMoveReviewIndex] : null
+    function machineInvalidateMoveReview() {
+        machineMoveReviewResult = null;
+        machineMoveReviewKey = "";
+        machineMoveReviewIndex = 0;
+        machineMoveReviewStatus = "NOT REVIEWED";
+    }
+    function machineReviewActionCandidate() {
+        if (!menuOpen || selectedMode !== "machine" || !machineStoredViewOpen
+                || machineMoveReviewBusy || machineStoreBusy || machineResolverBusy
+                || !machineResolverItem || machineResolverItem.status !== "candidate"
+                || !machineSavedItem || !machineOpenedCheckpoint
+                || machineOpenedCheckpoint.checkpoint.id !== machineSavedItem.id
+                || machineMoveCandidateKey === "")
+            return;
+        machineMoveReviewKey = machineMoveCandidateKey;
+        machineMoveReviewPayload = JSON.stringify({
+            checkpoint_id: machineSavedItem.id,
+            document: machineOpenedCheckpoint.document,
+            candidate: machineResolverItem
+        });
+        machineMoveReviewMode = "preview";
+        machineMoveReviewResult = null;
+        machineMoveReviewStatus = "VERIFYING ACTION // READ ONLY";
+        machineMoveReviewBusy = true;
+        machineMoveReviewProcess.exec(["python3", "-B", "-I",
+            Quickshell.shellPath("services/time/MachineMoveReviewRead.py"), "preview"]);
+    }
+    function machineCheckInterruptedMoves() {
+        if (!menuOpen || selectedMode !== "machine" || !machineStoredViewOpen
+                || machineMoveReviewBusy)
+            return;
+        machineMoveReviewMode = "pending";
+        machineMoveReviewKey = "";
+        machineMoveReviewPayload = "";
+        machineMoveReviewIndex = 0;
+        machineMoveReviewResult = null;
+        machineMoveReviewStatus = "CHECKING JOURNAL // READ ONLY";
+        machineMoveReviewBusy = true;
+        machineMoveReviewProcess.exec(["python3", "-B", "-I",
+            Quickshell.shellPath("services/time/MachineMoveReviewRead.py"), "pending"]);
+    }
+    function machineStepPendingMove(delta) {
+        const count = machineMoveReviewResult
+            && machineMoveReviewResult.kind === "machine-m1o-interruption-review"
+            ? machineMoveReviewResult.items.length : 0;
+        if (count > 0)
+            machineMoveReviewIndex = (machineMoveReviewIndex + delta + count) % count;
     }
 
     function machineStoreRequest(action, data, id) {
@@ -1221,6 +1296,70 @@ PanelWindow {
             if (exitCode !== 0) {
                 timew.machineWindowResolution = null;
                 timew.machineResolverStatus = "LIVE RESOLUTION UNAVAILABLE";
+            }
+        }
+    }
+
+    Process {
+        id: machineMoveReviewProcess
+        running: false
+        stdinEnabled: true
+        onStarted: {
+            if (timew.machineMoveReviewMode === "preview"
+                    && timew.machineMoveReviewPayload)
+                machineMoveReviewProcess.write(
+                    timew.machineMoveReviewPayload + String.fromCharCode(10));
+            timew.machineMoveReviewPayload = "";
+        }
+        stdout: StdioCollector {
+            onStreamFinished: {
+                try {
+                    const result = JSON.parse(this.text);
+                    const mode = timew.machineMoveReviewMode;
+                    const common = result && result.read_only === true
+                                   && result.executable === false
+                                   && result.approval_issued === false;
+                    if (timew.menuOpen && timew.selectedMode === "machine"
+                            && timew.machineStoredViewOpen && common
+                            && mode === "preview"
+                            && result.kind === "machine-m1o-action-review"
+                            && result.status === "review_only"
+                            && timew.machineMoveReviewKey !== ""
+                            && timew.machineMoveReviewKey === timew.machineMoveCandidateKey
+                            && result.action
+                            && timew.machineResolverItem
+                            && result.action.con_id === timew.machineResolverItem.live_con_id
+                            && result.action.app_id === timew.machineResolverItem.app_id) {
+                        timew.machineMoveReviewResult = result;
+                        timew.machineMoveReviewStatus = "MOVE REVIEWED // NO APPROVAL";
+                    } else if (timew.menuOpen && timew.selectedMode === "machine"
+                            && timew.machineStoredViewOpen && common
+                            && mode === "pending"
+                            && result.kind === "machine-m1o-interruption-review"
+                            && Array.isArray(result.items) && result.items.length <= 40
+                            && result.no_automatic_retry === true
+                            && result.no_automatic_undo === true) {
+                        timew.machineMoveReviewResult = result;
+                        timew.machineMoveReviewIndex = 0;
+                        timew.machineMoveReviewStatus = result.items.length
+                            ? "UNRESOLVED MOVES // MANUAL REVIEW"
+                            : "NO UNRESOLVED MOVE OPERATIONS";
+                    } else {
+                        timew.machineMoveReviewResult = null;
+                        timew.machineMoveReviewStatus = "MOVE REVIEW UNAVAILABLE";
+                    }
+                } catch (error) {
+                    timew.machineMoveReviewResult = null;
+                    timew.machineMoveReviewStatus = "INVALID REVIEW RESULT";
+                }
+            }
+        }
+        onExited: function(exitCode, exitStatus) {
+            timew.machineMoveReviewBusy = false;
+            timew.machineMoveReviewPayload = "";
+            if (exitCode !== 0) {
+                timew.machineMoveReviewResult = null;
+                timew.machineMoveReviewStatus = "MOVE REVIEW UNAVAILABLE";
             }
         }
     }
@@ -4231,6 +4370,111 @@ PanelWindow {
                                            && timew.machineWindowResolution.candidates.length > 1
                                 onLeftClicked: timew.machineStepResolverItem(1)
                             }
+                        }
+                        Row {
+                            width: parent.width
+                            height: 34
+                            spacing: 7
+                            ActionButton {
+                                width: (parent.width - parent.spacing) / 2
+                                height: parent.height
+                                label: "REVIEW MOVE"
+                                labelPixelSize: 10
+                                accentColor: timew.semanticColor
+                                available: !timew.machineMoveReviewBusy
+                                           && !timew.machineResolverBusy
+                                           && !!timew.machineResolverItem
+                                           && timew.machineResolverItem.status === "candidate"
+                                           && !!timew.machineOpenedCheckpoint
+                                           && !!timew.machineSavedItem
+                                           && timew.machineOpenedCheckpoint.checkpoint.id
+                                              === timew.machineSavedItem.id
+                                onLeftClicked: timew.machineReviewActionCandidate()
+                            }
+                            ActionButton {
+                                width: (parent.width - parent.spacing) / 2
+                                height: parent.height
+                                label: "CHECK INTERRUPTS"
+                                labelPixelSize: 9
+                                accentColor: timew.semanticColor
+                                available: !timew.machineMoveReviewBusy
+                                onLeftClicked: timew.machineCheckInterruptedMoves()
+                            }
+                        }
+                        GohuText {
+                            width: parent.width
+                            visible: timew.machineMoveReviewResult !== null
+                                     || timew.machineMoveReviewBusy
+                                     || timew.machineMoveReviewStatus !== "NOT REVIEWED"
+                            text: timew.machineMoveReviewStatus
+                            color: Colors.orange
+                            font.pixelSize: 10
+                            elide: Text.ElideRight
+                        }
+                        GohuText {
+                            width: parent.width
+                            visible: !!timew.machineMoveReviewResult
+                                     && timew.machineMoveReviewResult.kind
+                                        === "machine-m1o-action-review"
+                            text: timew.machineMoveReviewResult
+                                  ? "REVIEW ONLY // "
+                                    + timew.machineMoveReviewResult.action.app_id
+                                    + " // " + timew.machineMoveReviewResult.action.from_workspace
+                                    + " > " + timew.machineMoveReviewResult.action.to_workspace
+                                    + " // NO MOVE" : ""
+                            color: Colors.cyan
+                            font.pixelSize: 10
+                            elide: Text.ElideRight
+                        }
+                        Row {
+                            width: parent.width
+                            height: 27
+                            spacing: 6
+                            visible: !!timew.machineMoveReviewResult
+                                     && timew.machineMoveReviewResult.kind
+                                        === "machine-m1o-interruption-review"
+                                     && timew.machineMoveReviewResult.items.length > 0
+                            ActionButton {
+                                width: 38
+                                height: parent.height
+                                label: "<"
+                                accentColor: timew.semanticColor
+                                available: timew.machineMoveReviewResult
+                                           && timew.machineMoveReviewResult.items.length > 1
+                                onLeftClicked: timew.machineStepPendingMove(-1)
+                            }
+                            GohuText {
+                                width: Math.max(0, parent.width - 88)
+                                anchors.verticalCenter: parent.verticalCenter
+                                text: timew.machineMovePendingItem
+                                      ? (timew.machineMoveReviewIndex + 1) + " / "
+                                        + timew.machineMoveReviewResult.items.length
+                                        + " // " + timew.machineMovePendingItem.advisory_state
+                                        + " // " + timew.machineMovePendingItem.app_id
+                                        + " " + timew.machineMovePendingItem.from_workspace
+                                        + " > " + timew.machineMovePendingItem.to_workspace
+                                      : ""
+                                color: Colors.cyan
+                                font.pixelSize: 10
+                                elide: Text.ElideRight
+                            }
+                            ActionButton {
+                                width: 38
+                                height: parent.height
+                                label: ">"
+                                accentColor: timew.semanticColor
+                                available: timew.machineMoveReviewResult
+                                           && timew.machineMoveReviewResult.items.length > 1
+                                onLeftClicked: timew.machineStepPendingMove(1)
+                            }
+                        }
+                        GohuText {
+                            width: parent.width
+                            visible: !!timew.machineMovePendingItem
+                            text: "PENDING // NO AUTOMATIC RETRY OR UNDO"
+                            color: Colors.orange
+                            font.pixelSize: 10
+                            elide: Text.ElideRight
                         }
                         Row {
                             width: parent.width

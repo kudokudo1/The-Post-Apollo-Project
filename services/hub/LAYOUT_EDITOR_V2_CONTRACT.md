@@ -266,9 +266,17 @@ H:1 retains the existing `ApolloHubAppsMini` and its explicit exact-ID tap-to-la
 
 **Boundary:** No changes to shared AppsPolicy, ApolloHubLiveBridge, the compact launch function, Quickshell DesktopEntries collection or saved layout. No subprocess, timer, disk access, autostart, implicit launch, program switch or focus action. Source contracts and CI guard the original H:1 launch separately from Level 2 browsing. Live acceptance must check W:1/W:2 H:1/H:2/H:3, selection/back, first-24 indication, app disappearance, empty/unavailable catalog, large names/IDs, scroll and no accidental launch.
 
+## P1 Stage 8G // TASKS real task details and responsive Notes in Hub
+
+**To-do:** H:1 retains the original fully functional `ApolloHubTodoMini` add/rename/done/two-step delete controls. H:2/H:3 mount `ApolloHubTodoExplore.qml` with LIST/DETAILS tabs. LIST reuses the **same** `ApolloHubTodoMini` used in standalone `widgets/TasksW.qml`; selecting a task uses the **existing** `widgets/tasks/TaskDetailsPane.qml.chooseTask` to open priority, segmented due date and description editing inside Hub. Both panes consume the identical `ApolloHubTodoStore` singleton and snapshot, never a new writer. Switching modes preserves pending write state and dirty drafts; `TaskDetailsPane.chooseTask` refuses changes if a draft is dirty or a write is pending, and existing SAVE/DISCARD and confirmation semantics remain authoritative. While DETAILS is open the Hub's spatial-keyboard guard is suppressed to prevent interception of date/text editing.
+
+**Notes:** `ApolloHubNotesMini` already performs real create/open/save/reload/two-step-delete over `ApolloHubNotesStore`; there is no separate NotesW backend to invent. Stage 8G gives H:2/H:3 taller list headers/rows, larger title and note-body text, and more footer spacing without changing compact H:1, revision guards, atomic writes, or discard/delete confirmations.
+
+**VERIFY / desktop gate:** Source contracts check store injection and real TASKS pane reuse. Live verify H:1/H:2/H:3 W:1/W:2, LIST → task title → DETAILS, edit priority/date/description/save, dirty-draft refusal when changing tasks, write failure/recovery, editor focus isolation, Notes NEW/SAVE/BACK/DELETE two-stage actions, resizing while unsaved, long entries and overflow. CI is not visual acceptance. No shell/TasksW/TaskDetailsPane/policy/store changes, background collector, window jump or merge in this stage.
+
 ## NEXT
 
-Complete Stage 7A/7B/7C/7D/8A/8B/8C/8D/8E/8F desktop acceptance. Next can be Notes and To-do internal density, but those contain editable user data, so changes must preserve editor focus, draft and save-confirmation behavior. Durable undo/presets and drag-and-drop remain separate operator decisions.
+Complete Stage 7A/7B/7C/7D/8A/8B/8C/8D/8E/8F/8G desktop acceptance. Next can be Notes and To-do internal density, but those contain editable user data, so changes must preserve editor focus, draft and save-confirmation behavior. Durable undo/presets and drag-and-drop remain separate operator decisions.
 
 ## DECISIONS
 

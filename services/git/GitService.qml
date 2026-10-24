@@ -1379,8 +1379,14 @@ Scope {
                 '  fi',
                 'done < <(git -C "$root" for-each-ref --sort=-committerdate --count=24 --format="%(refname:short)%09%(committerdate:unix)" refs/remotes/origin 2>/dev/null)',
                 'trace_refresh_stage "cherry"',
-                'while IFS="$(printf "\\t")" read -r ref ref_head ref_upstream; do',
+                // Collect full local ref names while reading the existing
+                // for-each-ref rows. The nonempty "u" prefix prevents Bash
+                // tab IFS from swallowing an empty upstream column.
+                'declare -A local_branch_refs=()',
+                'while IFS="$(printf "\\t")" read -r ref ref_head encoded_upstream local_ref; do',
                 '  [ -z "$ref" ] && continue',
+                '  local_branch_refs["$local_ref"]=1',
+                '  ref_upstream="${encoded_upstream#u}"',
                 '  compare="$ref_upstream"',
                 '  if [ -z "$compare" ] && git -C "$root" show-ref --verify --quiet "refs/remotes/origin/$ref"; then compare="origin/$ref"; fi',
                 '  unpulled=0',
@@ -1390,7 +1396,7 @@ Scope {
                 '    if [ "$unpulled" -gt 0 ]; then changed="$(git -C "$root" show -s --format=%ct "$compare" 2>/dev/null || printf "0")"; fi',
                 '  fi',
                 '  printf "LOCALBRANCH\\t%s\\t%s\\t%s\\t%s\\t%s\\n" "$ref" "$ref_head" "$ref_upstream" "$unpulled" "$changed"',
-                'done < <(git -C "$root" for-each-ref --format="%(refname:short)%09%(objectname:short=10)%09%(upstream:short)" refs/heads 2>/dev/null)',
+                'done < <(git -C "$root" for-each-ref --format="%(refname:short)%09%(objectname:short=10)%09u%(upstream:short)%09%(refname:lstrip=2)" refs/heads 2>/dev/null)',
                 'trace_refresh_stage "local_branches"',
                 'while IFS="$(printf "\\t")" read -r ref changed; do',
                 '  [ -z "$ref" ] && continue',
@@ -1399,7 +1405,11 @@ Scope {
                 '  case "$ref" in */*) ;; *) continue ;; esac',
                 '  local_branch="${ref#origin/}"',
                 '  remote_only=0',
-                '  if ! git -C "$root" show-ref --verify --quiet "refs/heads/$local_branch"; then remote_only=1; fi',
+                // The local ref index is built from the exact full branch
+                // names in the earlier for-each-ref invocation. Avoid one
+                // Git subprocess per remote branch. Never use short-display
+                // names as keys: tags can make those ambiguous.
+                '  if [ -z "${local_branch_refs["$local_branch"]+present}" ]; then remote_only=1; fi',
                 '  unpulled=0',
                 '  case "$pending_refs" in *"|$ref|"*) unpulled=1 ;; esac',
                 '  if [ "$unpulled" -eq 0 ]; then changed=0; fi',

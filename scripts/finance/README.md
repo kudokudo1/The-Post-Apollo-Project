@@ -849,3 +849,33 @@ Existing D9/D12/D17 independent financial write gates and journal
 recovery remain unchanged. The actual balances and categories come from
 the authenticated read-only snapshot; the new panes never call Actual
 or persist data directly. No local host changes were made by this PR.
+
+
+## FinanceW Category Management M1 // Safe create and rename preview
+
+Under **Finance → Budget → Budget → CATEGORIES**, use **+ NEW CATEGORY**
+to choose an existing expense group, type a category name and select
+**PREVIEW**. On a category row, select **RENAME** to stage a new name within
+the category's existing group. **EDIT SET** remains the existing allocation
+shortcut and is unrelated to category naming.
+
+These forms are **preview-only**. They never create/rename/delete an Actual
+category, change permissions or persist drafts. The preview explicitly says
+**NOT SAVED // ACTUAL IS UNCHANGED**. There is no disguised APPLY or SAVE button.
+
+The read-only snapshot now carries stable expense category-group IDs and
+each category's group ID. Missing group identity fails the authenticated
+read rather than resolving writes by display name. Previews bind to the
+source fingerprint, selected month, original category and group identity.
+Renames are limited to a selected existing category's group. Empty/too-long
+names, control characters, duplicate names in one group and stale/missing
+IDs are refused. Category groups are chosen by the left/right controls.
+
+This is the first independent category-management milestone, not full
+category administration. **Next:** test create/rename semantics on a
+disposable Actual 26.10.0 server; design a separate category authorization,
+durable journal and readback writer (sharing FinanceW's global lock);
+wire save only after explicit operator review. Deletion and group
+reorganization are separately scoped, because existing transactions and
+historical budget allocations may depend on categories. No local machine
+modifications or personal-budget writes are performed by this milestone.

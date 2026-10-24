@@ -14,20 +14,29 @@ Rectangle {
     property bool viewerOpen: false
     property var selectedNews: null
 
+    // Live MM:SS display, keeping even long provider cooldowns readable.
+    function retryClock(value) {
+        const seconds = Math.max(0, Math.ceil(Number(value) || 0));
+        const mm = Math.floor(seconds / 60);
+        const ss = seconds % 60;
+        return (mm < 10 ? "0" : "") + mm + ":"
+               + (ss < 10 ? "0" : "") + ss;
+    }
+
     // Expose the child provider's actual NEWS state to the Station header.
     // Configured is not the same thing as received articles.
     readonly property string feedBadge: {
         if (source.failed)
             return source.errorText
                    + (source.retryWaitSeconds > 0
-                      ? " // RETRY " + source.retryWaitSeconds + "s" : "");
+                      ? " // RETRY " + stationDiscovery.retryClock(source.retryWaitSeconds) : "");
         if (source.loading)
             return "READING // NEWS";
         if (source.ready)
             return (source.usingCache ? "NEWS CACHED // " : "NEWS RECEIVED // ")
                    + source.rows.length;
         if (source.retryWaitSeconds > 0)
-            return "WAIT // RETRY " + source.retryWaitSeconds + "s";
+            return "WAIT // RETRY " + stationDiscovery.retryClock(source.retryWaitSeconds);
         return "CONNECTING // NEWS";
     }
     readonly property color feedBadgeColor:
@@ -193,12 +202,14 @@ Rectangle {
                     label: "RETRY NEWS"
                     labelPixelSize: 11
                     available: source.canRetry
-                    onClicked: source.refresh()
+                    onClicked: source.refresh(true)
                 }
                 QuietText {
                     anchors.verticalCenter: parent.verticalCenter
                     text: source.retryWaitSeconds > 0
-                          ? "NEXT REQUEST IN " + source.retryWaitSeconds + "s"
+                          ? "EARLIEST RETRY IN " + stationDiscovery.retryClock(source.retryWaitSeconds)
+                          : source.failed && source.errorText === "RATE LIMITED"
+                            ? "RETRY MAY STILL BE THROTTLED"
                           : source.failed ? "REQUEST FAILED // RETRY AVAILABLE"
                           : source.loading ? "REQUEST IN PROGRESS"
                           : "ON DEMAND // 15-MIN REFRESH"

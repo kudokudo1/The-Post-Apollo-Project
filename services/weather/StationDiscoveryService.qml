@@ -46,10 +46,19 @@ Scope {
             usingCache = true;
         }
     }
-    function refresh() {
+    function refresh(manual) {
         if (!active || endpoint === "" || fetchProcess.running)
             return false;
         const now = Date.now();
+        // After a 429, do not auto-retry on tab remount or the periodic timer.
+        // Only an explicit operator click may attempt another fetch when due.
+        if (domain === "news"
+                && !manual && DiscoveryPolicy.newsManualRetryRequired()) {
+            sourceClockMs = now;
+            failed = true;
+            errorText = "RATE LIMITED";
+            return false;
+        }
         sourceClockMs = now;
         if (domain === "news" && !DiscoveryPolicy.reserveNewsRequest(now)) {
             if (DiscoveryPolicy.newsThrottled(now)) {
@@ -75,6 +84,9 @@ Scope {
                 DiscoveryPolicy.recordNewsThrottle(now);
             failed = true;
             errorText = "RATE LIMITED";
+            // _newsNextAllowedMs is shared JS state, not a notifying QML
+            // property. Force an observable clock write after changing it.
+            sourceClockMs = Date.now();
             return;
         }
         if (received.status < 200 || received.status >= 300) {
@@ -124,18 +136,27 @@ Scope {
         running: discovery.active
         onTriggered: discovery.refresh()
     }
-    // Update retry availability, never automatically issue a failed request.
-    // This timer is active only during a limited NEWS cooldown.
+    // Always tick while NEWS is visible. A timer gated by retryWaitSeconds
+    // can stop when the countdown reaches zero, or fail to restart because
+    // the underlying pragma-library deadline does not send QML change signals.
+    // A steady one-second clock drives the panel and header independently
+    // of switching modes, with *no* network requests in this timer.
     Timer {
-        interval: 5000
+        interval: 1000
         repeat: true
         running: discovery.active && discovery.domain === "news"
-                 && discovery.retryWaitSeconds > 0
         onTriggered: discovery.sourceClockMs = Date.now()
     }
     onActiveChanged: { if (active) refresh(); }
     Component.onCompleted: {
         restoreNewsCache();
-        if (active) refresh();
+        if (domain === "news" && DiscoveryPolicy.newsManualRetryRequired()) {
+            // Preserve the provider refusal across page reconstruction.
+            failed = true;
+            errorText = "RATE LIMITED";
+            sourceClockMs = Date.now();
+        } else if (active) {
+            refresh();
+        }
     }
 }

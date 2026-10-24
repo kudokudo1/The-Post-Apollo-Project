@@ -101,6 +101,14 @@ Related source-of-truth and reading:
 
 **Stage Director coordination:** its SD0 Weather Station profile still declares the **older** 780×416 @ (190,132) scene-bay geometry. The new bay is **812×468 @ (174,152)** relative to the 1000×700 station. That declaration will be stale if this UI work lands; update Stage Director's scene model in its own reviewed assignment, not via an unauthorized compositor patch. Stage Director's present observation-only contract stays intact. New domain app IDs are not yet classified by that old profile; the M3 coordination plan must register them.
 
+### B11 // 2026-10-23 Sway-observed Kitty fit vs intended bay
+
+Operator ran `swaymsg -t get_tree` on the live Weather Station STAR MAP actor and reported Sway window rect **(1714,152) / 780×400** after the preceding QML implementation requested **(1714,152) / 812×468**. Position was correct, dimensions were **not**. This is runtime evidence that successful `swaymsg resize` exit does not guarantee resulting compositor size. The screenshot also showed unrelated desktop content through the excess transparent area.
+
+**Bounded corrective plan:** an extra cyan divider separates the header's contextual launch/CLOSE controls from the live-feed status badge. The station bay gains modest space, local **(8,90) / 824×482** in the fixed 1000×700 station (Sway expected (1708,152) on the primary reported 2560×1440 output). The Sway resize request explicitly names width and height in pixels. After positioning, a **one-shot `swaymsg -t get_tree` verification** finds only the exact actor app ID and measures its observed rect. The visual alpha cutout and input Region open **only at the intersection of the intended bay and observed actor**, leaving unused background painted if Kitty again refuses some requested dimensions. The UI reports `PARTIAL FIT` rather than silently treating the request as guaranteed size. No additional continuous get_tree poller or auto-resize loop. Live compositor acceptance and source permission boundaries remain required.
+
+**Stage Director future reconciliation:** the Stage Director SD0 declarative profile still describes 780×416 at (190,132), and has no mutating geometry authority. After confirming the desired viewer geometry, coordinate separately with the SwayPX owner to update the scene declaration; do not change compositor branch in this Weather UI PR.
+
 ## 4 // Domain family C: MAP and world/environmental layers
 
 Current EONET is an event index only. Planned:

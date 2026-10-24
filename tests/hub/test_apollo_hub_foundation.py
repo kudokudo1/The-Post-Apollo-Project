@@ -17,6 +17,7 @@ uptime_mini = (ROOT / "widgets/hub/ApolloHubUptimeMini.qml").read_text(encoding=
 apps_mini = (ROOT / "widgets/hub/ApolloHubAppsMini.qml").read_text(encoding="utf-8")
 apps_explore = (ROOT / "widgets/hub/ApolloHubAppsExplore.qml").read_text(encoding="utf-8")
 todo_mini = (ROOT / "widgets/hub/ApolloHubTodoMini.qml").read_text(encoding="utf-8")
+todo_explore = (ROOT / "widgets/hub/ApolloHubTodoExplore.qml").read_text(encoding="utf-8")
 todo_store = (ROOT / "services/hub/ApolloHubTodoStore.qml").read_text(encoding="utf-8")
 notes_mini = (ROOT / "widgets/hub/ApolloHubNotesMini.qml").read_text(encoding="utf-8")
 notes_store = (ROOT / "services/hub/ApolloHubNotesStore.qml").read_text(encoding="utf-8")
@@ -1329,6 +1330,54 @@ for forbidden in (
     assert forbidden not in apps_explore, f"Stage 8F must not activate apps: {forbidden}"
 assert apps_explore.count('onTapped:') == 1
 assert apps_mini.count('target.execute();') == 1
+
+
+# Stage 8G uses exactly the same TASKS pane for the real task details.
+for token in (
+    'visible: tile.moduleId === "todo" && tile.tileRowSpan === 1',
+    'ApolloHubTodoExplore {',
+    'visible: tile.moduleId === "todo" && tile.tileRowSpan > 1',
+    'todoStore: tile.todoStore',
+    'todoSnapshot: tile.todoSnapshot',
+    'todoExplore.statusLine',
+):
+    assert token in tile, f"Stage 8G To-do mount missing {token}"
+for token in (
+    'import "../tasks"',
+    'ApolloHubTodoMini {',
+    'TaskDetailsPane {',
+    'todoStore: todoExplore.todoStore',
+    'todoSnapshot: todoExplore.todoSnapshot',
+    'signal textFocusChanged(bool focused)',
+    'onTextFocusChanged: function(focused)',
+    'onTaskSelected: function(taskId)',
+    'taskDetails.chooseTask(taskId)',
+    'taskDetails.pendingWrite',
+    'taskDetails.dirty',
+    'onDetailModeChanged: textFocusChanged(detailMode)',
+    'label: "LIST"',
+    'label: "DETAILS"',
+):
+    assert token in todo_explore, f"Stage 8G TASKS reuse missing {token}"
+for forbidden in ('ApolloHubTodoStore {', 'FileView {', 'Process {',
+                  'Timer {', 'JsonAdapter {', 'updateTaskDetails(',
+                  'setTaskDone(', 'createProject(', 'saveDetails(',
+                  'Qt.openUrlExternally('):
+    assert forbidden not in todo_explore, f"Stage 8G double write forbidden: {forbidden}"
+for token in (
+    'readonly property int densityLevel: height >= 300 ? 3',
+    ': height >= 180 ? 2 : 1',
+    'height: notesMini.densityLevel === 3 ? 45',
+    'height: notesMini.densityLevel === 3 ? 30',
+    'height: notesMini.densityLevel === 3 ? 28',
+    'font.pixelSize: notesMini.densityLevel === 3 ? 15',
+    'notesStore.createNote(title, body)',
+    'notesStore.saveNote(openedId, openedRevision, title, body)',
+    'notesStore.deleteNote(openedId, openedRevision, true)',
+    'if (draftDirty && !discardArmed)',
+    'pendingAction = "delete"',
+):
+    assert token in notes_mini, f"Stage 8G Notes real editor missing {token}"
 
 # Launchers and widget backends are unchanged in this first stage.
 print("ApolloHubW foundation source contracts passed")

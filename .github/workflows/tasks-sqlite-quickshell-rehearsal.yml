@@ -1,0 +1,42 @@
+name: TASKS Proxy 1 M10q Quickshell admission rehearsal
+
+on:
+  pull_request:
+    paths:
+      - 'services/projects/TaskSqliteAdmissionRehearsal.qml'
+      - 'tests/tasks/fixtures/TaskSqliteHandoffHost.py'
+      - 'tests/tasks/test_task_sqlite_handoff_host.py'
+      - 'docs/tasks-sqlite-quickshell-admission-rehearsal-m10q.md'
+      - '.github/workflows/tasks-sqlite-quickshell-rehearsal.yml'
+  push:
+    branches:
+      - main
+    paths:
+      - 'services/projects/TaskSqliteAdmissionRehearsal.qml'
+      - 'tests/tasks/fixtures/TaskSqliteHandoffHost.py'
+      - 'tests/tasks/test_task_sqlite_handoff_host.py'
+      - 'docs/tasks-sqlite-quickshell-admission-rehearsal-m10q.md'
+      - '.github/workflows/tasks-sqlite-quickshell-rehearsal.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  qml-admission-rehearsal:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: M10q persistent JSONL test host and unmounted QML contract
+        run: python3 tests/tasks/test_task_sqlite_handoff_host.py
+      - name: M10p durable SQLite and OS flock regression
+        run: python3 tests/tasks/test_sqlite_writer_authority_fixture.py
+      - name: M10o single-writer freeze / drain / restart regression
+        run: node tests/tasks/test_sqlite_writer_handoff_policy.cjs
+      - name: M10n legacy backup and SQLite shadow verification regression
+        run: python3 tests/tasks/test_task_sqlite_cutover_review.py

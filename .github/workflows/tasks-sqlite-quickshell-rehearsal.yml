@@ -7,6 +7,9 @@ on:
       - 'tests/tasks/fixtures/TaskSqliteHandoffHost.py'
       - 'tests/tasks/test_task_sqlite_handoff_host.py'
       - 'docs/tasks-sqlite-quickshell-admission-rehearsal-m10q.md'
+      - 'tests/tasks/fixtures/TaskSqliteAdmissionHarness.qml'
+      - 'tests/tasks/test_task_sqlite_m10r_inventory.py'
+      - 'docs/tasks-sqlite-quickshell-inventory-m10r.md'
       - '.github/workflows/tasks-sqlite-quickshell-rehearsal.yml'
   push:
     branches:
@@ -16,6 +19,9 @@ on:
       - 'tests/tasks/fixtures/TaskSqliteHandoffHost.py'
       - 'tests/tasks/test_task_sqlite_handoff_host.py'
       - 'docs/tasks-sqlite-quickshell-admission-rehearsal-m10q.md'
+      - 'tests/tasks/fixtures/TaskSqliteAdmissionHarness.qml'
+      - 'tests/tasks/test_task_sqlite_m10r_inventory.py'
+      - 'docs/tasks-sqlite-quickshell-inventory-m10r.md'
       - '.github/workflows/tasks-sqlite-quickshell-rehearsal.yml'
 
 permissions:
@@ -32,6 +38,8 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
+      - name: M10r legacy vs SQLite API and disposable QML harness contract
+        run: python3 tests/tasks/test_task_sqlite_m10r_inventory.py
       - name: M10q persistent JSONL test host and unmounted QML contract
         run: python3 tests/tasks/test_task_sqlite_handoff_host.py
       - name: M10p durable SQLite and OS flock regression

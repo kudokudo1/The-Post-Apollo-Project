@@ -144,6 +144,14 @@ assert.match(weatherTerminalSource, /fitResizeRetries \+= 1/);
 assert.match(weatherTerminalSource, /id:\s*centerProcess/);
 assert.match(weatherTerminalSource, /SwayGeometry\.centeredPosition\(requested, actual\)/);
 assert.match(weatherTerminalSource, /fitCenterAttempted = true/);
+
+// Closing the menu or switching views while Kitty is waiting for an
+// asynchronous Wayland configure must never orphan the mapped actor.
+assert.match(weatherTerminalSource, /property bool kittyActorConfirmed:\s*false/);
+assert.match(weatherTerminalSource, /terminalView\.kittyActorConfirmed = true/);
+assert.match(weatherTerminalSource, /if \(terminalState === "STARTING" && !kittyActorConfirmed\)/);
+assert.match(weatherTerminalSource, /terminalView\.kittyActorConfirmed = false/);
+
 assert.match(weatherTerminalSource, /centerProcess\.targetX = centered\.x/);
 assert.match(weatherTerminalSource, /centerProcess\.targetY = centered\.y/);
 assert.match(weatherTerminalSource, /if \(!overlap\)\s*throw new Error/);

@@ -22,13 +22,13 @@ function viewportPixels(value, fallback) {
 function frame(level, viewportWidth, viewportHeight, gutter) {
     var inset = Math.max(0, Math.floor(Number(gutter) || 0));
     var width = Math.max(1, viewportPixels(viewportWidth, 456) - 2 * inset);
-    var height = Math.max(1, viewportPixels(viewportHeight, 792) - 2 * inset);
+    var height = Math.max(1, viewportPixels(viewportHeight, 814) - 2 * inset);
     var mode = normalize(level);
     return {
         width: mode === "fullscreen" ? width
              : Math.min(width, mode === "expanded" ? 1000 : 432),
         height: mode === "fullscreen" ? height
-              : Math.min(height, mode === "expanded" ? 900 : 768)
+              : Math.min(height, mode === "expanded" ? 900 : 790)
     };
 }
 

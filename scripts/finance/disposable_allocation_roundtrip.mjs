@@ -470,7 +470,7 @@ async function main(){
   stage="m2-category-create";
   const catCreated=runCategory(categoryNew);
   assert.equal(catCreated.error,undefined);
-  if(catCreated.status!==0 || catCreated.stdout.trim()!=="FINANCEW_CATEGORY_RESULT committed") {
+  if(catCreated.status!==0 || !/^FINANCEW_CATEGORY_RESULT committed$/m.test(catCreated.stdout)) {
     const token=/^FINANCEW_CATEGORY_RESULT (committed|uncertain|blocked:[a-z0-9-]+)$/m
       .exec(catCreated.stdout)?.[1] || "missing-status";
     throw new Error("category-create-"+token.replace(/[^a-z0-9:-]/g,""));
@@ -483,7 +483,7 @@ async function main(){
   stage="m2-category-rename";
   const catRenamed=runCategory(catRename);
   assert.equal(catRenamed.error,undefined);
-  if(catRenamed.status!==0 || catRenamed.stdout.trim()!=="FINANCEW_CATEGORY_RESULT committed") {
+  if(catRenamed.status!==0 || !/^FINANCEW_CATEGORY_RESULT committed$/m.test(catRenamed.stdout)) {
     const token=/^FINANCEW_CATEGORY_RESULT (committed|uncertain|blocked:[a-z0-9-]+)$/m
       .exec(catRenamed.stdout)?.[1] || "missing-status";
     throw new Error("category-rename-"+token.replace(/[^a-z0-9:-]/g,""));

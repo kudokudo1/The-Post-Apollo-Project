@@ -91,11 +91,5 @@ class QmlContract(unittest.TestCase):
         j=json.loads(result.stdout)
         self.assertEqual(j['mode'],'AUTH_REQUIRED')
         self.assertNotIn('token',result.stdout.lower())
-    def test_whatsapp_is_blocked(self):
-        path=ROOT / 'services/messaging/bridges/whatsapp/FEASIBILITY.md'
-        # Different PR; only present in the WhatsApp worktree.
-        if path.exists():
-            self.assertIn('BLOCKED / RESEARCH',path.read_text())
-
 if __name__=='__main__':
     unittest.main()

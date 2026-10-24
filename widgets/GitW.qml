@@ -5827,17 +5827,23 @@ PanelWindow {
                                 if (!isSync)
                                     return full;
 
-                                return full.split("\n").filter(function(line) {
+                                const lines = full.split("\n");
+                                // A second REFRESHED line represents another
+                                // event even when its number happens to match.
+                                // Suppress only the single exact row already
+                                // represented in the header.
+                                const pinnedViewLine = repoViewMs >= 0
+                                    ? "REFRESHED // repository view " + repoViewMs + " ms"
+                                    : "";
+                                const matches = pinnedViewLine
+                                    ? lines.filter(function(line) {
+                                        return String(line || "").trim() === pinnedViewLine;
+                                    }).length : 0;
+                                return lines.filter(function(line) {
                                     const value = String(line || "").trim();
-                                    // The unique repository-view timing is now
-                                    // visible in the pinned header. Suppress
-                                    // only an EXACT matching raw value in
-                                    // NORMAL, never warnings or unknown lines.
-                                    // DETAILS keeps the entire original output.
-                                    const viewMatch =
-                                        /^REFRESHED \/\/ repository view (\d+) ms$/.exec(value);
-                                    if (viewMatch && repoViewMs >= 0
-                                            && Number(viewMatch[1]) === repoViewMs)
+                                    // DETAILS keeps every byte. NORMAL removes
+                                    // only this sole exact header duplicate.
+                                    if (matches === 1 && value === pinnedViewLine)
                                         return false;
                                     // These two status-only lines duplicate
                                     // the already visible operation stage.

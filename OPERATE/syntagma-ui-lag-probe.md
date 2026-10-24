@@ -426,3 +426,122 @@ omit their two pause flags. No persistent state or schema changes.
 **Media handoff:** Only after coordination with the Media owner, consider
 a separate gated counter around `cavaAmbientTargetHeight` and its
 20-value slice/sort binding, rather than modifying it in this branch.
+
+## October 24 // Music CAVA A/B trial plus radio PAUSE/STOP observation
+
+**Status:** operator-approved experimental fix + measurement, source/CI
+verification only. **Not** an accepted default or a confirmed freeze fix.
+**Ownership:** narrow `modules/Mediaplayer.qml` seam has another Media
+worker; keep this as an isolated DRAFT PR pending its integration review.
+
+### Original mode versus latest-wins mode
+
+- `POST_APOLLO_CAVA_TRIAL_PROBE=1` adds five-second aggregate-only
+  `SYNTAGMA_CAVA_TRIAL` records. Off by default. It also suppresses
+  the older per-frame `SYNTAGMA_BG_PROBE // media cava-frame synchronous`
+  warnings (when the old UI lag probe is on), avoiding logarithmic
+  stdout inflation during recovery; the old five-second summary remains.
+- **Original**: leave `POST_APOLLO_CAVA_COALESCE` unset. Each accepted
+  stdout frame runs the existing CAVA QML decode, levels deduplication,
+  20 bars, and visualizations. Diagnostic counters do not change playback.
+- **Optimized trial**: set `POST_APOLLO_CAVA_COALESCE=1`. Each received
+  frame is cheaply validated; only the latest well-formed raw frame
+  remains pending. A single 67ms timer renders at most one pending
+  frame per tick. All obsolete pending frames are overwritten and counted
+  rather than initiating repeated level binding/animation work.
+- **Both** use the single existing 15-FPS CAVA subprocess and MPD observer.
+  Neither touches PipeWire source selection, MPD transport, Radio Browser,
+  Hub bridge, visual palette, CAVA config, nor the underlying output data.
+  The optimized mode does **not** prevent `SplitParser` from delivering
+  individual lines; it bounds only downstream model/visual updates.
+- Aggregate metrics: `received`, `applied`, `dropped`, `changed`,
+  `invalid`, `applyTotalMs`, `maxApplyMs`, `pending`, `mpdPlaying`, `tsMs`.
+  In the optimized mode, `received` includes invalid input lines; the
+  `dropped` count is only valid frames overwritten before a visual tick.
+  Values measure synchronous handler time, not GPU repaint duration.
+
+### Operator workflow (one mode at a time)
+
+After Media owner review, merge and pull, use the desktop normally,
+and save temporary state before restarting Quickshell. For comparison,
+keep Network/Notifications flags the *same* in both modes. Their
+pauses are optional; do not change several conditions between trials.
+
+Original A (measurement only):
+
+```bash
+qsdir="$(readlink -f ~/.config/quickshell)"
+POST_APOLLO_UI_LAG_PROBE=1 \
+POST_APOLLO_CAVA_TRIAL_PROBE=1 \
+  bash "$qsdir/scripts/restart_quickshell_safe.sh" "$qsdir"
+```
+
+Optimized B (same measurement plus experimental change):
+
+```bash
+POST_APOLLO_UI_LAG_PROBE=1 \
+POST_APOLLO_CAVA_TRIAL_PROBE=1 \
+POST_APOLLO_CAVA_COALESCE=1 \
+  bash "$qsdir/scripts/restart_quickshell_safe.sh" "$qsdir"
+```
+
+Verify each runtime actually inherited the flags:
+
+```bash
+pid="$(pgrep -n -x quickshell)"
+tr '\\0' '\\n' < "/proc/$pid/environ" | rg '^POST_APOLLO_(UI_LAG_PROBE|CAVA_TRIAL_PROBE|CAVA_COALESCE)='
+```
+
+Expected `SYNTAGMA_CAVA_TRIAL // startup mode=original` or
+`startup mode=coalesced` in that instance's log. If no marker exists
+do not draw a performance conclusion. Run a comparable radio PLAY →
+PAUSE → browser show sequence, with ordinary window load; no need to
+open all widgets. Stop the trial and recover your desktop if lag is severe.
+
+The current `qs log --tail 3000` may select a **new Quickshell instance**
+after a reset, losing the old diagnostic data. For a survivable recording
+start a short-lived separate reader BEFORE each test:
+
+```bash
+qs log --follow > "$HOME/cava-trial-current.log" 2>&1 &
+echo "QS_LOG_READER_PID=$!"
+```
+
+The reader creates additional log I/O, so note it when comparing A/B.
+Stop that particular reader when done, using its printed PID. Never
+kill arbitrary `qs` processes by name. Review the log for personal
+contents before uploading; other widgets may log their own metadata.
+
+### Read-only radio lifecycle evidence
+
+`scripts/media/media_pause_state_probe.py` samples only the existing
+user-owned controller's `snapshot` command (no playback mutation),
+collecting `mpdState`, controller ownership, loaded source category,
+sanitized relay state, and byte-count delta. It never emits station
+names, raw URLs, relay tokens, queue IDs, or controller error details.
+
+```bash
+python3 -B "$qsdir/scripts/media/media_pause_state_probe.py" \
+  --samples 20 --interval 2 > "$HOME/media-radio-state.jsonl" &
+```
+
+Start that bounded observer while radio is playing, press PAUSE in Hi-Fi,
+then begin the browser show. You can separately compare STOP if safe.
+`relayState=streaming` may be a *last recorded state*, not proof a live
+socket is still open. An increasing `relayBytesDelta` supports continuing
+relay traffic; a constant byte count is not proof the TCP connection
+was torn down. Snapshot calls may be delayed by other controller work.
+
+### Recovery and interpretation
+
+**Rollback:** Restart Quickshell without `POST_APOLLO_CAVA_COALESCE=1`.
+To eliminate all experiment overhead also omit
+`POST_APOLLO_CAVA_TRIAL_PROBE=1` and any older optional lag probes.
+No audio controller, MPD service, PipeWire settings, queues, persisted
+files, or media policy is changed by this experiment.
+
+If B reduces long UI stalls or recovery, inspect its dropped/applied
+counts to quantify contribution. If stalls remain, CAVA model updates
+are not sufficient to explain them. This does NOT override the earlier
+observation of freezes while CAVA was suspended, nor identify the
+underlying main-thread JavaScript signal from a single stack snapshot.

@@ -27,7 +27,10 @@ function harness() {
     const context = vm.createContext({
         barCount: 20,
         levels: Array(20).fill(0),
-        bgLagProbeEnabled: false
+        bgLagProbeEnabled: false,
+        cavaCoalesceEnabled: false,
+        cavaTrialProbeEnabled: false,
+        cavaDrainingPending: false
     });
     const receive = vm.runInContext("(function(frame) {" + match[1] + "\n})", context);
     return {context, receive};
@@ -766,4 +769,60 @@ test("bad frames cannot reset or replace the current visualizer reading", () => 
         receive(invalid);
         assert.equal(context.levels, valid);
     }
+});
+
+test("CAVA trial is default-off, opt-in, and the original frame handler remains active", () => {
+    assert.match(source, /POST_APOLLO_CAVA_COALESCE/);
+    assert.match(source, /POST_APOLLO_CAVA_TRIAL_PROBE/);
+    assert.match(source, /running:\s*mediaDock\.cavaCoalesceEnabled/);
+    assert.match(source, /interval:\s*67/);
+    assert.match(source, /onRead: function\(frame\) \{\s*mediaDock\.receiveCavaFrame\(frame\);/);
+    assert.match(source, /SYNTAGMA_CAVA_TRIAL/);
+    const {context, receive} = harness();
+    receive(Array(20).fill("3").join(";") + ";");
+    assert.equal(context.levels[0], 3);
+});
+
+test("coalesced mode keeps last valid frame, ignores malformed input and bounds publications", () => {
+    // Execute the actual QML functions with a light Qt-like object context.
+    const stageBody = source.match(/function stageCavaFrame\(frame\) \{([\s\S]*?)\n    \}\n\n    function drainCavaFrame/)?.[1];
+    const drainBody = source.match(/function drainCavaFrame\(\) \{([\s\S]*?)\n    \}\n\n    \/\/ CAVA visualizes/)?.[1];
+    assert.ok(stageBody && drainBody);
+    const context = vm.createContext({
+        barCount: 20, levels: Array(20).fill(0),
+        bgLagProbeEnabled: false, cavaCoalesceEnabled: true,
+        cavaTrialProbeEnabled: true, cavaDrainingPending: false,
+        cavaFramePending: false, cavaLatestPendingFrame: "",
+        cavaTrialStats: {received:0, applied:0, dropped:0, changed:0, invalid:0,
+                         applyTotalMs:0, maxApplyMs:0},
+        reportCavaTrial() {}
+    });
+    context.stageCavaFrame = vm.runInContext("(function(frame) {" + stageBody + "\n})", context);
+    context.receiveCavaFrame = vm.runInContext("(function(frame) {" +
+       source.match(/    function receiveCavaFrame\(frame\) \{([\s\S]*?)\n    \}\n\n    Process \{/)?.[1] + "\n})", context);
+    context.drainCavaFrame = vm.runInContext("(function() {" + drainBody + "\n})", context);
+    const input = (n) => Array(20).fill(String(n)).join(";") + ";";
+    const initial = context.levels;
+    context.receiveCavaFrame(input(1));
+    context.receiveCavaFrame(input(3));
+    context.receiveCavaFrame("broken");
+    context.receiveCavaFrame(input(5));
+    assert.equal(context.levels, initial, "receive does not publish until the visual timer runs");
+    assert.equal(context.cavaTrialStats.received, 4);
+    assert.equal(context.cavaTrialStats.dropped, 2);
+    assert.equal(context.cavaTrialStats.invalid, 1);
+    assert.equal(context.cavaFramePending, true);
+    context.drainCavaFrame();
+    assert.equal(context.cavaFramePending, false);
+    assert.equal(context.levels[0], 5, "latest valid frame reaches display");
+    assert.equal(context.cavaTrialStats.applied, 1);
+    assert.equal(context.cavaTrialStats.changed, 1);
+    const after = context.levels;
+    context.drainCavaFrame();
+    assert.equal(context.levels, after, "empty tick cannot republish");
+    context.receiveCavaFrame(input(5));
+    context.drainCavaFrame();
+    assert.equal(context.levels, after, "identical levels remain deduplicated");
+    assert.equal(context.cavaTrialStats.applied, 2);
+    assert.equal(context.cavaTrialStats.changed, 1);
 });

@@ -5,6 +5,9 @@ on:
     paths:
       - "shell.qml"
       - "modules/Mediaplayer.qml"
+      - "scripts/media/media_pause_state_probe.py"
+      - "tests/media/test_media_pause_state_probe.py"
+      - "tests/media/test_media_dock_performance.cjs"
       - "modules/Network.qml"
       - "widgets/notifications/NotificationsHubW.qml"
       - "widgets/GitW.qml"
@@ -24,6 +27,9 @@ on:
     paths:
       - "shell.qml"
       - "modules/Mediaplayer.qml"
+      - "scripts/media/media_pause_state_probe.py"
+      - "tests/media/test_media_pause_state_probe.py"
+      - "tests/media/test_media_dock_performance.cjs"
       - "modules/Network.qml"
       - "widgets/notifications/NotificationsHubW.qml"
       - "widgets/GitW.qml"
@@ -53,3 +59,5 @@ jobs:
           python3 tests/components/test_syntagma_bg_lag_probe.py
           python3 tests/components/test_syntagma_quickshell_thread_sampler.py
           python3 tests/components/test_syntagma_array_copy_probe.py
+          python3 -m unittest tests/media/test_media_pause_state_probe.py
+          node --test tests/media/test_media_dock_performance.cjs

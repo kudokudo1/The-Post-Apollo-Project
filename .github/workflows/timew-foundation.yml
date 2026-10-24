@@ -18,6 +18,8 @@ on:
       - "services/time/MachineRestorePreviewPolicy.js"
       - "services/time/MachineWindowResolver.py"
       - "services/time/MachineWindowMultiplicity.py"
+      - "services/time/MachineSessionIdentityV2.py"
+      - "docs/timew-machine-m2b-v2-session-identity-sidecar.md"
       - "docs/timew-machine-revive-restore-worker-plan.md"
       - "services/time/MachineWindowMovePilot.py"
       - "services/time/MachineMoveJournal.py"
@@ -59,6 +61,8 @@ on:
       - "services/time/MachineRestorePreviewPolicy.js"
       - "services/time/MachineWindowResolver.py"
       - "services/time/MachineWindowMultiplicity.py"
+      - "services/time/MachineSessionIdentityV2.py"
+      - "docs/timew-machine-m2b-v2-session-identity-sidecar.md"
       - "docs/timew-machine-revive-restore-worker-plan.md"
       - "services/time/MachineWindowMovePilot.py"
       - "services/time/MachineMoveJournal.py"
@@ -141,6 +145,10 @@ jobs:
         run: python3 -B -I tests/timew/test_machine_window_multiplicity.py
       - name: Verify MACHINE v1-safe, read-only identity inventory contract
         run: python3 -B -I tests/timew/test_machine_window_multiplicity_contract.py
+      - name: Verify MACHINE v2 proposed window and inner-item identity schema
+        run: python3 -B -I tests/timew/test_machine_session_identity_v2.py
+      - name: Verify MACHINE v2 identity model cannot mutate v1 or activate actions
+        run: python3 -B -I tests/timew/test_machine_session_identity_v2_contract.py
       - name: Verify MACHINE durable move journal crash and permissions
         run: python3 -B -I tests/timew/test_machine_move_journal.py
       - name: Verify MACHINE single-use approval and read-only reconciliation

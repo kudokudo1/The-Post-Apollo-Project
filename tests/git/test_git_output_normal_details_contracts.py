@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 """Check GitW's actual Normal/Details presentation code without Quickshell.
 
-Only the view may filter text. Raw service output and recovery decisions remain
-unchanged, and known errors/warnings must be readable in Normal mode.
+Only status-only repetition may be suppressed. Journal BEGIN/COMPLETE/FAIL
+profiles and the independent REFRESHED boundary are unique and must remain
+visible in Normal, while Details retains raw evidence byte-for-byte.
 """
 from pathlib import Path
 import json
@@ -69,10 +70,13 @@ assert.equal(normalGitOutput(null, true), '');
 assert.equal(compact, [
     'PREPARING // capturing repository references and journal evidence',
     'PREPARED // snapshot 35 ms // journal 90 ms',
+    'JOURNAL PROFILE // BEGIN clone 0 ms // record 1 ms',
     'From https://github.com/sample/repo',
     '   abc123..def456 main -> origin/main',
     'Already up to date.',
     'FINISHED // after snapshot 28 ms // journal 100 ms',
+    'JOURNAL PROFILE // COMPLETE clone 0 ms // entries 1 ms',
+    'REFRESHED // repository view 1400 ms',
     'SNAPSHOT WARNING // after snapshot could not be captured',
     'JOURNAL NOT RECORDED // AFTER save unconfirmed',
     'FETCH FAILED // connection timed out',
@@ -80,8 +84,11 @@ assert.equal(compact, [
     'error: permission denied'
 ].join('\n'));
 
-assert.ok(!compact.includes('JOURNAL PROFILE // BEGIN'));
-assert.ok(!compact.includes('JOURNAL PROFILE // COMPLETE'));
+assert.ok(compact.includes('JOURNAL PROFILE // BEGIN'));
+assert.ok(compact.includes('JOURNAL PROFILE // COMPLETE'));
+assert.ok(compact.includes('REFRESHED // repository view 1400 ms'));
+assert.ok(!compact.includes('RUNNING // Git subprocess started'));
+assert.ok(!compact.includes('FINALIZING // collecting repository evidence'));
 const failed = normalGitOutput([
     'JOURNAL PROFILE // FAIL clone 0 ms',
     'JOURNAL NOT RECORDED // persistent failure',
@@ -90,10 +97,12 @@ const failed = normalGitOutput([
     'REFRESHED // repository view 3 ms'
 ].join('\n'), true);
 assert.equal(failed,
-    'JOURNAL NOT RECORDED // persistent failure\n'
+    'JOURNAL PROFILE // FAIL clone 0 ms\n'
+    + 'JOURNAL NOT RECORDED // persistent failure\n'
     + 'JOURNAL PROFILE // UNEXPECTED DATA\n'
-    + 'REFRESHED // repository view unavailable',
-    'unexpected statuses must stay visible');
+    + 'REFRESHED // repository view unavailable\n'
+    + 'REFRESHED // repository view 3 ms',
+    'all unique timing and unexpected statuses must stay visible');
 assert.equal(normalGitOutput('   unrelated text\n\n   summary', true),
     '   unrelated text\n\n   summary', 'retain whitespace and blank lines');
 console.log('Git Normal/Details selective diagnostics: PASS');

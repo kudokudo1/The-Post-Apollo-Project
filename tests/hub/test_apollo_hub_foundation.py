@@ -1438,9 +1438,8 @@ for token in (
 for token in (
     'signal openAppControlRequested()',
     'property bool appControlAvailable: false',
-    'label: "APP CONTROL"',
-    'available: appsExplore.appControlAvailable',
-    'onLeftClicked: appsExplore.openAppControlRequested()',
+    'label: "RUNNING CONTROLS"',
+    'onLeftClicked: appsExplore.selectedView = "running"',
     'label: "BACK TO CATALOG"',
 ):
     assert token in apps_explore, f"AppControl entry missing {token}"
@@ -1490,13 +1489,19 @@ for token in (
     'property int selectedPid: -1',
     'property string selectedName: ""',
     'readonly property var selectedEntry:',
-    'item.pid === selectedPid && item.name === selectedName',
+    'item.pid === selectedPid',
+    'item.startTicks === selectedStartTicks',
     'function inspect(item)',
     'model: processExplore.entries',
     'onLeftClicked: processExplore.inspect(runningRow.modelData)',
-    'label: "APP CONTROL"',
-    'onLeftClicked: processExplore.openAppControlRequested()',
-    'OBSERVATION ONLY // USE APP CONTROL',
+    'label: "FREEZE"',
+    'label: "RESUME"',
+    'label: "END"',
+    'label: "RESTART"',
+    'label: "APPLY MEMORY LIMIT"',
+    'processExplore.processActionGate.prepare(',
+    'processExplore.processActionGate.confirm()',
+    'processExplore.processActionGate.cancel()',
     'NOT GUARANTEED CURRENT',
 ):
     assert token in process_explore, f"Process UI missing {token}"
@@ -1519,6 +1524,69 @@ for forbidden in (
         f"Hub cannot independently sample/control processes: {forbidden}")
 for sensitive in ('args:', 'user:', 'cmdline:', 'environment:', 'commandLine:'):
     assert sensitive not in process_policy, f"Process secret projected: {sensitive}"
+assert 'ApolloHubMediaExplore {' in tile
+
+
+# Phase 2C: all inline process mutations are issued by the AppControl-owner
+# gateway only after a fresh process birth check and local Hub confirmation.
+owner_blob = (ROOT / "widgets/AppControlW.qml").read_text(encoding="utf-8")
+owner_gate = (ROOT / "widgets/appcontrol/AppControlHubActionGate.qml").read_text(encoding="utf-8")
+telemetry = (ROOT / "services/system/ProcessTelemetry.qml").read_text(encoding="utf-8")
+for token in (
+    'AppControlHubActionGate {',
+    'property alias hubProcessActionGate: appControlHubGate',
+    'ownerRows: appControlWindow.taskRows',
+    'safetyOwner: taskSafety',
+    'presentationOwner: processPresentationController',
+    'controlOwner: processControl',
+    'limitsOwner: processLimits',
+):
+    assert token in owner_blob, f"AppControl owner API missing {token}"
+for token in (
+    'function exactRow(pid, startTicks, name)',
+    'function toggleOneShotUnlock(pid, startTicks, name)',
+    'function prepare(pid, startTicks, name, action, percent)',
+    'function confirm()',
+    'function cancel()',
+    'function finishProbe(exitCode)',
+    'actual==comm and int(fields[19])==born',
+    'safetyOwner.dangerActionUnlocked(row,kind)',
+    'controlOwner.sendSignal(req.pid,"-STOP")',
+    'controlOwner.sendSignal(req.pid,"-CONT")',
+    'controlOwner.sendSignal(req.pid,"-TERM")',
+    'controlOwner.restart(req.pid)',
+    'presentationOwner.setLimitPercent(req.percent,row)',
+    'REQUEST ISSUED // VERIFY OWNER STATE',
+):
+    assert token in owner_gate, f"Guarded AppControl gateway missing {token}"
+for token in (
+    'pidToken.indexOf(":")',
+    'startTicks: Number.isSafeInteger(startTicks)',
+    'stat_pair=$(sed',
+):
+    assert token in telemetry, f"AppControl birth token missing {token}"
+for token in (
+    'property var processActionGate: null',
+    'processActionGate: hub.processActionGate',
+    'processInputFocused = focused',
+    '&& !processInputFocused',
+):
+    assert token in window, f"Hub action/focus link missing {token}"
+assert 'processActionGate: appControlWindow' in shell
+assert 'appControlWindow.hubProcessActionGate : null' in shell
+assert 'processActionGate: tile.processActionGate' in tile
+assert 'processActionGate: appsExplore.processActionGate' in apps_explore
+assert 'signal inputFocusChanged(bool focused)' in process_explore
+assert 'Slider {' in process_explore
+assert 'onMoved: processExplore.limitDraft = Math.round(value)' in process_explore
+assert 'label: "CONFIRM ACTION"' in process_explore
+assert 'label: "CANCEL"' in process_explore
+assert 'label: "UNLOCK ONCE // PROTECTED"' in process_explore
+assert 'startTicks:Number.isSafeInteger(row.startTicks)' in process_policy
+for forbidden in ('controlOwner.sendSignal(', 'ProcessControl {', 'Process {',
+                  'Quickshell.execDetached(', 'toggleFreeze('):
+    assert forbidden not in process_explore + apps_explore, (
+        f"Process mutation must stay in owner gateway: {forbidden}")
 assert 'ApolloHubMediaExplore {' in tile
 
 # Launchers and widget backends are unchanged in this first stage.

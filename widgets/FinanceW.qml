@@ -1862,18 +1862,15 @@ Row {
                     }
                 }
 
-                GohuText {
+                // Non-Budget pages reserve a stable local host. Future
+                // adapters stay mounted across chassis size transitions.
+                FinanceToolHost {
+                    id: financeToolHost
+                    anchors.fill: parent
                     visible: !actualBudgetPage.visible
-                    anchors.top: parent.top
-                    anchors.topMargin: 16
-                    anchors.horizontalCenter: parent.horizontalCenter
-                    width: parent.width - 12
-                    horizontalAlignment: Text.AlignHCenter
-                    font.pixelSize: 11
-                    color: Colors.white
-                    text: root.selectedMainMode === "budget"
-                          ? root.selectedBudgetSubMode.toUpperCase()
-                          : root.mainModeName().toUpperCase()
+                    domainTitle: root.selectedMainMode === "budget"
+                                 ? root.selectedBudgetSubMode.toUpperCase()
+                                 : root.mainModeName().toUpperCase()
                 }
             }
         }

@@ -6,8 +6,14 @@
 var MAX_DELTAS = 40;
 
 function ident(value) {
-    return typeof value === "string" && value.length > 0
-           && value.length <= 128 && !/[\\x00-\\x1f\\x7f]/.test(value);
+    if (typeof value !== "string" || value.length < 1 || value.length > 128)
+        return false;
+    for (var i = 0; i < value.length; i++) {
+        var code = value.charCodeAt(i);
+        if (code < 32 || code === 127)
+            return false;
+    }
+    return true;
 }
 function rectValid(r) {
     if (!r || typeof r !== "object" || Array.isArray(r))

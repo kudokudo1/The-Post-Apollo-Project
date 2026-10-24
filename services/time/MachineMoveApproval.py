@@ -115,9 +115,13 @@ class MoveApprovalGate:
             if (not isinstance(confirmation_text, str)
                     or not hmac.compare_digest(ticket["challenge"], confirmation_text)):
                 raise ApprovalError("EXACT ACTION CONFIRMATION REQUIRED")
-            token = self._nonce_factory()
-            if not isinstance(token, str) or len(token) < 32:
+            entropy = self._nonce_factory()
+            if not isinstance(entropy, str) or len(entropy) < 32:
                 raise ApprovalError("INVALID APPROVAL NONCE")
+            # Even with an injected deterministic test entropy source, tokens
+            # remain distinct across review IDs. Production uses secure random.
+            token = hashlib.sha256((ticket["id"] + ":" + entropy).encode(
+                "utf-8")).hexdigest()
             ticket["token"] = token
             ticket["state"] = "approved"
             return {"kind": "machine-single-move-approval",

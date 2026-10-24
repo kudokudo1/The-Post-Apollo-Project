@@ -13,16 +13,20 @@ assert 'property string chassisLevel: "compact"' in menu
 assert 'readonly property var chassisFrame: FinanceChassisPolicy.frame(' in menu
 assert 'readonly property int frameWidth: chassisFrame.width' in menu
 assert 'readonly property int frameHeight: chassisFrame.height' in menu
-# Compact Finance and Git share a 9px top line; Finance's 3px lift is
-# against its own 12px glow gutter, not the current Git chassis inset.
+# All three FinanceW levels share the Git/Hospital 9px visible top line;
+# the 8px bottom reserve is part of the actual mapped window's height.
 assert 'property int panelHeight: 790' in git
 assert 'property int topGlowGutter: 9' in git
 assert 'mode === "expanded" ? 900 : 790' in policy
-assert 'readonly property int compactTopLift: 3' in menu
-assert 'chassisLevel === "compact" ? glowGutter - compactTopLift : glowGutter' in menu
-assert 'implicitHeight: frameHeight + frameTopInset + glowGutter' in menu
+assert 'readonly property int frameTopInset: 9' in menu
+assert 'readonly property int bottomScreenGap: 8' in menu
+assert 'frameTopInset, bottomScreenGap' in menu
+assert 'compactTopLift' not in menu
+assert 'chassisLevel === "compact" ? glowGutter' not in menu
+assert 'implicitHeight: frameHeight + frameTopInset + bottomScreenGap' in menu
 assert 'y: root.frameTopInset' in menu
 assert 'anchors.topMargin: root.frameTopInset' in menu
+assert 'anchors.bottomMargin: root.bottomScreenGap' in menu
 assert 'FinanceChassisPolicy.topMargin(' in menu
 assert 'FinanceChassisPolicy.leftMargin(' in menu
 assert 'chassisLevel = FinanceChassisPolicy.step(chassisLevel, 1);' in menu
@@ -62,7 +66,9 @@ assert 'active: host.toolConnected' in host
 assert 'sourceComponent: host.embeddedComponent' in host
 assert 'visible: host.toolConnected' in host
 assert 'IN-WORKSPACE TOOL // NOT CONNECTED' in host
-assert 'function frame(level, viewportWidth, viewportHeight, gutter)' in policy
+assert 'function frame(level, viewportWidth, viewportHeight, gutter, topInset, bottomGap)' in policy
+assert 'viewportPixels(viewportHeight, 768) - top - bottom' in policy
+assert 'root.implicitHeight, root.frameTopInset)' in menu
 assert 'function step(level, direction)' in policy
 for forbidden in ('Qt.openUrlExternally', 'Process {', 'openUrl(',
                   'exec(', 'financeWrite.submit(', 'financeFundingWrite.submit('):

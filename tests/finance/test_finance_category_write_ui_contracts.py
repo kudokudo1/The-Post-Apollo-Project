@@ -37,14 +37,9 @@ for item in (
     'saveRequested({',
     'writeState==="pending" || writeState==="uncertain"',
     'available: !categoryPane.busy',
-    'CATEGORY WRITES',
+    'SAVE REQUIRES A SEPARATE OPERATOR PERMIT',
 ):
-    # The pane intentionally uses the independent category writer,
-    # never an inline Actual mutator.
-    if item == 'CATEGORY WRITES':
-        assert 'CATEGORY WRITES' in pane
-    else:
-        assert item in pane, item
+    assert item in pane, item
 
 assert 'onVisibleChanged: if(!visible)clearDraft()' in pane
 assert pane.count('label: "PREVIEW"')==1

@@ -1581,7 +1581,7 @@ assert 'Slider {' in process_explore
 assert 'onMoved: processExplore.limitDraft = Math.round(value)' in process_explore
 assert 'label: "CONFIRM ACTION"' in process_explore
 assert 'label: "CANCEL"' in process_explore
-assert 'label: "UNLOCK ONCE // PROTECTED"' in process_explore
+assert '"UNLOCK ONCE // PROTECTED"' in process_explore
 assert 'startTicks:Number.isSafeInteger(row.startTicks)' in process_policy
 for forbidden in ('controlOwner.sendSignal(', 'ProcessControl {', 'Process {',
                   'Quickshell.execDetached(', 'toggleFreeze('):

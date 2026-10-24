@@ -32,6 +32,12 @@ PanelWindow {
         monitoring: root.menuOpen && root.selectedMainMode === "market"
     }
 
+    // Separate saved-crawl reader; it never executes a spider inside Quickshell.
+    FinanceServices.FinanceCrawlReadService {
+        id: crawlService
+        monitoring: root.menuOpen && root.selectedMainMode === "research"
+    }
+
     Component {
         id: marketPaneComponent
         FinanceMarketPane {
@@ -100,7 +106,12 @@ PanelWindow {
     // NO FEED for reserved/unimplemented pages. LIVE means an authenticated
     // read succeeded AND the local source remains reachable.
     readonly property string feedStatus:
-        selectedMainMode === "market"
+        selectedMainMode === "research"
+          ? (!menuOpen ? "IDLE"
+             : crawlService.loading ? "READING"
+             : crawlService.state === "failed" ? "ERROR"
+             : crawlService.state === "ready" ? "SNAPSHOT" : "NO FEED")
+        : selectedMainMode === "market"
           ? (!menuOpen ? "IDLE"
              : marketService.loading ? "READING"
              : marketService.state === "failed" ? "ERROR"
@@ -1921,12 +1932,22 @@ Row {
                     id: financeToolHost
                     anchors.fill: parent
                     visible: !actualBudgetPage.visible
+                             && root.selectedMainMode !== "research"
                     // Component persists while navigating/resizing, not just while Market is selected.
                     embeddedComponent: marketPaneComponent
                     showEmbedded: root.selectedMainMode === "market"
                     domainTitle: root.selectedMainMode === "budget"
                                  ? root.selectedBudgetSubMode.toUpperCase()
                                  : root.mainModeName().toUpperCase()
+                }
+
+                // Research has its own persistent reader and page inspector.
+                // Existing market tool host and Budget layout are unchanged.
+                FinanceResearchCrawlPane {
+                    id: crawlPane
+                    anchors.fill: parent
+                    visible: root.selectedMainMode === "research"
+                    crawlFeed: crawlService
                 }
             }
         }

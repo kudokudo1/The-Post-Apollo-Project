@@ -50,6 +50,8 @@ function snapshot(rows, loading, error) {
             const state = typeof row.state === "string"
                           ? row.state.slice(0, 8) : "";
             items.push({pid:pid,name:name,state:state,
+                        startTicks:Number.isSafeInteger(row.startTicks)
+                                   && row.startTicks > 0 ? row.startTicks : 0,
                         stopped:state.indexOf("T") !== -1,
                         cpu:percent(row.cpu),
                         memoryPercent:percent(row.mem)});

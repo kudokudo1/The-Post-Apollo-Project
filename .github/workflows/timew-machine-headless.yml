@@ -1,0 +1,41 @@
+name: TimeW MACHINE isolated headless Sway integration
+
+on:
+  pull_request:
+    paths:
+      - "services/time/MachineWindowMovePilot.py"
+      - "services/time/MachineWindowResolver.py"
+      - "services/time/MachineMoveJournal.py"
+      - "tests/timew/test_machine_headless_sway.py"
+      - "tests/timew/test_machine_headless_sway_contract.py"
+      - ".github/workflows/timew-machine-headless.yml"
+  push:
+    branches:
+      - main
+    paths:
+      - "services/time/MachineWindowMovePilot.py"
+      - "services/time/MachineWindowResolver.py"
+      - "services/time/MachineMoveJournal.py"
+      - "tests/timew/test_machine_headless_sway.py"
+      - "tests/timew/test_machine_headless_sway_contract.py"
+      - ".github/workflows/timew-machine-headless.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  isolated-sway:
+    name: Disposable Sway command and journal verification
+    runs-on: ubuntu-latest
+    timeout-minutes: 9
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate CI-only IPC isolation contract
+        run: python3 -B -I tests/timew/test_machine_headless_sway_contract.py
+      - name: Install isolated headless compositor and test terminal
+        run: |
+          sudo apt-get update -qq
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -qq sway foot fonts-dejavu-core
+      - name: Verify one actual move on disposable headless Sway
+        run: python3 -B -I tests/timew/test_machine_headless_sway.py

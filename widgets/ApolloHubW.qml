@@ -22,6 +22,7 @@ PanelWindow {
     // Owner-owned windows are represented by bounded availability/state
     // and explicit signals, never passed into tile delegates as handles.
     property bool appControlAvailable: false
+    property var processSnapshot: null
     property var socialSnapshot: null
     property bool socialActionsAvailable: false
     signal openAppControlRequested()
@@ -1064,6 +1065,7 @@ PanelWindow {
                             appsSnapshot: hub.liveBridge
                                           ? hub.liveBridge.appsSnapshot : null
                             appControlAvailable: hub.appControlAvailable
+                            processSnapshot: hub.processSnapshot
                             socialSnapshot: hub.socialSnapshot
                             socialActionsAvailable: hub.socialActionsAvailable
                             onOpenAppControlRequested: hub.requestAppControl()

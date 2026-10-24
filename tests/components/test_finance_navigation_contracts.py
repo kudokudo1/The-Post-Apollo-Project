@@ -40,7 +40,7 @@ assert "root.keyboardOwnershipRequested();" in menu
 assert menu.count("ModeButton {") == 1
 # Existing controls plus local-draft actions, ALLOCATE and CHECK WRITE LOCK.
 # Navigation grammar remains unchanged; no custom MouseArea introduced.
-assert menu.count("ActionButton {") == 21  # two reversible M0 size controls
+assert menu.count("ActionButton {") == 23  # M0 size controls and two Research tool tabs
 assert "MouseArea {" not in menu
 
 # Distinct header, divider, and canonical U+00D7 close control.

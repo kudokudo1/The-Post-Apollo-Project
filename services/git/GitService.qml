@@ -72,6 +72,9 @@ Scope {
     property int syncTimingGitMs: -1
     property int syncTimingFinalizeMs: -1
     property int syncTimingRefreshMs: -1
+    // Repository-view refresh ends *before* UI model publication. Distinct
+    // from syncTimingRefreshMs, which includes that final publication.
+    property int syncTimingRepoViewMs: -1
     property int syncTimingTotalMs: -1
     property bool actionOverdueNotified: false
     property string clonePendingQuery: ""
@@ -1462,6 +1465,9 @@ Scope {
                 const refreshElapsed =
                     Math.max(0, Date.now() - syncAfterRefreshStartedMs);
                 syncAfterRefreshStartedMs = 0;
+                // Expose the exact existing REFRESHED measurement to the
+                // header without changing or discarding the raw log line.
+                syncTimingRepoViewMs = refreshElapsed;
                 actionOutput += (actionOutput.length ? "\n" : "")
                     + "REFRESHED // repository view "
                     + refreshElapsed + " ms";
@@ -2389,6 +2395,7 @@ Scope {
             syncTimingGitMs = -1;
             syncTimingFinalizeMs = -1;
             syncTimingRefreshMs = -1;
+            syncTimingRepoViewMs = -1;
             syncTimingTotalMs = -1;
             traceSyncPhase("REQUESTED");
         }

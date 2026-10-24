@@ -209,6 +209,8 @@ def _inspect(con):
             raise StoreError("INVALID_STORED_REVIEW")
         prior_task = [x for x in entries if x["taskId"] == item["task_id"]]
         if (any(x["kind"] == "DELETE_GIT_TASK" for x in prior_task)
+                or (item["kind"] == "CREATE_GIT_TASK" and
+                    any(x["kind"] == "CREATE_GIT_TASK" for x in prior_task))
                 or any(x["id"] not in deps for x in prior_task)):
             raise StoreError("UNSAFE_TASK_DEPENDENCY_ORDER")
         body = _body(identifier, pos, item["kind"], item["task_id"],
@@ -282,8 +284,8 @@ def append_held(file, *, expected_revision, expected_head,
     source = copy.deepcopy(source_model)
     preview = copy.deepcopy(reviewed_preview)
     deps = list(depends_on)
-    if len(deps) != len(set(deps)) or any(
-            type(d) is not str or _ID.fullmatch(d) is None for d in deps):
+    if (any(type(d) is not str or _ID.fullmatch(d) is None for d in deps)
+            or len(deps) != len(set(deps))):
         raise StoreError("INVALID_INTENT_DEPENDENCIES")
     con = _connect(file, writable=True)
     try:
@@ -303,6 +305,9 @@ def append_held(file, *, expected_revision, expected_head,
                                  if x["taskId"] == preview["taskId"]]
             if any(x["kind"] == "DELETE_GIT_TASK" for x in previous_for_task):
                 raise StoreError("DELETION_ALREADY_PROPOSED")
+            if (preview["kind"] == "CREATE_GIT_TASK" and
+                    any(x["kind"] == "CREATE_GIT_TASK" for x in previous_for_task)):
+                raise StoreError("DUPLICATE_CREATE_PROPOSAL")
             if any(x["id"] not in deps for x in previous_for_task):
                 raise StoreError("TASK_DEPENDENCY_REQUIRED")
             identifier = "lx" + str(current["nextId"])

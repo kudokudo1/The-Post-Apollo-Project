@@ -28,6 +28,7 @@ fields = [
     ("Git", "syncTimingGitMs"),
     ("Finalize", "syncTimingFinalizeMs"),
     ("Refresh", "syncTimingRefreshMs"),
+    ("Repository view", "syncTimingRepoViewMs"),
     ("Total", "syncTimingTotalMs"),
 ]
 for label, name in fields:
@@ -49,6 +50,8 @@ assert "syncTimingPrepareMs = syncCommandStartedMs - syncStartedMs;" in started
 assert "syncTimingGitMs = syncCommandFinishedMs - syncCommandStartedMs;" in complete
 assert "syncTimingFinalizeMs =" in finalize
 assert "syncTimingRefreshMs = refreshMs;" in service
+assert "syncTimingRepoViewMs = refreshElapsed;" in service
+assert "syncTimingRepoViewMs = -1;" in service
 assert "syncTimingTotalMs = end - syncStartedMs;" in service
 
 # Two-line header, with one tighter log window. No new card or window.
@@ -57,8 +60,15 @@ assert "syncTimingHeader.visible ? 33 : 24" in view
 assert "visible: isSyncOutput" in header
 assert 'gitService.actionTitle.toLowerCase()' in header
 assert 'font.pixelSize: 9' in header
+assert "PREPARE " in header
+assert "GIT " in header
+assert "FINALIZE " in header
+assert "REFRESH " in header
+assert " (VIEW " in header
 assert "TOTAL " in header
-assert 'elide: Text.ElideRight' in header
+assert 'fontSizeMode: Text.HorizontalFit' in header
+assert 'minimumPixelSize: 7' in header
+assert 'elide: Text.ElideNone' in header
 
 # Run the actual QML formatting helper under Node and check pending,
 # millisecond, and second values, including exact boundary.

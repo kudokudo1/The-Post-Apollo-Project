@@ -5822,17 +5822,31 @@ PanelWindow {
                                 return value;
                             }
 
-                            function normalGitOutput(output, isSync) {
+                            function normalGitOutput(output, isSync, repoViewMs) {
                                 const full = String(output || "");
                                 if (!isSync)
                                     return full;
 
-                                return full.split("\n").filter(function(line) {
+                                const lines = full.split("\n");
+                                // A second REFRESHED line represents another
+                                // event even when its number happens to match.
+                                // Suppress only the single exact row already
+                                // represented in the header.
+                                const pinnedViewLine = repoViewMs >= 0
+                                    ? "REFRESHED // repository view " + repoViewMs + " ms"
+                                    : "";
+                                const matches = pinnedViewLine
+                                    ? lines.filter(function(line) {
+                                        return String(line || "").trim() === pinnedViewLine;
+                                    }).length : 0;
+                                return lines.filter(function(line) {
                                     const value = String(line || "").trim();
-                                    // BEGIN, COMPLETE/FAIL, and REFRESHED contain
-                                    // distinct evidence. Never drop them.
-                                    // Only the operation's already-displayed
-                                    // status markers are genuinely redundant.
+                                    // DETAILS keeps every byte. NORMAL removes
+                                    // only this sole exact header duplicate.
+                                    if (matches === 1 && value === pinnedViewLine)
+                                        return false;
+                                    // These two status-only lines duplicate
+                                    // the already visible operation stage.
                                     if (value === "RUNNING // Git subprocess started"
                                             || value === "FINALIZING // collecting repository evidence")
                                         return false;
@@ -5932,12 +5946,17 @@ PanelWindow {
                                 font.pixelSize: 9
                                 color: Colors.cyan
                                 text:
-                                    "P " + briefMs(gitService.syncTimingPrepareMs)
-                                    + " · G " + briefMs(gitService.syncTimingGitMs)
-                                    + " · F " + briefMs(gitService.syncTimingFinalizeMs)
-                                    + " · R " + briefMs(gitService.syncTimingRefreshMs)
+                                    "PREPARE " + briefMs(gitService.syncTimingPrepareMs)
+                                    + " · GIT " + briefMs(gitService.syncTimingGitMs)
+                                    + " · FINALIZE " + briefMs(gitService.syncTimingFinalizeMs)
+                                    + " · REFRESH " + briefMs(gitService.syncTimingRefreshMs)
+                                    + " (VIEW " + briefMs(gitService.syncTimingRepoViewMs) + ")"
                                     + " · TOTAL " + briefMs(gitService.syncTimingTotalMs)
-                                elide: Text.ElideRight
+                                // One row, same header slot; fit rather than
+                                // ellide a unique measurement on small menus.
+                                fontSizeMode: Text.HorizontalFit
+                                minimumPixelSize: 7
+                                elide: Text.ElideNone
                             }
 
                             Flickable {
@@ -5966,7 +5985,8 @@ PanelWindow {
                                         ? gitService.actionOutput
                                         : gitOutputPanel.normalGitOutput(
                                             gitService.actionOutput,
-                                            syncTimingHeader.isSyncOutput)
+                                            syncTimingHeader.isSyncOutput,
+                                            gitService.syncTimingRepoViewMs)
                                     font.pixelSize: 11
                                     color: Colors.white
                                     wrapMode: Text.WrapAnywhere

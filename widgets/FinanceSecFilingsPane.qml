@@ -1,5 +1,6 @@
 import QtQuick
 import "../components"
+import "FinanceSecEvidencePolicy.js" as EvidencePolicy
 
 // FinanceW Research SEC M2: official EDGAR issuer filings, not trade signals.
 // Source dates are filing dates; transaction direction is not inferred.
@@ -8,11 +9,39 @@ Item {
     property var secFeed: null
     property var documentFeed: null
     property int selectedIndex: 0
+    property string filterMode: "all"
+    property var pinnedEvidence: []
+    property string pinMessage: "PIN TWO INSPECTED FILINGS TO COMPARE"
     readonly property bool wide: width >= 650
     readonly property var filings: secFeed && secFeed.snapshot ? secFeed.snapshot.filings : []
-    readonly property var selected: selectedIndex >= 0 && selectedIndex < filings.length
-                                     ? filings[selectedIndex] : null
+    readonly property var filteredFilings: EvidencePolicy.filterFilings(filings, filterMode)
+    readonly property var selected: selectedIndex >= 0 && selectedIndex < filteredFilings.length
+                                     ? filteredFilings[selectedIndex] : null
+
+    function pinCurrentEvidence() {
+        if (!secFeed || !secFeed.snapshot || !documentFeed
+                || documentFeed.state !== "ready" || !selected)
+            return false;
+        const slots = EvidencePolicy.pinEvidence(
+            pinnedEvidence, selected, documentFeed.snapshot, secFeed.snapshot.cik);
+        if (!slots) return false;
+        pinnedEvidence = slots;
+        pinMessage = slots.length === 2
+            ? "TWO FILINGS PINNED // COMPARE AVAILABLE"
+            : "ONE FILING PINNED // INSPECT ANOTHER";
+        return true;
+    }
+
+    function clearEvidence() {
+        pinnedEvidence = [];
+        pinMessage = "PIN TWO INSPECTED FILINGS TO COMPARE";
+    }
     onFilingsChanged: {
+        selectedIndex = 0;
+        clearEvidence();
+        if (documentFeed) documentFeed.clear();
+    }
+    onFilterModeChanged: {
         selectedIndex = 0;
         if (documentFeed) documentFeed.clear();
     }
@@ -104,7 +133,7 @@ Item {
         anchors.topMargin: 8
         anchors.left: parent.left
         anchors.right: parent.right
-        text: "FILINGS " + pane.filings.length
+        text: "FILINGS " + pane.filteredFilings.length + " / " + pane.filings.length
               + "  //  " + (secFeed && secFeed.snapshot ? secFeed.snapshot.issuer : "NO ISSUER DATA")
         textFormat: Text.PlainText
         font.pixelSize: 10
@@ -112,9 +141,38 @@ Item {
         elide: Text.ElideRight
     }
 
+    Row {
+        id: filterRow
+        anchors.top: counts.bottom
+        anchors.topMargin: 8
+        anchors.left: parent.left
+        anchors.right: parent.right
+        height: 27
+        spacing: 4
+        Repeater {
+            model: [
+                {key: "all", label: "ALL"},
+                {key: "insider", label: "INSIDER"},
+                {key: "events", label: "8-K"},
+                {key: "owners", label: "OWNERS"},
+                {key: "reports", label: "REPORTS"}
+            ]
+            delegate: ActionButton {
+                required property var modelData
+                width: Math.max(46, (filterRow.width - 16) / 5)
+                height: 25
+                label: modelData.label
+                labelPixelSize: 9
+                selected: pane.filterMode === modelData.key
+                accentColor: Colors.cyan
+                onLeftClicked: pane.filterMode = modelData.key
+            }
+        }
+    }
+
     Item {
         id: body
-        anchors.top: counts.bottom
+        anchors.top: filterRow.bottom
         anchors.topMargin: 8
         anchors.left: parent.left
         anchors.right: parent.right
@@ -156,7 +214,7 @@ Item {
                     width: filingScroll.width
                     spacing: 3
                     Repeater {
-                        model: pane.filings
+                        model: pane.filteredFilings
                         delegate: Rectangle {
                             id: filingRow
                             required property var modelData
@@ -218,6 +276,10 @@ Item {
                 filing: pane.selected
                 secFeed: pane.secFeed
                 documentFeed: pane.documentFeed
+                evidenceSlots: pane.pinnedEvidence
+                pinMessage: pane.pinMessage
+                onPinRequested: pane.pinCurrentEvidence()
+                onClearRequested: pane.clearEvidence()
             }
         }
     }

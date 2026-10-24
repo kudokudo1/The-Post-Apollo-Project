@@ -24,7 +24,8 @@ Rectangle {
         if (source.loading)
             return "READING // NEWS";
         if (source.ready)
-            return "NEWS LIVE // " + source.rows.length;
+            return (source.usingCache ? "NEWS CACHED // " : "NEWS RECEIVED // ")
+                   + source.rows.length;
         if (source.retryWaitSeconds > 0)
             return "WAIT // RETRY " + source.retryWaitSeconds + "s";
         return "CONNECTING // NEWS";

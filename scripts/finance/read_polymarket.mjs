@@ -6,6 +6,7 @@ const API = "https://gamma-api.polymarket.com/markets?active=true&closed=false&l
 const MAX_MARKETS = 24;
 
 function finite(value, max = 1e15) {
+  if (value === null || value === undefined || value === "") return null;
   const n = typeof value === "number" || typeof value === "string" ? Number(value) : NaN;
   return Number.isFinite(n) && n >= 0 && n <= max ? n : null;
 }
@@ -33,7 +34,7 @@ export function normalizeMarket(raw) {
   if (!/^[0-9]{1,24}$/.test(id) || !question) return null;
   const vol = finite(raw.volume24hr) ?? finite(raw.volume24hrClob);
   const liquidity = finite(raw.liquidityNum) ?? finite(raw.liquidity);
-  const change = Number(raw.oneDayPriceChange);
+  const change = raw.oneDayPriceChange == null ? NaN : Number(raw.oneDayPriceChange);
   return {
     id,
     question,

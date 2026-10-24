@@ -18,6 +18,12 @@ function previewCategoryPlan(snapshot, mode, categoryId, groupId, rawName) {
     var name=rawName.trim().replace(/\s+/g," ");
     if (!name || name.length>80 || /[\u0000-\u001f\u007f]/.test(rawName))
         return refuse("NAME MUST BE 1 TO 80 CHARACTERS");
+    if (typeof groupId!=="string"
+            || !/^[A-Za-z0-9-]{4,80}$/.test(groupId))
+        return refuse("INVALID CATEGORY GROUP ID");
+    if (mode==="rename" && (typeof categoryId!=="string"
+            || !/^[A-Za-z0-9-]{4,80}$/.test(categoryId)))
+        return refuse("INVALID CATEGORY ID");
     var groups=snapshot.categoryGroups.filter(function(g) {
         return g && g.id===groupId && typeof g.name==="string";
     });
@@ -30,7 +36,8 @@ function previewCategoryPlan(snapshot, mode, categoryId, groupId, rawName) {
         if (matches.length!==1 || !matches[0].name)
             return refuse("CATEGORY CHANGED // REVIEW AGAIN");
         current=matches[0];
-        if (current.name===name) return refuse("NAME UNCHANGED");
+        if (current.name.trim().toLowerCase()===name.toLowerCase())
+            return refuse("NAME UNCHANGED");
     }
     if (snapshot.categories.some(function(c) {
         return c && c.groupId===groupId && c.name

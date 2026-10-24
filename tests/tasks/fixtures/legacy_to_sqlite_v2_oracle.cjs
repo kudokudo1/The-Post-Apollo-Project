@@ -15,6 +15,7 @@ const legacy=load("services/hub/ApolloHubTodoPolicy.js");
 const journal=load("services/projects/OfflineOperationJournal.js");
 const migrator=load("services/projects/LegacyMigrationDryRun.js");
 const model=load("services/projects/UnifiedProjectModelV2.js");
+const readBridge=load("services/projects/UnifiedStorageReadBridge.js");
 
 function convert(raw) {
     if(typeof raw!=="string" || raw.length<1 || raw.length>1048576)
@@ -35,8 +36,12 @@ function convert(raw) {
     if(!v2.ok) return {ok:false,reason:"M10H_"+v2.reason};
     const recheck=model.verify(v2.document);
     if(!recheck.ok) return {ok:false,reason:"CANDIDATE_"+recheck.reason};
-    const v3=legacy.clone(v2.document.version===2?dry.compatibilityV3:dry.compatibilityV3);
-    if(JSON.stringify(v3)!==JSON.stringify(dry.compatibilityV3))
+    const projection=model.legacyReadProjection(v2.document,journal);
+    if(!projection.ok)
+        return {ok:false,reason:"READ_PROJECTION_"+projection.reason};
+    const compat=readBridge.preview(projection.candidate,journal,legacy);
+    if(!compat.ok || JSON.stringify(compat.compatibilityDocument)
+            !==JSON.stringify(dry.compatibilityV3))
         return {ok:false,reason:"LEGACY_PARITY_FAILED"};
     return {ok:true,sourceVersion:dry.sourceVersion,
         counts:{projects:dry.counts.projects,tasks:dry.counts.tasks},

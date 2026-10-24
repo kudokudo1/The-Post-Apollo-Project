@@ -25,7 +25,8 @@ assert 'selected: gitOutputPanel.showDetails' in view
 assert 'onClicked: gitOutputPanel.showDetails =' in view
 assert 'gitOutputPanel.normalGitOutput(' in view
 assert 'gitService.actionOutput,' in view
-assert 'syncTimingHeader.isSyncOutput)' in view
+assert 'syncTimingHeader.isSyncOutput,' in view
+assert 'gitService.syncTimingRepoViewMs)' in view
 assert 'gitOutputPanel.showDetails\n                                        ? gitService.actionOutput' in view
 assert 'height: 112' in view
 assert 'syncTimingHeader.visible ? 33 : 24' in view
@@ -86,7 +87,19 @@ assert.equal(compact, [
 
 assert.ok(compact.includes('JOURNAL PROFILE // BEGIN'));
 assert.ok(compact.includes('JOURNAL PROFILE // COMPLETE'));
-assert.ok(compact.includes('REFRESHED │ repository view 1400ms'));
+assert.ok(compact.includes('REFRESHED │ repository view 1400ms'),
+    'without an exact header value, unique refresh info stays in NORMAL');
+// Once the *same* repository-view value is pinned, hide that line only.
+const withPinnedView = normalGitOutput(raw, true, 1400);
+assert.ok(!withPinnedView.includes('REFRESHED │ repository view 1400ms'));
+assert.ok(withPinnedView.includes('JOURNAL PROFILE // BEGIN'));
+assert.ok(withPinnedView.includes('JOURNAL PROFILE // COMPLETE'));
+assert.ok(withPinnedView.includes('SNAPSHOT WARNING // after snapshot'));
+assert.ok(withPinnedView.includes('JOURNAL NOT RECORDED // AFTER save unconfirmed'));
+assert.equal(normalGitOutput(raw, false, 1400), raw,
+    'DETAILS and nonsync output remain entirely raw');
+assert.ok(normalGitOutput(raw, true, 1399).includes('REFRESHED │ repository view 1400ms'),
+    'different / stale header metric must not hide raw evidence');
 assert.ok(!compact.includes('RUNNING // Git subprocess started'));
 assert.ok(!compact.includes('FINALIZING // collecting repository evidence'));
 const failed = normalGitOutput([
@@ -103,6 +116,16 @@ assert.equal(failed,
     + 'REFRESHED // repository view unavailable\n'
     + 'REFRESHED │ repository view 3ms',
     'all unique timing and unexpected statuses must stay visible');
+const pinnedFailed = normalGitOutput([
+    'JOURNAL PROFILE // FAIL clone 0 ms',
+    'REFRESHED // repository view 3 ms',
+    'REFRESHED // repository view unavailable',
+    'JOURNAL NOT RECORDED // failure'
+].join('\n'), true, 3);
+assert.ok(!pinnedFailed.includes('REFRESHED │ repository view 3ms'));
+assert.ok(pinnedFailed.includes('REFRESHED // repository view unavailable'));
+assert.ok(pinnedFailed.includes('JOURNAL PROFILE // FAIL clone 0 ms'));
+assert.ok(pinnedFailed.includes('JOURNAL NOT RECORDED // failure'));
 assert.equal(normalGitOutput('   unrelated text\n\n   summary', true),
     '   unrelated text\n\n   summary', 'retain whitespace and blank lines');
 console.log('Git Normal/Details selective diagnostics: PASS');

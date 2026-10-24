@@ -1,6 +1,7 @@
 import QtQuick
 import "../../components"
 import "../../services/weather" as WeatherServices
+import "StationViewerPolicy.js" as ViewerPolicy
 
 // Source-first stage. All records shown come from a backend, never examples.
 // MAP is an event index before an actual map canvas is integrated; RADIO is
@@ -10,6 +11,32 @@ Rectangle {
 
     property string domain: "map"
     property bool stationOpen: true
+    property bool viewerOpen: false
+    property var selectedNews: null
+
+    // NEWS selection stays in the Station. GDELT supplies a headline record,
+    // not verified article body text.
+    function openRow(row) {
+        if (domain === "news") {
+            const next = ViewerPolicy.normalizeNews(row);
+            if (!next) return;
+            selectedNews = next;
+            viewerOpen = true;
+            return;
+        }
+        // MAP's real internal event/map adapter is a later bounded stage.
+        // Preserve its existing path without changing other domain ownership.
+        if (row && row.url)
+            Qt.openUrlExternally(row.url);
+    }
+
+    function closeViewer() {
+        viewerOpen = false;
+        selectedNews = null;
+    }
+
+    onDomainChanged: closeViewer()
+    onStationOpenChanged: { if (!stationOpen) closeViewer(); }
 
     readonly property string modeTitle:
         domain === "map" ? "⌖  MAP // EVENT SOURCES"
@@ -59,6 +86,7 @@ Rectangle {
     Flickable {
         id: discoveryScroll
         anchors.fill: parent
+        visible: !stationDiscovery.viewerOpen
         clip: true
         boundsBehavior: Flickable.StopAtBounds
         contentWidth: width
@@ -198,7 +226,8 @@ Rectangle {
                         anchors.right: parent.right
                         anchors.verticalCenter: parent.verticalCenter
                         anchors.rightMargin: 12
-                        text: modelData.url !== "" ? modelData.action : "NO LINK"
+                        text: stationDiscovery.domain === "news" ? "VIEW HERE"
+                              : modelData.url !== "" ? modelData.action : "NO LINK"
                         color: entryMouse.containsMouse ? Colors.yellow : Colors.cyan
                         font.pixelSize: 11
                     }
@@ -207,12 +236,10 @@ Rectangle {
                         id: entryMouse
                         anchors.fill: parent
                         hoverEnabled: true
-                        cursorShape: modelData.url !== ""
+                        cursorShape: stationDiscovery.domain === "news"
+                                     || modelData.url !== ""
                                      ? Qt.PointingHandCursor : Qt.ArrowCursor
-                        onClicked: {
-                            if (modelData.url !== "")
-                                Qt.openUrlExternally(modelData.url);
-                        }
+                        onClicked: stationDiscovery.openRow(modelData)
                     }
                 }
             }
@@ -228,10 +255,26 @@ Rectangle {
         }
     }
 
+    // Destroy the optional webpage when backing out, retaining the discovery
+    // list position and its existing provider connection.
+    Component {
+        id: newsViewerComponent
+        StationViewerHost {
+            selectedRecord: stationDiscovery.selectedNews
+            onBackRequested: stationDiscovery.closeViewer()
+        }
+    }
+    Loader {
+        anchors.fill: parent
+        active: stationDiscovery.viewerOpen
+        sourceComponent: newsViewerComponent
+        z: 3
+    }
+
     NeonScrollBar {
         flickable: discoveryScroll
         handleStyle: "star"
         geometryHost: stationDiscovery
-        visible: scrollable
+        visible: !stationDiscovery.viewerOpen && scrollable
     }
 }

@@ -73,7 +73,7 @@ assert.equal(normalGitOutput(raw, true), expected,
 assert.equal(normalGitOutput(raw, false), raw, 'non-sync output is untouched');
 assert.equal(normalGitOutput(raw, false, 1345), raw, 'DETAILS is raw');
 assert.equal(normalGitOutput(raw, true, 1345), expected.replace(
- 'REFRESHED │ repository view 1345ms\\n', ''),
+ 'REFRESHED │ repository view 1345ms\n', ''),
  'NORMAL moves the exact repository-view value to the pinned header');
 assert.equal(normalGitOutput(raw, true, 1344), expected,
  'wrong header value must not suppress a distinct measurement');

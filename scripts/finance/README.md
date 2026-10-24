@@ -923,3 +923,29 @@ temporary permission file under an ephemeral runner HOME. It verifies missing
 permission refusal, one create, one rename, journal/privacy, duplicate request
 refusal, and independent post-sync readback. That temporary test permit and
 budget are not operator configuration. **This does not authorize live writes.**
+
+
+## FinanceW Categories M3 // Staged confirmation UI, independently LOCKED
+
+**Finance → Budget → Budget → CATEGORIES** now supports the full staged
+create/rename interaction **PREVIEW → ARM SAVE → CONFIRM SAVE**. All three
+are deliberate, separate actions, and each change requires a fresh preview.
+Changing the proposed name/group or refreshing the snapshot disarms approval;
+switching source/month cancels stale drafts. The existing category search
+and **EDIT SET** behavior remain intact.
+
+The M3 menu passes an exact source/month/group/category-and-original-name
+command over private process stdin to `FinanceCategoryWriteService.qml`,
+which invokes the M2 `write_category.mjs` backend. UI never imports Actual,
+creates a permit, edits files, stores finance records, or retries. The
+on-disk category writer's unique marker `category-writes-enabled` remains
+**absent unless explicitly created by the operator after further review**.
+Without that marker, the write is blocked *before* any API mutator or
+recovery attempt. Other outcomes are conservative: anything except a
+verified committed result or known missing permit locks the service as
+**REFUSED OR UNCERTAIN**, requiring manual Actual/journal inspection.
+
+This PR does **not** authorize real budget mutations. First verify the UI's
+missing-permit LOCKED feedback with live Quickshell, then separately decide
+whether to test activation in a controlled backed-up budget. The sibling
+Account/Market/Radar/etc. workstreams are outside this implementation.

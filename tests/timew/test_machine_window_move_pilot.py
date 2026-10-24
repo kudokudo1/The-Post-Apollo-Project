@@ -207,4 +207,46 @@ fake = SwappedApp()
 assert run_execute(document, request, read_runner=fake.read,
                        command_runner=fake.command)["status"] == "uncertain_requires_manual_review"
 
+# No movement if a durable journal cannot be created.
+class CannotDispatch(mod.MoveJournal):
+    def mark_dispatching(self, operation_id):
+        raise mod.JournalError("SIMULATED STORAGE FAILURE")
+
+path = Path(_tmp.name) / "fail-pre-dispatch" / "move-operations.db"
+fake = FakeSway()
+broken = CannotDispatch(path)
+try:
+    mod.execute_one(document, request, read_runner=fake.read,
+                    command_runner=fake.command, journal=broken)
+    raise AssertionError("moved without committing dispatch")
+except mod.JournalError:
+    pass
+assert not any(x[3] == "command" for x in fake.calls)
+assert broken.pending()[0]["phase"] == "prepared"
+
+# If outcome persistence fails AFTER dispatch, no verified result escapes.
+class CannotFinish(mod.MoveJournal):
+    def finish(self, operation_id, status, observed=None):
+        raise mod.JournalError("SIMULATED FINISH FAILURE")
+
+path = Path(_tmp.name) / "fail-post-dispatch" / "move-operations.db"
+fake = FakeSway()
+broken = CannotFinish(path)
+try:
+    mod.execute_one(document, request, read_runner=fake.read,
+                    command_runner=fake.command, journal=broken)
+    raise AssertionError("success claimed without durable completion")
+except mod.JournalError:
+    pass
+assert sum(x[3] == "command" for x in fake.calls) == 1
+assert broken.pending()[0]["phase"] == "dispatching"
+assert broken.pending()[0]["automatic_retry_allowed"] is False
+
+try:
+    mod.execute_one(document, request, read_runner=FakeSway().read,
+                    command_runner=FakeSway().command, journal=None)
+    raise AssertionError("journal-less move allowed")
+except mod.MoveRefused:
+    pass
+
 print("MACHINE M1K: GUARDED MOVE PILOT PASS / INJECTED SWAY ONLY")

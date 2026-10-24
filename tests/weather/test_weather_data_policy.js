@@ -683,4 +683,17 @@ assert.equal(terminalGeometry.position(terminalOutputs, "DP-5",
 assert.equal(terminalGeometry.position(terminalOutputs, "DP-5",
     1000, 20, 62, 160, 30, 70, 780, Infinity), null);
 
+
+// Expected enlarged terminal bay inside the top/right anchored Station,
+// including a compositor output with a negative global origin.
+function expandedBay(output) {
+    return terminalGeometry.position(
+        terminalOutputs, output, 1000, 20, 62, 160, 14, 90, 812, 468
+    );
+}
+assert.deepEqual(JSON.parse(JSON.stringify(expandedBay("DP-5"))),
+                 {x: 1714, y: 152, width: 812, height: 468});
+assert.deepEqual(JSON.parse(JSON.stringify(expandedBay("HDMI-A-1"))),
+                 {x: -846, y: 352, width: 812, height: 468});
+
 console.log("Weather data policy contracts: PASS");

@@ -12,6 +12,7 @@ Item {
     property string sourceAtOpen: ""
     property string monthAtOpen: ""
     property string selectedCategoryId: ""
+    property string originalNameAtOpen: ""
     property string selectedGroupId: ""
     property string draftName: ""
     property bool previewVisible: false
@@ -47,6 +48,7 @@ Item {
         sourceAtOpen="";
         monthAtOpen="";
         selectedCategoryId="";
+        originalNameAtOpen="";
         selectedGroupId="";
         draftName="";
     }
@@ -69,6 +71,7 @@ Item {
         sourceAtOpen=snapshot.sourceKey;
         monthAtOpen=snapshot.month;
         selectedCategoryId=row.id;
+        originalNameAtOpen=row.name;
         selectedGroupId=row.groupId;
         draftName=row.name;
         openMode="rename";
@@ -77,7 +80,8 @@ Item {
     function stepGroup(delta){
         if(openMode!=="create" || !groups.length)return false;
         const current=groups.findIndex(function(g){return g && g.id===selectedGroupId;});
-        const next=(current+(delta<0?-1:1)+groups.length)%groups.length;
+        const next=current<0 ? (delta<0 ? groups.length-1 : 0)
+            : (current+(delta<0?-1:1)+groups.length)%groups.length;
         selectedGroupId=groups[next].id;
         return true;
     }
@@ -92,7 +96,9 @@ Item {
             // A same-source refresh is not approval. Re-preview current data.
             previewVisible=false;
             if(openMode==="rename" && !categories.some(function(c){
-                return c && c.id===selectedCategoryId && c.groupId===selectedGroupId;
+                return c && c.id===selectedCategoryId
+                    && c.groupId===selectedGroupId
+                    && c.name===originalNameAtOpen;
             }))clearDraft();
         }
     }

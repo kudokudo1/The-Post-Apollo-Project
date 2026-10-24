@@ -1,0 +1,40 @@
+name: TASKS Proxy 1 M10n SQLite cutover safety review
+
+on:
+  pull_request:
+    paths:
+      - 'services/projects/TaskSqliteCutoverReview.py'
+      - 'tests/tasks/test_task_sqlite_cutover_review.py'
+      - 'docs/tasks-sqlite-cutover-review-m10n.md'
+      - '.github/workflows/tasks-sqlite-cutover-review.yml'
+  push:
+    branches:
+      - main
+    paths:
+      - 'services/projects/TaskSqliteCutoverReview.py'
+      - 'tests/tasks/test_task_sqlite_cutover_review.py'
+      - 'docs/tasks-sqlite-cutover-review-m10n.md'
+      - '.github/workflows/tasks-sqlite-cutover-review.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  cutover-review:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: M10n review-only shadow cutover and unsafe rollback safeguards
+        run: python3 tests/tasks/test_task_sqlite_cutover_review.py
+      - name: M10m legacy-byte and SQLite candidate migration regression
+        run: python3 tests/tasks/test_legacy_sqlite_migration_preview.py
+      - name: M10l record-level SQLite transaction regression
+        run: python3 tests/tasks/test_task_sqlite_records_v2.py
+      - name: M10k cross-language read probe regression
+        run: python3 tests/tasks/test_task_sqlite_read_parity.py

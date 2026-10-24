@@ -50,12 +50,13 @@ Scope {
             + "--sort=-pcpu | "
             + "while read -r pid rest; do "
             + "[ -n \"$pid\" ] || continue; "
-            + "ticks=$(sed 's/^[^)]*) //' /proc/$pid/stat 2>/dev/null "
-            + "| awk '{print $12+$13}'); "
+            + "stat_pair=$(sed 's/^[^)]*) //' /proc/$pid/stat 2>/dev/null "
+            + "| awk '{print ($12+$13)\" \"$20}'); "
+            + "ticks=${stat_pair%% *}; start=${stat_pair#* }; "
             + "readb=$(awk '$1==\"read_bytes:\" {print $2; exit}' /proc/$pid/io 2>/dev/null); "
             + "writeb=$(awk '$1==\"write_bytes:\" {print $2; exit}' /proc/$pid/io 2>/dev/null); "
             + "printf '%s %s %s %s %s %s\\n' \"$clk\" \"${ticks:-0}\" "
-            + "\"${readb:-0}\" \"${writeb:-0}\" \"$pid\" \"$rest\"; "
+            + "\"${readb:-0}\" "\"${writeb:-0}\" "\"$pid:${start:-0}\" "\"$rest\"; "
             + "done"
         ]);
     }
@@ -84,7 +85,15 @@ Scope {
             const cpuTicks = Math.max(0, Number(fields[1] || 0));
             const ioReadBytes = Math.max(0, Number(fields[2] || 0));
             const ioWriteBytes = Math.max(0, Number(fields[3] || 0));
-            const pid = Number(fields[4] || 0);
+            // Composite PID:birth keeps the existing ps field indexes and
+            // appends no sensitive data. A legacy plain PID remains readable
+            // but cannot authorize a Hub mutation without its birth token.
+            const pidToken = String(fields[4] || "");
+            const separator = pidToken.indexOf(":");
+            const pid = Number(separator >= 0 ? pidToken.slice(0, separator)
+                                             : pidToken);
+            const startTicks = separator >= 0
+                               ? Number(pidToken.slice(separator + 1)) : 0;
 
             if (!pid)
                 continue;
@@ -154,6 +163,8 @@ Scope {
                 _taskRecord: true,
                 id: "task:" + String(pid),
                 pid: pid,
+                startTicks: Number.isSafeInteger(startTicks) && startTicks > 0
+                            ? startTicks : 0,
                 ppid: Number(fields[5] || 0),
                 user: String(fields[6] || ""),
                 state: String(fields[7] || ""),

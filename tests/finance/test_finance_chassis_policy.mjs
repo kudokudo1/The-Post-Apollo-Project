@@ -24,7 +24,6 @@ assert.deepEqual(frame('compact', 2560, 1440), [432, 790]);
 assert.deepEqual(frame('expanded', 2560, 1440), [1000, 900]);
 assert.deepEqual(frame('fullscreen', 2560, 1440), [2536, 1120]);
 assert.deepEqual(frame('fullscreen', 2560, 1600), [2536, 1120]);
-assert.deepEqual(frame('expanded', 2560, 1440), [1000, 900]);
 assert.deepEqual(frame('expanded', 1360, 768), [1000, 751]);
 assert.deepEqual(frame('fullscreen', 1360, 768), [1336, 751]);
 assert.deepEqual(frame('compact', 320, 480), [296, 463]);

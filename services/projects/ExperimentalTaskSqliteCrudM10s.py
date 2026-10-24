@@ -110,7 +110,11 @@ def create_normal_project(file, *, expected_revision, expected_hash,
                 "remote": None, "fields": [],
                 "createdAtMs": now_ms, "updatedAtMs": now_ms}
         doc["nextProjectId"] += 1
-        records._insert_project(con, item, len(doc["projects"]))
+        # Deleted project rows can leave position gaps. Append above SQL's
+        # high-water mark rather than reusing a surviving row position.
+        next_pos = con.execute(
+            "SELECT COALESCE(MAX(position),-1)+1 FROM projects").fetchone()[0]
+        records._insert_project(con, item, next_pos)
         doc["projects"].append(item)
         return pid
     return _transaction(file, expected_revision, expected_hash, update, stop_at)

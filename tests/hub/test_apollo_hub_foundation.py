@@ -8,6 +8,7 @@ shell = (ROOT / "shell.qml").read_text(encoding="utf-8")
 dock = (ROOT / "modules/ApolloHub.qml").read_text(encoding="utf-8")
 window = (ROOT / "widgets/ApolloHubW.qml").read_text(encoding="utf-8")
 tile = (ROOT / "widgets/hub/ApolloHubTile.qml").read_text(encoding="utf-8")
+network_explore = (ROOT / "widgets/hub/ApolloHubNetworkExplore.qml").read_text(encoding="utf-8")
 weather_explore = (ROOT / "widgets/hub/ApolloHubWeatherExplore.qml").read_text(encoding="utf-8")
 media_mini = (ROOT / "widgets/hub/ApolloHubMediaMini.qml").read_text(encoding="utf-8")
 system_mini = (ROOT / "widgets/hub/ApolloHubSystemMini.qml").read_text(encoding="utf-8")
@@ -1191,6 +1192,48 @@ for forbidden in (
 ):
     assert forbidden not in weather_explore, (
         f"Stage 8C cannot collect or control: {forbidden}")
+
+
+# Stage 8D: read-only Network explorer, existing one bridge snapshot.
+for token in (
+    'visible: tile.moduleId === "network" && tile.tileRowSpan === 1',
+    'ApolloHubNetworkExplore {',
+    'visible: tile.moduleId === "network" && tile.tileRowSpan > 1',
+    'networkSnapshot: tile.networkSnapshot',
+    'networkExplore.statusLine',
+):
+    assert token in tile, f"Stage 8D mount missing {token}"
+for token in (
+    'property var networkSnapshot: null',
+    'property string selectedView: "status"',
+    'model: ["STATUS", "WI-FI", "ETHERNET"]',
+    'onLeftClicked: networkExplore.selectedView =',
+    'networkSnapshot.connected === true',
+    'networkState === "connected"',
+    'wifi.present === true',
+    'ethernet.present === true',
+    'wifi.signalPercent',
+    'typeof value === "number"',
+    'isFinite(value)',
+    'value >= 0 && value <= 100',
+    'networkSnapshot.linkSpeedApproximate !== true',
+    'networkSnapshot.linkSpeedMbps',
+    'transport !== "wifi"',
+    '"WIRED SPEED // NOT OBSERVED"',
+    'INTERNET // UNVERIFIED',
+    'LOCAL LINK CONNECTED',
+    'NOT PRESENT',
+    'UNAVAILABLE',
+):
+    assert token in network_explore, f"Stage 8D data missing {token}"
+for forbidden in (
+    'NetworkManager {', 'Networking.devices', 'Process {',
+    'FileView {', 'Timer {', 'nmcli', 'ethtool', 'iw dev',
+    'checkConnectivity(', 'activateConnection(', 'setNetworkingEnabled(',
+    'Qt.openUrlExternally(', 'request(', 'fetch(', 'refresh(', 'startPolling(',
+):
+    assert forbidden not in network_explore, (
+        f"Stage 8D network view must not probe/control: {forbidden}")
 
 # Launchers and widget backends are unchanged in this first stage.
 print("ApolloHubW foundation source contracts passed")

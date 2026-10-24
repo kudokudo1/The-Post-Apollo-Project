@@ -15,6 +15,7 @@ import sys
 # Importing existing read-only projection under python3 -I.
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from MachineSwayRead import PreviewError, _read_json
+from MachineMoveJournal import MoveJournal
 from MachineWindowResolver import (
     ResolutionError, _id, _walk_live, resolve,
 )
@@ -152,14 +153,20 @@ def _observe(runner, saved_document, request):
     return "unavailable"
 
 
-def execute_one(saved_document, request, *, read_runner, command_runner):
+def execute_one(saved_document, request, *, read_runner, command_runner, journal):
     """Isolated-injection pilot only; intentionally NO production CLI.
 
     Real use requires a separately approved UI, immutable approval scope,
-    runtime validation, a durable before-state journal and compositor tests.
+    runtime validation, reviewable approvals and compositor tests.
     """
+    if not isinstance(journal, MoveJournal):
+        raise MoveRefused("DURABLE JOURNAL REQUIRED")
     report = _preflight(saved_document, request, runner=read_runner,
                         approval_required=True)
+    # The original placement is committed before ANY possible command.
+    operation_id = journal.begin(report["before"])
+    journal.mark_dispatching(operation_id)
+    # A failed begin/dispatch transaction stops here without issuing a move.
     argv = ["swaymsg", "-r", "-t", "command", report["command"]]
     # Fixed command grammar, exact numeric target, no shell interpolation.
     # Only one command is sent. No focus/kill/start/reload command is sent.
@@ -180,7 +187,13 @@ def execute_one(saved_document, request, *, read_runner, command_runner):
         status = "refused_no_confirmed_move"
     else:
         status = "uncertain_requires_manual_review"
-    return {"status": status, "before": report["before"],
+    # No completion is reported unless the final outcome itself is durable.
+    # Crash or storage failure keeps 'dispatching' pending for manual review;
+    # retry and automatic rollback are deliberately forbidden.
+    journal.finish(operation_id, status,
+                   observed if observed != "unavailable" else None)
+    return {"status": status, "operation_id": operation_id,
+            "before": report["before"],
             "observed_workspace": observed,
             "undo_preview": report["undo_preview"],
             "reversible_automatically": False,

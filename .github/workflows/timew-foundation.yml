@@ -18,6 +18,8 @@ on:
       - "services/time/MachineRestorePreviewPolicy.js"
       - "services/time/MachineWindowResolver.py"
       - "services/time/MachineWindowMovePilot.py"
+      - "services/time/MachineMoveJournal.py"
+      - "docs/timew-machine-m1l-durable-move-journal.md"
       - "docs/timew-machine-m1k-single-window-pilot.md"
       - "services/time/MachineCheckpointStore.py"
       - "services/time/MachineCheckpointModel.py"
@@ -48,6 +50,8 @@ on:
       - "services/time/MachineRestorePreviewPolicy.js"
       - "services/time/MachineWindowResolver.py"
       - "services/time/MachineWindowMovePilot.py"
+      - "services/time/MachineMoveJournal.py"
+      - "docs/timew-machine-m1l-durable-move-journal.md"
       - "docs/timew-machine-m1k-single-window-pilot.md"
       - "services/time/MachineCheckpointStore.py"
       - "services/time/MachineCheckpointModel.py"
@@ -115,6 +119,8 @@ jobs:
         run: python3 -B -I tests/timew/test_machine_window_resolver.py
       - name: Verify MACHINE manual resolver UI never executes recovery
         run: python3 -B -I tests/timew/test_machine_window_resolver_ui.py
+      - name: Verify MACHINE durable move journal crash and permissions
+        run: python3 -B -I tests/timew/test_machine_move_journal.py
       - name: Verify MACHINE injected single-window move pilot with synthetic Sway
         run: python3 -B -I tests/timew/test_machine_window_move_pilot.py
       - name: Verify MACHINE move pilot cannot activate from TimeW

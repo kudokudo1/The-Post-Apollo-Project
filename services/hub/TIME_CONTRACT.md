@@ -20,6 +20,16 @@ Timer {
 
 The UI owner should **reuse** `tile.now` and not add another observer. The current Clock dock and TimeW each own their existing clocks independently. B10 does not merge or modify those owners.
 
+**Later integration clarification (October 24, 2026):** TimeW now imports the
+same pure `ApolloHubTimePolicy.js` formatter as a reusable utility. Its input
+comes from TimeW's existing `localClock.date.getTime()` `SystemClock` and
+its own `use24Hour` presentation preference. This does **not** make the Hub
+responsible for TimeW ticks and does **not** create a shared ticker or new
+background polling. The B10 source contract verifies that TimeW preserves
+its own one `SystemClock` while using the pure formatter, rather than
+forbidding any import of that file.
+
+
 ## Consumer API
 
 From `widgets/hub/ApolloHubTile.qml`, a UI worker can import:

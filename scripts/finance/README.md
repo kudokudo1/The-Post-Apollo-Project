@@ -914,3 +914,12 @@ and sync interruption. This is *not* operator authorization or live Quickshell
 acceptance. Next: disposable Actual 26.10 category create/rename roundtrip,
 then independently reviewed UI wiring and operator desktop verification
 while the write authorization marker remains absent.
+
+### M2 disposable server acceptance
+
+The FinanceW disposable Actual workflow now executes the actual production
+category CLI against an isolated, freshly created fictional budget and a
+temporary permission file under an ephemeral runner HOME. It verifies missing
+permission refusal, one create, one rename, journal/privacy, duplicate request
+refusal, and independent post-sync readback. That temporary test permit and
+budget are not operator configuration. **This does not authorize live writes.**

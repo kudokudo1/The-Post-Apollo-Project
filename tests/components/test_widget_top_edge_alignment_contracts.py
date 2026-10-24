@@ -45,9 +45,10 @@ assert "        top: panelTopMargin" in deck
 assert "    SurfaceFrame {\n        anchors.fill: parent" in deck
 assert "property int panelHeight: 850" in deck
 
-# Finance is the accepted experiment's reference: compact inset = 12 - 3.
-assert "readonly property int compactTopLift: 3" in finance
-assert 'chassisLevel === "compact" ? glowGutter - compactTopLift : glowGutter' in finance
+# Finance uses one 9px visible top line in Compact, Expanded and Fullscreen.
+assert "readonly property int frameTopInset: 9" in finance
+assert "readonly property int bottomScreenGap: 8" in finance
+assert "compactTopLift" not in finance
 assert "anchors.topMargin: root.frameTopInset" in finance
 assert "panelTopMargin: 0" in hospital
 assert "chassisTopY: hospitalWindow.panelTopMargin" in shell

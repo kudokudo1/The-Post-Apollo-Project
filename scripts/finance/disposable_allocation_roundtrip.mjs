@@ -449,7 +449,7 @@ async function main(){
   // fictional Actual server, with independently authenticated readback.
   await endClient();
   const runCategory=cmd=>spawnSync(process.execPath,[categoryWriter],{
-    encoding:"utf8",timeout:45000,input:JSON.stringify(cmd)+"\\n",
+    encoding:"utf8",timeout:45000,input:JSON.stringify(cmd)+"\n",
     env:{...process.env,HOME:writerHome,ACTUAL_SERVER_URL:"",
       ACTUAL_SYNC_ID:"",ACTUAL_PASSWORD_FILE:"",
       ACTUAL_SYNC_ID_FILE:"",ACTUAL_ENCRYPTION_PASSWORD_FILE:""}
@@ -466,7 +466,7 @@ async function main(){
     "FINANCEW_CATEGORY_RESULT blocked:writes-disabled");
   stage="m2-category-disposable-permit";
   await writeFile(join(config,"category-writes-enabled"),
-    "FINANCEW_CATEGORY_WRITES_APPROVED\\n",{mode:0o600,flag:"wx"});
+    "FINANCEW_CATEGORY_WRITES_APPROVED\n",{mode:0o600,flag:"wx"});
   stage="m2-category-create";
   const catCreated=runCategory(categoryNew);
   assert.equal(catCreated.error,undefined);

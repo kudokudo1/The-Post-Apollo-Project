@@ -37,3 +37,55 @@ function position(outputs, outputName, stationWidth, rightMargin,
         return null;
     return {x: x, y: y, width: width, height: height};
 }
+
+
+// Inspect compositor OBSERVED geometry rather than treating a successful
+// swaymsg resize exit as proof Kitty accepted the requested pixel size.
+// get_tree is a nested Sway tree; no shell interpolation or app-id patterns.
+function observedWindow(tree, appId) {
+    if (!tree || typeof tree !== "object"
+            || typeof appId !== "string" || !/^weather-screen(?:-[a-z]+)?$/.test(appId))
+        return null;
+    function scan(node) {
+        if (!node || typeof node !== "object") return null;
+        if (node.app_id === appId && node.rect && node.visible !== false) {
+            const r = node.rect;
+            if ([r.x, r.y, r.width, r.height].every(function(v) {
+                return typeof v === "number" && isFinite(v);
+            }) && r.width > 0 && r.height > 0)
+                return {x: r.x, y: r.y, width: r.width, height: r.height};
+        }
+        const children = []
+            .concat(Array.isArray(node.nodes) ? node.nodes : [])
+            .concat(Array.isArray(node.floating_nodes) ? node.floating_nodes : []);
+        for (let i = 0; i < children.length; ++i) {
+            const found = scan(children[i]);
+            if (found) return found;
+        }
+        return null;
+    }
+    return scan(tree);
+}
+
+// Return only Kitty's actual pixels that intersect the requested bay.
+// The rest of the layer-shell chassis must REMAIN painted so the desktop
+// does not leak through when a terminal refuses Sway's resize request.
+function visibleIntersection(desired, actual) {
+    if (!desired || !actual) return null;
+    const a = [desired.x, desired.y, desired.width, desired.height,
+               actual.x, actual.y, actual.width, actual.height];
+    if (!a.every(function(v) { return typeof v === "number" && isFinite(v); })
+            || desired.width <= 0 || desired.height <= 0
+            || actual.width <= 0 || actual.height <= 0)
+        return null;
+    const left = Math.max(desired.x, actual.x);
+    const top = Math.max(desired.y, actual.y);
+    const right = Math.min(desired.x + desired.width, actual.x + actual.width);
+    const bottom = Math.min(desired.y + desired.height, actual.y + actual.height);
+    if (right <= left || bottom <= top) return null;
+    return {x: left - desired.x, y: top - desired.y,
+            width: right - left, height: bottom - top,
+            exact: desired.x === actual.x && desired.y === actual.y
+                   && desired.width === actual.width
+                   && desired.height === actual.height};
+}

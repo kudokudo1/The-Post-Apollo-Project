@@ -27,10 +27,10 @@ PanelWindow {
 
     // The SAME geometry drives the layer-shell input mask and the actual
     // transparent visual opening. Sway owns Kitty's global positioning.
-    readonly property real terminalHoleX: modeRail.width + terminalView.bayX
-    readonly property real terminalHoleY: header.height + terminalView.bayY
-    readonly property real terminalHoleWidth: terminalView.bayWidth
-    readonly property real terminalHoleHeight: terminalView.bayHeight
+    readonly property real terminalHoleX: modeRail.width + terminalView.visibleBayX
+    readonly property real terminalHoleY: header.height + terminalView.visibleBayY
+    readonly property real terminalHoleWidth: terminalView.visibleBayWidth
+    readonly property real terminalHoleHeight: terminalView.visibleBayHeight
     readonly property bool terminalHoleValid:
         terminalHoleX >= 0 && terminalHoleY >= 0
         && terminalHoleWidth > 0 && terminalHoleHeight > 0
@@ -649,6 +649,17 @@ PanelWindow {
                                && (weatherStation.contextTerminalRequested
                                    || terminalView.terminalState !== "IDLE")
                     onLeftClicked: weatherStation.closeContextTerminal()
+                }
+
+                // Separate the terminal session controls from the live
+                // source indicator without stealing the whole header row.
+                Rectangle {
+                    id: terminalHeaderDivider
+                    width: 2
+                    height: 25
+                    anchors.verticalCenter: parent.verticalCenter
+                    color: Colors.cyan
+                    opacity: 0.85
                 }
 
                 // Live source badge, matching the Git/Finance header grammar.

@@ -696,4 +696,44 @@ assert.deepEqual(JSON.parse(JSON.stringify(expandedBay("DP-5"))),
 assert.deepEqual(JSON.parse(JSON.stringify(expandedBay("HDMI-A-1"))),
                  {x: -846, y: 352, width: 812, height: 468});
 
+
+// Actual operator-reported Sway geometry after an accepted resize command.
+// Desired 812x468, observed 780x400: only the intersecting 780x400 should
+// become transparent. More bay area must NOT reveal unrelated desktop windows.
+const treeExample = {
+    nodes: [{
+        nodes: [],
+        floating_nodes: [{
+            app_id: "weather-screen", name: "STAR MAP", visible: true,
+            rect: {x: 1714, y: 152, width: 780, height: 400}
+        }]
+    }]
+};
+const seen = terminalGeometry.observedWindow(treeExample, "weather-screen");
+assert.deepEqual(JSON.parse(JSON.stringify(seen)),
+                 {x: 1714, y: 152, width: 780, height: 400});
+const desired = {x: 1714, y: 152, width: 812, height: 468};
+const clipped = terminalGeometry.visibleIntersection(desired, seen);
+assert.deepEqual(JSON.parse(JSON.stringify(clipped)),
+                 {x: 0, y: 0, width: 780, height: 400, exact: false});
+assert.equal(terminalGeometry.visibleIntersection(desired, desired).exact, true);
+assert.deepEqual(JSON.parse(JSON.stringify(
+    terminalGeometry.visibleIntersection(desired,
+        {x: 1724, y: 167, width: 200, height: 100}))),
+        {x: 10, y: 15, width: 200, height: 100, exact: false});
+assert.equal(terminalGeometry.visibleIntersection(desired,
+    {x: 2600, y: 152, width: 100, height: 80}), null);
+assert.equal(terminalGeometry.visibleIntersection(desired,
+    {x: 1714, y: 152, width: 0, height: 400}), null);
+assert.equal(terminalGeometry.observedWindow(treeExample, "weather-screen-news"), null);
+assert.equal(terminalGeometry.observedWindow(treeExample, "malicious-name"), null);
+const nextBay = terminalGeometry.position(
+    terminalOutputs, "DP-5", 1000, 20, 62, 160, 8, 90, 824, 482);
+assert.deepEqual(JSON.parse(JSON.stringify(nextBay)),
+                 {x: 1708, y: 152, width: 824, height: 482});
+const otherBay = terminalGeometry.position(
+    terminalOutputs, "HDMI-A-1", 1000, 20, 62, 160, 8, 90, 824, 482);
+assert.deepEqual(JSON.parse(JSON.stringify(otherBay)),
+                 {x: -852, y: 352, width: 824, height: 482});
+
 console.log("Weather data policy contracts: PASS");

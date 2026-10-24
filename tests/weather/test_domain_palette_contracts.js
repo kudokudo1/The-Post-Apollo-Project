@@ -33,10 +33,10 @@ assert.doesNotMatch(weatherTerminalSource, /terminalBay\.mapToGlobal\s*\(/);
 assert.doesNotMatch(weatherTerminalSource, /"\s*,\s*scratchpad show"/);
 for (const name of ["bayX", "bayY", "bayWidth", "bayHeight"])
     assert.match(weatherTerminalSource, new RegExp("readonly property real " + name + ": terminalBay\\."));
-assert.match(windowSource, /readonly property real terminalHoleX:\s*modeRail\.width \+ terminalView\.bayX/);
-assert.match(windowSource, /readonly property real terminalHoleY:\s*header\.height \+ terminalView\.bayY/);
-assert.match(windowSource, /readonly property real terminalHoleWidth:\s*terminalView\.bayWidth/);
-assert.match(windowSource, /readonly property real terminalHoleHeight:\s*terminalView\.bayHeight/);
+assert.match(windowSource, /readonly property real terminalHoleX:\s*modeRail\.width \+ terminalView\.visibleBayX/);
+assert.match(windowSource, /readonly property real terminalHoleY:\s*header\.height \+ terminalView\.visibleBayY/);
+assert.match(windowSource, /readonly property real terminalHoleWidth:\s*terminalView\.visibleBayWidth/);
+assert.match(windowSource, /readonly property real terminalHoleHeight:\s*terminalView\.visibleBayHeight/);
 assert.match(windowSource, /readonly property bool terminalHoleActive:/);
 assert.match(windowSource, /mask:\s*Region[\s\S]*?width:\s*weatherStation\.terminalHoleActive/);
 assert.match(windowSource, /fillVisible:\s*!weatherStation\.terminalHoleActive/);
@@ -84,12 +84,32 @@ assert.match(weatherTerminalSource, /"weather-screen-" \+ sessionMode/);
 assert.match(weatherTerminalSource, /weatherstation-starmap/);
 assert.match(weatherTerminalSource, /"\/usr\/bin\/bash -l"/);
 assert.match(weatherTerminalSource, /sessionMode = terminalMode/);
-assert.match(weatherTerminalSource, /x:\s*14\s+y:\s*90/);
-assert.match(weatherTerminalSource, /parent\.width - 28/);
-assert.match(weatherTerminalSource, /parent\.height - 108/);
+assert.match(weatherTerminalSource, /x:\s*8\s+y:\s*90/);
+assert.match(weatherTerminalSource, /parent\.width - 16/);
+assert.match(weatherTerminalSource, /parent\.height - 94/);
 assert.doesNotMatch(weatherTerminalSource, /id:\s*stationActionRow/);
 assert.match(weatherTerminalSource, /pendingClose/);
 assert.match(weatherTerminalSource, /terminalView\.terminalAppId/);
+
+
+// Header divider belongs between terminal controls and source-status badge.
+// Do not add a second decorative footer/header line in another component.
+const dividerAt = headerControls.indexOf("id: terminalHeaderDivider");
+assert.ok(dividerAt > headerControls.indexOf("id: contextTerminalClose"));
+assert.ok(dividerAt < headerControls.length);
+assert.match(headerControls, /id:\s*terminalHeaderDivider[\s\S]*?width:\s*2[\s\S]*?height:\s*25/);
+assert.match(headerControls, /id:\s*terminalHeaderDivider[\s\S]*?color:\s*Colors\.cyan/);
+assert.match(weatherTerminalSource, /id:\s*verifyProcess/);
+assert.match(weatherTerminalSource, /command:\s*\["swaymsg", "-t", "get_tree"\]/);
+assert.match(weatherTerminalSource, /SwayGeometry\.observedWindow\(/);
+assert.match(weatherTerminalSource, /SwayGeometry\.visibleIntersection\(/);
+assert.match(weatherTerminalSource, /resize set width /);
+assert.match(weatherTerminalSource, /property string fitStatus:\s*"UNVERIFIED"/);
+assert.match(weatherTerminalSource, /fitStatus = overlap\.exact \? "ALIGNED" : "PARTIAL"/);
+assert.match(weatherTerminalSource, /terminalState = "VISIBLE"/);
+assert.match(weatherTerminalSource, /visibleBayWidth:\s*verifiedWidth/);
+assert.match(geometrySource, /function observedWindow\(tree, appId\)/);
+assert.match(geometrySource, /function visibleIntersection\(desired, actual\)/);
 
 const discoveryViewSource = read("widgets/weather/StationDiscovery.qml");
 const discoveryServiceSource = read("services/weather/StationDiscoveryService.qml");

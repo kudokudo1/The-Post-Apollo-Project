@@ -59,6 +59,18 @@ Rectangle {
     readonly property real bayWidth: terminalBay.width
     readonly property real bayHeight: terminalBay.height
 
+    // The observed Sway window may differ from requested resize dimensions.
+    // Feed only the actual intersecting region to the overlay alpha cutout.
+    property real verifiedOffsetX: 0
+    property real verifiedOffsetY: 0
+    property real verifiedWidth: 0
+    property real verifiedHeight: 0
+    property string fitStatus: "UNVERIFIED"
+    readonly property real visibleBayX: bayX + verifiedOffsetX
+    readonly property real visibleBayY: bayY + verifiedOffsetY
+    readonly property real visibleBayWidth: verifiedWidth
+    readonly property real visibleBayHeight: verifiedHeight
+
     readonly property string outputName:
         targetScreen ? String(targetScreen.name || "") : ""
     property var swayOutputs: []
@@ -181,29 +193,78 @@ Rectangle {
         property int targetWidth: 0
         property int targetHeight: 0
 
-        // Do NOT run "scratchpad show" after placing: it can move/hide
-        // an already-visible scratchpad window or fail for normal Kitty.
+        // Explicit px units, then verify compositor-applied geometry.
+        // A successful Sway IPC exit does NOT prove Kitty accepted resize.
         command: ["swaymsg", "[app_id=\"^" + terminalView.terminalAppId
-                  + "$\"] floating enable, border none, resize set "
-                  + targetWidth + " " + targetHeight
-                  + ", move absolute position " + targetX + " " + targetY]
+                  + "$\"] floating enable, border none, resize set width "
+                  + targetWidth + " px height " + targetHeight
+                  + " px, move absolute position " + targetX + " " + targetY]
 
         onExited: function (exitCode, exitStatus) {
-            if (exitCode === 0) {
-                terminalView.lastX = geometryProcess.targetX;
+            if (exitCode !== 0) {
+                terminalView.terminalState = "SYNC ERROR";
+                return;
+            }
+            terminalView.lastX = targetX;
+            terminalView.lastY = targetY;
+            terminalView.lastWidth = targetWidth;
+            terminalView.lastHeight = targetHeight;
 
-                terminalView.lastY = geometryProcess.targetY;
+            if (terminalView.pendingClose || closeProcess.running) {
+                // During STARTING, closeTerminal() would only re-arm the
+                // pending flag; kill the now-mapped actor directly instead.
+                if (!closeProcess.running)
+                    closeProcess.running = true;
+                return;
+            }
+            // Verify once per geometry placement, not every 75-ms tick.
+            if (!verifyProcess.running)
+                verifyProcess.running = true;
+        }
 
-                terminalView.lastWidth = geometryProcess.targetWidth;
 
-                terminalView.lastHeight = geometryProcess.targetHeight;
+    }
 
-                if (terminalView.revealAfterSync) {
+    // Sway's JSON tree reports the ACTUAL Kitty size. Never reveal the
+    // whole bay merely because the resize command returned exit code zero.
+    Process {
+        id: verifyProcess
+        command: ["swaymsg", "-t", "get_tree"]
+        stdout: StdioCollector {
+            onStreamFinished: {
+                if (terminalView.pendingClose || closeProcess.running)
+                    return;
+                try {
+                    const tree = JSON.parse(String(text || ""));
+                    const actual = SwayGeometry.observedWindow(
+                        tree, terminalView.terminalAppId);
+                    const requested = {
+                        x: geometryProcess.targetX,
+                        y: geometryProcess.targetY,
+                        width: geometryProcess.targetWidth,
+                        height: geometryProcess.targetHeight
+                    };
+                    const overlap = SwayGeometry.visibleIntersection(requested, actual);
+                    if (!overlap)
+                        throw new Error("Kitty absent or outside intended bay");
+                    terminalView.verifiedOffsetX = overlap.x;
+                    terminalView.verifiedOffsetY = overlap.y;
+                    terminalView.verifiedWidth = overlap.width;
+                    terminalView.verifiedHeight = overlap.height;
+                    terminalView.fitStatus = overlap.exact ? "ALIGNED" : "PARTIAL";
                     terminalView.revealAfterSync = false;
                     terminalView.terminalState = "VISIBLE";
+                } catch (error) {
+                    terminalView.fitStatus = "NO VERIFIED RECT";
+                    terminalView.terminalState = "VERIFY ERROR";
+                    console.log("Weather terminal size verification:", error);
                 }
-            } else {
-                terminalView.terminalState = "SYNC ERROR";
+            }
+        }
+        onExited: function(exitCode, exitStatus) {
+            if (exitCode !== 0 && !terminalView.pendingClose) {
+                terminalView.fitStatus = "Sway tree unavailable";
+                terminalView.terminalState = "VERIFY ERROR";
             }
         }
     }
@@ -270,6 +331,11 @@ Rectangle {
             terminalView.terminalState = "IDLE";
             terminalView.pendingClose = false;
             terminalView.revealAfterSync = false;
+            terminalView.verifiedWidth = 0;
+            terminalView.verifiedHeight = 0;
+            terminalView.verifiedOffsetX = 0;
+            terminalView.verifiedOffsetY = 0;
+            terminalView.fitStatus = "UNVERIFIED";
 
             terminalView.lastX = -99999;
             terminalView.lastY = -99999;
@@ -293,6 +359,9 @@ Rectangle {
             return false;
         }
         sessionMode = terminalMode;
+        verifiedWidth = 0;
+        verifiedHeight = 0;
+        fitStatus = "UNVERIFIED";
         terminalState = "STARTING";
         swayOutputs = [];
         if (!outputProcess.running)
@@ -367,7 +436,9 @@ Rectangle {
         anchors.topMargin: 26
         anchors.rightMargin: 30
 
-        text: terminalView.terminalState
+        text: terminalView.terminalState === "VISIBLE"
+              && terminalView.fitStatus === "PARTIAL"
+              ? "PARTIAL FIT" : terminalView.terminalState
 
         font.family: "GohuFont 11 Nerd Font Mono"
 
@@ -389,11 +460,11 @@ Rectangle {
 
         // Lower top edge, substantially larger reading area after moving
         // launch/close controls to the Weather Station header.
-        x: 14
+        x: 8
         y: 90
 
-        width: Math.max(0, parent.width - 28)
-        height: Math.max(0, parent.height - 108)
+        width: Math.max(0, parent.width - 16)
+        height: Math.max(0, parent.height - 94)
 
         color: terminalView.terminalState === "VISIBLE" ? "transparent" : Colors.black
 

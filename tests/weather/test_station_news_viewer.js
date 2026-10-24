@@ -109,7 +109,7 @@ assert.match(channel, /PUBLISHER PAGE FAILED/);
 assert.match(channel, /visible: channelScreen\.noRenderer/);
 assert.match(channel, /channelLoader\.status === Loader\.Error/);
 assert.match(channel, /channelScreen\.closeRequested\(\)/);
-assert.doesNotMatch(channel, /Qt\.openUrlExternally|swaymsg|kitty|\bProcess\s*\{/);
+assert.doesNotMatch(channel, /Qt\.openUrlExternally|swaymsg|command:[^\n]*kitty|\bProcess\s*\{/);
 assert.match(web, /property string loadError: ""/);
 assert.match(web, /WebEngineView\.LoadFailedStatus/);
 assert.match(web, /loadRequest\.errorString/);

@@ -289,16 +289,15 @@ PanelWindow {
     // navigation are not recreated on Compact / Expanded / Fullscreen changes.
     property string chassisLevel: "compact"
     readonly property int glowGutter: 12
-    // Git's visible frame starts 12px below its window top. Compact Finance
-    // moves its visible frame up 3px while retaining the bottom glow gutter.
-    readonly property int compactTopLift: 3
-    readonly property int frameTopInset:
-        chassisLevel === "compact" ? glowGutter - compactTopLift : glowGutter
+    // All three levels share the same visible top edge (9px). Reserve
+    // 8px beneath the visible frame for the operator's Sway bottom gap.
+    readonly property int frameTopInset: 9
+    readonly property int bottomScreenGap: 8
     readonly property var chassisFrame: FinanceChassisPolicy.frame(
         chassisLevel,
         root.screen ? root.screen.width : 456,
-        root.screen ? root.screen.height : 814,
-        glowGutter
+        root.screen ? root.screen.height : 768,
+        glowGutter, frameTopInset, bottomScreenGap
     )
     readonly property int frameWidth: chassisFrame.width
     readonly property int frameHeight: chassisFrame.height
@@ -329,7 +328,7 @@ PanelWindow {
     }
 
     implicitWidth: frameWidth + glowGutter * 2
-    implicitHeight: frameHeight + frameTopInset + glowGutter
+    implicitHeight: frameHeight + frameTopInset + bottomScreenGap
 
     anchors {
         top: true
@@ -339,12 +338,12 @@ PanelWindow {
     }
 
     // Compact remains dock-centered; Expanded is screen-clamped; Fullscreen
-    // occupies the screen with the existing 12px inset/glow safety gutter.
+    // fills the space between the common 9px top and 8px bottom border gaps.
     margins {
         top: FinanceChassisPolicy.topMargin(
             root.chassisLevel, root.chassisTopY,
             root.screen ? root.screen.height : root.implicitHeight,
-            root.implicitHeight, root.glowGutter)
+            root.implicitHeight, root.frameTopInset)
         left: FinanceChassisPolicy.leftMargin(
             root.chassisLevel, root.dockCenterX,
             root.screen ? root.screen.width : root.implicitWidth,
@@ -482,6 +481,7 @@ PanelWindow {
         anchors.fill: parent
         anchors.margins: root.glowGutter
         anchors.topMargin: root.frameTopInset
+        anchors.bottomMargin: root.bottomScreenGap
         visible: root.menuOpen
 
         fillColor: Colors.black

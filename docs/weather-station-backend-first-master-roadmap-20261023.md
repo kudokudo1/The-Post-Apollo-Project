@@ -91,6 +91,16 @@ Related source-of-truth and reading:
 
 **Future boundary:** Stage Director may observe/coordinate the parent layer-shell surface, its Kitty child, and their scene relationships. Moving placement authority from Weather-specific `swaymsg` to SwayPX requires an explicit later Stage Director design/authorization gate. Avoid two simultaneous position writers. When adding MAP/NEWS/RADIO terminal actors, use unique app/window identities and keep the visual alpha hole, input Region, and compositor positioning synchronized to the *same viewport rectangle*.
 
+### B10 // 2026-10-23 Header-driven terminal modes and expanded bay
+
+**Operator screenshot:** the STAR MAP Kitty window is now visible through the alpha cutout, but the terminal was positioned too high and its interior was cramped. The operator requested moving the bottom STAR MAP / CLOSE buttons to the Weather Station header, next to the live-source badge, replacing the inactive future/Observatory square; the launch label should follow the current main mode and the small terminal CLOSE button should be red. The existing header × continues to close Weather Station itself.
+
+**Implementation candidate:** Weather Station header uses the same ActionButton shell for a mode-aware launch (TERMINAL → STAR MAP; NEWS → NEWS; RADIO → RADIO; likewise other current modes) and adjacent red CLOSE. A single `StationTerminal` host uses a **trusted, enumerated mode** to launch the existing `weatherstation-starmap` program for TERMINAL and a **plain, domain-labelled Kitty shell** for other modes. **This is NOT yet a specialized news, radio or geographical map terminal application** and does not yet hand selected events/stations/articles to Kitty. Treat those specialized adapters as remaining M3/C/D work. Each session has its own app ID (`weather-screen` for STAR MAP, `weather-screen-<mode>` for others) and is explicitly closed on view change so compositor selectors cannot reposition the wrong window. Existing radio playback ownership remains with shared Hi-Fi.
+
+**Viewport design:** move the terminal bay from local (30,70) / 780×416 to local (14,90) / 812×468 at the current 1000×700 Weather Station size. Continue using **one geometry source** for Sway absolute placement, QML visual hole, and pointer pass-through. Bottom controls are removed rather than covering the enlarged viewer. This should be visually and interactively verified by the operator on live Sway before the new geometry is called accepted.
+
+**Stage Director coordination:** its SD0 Weather Station profile still declares the **older** 780×416 @ (190,132) scene-bay geometry. The new bay is **812×468 @ (174,152)** relative to the 1000×700 station. That declaration will be stale if this UI work lands; update Stage Director's scene model in its own reviewed assignment, not via an unauthorized compositor patch. Stage Director's present observation-only contract stays intact. New domain app IDs are not yet classified by that old profile; the M3 coordination plan must register them.
+
 ## 4 // Domain family C: MAP and world/environmental layers
 
 Current EONET is an event index only. Planned:

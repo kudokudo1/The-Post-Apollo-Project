@@ -59,6 +59,38 @@ assert.match(weatherTerminalSource, /color:\s*terminalView\.terminalState === "V
 assert.match(geometrySource, /function position\(outputs, outputName/);
 
 
+
+const headerActionsStart = windowSource.indexOf("id: headerActions");
+const sourceBadgeStart = windowSource.indexOf("id: sourceStatusIndicator", headerActionsStart);
+assert.ok(headerActionsStart >= 0 && sourceBadgeStart > headerActionsStart);
+const headerControls = windowSource.slice(headerActionsStart, sourceBadgeStart);
+assert.match(headerControls, /id:\s*contextTerminalLaunch/);
+assert.match(headerControls, /id:\s*contextTerminalClose/);
+assert.match(headerControls, /"STAR MAP" : weatherStation\.currentViewName/);
+assert.match(headerControls, /label:\s*"CLOSE"/);
+assert.match(headerControls, /destructive:\s*true/);
+assert.match(headerControls, /accentColor:\s*Colors\.red/);
+assert.doesNotMatch(windowSource, /id:\s*observatoryButton/);
+assert.match(windowSource, /function launchContextTerminal\(\)/);
+assert.match(windowSource, /function closeContextTerminal\(\)/);
+assert.match(windowSource, /onCurrentViewChanged:/);
+assert.match(windowSource, /terminalMode:\s*weatherStation\.currentView/);
+assert.match(windowSource, /terminalHoleActive:[\s\S]*?terminalView\.sessionMode === currentView/);
+assert.match(windowSource, /visible:\s*weatherStation\.currentView !== "terminal"\s*&& !weatherStation\.contextTerminalRequested/);
+assert.match(weatherTerminalSource, /property string sessionMode:\s*"terminal"/);
+assert.match(weatherTerminalSource, /function supportedMode\(mode\)/);
+assert.match(weatherTerminalSource, /sessionMode === "terminal" \? "weather-screen"/);
+assert.match(weatherTerminalSource, /"weather-screen-" \+ sessionMode/);
+assert.match(weatherTerminalSource, /weatherstation-starmap/);
+assert.match(weatherTerminalSource, /"\/usr\/bin\/bash -l"/);
+assert.match(weatherTerminalSource, /sessionMode = terminalMode/);
+assert.match(weatherTerminalSource, /x:\s*14\s+y:\s*90/);
+assert.match(weatherTerminalSource, /parent\.width - 28/);
+assert.match(weatherTerminalSource, /parent\.height - 108/);
+assert.doesNotMatch(weatherTerminalSource, /id:\s*stationActionRow/);
+assert.match(weatherTerminalSource, /pendingClose/);
+assert.match(weatherTerminalSource, /terminalView\.terminalAppId/);
+
 const discoveryViewSource = read("widgets/weather/StationDiscovery.qml");
 const discoveryServiceSource = read("services/weather/StationDiscoveryService.qml");
 for (const [id, domain] of [

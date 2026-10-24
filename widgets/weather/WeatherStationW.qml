@@ -23,6 +23,7 @@ PanelWindow {
     property bool relationshipFocused: false
 
     property string currentView: "home"
+    property bool contextTerminalRequested: false
 
     // The SAME geometry drives the layer-shell input mask and the actual
     // transparent visual opening. Sway owns Kitty's global positioning.
@@ -36,7 +37,8 @@ PanelWindow {
         && terminalHoleX + terminalHoleWidth <= stationBackground.width
         && terminalHoleY + terminalHoleHeight <= stationBackground.height
     readonly property bool terminalHoleActive:
-        menuOpen && currentView === "terminal"
+        menuOpen && (currentView === "terminal" || contextTerminalRequested)
+        && terminalView.sessionMode === currentView
         && terminalView.terminalState === "VISIBLE"
         && terminalHoleValid
 
@@ -490,8 +492,33 @@ PanelWindow {
         Qt.callLater(weatherStation.restoreWeatherKeyboardFocus);
     }
 
-    function close() {
+    function launchContextTerminal() {
+        if (!menuOpen || terminalView.terminalState !== "IDLE")
+            return;
+        contextTerminalRequested = true;
+        // Wait for the host to become visible before requesting Kitty.
+        Qt.callLater(function() {
+            if (menuOpen && contextTerminalRequested
+                    && terminalView.terminalMode === currentView) {
+                if (!terminalView.openTerminal())
+                    contextTerminalRequested = false;
+            }
+        });
+    }
+
+    function closeContextTerminal() {
         terminalView.closeTerminal();
+        contextTerminalRequested = false;
+    }
+
+    onCurrentViewChanged: {
+        // One compositor-backed session at a time. Each new mode has a
+        // different app ID; never direct Sway to close the wrong actor.
+        closeContextTerminal();
+    }
+
+    function close() {
+        closeContextTerminal();
         menuOpen = false;
     }
 
@@ -584,22 +611,44 @@ PanelWindow {
 
                 spacing: 8
 
-                // Observatory expansion is not wired yet. Present it as an
-                // unavailable shared action instead of a fake clickable glyph.
+                // One context-sensitive launch control replaces the
+                // Observatory placeholder. STAR MAP is the existing real
+                // TUI; other pages initially get an honest plain console.
                 ActionButton {
-                    id: observatoryButton
-
-                    width: 34
+                    id: contextTerminalLaunch
+                    width: 106
                     height: 32
-
-                    label: "□"
-                    labelPixelSize: 18
+                    label: weatherStation.currentView === "terminal"
+                           ? "STAR MAP" : weatherStation.currentViewName
+                    labelPixelSize: 11
                     contentPadding: 4
-
-                    available: false
-                    interactive: false
+                    available: weatherStation.menuOpen
+                               && terminalView.terminalState === "IDLE"
                     accentColor: Colors.cyan
-                    unavailableOpacity: 0.42
+                    onLeftClicked: weatherStation.launchContextTerminal()
+                }
+
+                ActionButton {
+                    id: contextTerminalClose
+                    width: 57
+                    height: 32
+                    label: "CLOSE"
+                    labelPixelSize: 11
+                    contentPadding: 4
+                    accentColor: Colors.red
+                    destructive: true
+                    idleForegroundColor: Colors.red
+                    idleBorderColor: Colors.red
+                    hoverForegroundColor: Colors.red
+                    hoverBorderColor: Colors.red
+                    idleContentGlowColor: Colors.red
+                    hoverContentGlowColor: Colors.red
+                    idleSoftGlowColor: Colors.red
+                    hoverSoftGlowColor: Colors.red
+                    available: weatherStation.menuOpen
+                               && (weatherStation.contextTerminalRequested
+                                   || terminalView.terminalState !== "IDLE")
+                    onLeftClicked: weatherStation.closeContextTerminal()
                 }
 
                 // Live source badge, matching the Git/Finance header grammar.
@@ -777,13 +826,16 @@ PanelWindow {
             anchors.left: modeRail.right
             anchors.right: parent.right
 
-            color: weatherStation.currentView === "terminal" ? "transparent" : Colors.black
+            color: weatherStation.currentView === "terminal"
+                   || weatherStation.contextTerminalRequested
+                   ? "transparent" : Colors.black
 
             clip: true
 
             Loader {
                 anchors.fill: parent
                 visible: weatherStation.currentView !== "terminal"
+                         && !weatherStation.contextTerminalRequested
 
                 sourceComponent:
                     weatherStation.currentView === "home"
@@ -808,7 +860,9 @@ PanelWindow {
 
                 anchors.fill: parent
                 visible: weatherStation.currentView === "terminal"
+                         || weatherStation.contextTerminalRequested
                 stationOpen: weatherStation.menuOpen
+                terminalMode: weatherStation.currentView
                 targetScreen: weatherStation.screen
                 stationWidth: stationBackground.width
                 stationHeight: stationBackground.height

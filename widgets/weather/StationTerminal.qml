@@ -22,7 +22,35 @@ Rectangle {
     property int stationRailWidth: 160
 
     property string terminalState: "IDLE"
-    property string terminalAppId: "weather-screen"
+    // Identity is pinned when launched. Changing the menu mode cannot make
+    // CLOSE accidentally kill a different domain's console.
+    property string terminalMode: "terminal"
+    property string sessionMode: "terminal"
+    property bool pendingClose: false
+    readonly property string terminalAppId:
+        sessionMode === "terminal" ? "weather-screen"
+        : "weather-screen-" + sessionMode
+    readonly property string sessionTitle:
+        sessionMode === "terminal" ? "STAR MAP"
+        : sessionMode.toUpperCase() + " CONSOLE"
+
+    function supportedMode(mode) {
+        return ["home", "ground", "sky", "space", "map",
+                "news", "radio", "terminal"].indexOf(mode) !== -1;
+    }
+
+    function launchCommand() {
+        // Both the app ID and title derive only from the closed mode list.
+        // Other domains get a plain Bash terminal, not a fictitious TUI.
+        const executable = sessionMode === "terminal"
+            ? "/var/home/mapple/.local/bin/weatherstation-starmap"
+            : "/usr/bin/bash -l";
+        return "kitty --config /var/home/mapple/.config/kitty/weatherstation.conf "
+            + "--override confirm_os_window_close=0 "
+            + "--app-id " + terminalAppId
+            + " --title '" + sessionTitle + "' " + executable
+            + " >/dev/null 2>&1 &";
+    }
 
     // Coordinates and cut-out are LOCAL to the panel. These properties
     // were referenced by WeatherStationW's mask but previously absent.
@@ -50,7 +78,7 @@ Rectangle {
     Process {
         id: launchProcess
 
-        command: ["bash", "-lc", "kitty " + "--config /var/home/mapple/.config/kitty/weatherstation.conf " + "--override confirm_os_window_close=0 " + "--app-id weather-screen " + "--title 'STAR MAP' " + "/var/home/mapple/.local/bin/weatherstation-starmap " + ">/dev/null 2>&1 &"]
+        command: ["bash", "-lc", terminalView.launchCommand()]
 
         onExited: function (exitCode, exitStatus) {
             if (exitCode === 0)
@@ -67,13 +95,22 @@ Rectangle {
     Process {
         id: waitForKitty
 
-        command: ["bash", "-lc", "for i in $(seq 1 100); do " + "if swaymsg -t get_tree | " + "grep -Fq '\"app_id\": \"weather-screen\"'; then " + "exit 0; " + "fi; " + "sleep 0.05; " + "done; " + "exit 1"]
+        command: ["bash", "-lc",
+                  "for i in $(seq 1 100); do "
+                  + "if swaymsg -t get_tree | grep -Fq '\\"app_id\\": \\""
+                  + terminalView.terminalAppId
+                  + "\\"'; then exit 0; fi; sleep 0.05; done; exit 1"]
 
         onExited: function (exitCode, exitStatus) {
             if (exitCode === 0) {
+                if (terminalView.pendingClose) {
+                    terminalView.closeTerminal();
+                    return;
+                }
                 terminalView.revealAfterSync = true;
                 terminalView.syncGeometry(true);
             } else {
+                terminalView.pendingClose = false;
                 terminalView.terminalState = "START ERROR";
             }
         }
@@ -145,7 +182,10 @@ Rectangle {
 
         // Do NOT run "scratchpad show" after placing: it can move/hide
         // an already-visible scratchpad window or fail for normal Kitty.
-        command: ["swaymsg", "[app_id=\"^weather-screen$\"] " + "floating enable, " + "border none, " + "resize set " + targetWidth + " " + targetHeight + ", " + "move absolute position " + targetX + " " + targetY]
+        command: ["swaymsg", "[app_id=\"^" + terminalView.terminalAppId
+                  + "$\"] floating enable, border none, resize set "
+                  + targetWidth + " " + targetHeight
+                  + ", move absolute position " + targetX + " " + targetY]
 
         onExited: function (exitCode, exitStatus) {
             if (exitCode === 0) {
@@ -222,10 +262,13 @@ Rectangle {
     Process {
         id: closeProcess
 
-        command: ["swaymsg", "[app_id=\"^weather-screen$\"] kill"]
+        command: ["swaymsg", "[app_id=\"^" + terminalView.terminalAppId
+                  + "$\"] kill"]
 
         onExited: function (exitCode, exitStatus) {
             terminalView.terminalState = "IDLE";
+            terminalView.pendingClose = false;
+            terminalView.revealAfterSync = false;
 
             terminalView.lastX = -99999;
             terminalView.lastY = -99999;
@@ -239,27 +282,34 @@ Rectangle {
     // ─────────────────────────────────────────────
 
     function openTerminal() {
-        if (terminalState === "VISIBLE" || terminalState === "STARTING") {
-            return;
-        }
-
+        if (terminalState === "VISIBLE" || terminalState === "STARTING"
+                || closeProcess.running || pendingClose)
+            return false;
+        if (!supportedMode(terminalMode))
+            return false;
         if (!outputName) {
             terminalState = "OUTPUT ERROR";
-            return;
+            return false;
         }
+        sessionMode = terminalMode;
         terminalState = "STARTING";
         swayOutputs = [];
         if (!outputProcess.running)
             outputProcess.running = true;
         if (!launchProcess.running)
             launchProcess.running = true;
+        return true;
     }
 
     function closeTerminal() {
-        if (terminalState === "IDLE")
+        if (terminalState === "IDLE" || closeProcess.running)
             return;
-        if (!closeProcess.running)
-            closeProcess.running = true;
+        if (terminalState === "STARTING" && waitForKitty.running) {
+            pendingClose = true;
+            return;
+        }
+        pendingClose = false;
+        closeProcess.running = true;
     }
 
     onStationOpenChanged: {
@@ -296,7 +346,7 @@ Rectangle {
         anchors.topMargin: 22
         anchors.leftMargin: 30
 
-        text: "✦ STAR MAP"
+        text: terminalView.sessionTitle
 
         font.family: "GohuFont 11 Nerd Font Mono"
 
@@ -334,12 +384,13 @@ Rectangle {
     Rectangle {
         id: terminalBay
 
-        x: 30
-        y: 70
+        // Lower top edge, substantially larger reading area after moving
+        // launch/close controls to the Weather Station header.
+        x: 14
+        y: 90
 
-        width: parent.width - 60
-
-        height: parent.height - 160
+        width: Math.max(0, parent.width - 28)
+        height: Math.max(0, parent.height - 108)
 
         color: terminalView.terminalState === "VISIBLE" ? "transparent" : Colors.black
 
@@ -353,7 +404,10 @@ Rectangle {
 
             visible: terminalView.terminalState !== "VISIBLE"
 
-            text: terminalView.terminalState === "STARTING" ? "STAR MAP // INITIALIZING" : terminalView.terminalState === "START ERROR" ? "STAR MAP // ERROR" : "STAR MAP // STANDBY"
+            text: terminalView.sessionTitle + " // "
+                  + (terminalView.terminalState === "STARTING" ? "INITIALIZING"
+                     : terminalView.terminalState === "START ERROR" ? "ERROR"
+                       : "STANDBY")
 
             font.family: "GohuFont 11 Nerd Font Mono"
 
@@ -379,166 +433,4 @@ Rectangle {
         }
     }
 
-    // ─────────────────────────────────────────────
-    // CONTROLS
-    // ─────────────────────────────────────────────
-
-
-    // Two Weather actions share the universal ActionButton shell.
-    // Weather owns only compact content and the available-width budget.
-    // These are ordinary actions; closing the Star Map is not destructive.
-    component StationActionButton: ActionButton {
-        id: stationAction
-
-        property string fullLabel: ""
-        property string compactIcon: ""
-        property string miniIcon: ""
-        property string actionDescription: fullLabel
-
-        readonly property real labelSpace: Math.max(0, width - 20)
-        readonly property bool labelFits:
-            minimumLabelMeasure.implicitWidth <= labelSpace
-        readonly property bool compactIconFits:
-            compactIconMeasure.implicitWidth <= labelSpace
-        readonly property string renderedContent:
-            labelFits ? fullLabel
-            : compactIconFits ? compactIcon
-            : miniIcon
-
-        implicitHeight: 35
-        height: 35
-        label: fullLabel
-        showLabel: false
-        contentItem.clip: true
-
-        Accessible.role: Accessible.Button
-        Accessible.name: actionDescription
-
-        acceptedButtons: Qt.LeftButton
-        idleFillColor: Colors.black
-        hoverFillColor: Colors.yellow
-        selectedFillColor: Colors.yellow
-        keyboardSelectedFillColor: Colors.yellow
-        pressedFillColor: Colors.magenta
-
-        idleForegroundColor: Colors.cyan
-        hoverForegroundColor: Colors.orange
-        selectedForegroundColor: Colors.orange
-        keyboardSelectedForegroundColor: Colors.orange
-        pressedForegroundColor: Colors.black
-
-        idleBorderColor: Colors.cyan
-        hoverBorderColor: Colors.orange
-        selectedBorderColor: Colors.orange
-        keyboardSelectedBorderColor: Colors.orange
-        pressedBorderColor: Colors.orange
-        // Border widths remain unchanged until the separate border audit.
-        idleBorderWidth: 1
-        hoverBorderWidth: 1
-        selectedBorderWidth: 1
-        keyboardSelectedBorderWidth: 1
-        pressedBorderWidth: 1
-
-        contentGlowSource: actionText
-        contentGlowEnabled: true
-        idleContentGlowColor: Colors.cyan
-        hoverContentGlowColor: Colors.orange
-        selectedContentGlowColor: Colors.orange
-        keyboardSelectedContentGlowColor: Colors.orange
-        pressedContentGlowColor: Colors.orange
-        contentGlowIdleOpacity: 0.35
-        contentGlowHoverOpacity: 0.75
-        contentGlowSelectedOpacity: 0.75
-        contentGlowKeyboardSelectedOpacity: 0.75
-        contentGlowPressedOpacity: 1.0
-
-        softGlowEnabled: true
-        softGlowSpread: 3
-        idleSoftGlowColor: Colors.cyan
-        hoverSoftGlowColor: Colors.orange
-        selectedSoftGlowColor: Colors.orange
-        keyboardSelectedSoftGlowColor: Colors.orange
-        pressedSoftGlowColor: Colors.orange
-        softGlowIdleOpacity: 0.25
-        softGlowHoverOpacity: 0.55
-        softGlowSelectedOpacity: 0.55
-        softGlowKeyboardSelectedOpacity: 0.55
-        softGlowPressedOpacity: 0.60
-
-        // Optional halo stays off so the two actions never visually collide.
-        wideGlowEnabled: false
-        wideGlowIdleOpacity: 0.015
-        wideGlowHoverOpacity: 0.075
-        wideGlowSelectedOpacity: 0.075
-        wideGlowKeyboardSelectedOpacity: 0.075
-        wideGlowPressedOpacity: 0.10
-
-        // Measure text at the minimum readable size before switching to
-        // an icon, then a smaller version if even that would not fit.
-        GohuText {
-            id: minimumLabelMeasure
-            visible: false
-            text: stationAction.fullLabel
-            font.pixelSize: 10
-        }
-        GohuText {
-            id: compactIconMeasure
-            visible: false
-            text: stationAction.compactIcon
-            font.pixelSize: 16
-        }
-        GohuText {
-            id: actionText
-            anchors.centerIn: parent
-            width: stationAction.labelSpace
-            height: Math.max(0, stationAction.height - 8)
-            visible: width > 0
-            text: stationAction.renderedContent
-            font.pixelSize: stationAction.labelFits ? 16
-                            : stationAction.compactIconFits ? 16 : 10
-            fontSizeMode: Text.HorizontalFit
-            minimumPixelSize: stationAction.labelFits ? 10 : 8
-            horizontalAlignment: Text.AlignHCenter
-            verticalAlignment: Text.AlignVCenter
-            elide: Text.ElideNone
-            color: stationAction.foregroundColor
-        }
-    }
-
-    Row {
-        id: stationActionRow
-        anchors.bottom: parent.bottom
-        anchors.horizontalCenter: parent.horizontalCenter
-        anchors.bottomMargin: 28
-
-        // Width of both actions + gap <= panel width - edge clearances.
-        readonly property real edgeClearance: 24
-        readonly property real availableWidth:
-            Math.max(0, terminalView.width - 2 * edgeClearance)
-        readonly property real actionWidthBudget:
-            Math.max(0, availableWidth - spacing)
-        readonly property real widthRatio:
-            Math.min(1, actionWidthBudget / (180 + 130))
-
-        spacing: Math.min(18, availableWidth * 0.05)
-        z: 5
-
-        StationActionButton {
-            width: 180 * stationActionRow.widthRatio
-            fullLabel: "[ STAR MAP ]"
-            compactIcon: "⌖"
-            miniIcon: "⌖"
-            actionDescription: "Open Star Map"
-            onTriggered: terminalView.openTerminal()
-        }
-
-        StationActionButton {
-            width: 130 * stationActionRow.widthRatio
-            fullLabel: "[ CLOSE ]"
-            compactIcon: "×"
-            miniIcon: "×"
-            actionDescription: "Close Star Map"
-            onTriggered: terminalView.closeTerminal()
-        }
-    }
 }

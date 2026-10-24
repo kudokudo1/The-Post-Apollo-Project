@@ -5780,6 +5780,7 @@ PanelWindow {
                         }
 
                         Rectangle {
+                            id: gitOutputPanel
                             width: parent.width
                             height: 112
                             color: Colors.dark
@@ -5789,15 +5790,67 @@ PanelWindow {
                                 ? Colors.cyan
                                 : Colors.red
 
+                            // Presentation-only. Never edit the canonical
+                            // actionOutput: Details always shows every byte.
+                            property bool showDetails: false
+
+                            function normalGitOutput(output, isSync) {
+                                const full = String(output || "");
+                                if (!isSync)
+                                    return full;
+
+                                return full.split("\n").filter(function(line) {
+                                    const value = String(line || "").trim();
+                                    // Only hide known diagnostic repetition;
+                                    // keep PREPARED, FINISHED, Git output,
+                                    // warnings, errors and recovery failures.
+                                    if (/^JOURNAL PROFILE \/\/ (BEGIN|COMPLETE|FAIL)(\s|$)/.test(value))
+                                        return false;
+                                    if (value === "RUNNING // Git subprocess started"
+                                            || value === "FINALIZING // collecting repository evidence")
+                                        return false;
+                                    if (/^REFRESHED \/\/ repository view [0-9]+ ms$/.test(value))
+                                        return false;
+                                    return true;
+                                }).join("\n");
+                            }
+
+                            SharedComponents.ActionButton {
+                                id: gitOutputModeToggle
+                                visible: syncTimingHeader.isSyncOutput
+                                anchors {
+                                    top: parent.top
+                                    right: parent.right
+                                    topMargin: 3
+                                    rightMargin: 7
+                                }
+                                width: 65
+                                height: 16
+                                label: gitOutputPanel.showDetails ? "DETAILS" : "NORMAL"
+                                labelPixelSize: 8
+                                labelMinimumPixelSize: 8
+                                contentPadding: 3
+                                accentColor: Colors.cyan
+                                selected: gitOutputPanel.showDetails
+                                selectedFillColor: Colors.magenta
+                                selectedForegroundColor: Colors.black
+                                selectedBorderColor: Colors.magenta
+                                softGlowEnabled: false
+                                onClicked: gitOutputPanel.showDetails =
+                                    !gitOutputPanel.showDetails
+                            }
+
                             GohuText {
                                 anchors {
                                     top: parent.top
                                     left: parent.left
-                                    right: parent.right
+                                    right: gitOutputModeToggle.visible
+                                        ? gitOutputModeToggle.left : parent.right
                                 }
                                 anchors.topMargin: 7
                                 anchors.leftMargin: 9
                                 anchors.rightMargin: 9
+                                elide: Text.ElideRight
                                 text:
                                     gitService.actionBusy
                                     ? gitService.actionTitle + " // " + gitService.actionStage
@@ -5882,7 +5935,11 @@ PanelWindow {
                                 GohuText {
                                     id: localOutputText
                                     width: parent.width
-                                    text: gitService.actionOutput
+                                    text: gitOutputPanel.showDetails
+                                        ? gitService.actionOutput
+                                        : gitOutputPanel.normalGitOutput(
+                                            gitService.actionOutput,
+                                            syncTimingHeader.isSyncOutput)
                                     font.pixelSize: 11
                                     color: Colors.white
                                     wrapMode: Text.WrapAnywhere

@@ -19,6 +19,8 @@ Scope {
     property bool busy: false
     property string feedback: ""
     property string probeReply: ""
+    property bool probeExited: false
+    property int probeExitCode: -1
 
     function exactRow(pid, startTicks, name) {
         if (!Array.isArray(ownerRows) || !Number.isSafeInteger(pid)
@@ -122,6 +124,8 @@ Scope {
             pending=null; feedback="SAFETY LOCK RE-ENGAGED // REFUSED"; return false;
         }
         probeReply = "";
+        probeExited = false;
+        probeExitCode = -1;
         busy = true;
         feedback = "VERIFYING PROCESS START IDENTITY";
         identityProbe.exec([
@@ -137,6 +141,11 @@ Scope {
             String(req.pid), String(req.startTicks), req.name
         ]);
         return true;
+    }
+
+    function maybeFinishProbe() {
+        if (busy && probeExited && probeReply.length > 0)
+            finishProbe(probeExitCode);
     }
 
     function finishProbe(exitCode) {
@@ -180,10 +189,15 @@ Scope {
     Process {
         id: identityProbe
         stdout: StdioCollector {
-            onStreamFinished: gate.probeReply = String(text || "")
+            onStreamFinished: {
+                gate.probeReply = String(text || "");
+                gate.maybeFinishProbe();
+            }
         }
         onExited: function(exitCode, exitStatus) {
-            gate.finishProbe(exitCode);
+            gate.probeExited = true;
+            gate.probeExitCode = exitCode;
+            gate.maybeFinishProbe();
         }
     }
 }

@@ -8,6 +8,7 @@ shell = (ROOT / "shell.qml").read_text(encoding="utf-8")
 dock = (ROOT / "modules/ApolloHub.qml").read_text(encoding="utf-8")
 window = (ROOT / "widgets/ApolloHubW.qml").read_text(encoding="utf-8")
 tile = (ROOT / "widgets/hub/ApolloHubTile.qml").read_text(encoding="utf-8")
+weather_explore = (ROOT / "widgets/hub/ApolloHubWeatherExplore.qml").read_text(encoding="utf-8")
 media_mini = (ROOT / "widgets/hub/ApolloHubMediaMini.qml").read_text(encoding="utf-8")
 system_mini = (ROOT / "widgets/hub/ApolloHubSystemMini.qml").read_text(encoding="utf-8")
 uptime_mini = (ROOT / "widgets/hub/ApolloHubUptimeMini.qml").read_text(encoding="utf-8")
@@ -1149,6 +1150,47 @@ for needle in (
 for forbidden in ('Timer {', 'FileView {', 'Process {', 'new Date(',
                   'Date.now(', 'addTask(', 'reschedule(', 'setDone('):
     assert forbidden not in calendar_mini, f"Stage 8B unowned action: {forbidden}"
+
+
+# Stage 8C: H:1 is the original weather card; H:2/H:3 expose
+# four truthful read-only domains through the one injected bridge.
+for needle in (
+    'visible: tile.moduleId === "weather" && tile.tileRowSpan === 1',
+    'ApolloHubWeatherExplore {',
+    'visible: tile.moduleId === "weather" && tile.tileRowSpan > 1',
+    'weatherSnapshot: tile.weatherSnapshot',
+    'weatherExplore.statusLine',
+):
+    assert needle in tile, f"Stage 8C mount missing {needle}"
+for needle in (
+    'property var weatherSnapshot: null',
+    'property string selectedDomain: "weather"',
+    'model: ["WEATHER", "GROUND", "SKY", "SPACE"]',
+    'onLeftClicked: weatherExplore.selectedDomain = modelData.toLowerCase()',
+    'weatherSnapshot.fresh === true',
+    'airQuality.fresh === true',
+    'typeof airQuality.index === "number"',
+    'weatherSnapshot.uvIndex >= 0',
+    'weatherSnapshot.temperatureF',
+    'weatherSnapshot.feelsLikeF',
+    'weatherSnapshot.windMph',
+    'weatherSnapshot.windDirection',
+    'weatherSnapshot.humidity',
+    'SPACE // PROVIDER NOT CONNECTED',
+    'POLLEN / SEISMIC // NOT CONNECTED',
+    'NOAA SOLAR // NOT CONNECTED',
+    'AURORA / FLARES // NOT CONNECTED',
+):
+    assert needle in weather_explore, f"Stage 8C data missing {needle}"
+for forbidden in (
+    'WeatherService {', 'SpaceService {', 'SeismicService {',
+    'AuroraService {', 'SolarFlareService {', 'XrayFluxService {',
+    'SwpcAlertService {', 'FileView {', 'Process {', 'Timer {',
+    'SystemTelemetry {', 'Qt.openUrlExternally(',
+    'request(', 'fetch(', 'refresh(', 'startPolling(',
+):
+    assert forbidden not in weather_explore, (
+        f"Stage 8C cannot collect or control: {forbidden}")
 
 # Launchers and widget backends are unchanged in this first stage.
 print("ApolloHubW foundation source contracts passed")

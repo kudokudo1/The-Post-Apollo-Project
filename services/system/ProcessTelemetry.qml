@@ -56,7 +56,7 @@ Scope {
             + "readb=$(awk '$1==\"read_bytes:\" {print $2; exit}' /proc/$pid/io 2>/dev/null); "
             + "writeb=$(awk '$1==\"write_bytes:\" {print $2; exit}' /proc/$pid/io 2>/dev/null); "
             + "printf '%s %s %s %s %s %s\\n' \"$clk\" \"${ticks:-0}\" "
-            + "\"${readb:-0}\" "\"${writeb:-0}\" "\"$pid:${start:-0}\" "\"$rest\"; "
+            + "\"${readb:-0}\" \"${writeb:-0}\" \"$pid:${start:-0}\" \"$rest\"; "
             + "done"
         ]);
     }

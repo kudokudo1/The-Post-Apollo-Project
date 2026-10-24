@@ -5821,6 +5821,45 @@ PanelWindow {
                                 }
                             }
 
+                            // Compact Fetch/Pull phase timings share the existing
+                            // output header. The separate journal detail stays
+                            // below; these values replace the duplicate log row.
+                            GohuText {
+                                id: syncTimingHeader
+                                readonly property bool isSyncOutput:
+                                    (gitService.syncTimingAction === "fetch"
+                                     || gitService.syncTimingAction === "pull")
+                                    && gitService.actionTitle.toLowerCase()
+                                        === gitService.syncTimingAction
+
+                                function briefMs(value) {
+                                    if (value < 0)
+                                        return "…";
+                                    if (value >= 1000)
+                                        return (value / 1000).toFixed(2) + "s";
+                                    return value + "ms";
+                                }
+
+                                visible: isSyncOutput
+                                anchors {
+                                    top: parent.top
+                                    left: parent.left
+                                    right: parent.right
+                                }
+                                anchors.topMargin: 19
+                                anchors.leftMargin: 9
+                                anchors.rightMargin: 9
+                                font.pixelSize: 9
+                                color: Colors.cyan
+                                text:
+                                    "P " + briefMs(gitService.syncTimingPrepareMs)
+                                    + " · G " + briefMs(gitService.syncTimingGitMs)
+                                    + " · F " + briefMs(gitService.syncTimingFinalizeMs)
+                                    + " · R " + briefMs(gitService.syncTimingRefreshMs)
+                                    + " · TOTAL " + briefMs(gitService.syncTimingTotalMs)
+                                elide: Text.ElideRight
+                            }
+
                             Flickable {
                                 id: syntagmaPane2
                                 anchors {
@@ -5829,7 +5868,8 @@ PanelWindow {
                                     left: parent.left
                                     right: parent.right
                                 }
-                                anchors.topMargin: 24
+                                anchors.topMargin:
+                                    syncTimingHeader.visible ? 33 : 24
                                 anchors.bottomMargin: 7
                                 anchors.leftMargin: 9
                                 anchors.rightMargin: 9

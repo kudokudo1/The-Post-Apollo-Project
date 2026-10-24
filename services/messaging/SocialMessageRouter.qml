@@ -22,8 +22,24 @@ Item {
         ? selectedBackend.messagesError : ""
     readonly property bool sending: selectedBackend ? selectedBackend.sending : false
     readonly property string sendError: selectedBackend ? selectedBackend.sendError : ""
-    readonly property int sendSuccessSerial: selectedBackend
-        ? selectedBackend.sendSuccessSerial : 0
+    // Provider success counters are global per adapter, but the feed must
+    // receive confirmations only for its own service and conversation.
+    property var confirmedByScope: ({})
+    property string pendingSessionConversationId: ""
+    property string pendingTelegramConversationId: ""
+    readonly property string selectedScope: selectedConversationId !== ""
+        ? serviceId + ":" + selectedConversationId : ""
+    readonly property int sendSuccessSerial: selectedScope !== ""
+        ? Number(confirmedByScope[selectedScope] || 0) : 0
+
+    function confirmSend(service, conversationId) {
+        if (!conversationId)
+            return;
+        const key = service + ":" + String(conversationId);
+        const next = Object.assign({}, confirmedByScope);
+        next[key] = Number(next[key] || 0) + 1;
+        confirmedByScope = next;
+    }
 
     // Existing Sessions supports text messages but predates capability flags.
     // Telegram's supported feature map is explicitly declared by its adapter.
@@ -47,12 +63,39 @@ Item {
         if (!nativeSelected || !selectedBackend || !sendEnabled || !conversationId
                 || String(conversationId) !== selectedConversationId)
             return false;
-        return selectedBackend.sendMessage(String(conversationId), body);
+        const accepted = selectedBackend.sendMessage(String(conversationId), body);
+        if (accepted) {
+            if (appIndex === 0)
+                pendingSessionConversationId = String(conversationId);
+            else if (appIndex === 2)
+                pendingTelegramConversationId = String(conversationId);
+        }
+        return accepted;
     }
 
     SessionAdapter {
         id: sessions
         active: router.appIndex === 0
+    }
+
+    Connections {
+        target: sessions
+        function onSendSuccessSerialChanged() {
+            if (router.pendingSessionConversationId === "")
+                return;
+            router.confirmSend("session", router.pendingSessionConversationId);
+            router.pendingSessionConversationId = "";
+        }
+    }
+
+    Connections {
+        target: telegram
+        function onSendSuccessSerialChanged() {
+            if (router.pendingTelegramConversationId === "")
+                return;
+            router.confirmSend("telegram", router.pendingTelegramConversationId);
+            router.pendingTelegramConversationId = "";
+        }
     }
 
     TelegramAdapter {

@@ -146,10 +146,13 @@ def compact_rect(rect: Any) -> dict[str, int] | None:
         return None
 
 
+BROWSER_SITES = ("x", "instagram", "facebook", "reddit")
+
+
 def snapshot_from_tree(tree: dict[str, Any]) -> dict[str, Any]:
     social: dict[str, Any] | None = None
     discord_candidates: list[dict[str, Any]] = []
-    x_candidates: list[dict[str, Any]] = []
+    browser_candidates: dict[str, list[dict[str, Any]]] = {site: [] for site in BROWSER_SITES}
 
     for node in walk_tree(tree):
         if not node.get("visible", False):
@@ -172,9 +175,11 @@ def snapshot_from_tree(tree: dict[str, Any]) -> dict[str, Any]:
             discord_entry["name"] = node.get("name")
             discord_candidates.append(discord_entry)
 
-        # The X app is forced to XWayland with a dedicated Chromium WM_CLASS.
-        if (node.get("window_properties") or {}).get("class") == "post-apollo-x":
-            x_candidates.append(entry)
+        # Isolated Chromium profiles expose one XWayland class per Social site.
+        window_class = (node.get("window_properties") or {}).get("class")
+        for site in BROWSER_SITES:
+            if window_class == f"post-apollo-{site}":
+                browser_candidates[site].append(entry)
 
     discord: dict[str, Any] | None = None
 
@@ -186,16 +191,19 @@ def snapshot_from_tree(tree: dict[str, Any]) -> dict[str, Any]:
             ),
         )
 
-    x_window = max(
-        x_candidates,
-        key=lambda item: item["rect"]["width"] * item["rect"]["height"],
-        default=None,
-    )
+    browser_windows = {
+        site: max(
+            browser_candidates[site],
+            key=lambda item: item["rect"]["width"] * item["rect"]["height"],
+            default=None,
+        )
+        for site in BROWSER_SITES
+    }
 
     return {
         "social": social,
         "discord": discord,
-        "x": x_window,
+        **browser_windows,
     }
 
 
@@ -204,8 +212,8 @@ def sway_criteria(target: str) -> str:
         return '[title="QS_SOCIAL_MENU"]'
     if target == "discord":
         return '[app_id="vesktop"]'
-    if target == "x":
-        return '[class="post-apollo-x"]'
+    if target in BROWSER_SITES:
+        return f'[class="post-apollo-{target}"]'
     raise ValueError(f"Unknown sync target: {target}")
 
 
@@ -268,6 +276,7 @@ class Bridge:
         self.discord_ready = False
         self.x_selected = False
         self.x_ready = False
+        self.browser_site = "x"
 
     @staticmethod
     def rect_equal(a: dict[str, int] | None, b: dict[str, int] | None) -> bool:
@@ -348,7 +357,7 @@ class Bridge:
         # path unchanged while allowing the same fast-follow for X.
         guest_id = (
             "discord" if self.discord_selected and self.discord_ready else
-            "x" if self.x_selected and self.x_ready else ""
+            self.browser_site if self.x_selected and self.x_ready else ""
         )
         if not guest_id:
             return snapshot
@@ -426,7 +435,7 @@ class Bridge:
     def queue_sync(self, message: dict[str, Any]) -> None:
         target = str(message.get("target", ""))
 
-        if target not in ("social", "discord", "x"):
+        if target not in ("social", "discord", *BROWSER_SITES):
             return
 
         with self.command_lock:
@@ -525,6 +534,8 @@ class Bridge:
                 )
                 self.x_selected = bool(message.get("xSelected", False))
                 self.x_ready = bool(message.get("xReady", False))
+                candidate = str(message.get("browserSite", "x"))
+                self.browser_site = candidate if candidate in BROWSER_SITES else "x"
                 continue
 
             if op == "sync":
@@ -546,7 +557,7 @@ class Bridge:
                 continue
 
             if op == "focusX":
-                self.queue_command('[class="post-apollo-x"] focus')
+                self.queue_command(f'[class="post-apollo-{self.browser_site}"] focus')
                 continue
 
             if op == "stop":

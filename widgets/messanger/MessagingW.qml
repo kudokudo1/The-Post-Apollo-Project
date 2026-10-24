@@ -64,17 +64,20 @@ PanelWindow {
     // X runs as a separate browser app; Chromium owns its private profile.
     Process {
         id: xShowProcess
+        property string launchSite: "x"
         stderr: StdioCollector {
             onStreamFinished: {
                 var detail = String(text || "").trim();
-                if (detail !== "")
+                if (detail !== "" && xShowProcess.launchSite === messagingWindow.browserSite)
                     messagingWindow.xError = detail;
             }
         }
         onExited: function(exitCode, exitStatus) {
+            // A previous site's startup must not seize the current selection.
+            if (xShowProcess.launchSite !== messagingWindow.browserSite)
+                return;
             if (exitCode !== 0 && messagingWindow.xError === "")
-                messagingWindow.xError = "X window could not be opened";
-            // Switching away during startup must not leave X on the desktop.
+                messagingWindow.xError = xShowProcess.launchSite.toUpperCase() + " window could not be opened";
             if (!messagingWindow.menuOpen || !messagingWindow.xSelected) {
                 messagingWindow.hideX();
                 return;
@@ -94,7 +97,7 @@ PanelWindow {
 
     Process {
         id: xHideProcess
-        command: ["python3", Quickshell.shellPath("widgets/messanger/XBrowser.py"), "hide"]
+        command: ["python3", Quickshell.shellPath("widgets/messanger/XBrowser.py"), "hide", "all"]
     }
 
     Process {
@@ -292,8 +295,11 @@ PanelWindow {
     property int discordInset: 1
 
     readonly property bool discordSelected: activeAppIndex === 1
-    readonly property bool xSelected: activeAppIndex === 3
+    // xSelected retains the existing external-browser focus contract.
+    readonly property bool xSelected: activeAppIndex === 3 || activeAppIndex === 4 || activeAppIndex === 5 || activeAppIndex === 6
+    readonly property string browserSite: activeAppIndex === 4 ? "instagram" : activeAppIndex === 5 ? "facebook" : activeAppIndex === 6 ? "reddit" : "x"
     readonly property bool externalSelected: discordSelected || xSelected
+    onBrowserSiteChanged: updateGeometryHelperMode()
 
     onDiscordSelectedChanged: updateGeometryHelperMode()
     onDiscordReadyChanged: updateGeometryHelperMode()
@@ -541,7 +547,8 @@ PanelWindow {
             discordSelected: discordSelected,
             discordReady: discordReady,
             xSelected: xSelected,
-            xReady: xReady
+            xReady: xReady,
+            browserSite: browserSite
         });
     }
 
@@ -609,7 +616,7 @@ PanelWindow {
 
         if (xSelected) {
             // X uses the shared external window slot, but its own lifecycle.
-            var xNode = payload.x;
+            var xNode = payload[browserSite];
             var xRect = xNode ? xNode.rect : null;
             if (!xRect) {
                 if (socialChanged)
@@ -780,7 +787,7 @@ PanelWindow {
 
         ignoreXGeometryUntil = Date.now() + 280;
         // Existing discord* values describe the shared external-app slot.
-        syncHelperWindow("x", discordX, discordY, discordWidth,
+        syncHelperWindow(browserSite, discordX, discordY, discordWidth,
                          discordHeight, focusWindow, !xConfigured);
         xConfigured = true;
     }
@@ -869,8 +876,10 @@ PanelWindow {
             xHideProcess.running = false;
         if (!swayGeometryReady)
             refreshSwayGeometry();
-        if (!xShowProcess.running)
-            xShowProcess.exec(["python3", Quickshell.shellPath("widgets/messanger/XBrowser.py"), "show"]);
+        if (xShowProcess.running)
+            xShowProcess.running = false;
+        xShowProcess.launchSite = browserSite;
+        xShowProcess.exec(["python3", Quickshell.shellPath("widgets/messanger/XBrowser.py"), "show", browserSite]);
     }
 
     function hideX() {
@@ -928,7 +937,7 @@ PanelWindow {
             return;
         }
 
-        if (index === 3) {
+        if (index >= 3 && index <= 6) {
             hideDiscord();
             restoreSelectorAfterXShow = retainSelectorFocus === true;
             showX();

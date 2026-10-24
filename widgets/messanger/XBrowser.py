@@ -21,6 +21,24 @@ from typing import Any
 X_CLASS = "post-apollo-x"
 X_URL = "https://x.com"
 CRITERIA = f'[class="{X_CLASS}"]'
+# Each service gets a distinct app id and browser data directory.
+SITES = {
+    "x": (X_URL, X_CLASS, "x-browser"),
+    "instagram": ("https://www.instagram.com/", "post-apollo-instagram", "instagram-browser"),
+    "facebook": ("https://www.facebook.com/", "post-apollo-facebook", "facebook-browser"),
+    "reddit": ("https://www.reddit.com/", "post-apollo-reddit", "reddit-browser"),
+}
+
+
+def site_config(site: str) -> tuple[str, str, str]:
+    if site not in SITES:
+        raise ValueError(f"Unsupported Social browser site: {site}")
+    return SITES[site]
+
+
+def site_criteria(site: str) -> str:
+    return f'[class="{site_config(site)[1]}"]'
+
 BROWSERS = (
     "brave-browser",
     "brave-browser-stable",
@@ -65,6 +83,16 @@ def x_exists() -> bool:
     return any(is_x_window(node) for node in walk_tree(sway_tree()))
 
 
+def site_exists(site: str) -> bool:
+    if site == "x":
+        return x_exists()
+    _, window_class, _ = site_config(site)
+    return any(
+        (node.get("window_properties") or {}).get("class") == window_class
+        for node in walk_tree(sway_tree())
+    )
+
+
 def sway_command(command: str) -> None:
     result = subprocess.run(
         ["swaymsg", "-r", command],
@@ -105,7 +133,8 @@ def browser_prefix() -> list[str]:
     )
 
 
-def browser_command() -> list[str]:
+def browser_command(site: str = "x") -> list[str]:
+    url, window_class, profile_dir = site_config(site)
     prefix = browser_prefix()
     if len(prefix) >= 3 and prefix[:2] == ["flatpak", "run"]:
         # Flatpak Chromium cannot normally write into the host XDG_DATA_HOME.
@@ -113,22 +142,27 @@ def browser_command() -> list[str]:
         data_root = Path.home() / ".var" / "app" / prefix[2] / "data"
     else:
         data_root = Path(os.environ.get("XDG_DATA_HOME") or (Path.home() / ".local/share"))
-    profile = data_root / "post-apollo" / "x-browser"
+    profile = data_root / "post-apollo" / profile_dir
     return prefix + [
         "--ozone-platform=x11",
-        f"--class={X_CLASS}",
+        f"--class={window_class}",
         f"--user-data-dir={profile}",
         "--no-first-run",
         "--no-default-browser-check",
-        f"--app={X_URL}",
+        f"--app={url}",
     ]
 
 
-def show() -> None:
-    if not x_exists():
-        command = browser_command()
-        # Browser creates its own dedicated profile, never touching the user's
-        # default Chromium/Brave session or Session's message database.
+def show(site: str = "x") -> None:
+    # Hiding a different site never logs it out or kills its browser process.
+    site_config(site)
+    for other in SITES:
+        if other != site and site_exists(other):
+            sway_command(f"{site_criteria(other)} move scratchpad")
+
+    if not site_exists(site):
+        command = browser_command(site)
+        # Chromium retains credentials in a site-specific profile.
         subprocess.Popen(
             command, start_new_session=True,
             stdin=subprocess.DEVNULL,
@@ -137,36 +171,52 @@ def show() -> None:
         )
         for _ in range(70):
             time.sleep(0.1)
-            if x_exists():
+            if site_exists(site):
                 break
         else:
             raise RuntimeError(
-                "X browser window did not appear with class post-apollo-x. "
+                f"{site} browser window did not appear with its Post-Apollo class. "
                 "Check browser/XWayland availability."
             )
 
-    # Reuse the exact same scratchpad lifecycle as Social's Vesktop window.
-    sway_command(f"{CRITERIA} move scratchpad")
-    sway_command(f"{CRITERIA} scratchpad show")
+    criteria = site_criteria(site)
+    sway_command(f"{criteria} move scratchpad")
+    sway_command(f"{criteria} scratchpad show")
 
 
-def hide() -> None:
-    if x_exists():
-        sway_command(f"{CRITERIA} move scratchpad")
+def hide(site: str = "x") -> None:
+    if site_exists(site):
+        sway_command(f"{site_criteria(site)} move scratchpad")
+
+
+def hide_all() -> None:
+    for site in SITES:
+        hide(site)
 
 
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("action", choices=("show", "hide", "status"))
+    parser.add_argument("site", nargs="?", default="x", choices=(*SITES, "all"))
     args = parser.parse_args()
 
     try:
         if args.action == "show":
-            show()
+            if args.site == "all":
+                raise ValueError("Cannot show all browser sites")
+            show(args.site)
         elif args.action == "hide":
-            hide()
+            if args.site == "all":
+                hide_all()
+            else:
+                hide(args.site)
+        elif args.site == "all":
+            print(json.dumps({site: site_exists(site) for site in SITES}))
         else:
-            print(json.dumps({"window": x_exists(), "class": X_CLASS}))
+            print(json.dumps({
+                "window": site_exists(args.site),
+                "class": site_config(args.site)[1],
+            }))
         return 0
     except (OSError, subprocess.CalledProcessError, ValueError, RuntimeError) as exc:
         print(f"Post-Apollo X: {exc}", file=sys.stderr, flush=True)

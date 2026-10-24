@@ -42,7 +42,7 @@ assert 'PREPARED // snapshot ' in service
 node = r"""
 const assert = require('node:assert/strict');
 const vm = require('node:vm');
-vm.runInThisContext(SOURCE);
+SOURCE
 const raw = [
     'PREPARING // capturing repository references and journal evidence',
     'PREPARED // snapshot 35 ms // journal 90 ms',

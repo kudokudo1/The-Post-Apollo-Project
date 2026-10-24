@@ -1,4 +1,5 @@
 import QtQuick
+import Quickshell
 
 QtObject {
     id: graphHistory
@@ -6,12 +7,59 @@ QtObject {
     // Pure graph/history presentation helpers shared by AppControl and CPU++.
     // This object deliberately owns no telemetry source and no selection state.
 
+    // Opt-in aggregate-only diagnostics. The counters are plain JS object fields,
+    // not QML-bound per-sample properties. No extra timer or data collector.
+    readonly property bool arrayCopyProbeEnabled:
+        String(Quickshell.env("POST_APOLLO_ARRAY_COPY_PROBE") || "").trim() === "1"
+    property var arrayCopyProbeBuckets: ({})
+    property double arrayCopyProbeLastReportMs: 0
+
+    function recordArrayCopy(kind, inputCount, copyMs, startMs) {
+        if (!arrayCopyProbeEnabled)
+            return;
+        const now = Date.now();
+        const buckets = arrayCopyProbeBuckets;
+        let bucket = buckets[kind];
+        if (!bucket) {
+            bucket = { count: 0, maxInput: 0, copyTotalMs: 0,
+                       workTotalMs: 0, maxWorkMs: 0 };
+            buckets[kind] = bucket;
+        }
+        const workMs = Math.max(0, now - startMs);
+        bucket.count += 1;
+        bucket.maxInput = Math.max(bucket.maxInput, inputCount);
+        bucket.copyTotalMs += copyMs;
+        bucket.workTotalMs += workMs;
+        bucket.maxWorkMs = Math.max(bucket.maxWorkMs, workMs);
+        if (!arrayCopyProbeLastReportMs) {
+            arrayCopyProbeLastReportMs = now;
+            return;
+        }
+        if (now - arrayCopyProbeLastReportMs < 5000)
+            return;
+        for (const name in buckets) {
+            const b = buckets[name];
+            console.warn("SYNTAGMA_ARRAY_PROBE // graph=" + name
+                         + " calls=" + b.count + " maxInput=" + b.maxInput
+                         + " copyTotalMs=" + b.copyTotalMs
+                         + " workTotalMs=" + b.workTotalMs
+                         + " maxWorkMs=" + b.maxWorkMs + " tsMs=" + now);
+        }
+        arrayCopyProbeBuckets = ({});
+        arrayCopyProbeLastReportMs = now;
+    }
+
     function linePoints(values, graphWidth, graphHeight, requiredRange,
                         slotCount, topInset, bottomInset) {
+        const probeStartMs = arrayCopyProbeEnabled ? Date.now() : 0;
         const source = Array.isArray(values) ? values.slice() : [];
+        const copyMs = probeStartMs ? Date.now() - probeStartMs : 0;
 
-        if (source.length === 0)
+        if (source.length === 0) {
+            if (probeStartMs)
+                recordArrayCopy("linePoints", 0, copyMs, probeStartMs);
             return [];
+        }
 
         if (source.length === 1)
             source.unshift(source[0]);
@@ -69,20 +117,26 @@ QtObject {
             points.push(Qt.point(rawX, rawY));
         }
 
+        if (probeStartMs)
+            recordArrayCopy("linePoints", source.length, copyMs, probeStartMs);
         return points;
     }
 
     function downsampleHistory(values, maximumPoints) {
+        const probeStartMs = arrayCopyProbeEnabled ? Date.now() : 0;
         const source = Array.isArray(values) ? values : [];
         const limit = Math.max(
             2,
             Math.floor(Number(maximumPoints || source.length))
         );
 
-        if (source.length <= limit)
-            return source.slice();
-
-        return source.slice(Math.max(0, source.length - limit));
+        const sampled = source.length <= limit
+            ? source.slice()
+            : source.slice(Math.max(0, source.length - limit));
+        if (probeStartMs)
+            recordArrayCopy("downsampleHistory", source.length,
+                            Date.now() - probeStartMs, probeStartMs);
+        return sampled;
     }
 
     function linePointsInBand(values, graphWidth, graphHeight, requiredRange,
@@ -136,7 +190,10 @@ QtObject {
     }
 
     function appendBounded(values, value, maximumPoints) {
+        const probeStartMs = arrayCopyProbeEnabled ? Date.now() : 0;
         const next = Array.isArray(values) ? values.slice() : [];
+        const copyMs = probeStartMs ? Date.now() - probeStartMs : 0;
+        const inputCount = next.length;
         const limit = Math.max(1, Math.floor(Number(maximumPoints || 1)));
 
         next.push(Number(value || 0));
@@ -144,6 +201,8 @@ QtObject {
         while (next.length > limit)
             next.shift();
 
+        if (probeStartMs)
+            recordArrayCopy("appendBounded", inputCount, copyMs, probeStartMs);
         return next;
     }
 }

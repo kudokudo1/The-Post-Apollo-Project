@@ -361,3 +361,67 @@ def edit_task(file, *, expected_revision, expected_hash,
 def _stop(selected, phase):
     if selected == phase:
         raise InterruptedCommit("INJECTED_" + phase)
+
+
+# Test-only local journal state tracking, NOT remote acknowledgement.
+# A real future sync executor requires verified GitHub identity, permissions,
+# baseline and readback before it may claim any remote ACK.
+_ALLOWED_LOCAL_TRANSITIONS = {
+    "PENDING": ("SENDING", "CONFLICT"),
+    "SENDING": ("UNCERTAIN",),
+    "UNCERTAIN": ("CONFLICT",),
+    "CONFLICT": (),
+    "ACKNOWLEDGED": (),
+}
+
+
+def transition_local_operation(file, *, expected_revision, expected_hash,
+                               operation_id, next_state, stop_at=None):
+    """Commit one operation state transition and revision; no network calls."""
+    if (type(expected_revision) is not int or expected_revision < 0
+            or type(expected_hash) is not str
+            or re.fullmatch(r"[0-9a-f]{64}", expected_hash) is None
+            or type(operation_id) is not str
+            or next_state not in ("SENDING", "UNCERTAIN", "CONFLICT")):
+        raise StoreError("INVALID_TRANSITION_REQUEST")
+    con = _connect(file, writable=True)
+    try:
+        con.execute("BEGIN IMMEDIATE")
+        try:
+            current = _load(con)
+            if (current["revision"] != expected_revision
+                    or current["hash"] != expected_hash):
+                raise StoreError("STALE_BASELINE")
+            doc = copy.deepcopy(current["document"])
+            op = next((x for x in doc["operations"] if x["id"] == operation_id), None)
+            if op is None:
+                raise StoreError("UNKNOWN_OPERATION")
+            if next_state not in _ALLOWED_LOCAL_TRANSITIONS[op["state"]]:
+                raise StoreError("DISALLOWED_TRANSITION")
+            if doc["revision"] >= 1000000000:
+                raise StoreError("REVISION_EXHAUSTED")
+            op["state"] = next_state
+            doc["revision"] += 1
+            _validator.validate(doc)
+            _stop(stop_at, "before_operation_update")
+            con.execute("UPDATE operations SET state=? WHERE id=?",
+                        (next_state, operation_id))
+            _stop(stop_at, "after_operation_update")
+            new_hash = _hash(doc)
+            con.execute("UPDATE meta SET revision=?,model_hash=? WHERE singleton=1",
+                        (doc["revision"], new_hash))
+            _stop(stop_at, "before_commit")
+            con.commit()
+        except Exception:
+            if con.in_transaction:
+                con.rollback()
+            raise
+        _stop(stop_at, "after_commit")
+        confirmed = _load(con)
+        if confirmed["hash"] != new_hash or confirmed["document"] != doc:
+            raise StoreError("POST_COMMIT_VERIFICATION_FAILED")
+        return {"status": "LOCAL_COMMITTED", "localSaved": True,
+                "remoteSent": False, "remoteWriteAuthorized": False,
+                "revision": doc["revision"], "hash": new_hash}
+    finally:
+        con.close()

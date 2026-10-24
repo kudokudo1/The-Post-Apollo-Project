@@ -21,6 +21,7 @@ PanelWindow {
     readonly property int frameWidth: 432
     readonly property int frameHeight: 768
     readonly property int glowGutter: 12
+    readonly property int frameTopInset: 9 // shared visible top line
 
     // M2: five main modes share one window and one truthful empty-state view.
     // Text-only labels are provisional until the user approves mode artwork.
@@ -74,7 +75,7 @@ PanelWindow {
     }
 
     implicitWidth: frameWidth + glowGutter * 2
-    implicitHeight: frameHeight + glowGutter * 2
+    implicitHeight: frameHeight + frameTopInset + glowGutter
 
     anchors {
         top: true
@@ -110,7 +111,7 @@ PanelWindow {
     visible: true
     mask: Region {
         x: root.glowGutter
-        y: root.glowGutter
+        y: root.frameTopInset
         width: root.menuOpen ? root.frameWidth : 0
         height: root.menuOpen ? root.frameHeight : 0
     }
@@ -119,6 +120,7 @@ PanelWindow {
         id: tasksFrame
         anchors.fill: parent
         anchors.margins: root.glowGutter
+        anchors.topMargin: root.frameTopInset
         visible: root.menuOpen
 
         fillColor: Colors.black

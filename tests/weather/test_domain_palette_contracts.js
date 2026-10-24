@@ -118,7 +118,7 @@ assert.match(headerControls, /id:\s*terminalHeaderDivider[\s\S]*?width:\s*2[\s\S
 assert.match(headerControls, /id:\s*terminalHeaderDivider[\s\S]*?color:\s*Colors\.cyan/);
 assert.match(weatherTerminalSource, /id:\s*verifyProcess/);
 assert.match(weatherTerminalSource, /command:\s*\["swaymsg", "-t", "get_tree"\]/);
-assert.match(weatherTerminalSource, /SwayGeometry\.observedWindow\(/);
+assert.match(weatherTerminalSource, /SwayGeometry\.observedContentWindow\(/);
 assert.match(weatherTerminalSource, /SwayGeometry\.visibleIntersection\(/);
 assert.match(weatherTerminalSource, /resize set width /);
 assert.match(weatherTerminalSource, /property string fitStatus:\s*"UNVERIFIED"/);
@@ -157,6 +157,15 @@ assert.match(weatherTerminalSource, /if \(!overlap\)\s*throw new Error/);
 assert.match(weatherTerminalSource, /terminalView\.verifiedWidth = overlap\.width/);
 assert.doesNotMatch(weatherTerminalSource, /setInterval|Qt\.openUrlExternally/);
 assert.match(geometrySource, /function centeredPosition\(desired, actual\)/);
+
+assert.match(geometrySource, /function observedContentWindow\(tree, appId\)/);
+assert.match(geometrySource, /actor\.window_rect/);
+assert.match(geometrySource, /window\.x \+ window\.width > outer\.width/);
+assert.match(weatherTerminalSource, /centerProcess\.targetWidth = actual\.width/);
+assert.match(weatherTerminalSource, /centerProcess\.targetHeight = actual\.height/);
+assert.match(weatherTerminalSource, /targetWidth \+ " px height " \+ targetHeight/);
+assert.match(weatherTerminalSource, /SwayGeometry\.visibleIntersection\(requested, actual\)/);
+
 
 
 const discoveryViewSource = read("widgets/weather/StationDiscovery.qml");

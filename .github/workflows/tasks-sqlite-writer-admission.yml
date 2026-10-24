@@ -1,0 +1,40 @@
+name: TASKS Proxy 1 M10p durable admission fixture
+
+on:
+  pull_request:
+    paths:
+      - 'tests/tasks/fixtures/TaskSqliteWriterAuthorityFixture.py'
+      - 'tests/tasks/test_sqlite_writer_authority_fixture.py'
+      - 'docs/tasks-sqlite-writer-admission-m10p.md'
+      - '.github/workflows/tasks-sqlite-writer-admission.yml'
+  push:
+    branches:
+      - main
+    paths:
+      - 'tests/tasks/fixtures/TaskSqliteWriterAuthorityFixture.py'
+      - 'tests/tasks/test_sqlite_writer_authority_fixture.py'
+      - 'docs/tasks-sqlite-writer-admission-m10p.md'
+      - '.github/workflows/tasks-sqlite-writer-admission.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  durable-admission:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: M10p durable SQLite admission and cross-process crash fencing
+        run: python3 tests/tasks/test_sqlite_writer_authority_fixture.py
+      - name: M10o pure handoff state machine regression
+        run: node tests/tasks/test_sqlite_writer_handoff_policy.cjs
+      - name: M10n shadow cutover, backup and rollback safeguards
+        run: python3 tests/tasks/test_task_sqlite_cutover_review.py
+      - name: M10l SQLite task and journal transactions
+        run: python3 tests/tasks/test_task_sqlite_records_v2.py

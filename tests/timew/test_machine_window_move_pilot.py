@@ -14,6 +14,7 @@ sys.path.insert(0, str(root))
 spec = importlib.util.spec_from_file_location("machine_move", root / "MachineWindowMovePilot.py")
 mod = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(mod)
+from MachineMoveJournal import JournalError
 
 rect = {"x": 0, "y": 0, "width": 1920, "height": 1080}
 document = {
@@ -210,7 +211,7 @@ assert run_execute(document, request, read_runner=fake.read,
 # No movement if a durable journal cannot be created.
 class CannotDispatch(mod.MoveJournal):
     def mark_dispatching(self, operation_id):
-        raise mod.JournalError("SIMULATED STORAGE FAILURE")
+        raise JournalError("SIMULATED STORAGE FAILURE")
 
 path = Path(_tmp.name) / "fail-pre-dispatch" / "move-operations.db"
 fake = FakeSway()

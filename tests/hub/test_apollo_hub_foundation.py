@@ -11,6 +11,7 @@ tile = (ROOT / "widgets/hub/ApolloHubTile.qml").read_text(encoding="utf-8")
 network_explore = (ROOT / "widgets/hub/ApolloHubNetworkExplore.qml").read_text(encoding="utf-8")
 weather_explore = (ROOT / "widgets/hub/ApolloHubWeatherExplore.qml").read_text(encoding="utf-8")
 media_mini = (ROOT / "widgets/hub/ApolloHubMediaMini.qml").read_text(encoding="utf-8")
+media_explore = (ROOT / "widgets/hub/ApolloHubMediaExplore.qml").read_text(encoding="utf-8")
 system_mini = (ROOT / "widgets/hub/ApolloHubSystemMini.qml").read_text(encoding="utf-8")
 uptime_mini = (ROOT / "widgets/hub/ApolloHubUptimeMini.qml").read_text(encoding="utf-8")
 apps_mini = (ROOT / "widgets/hub/ApolloHubAppsMini.qml").read_text(encoding="utf-8")
@@ -1234,6 +1235,50 @@ for forbidden in (
 ):
     assert forbidden not in network_explore, (
         f"Stage 8D network view must not probe/control: {forbidden}")
+
+
+# Stage 8E: taller Media views share the same MPD/MPRIS snapshots and
+# reuse the existing mini for BOTH. UI cannot create/own media services.
+for needle in (
+    'visible: tile.moduleId === "media" && tile.tileRowSpan === 1',
+    'ApolloHubMediaExplore {',
+    'visible: tile.moduleId === "media" && tile.tileRowSpan > 1',
+    'mediaSnapshot: tile.mediaSnapshot',
+    'mediaExplore.statusLine',
+):
+    assert needle in tile, f"Stage 8E tile seam missing {needle}"
+for needle in (
+    'property var mediaSnapshot: null',
+    'property string selectedView: "both"',
+    'model: ["BOTH", "MPD", "MPRIS"]',
+    'onLeftClicked: mediaExplore.selectedView = modelData.toLowerCase()',
+    'ApolloHubMediaMini {',
+    'mediaSnapshot: mediaExplore.mediaSnapshot',
+    'mediaExplore.selectedView === "both"',
+    'mpd.fresh === true',
+    'mpdState === "playing"',
+    'mpdState === "unloaded"',
+    'mpd.observationSource',
+    'mpd.ageSeconds',
+    'LAST KNOWN LOADED',
+    'mpris.selected === true',
+    'mprisState === "selection-required"',
+    'mprisState === "player-missing"',
+    'mpris.album',
+    'MPRIS PLAYERS',
+    'NO AUTOMATIC SELECTION',
+    'AUDIO OUTPUT NOT VERIFIED',
+):
+    assert needle in media_explore, f"Stage 8E Media missing {needle}"
+for forbidden in (
+    'HeadlessMediaController {', 'MprisPlaybackAdapter {',
+    'Mpris {', 'Process {', 'FileView {', 'Timer {',
+    'playPause(', 'play(', 'pause(', 'next(', 'previous(',
+    'selectedMprisBusName =', 'startPolling(', 'polling:',
+    'Qt.openUrlExternally(', 'execute(', 'run(',
+):
+    assert forbidden not in media_explore, (
+        f"Stage 8E Hub Media must not control playback: {forbidden}")
 
 # Launchers and widget backends are unchanged in this first stage.
 print("ApolloHubW foundation source contracts passed")

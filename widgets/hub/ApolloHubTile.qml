@@ -548,7 +548,22 @@ SectionFrame {
 
     // MPD and MPRIS remain separate; neither gets selected automatically.
     ApolloHubMediaMini {
-        visible: tile.moduleId === "media"
+        visible: tile.moduleId === "media" && tile.tileRowSpan === 1
+        mediaSnapshot: tile.mediaSnapshot
+        anchors {
+            left: parent.left
+            right: parent.right
+            top: parent.top
+            bottom: parent.bottom
+            topMargin: tile.editing ? 32 : 22
+            bottomMargin: 23
+        }
+    }
+
+    // Stage 8E expands only the passive display of the one Media snapshot.
+    ApolloHubMediaExplore {
+        id: mediaExplore
+        visible: tile.moduleId === "media" && tile.tileRowSpan > 1
         mediaSnapshot: tile.mediaSnapshot
         anchors {
             left: parent.left
@@ -606,6 +621,8 @@ SectionFrame {
               ? ("NETWORK // " + (tile.networkConnected
                                   ? "LOCAL LINK CONNECTED" : tile.networkState.toUpperCase())
                  + " // INTERNET UNVERIFIED")
+              : tile.moduleId === "media" && tile.tileRowSpan > 1
+              ? mediaExplore.statusLine
               : tile.moduleId === "media"
               ? "MEDIA // READ ONLY // AUDIO OUTPUT NOT VERIFIED"
               : tile.moduleId === "cpu"

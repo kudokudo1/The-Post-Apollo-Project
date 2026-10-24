@@ -250,9 +250,17 @@ The H:1 Network card retains the existing compact local-link display. Taller H:2
 
 Stage 8C's deeper shared solar, seismic, pollen, gas and forecast feeds are still **owner-dependent**, not silently populated. [Weather deferred-source checkpoint](WEATHER_DEFERRED_SOURCES_20261024.md) records the missing fields, freshness/status rules, service-lifetime constraint and reentry tests. The B10 TimeW CI contract repair was merged in PR #680; earlier PR #675 red checks are historical.
 
+## P1 Stage 8E // Media Level 2 source exploration
+
+The H:1 MEDIA tile retains the original two-column MPD/MPRIS status. H:2/H:3 mount `widgets/hub/ApolloHubMediaExplore.qml` with transient **BOTH / MPD / MPRIS** selection over the already-injected `mediaSnapshot`. BOTH reuses the original `ApolloHubMediaMini`; MPD details show observed state, track/artist, observation provenance/age (only if fresh) and a clearly labeled **LAST KNOWN LOADED** cassette title; MPRIS details show the explicitly selected player's metadata, album and known player count, never auto-select. Both source-specific views retain the **AUDIO OUTPUT NOT VERIFIED** footer.
+
+**Safety boundary:** The existing `ApolloHubMediaPolicy.js` masks stale MPD observations and refuses unselected MPRIS metadata. This view does not create MPD/MPRIS/controller instances, subprocesses, second timers, playback actions, player selection, audio rerouting, preference persistence or external browser windows. It does not alter the Hi-Fi owner widgets. It is Level 2, not Level 3.
+
+**VERIFY:** Hub foundation source contracts validate H:1 preservation, H:2/H:3 mount, MPD/MPRIS identity and stale behavior, provenance and nonactionable layout. Operator desktop acceptance checks W:1/W:2 H:1/H:2/H:3, idle/playing/paused/stopped/stale MPD, selection-required/player-missing MPRIS, title truncation, audio status footer, live media changes and freezes. CI is not a live desktop rendering check.
+
 ## NEXT
 
-Complete Stage 7A/7B/7C/7D/8A/8B/8C/8D desktop acceptance. Next can be Notes and To-do internal density, but those contain editable user data, so changes must preserve editor focus, draft and save-confirmation behavior. Durable undo/presets and drag-and-drop remain separate operator decisions.
+Complete Stage 7A/7B/7C/7D/8A/8B/8C/8D/8E desktop acceptance. Next can be Notes and To-do internal density, but those contain editable user data, so changes must preserve editor focus, draft and save-confirmation behavior. Durable undo/presets and drag-and-drop remain separate operator decisions.
 
 ## DECISIONS
 

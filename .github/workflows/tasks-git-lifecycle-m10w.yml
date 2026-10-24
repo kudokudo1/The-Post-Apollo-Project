@@ -1,0 +1,39 @@
+name: TASKS M10w review-only GIT lifecycle contract
+
+on:
+  pull_request:
+    paths:
+      - 'services/projects/ExperimentalTaskGitLifecycleM10w.py'
+      - 'tests/tasks/test_task_git_lifecycle_m10w.py'
+      - 'docs/tasks-sqlite-git-lifecycle-contract-m10w.md'
+      - '.github/workflows/tasks-git-lifecycle-m10w.yml'
+  push:
+    branches:
+      - main
+    paths:
+      - 'services/projects/ExperimentalTaskGitLifecycleM10w.py'
+      - 'tests/tasks/test_task_git_lifecycle_m10w.py'
+      - 'docs/tasks-sqlite-git-lifecycle-contract-m10w.md'
+      - '.github/workflows/tasks-git-lifecycle-m10w.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  lifecycle-review:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: M10w lifecycle intent review-only proposals
+        run: python3 tests/tasks/test_task_git_lifecycle_m10w.py
+      - name: M10v existing atomic field and journal isolation
+        run: python3 tests/tasks/test_task_sqlite_m10v_git_intents.py
+      - name: M10u local custom field and GIT no-sync
+        run: python3 tests/tasks/test_task_sqlite_m10u_custom_fields.py
+      - name: M10l strict v2 source schema and normalized SQLite
+        run: python3 tests/tasks/test_task_sqlite_records_v2.py
+      - name: M10r active writer parity inventory
+        run: python3 tests/tasks/test_task_sqlite_m10r_inventory.py

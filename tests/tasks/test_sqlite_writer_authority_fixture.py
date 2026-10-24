@@ -138,8 +138,7 @@ with tempfile.TemporaryDirectory(prefix="pa-m10p-fixtures-") as dirname:
         assert failed["callback"]=="FAILED"
         assert a.snapshot()["phase"]=="RECOVERY_REVIEW"
         assert a.snapshot()["reason"]=="LEGACY_SAVE_FAILED"
-        denied(lambda:a.record_quiescence(TASK,TASK),"SAVE_NOT_DRAINED"
-               if a.snapshot()["pendingStage"] else "UNEXPECTED_PHASE")
+        denied(lambda:a.record_quiescence(TASK,TASK),"UNEXPECTED_PHASE")
     with guard.Authority(db,ANOTHER) as a:
         assert a.snapshot()["phase"]=="RECOVERY_REVIEW"
         denied(lambda:a.admit_stage("new-stage-token-0007"),"LEGACY_STAGE_FROZEN")

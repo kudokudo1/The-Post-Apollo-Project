@@ -68,7 +68,7 @@ def _credentials() -> tuple[int, str]:
     return api_id, api_hash
 
 
-def _telegram_client():
+def _telegram_client(*, receive_updates: bool = False):
     api_id, api_hash = _credentials()
     try:
         from telethon import TelegramClient
@@ -83,7 +83,7 @@ def _telegram_client():
     # Ensure it is private *from creation*, not merely after disconnect.
     prior_umask = os.umask(0o077)
     try:
-        return TelegramClient(str(session), api_id, api_hash, receive_updates=False)
+        return TelegramClient(str(session), api_id, api_hash, receive_updates=receive_updates)
     finally:
         os.umask(prior_umask)
 

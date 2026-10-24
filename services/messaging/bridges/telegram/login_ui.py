@@ -167,7 +167,9 @@ async def connect(mode: str) -> None:
     if mode == "qr":
         # Detect missing QR support before touching the account session.
         qr_png_data("tg://login?token=preflight")
-    client = _telegram_client()
+    # QR waits for an UpdateLoginToken event. Ordinary read/send bridges
+    # deliberately disable updates, but QR authorization MUST enable them.
+    client = _telegram_client(receive_updates=(mode == "qr"))
     try:
         await client.connect()
         if await client.is_user_authorized():

@@ -38,6 +38,7 @@ class TelegramClient:
         assert api_id == 123456
         assert api_hash == "1234567890abcdef1234567890abcdef"
         self.authorized = False
+        self.receive_updates = receive_updates
         self.session = Path(session)
         self.session.write_text("FAKE SESSION")
     async def connect(self):
@@ -47,6 +48,7 @@ class TelegramClient:
     async def is_user_authorized(self):
         return self.authorized
     async def qr_login(self):
+        assert self.receive_updates is True, "QR requires Telegram update delivery"
         return Login(self)
     async def send_code_request(self, phone):
         assert phone == "+15551234567"

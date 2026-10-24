@@ -16,6 +16,7 @@ on:
       - "services/time/MachineSelectionPolicy.js"
       - "services/time/MachineLayoutDiffPolicy.js"
       - "services/time/MachineRestorePreviewPolicy.js"
+      - "services/time/MachineWindowResolver.py"
       - "services/time/MachineCheckpointStore.py"
       - "services/time/MachineCheckpointModel.py"
       - "services/time/MachineSwayRead.py"
@@ -43,6 +44,7 @@ on:
       - "services/time/MachineSelectionPolicy.js"
       - "services/time/MachineLayoutDiffPolicy.js"
       - "services/time/MachineRestorePreviewPolicy.js"
+      - "services/time/MachineWindowResolver.py"
       - "services/time/MachineCheckpointStore.py"
       - "services/time/MachineCheckpointModel.py"
       - "services/time/MachineSwayRead.py"
@@ -105,5 +107,9 @@ jobs:
         run: node tests/timew/test_machine_restore_preview.cjs
       - name: Verify MACHINE restore planning UI stays read-only
         run: python3 -B -I tests/timew/test_machine_restore_preview_ui.py
+      - name: Verify MACHINE live unique-window resolution fixtures
+        run: python3 -B -I tests/timew/test_machine_window_resolver.py
+      - name: Verify MACHINE manual resolver UI never executes recovery
+        run: python3 -B -I tests/timew/test_machine_window_resolver_ui.py
       - name: Verify MACHINE desktop checkpoint draft remains non-operative
         run: python3 -B -I tests/timew/test_machine_checkpoint_contract.py

@@ -53,6 +53,14 @@ PanelWindow {
                     && root.researchTool === "sec"
     }
 
+    // Historical market context is opt-in; no price fetch until PRICE CONTEXT.
+    FinanceServices.FinanceSecPriceReadService {
+        id: secPriceService
+        secFeed: secService
+        monitoring: root.menuOpen && root.selectedMainMode === "research"
+                    && root.researchTool === "sec"
+    }
+
     Component {
         id: marketPaneComponent
         FinanceMarketPane {
@@ -2013,6 +2021,7 @@ Row {
                         visible: root.researchTool === "sec"
                         secFeed: secService
                         documentFeed: secDocumentService
+                        priceFeed: secPriceService
                     }
                 }
             }

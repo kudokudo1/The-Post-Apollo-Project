@@ -19,10 +19,14 @@ function viewportPixels(value, fallback) {
     return isFinite(n) && n > 0 ? Math.floor(n) : fallback;
 }
 
-function frame(level, viewportWidth, viewportHeight, gutter) {
+function frame(level, viewportWidth, viewportHeight, gutter, topInset, bottomGap) {
+    // Frame and mapped PanelWindow share exactly the same vertical budget:
+    // screen height = top inset + frame height + bottom gap (when saturated).
     var inset = Math.max(0, Math.floor(Number(gutter) || 0));
+    var top = Math.max(0, Math.floor(Number(topInset) || 0));
+    var bottom = Math.max(0, Math.floor(Number(bottomGap) || 0));
     var width = Math.max(1, viewportPixels(viewportWidth, 456) - 2 * inset);
-    var height = Math.max(1, viewportPixels(viewportHeight, 814) - 2 * inset);
+    var height = Math.max(1, viewportPixels(viewportHeight, 768) - top - bottom);
     var mode = normalize(level);
     return {
         width: mode === "fullscreen" ? width

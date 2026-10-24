@@ -2,8 +2,8 @@ import QtQuick
 import "../components"
 import "../services/finance/FinanceCategoryPlan.js" as CategoryPlan
 
-// Category creation/rename planning on the existing authenticated snapshot.
-// The preview is intentionally NOT a writer or authorization surface.
+// Category create/rename staging. Only an explicitly armed confirmation can
+// reach M2's independently gated writer; preview never changes Actual.
 Item {
     id: categoryPane
     property var snapshot: null
@@ -16,7 +16,13 @@ Item {
     property string selectedGroupId: ""
     property string draftName: ""
     property bool previewVisible: false
+    property bool approvalArmed: false
+    property bool submitted: false
+    property string writeState: "idle"
+    property string writeMessage: ""
     signal editBudgetRequested(var category)
+    signal saveRequested(var payload)
+    readonly property bool busy: writeState==="pending" || writeState==="uncertain"
 
     readonly property var categories: snapshot && Array.isArray(snapshot.categories)
         ? snapshot.categories : []
@@ -38,12 +44,20 @@ Item {
     }
     readonly property var plan: CategoryPlan.previewCategoryPlan(
         snapshot,openMode,selectedCategoryId,selectedGroupId,draftName)
+    readonly property bool proposalEligible: previewVisible && !!plan && plan.ok
+        && !busy && !submitted && snapshot && snapshot.readOnly===true
+        && plan.sourceKey===sourceAtOpen
+        && plan.sourceKey===snapshot.sourceKey
+        && plan.month===monthAtOpen && plan.month===snapshot.month
 
     width: parent ? parent.width : 0
     height: content.implicitHeight
 
     function clearDraft(){
+        if(busy)return false;
         previewVisible=false;
+        approvalArmed=false;
+        submitted=false;
         openMode="";
         sourceAtOpen="";
         monthAtOpen="";
@@ -51,9 +65,24 @@ Item {
         originalNameAtOpen="";
         selectedGroupId="";
         draftName="";
+        return true;
+    }
+    function requestSave(){
+        if(!proposalEligible || !approvalArmed)return false;
+        let requestId="";
+        for(let i=0;i<32;i++)
+            requestId+=Math.floor(Math.random()*16).toString(16);
+        submitted=true;
+        saveRequested({
+            mode:plan.mode, requestId:requestId, sourceKey:plan.sourceKey,
+            month:plan.month, groupId:plan.groupId,
+            categoryId:plan.categoryId, expectedName:plan.originalName,
+            proposedName:plan.proposedName
+        });
+        return true;
     }
     function beginCreate(){
-        if(!snapshot || snapshot.readOnly!==true || !groups.length)return false;
+        if(busy || !snapshot || snapshot.readOnly!==true || !groups.length)return false;
         clearDraft();
         sourceAtOpen=snapshot.sourceKey;
         monthAtOpen=snapshot.month;
@@ -62,7 +91,7 @@ Item {
         return true;
     }
     function beginRename(row){
-        if(!snapshot || snapshot.readOnly!==true || !row)return false;
+        if(busy || !snapshot || snapshot.readOnly!==true || !row)return false;
         const matches=categories.filter(function(c){return c && c.id===row.id;});
         if(matches.length!==1 || !groups.some(function(g){
             return g && g.id===row.groupId;
@@ -78,16 +107,23 @@ Item {
         return true;
     }
     function stepGroup(delta){
-        if(openMode!=="create" || !groups.length)return false;
+        if(busy || submitted || openMode!=="create" || !groups.length)return false;
         const current=groups.findIndex(function(g){return g && g.id===selectedGroupId;});
         const next=current<0 ? (delta<0 ? groups.length-1 : 0)
             : (current+(delta<0?-1:1)+groups.length)%groups.length;
         selectedGroupId=groups[next].id;
         return true;
     }
-    onDraftNameChanged: previewVisible=false
-    onSelectedGroupIdChanged: previewVisible=false
+    onDraftNameChanged: {
+        previewVisible=false;
+        approvalArmed=false;
+    }
+    onSelectedGroupIdChanged: {
+        previewVisible=false;
+        approvalArmed=false;
+    }
     onSnapshotChanged: {
+        approvalArmed=false;
         if(!openMode)return;
         if(!snapshot || snapshot.sourceKey!==sourceAtOpen
                 || snapshot.month!==monthAtOpen){
@@ -232,8 +268,12 @@ Item {
                     labelPixelSize: 9
                     accentColor: Colors.orange
                     trackLabelGlowLocally: true
-                    available: categoryPane.plan.ok
-                    onLeftClicked: categoryPane.previewVisible=categoryPane.plan.ok
+                    available: categoryPane.plan.ok && !categoryPane.busy
+                        && !categoryPane.submitted
+                    onLeftClicked: {
+                        categoryPane.approvalArmed=false;
+                        categoryPane.previewVisible=categoryPane.plan.ok;
+                    }
                 }
                 ActionButton {
                     width: (parent.width-6)/2
@@ -242,13 +282,31 @@ Item {
                     labelPixelSize: 9
                     accentColor: Colors.red
                     trackLabelGlowLocally: true
+                    available: !categoryPane.busy
                     onLeftClicked: categoryPane.clearDraft()
+                }
+            }
+            ActionButton {
+                width: parent.width
+                height: 29
+                label: categoryPane.submitted ? "REQUEST SUBMITTED"
+                    : categoryPane.approvalArmed ? "CONFIRM SAVE" : "ARM SAVE"
+                labelPixelSize: 10
+                accentColor: categoryPane.approvalArmed
+                    ? Colors.magenta : Colors.orange
+                trackLabelGlowLocally: true
+                available: categoryPane.proposalEligible
+                onLeftClicked: {
+                    if(!categoryPane.proposalEligible)return;
+                    if(!categoryPane.approvalArmed)
+                        categoryPane.approvalArmed=true;
+                    else categoryPane.requestSave();
                 }
             }
             GohuText {
                 width: parent.width
                 text: categoryPane.plan.ok
-                    ? "PREVIEW AVAILABLE // NO SAVE YET"
+                    ? "PREVIEW VALID // EXPLICIT CONFIRMATION REQUIRED"
                     : categoryPane.plan.reason
                 font.pixelSize: 9
                 color: categoryPane.plan.ok ? Colors.cyan : Colors.orange
@@ -271,7 +329,20 @@ Item {
             GohuText {
                 width: parent.width
                 visible: categoryPane.previewVisible
-                text: "NOT SAVED // ACTUAL IS UNCHANGED"
+                text: categoryPane.submitted
+                    ? "SAVE REQUEST SENT // CHECK WRITER STATUS"
+                    : "NOT SAVED // ACTUAL IS UNCHANGED"
+                font.pixelSize: 9
+                color: Colors.orange
+                textFormat: Text.PlainText
+                wrapMode: Text.WordWrap
+            }
+            GohuText {
+                width: parent.width
+                visible: categoryPane.writeState==="pending"
+                    || categoryPane.writeState==="blocked"
+                    || categoryPane.writeState==="uncertain"
+                text: categoryPane.writeMessage
                 font.pixelSize: 9
                 color: Colors.orange
                 textFormat: Text.PlainText
@@ -373,7 +444,7 @@ Item {
         }
         GohuText {
             width: parent.width
-            text: "CREATE / RENAME ARE PREVIEW ONLY // DELETE REQUIRES A SEPARATE GUARDED WRITE PATH"
+            text: "CREATE / RENAME SAVE REQUIRES A SEPARATE OPERATOR PERMIT // DELETE UNAVAILABLE"
             font.pixelSize: 9
             color: Colors.orange
             textFormat: Text.PlainText

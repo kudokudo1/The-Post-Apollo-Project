@@ -39,5 +39,7 @@ jobs:
         run: node tests/weather/test_station_home_policy.js
       - name: Validate Kitty Sway workarea coordinate contracts
         run: node tests/weather/test_station_terminal_geometry.js
+      - name: Validate internal NEWS viewer and URL boundary contracts
+        run: node tests/weather/test_station_news_viewer.js
       - name: Validate Weather Station domain palette and live meter contracts
         run: node tests/weather/test_domain_palette_contracts.js

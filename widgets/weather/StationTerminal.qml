@@ -97,14 +97,15 @@ Rectangle {
 
         command: ["bash", "-lc",
                   "for i in $(seq 1 100); do "
-                  + "if swaymsg -t get_tree | grep -Fq '\\"app_id\\": \\""
+                  + "if swaymsg -t get_tree | grep -Fq '\"app_id\": \""
                   + terminalView.terminalAppId
-                  + "\\"'; then exit 0; fi; sleep 0.05; done; exit 1"]
+                  + "\"'; then exit 0; fi; sleep 0.05; done; exit 1"]
 
         onExited: function (exitCode, exitStatus) {
             if (exitCode === 0) {
                 if (terminalView.pendingClose) {
-                    terminalView.closeTerminal();
+                    if (!closeProcess.running)
+                        closeProcess.running = true;
                     return;
                 }
                 terminalView.revealAfterSync = true;
@@ -304,7 +305,9 @@ Rectangle {
     function closeTerminal() {
         if (terminalState === "IDLE" || closeProcess.running)
             return;
-        if (terminalState === "STARTING" && waitForKitty.running) {
+        if (terminalState === "STARTING") {
+            // Launch may still be racing compositor registration.
+            // Let waitForKitty finish, then kill the exact session actor.
             pendingClose = true;
             return;
         }

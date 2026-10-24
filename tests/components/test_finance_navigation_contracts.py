@@ -40,7 +40,7 @@ assert "root.keyboardOwnershipRequested();" in menu
 assert menu.count("ModeButton {") == 1
 # Existing controls plus local-draft actions, ALLOCATE and CHECK WRITE LOCK.
 # Navigation grammar remains unchanged; no custom MouseArea introduced.
-assert menu.count("ActionButton {") == 19
+assert menu.count("ActionButton {") == 21  # two reversible M0 size controls
 assert "MouseArea {" not in menu
 
 # Distinct header, divider, and canonical U+00D7 close control.
@@ -171,8 +171,8 @@ for line in (
     assert line in menu, line
 
 # Preserve the 9:16 surface, mapped-close safety and zero backend scope.
-assert "readonly property int frameWidth: 432" in menu
-assert "readonly property int frameHeight: 768" in menu
+assert "readonly property int frameWidth: chassisFrame.width" in menu
+assert "readonly property int frameHeight: chassisFrame.height" in menu
 assert "visible: true" in menu
 assert "width: root.menuOpen ? root.frameWidth : 0" in menu
 assert "WlrKeyboardFocus.None" in menu

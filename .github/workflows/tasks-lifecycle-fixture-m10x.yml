@@ -1,0 +1,39 @@
+name: TASKS M10x independent lifecycle journal fixture
+
+on:
+  pull_request:
+    paths:
+      - 'services/projects/ExperimentalTaskLifecycleJournalM10x.py'
+      - 'tests/tasks/test_task_lifecycle_journal_m10x.py'
+      - 'docs/tasks-sqlite-lifecycle-journal-m10x.md'
+      - '.github/workflows/tasks-lifecycle-fixture-m10x.yml'
+  push:
+    branches:
+      - main
+    paths:
+      - 'services/projects/ExperimentalTaskLifecycleJournalM10x.py'
+      - 'tests/tasks/test_task_lifecycle_journal_m10x.py'
+      - 'docs/tasks-sqlite-lifecycle-journal-m10x.md'
+      - '.github/workflows/tasks-lifecycle-fixture-m10x.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  lifecycle-journal-fixture:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: M10w strict in-memory lifecycle proposal contract
+        run: python3 tests/tasks/test_task_git_lifecycle_m10w.py
+      - name: M10x independent SQLite held journal and tombstone crash windows
+        run: python3 tests/tasks/test_task_lifecycle_journal_m10x.py
+      - name: M10v existing GIT field journal ordering and rollback
+        run: python3 tests/tasks/test_task_sqlite_m10v_git_intents.py
+      - name: M10l existing SQLite v2 integrity and operation invariants
+        run: python3 tests/tasks/test_task_sqlite_records_v2.py
+      - name: M10r current JSON versus SQLite API parity
+        run: python3 tests/tasks/test_task_sqlite_m10r_inventory.py

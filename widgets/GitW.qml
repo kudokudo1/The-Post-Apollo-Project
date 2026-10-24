@@ -5822,17 +5822,25 @@ PanelWindow {
                                 return value;
                             }
 
-                            function normalGitOutput(output, isSync) {
+                            function normalGitOutput(output, isSync, repoViewMs) {
                                 const full = String(output || "");
                                 if (!isSync)
                                     return full;
 
                                 return full.split("\n").filter(function(line) {
                                     const value = String(line || "").trim();
-                                    // BEGIN, COMPLETE/FAIL, and REFRESHED contain
-                                    // distinct evidence. Never drop them.
-                                    // Only the operation's already-displayed
-                                    // status markers are genuinely redundant.
+                                    // The unique repository-view timing is now
+                                    // visible in the pinned header. Suppress
+                                    // only an EXACT matching raw value in
+                                    // NORMAL, never warnings or unknown lines.
+                                    // DETAILS keeps the entire original output.
+                                    const viewMatch =
+                                        /^REFRESHED \/\/ repository view (\d+) ms$/.exec(value);
+                                    if (viewMatch && repoViewMs >= 0
+                                            && Number(viewMatch[1]) === repoViewMs)
+                                        return false;
+                                    // These two status-only lines duplicate
+                                    // the already visible operation stage.
                                     if (value === "RUNNING // Git subprocess started"
                                             || value === "FINALIZING // collecting repository evidence")
                                         return false;
@@ -5932,12 +5940,17 @@ PanelWindow {
                                 font.pixelSize: 9
                                 color: Colors.cyan
                                 text:
-                                    "P " + briefMs(gitService.syncTimingPrepareMs)
-                                    + " · G " + briefMs(gitService.syncTimingGitMs)
-                                    + " · F " + briefMs(gitService.syncTimingFinalizeMs)
-                                    + " · R " + briefMs(gitService.syncTimingRefreshMs)
+                                    "PREPARE " + briefMs(gitService.syncTimingPrepareMs)
+                                    + " · GIT " + briefMs(gitService.syncTimingGitMs)
+                                    + " · FINALIZE " + briefMs(gitService.syncTimingFinalizeMs)
+                                    + " · REFRESH " + briefMs(gitService.syncTimingRefreshMs)
+                                    + " (VIEW " + briefMs(gitService.syncTimingRepoViewMs) + ")"
                                     + " · TOTAL " + briefMs(gitService.syncTimingTotalMs)
-                                elide: Text.ElideRight
+                                // One row, same header slot; fit rather than
+                                // ellide a unique measurement on small menus.
+                                fontSizeMode: Text.HorizontalFit
+                                minimumPixelSize: 7
+                                elide: Text.ElideNone
                             }
 
                             Flickable {
@@ -5966,7 +5979,8 @@ PanelWindow {
                                         ? gitService.actionOutput
                                         : gitOutputPanel.normalGitOutput(
                                             gitService.actionOutput,
-                                            syncTimingHeader.isSyncOutput)
+                                            syncTimingHeader.isSyncOutput,
+                                            gitService.syncTimingRepoViewMs)
                                     font.pixelSize: 11
                                     color: Colors.white
                                     wrapMode: Text.WrapAnywhere

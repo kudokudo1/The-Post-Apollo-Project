@@ -753,6 +753,7 @@ PanelWindow {
         machineCapturePreview = null;
         machineLayoutComparison = null;
         machineRestorePlan = null;
+        machineInvalidateResolver();
         machineStoreStatus = "NEW CAPTURE // NOT SAVED";
         machineExcludedItems = ({});
         machineInspectIndex = 0;
@@ -826,6 +827,45 @@ PanelWindow {
             machineRestorePlanIndex = (machineRestorePlanIndex + delta + n) % n;
     }
 
+    // A fresh, one-shot Sway read resolves possible live window targets.
+    // IDs here are ephemeral and never an authorization to perform movement.
+    property bool machineResolverBusy: false
+    property string machineResolverStatus: "NOT RESOLVED"
+    property string machineResolverPayload: ""
+    property string machineResolverCheckpointId: ""
+    property var machineWindowResolution: null
+    property int machineResolverIndex: 0
+    readonly property var machineResolverItem:
+        machineWindowResolution && machineResolverIndex >= 0
+        && machineResolverIndex < machineWindowResolution.candidates.length
+        ? machineWindowResolution.candidates[machineResolverIndex] : null
+    function machineInvalidateResolver() {
+        machineResolverCheckpointId = "";
+        machineWindowResolution = null;
+        machineResolverIndex = 0;
+        machineResolverStatus = "NOT RESOLVED";
+    }
+    function machineResolveLiveWindows() {
+        if (!menuOpen || selectedMode !== "machine"
+                || machineResolverBusy || machineStoreBusy || machineCaptureBusy
+                || !machineOpenedCheckpoint || !machineSavedItem
+                || machineOpenedCheckpoint.checkpoint.id !== machineSavedItem.id)
+            return;
+        machineResolverCheckpointId = machineSavedItem.id;
+        machineResolverPayload = JSON.stringify(machineOpenedCheckpoint.document);
+        machineWindowResolution = null;
+        machineResolverIndex = 0;
+        machineResolverStatus = "RESOLVING LIVE WINDOWS";
+        machineResolverBusy = true;
+        machineResolverProcess.exec(["python3", "-B", "-I",
+            Quickshell.shellPath("services/time/MachineWindowResolver.py")]);
+    }
+    function machineStepResolverItem(delta) {
+        const n = machineWindowResolution ? machineWindowResolution.candidates.length : 0;
+        if (n)
+            machineResolverIndex = (machineResolverIndex + delta + n) % n;
+    }
+
     function machineStoreRequest(action, data, id) {
         if (!menuOpen || selectedMode !== "machine" || machineStoreBusy)
             return;
@@ -870,6 +910,7 @@ PanelWindow {
         machineOpenedCheckpoint = null;
         machineLayoutComparison = null;
         machineRestorePlan = null;
+        machineInvalidateResolver();
         machineStoreRequest("load", null, machineSavedItem.id);
     }
     function machineStepSavedCheckpoint(delta) {
@@ -879,6 +920,7 @@ PanelWindow {
         machineOpenedCheckpoint = null;
         machineLayoutComparison = null;
         machineRestorePlan = null;
+        machineInvalidateResolver();
     }
     function machineAcceptStoreResponse(data) {
         if (!data || typeof data.status !== "string") {
@@ -899,6 +941,7 @@ PanelWindow {
             machineOpenedCheckpoint = null;
             machineLayoutComparison = null;
             machineRestorePlan = null;
+            machineInvalidateResolver();
             machineStoreStatus = "SAVED // LOCAL SQLITE";
             return;
         }
@@ -909,6 +952,7 @@ PanelWindow {
             machineOpenedCheckpoint = null;
             machineLayoutComparison = null;
             machineRestorePlan = null;
+            machineInvalidateResolver();
             machineStoreStatus = "STORED // " + machineSavedCheckpoints.length;
             return;
         }
@@ -918,6 +962,7 @@ PanelWindow {
             machineOpenedCheckpoint = data;
             machineLayoutComparison = null;
             machineRestorePlan = null;
+            machineInvalidateResolver();
             machineStoreStatus = "OPENED // METADATA ONLY";
             return;
         }
@@ -1135,6 +1180,48 @@ PanelWindow {
                     ? "STORAGE ERROR // "
                       + String(timew.machineStoreResponse.reason || "UNKNOWN")
                     : "STORAGE UNAVAILABLE";
+        }
+    }
+
+    Process {
+        id: machineResolverProcess
+        running: false
+        stdinEnabled: true
+        onStarted: {
+            if (timew.machineResolverPayload)
+                machineResolverProcess.write(
+                    timew.machineResolverPayload + String.fromCharCode(10));
+            timew.machineResolverPayload = "";
+        }
+        stdout: StdioCollector {
+            onStreamFinished: {
+                try {
+                    const data = JSON.parse(this.text);
+                    if (timew.machineResolverCheckpointId !== ""
+                            && timew.machineSavedItem
+                            && timew.machineResolverCheckpointId === timew.machineSavedItem.id
+                            && data.kind === "machine-live-window-resolution"
+                            && data.read_only === true && data.executable === false
+                            && Array.isArray(data.candidates) && data.counts) {
+                        timew.machineWindowResolution = data;
+                        timew.machineResolverStatus = "LIVE RESOLUTION // REVIEW ONLY";
+                    } else {
+                        timew.machineWindowResolution = null;
+                        timew.machineResolverStatus = "RESOLUTION UNAVAILABLE";
+                    }
+                } catch (error) {
+                    timew.machineWindowResolution = null;
+                    timew.machineResolverStatus = "INVALID RESOLUTION";
+                }
+            }
+        }
+        onExited: function(exitCode, exitStatus) {
+            timew.machineResolverBusy = false;
+            timew.machineResolverPayload = "";
+            if (exitCode !== 0) {
+                timew.machineWindowResolution = null;
+                timew.machineResolverStatus = "LIVE RESOLUTION UNAVAILABLE";
+            }
         }
     }
 
@@ -4042,14 +4129,35 @@ PanelWindow {
                             font.pixelSize: 11
                             elide: Text.ElideRight
                         }
-                        ActionButton {
+                        Row {
                             width: parent.width
                             height: 35
-                            label: "OPEN SAVED METADATA"
-                            labelPixelSize: 11
-                            accentColor: timew.semanticColor
-                            available: !!timew.machineSavedItem && !timew.machineStoreBusy
-                            onLeftClicked: timew.machineOpenSavedCheckpoint()
+                            spacing: 7
+                            ActionButton {
+                                width: (parent.width - parent.spacing) / 2
+                                height: parent.height
+                                label: "OPEN SAVED METADATA"
+                                labelPixelSize: 9
+                                accentColor: timew.semanticColor
+                                available: !!timew.machineSavedItem && !timew.machineStoreBusy
+                                           && !timew.machineResolverBusy
+                                onLeftClicked: timew.machineOpenSavedCheckpoint()
+                            }
+                            ActionButton {
+                                width: (parent.width - parent.spacing) / 2
+                                height: parent.height
+                                label: "RESOLVE LIVE"
+                                labelPixelSize: 10
+                                accentColor: timew.semanticColor
+                                available: !!timew.machineOpenedCheckpoint
+                                           && !!timew.machineSavedItem
+                                           && timew.machineOpenedCheckpoint.checkpoint.id
+                                              === timew.machineSavedItem.id
+                                           && !timew.machineResolverBusy
+                                           && !timew.machineStoreBusy
+                                           && !timew.machineCaptureBusy
+                                onLeftClicked: timew.machineResolveLiveWindows()
+                            }
                         }
                         GohuText {
                             width: parent.width
@@ -4072,6 +4180,56 @@ PanelWindow {
                             color: Colors.white
                             font.pixelSize: 11
                             wrapMode: Text.Wrap
+                        }
+                        GohuText {
+                            width: parent.width
+                            visible: timew.machineWindowResolution !== null
+                            text: timew.machineWindowResolution
+                                  ? "LIVE // CANDIDATES "
+                                    + timew.machineWindowResolution.counts.candidate
+                                    + " / MANUAL " + timew.machineWindowResolution.counts.manual
+                                    + " / BLOCKED " + timew.machineWindowResolution.counts.blocked
+                                  : ""
+                            color: Colors.cyan
+                            font.pixelSize: 10
+                            elide: Text.ElideRight
+                        }
+                        Row {
+                            width: parent.width
+                            height: 26
+                            spacing: 5
+                            visible: !!timew.machineWindowResolution
+                                     && timew.machineWindowResolution.candidates.length > 0
+                            ActionButton {
+                                width: 37
+                                height: parent.height
+                                label: "<"
+                                accentColor: timew.semanticColor
+                                available: !!timew.machineWindowResolution
+                                           && timew.machineWindowResolution.candidates.length > 1
+                                onLeftClicked: timew.machineStepResolverItem(-1)
+                            }
+                            GohuText {
+                                width: Math.max(0, parent.width - 84)
+                                anchors.verticalCenter: parent.verticalCenter
+                                text: timew.machineResolverItem
+                                      ? timew.machineResolverItem.status.toUpperCase()
+                                        + " // " + timew.machineResolverItem.app_id
+                                        + " // " + timew.machineResolverItem.reason
+                                      : ""
+                                color: Colors.white
+                                font.pixelSize: 10
+                                elide: Text.ElideRight
+                            }
+                            ActionButton {
+                                width: 37
+                                height: parent.height
+                                label: ">"
+                                accentColor: timew.semanticColor
+                                available: !!timew.machineWindowResolution
+                                           && timew.machineWindowResolution.candidates.length > 1
+                                onLeftClicked: timew.machineStepResolverItem(1)
+                            }
                         }
                         Row {
                             width: parent.width

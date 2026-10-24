@@ -27,10 +27,9 @@ SITES = {
     "instagram": ("https://www.instagram.com/", "post-apollo-instagram", "instagram-browser"),
     "facebook": ("https://www.facebook.com/", "post-apollo-facebook", "facebook-browser"),
     "reddit": ("https://www.reddit.com/", "post-apollo-reddit", "reddit-browser"),
-    # Reels is a dedicated shortcut to Instagram's Reels feed. It uses an
-    # isolated profile: reusing a simultaneously running Instagram Chromium
-    # profile would not reliably produce a separate Sway-addressable window.
-    "reels": ("https://www.instagram.com/reels/", "post-apollo-reels", "reels-browser"),
+    # Threads is Meta's separate text-focused network, not Instagram Reels.
+    # Its independent profile provides a reliably Sway-addressable window.
+    "threads": ("https://www.threads.com/", "post-apollo-threads", "threads-browser"),
     "pinterest": ("https://www.pinterest.com/", "post-apollo-pinterest", "pinterest-browser"),
 }
 

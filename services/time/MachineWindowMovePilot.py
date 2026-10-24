@@ -91,7 +91,7 @@ def _preflight(saved_document, request, *, runner, approval_required):
     # No action on a missing or changed monitor/workspace; resolve() verifies
     # target workspace association and existing connected output.
     command = ("[con_id=" + str(request["con_id"])
-               + "] move container to workspace number "
+               + "] move --no-auto-back-and-forth container to workspace "
                + request["to_workspace"])
     before = {"con_id": request["con_id"], "app_id": request["app_id"],
               "workspace": request["from_workspace"],

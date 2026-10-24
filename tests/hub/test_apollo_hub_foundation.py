@@ -16,6 +16,8 @@ system_mini = (ROOT / "widgets/hub/ApolloHubSystemMini.qml").read_text(encoding=
 uptime_mini = (ROOT / "widgets/hub/ApolloHubUptimeMini.qml").read_text(encoding="utf-8")
 apps_mini = (ROOT / "widgets/hub/ApolloHubAppsMini.qml").read_text(encoding="utf-8")
 apps_explore = (ROOT / "widgets/hub/ApolloHubAppsExplore.qml").read_text(encoding="utf-8")
+process_explore = (ROOT / "widgets/hub/ApolloHubProcessesExplore.qml").read_text(encoding="utf-8")
+process_policy = (ROOT / "services/hub/ApolloHubProcessesPolicy.js").read_text(encoding="utf-8")
 social_mini = (ROOT / "widgets/hub/ApolloHubSocialMini.qml").read_text(encoding="utf-8")
 todo_mini = (ROOT / "widgets/hub/ApolloHubTodoMini.qml").read_text(encoding="utf-8")
 todo_explore = (ROOT / "widgets/hub/ApolloHubTodoExplore.qml").read_text(encoding="utf-8")
@@ -1452,6 +1454,72 @@ for forbidden in (
         f"Owner backend leak: {forbidden}")
 assert 'ApolloHubMediaExplore {' in tile
 assert 'mediaSnapshot: tile.mediaSnapshot' in tile
+
+
+# Phase 2B1: running processes are a bounded, read-only projection of the
+# EXISTING AppControl sampler. No second process sampler or direct signals.
+for token in (
+    'import "services/hub/ApolloHubProcessesPolicy.js" as HubProcessesPolicy',
+    'HubProcessesPolicy.snapshot(',
+    'appControlWindow.taskRows,',
+    'appControlWindow.taskSnapshotLoading,',
+    'appControlWindow.taskSnapshotError)',
+):
+    assert token in shell, f"Owner process snapshot missing {token}"
+for token in (
+    'property var processSnapshot: null',
+    'processSnapshot: hub.processSnapshot',
+):
+    assert token in window, f"Hub process binding missing {token}"
+for token in (
+    'property var processSnapshot: null',
+    'processSnapshot: tile.processSnapshot',
+):
+    assert token in tile, f"Process tile binding missing {token}"
+for token in (
+    'property var processSnapshot: null',
+    'readonly property bool runningMode: selectedView === "running"',
+    'runningMode ? processExplore.statusLine',
+    'label: "RUNNING"',
+    'ApolloHubProcessesExplore {',
+    'processSnapshot: appsExplore.processSnapshot',
+    'visible: !appsExplore.detailMode && !appsExplore.runningMode',
+):
+    assert token in apps_explore, f"Apps RUNNING view missing {token}"
+for token in (
+    'property int selectedPid: -1',
+    'property string selectedName: ""',
+    'readonly property var selectedEntry:',
+    'item.pid === selectedPid && item.name === selectedName',
+    'function inspect(item)',
+    'model: processExplore.entries',
+    'onLeftClicked: processExplore.inspect(runningRow.modelData)',
+    'label: "APP CONTROL"',
+    'onLeftClicked: processExplore.openAppControlRequested()',
+    'OBSERVATION ONLY // USE APP CONTROL',
+    'NOT GUARANTEED CURRENT',
+):
+    assert token in process_explore, f"Process UI missing {token}"
+for token in (
+    'var MAX_ROWS = 24',
+    'function snapshot(rows, loading, error)',
+    'function processId(value)',
+    'function cleanName(value)',
+    'total > items.length',
+    'state:loading === true ? "refreshing"',
+    'source:"appcontrol-process-telemetry"',
+):
+    assert token in process_policy, f"Process policy missing {token}"
+for forbidden in (
+    'ProcessTelemetry {', 'ProcessControl {', 'Process {', 'FileView {',
+    'Timer {', 'sendSignal(', 'toggleFreeze(', 'requestTerminate(',
+    'requestRestart(', 'Quickshell.execDetached(', 'onCompleted:',
+):
+    assert forbidden not in process_explore + process_policy, (
+        f"Hub cannot independently sample/control processes: {forbidden}")
+for sensitive in ('args:args', 'user:row.user', 'cmdline', 'environment'):
+    assert sensitive not in process_policy, f"Process secret projected: {sensitive}"
+assert 'ApolloHubMediaExplore {' in tile
 
 # Launchers and widget backends are unchanged in this first stage.
 print("ApolloHubW foundation source contracts passed")

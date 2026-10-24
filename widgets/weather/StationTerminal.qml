@@ -84,6 +84,8 @@ Rectangle {
     readonly property string outputName:
         targetScreen ? String(targetScreen.name || "") : ""
     property var swayOutputs: []
+    property var swayWorkspaces: []
+    property var swayGaps: null
 
     // Last geometry sent to Sway.
     property int lastX: -99999
@@ -179,6 +181,55 @@ Rectangle {
         }
     }
 
+    // Capture the workspace usable-area top separately from the normal output
+    // rect. This is a low-frequency, view-scoped observer, not a compositor
+    // override. All commands are fixed strings, never user-supplied text.
+    Process {
+        id: workareaProcess
+        command: ["bash", "-lc",
+                  "set -e; printf '{\"workspaces\":'; "
+                  + "swaymsg -t get_workspaces; "
+                  + "printf ',\"config\":'; "
+                  + "swaymsg -t get_config; printf '}\\n'"]
+        stdout: StdioCollector {
+            onStreamFinished: {
+                try {
+                    const payload = JSON.parse(String(text || ""));
+                    const configText = payload.config && payload.config.config;
+                    const gaps = SwayGeometry.parseSwayTopGaps(configText);
+                    if (!Array.isArray(payload.workspaces) || !gaps)
+                        throw new Error("Missing workspace/gap data");
+                    terminalView.swayWorkspaces = payload.workspaces;
+                    terminalView.swayGaps = gaps;
+                    if (terminalView.revealAfterSync)
+                        terminalView.syncGeometry(true);
+                    else if (terminalView.terminalState === "VISIBLE")
+                        terminalView.syncGeometry(false);
+                } catch (error) {
+                    terminalView.swayGaps = null;
+                    terminalView.fitStatus = "WORKAREA UNAVAILABLE";
+                    console.log("Weather terminal Sway workarea:", error);
+                }
+            }
+        }
+        onExited: function(exitCode, exitStatus) {
+            if (exitCode !== 0 && terminalView.terminalState !== "IDLE") {
+                terminalView.swayGaps = null;
+                terminalView.fitStatus = "WORKAREA UNAVAILABLE";
+            }
+        }
+    }
+
+    Timer {
+        interval: 15000
+        repeat: true
+        running: terminalView.terminalState === "VISIBLE"
+        onTriggered: {
+            if (!workareaProcess.running)
+                workareaProcess.running = true;
+        }
+    }
+
     Timer {
         // A low-frequency output refresh handles hotplug/scale/move. The
         // existing fast geometry timer emits no Sway command if unchanged.
@@ -194,6 +245,8 @@ Rectangle {
     onOutputNameChanged: {
         if (terminalState !== "IDLE" && !outputProcess.running)
             outputProcess.running = true;
+        if (terminalState !== "IDLE" && !workareaProcess.running)
+            workareaProcess.running = true;
     }
 
     // ─────────────────────────────────────────────
@@ -353,11 +406,16 @@ Rectangle {
             return;
         }
 
+        const topInset = SwayGeometry.reservedTopInset(
+            swayOutputs, swayWorkspaces, outputName, swayGaps
+        );
+        if (topInset === null)
+            return; // Unknown workarea: do not guess the layer-shell origin.
         const box = SwayGeometry.position(
             swayOutputs, outputName,
             stationWidth, stationRightMargin, stationHeaderHeight,
             stationRailWidth, terminalBay.x, terminalBay.y,
-            terminalBay.width, terminalBay.height
+            terminalBay.width, terminalBay.height, topInset
         );
         if (!box)
             return;
@@ -456,8 +514,12 @@ Rectangle {
         fitStatus = "UNVERIFIED";
         terminalState = "STARTING";
         swayOutputs = [];
+        swayWorkspaces = [];
+        swayGaps = null;
         if (!outputProcess.running)
             outputProcess.running = true;
+        if (!workareaProcess.running)
+            workareaProcess.running = true;
         if (!launchProcess.running)
             launchProcess.running = true;
         return true;

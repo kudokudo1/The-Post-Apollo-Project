@@ -1,0 +1,42 @@
+name: TASKS Proxy 1 M10l normalized SQLite records
+
+on:
+  pull_request:
+    paths:
+      - 'services/projects/ExperimentalTaskSqliteRecordsV2.py'
+      - 'tests/tasks/test_task_sqlite_records_v2.py'
+      - 'docs/tasks-sqlite-record-storage-m10l.md'
+      - '.github/workflows/tasks-sqlite-records-v2.yml'
+  push:
+    branches:
+      - main
+    paths:
+      - 'services/projects/ExperimentalTaskSqliteRecordsV2.py'
+      - 'tests/tasks/test_task_sqlite_records_v2.py'
+      - 'docs/tasks-sqlite-record-storage-m10l.md'
+      - '.github/workflows/tasks-sqlite-records-v2.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  sqlite-records:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: M10l record-level SQLite task and journal transactions
+        run: python3 tests/tasks/test_task_sqlite_records_v2.py
+      - name: M10k Python and JavaScript model parity
+        run: python3 tests/tasks/test_task_sqlite_read_parity.py
+      - name: M10j isolated SQLite transaction regression
+        run: python3 tests/tasks/test_experimental_task_sqlite_store.py
+      - name: M10h strict JS model regression
+        run: node tests/tasks/test_unified_project_model_v2.cjs
+      - name: TimeW existing SQLite regression
+        run: python3 tests/timew/test_machine_checkpoint_store.py

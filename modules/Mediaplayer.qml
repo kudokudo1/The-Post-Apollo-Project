@@ -116,10 +116,29 @@ Item {
         // long stall; it does not pretend to stop SplitParser from delivering.
         if (cavaTrialProbeEnabled) {
             cavaTrialStats.received += 1;
-            if (cavaFramePending)
-                cavaTrialStats.dropped += 1;
         }
-        cavaLatestPendingFrame = String(frame);
+        // Keep the newest WELL-FORMED raw frame. Invalid stdout never
+        // replaces a previously valid frame waiting for the next visual tick.
+        const raw = String(frame).trim();
+        const columns = raw.endsWith(";")
+            ? raw.slice(0, -1).split(";") : raw.split(";");
+        if (columns.length !== barCount) {
+            if (cavaTrialProbeEnabled)
+                cavaTrialStats.invalid += 1;
+            reportCavaTrial();
+            return;
+        }
+        for (let i = 0; i < barCount; i++) {
+            if (!isFinite(Number(columns[i]))) {
+                if (cavaTrialProbeEnabled)
+                    cavaTrialStats.invalid += 1;
+                reportCavaTrial();
+                return;
+            }
+        }
+        if (cavaTrialProbeEnabled && cavaFramePending)
+            cavaTrialStats.dropped += 1;
+        cavaLatestPendingFrame = raw;
         cavaFramePending = true;
         reportCavaTrial();
     }

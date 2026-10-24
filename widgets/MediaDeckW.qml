@@ -18,7 +18,8 @@ PanelWindow {
     // Keep the first pass easy to resize/reposition during the design phase.
     property int panelWidth: 520
     property int panelHeight: 850
-    property int panelTopMargin: 78
+    // The SurfaceFrame begins at the PanelWindow origin; no internal top gutter.
+    property int panelTopMargin: 9
     property int panelLeftMargin: 200
     property int contentInset: 14
     property int sectionSpacing: 10

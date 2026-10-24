@@ -21,6 +21,10 @@ assert 'visible: !host.toolConnected || !host.showEmbedded' in host
 assert 'onLeftClicked: marketFeed.refresh()' in pane
 assert 'readonly property bool wide: width >= 660' in pane
 assert 'TapHandler {' in pane
+# Qt's QML JavaScript parser still requires a named catch binding.
+# ES2019's optional `catch {}` binding fails during shell startup.
+assert 'catch (error) {' in service
+assert 'catch {' not in service
 assert 'FINANCE_MARKET_SNAPSHOT ' in service
 assert 'payload.source !== "polymarket-gamma"' in service
 assert 'payload.readOnly !== true' in service

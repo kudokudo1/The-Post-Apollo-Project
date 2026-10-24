@@ -69,7 +69,7 @@ Scope {
                 message = payload.markets.length
                     ? "Public snapshot. Not a live trading connection."
                     : "No eligible binary markets in this sample.";
-            } catch {
+            } catch (error) {
                 snapshot = null;
                 state = "failed";
                 message = "Unexpected market-data format.";

@@ -33,8 +33,29 @@ assert.doesNotMatch(weatherTerminalSource, /terminalBay\.mapToGlobal\s*\(/);
 assert.doesNotMatch(weatherTerminalSource, /"\s*,\s*scratchpad show"/);
 for (const name of ["bayX", "bayY", "bayWidth", "bayHeight"])
     assert.match(weatherTerminalSource, new RegExp("readonly property real " + name + ": terminalBay\\."));
-assert.match(windowSource, /mask:\s*Region[\s\S]*?terminalView\.bayX/);
-assert.match(windowSource, /terminalView\.bayWidth/);
+assert.match(windowSource, /readonly property real terminalHoleX:\s*modeRail\.width \+ terminalView\.bayX/);
+assert.match(windowSource, /readonly property real terminalHoleY:\s*header\.height \+ terminalView\.bayY/);
+assert.match(windowSource, /readonly property real terminalHoleWidth:\s*terminalView\.bayWidth/);
+assert.match(windowSource, /readonly property real terminalHoleHeight:\s*terminalView\.bayHeight/);
+assert.match(windowSource, /readonly property bool terminalHoleActive:/);
+assert.match(windowSource, /mask:\s*Region[\s\S]*?width:\s*weatherStation\.terminalHoleActive/);
+assert.match(windowSource, /fillVisible:\s*!weatherStation\.terminalHoleActive/);
+assert.match(windowSource, /StationChassisCutout\s*\{[\s\S]*?visible:\s*weatherStation\.terminalHoleActive/);
+assert.match(windowSource, /holeX:\s*weatherStation\.terminalHoleX/);
+assert.match(windowSource, /holeY:\s*weatherStation\.terminalHoleY/);
+assert.match(windowSource, /holeWidth:\s*weatherStation\.terminalHoleWidth/);
+assert.match(windowSource, /holeHeight:\s*weatherStation\.terminalHoleHeight/);
+assert.match(windowSource, /surfaceFormat\.opaque:\s*false/);
+const chassisCutout = read("widgets/weather/StationChassisCutout.qml");
+assert.match(chassisCutout, /readonly property bool holeValid:/);
+assert.match(chassisCutout, /holeX \+ holeWidth <= width/);
+assert.match(chassisCutout, /holeY \+ holeHeight <= height/);
+assert.equal((chassisCutout.match(/Rectangle\s*\{/g) || []).length, 4);
+assert.match(chassisCutout, /x:\s*chassis\.holeX \+ chassis\.holeWidth/);
+assert.match(chassisCutout, /y:\s*chassis\.holeY \+ chassis\.holeHeight/);
+assert.match(chassisCutout, /color:\s*chassis\.panelColor/);
+assert.match(chassisCutout, /opacity:\s*chassis\.panelOpacity/);
+assert.match(weatherTerminalSource, /color:\s*terminalView\.terminalState === "VISIBLE"\s*\? "transparent" : Colors\.black/);
 assert.match(geometrySource, /function position\(outputs, outputName/);
 
 

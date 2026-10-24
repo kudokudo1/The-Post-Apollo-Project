@@ -139,7 +139,12 @@ def test_weather_keyboard_live_indicator_and_close_follow_shared_contract():
     assert "weatherStation.keyboardActive" in src
     assert "weatherStation.relationshipFocused" in src
 
-    assert "fillVisible: true" in src
+    # Normal Weather Station chassis remains painted, but the Sway-hosted
+    # terminal viewport needs a REAL alpha hole through the overlay.
+    assert "fillVisible: !weatherStation.terminalHoleActive" in src
+    assert "StationChassisCutout {" in src
+    assert "visible: weatherStation.terminalHoleActive" in src
+    assert "panelOpacity: 0.96" in src
     assert "borderVisible: true" in src
     assert "borderColor: Colors.cyan" in src
 

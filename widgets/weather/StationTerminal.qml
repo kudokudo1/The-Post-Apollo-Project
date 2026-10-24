@@ -279,7 +279,10 @@ Rectangle {
     Rectangle {
         anchors.fill: parent
 
-        color: Colors.black
+        // Transparent children alone cannot punch through a painted parent.
+        // The Weather Station chassis paints four strips around this bay.
+        color: terminalView.terminalState === "VISIBLE"
+               ? "transparent" : Colors.black
     }
 
     // ─────────────────────────────────────────────

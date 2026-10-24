@@ -30,6 +30,22 @@ assert.equal(data.readOnly,true);
 assert.equal(data.filings.length,3);
 assert.deepEqual(data.filings.map(x=>x.form), ["4","SC 13D","8-K"]);
 assert.equal(data.filings[0].category, "INSIDER DISCLOSURE");
+assert.equal(data.filings[0].primaryDocument, "insider.xml");
+assert.deepEqual(data.filings[0].items, []);
+const xslSubmission = {
+  ...submission,
+  filings: {recent: {
+    ...submission.filings.recent,
+    primaryDocument: ["event.htm","xslF345X05/insider.xml","owner.htm","other.htm"],
+    items: ["1.01, 5.02, 9.01","", "5.01", ""]
+  }}
+};
+const xslResult = normalizeSubmissions(xslSubmission, "0000320193", "now");
+assert.equal(xslResult.filings.length, 3);
+assert.equal(xslResult.filings[0].primaryDocument, "xslF345X05/insider.xml");
+assert.deepEqual(xslResult.filings[2].items, ["1.01","5.02","9.01"]);
+assert.equal(xslResult.filings[0].documentUrl,
+ "https://www.sec.gov/Archives/edgar/data/320193/000032019326000014/xslF345X05/insider.xml");
 assert.equal(data.filings[0].filedAt, "2026-10-23");
 assert.equal(data.filings[0].documentUrl,
   "https://www.sec.gov/Archives/edgar/data/320193/000032019326000014/insider.xml");

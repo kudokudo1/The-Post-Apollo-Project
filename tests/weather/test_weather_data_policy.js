@@ -781,4 +781,52 @@ assert.deepEqual(JSON.parse(JSON.stringify(
         {x: -852, y: 336, width: 780, height: 400}))),
     {x: -830, y: 383});
 
+
+// Operator screenshot: Kitty looks too high even while the view says VISIBLE.
+// Sway can report a full-size OUTER rect and smaller app window_rect. The
+// displayed surface must be centered, not the outer shell.
+const paintedTree = {
+    nodes: [{
+        floating_nodes: [{
+            app_id: "weather-screen",
+            visible: true,
+            rect: {x: 1708, y: 136, width: 824, height: 494},
+            window_rect: {x: 0, y: 0, width: 780, height: 400}
+        }]
+    }]
+};
+const outerPainted = terminalGeometry.observedWindow(paintedTree, "weather-screen");
+const innerPainted = terminalGeometry.observedContentWindow(paintedTree, "weather-screen");
+assert.deepEqual(JSON.parse(JSON.stringify(outerPainted)),
+    {x: 1708, y: 136, width: 824, height: 494});
+assert.deepEqual(JSON.parse(JSON.stringify(innerPainted)),
+    {x: 1708, y: 136, width: 780, height: 400});
+assert.equal(terminalGeometry.visibleIntersection(nextBay, outerPainted).exact, true);
+assert.equal(terminalGeometry.visibleIntersection(nextBay, innerPainted).exact, false);
+const shiftPainted = terminalGeometry.centeredPosition(nextBay, innerPainted);
+assert.deepEqual(JSON.parse(JSON.stringify(shiftPainted)),
+    {x: 1730, y: 183});
+assert.deepEqual(JSON.parse(JSON.stringify(
+    terminalGeometry.visibleIntersection(nextBay,
+        {x: shiftPainted.x, y: shiftPainted.y, width: 780, height: 400}))),
+    {x: 22, y: 47, width: 780, height: 400, exact: false});
+
+// Relative window_rect offsets are converted into compositor-global pixels.
+const insetTree = {floating_nodes: [{
+    app_id: "weather-screen-news",
+    visible: true, rect: {x: -852, y: 336, width: 824, height: 494},
+    window_rect: {x: 2, y: 3, width: 780, height: 400}
+}]};
+assert.deepEqual(JSON.parse(JSON.stringify(
+    terminalGeometry.observedContentWindow(insetTree, "weather-screen-news"))),
+    {x: -850, y: 339, width: 780, height: 400});
+assert.equal(terminalGeometry.observedContentWindow(insetTree, "weather-screen"), null);
+assert.equal(terminalGeometry.observedContentWindow(
+    {floating_nodes: [{app_id:"weather-screen", visible:true,
+        rect:{x:5,y:5,width:300,height:200},
+        window_rect:{x:2,y:2,width:400,height:400}}]}, "weather-screen").width, 300);
+assert.deepEqual(JSON.parse(JSON.stringify(
+    terminalGeometry.observedContentWindow(treeExample, "weather-screen"))),
+    {x: 1714, y: 152, width: 780, height: 400});
+
 console.log("Weather data policy contracts: PASS");

@@ -255,10 +255,16 @@ Rectangle {
         id: centerProcess
         property int targetX: 0
         property int targetY: 0
-        // Only the exact Weather terminal identity can be moved. Do not
-        // target the currently focused window or every Kitty application.
+        property int targetWidth: 0
+        property int targetHeight: 0
+        // Normalize the container to Kitty's already-observed content size
+        // BEFORE centering it. This avoids moving an oversized transparent
+        // outer frame across the Station footer. No size enlargement here.
+        // Only this exact Weather actor is affected.
         command: ["swaymsg", "[app_id=\"^" + terminalView.terminalAppId
-                  + "$\"] move absolute position " + targetX + " " + targetY]
+                  + "$\"] floating enable, border none, resize set width "
+                  + targetWidth + " px height " + targetHeight
+                  + " px, move absolute position " + targetX + " " + targetY]
         onExited: function(exitCode, exitStatus) {
             if (terminalView.pendingClose || closeProcess.running)
                 return;
@@ -282,7 +288,9 @@ Rectangle {
                     return;
                 try {
                     const tree = JSON.parse(String(text || ""));
-                    const actual = SwayGeometry.observedWindow(
+                    // rect is the outer Sway frame; window_rect is Kitty's
+                    // painted content. Center and cut out the latter.
+                    const actual = SwayGeometry.observedContentWindow(
                         tree, terminalView.terminalAppId);
                     const requested = {
                         x: geometryProcess.targetX,
@@ -309,6 +317,8 @@ Rectangle {
                                              || actual.y !== centered.y)) {
                                 centerProcess.targetX = centered.x;
                                 centerProcess.targetY = centered.y;
+                                centerProcess.targetWidth = actual.width;
+                                centerProcess.targetHeight = actual.height;
                                 centerProcess.running = true;
                                 return;
                             }

@@ -69,7 +69,7 @@ class FakeSway:
         assert kwargs == {"check": False, "capture_output": True, "timeout": 3, "shell": False}
         self.calls.append(tuple(argv))
         assert argv == ["swaymsg", "-r", "-t", "command",
-                        "[con_id=51] move container to workspace number 2"]
+                        "[con_id=51] move --no-auto-back-and-forth container to workspace 2"]
         if self.successful:
             self.location = self.after
         return SimpleNamespace(

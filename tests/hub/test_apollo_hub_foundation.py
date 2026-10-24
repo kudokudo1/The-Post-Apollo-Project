@@ -1589,5 +1589,15 @@ for forbidden in ('controlOwner.sendSignal(', 'ProcessControl {', 'Process {',
         f"Process mutation must stay in owner gateway: {forbidden}")
 assert 'ApolloHubMediaExplore {' in tile
 
+# P2-C startup regression: RUNNING now operates inline and the child
+# ApolloHubProcessesExplore intentionally declares NO AppControl-open signal.
+# Binding its nonexistent onOpenAppControlRequested aborts the entire QS shell.
+assert "onOpenAppControlRequested:" not in apps_explore, (
+    "AppsExplore binds an obsolete signal on ApolloHubProcessesExplore; "
+    "Qt cannot instantiate the Hub and refuses to load shell.qml")
+assert "signal openAppControlRequested()" not in process_explore
+assert "onInputFocusChanged: function(focused)" in apps_explore
+assert "signal inputFocusChanged(bool focused)" in process_explore
+
 # Launchers and widget backends are unchanged in this first stage.
 print("ApolloHubW foundation source contracts passed")

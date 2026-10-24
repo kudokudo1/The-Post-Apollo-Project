@@ -116,7 +116,6 @@ Item {
         onInputFocusChanged: function(focused) {
             appsExplore.inputFocusChanged(focused);
         }
-        onOpenAppControlRequested: appsExplore.openAppControlRequested()
         anchors.top: selector.bottom
         anchors.topMargin: 6
         anchors.left: parent.left

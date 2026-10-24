@@ -22,6 +22,8 @@ on:
       - "services/time/MachineMoveApproval.py"
       - "services/time/MachineMoveReconciliation.py"
       - "services/time/MachineMoveReviewRead.py"
+      - "services/time/MachineMoveConfirmRead.py"
+      - "docs/timew-machine-m1p-confirmation-rehearsal.md"
       - "docs/timew-machine-m1o-readonly-recovery-menu.md"
       - "docs/timew-machine-m1n-scoped-recovery-approval.md"
       - "docs/timew-machine-m1l-durable-move-journal.md"
@@ -59,6 +61,8 @@ on:
       - "services/time/MachineMoveApproval.py"
       - "services/time/MachineMoveReconciliation.py"
       - "services/time/MachineMoveReviewRead.py"
+      - "services/time/MachineMoveConfirmRead.py"
+      - "docs/timew-machine-m1p-confirmation-rehearsal.md"
       - "docs/timew-machine-m1o-readonly-recovery-menu.md"
       - "docs/timew-machine-m1n-scoped-recovery-approval.md"
       - "docs/timew-machine-m1l-durable-move-journal.md"
@@ -139,6 +143,10 @@ jobs:
         run: python3 -B -I tests/timew/test_machine_move_review_read.py
       - name: Verify MACHINE recovery review UI has no apply/approval paths
         run: python3 -B -I tests/timew/test_machine_move_review_ui.py
+      - name: Verify MACHINE exact-phrase dry-run after fresh Sway read
+        run: python3 -B -I tests/timew/test_machine_move_confirm_read.py
+      - name: Verify MACHINE confirmation UI remains non-operative
+        run: python3 -B -I tests/timew/test_machine_move_confirm_ui.py
       - name: Verify MACHINE injected single-window move pilot with synthetic Sway
         run: python3 -B -I tests/timew/test_machine_window_move_pilot.py
       - name: Verify MACHINE move pilot cannot activate from TimeW

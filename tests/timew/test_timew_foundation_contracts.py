@@ -135,7 +135,7 @@ assert "WorldClockPolicy.snapshot(localClock.date.getTime()," in window
 assert 'command: ["date", "+%z"]' in window
 assert 'environment: { TZ: worldLookupZone, LC_ALL: "C" }' in window
 assert "Process {" in window
-assert window.count("Process {") == 11
+assert window.count("Process {") == 12
 assert "worldLookup.running" in window
 assert 'onLeftClicked:' in window
 assert 'timew.chooseWorldZone(modelData.id)' in window
@@ -249,7 +249,7 @@ assert 'enabled: timew.navigationKeysAvailable' in window
 assert 'WORLD // SELECT A SEARCH RESULT' in window
 assert '"ZONE DIRECTORY UNAVAILABLE"' in window
 # CLOCK WORLD search + CONVERT date/time + MATH date/time/duration fields.
-assert window.count('onTextEdited:') == 15
+assert window.count('onTextEdited:') == 16  # M1p adds one typed recovery confirmation input
 # No dynamic command composition or arbitrary typed TZ values.
 assert 'command: ["date", "+%z"]' in window
 assert 'worldLookup.exec({' in window
@@ -731,7 +731,7 @@ assert window.count("SystemClock {") == 1
 assert window.count("ElapsedTimer {") == 3
 assert window.count("\n    Timer {") == 3
 # MACHINE now has one read-only Sway capture Process and one guarded SQLite store Process.
-assert window.count("Process {") == 11
+assert window.count("Process {") == 12
 assert "id: machineCaptureProcess" in window
 assert "id: machineStoreProcess" in window
 assert "id: machineResolverProcess" in window

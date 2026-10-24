@@ -43,5 +43,5 @@ for prohibited in (
     assert prohibited not in resolver, prohibited
 assert 'function applySavedCheckpoint(' not in qml
 assert 'function machineApplyRecovery(' not in qml
-assert qml.count("Process {") == 10
+assert qml.count("Process {") == 11
 print("TIMEW MACHINE M1J UI CONTRACT: PASS / EPHEMERAL / READ ONLY")

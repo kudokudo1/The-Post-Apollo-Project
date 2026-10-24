@@ -789,6 +789,8 @@ PanelWindow {
             // geometry. Hub receives only a tiny state projection and
             // explicit typed action routing at direct button presses.
             appControlAvailable: appControlWindow !== null
+            processActionGate: appControlWindow
+                               ? appControlWindow.hubProcessActionGate : null
             // The existing AppControl sampler runs with its own cadence.
             // Clone only bounded display fields, no argv, user, command or
             // mutation handles and no new ProcessTelemetry instance.

@@ -9,6 +9,8 @@ Item {
     property var appsSnapshot: null
     // AppControl already owns and refreshes its ProcessTelemetry.
     property var processSnapshot: null
+    property var processActionGate: null
+    signal inputFocusChanged(bool focused)
     property bool appControlAvailable: false
     signal openAppControlRequested()
     property string selectedView: "catalog"
@@ -110,7 +112,10 @@ Item {
         id: processExplore
         visible: appsExplore.runningMode
         processSnapshot: appsExplore.processSnapshot
-        appControlAvailable: appsExplore.appControlAvailable
+        processActionGate: appsExplore.processActionGate
+        onInputFocusChanged: function(focused) {
+            appsExplore.inputFocusChanged(focused);
+        }
         onOpenAppControlRequested: appsExplore.openAppControlRequested()
         anchors.top: selector.bottom
         anchors.topMargin: 6
@@ -304,14 +309,14 @@ Item {
                 ActionButton {
                     width: Math.max(1, (parent.width - parent.spacing) / 2)
                     height: parent.height
-                    label: "APP CONTROL"
+                    label: "RUNNING CONTROLS"
                     labelPixelSize: 10
-                    available: appsExplore.appControlAvailable
+                    available: true
                     trackLabelGlowLocally: true
                     softGlowEnabled: false
                     // Deliberate navigation into the original owner window;
                     // does NOT target a PID or freeze/kill anything.
-                    onLeftClicked: appsExplore.openAppControlRequested()
+                    onLeftClicked: appsExplore.selectedView = "running"
                 }
                 ActionButton {
                     width: Math.max(1, (parent.width - parent.spacing) / 2)

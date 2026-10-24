@@ -23,6 +23,8 @@ PanelWindow {
     // and explicit signals, never passed into tile delegates as handles.
     property bool appControlAvailable: false
     property var processSnapshot: null
+    property var processActionGate: null
+    property bool processInputFocused: false
     property var socialSnapshot: null
     property bool socialActionsAvailable: false
     signal openAppControlRequested()
@@ -83,6 +85,7 @@ PanelWindow {
         && !transferPickerOpen
         && !todoInputFocused
         && !notesInputFocused
+        && !processInputFocused
     property bool writingLayout: false
     // In-session undo makes accidental tile deletion reversible.
     property var layoutUndoStack: []
@@ -500,6 +503,7 @@ PanelWindow {
             closeTransferPicker();
             todoInputFocused = false;
             notesInputFocused = false;
+            processInputFocused = false;
         }
         if (menuOpen && keyboardActive)
             Qt.callLater(function() {
@@ -1066,6 +1070,10 @@ PanelWindow {
                                           ? hub.liveBridge.appsSnapshot : null
                             appControlAvailable: hub.appControlAvailable
                             processSnapshot: hub.processSnapshot
+                            processActionGate: hub.processActionGate
+                            onProcessInputFocusChanged: function(focused) {
+                                hub.processInputFocused = focused;
+                            }
                             socialSnapshot: hub.socialSnapshot
                             socialActionsAvailable: hub.socialActionsAvailable
                             onOpenAppControlRequested: hub.requestAppControl()

@@ -20,13 +20,14 @@ function frame(mode, width, height) {
   const value = policy.frame(mode, width, height, 12);
   return [value.width, value.height];
 }
-assert.deepEqual(frame('compact', 2560, 1440), [432, 768]);
+assert.deepEqual(frame('compact', 2560, 1440), [432, 790]);
 assert.deepEqual(frame('expanded', 2560, 1440), [1000, 900]);
 assert.deepEqual(frame('fullscreen', 2560, 1440), [2536, 1416]);
 assert.deepEqual(frame('expanded', 1360, 768), [1000, 744]);
 assert.deepEqual(frame('fullscreen', 1360, 768), [1336, 744]);
 assert.deepEqual(frame('compact', 320, 480), [296, 456]);
-assert.deepEqual(frame('compact', 0, NaN), [432, 768]);
+assert.deepEqual(frame('compact', 0, NaN), [432, 790]);
+assert.deepEqual(frame('compact', 1360, 768), [432, 744]);
 
 assert.equal(policy.leftMargin('compact', 900, 2560, 456), 672);
 assert.equal(policy.leftMargin('expanded', 900, 1360, 1024), 336);

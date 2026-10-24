@@ -55,7 +55,7 @@ assert "PanelWindow {" in MENU
 assert "readonly property int frameWidth: chassisFrame.width" in MENU
 assert "readonly property int frameHeight: chassisFrame.height" in MENU
 assert "implicitWidth: frameWidth + glowGutter * 2" in MENU
-assert "implicitHeight: frameHeight + glowGutter * 2" in MENU
+assert "implicitHeight: frameHeight + frameTopInset + glowGutter" in MENU
 assert "property real dockCenterX: 0" in MENU
 assert "property real chassisTopY: 0" in MENU
 assert "FinanceChassisPolicy.leftMargin(" in MENU

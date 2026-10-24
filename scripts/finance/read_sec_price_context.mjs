@@ -1,5 +1,7 @@
 // FinanceW SEC M5: bounded end-of-day market context, not a price signal.
-// EODHD demo works for AAPL.US; other issuers need an optional private token.
+// EODHD demo confirmed locally for AAPL.US; documented MSFT support varies.
+// MSFT demo is opt-in as a live capability probe, never marked guaranteed.
+// NVIDIA remains gated behind an optional private provider token.
 import { homedir } from "node:os";
 import { join } from "node:path";
 import { lstat, readFile } from "node:fs/promises";
@@ -81,7 +83,9 @@ export async function loadPrices(cik, filingDate, fetcher=fetch,
   if (!SYMBOLS[cik] || !validDate(filingDate) || !validDate(today)
       || filingDate > today || filingDate < "2000-01-01") throw new Error("invalid-selection");
   const token = await tokenLoader();
-  if (!token && cik !== "0000320193") throw new Error("provider-key-required");
+  const demoTrial = !token && cik === "0000789019";
+  if (!token && cik !== "0000320193" && !demoTrial)
+    throw new Error("provider-key-required");
   const from=shift(filingDate,-10);
   const end=shift(filingDate,14);
   const to=end>today?today:end;
@@ -90,11 +94,17 @@ export async function loadPrices(cik, filingDate, fetcher=fetch,
     method:"GET",redirect:"error",headers:{Accept:"application/json"},
     signal:AbortSignal.timeout(12000)
   });
-  if (!response.ok) throw new Error("provider-unavailable");
+  if (!response.ok) {
+    if (demoTrial && (response.status === 401 || response.status === 403))
+      throw new Error("demo-not-authorized");
+    throw new Error("provider-unavailable");
+  }
   const len=Number(response.headers?.get?.("content-length"));
   if (Number.isFinite(len) && len>MAX_RESPONSE) throw new Error("provider-response-too-large");
   const body=await response.text();
   if (body.length>MAX_RESPONSE) throw new Error("provider-response-too-large");
+  if (demoTrial && /^(?:unauthenticated|unauthorized|forbidden|access denied)\s*$/i.test(body.trim()))
+    throw new Error("demo-not-authorized");
   let parsed;
   try {parsed=JSON.parse(body);}catch{throw new Error("provider-invalid");}
   return normalizePrices(parsed,cik,filingDate,new Date().toISOString());
@@ -107,7 +117,7 @@ if (process.argv[1] && import.meta.url===pathToFileURL(process.argv[1]).href) {
   } catch(error) {
     const allowed=["invalid-selection","provider-key-required","provider-unavailable",
       "provider-response-too-large","provider-invalid","invalid-price-data",
-      "token-unreadable","token-permissions","token-invalid"];
+      "token-unreadable","token-permissions","token-invalid","demo-not-authorized"];
     const code=allowed.includes(error?.message)?error.message:"provider-failed";
     process.stdout.write("FINANCE_SEC_PRICE_ERROR "+code+"\n");
     process.exitCode=1;

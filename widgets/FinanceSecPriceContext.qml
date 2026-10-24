@@ -41,7 +41,13 @@ Item {
                 verticalAlignment: Text.AlignVCenter
                 font.pixelSize: 9
                 color: Colors.orange
-                text: "DAILY END-OF-DAY // OPTIONAL"
+                text: priceFeed && priceFeed.secFeed
+                    && priceFeed.secFeed.selectedCik === "0000789019"
+                    ? "MSFT // DEMO ACCESS TRIAL"
+                    : priceFeed && priceFeed.secFeed
+                    && priceFeed.secFeed.selectedCik === "0001045810"
+                    ? "NVDA // TOKEN-GATED"
+                    : "AAPL // DEMO ACCESS"
                 elide: Text.ElideRight
             }
         }

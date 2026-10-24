@@ -34,13 +34,28 @@ This first pilot does **not** incorporate an SEC acceptance timestamp or
 intraday price changes. The orange chart guide denotes the filing date,
 not the exact instant the market received the disclosure.
 
-## Microsoft and NVIDIA
+## Microsoft trial and NVIDIA gating
 
-EODHD's published unauthenticated demo set does **not** guarantee
-coverage of `MSFT.US` or `NVDA.US`. Those show KEY REQUIRED unless you
-choose to configure an EODHD production/free account token.
+EODHD's own published material is **inconsistent about which symbols
+its public `demo` credential supports**. Some provider pages include
+`MSFT.US` and other current pages omit it. Apple is already locally
+verified; Microsoft's **actual API authorization has not yet been verified**
+on this desktop.
 
-Optional host-only private token setup using Zsh, if desired:
+M6 makes one bounded demo request for Microsoft's selected SEC filing
+when you press PRICE CONTEXT. If the provider permits it, genuine sourced
+historical prices display. If it returns 401/403 or an explicit
+Unauthenticated/Unauthorized response, the UI reports **MICROSOFT DEMO
+ACCESS DENIED // PROVIDER KEY REQUIRED**. We never produce demonstration
+or guessed stock prices as a fallback. No hidden retries and no requests
+until the user presses the button.
+
+NVIDIA (`NVDA.US`) is *not* listed as an eligible demo symbol by the
+provider documentation examined; it still requires a valid private
+EODHD token and makes **zero** requests when no token is configured.
+
+If you separately choose a provider account/token, keep it private and
+use the existing one-time host-only setup:
 
 ```zsh
 mkdir -p "$HOME/.local/share/post-apollo/finance-market"
@@ -51,9 +66,22 @@ chmod 600 "$HOME/.local/share/post-apollo/finance-market/eodhd-token.txt"
 unset eod_token
 ```
 
-The token is read only by the Node script, is not passed via command
-arguments, and must never appear in GitHub, screenshots or tool logs.
-Provider terms apply; broader use or redistribution may require a license.
+The private token remains outside GitHub and QML. Do not paste it into
+screenshots, shell logs, or chats.
+
+### Why not add a magic keyless provider?
+
+Stooq added a CAPTCHA/API-key requirement for historical downloads in
+2026. Yahoo's internal chart interface is not a documented redistributable
+financial-data API. Neither is suitable for an unverified, silent
+production fallback. A future Post-Apollo-managed licensed market-data
+service could provide centralized credentials, caching and controlled
+redistribution so ordinary users do not configure individual keys.
+
+Provider references:
+- https://eodhd.com/financial-apis/quick-start-with-our-financial-data-apis
+- https://eodhd.com/lp/eodhd-chatgpt
+- https://stooq.com/q/d/
 
 ## Scope / metrics
 
@@ -87,7 +115,8 @@ nor that the provider licenses this data for future public distribution.
 
 ## What comes next
 
-After first live Apple test, verify pricing availability and explain
-licensing for wider deployment. Only then consider plotted multi-day
-returns, benchmarks, SEC acceptance-time correlation, or Polymarket and
-OSIRIS relationships with explicit evidence.
+M6: verify whether Microsoft's *actual* API endpoint permits demo
+read access. If denied, retain the explicit setup message, do not bypass
+provider access restrictions, and assess a licensed provider for wider
+coverage. NVIDIA remains token-gated. Only then pursue benchmarks,
+acceptance-time alignment or cross-source claims with explicit evidence.

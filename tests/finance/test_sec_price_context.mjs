@@ -54,21 +54,42 @@ const http=async (url,options)=>{
 const response=await loadPrices(cic,"2026-10-22",http,async()=>null,"2026-10-24");
 assert.equal(response.previous.date,"2026-10-21");
 assert.equal(calls,1);
+// Some EODHD documentation includes MSFT.US as a demo ticker; an operator
+// must verify actual live provider authorization. Fake success isn't proof.
+const msftDemo=await loadPrices("0000789019","2026-10-22",
+  async(url,opts)=>{
+    calls++;
+    assert.ok(url.includes("/MSFT.US?"));
+    assert.ok(url.includes("api_token=demo"));
+    assert.equal(opts.method,"GET");
+    return {ok:true,headers:{get:()=>null},text:async()=>JSON.stringify(bars)};
+  },async()=>null,"2026-10-24");
+assert.equal(msftDemo.symbol,"MSFT.US");
+assert.equal(msftDemo.source,"eodhd-eod");
+assert.equal(calls,2);
 await assert.rejects(loadPrices("0000789019","2026-10-22",
+  async()=>{calls++;return {ok:false,status:403,headers:{get:()=>null}};},
+  async()=>null,"2026-10-24"),/demo-not-authorized/);
+await assert.rejects(loadPrices("0000789019","2026-10-22",
+  async()=>{calls++;return {ok:true,headers:{get:()=>null},text:async()=>"Unauthenticated"};},
+  async()=>null,"2026-10-24"),/demo-not-authorized/);
+assert.equal(calls,4);
+// A ticker not documented as demo-eligible must never consume a trial request.
+await assert.rejects(loadPrices("0001045810","2026-10-22",
   async()=>{calls++},async()=>null,"2026-10-24"),/provider-key-required/);
-assert.equal(calls,1);
+assert.equal(calls,4);
 await assert.rejects(loadPrices(cic,"2026-10-25",
   async()=>{calls++},async()=>null,"2026-10-24"),/invalid-selection/);
-assert.equal(calls,1);
+assert.equal(calls,4);
 await assert.rejects(loadPrices("invalid","2026-10-22",
   async()=>{calls++},async()=>null,"2026-10-24"),/invalid-selection/);
-assert.equal(calls,1);
+assert.equal(calls,4);
 const msft=await loadPrices("0000789019","2026-10-22",
   async(url)=>{calls++;assert.ok(url.includes("MSFT.US"));assert.ok(url.includes("api_token=private_example_token"));
     return {ok:true,headers:{get:()=>null},text:async()=>JSON.stringify(bars)};},
   async()=> "private_example_token","2026-10-24");
 assert.equal(msft.symbol,"MSFT.US");
-assert.equal(calls,2);
+assert.equal(calls,5);
 await assert.rejects(loadPrices(cic,"2026-10-22",
   async()=>({ok:false,headers:{get:()=>null}}),async()=>null,"2026-10-24"),/provider-unavailable/);
 console.log("Finance SEC M5 fictional market date alignment and provider access: PASS");

@@ -89,3 +89,24 @@ function visibleIntersection(desired, actual) {
                    && desired.width === actual.width
                    && desired.height === actual.height};
 }
+
+
+// If a compositor/client preserves a smaller OS-window size, center that
+// exact measured actor inside the desired viewport. Never assume the resize
+// was applied; do not center an oversized or off-output actor.
+function centeredPosition(desired, actual) {
+    if (!desired || !actual)
+        return null;
+    const values = [desired.x, desired.y, desired.width, desired.height,
+                    actual.x, actual.y, actual.width, actual.height];
+    if (!values.every(function(v) {
+        return typeof v === "number" && isFinite(v);
+    }) || desired.width <= 0 || desired.height <= 0
+       || actual.width <= 0 || actual.height <= 0
+       || actual.width > desired.width || actual.height > desired.height)
+        return null;
+    return {
+        x: Math.round(desired.x + (desired.width - actual.width) / 2),
+        y: Math.round(desired.y + (desired.height - actual.height) / 2)
+    };
+}

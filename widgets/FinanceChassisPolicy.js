@@ -31,9 +31,9 @@ function frame(level, viewportWidth, viewportHeight, gutter, topInset, bottomGap
     return {
         width: mode === "fullscreen" ? width
              : Math.min(width, mode === "expanded" ? 1000 : 432),
-        // Large now uses Social's default 1355px frame height minus 14px.
+        // Large now uses Social's default 1355px frame height minus 11px.
         // The 8px bottom gap remains the minimum on smaller displays.
-        height: Math.min(height, mode === "fullscreen" ? 1341
+        height: Math.min(height, mode === "fullscreen" ? 1344
                                    : mode === "expanded" ? 900 : 790)
     };
 }

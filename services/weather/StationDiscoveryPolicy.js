@@ -106,3 +106,60 @@ function parse(kind, root) {
     if (kind === "radio") return parseRadio(root);
     throw new Error("Unknown station discovery domain");
 }
+
+
+// NEWS is a page-scoped QML component; the same engine can recreate it every
+// time the operator switches tabs. The library's module state is intentionally
+// shared between those instances for this one external GDELT endpoint. Never
+// request again on remount within a cooldown, and preserve the last good rows.
+// This cache is session-only; no disk, background server, or new fetch owner.
+var _newsNextAllowedMs = 0;
+var _newsThrottleUntilMs = 0;
+var _newsCachedRows = [];
+var _newsCachedAtMs = 0;
+
+function newsWaitMs(nowMs) {
+    return Math.max(0, _newsNextAllowedMs - Number(nowMs));
+}
+function newsThrottled(nowMs) {
+    return Number(nowMs) < _newsThrottleUntilMs;
+}
+function reserveNewsRequest(nowMs) {
+    const now = Number(nowMs);
+    if (!isFinite(now) || now <= 0 || newsWaitMs(now) > 0)
+        return false;
+    // Provider reports a 5-second minimum. Use a more conservative 30 s
+    // across all NEWS remounts and manual retries in this QS engine.
+    _newsNextAllowedMs = now + 30000;
+    return true;
+}
+function recordNewsThrottle(nowMs) {
+    const now = Number(nowMs);
+    if (!isFinite(now) || now <= 0) return;
+    // 429: a longer, bounded pause. Do not queue a retry or hammer GDELT.
+    _newsThrottleUntilMs = Math.max(_newsThrottleUntilMs, now + 60000);
+    _newsNextAllowedMs = Math.max(_newsNextAllowedMs, _newsThrottleUntilMs);
+}
+function storeNewsRows(rows, nowMs) {
+    if (!Array.isArray(rows) || !isFinite(nowMs) || Number(nowMs) <= 0)
+        return;
+    _newsCachedRows = rows.slice(0, 30);
+    _newsCachedAtMs = Number(nowMs);
+    _newsThrottleUntilMs = 0;
+}
+function cachedNewsRows() {
+    return {rows: _newsCachedRows.slice(), updatedAtMs: _newsCachedAtMs};
+}
+
+// curl -w adds a status suffix, including on HTTP errors with non-JSON bodies.
+// It is not safe to assume HTTP 429 is a JSON article list or that -f exposes
+// its body. Keep the body and HTTP status separate for informative UI states.
+function splitHttpResponse(raw) {
+    const input = String(raw === undefined || raw === null ? "" : raw);
+    const marker = "\n__POST_APOLLO_HTTP__:";
+    const i = input.lastIndexOf(marker);
+    if (i < 0) return {status: 0, body: ""};
+    const statusText = input.slice(i + marker.length).trim();
+    if (!/^\d{3}$/.test(statusText)) return {status: 0, body: ""};
+    return {status: Number(statusText), body: input.slice(0, i)};
+}

@@ -100,7 +100,7 @@ assert.match(weatherTerminalSource, /id:\s*terminalTitleDivider[\s\S]*?x:\s*14[\
 const titleDividerAt = weatherTerminalSource.indexOf("id: terminalTitleDivider");
 const bayAt = weatherTerminalSource.indexOf("id: terminalBay");
 assert.ok(titleDividerAt > 0 && titleDividerAt < bayAt);
-assert.match(weatherTerminalSource, /y:\s*78/);
+assert.match(weatherTerminalSource, /y:\s*terminalTitleDivider\.y \+ terminalTitleDivider\.height \+ verticalClearance/);
 assert.match(weatherTerminalSource, /visibleBayY:\s*bayY \+ verifiedOffsetY/);
 assert.match(windowSource, /terminalHoleY:\s*header\.height \+ terminalView\.visibleBayY/);
 

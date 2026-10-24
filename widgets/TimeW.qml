@@ -897,6 +897,7 @@ PanelWindow {
     property string machineConfirmationTyped: ""
     property bool machineConfirmationBusy: false
     property string machineConfirmationPayload: ""
+    property string machineConfirmationSubmittedText: ""
     property string machineConfirmationSubmittedKey: ""
     property string machineConfirmationStatus: "NOT CONFIRMED"
     property var machineConfirmationResult: null
@@ -915,6 +916,7 @@ PanelWindow {
     function machineInvalidateConfirmation() {
         machineConfirmationTyped = "";
         machineConfirmationPayload = "";
+        machineConfirmationSubmittedText = "";
         machineConfirmationSubmittedKey = "";
         machineConfirmationResult = null;
         machineConfirmationStatus = "NOT CONFIRMED";
@@ -929,6 +931,7 @@ PanelWindow {
                 || !machineResolverItem)
             return;
         machineConfirmationSubmittedKey = machineMoveCandidateKey;
+        machineConfirmationSubmittedText = machineConfirmationTyped;
         machineConfirmationPayload = JSON.stringify({
             checkpoint_id: machineSavedItem.id,
             document: machineOpenedCheckpoint.document,
@@ -1437,6 +1440,10 @@ PanelWindow {
                         && timew.machineConfirmationSubmittedKey !== ""
                         && timew.machineConfirmationSubmittedKey
                            === timew.machineMoveCandidateKey
+                        && timew.machineConfirmationSubmittedText
+                           === timew.machineConfirmationTyped
+                        && timew.machineConfirmationTyped
+                           === timew.machineConfirmationPhrase
                         && result.kind === "machine-m1p-confirmation-dry-run"
                         && result.status === "phrase_validated_read_only"
                         && result.read_only === true

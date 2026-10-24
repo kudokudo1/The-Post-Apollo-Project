@@ -8,6 +8,8 @@ Rectangle {
     property var adapter: null
     readonly property string step: adapter ? String(adapter.loginState || "IDLE") : "IDLE"
     readonly property bool busy: adapter ? adapter.loginInProgress : false
+    readonly property var qrMatrixRows: adapter ? adapter.qrModules : []
+    onQrMatrixRowsChanged: qrCanvas.requestPaint()
 
     color: Colors.black
     border.color: Colors.cyan
@@ -138,13 +140,39 @@ Rectangle {
                 Rectangle {
                     width: 270; height: 270
                     color: "white"
-                    Image {
+                    Canvas {
+                        id: qrCanvas
                         anchors.fill: parent
                         anchors.margins: 10
-                        source: panel.adapter ? panel.adapter.qrSource : ""
-                        fillMode: Image.PreserveAspectFit
-                        cache: false
-                        asynchronous: false
+                        renderStrategy: Canvas.Immediate
+                        onVisibleChanged: if (visible) requestPaint()
+                        onPaint: {
+                            const ctx = getContext("2d");
+                            if (!ctx)
+                                return;
+                            ctx.fillStyle = "#ffffff";
+                            ctx.fillRect(0, 0, width, height);
+                            const rows = panel.qrMatrixRows || [];
+                            const count = rows.length;
+                            if (count === 0)
+                                return;
+                            const pixelSize = Math.floor(Math.min(width, height) / count);
+                            if (pixelSize < 1)
+                                return;
+                            const size = pixelSize * count;
+                            const left = Math.floor((width - size) / 2);
+                            const top = Math.floor((height - size) / 2);
+                            ctx.fillStyle = "#000000";
+                            for (let row = 0; row < count; row++) {
+                                const bits = String(rows[row]);
+                                if (bits.length !== count)
+                                    return;
+                                for (let col = 0; col < count; col++) {
+                                    if (bits.charAt(col) === "1")
+                                        ctx.fillRect(left + col * pixelSize, top + row * pixelSize, pixelSize, pixelSize);
+                                }
+                            }
+                        }
                     }
                 }
                 Text {

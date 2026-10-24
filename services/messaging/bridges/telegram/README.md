@@ -111,9 +111,7 @@ with parent mode `0700` and file mode `0600`. The old private process
 environment variables take precedence when already configured.
 
 **Dependencies:** The selected `TelegramAdapter.qml` Python interpreter
-needs Telethon 1.x for login. QR image generation also requires
-`qrcode[pil]` (the Python `qrcode` module plus Pillow). Without the QR
-dependency, choose phone verification instead. These are application
+needs Telethon 1.x for login. QR module generation requires the pure-Python `qrcode` package. The Social pane draws the QR pattern using Qt Quick `Canvas` directly: **Pillow is not required** and no QR image needs to be loaded from a data URL. Without `qrcode`, phone verification remains available. These are application
 dependencies, not account credentials; bundling them in Post-Apollo would be
 the polished deployment path.
 
@@ -129,3 +127,13 @@ secret, so avoid screenshots while pairing.
 merge, offline checks, and a separately approved desktop/Telegram live test.
 Do not assume a QR image or a mocked success proves Telegram has authorized a
 real account. Do not automatically restart Quickshell or alter a live session.
+
+## QR rendering simplification // validation candidate
+
+The QR bridge emits a newline-terminated JSON `QR_READY` event containing
+boolean matrix rows encoded as `0`/`1` strings with a standard quiet border.
+`TelegramConnectPanel.qml` renders that matrix as crisp black/white squares
+on the existing Qt Quick `Canvas`. **No PNG data URI, Pillow image encoder,
+QR token URL exposure or intermediate image file is necessary.** The rows
+are ephemeral authorization material and must never be copied into debug logs.
+This change does not replace real Telegram/Quickshell runtime acceptance.

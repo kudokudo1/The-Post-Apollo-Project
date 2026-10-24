@@ -69,13 +69,23 @@ class TelegramClient:
 '''
 FAKE_ERRORS = "class SessionPasswordNeededError(Exception): pass\n"
 FAKE_QR = r'''
-class FakeImage:
-    def save(self, buf, format):
-        assert format == "PNG"
-        buf.write(b"\x89PNGfake-for-ci")
-def make(url):
-    assert url.startswith("tg://login?token=")
-    return FakeImage()
+class QRCode:
+    def __init__(self, border):
+        assert border == 4
+        self.url = None
+    def add_data(self, url):
+        assert url.startswith("tg://login?token=")
+        self.url = url
+    def make(self, fit):
+        assert fit is True
+    def get_matrix(self):
+        assert self.url
+        # Fake 29x29 QR grid including a white quiet border.
+        return [
+            [False] * 29 if row < 4 or row >= 25 else
+            [False] * 4 + [((row + col) % 3) == 0 for col in range(21)] + [False] * 4
+            for row in range(29)
+        ]
 '''
 
 
@@ -112,7 +122,13 @@ class TelegramMenuLoginContracts(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stderr)
         events = self.events(result)
         self.assertEqual([e["state"] for e in events], ["QR_READY", "READY"])
-        self.assertTrue(events[0]["image"].startswith("data:image/png;base64,"))
+        rows = events[0]["modules"]
+        self.assertEqual(len(rows), 29)
+        self.assertTrue(all(len(row) == 29 for row in rows))
+        self.assertTrue(all(set(row) <= {"0", "1"} for row in rows))
+        self.assertEqual(rows[0], "0" * 29)
+        self.assertEqual(rows[-1], "0" * 29)
+        self.assertNotIn("image", events[0])
         self.assertNotIn("fake-qr-token", result.stdout + result.stderr)
         self.assertNotIn("1234567890abcdef", result.stdout + result.stderr)
 
@@ -211,6 +227,13 @@ class TelegramMenuLoginContracts(unittest.TestCase):
         self.assertIn('readonly property bool telegramNeedsSetup:', router)
         self.assertIn('echoMode: TextInput.Password', panel)
         self.assertIn('CONNECT WITH QR', panel)
+        self.assertIn('Canvas {', panel)
+        self.assertIn('const rows = panel.qrMatrixRows || [];', panel)
+        self.assertIn('qrCanvas.requestPaint()', panel)
+        self.assertIn('property var qrModules: []', adapter)
+        self.assertNotIn('data:image/png', panel)
+        self.assertNotIn('qrSource', panel)
+        self.assertNotIn('base64', (ROOT / "services/messaging/bridges/telegram/login_ui.py").read_text())
         self.assertIn('USE PHONE NUMBER', panel)
         self.assertIn('SAVE APP KEYS', panel)
         self.assertNotIn('console.log', adapter)

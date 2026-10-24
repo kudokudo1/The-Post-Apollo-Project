@@ -232,9 +232,17 @@ Extend Stage 8A's H:2/H:3 Calendar to four compact view selectors: MONTH, WEEK, 
 
 **Verification:** Source contracts cover the WEEK/DAY navigation, strict source ownership, H:1 preservation, and no extra poller/write operations. Runtime acceptance must test Monday-first WEEK vs SUN/MON MONTH, crossing month/year boundaries, multiple due tasks and unavailable store, H:2 vs H:3 labels, rapid view switching and no overflow or focus interception. No operator visual acceptance is presumed by CI.
 
+## P1 Stage 8C // Weather Level 2 read-only domains
+
+H:1 retains the original compact Weather card. H:2/H:3 mount `widgets/hub/ApolloHubWeatherExplore.qml`, presenting four independently selectable read-only domains over the **same `ApolloHubLiveBridge.weatherSnapshot`**. WEATHER shows temperature, condition, feels-like and wind. GROUND shows independently fresh AQI and label; pollen, gases, seismic and other Ground data are **NOT CONNECTED**. SKY shows current UV, wind, humidity and direction, but is not a forecast interface. SPACE exposes an explicit **PROVIDER NOT CONNECTED** state: solar, NOAA warning, X-ray, flare and aurora feeds are not present in the Hub bridge.
+
+**Boundary:** No WeatherStation-owned source, weather/space/ground collector, timer, network request, media controller, file write, action authority or saved-layout version is changed. In particular, the WeatherStation's view-scoped seismic, aurora, flare and X-ray services must not be instantiated by a Hub tile; owner-approved shared read-only projections are a future integration seam. Domain selection is transient to each component instance, not persisted.
+
+**Verify:** Hub foundation source contract guards compact presentation, domain selectors, independent weather/AQI readiness, intentional unavailable states and zero new collectors. Workflow now tracks the new Hub-only component. After operator-approved merge and normal desktop sync, compare H:1/H:2/H:3 and W:1/W:2; select all four tabs and verify title, readings, status footer and clipping. Test stale weather versus fresh AQI and the converse. No runtime acceptance or performance proof is inferred from CI.
+
 ## NEXT
 
-Complete Stage 7A/7B/7C/7D/8A/8B desktop acceptance. Next can be Notes and To-do internal density, but those contain editable user data, so changes must preserve editor focus, draft and save-confirmation behavior. Durable undo/presets and drag-and-drop remain separate operator decisions.
+Complete Stage 7A/7B/7C/7D/8A/8B/8C desktop acceptance. Next can be Notes and To-do internal density, but those contain editable user data, so changes must preserve editor focus, draft and save-confirmation behavior. Durable undo/presets and drag-and-drop remain separate operator decisions.
 
 ## DECISIONS
 

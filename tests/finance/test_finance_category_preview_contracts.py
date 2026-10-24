@@ -35,7 +35,7 @@ for expected in (
     'snapshot.month',
     'Array.isArray(snapshot.categoryGroups)',
     'mode!=="create" && mode!=="rename"',
-    'current.name===name',
+    'current.name.trim().toLowerCase()===name.toLowerCase()',
     'NAME ALREADY USED IN THIS GROUP',
     'savesToActual:false',
 ):

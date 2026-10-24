@@ -32,9 +32,9 @@ assert "sparkline.requestPaint()" in view
 assert "NO CAUSAL" in view.upper() or "do not establish a filing reaction" in view
 assert "SAME-DAY" not in view or "same-day" in view.lower()
 assert "EODHD HISTORICAL" in view
-assert "context.data.changePct.toFixed(2)" in view
-assert "context.data.previous.price.toFixed(2)" in view
-assert "context.data.next.price.toFixed(2)" in view
+assert "context.marketSnapshot.changePct.toFixed(2)" in view
+assert "context.marketSnapshot.previous.price.toFixed(2)" in view
+assert "context.marketSnapshot.next.price.toFixed(2)" in view
 
 assert 'if (!monitoring || !secFeed || !secFeed.snapshot || !filing' in service
 assert 'secFeed.snapshot.filings.some' in service

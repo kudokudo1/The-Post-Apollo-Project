@@ -117,6 +117,14 @@ Operator ran `swaymsg -t get_tree` on the live Weather Station STAR MAP actor an
 
 **Stage Director continuity:** SwayPX's SD0 observer profile may retain previous scene dimensions. It was NOT modified by this UI adjustment. Once the operator accepts the final location and size, hand the observed and requested geometry to the Stage Director owner for reconciliation. No new authority to force compositor window geometry is implied by this note.
 
+### B13 // 2026-10-24 Center the shared terminal bay
+
+**Operator visual acceptance request:** current bay dimensions are satisfactory but the vertical space between the cyan terminal-title divider and the viewing bay differs from the gap between the viewing bay and the footer.
+
+**Scoped UI adjustment:** in `StationTerminal.qml`, derive the bay's top edge from `terminalTitleDivider.y + terminalTitleDivider.height + verticalClearance`, with `verticalClearance: 8`; derive its height from the parent view's bottom edge minus the same clearance. At the existing layout the result is **local (8,74) / 824×494**, a **4-logical-pixel upward translation at unchanged size**. The actual gap after the 2px divider at local y=64 is 8px, and the bottom gap is also 8px. The Sway requested primary-output global origin becomes (1708,136), and the secondary negative-origin example (-852,336). The shared alpha/input cutout and compositor-requested position already derive from the bay, so they follow without another independent offset. This is a request/target geometry update; previous actual Kitty-resize mismatch still requires live comparison and is not considered fixed here.
+
+**Stage Director:** no mutation or change in compositor authority. Record the accepted target and observed output separately for later Stage Director reconciliation.
+
 ## 4 // Domain family C: MAP and world/environmental layers
 
 Current EONET is an event index only. Planned:

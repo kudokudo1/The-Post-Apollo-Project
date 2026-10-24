@@ -17,6 +17,15 @@ Rectangle {
     property bool sending: false
     property string sendError: ""
     property int sendSuccessSerial: 0
+    property bool sendEnabled: true
+
+    // Router-provided service + conversation identity. The default derives
+    // a local scope for other ConversationFeed consumers (such as Hospital).
+    property string scopeId: ""
+    readonly property string effectiveScope: scopeId || (conversation ? "default:" + conversation.id : "")
+    property string previousScope: ""
+    property var draftByScope: ({})
+    property var pendingByScope: ({})
 
     signal sendRequested(string conversationId, string text)
     signal messageActionRequested(string action, var message, string value)
@@ -684,7 +693,7 @@ Rectangle {
 
             clip: true
 
-            enabled: !chatFeed.sending
+            enabled: !chatFeed.sending && chatFeed.sendEnabled
 
             color: enabled ? Colors.white : Colors.cyan
 
@@ -745,7 +754,7 @@ Rectangle {
 
             radius: 0
 
-            property bool canSend: !chatFeed.sending && messageInput.text.trim() !== ""
+            property bool canSend: chatFeed.sendEnabled && !chatFeed.sending && messageInput.text.trim() !== ""
 
             property bool isHovered: sendMouse.containsMouse && canSend
 
@@ -917,38 +926,47 @@ Rectangle {
     // SEND LOGIC
     // =========================================================
 
-    function trySend() {
-        if (!conversation)
-            return;
+    // Preserve separate drafts. A late acknowledgement from a previous
+    // provider/thread is never allowed to erase the text being composed now.
+    onEffectiveScopeChanged: {
+        if (previousScope !== "")
+            draftByScope[previousScope] = messageInput.text;
+        previousScope = effectiveScope;
+        messageInput.text = effectiveScope ? String(draftByScope[effectiveScope] || "") : "";
+        finishConfirmedSend();
+    }
 
-        if (sending)
+    function finishConfirmedSend() {
+        if (!effectiveScope)
+            return;
+        const pending = pendingByScope[effectiveScope];
+        if (!pending || sendSuccessSerial <= pending.serial)
+            return;
+        if (messageInput.text.trim() === pending.text) {
+            messageInput.clear();
+            draftByScope[effectiveScope] = "";
+        }
+        delete pendingByScope[effectiveScope];
+        messageInput.forceActiveFocus();
+        Qt.callLater(function () {
+            if (messageList.count > 0 && effectiveScope !== "")
+                messageList.positionViewAtEnd();
+        });
+    }
+
+    function trySend() {
+        if (!conversation || !sendEnabled || sending || !effectiveScope)
             return;
 
         const text = messageInput.text.trim();
-
         if (text === "")
             return;
 
-        pendingSendSerial = sendSuccessSerial;
-
+        pendingByScope[effectiveScope] = { serial: sendSuccessSerial, text: text };
         sendRequested(conversation.id, text);
     }
 
-    onSendSuccessSerialChanged: {
-        if (pendingSendSerial >= 0 && sendSuccessSerial > pendingSendSerial) {
-            messageInput.clear();
-
-            pendingSendSerial = -1;
-
-            messageInput.forceActiveFocus();
-
-            Qt.callLater(function () {
-                if (messageList.count > 0) {
-                    messageList.positionViewAtEnd();
-                }
-            });
-        }
-    }
+    onSendSuccessSerialChanged: finishConfirmedSend()
 
     function focusMessageInput() {
         if (!conversation)

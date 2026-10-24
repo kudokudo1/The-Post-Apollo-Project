@@ -27,8 +27,9 @@ PanelWindow {
     // BACKEND
     // ============================================================
 
-    SessionAdapter {
-        id: sessionAdapter
+    SocialMessageRouter {
+        id: messageRouter
+        appIndex: messagingWindow.activeAppIndex
     }
 
     IpcHandler {
@@ -294,6 +295,7 @@ PanelWindow {
     // Leave a 1 px cyan shell visible around Vesktop.
     property int discordInset: 1
 
+    readonly property bool nativeChatSelected: activeAppIndex === 0 || activeAppIndex === 2
     readonly property bool discordSelected: activeAppIndex === 1
     // xSelected retains the existing external-browser focus contract.
     readonly property bool xSelected: (activeAppIndex >= 3 && activeAppIndex <= 13) || (activeAppIndex >= 16 && activeAppIndex <= 25)
@@ -942,8 +944,10 @@ PanelWindow {
     }
 
     function activateApp(index, retainSelectorFocus) {
-        activeAppIndex = index;
+        // Clear the old selection before swapping adapters; never briefly
+        // render a Sessions thread under Telegram or vice versa.
         contactList.clearSelection();
+        activeAppIndex = index;
 
         if (retainSelectorFocus === true) {
             focusZone = appZone;
@@ -975,7 +979,7 @@ PanelWindow {
             keyboardFocus.forceActiveFocus();
         });
 
-        if (index === 0 && contactList.conversations.length > 0)
+        if (messagingWindow.nativeChatSelected && contactList.conversations.length > 0)
             focusContacts();
     }
 
@@ -1180,6 +1184,7 @@ PanelWindow {
             // WhatsApp and Messenger are reserved for future Session-style adapters.
             // Do not show fake contacts or launch external browser windows.
             statusText: messagingWindow.xSelected ? messagingWindow.xError
+                       : messagingWindow.activeAppIndex === 2 ? messageRouter.telegramStatus
                        : messagingWindow.activeAppIndex === 14 ? "WHATSAPP // Native integration pending"
                        : messagingWindow.activeAppIndex === 15 ? "MESSENGER // Native integration pending"
                        : messagingWindow.activeAppIndex === 26 ? "SIGNAL // Native integration pending"
@@ -1240,16 +1245,15 @@ PanelWindow {
             // ACTIVE BACKEND CONTACTS
             // ----------------------------------------------------
 
-            conversations: messagingWindow.activeAppIndex === 0 ? sessionAdapter.conversations : []
+            conversations: messageRouter.conversations
 
             // ----------------------------------------------------
             // CONVERSATION CHANGE
             // ----------------------------------------------------
 
             onSelectedConversationChanged: {
-                if (messagingWindow.activeAppIndex === 0 && selectedConversation) {
-                    sessionAdapter.loadMessages(selectedConversation.id);
-                }
+                if (messagingWindow.nativeChatSelected && selectedConversation)
+                    messageRouter.loadMessages(selectedConversation.id);
             }
 
             // ----------------------------------------------------
@@ -1290,52 +1294,56 @@ PanelWindow {
             // ACTIVE CONVERSATION
             // ----------------------------------------------------
 
-            conversation: messagingWindow.activeAppIndex === 0 ? contactList.selectedConversation : null
+            conversation: messagingWindow.nativeChatSelected ? contactList.selectedConversation : null
+            scopeId: messagingWindow.nativeChatSelected && conversation
+                     ? messageRouter.serviceId + ":" + String(conversation.id) : ""
+            sendEnabled: messageRouter.sendEnabled
 
             // ----------------------------------------------------
             // MESSAGES
             // ----------------------------------------------------
 
-            messages: messagingWindow.activeAppIndex === 0 ? sessionAdapter.messages : []
+            messages: messagingWindow.nativeChatSelected && contactList.selectedConversation
+                      && String(messageRouter.selectedConversationId) === String(contactList.selectedConversation.id)
+                      ? messageRouter.messages : []
 
             // ----------------------------------------------------
             // LOADING
             // ----------------------------------------------------
 
-            loading: messagingWindow.activeAppIndex === 0 ? sessionAdapter.messagesLoading : false
+            loading: messagingWindow.nativeChatSelected ? messageRouter.messagesLoading : false
 
             // ----------------------------------------------------
             // LOAD ERROR
             // ----------------------------------------------------
 
-            error: messagingWindow.activeAppIndex === 0 ? sessionAdapter.messagesError : ""
+            error: messagingWindow.nativeChatSelected ? messageRouter.messagesError : ""
 
             // ----------------------------------------------------
             // SENDING
             // ----------------------------------------------------
 
-            sending: messagingWindow.activeAppIndex === 0 ? sessionAdapter.sending : false
+            sending: messagingWindow.nativeChatSelected ? messageRouter.sending : false
 
             // ----------------------------------------------------
             // SEND ERROR
             // ----------------------------------------------------
 
-            sendError: messagingWindow.activeAppIndex === 0 ? sessionAdapter.sendError : ""
+            sendError: messagingWindow.nativeChatSelected ? messageRouter.sendError : ""
 
             // ----------------------------------------------------
             // SEND SUCCESS
             // ----------------------------------------------------
 
-            sendSuccessSerial: messagingWindow.activeAppIndex === 0 ? sessionAdapter.sendSuccessSerial : 0
+            sendSuccessSerial: messagingWindow.nativeChatSelected ? messageRouter.sendSuccessSerial : 0
 
             // ----------------------------------------------------
             // SEND MESSAGE
             // ----------------------------------------------------
 
             onSendRequested: function (conversationId, text) {
-                if (messagingWindow.activeAppIndex === 0) {
-                    sessionAdapter.sendMessage(conversationId, text);
-                }
+                if (messagingWindow.nativeChatSelected)
+                    messageRouter.sendMessage(conversationId, text);
             }
 
             // ----------------------------------------------------
@@ -1359,6 +1367,7 @@ PanelWindow {
             messagingWindow.setGeometryWatch(true);
 
             // The BAR Sessions button opens the menu on Sessions.
+            contactList.clearSelection();
             activeAppIndex = 0;
             appSelector.selectedIndex = 0;
 
@@ -1393,6 +1402,7 @@ PanelWindow {
             discordLeaveProcess.running = true;
             messagingWindow.hideX();
 
+            contactList.clearSelection();
             activeAppIndex = 0;
             focusZone = appZone;
             keyboardFocus.focus = false;

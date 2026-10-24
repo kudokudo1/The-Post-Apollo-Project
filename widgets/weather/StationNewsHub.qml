@@ -14,6 +14,9 @@ Rectangle {
     property string section: "LIVE"
     property bool viewerOpen: false
     property var chosenRecord: null
+    // Channel sound follows one active in-Station viewer. It starts muted
+    // on every new viewer session; the list button can explicitly unmute.
+    property bool channelMuted: true
     property string notice: ""
     property string creatorFeedStatus: "CHOOSE A SAVED CREATOR"
     property var creatorFeedRows: []
@@ -104,6 +107,10 @@ Rectangle {
     function closeViewer() {
         viewerOpen = false;
         chosenRecord = null;
+        channelMuted = true;
+    }
+    function toggleMute() {
+        channelMuted = !channelMuted;
     }
     function checkUploads(item) {
         if (!item || !item.channelId) return;
@@ -157,6 +164,7 @@ Rectangle {
         anchors.margins: 10
         height: 33
         spacing: 7
+        visible: !stationNewsHub.viewerOpen
 
         Repeater {
             model: Catalog.sections
@@ -292,11 +300,18 @@ Rectangle {
                         spacing: 6
                         z: 2
                         ActionButton {
-                            width: 88
+                            width: 139
                             height: 28
-                            label: "VIEW HERE"
+                            label: "WATCH IN STATION"
                             labelPixelSize: 10
                             onClicked: stationNewsHub.chooseItem(modelData)
+                        }
+                        ActionButton {
+                            width: 90
+                            height: 28
+                            label: stationNewsHub.channelMuted ? "MUTE: ON" : "MUTE: OFF"
+                            labelPixelSize: 10
+                            onClicked: stationNewsHub.toggleMute()
                         }
                         ActionButton {
                             width: 82
@@ -410,9 +425,11 @@ Rectangle {
         visible: active
         z: 5
         sourceComponent: Component {
-            StationViewerHost {
+            StationChannelScreen {
                 selectedRecord: stationNewsHub.chosenRecord
-                onBackRequested: stationNewsHub.closeViewer()
+                muted: stationNewsHub.channelMuted
+                onMuteToggled: stationNewsHub.toggleMute()
+                onCloseRequested: stationNewsHub.closeViewer()
             }
         }
     }

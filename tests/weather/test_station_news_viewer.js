@@ -92,6 +92,28 @@ assert.match(web, /property bool audioAllowed: false/);
 assert.match(web, /audioMuted: !newsWeb.audioAllowed/);
 assert.match(viewer, /label: stationViewer.audioAllowed \? "MUTE" : "ENABLE AUDIO"/);
 
+const channel = read("widgets/weather/StationChannelScreen.qml");
+// Direct channel view hides the surrounding NEWS rack and occupies the full
+// viewing bay. It never silently launches an OS browser or a second terminal.
+assert.match(channel, /signal closeRequested\(\)/);
+assert.match(channel, /signal muteToggled\(\)/);
+assert.match(channel, /label: "×  CLOSE"/);
+assert.match(channel, /label: channelScreen\.muted \? "MUTE: ON" : "MUTE: OFF"/);
+assert.match(channel, /active: channelScreen\.sourceUrl !== ""/);
+assert.match(channel, /source: "StationNewsWebView\.qml"/);
+assert.match(channel, /onLoaded:[\s\S]*?item\.articleUrl = channelScreen\.sourceUrl/);
+assert.match(channel, /WEB RENDERER NOT AVAILABLE/);
+assert.match(channel, /QtWebEngine could not load in this Quickshell runtime/);
+assert.match(channel, /PLAYER REDIRECT BLOCKED/);
+assert.match(channel, /PUBLISHER PAGE FAILED/);
+assert.match(channel, /visible: channelScreen\.noRenderer/);
+assert.match(channel, /channelLoader\.status === Loader\.Error/);
+assert.match(channel, /channelScreen\.closeRequested\(\)/);
+assert.doesNotMatch(channel, /Qt\.openUrlExternally|swaymsg|command:[^\n]*kitty|\bProcess\s*\{/);
+assert.match(web, /property string loadError: ""/);
+assert.match(web, /WebEngineView\.LoadFailedStatus/);
+assert.match(web, /loadRequest\.errorString/);
+
 // No new radio backend, terminal launcher or compositor control in this stage.
 assert.doesNotMatch(viewer, /\bProcess\s*\{/);
 assert.doesNotMatch(discovery, /\bProcess\s*\{/);

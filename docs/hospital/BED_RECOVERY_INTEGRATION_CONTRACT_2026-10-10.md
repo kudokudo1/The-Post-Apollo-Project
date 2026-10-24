@@ -56,3 +56,26 @@ The embedding Hospital UI provides:
 
 ## Rollback
 Disconnect the new UI host bridge; retain PX's independent fail-closed target preflight once accepted. No database migration or changes to existing staff authority are involved.
+
+
+## 2026-10-11 PXD operations preview (#182) — status update
+The previous contract described the isolated UI. The draft preview now also implements:
+- scripts/hospital-bed-operations.py: bounded Python CLI (list, register, create), checked actual Git root, branch and anchored GitHub origin, absolute paths, atomic local registry writes.
+- services/hospital/HospitalBedRecoveryOperationService.qml: user-requested register/create operations, asynchronous completion and registry load.
+- services/hospital/HospitalFloorService.qml: combines fresh discovered Beds with registered Beds, deduplicates by path; scanner data takes precedence.
+- widgets/HospitalBedRecoveryDialog.qml: manual checkout path input, explicit registration, two-click new worktree creation.
+- widgets/HospitalW.qml: wires the operation service. No auto-send or implicit provider approval.
+- tests/hospital/test_bed_operations.py: disposable Git regression cases.
+- tests/hospital/test_bed_operations_bridge.js: static UI/service integration contract.
+
+Registry default: $XDG_STATE_HOME/post-apollo/hospital/registered-beds.json.
+New managed worktree default: $XDG_DATA_HOME/post-apollo/hospital/beds/.
+Standard home fallbacks apply when XDG variables are unset.
+Registry entries are candidate discovery metadata only, never Assignment authority.
+The script does not fetch, reset, clean, stash, force-switch or overwrite existing destinations.
+Occupied branches, unavailable local branches, invalid roots and mismatched GitHub Patient remotes refuse safely.
+Local-only repos without an anchored GitHub origin are not automatically trusted.
+
+IMPORTANT: Force movement remains held because global live Doctor/Bed occupancy has not been authoritatively verified.
+Also pending: real Quickshell QML loading and keyboard/pointer tests, PX production guard integration, shared PR #31/#53 reconciliation, and operator acceptance.
+Do not merge or install this candidate based on source/CI checks alone.

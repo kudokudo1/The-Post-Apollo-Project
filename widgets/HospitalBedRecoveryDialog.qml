@@ -16,6 +16,11 @@ Item {
     property string currentBedBranch: ""
     property string mismatchCode: ""
     property string pendingDraft: ""
+    property string actionError: ""
+    property string manualBedPath: ""
+    property bool createArmed: false
+    property bool operationBusy: false
+    property bool moveWorkerClearance: false
     property bool operationActive: false
     property bool recoveryOpen: false
     property bool moveArmed: false
@@ -40,14 +45,17 @@ Item {
     }
     readonly property var movePolicy: RecoveryPolicy.moveEligibility(
         currentBed, expectedRepository, expectedBranch,
-        operationActive || Boolean(floorService && floorService.moveRunning)
+        operationActive || operationBusy || !moveWorkerClearance
+        || Boolean(floorService && floorService.moveRunning)
     )
     readonly property bool scanning: Boolean(floorService && floorService.discovering)
+    // An observed idle selected Doctor does not prove OTHER Rooms are idle.
+    // Host must provide affirmative global worker/Bed occupancy evidence.
 
     signal selectBedRequested(var candidate)
     signal createBedRequested(string repository, string branch)
     signal moveBedRequested(string bedPath, string branch)
-    signal registerBedRequested()
+    signal registerBedRequested(string path)
     signal inspectOnlyRequested()
     signal cancelled()
 
@@ -63,12 +71,21 @@ Item {
         recoveryOpen = true;
         moveArmed = false;
         selectedPath = "";
+        actionError = "";
+        manualBedPath = "";
+        createArmed = false;
         scan();
         forceActiveFocus();
     }
 
     function cancel() {
+        if (operationBusy) {
+            actionError =
+                "BED OPERATION STILL RUNNING // WAIT FOR ITS RESULT";
+            return;
+        }
         moveArmed = false;
+        createArmed = false;
         recoveryOpen = false;
         // Parent retains pendingDraft: never clear or send a queued message.
         cancelled();
@@ -95,9 +112,14 @@ Item {
     onExpectedRepositoryChanged: rebuildCandidates()
     onExpectedBranchChanged: {
         moveArmed = false;
+        createArmed = false;
         rebuildCandidates();
     }
     onCurrentBedPathChanged: moveArmed = false
+    onOperationBusyChanged: {
+        moveArmed = false;
+        createArmed = false;
+    }
     onOperationActiveChanged: moveArmed = false
 
     Connections {
@@ -265,7 +287,7 @@ Item {
 
                     RecoveryButton {
                         id: searchButton
-                        title: root.scanning ? "SCANNING" : "SEARCH AGAIN"
+                        title: root.scanning || root.operationBusy ? "SCANNING" : "SEARCH AGAIN"
                         width: 140
                         enabledAction: !root.scanning
                         onTriggered: root.scan()
@@ -353,6 +375,15 @@ Item {
                     wrapMode: Text.WordWrap
                 }
 
+                GohuText {
+                    width: parent.width
+                    visible: root.actionError.length > 0
+                    text: root.actionError
+                    color: Colors.red
+                    font.pixelSize: 10
+                    wrapMode: Text.WordWrap
+                }
+
                 RecoveryButton {
                     width: parent.width
                     title: root.selectedCandidate
@@ -363,27 +394,71 @@ Item {
                     onTriggered: root.selectBedRequested(root.selectedCandidate)
                 }
 
-                Row {
+                RecoveryButton {
                     width: parent.width
-                    spacing: 8
-
-                    RecoveryButton {
-                        width: (parent.width - 8) / 2
-                        title: "CREATE NEW BED"
-                        accent: Colors.cyan
-                        enabledAction: Boolean(root.expectedRepository
-                                               && root.expectedBranch)
-                        onTriggered: root.createBedRequested(
+                    title: root.createArmed
+                           ? "CONFIRM NEW WORKTREE // CREATES FILES"
+                           : "CREATE SEPARATE BED // NO BRANCH SWITCH"
+                    accent: root.createArmed ? Colors.orange : Colors.cyan
+                    armed: root.createArmed
+                    enabledAction: !root.operationBusy
+                                   && Boolean(root.expectedRepository
+                                              && root.expectedBranch)
+                    onTriggered: {
+                        if (!root.createArmed) {
+                            root.createArmed = true;
+                            return;
+                        }
+                        root.createArmed = false;
+                        root.createBedRequested(
                             root.expectedRepository, root.expectedBranch
-                        )
+                        );
                     }
+                }
 
-                    RecoveryButton {
-                        width: (parent.width - 8) / 2
-                        title: "BROWSE / REGISTER BED"
-                        accent: Colors.cyan
-                        onTriggered: root.registerBedRequested()
+                GohuText {
+                    width: parent.width
+                    text: "REGISTER EXISTING BED // ENTER ABSOLUTE GIT WORKTREE PATH"
+                    color: Colors.cyan
+                    font.pixelSize: 9
+                    wrapMode: Text.WordWrap
+                }
+
+                Rectangle {
+                    width: parent.width
+                    height: 34
+                    color: Colors.black
+                    border.width: 1
+                    border.color: bedPathInput.activeFocus
+                                  ? Colors.orange : Colors.cyan
+
+                    TextInput {
+                        id: bedPathInput
+                        anchors.fill: parent
+                        anchors.margins: 8
+                        color: Colors.white
+                        selectionColor: Colors.orange
+                        selectedTextColor: Colors.black
+                        font.family: "GohuFont 11 Nerd Font Mono"
+                        font.pixelSize: 11
+                        clip: true
+                        text: root.manualBedPath
+                        onTextEdited: root.manualBedPath = text
+                        horizontalAlignment: Text.AlignLeft
+                        verticalAlignment: TextInput.AlignVCenter
+                        selectByMouse: true
                     }
+                }
+
+                RecoveryButton {
+                    width: parent.width
+                    title: "VERIFY AND REGISTER EXISTING BED"
+                    accent: Colors.cyan
+                    enabledAction: !root.operationBusy
+                                   && root.manualBedPath.trim().length > 0
+                    onTriggered: root.registerBedRequested(
+                        root.manualBedPath.trim()
+                    )
                 }
 
                 RecoveryButton {
@@ -410,7 +485,10 @@ Item {
                     width: parent.width
                     text: root.movePolicy.eligible
                           ? "Movement still requires a fresh dirty/occupancy/worker check. LIVE Beds require the existing second confirmation."
-                          : "MOVE UNAVAILABLE // " + root.movePolicy.reason
+                          : "MOVE UNAVAILABLE // "
+                            + (!root.moveWorkerClearance
+                               ? "ACTIVE WORKER CLEARANCE NOT YET VERIFIED"
+                               : root.movePolicy.reason)
                             + ". Create a separate Bed instead."
                     font.pixelSize: 9
                     wrapMode: Text.WordWrap
@@ -430,8 +508,11 @@ Item {
 
                     RecoveryButton {
                         width: (parent.width - 8) / 2
-                        title: "CANCEL // KEEP DRAFT"
+                        title: root.operationBusy
+                               ? "BED OPERATION IN PROGRESS"
+                               : "CANCEL // KEEP DRAFT"
                         accent: Colors.red
+                        enabledAction: !root.operationBusy
                         onTriggered: root.cancel()
                     }
                 }

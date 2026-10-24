@@ -73,3 +73,55 @@ function created(snapshot,ids,title) {
         return row && row.title===title && ids.indexOf(row.id)===-1;
     });
 }
+
+
+function candidates(snapshot, projectFilter, priorityFilter, undatedOnly) {
+    if (!snapshot || !Array.isArray(snapshot.items)
+            || (snapshot.state!=="ready" && snapshot.state!=="empty"
+                && snapshot.state!=="saving"))
+        return [];
+    if (typeof projectFilter!=="string" || typeof priorityFilter!=="string"
+            || typeof undatedOnly!=="boolean") return [];
+    var projects=Array.isArray(snapshot.projects) ? snapshot.projects : [];
+    if (projectFilter!=="all" && projectFilter!=="unassigned"
+            && !projects.some(function(p) { return p && p.id===projectFilter; }))
+        return [];
+    var priorities=["any","none","low","medium","high","urgent"];
+    if (priorities.indexOf(priorityFilter)<0) return [];
+    var filtered=snapshot.items.filter(function(task) {
+        if (!task || typeof task.id!=="string"
+                || typeof task.title!=="string" || task.done!==false)
+            return false;
+        if (projectFilter==="unassigned"
+                && task.projectId!==null && task.projectId!==undefined)
+            return false;
+        if (projectFilter!=="all" && projectFilter!=="unassigned"
+                && task.projectId!==projectFilter)
+            return false;
+        if (priorityFilter!=="any" && task.priority!==priorityFilter)
+            return false;
+        if (undatedOnly && task.dueDate!==null && task.dueDate!==undefined)
+            return false;
+        return true;
+    });
+    // Default to undated tasks first, then soonest deadline, then stable ID.
+    // Sorting is display-only; never change snapshot.items or task identities.
+    return filtered.slice().sort(function(a,b) {
+        var dateA=a.dueDate || "", dateB=b.dueDate || "";
+        if (dateA!==dateB) return dateA<dateB ? -1 : 1;
+        if (a.id!==b.id) return a.id<b.id ? -1 : 1;
+        return 0;
+    });
+}
+function newlyCreated(snapshot,ids,title) {
+    if (!snapshot || (snapshot.state!=="ready" && snapshot.state!=="empty")
+            || !Array.isArray(snapshot.items) || !Array.isArray(ids))
+        return null;
+    for (var i=0;i<snapshot.items.length;i++) {
+        var row=snapshot.items[i];
+        if (row && row.title===title && ids.indexOf(row.id)===-1
+                && row.dueDate===null && row.done===false)
+            return row;
+    }
+    return null;
+}

@@ -35,11 +35,18 @@ export function normalizeSnapshot({month, budget, accounts, balances,
     throw new Error("unexpected-actual-data-shape");
   }
   const categoryRows = [];
+  const groupRows = [];
   for (const group of budget.categoryGroups) {
     if (!group || !Array.isArray(group.categories)) {
       throw new Error("unexpected-category-group");
     }
     if (group.is_income) continue;
+    // Stable identifiers, not display names, are needed for future category
+    // management. A malformed group fails closed rather than guessing IDs.
+    if (typeof group.id !== "string" || !group.id
+        || typeof group.name !== "string" || !group.name.trim())
+      throw new Error("unexpected-category-group-identity");
+    groupRows.push({id:group.id,name:group.name});
     for (const category of group.categories) {
       if (!category || typeof category.name !== "string"
           || typeof category.id !== "string") {
@@ -48,7 +55,8 @@ export function normalizeSnapshot({month, budget, accounts, balances,
       categoryRows.push({
         id: category.id,
         name: category.name,
-        group: String(group.name || ""),
+        group: group.name,
+        groupId: group.id,
         budgetedCents: cents(category.budgeted, "budgeted"),
         spentCents: cents(category.spent, "spent"),
         availableCents: cents(category.balance, "balance")
@@ -119,6 +127,7 @@ export function normalizeSnapshot({month, budget, accounts, balances,
     toBudgetCents: cents(budget.toBudget, "toBudget"),
     accounts: accountRows,
     categories: categoryRows,
+    categoryGroups: groupRows,
     funding: summarizeFunding({month,budget,accounts,balances,transactionSets}),
     incomeReview: summarizeIncomeCandidates({month,budget,accounts,transactionSets}),
     transactionsCount: transactionRows.length,

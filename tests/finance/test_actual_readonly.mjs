@@ -9,11 +9,11 @@ const sample = {
   budget: {
     toBudget: 20000,
     categoryGroups: [
-      {name: "Usual Expenses", is_income: false, categories: [
+      {id:"group-expenses", name: "Usual Expenses", is_income: false, categories: [
         {id: "spotify", name: "Spotify Subscription",
           budgeted: 5000, spent: 0, balance: 5000}
       ]},
-      {name: "Income", is_income: true, categories: [
+      {id:"group-income", name: "Income", is_income: true, categories: [
         {id:"income", name:"Starting Balances",
           budgeted:0, spent:0, balance:25000}
       ]}
@@ -42,8 +42,9 @@ test("snapshot contains the original fictional $250 / $50 / $200 values", () => 
   ]);
   assert.deepEqual(result.categories, [{
     id:"spotify",name:"Spotify Subscription",group:"Usual Expenses",
-    budgetedCents:5000,spentCents:0,availableCents:5000
+    groupId:"group-expenses",budgetedCents:5000,spentCents:0,availableCents:5000
   }]);
+  assert.deepEqual(result.categoryGroups,[{id:"group-expenses",name:"Usual Expenses"}]);
   assert.equal(result.schemaVersion, 1);
   assert.equal(result.transactionsCount, 3);
   assert.deepEqual(result.transactions.map(x=>x.date),
@@ -84,10 +85,13 @@ test("fail closed rather than inventing a missing balance", () => {
   assert.throws(()=>normalizeSnapshot({...sample,
     balances: new Map()}), /unexpected-account/);
   assert.throws(()=>normalizeSnapshot({...sample,
+    budget:{...sample.budget,categoryGroups:[{...sample.budget.categoryGroups[0],id:undefined}]} }),
+    /unexpected-category-group-identity/);
+  assert.throws(()=>normalizeSnapshot({...sample,
     budget: {...sample.budget,categoryGroups: [{}]}}), /unexpected-category-group/);
   assert.throws(()=>normalizeSnapshot({...sample,
     budget: {...sample.budget,categoryGroups: [{
-      name:"Usual Expenses",categories:[{id:"x",name:"Test",budgeted:500,
+      id:"group-expenses",name:"Usual Expenses",categories:[{id:"x",name:"Test",budgeted:500,
         spent:0,balance:5.3}]
     }]}}), /invalid-financial-field/);
 });

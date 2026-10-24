@@ -12,6 +12,10 @@ on:
       - "tests/components/test_syntagma_ui_lag_probe.py"
       - "tests/components/test_syntagma_bg_lag_probe.py"
       - "tests/components/test_syntagma_quickshell_thread_sampler.py"
+      - "tests/components/test_syntagma_array_copy_probe.py"
+      - "services/system/GraphHistory.qml"
+      - "services/notifications/NotificationsService.qml"
+      - "OPERATE/syntagma-ui-lag-probe.md"
       - "scripts/syntagma_quickshell_thread_sampler.py"
       - "docs/syntagma-ui-lag-probe.md"
       - ".github/workflows/syntagma-ui-lag-probe.yml"
@@ -27,6 +31,10 @@ on:
       - "tests/components/test_syntagma_ui_lag_probe.py"
       - "tests/components/test_syntagma_bg_lag_probe.py"
       - "tests/components/test_syntagma_quickshell_thread_sampler.py"
+      - "tests/components/test_syntagma_array_copy_probe.py"
+      - "services/system/GraphHistory.qml"
+      - "services/notifications/NotificationsService.qml"
+      - "OPERATE/syntagma-ui-lag-probe.md"
       - "scripts/syntagma_quickshell_thread_sampler.py"
       - ".github/workflows/syntagma-ui-lag-probe.yml"
   workflow_dispatch:
@@ -44,3 +52,4 @@ jobs:
           python3 tests/components/test_syntagma_ui_lag_probe.py
           python3 tests/components/test_syntagma_bg_lag_probe.py
           python3 tests/components/test_syntagma_quickshell_thread_sampler.py
+          python3 tests/components/test_syntagma_array_copy_probe.py

@@ -1,0 +1,44 @@
+name: TASKS Proxy 1 M10m legacy to SQLite preview
+
+on:
+  pull_request:
+    paths:
+      - 'services/projects/LegacySqliteMigrationPreview.py'
+      - 'tests/tasks/fixtures/legacy_to_sqlite_v2_oracle.cjs'
+      - 'tests/tasks/test_legacy_sqlite_migration_preview.py'
+      - 'docs/tasks-legacy-to-sqlite-preview-m10m.md'
+      - '.github/workflows/tasks-legacy-sqlite-preview.yml'
+  push:
+    branches:
+      - main
+    paths:
+      - 'services/projects/LegacySqliteMigrationPreview.py'
+      - 'tests/tasks/fixtures/legacy_to_sqlite_v2_oracle.cjs'
+      - 'tests/tasks/test_legacy_sqlite_migration_preview.py'
+      - 'docs/tasks-legacy-to-sqlite-preview-m10m.md'
+      - '.github/workflows/tasks-legacy-sqlite-preview.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  migration-preview:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: M10m raw-byte legacy backup and SQLite v2 preview
+        run: python3 tests/tasks/test_legacy_sqlite_migration_preview.py
+      - name: Existing M10d strict legacy dry run
+        run: node tests/tasks/test_legacy_migration_dryrun.cjs
+      - name: Existing M10h model and migration contract
+        run: node tests/tasks/test_unified_project_model_v2.cjs
+      - name: Existing M10l record-level SQLite and crash windows
+        run: python3 tests/tasks/test_task_sqlite_records_v2.py
+      - name: Existing M10k JS/Python schema parity
+        run: python3 tests/tasks/test_task_sqlite_read_parity.py

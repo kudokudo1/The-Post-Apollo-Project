@@ -31,8 +31,11 @@ function frame(level, viewportWidth, viewportHeight, gutter, topInset, bottomGap
     return {
         width: mode === "fullscreen" ? width
              : Math.min(width, mode === "expanded" ? 1000 : 432),
-        height: mode === "fullscreen" ? height
-              : Math.min(height, mode === "expanded" ? 900 : 790)
+        // Large is a roomy, screen-width workspace, not a mandate to
+        // stretch vertically to the output edge when content doesn't need it.
+        // The 8px bottom gap is a minimum on smaller displays.
+        height: Math.min(height, mode === "fullscreen" ? 1120
+                                   : mode === "expanded" ? 900 : 790)
     };
 }
 

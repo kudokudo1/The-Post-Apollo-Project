@@ -169,6 +169,14 @@ Operator ran `swaymsg -t get_tree` on the live Weather Station STAR MAP actor an
 
 **Verification / boundaries:** regression tests cover 429 text, conservative admission/backoff, cached records and UI links. Do not claim service health from code/CI, and do not spam GDELT to validate throttling. The session cache clears on full Quickshell restart and cannot prevent requests made by other applications sharing the provider/IP. No Kitty, SwayPX, MAP, RADIO, local machine file or browser viewer change; any local reload requires explicit operator authorization.
 
+### B19 // 2026-10-24 NEWS repeated 429 + stationary countdown (operator live feedback)
+
+**Observed after B18:** operator clicked RETRY NEWS at the previous 60-second local deadline and received **another HTTP 429**. The countdown failed to visibly change while NEWS remained open; switching modes forced an apparent refresh. This distinguishes a local retry timer from actual upstream rate-limit recovery, and reveals a QML clock observer that must repaint independently of tab transitions. No additional provider requests were sent during this repair.
+
+**Narrow correction:** GDELT 429 response now produces progressive **5, 15, 30, then 60-minute** minimum delays in a shared in-memory policy. After the first 429, an explicit **manual-only retry latch** prevents automatic re-requests on page reconstruction and the existing periodic refresh timer. Successful replies clear this latch and reuse results for at least 15 minutes across page remounts. A one-second Qt Quick Timer runs whenever the NEWS page is active to update `sourceClockMs` independent of the countdown expression; header and retry row show an actual MM:SS countdown. The button calls `refresh(true)`, while lifecycle and periodic refresh call the guarded `refresh()`.
+
+**Meaning:** the countdown shows **earliest permitted local retry**, never a guarantee that GDELT will allow the next attempt. Failures may persist due to upstream abuse controls or other clients on the same IP. Live GDELT and Wayland/QML behavior require operator verification after an authorized pull/reload. No new news provider, local write, Kitty, SwayPX, Stage Director, RADIO or MAP changes.
+
 ## 4 // Domain family C: MAP and world/environmental layers
 
 Current EONET is an event index only. Planned:

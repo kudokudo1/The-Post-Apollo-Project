@@ -722,7 +722,7 @@ assert.deepEqual(JSON.parse(JSON.stringify(
         {x: 1724, y: 167, width: 200, height: 100}))),
         {x: 10, y: 15, width: 200, height: 100, exact: false});
 assert.equal(terminalGeometry.visibleIntersection(desired,
-    {x: 2100, y: 152, width: 100, height: 80}), null);
+    {x: 2600, y: 152, width: 100, height: 80}), null);
 assert.equal(terminalGeometry.visibleIntersection(desired,
     {x: 1714, y: 152, width: 0, height: 400}), null);
 assert.equal(terminalGeometry.observedWindow(treeExample, "weather-screen-news"), null);

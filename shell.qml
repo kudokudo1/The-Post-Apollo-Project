@@ -784,6 +784,31 @@ PanelWindow {
             id: apolloHubWindow
             screen: shellRoot.screen
             liveBridge: apolloHubLive
+            // Owner windows retain the controller, subprocesses and Sway
+            // geometry. Hub receives only a tiny state projection and
+            // explicit typed action routing at direct button presses.
+            appControlAvailable: appControlWindow !== null
+            socialActionsAvailable: messagingWindow !== null
+            socialSnapshot: messagingWindow
+                            ? ({ menuOpen: messagingWindow.menuOpen,
+                                 activeAppIndex: messagingWindow.activeAppIndex })
+                            : null
+            onOpenAppControlRequested: {
+                if (appControlWindow)
+                    appControlWindow.menuOpen = true;
+            }
+            onOpenSocialRequested: {
+                if (messagingWindow)
+                    messagingWindow.menuOpen = true;
+            }
+            onSocialPlatformRequested: function(index) {
+                if (!messagingWindow || !Number.isInteger(index)
+                        || index < 0 || index > 3)
+                    return;
+                messagingWindow.menuOpen = true;
+                // Only MessagingW owns Discord/X window and focus behavior.
+                messagingWindow.activateApp(index, false);
+            }
             // The Hub is not yet enrolled in Koinoikos's cross-window
             // registry; it cannot take keyboard input during that mode.
             keyboardActive: !relationshipFocus.active

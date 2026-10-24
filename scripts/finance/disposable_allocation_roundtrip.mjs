@@ -28,6 +28,7 @@ const here=dirname(fileURLToPath(import.meta.url));
 const binary=join(here,"node_modules",".bin","actual-server");
 const writer=join(here,"write_allocation.mjs");
 const fundingWriter=join(here,"write_funding.mjs");
+const categoryWriter=join(here,"write_category.mjs");
 const host="http://127.0.0.1:5006";
 const password="FICTIONAL-ONLY-D12-TEST-2026";
 const date=new Date().toISOString().slice(0,7)+"-01";
@@ -443,7 +444,70 @@ async function main(){
   const created=allAccounts.filter(a=>a.name===writerOpening.accountName);
   assert.equal(created.length,1);
   assert.equal(await api.getAccountBalance(created[0].id),6500);
+
+  // M2: production category create/rename writer against this disposable
+  // fictional Actual server, with independently authenticated readback.
+  await endClient();
+  const runCategory=cmd=>spawnSync(process.execPath,[categoryWriter],{
+    encoding:"utf8",timeout:45000,input:JSON.stringify(cmd)+"\n",
+    env:{...process.env,HOME:writerHome,ACTUAL_SERVER_URL:"",
+      ACTUAL_SYNC_ID:"",ACTUAL_PASSWORD_FILE:"",
+      ACTUAL_SYNC_ID_FILE:"",ACTUAL_ENCRYPTION_PASSWORD_FILE:""}
+  });
+  const categoryNew={
+    mode:"create",requestId:"5".repeat(32),sourceKey,month,
+    groupId,categoryId:"",expectedName:"",
+    proposedName:"M2 FICTIONAL Utilities"
+  };
+  stage="m2-category-permit-absent";
+  const catLocked=runCategory(categoryNew);
+  assert.equal(catLocked.status,1);
+  assert.equal(catLocked.stdout.trim(),
+    "FINANCEW_CATEGORY_RESULT blocked:writes-disabled");
+  stage="m2-category-disposable-permit";
+  await writeFile(join(config,"category-writes-enabled"),
+    "FINANCEW_CATEGORY_WRITES_APPROVED\n",{mode:0o600,flag:"wx"});
+  stage="m2-category-create";
+  const catCreated=runCategory(categoryNew);
+  assert.equal(catCreated.error,undefined);
+  if(catCreated.status!==0 || !/^FINANCEW_CATEGORY_RESULT committed$/m.test(catCreated.stdout)) {
+    const token=/^FINANCEW_CATEGORY_RESULT (committed|uncertain|blocked:[a-z0-9-]+)$/m
+      .exec(catCreated.stdout)?.[1] || "missing-status";
+    throw new Error("category-create-"+token.replace(/[^a-z0-9:-]/g,""));
+  }
+  const catRename={
+    mode:"rename",requestId:"6".repeat(32),sourceKey,month,
+    groupId,categoryId,expectedName:"FICTIONAL Food",
+    proposedName:"M2 FICTIONAL Food"
+  };
+  stage="m2-category-rename";
+  const catRenamed=runCategory(catRename);
+  assert.equal(catRenamed.error,undefined);
+  if(catRenamed.status!==0 || !/^FINANCEW_CATEGORY_RESULT committed$/m.test(catRenamed.stdout)) {
+    const token=/^FINANCEW_CATEGORY_RESULT (committed|uncertain|blocked:[a-z0-9-]+)$/m
+      .exec(catRenamed.stdout)?.[1] || "missing-status";
+    throw new Error("category-rename-"+token.replace(/[^a-z0-9:-]/g,""));
+  }
+  const catReceiptPath=cmd=>join(writerHome,".local","state","financew",
+    "operations","category-"+cmd.requestId+".json");
+  assert.equal(JSON.parse(await readFile(catReceiptPath(categoryNew),"utf8")).status,"committed");
+  assert.equal(JSON.parse(await readFile(catReceiptPath(catRename),"utf8")).status,"committed");
+  assert.equal((await stat(catReceiptPath(categoryNew))).mode & 0o077,0);
+  assert.ok(!(await readFile(catReceiptPath(categoryNew),"utf8")).includes("Utilities"));
+  stage="m2-category-replay-refusal";
+  const catReplay=runCategory(categoryNew);
+  assert.equal(catReplay.status,1);
+  assert.match(catReplay.stdout,/FINANCEW_CATEGORY_RESULT blocked:operation-already-attempted/);
+  stage="m2-category-independent-readback";
+  await startClient("m2-category-readback");
+  await api.downloadBudget(syncId);
+  const catAfter=await api.getCategories();
+  assert.equal(catAfter.filter(c=>c.name===categoryNew.proposedName
+    && c.group_id===groupId).length,1);
+  assert.equal(catAfter.filter(c=>c.id===categoryId
+    && c.name===catRename.proposedName && c.group_id===groupId).length,1);
   stage="pass";
+  process.stdout.write("FINANCEW_M2_DISPOSABLE_PASS category-create/rename/locked/replay/readback\\n");
   process.stdout.write("FINANCEW_D17C_DISPOSABLE_PASS locked/income/opening/replay/recovery/readback\n");
   process.stdout.write("FINANCEW_D17B_DISPOSABLE_PASS income/opening/replay/reconciliation/readback\n");
   process.stdout.write("FINANCEW_D12B_D12C_DISPOSABLE_PASS real-server/gate/allocation/replay/readback\n");

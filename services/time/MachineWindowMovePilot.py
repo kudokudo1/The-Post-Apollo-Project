@@ -127,16 +127,29 @@ def _command_success(result):
             and parsed[0].get("success") is True)
 
 
-def _observe(runner, request):
-    _, _, tree = _read_state(runner)
+def _observe(runner, saved_document, request):
+    """Postflight rechecks target placement, app uniqueness and output mapping."""
+    outputs, workspaces, tree = _read_state(runner)
     try:
+        resolution = resolve(saved_document, outputs, workspaces, tree)
         nodes = _walk_live(tree)
     except ResolutionError:
         return "unavailable"
-    hits = [x for x in nodes if x["con_id"] == request["con_id"]]
-    if len(hits) != 1 or hits[0]["app_id"] != request["app_id"]:
+    matching = [row for row in resolution["candidates"]
+                if row["app_id"] == request["app_id"]]
+    app_nodes = [row for row in nodes if row["app_id"] == request["app_id"]]
+    if len(matching) != 1 or len(app_nodes) != 1:
         return "unavailable"
-    return hits[0]["workspace"]
+    win = app_nodes[0]
+    if win["con_id"] != request["con_id"] or win["fullscreen"]:
+        return "unavailable"
+    if matching[0]["status"] == "already" and win["workspace"] == request["to_workspace"]:
+        return request["to_workspace"]
+    if (matching[0]["status"] == "candidate"
+            and matching[0]["live_con_id"] == request["con_id"]
+            and win["workspace"] == request["from_workspace"]):
+        return request["from_workspace"]
+    return "unavailable"
 
 
 def execute_one(saved_document, request, *, read_runner, command_runner):
@@ -158,7 +171,7 @@ def execute_one(saved_document, request, *, read_runner, command_runner):
     accepted = _command_success(outcome)
     # Postflight must re-observe. Never claim success from IPC reply alone.
     try:
-        observed = _observe(read_runner, request)
+        observed = _observe(read_runner, saved_document, request)
     except MoveRefused:
         observed = "unavailable"
     if accepted and observed == request["to_workspace"]:

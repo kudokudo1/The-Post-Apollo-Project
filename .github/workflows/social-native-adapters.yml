@@ -40,6 +40,7 @@ jobs:
           python3 tests/messaging/test_session_adapter_contracts.py
           python3 tests/messaging/test_telegram_adapter_contracts.py
           python3 tests/messaging/test_telegram_bridge_cli_contracts.py
+          python3 tests/messaging/test_telegram_login_ui_contracts.py
           # Worker B sentinel source is checked by test_social_native_router_contracts.py.
           # Worker B owns separate legacy static tests with a false-positive
           # substring guard (the word "password" appears in a safety comment).

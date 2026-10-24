@@ -49,6 +49,96 @@ Item {
 
     readonly property string bridgePath: Quickshell.shellPath("services/messaging/bridges/telegram/bridge.py")
     property string pythonPath: "/usr/bin/python3"
+    readonly property string loginBridgePath: Quickshell.shellPath("services/messaging/bridges/telegram/login_ui.py")
+
+    // Explicit, user-initiated account connection. No automatic login.
+    property string loginState: "IDLE"
+    property string loginDetail: ""
+    property string qrSource: ""
+    property string loginMode: ""
+    property string requestedLoginMode: ""
+    property bool loginCancelled: false
+    property string pendingAppId: ""
+    property string pendingAppHash: ""
+    readonly property bool loginInProgress: loginProcess.running
+
+    function startLogin(mode) {
+        if (!active || (mode !== "qr" && mode !== "phone" && mode !== "configure"))
+            return;
+        requestedLoginMode = mode;
+        if (loginProcess.running) {
+            loginCancelled = true;
+            loginProcess.running = false;
+            return;
+        }
+        launchRequestedLogin();
+    }
+
+    function launchRequestedLogin() {
+        if (!active || !requestedLoginMode || loginProcess.running)
+            return;
+        loginMode = requestedLoginMode;
+        requestedLoginMode = "";
+        loginCancelled = false;
+        loginState = "CONNECTING";
+        loginDetail = "Connecting to Telegram...";
+        qrSource = "";
+        loginProcess.command = [pythonPath, loginBridgePath, loginMode];
+        loginProcess.running = true;
+    }
+
+    function cancelLogin() {
+        requestedLoginMode = "";
+        loginCancelled = true;
+        loginProcess.running = false;
+        loginState = "IDLE";
+        loginDetail = "";
+        qrSource = "";
+        pendingAppId = "";
+        pendingAppHash = "";
+    }
+
+    function submitPhone(value) {
+        if (loginProcess.running && loginState === "PHONE_REQUIRED")
+            loginProcess.write(JSON.stringify({action: "phone", value: String(value)}) + "\n");
+    }
+
+    function submitCode(value) {
+        if (loginProcess.running && loginState === "CODE_REQUIRED")
+            loginProcess.write(JSON.stringify({action: "code", value: String(value)}) + "\n");
+    }
+
+    function submitPassword(value) {
+        if (loginProcess.running && loginState === "PASSWORD_REQUIRED")
+            loginProcess.write(JSON.stringify({action: "password", value: String(value)}) + "\n");
+    }
+
+    function saveApplicationKeys(apiId, apiHash) {
+        if (!active)
+            return;
+        pendingAppId = String(apiId);
+        pendingAppHash = String(apiHash);
+        startLogin("configure");
+    }
+
+    function handleLoginEvent(line) {
+        if (!active || loginCancelled)
+            return;
+        try {
+            const event = JSON.parse(String(line));
+            const state = String(event.state || "ERROR");
+            loginState = state === "INVALID_CODE" ? "CODE_REQUIRED" : state;
+            loginDetail = String(event.detail || "");
+            qrSource = state === "QR_READY" ? String(event.image || "") : "";
+            if (state === "READY") {
+                loginDetail = "Connected. Loading your conversations...";
+                backendMode = "PROBING";
+            }
+        } catch (e) {
+            loginState = "ERROR";
+            loginDetail = "Invalid connection status from Telegram";
+        }
+    }
 
     function command(args) {
         return [pythonPath, bridgePath].concat(args || []);
@@ -69,6 +159,7 @@ Item {
         if (active) {
             probe();
         } else {
+            cancelLogin();
             // Never leave a selected conversation or private history attached
             // to a deselected service. In-flight reads are generation-guarded.
             selectedConversationId = "";
@@ -130,6 +221,46 @@ Item {
         sendProcess.command = command(["send", String(conversationId)]);
         sendProcess.running = true;
         return true;
+    }
+
+    Process {
+        id: loginProcess
+        stdinEnabled: true
+        stdout: SplitParser {
+            onRead: function(line) {
+                adapter.handleLoginEvent(line);
+            }
+        }
+        onStarted: {
+            if (adapter.loginMode === "configure") {
+                write(JSON.stringify({
+                    action: "configure",
+                    apiId: adapter.pendingAppId,
+                    apiHash: adapter.pendingAppHash
+                }) + "\n");
+                adapter.pendingAppId = "";
+                adapter.pendingAppHash = "";
+            }
+        }
+        onExited: function(exitCode, exitStatus) {
+            if (adapter.loginCancelled) {
+                adapter.loginCancelled = false;
+                Qt.callLater(function() { adapter.launchRequestedLogin(); });
+                return;
+            }
+            if (!adapter.active)
+                return;
+            if (adapter.loginState === "APP_SAVED") {
+                // Keys saved, now attempt QR pairing without leaving Social.
+                adapter.requestedLoginMode = "qr";
+                Qt.callLater(function() { adapter.launchRequestedLogin(); });
+            } else if (adapter.loginState === "READY") {
+                Qt.callLater(function() { adapter.probe(); });
+            } else if (adapter.loginState === "CONNECTING") {
+                adapter.loginState = "ERROR";
+                adapter.loginDetail = "Telegram connection stopped; retry";
+            }
+        }
     }
 
     Process {

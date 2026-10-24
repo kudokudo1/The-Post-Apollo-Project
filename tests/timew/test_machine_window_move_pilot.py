@@ -15,7 +15,7 @@ spec = importlib.util.spec_from_file_location("machine_move", root / "MachineWin
 mod = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(mod)
 from MachineMoveJournal import JournalError
-from MachineMoveJournal import JournalError
+from MachineMoveApproval import MoveApprovalGate
 
 rect = {"x": 0, "y": 0, "width": 1920, "height": 1080}
 document = {
@@ -82,6 +82,21 @@ class FakeSway:
         )
 
 
+# The operator-confirmation interface does not yet exist. These fixtures
+# explicitly stage a short-lived per-action review/confirmation and grant.
+CHECKPOINT_ID = "11111111-2222-4333-8444-555555555555"
+def grant_for(saved_document, req, read_runner):
+    gate = MoveApprovalGate()
+    unsigned = dict(req, approved=False)
+    review = gate.review(saved_document, unsigned,
+                         checkpoint_id=CHECKPOINT_ID, read_runner=read_runner)
+    approved = gate.approve(
+        review_id=review["review_id"], checkpoint_id=CHECKPOINT_ID,
+        saved_document=saved_document, request=unsigned,
+        confirmation_text=review["confirmation_text"])
+    return {"approval_gate": gate, "approval_token": approved["approval_token"],
+            "checkpoint_id": CHECKPOINT_ID}
+
 # Every synthetic execution gets its own independent temporary journal.
 # Even uncertain outcomes cannot spill into another fixture or live XDG path.
 _tmp = tempfile.TemporaryDirectory()
@@ -89,7 +104,9 @@ _case_id = itertools.count()
 def run_execute(*args, **kwargs):
     path = Path(_tmp.name) / ("case-" + str(next(_case_id))) / "move-operations.db"
     journal = mod.MoveJournal(path)
-    result = mod.execute_one(*args, journal=journal, **kwargs)
+    saved_document, req = args[:2]
+    consent = grant_for(saved_document, req, kwargs["read_runner"])
+    result = mod.execute_one(*args, journal=journal, **consent, **kwargs)
     assert journal.get(result["operation_id"])["phase"] == result["status"]
     return result
 
@@ -219,7 +236,8 @@ fake = FakeSway()
 broken = CannotDispatch(path)
 try:
     mod.execute_one(document, request, read_runner=fake.read,
-                    command_runner=fake.command, journal=broken)
+                    command_runner=fake.command, journal=broken,
+                    **grant_for(document, request, fake.read))
     raise AssertionError("moved without committing dispatch")
 except JournalError:
     pass
@@ -236,7 +254,8 @@ fake = FakeSway()
 broken = CannotFinish(path)
 try:
     mod.execute_one(document, request, read_runner=fake.read,
-                    command_runner=fake.command, journal=broken)
+                    command_runner=fake.command, journal=broken,
+                    **grant_for(document, request, fake.read))
     raise AssertionError("success claimed without durable completion")
 except JournalError:
     pass
@@ -246,7 +265,9 @@ assert broken.pending()[0]["automatic_retry_allowed"] is False
 
 try:
     mod.execute_one(document, request, read_runner=FakeSway().read,
-                    command_runner=FakeSway().command, journal=None)
+                    command_runner=FakeSway().command, journal=None,
+                    approval_gate=MoveApprovalGate(), approval_token="invalid",
+                    checkpoint_id=CHECKPOINT_ID)
     raise AssertionError("journal-less move allowed")
 except mod.MoveRefused:
     pass

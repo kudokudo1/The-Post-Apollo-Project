@@ -57,8 +57,14 @@ Item {
     }
     readonly property var taskView: Planner.view(
         todoSnapshot, taskMonthKey, taskFocusDateKey, taskTodayKey)
+    // The mini exposes owner-provided projections, not full TASKS screens.
     readonly property bool agendaMode:
-        densityLevel >= 2 && selectedView === "agenda"
+        densityLevel >= 2 && (selectedView === "agenda"
+                              || selectedView === "week"
+                              || selectedView === "day")
+    readonly property var weekEntries:
+        taskView && taskView.available
+        ? Planner.weekDays(todoSnapshot, taskFocusDateKey, taskTodayKey) : []
     readonly property var agendaEntries:
         taskView && taskView.available ? taskView.agenda : []
     readonly property string statusLine:
@@ -89,6 +95,28 @@ Item {
         selectedTaskDate = dateKey;
     }
 
+    // Reuse TASKS' civil-day arithmetic. Keep the visible month and selected
+    // date aligned across month/year boundaries, without a new clock/store.
+    function stepTaskDate(direction) {
+        if (!calendarReady || !taskView.available || !calendarBridge
+                || !Planner.parse(taskFocusDateKey)
+                || (direction !== -1 && direction !== 1))
+            return;
+        const step = selectedView === "week" ? direction * 7 : direction;
+        const next = Planner.moveDay(taskFocusDateKey, step);
+        const from = Planner.parse(taskMonthKey);
+        const to = Planner.parse(next);
+        if (!from || !to || next === taskFocusDateKey)
+            return;
+        const delta = (to.year - from.year) * 12 + (to.month - from.month);
+        const newOffset = monthOffset + delta;
+        if (newOffset < -120 || newOffset > 120)
+            return;
+        selectedTaskDate = next;
+        if (delta !== 0)
+            calendarBridge.calendarMonthOffset = newOffset;
+    }
+
     // These functions only run on an explicit button click. They alter the
     // bridge's view parameters, never the system clock or any calendar event.
     function moveMonth(direction) {
@@ -113,35 +141,33 @@ Item {
         calendarBridge.calendarWeekStartsOn = weekStart === 0 ? 1 : 0;
     }
 
-    // H:1 remains the existing compact month grid. H:2/H:3 gain a
-    // transient MONTH / AGENDA selector without a second clock or store.
+    // H:1 remains compact. H:2/H:3 add bounded read-only views derived
+    // from the existing TASKS snapshot; no new background activity.
     Row {
         id: viewSelector
         anchors.top: parent.top
         anchors.left: parent.left
         anchors.right: parent.right
         height: calendarMini.densityLevel === 3 ? 29 : 25
-        spacing: 6
+        spacing: 4
         visible: calendarMini.densityLevel >= 2
 
-        ActionButton {
-            width: Math.min(94, (viewSelector.width - viewSelector.spacing) / 2)
-            height: parent.height
-            label: "MONTH"
-            selected: !calendarMini.agendaMode
-            trackLabelGlowLocally: true
-            softGlowEnabled: false
-            onLeftClicked: calendarMini.selectedView = "month"
-        }
-        ActionButton {
-            width: Math.min(94, (viewSelector.width - viewSelector.spacing) / 2)
-            height: parent.height
-            label: "AGENDA"
-            selected: calendarMini.agendaMode
-            available: calendarMini.calendarReady && calendarMini.taskView.available
-            trackLabelGlowLocally: true
-            softGlowEnabled: false
-            onLeftClicked: calendarMini.selectedView = "agenda"
+        Repeater {
+            model: ["MONTH", "WEEK", "DAY", "AGENDA"]
+            ActionButton {
+                required property string modelData
+                width: Math.max(0, (viewSelector.width - 3 * viewSelector.spacing) / 4)
+                height: viewSelector.height
+                label: modelData
+                labelPixelSize: 10
+                selected: modelData.toLowerCase() === calendarMini.selectedView
+                available: modelData === "MONTH"
+                           ? calendarMini.calendarReady
+                           : calendarMini.calendarReady && calendarMini.taskView.available
+                trackLabelGlowLocally: true
+                softGlowEnabled: false
+                onLeftClicked: calendarMini.selectedView = modelData.toLowerCase()
+            }
         }
     }
 
@@ -341,6 +367,116 @@ Item {
         Column {
             anchors.fill: parent
             spacing: 6
+
+            // WEEK advances seven days; DAY advances one. AGENDA retains
+            // its original fixed selected-day overview.
+            Row {
+                id: dateNavigation
+                width: parent.width
+                height: 27
+                spacing: 5
+                visible: calendarMini.selectedView === "week"
+                         || calendarMini.selectedView === "day"
+
+                ActionButton {
+                    width: 29
+                    height: parent.height
+                    label: "‹"
+                    labelPixelSize: 17
+                    available: calendarMini.taskView.available
+                    onLeftClicked: calendarMini.stepTaskDate(-1)
+                }
+                GohuText {
+                    width: Math.max(0, dateNavigation.width - 29 * 2 - 74
+                                    - 3 * dateNavigation.spacing)
+                    height: parent.height
+                    verticalAlignment: Text.AlignVCenter
+                    horizontalAlignment: Text.AlignHCenter
+                    elide: Text.ElideRight
+                    font.pixelSize: 11
+                    color: Colors.cyan
+                    text: calendarMini.selectedView.toUpperCase() + " // "
+                          + calendarMini.taskFocusDateKey
+                }
+                ActionButton {
+                    width: 29
+                    height: parent.height
+                    label: "›"
+                    labelPixelSize: 17
+                    available: calendarMini.taskView.available
+                    onLeftClicked: calendarMini.stepTaskDate(1)
+                }
+                ActionButton {
+                    width: 74
+                    height: parent.height
+                    label: "TODAY"
+                    available: calendarMini.calendarReady
+                    onLeftClicked: calendarMini.showToday()
+                }
+            }
+
+            // Existing TASKS Policy returns Monday-first rows. The local
+            // month view separately preserves its SUN/MON toggle.
+            Row {
+                id: weekStrip
+                width: parent.width
+                height: calendarMini.densityLevel === 3 ? 77 : 61
+                spacing: 3
+                visible: calendarMini.selectedView === "week"
+                         && calendarMini.weekEntries.length === 7
+
+                Repeater {
+                    model: calendarMini.weekEntries
+                    delegate: Rectangle {
+                        id: weekDay
+                        required property var modelData
+                        width: Math.max(1, (weekStrip.width - 6 * weekStrip.spacing) / 7)
+                        height: weekStrip.height
+                        radius: 0
+                        color: modelData.selected ? Colors.dark : "transparent"
+                        border.width: modelData.selected || modelData.today ? 1 : 0
+                        border.color: modelData.today ? Colors.orange : Colors.magenta
+
+                        Column {
+                            anchors.fill: parent
+                            anchors.margins: 2
+                            spacing: 1
+                            GohuText {
+                                width: parent.width
+                                height: 16
+                                font.pixelSize: 10
+                                horizontalAlignment: Text.AlignHCenter
+                                color: Colors.cyan
+                                text: weekDay.modelData.weekday
+                            }
+                            GohuText {
+                                width: parent.width
+                                height: 22
+                                font.pixelSize: 16
+                                horizontalAlignment: Text.AlignHCenter
+                                color: Colors.white
+                                text: String(weekDay.modelData.day)
+                            }
+                            GohuText {
+                                width: parent.width
+                                height: 15
+                                font.pixelSize: 9
+                                horizontalAlignment: Text.AlignHCenter
+                                color: weekDay.modelData.remaining > 0
+                                       ? Colors.orange : Colors.cyan
+                                text: weekDay.modelData.remaining + " OPEN"
+                            }
+                        }
+                        TapHandler {
+                            acceptedButtons: Qt.LeftButton
+                            enabled: calendarMini.taskView.available
+                                     && weekDay.modelData.date.length > 0
+                            onTapped: calendarMini.selectedTaskDate = weekDay.modelData.date
+                        }
+                    }
+                }
+            }
+
             GohuText {
                 width: parent.width
                 height: 24
@@ -363,7 +499,10 @@ Item {
             ListView {
                 id: agendaList
                 width: parent.width
-                height: Math.max(0, agendaPane.height - 24 - 19 - 12)
+                height: Math.max(0, agendaPane.height - 24 - 19 - 12
+                                 - (dateNavigation.visible
+                                    ? dateNavigation.height + 6 : 0)
+                                 - (weekStrip.visible ? weekStrip.height + 6 : 0))
                 model: calendarMini.agendaEntries
                 clip: true
                 spacing: 3
@@ -371,17 +510,32 @@ Item {
                 delegate: Rectangle {
                     required property var modelData
                     width: agendaList.width
-                    height: 29
+                    height: calendarMini.selectedView === "day" ? 47 : 29
                     radius: 0
                     color: "transparent"
                     GohuText {
-                        anchors.fill: parent
+                        anchors.left: parent.left
+                        anchors.right: parent.right
+                        anchors.top: parent.top
+                        height: calendarMini.selectedView === "day" ? 26 : 29
                         verticalAlignment: Text.AlignVCenter
                         elide: Text.ElideRight
                         font.pixelSize: 11
                         color: parent.modelData.done ? Colors.cyan : Colors.white
                         text: (parent.modelData.done ? "DONE // " : "OPEN // ")
                               + parent.modelData.title
+                    }
+                    GohuText {
+                        anchors.left: parent.left
+                        anchors.right: parent.right
+                        anchors.bottom: parent.bottom
+                        height: 17
+                        visible: calendarMini.selectedView === "day"
+                        font.pixelSize: 10
+                        color: Colors.orange
+                        elide: Text.ElideRight
+                        text: "PRIORITY // " + String(parent.modelData.priority)
+                              + "  //  PROJECT " + String(parent.modelData.projectId || "NONE")
                     }
                 }
             }

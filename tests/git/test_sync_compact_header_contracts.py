@@ -14,7 +14,10 @@ header = view.split("id: syncTimingHeader", 1)[1].split(
 
 # No duplicate end-to-end row remains in the scrollable Git output.
 assert 'actionOutput += "\\nSYNC TIMELINE' not in service
-assert 'text: gitService.actionOutput' in view
+# Normal/Details now owns presentation while preserving raw Details output.
+assert 'text: gitOutputPanel.showDetails' in view
+assert '? gitService.actionOutput' in view
+assert 'gitOutputPanel.normalGitOutput(' in view
 assert 'journalProfileLine(' in service
 assert 'JOURNAL PROFILE // ' in service
 assert 'FINISHED // after snapshot ' in service

@@ -460,7 +460,22 @@ SectionFrame {
     // B6 native desktop-entry index: scrollable metadata, no launch path.
     ApolloHubAppsMini {
         id: appsMini
-        visible: tile.moduleId === "apps"
+        visible: tile.moduleId === "apps" && tile.tileRowSpan === 1
+        appsSnapshot: tile.appsSnapshot
+        anchors {
+            left: parent.left
+            right: parent.right
+            top: parent.top
+            bottom: parent.bottom
+            topMargin: tile.editing ? 32 : 22
+            bottomMargin: 23
+        }
+    }
+
+    // Stage 8F: taller tiles inspect indexed app metadata only.
+    ApolloHubAppsExplore {
+        id: appsExplore
+        visible: tile.moduleId === "apps" && tile.tileRowSpan > 1
         appsSnapshot: tile.appsSnapshot
         anchors {
             left: parent.left
@@ -629,6 +644,8 @@ SectionFrame {
               ? systemMini.statusLine
               : tile.moduleId === "uptime"
               ? uptimeMini.statusLine
+              : tile.moduleId === "apps" && tile.tileRowSpan > 1
+              ? appsExplore.statusLine
               : tile.moduleId === "apps"
               ? appsMini.statusLine
               : tile.moduleId === "todo"

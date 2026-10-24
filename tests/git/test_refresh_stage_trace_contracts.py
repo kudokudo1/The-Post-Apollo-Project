@@ -23,7 +23,7 @@ assert "JOURNAL NOT RECORDED // " in service
 assert 'REFRESHED // repository view ' in service
 
 start = service.index('        refreshProcess.exec([')
-end = service.index('        ]);', start) + len('        ])')
+end = service.index('        ]);', start) + len('        ]')
 command = service[start + len('        refreshProcess.exec('):end]
 assert command.startswith("[") and command.endswith("]")
 assert "trace_refresh_stage" in command

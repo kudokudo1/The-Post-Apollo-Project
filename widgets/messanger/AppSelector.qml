@@ -58,6 +58,34 @@ Rectangle {
         {
             name: "PINTEREST",
             icon: ""
+        },
+        {
+            name: "TRUTH SOCIAL",
+            icon: ""
+        },
+        {
+            name: "BLUESKY",
+            icon: ""
+        },
+        {
+            name: "TUMBLR",
+            icon: ""
+        },
+        {
+            name: "TIKTOK",
+            icon: ""
+        },
+        {
+            name: "SNAPCHAT",
+            icon: ""
+        },
+        {
+            name: "WHATSAPP",
+            icon: ""
+        },
+        {
+            name: "MESSENGER",
+            icon: ""
         }
     ]
 
@@ -80,214 +108,253 @@ Rectangle {
     // APP BUTTONS
     // ============================================================
 
-    Column {
-        id: appColumn
+    // Scroll within Social's existing fixed-height cyan selector frame.
+    // Keyboard/Tab selection stays visible without changing activation rules.
+    function ensureSelectedVisible() {
+        if (appScroll.height <= 0)
+            return;
+        var rowTop = 10 + selectedIndex * 60;
+        var rowBottom = rowTop + 50;
+        var target = appScroll.contentY;
+        if (rowTop < target)
+            target = rowTop;
+        else if (rowBottom > target + appScroll.height)
+            target = rowBottom - appScroll.height;
+        appScroll.contentY = Math.max(0, Math.min(
+            target, Math.max(0, appScroll.contentHeight - appScroll.height)));
+    }
 
+    onSelectedIndexChanged: Qt.callLater(function() {
+        appSelector.ensureSelectedVisible();
+    })
+
+    Flickable {
+        id: appScroll
         anchors {
             top: parent.top
-            horizontalCenter: parent.horizontalCenter
-            topMargin: 10
+            left: parent.left
+            right: parent.right
+            bottom: statusMessage.visible ? statusMessage.top : parent.bottom
         }
+        contentWidth: width
+        contentHeight: appColumn.height + 20
+        clip: true
+        flickableDirection: Flickable.VerticalFlick
+        boundsBehavior: Flickable.StopAtBounds
+        onHeightChanged: appSelector.ensureSelectedVisible()
+        onContentHeightChanged: appSelector.ensureSelectedVisible()
 
-        spacing: 10
-
-        Repeater {
-            model: appSelector.messagingApps
-
-            delegate: Item {
-                id: buttonContainer
-
-                required property var modelData
-                required property int index
-
-                width: 90
-                height: 50
-
-                Rectangle {
-                    id: appButton
-
-                    anchors.fill: parent
-
-                    radius: 0
-                    clip: false
-
-                    property bool isSelected: appSelector.selectedIndex === buttonContainer.index
-
-                    property bool isHovered: !appSelector.keyboardActive && appMouse.containsMouse
-
-                    property bool isPressed: appMouse.pressed
-
-                    // ============================================
-                    // POWER-STYLE BUTTON COLOR
-                    // ============================================
-
-                    color: appButton.isPressed ? Colors.magenta : appButton.isHovered ? Colors.yellow : appButton.isSelected ? Colors.yellow : Colors.dark
-
-                    // ============================================
-                    // CONTENT
-                    // ============================================
-
-                    Row {
-                        id: appContent
-
-                        anchors.centerIn: parent
-
-                        spacing: buttonContainer.modelData.icon !== "" ? 4 : 0
-
-                        // ========================================
-                        // APP ICON
-                        // ========================================
-
-                        Item {
-                            id: iconContainer
-
-                            width: buttonContainer.modelData.icon !== "" ? 14 : 0
-
-                            height: 18
-
-                            visible: buttonContainer.modelData.icon !== ""
-
-                            Image {
-                                id: appIcon
-
-                                anchors.centerIn: parent
-
-                                width: 14
-                                height: 14
-
-                                source: buttonContainer.modelData.icon !== "" ? Qt.resolvedUrl(buttonContainer.modelData.icon) : ""
-
-                                fillMode: Image.PreserveAspectFit
-
-                                smooth: false
-
-                                opacity: appButton.isPressed ? 1.0 : appButton.isSelected || appButton.isHovered ? 1.0 : 0.80
-                            }
-
-                            DropShadow {
-                                anchors.fill: appIcon
-                                source: appIcon
-
-                                horizontalOffset: 0
-                                verticalOffset: 0
-
-                                radius: 8
-                                samples: 12
-
-                                color: appButton.isPressed ? Colors.magenta : appButton.isHovered ? Colors.orange : appButton.isSelected ? Colors.orange : Colors.cyan
-
-                                opacity: appButton.isPressed ? 0.55 : appButton.isHovered ? 0.45 : appButton.isSelected ? 0.45 : 0.18
-
-                                transparentBorder: true
-                            }
-                        }
-
-                        // ========================================
-                        // APP NAME
-                        // ========================================
-
-                        Text {
-                            id: appText
-
-                            anchors.verticalCenter: parent.verticalCenter
-
-                            text: buttonContainer.modelData.name
-
-                            font.family: "GohuFont 11 Nerd Font Mono"
-
-                            font.pixelSize: buttonContainer.modelData.icon !== "" ? 10 : 11
-
-                            color: appButton.isPressed ? Colors.black : appButton.isHovered ? Colors.orange : appButton.isSelected ? Colors.orange : Colors.cyan
-
-                            layer.enabled: appButton.isSelected || appButton.isHovered
-
-                            layer.effect: DropShadow {
-                                color: Colors.orange
-
-                                opacity: 1.0
-
-                                horizontalOffset: 0
-                                verticalOffset: 0
-
-                                radius: 30
-                                samples: 60
-
-                                transparentBorder: true
-                            }
-                        }
-                    }
-
-                    // ============================================
-                    // MOUSE
-                    // ============================================
-
-                    MouseArea {
-                        id: appMouse
-
+        Column {
+            id: appColumn
+    
+            anchors {
+                top: parent.top
+                horizontalCenter: parent.horizontalCenter
+                topMargin: 10
+            }
+    
+            spacing: 10
+    
+            Repeater {
+                model: appSelector.messagingApps
+    
+                delegate: Item {
+                    id: buttonContainer
+    
+                    required property var modelData
+                    required property int index
+    
+                    width: 90
+                    height: 50
+    
+                    Rectangle {
+                        id: appButton
+    
                         anchors.fill: parent
-
-                        hoverEnabled: true
-
-                        acceptedButtons: Qt.LeftButton
-
-                        // Hover may move the visual selector,
-                        // but it does NOT activate/open an app.
-                        onEntered: {
-                            appSelector.keyboardActive = false;
-                            appSelector.selectedIndex = buttonContainer.index;
+    
+                        radius: 0
+                        clip: false
+    
+                        property bool isSelected: appSelector.selectedIndex === buttonContainer.index
+    
+                        property bool isHovered: !appSelector.keyboardActive && appMouse.containsMouse
+    
+                        property bool isPressed: appMouse.pressed
+    
+                        // ============================================
+                        // POWER-STYLE BUTTON COLOR
+                        // ============================================
+    
+                        color: appButton.isPressed ? Colors.magenta : appButton.isHovered ? Colors.yellow : appButton.isSelected ? Colors.yellow : Colors.dark
+    
+                        // ============================================
+                        // CONTENT
+                        // ============================================
+    
+                        Row {
+                            id: appContent
+    
+                            anchors.centerIn: parent
+    
+                            spacing: buttonContainer.modelData.icon !== "" ? 4 : 0
+    
+                            // ========================================
+                            // APP ICON
+                            // ========================================
+    
+                            Item {
+                                id: iconContainer
+    
+                                width: buttonContainer.modelData.icon !== "" ? 14 : 0
+    
+                                height: 18
+    
+                                visible: buttonContainer.modelData.icon !== ""
+    
+                                Image {
+                                    id: appIcon
+    
+                                    anchors.centerIn: parent
+    
+                                    width: 14
+                                    height: 14
+    
+                                    source: buttonContainer.modelData.icon !== "" ? Qt.resolvedUrl(buttonContainer.modelData.icon) : ""
+    
+                                    fillMode: Image.PreserveAspectFit
+    
+                                    smooth: false
+    
+                                    opacity: appButton.isPressed ? 1.0 : appButton.isSelected || appButton.isHovered ? 1.0 : 0.80
+                                }
+    
+                                DropShadow {
+                                    anchors.fill: appIcon
+                                    source: appIcon
+    
+                                    horizontalOffset: 0
+                                    verticalOffset: 0
+    
+                                    radius: 8
+                                    samples: 12
+    
+                                    color: appButton.isPressed ? Colors.magenta : appButton.isHovered ? Colors.orange : appButton.isSelected ? Colors.orange : Colors.cyan
+    
+                                    opacity: appButton.isPressed ? 0.55 : appButton.isHovered ? 0.45 : appButton.isSelected ? 0.45 : 0.18
+    
+                                    transparentBorder: true
+                                }
+                            }
+    
+                            // ========================================
+                            // APP NAME
+                            // ========================================
+    
+                            Text {
+                                id: appText
+    
+                                anchors.verticalCenter: parent.verticalCenter
+    
+                                text: buttonContainer.modelData.name
+    
+                                font.family: "GohuFont 11 Nerd Font Mono"
+    
+                                font.pixelSize: buttonContainer.modelData.name === "TRUTH SOCIAL" ? 9 : buttonContainer.modelData.icon !== "" ? 10 : 11
+    
+                                color: appButton.isPressed ? Colors.black : appButton.isHovered ? Colors.orange : appButton.isSelected ? Colors.orange : Colors.cyan
+    
+                                layer.enabled: appButton.isSelected || appButton.isHovered
+    
+                                layer.effect: DropShadow {
+                                    color: Colors.orange
+    
+                                    opacity: 1.0
+    
+                                    horizontalOffset: 0
+                                    verticalOffset: 0
+    
+                                    radius: 30
+                                    samples: 60
+    
+                                    transparentBorder: true
+                                }
+                            }
                         }
-
-                        // The button itself owns activation.
-                        onClicked: function (mouse) {
-                            if (mouse.button !== Qt.LeftButton)
-                                return;
-
-                            appSelector.selectedIndex = buttonContainer.index;
-
-                            appSelector.appActivated(buttonContainer.index);
-
-                            console.log("Selected:", buttonContainer.modelData.name);
+    
+                        // ============================================
+                        // MOUSE
+                        // ============================================
+    
+                        MouseArea {
+                            id: appMouse
+    
+                            anchors.fill: parent
+    
+                            hoverEnabled: true
+    
+                            acceptedButtons: Qt.LeftButton
+    
+                            // Hover may move the visual selector,
+                            // but it does NOT activate/open an app.
+                            onEntered: {
+                                appSelector.keyboardActive = false;
+                                appSelector.selectedIndex = buttonContainer.index;
+                            }
+    
+                            // The button itself owns activation.
+                            onClicked: function (mouse) {
+                                if (mouse.button !== Qt.LeftButton)
+                                    return;
+    
+                                appSelector.selectedIndex = buttonContainer.index;
+    
+                                appSelector.appActivated(buttonContainer.index);
+    
+                                console.log("Selected:", buttonContainer.modelData.name);
+                            }
                         }
-                    }
-
-                    // ============================================
-                    // CLOCK-STYLE CLOSE GLOW
-                    // ============================================
-
-                    RectangularShadow {
-                        anchors.fill: parent
-
-                        spread: 3
-
-                        color: appButton.isPressed ? Colors.magenta : appButton.isHovered ? Colors.orange : appButton.isSelected ? Colors.orange : Colors.cyan
-
-                        opacity: appButton.isPressed ? 0.60 : appButton.isHovered ? 0.50 : appButton.isSelected ? 0.50 : 0.0
-
-                        z: -1
-                    }
-
-                    // ============================================
-                    // CLOCK-STYLE WIDE GLOW
-                    // ============================================
-
-                    RectangularShadow {
-                        anchors.fill: parent
-
-                        spread: 10
-
-                        color: appButton.isPressed ? Colors.magenta : appButton.isHovered ? Colors.orange : appButton.isSelected ? Colors.orange : Colors.cyan
-
-                        opacity: appButton.isPressed ? 0.12 : appButton.isHovered ? 0.09 : appButton.isSelected ? 0.09 : 0.0
-
-                        z: -2
+    
+                        // ============================================
+                        // CLOCK-STYLE CLOSE GLOW
+                        // ============================================
+    
+                        RectangularShadow {
+                            anchors.fill: parent
+    
+                            spread: 3
+    
+                            color: appButton.isPressed ? Colors.magenta : appButton.isHovered ? Colors.orange : appButton.isSelected ? Colors.orange : Colors.cyan
+    
+                            opacity: appButton.isPressed ? 0.60 : appButton.isHovered ? 0.50 : appButton.isSelected ? 0.50 : 0.0
+    
+                            z: -1
+                        }
+    
+                        // ============================================
+                        // CLOCK-STYLE WIDE GLOW
+                        // ============================================
+    
+                        RectangularShadow {
+                            anchors.fill: parent
+    
+                            spread: 10
+    
+                            color: appButton.isPressed ? Colors.magenta : appButton.isHovered ? Colors.orange : appButton.isSelected ? Colors.orange : Colors.cyan
+    
+                            opacity: appButton.isPressed ? 0.12 : appButton.isHovered ? 0.09 : appButton.isSelected ? 0.09 : 0.0
+    
+                            z: -2
+                        }
                     }
                 }
             }
         }
     }
+
     // Keep launch errors visible in the selector even when the external
     // browser owns the rest of Social's click-through window.
     Text {
+        id: statusMessage
         anchors.left: parent.left
         anchors.right: parent.right
         anchors.bottom: parent.bottom

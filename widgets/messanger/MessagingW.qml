@@ -296,8 +296,8 @@ PanelWindow {
 
     readonly property bool discordSelected: activeAppIndex === 1
     // xSelected retains the existing external-browser focus contract.
-    readonly property bool xSelected: activeAppIndex >= 3 && activeAppIndex <= 8
-    readonly property string browserSite: activeAppIndex === 4 ? "instagram" : activeAppIndex === 5 ? "facebook" : activeAppIndex === 6 ? "reddit" : activeAppIndex === 7 ? "threads" : activeAppIndex === 8 ? "pinterest" : "x"
+    readonly property bool xSelected: activeAppIndex >= 3 && activeAppIndex <= 13
+    readonly property string browserSite: activeAppIndex === 4 ? "instagram" : activeAppIndex === 5 ? "facebook" : activeAppIndex === 6 ? "reddit" : activeAppIndex === 7 ? "threads" : activeAppIndex === 8 ? "pinterest" : activeAppIndex === 9 ? "truthsocial" : activeAppIndex === 10 ? "bluesky" : activeAppIndex === 11 ? "tumblr" : activeAppIndex === 12 ? "tiktok" : activeAppIndex === 13 ? "snapchat" : "x"
     readonly property bool externalSelected: discordSelected || xSelected
     onBrowserSiteChanged: updateGeometryHelperMode()
 
@@ -937,7 +937,7 @@ PanelWindow {
             return;
         }
 
-        if (index >= 3 && index <= 8) {
+        if (index >= 3 && index <= 13) {
             hideDiscord();
             restoreSelectorAfterXShow = retainSelectorFocus === true;
             showX();
@@ -947,7 +947,7 @@ PanelWindow {
         hideDiscord();
         hideX();
 
-        // Returning to Sessions / Telegram puts focus back on the same normal
+        // Returning to native Sessions / Telegram / placeholder modes restores the normal
         // social FloatingWindow, preserving the same Mod move/resize controls.
         syncSocialGeometry(true);
 
@@ -1157,7 +1157,12 @@ PanelWindow {
 
         AppSelector {
             id: appSelector
-            statusText: messagingWindow.xSelected ? messagingWindow.xError : ""
+            // WhatsApp and Messenger are reserved for future Session-style adapters.
+            // Do not show fake contacts or launch external browser windows.
+            statusText: messagingWindow.xSelected ? messagingWindow.xError
+                       : messagingWindow.activeAppIndex === 14 ? "WHATSAPP // Native integration pending"
+                       : messagingWindow.activeAppIndex === 15 ? "MESSENGER // Native integration pending"
+                       : ""
 
             width: messagingWindow.appSelectorWidth
             height: parent.height

@@ -55,6 +55,15 @@ class NativeIntegrationContracts(unittest.TestCase):
         self.assertIn('active: router.appIndex === 2', router)
         self.assertIn('active: router.appIndex === 0', router)
         self.assertIn('TELEGRAM //', router)
+        self.assertIn('property var confirmedByScope: ({})', router)
+        self.assertIn('property string pendingSessionConversationId: ""', router)
+        self.assertIn('property string pendingTelegramConversationId: ""', router)
+        self.assertIn('function confirmSend(service, conversationId)', router)
+        self.assertIn('next[key] = Number(next[key] || 0) + 1', router)
+        self.assertIn('router.confirmSend("session", router.pendingSessionConversationId)', router)
+        self.assertIn('router.confirmSend("telegram", router.pendingTelegramConversationId)', router)
+        self.assertIn('if (accepted)', router)
+        self.assertIn('selectedBackend.sendMessage(String(conversationId), body)', router)
         for unsupported in ('services/messaging/adapters/SignalAdapter.qml',
                             'services/messaging/adapters/MessengerAdapter.qml',
                             'services/messaging/adapters/ViberAdapter.qml'):

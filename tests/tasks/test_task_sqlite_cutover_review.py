@@ -70,6 +70,11 @@ with tempfile.TemporaryDirectory(prefix="pa-task-cutover-m10n-") as folder:
     backup_dir.mkdir(mode=0o700)
     shadow = shadow_dir / "tasks.db"
     sql_backup = backup_dir / "tasks.db"
+    # SQLite's normal CREATE honors the process umask. Ensure the throwaway
+    # backup is private before invoking SQLite's online backup API.
+    import os
+    fd = os.open(sql_backup, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600)
+    os.close(fd)
     saved = sqlite.initialize(shadow, candidate)
     assert saved["localSaved"] is True
     assert sqlite.read(shadow)["document"] == candidate
@@ -153,6 +158,8 @@ with tempfile.TemporaryDirectory(prefix="pa-task-cutover-m10n-") as folder:
         later_dir = root / "later-copy"
         later_dir.mkdir(mode=0o700)
         later = later_dir / "tasks.db"
+        fd = os.open(later, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600)
+        os.close(fd)
         with sqlite3.connect(later) as writer:
             reader.backup(writer)
     assert sqlite.read(later)["revision"] == 1

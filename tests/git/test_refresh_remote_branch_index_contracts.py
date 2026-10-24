@@ -51,7 +51,7 @@ const result = vm.runInNewContext(process.argv[1], {
   refreshRepoPath: process.argv[2],
   refreshStageTraceEnabled: process.argv[3] === '1'
 });
-if (!Array.isArray(result) || result.length !== 5
+if (!Array.isArray(result) || result.length !== 6
     || result[0] !== 'bash' || result[1] !== '-lc')
   throw Error('changed refresh process argv');
 process.stdout.write(JSON.stringify(result));

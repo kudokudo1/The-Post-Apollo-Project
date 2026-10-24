@@ -143,6 +143,14 @@ Operator ran `swaymsg -t get_tree` on the live Weather Station STAR MAP actor an
 
 **Verification distinction:** Sway documentation defines the separate `rect` and `window_rect` geometries, but actual live Kitty content geometry after this change remains to be measured on the operator's SwayFX build. If the compositor already reports a full content rectangle while pixels still appear clipped, diagnose the client surface/scene rendering separately; don't keep blindly changing the panel position.
 
+### B16 // 2026-10-24 Exclusive-zone top coordinate diagnosis and patch
+
+**Operator's measured Sway layout:** DP-3 output y=0, visible workspace y=82; configured inner=8px and top=1px gaps yield a 73px inferred reserved top offset. HDMI-A-1 output/workspace y=0/9 yields zero offset with the same gaps. Sway places the floating Weather Kitty at (1708,136), 824x494 in both container and window_rect, while visually centered placement was observed around y=210.
+
+**Bounded patch:** infer the per-output top exclusive displacement from current Sway workspaces/configured gaps, then add it to the Weather terminal's compositor-global position. Expected DP-3 result (1708,209), HDMI-A-1 result with zero top adjustment. Reuse the original bounded fit verification; keep accepted bay, alpha/input cutout, title, footer, Kitty configuration and SwayPX Stage Director unchanged. Workspace/config observations refresh only while the terminal is active at a longer interval than the existing output watcher. Missing/inconsistent workarea evidence is treated as unavailable, never guessed.
+
+**Acceptance:** static regression tests cover both operator outputs, negative global coordinates and malformed/missing workarea. This is a hypothesis supported by geometry, not verified layer-surface pixels; operator live visual confirmation remains required. Separate stale shell DP-5 bindings are not part of this patch.
+
 ## 4 // Domain family C: MAP and world/environmental layers
 
 Current EONET is an event index only. Planned:

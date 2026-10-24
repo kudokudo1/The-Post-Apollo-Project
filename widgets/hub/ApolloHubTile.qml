@@ -327,7 +327,7 @@ SectionFrame {
     // Both transports remain visible even when Ethernet takes priority.
     Row {
         id: networkInfo
-        visible: tile.moduleId === "network"
+        visible: tile.moduleId === "network" && tile.tileRowSpan === 1
         anchors {
             left: parent.left
             right: parent.right
@@ -407,6 +407,21 @@ SectionFrame {
                 elide: Text.ElideRight
                 text: "INTERNET   UNVERIFIED"
             }
+        }
+    }
+
+    // Stage 8D passive network views on the SAME source as the H:1 card.
+    ApolloHubNetworkExplore {
+        id: networkExplore
+        visible: tile.moduleId === "network" && tile.tileRowSpan > 1
+        networkSnapshot: tile.networkSnapshot
+        anchors {
+            left: parent.left
+            right: parent.right
+            top: parent.top
+            bottom: parent.bottom
+            topMargin: tile.editing ? 32 : 22
+            bottomMargin: 23
         }
     }
 
@@ -585,6 +600,8 @@ SectionFrame {
                       + String(tile.weatherSnapshot.ageMinutes) + " MIN OLD"
                     : "WEATHER // FRESH")
                  : "WEATHER // " + tile.weatherStatus)
+              : tile.moduleId === "network" && tile.tileRowSpan > 1
+              ? networkExplore.statusLine
               : tile.moduleId === "network"
               ? ("NETWORK // " + (tile.networkConnected
                                   ? "LOCAL LINK CONNECTED" : tile.networkState.toUpperCase())

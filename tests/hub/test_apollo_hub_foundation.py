@@ -1517,7 +1517,7 @@ for forbidden in (
 ):
     assert forbidden not in process_explore + process_policy, (
         f"Hub cannot independently sample/control processes: {forbidden}")
-for sensitive in ('args:args', 'user:row.user', 'cmdline', 'environment'):
+for sensitive in ('args:', 'user:', 'cmdline:', 'environment:', 'commandLine:'):
     assert sensitive not in process_policy, f"Process secret projected: {sensitive}"
 assert 'ApolloHubMediaExplore {' in tile
 

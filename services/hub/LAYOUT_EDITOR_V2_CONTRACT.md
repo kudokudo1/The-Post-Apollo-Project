@@ -224,9 +224,17 @@ H:1 remains the original month grid. H:2/H:3 gain MONTH/AGENDA view controls. Ca
 
 **NEXT boundary:** WEEK/DAY projections, opening a task in TASKS, and any Level 3 mutation require separate owner-coordinated navigation/focus and action contracts.
 
+## P1 Stage 8B // Read-only WEEK and DAY navigation (Level 2)
+
+Extend Stage 8A's H:2/H:3 Calendar to four compact view selectors: MONTH, WEEK, DAY, AGENDA. H:1 remains the existing month-only calendar. WEEK displays the TASKS owner's Monday-first seven-day projection with due-task counts and tap-to-select days; DAY shows the selected day's tasks with priority and project identifiers. Both WEEK and DAY have previous/next date controls (seven days or one day) and TODAY; AGENDA retains the existing compact selected-day list. Month view still has its separate SUN/MON header toggle.
+
+**Ownership & safety:** All date parsing, cross-day navigation and week counts use existing `TaskPlannerPolicy.js`; the Hub passes only the established `todoSnapshot`. Cross-month moves advance the existing view-only Hub calendar bridge month offset without creating new event/timer data. Navigation is bounded by the original +/-120-month window. No TASKS source, local data, layout schema, media controller, weather feed, writer or user machine file changes. Task dates are **due dates**, never unverified appointments.
+
+**Verification:** Source contracts cover the WEEK/DAY navigation, strict source ownership, H:1 preservation, and no extra poller/write operations. Runtime acceptance must test Monday-first WEEK vs SUN/MON MONTH, crossing month/year boundaries, multiple due tasks and unavailable store, H:2 vs H:3 labels, rapid view switching and no overflow or focus interception. No operator visual acceptance is presumed by CI.
+
 ## NEXT
 
-Complete Stage 7A/7B/7C/7D/8A desktop acceptance. Next can be Notes and To-do internal density, but those contain editable user data, so changes must preserve editor focus, draft and save-confirmation behavior. Durable undo/presets and drag-and-drop remain separate operator decisions.
+Complete Stage 7A/7B/7C/7D/8A/8B desktop acceptance. Next can be Notes and To-do internal density, but those contain editable user data, so changes must preserve editor focus, draft and save-confirmation behavior. Durable undo/presets and drag-and-drop remain separate operator decisions.
 
 ## DECISIONS
 

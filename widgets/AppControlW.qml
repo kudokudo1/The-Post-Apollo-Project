@@ -35,6 +35,8 @@ PanelWindow {
     // ============================================================
 
     property bool menuOpen: false
+    // Owner-owned typed action surface for Hub RUNNING. No service clones.
+    property alias hubProcessActionGate: appControlHubGate
     property bool relationshipFocusModeActive: false
     property bool relationshipFocused: false
 
@@ -916,6 +918,16 @@ PanelWindow {
         processControlObject: processControl
         processControllerObject: processPresentationController
         processLimitsObject: processLimits
+        refreshTimer: taskRefreshAfterKillTimer
+    }
+
+    AppControlHubActionGate {
+        id: appControlHubGate
+        taskRows: appControlWindow.taskRows
+        taskSafety: taskSafety
+        taskController: processPresentationController
+        processControl: processControl
+        processLimits: processLimits
         refreshTimer: taskRefreshAfterKillTimer
     }
 

@@ -545,7 +545,7 @@ SectionFrame {
     // B7 personal checklist, independent from Hospital and Hub layout data.
     ApolloHubTodoMini {
         id: todoMini
-        visible: tile.moduleId === "todo"
+        visible: tile.moduleId === "todo" && tile.tileRowSpan === 1
         todoStore: tile.todoStore
         todoSnapshot: tile.todoSnapshot
         onTextFocusChanged: function(focused) {
@@ -580,6 +580,26 @@ SectionFrame {
         id: mediaExplore
         visible: tile.moduleId === "media" && tile.tileRowSpan > 1
         mediaSnapshot: tile.mediaSnapshot
+        anchors {
+            left: parent.left
+            right: parent.right
+            top: parent.top
+            bottom: parent.bottom
+            topMargin: tile.editing ? 32 : 22
+            bottomMargin: 23
+        }
+    }
+
+    // Stage 8G: TASKS' existing details writer in the Hub, not another
+    // task backend. The compact H:1 To-do mini remains exactly as before.
+    ApolloHubTodoExplore {
+        id: todoExplore
+        visible: tile.moduleId === "todo" && tile.tileRowSpan > 1
+        todoStore: tile.todoStore
+        todoSnapshot: tile.todoSnapshot
+        onTextFocusChanged: function(focused) {
+            tile.todoTextFocusChanged(focused);
+        }
         anchors {
             left: parent.left
             right: parent.right
@@ -648,6 +668,8 @@ SectionFrame {
               ? appsExplore.statusLine
               : tile.moduleId === "apps"
               ? appsMini.statusLine
+              : tile.moduleId === "todo" && tile.tileRowSpan > 1
+              ? todoExplore.statusLine
               : tile.moduleId === "todo"
               ? todoMini.statusLine
               : tile.moduleId === "notes"

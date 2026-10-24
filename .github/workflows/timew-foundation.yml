@@ -14,6 +14,7 @@ on:
       - "services/time/CountdownPolicy.js"
       - "services/time/MachineTimelinePolicy.js"
       - "services/time/MachineSelectionPolicy.js"
+      - "services/time/MachineLayoutDiffPolicy.js"
       - "services/time/MachineCheckpointStore.py"
       - "services/time/MachineCheckpointModel.py"
       - "services/time/MachineSwayRead.py"
@@ -39,6 +40,7 @@ on:
       - "services/time/CountdownPolicy.js"
       - "services/time/MachineTimelinePolicy.js"
       - "services/time/MachineSelectionPolicy.js"
+      - "services/time/MachineLayoutDiffPolicy.js"
       - "services/time/MachineCheckpointStore.py"
       - "services/time/MachineCheckpointModel.py"
       - "services/time/MachineSwayRead.py"
@@ -93,5 +95,9 @@ jobs:
         run: python3 -B -I tests/timew/test_machine_checkpoint_store.py
       - name: Verify MACHINE explicit save/open UI contracts
         run: python3 -B -I tests/timew/test_machine_checkpoint_store_ui.py
+      - name: Verify MACHINE pure saved/current layout comparison
+        run: node tests/timew/test_machine_layout_diff.cjs
+      - name: Verify MACHINE comparison controls never restore
+        run: python3 -B -I tests/timew/test_machine_layout_diff_ui.py
       - name: Verify MACHINE desktop checkpoint draft remains non-operative
         run: python3 -B -I tests/timew/test_machine_checkpoint_contract.py

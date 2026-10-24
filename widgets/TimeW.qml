@@ -12,6 +12,7 @@ import "../services/time/StopwatchPolicy.js" as StopwatchPolicy
 import "../services/time/CountdownPolicy.js" as CountdownPolicy
 import "../services/time/MachineTimelinePolicy.js" as MachineTimelinePolicy
 import "../services/time/MachineSelectionPolicy.js" as MachineSelectionPolicy
+import "../services/time/MachineLayoutDiffPolicy.js" as MachineLayoutDiffPolicy
 
 // TimeW: standalone temporal window. Manual MACHINE timeline markers are
 // session-local; no screenshots or desktop restoration are implemented.
@@ -749,6 +750,7 @@ PanelWindow {
         if (!menuOpen || selectedMode !== "machine" || machineCaptureBusy)
             return;
         machineCapturePreview = null;
+        machineLayoutComparison = null;
         machineStoreStatus = "NEW CAPTURE // NOT SAVED";
         machineExcludedItems = ({});
         machineInspectIndex = 0;
@@ -772,6 +774,31 @@ PanelWindow {
     readonly property var machineSavedItem:
         machineSavedIndex >= 0 && machineSavedIndex < machineSavedCheckpoints.length
         ? machineSavedCheckpoints[machineSavedIndex] : null
+
+    // An explicit, bounded comparison of a saved metadata snapshot against
+    // an explicit current capture. No Sway reads, writes, or restore operations.
+    property var machineLayoutComparison: null
+    property int machineLayoutDifferenceIndex: 0
+    readonly property var machineLayoutDifference:
+        machineLayoutComparison && machineLayoutDifferenceIndex >= 0
+        && machineLayoutDifferenceIndex < machineLayoutComparison.differences.length
+        ? machineLayoutComparison.differences[machineLayoutDifferenceIndex] : null
+    function machineCompareSavedToCapture() {
+        if (machineStoreBusy || machineCaptureBusy || !machineCapturePreview
+                || !machineOpenedCheckpoint || !machineSavedItem
+                || machineOpenedCheckpoint.checkpoint.id !== machineSavedItem.id)
+            return;
+        machineLayoutComparison = MachineLayoutDiffPolicy.compare(
+            machineOpenedCheckpoint.document, machineCapturePreview);
+        machineLayoutDifferenceIndex = 0;
+    }
+    function machineStepLayoutDifference(delta) {
+        const n = machineLayoutComparison
+                  ? machineLayoutComparison.differences.length : 0;
+        if (n)
+            machineLayoutDifferenceIndex =
+                (machineLayoutDifferenceIndex + delta + n) % n;
+    }
 
     function machineStoreRequest(action, data, id) {
         if (!menuOpen || selectedMode !== "machine" || machineStoreBusy)
@@ -815,6 +842,7 @@ PanelWindow {
         if (!machineSavedItem)
             return;
         machineOpenedCheckpoint = null;
+        machineLayoutComparison = null;
         machineStoreRequest("load", null, machineSavedItem.id);
     }
     function machineStepSavedCheckpoint(delta) {
@@ -822,6 +850,7 @@ PanelWindow {
         if (n > 0)
             machineSavedIndex = (machineSavedIndex + delta + n) % n;
         machineOpenedCheckpoint = null;
+        machineLayoutComparison = null;
     }
     function machineAcceptStoreResponse(data) {
         if (!data || typeof data.status !== "string") {
@@ -839,6 +868,8 @@ PanelWindow {
                     return x.id !== data.checkpoint.id;
                 })).slice(0, 30);
             machineSavedIndex = 0;
+            machineOpenedCheckpoint = null;
+            machineLayoutComparison = null;
             machineStoreStatus = "SAVED // LOCAL SQLITE";
             return;
         }
@@ -847,6 +878,7 @@ PanelWindow {
             machineSavedCheckpoints = data.checkpoints.slice(0, 30);
             machineSavedIndex = 0;
             machineOpenedCheckpoint = null;
+            machineLayoutComparison = null;
             machineStoreStatus = "STORED // " + machineSavedCheckpoints.length;
             return;
         }
@@ -854,6 +886,7 @@ PanelWindow {
                 && data.read_only === true && data.document
                 && data.document.preview_only === true) {
             machineOpenedCheckpoint = data;
+            machineLayoutComparison = null;
             machineStoreStatus = "OPENED // METADATA ONLY";
             return;
         }
@@ -4008,6 +4041,106 @@ PanelWindow {
                             color: Colors.white
                             font.pixelSize: 11
                             wrapMode: Text.Wrap
+                        }
+                        Row {
+                            width: parent.width
+                            height: 35
+                            spacing: 8
+                            ActionButton {
+                                width: 163
+                                height: parent.height
+                                label: "COMPARE TO CAPTURE"
+                                labelPixelSize: 10
+                                accentColor: timew.semanticColor
+                                available: !!timew.machineOpenedCheckpoint
+                                           && !!timew.machineCapturePreview
+                                           && !!timew.machineSavedItem
+                                           && timew.machineOpenedCheckpoint.checkpoint.id
+                                              === timew.machineSavedItem.id
+                                           && !timew.machineCaptureBusy
+                                           && !timew.machineStoreBusy
+                                onLeftClicked: timew.machineCompareSavedToCapture()
+                            }
+                            GohuText {
+                                width: parent.width - 171
+                                anchors.verticalCenter: parent.verticalCenter
+                                text: !timew.machineCapturePreview
+                                      ? "CAPTURE CURRENT FIRST"
+                                      : !timew.machineOpenedCheckpoint
+                                      ? "OPEN SAVED FIRST"
+                                      : "READ ONLY // NO APPLY"
+                                color: Colors.cyan
+                                font.pixelSize: 10
+                                wrapMode: Text.Wrap
+                            }
+                        }
+                        GohuText {
+                            width: parent.width
+                            visible: timew.machineLayoutComparison !== null
+                            text: !timew.machineLayoutComparison
+                                  ? ""
+                                  : timew.machineLayoutComparison.status === "unavailable"
+                                  ? "COMPARE UNAVAILABLE // INVALID METADATA"
+                                  : timew.machineLayoutComparison.status === "match"
+                                  ? "MATCHES CURRENT CAPTURE // NO CHANGES"
+                                  : "DIFFERENCES // "
+                                    + timew.machineLayoutComparison.differenceCount
+                                    + " (MON "
+                                    + timew.machineLayoutComparison.counts.monitors
+                                    + " / WS "
+                                    + timew.machineLayoutComparison.counts.workspaces
+                                    + " / WIN "
+                                    + timew.machineLayoutComparison.counts.windows + ")"
+                            color: timew.machineLayoutComparison
+                                   && timew.machineLayoutComparison.status === "match"
+                                   ? Colors.cyan : Colors.orange
+                            font.pixelSize: 10
+                            elide: Text.ElideRight
+                        }
+                        Row {
+                            width: parent.width
+                            height: 29
+                            spacing: 6
+                            visible: !!timew.machineLayoutComparison
+                                     && timew.machineLayoutComparison.differences.length > 0
+                            ActionButton {
+                                width: 43
+                                height: parent.height
+                                label: "<"
+                                accentColor: timew.semanticColor
+                                available: timew.machineLayoutComparison
+                                           && timew.machineLayoutComparison.differences.length > 1
+                                onLeftClicked: timew.machineStepLayoutDifference(-1)
+                            }
+                            GohuText {
+                                width: Math.max(0, parent.width - 98)
+                                anchors.verticalCenter: parent.verticalCenter
+                                text: timew.machineLayoutDifference
+                                      ? (timew.machineLayoutDifferenceIndex + 1) + " / "
+                                        + timew.machineLayoutComparison.differences.length
+                                        + " // " + timew.machineLayoutDifference.label
+                                      : ""
+                                color: Colors.white
+                                font.pixelSize: 10
+                                elide: Text.ElideRight
+                            }
+                            ActionButton {
+                                width: 43
+                                height: parent.height
+                                label: ">"
+                                accentColor: timew.semanticColor
+                                available: timew.machineLayoutComparison
+                                           && timew.machineLayoutComparison.differences.length > 1
+                                onLeftClicked: timew.machineStepLayoutDifference(1)
+                            }
+                        }
+                        GohuText {
+                            width: parent.width
+                            visible: !!timew.machineLayoutComparison
+                                     && timew.machineLayoutComparison.truncated === true
+                            text: "SHOWING FIRST 40 DIFFERENCES"
+                            color: Colors.orange
+                            font.pixelSize: 10
                         }
                         GohuText {
                             width: parent.width

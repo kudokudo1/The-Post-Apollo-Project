@@ -15,6 +15,7 @@ SectionFrame {
     property var systemSnapshot: null
     property var uptimeSnapshot: null
     property var appsSnapshot: null
+    property var processSnapshot: null
     property bool appControlAvailable: false
     property var socialSnapshot: null
     property bool socialActionsAvailable: false
@@ -483,6 +484,7 @@ SectionFrame {
         id: appsExplore
         visible: tile.moduleId === "apps" && tile.tileRowSpan > 1
         appsSnapshot: tile.appsSnapshot
+        processSnapshot: tile.processSnapshot
         appControlAvailable: tile.appControlAvailable
         onOpenAppControlRequested: tile.openAppControlRequested()
         anchors {

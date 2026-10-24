@@ -27,6 +27,8 @@ MODEL describes architecture, ownership, contracts, services, and subsystem rela
 
 - **Weather Station / Observatory worker recovery (proposed plan):** [Backend-first master roadmap](../docs/weather-station-backend-first-roadmap.md) covers connected sources, shared Hi-Fi radio, terminal/viewer architecture, remaining domains and acceptance gates. It is a proposed staged plan, not a live Hospital Assignment or implementation certification. The [Syntagma rules entry](https://github.com/kudokudo1/Meta-Apollo-Logos-How-I-Think/blob/main/AGENTS.md) owns shared operator/semantic guidance; this repository owns QML implementation and local technical contracts.
 
+- **P // Weather Station / Stage Director virtual viewport:** [Real Kitty scene clipping, mouse pan/zoom and CRT shader preservation (strong proposal)](./weather-station-virtual-viewport-proposal-20261024.md). Mirrored with SwayPX; documentation only and no compositor implementation authorization.
+
 - **Apollo Hub capability levels and succession (proposed):** [Level 1 display / Level 2 explore / Level 3 operate, TASKS + Weather integration boundaries, Stage 7 recovery](./contracts/apollo-hub-capability-levels-v0.md). Geometry W/H remains independent; no new service or action authority is implied.
 - **Control families:** [Selector family foundation](./components/selector-family-foundation.md); [SelectorDial variants](../docs/selector-dial-variants.md); [NeonScrollBar API](../docs/neon-scrollbar-syntagma-api.md).
 - **Visual behavior:** [Visual-language effects and recipes](./components/visual-language-recipes.md); consult [current QML components](../components/) before implementing changes.

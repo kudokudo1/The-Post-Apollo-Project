@@ -13,7 +13,7 @@ root = Path(__file__).resolve().parents[2]
 view = (root / "widgets/GitW.qml").read_text()
 service = (root / "services/git/GitService.qml").read_text()
 
-start = view.index("                            function normalGitOutput(output, isSync) {")
+start = view.index("                            function compactGitTimingLine(line) {")
 end = view.index("                            SharedComponents.ActionButton {", start)
 normal_js = view[start:end].strip()
 
@@ -76,7 +76,7 @@ assert.equal(compact, [
     'Already up to date.',
     'FINISHED // after snapshot 28 ms // journal 100 ms',
     'JOURNAL PROFILE // COMPLETE clone 0 ms // entries 1 ms',
-    'REFRESHED // repository view 1400 ms',
+    'REFRESHED │ repository view 1400ms',
     'SNAPSHOT WARNING // after snapshot could not be captured',
     'JOURNAL NOT RECORDED // AFTER save unconfirmed',
     'FETCH FAILED // connection timed out',
@@ -86,7 +86,7 @@ assert.equal(compact, [
 
 assert.ok(compact.includes('JOURNAL PROFILE // BEGIN'));
 assert.ok(compact.includes('JOURNAL PROFILE // COMPLETE'));
-assert.ok(compact.includes('REFRESHED // repository view 1400 ms'));
+assert.ok(compact.includes('REFRESHED │ repository view 1400ms'));
 assert.ok(!compact.includes('RUNNING // Git subprocess started'));
 assert.ok(!compact.includes('FINALIZING // collecting repository evidence'));
 const failed = normalGitOutput([
@@ -101,7 +101,7 @@ assert.equal(failed,
     + 'JOURNAL NOT RECORDED // persistent failure\n'
     + 'JOURNAL PROFILE // UNEXPECTED DATA\n'
     + 'REFRESHED // repository view unavailable\n'
-    + 'REFRESHED // repository view 3 ms',
+    + 'REFRESHED │ repository view 3ms',
     'all unique timing and unexpected statuses must stay visible');
 assert.equal(normalGitOutput('   unrelated text\n\n   summary', true),
     '   unrelated text\n\n   summary', 'retain whitespace and blank lines');

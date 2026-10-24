@@ -1,4 +1,4 @@
-"""Offline contracts for Instagram, Facebook and Reddit Social browser modes."""
+"""Offline contracts for the complete Social managed-browser family."""
 import importlib.util
 import os
 from pathlib import Path
@@ -17,7 +17,7 @@ spec.loader.exec_module(geometry)
 selector = (BASE / "AppSelector.qml").read_text()
 social = (BASE / "MessagingW.qml").read_text()
 
-for index, site in enumerate(("instagram", "facebook", "reddit"), start=4):
+for index, site in enumerate(("instagram", "facebook", "reddit", "reels", "pinterest"), start=4):
     url, window_class, profile = browser.site_config(site)
     assert f'name: "{site.upper()}"' in selector
     assert geometry.sway_criteria(site) == f'[class="{window_class}"]'
@@ -31,7 +31,15 @@ for index, site in enumerate(("instagram", "facebook", "reddit"), start=4):
     assert f"--class={window_class}" in cmd
     assert f"--user-data-dir=/tmp/social-browser-contract/post-apollo/{profile}" in cmd
     assert "browserSite: browserSite" in social
-    assert f"activeAppIndex === {index}" in social
+    assert f'activeAppIndex === {index} ? "{site}"' in social
+
+assert browser.site_config("reels")[0] == "https://www.instagram.com/reels/"
+assert browser.site_config("pinterest")[0] == "https://www.pinterest.com/"
+assert len({config[1] for config in browser.SITES.values()}) == len(browser.SITES)
+assert len({config[2] for config in browser.SITES.values()}) == len(browser.SITES)
+assert browser.site_config("reels")[2] != browser.site_config("instagram")[2]
+assert "activeAppIndex >= 3 && activeAppIndex <= 8" in social
+assert "index >= 3 && index <= 8" in social
 
 commands = []
 with patch.object(browser, "site_exists", side_effect=lambda site: site in ("x", "reddit")):
@@ -48,14 +56,14 @@ assert commands == [
 nodes = [
     {"visible": True, "name": "QS_SOCIAL_MENU", "rect": {"x": 0, "y": 0, "width": 800, "height": 700}},
 ]
-for site in ("x", "instagram", "facebook", "reddit"):
+for site in ("x", "instagram", "facebook", "reddit", "reels", "pinterest"):
     nodes.append({
         "visible": True,
         "window_properties": {"class": f"post-apollo-{site}"},
         "rect": {"x": 120, "y": 1, "width": 680, "height": 700},
     })
 sample = geometry.snapshot_from_tree({"visible": True, "nodes": nodes})
-for site in ("x", "instagram", "facebook", "reddit"):
+for site in ("x", "instagram", "facebook", "reddit", "reels", "pinterest"):
     assert sample[site] and sample[site]["rect"]["width"] == 680
     bridge = geometry.Bridge(0.1)
     bridge.x_selected = True

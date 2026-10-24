@@ -50,6 +50,14 @@ Rectangle {
         {
             name: "REDDIT",
             icon: ""
+        },
+        {
+            name: "REELS",
+            icon: ""
+        },
+        {
+            name: "PINTEREST",
+            icon: ""
         }
     ]
 

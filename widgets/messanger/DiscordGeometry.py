@@ -146,7 +146,7 @@ def compact_rect(rect: Any) -> dict[str, int] | None:
         return None
 
 
-BROWSER_SITES = ("x", "instagram", "facebook", "reddit")
+BROWSER_SITES = ("x", "instagram", "facebook", "reddit", "reels", "pinterest")
 
 
 def snapshot_from_tree(tree: dict[str, Any]) -> dict[str, Any]:

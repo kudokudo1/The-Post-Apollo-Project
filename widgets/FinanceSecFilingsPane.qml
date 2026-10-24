@@ -6,12 +6,19 @@ import "../components"
 Item {
     id: pane
     property var secFeed: null
+    property var documentFeed: null
     property int selectedIndex: 0
     readonly property bool wide: width >= 650
     readonly property var filings: secFeed && secFeed.snapshot ? secFeed.snapshot.filings : []
     readonly property var selected: selectedIndex >= 0 && selectedIndex < filings.length
                                      ? filings[selectedIndex] : null
-    onFilingsChanged: selectedIndex = 0
+    onFilingsChanged: {
+        selectedIndex = 0;
+        if (documentFeed) documentFeed.clear();
+    }
+    onSelectedIndexChanged: {
+        if (documentFeed) documentFeed.clear();
+    }
 
     GohuText {
         id: title
@@ -206,61 +213,11 @@ Item {
             border.width: 1
             border.color: Colors.cyan
             clip: true
-            Flickable {
+            FinanceSecDocumentInspector {
                 anchors.fill: parent
-                anchors.margins: 9
-                contentWidth: width
-                contentHeight: detailItems.height
-                clip: true
-                boundsBehavior: Flickable.StopAtBounds
-                Column {
-                    id: detailItems
-                    width: parent.width
-                    spacing: 10
-                    GohuText {
-                        width: parent.width
-                        text: pane.selected ? pane.selected.category : "SELECT A DISCLOSURE"
-                        font.pixelSize: 12
-                        color: Colors.magenta
-                    }
-                    GohuText {
-                        width: parent.width
-                        text: pane.selected
-                            ? "FORM " + pane.selected.form + " // FILED " + pane.selected.filedAt
-                            : ""
-                        font.pixelSize: 10
-                        color: Colors.white
-                    }
-                    GohuText {
-                        width: parent.width
-                        text: pane.selected && pane.selected.acceptedAt
-                            ? "ACCEPTED " + pane.selected.acceptedAt : ""
-                        font.pixelSize: 9
-                        color: Colors.white
-                    }
-                    GohuText {
-                        width: parent.width
-                        text: pane.selected ? "SEC ORIGINAL DOCUMENT" : ""
-                        font.pixelSize: 10
-                        color: Colors.orange
-                    }
-                    GohuText {
-                        width: parent.width
-                        text: pane.selected ? pane.selected.documentUrl : ""
-                        textFormat: Text.PlainText
-                        wrapMode: Text.WrapAnywhere
-                        font.pixelSize: 9
-                        color: Colors.cyan
-                    }
-                    GohuText {
-                        width: parent.width
-                        text: "INDEX ONLY. Form 4 direction, deal size, and signal strength are not yet parsed."
-                        textFormat: Text.PlainText
-                        wrapMode: Text.WordWrap
-                        font.pixelSize: 10
-                        color: Colors.orange
-                    }
-                }
+                filing: pane.selected
+                secFeed: pane.secFeed
+                documentFeed: pane.documentFeed
             }
         }
     }

@@ -17,7 +17,9 @@ export const FORMS = new Set(["8-K","8-K/A","4","4/A","SC 13D","SC 13D/A",
 const MAX_RETURN = 30;
 const MAX_SIZE = 9 * 1024 * 1024;
 const ACC = /^\d{10}-\d{2}-\d{6}$/;
-const DOC = /^[a-zA-Z0-9][a-zA-Z0-9_.-]{0,170}$/;
+// Filing agents sometimes publish Form 4 as xslF345X05/name.xml.
+// Permit exactly that known view prefix, never general directory traversal.
+const DOC = /^(?:xslF345X\d{2}\/)?[A-Za-z0-9][A-Za-z0-9_.-]{0,170}$/;
 const DAY = /^\d{4}-\d{2}-\d{2}$/;
 
 export function validateAgent(raw) {
@@ -91,6 +93,12 @@ export function normalizeSubmissions(raw, cik, retrievedAt) {
       accession, form, category: groupFor(form), filedAt: date, acceptedAt,
       documentUrl: "https://www.sec.gov/Archives/edgar/data/"
         + String(Number(cik)) + "/" + accession.replaceAll("-", "") + "/" + document,
+      primaryDocument: document,
+      items: form.startsWith("8-K") && Array.isArray(recent.items)
+        && typeof recent.items[i] === "string"
+        ? Array.from(new Set(recent.items[i].split(",")
+            .map(item => item.trim()).filter(item => /^[1-9]\.\d{2}$/.test(item)))).slice(0, 12)
+        : [],
     });
   }
   filings.sort((a,b) => (b.filedAt.localeCompare(a.filedAt)

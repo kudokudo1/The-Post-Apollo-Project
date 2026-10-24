@@ -4,6 +4,7 @@ from pathlib import Path
 root = Path(__file__).resolve().parents[2]
 finance = (root/"widgets/FinanceW.qml").read_text()
 sec = (root/"widgets/FinanceSecFilingsPane.qml").read_text()
+detail = (root/"widgets/FinanceSecDocumentInspector.qml").read_text()
 service = (root/"services/finance/FinanceSecReadService.qml").read_text()
 reader = (root/"scripts/finance/read_sec_filings.mjs").read_text()
 crawl = (root/"widgets/FinanceResearchCrawlPane.qml").read_text()
@@ -33,7 +34,7 @@ assert 'secFeed.selectIssuer("0000789019")' in sec
 assert 'secFeed.selectIssuer("0001045810")' in sec
 assert 'readonly property bool wide: width >= 650' in sec
 assert 'TapHandler {' in sec
-assert 'index only' in sec.lower()
+assert 'index only' in detail.lower()
 assert 'SEC DATA.SEC.GOV // PUBLIC SNAPSHOT // NOT LIVE' in sec
 assert 'Text.PlainText' in sec
 

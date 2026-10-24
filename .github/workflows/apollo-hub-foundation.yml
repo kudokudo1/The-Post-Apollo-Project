@@ -4,7 +4,9 @@ on:
   pull_request:
     paths:
       - "widgets/ApolloHubW.qml"
+      - "shell.qml"
       - "services/hub/ApolloHubLayout.js"
+      - "services/hub/LAYOUT_EDITOR_V2_CONTRACT.md"
       - "tests/hub/test_apollo_hub_layout_v2.cjs"
       - "widgets/hub/ApolloHubTile.qml"
       - "widgets/hub/ApolloHubWeatherExplore.qml"
@@ -15,6 +17,7 @@ on:
       - "widgets/hub/ApolloHubUptimeMini.qml"
       - "widgets/hub/ApolloHubAppsMini.qml"
       - "widgets/hub/ApolloHubAppsExplore.qml"
+      - "widgets/hub/ApolloHubSocialMini.qml"
       - "widgets/hub/ApolloHubTodoMini.qml"
       - "widgets/hub/ApolloHubTodoExplore.qml"
       - "widgets/hub/ApolloHubNotesMini.qml"
@@ -29,7 +32,9 @@ on:
       - main
     paths:
       - "widgets/ApolloHubW.qml"
+      - "shell.qml"
       - "services/hub/ApolloHubLayout.js"
+      - "services/hub/LAYOUT_EDITOR_V2_CONTRACT.md"
       - "tests/hub/test_apollo_hub_layout_v2.cjs"
       - "widgets/hub/ApolloHubTile.qml"
       - "widgets/hub/ApolloHubWeatherExplore.qml"
@@ -40,6 +45,7 @@ on:
       - "widgets/hub/ApolloHubUptimeMini.qml"
       - "widgets/hub/ApolloHubAppsMini.qml"
       - "widgets/hub/ApolloHubAppsExplore.qml"
+      - "widgets/hub/ApolloHubSocialMini.qml"
       - "widgets/hub/ApolloHubTodoMini.qml"
       - "widgets/hub/ApolloHubTodoExplore.qml"
       - "widgets/hub/ApolloHubNotesMini.qml"

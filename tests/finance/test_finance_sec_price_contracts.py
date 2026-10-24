@@ -46,7 +46,12 @@ assert "Quickshell.shellPath(\"scripts/finance/read_sec_price_context.mjs\")" in
 assert "priceFeed.inspect" not in ui  # only user action in price view starts fetch
 
 assert 'const token = await tokenLoader();' in reader
-assert 'if (!token && cik !== "0000320193")' in reader
+assert 'const demoTrial = !token && cik === "0000789019"' in reader
+assert 'if (!token && cik !== "0000320193" && !demoTrial)' in reader
+assert 'demo-not-authorized' in reader and 'demo-not-authorized' in service
+assert 'MICROSOFT DEMO ACCESS DENIED' in service
+assert 'NVDA // TOKEN-GATED' in view
+assert 'MSFT // DEMO ACCESS TRIAL' in view
 assert 'api_token:token||"demo"' in reader
 assert 'https://eodhd.com/api/eod/' in reader
 assert 'AbortSignal.timeout(12000)' in reader

@@ -9,8 +9,6 @@ from __future__ import annotations
 
 import argparse
 import asyncio
-import base64
-import io
 import json
 import os
 from pathlib import Path
@@ -80,16 +78,24 @@ def save_app_keys() -> None:
     emit("APP_SAVED", "Application configuration saved privately")
 
 
-def qr_png_data(url: str) -> str:
+def qr_matrix_rows(url: str) -> list[str]:
+    """Return QR modules only, not the sensitive login URL or an image file.
+
+    python-qrcode can generate the matrix without Pillow. The Qt Quick Canvas
+    renders it with integer cells, keeping the complete pairing flow in Social.
+    """
     try:
         import qrcode
     except ImportError as exc:
         raise BridgeError("DEPENDENCY_MISSING",
-                          "QR pairing requires Python qrcode with Pillow; phone sign-in remains available") from exc
-    buffer = io.BytesIO()
-    image = qrcode.make(url)
-    image.save(buffer, format="PNG")
-    return "data:image/png;base64," + base64.b64encode(buffer.getvalue()).decode("ascii")
+                          "QR pairing requires Python qrcode; phone sign-in remains available") from exc
+    qr = qrcode.QRCode(border=4)
+    qr.add_data(url)
+    qr.make(fit=True)
+    matrix = qr.get_matrix()
+    if not matrix or len(matrix) > 97 or any(len(row) != len(matrix) for row in matrix):
+        raise BridgeError("ERROR", "Telegram returned an unsupported QR payload")
+    return ["".join("1" if pixel else "0" for pixel in row) for row in matrix]
 
 
 async def two_step_password(client) -> None:
@@ -113,7 +119,7 @@ async def qr_sign_in(client) -> None:
     login = await client.qr_login()
     for _ in range(8):
         emit("QR_READY", "Scan this QR in Telegram Settings > Devices > Link Desktop Device",
-             image=qr_png_data(login.url))
+             modules=qr_matrix_rows(login.url))
         try:
             await asyncio.wait_for(login.wait(), timeout=55)
             return
@@ -166,7 +172,7 @@ async def connect(mode: str) -> None:
         raise
     if mode == "qr":
         # Detect missing QR support before touching the account session.
-        qr_png_data("tg://login?token=preflight")
+        qr_matrix_rows("tg://login?token=preflight")
     # QR waits for an UpdateLoginToken event. Ordinary read/send bridges
     # deliberately disable updates, but QR authorization MUST enable them.
     client = _telegram_client(receive_updates=(mode == "qr"))

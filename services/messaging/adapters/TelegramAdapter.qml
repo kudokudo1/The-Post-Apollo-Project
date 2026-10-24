@@ -54,7 +54,7 @@ Item {
     // Explicit, user-initiated account connection. No automatic login.
     property string loginState: "IDLE"
     property string loginDetail: ""
-    property string qrSource: ""
+    property var qrModules: []
     property string loginMode: ""
     property string requestedLoginMode: ""
     property bool loginCancelled: false
@@ -82,7 +82,7 @@ Item {
         loginCancelled = false;
         loginState = "CONNECTING";
         loginDetail = "Connecting to Telegram...";
-        qrSource = "";
+        qrModules = [];
         loginProcess.command = [pythonPath, loginBridgePath, loginMode];
         loginProcess.running = true;
     }
@@ -93,7 +93,7 @@ Item {
         loginProcess.running = false;
         loginState = "IDLE";
         loginDetail = "";
-        qrSource = "";
+        qrModules = [];
         pendingAppId = "";
         pendingAppHash = "";
     }
@@ -129,7 +129,7 @@ Item {
             const state = String(event.state || "ERROR");
             loginState = state === "INVALID_CODE" ? "CODE_REQUIRED" : state;
             loginDetail = String(event.detail || "");
-            qrSource = state === "QR_READY" ? String(event.image || "") : "";
+            qrModules = state === "QR_READY" && Array.isArray(event.modules) ? event.modules : [];
             if (state === "READY") {
                 loginDetail = "Connected. Loading your conversations...";
                 backendMode = "PROBING";

@@ -66,6 +66,75 @@ Item {
     property int bgMaxFrameMs: 0
     property double bgLastFrameSummaryMs: 0
 
+    // Operator-controlled A/B experiment; both gates default OFF.
+    // Reuse the existing CAVA process and stdout parser. No audio mutation.
+    readonly property bool cavaCoalesceEnabled:
+        String(Quickshell.env("POST_APOLLO_CAVA_COALESCE") || "").trim() === "1"
+    readonly property bool cavaTrialProbeEnabled:
+        String(Quickshell.env("POST_APOLLO_CAVA_TRIAL_PROBE") || "").trim() === "1"
+    property string cavaLatestPendingFrame: ""
+    property bool cavaFramePending: false
+    property bool cavaDrainingPending: false
+    property var cavaTrialStats: ({
+        received: 0, applied: 0, dropped: 0, changed: 0,
+        invalid: 0, applyTotalMs: 0, maxApplyMs: 0
+    })
+    property double cavaTrialLastReportMs: 0
+
+    function reportCavaTrial() {
+        if (!cavaTrialProbeEnabled)
+            return;
+        const now = Date.now();
+        if (!cavaTrialLastReportMs) {
+            cavaTrialLastReportMs = now;
+            return;
+        }
+        if (now - cavaTrialLastReportMs < 5000)
+            return;
+        const stats = cavaTrialStats;
+        console.warn("SYNTAGMA_CAVA_TRIAL // mode="
+                     + (cavaCoalesceEnabled ? "coalesced" : "original")
+                     + " received=" + stats.received
+                     + " applied=" + stats.applied
+                     + " dropped=" + stats.dropped
+                     + " changed=" + stats.changed
+                     + " invalid=" + stats.invalid
+                     + " applyTotalMs=" + stats.applyTotalMs
+                     + " maxApplyMs=" + stats.maxApplyMs
+                     + " pending=" + (cavaFramePending ? 1 : 0)
+                     + " mpdPlaying=" + (mpdPlaying ? 1 : 0)
+                     + " tsMs=" + now);
+        cavaTrialStats = ({
+            received: 0, applied: 0, dropped: 0, changed: 0,
+            invalid: 0, applyTotalMs: 0, maxApplyMs: 0
+        });
+        cavaTrialLastReportMs = now;
+    }
+
+    function stageCavaFrame(frame) {
+        // Last-wins buffer reduces repeated QML bar/halo updates after a
+        // long stall; it does not pretend to stop SplitParser from delivering.
+        if (cavaTrialProbeEnabled) {
+            cavaTrialStats.received += 1;
+            if (cavaFramePending)
+                cavaTrialStats.dropped += 1;
+        }
+        cavaLatestPendingFrame = String(frame);
+        cavaFramePending = true;
+        reportCavaTrial();
+    }
+
+    function drainCavaFrame() {
+        if (!cavaCoalesceEnabled || !cavaFramePending)
+            return;
+        const frame = cavaLatestPendingFrame;
+        cavaFramePending = false;
+        cavaLatestPendingFrame = "";
+        cavaDrainingPending = true;
+        receiveCavaFrame(frame);
+        cavaDrainingPending = false;
+    }
+
     // CAVA visualizes the system's default audio output, not just MPD.
     // MPD state is independent and will later be shared with the full deck.
     property string playbackState: "offline"
@@ -462,20 +531,37 @@ Item {
     }
 
     function receiveCavaFrame(frame) {
+        if (cavaCoalesceEnabled && !cavaDrainingPending) {
+            stageCavaFrame(frame);
+            return;
+        }
         const traceStartMs = bgLagProbeEnabled ? Date.now() : 0;
+        const trialStartMs = cavaTrialProbeEnabled ? Date.now() : 0;
+        if (trialStartMs && !cavaDrainingPending)
+            cavaTrialStats.received += 1;
         var raw = String(frame).trim();
         if (raw.endsWith(";"))
             raw = raw.slice(0, -1);
         var columns = raw.split(";");
-        if (columns.length !== barCount)
+        if (columns.length !== barCount) {
+            if (trialStartMs) {
+                cavaTrialStats.invalid += 1;
+                reportCavaTrial();
+            }
             return;
+        }
 
         var newLevels = [];
         var changed = false;
         for (var i = 0; i < barCount; ++i) {
             var value = Number(columns[i]);
-            if (!isFinite(value))
+            if (!isFinite(value)) {
+                if (trialStartMs) {
+                    cavaTrialStats.invalid += 1;
+                    reportCavaTrial();
+                }
                 return;
+            }
             var level = Math.max(0, Math.min(7, value));
             newLevels.push(level);
             if (level !== Number(levels[i] || 0))
@@ -486,6 +572,16 @@ Item {
         if (changed)
             levels = newLevels;
 
+        if (trialStartMs) {
+            const elapsed = Date.now() - trialStartMs;
+            cavaTrialStats.applied += 1;
+            if (changed)
+                cavaTrialStats.changed += 1;
+            cavaTrialStats.applyTotalMs += elapsed;
+            cavaTrialStats.maxApplyMs = Math.max(cavaTrialStats.maxApplyMs, elapsed);
+            reportCavaTrial();
+        }
+
         if (traceStartMs) {
             const now = Date.now();
             const elapsed = now - traceStartMs;
@@ -493,7 +589,9 @@ Item {
             if (changed)
                 bgChangedFrameCount += 1;
             bgMaxFrameMs = Math.max(bgMaxFrameMs, elapsed);
-            if (elapsed >= 25)
+            // In the A/B experiment report aggregates instead of generating
+            // hundreds of synchronous per-frame warnings during recovery.
+            if (elapsed >= 25 && !cavaTrialProbeEnabled)
                 console.warn("SYNTAGMA_BG_PROBE // media cava-frame synchronous="
                              + elapsed + "ms tsMs=" + now);
             if (!bgLastFrameSummaryMs)
@@ -522,9 +620,22 @@ Item {
         }
 
         onRunningChanged: {
-            if (!running)
+            if (!running) {
+                mediaDock.cavaFramePending = false;
+                mediaDock.cavaLatestPendingFrame = "";
                 mediaDock.levels = Array(mediaDock.barCount).fill(0);
+            }
         }
+    }
+
+    Timer {
+        id: cavaCoalescedRenderTimer
+        // The source is 15 FPS; render at most once every ~67ms. No timer
+        // exists in the original behavior because this gate is default-off.
+        interval: 67
+        repeat: true
+        running: mediaDock.cavaCoalesceEnabled
+        onTriggered: mediaDock.drainCavaFrame()
     }
 
     function receiveMpdStatus(output) {

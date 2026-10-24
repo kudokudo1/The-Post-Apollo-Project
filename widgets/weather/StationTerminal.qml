@@ -45,7 +45,15 @@ Rectangle {
         const executable = sessionMode === "terminal"
             ? "/var/home/mapple/.local/bin/weatherstation-starmap"
             : "/usr/bin/bash -l";
+        // Supply Kitty with the final bay size at WINDOW CREATION, not
+        // just a later Sway resize. Do not mutate the user's kitty config.
+        const w = Math.round(terminalBay.width);
+        const h = Math.round(terminalBay.height);
         return "kitty --config /var/home/mapple/.config/kitty/weatherstation.conf "
+            + "--override remember_window_size=no "
+            + "--override initial_window_width=" + w + " "
+            + "--override initial_window_height=" + h + " "
+            + "--override resize_in_steps=no "
             + "--override confirm_os_window_close=0 "
             + "--app-id " + terminalAppId
             + " --title '" + sessionTitle + "' " + executable
@@ -82,6 +90,10 @@ Rectangle {
     property int lastHeight: -1
 
     property bool revealAfterSync: false
+    // At most one post-map corrective resize and one center fallback.
+    // Never spin resizing Kitty every 75 ms.
+    property int fitResizeRetries: 0
+    property bool fitCenterAttempted: false
 
     // ─────────────────────────────────────────────
     // LAUNCH
@@ -217,12 +229,43 @@ Rectangle {
                     closeProcess.running = true;
                 return;
             }
-            // Verify once per geometry placement, not every 75-ms tick.
-            if (!verifyProcess.running)
-                verifyProcess.running = true;
+            // Wayland applies configure asynchronously; reading get_tree
+            // immediately can observe the old Kitty rect. Wait briefly.
+            verifyDelay.restart();
         }
 
 
+    }
+
+    Timer {
+        id: verifyDelay
+        interval: 250
+        repeat: false
+        onTriggered: {
+            if (!terminalView.pendingClose && !closeProcess.running
+                    && !verifyProcess.running)
+                verifyProcess.running = true;
+        }
+    }
+
+    Process {
+        id: centerProcess
+        property int targetX: 0
+        property int targetY: 0
+        // Only the exact Weather terminal identity can be moved. Do not
+        // target the currently focused window or every Kitty application.
+        command: ["swaymsg", "[app_id=\"^" + terminalView.terminalAppId
+                  + "$\"] move absolute position " + targetX + " " + targetY]
+        onExited: function(exitCode, exitStatus) {
+            if (terminalView.pendingClose || closeProcess.running)
+                return;
+            if (exitCode !== 0) {
+                terminalView.fitStatus = "CENTER ERROR";
+                terminalView.terminalState = "VERIFY ERROR";
+                return;
+            }
+            verifyDelay.restart();
+        }
     }
 
     // Sway's JSON tree reports the ACTUAL Kitty size. Never reveal the
@@ -244,7 +287,30 @@ Rectangle {
                         width: geometryProcess.targetWidth,
                         height: geometryProcess.targetHeight
                     };
+                    if (!actual)
+                        throw new Error("Kitty actor not visible in Sway tree");
                     const overlap = SwayGeometry.visibleIntersection(requested, actual);
+                    if (!overlap || !overlap.exact) {
+                        if (terminalView.fitResizeRetries < 1) {
+                            // Initial Kitty dimensions/configure may still
+                            // be stale. Try the SAME requested size once.
+                            terminalView.fitResizeRetries += 1;
+                            if (!geometryProcess.running)
+                                geometryProcess.running = true;
+                            return;
+                        }
+                        if (!terminalView.fitCenterAttempted) {
+                            const centered = SwayGeometry.centeredPosition(requested, actual);
+                            terminalView.fitCenterAttempted = true;
+                            if (centered && (actual.x !== centered.x
+                                             || actual.y !== centered.y)) {
+                                centerProcess.targetX = centered.x;
+                                centerProcess.targetY = centered.y;
+                                centerProcess.running = true;
+                                return;
+                            }
+                        }
+                    }
                     if (!overlap)
                         throw new Error("Kitty absent or outside intended bay");
                     terminalView.verifiedOffsetX = overlap.x;
@@ -294,6 +360,12 @@ Rectangle {
 
         if (geometryProcess.running)
             return;
+        // A *new* requested bay/screen geometry gets its own bounded
+        // verification cycle. A retry for identical geometry does not.
+        if (gx !== lastX || gy !== lastY || gw !== lastWidth || gh !== lastHeight) {
+            fitResizeRetries = 0;
+            fitCenterAttempted = false;
+        }
         geometryProcess.targetX = gx;
         geometryProcess.targetY = gy;
         geometryProcess.targetWidth = gw;
@@ -331,6 +403,9 @@ Rectangle {
             terminalView.terminalState = "IDLE";
             terminalView.pendingClose = false;
             terminalView.revealAfterSync = false;
+            verifyDelay.stop();
+            terminalView.fitResizeRetries = 0;
+            terminalView.fitCenterAttempted = false;
             terminalView.verifiedWidth = 0;
             terminalView.verifiedHeight = 0;
             terminalView.verifiedOffsetX = 0;
@@ -359,6 +434,8 @@ Rectangle {
             return false;
         }
         sessionMode = terminalMode;
+        fitResizeRetries = 0;
+        fitCenterAttempted = false;
         verifiedWidth = 0;
         verifiedHeight = 0;
         fitStatus = "UNVERIFIED";

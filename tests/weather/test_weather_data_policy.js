@@ -748,4 +748,37 @@ assert.equal(centeredY, 74);
 assert.equal(centeredHeight, 494);
 assert.equal(centeredY - dividerBottom, viewHeight - (centeredY + centeredHeight));
 
+
+// A forced window size is only a request. If Sway still reports a smaller
+// Kitty actor, a single bounded fallback should center that exact actor,
+// preserving the clipped visual alpha hole around the measured rect.
+const centeredFallback = terminalGeometry.centeredPosition(
+    {x: 1708, y: 136, width: 824, height: 494},
+    {x: 1708, y: 136, width: 780, height: 400});
+assert.deepEqual(JSON.parse(JSON.stringify(centeredFallback)),
+                 {x: 1730, y: 183});
+const centeredRect = {x: centeredFallback.x, y: centeredFallback.y,
+                      width: 780, height: 400};
+assert.deepEqual(JSON.parse(JSON.stringify(
+    terminalGeometry.visibleIntersection(
+        {x: 1708, y: 136, width: 824, height: 494}, centeredRect))),
+    {x: 22, y: 47, width: 780, height: 400, exact: false});
+assert.deepEqual(JSON.parse(JSON.stringify(
+    terminalGeometry.centeredPosition(
+        {x: 1708, y: 136, width: 824, height: 494},
+        {x: 1708, y: 136, width: 824, height: 494}))),
+    {x: 1708, y: 136});
+assert.equal(terminalGeometry.centeredPosition(
+    {x: 1708, y: 136, width: 824, height: 494},
+    {x: 0, y: 0, width: 1000, height: 400}), null);
+assert.equal(terminalGeometry.centeredPosition(
+    {x: 1708, y: 136, width: 824, height: 494},
+    {x: 0, y: 0, width: NaN, height: 400}), null);
+assert.equal(terminalGeometry.centeredPosition(null, centeredRect), null);
+assert.deepEqual(JSON.parse(JSON.stringify(
+    terminalGeometry.centeredPosition(
+        {x: -852, y: 336, width: 824, height: 494},
+        {x: -852, y: 336, width: 780, height: 400}))),
+    {x: -830, y: 383});
+
 console.log("Weather data policy contracts: PASS");

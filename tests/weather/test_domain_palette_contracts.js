@@ -128,6 +128,30 @@ assert.match(weatherTerminalSource, /visibleBayWidth:\s*verifiedWidth/);
 assert.match(geometrySource, /function observedWindow\(tree, appId\)/);
 assert.match(geometrySource, /function visibleIntersection\(desired, actual\)/);
 
+// Kitty and Sway must agree on the same viewport; a successful IPC exit
+// alone is not proof the Wayland surface resized. The retry is bounded and
+// a smaller confirmed window is centered without enlarging the alpha hole.
+assert.match(weatherTerminalSource, /--override remember_window_size=no /);
+assert.match(weatherTerminalSource, /--override initial_window_width=/);
+assert.match(weatherTerminalSource, /--override initial_window_height=/);
+assert.match(weatherTerminalSource, /--override resize_in_steps=no /);
+assert.match(weatherTerminalSource, /Math\.round\(terminalBay\.width\)/);
+assert.match(weatherTerminalSource, /Math\.round\(terminalBay\.height\)/);
+assert.match(weatherTerminalSource, /id:\s*verifyDelay[\s\S]*?interval:\s*250/);
+assert.match(weatherTerminalSource, /verifyDelay\.restart\(\)/);
+assert.match(weatherTerminalSource, /fitResizeRetries < 1/);
+assert.match(weatherTerminalSource, /fitResizeRetries \+= 1/);
+assert.match(weatherTerminalSource, /id:\s*centerProcess/);
+assert.match(weatherTerminalSource, /SwayGeometry\.centeredPosition\(requested, actual\)/);
+assert.match(weatherTerminalSource, /fitCenterAttempted = true/);
+assert.match(weatherTerminalSource, /centerProcess\.targetX = centered\.x/);
+assert.match(weatherTerminalSource, /centerProcess\.targetY = centered\.y/);
+assert.match(weatherTerminalSource, /if \(!overlap\)\s*throw new Error/);
+assert.match(weatherTerminalSource, /terminalView\.verifiedWidth = overlap\.width/);
+assert.doesNotMatch(weatherTerminalSource, /setInterval|Qt\.openUrlExternally/);
+assert.match(geometrySource, /function centeredPosition\(desired, actual\)/);
+
+
 const discoveryViewSource = read("widgets/weather/StationDiscovery.qml");
 const discoveryServiceSource = read("services/weather/StationDiscoveryService.qml");
 for (const [id, domain] of [

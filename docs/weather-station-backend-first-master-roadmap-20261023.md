@@ -125,6 +125,16 @@ Operator ran `swaymsg -t get_tree` on the live Weather Station STAR MAP actor an
 
 **Stage Director:** no mutation or change in compositor authority. Record the accepted target and observed output separately for later Stage Director reconciliation.
 
+### B14 // 2026-10-24 Kitty's actual window fit inside the centered terminal viewport
+
+**Operator observation:** the STAR MAP title divider and bay are now centered, but actual Kitty content remains smaller than the bay (previous measured Sway instance: 780×400 despite target 824×494) and exposes only a top-left region of the map. The operator asked to fix the actual terminal/window, **not** redesign the bay again.
+
+**Scoped implementation candidate:** keep the accepted local viewport **(8,74) / 824×494**, cyan divider, Sway output-relative positioning, and observed-only Stage Director boundary unchanged. Supply Kitty's window size at startup with per-launch `--override remember_window_size=no`, `initial_window_width=<terminalBay.width>`, `initial_window_height=<terminalBay.height>`, `resize_in_steps=no`. This overrides a potentially remembered/specified size in the dedicated `weatherstation.conf` without modifying that local config.
+
+**Sway acceptance safeguard:** continue to request exact app-id scoped floating geometry, but wait briefly for Wayland's asynchronous window configuration before reading `swaymsg -t get_tree`. If still smaller, allow **one** corrective resize of the same target and **one** bounded center move using the actual observed width/height. The resulting compositor-confirmed rectangle, not the requested rectangle, drives the existing visual alpha opening and input pass-through mask, so unused space remains painted. The view reports `PARTIAL FIT` if Kitty still refuses the exact dimensions; center fallback never starts another player/Kitty process and never targets unrelated windows.
+
+**Tests and acceptance:** verify source-level launch overrides and retry bounds, pure geometry on the operator's 780×400 example (fallback global center at (1730,183) for the current primary target 824×494), null/oversized guards, negative-origin secondary output, and GitHub CI. Full-screen Kitty/SwayFX runtime fit, keyboard focus, and exact alpha boundaries need operator visual acceptance. No local Kitty config edits, local restarts or SwayPX Stage Director mutation.
+
 ## 4 // Domain family C: MAP and world/environmental layers
 
 Current EONET is an event index only. Planned:

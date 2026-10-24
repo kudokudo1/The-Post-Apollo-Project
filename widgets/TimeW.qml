@@ -893,7 +893,58 @@ PanelWindow {
         && machineMoveReviewIndex >= 0
         && machineMoveReviewIndex < machineMoveReviewResult.items.length
         ? machineMoveReviewResult.items[machineMoveReviewIndex] : null
+    // M1p confirmation dry run: typed input never becomes M1n approval.
+    property string machineConfirmationTyped: ""
+    property bool machineConfirmationBusy: false
+    property string machineConfirmationPayload: ""
+    property string machineConfirmationSubmittedKey: ""
+    property string machineConfirmationStatus: "NOT CONFIRMED"
+    property var machineConfirmationResult: null
+    readonly property bool machineReviewReadyForConfirmation:
+        machineMoveReviewResult
+        && machineMoveReviewResult.kind === "machine-m1o-action-review"
+        && machineMoveReviewResult.status === "review_only"
+        && machineMoveCandidateKey !== ""
+        && machineMoveReviewKey === machineMoveCandidateKey
+    readonly property string machineConfirmationPhrase:
+        machineReviewReadyForConfirmation
+        ? "MOVE " + machineMoveReviewResult.action.app_id
+          + " FROM " + machineMoveReviewResult.action.from_workspace
+          + " TO " + machineMoveReviewResult.action.to_workspace
+        : ""
+    function machineInvalidateConfirmation() {
+        machineConfirmationTyped = "";
+        machineConfirmationPayload = "";
+        machineConfirmationSubmittedKey = "";
+        machineConfirmationResult = null;
+        machineConfirmationStatus = "NOT CONFIRMED";
+    }
+    function machineConfirmPreviewOnly() {
+        if (!menuOpen || selectedMode !== "machine" || !machineStoredViewOpen
+                || machineConfirmationBusy || machineMoveReviewBusy
+                || machineStoreBusy || machineResolverBusy
+                || !machineReviewReadyForConfirmation
+                || machineConfirmationTyped !== machineConfirmationPhrase
+                || !machineSavedItem || !machineOpenedCheckpoint
+                || !machineResolverItem)
+            return;
+        machineConfirmationSubmittedKey = machineMoveCandidateKey;
+        machineConfirmationPayload = JSON.stringify({
+            checkpoint_id: machineSavedItem.id,
+            document: machineOpenedCheckpoint.document,
+            candidate: machineResolverItem,
+            confirmation_text: machineConfirmationTyped
+        });
+        machineConfirmationResult = null;
+        machineConfirmationStatus = "RECHECKING CURRENT WINDOW // NO MOVE";
+        machineConfirmationBusy = true;
+        machineConfirmPreviewProcess.exec(["python3", "-B", "-I",
+            Quickshell.shellPath("services/time/MachineMoveConfirmRead.py"),
+            "confirm-preview"]);
+    }
+
     function machineInvalidateMoveReview() {
+        machineInvalidateConfirmation();
         machineMoveReviewResult = null;
         machineMoveReviewKey = "";
         machineMoveReviewIndex = 0;
@@ -907,6 +958,7 @@ PanelWindow {
                 || machineOpenedCheckpoint.checkpoint.id !== machineSavedItem.id
                 || machineMoveCandidateKey === "")
             return;
+        machineInvalidateConfirmation();
         machineMoveReviewKey = machineMoveCandidateKey;
         machineMoveReviewPayload = JSON.stringify({
             checkpoint_id: machineSavedItem.id,
@@ -924,6 +976,7 @@ PanelWindow {
         if (!menuOpen || selectedMode !== "machine" || !machineStoredViewOpen
                 || machineMoveReviewBusy)
             return;
+        machineInvalidateConfirmation();
         machineMoveReviewMode = "pending";
         machineMoveReviewKey = "";
         machineMoveReviewPayload = "";
@@ -1360,6 +1413,64 @@ PanelWindow {
             if (exitCode !== 0) {
                 timew.machineMoveReviewResult = null;
                 timew.machineMoveReviewStatus = "MOVE REVIEW UNAVAILABLE";
+            }
+        }
+    }
+
+    Process {
+        id: machineConfirmPreviewProcess
+        running: false
+        stdinEnabled: true
+        onStarted: {
+            if (timew.machineConfirmationPayload)
+                machineConfirmPreviewProcess.write(
+                    timew.machineConfirmationPayload + String.fromCharCode(10));
+            timew.machineConfirmationPayload = "";
+        }
+        stdout: StdioCollector {
+            onStreamFinished: {
+                try {
+                    const result = JSON.parse(this.text);
+                    const valid = timew.menuOpen && timew.selectedMode === "machine"
+                        && timew.machineStoredViewOpen
+                        && timew.machineReviewReadyForConfirmation
+                        && timew.machineConfirmationSubmittedKey !== ""
+                        && timew.machineConfirmationSubmittedKey
+                           === timew.machineMoveCandidateKey
+                        && result.kind === "machine-m1p-confirmation-dry-run"
+                        && result.status === "phrase_validated_read_only"
+                        && result.read_only === true
+                        && result.executable === false
+                        && result.approval_issued === false
+                        && result.confirmation_persisted === false
+                        && result.requires_new_approval_to_execute === true
+                        && result.action && timew.machineResolverItem
+                        && result.action.app_id === timew.machineResolverItem.app_id
+                        && result.action.con_id === timew.machineResolverItem.live_con_id
+                        && result.action.from_workspace
+                           === timew.machineResolverItem.current_workspace
+                        && result.action.to_workspace
+                           === timew.machineResolverItem.target_workspace;
+                    if (valid) {
+                        timew.machineConfirmationResult = result;
+                        timew.machineConfirmationStatus =
+                            "PHRASE VALIDATED // NO APPROVAL OR MOVE";
+                    } else {
+                        timew.machineConfirmationResult = null;
+                        timew.machineConfirmationStatus = "CONFIRMATION REJECTED";
+                    }
+                } catch (error) {
+                    timew.machineConfirmationResult = null;
+                    timew.machineConfirmationStatus = "INVALID CONFIRMATION RESPONSE";
+                }
+            }
+        }
+        onExited: function(exitCode, exitStatus) {
+            timew.machineConfirmationBusy = false;
+            timew.machineConfirmationPayload = "";
+            if (exitCode !== 0) {
+                timew.machineConfirmationResult = null;
+                timew.machineConfirmationStatus = "CONFIRMATION NOT VALIDATED";
             }
         }
     }
@@ -4423,6 +4534,76 @@ PanelWindow {
                                     + " > " + timew.machineMoveReviewResult.action.to_workspace
                                     + " // NO MOVE" : ""
                             color: Colors.cyan
+                            font.pixelSize: 10
+                            elide: Text.ElideRight
+                        }
+                        GohuText {
+                            width: parent.width
+                            visible: timew.machineReviewReadyForConfirmation
+                            text: "TYPE EXACT PHRASE // DRY RUN ONLY: "
+                                  + timew.machineConfirmationPhrase
+                            color: Colors.orange
+                            font.pixelSize: 10
+                            wrapMode: Text.Wrap
+                        }
+                        Row {
+                            width: parent.width
+                            height: 34
+                            spacing: 7
+                            visible: timew.machineReviewReadyForConfirmation
+                            TextField {
+                                id: machineConfirmationInput
+                                width: Math.max(0, parent.width - confirmPreviewButton.width
+                                                - parent.spacing)
+                                height: parent.height
+                                text: timew.machineConfirmationTyped
+                                placeholderText: "TYPE EXACT PHRASE"
+                                placeholderTextColor: Colors.cyan
+                                color: Colors.magenta
+                                selectionColor: Colors.magenta
+                                selectedTextColor: Colors.black
+                                font.family: "GohuFont 11 Nerd Font Mono"
+                                font.pixelSize: 10
+                                leftPadding: 4
+                                rightPadding: 4
+                                selectByMouse: true
+                                cursorDelegate: Rectangle {
+                                    width: 2
+                                    color: Colors.orange
+                                }
+                                background: Rectangle {
+                                    color: Colors.black
+                                    border.width: 1
+                                    border.color: machineConfirmationInput.activeFocus
+                                                  ? Colors.magenta : Colors.cyan
+                                }
+                                onTextEdited: {
+                                    timew.machineConfirmationTyped = text;
+                                    timew.machineConfirmationResult = null;
+                                    timew.machineConfirmationStatus = "NOT CONFIRMED";
+                                }
+                            }
+                            ActionButton {
+                                id: confirmPreviewButton
+                                width: 136
+                                height: parent.height
+                                label: "VALIDATE ONLY"
+                                labelPixelSize: 9
+                                accentColor: timew.semanticColor
+                                available: timew.machineReviewReadyForConfirmation
+                                           && !timew.machineConfirmationBusy
+                                           && !timew.machineMoveReviewBusy
+                                           && timew.machineConfirmationTyped
+                                              === timew.machineConfirmationPhrase
+                                onLeftClicked: timew.machineConfirmPreviewOnly()
+                            }
+                        }
+                        GohuText {
+                            width: parent.width
+                            visible: timew.machineReviewReadyForConfirmation
+                                     && timew.machineConfirmationStatus !== "NOT CONFIRMED"
+                            text: timew.machineConfirmationStatus
+                            color: Colors.orange
                             font.pixelSize: 10
                             elide: Text.ElideRight
                         }

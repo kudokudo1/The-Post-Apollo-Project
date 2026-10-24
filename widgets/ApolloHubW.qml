@@ -18,6 +18,35 @@ PanelWindow {
     property bool notesInputFocused: false
     // Injected read-only ApolloHubLiveBridge; do not construct a second provider.
     property var liveBridge: null
+
+    // Owner-owned windows are represented by bounded availability/state
+    // and explicit signals, never passed into tile delegates as handles.
+    property bool appControlAvailable: false
+    property var socialSnapshot: null
+    property bool socialActionsAvailable: false
+    signal openAppControlRequested()
+    signal openSocialRequested()
+    signal socialPlatformRequested(int index)
+
+    function requestAppControl() {
+        if (!appControlAvailable || !menuOpen)
+            return;
+        openAppControlRequested();
+        menuOpen = false;
+    }
+    function requestSocialOpen() {
+        if (!socialActionsAvailable || !menuOpen)
+            return;
+        openSocialRequested();
+        menuOpen = false;
+    }
+    function requestSocialPlatform(index) {
+        if (!socialActionsAvailable || !menuOpen
+                || !Number.isInteger(index) || index < 0 || index > 3)
+            return;
+        socialPlatformRequested(index);
+        menuOpen = false;
+    }
     // Only the currently keyboard-owned window may consume navigation keys.
     // The standalone preview uses keyboardActive=true; the main bar supplies
     // relationship-focus guards when it mounts this window.
@@ -1034,6 +1063,14 @@ PanelWindow {
                             // to launch methods, command lines, or executables.
                             appsSnapshot: hub.liveBridge
                                           ? hub.liveBridge.appsSnapshot : null
+                            appControlAvailable: hub.appControlAvailable
+                            socialSnapshot: hub.socialSnapshot
+                            socialActionsAvailable: hub.socialActionsAvailable
+                            onOpenAppControlRequested: hub.requestAppControl()
+                            onOpenSocialRequested: hub.requestSocialOpen()
+                            onSocialPlatformRequested: function(index) {
+                                hub.requestSocialPlatform(index);
+                            }
                             // B7 task data belongs to a separate guarded
                             // singleton; never mix it with hub layout JSON.
                             todoStore: ApolloHubTodoStore

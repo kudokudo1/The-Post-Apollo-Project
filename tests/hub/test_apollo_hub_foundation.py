@@ -16,6 +16,7 @@ system_mini = (ROOT / "widgets/hub/ApolloHubSystemMini.qml").read_text(encoding=
 uptime_mini = (ROOT / "widgets/hub/ApolloHubUptimeMini.qml").read_text(encoding="utf-8")
 apps_mini = (ROOT / "widgets/hub/ApolloHubAppsMini.qml").read_text(encoding="utf-8")
 apps_explore = (ROOT / "widgets/hub/ApolloHubAppsExplore.qml").read_text(encoding="utf-8")
+social_mini = (ROOT / "widgets/hub/ApolloHubSocialMini.qml").read_text(encoding="utf-8")
 todo_mini = (ROOT / "widgets/hub/ApolloHubTodoMini.qml").read_text(encoding="utf-8")
 todo_explore = (ROOT / "widgets/hub/ApolloHubTodoExplore.qml").read_text(encoding="utf-8")
 todo_store = (ROOT / "services/hub/ApolloHubTodoStore.qml").read_text(encoding="utf-8")
@@ -1378,6 +1379,79 @@ for token in (
     'pendingAction = "delete"',
 ):
     assert token in notes_mini, f"Stage 8G Notes real editor missing {token}"
+
+
+# Phase 2A: opt-in Social, AppControl owner-opening and no Hi-Fi changes.
+for token in ('"media", "apps", "cpu", "network", "social"',
+              'network: "NETWORK", social: "SOCIAL"'):
+    assert token in layout, f"Social module registration missing {token}"
+for token in (
+    'appControlAvailable: appControlWindow !== null',
+    'socialActionsAvailable: messagingWindow !== null',
+    'activeAppIndex: messagingWindow.activeAppIndex',
+    'onOpenAppControlRequested:',
+    'appControlWindow.menuOpen = true;',
+    'onOpenSocialRequested:',
+    'messagingWindow.menuOpen = true;',
+    'onSocialPlatformRequested: function(index)',
+    'messagingWindow.activateApp(index, false);',
+):
+    assert token in shell, f"Owner action seam missing {token}"
+for token in (
+    'signal openAppControlRequested()',
+    'signal openSocialRequested()',
+    'signal socialPlatformRequested(int index)',
+    'function requestAppControl()',
+    'function requestSocialOpen()',
+    'function requestSocialPlatform(index)',
+    'Number.isInteger(index)',
+    'onOpenAppControlRequested: hub.requestAppControl()',
+    'onOpenSocialRequested: hub.requestSocialOpen()',
+    'hub.requestSocialPlatform(index);',
+):
+    assert token in window, f"Hub action boundary missing {token}"
+for token in (
+    'property var socialSnapshot: null',
+    'property bool socialActionsAvailable: false',
+    'signal openSocialRequested()',
+    'signal socialPlatformRequested(int index)',
+    'ApolloHubSocialMini {',
+    'socialSnapshot: tile.socialSnapshot',
+    'actionsAvailable: tile.socialActionsAvailable',
+    'socialMini.statusLine',
+    'tile.moduleId !== "social"',
+):
+    assert token in tile, f"Social tile seam missing {token}"
+for token in (
+    'model: socialMini.platforms',
+    '["SESSIONS", "DISCORD", "TELEGRAM", "X"]',
+    'signal openRequested()',
+    'signal platformRequested(int index)',
+    'available: socialMini.actionsAvailable',
+    'onLeftClicked: socialMini.openRequested()',
+    'onLeftClicked: socialMini.platformRequested(index)',
+    'MODE SELECTION // NOT CONNECTION PROOF',
+):
+    assert token in social_mini, f"Social controls missing: {token}"
+for token in (
+    'signal openAppControlRequested()',
+    'property bool appControlAvailable: false',
+    'label: "APP CONTROL"',
+    'available: appsExplore.appControlAvailable',
+    'onLeftClicked: appsExplore.openAppControlRequested()',
+    'label: "BACK TO CATALOG"',
+):
+    assert token in apps_explore, f"AppControl entry missing {token}"
+for forbidden in (
+    'SessionAdapter {', 'Process {', 'FileView {', 'Timer {',
+    'DesktopEntries.byId(', 'Quickshell.execDetached(',
+    'sendMessage(', 'stopProcess(', 'terminate(', 'kill(',
+    'transport(', 'HeadlessMediaController {',
+):
+    assert forbidden not in social_mini + apps_explore, (
+        f"Owner backend leak: {forbidden}")
+assert 'ApolloHubMediaExplore {' in tile
+assert 'mediaSnapshot: tile.mediaSnapshot' in tile
 
 # Launchers and widget backends are unchanged in this first stage.
 print("ApolloHubW foundation source contracts passed")

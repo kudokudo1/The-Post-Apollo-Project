@@ -15,6 +15,12 @@ SectionFrame {
     property var systemSnapshot: null
     property var uptimeSnapshot: null
     property var appsSnapshot: null
+    property bool appControlAvailable: false
+    property var socialSnapshot: null
+    property bool socialActionsAvailable: false
+    signal openAppControlRequested()
+    signal openSocialRequested()
+    signal socialPlatformRequested(int index)
     property var todoStore: null
     property var todoSnapshot: null
     property var notesStore: null
@@ -477,6 +483,28 @@ SectionFrame {
         id: appsExplore
         visible: tile.moduleId === "apps" && tile.tileRowSpan > 1
         appsSnapshot: tile.appsSnapshot
+        appControlAvailable: tile.appControlAvailable
+        onOpenAppControlRequested: tile.openAppControlRequested()
+        anchors {
+            left: parent.left
+            right: parent.right
+            top: parent.top
+            bottom: parent.bottom
+            topMargin: tile.editing ? 32 : 22
+            bottomMargin: 23
+        }
+    }
+
+    // P2-A: Social is a new opt-in tile, wired to the existing owner.
+    ApolloHubSocialMini {
+        id: socialMini
+        visible: tile.moduleId === "social"
+        socialSnapshot: tile.socialSnapshot
+        actionsAvailable: tile.socialActionsAvailable
+        onOpenRequested: tile.openSocialRequested()
+        onPlatformRequested: function(index) {
+            tile.socialPlatformRequested(index);
+        }
         anchors {
             left: parent.left
             right: parent.right
@@ -616,6 +644,7 @@ SectionFrame {
                  && tile.moduleId !== "cpu"
                  && tile.moduleId !== "uptime"
                  && tile.moduleId !== "apps"
+                 && tile.moduleId !== "social"
                  && tile.moduleId !== "todo"
                  && tile.moduleId !== "notes"
                  && tile.moduleId !== "calendar"
@@ -668,6 +697,8 @@ SectionFrame {
               ? appsExplore.statusLine
               : tile.moduleId === "apps"
               ? appsMini.statusLine
+              : tile.moduleId === "social"
+              ? socialMini.statusLine
               : tile.moduleId === "todo" && tile.tileRowSpan > 1
               ? todoExplore.statusLine
               : tile.moduleId === "todo"

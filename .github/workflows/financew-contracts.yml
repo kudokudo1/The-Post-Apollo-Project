@@ -23,6 +23,8 @@ on:
       - "widgets/FinanceQuickAddPane.qml"
       - "widgets/FinanceAccountsPane.qml"
       - "widgets/FinanceCategoriesPane.qml"
+      - "services/finance/FinanceCategoryPlan.js"
+      - "tests/finance/test_finance_category_preview_contracts.py"
       - "tests/finance/test_finance_control_sections_contracts.py"
       - "tests/finance/test_finance_compact_grid_contracts.py"
       - "services/finance/FinanceSpreadsheetPolicy.js"
@@ -59,6 +61,8 @@ on:
       - "widgets/FinanceQuickAddPane.qml"
       - "widgets/FinanceAccountsPane.qml"
       - "widgets/FinanceCategoriesPane.qml"
+      - "services/finance/FinanceCategoryPlan.js"
+      - "tests/finance/test_finance_category_preview_contracts.py"
       - "tests/finance/test_finance_control_sections_contracts.py"
       - "tests/finance/test_finance_compact_grid_contracts.py"
       - "services/finance/FinanceSpreadsheetPolicy.js"
@@ -113,5 +117,7 @@ jobs:
         run: python3 tests/finance/test_finance_compact_grid_contracts.py
       - name: Verify FinanceW budget control-center sections
         run: python3 tests/finance/test_finance_control_sections_contracts.py
+      - name: Verify category create and rename previews are non-mutating
+        run: python3 tests/finance/test_finance_category_preview_contracts.py
       - name: Verify shared FinanceW numeric and calendar input controls
         run: python3 tests/finance/test_finance_input_controls_contracts.py

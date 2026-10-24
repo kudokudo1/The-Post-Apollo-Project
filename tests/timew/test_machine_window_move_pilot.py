@@ -55,7 +55,6 @@ class FakeSway:
         self.calls = []
 
     def read(self, argv, **kwargs):
-        assert argv[:4] == ["swaymsg", "-r", "-t", "get_" + argv[-1][4:]] if False else argv[:4]
         assert argv[:3] == ["swaymsg", "-r", "-t"]
         assert kwargs["shell"] is False and kwargs["timeout"] == 3
         assert kwargs["capture_output"] is True and kwargs["check"] is True
@@ -168,5 +167,31 @@ try:
     raise AssertionError("duplicate apps accepted")
 except mod.MoveRefused:
     pass
+
+
+# A command accepted by Sway but losing its target output after the move
+# must not be reported as successful.
+class ChangedOutput(FakeSway):
+    def read(self, argv, **kwargs):
+        if self.location == "2" and argv[-1] == "get_workspaces":
+            changed = copy.deepcopy(workspaces)
+            changed[1]["output"] = "UNPLUGGED"
+            return SimpleNamespace(stdout=json.dumps(changed).encode())
+        return super().read(argv, **kwargs)
+fake = ChangedOutput()
+assert mod.execute_one(document, request, read_runner=fake.read,
+                       command_runner=fake.command)["status"] == "uncertain_requires_manual_review"
+
+# Fresh postflight no longer sees the same app identity: uncertain.
+class SwappedApp(FakeSway):
+    def read(self, argv, **kwargs):
+        if self.location == "2" and argv[-1] == "get_tree":
+            altered = node("2")
+            altered["nodes"][0]["nodes"][0]["app_id"] = "different-app"
+            return SimpleNamespace(stdout=json.dumps(altered).encode())
+        return super().read(argv, **kwargs)
+fake = SwappedApp()
+assert mod.execute_one(document, request, read_runner=fake.read,
+                       command_runner=fake.command)["status"] == "uncertain_requires_manual_review"
 
 print("MACHINE M1K: GUARDED MOVE PILOT PASS / INJECTED SWAY ONLY")

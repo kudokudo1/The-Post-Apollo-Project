@@ -211,7 +211,10 @@ Rectangle {
             terminalView.lastHeight = targetHeight;
 
             if (terminalView.pendingClose || closeProcess.running) {
-                terminalView.closeTerminal();
+                // During STARTING, closeTerminal() would only re-arm the
+                // pending flag; kill the now-mapped actor directly instead.
+                if (!closeProcess.running)
+                    closeProcess.running = true;
                 return;
             }
             // Verify once per geometry placement, not every 75-ms tick.

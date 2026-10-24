@@ -7,12 +7,12 @@ Item {
     id: context
     property var filing: null
     property var priceFeed: null
-    readonly property var data: priceFeed && priceFeed.state === "ready"
+    readonly property var marketSnapshot: priceFeed && priceFeed.state === "ready"
         ? priceFeed.snapshot : null
-    readonly property var bars: data && Array.isArray(data.bars) ? data.bars : []
-    readonly property bool hasPair: data && data.previous && data.next
+    readonly property var bars: marketSnapshot && Array.isArray(marketSnapshot.bars) ? marketSnapshot.bars : []
+    readonly property bool hasPair: marketSnapshot && marketSnapshot.previous && marketSnapshot.next
     implicitHeight: contents.implicitHeight
-    onDataChanged: sparkline.requestPaint()
+    onMarketSnapshotChanged: sparkline.requestPaint()
 
     Column {
         id: contents
@@ -28,7 +28,7 @@ Item {
                 width: 120
                 height: 28
                 label: priceFeed && priceFeed.loading ? "READING"
-                    : context.data ? "REFRESH PRICE" : "PRICE CONTEXT"
+                    : context.marketSnapshot ? "REFRESH PRICE" : "PRICE CONTEXT"
                 labelPixelSize: 9
                 accentColor: Colors.cyan
                 available: context.filing && priceFeed && priceFeed.monitoring
@@ -56,8 +56,8 @@ Item {
 
         GohuText {
             width: parent.width
-            visible: !!context.data
-            text: context.data ? context.data.symbol + " // " + context.data.priceBasis
+            visible: !!context.marketSnapshot
+            text: context.marketSnapshot ? context.marketSnapshot.symbol + " // " + context.marketSnapshot.priceBasis
                 + " // EODHD HISTORICAL" : ""
             textFormat: Text.PlainText
             font.pixelSize: 11
@@ -65,17 +65,17 @@ Item {
         }
         GohuText {
             width: parent.width
-            visible: !!context.data
-            text: context.data
-                ? "SEC FILED: " + context.data.filingDate
-                  + "\nPRIOR CLOSE: " + (context.data.previous
-                      ? "$" + context.data.previous.price.toFixed(2)
-                          + " (" + context.data.previous.date + ")" : "UNAVAILABLE")
-                  + "\nNEXT CLOSE: " + (context.data.next
-                      ? "$" + context.data.next.price.toFixed(2)
-                          + " (" + context.data.next.date + ")" : "NOT YET AVAILABLE")
-                  + "\nNEXT VS PRIOR: " + (context.data.changePct === null
-                      ? "N/A" : context.data.changePct.toFixed(2) + "%")
+            visible: !!context.marketSnapshot
+            text: context.marketSnapshot
+                ? "SEC FILED: " + context.marketSnapshot.filingDate
+                  + "\nPRIOR CLOSE: " + (context.marketSnapshot.previous
+                      ? "$" + context.marketSnapshot.previous.price.toFixed(2)
+                          + " (" + context.marketSnapshot.previous.date + ")" : "UNAVAILABLE")
+                  + "\nNEXT CLOSE: " + (context.marketSnapshot.next
+                      ? "$" + context.marketSnapshot.next.price.toFixed(2)
+                          + " (" + context.marketSnapshot.next.date + ")" : "NOT YET AVAILABLE")
+                  + "\nNEXT VS PRIOR: " + (context.marketSnapshot.changePct === null
+                      ? "N/A" : context.marketSnapshot.changePct.toFixed(2) + "%")
                 : ""
             textFormat: Text.PlainText
             font.pixelSize: 10
@@ -119,7 +119,7 @@ Item {
                     // Observational filing date position, not a claim about
                     // when this information became available intraday.
                     let index = points.findIndex(function(p) {
-                        return p.date >= context.data.filingDate;
+                        return p.date >= context.marketSnapshot.filingDate;
                     });
                     if (index >= 0) {
                         const px = index*(width-1)/(points.length-1);
@@ -135,7 +135,7 @@ Item {
         }
         GohuText {
             width: parent.width
-            visible: !!context.data
+            visible: !!context.marketSnapshot
             text: "LINE = DAILY CLOSING PRICE // ORANGE = FILING-DATE POSITION"
             textFormat: Text.PlainText
             font.pixelSize: 9

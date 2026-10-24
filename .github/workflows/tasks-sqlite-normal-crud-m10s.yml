@@ -5,6 +5,9 @@ on:
     paths:
       - 'services/projects/ExperimentalTaskSqliteCrudM10s.py'
       - 'services/projects/ExperimentalTaskSqliteProjectsM10t.py'
+      - 'services/projects/ExperimentalTaskSqliteCustomM10u.py'
+      - 'tests/tasks/test_task_sqlite_m10u_custom_fields.py'
+      - 'docs/tasks-sqlite-local-custom-fields-m10u.md'
       - 'tests/tasks/test_task_sqlite_m10t_project_lifecycle.py'
       - 'docs/tasks-sqlite-normal-project-lifecycle-m10t.md'
       - 'tests/tasks/test_task_sqlite_m10s_normal_crud.py'
@@ -16,6 +19,9 @@ on:
     paths:
       - 'services/projects/ExperimentalTaskSqliteCrudM10s.py'
       - 'services/projects/ExperimentalTaskSqliteProjectsM10t.py'
+      - 'services/projects/ExperimentalTaskSqliteCustomM10u.py'
+      - 'tests/tasks/test_task_sqlite_m10u_custom_fields.py'
+      - 'docs/tasks-sqlite-local-custom-fields-m10u.md'
       - 'tests/tasks/test_task_sqlite_m10t_project_lifecycle.py'
       - 'docs/tasks-sqlite-normal-project-lifecycle-m10t.md'
       - 'tests/tasks/test_task_sqlite_m10s_normal_crud.py'
@@ -37,6 +43,8 @@ jobs:
         run: python3 tests/tasks/test_task_sqlite_m10s_normal_crud.py
       - name: M10t NORMAL project rename/delete lifecycle
         run: python3 tests/tasks/test_task_sqlite_m10t_project_lifecycle.py
+      - name: M10u LOCAL typed-field writes and GIT no-sync journal safety
+        run: python3 tests/tasks/test_task_sqlite_m10u_custom_fields.py
       - name: M10l existing normalized record and journal regression
         run: python3 tests/tasks/test_task_sqlite_records_v2.py
       - name: M10r compatibility and production isolation guards

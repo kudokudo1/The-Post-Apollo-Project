@@ -8,7 +8,7 @@ var channels = [
     {id:"aje", section:"LIVE", title:"AL JAZEERA ENGLISH", source:"Al Jazeera", detail:"International reporting // official live page", access:"FREE PAGE // EMBED UNVERIFIED", kind:"channel", url:"https://www.aljazeera.com/video/live"},
     {id:"livenow", section:"LIVE", title:"LIVENOW FROM FOX", source:"FOX Television Stations", detail:"Free rolling US news // not pay-TV FOX News Channel", access:"FREE PAGE // EMBED UNVERIFIED", kind:"channel", url:"https://www.livenowfox.com/live"},
     {id:"nbcnow", section:"LIVE", title:"NBC NEWS NOW", source:"NBC News", detail:"Free 24-hour streaming news", access:"FREE PAGE // EMBED UNVERIFIED", kind:"channel", url:"https://www.nbcnews.com/now"},
-    {id:"abcnews", section:"LIVE", title:"ABC NEWS LIVE", source:"ABC News", detail:"Free continuous news and reporting", access:"FREE PAGE // EMBED UNVERIFIED", kind:"channel", url:"https://abcnews.com/Live"},
+    {id:"abcnews", section:"LIVE", title:"ABC NEWS LIVE", source:"ABC News", detail:"Free continuous news and reporting", access:"FREE PAGE // EMBED UNVERIFIED", kind:"channel", url:"https://abc.com/watch-live"},
     {id:"cnn", section:"LIVE", title:"CNN", source:"CNN", detail:"Full live channel requires All Access or eligible TV provider", access:"SUBSCRIPTION / TV LOGIN", kind:"channel", url:"https://www.cnn.com/"},
     {id:"foxnews", section:"LIVE", title:"FOX NEWS CHANNEL", source:"Fox News", detail:"Full live channel requires FOX One or TV provider", access:"SUBSCRIPTION / TV LOGIN", kind:"channel", url:"https://www.fox.com/stream/fox-news"},
     {id:"house", section:"CONGRESS", title:"U.S. HOUSE FLOOR", source:"Office of the House Clerk", detail:"Official floor webcast // only when proceedings occur", access:"FREE OFFICIAL WEBCAST", kind:"channel", url:"https://live.house.gov/"},
@@ -40,7 +40,7 @@ function safeChannelId(input) {
 }
 function normalizeCreator(label, channelId) {
     const id = safeChannelId(channelId);
-    const title = String(label || "").replace(/[\u0000-\u001f<>]/g, " ").trim().slice(0, 70);
+    const title = String(label || "").replace(/[\u0000-\u001f<>|]/g, " ").trim().slice(0, 70);
     if (!id || !title) return null;
     return {id:id, title:title};
 }

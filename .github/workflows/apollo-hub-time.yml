@@ -8,6 +8,7 @@ on:
       - "widgets/hub/ApolloHubTimeMini.qml"
       - "tests/hub/test_apollo_hub_time_policy.cjs"
       - "tests/hub/test_apollo_hub_time_contract.py"
+      - "widgets/TimeW.qml"
       - ".github/workflows/apollo-hub-time.yml"
   push:
     branches:
@@ -18,6 +19,7 @@ on:
       - "widgets/hub/ApolloHubTimeMini.qml"
       - "tests/hub/test_apollo_hub_time_policy.cjs"
       - "tests/hub/test_apollo_hub_time_contract.py"
+      - "widgets/TimeW.qml"
       - ".github/workflows/apollo-hub-time.yml"
   workflow_dispatch:
 

@@ -21,6 +21,10 @@ Item {
 
     signal textFocusChanged(bool focused)
 
+    // Same revision-safe Notes editor. Taller chassis only changes sizing.
+    readonly property int densityLevel: height >= 300 ? 3
+                                        : height >= 180 ? 2 : 1
+
     readonly property string storeState:
         notesSnapshot && notesSnapshot.state
         ? String(notesSnapshot.state) : "loading"
@@ -211,7 +215,8 @@ Item {
             anchors.top: parent.top
             anchors.left: parent.left
             anchors.right: parent.right
-            height: 21
+            height: notesMini.densityLevel === 3 ? 30
+                    : notesMini.densityLevel === 2 ? 25 : 21
             spacing: 5
 
             GohuText {
@@ -272,7 +277,8 @@ Item {
                 id: noteRow
                 required property var modelData
                 width: noteList.width
-                height: 26
+                height: notesMini.densityLevel === 3 ? 45
+                        : notesMini.densityLevel === 2 ? 35 : 26
                 softGlowEnabled: false
                 contentGlowEnabled: false
                 idleFillColor: Colors.black
@@ -289,8 +295,10 @@ Item {
                     spacing: 0
                     GohuText {
                         width: parent.width
-                        height: 14
-                        font.pixelSize: 11
+                        height: notesMini.densityLevel === 3 ? 24
+                                : notesMini.densityLevel === 2 ? 19 : 14
+                        font.pixelSize: notesMini.densityLevel === 3 ? 15
+                                        : notesMini.densityLevel === 2 ? 13 : 11
                         color: Colors.white
                         elide: Text.ElideRight
                         textFormat: Text.PlainText
@@ -298,8 +306,10 @@ Item {
                     }
                     GohuText {
                         width: parent.width
-                        height: 12
-                        font.pixelSize: 9
+                        height: notesMini.densityLevel === 3 ? 18
+                                : notesMini.densityLevel === 2 ? 15 : 12
+                        font.pixelSize: notesMini.densityLevel === 3 ? 12
+                                        : notesMini.densityLevel === 2 ? 10 : 9
                         color: Colors.cyan
                         opacity: 0.7
                         elide: Text.ElideRight
@@ -339,7 +349,8 @@ Item {
             anchors.left: parent.left
             anchors.right: parent.right
             anchors.top: parent.top
-            height: 21
+            height: notesMini.densityLevel === 3 ? 30
+                    : notesMini.densityLevel === 2 ? 25 : 21
             spacing: 5
 
             Rectangle {
@@ -358,7 +369,8 @@ Item {
                     anchors.rightMargin: 5
                     verticalAlignment: TextInput.AlignVCenter
                     font.family: "GohuFont 11 Nerd Font Mono"
-                    font.pixelSize: 11
+                    font.pixelSize: notesMini.densityLevel === 3 ? 15
+                                    : notesMini.densityLevel === 2 ? 13 : 11
                     color: Colors.white
                     selectionColor: Colors.magenta
                     selectedTextColor: Colors.black
@@ -427,7 +439,8 @@ Item {
                     width: bodyFlick.width
                     height: Math.max(bodyFlick.height, contentHeight + 4)
                     font.family: "GohuFont 11 Nerd Font Mono"
-                    font.pixelSize: 11
+                    font.pixelSize: notesMini.densityLevel === 3 ? 15
+                                    : notesMini.densityLevel === 2 ? 13 : 11
                     color: Colors.white
                     wrapMode: TextEdit.Wrap
                     textFormat: TextEdit.PlainText
@@ -448,7 +461,8 @@ Item {
             anchors.left: parent.left
             anchors.right: parent.right
             anchors.bottom: parent.bottom
-            height: 20
+            height: notesMini.densityLevel === 3 ? 28
+                    : notesMini.densityLevel === 2 ? 24 : 20
             spacing: 5
 
             GohuText {

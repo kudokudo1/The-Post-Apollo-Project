@@ -848,7 +848,7 @@ PanelWindow {
     property int panelLeftMargin: 6
     property int frameInset: 8
     property int glowGutter: 14
-    property int topGlowGutter: 12
+    property int topGlowGutter: 9
 
     // Reserve transparent pixels above the visible chassis so its top glow
     // renders inside the PanelWindow instead of being clipped by the top bar.

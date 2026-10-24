@@ -1,0 +1,44 @@
+name: TASKS M10y SQLite v2 Quickshell snapshot parity
+
+on:
+  pull_request:
+    paths:
+      - 'services/projects/TaskSqliteSnapshotProbeM10y.py'
+      - 'services/projects/TaskSqliteSnapshotBridgeM10y.qml'
+      - 'tests/tasks/fixtures/task_sqlite_snapshot_m10y_oracle.cjs'
+      - 'tests/tasks/test_task_sqlite_snapshot_m10y.py'
+      - 'docs/tasks-sqlite-snapshot-parity-m10y.md'
+      - '.github/workflows/tasks-sqlite-snapshot-parity-m10y.yml'
+  push:
+    branches:
+      - main
+    paths:
+      - 'services/projects/TaskSqliteSnapshotProbeM10y.py'
+      - 'services/projects/TaskSqliteSnapshotBridgeM10y.qml'
+      - 'tests/tasks/fixtures/task_sqlite_snapshot_m10y_oracle.cjs'
+      - 'tests/tasks/test_task_sqlite_snapshot_m10y.py'
+      - 'docs/tasks-sqlite-snapshot-parity-m10y.md'
+      - '.github/workflows/tasks-sqlite-snapshot-parity-m10y.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  sqlite-snapshot-parity:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: M10y SQLite v2 probe + actual deployed TODAY/PLANNER policy
+        run: python3 tests/tasks/test_task_sqlite_snapshot_m10y.py
+      - name: M10l strict SQLite v2 integrity and journal regression
+        run: python3 tests/tasks/test_task_sqlite_records_v2.py
+      - name: M10g compatibility projection source regression
+        run: node tests/tasks/test_unified_storage_read_bridge.cjs
+      - name: M10r writer parity and unmounted QML boundaries
+        run: python3 tests/tasks/test_task_sqlite_m10r_inventory.py

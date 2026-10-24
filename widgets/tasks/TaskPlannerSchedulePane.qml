@@ -18,12 +18,40 @@ Item {
     property string pendingTitle: ""
     property var beforeCreateIds: []
     property string feedback: ""
+    property string projectFilter: "all"
+    property string priorityFilter: "any"
+    property bool undatedOnly: false
+
+    readonly property var projectChoices: {
+        var rows=[{id:"all",label:"ALL"}, {id:"unassigned",label:"UNASSIGNED"}];
+        var projects=todoSnapshot && Array.isArray(todoSnapshot.projects)
+            ? todoSnapshot.projects : [];
+        for (var i=0;i<projects.length;i++)
+            if (projects[i] && typeof projects[i].id==="string")
+                rows.push({id:projects[i].id,label:projects[i].name});
+        return rows;
+    }
+    readonly property var priorityChoices: ["any","none","low","medium","high","urgent"]
+    readonly property var chosenProject: {
+        for (var i=0;i<projectChoices.length;i++)
+            if (projectChoices[i].id===projectFilter) return projectChoices[i];
+        return {id:"missing",label:"MISSING"};
+    }
+    function cycleProject() {
+        var choices=projectChoices, index=-1;
+        for (var i=0;i<choices.length;i++)
+            if (choices[i].id===projectFilter) { index=i; break; }
+        projectFilter=choices[(index+1)%choices.length].id;
+    }
+    function cyclePriority() {
+        var choices=priorityChoices, index=choices.indexOf(priorityFilter);
+        priorityFilter=choices[(index+1)%choices.length];
+    }
 
     readonly property bool writable: todoStore !== null
         && SchedulePolicy.writable(todoSnapshot) && !pendingWrite
-    readonly property var candidates: todoSnapshot && Array.isArray(todoSnapshot.items)
-        ? todoSnapshot.items.filter(function(task) { return task && !task.done; })
-        : []
+    readonly property var candidates: SchedulePolicy.candidates(
+        todoSnapshot,projectFilter,priorityFilter,undatedOnly)
     readonly property var selectedProposal: SchedulePolicy.proposal(
         todoSnapshot, originalTask, clearTarget ? null : selectedDate)
 
@@ -64,6 +92,11 @@ Item {
     function createTask() {
         if (pendingWrite || !SchedulePolicy.canCreate(todoSnapshot, newTaskInput.text)
             || todoStore === null) return;
+        // Creation must never replace an existing scheduling draft.
+        if (originalTask !== null) {
+            feedback = "CANCEL DRAFT FIRST";
+            return;
+        }
         var clean=newTaskInput.text.trim();
         beforeCreateIds = todoSnapshot.items.map(function(row) { return row.id; });
         pendingTitle = clean;
@@ -102,10 +135,18 @@ Item {
             feedback = "SAVED // DATE CONFIRMED";
         } else if (pendingKind === "create"
                    && SchedulePolicy.created(snap,beforeCreateIds,pendingTitle)) {
+            var newRow = SchedulePolicy.newlyCreated(snap,beforeCreateIds,pendingTitle);
             pendingWrite = false;
             pendingKind = "";
             newTaskInput.text = "";
-            feedback = "CREATED UNDATED // SELECT TASK TO SCHEDULE";
+            if (newRow) {
+                originalTask = SchedulePolicy.signature(newRow);
+                selectedTaskId = newRow.id;
+                clearTarget = false;
+                feedback = "CREATED UNDATED // READY TO SAVE DATE";
+            } else {
+                feedback = "SAVE NOT VERIFIED // CHECK BEFORE RETRY";
+            }
         } else {
             pendingWrite = false;
             pendingKind = "";
@@ -160,6 +201,7 @@ Item {
                 label: "ADD"
                 labelPixelSize: 10
                 available: schedule.writable
+                    && schedule.originalTask === null
                     && SchedulePolicy.canCreate(schedule.todoSnapshot,newTaskInput.text)
                 onLeftClicked: schedule.createTask()
             }
@@ -229,10 +271,52 @@ Item {
         }
     }
 
+    Column {
+        id: filters
+        anchors.top: entry.bottom
+        anchors.topMargin: 7
+        anchors.left: parent.left
+        anchors.right: parent.right
+        spacing: 4
+        Row {
+            width: parent.width
+            height: 27
+            spacing: 4
+            ActionButton {
+                width: (parent.width - 8) / 3
+                height: 27
+                label: "PROJECT: " + schedule.chosenProject.label.slice(0,9)
+                labelPixelSize: 8
+                onLeftClicked: schedule.cycleProject()
+            }
+            ActionButton {
+                width: (parent.width - 8) / 3
+                height: 27
+                label: "P: " + schedule.priorityFilter.toUpperCase()
+                labelPixelSize: 9
+                onLeftClicked: schedule.cyclePriority()
+            }
+            ActionButton {
+                width: (parent.width - 8) / 3
+                height: 27
+                label: schedule.undatedOnly ? "UNDATED" : "ALL DATES"
+                labelPixelSize: 9
+                selected: schedule.undatedOnly
+                onLeftClicked: schedule.undatedOnly = !schedule.undatedOnly
+            }
+        }
+        GohuText {
+            width: parent.width
+            font.pixelSize: 9
+            color: Colors.cyan
+            text: schedule.candidates.length + " OPEN TASKS // FILTERED"
+            elide: Text.ElideRight
+        }
+    }
     ListView {
         id: taskList
-        anchors.top: entry.bottom
-        anchors.topMargin: 8
+        anchors.top: filters.bottom
+        anchors.topMargin: 7
         anchors.bottom: confirm.top
         anchors.bottomMargin: 8
         anchors.left: parent.left

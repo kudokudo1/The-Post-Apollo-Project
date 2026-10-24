@@ -29,4 +29,5 @@ jobs:
       - run: python3 tests/tasks/test_task_planner_mount.py
       - run: python3 tests/tasks/test_task_planner_week_day_ui.py
       - run: node tests/tasks/test_task_planner_scheduling_policy.cjs
+      - run: node tests/tasks/test_task_planner_filters.cjs
       - run: python3 tests/tasks/test_task_planner_scheduling_ui.py

@@ -19,6 +19,9 @@ on:
       - "services/time/MachineWindowResolver.py"
       - "services/time/MachineWindowMovePilot.py"
       - "services/time/MachineMoveJournal.py"
+      - "services/time/MachineMoveApproval.py"
+      - "services/time/MachineMoveReconciliation.py"
+      - "docs/timew-machine-m1n-scoped-recovery-approval.md"
       - "docs/timew-machine-m1l-durable-move-journal.md"
       - "docs/timew-machine-m1k-single-window-pilot.md"
       - "services/time/MachineCheckpointStore.py"
@@ -51,6 +54,9 @@ on:
       - "services/time/MachineWindowResolver.py"
       - "services/time/MachineWindowMovePilot.py"
       - "services/time/MachineMoveJournal.py"
+      - "services/time/MachineMoveApproval.py"
+      - "services/time/MachineMoveReconciliation.py"
+      - "docs/timew-machine-m1n-scoped-recovery-approval.md"
       - "docs/timew-machine-m1l-durable-move-journal.md"
       - "docs/timew-machine-m1k-single-window-pilot.md"
       - "services/time/MachineCheckpointStore.py"
@@ -121,6 +127,10 @@ jobs:
         run: python3 -B -I tests/timew/test_machine_window_resolver_ui.py
       - name: Verify MACHINE durable move journal crash and permissions
         run: python3 -B -I tests/timew/test_machine_move_journal.py
+      - name: Verify MACHINE single-use approval and read-only reconciliation
+        run: python3 -B -I tests/timew/test_machine_move_approval_reconciliation.py
+      - name: Verify MACHINE approval/reconciliation cannot activate from TimeW
+        run: python3 -B -I tests/timew/test_machine_move_approval_contract.py
       - name: Verify MACHINE injected single-window move pilot with synthetic Sway
         run: python3 -B -I tests/timew/test_machine_window_move_pilot.py
       - name: Verify MACHINE move pilot cannot activate from TimeW

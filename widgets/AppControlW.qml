@@ -923,12 +923,12 @@ PanelWindow {
 
     AppControlHubActionGate {
         id: appControlHubGate
-        taskRows: appControlWindow.taskRows
-        taskSafety: taskSafety
-        taskController: processPresentationController
-        processControl: processControl
-        processLimits: processLimits
-        refreshTimer: taskRefreshAfterKillTimer
+        ownerRows: appControlWindow.taskRows
+        safetyOwner: taskSafety
+        presentationOwner: processPresentationController
+        controlOwner: processControl
+        limitsOwner: processLimits
+        refreshOwner: taskRefreshAfterKillTimer
     }
 
     HunterOperationController {

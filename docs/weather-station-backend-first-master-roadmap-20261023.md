@@ -189,6 +189,16 @@ Operator ran `swaymsg -t get_tree` on the live Weather Station STAR MAP actor an
 
 **Acceptance gates:** CI for exact registry labels, safe channel identities, persisted creator controls, isolated backend, disabled automatic web loading/audio, bounded feed parsing and blocked unexpected redirects; operator runtime screenshot/test for each tab, source, WebEngine availability, creator persistence and actual audiovisual playback. Only source/UI changes in Post-Apollo. No SwayPX/Stage Director implementation, Kitty change, shell geometry, subscription bypass, new music backend or live local activation.
 
+### B21 // 2026-10-24 NEWS direct WATCH and MUTE + renderer diagnostics
+
+**Operator live feedback after B20:** every source reported `ARTICLE RENDERER UNAVAILABLE` and no website/video appeared. Channel access is failing at a shared optional WebEngine boundary, not evidence that every publisher individually blocked the Station. Exact cause (missing QtWebEngine QML module, missing QtWebEngineQuick host initialization, blocked redirect, HTTP restriction, unsupported playback) remains unverified until live Quickshell error logs are examined.
+
+**Approved interaction change:** replace the indirect `VIEW HERE → WATCH IN STATION` channel flow with directly exposed `WATCH IN STATION` and `MUTE: ON/OFF` controls on each catalog entry. WATCH immediately opens a single dedicated `StationChannelScreen.qml` occupying the NEWS content bay, hiding the NEWS tabs/list rather than presenting the article metadata screen. Its top strip has an existing-style **× CLOSE** and a second mute toggle; CLOSE releases the optional web renderer, returns to the same catalog, and resets audio to mute on the next session. Creator UPLOADS and remove controls remain present. GDELT REPORTS retain the separate internal headline-reader route.
+
+**Renderer boundary:** `StationChannelScreen.qml` loads the existing opt-in `StationNewsWebView.qml` only on explicit WATCH. The viewport is still Qt Quick, **not a genuine Kitty terminal, a new mpv process, or an external compositor-controlled surface**. QtWebEngine optional startup failure now says `WEB RENDERER NOT AVAILABLE`; publisher load failure displays its available `errorString`; disallowed cross-host redirects say `PLAYER REDIRECT BLOCKED`. Logs signal module-load failure for the operator to inspect. Channel audio is always muted unless deliberately switched. This improves diagnosis and UX, **but cannot independently make video decode or render when Quickshell lacks a functioning WebEngine host**. Never confuse tests that show `Loader.Error` handling with actual live video playback.
+
+**Next acceptance:** operator visual check of WATCH → fullscreen in-bay viewer → mute toggle → CLOSE → retained source rack. Then capture the first Quickshell Qt/QML error produced when WebEngine attempts to instantiate. If missing import/initialization is confirmed, route a *separate authorized* task to Quickshell fork/renderer owner. For the already-proposed Stage Director external browser/video surface solution, coordinate ownership before modifying compositor placement, clipping or input.
+
 ## 4 // Domain family C: MAP and world/environmental layers
 
 Current EONET is an event index only. Planned:

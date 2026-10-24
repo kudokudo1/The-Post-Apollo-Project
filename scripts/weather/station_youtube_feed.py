@@ -11,7 +11,7 @@ import re
 import sys
 from urllib.error import HTTPError, URLError
 from urllib.parse import urlsplit
-from urllib.request import Request, urlopen
+from urllib.request import HTTPRedirectHandler, Request, build_opener
 from xml.etree import ElementTree as ET
 
 CHANNEL_RE = re.compile(r"UC[A-Za-z0-9_-]{22}\Z")
@@ -38,6 +38,14 @@ def parse_feed(xml_bytes: bytes) -> dict:
     return {"rows": result}
 
 
+class YouTubeOnlyRedirects(HTTPRedirectHandler):
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        dest = urlsplit(newurl)
+        if dest.scheme != "https" or dest.hostname not in ("youtube.com", "www.youtube.com"):
+            raise ValueError("Unexpected feed redirect")
+        return super().redirect_request(req, fp, code, msg, headers, newurl)
+
+
 def main(argv: list[str]) -> int:
     if len(argv) != 2 or not CHANNEL_RE.fullmatch(argv[1]):
         print(json.dumps({"error": "INVALID CHANNEL ID"}))
@@ -45,7 +53,8 @@ def main(argv: list[str]) -> int:
     endpoint = "https://www.youtube.com/feeds/videos.xml?channel_id=" + argv[1]
     try:
         request = Request(endpoint, headers={"User-Agent": "Post-Apollo-WeatherStation/0.2"})
-        with urlopen(request, timeout=12) as response:
+        opener = build_opener(YouTubeOnlyRedirects())
+        with opener.open(request, timeout=12) as response:
             actual = urlsplit(response.geturl())
             if actual.scheme != "https" or actual.hostname not in ("youtube.com", "www.youtube.com"):
                 raise ValueError("Unexpected feed redirect")

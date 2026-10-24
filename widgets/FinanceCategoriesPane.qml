@@ -297,10 +297,12 @@ Item {
                 trackLabelGlowLocally: true
                 available: categoryPane.proposalEligible
                 onLeftClicked: {
-                    if(!categoryPane.proposalEligible)return;
-                    if(!categoryPane.approvalArmed)
-                        categoryPane.approvalArmed=true;
-                    else categoryPane.requestSave();
+                    if(categoryPane.proposalEligible) {
+                        if(!categoryPane.approvalArmed)
+                            categoryPane.approvalArmed=true;
+                        else
+                            categoryPane.requestSave();
+                    }
                 }
             }
             GohuText {

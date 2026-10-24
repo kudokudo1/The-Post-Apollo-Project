@@ -27,11 +27,12 @@ Item {
                 id: loadButton
                 width: 120
                 height: 28
-                label: priceFeed && priceFeed.loading ? "READING" : "PRICE CONTEXT"
+                label: priceFeed && priceFeed.loading ? "READING"
+                    : context.data ? "REFRESH PRICE" : "PRICE CONTEXT"
                 labelPixelSize: 9
                 accentColor: Colors.cyan
                 available: context.filing && priceFeed && priceFeed.monitoring
-                    && !priceFeed.loading && !context.data
+                    && !priceFeed.loading
                 onLeftClicked: priceFeed.inspect(context.filing)
             }
             GohuText {

@@ -1,0 +1,40 @@
+name: TASKS Proxy 1 M10o single-writer handoff contract
+
+on:
+  pull_request:
+    paths:
+      - 'services/projects/TaskSqliteWriterHandoffPolicy.js'
+      - 'tests/tasks/test_sqlite_writer_handoff_policy.cjs'
+      - 'docs/tasks-sqlite-writer-handoff-m10o.md'
+      - '.github/workflows/tasks-sqlite-writer-handoff.yml'
+  push:
+    branches:
+      - main
+    paths:
+      - 'services/projects/TaskSqliteWriterHandoffPolicy.js'
+      - 'tests/tasks/test_sqlite_writer_handoff_policy.cjs'
+      - 'docs/tasks-sqlite-writer-handoff-m10o.md'
+      - '.github/workflows/tasks-sqlite-writer-handoff.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  handoff-contract:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: M10o simulated single-writer freeze and fail-closed restart
+        run: node tests/tasks/test_sqlite_writer_handoff_policy.cjs
+      - name: M10n review-only SQLite shadow cutover and rollback safety
+        run: python3 tests/tasks/test_task_sqlite_cutover_review.py
+      - name: M10m legacy-to-SQLite preview regression
+        run: python3 tests/tasks/test_legacy_sqlite_migration_preview.py
+      - name: M10l record-level SQLite and journal regression
+        run: python3 tests/tasks/test_task_sqlite_records_v2.py

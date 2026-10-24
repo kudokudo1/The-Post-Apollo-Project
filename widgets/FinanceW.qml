@@ -271,8 +271,8 @@ PanelWindow {
     property string chassisLevel: "compact"
     readonly property int glowGutter: 12
     // Git's visible frame starts 12px below its window top. Compact Finance
-    // moves its visible frame up 2px while retaining the bottom glow gutter.
-    readonly property int compactTopLift: 2
+    // moves its visible frame up 3px while retaining the bottom glow gutter.
+    readonly property int compactTopLift: 3
     readonly property int frameTopInset:
         chassisLevel === "compact" ? glowGutter - compactTopLift : glowGutter
     readonly property var chassisFrame: FinanceChassisPolicy.frame(

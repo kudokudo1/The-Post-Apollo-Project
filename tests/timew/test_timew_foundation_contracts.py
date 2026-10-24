@@ -80,12 +80,16 @@ for key in ("Tab", "Shift+Tab", "Esc"):
     assert 'sequence: "' + key + '"' in window
 assert "onLeftClicked: timew.menuOpen = false" in window
 
-# TimeW-specific white identity and screenshot-corrected top alignment.
-# Preserve the 8px right-dock top inset; adding 50px for dock height placed
-# the TimeW frame too low in the 2026-10-22 operator screenshot.
+# TimeW-specific white identity and shared 9px visible top alignment.
+# Preserve the clock dock position; moving the *TimeW window frame* is separate
+# from moving the clock's dock button.
 assert "anchors.topMargin: 8" in shell
 assert "implicitHeight: 50" in clock
-assert "    margins {\n        top: 8\n        right: 13\n    }" in window
+assert "    margins {\n        top: 0\n        right: 13\n    }" in window
+assert "readonly property int frameTopInset: 9" in window
+assert "implicitHeight: frameHeight + frameTopInset + glowGutter" in window
+assert "y: timew.frameTopInset" in window
+assert "anchors.topMargin: timew.frameTopInset" in window
 assert "top: 8 + 50 - timew.glowGutter" not in window
 assert "readonly property color semanticColor: Colors.white" in window
 assert "glowColor: timew.semanticColor" in window

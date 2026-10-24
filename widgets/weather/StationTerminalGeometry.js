@@ -110,3 +110,41 @@ function centeredPosition(desired, actual) {
         y: Math.round(desired.y + (desired.height - actual.height) / 2)
     };
 }
+
+
+// Sway rect is the OUTER container. Kitty's visible surface may occupy a
+// smaller window_rect inside it, even after compositor resize succeeds.
+// The latter is relative to rect (see sway-ipc GET_TREE). Distinguish
+// painted client pixels from the frame so the alpha cutout and centering
+// are not mistaken for the outer box.
+function observedContentWindow(tree, appId) {
+    const outer = observedWindow(tree, appId);
+    if (!outer)
+        return null;
+    function locate(node) {
+        if (!node || typeof node !== "object") return null;
+        if (node.app_id === appId) return node;
+        const children = []
+            .concat(Array.isArray(node.nodes) ? node.nodes : [])
+            .concat(Array.isArray(node.floating_nodes) ? node.floating_nodes : []);
+        for (let i = 0; i < children.length; ++i) {
+            const match = locate(children[i]);
+            if (match) return match;
+        }
+        return null;
+    }
+    const actor = locate(tree);
+    const window = actor ? actor.window_rect : null;
+    if (!window)
+        return outer;
+    const values = [window.x, window.y, window.width, window.height];
+    if (!values.every(function(v) {
+        return typeof v === "number" && isFinite(v);
+    }) || window.x < 0 || window.y < 0
+        || window.width <= 0 || window.height <= 0
+        || window.x + window.width > outer.width + 1
+        || window.y + window.height > outer.height + 1)
+        return outer;
+    return {x: outer.x + window.x, y: outer.y + window.y,
+            width: window.width, height: window.height};
+}

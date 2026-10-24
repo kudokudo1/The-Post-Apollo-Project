@@ -21,8 +21,9 @@ const DOC = /^[a-zA-Z0-9][a-zA-Z0-9_.-]{0,170}$/;
 const DAY = /^\d{4}-\d{2}-\d{2}$/;
 
 export function validateAgent(raw) {
-  if (typeof raw !== "string" || /[\r\n\x00-\x1F\x7F]/.test(raw)) return null;
+  if (typeof raw !== "string") return null;
   const text = raw.trim();
+  if (/[\r\n\x00-\x1F\x7F]/.test(text)) return null;
   // A named product/team and real contact address, not a synthetic UA.
   const match = text.match(/^([A-Za-z][A-Za-z0-9 ._-]{3,80})\s+([A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,})$/);
   if (!match || /example\.(com|org|net)$/i.test(match[2])) return null;

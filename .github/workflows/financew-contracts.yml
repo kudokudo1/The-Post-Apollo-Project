@@ -45,6 +45,10 @@ on:
       - "widgets/FinanceResearchCrawlPane.qml"
       - "widgets/FinanceSecFilingsPane.qml"
       - "widgets/FinanceSecDocumentInspector.qml"
+      - "widgets/FinanceSecEvidenceCompare.qml"
+      - "widgets/FinanceSecEvidencePolicy.js"
+      - "tests/finance/test_sec_evidence_policy.mjs"
+      - "tests/finance/test_finance_sec_evidence_contracts.py"
       - "scripts/finance/inspect_sec_document.py"
       - "scripts/finance/SEC_DOCUMENT_README.md"
       - "tests/finance/test_sec_document_inspector.py"
@@ -110,6 +114,10 @@ on:
       - "widgets/FinanceResearchCrawlPane.qml"
       - "widgets/FinanceSecFilingsPane.qml"
       - "widgets/FinanceSecDocumentInspector.qml"
+      - "widgets/FinanceSecEvidenceCompare.qml"
+      - "widgets/FinanceSecEvidencePolicy.js"
+      - "tests/finance/test_sec_evidence_policy.mjs"
+      - "tests/finance/test_finance_sec_evidence_contracts.py"
       - "scripts/finance/inspect_sec_document.py"
       - "scripts/finance/SEC_DOCUMENT_README.md"
       - "tests/finance/test_sec_document_inspector.py"
@@ -169,6 +177,10 @@ jobs:
         run: python3 tests/finance/test_finance_sec_document_contracts.py
       - name: Test SEC Form 4 and 8-K parsers with fictional files
         run: python3 tests/finance/test_sec_document_inspector.py
+      - name: Verify Finance SEC Evidence Desk source contracts
+        run: python3 tests/finance/test_finance_sec_evidence_contracts.py
+      - name: Test Finance SEC evidence filtering and paired view on fictional filings
+        run: node tests/finance/test_sec_evidence_policy.mjs
       - name: Verify local read-only FinanceW Budget UI
         run: python3 tests/finance/test_finance_budget_ui_contracts.py
       - name: Verify transaction draft stays non-mutating

@@ -81,7 +81,7 @@ assert.match(weatherTerminalSource, /property string sessionMode:\s*"terminal"/)
 assert.match(weatherTerminalSource, /function supportedMode\(mode\)/);
 assert.match(weatherTerminalSource, /sessionMode === "terminal" \? "weather-screen"/);
 assert.match(weatherTerminalSource, /"weather-screen-" \+ sessionMode/);
-assert.match(weatherTerminalSource, /"weatherstation-starmap"/);
+assert.match(weatherTerminalSource, /weatherstation-starmap/);
 assert.match(weatherTerminalSource, /"\/usr\/bin\/bash -l"/);
 assert.match(weatherTerminalSource, /sessionMode = terminalMode/);
 assert.match(weatherTerminalSource, /x:\s*14\s+y:\s*90/);

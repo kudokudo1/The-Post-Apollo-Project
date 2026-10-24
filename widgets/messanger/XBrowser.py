@@ -36,6 +36,17 @@ SITES = {
     "tumblr": ("https://www.tumblr.com/", "post-apollo-tumblr", "tumblr-browser"),
     "tiktok": ("https://www.tiktok.com/", "post-apollo-tiktok", "tiktok-browser"),
     "snapchat": ("https://web.snapchat.com/", "post-apollo-snapchat", "snapchat-browser"),
+    # Official site-backed modes; some provider features still require mobile.
+    "linkedin": ("https://www.linkedin.com/", "post-apollo-linkedin", "linkedin-browser"),
+    "mastodon": ("https://mastodon.social/", "post-apollo-mastodon", "mastodon-browser"),
+    "nextdoor": ("https://nextdoor.com/", "post-apollo-nextdoor", "nextdoor-browser"),
+    "steamchat": ("https://steamcommunity.com/chat/", "post-apollo-steamchat", "steamchat-browser"),
+    "element": ("https://app.element.io/", "post-apollo-element", "element-browser"),
+    "groupme": ("https://web.groupme.com/", "post-apollo-groupme", "groupme-browser"),
+    "lemon8": ("https://www.lemon8-app.com/", "post-apollo-lemon8", "lemon8-browser"),
+    "quora": ("https://www.quora.com/", "post-apollo-quora", "quora-browser"),
+    "pixelfed": ("https://pixelfed.social/", "post-apollo-pixelfed", "pixelfed-browser"),
+    "zalo": ("https://chat.zalo.me/", "post-apollo-zalo", "zalo-browser"),
 }
 
 

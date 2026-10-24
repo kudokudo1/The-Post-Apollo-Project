@@ -86,6 +86,70 @@ Rectangle {
         {
             name: "MESSENGER",
             icon: ""
+        },
+        {
+            name: "LINKEDIN",
+            icon: ""
+        },
+        {
+            name: "MASTODON",
+            icon: ""
+        },
+        {
+            name: "NEXTDOOR",
+            icon: ""
+        },
+        {
+            name: "STEAM CHAT",
+            icon: ""
+        },
+        {
+            name: "ELEMENT",
+            icon: ""
+        },
+        {
+            name: "GROUPME",
+            icon: ""
+        },
+        {
+            name: "LEMON8",
+            icon: ""
+        },
+        {
+            name: "QUORA",
+            icon: ""
+        },
+        {
+            name: "PIXELFED",
+            icon: ""
+        },
+        {
+            name: "ZALO",
+            icon: ""
+        },
+        {
+            name: "SIGNAL",
+            icon: ""
+        },
+        {
+            name: "WECHAT",
+            icon: ""
+        },
+        {
+            name: "LINE",
+            icon: ""
+        },
+        {
+            name: "VIBER",
+            icon: ""
+        },
+        {
+            name: "KAKAOTALK",
+            icon: ""
+        },
+        {
+            name: "BEREAL",
+            icon: ""
         }
     ]
 

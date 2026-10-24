@@ -1,0 +1,37 @@
+name: TASKS M10s isolated SQLite NORMAL transactions
+
+on:
+  pull_request:
+    paths:
+      - 'services/projects/ExperimentalTaskSqliteCrudM10s.py'
+      - 'tests/tasks/test_task_sqlite_m10s_normal_crud.py'
+      - 'docs/tasks-sqlite-normal-crud-m10s.md'
+      - '.github/workflows/tasks-sqlite-normal-crud-m10s.yml'
+  push:
+    branches:
+      - main
+    paths:
+      - 'services/projects/ExperimentalTaskSqliteCrudM10s.py'
+      - 'tests/tasks/test_task_sqlite_m10s_normal_crud.py'
+      - 'docs/tasks-sqlite-normal-crud-m10s.md'
+      - '.github/workflows/tasks-sqlite-normal-crud-m10s.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  sqlite-normal-crud:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: M10s NORMAL task/project SQL transactions
+        run: python3 tests/tasks/test_task_sqlite_m10s_normal_crud.py
+      - name: M10l existing normalized record and journal regression
+        run: python3 tests/tasks/test_task_sqlite_records_v2.py
+      - name: M10r compatibility and production isolation guards
+        run: python3 tests/tasks/test_task_sqlite_m10r_inventory.py
+      - name: M10n backup, source-parity and rollback review
+        run: python3 tests/tasks/test_task_sqlite_cutover_review.py

@@ -9,6 +9,10 @@ Scope {
     // to repo discovery. The measurements are dormant unless opted in.
     readonly property bool syntagmaStartupTraceEnabled:
         String(Quickshell.env("POST_APOLLO_GIT_STARTUP_TRACE") || "").trim() === "1"
+    // Opt-in, stdout-protocol-safe Git subprocess stage timings.
+    // No new processes, polling, journal writes or UI rows by default.
+    readonly property bool refreshStageTraceEnabled:
+        String(Quickshell.env("POST_APOLLO_GIT_REFRESH_STAGE_TRACE") || "").trim() === "1"
     property double traceRepoStartedMs: 0
     property int traceRepoLines: 0
     property double traceRepoSyncMs: 0
@@ -1296,6 +1300,25 @@ Scope {
             [
                 'repo="$1"',
                 'if [ -z "$repo" ]; then repo="$HOME/.config/quickshell"; fi',
+                // Bash EPOCHREALTIME is built in: no extra date subprocesses.
+                // Off by default; timings are wall durations, not CPU time.
+                'refresh_stage_trace="$2"',
+                'if [ "$refresh_stage_trace" = "1" ]; then',
+                '  refresh_stage_started="${EPOCHREALTIME/./}"',
+                '  refresh_stage_last="$refresh_stage_started"',
+                'fi',
+                'trace_refresh_stage() {',
+                '  [ "$refresh_stage_trace" = "1" ] || return 0',
+                '  local now="${EPOCHREALTIME/./}"',
+                '  [ "$1" = "history" ] && printf "\\n"',
+                '  printf "PROFILE\\t%s\\t%s\\n" "$1" "$(( (now - refresh_stage_last) / 1000 ))"',
+                '  refresh_stage_last="$now"',
+                '}',
+                'trace_refresh_total() {',
+                '  [ "$refresh_stage_trace" = "1" ] || return 0',
+                '  local now="${EPOCHREALTIME/./}"',
+                '  printf "PROFILE\\ttotal\\t%s\\n" "$(( (now - refresh_stage_started) / 1000 ))"',
+                '}',
                 'if ! git -C "$repo" rev-parse --is-inside-work-tree >/dev/null 2>&1; then',
                 '  printf "ERROR\\tNOT A GIT REPOSITORY\\n"',
                 '  printf "DONE\\t\\n"',
@@ -1307,8 +1330,10 @@ Scope {
                 'if [ -z "$branch" ]; then branch="DETACHED"; fi',
                 'head="$(git -C "$root" rev-parse --short=10 HEAD)"',
                 'head_full="$(git -C "$root" rev-parse HEAD)"',
+                'trace_refresh_stage "metadata"',
                 'count="$(git -C "$root" status --porcelain=v1 | wc -l | tr -d " ")"',
                 'if [ "$count" -eq 0 ]; then worktree="CLEAN"; else worktree="DIRTY • $count CHANGES"; fi',
+                'trace_refresh_stage "status"',
                 'origin="$(git -C "$root" remote get-url origin 2>/dev/null || true)"',
                 'if [ -z "$origin" ]; then origin="NO ORIGIN"; fi',
                 'upstream="$(git -C "$root" rev-parse --abbrev-ref --symbolic-full-name "@{u}" 2>/dev/null || true)"',
@@ -1319,6 +1344,7 @@ Scope {
                 '  ahead="$(printf "%s" "$counts" | cut -f1)"',
                 '  behind="$(printf "%s" "$counts" | cut -f2)"',
                 'fi',
+                'trace_refresh_stage "upstream"',
                 'printf "ROOT\\t%s\\n" "$root"',
                 'printf "REPO\\t%s\\n" "$name"',
                 'printf "BRANCH\\t%s\\n" "$branch"',
@@ -1337,6 +1363,7 @@ Scope {
                 '  [ -n "$ref" ] || continue',
                 '  merged_remote_refs="${merged_remote_refs}${ref}|"',
                 'done < <(git -C "$root" for-each-ref --merged=HEAD --format="%(refname:short)" refs/remotes/origin 2>/dev/null)',
+                'trace_refresh_stage "merged_refs"',
                 'pending_refs="|"',
                 'pending_count=0',
                 'while IFS="$(printf "\\t")" read -r ref changed; do',
@@ -1351,6 +1378,7 @@ Scope {
                 '    [ "$pending_count" -ge 5 ] && break',
                 '  fi',
                 'done < <(git -C "$root" for-each-ref --sort=-committerdate --count=24 --format="%(refname:short)%09%(committerdate:unix)" refs/remotes/origin 2>/dev/null)',
+                'trace_refresh_stage "cherry"',
                 'while IFS="$(printf "\\t")" read -r ref ref_head ref_upstream; do',
                 '  [ -z "$ref" ] && continue',
                 '  compare="$ref_upstream"',
@@ -1363,6 +1391,7 @@ Scope {
                 '  fi',
                 '  printf "LOCALBRANCH\\t%s\\t%s\\t%s\\t%s\\t%s\\n" "$ref" "$ref_head" "$ref_upstream" "$unpulled" "$changed"',
                 'done < <(git -C "$root" for-each-ref --format="%(refname:short)%09%(objectname:short=10)%09%(upstream:short)" refs/heads 2>/dev/null)',
+                'trace_refresh_stage "local_branches"',
                 'while IFS="$(printf "\\t")" read -r ref changed; do',
                 '  [ -z "$ref" ] && continue',
                 '  [ "$ref" = "origin" ] && continue',
@@ -1376,11 +1405,21 @@ Scope {
                 '  if [ "$unpulled" -eq 0 ]; then changed=0; fi',
                 '  printf "REMOTEBRANCH\\t%s\\t%s\\t%s\\t%s\\n" "$ref" "$unpulled" "$remote_only" "$changed"',
                 'done < <(git -C "$root" for-each-ref --format="%(refname:short)%09%(committerdate:unix)" refs/remotes/origin 2>/dev/null)',
+                'trace_refresh_stage "remote_branches"',
                 'git -C "$root" log --all --topo-order --date-order -n 48 --pretty=format:"COMMIT%x09%H%x09%P%x09%D%x09%ct%x09%an%x09%s"',
-                'printf "\\nDONE\\t\\n"'
+                'trace_refresh_stage "history"',
+                'trace_refresh_total',
+                // The opt-in PROFILE rows already terminate with a newline.
+                // Preserve the exact same regular-output bytes as when off.
+                'if [ "$refresh_stage_trace" = "1" ]; then',
+                '  printf "DONE\\t\\n"',
+                'else',
+                '  printf "\\nDONE\\t\\n"',
+                'fi'
             ].join("\n"),
             "pa-git-refresh",
-            refreshRepoPath
+            refreshRepoPath,
+            refreshStageTraceEnabled ? "1" : "0"
         ]);
     }
 
@@ -1438,6 +1477,21 @@ Scope {
                 remoteOnly: parts.length > 3 ? Number(parts[3] || 0) === 1 : false,
                 lastChangedEpoch: parts.length > 4 ? Number(parts[4] || 0) : 0
             });
+        else if (key === "PROFILE") {
+            // Diagnostic protocol only; no repository content is logged.
+            // Ignore malformed or unrecognized stage records.
+            if (!refreshStageTraceEnabled)
+                return;
+            const stage = parts.length === 3 ? parts[1] : "";
+            const elapsed = parts.length === 3 ? parts[2] : "";
+            if (!/^(metadata|status|upstream|merged_refs|cherry|local_branches|remote_branches|history|total)$/.test(stage)
+                    || !/^\d{1,9}$/.test(elapsed))
+                return;
+            console.warn(
+                "GIT_REFRESH_STAGE_TRACE // stage=" + stage
+                + " elapsed=" + elapsed + "ms"
+            );
+        }
         else if (key === "ERROR") {
             available = false;
             lastError = value;

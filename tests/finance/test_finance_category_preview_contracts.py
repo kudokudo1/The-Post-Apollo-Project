@@ -18,7 +18,7 @@ for expected in (
     'onSnapshotChanged:',
     'onVisibleChanged: if(!visible)clearDraft()',
     'CategoryPlan.previewCategoryPlan(',
-    'label: "+ NEW CATEGORY"',
+    '"+ NEW CATEGORY"',
     'label: "RENAME"',
     'label: "PREVIEW"',
     'label: "CANCEL"',

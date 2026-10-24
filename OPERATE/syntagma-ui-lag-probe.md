@@ -1,5 +1,11 @@
 # Syntagma // opt-in UI-event-loop lag measurement
 
+> **Current Media default (October 24):** CAVA latest-frame coalescing is now
+> the intended ordinary-launch behavior. The CAVA *diagnostic measurements*
+> remain opt-in. See the final section below for normal startup and rollback.
+> Earlier A/B launch commands in this document are preserved as experiment
+> history, not the current default policy.
+
 **Owner:** Nurse 3c. **Status:** diagnostic instrumentation only, not
 an optimization or fix. **Introduced:** October 13, 2026.
 **Original scope:** `shell.qml` (dock Git/Hospital controls and a shell timer).
@@ -545,3 +551,48 @@ counts to quantify contribution. If stalls remain, CAVA model updates
 are not sufficient to explain them. This does NOT override the earlier
 observation of freezes while CAVA was suspended, nor identify the
 underlying main-thread JavaScript signal from a single stack snapshot.
+
+## October 24 // CAVA coalescing promoted to the normal launch path
+
+**Scope and authorization:** Following the operator's repeat observation of
+severe lag on an ordinary PC/Quickshell restart and significant improvement
+after launching with `POST_APOLLO_CAVA_COALESCE=1`, the CAVA latest-frame
+visual update path is promoted to the intended default. This is an operational
+mitigation, **not** a verified single root cause or final performance sign-off.
+Other optional probes were also enabled in the successful experiment, so
+their independent effects have not been isolated.
+
+**Normal Quickshell startup:** no special `POST_APOLLO_*` environment flags
+are necessary for CAVA coalescing. `modules/Mediaplayer.qml` now treats
+`POST_APOLLO_CAVA_COALESCE` unset, blank, or `1` as coalescing enabled. It
+still uses the same CAVA process and 20-bar UI, validates frames, and applies
+only the last valid pending frame per approximately 67ms visual tick.
+
+**Explicit rollback to the previous frame-per-event behavior:**
+
+```bash
+qsdir="$(readlink -f ~/.config/quickshell)"
+POST_APOLLO_CAVA_COALESCE=0 \
+  bash "$qsdir/scripts/restart_quickshell_safe.sh" "$qsdir"
+```
+
+**Opt-in observation without modifying the optimized default:**
+
+```bash
+POST_APOLLO_UI_LAG_PROBE=1 \
+POST_APOLLO_CAVA_TRIAL_PROBE=1 \
+  bash "$qsdir/scripts/restart_quickshell_safe.sh" "$qsdir"
+```
+
+The two optional measurement flags remain disabled on ordinary launches,
+avoiding continuous diagnostic log traffic. The existing A/B capture
+procedures above remain valid **only** when the "original" case explicitly
+sets `POST_APOLLO_CAVA_COALESCE=0`.
+
+**Verification gate:** GitHub source/CI checks establish configuration and
+logic contracts; they cannot verify sustained desktop responsiveness. After
+merge and local pull, verify a *normal*, unflagged restart is responsive during
+the specific radio PLAY → PAUSE → browser-show transition and during ordinary
+work. If severe freezes recur, compare against the same launch with temporary
+probes and keep the fault open. No automatic audio/MPD/radio-controller or
+notification behavior changes are authorized by this decision.

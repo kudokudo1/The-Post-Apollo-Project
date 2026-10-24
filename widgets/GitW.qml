@@ -5794,6 +5794,34 @@ PanelWindow {
                             // actionOutput: Details always shows every byte.
                             property bool showDetails: false
 
+                            // Presentation-only formatting of known timing
+                            // shapes. Every named field and its numeric value is
+                            // preserved, with [ms] applying to the entire row.
+                            // Unrecognized lines, Git output, errors and warnings
+                            // remain byte-for-byte unchanged.
+                            function compactGitTimingLine(line) {
+                                const value = String(line || "");
+                                let m = /^JOURNAL PROFILE \/\/ (BEGIN|COMPLETE|FAIL) clone (\d+) ms \/\/ record (\d+) ms \/\/ entries (\d+) ms \/\/ persist (\d+) ms \/\/ notify (\d+) ms \/\/ mutation (\d+) ms$/.exec(value);
+                                if (m) {
+                                    return "JOURNAL PROFILE " + m[1] + " [ms] │ "
+                                        + "clone " + m[2] + " · record " + m[3]
+                                        + " · entries " + m[4] + " · persist " + m[5]
+                                        + " · notify " + m[6] + " · mutation " + m[7];
+                                }
+
+                                m = /^(PREPARED|FINISHED) \/\/ (snapshot|after snapshot) (\d+) ms \/\/ journal (\d+) ms \(encode (\d+) ms \/ disk (\d+) ms\)$/.exec(value);
+                                if (m) {
+                                    return m[1] + " [ms] │ " + m[2] + " " + m[3]
+                                        + " · journal " + m[4]
+                                        + " (encode " + m[5] + " · disk " + m[6] + ")";
+                                }
+
+                                m = /^REFRESHED \/\/ repository view (\d+) ms$/.exec(value);
+                                if (m)
+                                    return "REFRESHED │ repository view " + m[1] + "ms";
+                                return value;
+                            }
+
                             function normalGitOutput(output, isSync) {
                                 const full = String(output || "");
                                 if (!isSync)
@@ -5801,17 +5829,16 @@ PanelWindow {
 
                                 return full.split("\n").filter(function(line) {
                                     const value = String(line || "").trim();
-                                    // The journal profiles contain *unique*
-                                    // timings, not the P/G/F/R/TOTAL phases.
-                                    // REFRESHED measures a separate boundary
-                                    // (before synchronous model publication).
-                                    // Preserve both, plus all Git results and
-                                    // errors; only suppress status-only echoes
-                                    // already represented by actionStage.
+                                    // BEGIN, COMPLETE/FAIL, and REFRESHED contain
+                                    // distinct evidence. Never drop them.
+                                    // Only the operation's already-displayed
+                                    // status markers are genuinely redundant.
                                     if (value === "RUNNING // Git subprocess started"
                                             || value === "FINALIZING // collecting repository evidence")
                                         return false;
                                     return true;
+                                }).map(function(line) {
+                                    return compactGitTimingLine(line);
                                 }).join("\n");
                             }
 

@@ -296,8 +296,28 @@ PanelWindow {
 
     readonly property bool discordSelected: activeAppIndex === 1
     // xSelected retains the existing external-browser focus contract.
-    readonly property bool xSelected: activeAppIndex >= 3 && activeAppIndex <= 13
-    readonly property string browserSite: activeAppIndex === 4 ? "instagram" : activeAppIndex === 5 ? "facebook" : activeAppIndex === 6 ? "reddit" : activeAppIndex === 7 ? "threads" : activeAppIndex === 8 ? "pinterest" : activeAppIndex === 9 ? "truthsocial" : activeAppIndex === 10 ? "bluesky" : activeAppIndex === 11 ? "tumblr" : activeAppIndex === 12 ? "tiktok" : activeAppIndex === 13 ? "snapchat" : "x"
+    readonly property bool xSelected: (activeAppIndex >= 3 && activeAppIndex <= 13) || (activeAppIndex >= 16 && activeAppIndex <= 25)
+    readonly property string browserSite:
+        activeAppIndex === 4 ? "instagram" :
+        activeAppIndex === 5 ? "facebook" :
+        activeAppIndex === 6 ? "reddit" :
+        activeAppIndex === 7 ? "threads" :
+        activeAppIndex === 8 ? "pinterest" :
+        activeAppIndex === 9 ? "truthsocial" :
+        activeAppIndex === 10 ? "bluesky" :
+        activeAppIndex === 11 ? "tumblr" :
+        activeAppIndex === 12 ? "tiktok" :
+        activeAppIndex === 13 ? "snapchat" :
+        activeAppIndex === 16 ? "linkedin" :
+        activeAppIndex === 17 ? "mastodon" :
+        activeAppIndex === 18 ? "nextdoor" :
+        activeAppIndex === 19 ? "steamchat" :
+        activeAppIndex === 20 ? "element" :
+        activeAppIndex === 21 ? "groupme" :
+        activeAppIndex === 22 ? "lemon8" :
+        activeAppIndex === 23 ? "quora" :
+        activeAppIndex === 24 ? "pixelfed" :
+        activeAppIndex === 25 ? "zalo" : "x"
     readonly property bool externalSelected: discordSelected || xSelected
     onBrowserSiteChanged: updateGeometryHelperMode()
 
@@ -937,7 +957,7 @@ PanelWindow {
             return;
         }
 
-        if (index >= 3 && index <= 13) {
+        if ((index >= 3 && index <= 13) || (index >= 16 && index <= 25)) {
             hideDiscord();
             restoreSelectorAfterXShow = retainSelectorFocus === true;
             showX();
@@ -1162,6 +1182,12 @@ PanelWindow {
             statusText: messagingWindow.xSelected ? messagingWindow.xError
                        : messagingWindow.activeAppIndex === 14 ? "WHATSAPP // Native integration pending"
                        : messagingWindow.activeAppIndex === 15 ? "MESSENGER // Native integration pending"
+                       : messagingWindow.activeAppIndex === 26 ? "SIGNAL // Native integration pending"
+                       : messagingWindow.activeAppIndex === 27 ? "WECHAT // Native integration pending"
+                       : messagingWindow.activeAppIndex === 28 ? "LINE // Desktop integration pending"
+                       : messagingWindow.activeAppIndex === 29 ? "VIBER // Native integration pending"
+                       : messagingWindow.activeAppIndex === 30 ? "KAKAOTALK // Desktop integration pending"
+                       : messagingWindow.activeAppIndex === 31 ? "BEREAL // Mobile integration pending"
                        : ""
 
             width: messagingWindow.appSelectorWidth

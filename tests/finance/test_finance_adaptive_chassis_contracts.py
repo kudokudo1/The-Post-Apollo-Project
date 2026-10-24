@@ -17,8 +17,8 @@ assert 'readonly property int frameHeight: chassisFrame.height' in menu
 # the 8px bottom reserve is part of the actual mapped window's height.
 assert 'property int panelHeight: 790' in git
 assert 'property int topGlowGutter: 9' in git
-assert 'mode === "fullscreen" ? 1335' in policy
-# Large's height is sampled from Social's source default, minus 20px.
+assert 'mode === "fullscreen" ? 1341' in policy
+# Large's height is based on Social's source default, minus 14px.
 social = (root / "widgets/messanger/MessagingW.qml").read_text(encoding="utf-8")
 assert 'property int defaultPanelHeight: 1355' in social
 assert 'mode === "expanded" ? 900 : 790' in policy

@@ -45,6 +45,14 @@ PanelWindow {
                     && root.researchTool === "sec"
     }
 
+    // Document inspection is explicitly requested for one selected filing.
+    FinanceServices.FinanceSecDocumentReadService {
+        id: secDocumentService
+        secFeed: secService
+        monitoring: root.menuOpen && root.selectedMainMode === "research"
+                    && root.researchTool === "sec"
+    }
+
     Component {
         id: marketPaneComponent
         FinanceMarketPane {
@@ -2004,6 +2012,7 @@ Row {
                         anchors.bottom: parent.bottom
                         visible: root.researchTool === "sec"
                         secFeed: secService
+                        documentFeed: secDocumentService
                     }
                 }
             }

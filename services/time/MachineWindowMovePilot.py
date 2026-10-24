@@ -16,6 +16,7 @@ import sys
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from MachineSwayRead import PreviewError, _read_json
 from MachineMoveJournal import MoveJournal
+from MachineMoveApproval import MoveApprovalGate, ApprovalError
 from MachineWindowResolver import (
     ResolutionError, _id, _walk_live, resolve,
 )
@@ -153,7 +154,8 @@ def _observe(runner, saved_document, request):
     return "unavailable"
 
 
-def execute_one(saved_document, request, *, read_runner, command_runner, journal):
+def execute_one(saved_document, request, *, read_runner, command_runner,
+                journal, approval_gate, approval_token, checkpoint_id):
     """Isolated-injection pilot only; intentionally NO production CLI.
 
     Real use requires a separately approved UI, immutable approval scope,
@@ -161,8 +163,18 @@ def execute_one(saved_document, request, *, read_runner, command_runner, journal
     """
     if not isinstance(journal, MoveJournal):
         raise MoveRefused("DURABLE JOURNAL REQUIRED")
+    if not isinstance(approval_gate, MoveApprovalGate):
+        raise MoveRefused("SCOPED APPROVAL REQUIRED")
     report = _preflight(saved_document, request, runner=read_runner,
                         approval_required=True)
+    # Rechecked immediately before spending the expiring one-action grant.
+    # Never journal or dispatch on an absent/stale/mismatched approval.
+    try:
+        approval_gate.consume(
+            approval_token=approval_token, checkpoint_id=checkpoint_id,
+            saved_document=saved_document, request=request)
+    except ApprovalError as exc:
+        raise MoveRefused("APPROVAL EXPIRED, USED OR MISMATCHED") from exc
     # The original placement is committed before ANY possible command.
     operation_id = journal.begin(report["before"])
     journal.mark_dispatching(operation_id)

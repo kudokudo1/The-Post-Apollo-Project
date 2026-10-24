@@ -24,6 +24,7 @@ if os.environ.get("CI") != "true" or os.environ.get("GITHUB_ACTIONS") != "true":
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "services" / "time"))
 from MachineMoveJournal import MoveJournal
+from MachineMoveApproval import MoveApprovalGate
 from MachineWindowMovePilot import MoveRefused, execute_one, preview_one
 from MachineWindowResolver import _walk_live
 
@@ -196,13 +197,26 @@ with tempfile.TemporaryDirectory(prefix="machine-m1m-") as tmp:
             "from_workspace": "1", "to_workspace": "2"
         }
 
+        # Exact-action consent exists only inside this disposable CI fixture.
+        checkpoint_id = "aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee"
+        gate = MoveApprovalGate()
+        unsigned = dict(request, approved=False)
+        review = gate.review(saved, unsigned, checkpoint_id=checkpoint_id,
+                             read_runner=read)
+        assert review["executable"] is False
+        consent = gate.approve(
+            review_id=review["review_id"], checkpoint_id=checkpoint_id,
+            saved_document=saved, request=unsigned,
+            confirmation_text=review["confirmation_text"])
+        grant = {"approval_gate": gate, "approval_token": consent["approval_token"],
+                 "checkpoint_id": checkpoint_id}
         # Preview and wrong-ID rejection must never issue any command.
         before = preview_one(saved, dict(request, approved=False), read_runner=read)
         assert before["status"] == "ready_for_review" and not before["executable"]
         journal = MoveJournal(base / "journal" / "move-operations.db")
         try:
             execute_one(saved, dict(request, con_id=request["con_id"] + 9000),
-                        read_runner=read, command_runner=move_command, journal=journal)
+                        read_runner=read, command_runner=move_command, journal=journal, **grant)
             raise AssertionError("stale live container ID accepted")
         except MoveRefused:
             pass
@@ -210,7 +224,7 @@ with tempfile.TemporaryDirectory(prefix="machine-m1m-") as tmp:
 
         # One real move, ONLY inside the newly spawned temporary headless Sway.
         result = execute_one(saved, request, read_runner=read,
-                             command_runner=move_command, journal=journal)
+                             command_runner=move_command, journal=journal, **grant)
         assert result["status"] == "verified_moved", result["status"]
         assert result["observed_workspace"] == "2"
         assert len(commands) == 1
@@ -225,7 +239,7 @@ with tempfile.TemporaryDirectory(prefix="machine-m1m-") as tmp:
         # Old approval/request cannot be reused after the window has moved.
         try:
             execute_one(saved, request, read_runner=read,
-                        command_runner=move_command, journal=journal)
+                        command_runner=move_command, journal=journal, **grant)
             raise AssertionError("stale approved request was replayed")
         except MoveRefused:
             pass

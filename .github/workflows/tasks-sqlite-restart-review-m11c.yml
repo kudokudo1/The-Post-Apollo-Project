@@ -1,0 +1,43 @@
+name: TASKS M11c disposable restart recovery review
+
+on:
+  pull_request:
+    paths:
+      - 'tests/tasks/fixtures/TaskWriterRecoveryM11c.py'
+      - 'tests/tasks/test_task_writer_recovery_m11c.py'
+      - 'docs/tasks-sqlite-restart-review-m11c.md'
+      - '.github/workflows/tasks-sqlite-restart-review-m11c.yml'
+  push:
+    branches:
+      - main
+    paths:
+      - 'tests/tasks/fixtures/TaskWriterRecoveryM11c.py'
+      - 'tests/tasks/test_task_writer_recovery_m11c.py'
+      - 'docs/tasks-sqlite-restart-review-m11c.md'
+      - '.github/workflows/tasks-sqlite-restart-review-m11c.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  restart-review:
+    runs-on: ubuntu-latest
+    timeout-minutes: 7
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: M11c consumable quiescence checkpoint and crash restart review
+        run: python3 tests/tasks/test_task_writer_recovery_m11c.py
+      - name: M11b existing source double-read and owner fencing
+        run: python3 tests/tasks/test_task_writer_coordination_m11b.py
+      - name: M10p original process lock and restart fencing
+        run: python3 tests/tasks/test_sqlite_writer_authority_fixture.py
+      - name: M10o simulated handoff state transition invariants
+        run: node tests/tasks/test_sqlite_writer_handoff_policy.cjs
+      - name: M11a shadow read parity remains read-only
+        run: node tests/tasks/test_task_sqlite_shadow_parity_m11a.cjs

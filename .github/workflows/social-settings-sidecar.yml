@@ -1,0 +1,42 @@
+name: Social Wide Settings Sidecar Contracts
+
+on:
+  pull_request:
+    paths:
+      - 'widgets/messanger/AppSelector.qml'
+      - 'widgets/messanger/MessagingW.qml'
+      - 'tests/messaging/test_social_settings_sidecar.py'
+      - '.github/workflows/social-settings-sidecar.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'widgets/messanger/AppSelector.qml'
+      - 'widgets/messanger/MessagingW.qml'
+      - 'tests/messaging/test_social_settings_sidecar.py'
+      - '.github/workflows/social-settings-sidecar.yml'
+  workflow_dispatch:
+
+jobs:
+  sidecar-contracts:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify in-window Settings composition and pointer masks
+        run: python3 -m unittest discover -s tests/messaging -p 'test_social_settings_sidecar.py' -v
+      - name: Preserve existing user organization and launcher contracts
+        run: |
+          node tests/messaging/test_social_identity_policy.cjs
+          node tests/messaging/test_social_family_rail.cjs
+          node tests/messaging/test_social_family_manager.cjs
+          node tests/messaging/test_social_family_order_visibility.cjs
+          node tests/messaging/test_social_safe_family_removal.cjs
+          python3 -m unittest discover -s tests/messaging -p 'test_social_user_settings_rail.py' -v
+          python3 -m unittest discover -s tests/messaging -p 'test_social_identity_store.py' -v
+          python3 -m unittest discover -s tests/messaging -p 'test_social_family_rail.py' -v
+          python3 -m unittest discover -s tests/messaging -p 'test_social_family_manager.py' -v
+          python3 -m unittest discover -s tests/messaging -p 'test_social_family_order_visibility.py' -v
+          python3 -m unittest discover -s tests/messaging -p 'test_social_safe_family_removal.py' -v
+      - name: Preserve Discord and X/Sway geometry behavior
+        run: |
+          python3 -m unittest discover -s tests/messaging -p 'test_discord_geometry_docking.py' -v
+          python3 tests/messaging/test_x_social_contracts.py

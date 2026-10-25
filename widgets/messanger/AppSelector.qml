@@ -23,6 +23,36 @@ Rectangle {
     property string identityCreateMode: "default"
     property string copyIdentityId: "identity-1"
     readonly property var identitySnapshot: SocialIdentityStore.snapshot
+    readonly property var railRows: identitySnapshot.railRows || []
+    readonly property var visibleAppIndices: identitySnapshot.visibleAppIndices || []
+
+    // Cursor tracks the legacy provider index, not a re-ordered visual row.
+    function isAppVisible(index) {
+        return visibleAppIndices.indexOf(index) !== -1;
+    }
+    function ensureValidSelection() {
+        if (!visibleAppIndices.length) selectedIndex = -1;
+        else if (!isAppVisible(selectedIndex)) selectedIndex = visibleAppIndices[0];
+    }
+    function moveSelection(direction) {
+        var list = visibleAppIndices;
+        if (!list.length) { selectedIndex = -1; return; }
+        var pos = list.indexOf(selectedIndex);
+        selectedIndex = pos < 0
+            ? (direction < 0 ? list[list.length - 1] : list[0])
+            : list[(pos + direction + list.length) % list.length];
+    }
+    function nextActiveAppIndex(activeIndex, reverse) {
+        var list = visibleAppIndices;
+        if (!list.length) return -1;
+        var pos = list.indexOf(activeIndex);
+        return pos < 0 ? (reverse ? list[list.length - 1] : list[0])
+            : list[(pos + (reverse ? -1 : 1) + list.length) % list.length];
+    }
+    onIdentitySnapshotChanged: Qt.callLater(function() {
+        appSelector.ensureValidSelection();
+        appSelector.ensureSelectedVisible();
+    })
 
     // Only clear the form after the actual atomic FileView save succeeds.
     Connections {
@@ -201,13 +231,22 @@ Rectangle {
     // Scroll within Social's existing fixed-height cyan selector frame.
     // Keyboard/Tab selection stays visible without changing activation rules.
     function ensureSelectedVisible() {
-        if (appScroll.height <= 0)
-            return;
-        var rowTop = 10 + selectedIndex * 60;
-        var rowBottom = rowTop + 50;
+        if (appScroll.height <= 0 || selectedIndex < 0) return;
+        var rowTop = 10;
+        var rowBottom = -1;
+        for (var i = 0; i < railRows.length; i++) {
+            var row = railRows[i];
+            var height = row.kind === "family" ? 42
+                       : row.kind === "empty" ? 56 : 50;
+            if (row.kind === "app" && row.serviceIndex === selectedIndex) {
+                rowBottom = rowTop + height;
+                break;
+            }
+            rowTop += height + appColumn.spacing;
+        }
+        if (rowBottom < 0) return; // A collapsed app has no scroll target.
         var target = appScroll.contentY;
-        if (rowTop < target)
-            target = rowTop;
+        if (rowTop < target) target = rowTop;
         else if (rowBottom > target + appScroll.height)
             target = rowBottom - appScroll.height;
         appScroll.contentY = Math.max(0, Math.min(
@@ -247,26 +286,57 @@ Rectangle {
             spacing: 10
     
             Repeater {
-                model: appSelector.messagingApps
+                model: appSelector.railRows
     
                 delegate: Item {
                     id: buttonContainer
     
                     required property var modelData
                     required property int index
-    
+                    readonly property bool isAppRow: modelData.kind === "app"
+                    readonly property bool isFamilyRow: modelData.kind === "family"
+                    readonly property var appData: isAppRow
+                        ? appSelector.messagingApps[modelData.serviceIndex]
+                        : ({name:"", icon:""})
+
                     width: 90
-                    height: 50
-    
+                    height: isFamilyRow ? 42 : modelData.kind === "empty" ? 56 : 50
+
+                    ActionButton {
+                        anchors.fill: parent
+                        visible: buttonContainer.isFamilyRow
+                        interactive: visible && appSelector.identitySnapshot.writable
+                        label: (buttonContainer.modelData.expanded ? "▾ " : "▸ ")
+                               + buttonContainer.modelData.title
+                        labelPixelSize: 9
+                        labelMinimumPixelSize: 8
+                        contentPadding: 3
+                        accentColor: Colors.cyan
+                        onTriggered: SocialIdentityStore.toggleFamily(
+                            buttonContainer.modelData.familyId)
+                    }
+
+                    Text {
+                        anchors.centerIn: parent
+                        width: parent.width - 4
+                        visible: buttonContainer.modelData.kind === "empty"
+                        text: "NO FAMILIES\nUSE SETTINGS"
+                        color: Colors.orange
+                        font.pixelSize: 9
+                        wrapMode: Text.WordWrap
+                        horizontalAlignment: Text.AlignHCenter
+                    }
+
                     Rectangle {
                         id: appButton
+                        visible: buttonContainer.isAppRow
     
                         anchors.fill: parent
     
                         radius: 0
                         clip: false
     
-                        property bool isSelected: appSelector.selectedIndex === buttonContainer.index
+                        property bool isSelected: appSelector.selectedIndex === buttonContainer.modelData.serviceIndex
     
                         property bool isHovered: !appSelector.keyboardActive && appMouse.containsMouse
     
@@ -287,7 +357,7 @@ Rectangle {
     
                             anchors.centerIn: parent
     
-                            spacing: buttonContainer.modelData.icon !== "" ? 4 : 0
+                            spacing: buttonContainer.appData.icon !== "" ? 4 : 0
     
                             // ========================================
                             // APP ICON
@@ -296,11 +366,11 @@ Rectangle {
                             Item {
                                 id: iconContainer
     
-                                width: buttonContainer.modelData.icon !== "" ? 14 : 0
+                                width: buttonContainer.appData.icon !== "" ? 14 : 0
     
                                 height: 18
     
-                                visible: buttonContainer.modelData.icon !== ""
+                                visible: buttonContainer.appData.icon !== ""
     
                                 Image {
                                     id: appIcon
@@ -310,7 +380,7 @@ Rectangle {
                                     width: 14
                                     height: 14
     
-                                    source: buttonContainer.modelData.icon !== "" ? Qt.resolvedUrl(buttonContainer.modelData.icon) : ""
+                                    source: buttonContainer.appData.icon !== "" ? Qt.resolvedUrl(buttonContainer.appData.icon) : ""
     
                                     fillMode: Image.PreserveAspectFit
     
@@ -346,11 +416,11 @@ Rectangle {
     
                                 anchors.verticalCenter: parent.verticalCenter
     
-                                text: buttonContainer.modelData.name
+                                text: buttonContainer.appData.name
     
                                 font.family: "GohuFont 11 Nerd Font Mono"
     
-                                font.pixelSize: buttonContainer.modelData.name === "TRUTH SOCIAL" ? 9 : buttonContainer.modelData.icon !== "" ? 10 : 11
+                                font.pixelSize: buttonContainer.appData.name === "TRUTH SOCIAL" ? 9 : buttonContainer.appData.icon !== "" ? 10 : 11
     
                                 color: appButton.isPressed ? Colors.black : appButton.isHovered ? Colors.orange : appButton.isSelected ? Colors.orange : Colors.cyan
     
@@ -389,19 +459,20 @@ Rectangle {
                             // but it does NOT activate/open an app.
                             onEntered: {
                                 appSelector.keyboardActive = false;
-                                appSelector.selectedIndex = buttonContainer.index;
+                                appSelector.selectedIndex = buttonContainer.modelData.serviceIndex;
                             }
     
                             // The button itself owns activation.
                             onClicked: function (mouse) {
-                                if (mouse.button !== Qt.LeftButton)
+                                if (mouse.button !== Qt.LeftButton
+                                        || !appSelector.isAppVisible(buttonContainer.modelData.serviceIndex))
                                     return;
     
-                                appSelector.selectedIndex = buttonContainer.index;
+                                appSelector.selectedIndex = buttonContainer.modelData.serviceIndex;
     
-                                appSelector.appActivated(buttonContainer.index);
+                                appSelector.appActivated(buttonContainer.modelData.serviceIndex);
     
-                                console.log("Selected:", buttonContainer.modelData.name);
+                                console.log("Selected:", buttonContainer.appData.name);
                             }
                         }
     

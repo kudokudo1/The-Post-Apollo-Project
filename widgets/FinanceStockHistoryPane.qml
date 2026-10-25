@@ -1,8 +1,9 @@
 import QtQuick
 import "../components"
 import "FinanceStockModePolicy.js" as StockModePolicy
+import "FinanceStockChartPointPolicy.js" as ChartPointPolicy
 
-// Market STOCKS M11: explicit DAY and RANGE with manual-only price requests.
+// Market STOCKS M12: chart-session selection in RANGE, without new price reads.
 Item {
     id: stocks
     property var stockFeed: null
@@ -13,7 +14,28 @@ Item {
     readonly property bool dayMode: stockFeed && stockFeed.displayMode === "day"
     readonly property var dayResult: dayMode && snapshot
         ? StockModePolicy.daySession(snapshot, stockFeed.dayDate) : null
-    onPriceBarsChanged: priceCanvas.requestPaint()
+    property int selectedPointIndex: -1
+    readonly property var inspectedPoint: !dayMode
+        ? ChartPointPolicy.selectedBar(priceBars, selectedPointIndex) : null
+
+    function inspectChartPoint(x, y) {
+        if (dayMode || !snapshot || priceBars.length < 2
+                || priceCanvas.width < 5 || priceCanvas.height < 5)
+            return;
+        const index = ChartPointPolicy.nearestPoint(priceBars,
+            priceCanvas.width, priceCanvas.height, x, y, 18);
+        // Tapping the selected point again, or empty chart area, clears it.
+        selectedPointIndex = index === selectedPointIndex ? -1 : index;
+    }
+    onPriceBarsChanged: {
+        selectedPointIndex = -1;
+        priceCanvas.requestPaint();
+    }
+    onDayModeChanged: {
+        selectedPointIndex = -1;
+        priceCanvas.requestPaint();
+    }
+    onSelectedPointIndexChanged: priceCanvas.requestPaint()
 
     GohuText {
         id: title
@@ -340,17 +362,71 @@ Item {
                         ctx.lineWidth = 1.6;
                         ctx.stroke();
 
+                        // Small windows keep every point visible; long histories
+                        // remain legible without painting 132 overlapping dots.
+                        if (bars.length <= 32) {
+                            ctx.fillStyle = "#55CFCA";
+                            for (let i=0;i<bars.length;++i) {
+                                const point = ChartPointPolicy.pointAt(
+                                    bars, width, height, i);
+                                if (!point) continue;
+                                ctx.beginPath();
+                                ctx.arc(point.x, point.y, 2.3, 0, Math.PI * 2);
+                                ctx.fill();
+                            }
+                        }
+                        if (stocks.inspectedPoint !== null) {
+                            const point = ChartPointPolicy.pointAt(
+                                bars, width, height, stocks.selectedPointIndex);
+                            if (point) {
+                                ctx.strokeStyle = "#C74EC7";
+                                ctx.lineWidth = 1;
+                                ctx.beginPath();
+                                ctx.moveTo(point.x, 0);
+                                ctx.lineTo(point.x, height);
+                                ctx.stroke();
+                                ctx.beginPath();
+                                ctx.arc(point.x, point.y, 5, 0, Math.PI * 2);
+                                ctx.fillStyle = "#ED981A";
+                                ctx.fill();
+                                ctx.strokeStyle = "#C74EC7";
+                                ctx.lineWidth = 1.8;
+                                ctx.stroke();
+                            }
+                        }
+                    }
+                    MouseArea {
+                        anchors.fill: parent
+                        enabled: !stocks.dayMode && stocks.priceBars.length >= 2
+                        acceptedButtons: Qt.LeftButton
+                        onClicked: function(mouse) {
+                            stocks.inspectChartPoint(mouse.x, mouse.y);
+                        }
                     }
                 }
             }
             GohuText {
                 width: parent.width
                 visible: !stocks.dayMode && stocks.priceBars.length >= 2
-                text: "CYAN = ACTUAL DAILY CLOSES // RANGE IS INCLUSIVE"
+                text: "CYAN = DAILY CLOSES // CLICK A DATA POINT TO INSPECT // ORANGE = SELECTED"
                 textFormat: Text.PlainText
                 wrapMode: Text.WordWrap
                 font.pixelSize: 9
                 color: Colors.orange
+            }
+            GohuText {
+                width: parent.width
+                visible: !stocks.dayMode && stocks.inspectedPoint !== null
+                text: stocks.inspectedPoint
+                    ? "SELECTED SESSION // " + stocks.inspectedPoint.date
+                      + "\n" + stocks.snapshot.priceBasis + " // $"
+                      + stocks.inspectedPoint.price.toFixed(2)
+                      + " // " + stocks.snapshot.symbol
+                    : ""
+                textFormat: Text.PlainText
+                font.pixelSize: 11
+                color: Colors.orange
+                wrapMode: Text.WordWrap
             }
             GohuText {
                 width: parent.width

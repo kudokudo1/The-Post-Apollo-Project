@@ -105,9 +105,8 @@ assert.doesNotMatch(hub, /Qt\.openUrlExternally|StationNewsWebView\.qml/);
 assert.doesNotMatch(station, /import QtWebEngine/);
 // Keep the orphaned implementation on disk for a *future* authorized
 // host experiment, but ensure it is unreachable from both NEWS pathways.
-const web = read("widgets/weather/StationNewsWebView.qml");
+// 'web' and 'discovery' are already read above.
 assert.match(web, /^import QtWebEngine/m);
-const discovery = read("widgets/weather/StationDiscovery.qml");
 assert.match(discovery, /StationViewerHost\s*\{/);
 assert.match(discovery, /onBackRequested: stationDiscovery\.closeViewer\(\)/);
 assert.match(discovery, /viewerOpen = true/);

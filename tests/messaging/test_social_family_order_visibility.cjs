@@ -68,8 +68,10 @@ assert.equal(movedTelegram.identities[0].layout.families[1].appIds.join(","),
 const reorderedView = policy.view("ready",swapped.document,"");
 assert.equal(reorderedView.visibleAppIndices.slice(-2).join(","),"2,1");
 assert.equal(reorderedView.appChoices[2].orderIndex,0);
-assert.equal(reorderedView.railRows.at(-2).serviceIndex,2);
-assert.equal(reorderedView.railRows.at(-1).serviceIndex,1);
+// The third, empty family still has its own header after these app rows.
+assert.equal(reorderedView.railRows.at(-3).serviceIndex,2);
+assert.equal(reorderedView.railRows.at(-2).serviceIndex,1);
+assert.equal(reorderedView.railRows.at(-1).kind,"family");
 assert.equal(policy.validate(swapped.document).ok,true);
 
 // Hiding is a visibility preference, never removal or account logout.

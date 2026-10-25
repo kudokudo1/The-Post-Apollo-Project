@@ -35,6 +35,44 @@ Rectangle {
     property string editedAppId: ""
     property bool familyCreatePending: false
     property string pendingNewFamilyId: ""
+    property string removalTargetFamilyId: ""
+    property string removalConfirmIdentityId: ""
+    property string removalConfirmFamilyId: ""
+    property string removalConfirmTargetId: ""
+
+    // A confirmation is scoped to a particular identity, family and target.
+    function resetFamilyRemovalConfirmation() {
+        removalConfirmIdentityId = "";
+        removalConfirmFamilyId = "";
+        removalConfirmTargetId = "";
+    }
+
+    function rehomeFamilyOptions() {
+        if (!familyIsSelected()) return [];
+        return (identitySnapshot.familyOptions || []).filter(function(f) {
+            return f.id !== editedFamilyId;
+        });
+    }
+
+    function removalTargetValid() {
+        return rehomeFamilyOptions().some(function(f) {
+            return f.id === removalTargetFamilyId;
+        });
+    }
+
+    function familyCanBeRemoved() {
+        var selected = selectedFamilyOption();
+        return !!selected && (selected.count === 0 || removalTargetValid());
+    }
+
+    function familyRemovalConfirmationMatches() {
+        var family = selectedFamilyOption();
+        if (!family || !familyCanBeRemoved()) return false;
+        return removalConfirmIdentityId === identitySnapshot.activeId
+            && removalConfirmFamilyId === editedFamilyId
+            && removalConfirmTargetId ===
+               (family.count > 0 ? removalTargetFamilyId : "");
+    }
 
     function familyIsSelected() {
         if (familyEditorIdentityId !== identitySnapshot.activeId)
@@ -120,14 +158,28 @@ Rectangle {
     onIdentitySnapshotChanged: Qt.callLater(function() {
         appSelector.ensureValidSelection();
         appSelector.ensureSelectedVisible();
+        appSelector.resetFamilyRemovalConfirmation();
         if (appSelector.familyEditorIdentityId !== appSelector.identitySnapshot.activeId) {
             appSelector.familyEditorIdentityId = appSelector.identitySnapshot.activeId;
             appSelector.editedFamilyId = "";
             appSelector.editedAppId = "";
+            appSelector.removalTargetFamilyId = "";
             familyNameInput.text = "";
             familySearchInput.text = "";
+        } else if (appSelector.editedFamilyId !== ""
+                   && !appSelector.familyIsSelected()
+                   && !appSelector.familyCreatePending) {
+            // A confirmed save removed the selected family.
+            appSelector.editedFamilyId = "";
+            appSelector.editedAppId = "";
+            appSelector.removalTargetFamilyId = "";
+            familyNameInput.text = "";
         }
     })
+
+    onSettingsOpenChanged: {
+        if (!settingsOpen) appSelector.resetFamilyRemovalConfirmation();
+    }
 
     // Only clear the form after the actual atomic FileView save succeeds.
     Connections {
@@ -831,6 +883,8 @@ Rectangle {
                             appSelector.identitySnapshot.activeId;
                         appSelector.editedFamilyId = "";
                         appSelector.editedAppId = "";
+                        appSelector.removalTargetFamilyId = "";
+                        appSelector.resetFamilyRemovalConfirmation();
                         familyNameInput.text = "";
                         familySearchInput.text = "";
                     }
@@ -862,6 +916,8 @@ Rectangle {
                                             appSelector.identitySnapshot.activeId
                             onTriggered: {
                                 appSelector.editedFamilyId = modelData.id;
+                                appSelector.removalTargetFamilyId = "";
+                                appSelector.resetFamilyRemovalConfirmation();
                                 familyNameInput.text = modelData.title;
                             }
                         }
@@ -952,6 +1008,111 @@ Rectangle {
                                      && familyNameInput.text.trim().length > 0
                         onTriggered: SocialIdentityStore.renameFamily(
                             appSelector.editedFamilyId, familyNameInput.text)
+                    }
+                    Rectangle {
+                        width: parent.width
+                        height: 1
+                        color: Colors.cyan
+                    }
+                    Text {
+                        width: parent.width
+                        text: "REMOVE FAMILY"
+                        color: Colors.orange
+                        font.pixelSize: 9
+                        font.bold: true
+                        wrapMode: Text.WordWrap
+                    }
+                    Text {
+                        width: parent.width
+                        visible: appSelector.familyIsSelected()
+                        text: appSelector.selectedFamilyOption()
+                              ? (appSelector.selectedFamilyOption().count
+                                 + " assigned apps") : ""
+                        color: Colors.white
+                        font.pixelSize: 9
+                        wrapMode: Text.WrapAnywhere
+                    }
+                    Text {
+                        width: parent.width
+                        visible: appSelector.selectedFamilyOption() !== null
+                                 && appSelector.selectedFamilyOption().count > 0
+                        text: "REHOME TO"
+                        color: Colors.cyan
+                        font.pixelSize: 9
+                        wrapMode: Text.WordWrap
+                    }
+                    Repeater {
+                        model: appSelector.selectedFamilyOption()
+                               && appSelector.selectedFamilyOption().count > 0
+                               ? appSelector.rehomeFamilyOptions() : []
+                        delegate: ActionButton {
+                            required property var modelData
+                            width: settingsColumn.width
+                            height: 32
+                            label: modelData.title
+                            labelPixelSize: 9
+                            labelMinimumPixelSize: 8
+                            contentPadding: 3
+                            selected: appSelector.removalTargetFamilyId === modelData.id
+                            interactive: appSelector.identitySnapshot.writable
+                                         && appSelector.familyIsSelected()
+                            onTriggered: {
+                                appSelector.removalTargetFamilyId = modelData.id;
+                                appSelector.resetFamilyRemovalConfirmation();
+                            }
+                        }
+                    }
+                    Text {
+                        width: parent.width
+                        visible: appSelector.selectedFamilyOption() !== null
+                                 && appSelector.selectedFamilyOption().count > 0
+                                 && appSelector.rehomeFamilyOptions().length === 0
+                        text: "CREATE ANOTHER FAMILY FIRST"
+                        color: Colors.orange
+                        font.pixelSize: 9
+                        wrapMode: Text.WordWrap
+                    }
+                    Text {
+                        width: parent.width
+                        visible: appSelector.familyIsSelected()
+                        text: appSelector.selectedFamilyOption()
+                              && appSelector.selectedFamilyOption().count > 0
+                              ? "Apps append to destination. Hidden stays hidden."
+                              : "Empty family: no apps to move."
+                        color: Colors.white
+                        font.pixelSize: 9
+                        wrapMode: Text.WordWrap
+                    }
+                    ActionButton {
+                        width: parent.width
+                        height: 36
+                        label: appSelector.familyRemovalConfirmationMatches()
+                               ? "CONFIRM REMOVE" : "REMOVE FAMILY"
+                        labelPixelSize: 9
+                        labelMinimumPixelSize: 8
+                        contentPadding: 3
+                        interactive: appSelector.identitySnapshot.writable
+                                     && appSelector.familyCanBeRemoved()
+                                     && !appSelector.familyCreatePending
+                        onTriggered: {
+                            if (!appSelector.familyCanBeRemoved()) return;
+                            var family = appSelector.selectedFamilyOption();
+                            if (!family) return;
+                            var destination = family.count > 0
+                                ? appSelector.removalTargetFamilyId : "";
+                            if (!appSelector.familyRemovalConfirmationMatches()) {
+                                appSelector.removalConfirmIdentityId =
+                                    appSelector.identitySnapshot.activeId;
+                                appSelector.removalConfirmFamilyId =
+                                    appSelector.editedFamilyId;
+                                appSelector.removalConfirmTargetId = destination;
+                            } else {
+                                // Store validation independently enforces rehome.
+                                if (SocialIdentityStore.removeFamily(
+                                        appSelector.editedFamilyId, destination))
+                                    appSelector.resetFamilyRemovalConfirmation();
+                            }
+                        }
                     }
                     Text {
                         width: parent.width

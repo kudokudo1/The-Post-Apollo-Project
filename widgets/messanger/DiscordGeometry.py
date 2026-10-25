@@ -9,7 +9,7 @@ Protocol on stdin: newline-delimited JSON.
   {"op":"config","appSelectorWidth":110,"contactListWidth":200,
    "discordGap":0,"discordInset":1,"minimumSharedWidth":311,
    "minimumSharedHeight":260}
-  {"op":"mode","discordSelected":true,"discordReady":true}
+  {"op":"mode","discordSelected":true,"discordReady":true,"discordDocked":true}
   {"op":"sync","target":"social|discord","x":0,"y":0,
    "width":100,"height":100,"focus":false,"setup":false}
   {"op":"centerDiscord","x":0,"y":0}
@@ -278,6 +278,8 @@ class Bridge:
         # Fast-follow is active only after the real Discord window is ready.
         self.discord_selected = False
         self.discord_ready = False
+        # Social confirms Vesktop's initial dock before it can lead moves.
+        self.discord_docked = False
         self.x_selected = False
         self.x_ready = False
         self.browser_site = "x"
@@ -360,7 +362,7 @@ class Bridge:
         # Only one external app is selected at a time. Keep the Vesktop
         # path unchanged while allowing the same fast-follow for X.
         guest_id = (
-            "discord" if self.discord_selected and self.discord_ready else
+            "discord" if self.discord_selected and self.discord_ready and self.discord_docked else
             self.browser_site if self.x_selected and self.x_ready else ""
         )
         if not guest_id:
@@ -536,6 +538,9 @@ class Bridge:
                 self.discord_ready = bool(
                     message.get("discordReady", False)
                 )
+                self.discord_docked = bool(
+                    message.get("discordDocked", False)
+                ) and self.discord_selected and self.discord_ready
                 self.x_selected = bool(message.get("xSelected", False))
                 self.x_ready = bool(message.get("xReady", False))
                 candidate = str(message.get("browserSite", "x"))

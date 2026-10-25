@@ -111,6 +111,7 @@ assert result["shared"]["width"] >= 800
 bridge.x_selected = False
 bridge.discord_selected = True
 bridge.discord_ready = True
+bridge.discord_docked = True
 commands.clear()
 sample["discord"] = sample.pop("x")
 result = bridge.fast_follow(sample)

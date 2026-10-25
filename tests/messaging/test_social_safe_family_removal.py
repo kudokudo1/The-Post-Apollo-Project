@@ -71,7 +71,7 @@ class SafeFamilyRemovalContracts(unittest.TestCase):
             "onIdentitySnapshotChanged: Qt.callLater",
             "onSettingsOpenChanged:",
             "appSelector.resetFamilyRemovalConfirmation();",
-            'text: "Apps append to destination. Hidden stays hidden."',
+            '"Apps append to destination. Hidden stays hidden."',
         ):
             self.assertIn(needle,SELECTOR,needle)
         self.assertIn("appSelector.removalTargetFamilyId = \"\";",SELECTOR)

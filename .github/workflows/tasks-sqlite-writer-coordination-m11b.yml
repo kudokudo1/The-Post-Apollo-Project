@@ -1,0 +1,45 @@
+name: TASKS M11b disposable writer coordination
+
+on:
+  pull_request:
+    paths:
+      - 'tests/tasks/fixtures/TaskWriterCoordinationM11b.py'
+      - 'tests/tasks/test_task_writer_coordination_m11b.py'
+      - 'docs/tasks-sqlite-writer-coordination-m11b.md'
+      - '.github/workflows/tasks-sqlite-writer-coordination-m11b.yml'
+  push:
+    branches:
+      - main
+    paths:
+      - 'tests/tasks/fixtures/TaskWriterCoordinationM11b.py'
+      - 'tests/tasks/test_task_writer_coordination_m11b.py'
+      - 'docs/tasks-sqlite-writer-coordination-m11b.md'
+      - '.github/workflows/tasks-sqlite-writer-coordination-m11b.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  source-drain-and-fence:
+    runs-on: ubuntu-latest
+    timeout-minutes: 7
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: M11b test-only OS lock plus explicit JSON freeze/drain review
+        run: python3 tests/tasks/test_task_writer_coordination_m11b.py
+      - name: M10p original durable OS admission and crash fencing
+        run: python3 tests/tasks/test_sqlite_writer_authority_fixture.py
+      - name: M10q persistent subprocess handoff protocol
+        run: python3 tests/tasks/test_task_sqlite_handoff_host.py
+      - name: M10o pure writer handoff state contract
+        run: node tests/tasks/test_sqlite_writer_handoff_policy.cjs
+      - name: M11a snapshot parity remains non-writable and non-activating
+        run: node tests/tasks/test_task_sqlite_shadow_parity_m11a.cjs
+      - name: M10n rollback and online SQLite backup review
+        run: python3 tests/tasks/test_task_sqlite_cutover_review.py

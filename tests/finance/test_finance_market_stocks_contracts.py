@@ -59,7 +59,8 @@ assert 'SOURCE EODHD EOD' in pane
 assert 'stocks.snapshot.delivery.cachedAt' in pane
 assert 'stocks.snapshot.delivery.servedAt' in pane
 assert 'Canvas {' in pane
-assert 'onPriceBarsChanged: priceCanvas.requestPaint()' in pane
+assert 'onPriceBarsChanged: {' in pane
+assert 'selectedPointIndex = -1;' in pane
 assert 'Math.min.apply(null,nums)' in pane
 assert 'property var stockFeed: null' in market
 assert 'property var stockFeed: null' in pane

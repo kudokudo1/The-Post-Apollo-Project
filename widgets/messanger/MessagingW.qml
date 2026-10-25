@@ -1123,7 +1123,11 @@ PanelWindow {
         visible: messagingWindow.menuOpen
 
         fillColor: Colors.black
-        fillOpacity: 0.20
+        // Social uses a full-size FloatingWindow for shared Sway geometry.
+        // Its input mask is NOT a visual clipping mask. If this fill stays
+        // painted while Discord is selected, the entire Vesktop view gets
+        // tinted by the overlay despite receiving input normally.
+        fillOpacity: messagingWindow.discordSelected ? 0.0 : 0.20
         borderVisible: false
         radius: 0
 
@@ -1339,7 +1343,10 @@ PanelWindow {
             width: messagingWindow.contactListWidth
             height: messagingContent.height
 
-            visible: messagingWindow.menuOpen && !providerAccessPanel.visible && !messagingWindow.providerDesktopManaged
+            // Hide the whole panel, including its 0.85-opacity Rectangle.
+            // discordMode only hides contents; it does not clear the paint.
+            visible: messagingWindow.menuOpen && !messagingWindow.discordSelected
+                     && !providerAccessPanel.visible && !messagingWindow.providerDesktopManaged
 
             discordMode: messagingWindow.externalSelected
 
@@ -1437,7 +1444,11 @@ PanelWindow {
 
             height: messagingContent.height
 
-            visible: messagingWindow.menuOpen && !telegramConnectPanel.visible && !providerAccessPanel.visible && !messagingWindow.providerDesktopManaged
+            // Discord is a separate Sway window underneath the transparent
+            // Social FloatingWindow. Do not paint the chat shell above it.
+            visible: messagingWindow.menuOpen && !messagingWindow.discordSelected
+                     && !telegramConnectPanel.visible && !providerAccessPanel.visible
+                     && !messagingWindow.providerDesktopManaged
 
             discordMode: messagingWindow.externalSelected
 

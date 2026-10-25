@@ -20,6 +20,8 @@ on:
       - "services/time/MachineWindowMultiplicity.py"
       - "services/time/MachineSessionIdentityV2.py"
       - "services/time/MachineAdapterRegistry.py"
+      - "services/time/MachineAdapterFixtureCorrelation.py"
+      - "docs/timew-machine-m2d-fixture-session-correlation.md"
       - "services/time/MachineAdapterEvidencePolicy.py"
       - "docs/timew-machine-m2c2-app-capability-evidence.json"
       - "docs/timew-machine-m2c2-application-capability-audit.md"
@@ -68,6 +70,8 @@ on:
       - "services/time/MachineWindowMultiplicity.py"
       - "services/time/MachineSessionIdentityV2.py"
       - "services/time/MachineAdapterRegistry.py"
+      - "services/time/MachineAdapterFixtureCorrelation.py"
+      - "docs/timew-machine-m2d-fixture-session-correlation.md"
       - "services/time/MachineAdapterEvidencePolicy.py"
       - "docs/timew-machine-m2c2-app-capability-evidence.json"
       - "docs/timew-machine-m2c2-application-capability-audit.md"
@@ -165,6 +169,10 @@ jobs:
         run: python3 -B -I tests/timew/test_machine_adapter_registry_contract.py
       - name: Verify MACHINE public API capability evidence never grants live access
         run: python3 -B -I tests/timew/test_machine_adapter_evidence_audit.py
+      - name: Verify MACHINE scoped synthetic app to host window correlation
+        run: python3 -B -I tests/timew/test_machine_adapter_fixture_correlation.py
+      - name: Verify MACHINE fixture correlation cannot capture or execute
+        run: python3 -B -I tests/timew/test_machine_adapter_fixture_correlation_contract.py
       - name: Verify MACHINE durable move journal crash and permissions
         run: python3 -B -I tests/timew/test_machine_move_journal.py
       - name: Verify MACHINE single-use approval and read-only reconciliation

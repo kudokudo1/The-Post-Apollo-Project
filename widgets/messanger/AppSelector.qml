@@ -18,6 +18,10 @@ Rectangle {
     // Entry-point shell only. Identity storage, credentials and family layouts
     // are deliberately reserved for subsequent operator-reviewed slices.
     property bool settingsOpen: false
+    // The sidecar lives in the existing Social FloatingWindow, never a new
+    // independent Sway window or provider session.
+    property Item settingsOverlayParent: null
+    property int settingsOverlayWidth: 400
     property bool creatingIdentity: false
     property bool identityCreatePending: false
     property string identityCreateMode: "default"
@@ -405,7 +409,8 @@ Rectangle {
         }
         contentWidth: width
         contentHeight: appColumn.height + 20
-        visible: !appSelector.settingsOpen
+        // Keep the rail visible alongside the wide settings editor.
+        visible: !appSelector.settingsOpen || !!appSelector.settingsOverlayParent
         clip: true
         flickableDirection: Flickable.VerticalFlick
         boundsBehavior: Flickable.StopAtBounds
@@ -444,6 +449,7 @@ Rectangle {
                         anchors.fill: parent
                         visible: buttonContainer.isFamilyRow
                         interactive: visible && appSelector.identitySnapshot.writable
+                                     && !appSelector.settingsOpen
                         label: (buttonContainer.modelData.expanded ? "▾ " : "▸ ")
                                + buttonContainer.modelData.title
                         labelPixelSize: 9
@@ -586,6 +592,8 @@ Rectangle {
     
                         MouseArea {
                             id: appMouse
+                            // A visible launcher rail is read-only while editing Settings.
+                            enabled: !appSelector.settingsOpen
     
                             anchors.fill: parent
     
@@ -651,18 +659,27 @@ Rectangle {
         }
     }
 
-    // Settings stays inside the selector's existing 110 px input region.
-    // A wider pop-out must be handled separately: external browser/Discord
-    // modes deliberately mask off the content region for pointer pass-through.
+    // Reparent the EXISTING settings form to the area beside the selector.
+    // This is still the same Social FloatingWindow. Its dynamic input mask,
+    // not window geometry or provider windows, bounds clickable sidecar space.
     Rectangle {
         id: settingsPage
+        parent: appSelector.settingsOverlayParent
+                ? appSelector.settingsOverlayParent : appSelector
         anchors {
             top: parent.top
-            left: parent.left
-            right: parent.right
-            bottom: statusMessage.visible ? statusMessage.top : settingsFooter.top
+            left: appSelector.settingsOverlayParent ? appSelector.right : parent.left
+            bottom: appSelector.settingsOverlayParent ? parent.bottom
+                    : (statusMessage.visible ? statusMessage.top : settingsFooter.top)
         }
+        width: appSelector.settingsOverlayParent
+               ? Math.max(1, Math.min(appSelector.settingsOverlayWidth,
+                                     parent.width - appSelector.width))
+               : parent.width
+        z: 8
         color: Colors.black
+        border.width: 1
+        border.color: Colors.cyan
         visible: appSelector.settingsOpen
         clip: true
 

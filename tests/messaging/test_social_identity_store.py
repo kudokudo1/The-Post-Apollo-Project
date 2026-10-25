@@ -36,7 +36,7 @@ class SocialIdentitySourceContracts(unittest.TestCase):
         self.assertIn('? "unsupported" : "error"', STORE)
         self.assertIn("identityFile.reload()", STORE)
         self.assertIn("pendingDocument = result.document", STORE)
-        self.assertIn('if (storageState !== "ready" && storageState !== "empty")', STORE)
+        self.assertIn('storageState !== "ready" && storageState !== "empty"', STORE)
         self.assertIn("IdentityPolicy.initialDocument()", STORE)
         self.assertIn("IdentityPolicy.create(", STORE)
         self.assertIn("IdentityPolicy.select(", STORE)

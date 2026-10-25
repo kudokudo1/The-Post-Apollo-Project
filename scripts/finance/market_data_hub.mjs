@@ -158,7 +158,8 @@ export function createMarketDataHub({
   // Both views still share one provider concurrency ceiling and cache budget.
   async function getPriceRange({cik, from, to, provider="eodhd"}={}) {
     if (provider !== "eodhd") throw fail("unknown-provider");
-    validateRange(cik,from,to,new Date(now()).toISOString().slice(0,10));
+    try {validateRange(cik,from,to,new Date(now()).toISOString().slice(0,10));}
+    catch {throw fail("invalid-range");}
     const key="range|"+provider+"|"+cik+"|"+from+"|"+to;
     const stamp=now();
     const pack=(entry,state,at)=>({

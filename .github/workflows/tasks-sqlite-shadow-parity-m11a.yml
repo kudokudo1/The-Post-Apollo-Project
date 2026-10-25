@@ -1,0 +1,46 @@
+name: TASKS M11a read-only JSON/SQLite shadow parity
+
+on:
+  pull_request:
+    paths:
+      - 'services/projects/TaskSqliteShadowParityM11a.js'
+      - 'tests/tasks/test_task_sqlite_shadow_parity_m11a.cjs'
+      - 'tests/tasks/test_task_sqlite_shadow_parity_m11a.py'
+      - 'tests/tasks/fixtures/task_shadow_parity_m11a_oracle.cjs'
+      - 'docs/tasks-sqlite-shadow-parity-m11a.md'
+      - '.github/workflows/tasks-sqlite-shadow-parity-m11a.yml'
+  push:
+    branches:
+      - main
+    paths:
+      - 'services/projects/TaskSqliteShadowParityM11a.js'
+      - 'tests/tasks/test_task_sqlite_shadow_parity_m11a.cjs'
+      - 'tests/tasks/test_task_sqlite_shadow_parity_m11a.py'
+      - 'tests/tasks/fixtures/task_shadow_parity_m11a_oracle.cjs'
+      - 'docs/tasks-sqlite-shadow-parity-m11a.md'
+      - '.github/workflows/tasks-sqlite-shadow-parity-m11a.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  shadow-compare:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: M11a exact v3 UI field parity, divergence and blocked-state logic
+        run: node tests/tasks/test_task_sqlite_shadow_parity_m11a.cjs
+      - name: M11a independent legacy source vs real disposable SQLite process
+        run: python3 tests/tasks/test_task_sqlite_shadow_parity_m11a.py
+      - name: M10y SQLite to deployed TODAY/PLANNER source regression
+        run: python3 tests/tasks/test_task_sqlite_snapshot_m10y.py
+      - name: M10z Quickshell callback and cancellation regression
+        run: node tests/tasks/test_task_sqlite_snapshot_lifecycle_m10z.cjs
+      - name: M10n SQLite backup and rollback review
+        run: python3 tests/tasks/test_task_sqlite_cutover_review.py

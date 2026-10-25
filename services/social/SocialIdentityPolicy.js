@@ -319,6 +319,48 @@ function moveAppToFamily(doc, appId, targetFamilyId) {
             familyId:targetFamilyId, appId:appId};
 }
 
+// Delete a family RECORD only, never its application IDs or linked accounts.
+// A nonempty family MUST nominate a different existing family for rehoming;
+// empty families can be removed (including the final empty family).
+// The existing destination order is kept, followed by all source apps in order.
+// hiddenAppIds and nextFamilyId are preserved, so visibility and IDs survive.
+function removeFamily(doc, familyId, targetFamilyId) {
+    var checked = validate(doc);
+    if (!checked.ok) return checked;
+    if (typeof familyId !== "string")
+        return {ok:false, reason:"INVALID_FAMILY"};
+    if (typeof targetFamilyId !== "string")
+        return {ok:false, reason:"INVALID_TARGET_FAMILY"};
+    var next = clone(doc);
+    var active = next.identities.find(function(i) {
+        return i.id === next.activeId;
+    });
+    var families = active.layout.families;
+    var index = families.findIndex(function(f) { return f.id === familyId; });
+    if (index < 0) return {ok:false, reason:"INVALID_FAMILY"};
+    var source = families[index];
+    if (source.appIds.length > 0) {
+        if (!targetFamilyId)
+            return {ok:false, reason:"REHOME_REQUIRED"};
+        if (targetFamilyId === familyId)
+            return {ok:false, reason:"SAME_FAMILY"};
+        var destination = families.find(function(f) {
+            return f.id === targetFamilyId;
+        });
+        if (!destination) return {ok:false, reason:"INVALID_TARGET_FAMILY"};
+        // Valid documents guarantee globally unique memberships. Do not
+        // orphan apps, silently unassign any app, or deduplicate on removal.
+        destination.appIds = destination.appIds.concat(source.appIds);
+    } else if (targetFamilyId !== "") {
+        return {ok:false, reason:"TARGET_NOT_NEEDED"};
+    }
+    families.splice(index, 1);
+    var after = validate(next);
+    if (!after.ok) return after;
+    return {ok:true, reason:"", document:next,
+            removedFamilyId:familyId, rehomedAppCount:source.appIds.length};
+}
+
 // Reorder only metadata for the active identity. Direction is an explicit
 // adjacent step; no wrapping, surprise launch, deletion or cross-identity edit.
 function reorderFamily(doc, familyId, direction) {

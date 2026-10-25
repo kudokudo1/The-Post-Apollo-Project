@@ -66,7 +66,7 @@ assert "anchors.rightMargin: 12" in header_divider
 # Main and Budget sub-mode icon artwork uses Gohu, with fit to avoid
 # truncating decorated glyphs in the narrow 9:16 panel.
 assert "NotoText {" not in menu
-assert "Item {\n                        id: mainIcon" in menu
+assert "Item {\n                            id: mainIcon" in menu
 assert "Item {\n                            id: subIcon" in menu
 assert "id: mainGlyphParts" in menu
 assert "id: subGlyphParts" in menu
@@ -76,7 +76,12 @@ assert "font.pixelSize: 22" in menu
 assert menu.count("fontSizeMode: Text.Fit") == 2
 assert "minimumPixelSize: 15" in menu
 assert "minimumPixelSize: 12" in menu
-assert "opacity: mainModeButton.selected ? 0.60 : 0.36" in menu
+assert 'id: mainModeLabel' in menu
+assert 'customLabelGlowSource: mainModeLabel' in menu
+assert 'labelGlowEnabled: !modelData.future' in menu
+assert 'color: mainModeButton.pressed ? Colors.black : Colors.white' in menu
+assert 'mainModeButton.selected || mainModeButton.hovered' in menu
+assert '? 0.48 : 0.34' in menu
 
 # No increase in ornament size: the two core glyphs are larger, the
 # decorations remain smaller and Unicode combining marks stay on the core.
@@ -106,8 +111,8 @@ for pre, dollar, core, post, full in (
 assert menu.count('dollar: "$"') == 2
 assert menu.count('text: modelData.dollar || ""') == 2
 assert menu.count("visible: !!modelData.dollar") == 2
-# The 24px dollar must be vertically centered alongside each larger chart.
-# Do not recenter the small stars or resize any glyphs in this follow-up.
+# The 24px dollar stays vertically centered with the core chart; all
+# ornaments retain their original sizes and combining glyphs.
 for row_id, end_id in (("mainGlyphParts", "mainModeButton"),
                        ("subGlyphParts", "budgetSubButton")):
     start = menu.index("id: " + row_id)
@@ -132,6 +137,28 @@ for ident in ("market", "agentic"):
 assert menu.count("coreSize:") == 3
 assert "scale: Math.min(1, mainIcon.width" in menu
 assert "scale: Math.min(1, subIcon.width" in menu
+
+# AppControl-like borderless main rail and a shared geometric center.
+# The core must be centered regardless of asymmetrical ornaments.
+main_rail = menu[menu.index("// MAIN MODE:"):menu.index("id: mainRailDivider")]
+assert "width: 102" in main_rail
+assert "spacing: 8" in main_rail
+assert "height: 55" in main_rail
+assert "bordered: false" in main_rail
+assert "bordered: true" not in main_rail
+assert "id: mainModeContent" in main_rail
+assert "anchors.centerIn: parent" in main_rail
+assert "id: mainCoreGlyph" in main_rail
+assert "id: mainLeadingGlyphs" in main_rail
+assert "id: mainTrailingGlyph" in main_rail
+assert "anchors.right: mainCoreGlyph.left" in main_rail
+assert "anchors.left: mainCoreGlyph.right" in main_rail
+assert "2 * Math.max(mainLeadingGlyphs.implicitWidth," in main_rail
+assert "mainTrailingGlyph.implicitWidth)" in main_rail
+assert "anchors.horizontalCenter: parent.horizontalCenter" in main_rail
+assert "id: mainModeLabel" in main_rail
+assert "customPrimaryGlowSource: mainIcon" in main_rail
+assert "customLabelGlowSource: mainModeLabel" in main_rail
 # Ornaments are vertically centered relative to the larger core glyph
 # while retaining the 15/12 px small decorations and original source strings.
 for row_id, ornament_px, expected_color in (
@@ -143,10 +170,16 @@ for row_id, ornament_px, expected_color in (
         marker = 'text: modelData.' + ornament + ' || ""'
         pos = row.index(marker)
         block = row[row.rfind("GohuText {", 0, pos):row.index("}", pos)]
-        assert "anchors.verticalCenter: parent.verticalCenter" in block, (row_id, ornament)
+        expected_anchor = (
+            "anchors.verticalCenter: mainCoreGlyph.verticalCenter"
+            if row_id == "mainGlyphParts" and ornament == "suffix"
+            else "anchors.verticalCenter: parent.verticalCenter"
+        )
+        assert expected_anchor in block, (row_id, ornament)
         assert f"font.pixelSize: {ornament_px}" in block, (row_id, ornament)
         assert f"color: {expected_color}" in block, (row_id, ornament)
-assert menu.count('anchors.verticalCenter: parent.verticalCenter') >= 6
+assert menu.count('anchors.verticalCenter: parent.verticalCenter') >= 5
+assert "anchors.verticalCenter: mainCoreGlyph.verticalCenter" in menu
 
 
 # Permanent Omnitrix vertical line with independent, source-safe glow.

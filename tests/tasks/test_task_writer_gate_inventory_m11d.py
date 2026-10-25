@@ -139,7 +139,7 @@ assert actual == data["callers"], (
 
 # No task UI should hold a second FileView, write to a task path, or call
 # stage directly. These are targeted checks, not a general filesystem audit.
-target_files = [p for p in files if (
+target_files = [p for p in files if p != STORE and (
     p.as_posix().startswith((ROOT/"widgets/tasks").as_posix()) or
     p.name.startswith(("ApolloHubTodo","TasksW")))]
 for p in target_files:

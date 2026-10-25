@@ -26,6 +26,43 @@ Rectangle {
     readonly property var railRows: identitySnapshot.railRows || []
     readonly property var visibleAppIndices: identitySnapshot.visibleAppIndices || []
 
+    // Family editing only touches metadata for the identity active when its
+    // controls were selected. Switches clear stale selections, even if two
+    // identities happen to use the same stable family ID.
+    property bool editingFamilies: false
+    property string familyEditorIdentityId: ""
+    property string editedFamilyId: ""
+    property string editedAppId: ""
+    property bool familyCreatePending: false
+    property string pendingNewFamilyId: ""
+
+    function familyIsSelected() {
+        if (familyEditorIdentityId !== identitySnapshot.activeId)
+            return false;
+        return (identitySnapshot.familyOptions || []).some(function(f) {
+            return f.id === editedFamilyId;
+        });
+    }
+
+    function selectedAppNeedsMove() {
+        if (!familyIsSelected() || !editedAppId) return false;
+        var app = (identitySnapshot.appChoices || []).find(function(c) {
+            return c.id === editedAppId;
+        });
+        return !!app && app.familyId !== editedFamilyId;
+    }
+
+    // Search by existing displayed app names, with a short initial list.
+    // No second service catalog or invented provider indices.
+    function matchingFamilyApps(query) {
+        var term = String(query || "").trim().toLowerCase();
+        return (identitySnapshot.appChoices || []).filter(function(c) {
+            var a = messagingApps[c.serviceIndex];
+            return !!a && (!term || a.name.toLowerCase().indexOf(term) >= 0
+                          || c.id.indexOf(term) >= 0);
+        }).slice(0, 8);
+    }
+
     // Cursor tracks the legacy provider index, not a re-ordered visual row.
     function isAppVisible(index) {
         return visibleAppIndices.indexOf(index) !== -1;
@@ -52,21 +89,39 @@ Rectangle {
     onIdentitySnapshotChanged: Qt.callLater(function() {
         appSelector.ensureValidSelection();
         appSelector.ensureSelectedVisible();
+        if (appSelector.familyEditorIdentityId !== appSelector.identitySnapshot.activeId) {
+            appSelector.familyEditorIdentityId = appSelector.identitySnapshot.activeId;
+            appSelector.editedFamilyId = "";
+            appSelector.editedAppId = "";
+            familyNameInput.text = "";
+            familySearchInput.text = "";
+        }
     })
 
     // Only clear the form after the actual atomic FileView save succeeds.
     Connections {
         target: SocialIdentityStore
         function onStorageStateChanged() {
-            if (!appSelector.identityCreatePending)
-                return;
-            if (SocialIdentityStore.storageState === "ready") {
-                newIdentityName.text = "";
-                appSelector.creatingIdentity = false;
-                appSelector.identityCreatePending = false;
-            } else if (SocialIdentityStore.storageState === "error"
-                       || SocialIdentityStore.storageState === "unsupported") {
-                appSelector.identityCreatePending = false;
+            if (appSelector.identityCreatePending) {
+                if (SocialIdentityStore.storageState === "ready") {
+                    newIdentityName.text = "";
+                    appSelector.creatingIdentity = false;
+                    appSelector.identityCreatePending = false;
+                } else if (SocialIdentityStore.storageState === "error"
+                           || SocialIdentityStore.storageState === "unsupported") {
+                    appSelector.identityCreatePending = false;
+                }
+            }
+            if (appSelector.familyCreatePending) {
+                if (SocialIdentityStore.storageState === "ready") {
+                    appSelector.editedFamilyId = appSelector.pendingNewFamilyId;
+                    appSelector.familyCreatePending = false;
+                    appSelector.pendingNewFamilyId = "";
+                } else if (SocialIdentityStore.storageState === "error"
+                           || SocialIdentityStore.storageState === "unsupported") {
+                    appSelector.familyCreatePending = false;
+                    appSelector.pendingNewFamilyId = "";
+                }
             }
         }
     }
@@ -727,10 +782,216 @@ Rectangle {
                 }
                 Text {
                     width: parent.width
-                    text: "Layout manager is next"
+                    text: "Active: " + appSelector.identitySnapshot.activeName
                     color: Colors.white
                     font.pixelSize: 9
-                    wrapMode: Text.WordWrap
+                    wrapMode: Text.WrapAnywhere
+                }
+                ActionButton {
+                    width: parent.width
+                    height: 36
+                    label: appSelector.editingFamilies ? "CLOSE EDIT" : "EDIT FAMILIES"
+                    labelPixelSize: 9
+                    contentPadding: 3
+                    interactive: appSelector.identitySnapshot.writable
+                    onTriggered: {
+                        appSelector.editingFamilies = !appSelector.editingFamilies;
+                        appSelector.familyEditorIdentityId =
+                            appSelector.identitySnapshot.activeId;
+                        appSelector.editedFamilyId = "";
+                        appSelector.editedAppId = "";
+                        familyNameInput.text = "";
+                        familySearchInput.text = "";
+                    }
+                }
+                Column {
+                    width: parent.width
+                    spacing: 8
+                    visible: appSelector.editingFamilies
+                    Text {
+                        width: parent.width
+                        text: "SELECT FAMILY"
+                        color: Colors.cyan
+                        font.pixelSize: 9
+                        wrapMode: Text.WordWrap
+                    }
+                    Repeater {
+                        model: appSelector.identitySnapshot.familyOptions || []
+                        delegate: ActionButton {
+                            required property var modelData
+                            width: settingsColumn.width
+                            height: 33
+                            label: modelData.title
+                            labelPixelSize: 9
+                            labelMinimumPixelSize: 8
+                            contentPadding: 3
+                            selected: appSelector.editedFamilyId === modelData.id
+                            interactive: appSelector.identitySnapshot.writable
+                                         && appSelector.familyEditorIdentityId ===
+                                            appSelector.identitySnapshot.activeId
+                            onTriggered: {
+                                appSelector.editedFamilyId = modelData.id;
+                                familyNameInput.text = modelData.title;
+                            }
+                        }
+                    }
+                    Text {
+                        width: parent.width
+                        visible: appSelector.identitySnapshot.familyOptions.length === 0
+                        text: "NO FAMILIES"
+                        color: Colors.orange
+                        font.pixelSize: 9
+                    }
+                    Text {
+                        width: parent.width
+                        text: "FAMILY NAME"
+                        color: Colors.cyan
+                        font.pixelSize: 9
+                    }
+                    Rectangle {
+                        width: parent.width
+                        height: 36
+                        color: Colors.dark
+                        border.width: 1
+                        border.color: Colors.orange
+                        TextInput {
+                            id: familyNameInput
+                            anchors.fill: parent
+                            anchors.margins: 5
+                            font.family: "GohuFont 11 Nerd Font Mono"
+                            font.pixelSize: 11
+                            color: Colors.white
+                            clip: true
+                            selectByMouse: true
+                            maximumLength: 32
+                        }
+                    }
+                    ActionButton {
+                        width: parent.width
+                        height: 34
+                        label: "+ FAMILY"
+                        labelPixelSize: 9
+                        contentPadding: 3
+                        interactive: appSelector.identitySnapshot.writable
+                                     && familyNameInput.text.trim().length > 0
+                                     && appSelector.identitySnapshot.familyOptions.length < 20
+                                     && appSelector.familyEditorIdentityId ===
+                                        appSelector.identitySnapshot.activeId
+                                     && !appSelector.familyCreatePending
+                        onTriggered: {
+                            // The ID is derived from the validated store snapshot.
+                            // Show the new selection only after storage confirms the save.
+                            var newId = "family-" + appSelector.identitySnapshot.nextFamilyId;
+                            if (SocialIdentityStore.createFamily(familyNameInput.text)) {
+                                appSelector.pendingNewFamilyId = newId;
+                                appSelector.familyCreatePending = true;
+                            }
+                        }
+                    }
+                    ActionButton {
+                        width: parent.width
+                        height: 34
+                        label: "RENAME"
+                        labelPixelSize: 9
+                        contentPadding: 3
+                        interactive: appSelector.identitySnapshot.writable
+                                     && appSelector.familyIsSelected()
+                                     && familyNameInput.text.trim().length > 0
+                        onTriggered: SocialIdentityStore.renameFamily(
+                            appSelector.editedFamilyId, familyNameInput.text)
+                    }
+                    Text {
+                        width: parent.width
+                        visible: SocialIdentityStore.familyActionError !== ""
+                        text: "FAMILY: " + SocialIdentityStore.familyActionError
+                        color: Colors.orange
+                        font.pixelSize: 9
+                        wrapMode: Text.WrapAnywhere
+                    }
+                    Rectangle {
+                        width: parent.width
+                        height: 1
+                        color: Colors.cyan
+                    }
+                    Text {
+                        width: parent.width
+                        text: "MOVE APP"
+                        color: Colors.cyan
+                        font.pixelSize: 9
+                    }
+                    Text {
+                        width: parent.width
+                        text: "Select a family above, then search for an app."
+                        color: Colors.white
+                        font.pixelSize: 9
+                        wrapMode: Text.WordWrap
+                    }
+                    Rectangle {
+                        width: parent.width
+                        height: 36
+                        color: Colors.dark
+                        border.width: 1
+                        border.color: Colors.orange
+                        TextInput {
+                            id: familySearchInput
+                            anchors.fill: parent
+                            anchors.margins: 5
+                            font.family: "GohuFont 11 Nerd Font Mono"
+                            font.pixelSize: 11
+                            color: Colors.white
+                            clip: true
+                            selectByMouse: true
+                            maximumLength: 40
+                        }
+                    }
+                    Text {
+                        width: parent.width
+                        text: "First 8 matches"
+                        color: Colors.white
+                        font.pixelSize: 9
+                    }
+                    Repeater {
+                        model: appSelector.matchingFamilyApps(familySearchInput.text)
+                        delegate: ActionButton {
+                            required property var modelData
+                            width: settingsColumn.width
+                            height: 32
+                            label: appSelector.messagingApps[modelData.serviceIndex].name
+                            labelPixelSize: 9
+                            labelMinimumPixelSize: 8
+                            contentPadding: 3
+                            selected: appSelector.editedAppId === modelData.id
+                            interactive: appSelector.identitySnapshot.writable
+                                         && appSelector.familyEditorIdentityId ===
+                                            appSelector.identitySnapshot.activeId
+                            onTriggered: appSelector.editedAppId = modelData.id
+                        }
+                    }
+                    Text {
+                        width: parent.width
+                        visible: appSelector.matchingFamilyApps(familySearchInput.text).length === 0
+                        text: "NO MATCH"
+                        color: Colors.orange
+                        font.pixelSize: 9
+                    }
+                    ActionButton {
+                        width: parent.width
+                        height: 36
+                        label: "MOVE HERE"
+                        labelPixelSize: 9
+                        contentPadding: 3
+                        interactive: appSelector.identitySnapshot.writable
+                                     && appSelector.selectedAppNeedsMove()
+                        onTriggered: SocialIdentityStore.moveAppToFamily(
+                            appSelector.editedAppId, appSelector.editedFamilyId)
+                    }
+                    Text {
+                        width: parent.width
+                        text: "Only button placement changes. Logins stay unchanged."
+                        color: Colors.white
+                        font.pixelSize: 9
+                        wrapMode: Text.WordWrap
+                    }
                 }
                 Text {
                     width: parent.width

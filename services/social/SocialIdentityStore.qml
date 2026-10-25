@@ -16,6 +16,7 @@ Scope {
 
     property string storageState: "loading"
     property string errorCode: ""
+    property string familyActionError: ""
     property var document: IdentityPolicy.initialDocument()
     property var pendingDocument: null
     readonly property var snapshot:
@@ -75,6 +76,35 @@ Scope {
         return stage(IdentityPolicy.toggleFamily(document, familyId));
     }
 
+    // Preserve useful validation feedback without publishing an unsaved edit.
+    function applyFamilyAction(result) {
+        if (storageState !== "ready" && storageState !== "empty") {
+            familyActionError = "STORAGE_UNAVAILABLE";
+            return false;
+        }
+        if (!result || result.ok !== true) {
+            familyActionError = result && result.reason
+                                ? result.reason : "INVALID_ACTION";
+            return false;
+        }
+        familyActionError = "";
+        return stage(result);
+    }
+
+    function createFamily(name) {
+        return applyFamilyAction(IdentityPolicy.createFamily(document, name));
+    }
+
+    function renameFamily(familyId, name) {
+        return applyFamilyAction(IdentityPolicy.renameFamily(
+            document, familyId, name));
+    }
+
+    function moveAppToFamily(appId, familyId) {
+        return applyFamilyAction(IdentityPolicy.moveAppToFamily(
+            document, appId, familyId));
+    }
+
     FileView {
         id: identityFile
         path: identities.storagePath
@@ -111,6 +141,7 @@ Scope {
             identities.pendingDocument = null;
             identities.storageState = "error";
             identities.errorCode = "FILE_SAVE_FAILED";
+            identities.familyActionError = "FILE_SAVE_FAILED";
         }
     }
 }

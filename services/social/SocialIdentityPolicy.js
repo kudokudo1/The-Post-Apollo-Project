@@ -76,7 +76,7 @@ function validLayout(layout) {
             || !Array.isArray(layout.hiddenAppIds)
             || layout.hiddenAppIds.length > APP_IDS.length)
         return false;
-    var familySeen = {}, appSeen = {}, highest = 0;
+    var familySeen = {}, familyNames = {}, appSeen = {}, highest = 0;
     for (var i = 0; i < layout.families.length; ++i) {
         var f = layout.families[i];
         if (!f || typeof f !== "object" || Array.isArray(f)
@@ -84,9 +84,12 @@ function validLayout(layout) {
                 || !cleanName(f.name) || f.name !== cleanName(f.name)
                 || !Array.isArray(f.appIds) || typeof f.expanded !== "boolean")
             return false;
-        if (Object.prototype.hasOwnProperty.call(familySeen, f.id))
+        var folded = f.name.toLowerCase();
+        if (Object.prototype.hasOwnProperty.call(familySeen, f.id)
+                || Object.prototype.hasOwnProperty.call(familyNames, folded))
             return false;
         familySeen[f.id] = true;
+        familyNames[folded] = true;
         highest = Math.max(highest, numberedId(f.id, "family"));
         for (var j = 0; j < f.appIds.length; ++j) {
             var app = f.appIds[j];
@@ -235,6 +238,87 @@ function toggleFamily(doc, familyId) {
     return {ok:true, reason:"", document:next};
 }
 
+// Family manager v1: organization only, scoped to the currently active
+// Post-Apollo identity. Stable family IDs and service IDs never become a
+// provider credential, session path, or numeric launcher identity.
+function createFamily(doc, name) {
+    var checked = validate(doc);
+    if (!checked.ok) return checked;
+    var title = cleanName(name);
+    if (!title) return {ok:false, reason:"INVALID_FAMILY_NAME"};
+    var next = clone(doc);
+    var identity = next.identities.find(function(i) {
+        return i.id === next.activeId;
+    });
+    var layout = identity.layout;
+    if (layout.families.length >= MAX_FAMILIES)
+        return {ok:false, reason:"FAMILY_CAPACITY"};
+    if (layout.nextFamilyId >= MAX_ID)
+        return {ok:false, reason:"FAMILY_ID_EXHAUSTED"};
+    if (layout.families.some(function(f) {
+        return f.name.toLowerCase() === title.toLowerCase();
+    })) return {ok:false, reason:"DUPLICATE_FAMILY_NAME"};
+    var id = "family-" + layout.nextFamilyId++;
+    layout.families.push({id:id, name:title, appIds:[], expanded:true});
+    return {ok:true, reason:"", document:next, familyId:id};
+}
+
+function renameFamily(doc, familyId, name) {
+    var checked = validate(doc);
+    if (!checked.ok) return checked;
+    if (typeof familyId !== "string")
+        return {ok:false, reason:"INVALID_FAMILY"};
+    var title = cleanName(name);
+    if (!title) return {ok:false, reason:"INVALID_FAMILY_NAME"};
+    var next = clone(doc);
+    var identity = next.identities.find(function(i) {
+        return i.id === next.activeId;
+    });
+    var family = identity.layout.families.find(function(f) {
+        return f.id === familyId;
+    });
+    if (!family) return {ok:false, reason:"INVALID_FAMILY"};
+    if (family.name === title) return {ok:false, reason:"NO_CHANGE"};
+    if (identity.layout.families.some(function(f) {
+        return f.id !== familyId
+               && f.name.toLowerCase() === title.toLowerCase();
+    })) return {ok:false, reason:"DUPLICATE_FAMILY_NAME"};
+    family.name = title;
+    return {ok:true, reason:"", document:next, familyId:familyId};
+}
+
+// Membership changes are NOT app launch actions. The original provider
+// index is derived later from APP_IDS by rowsForLayout, never persisted here.
+// Moving an unassigned app into a family supports start-empty identities.
+function moveAppToFamily(doc, appId, targetFamilyId) {
+    var checked = validate(doc);
+    if (!checked.ok) return checked;
+    if (!validAppId(appId))
+        return {ok:false, reason:"INVALID_APP"};
+    if (typeof targetFamilyId !== "string")
+        return {ok:false, reason:"INVALID_FAMILY"};
+    var next = clone(doc);
+    var identity = next.identities.find(function(i) {
+        return i.id === next.activeId;
+    });
+    var families = identity.layout.families;
+    var target = families.find(function(f) {
+        return f.id === targetFamilyId;
+    });
+    if (!target) return {ok:false, reason:"INVALID_FAMILY"};
+    if (target.appIds.indexOf(appId) !== -1)
+        return {ok:false, reason:"NO_CHANGE"};
+    for (var i = 0; i < families.length; ++i) {
+        var index = families[i].appIds.indexOf(appId);
+        if (index !== -1)
+            families[i].appIds.splice(index, 1);
+    }
+    target.appIds.push(appId);
+    // The app's existing hidden flag, if any, stays independent of placement.
+    return {ok:true, reason:"", document:next,
+            familyId:targetFamilyId, appId:appId};
+}
+
 // UI-only rows, with stable provider indices from the canonical catalog.
 // A collapsed or hidden app is not reachable by keyboard activation.
 function rowsForLayout(layout) {
@@ -272,7 +356,21 @@ function view(state, doc, reason) {
         return i.id === doc.activeId;
     }) : null;
     var display = rowsForLayout(identity ? identity.layout : defaultLayout());
+    var families = identity ? identity.layout.families.map(function(f) {
+        return {id:f.id, title:f.name, count:f.appIds.length,
+                expanded:f.expanded};
+    }) : [];
+    var appChoices = identity ? APP_IDS.map(function(appId, index) {
+        var family = identity.layout.families.find(function(f) {
+            return f.appIds.indexOf(appId) !== -1;
+        });
+        return {id:appId, serviceIndex:index,
+                familyId:family ? family.id : ""};
+    }) : [];
     return {
+        familyOptions: families, appChoices: appChoices,
+        nextFamilyId: identity ? identity.layout.nextFamilyId : -1,
+        activeName: identity ? identity.name : "",
         railRows: display.rows, visibleAppIndices: display.appIndices,
         state: state, writable: state === "ready" || state === "empty",
         error: state === "error" || state === "unsupported"

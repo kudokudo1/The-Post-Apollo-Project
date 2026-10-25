@@ -1,0 +1,34 @@
+name: Social Family Manager Contracts
+
+on:
+  pull_request:
+    paths:
+      - 'services/social/**'
+      - 'widgets/messanger/AppSelector.qml'
+      - 'tests/messaging/test_social_family_manager.*'
+      - '.github/workflows/social-family-manager.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'services/social/**'
+      - 'widgets/messanger/AppSelector.qml'
+      - 'tests/messaging/test_social_family_manager.*'
+      - '.github/workflows/social-family-manager.yml'
+  workflow_dispatch:
+
+jobs:
+  family-manager:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Exercise family create rename and safe app moves
+        run: node tests/messaging/test_social_family_manager.cjs
+      - name: Verify in-settings UI and persistence source contracts
+        run: python3 -m unittest discover -s tests/messaging -p 'test_social_family_manager.py' -v
+      - name: Preserve identity and collapsible-rail behavior
+        run: |
+          node tests/messaging/test_social_identity_policy.cjs
+          node tests/messaging/test_social_family_rail.cjs
+          python3 -m unittest discover -s tests/messaging -p 'test_social_identity_store.py' -v
+          python3 -m unittest discover -s tests/messaging -p 'test_social_family_rail.py' -v
+          python3 -m unittest discover -s tests/messaging -p 'test_social_user_settings_rail.py' -v

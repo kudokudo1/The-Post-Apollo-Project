@@ -91,13 +91,18 @@ datasets require separate entitlements:
 - https://www.alphavantage.co/documentation/
 - https://www.alphavantage.co/support/api-key/
 
-## Integration boundary / future work
+## Integration boundary // updated by M8
 
-The existing FinanceW SEC inspector still calls
-\`scripts/finance/read_sec_price_context.mjs\` directly, unchanged.
-This PR **does not route UI requests to the new server** and therefore
-does not introduce a new mandatory process, failure point or startup lag.
+M7 introduced the manual-only loopback service. M8 adds the optional
+read_sec_price_optional_hub.mjs adapter behind FinanceW's existing
+PRICE CONTEXT button. When the hub is not listening, the original
+read_sec_price_context.mjs is used directly.
 
-A later approved step can add an **optional local hub adapter** with
-health/read-only fallback, then link Radar and other price consumers.
-This remains subject to live user testing and legal provider access.
+Only an absent listener causes direct fallback; an active but unhealthy
+hub or provider error does **not** trigger a duplicate upstream request.
+
+See scripts/finance/MARKET_HUB_ROUTING_README.md for exact behavior,
+failure states, cache provenance and the optional operator smoke test.
+The service is still manual-only, not automatically installed or
+activated by the widget. Radar/other consumers and broader licensed
+market coverage remain separate future work.

@@ -42,7 +42,7 @@ assert 'if (reader.running)' in service
 assert "if (desiredKey !== inFlightKey" in service
 assert "FINANCE_SEC_PRICE_ERROR" in service
 assert "FINANCE_SEC_PRICE " in service
-assert "Quickshell.shellPath(\"scripts/finance/read_sec_price_context.mjs\")" in service
+assert "Quickshell.shellPath(\"scripts/finance/read_sec_price_optional_hub.mjs\")" in service
 assert "priceFeed.inspect" not in ui  # only user action in price view starts fetch
 
 assert 'const token = await tokenLoader();' in reader

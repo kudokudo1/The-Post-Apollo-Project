@@ -49,7 +49,7 @@ Scope {
         state = "loading";
         message = "Retrieving historical daily closing prices.";
         reader.exec(["/usr/bin/env","node",
-                     Quickshell.shellPath("scripts/finance/read_sec_price_context.mjs"),
+                     Quickshell.shellPath("scripts/finance/read_sec_price_optional_hub.mjs"),
                      secFeed.snapshot.cik,filing.filedAt]);
         return true;
     }
@@ -69,6 +69,8 @@ Scope {
                     ? "NVIDIA PRICE HISTORY REQUIRES AN EODHD KEY"
                     : reason === "demo-not-authorized"
                     ? "MICROSOFT DEMO ACCESS DENIED // PROVIDER KEY REQUIRED"
+                    : reason === "hub-unhealthy" || reason === "hub-invalid-response"
+                    ? "LOCAL MARKET HUB ERROR // NO DIRECT RETRY TO AVOID DUPLICATE REQUEST"
                     : "HISTORICAL PRICE DATA UNAVAILABLE // NO ESTIMATE DISPLAYED";
                 return;
             }
@@ -81,6 +83,16 @@ Scope {
                     || data.cik !== secFeed.snapshot.cik
                     || !["AAPL.US","MSFT.US","NVDA.US"].includes(data.symbol)
                     || !["ADJUSTED CLOSE","CLOSE"].includes(data.priceBasis)
+                    || !data.delivery
+                    || !["DIRECT","HUB"].includes(data.delivery.via)
+                    || !["DIRECT","FETCHED","CACHED","SHARED"].includes(data.delivery.state)
+                    || typeof data.delivery.servedAt !== "string"
+                    || !Number.isFinite(Date.parse(data.delivery.servedAt))
+                    || (data.delivery.via === "HUB"
+                        && (!["FETCHED","CACHED","SHARED"].includes(data.delivery.state)
+                            || typeof data.delivery.cachedAt !== "string"
+                            || !Number.isFinite(Date.parse(data.delivery.cachedAt))))
+                    || (data.delivery.via === "DIRECT" && data.delivery.state !== "DIRECT")
                     || !Array.isArray(data.bars) || data.bars.length > 32
                     || !data.bars.every(function(bar) {
                         return bar && /^\d{4}-\d{2}-\d{2}$/.test(bar.date)
@@ -97,9 +109,11 @@ Scope {
                 })) throw new Error("stale-filing");
                 snapshot = data;
                 state = "ready";
+                const delivery = data.delivery.via === "HUB"
+                    ? "MARKET HUB " + data.delivery.state : "DIRECT EODHD";
                 message = data.previous && data.next
-                    ? "DAILY PRICE COMPARISON // NOT CAUSAL EVIDENCE"
-                    : "PARTIAL PRICE HISTORY // COMPARISON UNAVAILABLE";
+                    ? delivery + " // DATED PRICE COMPARISON // NOT CAUSAL"
+                    : delivery + " // PARTIAL PRICE HISTORY";
             } catch (error) {
                 snapshot = null;
                 state = "failed";

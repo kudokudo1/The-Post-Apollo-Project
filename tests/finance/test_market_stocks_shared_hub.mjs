@@ -10,7 +10,7 @@ import {readOptionalPrice} from "../../scripts/finance/read_sec_price_optional_h
 const apple="0000320193", microsoft="0000789019", date="2026-10-20";
 const now=Date.parse("2026-10-24T20:00:00.000Z");
 const symbols={ [apple]:"AAPL.US", [microsoft]:"MSFT.US" };
-const dates={ [date]:["2026-10-19","2026-10-21"],"2026-10-19":["2026-10-18","2026-10-20"]};
+const dates={ [date]:["2026-10-19","2026-10-21"],"2026-10-19":["2026-10-16","2026-10-20"]};
 let providerCalls=0, directCalls=0;
 const hub=createMarketDataHub({
   now:()=>now,

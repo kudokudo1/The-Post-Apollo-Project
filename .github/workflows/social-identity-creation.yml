@@ -1,0 +1,29 @@
+name: Social Identity Creation Contracts
+
+on:
+  pull_request:
+    paths:
+      - 'services/social/**'
+      - 'widgets/messanger/AppSelector.qml'
+      - 'tests/messaging/test_social_identity_*'
+      - '.github/workflows/social-identity-creation.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'services/social/**'
+      - 'widgets/messanger/AppSelector.qml'
+      - 'tests/messaging/test_social_identity_*'
+      - '.github/workflows/social-identity-creation.yml'
+  workflow_dispatch:
+
+jobs:
+  identity-contracts:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Exercise real identity policy
+        run: node tests/messaging/test_social_identity_policy.cjs
+      - name: Verify persistence and UI isolation
+        run: python3 -m unittest discover -s tests/messaging -p 'test_social_identity_store.py' -v
+      - name: Preserve first settings rail contracts
+        run: python3 -m unittest discover -s tests/messaging -p 'test_social_user_settings_rail.py' -v

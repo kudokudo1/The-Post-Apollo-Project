@@ -134,7 +134,9 @@ class DiscordDockingTests(TestCase):
     def test_source_requires_confirmed_dock_and_resets_on_every_entry(self):
         text = SOCIAL.read_text(encoding="utf-8")
         self.assertIn("property bool discordDocked: false", text)
-        self.assertIn("onDiscordDockedChanged: updateGeometryHelperMode()", text)
+        self.assertIn("onDiscordDockedChanged: {", text)
+        self.assertIn("updateGeometryHelperMode();", text)
+        self.assertIn("if (discordDocked && menuOpen && discordSelected)", text)
         self.assertIn("discordDocked: discordDocked,", text)
         self.assertIn("function initialDiscordDockAligned(rect)", text)
         self.assertIn("function initialSocialDockAligned(rect)", text)

@@ -86,9 +86,16 @@ assert 'confirmDeleteId === modelData.id' in EDITOR
 # with the original guarded YES/NO confirmation flow unchanged.
 assert 'label: todoEntry.awaitingDelete ? "YES" : "×"' in EDITOR
 assert 'labelPixelSize: todoEntry.awaitingDelete ? 10 : 14' in EDITOR
-assert 'label: todoEntry.awaitingDelete ? "NO" : "⊹ ࣪✎˖"' in EDITOR
+assert 'label: todoEntry.awaitingDelete ? "NO" : "⊹\\u200A࣪✎˖"' in EDITOR
 assert 'labelPixelSize: todoEntry.awaitingDelete ? 10 : 12' in EDITOR
-assert 'contentPadding: todoEntry.awaitingDelete ? 8 : 2' in EDITOR
+assert 'contentPadding: todoEntry.awaitingDelete ? 8 : 4' in EDITOR
+# 44+40px -> 32+26px returns 26px to the title while the row stays 22px
+# tall. The NO/YES confirmation remains legible in the smaller buttons.
+assert 'width: Math.max(24, actions.width - 23 - 32 - 26' in EDITOR
+assert 'width: 32' in EDITOR
+assert 'width: 26' in EDITOR
+assert 'height: parent.height' in EDITOR
+assert 'label: todoEntry.awaitingDelete ? "YES" : "×"' in EDITOR
 assert 'destructive: true' in EDITOR
 assert 'accentColor: Colors.red' in EDITOR
 assert 'todoMini.requestDelete(todoEntry.modelData);' in EDITOR

@@ -578,15 +578,15 @@ Rectangle {
                     }
                     Repeater {
                         model: [
-                            {mode:"default", name:"DEFAULT"},
-                            {mode:"copy", name:"COPY"},
-                            {mode:"empty", name:"EMPTY"}
+                            {mode:"default", title:"DEFAULT"},
+                            {mode:"copy", title:"COPY"},
+                            {mode:"empty", title:"EMPTY"}
                         ]
                         delegate: ActionButton {
                             required property var modelData
                             width: settingsColumn.width
                             height: 32
-                            label: modelData.name
+                            label: modelData.title
                             labelPixelSize: 9
                             selected: appSelector.identityCreateMode === modelData.mode
                             interactive: appSelector.identitySnapshot.writable

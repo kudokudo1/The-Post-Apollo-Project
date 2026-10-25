@@ -303,6 +303,7 @@ PanelWindow {
                 anchors.right: parent.right
                 height: Math.min(350, mainModeContent.height * 0.53)
                 visible: root.menuOpen && root.activeMode.id === "tasks"
+                taskScrollbarEnabled: true
                 todoStore: ApolloHubTodoStore
                 todoSnapshot: ApolloHubTodoStore.snapshot
                 onTaskSelected: function(taskId) {

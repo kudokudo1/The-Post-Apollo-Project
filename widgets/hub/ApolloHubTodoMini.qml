@@ -9,6 +9,9 @@ Item {
 
     property var todoStore: null
     property var todoSnapshot: null
+    // Enabled only by the standalone TASKS page; ApolloHub's mini tile
+    // keeps its existing wheel-scrolling layout and no additional rail.
+    property bool taskScrollbarEnabled: false
     property string editingTaskId: ""
     property string savedAddDraft: ""
     property string confirmDeleteId: ""
@@ -313,6 +316,11 @@ Item {
             Row {
                 id: actions
                 anchors.fill: parent
+                // Protect EDIT/DEL from the list's right-hand star rail.
+                // No empty gutter is reserved until scrolling is needed.
+                anchors.rightMargin: todoMini.taskScrollbarEnabled
+                                     && taskListRail.scrollable
+                                     ? taskListRail.reservedExtent : 0
                 spacing: 5
 
                 ActionButton {
@@ -377,6 +385,20 @@ Item {
                 }
             }
         }
+    }
+
+    // Shared neon scrollbar belongs to the task-list viewport, not the
+    // editor/header. It is mounted next to the ListView so row clipping and
+    // pointer hit testing remain independent of the star drag target.
+    NeonScrollBar {
+        id: taskListRail
+        parent: todoMini
+        flickable: todoMini.taskScrollbarEnabled ? todoList : null
+        geometryMode: "viewport"
+        accountForContentOrigin: true
+        handleStyle: "star"
+        handleColor: Colors.magenta
+        railColor: Colors.cyan
     }
 
     GohuText {

@@ -3,6 +3,7 @@ import Quickshell
 import "../../components"
 import QtQuick.Effects
 import Qt5Compat.GraphicalEffects
+import qs.services.social
 
 Rectangle {
     id: appSelector
@@ -17,6 +18,28 @@ Rectangle {
     // Entry-point shell only. Identity storage, credentials and family layouts
     // are deliberately reserved for subsequent operator-reviewed slices.
     property bool settingsOpen: false
+    property bool creatingIdentity: false
+    property bool identityCreatePending: false
+    property string identityCreateMode: "default"
+    property string copyIdentityId: "identity-1"
+    readonly property var identitySnapshot: SocialIdentityStore.snapshot
+
+    // Only clear the form after the actual atomic FileView save succeeds.
+    Connections {
+        target: SocialIdentityStore
+        function onStorageStateChanged() {
+            if (!appSelector.identityCreatePending)
+                return;
+            if (SocialIdentityStore.storageState === "ready") {
+                newIdentityName.text = "";
+                appSelector.creatingIdentity = false;
+                appSelector.identityCreatePending = false;
+            } else if (SocialIdentityStore.storageState === "error"
+                       || SocialIdentityStore.storageState === "unsupported") {
+                appSelector.identityCreatePending = false;
+            }
+        }
+    }
 
     // Emitted ONLY when a button is actually clicked.
     signal appActivated(int index)
@@ -474,7 +497,151 @@ Rectangle {
                 }
                 Text {
                     width: parent.width
-                    text: "Not configured yet"
+                    text: "LAYOUT ONLY"
+                    color: Colors.orange
+                    font.pixelSize: 9
+                }
+                Text {
+                    width: parent.width
+                    visible: !appSelector.identitySnapshot.writable
+                    text: appSelector.identitySnapshot.state === "saving"
+                          ? "Saving..." :
+                          appSelector.identitySnapshot.error
+                          ? "Storage blocked: " + appSelector.identitySnapshot.error
+                          : "Loading..."
+                    color: Colors.orange
+                    font.pixelSize: 9
+                    wrapMode: Text.WordWrap
+                }
+                Repeater {
+                    model: appSelector.identitySnapshot.identities
+                    delegate: ActionButton {
+                        required property var modelData
+                        width: settingsColumn.width
+                        height: 34
+                        label: modelData.name
+                        labelPixelSize: 9
+                        contentPadding: 4
+                        selected: appSelector.identitySnapshot.activeId === modelData.id
+                        interactive: appSelector.identitySnapshot.writable
+                        onTriggered: SocialIdentityStore.selectIdentity(modelData.id)
+                    }
+                }
+                ActionButton {
+                    width: parent.width
+                    height: 36
+                    label: appSelector.creatingIdentity ? "CANCEL NEW" : "+ NEW ID"
+                    labelPixelSize: 9
+                    contentPadding: 3
+                    interactive: appSelector.identitySnapshot.writable
+                    onTriggered: {
+                        appSelector.creatingIdentity = !appSelector.creatingIdentity;
+                        appSelector.identityCreateMode = "default";
+                        appSelector.copyIdentityId = appSelector.identitySnapshot.activeId;
+                        newIdentityName.text = "";
+                    }
+                }
+                Column {
+                    width: parent.width
+                    spacing: 8
+                    visible: appSelector.creatingIdentity
+
+                    Text {
+                        width: parent.width
+                        text: "NAME"
+                        color: Colors.cyan
+                        font.pixelSize: 9
+                    }
+                    Rectangle {
+                        width: parent.width
+                        height: 36
+                        color: Colors.dark
+                        border.width: 1
+                        border.color: Colors.orange
+                        TextInput {
+                            id: newIdentityName
+                            anchors.fill: parent
+                            anchors.margins: 5
+                            color: Colors.white
+                            font.family: "GohuFont 11 Nerd Font Mono"
+                            font.pixelSize: 11
+                            clip: true
+                            selectByMouse: true
+                            maximumLength: 32
+                        }
+                    }
+                    Text {
+                        width: parent.width
+                        text: "START FROM"
+                        color: Colors.cyan
+                        font.pixelSize: 9
+                    }
+                    Repeater {
+                        model: [
+                            {mode:"default", title:"DEFAULT"},
+                            {mode:"copy", title:"COPY"},
+                            {mode:"empty", title:"EMPTY"}
+                        ]
+                        delegate: ActionButton {
+                            required property var modelData
+                            width: settingsColumn.width
+                            height: 32
+                            label: modelData.title
+                            labelPixelSize: 9
+                            selected: appSelector.identityCreateMode === modelData.mode
+                            interactive: appSelector.identitySnapshot.writable
+                            onTriggered: appSelector.identityCreateMode = modelData.mode
+                        }
+                    }
+                    Text {
+                        width: parent.width
+                        visible: appSelector.identityCreateMode === "default"
+                        text: "ALL APPS (TEMP)"
+                        color: Colors.white
+                        font.pixelSize: 9
+                        wrapMode: Text.WordWrap
+                    }
+                    Text {
+                        width: parent.width
+                        visible: appSelector.identityCreateMode === "copy"
+                        text: "COPY FROM"
+                        color: Colors.cyan
+                        font.pixelSize: 9
+                    }
+                    Repeater {
+                        model: appSelector.identityCreateMode === "copy"
+                               ? appSelector.identitySnapshot.identities : []
+                        delegate: ActionButton {
+                            required property var modelData
+                            width: settingsColumn.width
+                            height: 31
+                            label: modelData.name
+                            labelPixelSize: 9
+                            selected: appSelector.copyIdentityId === modelData.id
+                            interactive: appSelector.identitySnapshot.writable
+                            onTriggered: appSelector.copyIdentityId = modelData.id
+                        }
+                    }
+                    ActionButton {
+                        width: parent.width
+                        height: 36
+                        label: appSelector.identityCreatePending ? "SAVING" : "CREATE"
+                        labelPixelSize: 9
+                        interactive: appSelector.identitySnapshot.writable
+                                     && newIdentityName.text.trim().length > 0
+                                     && !appSelector.identityCreatePending
+                        onTriggered: {
+                            appSelector.identityCreatePending =
+                                SocialIdentityStore.createIdentity(
+                                    newIdentityName.text,
+                                    appSelector.identityCreateMode,
+                                    appSelector.copyIdentityId);
+                        }
+                    }
+                }
+                Text {
+                    width: parent.width
+                    text: "Identity layout selection does not switch live accounts yet."
                     color: Colors.white
                     font.pixelSize: 9
                     wrapMode: Text.WordWrap

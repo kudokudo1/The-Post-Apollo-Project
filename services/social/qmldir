@@ -1,0 +1,3 @@
+module qs.services.social
+
+singleton SocialIdentityStore 1.0 SocialIdentityStore.qml

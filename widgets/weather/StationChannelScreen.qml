@@ -2,29 +2,23 @@ import QtQuick
 import "../../components"
 import "StationViewerPolicy.js" as ViewerPolicy
 
-// Direct NEWS channel destination. The source rack disappears behind one
-// maximized-in-bay video/web surface; CLOSE returns to the unchanged list.
-// QtWebEngine itself is optional and compiled only after the operator clicks
-// WATCH IN STATION. This is NOT a true Kitty/browser surface embed.
+// SAFE MODE // Operator runtime crash: QS 0.3.2, Qt 6.11.2, SIGABRT in
+// Qt6WebEngineCore after "Argument list is empty, the program name is not
+// passed to QCoreApplication". Loading the optional WebEngine QML file can
+// terminate *all of Quickshell*, so NO WebEngine object or dynamic Loader
+// belongs on this NEWS code path until an independently tested renderer
+// process is owned by the authorized Stage Director / viewer workstream.
+// Keep the catalog / CLOSE contract usable without launching any process.
 Rectangle {
     id: channelScreen
 
     property var selectedRecord: null
     property bool muted: true
     signal closeRequested()
-    signal muteToggled()
 
     readonly property string sourceUrl:
         selectedRecord ? ViewerPolicy.safeArticleUrl(selectedRecord.url) : ""
-    readonly property bool noRenderer: channelLoader.status === Loader.Error
-    readonly property bool loadingRenderer:
-        channelLoader.status === Loader.Loading
-    readonly property bool blocked:
-        !!(channelLoader.item && channelLoader.item.blockedNavigation)
-    readonly property bool pageFailed:
-        !!(channelLoader.item && channelLoader.item.loadState === "FAILED")
-    readonly property string pageError:
-        channelLoader.item ? String(channelLoader.item.loadError || "") : ""
+    readonly property bool playbackAvailable: false
 
     color: Colors.black
     clip: true
@@ -70,9 +64,9 @@ Rectangle {
             anchors.verticalCenter: parent.verticalCenter
             width: 99
             height: 31
-            label: channelScreen.muted ? "MUTE: ON" : "MUTE: OFF"
+            label: "MUTE: ON"
             labelPixelSize: 10
-            onClicked: channelScreen.muteToggled()
+            available: channelScreen.playbackAvailable
         }
     }
 
@@ -87,72 +81,63 @@ Rectangle {
         border.width: 1
         border.color: Colors.cyan
 
-        Loader {
-            id: channelLoader
-            anchors.fill: parent
-            anchors.margins: 2
-            active: channelScreen.sourceUrl !== ""
-            source: "StationNewsWebView.qml"
-            onLoaded: {
-                if (item) {
-                    item.articleUrl = channelScreen.sourceUrl;
-                    item.audioAllowed = !channelScreen.muted;
-                }
-            }
-            onStatusChanged: {
-                if (status === Loader.Error)
-                    console.warn("Weather NEWS: optional QtWebEngine viewer could not be constructed; check QtWebEngine QML module and Quickshell host initialization");
-            }
-        }
-
         Column {
             anchors.centerIn: parent
-            width: Math.max(0, parent.width - 40)
-            spacing: 13
-            visible: channelScreen.noRenderer
-                     || channelScreen.pageFailed
-                     || channelScreen.blocked
-                     || channelScreen.sourceUrl === ""
+            width: Math.max(0, parent.width - 48)
+            spacing: 14
+
             GohuText {
                 width: parent.width
-                font.pixelSize: 18
+                font.pixelSize: 20
                 color: Colors.orange
                 horizontalAlignment: Text.AlignHCenter
-                text: channelScreen.noRenderer
-                      ? "WEB RENDERER NOT AVAILABLE"
-                      : channelScreen.blocked
-                        ? "PLAYER REDIRECT BLOCKED"
-                      : channelScreen.pageFailed
-                        ? "PUBLISHER PAGE FAILED"
-                        : "INVALID SOURCE URL"
+                text: "NEWS VIEWER // SAFE MODE"
             }
             SecondaryText {
                 width: parent.width
+                font.pixelSize: 13
                 wrapMode: Text.WordWrap
                 horizontalAlignment: Text.AlignHCenter
+                text: "In-process QtWebEngine playback is disabled because it"
+                      + " crashes Quickshell during browser startup. The channel"
+                      + " catalog and controls remain available."
+            }
+            QuietText {
+                width: parent.width
                 font.pixelSize: 12
-                text: channelScreen.noRenderer
-                      ? "QtWebEngine could not load in this Quickshell runtime."
-                        + " Check the QtWebEngine QML import and host initialization"
-                        + " in the QS logs. The channel catalog remains available."
-                      : channelScreen.blocked
-                        ? "The source redirected to a different website/player"
-                          + " host. That navigation was intentionally blocked."
-                          + " A provider-specific adapter may be required."
-                      : channelScreen.pageFailed
-                        ? (channelScreen.pageError
-                           ? channelScreen.pageError
-                           : "The publisher refused or could not load this page.")
-                      : "This entry does not provide a valid HTTPS page."
+                horizontalAlignment: Text.AlignHCenter
+                text: selectedRecord
+                      ? String(selectedRecord.source || "SOURCE UNKNOWN")
+                        + " // " + String(selectedRecord.time || "ACCESS UNVERIFIED")
+                      : "NO CHANNEL SELECTED"
+                wrapMode: Text.WordWrap
+            }
+            QuietText {
+                width: parent.width
+                font.pixelSize: 11
+                horizontalAlignment: Text.AlignHCenter
+                wrapMode: Text.WordWrap
+                text: channelScreen.sourceUrl === ""
+                      ? "NO VALID HTTPS DESTINATION"
+                      : "DESTINATION REGISTERED // EXTERNAL VIEWER NOT CONNECTED"
+            }
+            SecondaryText {
+                width: parent.width
+                font.pixelSize: 12
+                horizontalAlignment: Text.AlignHCenter
+                wrapMode: Text.WordWrap
+                text: "CLOSE returns to NEWS. A separate browser/video"
+                      + " process with Stage Director containment is pending;"
+                      + " no video or audio is launched from this view."
             }
         }
     }
 
     Rectangle {
         id: footerStrip
-        anchors.bottom: parent.bottom
         anchors.left: parent.left
         anchors.right: parent.right
+        anchors.bottom: parent.bottom
         height: 31
         color: Colors.dark
 
@@ -162,20 +147,7 @@ Rectangle {
             anchors.rightMargin: 12
             verticalAlignment: Text.AlignVCenter
             elide: Text.ElideRight
-            text: channelScreen.noRenderer
-                  ? "ENGINE ERROR // NOT AN ARTICLE ERROR"
-                  : channelScreen.blocked
-                    ? "CROSS-HOST NAVIGATION BLOCKED"
-                  : channelScreen.pageFailed
-                    ? "PAGE LOAD FAILED // NO VIDEO VERIFIED"
-                  : channelScreen.loadingRenderer
-                    ? "LOADING INTERNAL WEB ENGINE"
-                  : "IN-STATION WEB VIEW // VIDEO PLAYBACK NOT VERIFIED"
+            text: "WEBENGINE DISABLED // QUICKSHELL CRASH PROTECTION"
         }
-    }
-
-    onMutedChanged: {
-        if (channelLoader.item)
-            channelLoader.item.audioAllowed = !muted;
     }
 }

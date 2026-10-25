@@ -199,6 +199,14 @@ Operator ran `swaymsg -t get_tree` on the live Weather Station STAR MAP actor an
 
 **Next acceptance:** operator visual check of WATCH → fullscreen in-bay viewer → mute toggle → CLOSE → retained source rack. Then capture the first Quickshell Qt/QML error produced when WebEngine attempts to instantiate. If missing import/initialization is confirmed, route a *separate authorized* task to Quickshell fork/renderer owner. For the already-proposed Stage Director external browser/video surface solution, coordinate ownership before modifying compositor placement, clipping or input.
 
+### B22 // 2026-10-24 NEWS crash isolation safety recovery
+
+**Operator event:** after installing the previously missing QtWebEngine QML module and rebooting, clicking NEWS WATCH aborted Quickshell 0.3.2 (Qt 6.11.2) with QtWebEngineCore fatal `Argument list is empty, the program name is not passed to QCoreApplication`. Stack: `QQuickWebEngineView` constructor into `Qt6WebEngineCore`; the missing-module error was resolved but replaced by a whole-shell crash. Upstream Quickshell v0.3.2 uses `auto qArgC = 0; new QGuiApplication(qArgC, argv)`, a plausible direct root cause of Chromium's fatal guard; this was not a video-provider or GDELT error.
+
+**Approved bounded safety change:** stop both NEWS launch paths (`StationChannelScreen.qml` and `StationViewerHost.qml`) from creating an in-process WebEngine object. WATCH remains one-click into a static safe-mode channel bay with × CLOSE; REPORTS keeps headline/source/time metadata and a disabled reader; MUTE shows ON but is disabled because there is no player. Preserve every existing source, GDELT throttling, creator list and separate RADIO/terminal ownership. Retain `StationNewsWebView.qml` on disk only as dormant legacy implementation. No local reload, install, browser process or compositor change.
+
+**Isolated-viewer handoff:** [NEWS separate-process Stage Director handoff](./weather-news-isolated-viewer-stage-director-handoff-20261024.md) records operator expectations, existing Social Chromium-window and Weather Kitty precedents, separate-process rendering scope, Stage Director/SwayPX ownership gate, clipping/input/close/mute acceptance and rollback. The previously mirrored SwayPX virtual viewport remains a **P** proposal, not authorization to modify another worker's compositor branch.
+
 ## 4 // Domain family C: MAP and world/environmental layers
 
 Current EONET is an event index only. Planned:

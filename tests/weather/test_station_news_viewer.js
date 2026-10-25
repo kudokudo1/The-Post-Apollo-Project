@@ -71,50 +71,48 @@ assert.match(discovery, /onStationOpenChanged: \{ if \(!stationOpen\) closeViewe
 assert.doesNotMatch(discovery, /onClicked:\s*\{\s*if \(modelData\.url/);
 assert.match(discovery, /visible: !stationDiscovery\.viewerOpen/);
 assert.match(viewer, /signal backRequested\(\)/);
-assert.match(viewer, /property bool webRequested: false/);
-assert.match(viewer, /active: stationViewer\.webRequested && stationViewer\.canReadWeb/);
-assert.match(viewer, /source: "StationNewsWebView\.qml"/);
-assert.match(viewer, /WEBPAGE LOADS HERE ONLY WHEN REQUESTED/);
-assert.match(viewer, /A headline is not the/);
+assert.match(viewer, /label: "◂  BACK"/);
+assert.match(viewer, /label: "READER DISABLED"/);
+assert.match(viewer, /available: false/);
+assert.match(viewer, /INTERNAL ARTICLE RENDERER \/\/ SAFE MODE/);
+assert.match(viewer, /WEBENGINE DISABLED \/\/ NO BROWSER PROCESS LAUNCHED/);
+assert.match(viewer, /The headline, publisher and time/);
+assert.doesNotMatch(viewer, /\bimport\s+QtWebEngine|StationNewsWebView\.qml|webLoader|webRequested/);
+assert.doesNotMatch(viewer, /\bLoader\s*\{|\bProcess\s*\{|Qt\.openUrlExternally/);
 
-// QtWebEngine is dynamically isolated from the shell, dock and NEWS list.
-assert.match(web, /^import QtWebEngine/m);
-assert.doesNotMatch(discovery, /import QtWebEngine/);
-assert.doesNotMatch(viewer, /import QtWebEngine/);
-assert.doesNotMatch(station, /import QtWebEngine/);
-assert.match(web, /onNavigationRequested/);
-assert.match(web, /ViewerPolicy\.articleHost\(target\)/);
-assert.match(web, /request\.reject\(\)/);
-assert.match(web, /onNewWindowRequested/);
-assert.match(web, /onPermissionRequested/);
-assert.match(web, /permission\.deny\(\)/);
-assert.match(web, /property bool audioAllowed: false/);
-assert.match(web, /audioMuted: !newsWeb.audioAllowed/);
-assert.match(viewer, /label: stationViewer.audioAllowed \? "MUTE" : "ENABLE AUDIO"/);
-
+// Quickshell 0.3.2 crash evidence: SIGABRT in QtWebEngineCore constructor
+// after Qt app was initialized with argc=0. NO NEWS-facing QML component
+// may instantiate the optional WebEngine implementation until another
+// process owns rendering and the operator authorizes its Stage Director path.
 const channel = read("widgets/weather/StationChannelScreen.qml");
-// Direct channel view hides the surrounding NEWS rack and occupies the full
-// viewing bay. It never silently launches an OS browser or a second terminal.
+const hub = read("widgets/weather/StationNewsHub.qml");
 assert.match(channel, /signal closeRequested\(\)/);
-assert.match(channel, /signal muteToggled\(\)/);
 assert.match(channel, /label: "×  CLOSE"/);
-assert.match(channel, /label: channelScreen\.muted \? "MUTE: ON" : "MUTE: OFF"/);
-assert.match(channel, /active: channelScreen\.sourceUrl !== ""/);
-assert.match(channel, /source: "StationNewsWebView\.qml"/);
-assert.match(channel, /onLoaded:[\s\S]*?item\.articleUrl = channelScreen\.sourceUrl/);
-assert.match(channel, /WEB RENDERER NOT AVAILABLE/);
-assert.match(channel, /QtWebEngine could not load in this Quickshell runtime/);
-assert.match(channel, /PLAYER REDIRECT BLOCKED/);
-assert.match(channel, /PUBLISHER PAGE FAILED/);
-assert.match(channel, /visible: channelScreen\.noRenderer/);
-assert.match(channel, /channelLoader\.status === Loader\.Error/);
-assert.match(channel, /channelScreen\.closeRequested\(\)/);
-assert.doesNotMatch(channel, /Qt\.openUrlExternally|swaymsg|command:[^\n]*kitty|\bProcess\s*\{/);
-assert.match(web, /property string loadError: ""/);
-assert.match(web, /WebEngineView\.LoadFailedStatus/);
-assert.match(web, /loadRequest\.errorString/);
+assert.match(channel, /label: "MUTE: ON"/);
+assert.match(channel, /available: channelScreen\.playbackAvailable/);
+assert.match(channel, /readonly property bool playbackAvailable: false/);
+assert.match(channel, /NEWS VIEWER \/\/ SAFE MODE/);
+assert.match(channel, /CRASH PROTECTION/);
+assert.match(channel, /onClicked: channelScreen\.closeRequested\(\)/);
+assert.doesNotMatch(channel, /\bLoader\s*\{|StationNewsWebView\.qml|import QtWebEngine/);
+assert.doesNotMatch(channel, /\bProcess\s*\{|Qt\.openUrlExternally|swaymsg|command:[^\n]*kitty/);
+assert.match(hub, /StationChannelScreen\s*\{/);
+assert.match(hub, /onCloseRequested: stationNewsHub\.closeViewer\(\)/);
+assert.match(hub, /label: "WATCH IN STATION"/);
+assert.match(hub, /label: "MUTE: ON"/);
+assert.match(hub, /available: false/);
+assert.doesNotMatch(hub, /Qt\.openUrlExternally|StationNewsWebView\.qml/);
+assert.doesNotMatch(station, /import QtWebEngine/);
+// Keep the orphaned implementation on disk for a *future* authorized
+// host experiment, but ensure it is unreachable from both NEWS pathways.
+// 'web' and 'discovery' are already read above.
+assert.match(web, /^import QtWebEngine/m);
+assert.match(discovery, /StationViewerHost\s*\{/);
+assert.match(discovery, /onBackRequested: stationDiscovery\.closeViewer\(\)/);
+assert.match(discovery, /viewerOpen = true/);
+assert.doesNotMatch(discovery, /StationNewsWebView\.qml|import QtWebEngine/);
+assert.match(hub, /StationDiscovery\s*\{[\s\S]*?domain: "news"/);
+assert.doesNotMatch(hub, /import QtWebEngine/);
+assert.doesNotMatch(channel + hub + viewer + discovery, /source:\s*["']StationNewsWebView\.qml/);
 
-// No new radio backend, terminal launcher or compositor control in this stage.
-assert.doesNotMatch(viewer, /\bProcess\s*\{/);
-assert.doesNotMatch(discovery, /\bProcess\s*\{/);
 console.log("Weather Station NEWS internal viewer contracts: PASS");

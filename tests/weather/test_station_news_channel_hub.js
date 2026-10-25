@@ -76,15 +76,19 @@ assert.match(hub,/active: stationNewsHub\.isReports && stationNewsHub\.stationOp
 assert.match(hub,/StationDiscovery\s*\{[\s\S]*?domain: "news"/);
 assert.match(hub,/StationChannelScreen/);
 assert.match(hub,/label: "WATCH IN STATION"/);
-assert.match(hub,/label: stationNewsHub\.channelMuted \? "MUTE: ON" : "MUTE: OFF"/);
-assert.match(hub,/onMuteToggled: stationNewsHub\.toggleMute\(\)/);
+assert.match(hub,/label: "MUTE: ON"/);
+assert.match(hub,/available: false/);
+assert.match(hub,/VIDEO SAFE MODE/);
+assert.doesNotMatch(hub,/onMuteToggled:/);
 assert.match(hub,/onCloseRequested: stationNewsHub\.closeViewer\(\)/);
 assert.match(hub,/muted: stationNewsHub\.channelMuted/);
 assert.match(hub,/viewerOpen = false;[\s\S]*?channelMuted = true;/);
 assert.doesNotMatch(hub,/label: "VIEW HERE"/);
 assert.match(station,/id: newsViewComponent[\s\S]*?StationNewsHub/);
-assert.match(viewer,/WATCH IN STATION/);
-assert.match(viewer,/ENABLE AUDIO/);
+// The NEWS launch paths now deliberately cannot create QtWebEngine inside
+// the host. The optional web file remains unreferenced, not "available".
+assert.match(viewer,/READER DISABLED/);
+assert.doesNotMatch(viewer,/StationNewsWebView\.qml|\bLoader\s*\{/);
 assert.match(web,/audioMuted: !newsWeb\.audioAllowed/);
 assert.match(web,/onNewWindowRequested/);
 assert.match(web,/permission\.deny\(\)/);

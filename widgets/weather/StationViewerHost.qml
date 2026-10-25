@@ -2,9 +2,9 @@ import QtQuick
 import "../../components"
 import "StationViewerPolicy.js" as ViewerPolicy
 
-// Reusable Weather Station VIEW destination. This first adapter handles GDELT
-// NEWS records. Later MAP/video adapters can reuse its OPEN / VIEW / BACK
-// lifecycle without promising that all renderers are terminal applications.
+// NEWS metadata viewer in crash-safe mode. Reports remain inspectable, but
+// QtWebEngine must never instantiate inside Quickshell until an isolated
+// renderer is connected. Preserve the existing BACK / report list contract.
 Rectangle {
     id: stationViewer
 
@@ -13,16 +13,9 @@ Rectangle {
 
     readonly property string articleUrl:
         selectedRecord ? ViewerPolicy.safeArticleUrl(selectedRecord.url) : ""
-    readonly property bool canReadWeb: articleUrl !== ""
-    property bool webRequested: false
-    property bool audioAllowed: false
+    readonly property bool canReadWeb: false
     readonly property bool isChannel:
         selectedRecord && selectedRecord.kind === "channel"
-    readonly property bool webFailed:
-        webRequested && (webLoader.status === Loader.Error
-                         || (webLoader.item
-                             && (webLoader.item.loadState === "FAILED"
-                                 || webLoader.item.blockedNavigation)))
     color: Colors.black
 
     Column {
@@ -99,44 +92,18 @@ Rectangle {
             spacing: 10
 
             ActionButton {
-                width: 155
+                width: 160
                 height: 34
-                label: stationViewer.webRequested
-                       ? (stationViewer.isChannel ? "CLOSE CHANNEL" : "CLOSE ARTICLE")
-                       : (stationViewer.isChannel ? "WATCH IN STATION" : "READ ARTICLE")
-                labelPixelSize: 12
-                available: stationViewer.canReadWeb || stationViewer.webRequested
-                onClicked: {
-                    stationViewer.webRequested = !stationViewer.webRequested;
-                }
+                label: "READER DISABLED"
+                labelPixelSize: 11
+                available: false
             }
-
-            ActionButton {
-                width: 114
-                height: 34
-                visible: stationViewer.isChannel
-                label: stationViewer.audioAllowed ? "MUTE" : "ENABLE AUDIO"
-                labelPixelSize: 10
-                available: stationViewer.webRequested
-                onClicked: {
-                    stationViewer.audioAllowed = !stationViewer.audioAllowed;
-                    if (webLoader.item)
-                        webLoader.item.audioAllowed = stationViewer.audioAllowed;
-                }
-            }
-
             QuietText {
                 anchors.verticalCenter: parent.verticalCenter
-                width: Math.max(90, parent.width - (stationViewer.isChannel ? 290 : 165))
+                width: Math.max(90, parent.width - 170)
                 font.pixelSize: 11
                 elide: Text.ElideRight
-                text: stationViewer.webRequested
-                      ? "GUARDED WEB RENDERER // NO POPUPS OR EXTERNAL TABS"
-                      : stationViewer.canReadWeb
-                      ? (stationViewer.isChannel
-                         ? "OFFICIAL SITE // PLAYBACK DEPENDS ON PROVIDER"
-                         : "WEBPAGE LOADS HERE ONLY WHEN REQUESTED")
-                      : "FULL ARTICLE URL UNAVAILABLE"
+                text: "CRASH PROTECTION // REPORT METADATA STILL AVAILABLE"
             }
         }
 
@@ -148,54 +115,37 @@ Rectangle {
             border.width: 1
             border.color: Colors.cyan
 
-            // Importing QtWebEngine is optional and lazy. An unavailable
-            // module must never prevent the metadata view from working.
-            Loader {
-                id: webLoader
-                anchors.fill: parent
-                anchors.margins: 2
-                active: stationViewer.webRequested && stationViewer.canReadWeb
-                source: "StationNewsWebView.qml"
-                onLoaded: {
-                    if (item) {
-                        item.articleUrl = stationViewer.articleUrl;
-                        item.audioAllowed = stationViewer.audioAllowed;
-                    }
-                }
-            }
-
             Column {
                 anchors.centerIn: parent
                 width: Math.max(0, parent.width - 32)
                 spacing: 10
-                visible: !stationViewer.webRequested || stationViewer.webFailed
 
                 GohuText {
                     width: parent.width
                     font.pixelSize: 16
-                    color: stationViewer.webFailed ? Colors.orange : Colors.cyan
+                    color: Colors.orange
                     horizontalAlignment: Text.AlignHCenter
-                    text: stationViewer.webFailed
-                          ? "ARTICLE RENDERER UNAVAILABLE"
-                          : "INTERNAL NEWS VIEW // READY"
+                    text: "INTERNAL ARTICLE RENDERER // SAFE MODE"
                 }
                 SecondaryText {
                     width: parent.width
                     wrapMode: Text.WordWrap
                     horizontalAlignment: Text.AlignHCenter
                     font.pixelSize: 12
-                    text: stationViewer.webFailed
-                          ? "This site could not be loaded here. The report title,"
-                            + " source and time remain available above."
-                          : stationViewer.isChannel
-                            ? "This entry is a source directory record, not proof"
-                              + " of live playback. WATCH IN STATION attempts"
-                              + " the provider website here. Restricted players"
-                              + " may refuse embedded playback."
-                            : "This record contains a headline and source information."
-                              + " Select READ ARTICLE to try the original webpage"
-                              + " inside Weather Station. A headline is not the"
-                              + " full article."
+                    text: "The original article page cannot be opened here"
+                          + " until an isolated web renderer is connected."
+                          + " Quickshell's in-process WebEngine caused a"
+                          + " fatal crash. The headline, publisher and time"
+                          + " remain available above."
+                }
+                QuietText {
+                    width: parent.width
+                    horizontalAlignment: Text.AlignHCenter
+                    wrapMode: Text.WordWrap
+                    font.pixelSize: 11
+                    text: stationViewer.articleUrl === ""
+                          ? "FULL ARTICLE URL UNAVAILABLE"
+                          : "ARTICLE HTTPS DESTINATION REGISTERED"
                 }
             }
         }
@@ -203,9 +153,7 @@ Rectangle {
         QuietText {
             width: parent.width
             font.pixelSize: 10
-            text: stationViewer.isChannel
-                  ? "INTERNAL VIEW ONLY // NO AUTOPLAY // PROVIDER ACCESS RULES APPLY"
-                  : "EXTERNAL BROWSER NOT OPENED // ARTICLE CONTENT MAY BE RESTRICTED"
+            text: "WEBENGINE DISABLED // NO BROWSER PROCESS LAUNCHED"
             elide: Text.ElideRight
         }
     }

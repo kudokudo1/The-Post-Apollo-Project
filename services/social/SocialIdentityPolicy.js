@@ -319,6 +319,83 @@ function moveAppToFamily(doc, appId, targetFamilyId) {
             familyId:targetFamilyId, appId:appId};
 }
 
+// Reorder only metadata for the active identity. Direction is an explicit
+// adjacent step; no wrapping, surprise launch, deletion or cross-identity edit.
+function reorderFamily(doc, familyId, direction) {
+    var checked = validate(doc);
+    if (!checked.ok) return checked;
+    if (typeof familyId !== "string")
+        return {ok:false, reason:"INVALID_FAMILY"};
+    if (direction !== -1 && direction !== 1)
+        return {ok:false, reason:"INVALID_DIRECTION"};
+    var next = clone(doc);
+    var active = next.identities.find(function(i) {
+        return i.id === next.activeId;
+    });
+    var families = active.layout.families;
+    var index = families.findIndex(function(f) { return f.id === familyId; });
+    if (index < 0) return {ok:false, reason:"INVALID_FAMILY"};
+    var destination = index + direction;
+    if (destination < 0 || destination >= families.length)
+        return {ok:false, reason:"NO_CHANGE"};
+    var previous = families[index];
+    families[index] = families[destination];
+    families[destination] = previous;
+    return {ok:true, reason:"", document:next};
+}
+
+// App order is specific to its owning family, including an app temporarily
+// hidden from the launcher. The provider's numeric dispatch index is unchanged.
+function reorderApp(doc, familyId, appId, direction) {
+    var checked = validate(doc);
+    if (!checked.ok) return checked;
+    if (typeof familyId !== "string")
+        return {ok:false, reason:"INVALID_FAMILY"};
+    if (!validAppId(appId))
+        return {ok:false, reason:"INVALID_APP"};
+    if (direction !== -1 && direction !== 1)
+        return {ok:false, reason:"INVALID_DIRECTION"};
+    var next = clone(doc);
+    var active = next.identities.find(function(i) {
+        return i.id === next.activeId;
+    });
+    var family = active.layout.families.find(function(f) {
+        return f.id === familyId;
+    });
+    if (!family) return {ok:false, reason:"INVALID_FAMILY"};
+    var index = family.appIds.indexOf(appId);
+    if (index < 0) return {ok:false, reason:"APP_NOT_IN_FAMILY"};
+    var destination = index + direction;
+    if (destination < 0 || destination >= family.appIds.length)
+        return {ok:false, reason:"NO_CHANGE"};
+    var previous = family.appIds[index];
+    family.appIds[index] = family.appIds[destination];
+    family.appIds[destination] = previous;
+    return {ok:true, reason:"", document:next};
+}
+
+// Visibility belongs to the active identity, NOT the browser profile or
+// provider account. Hidden apps retain family membership and saved sessions.
+function setAppHidden(doc, appId, hidden) {
+    var checked = validate(doc);
+    if (!checked.ok) return checked;
+    if (!validAppId(appId))
+        return {ok:false, reason:"INVALID_APP"};
+    if (typeof hidden !== "boolean")
+        return {ok:false, reason:"INVALID_VISIBILITY"};
+    var next = clone(doc);
+    var active = next.identities.find(function(i) {
+        return i.id === next.activeId;
+    });
+    var hiddenIds = active.layout.hiddenAppIds;
+    var index = hiddenIds.indexOf(appId);
+    if ((index !== -1) === hidden)
+        return {ok:false, reason:"NO_CHANGE"};
+    if (hidden) hiddenIds.push(appId);
+    else hiddenIds.splice(index, 1);
+    return {ok:true, reason:"", document:next};
+}
+
 // UI-only rows, with stable provider indices from the canonical catalog.
 // A collapsed or hidden app is not reachable by keyboard activation.
 function rowsForLayout(layout) {
@@ -356,16 +433,21 @@ function view(state, doc, reason) {
         return i.id === doc.activeId;
     }) : null;
     var display = rowsForLayout(identity ? identity.layout : defaultLayout());
-    var families = identity ? identity.layout.families.map(function(f) {
+    var families = identity ? identity.layout.families.map(function(f, orderIndex) {
         return {id:f.id, title:f.name, count:f.appIds.length,
-                expanded:f.expanded};
+                expanded:f.expanded, orderIndex:orderIndex,
+                familyCount:identity.layout.families.length};
     }) : [];
     var appChoices = identity ? APP_IDS.map(function(appId, index) {
         var family = identity.layout.families.find(function(f) {
             return f.appIds.indexOf(appId) !== -1;
         });
         return {id:appId, serviceIndex:index,
-                familyId:family ? family.id : ""};
+                familyId:family ? family.id : "",
+                familyTitle:family ? family.name : "UNASSIGNED",
+                orderIndex:family ? family.appIds.indexOf(appId) : -1,
+                siblingCount:family ? family.appIds.length : 0,
+                hidden:identity.layout.hiddenAppIds.indexOf(appId) !== -1};
     }) : [];
     return {
         familyOptions: families, appChoices: appChoices,

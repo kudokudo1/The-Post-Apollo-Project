@@ -52,6 +52,37 @@ Rectangle {
         return !!app && app.familyId !== editedFamilyId;
     }
 
+    function selectedFamilyOption() {
+        if (!familyIsSelected()) return null;
+        return (identitySnapshot.familyOptions || []).find(function(f) {
+            return f.id === editedFamilyId;
+        }) || null;
+    }
+
+    function selectedAppOption() {
+        if (familyEditorIdentityId !== identitySnapshot.activeId
+                || !editedAppId) return null;
+        return (identitySnapshot.appChoices || []).find(function(c) {
+            return c.id === editedAppId;
+        }) || null;
+    }
+
+    function familyCanStep(direction) {
+        var family = selectedFamilyOption();
+        return !!family && (direction === -1 || direction === 1)
+               && family.orderIndex + direction >= 0
+               && family.orderIndex + direction < family.familyCount;
+    }
+
+    function appCanStep(direction) {
+        var app = selectedAppOption();
+        return familyIsSelected() && !!app
+               && app.familyId === editedFamilyId
+               && (direction === -1 || direction === 1)
+               && app.orderIndex + direction >= 0
+               && app.orderIndex + direction < app.siblingCount;
+    }
+
     // Search by existing displayed app names, with a short initial list.
     // No second service catalog or invented provider indices.
     function matchingFamilyApps(query) {
@@ -835,6 +866,28 @@ Rectangle {
                             }
                         }
                     }
+                    ActionButton {
+                        width: parent.width
+                        height: 32
+                        label: "FAMILY UP"
+                        labelPixelSize: 9
+                        contentPadding: 3
+                        interactive: appSelector.identitySnapshot.writable
+                                     && appSelector.familyCanStep(-1)
+                        onTriggered: SocialIdentityStore.reorderFamily(
+                            appSelector.editedFamilyId, -1)
+                    }
+                    ActionButton {
+                        width: parent.width
+                        height: 32
+                        label: "FAMILY DOWN"
+                        labelPixelSize: 9
+                        contentPadding: 3
+                        interactive: appSelector.identitySnapshot.writable
+                                     && appSelector.familyCanStep(1)
+                        onTriggered: SocialIdentityStore.reorderFamily(
+                            appSelector.editedFamilyId, 1)
+                    }
                     Text {
                         width: parent.width
                         visible: appSelector.identitySnapshot.familyOptions.length === 0
@@ -984,6 +1037,64 @@ Rectangle {
                                      && appSelector.selectedAppNeedsMove()
                         onTriggered: SocialIdentityStore.moveAppToFamily(
                             appSelector.editedAppId, appSelector.editedFamilyId)
+                    }
+                    Text {
+                        width: parent.width
+                        visible: appSelector.selectedAppOption() !== null
+                        text: appSelector.selectedAppOption()
+                              ? ("IN: " + appSelector.selectedAppOption().familyTitle
+                                 + (appSelector.selectedAppOption().hidden
+                                    ? " / HIDDEN" : " / SHOWN")) : ""
+                        color: Colors.white
+                        font.pixelSize: 9
+                        wrapMode: Text.WrapAnywhere
+                    }
+                    ActionButton {
+                        width: parent.width
+                        height: 32
+                        label: "APP UP"
+                        labelPixelSize: 9
+                        contentPadding: 3
+                        interactive: appSelector.identitySnapshot.writable
+                                     && appSelector.appCanStep(-1)
+                        onTriggered: SocialIdentityStore.reorderApp(
+                            appSelector.editedFamilyId, appSelector.editedAppId, -1)
+                    }
+                    ActionButton {
+                        width: parent.width
+                        height: 32
+                        label: "APP DOWN"
+                        labelPixelSize: 9
+                        contentPadding: 3
+                        interactive: appSelector.identitySnapshot.writable
+                                     && appSelector.appCanStep(1)
+                        onTriggered: SocialIdentityStore.reorderApp(
+                            appSelector.editedFamilyId, appSelector.editedAppId, 1)
+                    }
+                    ActionButton {
+                        width: parent.width
+                        height: 34
+                        label: appSelector.selectedAppOption()
+                               && appSelector.selectedAppOption().hidden
+                               ? "SHOW APP" : "HIDE APP"
+                        labelPixelSize: 9
+                        contentPadding: 3
+                        interactive: appSelector.identitySnapshot.writable
+                                     && appSelector.selectedAppOption() !== null
+                                     && appSelector.selectedAppOption().familyId !== ""
+                        onTriggered: {
+                            var app = appSelector.selectedAppOption();
+                            if (app)
+                                SocialIdentityStore.setAppHidden(
+                                    app.id, !app.hidden);
+                        }
+                    }
+                    Text {
+                        width: parent.width
+                        text: "Hidden apps keep their family and account."
+                        color: Colors.white
+                        font.pixelSize: 9
+                        wrapMode: Text.WordWrap
                     }
                     Text {
                         width: parent.width

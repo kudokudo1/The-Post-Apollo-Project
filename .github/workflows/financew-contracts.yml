@@ -44,6 +44,10 @@ on:
       - "widgets/FinanceMarketPane.qml"
       - "widgets/FinanceStockHistoryPane.qml"
       - "widgets/FinanceStockModePolicy.js"
+      - "widgets/FinanceStockChartPointPolicy.js"
+      - "scripts/finance/MARKET_CHART_POINTS_README.md"
+      - "tests/finance/test_finance_chart_points.mjs"
+      - "tests/finance/test_finance_chart_point_contracts.py"
       - "scripts/finance/MARKET_DAY_RANGE_README.md"
       - "tests/finance/test_finance_stock_modes.mjs"
       - "tests/finance/test_finance_day_range_contracts.py"
@@ -142,6 +146,10 @@ on:
       - "widgets/FinanceMarketPane.qml"
       - "widgets/FinanceStockHistoryPane.qml"
       - "widgets/FinanceStockModePolicy.js"
+      - "widgets/FinanceStockChartPointPolicy.js"
+      - "scripts/finance/MARKET_CHART_POINTS_README.md"
+      - "tests/finance/test_finance_chart_points.mjs"
+      - "tests/finance/test_finance_chart_point_contracts.py"
       - "scripts/finance/MARKET_DAY_RANGE_README.md"
       - "tests/finance/test_finance_stock_modes.mjs"
       - "tests/finance/test_finance_day_range_contracts.py"
@@ -233,6 +241,10 @@ jobs:
         run: python3 tests/finance/test_finance_day_range_contracts.py
       - name: Test FinanceW DAY/RANGE selection on fictional sessions
         run: node tests/finance/test_finance_stock_modes.mjs
+      - name: Verify FinanceW chart point selection and no-fetch contracts
+        run: python3 tests/finance/test_finance_chart_point_contracts.py
+      - name: Test FinanceW chart point hit detection on fictional sessions
+        run: node tests/finance/test_finance_chart_points.mjs
       - name: Verify opt-in OSIRIS globe does not affect FinanceW startup
         run: python3 tests/finance/test_finance_osiris_globe_contracts.py
       - name: Verify FinanceW Research M1 safe Crawl pane

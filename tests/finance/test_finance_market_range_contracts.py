@@ -31,6 +31,7 @@ assert 'stocks.snapshot.first.price.toFixed(2)' in pane
 assert 'stocks.snapshot.last.price.toFixed(2)' in pane
 assert 'stocks.snapshot.delivery.cachedAt' in pane
 assert 'Canvas {' in pane and 'priceCanvas.requestPaint()' in pane
+assert 'onPriceBarsChanged: {' in pane
 assert 'REFERENCE DATE POSITION' not in pane
 
 assert 'property string startDate: dateOffset(-30)' in stock

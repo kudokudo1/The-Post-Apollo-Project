@@ -50,6 +50,9 @@ on:
       - "scripts/finance/read_sec_price_context.mjs"
       - "scripts/finance/market_data_hub.mjs"
       - "scripts/finance/market_data_server.mjs"
+      - "scripts/finance/read_sec_price_optional_hub.mjs"
+      - "tests/finance/test_sec_optional_hub.mjs"
+      - "tests/finance/test_finance_sec_optional_hub_contracts.py"
       - "scripts/finance/MARKET_DATA_HUB_README.md"
       - "tests/finance/test_market_data_hub.mjs"
       - "tests/finance/test_market_data_server.mjs"
@@ -130,6 +133,9 @@ on:
       - "scripts/finance/read_sec_price_context.mjs"
       - "scripts/finance/market_data_hub.mjs"
       - "scripts/finance/market_data_server.mjs"
+      - "scripts/finance/read_sec_price_optional_hub.mjs"
+      - "tests/finance/test_sec_optional_hub.mjs"
+      - "tests/finance/test_finance_sec_optional_hub_contracts.py"
       - "scripts/finance/MARKET_DATA_HUB_README.md"
       - "tests/finance/test_market_data_hub.mjs"
       - "tests/finance/test_market_data_server.mjs"
@@ -213,6 +219,10 @@ jobs:
         run: node tests/finance/test_market_data_hub.mjs
       - name: Test guarded loopback read-only market-data API
         run: node tests/finance/test_market_data_server.mjs
+      - name: Verify Finance SEC optional market hub integration
+        run: python3 tests/finance/test_finance_sec_optional_hub_contracts.py
+      - name: Test Finance SEC optional hub, fail-closed and direct fallback
+        run: node tests/finance/test_sec_optional_hub.mjs
       - name: Verify local read-only FinanceW Budget UI
         run: python3 tests/finance/test_finance_budget_ui_contracts.py
       - name: Verify transaction draft stays non-mutating

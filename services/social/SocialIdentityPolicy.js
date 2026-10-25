@@ -216,10 +216,64 @@ function select(doc, id) {
     return {ok:true, reason:"", document:next};
 }
 
+// Family expansion is saved independently per Post-Apollo identity.
+// Mutating layout preferences must never switch provider accounts.
+function toggleFamily(doc, familyId) {
+    var check = validate(doc);
+    if (!check.ok) return check;
+    if (typeof familyId !== "string")
+        return {ok:false, reason:"INVALID_FAMILY"};
+    var next = clone(doc);
+    var active = next.identities.find(function(i) {
+        return i.id === next.activeId;
+    });
+    var family = active.layout.families.find(function(f) {
+        return f.id === familyId;
+    });
+    if (!family) return {ok:false, reason:"INVALID_FAMILY"};
+    family.expanded = !family.expanded;
+    return {ok:true, reason:"", document:next};
+}
+
+// UI-only rows, with stable provider indices from the canonical catalog.
+// A collapsed or hidden app is not reachable by keyboard activation.
+function rowsForLayout(layout) {
+    var rows = [], indices = [];
+    var hidden = {};
+    for (var i = 0; i < layout.hiddenAppIds.length; ++i)
+        hidden[layout.hiddenAppIds[i]] = true;
+    for (var f = 0; f < layout.families.length; ++f) {
+        var family = layout.families[f];
+        var members = family.appIds.filter(function(appId) {
+            return !Object.prototype.hasOwnProperty.call(hidden, appId);
+        });
+        rows.push({kind:"family", familyId:family.id, title:family.name,
+                   expanded:family.expanded, count:members.length});
+        if (!family.expanded) continue;
+        for (var j = 0; j < members.length; ++j) {
+            var serviceIndex = APP_IDS.indexOf(members[j]);
+            if (serviceIndex < 0) continue; // Validate before rendering.
+            indices.push(serviceIndex);
+            rows.push({kind:"app", serviceId:members[j],
+                       serviceIndex:serviceIndex});
+        }
+    }
+    if (layout.families.length === 0)
+        rows.push({kind:"empty", title:"NO FAMILIES"});
+    return {rows:rows, appIndices:indices};
+}
+
 function view(state, doc, reason) {
     var usable = (state === "ready" || state === "empty" || state === "saving")
                  && validate(doc).ok;
+    // On malformed/newer config keep the original service rail accessible.
+    // Never auto-repair or write over unrecognized on-disk state.
+    var identity = usable ? doc.identities.find(function(i) {
+        return i.id === doc.activeId;
+    }) : null;
+    var display = rowsForLayout(identity ? identity.layout : defaultLayout());
     return {
+        railRows: display.rows, visibleAppIndices: display.appIndices,
         state: state, writable: state === "ready" || state === "empty",
         error: state === "error" || state === "unsupported"
                ? String(reason || "STORAGE_UNAVAILABLE").slice(0, 60) : "",

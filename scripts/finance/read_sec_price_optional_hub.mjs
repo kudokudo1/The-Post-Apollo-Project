@@ -107,7 +107,10 @@ export async function readOptionalPrice(cik, filingDate, {
       || filingDate > today || !validPort(port))
     throw failure("invalid-selection");
   const base = "http://" + LOCAL_HOST + ":" + port;
-  const headers = {"X-Post-Apollo-Client":"financew","Accept":"application/json"};
+  // Avoid stale pooled sockets after the operator manually stops the hub.
+  // A new health probe then yields ECONNREFUSED, the sole direct-fallback gate.
+  const headers = {"X-Post-Apollo-Client":"financew",
+    "Accept":"application/json", "Connection":"close"};
   let health;
   try {
     const res = await fetcher(base + "/v1/health", {

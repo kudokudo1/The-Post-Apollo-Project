@@ -43,6 +43,8 @@ jobs:
         run: node tests/weather/test_station_news_viewer.js
       - name: Validate NEWS source catalog and creator subscriptions
         run: node tests/weather/test_station_news_channel_hub.js
+      - name: Validate NEWS isolated browser preflight safety contract
+        run: python3 tests/weather/test_station_news_viewer_preflight.py
       - name: Validate optional YouTube creator feed parser offline
         run: python3 tests/weather/test_station_youtube_feed.py
       - name: Validate GDELT NEWS rate limit, cache and live source reporting

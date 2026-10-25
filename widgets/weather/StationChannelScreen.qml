@@ -1,4 +1,6 @@
 import QtQuick
+import Quickshell
+import Quickshell.Io
 import "../../components"
 import "StationViewerPolicy.js" as ViewerPolicy
 
@@ -19,6 +21,35 @@ Rectangle {
     readonly property string sourceUrl:
         selectedRecord ? ViewerPolicy.safeArticleUrl(selectedRecord.url) : ""
     readonly property bool playbackAvailable: false
+    property string viewerProbeState: "VIEWER CHECK NOT RUN"
+
+    // V0 probes only which external browser binary could be used. The helper
+    // never launches a browser, contacts a provider, or touches compositor
+    // geometry. It deliberately reports containment unavailable.
+    Process {
+        id: viewerProbe
+        command: ["python3", "-B",
+                  Quickshell.shellDir + "/scripts/weather/news_viewer_preflight.py",
+                  "inspect"]
+        stdout: StdioCollector {
+            onStreamFinished: {
+                try {
+                    const result = JSON.parse(String(text || ""));
+                    channelScreen.viewerProbeState =
+                        result.can_launch === false
+                        && result.state === "BLOCKED_VIEWPORT_UNAVAILABLE"
+                        ? String(result.message || "VIEWER NOT CONNECTED")
+                        : "VIEWER PREFLIGHT CONTRACT UNAVAILABLE";
+                } catch (error) {
+                    channelScreen.viewerProbeState = "VIEWER PREFLIGHT UNAVAILABLE";
+                }
+            }
+        }
+        onExited: function(exitCode, exitStatus) {
+            if (exitCode !== 0)
+                channelScreen.viewerProbeState = "VIEWER PREFLIGHT FAILED";
+        }
+    }
 
     color: Colors.black
     clip: true
@@ -121,14 +152,34 @@ Rectangle {
                       ? "NO VALID HTTPS DESTINATION"
                       : "DESTINATION REGISTERED // EXTERNAL VIEWER NOT CONNECTED"
             }
+            ActionButton {
+                width: 170
+                height: 31
+                anchors.horizontalCenter: parent.horizontalCenter
+                label: viewerProbe.running ? "CHECKING ENGINE" : "CHECK VIEWER"
+                labelPixelSize: 11
+                available: !viewerProbe.running
+                onClicked: {
+                    channelScreen.viewerProbeState = "CHECKING BROWSER AVAILABILITY";
+                    viewerProbe.running = true;
+                }
+            }
+            QuietText {
+                width: parent.width
+                color: Colors.cyan
+                font.pixelSize: 11
+                horizontalAlignment: Text.AlignHCenter
+                wrapMode: Text.WordWrap
+                text: channelScreen.viewerProbeState
+            }
             SecondaryText {
                 width: parent.width
                 font.pixelSize: 12
                 horizontalAlignment: Text.AlignHCenter
                 wrapMode: Text.WordWrap
-                text: "CLOSE returns to NEWS. A separate browser/video"
-                      + " process with Stage Director containment is pending;"
-                      + " no video or audio is launched from this view."
+                text: "CLOSE returns to NEWS. This check cannot play video;"
+                      + " a separate viewer process with verified Stage Director"
+                      + " containment is still required."
             }
         }
     }

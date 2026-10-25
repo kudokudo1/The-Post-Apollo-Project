@@ -13,6 +13,20 @@ The crash stack crosses `QQuickWebEngineView` → `Qt6WebEngineCore` → `abort(
 
 **Crash-safe milestone:** `widgets/weather/StationChannelScreen.qml` and `widgets/weather/StationViewerHost.qml` no longer import or indirectly instantiate `StationNewsWebView.qml`. WATCH opens a static safe-mode surface with CLOSE returning to NEWS; REPORTS still shows article metadata with disabled reader. The legacy WebEngine file is deliberately retained but unreachable from NEWS. No outside browser launches, local binary changes, new pollers, music/audio-controller change or compositor write.
 
+## V0 // Read-only process preflight and allowlist (2026-10-24)
+
+**Evidence:** Crash-safe NEWS PR #774 was found merged into main. SwayPX `master` does not provide the proposed Stage Director viewport feature; the only matching active PR (#3) is a draft **P-level documentation proposal**, with SD0 observer branches, not an approved compositor clip/focus implementation.
+
+**This bounded stage** adds:
+- `scripts/weather/news_viewer_allowlist.json`: the exact source-ID, category and official URL allowlist corresponding to `StationNewsCatalogPolicy.js`.
+- `scripts/weather/news_viewer_preflight.py`: a read-only command contract supporting `inspect` (find installed host browsers using `shutil.which`) and `plan --kind source --id house`, or strictly verified YouTube channel/video IDs. It returns JSON with `can_launch: false`, `can_play: false`, `muted: true`, `state: BLOCKED_VIEWPORT_UNAVAILABLE` and explicit unverified Stage Director containment flags. It does not instantiate a browser, contact the network, query Sway IPC, write a profile or execute an arbitrary URL. No user-controlled raw URL is accepted.
+- `StationChannelScreen.qml`: a user-initiated **CHECK VIEWER** control starts only that short-lived Python `inspect` child and shows whether a browser candidate exists. It never changes playback state. The existing WATCH/CLOSE safe-mode screen, unavailable mute and source catalog remain intact.
+- Offline Python and Node contracts: browser scan is mocked to avoid local dependencies, strict source mapping matches QML catalog, invalid targets stop, and no unsafe child-process or WebEngine loader may appear in the NEWS path.
+
+**Use from CLI only as optional offline diagnosis:** `python3 -B scripts/weather/news_viewer_preflight.py inspect` or `python3 -B scripts/weather/news_viewer_preflight.py plan --kind source --id house`. Both only print JSON. This **is not yet** a transport launcher or a compositor integration. In the UI, NEWS → WATCH IN STATION → CHECK VIEWER runs the same read-only inspect, without leaving the Station.
+
+**Next Stage Director acceptance:** Confirm who owns SD0/V1, inspect its actual running/live compositor branch, and request an independently authorized implementation of a real actor, clip, focus and lifecycle boundary. Only after those gates pass may a separate UI↔renderer transport change allow actual launch, mute/unmute and playback. The safe-mode branch must remain a rollback option.
+
 ## HOW TO USE // Proposed future transport contract
 
 Preserve the operator's **WATCH IN STATION → single immersive viewer in the Station bay → × CLOSE returns to the source list** contract. MUTE starts ON and remains disabled until playback is real.

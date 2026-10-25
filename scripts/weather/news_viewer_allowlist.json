@@ -1,0 +1,96 @@
+{
+  "schema": 1,
+  "description": "Exact source-id → official HTTPS destination allowlist for read-only viewer preflight; never a launch list or live stream certification.",
+  "sources": [
+    {
+      "id": "aje",
+      "section": "LIVE",
+      "url": "https://www.aljazeera.com/video/live"
+    },
+    {
+      "id": "livenow",
+      "section": "LIVE",
+      "url": "https://www.livenowfox.com/live"
+    },
+    {
+      "id": "nbcnow",
+      "section": "LIVE",
+      "url": "https://www.nbcnews.com/now"
+    },
+    {
+      "id": "abcnews",
+      "section": "LIVE",
+      "url": "https://abc.com/watch-live"
+    },
+    {
+      "id": "cnn",
+      "section": "LIVE",
+      "url": "https://www.cnn.com/"
+    },
+    {
+      "id": "foxnews",
+      "section": "LIVE",
+      "url": "https://www.fox.com/stream/fox-news"
+    },
+    {
+      "id": "house",
+      "section": "CONGRESS",
+      "url": "https://live.house.gov/"
+    },
+    {
+      "id": "senate",
+      "section": "CONGRESS",
+      "url": "https://www.senate.gov/floor/"
+    },
+    {
+      "id": "hearings",
+      "section": "CONGRESS",
+      "url": "https://www.congress.gov/committees"
+    },
+    {
+      "id": "cspan",
+      "section": "CONGRESS",
+      "url": "https://www.c-span.org/"
+    },
+    {
+      "id": "bbc",
+      "section": "REPORTS",
+      "url": "https://www.bbc.com/news"
+    },
+    {
+      "id": "npr",
+      "section": "REPORTS",
+      "url": "https://www.npr.org/sections/news/"
+    },
+    {
+      "id": "nasa",
+      "section": "REPORTS",
+      "url": "https://www.nasa.gov/news/"
+    },
+    {
+      "id": "nws",
+      "section": "REPORTS",
+      "url": "https://www.weather.gov/"
+    },
+    {
+      "id": "groundnews",
+      "section": "COMPARE",
+      "url": "https://ground.news/"
+    },
+    {
+      "id": "allsides",
+      "section": "COMPARE",
+      "url": "https://www.allsides.com/unbiased-balanced-news"
+    },
+    {
+      "id": "jubilee",
+      "section": "CREATORS",
+      "url": "https://www.jubileemedia.com/"
+    },
+    {
+      "id": "theonion",
+      "section": "SATIRE",
+      "url": "https://theonion.com/"
+    }
+  ]
+}

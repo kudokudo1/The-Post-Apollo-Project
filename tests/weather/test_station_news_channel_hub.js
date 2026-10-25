@@ -12,6 +12,18 @@ vm.runInNewContext(read("widgets/weather/StationNewsCatalogPolicy.js")
 const plain=x=>JSON.parse(JSON.stringify(x));
 assert.deepEqual(plain(c.sections),[
     "LIVE","CONGRESS","REPORTS","COMPARE","CREATORS","SATIRE"]);
+// The Python preflight must never acquire an unrelated/mismatched URL.
+// Enforce exact source-ID, section and URL parity with the QML catalog.
+const allowlist=JSON.parse(read("scripts/weather/news_viewer_allowlist.json"));
+assert.equal(allowlist.schema,1);
+assert.equal(allowlist.sources.length,c.channels.length);
+const byId=new Map(allowlist.sources.map(x=>[x.id,x]));
+for(const item of c.channels){
+    const registered=byId.get(item.id);
+    assert.ok(registered, "preflight missing "+item.id);
+    assert.equal(registered.url,item.url);
+    assert.equal(registered.section,item.section);
+}
 const ids=new Set(c.channels.map(v=>v.id));
 assert.equal(ids.size,c.channels.length);
 for(const item of c.channels){

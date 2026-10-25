@@ -214,6 +214,31 @@ try:
     app.processEvents()
     near(bar.property("opacity"), 0.34, "explicit persistent root inactive opacity")
 
+    # Regression: live panes may detach/rebind while reveal mode is active.
+    # Previously this produced repeated 'hovered of null' binding warnings.
+    from PySide6.QtCore import qInstallMessageHandler
+    teardown_warnings = []
+
+    def capture_qt_message(mode, context, message):
+        teardown_warnings.append(message)
+
+    previous_handler = qInstallMessageHandler(capture_qt_message)
+    try:
+        assert bar.setProperty("visibilityMode", "reveal")
+        app.processEvents()
+        assert bar.setProperty("flickable", None)
+        app.processEvents()
+        assert bar.property("revealTriggerActive") is False
+        assert bar.setProperty("flickable", inner)
+        app.processEvents()
+    finally:
+        qInstallMessageHandler(previous_handler)
+
+    assert not any("Cannot read property 'hovered' of null" in warning
+                   or "Cannot read property 'containsMouse' of null" in warning
+                   or "Cannot read property 'pressed' of null" in warning
+                   for warning in teardown_warnings), teardown_warnings
+
     print("NeonScrollBar Qt runtime smoke: PASS")
 finally:
     root.close()

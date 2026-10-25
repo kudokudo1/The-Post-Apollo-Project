@@ -1,0 +1,119 @@
+{
+  "contractVersion": 1,
+  "scope": "SOURCE_AUDIT_ONLY_NOT_WRITER_GATE",
+  "authoritativeStore": "services/hub/ApolloHubTodoStore.qml",
+  "storagePathSuffix": "/apollo-hub-todo-v1.json",
+  "stageFunction": "stage",
+  "mutationMethods": [
+    "addTask",
+    "setTaskDone",
+    "renameTask",
+    "updateTaskDetails",
+    "createProject",
+    "assignTaskProject",
+    "renameProject",
+    "deleteProject",
+    "removeTask"
+  ],
+  "readMethods": [
+    "reloadFromDisk"
+  ],
+  "callers": {
+    "widgets/hub/ApolloHubTodoMini.qml": {
+      "addTask": 1,
+      "renameTask": 1,
+      "setTaskDone": 1,
+      "removeTask": 1,
+      "reloadFromDisk": 1
+    },
+    "widgets/tasks/TaskDetailsPane.qml": {
+      "updateTaskDetails": 1
+    },
+    "widgets/tasks/TaskPlannerSchedulePane.qml": {
+      "addTask": 1,
+      "updateTaskDetails": 1
+    },
+    "widgets/tasks/TaskProjectsPane.qml": {
+      "createProject": 1,
+      "renameProject": 1,
+      "deleteProject": 1,
+      "assignTaskProject": 1
+    }
+  },
+  "readOnlySurfaces": [
+    "widgets/tasks/TaskTodayPane.qml",
+    "widgets/tasks/TaskPlannerPane.qml",
+    "widgets/hub/ApolloHubCalendarMini.qml"
+  ],
+  "hostBindings": {
+    "widgets/TasksW.qml": {
+      "store": "todoStore: ApolloHubTodoStore",
+      "snapshot": "todoSnapshot: ApolloHubTodoStore.snapshot"
+    },
+    "widgets/ApolloHubW.qml": {
+      "store": "todoStore: ApolloHubTodoStore",
+      "snapshot": "todoSnapshot: ApolloHubTodoStore.snapshot"
+    },
+    "widgets/hub/ApolloHubTile.qml": {
+      "store": "todoStore: tile.todoStore",
+      "snapshot": "todoSnapshot: tile.todoSnapshot"
+    },
+    "widgets/hub/ApolloHubTodoExplore.qml": {
+      "store": "todoStore: todoExplore.todoStore",
+      "snapshot": "todoSnapshot: todoExplore.todoSnapshot"
+    },
+    "widgets/tasks/TaskPlannerPane.qml": {
+      "store": "todoStore: planner.todoStore",
+      "snapshot": "todoSnapshot: planner.todoSnapshot"
+    }
+  },
+  "mandatoryFutureGateSeams": [
+    {
+      "event": "stage entry",
+      "location": "ApolloHubTodoStore.qml:function stage",
+      "requirement": "Durable OS-owned epoch and closed-admission decision before any pendingDocument mutation or FileView.setText"
+    },
+    {
+      "event": "freeze request",
+      "location": "writer authority host",
+      "requirement": "Persist gate closed atomically before announcing FREEZE_REQUESTED; reject all later stage callers"
+    },
+    {
+      "event": "in-flight save",
+      "location": "FileView.onSaved",
+      "requirement": "Correlate a durable stage token/generation with the exact save before publishing pendingDocument"
+    },
+    {
+      "event": "save failure",
+      "location": "FileView.onSaveFailed",
+      "requirement": "Persist RECOVERY_REVIEW and never report a save as committed"
+    },
+    {
+      "event": "load",
+      "location": "FileView.onLoaded/onLoadFailed",
+      "requirement": "Do not let stale load callbacks replace a frozen or recovery-reviewed snapshot"
+    },
+    {
+      "event": "explicit reload",
+      "location": "reloadFromDisk",
+      "requirement": "Block or coordinate reload during freeze, drain, recovery, and staged writes"
+    },
+    {
+      "event": "source readback",
+      "location": "legacy source file",
+      "requirement": "Verify source bytes against settled stage/owner and stable backup before considering handoff"
+    },
+    {
+      "event": "process restart",
+      "location": "durable OS authority",
+      "requirement": "New process enters RECOVERY_REVIEW; never accept old QML booleans or stale epochs as write authority"
+    },
+    {
+      "event": "SQLite writer",
+      "location": "future native host",
+      "requirement": "No SQLite_ACTIVE branch until separately authorized migration, verified exclusive owner, journal/identity compatibility, rollback and runtime acceptance"
+    }
+  ],
+  "productionChangesAuthorized": false,
+  "sqliteActivationAuthorized": false
+}

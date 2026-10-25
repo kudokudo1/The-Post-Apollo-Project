@@ -37,9 +37,9 @@ assert "unknown-provider" in server and "provider-busy" in server
 assert "POST_APOLLO_MARKET_HUB_READY" in server
 assert "process.argv[1] && import.meta.url" in server
 
-# M7 adds a standalone experimental service; it does NOT transfer the existing
-# live SEC reader or modify the user-facing FinanceW controls.
-assert 'Quickshell.shellPath("scripts/finance/read_sec_price_context.mjs")' in service
+# M7 remains an isolated, manual-only service. M8 introduces a safe optional
+# client adapter; it never starts the hub or makes the running service mandatory.
+assert 'Quickshell.shellPath("scripts/finance/read_sec_price_optional_hub.mjs")' in service
 assert "market_data_server.mjs" not in service + ui
 assert "market_data_hub.mjs" not in service + ui
 assert 'loadPrices(cik, filingDate' in sec

@@ -169,3 +169,28 @@ fresh revalidation and nonduplicate behavior. No browser tabs, terminal
 directories/commands or editor document paths may be read from the live
 workstation until explicitly approved. Continue to preserve seven v1 saves
 and keep REVIVE and RESTORE separate.
+
+
+## M2d stage 1 // Synthetic host-to-app correlation (2026-10-24)
+
+Bounded GitHub implementation: `MachineAdapterFixtureCorrelation.py`
+and `docs/timew-machine-m2d-fixture-session-correlation.md` test a pure,
+read-only, synthetic host/compositor window list against fabricated browser,
+terminal and editor reports. A scoped opaque challenge and declared
+adapter/application namespace are required to correlate windows, with
+duplicate, cross-app and stale-scope claims rejected. The 23-window
+synthetic case includes 17 Brave, four Kitty, Firefox and VS Code.
+
+This tests *shape and failure handling only*. Fixture claims are untrusted,
+do not establish restart-stable identity or exact matching, and cannot
+read tabs, launch apps, move windows, change checkpoints or approve recovery.
+Results never emit safe actions. A browser's live `windowId`, a host
+`con_id`, an application title or matching counts must never substitute
+for independently authenticated app-to-host correlation.
+
+**M2d stage 2 remains unauthorized:** separate trusted transport,
+app-scoped permission, origin/provenance, isolated replay/duplication tests,
+opt-in privacy choices and only then consideration of owner-only v2 storage.
+Coordinate with Notifications/Proton ownership; do not repurpose its
+narrow browser extension. Preserve REVIVE current-work and RESTORE
+historical-checkpoint semantics.

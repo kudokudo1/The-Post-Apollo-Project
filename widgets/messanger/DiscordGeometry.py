@@ -555,6 +555,7 @@ class Bridge:
                 x = int(message.get("x", 0))
                 y = int(message.get("y", 0))
                 self.queue_command(
+                    '[app_id="vesktop"] floating enable; '
                     '[app_id="vesktop"] border none; '
                     f'[app_id="vesktop"] move absolute position '
                     f'{x} px {y} px'
@@ -562,7 +563,10 @@ class Bridge:
                 continue
 
             if op == "focusDiscord":
-                self.queue_command('[app_id="vesktop"] focus')
+                self.queue_command(
+                    '[app_id="vesktop"] floating enable; '
+                    '[app_id="vesktop"] focus'
+                )
                 continue
 
             if op == "focusX":

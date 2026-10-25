@@ -335,7 +335,9 @@ Item {
                     onLeftClicked: todoMini.toggleDone(todoEntry.modelData)
                 }
                 GohuText {
-                    width: Math.max(24, actions.width - 23 - 44 - 40
+                    // Leave the freed 26px with the title rather than empty
+                    // space inside the edit and delete action buttons.
+                    width: Math.max(24, actions.width - 23 - 32 - 26
                                     - 3 * actions.spacing)
                     height: parent.height
                     verticalAlignment: Text.AlignVCenter
@@ -352,15 +354,16 @@ Item {
                     }
                 }
                 ActionButton {
-                    width: 44
+                    width: 32
                     height: parent.height
                     trackLabelGlowLocally: true
                     softGlowEnabled: false
                     labelPixelSize: todoEntry.awaitingDelete ? 10 : 12
-                    // Allow the full decorated pencil glyph to sit centered
-                    // in the existing 44px button without truncation.
-                    contentPadding: todoEntry.awaitingDelete ? 8 : 2
-                    label: todoEntry.awaitingDelete ? "NO" : "⊹ ࣪✎˖"
+                    // A hair space keeps the decorative mark attached to a
+                    // separator, but pulls the large four-point star almost
+                    // against the pencil. 4px content inset leaves border air.
+                    contentPadding: todoEntry.awaitingDelete ? 8 : 4
+                    label: todoEntry.awaitingDelete ? "NO" : "⊹\u200A࣪✎˖"
                     available: todoMini.writable
                     onLeftClicked: {
                         if (todoEntry.awaitingDelete)
@@ -370,7 +373,7 @@ Item {
                     }
                 }
                 ActionButton {
-                    width: 40
+                    width: 26
                     height: parent.height
                     trackLabelGlowLocally: true
                     softGlowEnabled: false

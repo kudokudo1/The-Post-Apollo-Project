@@ -371,10 +371,10 @@ Item {
                     height: parent.height
                     trackLabelGlowLocally: true
                     softGlowEnabled: false
-                    labelPixelSize: 10
+                    labelPixelSize: todoEntry.awaitingDelete ? 10 : 18
                     destructive: true
                     accentColor: Colors.red
-                    label: todoEntry.awaitingDelete ? "YES" : "DEL"
+                    label: todoEntry.awaitingDelete ? "YES" : "×"
                     available: todoMini.writable
                     onLeftClicked: {
                         if (todoEntry.awaitingDelete)

@@ -82,6 +82,16 @@ for method in ("addTask(", "renameTask(", "setTaskDone(", "removeTask("):
     assert method in EDITOR, method
 assert "todoStore.removeTask(task.id, true)" in EDITOR
 assert 'confirmDeleteId === modelData.id' in EDITOR
+# The task-row destructive control uses the canonical U+00D7 close cross,
+# with the original guarded YES/NO confirmation flow unchanged.
+assert 'label: todoEntry.awaitingDelete ? "YES" : "×"' in EDITOR
+assert 'labelPixelSize: todoEntry.awaitingDelete ? 10 : 18' in EDITOR
+assert 'label: todoEntry.awaitingDelete ? "NO" : "EDIT"' in EDITOR
+assert 'destructive: true' in EDITOR
+assert 'accentColor: Colors.red' in EDITOR
+assert 'todoMini.requestDelete(todoEntry.modelData);' in EDITOR
+assert 'todoMini.confirmDelete(todoEntry.modelData);' in EDITOR
+assert 'label: todoEntry.awaitingDelete ? "YES" : "DEL"' not in EDITOR
 assert "onTodoSnapshotChanged:" in EDITOR
 assert 'storeState === "saving"' in EDITOR
 assert "onSaveFailed: function(error)" in STORE

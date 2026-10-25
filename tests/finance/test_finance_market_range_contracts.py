@@ -19,7 +19,7 @@ assert 'FinanceServices.FinanceSecPriceReadService {' in app
 assert 'label: "POLYMARKET"' in market and 'label: "OSIRIS"' in market
 assert 'label: "STOCKS"' in market
 assert 'FinanceStockHistoryPane {' in market
-assert pane.count("FinanceDateInput {")==2
+assert pane.count("FinanceDateInput {")==3
 assert 'START DATE' in pane and 'END DATE' in pane
 assert 'dateControls.sideBySide' in pane
 assert 'HISTORICAL RANGE // INCLUSIVE // MAX 180 DAYS' in pane
@@ -35,12 +35,13 @@ assert 'REFERENCE DATE POSITION' not in pane
 
 assert 'property string startDate: dateOffset(-30)' in stock
 assert 'property string endDate: dateOffset(0)' in stock
-assert 'rangeDays <= 180' in stock
+assert 'StockModePolicy.selectWindow(' in stock
+assert 'b - a <= 180' in (r/"widgets/FinanceStockModePolicy.js").read_text()
 assert 'selectStartDate(day)' in stock and 'selectEndDate(day)' in stock
 assert 'if (!monitoring) clear();' in stock
 assert 'if (reader.running)' in stock
 assert 'if (desiredKey !== inFlightKey || !monitoring)' in stock
-assert 'data.from!==startDate || data.to!==endDate' in stock
+assert 'data.from!==activeWindow.from || data.to!==activeWindow.to' in stock
 assert 'data.cik!==selectedCik' in stock
 assert 'data.symbol!==symbols[selectedCik]' in stock
 assert 'Quickshell.shellPath("scripts/finance/read_market_price_range_optional_hub.mjs")' in stock

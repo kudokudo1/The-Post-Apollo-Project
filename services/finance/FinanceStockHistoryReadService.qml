@@ -1,13 +1,16 @@
 import QtQuick
 import Quickshell
 import Quickshell.Io
+import "../../widgets/FinanceStockModePolicy.js" as StockModePolicy
 
-// Finance M10: explicit historical date range, within 180 calendar days.
-// Independent from SEC event prices; reuses M7 hub / direct EODHD provider.
+// Finance M11: separate DAY and RANGE selectors; no implicit requests.
+// Still uses the M10 bounded historical-range endpoint for both modes.
 Scope {
     id: stockFeed
     property bool monitoring: false
     property string selectedCik: "0000320193"
+    property string displayMode: "range"
+    property string dayDate: dateOffset(-1)
     property string startDate: dateOffset(-30)
     property string endDate: dateOffset(0)
     property string state: "idle"
@@ -21,9 +24,9 @@ Scope {
         ? Math.round((new Date(endDate + "T00:00:00Z").getTime()
                       - new Date(startDate + "T00:00:00Z").getTime()) / 86400000)
         : -1
-    readonly property bool validSelection: rangeDays >= 0 && rangeDays <= 180
-        && startDate >= "2000-01-01"
-        && endDate <= dateOffset(0)
+    readonly property var activeWindow: StockModePolicy.selectWindow(
+        displayMode, dayDate, startDate, endDate, dateOffset(0))
+    readonly property bool validSelection: activeWindow !== null
         && ["0000320193","0000789019","0001045810"].indexOf(selectedCik) >= 0
 
     function dateOffset(days) {
@@ -55,6 +58,20 @@ Scope {
         }
         return true;
     }
+    function selectMode(nextMode) {
+        if (nextMode !== "day" && nextMode !== "range") return false;
+        if (displayMode !== nextMode) {
+            displayMode = nextMode;
+            clear();
+        }
+        return true;
+    }
+    function selectDayDate(day) {
+        if (!validDate(day) || day < "2000-01-01"
+                || day > dateOffset(0)) return false;
+        if (dayDate !== day) {dayDate=day;clear();}
+        return true;
+    }
     function selectStartDate(day) {
         if (!validDate(day) || day < "2000-01-01"
                 || day > dateOffset(0)) return false;
@@ -71,7 +88,9 @@ Scope {
         if (!monitoring || !validSelection) {
             snapshot = null;
             state = "invalid";
-            message = "SELECT AN ORDERED RANGE OF 0 TO 180 CALENDAR DAYS.";
+            message = displayMode === "day"
+                ? "SELECT A VALID PAST OR PRESENT CALENDAR DAY."
+                : "SELECT AN ORDERED RANGE OF 0 TO 180 CALENDAR DAYS.";
             return false;
         }
         if (reader.running) {
@@ -80,15 +99,18 @@ Scope {
             message = "Previous history request is still running.";
             return false;
         }
-        const key=selectedCik+"/"+startDate+"/"+endDate;
+        const from=activeWindow.from, to=activeWindow.to;
+        const key=displayMode+"/"+selectedCik+"/"+from+"/"+to;
         desiredKey=key;
         inFlightKey=key;
         snapshot=null;
         state="loading";
-        message="Reading historical trading sessions.";
+        message=displayMode === "day"
+            ? "Reading selected day closing price."
+            : "Reading historical trading sessions.";
         reader.exec(["/usr/bin/env","node",
                      Quickshell.shellPath("scripts/finance/read_market_price_range_optional_hub.mjs"),
-                     selectedCik,startDate,endDate]);
+                     selectedCik,from,to]);
         return true;
     }
     function acceptOutput(raw) {
@@ -120,8 +142,10 @@ Scope {
                 if(!data || data.schemaVersion!==1 || data.source!=="eodhd-eod"
                     || data.readOnly!==true || data.cik!==selectedCik
                     || data.symbol!==symbols[selectedCik]
-                    || data.from!==startDate || data.to!==endDate
-                    || desiredKey!==selectedCik+"/"+startDate+"/"+endDate
+                    || !activeWindow
+                    || data.from!==activeWindow.from || data.to!==activeWindow.to
+                    || desiredKey!==displayMode+"/"+selectedCik+"/"
+                        +activeWindow.from+"/"+activeWindow.to
                     || !["CLOSE","ADJUSTED CLOSE"].includes(data.priceBasis)
                     || !data.delivery || !["DIRECT","HUB"].includes(data.delivery.via)
                     || !["DIRECT","FETCHED","CACHED","SHARED"].includes(data.delivery.state)
@@ -130,6 +154,7 @@ Scope {
                     || typeof data.delivery.servedAt!=="string"
                     || !Number.isFinite(Date.parse(data.delivery.servedAt))
                     || !Array.isArray(data.bars) || data.bars.length>132
+                    || (displayMode==="day" && data.bars.length>1)
                     || !data.bars.every(function(bar,index) {
                         return bar && validDate(bar.date) && bar.date>=startDate
                             && bar.date<=endDate && typeof bar.price==="number"
@@ -146,11 +171,15 @@ Scope {
                     throw new Error("invalid-stock-range");
                 snapshot=data;
                 state="ready";
-                message=data.bars.length
-                    ? "DAILY PRICE RANGE // "
-                      + (data.delivery.via==="HUB"
-                          ? "MARKET HUB "+data.delivery.state : "DIRECT EODHD")
-                    : "NO TRADING SESSIONS RETURNED IN THIS RANGE";
+                const delivery=data.delivery.via==="HUB"
+                    ? "MARKET HUB "+data.delivery.state : "DIRECT EODHD";
+                message=displayMode==="day"
+                    ? (data.bars.length
+                        ? "DAY CLOSE // "+delivery
+                        : "NO TRADING SESSION FOR THIS CALENDAR DAY")
+                    : (data.bars.length
+                        ? "DAILY PRICE RANGE // "+delivery
+                        : "NO TRADING SESSIONS RETURNED IN THIS RANGE");
             }catch(error){
                 snapshot=null;
                 state="failed";

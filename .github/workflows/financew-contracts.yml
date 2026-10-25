@@ -43,6 +43,10 @@ on:
       - "services/finance/**"
       - "widgets/FinanceMarketPane.qml"
       - "widgets/FinanceStockHistoryPane.qml"
+      - "widgets/FinanceStockModePolicy.js"
+      - "scripts/finance/MARKET_DAY_RANGE_README.md"
+      - "tests/finance/test_finance_stock_modes.mjs"
+      - "tests/finance/test_finance_day_range_contracts.py"
       - "services/finance/FinanceStockHistoryReadService.qml"
       - "scripts/finance/MARKET_STOCKS_README.md"
       - "tests/finance/test_market_stocks_shared_hub.mjs"
@@ -137,6 +141,10 @@ on:
       - "services/finance/**"
       - "widgets/FinanceMarketPane.qml"
       - "widgets/FinanceStockHistoryPane.qml"
+      - "widgets/FinanceStockModePolicy.js"
+      - "scripts/finance/MARKET_DAY_RANGE_README.md"
+      - "tests/finance/test_finance_stock_modes.mjs"
+      - "tests/finance/test_finance_day_range_contracts.py"
       - "services/finance/FinanceStockHistoryReadService.qml"
       - "scripts/finance/MARKET_STOCKS_README.md"
       - "tests/finance/test_market_stocks_shared_hub.mjs"
@@ -221,6 +229,10 @@ jobs:
         run: python3 tests/finance/test_finance_market_range_contracts.py
       - name: Test EODHD historical ranges and local hub using fictional prices
         run: node tests/finance/test_market_price_range.mjs
+      - name: Verify FinanceW DAY/RANGE mode selection and isolation
+        run: python3 tests/finance/test_finance_day_range_contracts.py
+      - name: Test FinanceW DAY/RANGE selection on fictional sessions
+        run: node tests/finance/test_finance_stock_modes.mjs
       - name: Verify opt-in OSIRIS globe does not affect FinanceW startup
         run: python3 tests/finance/test_finance_osiris_globe_contracts.py
       - name: Verify FinanceW Research M1 safe Crawl pane

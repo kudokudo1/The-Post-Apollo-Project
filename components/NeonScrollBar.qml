@@ -1,6 +1,7 @@
 import QtQuick
 import QtQuick.Effects
 import QtQuick.Controls
+import QtQuick.Shapes
 
 Item {
     id: root
@@ -142,6 +143,10 @@ Item {
     // One component, switchable handle form.
     // Unknown values intentionally fall back to the normal bar.
     property string handleStyle: "bar"
+    // Scoped renderer alternative for systems where a Canvas-backed star
+    // has a visible rail but an unpainted handle. The default star Canvas
+    // and all existing consumers stay unchanged.
+    property bool starSceneGraphRenderer: false
     readonly property bool starStyle:
         String(root.handleStyle || "").toLowerCase() === "star"
 
@@ -273,6 +278,24 @@ Item {
     property real starOuterRadius: starHandleSize * 0.443
     property real starInnerRadius: starHandleSize * 0.20
     property real starLineWidth: 1
+
+    // Same 10 vertices as the existing Canvas, rendered through the Qt
+    // Quick scene graph so no Canvas texture upload is required.
+    function starSvgPath(width, height) {
+        if (width <= 0 || height <= 0)
+            return "";
+        const centerX = width / 2;
+        const centerY = height / 2;
+        let segments = [];
+        for (let index = 0; index < 10; ++index) {
+            const radius = index % 2 === 0 ? starOuterRadius : starInnerRadius;
+            const angle = -Math.PI / 2 + index * Math.PI / 5;
+            const x = centerX + Math.cos(angle) * radius;
+            const y = centerY + Math.sin(angle) * radius;
+            segments.push((index === 0 ? "M " : "L ") + x + " " + y);
+        }
+        return segments.join(" ") + " Z";
+    }
 
     // Optional overlay for semantic markers/ticks/activity points.
     property Component railDecoration: null
@@ -737,6 +760,7 @@ Item {
 
             Canvas {
                 id: starCanvas
+                visible: !root.starSceneGraphRenderer
 
                 property color paintColor: root.effectiveHandleColor
                 property real paintOuterRadius: root.starOuterRadius
@@ -788,6 +812,26 @@ Item {
                     ctx.lineWidth = paintLineWidth;
                     ctx.fill();
                     ctx.stroke();
+                }
+            }
+
+            // Alternative rendering of precisely the same star path.
+            // Only TASKS opts in. The shared Loader, hit region, movement,
+            // auto visibility and glow semantics remain owned by this component.
+            Shape {
+                id: starGraphic
+                anchors.fill: parent
+                visible: root.starSceneGraphRenderer
+                antialiasing: true
+
+                ShapePath {
+                    fillColor: root.effectiveHandleColor
+                    strokeColor: root.effectiveHandleColor
+                    strokeWidth: root.starLineWidth
+                    joinStyle: ShapePath.RoundJoin
+                    PathSvg {
+                        path: root.starSvgPath(starGraphic.width, starGraphic.height)
+                    }
                 }
             }
 

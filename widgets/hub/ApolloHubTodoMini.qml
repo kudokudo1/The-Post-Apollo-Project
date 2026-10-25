@@ -397,6 +397,9 @@ Item {
         geometryMode: "viewport"
         accountForContentOrigin: true
         handleStyle: "star"
+        // Screenshot: track is visible but Canvas star does not paint here.
+        // Keep standard NeonScrollBar mechanics; draw the same star as a Shape.
+        starSceneGraphRenderer: todoMini.taskScrollbarEnabled
         handleColor: Colors.magenta
         railColor: Colors.cyan
     }

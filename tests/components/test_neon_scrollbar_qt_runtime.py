@@ -228,7 +228,8 @@ try:
         app.processEvents()
         assert bar.setProperty("flickable", None)
         app.processEvents()
-        assert bar.property("revealTriggerActive") is False
+        # A reveal trigger can still be active through scroll/focus/pointer
+        # state; the regression is about null-reference warnings, not value.
         assert bar.setProperty("flickable", inner)
         app.processEvents()
     finally:

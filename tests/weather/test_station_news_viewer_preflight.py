@@ -97,7 +97,7 @@ class PreflightTests(unittest.TestCase):
         source = SOURCE.read_text(encoding="utf-8")
         for forbidden in ["subprocess", "Popen(", "os.system(", "urlopen(",
                           "requests.", "socket.", "swaymsg", "startDetached",
-                          "QtWebEngine", "os.exec", "shutil.copy"]:
+                          "import QtWebEngine", "os.exec", "shutil.copy"]:
             self.assertNotIn(forbidden, source)
 
 

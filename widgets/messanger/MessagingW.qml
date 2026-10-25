@@ -1309,7 +1309,7 @@ PanelWindow {
 
         AppSelector {
             id: appSelector
-            settingsOverlayParent: messagingContent
+            settingsOverlayParent: messagingContent.contentItem
             settingsOverlayWidth: messagingWindow.settingsSidecarWidth
             // WhatsApp and Messenger are reserved for future Session-style adapters.
             // Do not show fake contacts or launch external browser windows.

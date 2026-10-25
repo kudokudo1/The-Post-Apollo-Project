@@ -6,6 +6,7 @@ import "../components"
 Item {
     id: pane
     property var marketFeed: null
+    property var stockFeed: null
     property string displayLevel: "compact"
     property int selectedIndex: 0
     readonly property bool wide: width >= 660
@@ -43,6 +44,15 @@ Item {
             selected: pane.activeTool === "osiris"
             accentColor: Colors.orange
             onLeftClicked: pane.activeTool = "osiris"
+        }
+        ActionButton {
+            width: 90
+            height: 28
+            label: "STOCKS"
+            labelPixelSize: 10
+            selected: pane.activeTool === "stocks"
+            accentColor: Colors.magenta
+            onLeftClicked: pane.activeTool = "stocks"
         }
     }
 
@@ -339,6 +349,16 @@ Item {
                 + (marketFeed && marketFeed.snapshot
                     ? marketFeed.snapshot.retrievedAt : "NOT READ")
         }
+    }
+
+    FinanceStockHistoryPane {
+        id: stocksTool
+        anchors.top: marketToolStrip.bottom
+        anchors.left: parent.left
+        anchors.right: parent.right
+        anchors.bottom: parent.bottom
+        visible: pane.activeTool === "stocks"
+        stockFeed: pane.stockFeed
     }
 
     FinanceOsirisPane {

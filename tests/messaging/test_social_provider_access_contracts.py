@@ -119,8 +119,12 @@ class ProviderAccessContracts(unittest.TestCase):
         self.assertIn("NATIVE PERSONAL-MESSAGE BACKEND // ", panel)
         self.assertIn("providerWebOpen = true;", social)
         self.assertIn("providerWebOpen = false;", social)
-        self.assertIn("visible: messagingWindow.menuOpen && !providerAccessPanel.visible", social)
-        self.assertIn("!telegramConnectPanel.visible && !providerAccessPanel.visible", social)
+        # Contact and feed panels must disappear entirely during Discord;
+        # the old source assertions unintentionally enforced opaque paint
+        # above Vesktop even though only the app selector should remain.
+        self.assertIn("visible: messagingWindow.menuOpen && !messagingWindow.discordSelected", social)
+        self.assertIn("&& !providerAccessPanel.visible && !messagingWindow.providerDesktopManaged", social)
+        self.assertIn("&& !telegramConnectPanel.visible && !providerAccessPanel.visible", social)
         self.assertNotIn("sendMessage(", panel)
         self.assertNotIn("password", panel.lower())
 

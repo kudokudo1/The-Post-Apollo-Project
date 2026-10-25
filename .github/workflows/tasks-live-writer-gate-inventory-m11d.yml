@@ -1,0 +1,53 @@
+name: TASKS M11d live JSON writer source inventory
+
+on:
+  pull_request:
+    paths:
+      - 'services/hub/ApolloHubTodoStore.qml'
+      - 'widgets/**/*.qml'
+      - 'modules/**/*.qml'
+      - 'services/**/*.qml'
+      - 'shell.qml'
+      - 'tests/tasks/fixtures/task_writer_gate_inventory_m11d.json'
+      - 'tests/tasks/test_task_writer_gate_inventory_m11d.py'
+      - 'docs/tasks-sqlite-live-stage-integration-m11d.md'
+      - '.github/workflows/tasks-live-writer-gate-inventory-m11d.yml'
+  push:
+    branches:
+      - main
+    paths:
+      - 'services/hub/ApolloHubTodoStore.qml'
+      - 'widgets/**/*.qml'
+      - 'modules/**/*.qml'
+      - 'services/**/*.qml'
+      - 'shell.qml'
+      - 'tests/tasks/fixtures/task_writer_gate_inventory_m11d.json'
+      - 'tests/tasks/test_task_writer_gate_inventory_m11d.py'
+      - 'docs/tasks-sqlite-live-stage-integration-m11d.md'
+      - '.github/workflows/tasks-live-writer-gate-inventory-m11d.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  inventory:
+    runs-on: ubuntu-latest
+    timeout-minutes: 7
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: M11d live TASKS/TODAY/PLANNER/Hub mutation route inventory
+        run: python3 tests/tasks/test_task_writer_gate_inventory_m11d.py
+      - name: M11c current durable recovery review regression
+        run: python3 tests/tasks/test_task_writer_recovery_m11c.py
+      - name: M11b current fenced source drain regression
+        run: python3 tests/tasks/test_task_writer_coordination_m11b.py
+      - name: M11a read-only shadow snapshot compatibility
+        run: node tests/tasks/test_task_sqlite_shadow_parity_m11a.cjs
+      - name: M10z read-only Quickshell harness contract
+        run: python3 tests/tasks/test_task_sqlite_snapshot_runtime_m10z.py

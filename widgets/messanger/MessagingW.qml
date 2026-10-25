@@ -102,6 +102,12 @@ PanelWindow {
     }
 
     Process {
+        id: providerDesktopHideProcess
+        // The helper refuses to hide anything without our Sway window mark
+        // and exact provider process identity.
+    }
+
+    Process {
         id: discordHideProcess
         command: ["swaymsg", "[app_id=\"vesktop\"] move scratchpad"]
     }
@@ -301,6 +307,10 @@ PanelWindow {
         activeAppIndex === 14 || activeAppIndex === 15 ||
         (activeAppIndex >= 26 && activeAppIndex <= 31)
     property bool providerWebOpen: false
+    // Only a direct Dock click manages a provider window. Never attach on
+    // mere selection, login status, or account-manager identity switch.
+    property bool providerDesktopManaged: false
+    property string providerDesktopService: ""
     // xSelected retains the existing external-browser focus contract.
     readonly property bool xSelected: (activeAppIndex >= 3 && activeAppIndex <= 13) || (activeAppIndex >= 16 && activeAppIndex <= 25)
         || ((activeAppIndex === 14 || activeAppIndex === 15) && providerWebOpen)
@@ -327,7 +337,7 @@ PanelWindow {
         activeAppIndex === 23 ? "quora" :
         activeAppIndex === 24 ? "pixelfed" :
         activeAppIndex === 25 ? "zalo" : "x"
-    readonly property bool externalSelected: discordSelected || xSelected
+    readonly property bool externalSelected: discordSelected || xSelected || providerDesktopManaged
     onBrowserSiteChanged: updateGeometryHelperMode()
 
     onDiscordSelectedChanged: updateGeometryHelperMode()
@@ -950,6 +960,20 @@ PanelWindow {
         chatFeed.focusMessageInput();
     }
 
+    function hideProviderDesktop() {
+        if (!providerDesktopManaged || providerDesktopService === "")
+            return;
+        const managedService = providerDesktopService;
+        providerDesktopManaged = false;
+        providerDesktopService = "";
+        if (providerDesktopHideProcess.running)
+            providerDesktopHideProcess.running = false;
+        providerDesktopHideProcess.exec([
+            "python3", Quickshell.shellPath("services/messaging/DesktopWindowBridge.py"),
+            "hide", managedService
+        ]);
+    }
+
     function openProviderWeb(service) {
         // A provider website is a provider-owned UI, not a native message API.
         if (!menuOpen || providerWebOpen)
@@ -966,6 +990,7 @@ PanelWindow {
     }
 
     function activateApp(index, retainSelectorFocus) {
+        hideProviderDesktop();
         if (providerWebOpen) {
             hideX();
             providerWebOpen = false;
@@ -1268,7 +1293,7 @@ PanelWindow {
             width: messagingWindow.contactListWidth
             height: messagingContent.height
 
-            visible: messagingWindow.menuOpen && !providerAccessPanel.visible
+            visible: messagingWindow.menuOpen && !providerAccessPanel.visible && !messagingWindow.providerDesktopManaged
 
             discordMode: messagingWindow.externalSelected
 
@@ -1334,10 +1359,20 @@ PanelWindow {
             width: Math.max(1, messagingContent.width - x)
             height: messagingContent.height
             visible: messagingWindow.menuOpen && messagingWindow.providerAccessSelected
-                     && !messagingWindow.providerWebOpen
+                     && !messagingWindow.providerWebOpen && !messagingWindow.providerDesktopManaged
             z: 2
             onBrowserRequested: function(serviceId) {
                 messagingWindow.openProviderWeb(serviceId);
+            }
+            onDesktopDocked: function(serviceId) {
+                if (!messagingWindow.menuOpen)
+                    return;
+                if ((serviceId === "signal" && messagingWindow.activeAppIndex !== 26)
+                    || (serviceId === "viber" && messagingWindow.activeAppIndex !== 29)
+                    || (serviceId === "wechat" && messagingWindow.activeAppIndex !== 27))
+                    return;
+                messagingWindow.providerDesktopService = serviceId;
+                messagingWindow.providerDesktopManaged = true;
             }
         }
 
@@ -1356,7 +1391,7 @@ PanelWindow {
 
             height: messagingContent.height
 
-            visible: messagingWindow.menuOpen && !telegramConnectPanel.visible && !providerAccessPanel.visible
+            visible: messagingWindow.menuOpen && !telegramConnectPanel.visible && !providerAccessPanel.visible && !messagingWindow.providerDesktopManaged
 
             discordMode: messagingWindow.externalSelected
 
@@ -1433,6 +1468,8 @@ PanelWindow {
     // ============================================================
 
     onMenuOpenChanged: {
+        if (!menuOpen)
+            hideProviderDesktop();
         // Do not resume into a stale settings page after Social closes.
         // External-web fallbacks stay separate from each provider's native
         // unsupported status; reset without touching provider login sessions.

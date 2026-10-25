@@ -72,6 +72,21 @@ Item {
         GohuText {
             width: parent.width
             visible: !!context.marketSnapshot
+            textFormat: Text.PlainText
+            wrapMode: Text.WordWrap
+            font.pixelSize: 9
+            color: Colors.orange
+            text: context.marketSnapshot && context.marketSnapshot.delivery
+                ? "PATH " + context.marketSnapshot.delivery.via
+                    + " // " + context.marketSnapshot.delivery.state
+                    + (context.marketSnapshot.delivery.cachedAt
+                        ? "\nCACHED AT " + context.marketSnapshot.delivery.cachedAt : "")
+                    + "\nSERVED AT " + context.marketSnapshot.delivery.servedAt
+                : "DELIVERY PATH UNVERIFIED"
+        }
+        GohuText {
+            width: parent.width
+            visible: !!context.marketSnapshot
             text: context.marketSnapshot
                 ? "SEC FILED: " + context.marketSnapshot.filingDate
                   + "\nPRIOR CLOSE: " + (context.marketSnapshot.previous

@@ -52,6 +52,7 @@ jobs:
           python3 tests/messaging/test_social_account_catalog_contracts.py
           python3 tests/messaging/test_social_provider_access_contracts.py
           python3 tests/messaging/test_social_desktop_window_docking.py
+          python3 tests/messaging/test_discord_geometry_docking.py
           python3 tests/messaging/test_session_adapter_contracts.py
           python3 tests/messaging/test_telegram_adapter_contracts.py
           python3 tests/messaging/test_telegram_bridge_cli_contracts.py

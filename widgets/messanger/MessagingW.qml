@@ -213,21 +213,21 @@ PanelWindow {
         id: socialFocusDelay
 
         interval: 20
-        repeat: false
+        repeat: true
 
         property int attempts: 0
 
         onTriggered: {
             if (!messagingWindow.menuOpen) {
-                //stop();
+                stop();
                 return;
             }
 
-            messagingWindow.syncSocialGeometry(!messagingWindow.discordSelected);
+            messagingWindow.syncSocialGeometry(!messagingWindow.externalSelected);
 
             attempts++;
 
-            if (messagingWindow.socailReady || attempts >= 6) {
+            if (messagingWindow.socialReady || attempts >= 6) {
                 stop();
 
                 if (!messagingWindow.externalSelected)
@@ -248,6 +248,12 @@ PanelWindow {
 
         onTriggered: {
             if (messagingWindow.menuOpen && messagingWindow.discordSelected && !messagingWindow.discordReady) {
+                // A stale Vesktop position cannot become authoritative while
+                // the Social FloatingWindow is still being positioned.
+                if (!messagingWindow.socialReady) {
+                    messagingWindow.requestGroupGeometry();
+                    return;
+                }
                 messagingWindow.discordReady = true;
                 messagingWindow.syncDiscordGeometry(true);
             }
@@ -342,6 +348,7 @@ PanelWindow {
 
     onDiscordSelectedChanged: updateGeometryHelperMode()
     onDiscordReadyChanged: updateGeometryHelperMode()
+    onDiscordDockedChanged: updateGeometryHelperMode()
     onXSelectedChanged: updateGeometryHelperMode()
     onXReadyChanged: updateGeometryHelperMode()
 
@@ -371,6 +378,8 @@ PanelWindow {
     property bool sharedPositionReady: false
     property bool socialReady: false
     property bool discordReady: false
+    // Only after initial Social-owned placement may Vesktop lead $mod moves.
+    property bool discordDocked: false
     property bool discordConfigured: false
     property bool xReady: false
     property bool xConfigured: false
@@ -530,8 +539,30 @@ PanelWindow {
         return rectNear(rect, sharedPanelX, sharedPanelY, sharedPanelWidth, sharedPanelHeight);
     }
 
+    function initialSocialDockAligned(rect) {
+        if (!rect)
+            return false;
+        const tolerance = 2; // Floating-window pixel rounding at startup.
+        return Math.abs(Number(rect.x) - sharedPanelX) <= tolerance
+            && Math.abs(Number(rect.y) - sharedPanelY) <= tolerance
+            && Math.abs(Number(rect.width) - sharedPanelWidth) <= tolerance
+            && Math.abs(Number(rect.height) - sharedPanelHeight) <= tolerance;
+    }
+
     function discordRectNearShared(rect) {
         return rectNear(rect, discordX, discordY, discordWidth, discordHeight);
+    }
+
+    function initialDiscordDockAligned(rect) {
+        // The compositor may round a floating window by a pixel. Require
+        // actual placement in the slot, not exact fractional pixel identity.
+        if (!rect)
+            return false;
+        const tolerance = 2;
+        return Math.abs(Number(rect.x) - discordX) <= tolerance
+            && Math.abs(Number(rect.y) - discordY) <= tolerance
+            && Math.abs(Number(rect.width) - discordWidth) <= tolerance
+            && Math.abs(Number(rect.height) - discordHeight) <= tolerance;
     }
 
     function adoptSocialGeometry(rect) {
@@ -585,6 +616,7 @@ PanelWindow {
             op: "mode",
             discordSelected: discordSelected,
             discordReady: discordReady,
+            discordDocked: discordDocked,
             xSelected: xSelected,
             xReady: xReady,
             browserSite: browserSite
@@ -644,7 +676,7 @@ PanelWindow {
         // First map/configure the social FloatingWindow at the shared default
         // geometry. Do not adopt Sway's temporary tiled/map geometry.
         if (!socialReady) {
-            if (socialRect && socialRectNearShared(socialRect)) {
+            if (socialRect && initialSocialDockAligned(socialRect)) {
                 socialReady = true;
             } else if (now >= ignoreSocialGeometryUntil) {
                 syncSocialGeometry(!discordSelected);
@@ -704,7 +736,8 @@ PanelWindow {
             return;
         }
 
-        if (!discordRect)
+        // The first mapped Social rectangle is authoritative on activation.
+        if (!socialReady || !discordRect)
             return;
 
         // The little Vesktop/Vencord startup window is a guest inside the
@@ -723,10 +756,18 @@ PanelWindow {
             return;
         }
 
-        // While one member is actively focused, DiscordGeometry.py already
-        // moved the follower directly through Sway IPC. QML only adopts the
-        // canonical shared state here; it does NOT send a second follower
-        // command back through the helper.
+        // On every activation Social places Discord first. A scratchpad view
+        // can retain its old position; never let that pull Social away.
+        if (!discordDocked) {
+            if (initialDiscordDockAligned(discordRect)) {
+                discordDocked = true;
+            } else if (now >= ignoreDiscordGeometryUntil) {
+                syncDiscordGeometry(false);
+            }
+            return;
+        }
+
+        // Only after confirmed docking can focused Discord lead geometry.
         if (payload.fastLeader && payload.shared) {
             sharedPanelX = Math.round(Number(payload.shared.x));
             sharedPanelY = Math.round(Number(payload.shared.y));
@@ -859,11 +900,12 @@ PanelWindow {
         if (!menuOpen || !discordSelected)
             return;
 
+        discordReady = false;
+        discordDocked = false;
         discordConfigured = false;
         ignoreDiscordGeometryUntil = 0;
 
-        if (!discordReady)
-            discordStartupFallback.restart();
+        discordStartupFallback.restart();
 
         if (discordLeaveProcess.running)
             discordLeaveProcess.running = false;
@@ -888,6 +930,8 @@ PanelWindow {
         restoreSelectorAfterDiscordShow = false;
         discordRaiseDelay.stop();
         discordStartupFallback.stop();
+        discordReady = false;
+        discordDocked = false;
         discordConfigured = false;
         ignoreDiscordGeometryUntil = 0;
 
@@ -994,6 +1038,12 @@ PanelWindow {
         if (providerWebOpen) {
             hideX();
             providerWebOpen = false;
+        }
+        // Disarm Discord before the selector flips: otherwise an already
+        // focused Vesktop could send one stale fast-follow update first.
+        if (index === 1) {
+            discordReady = false;
+            discordDocked = false;
         }
         // Clear the old selection before swapping adapters; never briefly
         // render a Sessions thread under Telegram or vice versa.

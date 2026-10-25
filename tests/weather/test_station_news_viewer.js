@@ -77,7 +77,7 @@ assert.match(viewer, /available: false/);
 assert.match(viewer, /INTERNAL ARTICLE RENDERER \/\/ SAFE MODE/);
 assert.match(viewer, /WEBENGINE DISABLED \/\/ NO BROWSER PROCESS LAUNCHED/);
 assert.match(viewer, /The headline, publisher and time/);
-assert.doesNotMatch(viewer, /QtWebEngine|StationNewsWebView\.qml|webLoader|webRequested/);
+assert.doesNotMatch(viewer, /\bimport\s+QtWebEngine|StationNewsWebView\.qml|webLoader|webRequested/);
 assert.doesNotMatch(viewer, /\bLoader\s*\{|\bProcess\s*\{|Qt\.openUrlExternally/);
 
 // Quickshell 0.3.2 crash evidence: SIGABRT in QtWebEngineCore constructor

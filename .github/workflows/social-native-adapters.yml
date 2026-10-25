@@ -37,6 +37,7 @@ jobs:
         run: |
           set -euo pipefail
           python3 tests/messaging/test_social_native_router_contracts.py
+          python3 tests/messaging/test_social_account_catalog_contracts.py
           python3 tests/messaging/test_session_adapter_contracts.py
           python3 tests/messaging/test_telegram_adapter_contracts.py
           python3 tests/messaging/test_telegram_bridge_cli_contracts.py

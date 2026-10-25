@@ -22,6 +22,25 @@ assert "todoSnapshot: ApolloHubTodoStore.snapshot" in HUB
 assert "visible: root.menuOpen && root.activeMode.id === \"tasks\"" in MENU
 assert 'visible: root.activeMode.id !== "tasks"' in MENU
 
+# The TASKS page alone opts into the standard scrollable checklist star.
+# The editor is also used by ApolloHub; opt-in avoids changing the Hub tile.
+assert 'taskScrollbarEnabled: true' in MENU
+assert 'property bool taskScrollbarEnabled: false' in EDITOR
+assert 'id: todoList' in EDITOR
+assert 'boundsBehavior: Flickable.StopAtBounds' in EDITOR
+assert EDITOR.count('NeonScrollBar {') == 1
+assert 'id: taskListRail' in EDITOR
+assert 'parent: todoMini' in EDITOR
+assert 'flickable: todoMini.taskScrollbarEnabled ? todoList : null' in EDITOR
+assert 'geometryMode: "viewport"' in EDITOR
+assert 'accountForContentOrigin: true' in EDITOR
+assert 'handleStyle: "star"' in EDITOR
+assert 'handleColor: Colors.magenta' in EDITOR
+assert 'railColor: Colors.cyan' in EDITOR
+assert '&& taskListRail.scrollable' in EDITOR
+assert 'taskListRail.reservedExtent : 0' in EDITOR
+assert 'taskScrollbarEnabled: true' not in HUB
+
 # Only the TASKS editor page can receive on-demand typing; closing it
 # clears pointer capture and disables keyboard capture.
 assert 'root.menuOpen && root.activeMode.id === "tasks"' in MENU

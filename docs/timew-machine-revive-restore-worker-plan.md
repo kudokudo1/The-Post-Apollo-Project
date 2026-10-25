@@ -144,3 +144,28 @@ during this schema-only phase.
 **Next gate after M2c registry:** audit actual browser, terminal and editor
 interfaces and ownership, then present a capability/consent matrix. No
 active capture, launch, migration, app command replay or live restore yet.
+
+
+## M2c2 update // Evidence-based app integration audit (2026-10-24)
+
+The universal adapter registry is **schema-only**. A source-backed audit now
+resides in `docs/timew-machine-m2c2-application-capability-audit.md`, with
+machine-readable, explicitly non-operative evidence in
+`docs/timew-machine-m2c2-app-capability-evidence.json`. Its pure validator
+`MachineAdapterEvidencePolicy.py` rejects any claim that documented vendor
+APIs prove a live MACHINE integration or arbitrary-checkpoint restoration.
+
+The audit distinguishes Chromium/Firefox browser APIs, Kitty session files,
+WezTerm CLI, Ghostty Linux support, VS Code window/editor APIs, the existing
+Proton-specific browser native messaging pilot and the generic Sway fallback.
+No app-specific live reader has been installed or run. Do not reuse the
+Proton extension without coordinating with its Notifications owner. Do not
+automatically execute commands from terminal session files. Browser session
+history is not the same as an arbitrary MACHINE checkpoint.
+
+**M2d next gate:** operator-reviewed narrow permission boundary, disposable
+integration test, per-app-instance correlation, private metadata exclusions,
+fresh revalidation and nonduplicate behavior. No browser tabs, terminal
+directories/commands or editor document paths may be read from the live
+workstation until explicitly approved. Continue to preserve seven v1 saves
+and keep REVIVE and RESTORE separate.

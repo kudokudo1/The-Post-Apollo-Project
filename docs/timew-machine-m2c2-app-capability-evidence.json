@@ -1,0 +1,176 @@
+{
+  "schema_version": 1,
+  "kind": "machine-app-capability-evidence-audit",
+  "audited_utc": "2026-10-25",
+  "status": "documentation_only",
+  "runtime_implementation_count": 0,
+  "entries": [
+    {
+      "family": "browser",
+      "subject": "Chromium extension APIs",
+      "applies_to": [
+        "Brave",
+        "Chrome",
+        "Edge",
+        "Chromium derivatives with compatible API"
+      ],
+      "evidence": "documented_interface",
+      "capability": "window_tab_inventory_and_recently_closed_restore",
+      "constraints": [
+        "extension_permissions_needed",
+        "browser_scoped_not_generic_OS_identity",
+        "recently_closed_not_arbitrary_checkpoint",
+        "private_urls_not_collected"
+      ],
+      "official_source": "https://developer.chrome.com/docs/extensions/reference/api/tabs",
+      "secondary_source": "https://developer.chrome.com/docs/extensions/reference/api/sessions",
+      "runtime_verified": false,
+      "arbitrary_checkpoint_reconstruction_verified": false,
+      "live_enabled": false
+    },
+    {
+      "family": "browser",
+      "subject": "Firefox WebExtensions",
+      "applies_to": [
+        "Firefox",
+        "Firefox-compatible extensions where supported"
+      ],
+      "evidence": "documented_interface",
+      "capability": "window_tab_session_restore_and_extension_scoped_values",
+      "constraints": [
+        "extension_permissions_needed",
+        "tab_IDs_are_not_durable_window_identity",
+        "closed_session_IDs_differ_from_live_tab_IDs",
+        "private_urls_not_collected"
+      ],
+      "official_source": "https://developer.mozilla.org/en-US/docs/Mozilla/Add-ons/WebExtensions/API/sessions",
+      "secondary_source": "https://developer.mozilla.org/en-US/docs/Mozilla/Add-ons/WebExtensions/API/sessions/Session",
+      "runtime_verified": false,
+      "arbitrary_checkpoint_reconstruction_verified": false,
+      "live_enabled": false
+    },
+    {
+      "family": "terminal",
+      "subject": "Kitty sessions",
+      "applies_to": [
+        "Kitty"
+      ],
+      "evidence": "documented_interface",
+      "capability": "session_file_windows_tabs_layouts",
+      "constraints": [
+        "session_files_can_contain_commands",
+        "never_autoreplay_foreground_process",
+        "do_not_collect_terminal_buffers",
+        "identity_across_restart_unverified"
+      ],
+      "official_source": "https://sw.kovidgoyal.net/kitty/sessions/",
+      "secondary_source": "https://sw.kovidgoyal.net/kitty/rc_protocol/",
+      "runtime_verified": false,
+      "arbitrary_checkpoint_reconstruction_verified": false,
+      "live_enabled": false
+    },
+    {
+      "family": "terminal",
+      "subject": "WezTerm CLI",
+      "applies_to": [
+        "WezTerm"
+      ],
+      "evidence": "documented_interface",
+      "capability": "enumerate_windows_tabs_panes",
+      "constraints": [
+        "titles_and_working_directories_are_private",
+        "cli_may_target_multiple_instances",
+        "enumeration_is_not_checkpoint_restore",
+        "never_spawn_or_send_text_unapproved"
+      ],
+      "official_source": "https://wezterm.org/cli/cli/list.html",
+      "secondary_source": "https://wezterm.org/cli/cli/index.html",
+      "runtime_verified": false,
+      "arbitrary_checkpoint_reconstruction_verified": false,
+      "live_enabled": false
+    },
+    {
+      "family": "terminal",
+      "subject": "Ghostty Linux",
+      "applies_to": [
+        "Ghostty"
+      ],
+      "evidence": "runtime_interface_unverified",
+      "capability": "host_window_baseline_only",
+      "constraints": [
+        "wayland_x11_support_not_session_API",
+        "session_enumeration_unverified",
+        "session_restore_unverified",
+        "no_unproven_Linux_session_claim"
+      ],
+      "official_source": "https://ghostty.org/docs/linux",
+      "secondary_source": null,
+      "runtime_verified": false,
+      "arbitrary_checkpoint_reconstruction_verified": false,
+      "live_enabled": false
+    },
+    {
+      "family": "editor",
+      "subject": "VS Code UI and extension APIs",
+      "applies_to": [
+        "VS Code",
+        "VSCodium",
+        "compatible editor variants need separate validation"
+      ],
+      "evidence": "documented_interface",
+      "capability": "window_restore_settings_and_editor_tab_groups",
+      "constraints": [
+        "native_restore_is_not_arbitrary_checkpoint",
+        "extension_api_scoped_to_editor_window",
+        "dirty_document_data_is_private",
+        "no_automatic_unsaved_data_access"
+      ],
+      "official_source": "https://code.visualstudio.com/docs/editing/getting-started/userinterface",
+      "secondary_source": "https://code.visualstudio.com/api/references/vscode-api",
+      "runtime_verified": false,
+      "arbitrary_checkpoint_reconstruction_verified": false,
+      "live_enabled": false
+    },
+    {
+      "family": "existing_repo",
+      "subject": "Post-Apollo Proton browser companion",
+      "applies_to": [
+        "Brave/Chromium Proton companion",
+        "Firefox Proton companion"
+      ],
+      "evidence": "repo_source_verified",
+      "capability": "proton_specific_read_only_native_handshake",
+      "constraints": [
+        "not_general_browser_session_inventory",
+        "activeTab_nativeMessaging_scripting_only",
+        "must_coordinate_with_Notifications_owner",
+        "no_shared_session_access_permission"
+      ],
+      "official_source": "integrations/proton/browser/manifest.json",
+      "secondary_source": "integrations/proton/browser/manifest.firefox.json",
+      "runtime_verified": false,
+      "arbitrary_checkpoint_reconstruction_verified": false,
+      "live_enabled": false
+    },
+    {
+      "family": "generic",
+      "subject": "Sway v1 fallback",
+      "applies_to": [
+        "unknown applications under supported Sway metadata projection"
+      ],
+      "evidence": "repo_source_verified",
+      "capability": "app_window_placement_multiplicity_only",
+      "constraints": [
+        "no_durable_per_window_identity",
+        "no_tab_or_document_contents",
+        "no_app_launch",
+        "never_claim_exact_session_match"
+      ],
+      "official_source": "services/time/MachineWindowMultiplicity.py",
+      "secondary_source": "services/time/MachineSwayRead.py",
+      "runtime_verified": false,
+      "arbitrary_checkpoint_reconstruction_verified": false,
+      "live_enabled": false
+    }
+  ]
+}

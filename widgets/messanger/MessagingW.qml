@@ -444,6 +444,12 @@ PanelWindow {
 
     property int appSelectorWidth: 110
     property int contactListWidth: 200
+    // An overlay *within* the existing 1210px Social window. No width/height
+    // or origin changes are sent to Discord/X geometry helpers.
+    property int settingsSidecarPreferredWidth: 400
+    readonly property int settingsSidecarWidth:
+        Math.max(1, Math.min(settingsSidecarPreferredWidth,
+                             sharedPanelWidth - appSelectorWidth))
     property int discordGap: 0
 
     onAppSelectorWidthChanged: configureGeometryHelper()
@@ -509,7 +515,16 @@ PanelWindow {
             x: 0
             y: 0
 
-            width: messagingWindow.menuOpen ? (messagingWindow.externalSelected ? messagingWindow.appSelectorWidth : socialWindow.width) : 0
+            // A normal external mode owns the area to the right of the rail.
+            // Settings temporarily claims only its own adjacent width.
+            // On close, restore the exact original provider click-through.
+            width: messagingWindow.menuOpen
+                   ? (appSelector.settingsOpen
+                      ? Math.min(socialWindow.width,
+                                 messagingWindow.appSelectorWidth
+                                 + messagingWindow.settingsSidecarWidth)
+                      : (messagingWindow.externalSelected ? messagingWindow.appSelectorWidth : socialWindow.width))
+                   : 0
 
             height: messagingWindow.menuOpen ? socialWindow.height : 0
         }
@@ -873,13 +888,15 @@ PanelWindow {
     }
 
     function raiseX() {
-        if (!menuOpen || !xSelected || !xReady)
+        // Do not re-stack a browser above the Settings sidecar.
+        if (!menuOpen || !xSelected || !xReady || appSelector.settingsOpen)
             return;
         sendGeometryHelper({ op: "focusX" });
     }
 
     function raiseDiscord() {
-        if (!menuOpen || !discordSelected || !discordReady)
+        // Do not re-stack Vesktop above the Settings sidecar.
+        if (!menuOpen || !discordSelected || !discordReady || appSelector.settingsOpen)
             return;
 
         helperFocusDiscord();
@@ -1292,6 +1309,8 @@ PanelWindow {
 
         AppSelector {
             id: appSelector
+            settingsOverlayParent: messagingContent
+            settingsOverlayWidth: messagingWindow.settingsSidecarWidth
             // WhatsApp and Messenger are reserved for future Session-style adapters.
             // Do not show fake contacts or launch external browser windows.
             statusText: messagingWindow.xSelected ? messagingWindow.xError
@@ -1319,8 +1338,21 @@ PanelWindow {
             }
 
             onSettingsOpenChanged: {
-                if (settingsOpen && messagingWindow.menuOpen)
+                if (!messagingWindow.menuOpen)
+                    return;
+                if (settingsOpen) {
+                    // A normal click on the rail raises the SAME Social window.
+                    // Best-effort compositor activation avoids a hidden overlay
+                    // behind Discord/X without touching provider geometry.
+                    discordRaiseDelay.stop();
+                    xRaiseDelay.stop();
                     messagingWindow.focusAppSelector();
+                    socialWindow.requestActivate();
+                } else if (messagingWindow.discordSelected) {
+                    messagingWindow.raiseDiscord();
+                } else if (messagingWindow.xSelected) {
+                    messagingWindow.raiseX();
+                }
             }
 
             // The AppSelector's OWN MouseArea emits this only

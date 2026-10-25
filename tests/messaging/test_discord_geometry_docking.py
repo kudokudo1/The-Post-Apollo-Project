@@ -166,6 +166,36 @@ class DiscordDockingTests(TestCase):
         self.assertIn("syncSocialGeometry(!messagingWindow.externalSelected)", chunk)
         self.assertIn("if (!messagingWindow.socialReady)", src)
 
+    def test_discord_overlay_does_not_paint_above_vesktop(self):
+        # The Sway region mask controls clicks, not pixels. A full-window
+        # painted frame + hidden-content-only Discord mode tinted the actual
+        # Vesktop client in the operator's desktop screenshot.
+        src = SOCIAL.read_text(encoding="utf-8")
+        frame = src.split("    WindowPanelFrame {", 1)[1].split(
+            "        // KEYBOARD CONTROLLER", 1)[0]
+        self.assertIn(
+            "fillOpacity: messagingWindow.discordSelected ? 0.0 : 0.20", frame
+        )
+        self.assertIn("borderVisible: false", frame)
+        self.assertIn("glowVisible: false", frame)
+
+        contact = src.split("        ContactList {", 1)[1].split(
+            "        // IN-MENU TELEGRAM ACCOUNT CONNECTION", 1)[0]
+        feed = src.split("        ChatFeed {", 1)[1]
+        for name, body in (("contact", contact), ("feed", feed)):
+            with self.subTest(name=name):
+                self.assertIn("visible: messagingWindow.menuOpen && !messagingWindow.discordSelected", body)
+                self.assertIn("discordMode: messagingWindow.externalSelected", body)
+
+        # The narrow selector should still paint above the provider desktop.
+        selector = src.split("        AppSelector {", 1)[1].split(
+            "        // CONTACT LIST", 1)[0]
+        self.assertIn("id: appSelector", selector)
+        self.assertIn("z: 3", selector)
+        self.assertNotIn("!messagingWindow.discordSelected", selector)
+        self.assertIn("width: messagingWindow.menuOpen ? (messagingWindow.externalSelected ? messagingWindow.appSelectorWidth : socialWindow.width) : 0", src)
+        self.assertNotIn("DiscordBackingW {", src)
+
     def test_backing_remains_unused(self):
         self.assertTrue(BACKING.exists())
         source = SOCIAL.read_text()

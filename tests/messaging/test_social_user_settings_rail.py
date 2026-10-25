@@ -29,7 +29,7 @@ class SocialUserSettingsRailContracts(unittest.TestCase):
             "SIGNAL", "WECHAT", "LINE", "VIBER", "KAKAOTALK",
             "BEREAL",
         ])
-        self.assertIn("appSelector.appActivated(buttonContainer.index);", SELECTOR)
+        self.assertIn("appSelector.appActivated(buttonContainer.modelData.serviceIndex);", SELECTOR)
         self.assertIn("messagingWindow.activateApp(index);", HOST)
 
     def test_settings_button_is_outside_scroll_and_never_activates_app(self):
@@ -65,7 +65,7 @@ class SocialUserSettingsRailContracts(unittest.TestCase):
         self.assertIn("event.accepted = true", scope)
         self.assertIn("onSettingsOpenChanged:", HOST)
         self.assertIn("appSelector.settingsOpen = false;\n        setGeometryWatch(menuOpen)", HOST)
-        self.assertIn("const count = appSelector.messagingApps.length;", HOST)
+        self.assertIn("const count = appSelector.visibleAppIndices.length;", HOST)
 
     def test_external_input_mask_and_routing_unchanged(self):
         self.assertIn(

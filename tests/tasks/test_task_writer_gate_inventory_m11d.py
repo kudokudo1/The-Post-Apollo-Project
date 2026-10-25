@@ -82,8 +82,16 @@ pattern = re.compile(
     r"\b(?:todoStore|ApolloHubTodoStore)\s*\.\s*(" +
     "|".join(re.escape(x) for x in sorted(ALL | {"stage"})) + r")\s*\(")
 actual = {}
+def without_comments(text):
+    # A prior M10q rehearsal documents todoStore.stage() in a comment.
+    # Do not mistake commentary for an executable write route. This is
+    # a narrow audit, not a complete QML parser.
+    text = re.sub(r"/\\*.*?\\*/", "", text, flags=re.DOTALL)
+    return re.sub(r"(?m)//[^\\n]*$", "", text)
+
+
 for path in files:
-    text = path.read_text()
+    text = without_comments(path.read_text())
     name = path.relative_to(ROOT).as_posix()
     matches = Counter(pattern.findall(text))
     if matches:

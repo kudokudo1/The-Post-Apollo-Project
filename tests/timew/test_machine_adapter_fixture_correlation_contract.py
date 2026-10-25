@@ -40,6 +40,6 @@ assert "SCHEMA_VERSION = 1" in store
 assert 'load_parser = choices.add_parser("load")' in store
 for required in ("REVIVE", "RESTORE", "23", "Kitty",
                  "Firefox", "VS Code", "synthetic", "M2d",
-                 "no live", "scope", "privacy"):
+                 "nothing on the operator", "scope", "privacy"):
     assert required.lower() in plan.lower(), required
 print("MACHINE M2D: FIXTURE-ONLY CORRELATION CONTRACT / NO LIVE APP CONTROL PASS")

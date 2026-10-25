@@ -1,8 +1,8 @@
 import QtQuick
 import "../components"
+import "FinanceStockModePolicy.js" as StockModePolicy
 
-// Market STOCKS M10: inclusive historical range, not an SEC event study.
-// No request until the operator presses LOAD HISTORY.
+// Market STOCKS M11: explicit DAY and RANGE with manual-only price requests.
 Item {
     id: stocks
     property var stockFeed: null
@@ -10,6 +10,9 @@ Item {
         ? stockFeed.snapshot : null
     readonly property var priceBars: snapshot && Array.isArray(snapshot.bars)
         ? snapshot.bars : []
+    readonly property bool dayMode: stockFeed && stockFeed.displayMode === "day"
+    readonly property var dayResult: dayMode && snapshot
+        ? StockModePolicy.daySession(snapshot, stockFeed.dayDate) : null
     onPriceBarsChanged: priceCanvas.requestPaint()
 
     GohuText {
@@ -55,13 +58,48 @@ Item {
         }
     }
 
-    GohuText {
-        id: dateLabel
+    Row {
+        id: modeControls
         anchors.top: issuers.bottom
-        anchors.topMargin: 11
+        anchors.topMargin: 9
         anchors.left: parent.left
         anchors.right: parent.right
-        text: "HISTORICAL RANGE // INCLUSIVE // MAX 180 DAYS"
+        height: 28
+        spacing: 6
+        ActionButton {
+            width: 92
+            height: 27
+            label: "DAY"
+            labelPixelSize: 10
+            accentColor: Colors.magenta
+            selected: stocks.dayMode
+            available: stocks.stockFeed && !stocks.stockFeed.loading
+            onLeftClicked: {
+                if (stocks.stockFeed) stocks.stockFeed.selectMode("day");
+            }
+        }
+        ActionButton {
+            width: 92
+            height: 27
+            label: "RANGE"
+            labelPixelSize: 10
+            accentColor: Colors.magenta
+            selected: !stocks.dayMode
+            available: stocks.stockFeed && !stocks.stockFeed.loading
+            onLeftClicked: {
+                if (stocks.stockFeed) stocks.stockFeed.selectMode("range");
+            }
+        }
+    }
+    GohuText {
+        id: dateLabel
+        anchors.top: modeControls.bottom
+        anchors.topMargin: 10
+        anchors.left: parent.left
+        anchors.right: parent.right
+        text: stocks.dayMode
+            ? "SINGLE DAY // WEEKENDS/HOLIDAYS MAY HAVE NO SESSION"
+            : "HISTORICAL RANGE // INCLUSIVE // MAX 180 DAYS"
         font.pixelSize: 10
         color: Colors.orange
     }
@@ -72,9 +110,33 @@ Item {
         anchors.left: parent.left
         anchors.right: parent.right
         readonly property bool sideBySide: width >= 640
-        height: sideBySide ? 66 : 136
+        height: stocks.dayMode ? 66 : (sideBySide ? 66 : 136)
+        Column {
+            id: dayGroup
+            visible: stocks.dayMode
+            anchors.left: parent.left
+            anchors.top: parent.top
+            width: parent.width
+            spacing: 4
+            GohuText {
+                text: "DAY DATE"
+                font.pixelSize: 9
+                color: Colors.cyan
+            }
+            FinanceDateInput {
+                width: parent.width
+                height: 48
+                value: stocks.stockFeed ? stocks.stockFeed.dayDate : ""
+                fallbackDate: stocks.stockFeed ? stocks.stockFeed.dayDate : ""
+                canEdit: !!stocks.stockFeed && !stocks.stockFeed.loading
+                onValueEdited: function(value) {
+                    if (stocks.stockFeed) stocks.stockFeed.selectDayDate(value);
+                }
+            }
+        }
         Column {
             id: fromGroup
+            visible: !stocks.dayMode
             anchors.top: parent.top
             anchors.left: parent.left
             width: dateControls.sideBySide ? (dateControls.width-12)/2 : dateControls.width
@@ -96,6 +158,7 @@ Item {
             }
         }
         Column {
+            visible: !stocks.dayMode
             anchors.top: dateControls.sideBySide ? parent.top : fromGroup.bottom
             anchors.topMargin: dateControls.sideBySide ? 0 : 8
             anchors.left: dateControls.sideBySide ? fromGroup.right : parent.left
@@ -132,7 +195,9 @@ Item {
             width: 122
             height: 28
             label: stocks.stockFeed && stocks.stockFeed.loading ? "READING"
-                : stocks.snapshot ? "REFRESH RANGE" : "LOAD RANGE"
+                : stocks.dayMode
+                    ? (stocks.snapshot ? "REFRESH DAY" : "LOAD DAY")
+                    : (stocks.snapshot ? "REFRESH RANGE" : "LOAD RANGE")
             labelPixelSize: 9
             accentColor: Colors.magenta
             available: stocks.stockFeed && stocks.stockFeed.monitoring
@@ -188,7 +253,9 @@ Item {
             spacing: 13
             GohuText {
                 width: parent.width
-                text: "Select an issuer and START/END dates, then LOAD RANGE. Dates are inclusive; only actual trading sessions appear."
+                text: stocks.dayMode
+                    ? "Choose a calendar day and LOAD DAY. Weekends and market holidays may return NO TRADING SESSION."
+                    : "Select an issuer and START/END dates, then LOAD RANGE. Dates are inclusive; only actual trading sessions appear."
                 textFormat: Text.PlainText
                 wrapMode: Text.WordWrap
                 font.pixelSize: 9
@@ -215,16 +282,24 @@ Item {
                 width: parent.width
                 visible: !!stocks.snapshot
                 text: stocks.snapshot
-                    ? "REQUESTED " + stocks.snapshot.from + " to " + stocks.snapshot.to
-                        + "\nSESSIONS " + stocks.snapshot.bars.length
-                        + "\nFIRST CLOSE " + (stocks.snapshot.first
-                            ? stocks.snapshot.first.date + " // $"
-                                + stocks.snapshot.first.price.toFixed(2) : "UNAVAILABLE")
-                        + "\nLAST CLOSE " + (stocks.snapshot.last
-                            ? stocks.snapshot.last.date + " // $"
-                                + stocks.snapshot.last.price.toFixed(2) : "UNAVAILABLE")
-                        + "\nLAST VS FIRST " + (stocks.snapshot.changePct === null
-                            ? "N/A" : stocks.snapshot.changePct.toFixed(2) + "%")
+                    ? (stocks.dayMode
+                        ? "REQUESTED DAY " + stocks.stockFeed.dayDate
+                          + "\nSESSION " + (stocks.dayResult
+                              && stocks.dayResult.state === "session" ? "AVAILABLE"
+                              : stocks.dayResult && stocks.dayResult.state === "no-session"
+                                  ? "NO TRADING SESSION" : "INVALID DATA")
+                          + "\nCLOSE " + (stocks.dayResult && stocks.dayResult.state === "session"
+                              ? "$" + stocks.dayResult.close.toFixed(2) : "N/A")
+                        : "REQUESTED " + stocks.snapshot.from + " to " + stocks.snapshot.to
+                          + "\nSESSIONS " + stocks.snapshot.bars.length
+                          + "\nFIRST CLOSE " + (stocks.snapshot.first
+                              ? stocks.snapshot.first.date + " // $"
+                                  + stocks.snapshot.first.price.toFixed(2) : "UNAVAILABLE")
+                          + "\nLAST CLOSE " + (stocks.snapshot.last
+                              ? stocks.snapshot.last.date + " // $"
+                                  + stocks.snapshot.last.price.toFixed(2) : "UNAVAILABLE")
+                          + "\nLAST VS FIRST " + (stocks.snapshot.changePct === null
+                              ? "N/A" : stocks.snapshot.changePct.toFixed(2) + "%"))
                     : ""
                 textFormat: Text.PlainText
                 wrapMode: Text.WordWrap
@@ -234,7 +309,7 @@ Item {
             Rectangle {
                 width: parent.width
                 height: visible ? 174 : 0
-                visible: stocks.priceBars.length >= 2
+                visible: !stocks.dayMode && stocks.priceBars.length >= 2
                 color: Colors.black
                 border.width: 1
                 border.color: Colors.cyan
@@ -270,8 +345,8 @@ Item {
             }
             GohuText {
                 width: parent.width
-                visible: stocks.priceBars.length >= 2
-                text: "CYAN = ACTUAL DAILY CLOSES // SELECTED RANGE IS INCLUSIVE"
+                visible: !stocks.dayMode && stocks.priceBars.length >= 2
+                text: "CYAN = ACTUAL DAILY CLOSES // RANGE IS INCLUSIVE"
                 textFormat: Text.PlainText
                 wrapMode: Text.WordWrap
                 font.pixelSize: 9

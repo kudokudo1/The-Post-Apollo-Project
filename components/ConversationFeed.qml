@@ -86,6 +86,9 @@ Rectangle {
     // the 0.85 background and cyan OUTER frame remain, while all inner
     // chat/header/composer contents disappear.
     property bool discordMode: false
+    // In Discord mode the blank shell exists but its paint is provided by
+    // the separate bottom-layer DiscordBackingW instead of this top-level UI.
+    property bool discordVisualBehind: false
 
     // Root must stay transparent or it blocks the translucent background.
     color: "transparent"
@@ -102,8 +105,8 @@ Rectangle {
 
         color: Colors.black
 
-        // Only this layer is transparent.
-        opacity: 0.85
+        // Never tint the floating Vesktop window.
+        opacity: chatFeed.discordVisualBehind ? 0.0 : 0.85
 
         radius: 0
         z: 0
@@ -915,9 +918,9 @@ Rectangle {
         border.width: 1
         border.color: Colors.cyan
 
-        // Keep the outer cyan frame in Discord mode. Only the inner
-        // contents disappear.
-        visible: true
+        // Remove the dividing line above Vesktop; keep the native chat
+        // frame when Sessions or Telegram is selected.
+        visible: !chatFeed.discordVisualBehind
 
         z: 20
     }

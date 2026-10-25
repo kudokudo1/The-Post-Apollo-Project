@@ -122,9 +122,13 @@ class ProviderAccessContracts(unittest.TestCase):
         # Contact and feed panels must disappear entirely during Discord;
         # the old source assertions unintentionally enforced opaque paint
         # above Vesktop even though only the app selector should remain.
-        self.assertIn("visible: messagingWindow.menuOpen && !messagingWindow.discordSelected", social)
-        self.assertIn("&& !providerAccessPanel.visible && !messagingWindow.providerDesktopManaged", social)
-        self.assertIn("&& !telegramConnectPanel.visible && !providerAccessPanel.visible", social)
+        # Both native panes retain their component shell; Discord makes them
+        # empty and paints the backdrop in a separate bottom-layer window.
+        self.assertIn("visible: messagingWindow.menuOpen && !providerAccessPanel.visible", social)
+        self.assertIn("visible: messagingWindow.menuOpen && !telegramConnectPanel.visible", social)
+        self.assertIn("discordVisualBehind: messagingWindow.discordSelected", social)
+        self.assertIn("DiscordBackingW {", social)
+        self.assertIn("&& !providerAccessPanel.visible", social)
         self.assertNotIn("sendMessage(", panel)
         self.assertNotIn("password", panel.lower())
 

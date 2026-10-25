@@ -154,7 +154,7 @@ class DiscordDockingTests(TestCase):
             self.assertIn("discordReady = false;", method)
             self.assertIn("discordDocked = false;", method)
         self.assertIn('Quickshell.shellPath("widgets/messanger/DiscordGeometry.py")', text)
-        self.assertNotIn("DiscordBackingW", text)
+        self.assertIn("DiscordBackingW {", text)
 
     def test_social_focus_retry_uses_real_readiness_and_repeats(self):
         src = SOCIAL.read_text(encoding="utf-8")
@@ -166,45 +166,62 @@ class DiscordDockingTests(TestCase):
         self.assertIn("syncSocialGeometry(!messagingWindow.externalSelected)", chunk)
         self.assertIn("if (!messagingWindow.socialReady)", src)
 
-    def test_discord_overlay_does_not_paint_above_vesktop(self):
-        # The Sway region mask controls clicks, not pixels. A full-window
-        # painted frame + hidden-content-only Discord mode tinted the actual
-        # Vesktop client in the operator's desktop screenshot.
-        src = SOCIAL.read_text(encoding="utf-8")
-        frame = src.split("    WindowPanelFrame {", 1)[1].split(
-            "        // KEYBOARD CONTROLLER", 1)[0]
-        self.assertIn(
-            "fillOpacity: messagingWindow.discordSelected ? 0.0 : 0.20", frame
-        )
-        self.assertIn("borderVisible: false", frame)
-        self.assertIn("glowVisible: false", frame)
+    def test_discord_shells_remain_empty_but_exist_above_backing(self):
+        # The Social FloatingWindow still contains the component instances,
+        # yet they must paint no translucent surface/border above Vesktop.
+        social = SOCIAL.read_text(encoding="utf-8")
+        contact = (ROOT / "widgets/messanger/ContactList.qml").read_text()
+        feed = (ROOT / "components/ConversationFeed.qml").read_text()
+        self.assertIn("fillOpacity: messagingWindow.discordSelected ? 0.0 : 0.20", social)
+        self.assertIn("id: contactList", social)
+        self.assertIn("id: chatFeed", social)
+        self.assertIn("discordVisualBehind: messagingWindow.discordSelected", social)
+        self.assertIn("visible: messagingWindow.menuOpen && !providerAccessPanel.visible", social)
+        self.assertIn("visible: messagingWindow.menuOpen && !telegramConnectPanel.visible", social)
+        self.assertIn("discordMode: messagingWindow.externalSelected", social)
+        self.assertIn('color: discordVisualBehind ? "transparent"', contact)
+        self.assertIn("border.width: discordVisualBehind ? 0 : 1", contact)
+        self.assertIn("opacity: chatFeed.discordVisualBehind ? 0.0 : 0.85", feed)
+        self.assertIn("visible: !chatFeed.discordVisualBehind", feed)
+        self.assertIn("visible: !contactRoot.discordMode", contact)
+        self.assertIn("visible: !chatFeed.discordMode", feed)
+        self.assertIn("z: 3", social)
 
-        contact = src.split("        ContactList {", 1)[1].split(
-            "        // IN-MENU TELEGRAM ACCOUNT CONNECTION", 1)[0]
-        feed = src.split("        ChatFeed {", 1)[1]
-        for name, body in (("contact", contact), ("feed", feed)):
-            with self.subTest(name=name):
-                self.assertIn("visible: messagingWindow.menuOpen && !messagingWindow.discordSelected", body)
-                self.assertIn("discordMode: messagingWindow.externalSelected", body)
+    def test_discord_backing_restored_on_bottom_layer_and_screen(self):
+        social = SOCIAL.read_text(encoding="utf-8")
+        backing = BACKING.read_text(encoding="utf-8")
+        self.assertIn("DiscordBackingW {", social)
+        self.assertIn("hostSocial: messagingWindow", social)
+        self.assertIn("property var hostSocial: null", backing)
+        self.assertIn("WlrLayershell.layer: WlrLayer.Bottom", backing)
+        self.assertIn("discordBackingWindow", backing)
+        self.assertIn("hostSocial.discordX", backing)
+        self.assertIn("hostSocial.discordWidth", backing)
+        self.assertIn("hostSocial.menuOpen", backing)
+        self.assertIn("hostSocial.discordSelected", backing)
+        self.assertIn("width: 0", backing)
+        self.assertIn("height: 0", backing)
+        self.assertIn("opacity: 0.85", backing)
 
-        # The narrow selector should still paint above the provider desktop.
-        selector = src.split("        AppSelector {", 1)[1].split(
-            "        // CONTACT LIST", 1)[0]
-        self.assertIn("id: appSelector", selector)
-        self.assertIn("z: 3", selector)
-        # Existing selector focus logic may check discordSelected, but its
-        # visual surface must not be hidden along with the chat panels.
-        self.assertNotIn(
-            "visible: messagingWindow.menuOpen && !messagingWindow.discordSelected",
-            selector,
-        )
-        self.assertIn("width: messagingWindow.menuOpen ? (messagingWindow.externalSelected ? messagingWindow.appSelectorWidth : socialWindow.width) : 0", src)
-        self.assertNotIn("DiscordBackingW {", src)
+    def test_discord_launch_requests_real_sway_floating_and_raise(self):
+        social = SOCIAL.read_text(encoding="utf-8")
+        launch = social.split("    function showDiscord() {", 1)[1].split(
+            "    function hideDiscord()", 1)[0]
+        float_cmd = 'swaymsg \'[app_id=\\\"vesktop\\\"] floating enable\''
+        show_cmd = 'swaymsg \'[app_id=\\\"vesktop\\\"] scratchpad show\''
+        focus_cmd = 'swaymsg \'[app_id=\\\"vesktop\\\"] focus\''
+        self.assertGreaterEqual(launch.count(float_cmd), 2)
+        self.assertIn(show_cmd, launch)
+        self.assertIn(focus_cmd, launch)
+        self.assertLess(launch.index(float_cmd), launch.index(show_cmd))
+        self.assertLess(launch.index(show_cmd), launch.index(focus_cmd))
+        self.assertIn("if (discordDocked && menuOpen && discordSelected)", social)
+        self.assertIn("discordRaiseDelay.restart();", social)
 
-    def test_backing_remains_unused(self):
-        self.assertTrue(BACKING.exists())
-        source = SOCIAL.read_text()
-        self.assertNotIn("DiscordBackingW {", source)
+        helper = GEOMETRY.read_text()
+        self.assertIn("""'[app_id="vesktop"] floating enable; '""", helper)
+        self.assertIn("""'[app_id="vesktop"] focus'""", helper)
+        self.assertIn("""'[app_id="vesktop"] move absolute position '""", helper)
 
 
 if __name__ == "__main__":

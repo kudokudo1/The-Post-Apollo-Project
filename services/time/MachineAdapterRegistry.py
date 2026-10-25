@@ -2,7 +2,7 @@
 
 Registry entries describe PROPOSED identity shapes, not executable plugins,
 installed applications, read permissions, or supported live recovery.
-No filesystem discovery, dynamic imports, subprocesses, IPC or mutations.
+No filesystem discovery, dynamic loading, process spawning, IPC or mutations.
 """
 from __future__ import annotations
 

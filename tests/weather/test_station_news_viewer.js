@@ -95,7 +95,16 @@ assert.match(channel, /NEWS VIEWER \/\/ SAFE MODE/);
 assert.match(channel, /CRASH PROTECTION/);
 assert.match(channel, /onClicked: channelScreen\.closeRequested\(\)/);
 assert.doesNotMatch(channel, /\bLoader\s*\{|StationNewsWebView\.qml|import QtWebEngine/);
-assert.doesNotMatch(channel, /\bProcess\s*\{|Qt\.openUrlExternally|swaymsg|command:[^\n]*kitty/);
+// Exactly one read-only Process may inspect external browser availability.
+// Launching browsers, touching Sway geometry, or loading QtWebEngine remains
+// forbidden until a compositor-owned viewport is actually certified.
+assert.equal((channel.match(/\bProcess\s*\{/g) || []).length, 1);
+assert.match(channel, /Quickshell\.shellDir \+ "\/scripts\/weather\/news_viewer_preflight\.py"/);
+assert.match(channel, /"inspect"\]/);
+assert.match(channel, /label: viewerProbe\.running \? "CHECKING ENGINE" : "CHECK VIEWER"/);
+assert.match(channel, /onClicked:[\s\S]*?viewerProbe\.running = true/);
+assert.match(channel, /result\.can_launch === false/);
+assert.doesNotMatch(channel, /Qt\.openUrlExternally|swaymsg|startDetached\(|execDetached\(|command:[^\n]*kitty/);
 assert.match(hub, /StationChannelScreen\s*\{/);
 assert.match(hub, /onCloseRequested: stationNewsHub\.closeViewer\(\)/);
 assert.match(hub, /label: "WATCH IN STATION"/);

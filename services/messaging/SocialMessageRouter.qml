@@ -47,6 +47,22 @@ Item {
         || (appIndex === 2 && telegram.backendMode === "READY"
             && telegram.capabilities.sendText === true)
 
+    // Adapter B's inert sentinel states are surfaced without routing native
+    // messages or allowing unsupported send controls.
+    readonly property string accessBackendMode:
+        appIndex === 15 ? messenger.backendMode :
+        appIndex === 26 ? signal.backendMode :
+        appIndex === 29 ? viber.backendMode : "UNSUPPORTED"
+    readonly property string accessBackendDetail:
+        appIndex === 15 ? messenger.backendDetail :
+        appIndex === 26 ? signal.backendDetail :
+        appIndex === 29 ? viber.backendDetail :
+        appIndex === 14 ? "WhatsApp personal inbox is not exposed through an approved native API. WhatsApp Web is a separate provider interface." :
+        appIndex === 27 ? "WeChat personal message history is not exposed through an approved native adapter. The provider's desktop app is separate." :
+        appIndex === 28 ? "LINE Official Account APIs are not personal inbox access. The provider's Chrome extension is separate." :
+        appIndex === 30 ? "No supported KakaoTalk personal inbox adapter is available." :
+        appIndex === 31 ? "No supported BeReal desktop/personal-message adapter is available." : ""
+
     readonly property var telegramBackend: telegram
     readonly property bool telegramNeedsSetup: appIndex === 2
         && (telegram.backendMode !== "READY" || telegram.loginInProgress)
@@ -105,5 +121,18 @@ Item {
     TelegramAdapter {
         id: telegram
         active: router.appIndex === 2
+    }
+
+    SignalAdapter {
+        id: signal
+        active: router.appIndex === 26
+    }
+    MessengerAdapter {
+        id: messenger
+        active: router.appIndex === 15
+    }
+    ViberAdapter {
+        id: viber
+        active: router.appIndex === 29
     }
 }

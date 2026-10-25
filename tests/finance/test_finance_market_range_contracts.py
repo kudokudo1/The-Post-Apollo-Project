@@ -62,7 +62,8 @@ assert '"ADJUSTED CLOSE":"CLOSE"' in reader
 assert 'normalized' not in pane.lower() or 'SOURCE EODHD EOD' in pane
 
 assert 'readOptionalRange' in adapter
-assert 'if(!refused(error))' in adapter
+assert 'if(!refused(healthError))' in adapter
+assert 'health=await healthProbe(); healthError=null;' in adapter
 assert 'directReader(cik,from,to)' in adapter
 assert 'hub-unhealthy' in adapter
 assert 'FINANCE_STOCK_RANGE ' in adapter

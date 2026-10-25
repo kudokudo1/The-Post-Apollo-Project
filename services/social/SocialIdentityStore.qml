@@ -105,6 +105,23 @@ Scope {
             document, appId, familyId));
     }
 
+    // Reuse the sole guarded, atomic organization writer. Never route a
+    // layout edit through service providers or desktop window management.
+    function reorderFamily(familyId, direction) {
+        return applyFamilyAction(IdentityPolicy.reorderFamily(
+            document, familyId, direction));
+    }
+
+    function reorderApp(familyId, appId, direction) {
+        return applyFamilyAction(IdentityPolicy.reorderApp(
+            document, familyId, appId, direction));
+    }
+
+    function setAppHidden(appId, hidden) {
+        return applyFamilyAction(IdentityPolicy.setAppHidden(
+            document, appId, hidden));
+    }
+
     FileView {
         id: identityFile
         path: identities.storagePath

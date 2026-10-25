@@ -73,12 +73,17 @@ for source in (
     assert f"id: {source}" in clock
     assert f"safeSource: {source}" in clock
 
-# The operator-approved direction keeps cyan as the 12-hour primary identity
-# and orange as the 24-hour identity. Stars, colon, and the // separator stay
-# white at 0.6 opacity with tight full-strength mode-colored glows. AM/PM is a normal
-# state-colored element at default opacity and the original 20px size.
+# Closed Clock keeps cyan for 12-hour and orange for 24-hour readings.
+# TimeW-open inherits the canonical yellow dock fill and magenta open glow:
+# each source-sampled glyph must follow the bound DockButton color. The four
+# structural marks are white/muted while closed and magenta while open.
+assert "open: clockArea.timeWindow !== null" in clock
+assert "&& clockArea.timeWindow.menuOpen === true" in clock
 assert "clockArea.is24Hour ? Colors.orange : Colors.cyan" in clock
-assert "clockArea.is24Hour\n                            ? Colors.orange\n                            : Colors.cyan" in clock
+assert "normalDockGlowColor: normalForegroundColor" in clock
+assert "normalContentGlowColor: normalDockGlowColor" in clock
+assert clock.count("color: clockButton.foregroundColor") == 4
+assert clock.count("color: clockButton.contentGlowColor") == 8
 assert 'Qt.formatDateTime(clock.date, "hh AP").split(" ")[0]' in clock
 assert 'Qt.formatDateTime(clock.date, "HH")' in clock
 assert 'text: "//"' in clock
@@ -92,8 +97,8 @@ assert "+ contentLeftPadding" in clock
 assert "+ contentRightPadding" in clock
 assert "(clockButton.contentLeftPadding" in clock
 assert "- clockButton.contentRightPadding) / 2" in clock
-assert clock.count("color: Colors.white") >= 3
-assert clock.count("opacity: 0.6") >= 4
+assert clock.count("? clockButton.openForegroundColor : Colors.white") == 4
+assert clock.count("opacity: clockButton.open ? 1.0 : 0.6") == 4
 assert clock.count("radius: 8") >= 4
 assert clock.count("samples: 15") >= 8
 assert clock.count("opacity: 1.0") >= 4
@@ -102,8 +107,7 @@ period_end = clock.index("SafeDropShadow", period_start)
 period_text = clock[period_start:period_end]
 assert "color: Colors.white" not in period_text
 assert "opacity: 0.6" not in period_text
-assert "? Colors.orange" in period_text
-assert ": Colors.cyan" in period_text
+assert "color: clockButton.foregroundColor" in period_text
 assert "font.pixelSize: 11" not in clock
 assert "font.pixelSize: 17" not in clock
 assert "font.pixelSize: 20" in clock

@@ -33,12 +33,28 @@ Item {
                 + contentRightPadding
             )
 
+        // The clock's dock follows the actual TimeW visibility, not just
+        // the click pulse. DockButton supplies the shared open yellow fill,
+        // magenta foreground, and magenta soft/wide halo.
+        open: clockArea.timeWindow !== null
+              && clockArea.timeWindow.menuOpen === true
+
+        // Individual clock glyphs retain their independent sampled glows.
+        // The generic whole-row content sampler stays disabled.
         contentGlowEnabled: false
 
-        normalDockGlowColor:
+        // Closed 12h = cyan, closed 24h = orange. Open overrides both
+        // through DockButton's standard foreground/glow state precedence.
+        normalForegroundColor:
             clockArea.is24Hour ? Colors.orange : Colors.cyan
+        hoverForegroundColor: normalForegroundColor
+        pressedForegroundColor: normalForegroundColor
+        normalDockGlowColor: normalForegroundColor
         hoverDockGlowColor: normalDockGlowColor
         pressedDockGlowColor: normalDockGlowColor
+        normalContentGlowColor: normalDockGlowColor
+        hoverContentGlowColor: normalDockGlowColor
+        pressedContentGlowColor: normalDockGlowColor
 
         softGlowIdleOpacity: 0.40
         softGlowHoverOpacity: 0.50
@@ -53,15 +69,11 @@ Item {
             precision: SystemClock.Seconds
         }
 
-        // The clock keeps a cyan primary identity in 12-hour mode and shifts
-        // that primary identity to orange in alternate 24-hour mode. Stars,
-        // stars and punctuation accents remain white at 0.6 opacity while
-        // their tight full-strength Wi-Fi-style glows carry the active mode
-        // color. AM/PM is a normal
-        // module-state element again: cyan in 12-hour mode, orange in 24-hour
-        // mode, at default opacity and the original 20px size. The // slot
-        // carries a tiny geometry gap on each side without literal spaces.
-        // Each source-attached glow stays inside its slot.
+        // Closed: 12-hour cyan or 24-hour orange for the time glyphs;
+        // ornaments stay muted white. Open: magenta foreground and independent
+        // sampled magenta glows, in sync with DockButton's open fill and halo.
+        // Right-click changes only the time format, never the menu-open state.
+        // The // slot retains its small visual gap and original glyph layout.
         Row {
             id: clockRow
 
@@ -88,8 +100,9 @@ Item {
                         anchors.centerIn: parent
 
                         text: " ๋࣭"
-                        color: Colors.white
-                        opacity: 0.6
+                        color: clockButton.open
+                               ? clockButton.openForegroundColor : Colors.white
+                        opacity: clockButton.open ? 1.0 : 0.6
                         font.pixelSize: 20
                     }
 
@@ -105,10 +118,7 @@ Item {
 
                         opacity: 1.0
 
-                        color:
-                            clockArea.is24Hour
-                            ? Colors.orange
-                            : Colors.cyan
+                        color: clockButton.contentGlowColor
                         transparentBorder: true
                     }
                 }
@@ -124,10 +134,7 @@ Item {
                         anchors.centerIn: parent
 
                         text: "🕰"
-                        color:
-                            clockArea.is24Hour
-                            ? Colors.orange
-                            : Colors.cyan
+                        color: clockButton.foregroundColor
                         font.pixelSize: 20
                     }
 
@@ -142,16 +149,11 @@ Item {
                         z: 2
 
                         opacity:
-                            clockButton.pressed
-                            ? 1.0
-                            : clockButton.hovered
-                            ? 0.95
-                            : 0.75
+                            clockButton.open ? clockButton.contentGlowOpacity
+                            : clockButton.pressed ? 1.0
+                            : clockButton.hovered ? 0.95 : 0.75
 
-                        color:
-                            clockArea.is24Hour
-                            ? Colors.orange
-                            : Colors.cyan
+                        color: clockButton.contentGlowColor
                         transparentBorder: true
                     }
                 }
@@ -167,8 +169,9 @@ Item {
                         anchors.centerIn: parent
 
                         text: "⭑"
-                        color: Colors.white
-                        opacity: 0.6
+                        color: clockButton.open
+                               ? clockButton.openForegroundColor : Colors.white
+                        opacity: clockButton.open ? 1.0 : 0.6
                         font.pixelSize: 20
                     }
 
@@ -184,10 +187,7 @@ Item {
 
                         opacity: 1.0
 
-                        color:
-                            clockArea.is24Hour
-                            ? Colors.orange
-                            : Colors.cyan
+                        color: clockButton.contentGlowColor
                         transparentBorder: true
                     }
                 }
@@ -214,10 +214,7 @@ Item {
                             ? Qt.formatDateTime(clock.date, "HH")
                             : Qt.formatDateTime(clock.date, "hh AP").split(" ")[0]
 
-                        color:
-                            clockArea.is24Hour
-                            ? Colors.orange
-                            : Colors.cyan
+                        color: clockButton.foregroundColor
                         font.pixelSize: 20
                     }
 
@@ -232,16 +229,11 @@ Item {
                         z: 2
 
                         opacity:
-                            clockButton.pressed
-                            ? 1.0
-                            : clockButton.hovered
-                            ? 0.95
-                            : 0.75
+                            clockButton.open ? clockButton.contentGlowOpacity
+                            : clockButton.pressed ? 1.0
+                            : clockButton.hovered ? 0.95 : 0.75
 
-                        color:
-                            clockArea.is24Hour
-                            ? Colors.orange
-                            : Colors.cyan
+                        color: clockButton.contentGlowColor
                         transparentBorder: true
                     }
                 }
@@ -257,8 +249,9 @@ Item {
                         anchors.centerIn: parent
 
                         text: ":"
-                        color: Colors.white
-                        opacity: 0.6
+                        color: clockButton.open
+                               ? clockButton.openForegroundColor : Colors.white
+                        opacity: clockButton.open ? 1.0 : 0.6
                         font.pixelSize: 20
                     }
 
@@ -274,10 +267,7 @@ Item {
 
                         opacity: 1.0
 
-                        color:
-                            clockArea.is24Hour
-                            ? Colors.orange
-                            : Colors.cyan
+                        color: clockButton.contentGlowColor
                         transparentBorder: true
                     }
                 }
@@ -293,10 +283,7 @@ Item {
                         anchors.centerIn: parent
 
                         text: Qt.formatDateTime(clock.date, "mm")
-                        color:
-                            clockArea.is24Hour
-                            ? Colors.orange
-                            : Colors.cyan
+                        color: clockButton.foregroundColor
                         font.pixelSize: 20
                     }
 
@@ -311,16 +298,11 @@ Item {
                         z: 2
 
                         opacity:
-                            clockButton.pressed
-                            ? 1.0
-                            : clockButton.hovered
-                            ? 0.95
-                            : 0.75
+                            clockButton.open ? clockButton.contentGlowOpacity
+                            : clockButton.pressed ? 1.0
+                            : clockButton.hovered ? 0.95 : 0.75
 
-                        color:
-                            clockArea.is24Hour
-                            ? Colors.orange
-                            : Colors.cyan
+                        color: clockButton.contentGlowColor
                         transparentBorder: true
                     }
                 }
@@ -338,8 +320,9 @@ Item {
                         anchors.centerIn: parent
 
                         text: "//"
-                        color: Colors.white
-                        opacity: 0.6
+                        color: clockButton.open
+                               ? clockButton.openForegroundColor : Colors.white
+                        opacity: clockButton.open ? 1.0 : 0.6
                         font.pixelSize: 20
                     }
 
@@ -355,10 +338,7 @@ Item {
 
                         opacity: 1.0
 
-                        color:
-                            clockArea.is24Hour
-                            ? Colors.orange
-                            : Colors.cyan
+                        color: clockButton.contentGlowColor
                         transparentBorder: true
                     }
                 }
@@ -374,10 +354,7 @@ Item {
                         anchors.centerIn: parent
 
                         text: Qt.formatDateTime(clock.date, "AP")
-                        color:
-                            clockArea.is24Hour
-                            ? Colors.orange
-                            : Colors.cyan
+                        color: clockButton.foregroundColor
                         font.pixelSize: 20
                     }
 
@@ -392,16 +369,11 @@ Item {
                         z: 2
 
                         opacity:
-                            clockButton.pressed
-                            ? 1.0
-                            : clockButton.hovered
-                            ? 0.95
-                            : 0.75
+                            clockButton.open ? clockButton.contentGlowOpacity
+                            : clockButton.pressed ? 1.0
+                            : clockButton.hovered ? 0.95 : 0.75
 
-                        color:
-                            clockArea.is24Hour
-                            ? Colors.orange
-                            : Colors.cyan
+                        color: clockButton.contentGlowColor
                         transparentBorder: true
                     }
                 }

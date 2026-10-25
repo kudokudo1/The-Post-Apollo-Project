@@ -49,6 +49,32 @@ assert 'console.log("clockButton clicked");' in clock
 assert "SystemClock.Seconds" in clock
 assert "implicitHeight: 50" in clock
 
+# Clock's dock must reflect TimeW's real open state, using the shared
+# DockButton open-fill, foreground and halo recipe. Preserve the closed
+# 12h-cyan / 24h-orange identity and independently sampled glyph glows.
+dock_button = (ROOT / "components/DockButton.qml").read_text(encoding="utf-8")
+assert "open: clockArea.timeWindow !== null" in clock
+assert "&& clockArea.timeWindow.menuOpen === true" in clock
+assert "property color openFillColor: Colors.yellow" in dock_button
+assert "property color openForegroundColor: Colors.magenta" in dock_button
+assert "property color openGlowColor: Colors.magenta" in dock_button
+assert "color: open ? openFillColor : closedFillColor" in dock_button
+assert "normalForegroundColor:\n            clockArea.is24Hour ? Colors.orange : Colors.cyan" in clock
+assert "normalDockGlowColor: normalForegroundColor" in clock
+assert "normalContentGlowColor: normalDockGlowColor" in clock
+assert "hoverContentGlowColor: normalDockGlowColor" in clock
+assert "pressedContentGlowColor: normalDockGlowColor" in clock
+assert "contentGlowEnabled: false" in clock
+assert clock.count("color: clockButton.foregroundColor") == 4
+assert clock.count("color: clockButton.contentGlowColor") == 8
+assert clock.count("? clockButton.openForegroundColor : Colors.white") == 4
+assert clock.count("opacity: clockButton.open ? 1.0 : 0.6") == 4
+assert clock.count("clockButton.open ? clockButton.contentGlowOpacity") == 4
+assert "property bool is24Hour: false" in clock
+assert "onRightClicked: {" in clock
+assert "clockArea.is24Hour = !clockArea.is24Hour;" in clock
+assert "clockArea.timeWindow.toggle();" in clock
+
 # TimeW now matches FinanceW Compact's 790px visible frame height.
 # FinanceW remains dynamic; the source contract checks TimeW's fixed cap.
 for dim in ("frameWidth: 432", "frameHeight: 790", "glowGutter: 12"):

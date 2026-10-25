@@ -4,6 +4,11 @@ on:
   pull_request:
     paths:
       - "services/messaging/SocialMessageRouter.qml"
+      - "services/messaging/DesktopServiceLauncher.py"
+      - "services/messaging/SocialAccountCatalog.py"
+      - "widgets/messanger/ProviderAccessPanel.qml"
+      - "widgets/messanger/XBrowser.py"
+      - "widgets/messanger/DiscordGeometry.py"
       - "services/messaging/SessionAdapter.qml"
       - "services/messaging/adapters/**"
       - "services/messaging/bridges/telegram/**"
@@ -17,6 +22,11 @@ on:
       - main
     paths:
       - "services/messaging/SocialMessageRouter.qml"
+      - "services/messaging/DesktopServiceLauncher.py"
+      - "services/messaging/SocialAccountCatalog.py"
+      - "widgets/messanger/ProviderAccessPanel.qml"
+      - "widgets/messanger/XBrowser.py"
+      - "widgets/messanger/DiscordGeometry.py"
       - "services/messaging/SessionAdapter.qml"
       - "services/messaging/adapters/**"
       - "services/messaging/bridges/telegram/**"
@@ -38,6 +48,7 @@ jobs:
           set -euo pipefail
           python3 tests/messaging/test_social_native_router_contracts.py
           python3 tests/messaging/test_social_account_catalog_contracts.py
+          python3 tests/messaging/test_social_provider_access_contracts.py
           python3 tests/messaging/test_session_adapter_contracts.py
           python3 tests/messaging/test_telegram_adapter_contracts.py
           python3 tests/messaging/test_telegram_bridge_cli_contracts.py

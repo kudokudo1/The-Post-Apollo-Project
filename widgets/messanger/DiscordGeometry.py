@@ -149,7 +149,8 @@ def compact_rect(rect: Any) -> dict[str, int] | None:
 BROWSER_SITES = ("x", "instagram", "facebook", "reddit", "threads", "pinterest",
                  "truthsocial", "bluesky", "tumblr", "tiktok", "snapchat",
                  "linkedin", "mastodon", "nextdoor", "steamchat", "element",
-                 "groupme", "lemon8", "quora", "pixelfed", "zalo")
+                 "groupme", "lemon8", "quora", "pixelfed", "zalo",
+                 "whatsappweb", "messengerweb")
 
 
 def snapshot_from_tree(tree: dict[str, Any]) -> dict[str, Any]:

@@ -54,6 +54,9 @@ ITEMS: tuple[tuple[str, str, str], ...] = (
 ITEM_BY_ID = {item[0]: (i, item[1], item[2]) for i, item in enumerate(ITEMS)}
 BROWSER_IDS = {item[0] for item in ITEMS if item[2] == "browser_profile"}
 BLOCKED = {"unsupported_personal", "unsupported_mobile"}
+# These are separate provider-owned desktop/web surfaces, NOT native inbox APIs.
+DESKTOP_FALLBACKS = {"signal": "signal", "viber": "viber", "wechat": "wechat"}
+WEB_FALLBACKS = {"whatsapp": "whatsappweb", "messenger": "messengerweb"}
 
 
 def catalog() -> dict[str, Any]:
@@ -66,6 +69,8 @@ def catalog() -> dict[str, Any]:
                 "serviceId": service_id, "label": label,
                 "selectorIndex": index, "channel": channel,
                 "supportsManagedBatchLogin": False,
+                "desktopFallbackId": DESKTOP_FALLBACKS.get(service_id),
+                "webFallbackId": WEB_FALLBACKS.get(service_id),
             }
             for index, (service_id, label, channel) in enumerate(ITEMS)
         ],
@@ -122,6 +127,8 @@ def plan(payload: object) -> dict[str, Any]:
         rows.append({
             "serviceId": service_id, "selectorIndex": index,
             "channel": channel, "status": status, "nextAction": action,
+            "desktopFallbackId": DESKTOP_FALLBACKS.get(service_id),
+            "webFallbackId": WEB_FALLBACKS.get(service_id),
             "authenticated": None,  # Unknown, never fabricated.
             "batchLoginPerformed": False,
         })

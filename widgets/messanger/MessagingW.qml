@@ -297,9 +297,16 @@ PanelWindow {
 
     readonly property bool nativeChatSelected: activeAppIndex === 0 || activeAppIndex === 2
     readonly property bool discordSelected: activeAppIndex === 1
+    readonly property bool providerAccessSelected:
+        activeAppIndex === 14 || activeAppIndex === 15 ||
+        (activeAppIndex >= 26 && activeAppIndex <= 31)
+    property bool providerWebOpen: false
     // xSelected retains the existing external-browser focus contract.
     readonly property bool xSelected: (activeAppIndex >= 3 && activeAppIndex <= 13) || (activeAppIndex >= 16 && activeAppIndex <= 25)
+        || ((activeAppIndex === 14 || activeAppIndex === 15) && providerWebOpen)
     readonly property string browserSite:
+        activeAppIndex === 14 && providerWebOpen ? "whatsappweb" :
+        activeAppIndex === 15 && providerWebOpen ? "messengerweb" :
         activeAppIndex === 4 ? "instagram" :
         activeAppIndex === 5 ? "facebook" :
         activeAppIndex === 6 ? "reddit" :
@@ -943,7 +950,26 @@ PanelWindow {
         chatFeed.focusMessageInput();
     }
 
+    function openProviderWeb(service) {
+        // A provider website is a provider-owned UI, not a native message API.
+        if (!menuOpen || providerWebOpen)
+            return;
+        if ((service === "whatsapp" && activeAppIndex !== 14)
+                || (service === "messenger" && activeAppIndex !== 15))
+            return;
+        if (service !== "whatsapp" && service !== "messenger")
+            return;
+        providerWebOpen = true;
+        hideDiscord();
+        xError = "";
+        showX();
+    }
+
     function activateApp(index, retainSelectorFocus) {
+        if (providerWebOpen) {
+            hideX();
+            providerWebOpen = false;
+        }
         // Clear the old selection before swapping adapters; never briefly
         // render a Sessions thread under Telegram or vice versa.
         contactList.clearSelection();
@@ -1195,14 +1221,8 @@ PanelWindow {
             // Do not show fake contacts or launch external browser windows.
             statusText: messagingWindow.xSelected ? messagingWindow.xError
                        : messagingWindow.activeAppIndex === 2 ? messageRouter.telegramStatus
-                       : messagingWindow.activeAppIndex === 14 ? "WHATSAPP // Native integration pending"
-                       : messagingWindow.activeAppIndex === 15 ? "MESSENGER // Native integration pending"
-                       : messagingWindow.activeAppIndex === 26 ? "SIGNAL // Native integration pending"
-                       : messagingWindow.activeAppIndex === 27 ? "WECHAT // Native integration pending"
-                       : messagingWindow.activeAppIndex === 28 ? "LINE // Desktop integration pending"
-                       : messagingWindow.activeAppIndex === 29 ? "VIBER // Native integration pending"
-                       : messagingWindow.activeAppIndex === 30 ? "KAKAOTALK // Desktop integration pending"
-                       : messagingWindow.activeAppIndex === 31 ? "BEREAL // Mobile integration pending"
+                       : messagingWindow.providerAccessSelected
+                           ? "NATIVE // " + messageRouter.accessBackendMode
                        : ""
 
             width: messagingWindow.appSelectorWidth
@@ -1248,7 +1268,7 @@ PanelWindow {
             width: messagingWindow.contactListWidth
             height: messagingContent.height
 
-            visible: messagingWindow.menuOpen
+            visible: messagingWindow.menuOpen && !providerAccessPanel.visible
 
             discordMode: messagingWindow.externalSelected
 
@@ -1301,6 +1321,27 @@ PanelWindow {
         }
 
         // ========================================================
+        // NON-NATIVE PROVIDER ACCESS // DESKTOP + WEB FALLBACKS
+        // ========================================================
+
+        ProviderAccessPanel {
+            id: providerAccessPanel
+            serviceIndex: messagingWindow.activeAppIndex
+            backendMode: messageRouter.accessBackendMode
+            backendDetail: messageRouter.accessBackendDetail
+            x: messagingWindow.appSelectorWidth
+            y: 0
+            width: Math.max(1, messagingContent.width - x)
+            height: messagingContent.height
+            visible: messagingWindow.menuOpen && messagingWindow.providerAccessSelected
+                     && !messagingWindow.providerWebOpen
+            z: 2
+            onBrowserRequested: function(serviceId) {
+                messagingWindow.openProviderWeb(serviceId);
+            }
+        }
+
+        // ========================================================
         // CHAT FEED
         // ========================================================
 
@@ -1315,7 +1356,7 @@ PanelWindow {
 
             height: messagingContent.height
 
-            visible: messagingWindow.menuOpen && !telegramConnectPanel.visible
+            visible: messagingWindow.menuOpen && !telegramConnectPanel.visible && !providerAccessPanel.visible
 
             discordMode: messagingWindow.externalSelected
 
@@ -1393,7 +1434,9 @@ PanelWindow {
 
     onMenuOpenChanged: {
         // Do not resume into a stale settings page after Social closes.
-        // The app-selection and external-window lifecycle stay unchanged.
+        // External-web fallbacks stay separate from each provider's native
+        // unsupported status; reset without touching provider login sessions.
+        providerWebOpen = false;
         appSelector.settingsOpen = false;
         setGeometryWatch(menuOpen);
 

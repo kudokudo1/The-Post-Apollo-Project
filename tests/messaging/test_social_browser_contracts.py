@@ -58,12 +58,19 @@ for index, site, label, url in new_sites:
     assert f"--class={window_class}" in command
     assert f"--user-data-dir=/tmp/social-browser-contract/post-apollo/{profile}" in command
 
-# WhatsApp and Messenger use an explicit, unconnected native messaging slot.
-for index, label in ((14, "WHATSAPP"), (15, "MESSENGER")):
+# The two official web fallbacks are opt-in, not native inbox adapters.
+for index, label, key, url in (
+    (14, "WHATSAPP", "whatsappweb", "https://web.whatsapp.com/"),
+    (15, "MESSENGER", "messengerweb", "https://www.facebook.com/messages/"),
+):
     assert f'name: "{label}"' in selector
     assert label.lower() not in browser.SITES
-    assert label.lower() not in geometry.BROWSER_SITES
-    assert f'activeAppIndex === {index} ? "{label} // Native integration pending"' in social
+    assert key not in browser.SITES  # 21 ordinary browser-profile slots remain.
+    assert browser.site_config(key)[0] == url
+    assert geometry.sway_criteria(key) == f'[class="post-apollo-{key}"]'
+    assert f'activeAppIndex === {index}' in social
+assert 'providerWebOpen = true;' in social
+assert 'onBrowserRequested: function(serviceId)' in social
 
 # Keep all modes reachable in the fixed-height Social selector via scrolling.
 assert "Flickable {" in selector
@@ -166,21 +173,23 @@ pending_modes = (
 )
 for index, label, detail in pending_modes:
     assert f'name: "{label}"' in selector
-    assert f'activeAppIndex === {index} ? "{label} // {detail}"' in social
     assert label.lower() not in browser.SITES
     assert label.lower() not in geometry.BROWSER_SITES
+    assert "ProviderAccessPanel {" in social
+    assert "messageRouter.accessBackendMode" in social
 
 # Twitch and YouTube remain in the streaming/media category, not Social.
 assert 'name: "TWITCH"' not in selector
 assert 'name: "YOUTUBE"' not in selector
-assert len(browser.SITES) == len(geometry.BROWSER_SITES)
-assert set(browser.SITES) == set(geometry.BROWSER_SITES)
+assert len(browser.SITES) == 21
+assert set(browser.ALL_SITES) == set(geometry.BROWSER_SITES)
+assert set(browser.WEB_FALLBACK_SITES) == {"whatsappweb", "messengerweb"}
 assert len({config[1] for config in browser.SITES.values()}) == len(browser.SITES)
 assert len({config[2] for config in browser.SITES.values()}) == len(browser.SITES)
 assert "activeAppIndex >= 16 && activeAppIndex <= 25" in social
 assert "index >= 16 && index <= 25" in social
-assert 'activeAppIndex === 14 ? "WHATSAPP // Native integration pending"' in social
-assert 'activeAppIndex === 15 ? "MESSENGER // Native integration pending"' in social
+assert 'readonly property bool providerAccessSelected:' in social
+assert 'messageRouter.accessBackendDetail' in social
 assert "function ensureSelectedVisible()" in selector
 assert "Flickable {" in selector
 

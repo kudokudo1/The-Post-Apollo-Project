@@ -49,11 +49,20 @@ SITES = {
     "zalo": ("https://chat.zalo.me/", "post-apollo-zalo", "zalo-browser"),
 }
 
+# Official web messaging fallbacks, NOT personal-message API adapters. They
+# are visible only after an explicit in-menu Open Web click; each has a
+# separate persistent Chromium profile and an independent Sway class.
+WEB_FALLBACK_SITES = {
+    "whatsappweb": ("https://web.whatsapp.com/", "post-apollo-whatsappweb", "whatsappweb-browser"),
+    "messengerweb": ("https://www.facebook.com/messages/", "post-apollo-messengerweb", "messengerweb-browser"),
+}
+ALL_SITES = {**SITES, **WEB_FALLBACK_SITES}
+
 
 def site_config(site: str) -> tuple[str, str, str]:
-    if site not in SITES:
+    if site not in ALL_SITES:
         raise ValueError(f"Unsupported Social browser site: {site}")
-    return SITES[site]
+    return ALL_SITES[site]
 
 
 def site_criteria(site: str) -> str:
@@ -176,7 +185,7 @@ def browser_command(site: str = "x") -> list[str]:
 def show(site: str = "x") -> None:
     # Hiding a different site never logs it out or kills its browser process.
     site_config(site)
-    for other in SITES:
+    for other in ALL_SITES:
         if other != site and site_exists(other):
             sway_command(f"{site_criteria(other)} move scratchpad")
 
@@ -210,14 +219,14 @@ def hide(site: str = "x") -> None:
 
 
 def hide_all() -> None:
-    for site in SITES:
+    for site in ALL_SITES:
         hide(site)
 
 
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("action", choices=("show", "hide", "status"))
-    parser.add_argument("site", nargs="?", default="x", choices=(*SITES, "all"))
+    parser.add_argument("site", nargs="?", default="x", choices=(*ALL_SITES, "all"))
     args = parser.parse_args()
 
     try:
@@ -231,7 +240,7 @@ def main() -> int:
             else:
                 hide(args.site)
         elif args.site == "all":
-            print(json.dumps({site: site_exists(site) for site in SITES}))
+            print(json.dumps({site: site_exists(site) for site in ALL_SITES}))
         else:
             print(json.dumps({
                 "window": site_exists(args.site),

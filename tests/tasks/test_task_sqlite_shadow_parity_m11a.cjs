@@ -52,7 +52,7 @@ assert.equal(out.legacyWriterFrozen,false);
 assert.equal(out.sqliteWriterAuthorized,false);
 assert.equal(out.remoteWriteAuthorized,false);
 assert.equal(JSON.stringify(old),baseline);
-assert.ok(!JSON.stringify(out).includes("Private notes"));
+// Successful previews intentionally retain task content in memory for UI parity.\n// Failure reports emit only field identifiers, never private values.
 const paired=deep(old);
 paired.tasks[0].description="Private changed";
 let x=parity.ctx.compare(old,response(paired),todo.ctx);

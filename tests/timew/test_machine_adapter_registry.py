@@ -139,10 +139,10 @@ refuses(lambda p: p["windows"][24]["items"][0].update(kind="terminal_split"))
 refuses(lambda p: p["windows"][23]["items"][0].update(kind="browser_tab"))
 refuses(lambda p: p["windows"][27]["identity"].update(adapter="editor.vscode"))
 refuses(lambda p: p["windows"][27]["items"].append({
-    "item_key": key(40000), "kind": "custom_session_item",
+    "item_key": key(40000), "kind": "browser_tab",
     "position": 1, "adapter_item_key": None}))
-refuses(lambda p: p["windows"][27]["identity"].update(status="reported"))
-refuses(lambda p: p["windows"][27]["capabilities"].update(reopen_window="reported"))
+refuses(lambda p: p["windows"][27]["identity"].update(status="denied"))
+refuses(lambda p: p["windows"][27]["capabilities"].update(reopen_window="active"))
 refuses(lambda p: p["windows"][21]["items"][0].update(url="SECRET"))
 refuses(lambda p: p["windows"][25]["items"][0].update(document_path="/private"))
 refuses(lambda p: p["windows"][23].update(workspace="3"))
@@ -152,7 +152,7 @@ unknown = window(33, "unregistered-sandbox", "2", "none", None)
 copy_unknown = copy.deepcopy(sidecar)
 copy_unknown["windows"].append(unknown)
 validate_sidecar(copy_unknown, adapter_manifests=extra_adapters)
-assert all(not x["safe_actions"] for x in [])  # no app execution exists
+assert describe_coverage(copy_unknown, adapter_manifests=extra_adapters)["safe_actions"] == []
 
 def bad_manifest(m):
     try:

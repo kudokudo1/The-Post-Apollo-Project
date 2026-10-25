@@ -115,3 +115,32 @@ If source and destination have the same number of windows but in different works
 - Exact language and visual styles for user-facing buttons, deferred by operator.
 
 **Near-term acceptance:** M2a read-only duplicate-window inventory with 17 Brave and four Kitty tests, merged only with operator approval. Everything else above is roadmap, not a claim of completed functionality.
+
+
+## M2c update // Cross-application compatibility (2026-10-24)
+
+**Operator-approved direction:** Brave and Kitty are the initial stress cases,
+**not the list of supported applications**. Universal compatibility is a core
+constraint: browsers (including Firefox/Chrome/Edge/Opera/Mullvad), terminals
+(including Ghostty/WezTerm/Foot), editors and IDEs (including VS Code, Zed,
+JetBrains), file managers, office, media and other families.
+
+The M2b parser's hardcoded Brave/Kitty adapter types are being replaced in a
+separate draft PR by a data-only manifest registry. See
+`docs/timew-machine-m2c-universal-adapters.md`. Registry declaration is
+**not** evidence of installed/usable integration. Every app's live identity,
+tab/session recovery, data permission and launch capability must pass separate
+verification. Linux Wayland, Linux X11, macOS and Windows require distinct
+host adapters; listing them as targets never means they are supported.
+
+Preserve both recovery semantics: REVIVE repairs current work minimally;
+RESTORE reconstructs selected historical work only after protecting the
+current timeline. Unknown apps retain the basic v1 layout-only fallback.
+Do not fake exact session equality from matching app/window counts or
+arbitrary UUIDs. Future workers must not implement a special-case switch for
+Brave/Kitty instead of the registry, and must not access private app content
+during this schema-only phase.
+
+**Next gate after M2c registry:** audit actual browser, terminal and editor
+interfaces and ownership, then present a capability/consent matrix. No
+active capture, launch, migration, app command replay or live restore yet.

@@ -1,6 +1,6 @@
 """MACHINE M2b: strict, pure PROPOSED v2 session identity sidecar schema.
 
-NO files, Sway IPC, browser/Kitty access, action runners, or migrations.
+NO files, Sway IPC, browser/terminal/editor access, action runners, or migrations.
 The current v1 checkpoint document/database remains the only implemented
 persistent save. Parsed adapter identifiers are CLAIMS, never verified proof
 of which live window, tab, process or browser profile is which.
@@ -12,6 +12,7 @@ import json
 import uuid
 
 from MachineCheckpointStore import StoreError, validate as validate_v1
+from MachineAdapterRegistry import RegistryError, build_registry, find_declared_adapter
 
 MAX_WINDOWS = 512
 MAX_ITEMS = 4096
@@ -20,8 +21,6 @@ MAX_TEXT = 128
 SIDECAR_KIND = "machine-session-identity-sidecar"
 IDENTITY_STATES = frozenset((
     "not_requested", "denied", "unsupported", "partial", "reported"))
-SOURCES = frozenset(("none", "brave", "kitty"))
-ITEM_KINDS = frozenset(("browser_tab", "terminal_tab", "terminal_split"))
 
 
 class SidecarError(ValueError):
@@ -68,7 +67,7 @@ def _ordinal(value):
     return value
 
 
-def validate_sidecar(document, *, v1_checkpoint=None):
+def validate_sidecar(document, *, v1_checkpoint=None, adapter_manifests=()):
     """Strict allowlisted parser; never emits a claim of live session equality.
 
     Optional v1 document comparison binds this PROPOSAL to precisely the
@@ -96,6 +95,11 @@ def validate_sidecar(document, *, v1_checkpoint=None):
     if not isinstance(windows, list) or len(windows) > MAX_WINDOWS:
         raise SidecarError("INVALID WINDOW COLLECTION")
 
+    try:
+        registry = build_registry(adapter_manifests)
+    except RegistryError as exc:
+        raise SidecarError("INVALID ADAPTER CATALOG") from exc
+
     cleaned = []
     window_keys = set()
     app_instance_refs = set()
@@ -117,8 +121,10 @@ def validate_sidecar(document, *, v1_checkpoint=None):
         _fields(identity, ("adapter", "status", "namespace_key",
                            "instance_key"))
         adapter = identity["adapter"]
-        if not isinstance(adapter, str) or adapter not in SOURCES:
-            raise SidecarError("UNRECOGNIZED ADAPTER")
+        try:
+            descriptor = find_declared_adapter(registry, adapter, app)
+        except RegistryError as exc:
+            raise SidecarError("UNKNOWN OR WRONG APPLICATION ADAPTER") from exc
         status = _state(identity["status"])
         namespace_key = _maybe_id(identity["namespace_key"])
         instance_key = _maybe_id(identity["instance_key"])
@@ -169,12 +175,9 @@ def validate_sidecar(document, *, v1_checkpoint=None):
                 raise SidecarError("DUPLICATE INNER ITEM KEY")
             all_item_keys.add(item_key)
             kind = item["kind"]
-            if not isinstance(kind, str) or kind not in ITEM_KINDS:
-                raise SidecarError("UNSUPPORTED INNER ITEM KIND")
-            if adapter == "brave" and kind != "browser_tab":
-                raise SidecarError("WRONG INNER ITEM ADAPTER")
-            if adapter == "kitty" and kind == "browser_tab":
-                raise SidecarError("WRONG INNER ITEM ADAPTER")
+            if (not isinstance(kind, str)
+                    or kind not in descriptor["item_kinds"]):
+                raise SidecarError("WRONG OR UNSUPPORTED INNER ITEM KIND")
             position = _ordinal(item["position"])
             if position in seen_positions:
                 raise SidecarError("DUPLICATE INNER ITEM POSITION")
@@ -212,9 +215,9 @@ def validate_sidecar(document, *, v1_checkpoint=None):
             "checkpoint_id": checkpoint_id, "windows": cleaned}
 
 
-def describe_coverage(proposal):
+def describe_coverage(proposal, *, adapter_manifests=()):
     """Information summary only; adapter claims do not prove session equality."""
-    valid = validate_sidecar(proposal)
+    valid = validate_sidecar(proposal, adapter_manifests=adapter_manifests)
     counts = Counter(x["identity"]["status"] for x in valid["windows"])
     return {
         "kind": "machine-v2-identity-coverage",

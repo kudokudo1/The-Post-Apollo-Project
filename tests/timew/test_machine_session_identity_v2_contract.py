@@ -9,8 +9,8 @@ qml = (root / "widgets/TimeW.qml").read_text()
 doc = (root / "docs/timew-machine-m2b-v2-session-identity-sidecar.md").read_text()
 
 for required in (
-    "def validate_sidecar(document, *, v1_checkpoint=None):",
-    "def describe_coverage(proposal):",
+    "def validate_sidecar(document, *, v1_checkpoint=None, adapter_manifests=()):",
+    "def describe_coverage(proposal, *, adapter_manifests=()):",
     'SIDECAR_KIND = "machine-session-identity-sidecar"',
     '"checkpoint_id"',
     '"window_key"',

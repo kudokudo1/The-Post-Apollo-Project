@@ -2,6 +2,7 @@
 // Provider-neutral contract; EODHD is the ONLY wired provider in this milestone.
 // Nothing is fetched at module import, no disk writes and no background polling.
 import { loadPrices, SYMBOLS } from "./read_sec_price_context.mjs";
+import {loadPriceRange, validateRange, MAX_RANGE_BARS, dayNumber} from "./read_market_price_range.mjs";
 
 const DEFAULT_TTL_RECENT_MS = 15 * 60 * 1000;
 const DEFAULT_TTL_HISTORICAL_MS = 24 * 60 * 60 * 1000;
@@ -64,11 +65,13 @@ function ensureSnapshot(result, cik, filingDate) {
  */
 export function createMarketDataHub({
   adapters = { eodhd: (cik, filingDate) => loadPrices(cik, filingDate) },
+  rangeAdapter = (cik, from, to) => loadPriceRange(cik,from,to),
   now = () => Date.now(),
   maxEntries = MAX_SLOTS,
   maxConcurrent = MAX_CONCURRENT
 } = {}) {
   if (!adapters || typeof adapters.eodhd !== "function"
+      || typeof rangeAdapter !== "function"
       || Object.keys(adapters).some(key => key !== "eodhd")
       || !Number.isInteger(maxEntries) || maxEntries < 1 || maxEntries > MAX_SLOTS
       || !Number.isInteger(maxConcurrent) || maxConcurrent < 1
@@ -151,5 +154,75 @@ export function createMarketDataHub({
     }
   }
 
-  return {getPriceContext, health};
+  // Independent range key never collides with M5/M8 SEC filing-date cache.
+  // Both views still share one provider concurrency ceiling and cache budget.
+  async function getPriceRange({cik, from, to, provider="eodhd"}={}) {
+    if (provider !== "eodhd") throw fail("unknown-provider");
+    try {validateRange(cik,from,to,new Date(now()).toISOString().slice(0,10));}
+    catch {throw fail("invalid-range");}
+    const key="range|"+provider+"|"+cik+"|"+from+"|"+to;
+    const stamp=now();
+    const pack=(entry,state,at)=>({
+      ...clone(entry.snapshot),
+      hub:{provider,state,cachedAt:entry.cachedAt,
+        expiresAt:new Date(entry.expiresAt).toISOString(),
+        servedAt:new Date(at).toISOString(),
+        ageSeconds:Math.max(0,Math.floor((at-Date.parse(entry.cachedAt))/1000))}
+    });
+    let saved=cache.get(key);
+    if(saved && saved.expiresAt>stamp){
+      cache.delete(key);
+      cache.set(key,saved);
+      return pack(saved,"CACHED",stamp);
+    }
+    cache.delete(key);
+    if(inFlight.has(key)){
+      // Propagate the original normalized provider error, never retry it.
+      await inFlight.get(key);
+      saved=cache.get(key);
+      if(!saved)throw fail("provider-failed");
+      return pack(saved,"SHARED",now());
+    }
+    if(inFlight.size>=maxConcurrent)throw fail("provider-busy");
+    const task=(async()=>{
+      let result;
+      try {
+        result=await rangeAdapter(cik,from,to);
+        if(!result || result.schemaVersion!==1 || result.source!=="eodhd-eod"
+            || result.readOnly!==true || result.cik!==cik
+            || result.symbol!==SYMBOLS[cik] || result.from!==from || result.to!==to
+            || !["CLOSE","ADJUSTED CLOSE"].includes(result.priceBasis)
+            || !Array.isArray(result.bars) || result.bars.length>MAX_RANGE_BARS
+            || !result.bars.every((bar,i)=>{
+                return bar && dayNumber(bar.date)!==null
+                  && bar.date>=from && bar.date<=to
+                  && Number.isFinite(bar.price) && bar.price>0
+                  && (i===0 || result.bars[i-1].date<bar.date);
+              })
+            || (result.first===null)!==(result.bars.length===0)
+            || (result.last===null)!==(result.bars.length===0)
+            || (result.first && (result.first.date!==result.bars[0].date
+                || result.first.price!==result.bars[0].price))
+            || (result.last && (result.last.date!==result.bars[result.bars.length-1].date
+                || result.last.price!==result.bars[result.bars.length-1].price))
+            || (result.changePct!==null && !Number.isFinite(result.changePct))
+            || (result.bars.length<2 && result.changePct!==null))
+          throw fail("invalid-provider-snapshot");
+      } catch(error){
+        throw sanitizeError(error);
+      }
+      const captured=now();
+      const recent=captured-Date.parse(to+"T00:00:00Z") < 7*86400000;
+      const entry={snapshot:clone(result),cachedAt:new Date(captured).toISOString(),
+        expiresAt:captured+(recent?DEFAULT_TTL_RECENT_MS:DEFAULT_TTL_HISTORICAL_MS)};
+      cache.set(key,entry);
+      while(cache.size>maxEntries)cache.delete(cache.keys().next().value);
+      return entry;
+    })();
+    inFlight.set(key,task);
+    try { return pack(await task,"FETCHED",now()); }
+    finally {inFlight.delete(key);}
+  }
+
+  return {getPriceContext,getPriceRange,health};
 }

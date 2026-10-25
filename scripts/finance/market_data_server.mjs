@@ -17,7 +17,7 @@ function reply(response, status, body) {
   response.end(JSON.stringify(body) + "\n");
 }
 const ERRORS = new Set([
-  "invalid-selection", "unknown-provider", "provider-busy",
+  "invalid-selection", "invalid-range", "unknown-provider", "provider-busy",
   "provider-key-required", "demo-not-authorized", "provider-unavailable",
   "provider-response-too-large", "provider-invalid", "invalid-price-data",
   "invalid-provider-snapshot", "token-unreadable", "token-permissions",
@@ -46,22 +46,31 @@ export function createMarketDataServer({hub=createMarketDataHub()}={}) {
     if (url.pathname === "/v1/health" && url.search === "") {
       reply(response,200,hub.health()); return;
     }
-    if (url.pathname !== "/v1/price-context"
-        || Array.from(url.searchParams.keys()).some(k=>!["cik","date","provider"].includes(k))
-        || ["cik","date","provider"].some(k=>url.searchParams.getAll(k).length>1)) {
-      reply(response,404,{error:"unknown-route"}); return;
+    const rangeMode=url.pathname==="/v1/price-range";
+    if(!rangeMode && url.pathname!=="/v1/price-context"){
+      reply(response,404,{error:"unknown-route"});return;
+    }
+    const allowed=rangeMode?["cik","from","to","provider"]:["cik","date","provider"];
+    if(Array.from(url.searchParams.keys()).some(k=>!allowed.includes(k))
+        || allowed.some(k=>url.searchParams.getAll(k).length>1)){
+      reply(response,404,{error:"unknown-route"});return;
     }
     try {
-      const payload = await hub.getPriceContext({
-        cik:url.searchParams.get("cik"),
-        filingDate:url.searchParams.get("date"),
-        provider:url.searchParams.get("provider") || "eodhd"
-      });
+      const payload=rangeMode
+        ? await hub.getPriceRange({
+            cik:url.searchParams.get("cik"),from:url.searchParams.get("from"),
+            to:url.searchParams.get("to"),provider:url.searchParams.get("provider")||"eodhd"
+          })
+        : await hub.getPriceContext({
+            cik:url.searchParams.get("cik"),
+            filingDate:url.searchParams.get("date"),
+            provider:url.searchParams.get("provider") || "eodhd"
+          });
       reply(response,200,payload);
-    } catch (error) {
-      const code = ERRORS.has(error?.code) ? error.code : "provider-failed";
-      const status = code === "invalid-selection" || code === "unknown-provider" ? 400
-        : code === "provider-busy" ? 429 : 503;
+    } catch(error) {
+      const code=ERRORS.has(error?.code)?error.code:"provider-failed";
+      const status=["invalid-selection","invalid-range","unknown-provider"].includes(code)
+        ? 400 : code==="provider-busy" ? 429 : 503;
       reply(response,status,{error:code});
     }
   });

@@ -20,17 +20,18 @@ assert 'monitoring: root.menuOpen && root.selectedMainMode === "market"' in root
 assert "stockFeed: stockHistoryService" in root
 assert "marketFeed: marketService" in root
 assert 'Quickshell.shellPath("scripts/finance/read_sec_price_optional_hub.mjs")' in existing
-assert 'Quickshell.shellPath("scripts/finance/read_sec_price_optional_hub.mjs")' in service
+assert 'Quickshell.shellPath("scripts/finance/read_market_price_range_optional_hub.mjs")' in service
 assert 'function refresh()' in service
 assert 'function selectIssuer(cik)' in service
-assert 'function selectReferenceDate(day)' in service
+assert 'function selectStartDate(day)' in service
+assert 'function selectEndDate(day)' in service
 assert 'onMonitoringChanged:' in service and 'if (!monitoring) clear();' in service
 assert 'if (reader.running)' in service
 assert 'if (desiredKey !== inFlightKey || !monitoring)' in service
-assert 'data.cik !== selectedCik' in service
-assert 'data.filingDate !== referenceDate' in service
-assert 'data.symbol !== symbols[selectedCik]' in service
-assert 'data.delivery.via === "HUB"' in service
+assert 'data.cik!==selectedCik' in service
+assert 'data.from!==startDate || data.to!==endDate' in service
+assert 'data.symbol!==symbols[selectedCik]' in service
+assert 'data.delivery.via==="HUB"' in service
 assert 'stockFeed.acceptOutput(text)' in service
 assert '"provider-key-required"' in service
 assert '"demo-not-authorized"' in service
@@ -48,11 +49,12 @@ assert 'FinanceOsirisPane {' in market
 
 assert 'FinanceDateInput {' in pane
 assert 'onValueEdited: function(value)' in pane
-assert 'stockFeed.selectReferenceDate(value)' in pane
+assert 'stocks.stockFeed.selectStartDate(value)' in pane
+assert 'stocks.stockFeed.selectEndDate(value)' in pane
 assert 'label: stocks.stockFeed && stocks.stockFeed.loading ? "READING"' in pane
 assert 'stocks.stockFeed.refresh()' in pane
-assert 'REFERENCE DATE // NOT AN SEC FILING DATE' in pane
-assert 'This is NOT an event study.' in pane
+assert 'HISTORICAL RANGE // INCLUSIVE // MAX 180 DAYS' in pane
+assert 'Select an issuer and START/END dates' in pane
 assert 'SOURCE EODHD EOD' in pane
 assert 'stocks.snapshot.delivery.cachedAt' in pane
 assert 'stocks.snapshot.delivery.servedAt' in pane
@@ -66,7 +68,7 @@ assert 'createMarketDataHub' in hub
 assert 'getPriceContext' in hub
 assert 'const key = provider + "|" + cik + "|" + filingDate;' in hub
 assert '"/v1/price-context?cik="' in adapter
-assert 'url.pathname !== "/v1/price-context"' in server
+assert 'url.pathname!=="/v1/price-context"' in server
 for forbidden in ('financeWrite.submit(', 'financeFundingWrite.submit(',
                   'writeFile(', 'Qt.openUrlExternally','setInterval(',
                   'https://clob.polymarket.com/order'):

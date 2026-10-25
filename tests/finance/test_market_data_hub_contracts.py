@@ -31,7 +31,9 @@ assert 'request.headers["x-post-apollo-client"] !== CLIENT_HEADER' in server
 assert '"Cache-Control": "no-store"' in server
 assert "request.method !== \"GET\"" in server
 assert 'url.pathname === "/v1/health"' in server
-assert 'url.pathname !== "/v1/price-context"' in server
+assert 'url.pathname!=="/v1/price-context"' in server
+assert 'url.pathname==="/v1/price-range"' in server
+assert 'getPriceRange' in hub
 assert "request.url.length > MAX_REQUEST_PATH" in server
 assert "unknown-provider" in server and "provider-busy" in server
 assert "POST_APOLLO_MARKET_HUB_READY" in server

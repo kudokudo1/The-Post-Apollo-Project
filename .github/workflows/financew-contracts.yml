@@ -56,6 +56,11 @@ on:
       - "scripts/finance/market_data_hub.mjs"
       - "scripts/finance/market_data_server.mjs"
       - "scripts/finance/read_sec_price_optional_hub.mjs"
+      - "scripts/finance/read_market_price_range.mjs"
+      - "scripts/finance/read_market_price_range_optional_hub.mjs"
+      - "scripts/finance/MARKET_PRICE_RANGES_README.md"
+      - "tests/finance/test_market_price_range.mjs"
+      - "tests/finance/test_finance_market_range_contracts.py"
       - "scripts/finance/MARKET_HUB_ROUTING_README.md"
       - "tests/finance/test_sec_optional_hub.mjs"
       - "tests/finance/test_finance_sec_optional_hub_contracts.py"
@@ -145,6 +150,11 @@ on:
       - "scripts/finance/market_data_hub.mjs"
       - "scripts/finance/market_data_server.mjs"
       - "scripts/finance/read_sec_price_optional_hub.mjs"
+      - "scripts/finance/read_market_price_range.mjs"
+      - "scripts/finance/read_market_price_range_optional_hub.mjs"
+      - "scripts/finance/MARKET_PRICE_RANGES_README.md"
+      - "tests/finance/test_market_price_range.mjs"
+      - "tests/finance/test_finance_market_range_contracts.py"
       - "scripts/finance/MARKET_HUB_ROUTING_README.md"
       - "tests/finance/test_sec_optional_hub.mjs"
       - "tests/finance/test_finance_sec_optional_hub_contracts.py"
@@ -207,6 +217,10 @@ jobs:
         run: python3 tests/finance/test_finance_market_stocks_contracts.py
       - name: Test FinanceW Market STOCKS and SEC shared market cache
         run: node tests/finance/test_market_stocks_shared_hub.mjs
+      - name: Verify FinanceW bounded historical range controls and source isolation
+        run: python3 tests/finance/test_finance_market_range_contracts.py
+      - name: Test EODHD historical ranges and local hub using fictional prices
+        run: node tests/finance/test_market_price_range.mjs
       - name: Verify opt-in OSIRIS globe does not affect FinanceW startup
         run: python3 tests/finance/test_finance_osiris_globe_contracts.py
       - name: Verify FinanceW Research M1 safe Crawl pane

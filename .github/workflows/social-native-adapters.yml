@@ -5,6 +5,7 @@ on:
     paths:
       - "services/messaging/SocialMessageRouter.qml"
       - "services/messaging/DesktopServiceLauncher.py"
+      - "services/messaging/DesktopWindowBridge.py"
       - "services/messaging/SocialAccountCatalog.py"
       - "widgets/messanger/ProviderAccessPanel.qml"
       - "widgets/messanger/XBrowser.py"
@@ -23,6 +24,7 @@ on:
     paths:
       - "services/messaging/SocialMessageRouter.qml"
       - "services/messaging/DesktopServiceLauncher.py"
+      - "services/messaging/DesktopWindowBridge.py"
       - "services/messaging/SocialAccountCatalog.py"
       - "widgets/messanger/ProviderAccessPanel.qml"
       - "widgets/messanger/XBrowser.py"
@@ -49,6 +51,7 @@ jobs:
           python3 tests/messaging/test_social_native_router_contracts.py
           python3 tests/messaging/test_social_account_catalog_contracts.py
           python3 tests/messaging/test_social_provider_access_contracts.py
+          python3 tests/messaging/test_social_desktop_window_docking.py
           python3 tests/messaging/test_session_adapter_contracts.py
           python3 tests/messaging/test_telegram_adapter_contracts.py
           python3 tests/messaging/test_telegram_bridge_cli_contracts.py

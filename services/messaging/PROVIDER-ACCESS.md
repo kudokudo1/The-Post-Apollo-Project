@@ -51,11 +51,32 @@ an allowlisted installed binary **without a shell**, reports **launch
 requested**, and never reports an authenticated account. It does not install
 packages, locate arbitrary user binaries or access app data.
 
-Desktop clients may appear in their own native windows. Unlike Chromium
-fallbacks, their windows are **not yet geometrically docked inside the
-Social backing surface**: that needs real Sway window-class inspection and
-desktop acceptance on the operator's computer. The Social menu itself retains
-the status/explanation panel.
+Desktop clients initially appear in their own native windows. A separate
+**one-shot opt-in docking pilot** uses `DesktopWindowBridge.py` from the
+in-menu **CHECK FOR DESKTOP WINDOW** and **DOCK DESKTOP WINDOW IN SOCIAL**
+controls. It does not inspect app chats or window titles.
+
+The helper reads Sway's layout tree, identifies provider windows only when
+their actual `/proc/<pid>/exe` basename matches an allowlisted provider binary
+AND exactly one matching client view exists, and locates the unique visible
+`QS_SOCIAL_MENU` window. Without this evidence docking refuses to act.
+An explicit Dock click moves only the uniquely identified numeric Sway
+`con_id` into the area beside the existing Social selector. Post-Apollo
+adds a service-specific Sway mark to the managed container; selection change
+or menu close sends a hide request that refuses to touch any unmarked window.
+No other window is repositioned, closed, killed or authorized.
+
+**Important limitation:** This is initial attach/hide/restore groundwork,
+**not the continuous two-way Mod-move/resize follower used by Discord**.
+Provider windows with unexpected executable names, Flatpak wrapping,
+ambiguous matches, multiple windows or absent compositor evidence remain
+undocked. Their original windows still work. Continuous geometry following
+needs verified Sway IDs and live acceptance before enabling. Never widen
+window matching to generic title substrings or guessed client classes.
+
+The Social menu itself retains the status/explanation panel until docking
+succeeds. No native personal-inbox adapter becomes `READY` merely because
+its desktop client is docked.
 
 ## Web fallback behavior
 
@@ -86,6 +107,7 @@ under it, or if switching Post-Apollo identities reuses the wrong profile.
 
 ### Evidence links (provider-owned)
 
+- Sway docking semantics: https://manpages.debian.org/trixie/sway/sway.5.en.html
 - Signal Linux: https://signal.org/download/linux/
 - Viber Linux/desktop: https://www.viber.com/en/download/
 - WeChat Linux: https://linux.weixin.qq.com/

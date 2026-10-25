@@ -11,6 +11,7 @@ Rectangle {
     property string backendMode: "UNSUPPORTED"
     property string backendDetail: ""
     signal browserRequested(string serviceId)
+    signal desktopDocked(string serviceId)
 
     readonly property string serviceId:
         serviceIndex === 14 ? "whatsapp" :
@@ -37,7 +38,30 @@ Rectangle {
         serviceId === "messenger" ? "Messenger personal chats are available through Facebook Messages in a browser, not the old standalone app." : ""
 
     property bool desktopAvailable: false
+    property bool windowAvailable: false
     property string launchNotice: ""
+    property string dockNotice: ""
+    property int windowProbeAttempts: 0
+
+    function probeWindow() {
+        if (!visible || !desktopSupported || windowProcess.running)
+            return;
+        windowProcess.requestService = serviceId;
+        windowProcess.command = ["python3", Quickshell.shellPath("services/messaging/DesktopWindowBridge.py"),
+                                 "probe", serviceId];
+        windowProcess.running = true;
+    }
+
+    function dockWindow() {
+        if (!visible || !desktopSupported || !windowAvailable || windowProcess.running)
+            return;
+        windowRetryTimer.stop();
+        dockNotice = "Docking identified provider window...";
+        windowProcess.requestService = serviceId;
+        windowProcess.command = ["python3", Quickshell.shellPath("services/messaging/DesktopWindowBridge.py"),
+                                 "dock", serviceId];
+        windowProcess.running = true;
+    }
     color: Colors.black
     border.color: Colors.cyan
     border.width: 1
@@ -66,13 +90,19 @@ Rectangle {
     onVisibleChanged: {
         if (visible) {
             launchNotice = "";
+            dockNotice = "";
             probeDesktop();
+            probeWindow();
         }
     }
     onServiceIdChanged: {
         launchNotice = "";
+        dockNotice = "";
+        windowAvailable = false;
+        windowRetryTimer.stop();
         desktopAvailable = false;
         probeDesktop();
+        probeWindow();
     }
 
     Process {
@@ -89,6 +119,10 @@ Rectangle {
                     panel.desktopAvailable = result.desktopInstalled === true;
                     if (result.launched === true || result.desktopInstalled === false)
                         panel.launchNotice = String(result.detail || "");
+                    if (result.launched === true) {
+                        panel.windowProbeAttempts = 0;
+                        windowRetryTimer.start();
+                    }
                 } catch (e) {
                     panel.launchNotice = "Desktop status could not be checked";
                 }
@@ -104,6 +138,59 @@ Rectangle {
             }
             if (exitCode !== 0)
                 panel.launchNotice = "Provider desktop launcher unavailable";
+        }
+    }
+
+    Process {
+        id: windowProcess
+        property string requestService: ""
+        stdout: StdioCollector {
+            onStreamFinished: {
+                if (!panel.visible)
+                    return;
+                try {
+                    const result = JSON.parse(String(text || ""));
+                    if (result.serviceId !== panel.serviceId)
+                        return;
+                    panel.windowAvailable = result.windowAvailable === true
+                                             && result.ambiguous !== true;
+                    panel.dockNotice = String(result.detail || "");
+                    if (result.action === "dock" && result.changed === true
+                            && result.docked === true) {
+                        panel.desktopDocked(panel.serviceId);
+                    }
+                    if (panel.windowAvailable)
+                        windowRetryTimer.stop();
+                } catch (e) {
+                    panel.windowAvailable = false;
+                    panel.dockNotice = "Could not identify a safe provider window";
+                }
+            }
+        }
+        onExited: function(exitCode, exitStatus) {
+            if (!panel.visible)
+                return;
+            if (requestService !== panel.serviceId) {
+                Qt.callLater(function() { panel.probeWindow(); });
+            } else if (exitCode !== 0) {
+                panel.dockNotice = "Sway provider window check unavailable";
+            }
+        }
+    }
+
+    Timer {
+        id: windowRetryTimer
+        interval: 850
+        repeat: true
+        running: false
+        onTriggered: {
+            if (!panel.visible || !panel.desktopSupported
+                    || panel.windowAvailable || panel.windowProbeAttempts >= 8) {
+                stop();
+                return;
+            }
+            panel.windowProbeAttempts += 1;
+            panel.probeWindow();
         }
     }
 
@@ -192,6 +279,51 @@ Rectangle {
                     anchors.fill: parent
                     onClicked: panel.browserRequested(panel.serviceId)
                 }
+            }
+            Rectangle {
+                width: Math.min(parent.width, 310)
+                height: 44
+                visible: panel.desktopSupported
+                opacity: panel.windowAvailable ? 1 : 0.6
+                color: Colors.dark
+                border.color: Colors.orange
+                Text {
+                    anchors.centerIn: parent
+                    text: panel.windowAvailable ? "DOCK DESKTOP WINDOW IN SOCIAL"
+                                                : "WINDOW NOT YET IDENTIFIED"
+                    color: Colors.cyan
+                    font.pixelSize: 12
+                }
+                MouseArea {
+                    anchors.fill: parent
+                    enabled: panel.windowAvailable
+                    onClicked: panel.dockWindow()
+                }
+            }
+            Rectangle {
+                width: Math.min(parent.width, 310)
+                height: 36
+                visible: panel.desktopSupported
+                color: Colors.dark
+                border.color: Colors.cyan
+                Text {
+                    anchors.centerIn: parent
+                    text: "CHECK FOR DESKTOP WINDOW"
+                    color: Colors.cyan
+                    font.pixelSize: 12
+                }
+                MouseArea {
+                    anchors.fill: parent
+                    onClicked: panel.probeWindow()
+                }
+            }
+            Text {
+                text: panel.dockNotice
+                visible: panel.dockNotice !== ""
+                color: Colors.cyan
+                width: parent.width
+                wrapMode: Text.WordWrap
+                font.pixelSize: 12
             }
             Text {
                 text: panel.launchNotice

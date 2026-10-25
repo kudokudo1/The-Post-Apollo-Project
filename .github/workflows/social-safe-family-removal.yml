@@ -1,0 +1,38 @@
+name: Social Safe Family Removal Contracts
+
+on:
+  pull_request:
+    paths:
+      - 'services/social/**'
+      - 'widgets/messanger/AppSelector.qml'
+      - 'tests/messaging/test_social_safe_family_removal.*'
+      - '.github/workflows/social-safe-family-removal.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'services/social/**'
+      - 'widgets/messanger/AppSelector.qml'
+      - 'tests/messaging/test_social_safe_family_removal.*'
+      - '.github/workflows/social-safe-family-removal.yml'
+  workflow_dispatch:
+
+jobs:
+  safe-removal:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Exercise real safe rehome policy and identity isolation
+        run: node tests/messaging/test_social_safe_family_removal.cjs
+      - name: Verify safe editor controls and single writer
+        run: python3 -m unittest discover -s tests/messaging -p 'test_social_safe_family_removal.py' -v
+      - name: Preserve all preceding Social organization contracts
+        run: |
+          node tests/messaging/test_social_identity_policy.cjs
+          node tests/messaging/test_social_family_rail.cjs
+          node tests/messaging/test_social_family_manager.cjs
+          node tests/messaging/test_social_family_order_visibility.cjs
+          python3 -m unittest discover -s tests/messaging -p 'test_social_identity_store.py' -v
+          python3 -m unittest discover -s tests/messaging -p 'test_social_family_rail.py' -v
+          python3 -m unittest discover -s tests/messaging -p 'test_social_family_manager.py' -v
+          python3 -m unittest discover -s tests/messaging -p 'test_social_family_order_visibility.py' -v
+          python3 -m unittest discover -s tests/messaging -p 'test_social_user_settings_rail.py' -v

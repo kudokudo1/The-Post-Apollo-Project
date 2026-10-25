@@ -32,6 +32,12 @@ PanelWindow {
         monitoring: root.menuOpen && root.selectedMainMode === "market"
     }
 
+    // Separate stock history consumer; strictly no request until LOAD HISTORY.
+    FinanceServices.FinanceStockHistoryReadService {
+        id: stockHistoryService
+        monitoring: root.menuOpen && root.selectedMainMode === "market"
+    }
+
     // Separate saved-crawl reader; it never executes a spider inside Quickshell.
     FinanceServices.FinanceCrawlReadService {
         id: crawlService
@@ -65,6 +71,7 @@ PanelWindow {
         id: marketPaneComponent
         FinanceMarketPane {
             marketFeed: marketService
+            stockFeed: stockHistoryService
             displayLevel: root.chassisLevel
         }
     }

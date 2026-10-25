@@ -1,0 +1,51 @@
+name: TASKS M11e disposable FileView callback gate
+
+on:
+  pull_request:
+    paths:
+      - 'services/projects/TaskFileViewGatePolicyM11e.js'
+      - 'services/projects/TaskFileViewGateM11e.qml'
+      - 'TaskFileViewGateHarnessM11e.qml'
+      - 'tests/tasks/fixtures/m11e_fileview_fixture.py'
+      - 'tests/tasks/test_task_fileview_gate_policy_m11e.cjs'
+      - 'tests/tasks/test_task_fileview_runtime_m11e.py'
+      - 'docs/tasks-fileview-gate-harness-m11e.md'
+      - '.github/workflows/tasks-fileview-gate-m11e.yml'
+  push:
+    branches:
+      - main
+    paths:
+      - 'services/projects/TaskFileViewGatePolicyM11e.js'
+      - 'services/projects/TaskFileViewGateM11e.qml'
+      - 'TaskFileViewGateHarnessM11e.qml'
+      - 'tests/tasks/fixtures/m11e_fileview_fixture.py'
+      - 'tests/tasks/test_task_fileview_gate_policy_m11e.cjs'
+      - 'tests/tasks/test_task_fileview_runtime_m11e.py'
+      - 'docs/tasks-fileview-gate-harness-m11e.md'
+      - '.github/workflows/tasks-fileview-gate-m11e.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  fileview-gate-fixture:
+    runs-on: ubuntu-latest
+    timeout-minutes: 7
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: M11e pure FileView callback stage/readback/freeze semantics
+        run: node tests/tasks/test_task_fileview_gate_policy_m11e.cjs
+      - name: M11e private fixture and standalone QML no-mount boundaries
+        run: python3 tests/tasks/test_task_fileview_runtime_m11e.py
+      - name: M11d source inventory still finds one production writer
+        run: python3 tests/tasks/test_task_writer_gate_inventory_m11d.py
+      - name: M11c durable restart review remains fenced
+        run: python3 tests/tasks/test_task_writer_recovery_m11c.py
+      - name: M10z subprocess callback lifecycle regression
+        run: node tests/tasks/test_task_sqlite_snapshot_lifecycle_m10z.cjs

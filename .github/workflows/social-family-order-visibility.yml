@@ -1,0 +1,36 @@
+name: Social Family Order and Visibility Contracts
+
+on:
+  pull_request:
+    paths:
+      - 'services/social/**'
+      - 'widgets/messanger/AppSelector.qml'
+      - 'tests/messaging/test_social_family_order_visibility.*'
+      - '.github/workflows/social-family-order-visibility.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'services/social/**'
+      - 'widgets/messanger/AppSelector.qml'
+      - 'tests/messaging/test_social_family_order_visibility.*'
+      - '.github/workflows/social-family-order-visibility.yml'
+  workflow_dispatch:
+
+jobs:
+  organization-controls:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Exercise real family/app ordering and visibility policy
+        run: node tests/messaging/test_social_family_order_visibility.cjs
+      - name: Check ordering UI and storage isolation
+        run: python3 -m unittest discover -s tests/messaging -p 'test_social_family_order_visibility.py' -v
+      - name: Preserve existing identity and family behavior
+        run: |
+          node tests/messaging/test_social_identity_policy.cjs
+          node tests/messaging/test_social_family_rail.cjs
+          node tests/messaging/test_social_family_manager.cjs
+          python3 -m unittest discover -s tests/messaging -p 'test_social_identity_store.py' -v
+          python3 -m unittest discover -s tests/messaging -p 'test_social_family_rail.py' -v
+          python3 -m unittest discover -s tests/messaging -p 'test_social_family_manager.py' -v
+          python3 -m unittest discover -s tests/messaging -p 'test_social_user_settings_rail.py' -v

@@ -1,0 +1,26 @@
+name: Social User Settings Rail Contracts
+
+on:
+  pull_request:
+    paths:
+      - 'widgets/messanger/AppSelector.qml'
+      - 'widgets/messanger/MessagingW.qml'
+      - 'tests/messaging/test_social_user_settings_rail.py'
+      - '.github/workflows/social-user-settings-rail.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'widgets/messanger/AppSelector.qml'
+      - 'widgets/messanger/MessagingW.qml'
+      - 'tests/messaging/test_social_user_settings_rail.py'
+      - '.github/workflows/social-user-settings-rail.yml'
+  workflow_dispatch:
+
+jobs:
+  contracts:
+    name: Settings rail source contracts
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check fixed footer, scope and stable app IDs
+        run: python3 -m unittest discover -s tests/messaging -p 'test_social_user_settings_rail.py' -v

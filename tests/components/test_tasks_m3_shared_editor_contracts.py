@@ -35,8 +35,25 @@ assert 'flickable: todoMini.taskScrollbarEnabled ? todoList : null' in EDITOR
 assert 'geometryMode: "viewport"' in EDITOR
 assert 'accountForContentOrigin: true' in EDITOR
 assert 'handleStyle: "star"' in EDITOR
+assert 'starSceneGraphRenderer: todoMini.taskScrollbarEnabled' in EDITOR
 assert 'handleColor: Colors.magenta' in EDITOR
 assert 'railColor: Colors.cyan' in EDITOR
+
+# The cyan track already showed up on Sway, but the task star Canvas did not.
+# The standard component now exposes a TASKS-only Qt Quick Shape renderer,
+# keeping its default Canvas for all pre-existing Git/Hospital consumers.
+scrollbar = (ROOT / "components/NeonScrollBar.qml").read_text(encoding="utf-8")
+assert "import QtQuick.Shapes" in scrollbar
+assert "property bool starSceneGraphRenderer: false" in scrollbar
+assert "visible: !root.starSceneGraphRenderer" in scrollbar
+assert "visible: root.starSceneGraphRenderer" in scrollbar
+assert "function starSvgPath(width, height)" in scrollbar
+assert "PathSvg {" in scrollbar
+assert "path: root.starSvgPath(starGraphic.width, starGraphic.height)" in scrollbar
+assert "fillColor: root.effectiveHandleColor" in scrollbar
+assert "strokeColor: root.effectiveHandleColor" in scrollbar
+assert "sourceComponent:" in scrollbar
+assert "root.starStyle" in scrollbar
 assert '&& taskListRail.scrollable' in EDITOR
 assert 'taskListRail.reservedExtent : 0' in EDITOR
 assert 'taskScrollbarEnabled: true' not in HUB

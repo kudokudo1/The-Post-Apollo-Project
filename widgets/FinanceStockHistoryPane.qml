@@ -47,8 +47,10 @@ Item {
                 selected: stocks.stockFeed
                     && stocks.stockFeed.selectedCik === modelData.cik
                 accentColor: Colors.cyan
-                onLeftClicked: if (stocks.stockFeed)
-                    stocks.stockFeed.selectIssuer(modelData.cik)
+                onLeftClicked: {
+                    if (stocks.stockFeed)
+                        stocks.stockFeed.selectIssuer(modelData.cik);
+                }
             }
         }
     }
@@ -96,7 +98,9 @@ Item {
             accentColor: Colors.magenta
             available: stocks.stockFeed && stocks.stockFeed.monitoring
                 && !stocks.stockFeed.loading
-            onLeftClicked: if (stocks.stockFeed) stocks.stockFeed.refresh()
+            onLeftClicked: {
+                if (stocks.stockFeed) stocks.stockFeed.refresh();
+            }
         }
         GohuText {
             width: Math.max(0,fetchControls.width - load.width - 8)

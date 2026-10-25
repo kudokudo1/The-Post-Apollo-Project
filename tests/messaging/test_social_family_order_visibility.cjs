@@ -100,7 +100,7 @@ const copied = policy.create(hidden.document,"Gaming","copy","identity-1").docum
 assert.equal(policy.view("ready",copied,"").appChoices[2].hidden,true);
 const gamingUp = policy.reorderFamily(copied,"family-2",-1).document;
 const gamingShow = policy.setAppHidden(gamingUp,"telegram",false).document;
-const gamingAppUp = policy.reorderApp(gamingShow,"family-2","telegram",-1).document;
+const gamingAppUp = policy.reorderApp(gamingShow,"family-2","discord",-1).document;
 assert.equal(gamingAppUp.identities[0].layout.families[1].appIds.join(","),
              "telegram,discord");
 assert.equal(gamingAppUp.identities[0].layout.hiddenAppIds.join(","),"telegram");

@@ -813,7 +813,7 @@ for phrase in (
     "MAXIMUM_LENGTH_PLACEHOLDER",
     "onActiveFocusChanged: todoMini.textFocusChanged(activeFocus)",
     "onTextFocusChanged: function(focused)",
-    'label: todoEntry.awaitingDelete ? "YES" : "DEL"',
+    'label: todoEntry.awaitingDelete ? "YES" : "×"',
     'label: todoEntry.awaitingDelete ? "NO" : "EDIT"',
 ):
     if phrase == "MAXIMUM_LENGTH_PLACEHOLDER":

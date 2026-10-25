@@ -71,7 +71,7 @@ class SocialSettingsSidecarContracts(unittest.TestCase):
             expanded=min(shared, 110+sidecar)
             self.assertGreaterEqual(expanded,110)
             self.assertLessEqual(expanded,shared)
-            self.assertEqual(110,110) # original external mask when closed
+            self.assertEqual(110, min(shared, 110))  # original external mask
 
     def test_background_launcher_is_visible_but_not_actionable(self):
         self.assertIn('visible: !appSelector.settingsOpen || !!appSelector.settingsOverlayParent',
@@ -95,7 +95,6 @@ class SocialSettingsSidecarContracts(unittest.TestCase):
         self.assertIn('messagingWindow.raiseDiscord();', HOST)
         self.assertIn('messagingWindow.raiseX();',HOST)
         self.assertIn('appSelector.settingsOpen = false;',HOST)
-        self.assertIn('settingsOpen && messagingWindow.menuOpen',HOST) if False else None
         # Session storage, account switching and platform helpers are not edited.
         self.assertNotIn('SocialIdentityStore',HOST)
         self.assertIn('providerDesktopManaged: false',HOST)

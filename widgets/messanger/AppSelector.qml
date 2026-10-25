@@ -297,7 +297,7 @@ Rectangle {
                     readonly property bool isFamilyRow: modelData.kind === "family"
                     readonly property var appData: isAppRow
                         ? appSelector.messagingApps[modelData.serviceIndex]
-                        : ({name:"", icon:""})
+                        : appSelector.messagingApps[0]
 
                     width: 90
                     height: isFamilyRow ? 42 : modelData.kind === "empty" ? 56 : 50

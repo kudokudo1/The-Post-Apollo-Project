@@ -192,7 +192,12 @@ class DiscordDockingTests(TestCase):
             "        // CONTACT LIST", 1)[0]
         self.assertIn("id: appSelector", selector)
         self.assertIn("z: 3", selector)
-        self.assertNotIn("!messagingWindow.discordSelected", selector)
+        # Existing selector focus logic may check discordSelected, but its
+        # visual surface must not be hidden along with the chat panels.
+        self.assertNotIn(
+            "visible: messagingWindow.menuOpen && !messagingWindow.discordSelected",
+            selector,
+        )
         self.assertIn("width: messagingWindow.menuOpen ? (messagingWindow.externalSelected ? messagingWindow.appSelectorWidth : socialWindow.width) : 0", src)
         self.assertNotIn("DiscordBackingW {", src)
 

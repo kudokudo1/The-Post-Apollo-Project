@@ -122,6 +122,13 @@ Scope {
             document, appId, hidden));
     }
 
+    // This operation has no provider/session side effects. The policy refuses
+    // to remove an occupied family without an explicit different destination.
+    function removeFamily(familyId, targetFamilyId) {
+        return applyFamilyAction(IdentityPolicy.removeFamily(
+            document, familyId, targetFamilyId));
+    }
+
     FileView {
         id: identityFile
         path: identities.storagePath

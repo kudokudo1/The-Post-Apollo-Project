@@ -14,8 +14,8 @@ Rectangle {
     property string section: "LIVE"
     property bool viewerOpen: false
     property var chosenRecord: null
-    // Channel sound follows one active in-Station viewer. It starts muted
-    // on every new viewer session; the list button can explicitly unmute.
+    // Preserve an explicit muted presentation preference for a future
+    // independent player. Audio controls are disabled while playback is off.
     property bool channelMuted: true
     property string notice: ""
     property string creatorFeedStatus: "CHOOSE A SAVED CREATOR"
@@ -108,9 +108,6 @@ Rectangle {
         viewerOpen = false;
         chosenRecord = null;
         channelMuted = true;
-    }
-    function toggleMute() {
-        channelMuted = !channelMuted;
     }
     function checkUploads(item) {
         if (!item || !item.channelId) return;
@@ -231,7 +228,7 @@ Rectangle {
                 QuietText {
                     anchors.verticalCenter: parent.verticalCenter
                     font.pixelSize: 11
-                    text: "CATALOG DESTINATIONS // PLAYER NOT VERIFIED"
+                    text: "CATALOG DESTINATIONS // VIDEO SAFE MODE"
                 }
             }
             QuietText {
@@ -246,7 +243,7 @@ Rectangle {
                       ? "DISCUSSION & USER-SAVED CHANNELS // NOT EDITORIAL NEWS CERTIFICATION"
                       : stationNewsHub.section === "SATIRE"
                       ? "PARODY AND FICTIONAL NEWS // NOT VERIFIED CURRENT EVENTS"
-                      : "SOURCE PAGES // WATCH IN THIS STATION WHEN SUPPORTED"
+                      : "SOURCE PAGES REGISTERED // VIDEO ENGINE TEMPORARILY DISABLED"
             }
 
             Repeater {
@@ -309,9 +306,9 @@ Rectangle {
                         ActionButton {
                             width: 90
                             height: 28
-                            label: stationNewsHub.channelMuted ? "MUTE: ON" : "MUTE: OFF"
+                            label: "MUTE: ON"
                             labelPixelSize: 10
-                            onClicked: stationNewsHub.toggleMute()
+                            available: false
                         }
                         ActionButton {
                             width: 82
@@ -428,7 +425,6 @@ Rectangle {
             StationChannelScreen {
                 selectedRecord: stationNewsHub.chosenRecord
                 muted: stationNewsHub.channelMuted
-                onMuteToggled: stationNewsHub.toggleMute()
                 onCloseRequested: stationNewsHub.closeViewer()
             }
         }

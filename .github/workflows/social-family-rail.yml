@@ -1,0 +1,34 @@
+name: Social Collapsible Family Rail Contracts
+
+on:
+  pull_request:
+    paths:
+      - 'services/social/**'
+      - 'widgets/messanger/AppSelector.qml'
+      - 'widgets/messanger/MessagingW.qml'
+      - 'tests/messaging/test_social_family_rail.*'
+      - '.github/workflows/social-family-rail.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'services/social/**'
+      - 'widgets/messanger/AppSelector.qml'
+      - 'widgets/messanger/MessagingW.qml'
+      - 'tests/messaging/test_social_family_rail.*'
+      - '.github/workflows/social-family-rail.yml'
+  workflow_dispatch:
+
+jobs:
+  family-rail:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Exercise live family policy functions offline
+        run: node tests/messaging/test_social_family_rail.cjs
+      - name: Check selector and backend isolation
+        run: python3 -m unittest discover -s tests/messaging -p 'test_social_family_rail.py' -v
+      - name: Preserve identity creation and settings controls
+        run: |
+          node tests/messaging/test_social_identity_policy.cjs
+          python3 -m unittest discover -s tests/messaging -p 'test_social_identity_store.py' -v
+          python3 -m unittest discover -s tests/messaging -p 'test_social_user_settings_rail.py' -v

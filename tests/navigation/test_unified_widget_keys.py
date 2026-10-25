@@ -266,7 +266,10 @@ def test_social_main_app_modes_use_existing_activate_path_and_protect_chat():
     assert "event.key === Qt.Key_Tab" in src
     assert "event.key === Qt.Key_Backtab" in src
     assert "messagingWindow.focusZone !== messagingWindow.chatZone" in src
-    assert "appSelector.messagingApps.length" in src
+    # Family layouts can hide/reorder apps; Tab is restricted to visible
+    # canonical app indices, while the host activateApp path stays unchanged.
+    assert "appSelector.visibleAppIndices.length" in src
+    assert "appSelector.nextActiveAppIndex(" in src
     assert "messagingWindow.activateApp(index);" in src
     assert "focusable: false" in src  # Controller layer, not Social FloatingWindow.
     assert "id: socialWindow" in src

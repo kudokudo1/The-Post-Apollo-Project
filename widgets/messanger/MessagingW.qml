@@ -1010,7 +1010,10 @@ PanelWindow {
     }
 
     function acceptSelectedApp() {
-        activateApp(appSelector.selectedIndex);
+        // The cursor may have been inside a family that was just collapsed.
+        // Never route Enter/Right to a hidden or no-longer-visible provider.
+        if (appSelector.isAppVisible(appSelector.selectedIndex))
+            activateApp(appSelector.selectedIndex);
     }
 
     function activateCurrentContact() {
@@ -1086,15 +1089,16 @@ PanelWindow {
                 if (messagingWindow.focusZone !== messagingWindow.chatZone
                         && (event.key === Qt.Key_Tab
                             || event.key === Qt.Key_Backtab)) {
-                    const count = appSelector.messagingApps.length;
+                    const count = appSelector.visibleAppIndices.length;
                     if (count > 1) {
                         const reverse = event.key === Qt.Key_Backtab
                             || (event.modifiers & Qt.ShiftModifier) !== 0;
-                        const direction = reverse ? -1 : 1;
-                        const index = (messagingWindow.activeAppIndex
-                                       + direction + count) % count;
-                        appSelector.selectedIndex = index;
-                        messagingWindow.activateApp(index, true);
+                        const index = appSelector.nextActiveAppIndex(
+                            messagingWindow.activeAppIndex, reverse);
+                        if (index >= 0) {
+                            appSelector.selectedIndex = index;
+                            messagingWindow.activateApp(index, true);
+                        }
                     }
                     event.accepted = true;
                     return;
@@ -1108,11 +1112,7 @@ PanelWindow {
                     if (event.key === Qt.Key_Up) {
                         appSelector.keyboardActive = true;
 
-                        if (appSelector.selectedIndex > 0) {
-                            appSelector.selectedIndex--;
-                        } else {
-                            appSelector.selectedIndex = appSelector.messagingApps.length - 1;
-                        }
+                        appSelector.moveSelection(-1);
 
                         event.accepted = true;
                         return;
@@ -1121,11 +1121,7 @@ PanelWindow {
                     if (event.key === Qt.Key_Down) {
                         appSelector.keyboardActive = true;
 
-                        if (appSelector.selectedIndex < appSelector.messagingApps.length - 1) {
-                            appSelector.selectedIndex++;
-                        } else {
-                            appSelector.selectedIndex = 0;
-                        }
+                        appSelector.moveSelection(1);
 
                         event.accepted = true;
                         return;
@@ -1447,6 +1443,7 @@ PanelWindow {
             contactList.clearSelection();
             activeAppIndex = 0;
             appSelector.selectedIndex = 0;
+            Qt.callLater(function() { appSelector.ensureValidSelection(); });
 
             messagingWindow.hideDiscord();
             messagingWindow.hideX();

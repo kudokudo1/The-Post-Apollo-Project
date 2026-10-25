@@ -1044,6 +1044,16 @@ PanelWindow {
                 if (!messagingWindow.menuOpen)
                     return;
 
+                // The in-rail settings sheet is not an application.
+                // Escape returns to the app rail; other keys must not invisibly
+                // activate apps while their buttons are hidden.
+                if (appSelector.settingsOpen) {
+                    if (event.key === Qt.Key_Escape)
+                        appSelector.settingsOpen = false;
+                    event.accepted = true;
+                    return;
+                }
+
                 // Nurse 3c // Main Modes are the existing app-selector choices.
                 // Tab changes the active application just like its clicked mode
                 // button; chat/composer focus stays reserved to the editor.
@@ -1213,6 +1223,11 @@ PanelWindow {
                 }
             }
 
+            onSettingsOpenChanged: {
+                if (settingsOpen && messagingWindow.menuOpen)
+                    messagingWindow.focusAppSelector();
+            }
+
             // The AppSelector's OWN MouseArea emits this only
             // on a real click.
             onAppActivated: function (index) {
@@ -1377,6 +1392,9 @@ PanelWindow {
     // ============================================================
 
     onMenuOpenChanged: {
+        // Do not resume into a stale settings page after Social closes.
+        // The app-selection and external-window lifecycle stay unchanged.
+        appSelector.settingsOpen = false;
         setGeometryWatch(menuOpen);
 
         if (menuOpen) {

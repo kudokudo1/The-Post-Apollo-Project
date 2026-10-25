@@ -14,6 +14,9 @@ Rectangle {
     property int selectedIndex: 0
     property bool keyboardActive: false
     property string statusText: ""
+    // Entry-point shell only. Identity storage, credentials and family layouts
+    // are deliberately reserved for subsequent operator-reviewed slices.
+    property bool settingsOpen: false
 
     // Emitted ONLY when a button is actually clicked.
     signal appActivated(int index)
@@ -198,10 +201,11 @@ Rectangle {
             top: parent.top
             left: parent.left
             right: parent.right
-            bottom: statusMessage.visible ? statusMessage.top : parent.bottom
+            bottom: statusMessage.visible ? statusMessage.top : settingsFooter.top
         }
         contentWidth: width
         contentHeight: appColumn.height + 20
+        visible: !appSelector.settingsOpen
         clip: true
         flickableDirection: Flickable.VerticalFlick
         boundsBehavior: Flickable.StopAtBounds
@@ -415,13 +419,140 @@ Rectangle {
         }
     }
 
+    // Settings stays inside the selector's existing 110 px input region.
+    // A wider pop-out must be handled separately: external browser/Discord
+    // modes deliberately mask off the content region for pointer pass-through.
+    Rectangle {
+        id: settingsPage
+        anchors {
+            top: parent.top
+            left: parent.left
+            right: parent.right
+            bottom: statusMessage.visible ? statusMessage.top : settingsFooter.top
+        }
+        color: Colors.black
+        visible: appSelector.settingsOpen
+        clip: true
+
+        Flickable {
+            anchors.fill: parent
+            contentWidth: width
+            contentHeight: settingsColumn.height + 24
+            flickableDirection: Flickable.VerticalFlick
+            boundsBehavior: Flickable.StopAtBounds
+            clip: true
+
+            Column {
+                id: settingsColumn
+                anchors.top: parent.top
+                anchors.topMargin: 12
+                anchors.horizontalCenter: parent.horizontalCenter
+                width: Math.max(1, parent.width - 14)
+                spacing: 12
+
+                Text {
+                    width: parent.width
+                    text: "USER //\nSETTINGS"
+                    color: Colors.orange
+                    horizontalAlignment: Text.AlignHCenter
+                    font.family: "GohuFont 11 Nerd Font Mono"
+                    font.pixelSize: 11
+                    font.bold: true
+                }
+                Rectangle {
+                    width: parent.width
+                    height: 1
+                    color: Colors.cyan
+                }
+                Text {
+                    width: parent.width
+                    text: "IDENTITIES"
+                    color: Colors.cyan
+                    font.pixelSize: 10
+                    font.bold: true
+                    wrapMode: Text.WordWrap
+                }
+                Text {
+                    width: parent.width
+                    text: "Not configured yet"
+                    color: Colors.white
+                    font.pixelSize: 9
+                    wrapMode: Text.WordWrap
+                }
+                Text {
+                    width: parent.width
+                    text: "BUTTON FAMILIES"
+                    color: Colors.cyan
+                    font.pixelSize: 9
+                    font.bold: true
+                    wrapMode: Text.WordWrap
+                }
+                Text {
+                    width: parent.width
+                    text: "Layout manager is next"
+                    color: Colors.white
+                    font.pixelSize: 9
+                    wrapMode: Text.WordWrap
+                }
+                Text {
+                    width: parent.width
+                    text: "LINKED ACCOUNTS"
+                    color: Colors.cyan
+                    font.pixelSize: 9
+                    font.bold: true
+                    wrapMode: Text.WordWrap
+                }
+                Text {
+                    width: parent.width
+                    text: "Not connected to this menu"
+                    color: Colors.white
+                    font.pixelSize: 9
+                    wrapMode: Text.WordWrap
+                }
+                Text {
+                    width: parent.width
+                    text: "API CREDENTIALS"
+                    color: Colors.cyan
+                    font.pixelSize: 9
+                    font.bold: true
+                    wrapMode: Text.WordWrap
+                }
+                Text {
+                    width: parent.width
+                    text: "Existing service setup unchanged"
+                    color: Colors.white
+                    font.pixelSize: 9
+                    wrapMode: Text.WordWrap
+                }
+            }
+        }
+    }
+
+    // This entry point is always visible, independently of app scrolling and
+    // status/error text. Its click must never activate a provider app index.
+    ActionButton {
+        id: settingsFooter
+        anchors.horizontalCenter: parent.horizontalCenter
+        anchors.bottom: parent.bottom
+        anchors.bottomMargin: 6
+        width: parent.width - 12
+        height: 44
+        label: "USER // SETTINGS"
+        labelPixelSize: 8
+        labelMinimumPixelSize: 8
+        contentPadding: 2
+        accentColor: Colors.cyan
+        selected: appSelector.settingsOpen
+        onTriggered: appSelector.settingsOpen = !appSelector.settingsOpen
+    }
+
     // Keep launch errors visible in the selector even when the external
     // browser owns the rest of Social's click-through window.
     Text {
         id: statusMessage
         anchors.left: parent.left
         anchors.right: parent.right
-        anchors.bottom: parent.bottom
+        anchors.bottom: settingsFooter.top
         anchors.margins: 6
         visible: appSelector.statusText !== ""
         text: appSelector.statusText

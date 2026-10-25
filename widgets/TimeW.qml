@@ -30,10 +30,10 @@ PanelWindow {
         menuOpen && keyboardActive
         && (!relationshipFocusModeActive || relationshipFocused)
 
-    // Reuse FinanceW's tested chassis geometry until the operator has a live
-    // TimeW preview to measure. This remains a design choice, not a new rule.
+    // Match FinanceW Compact's 790px visible height while retaining TimeW's
+    // existing 432px width, 9px top inset and distinct time controls.
     readonly property int frameWidth: 432
-    readonly property int frameHeight: 768
+    readonly property int frameHeight: 790
     readonly property int glowGutter: 12
     readonly property int frameTopInset: 9 // shared visible top line
     // TimeW identity is white. Universal magenta header, cyan dividers and

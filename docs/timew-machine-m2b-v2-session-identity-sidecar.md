@@ -118,3 +118,15 @@ That's a separate metadata/UI task, not an excuse to migrate v1 now.
 `tests/timew/test_machine_session_identity_v2_contract.py`, along with
 all existing TimeW foundation tests. All tests use fabricated UUIDs and
 invented app/window layouts, never the operator's private sessions.
+
+
+## M2c supersession note (2026-10-24)
+
+The original M2b proposal included a hardcoded three-value adapter source
+set (`none`, `brave`, `kitty`). That was a schema-stage shortcut, not an
+approved limit on compatible applications. M2c introduces a data-only
+extensible family manifest registry in `MachineAdapterRegistry.py` and
+makes `MachineSessionIdentityV2.validate_sidecar` accept caller-supplied
+validated declarations. Two legacy Brave/Kitty aliases remain for existing
+synthetic fixtures. A declaration does not establish installed/live support.
+See `docs/timew-machine-m2c-universal-adapters.md` for the current design.

@@ -105,6 +105,15 @@ CONTRACT = {
 for snippet, meaning in CONTRACT.items():
     expect(snippet, meaning)
 
+# A detached/reparented HoverHandler must not throw when the visibility
+# binding reevaluates while its target or pointer handlers are null.
+for needle in (
+    "paneHover ? paneHover.hovered : false",
+    "handleMouse ? handleMouse.containsMouse : false",
+    "handleMouse ? handleMouse.pressed : false",
+):
+    expect(needle, "null-safe hover/reveal trigger lifecycle")
+
 # The rail may be interactive, but only the handle activates the hover glow.
 assert "handleMouse.containsMouse\n                    ?" not in SOURCE, (
     "full-root hover still directly drives an individual handle glow"

@@ -880,7 +880,7 @@ Rectangle {
                                      && !appSelector.familyCreatePending
                         onTriggered: {
                             // The ID is derived from the validated store snapshot.
-                            // Show the new selection only after FileView.onSaved.
+                            // Show the new selection only after storage confirms the save.
                             var newId = "family-" + appSelector.identitySnapshot.nextFamilyId;
                             if (SocialIdentityStore.createFamily(familyNameInput.text)) {
                                 appSelector.pendingNewFamilyId = newId;

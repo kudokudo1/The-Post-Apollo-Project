@@ -66,16 +66,29 @@ export async function readOptionalRange(cik,from,to,{
   const base="http://"+HOST+":"+port;
   const headers={"X-Post-Apollo-Client":"financew",
     "Accept":"application/json","Connection":"close"};
-  let health;
-  try {
+  // An old closed socket can fail before a fresh TCP connect. Retry only
+  // the read-only health endpoint once, NEVER the provider/price endpoint.
+  const healthProbe=async()=>{
     const r=await fetcher(base+"/v1/health",{
       method:"GET",redirect:"error",headers,signal:AbortSignal.timeout(900)
     });
     if(!r.ok)throw fail("hub-unhealthy");
-    health=await boundedJson(r);
-  }catch(error){
-    if(!refused(error))
-      throw fail(error?.code==="hub-invalid-response"?"hub-invalid-response":"hub-unhealthy");
+    return await boundedJson(r);
+  };
+  let health, healthError=null;
+  try {health=await healthProbe();}
+  catch(error) {
+    healthError=error;
+    if(!refused(error) && error?.code!=="hub-unhealthy"
+        && error?.code!=="hub-invalid-response") {
+      try {health=await healthProbe(); healthError=null;}
+      catch(retryError) {healthError=retryError;}
+    }
+  }
+  if(healthError){
+    if(!refused(healthError))
+      throw fail(healthError?.code==="hub-invalid-response"
+        ? "hub-invalid-response" : "hub-unhealthy");
     const data=validateResult(await directReader(cik,from,to),cik,from,to);
     return {...data,delivery:{via:"DIRECT",state:"DIRECT",
       servedAt:now(),cachedAt:null,expiresAt:null,ageSeconds:null}};

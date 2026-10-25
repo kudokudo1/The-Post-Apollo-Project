@@ -76,7 +76,7 @@ function validLayout(layout) {
             || !Array.isArray(layout.hiddenAppIds)
             || layout.hiddenAppIds.length > APP_IDS.length)
         return false;
-    var familySeen = {}, appSeen = {}, highest = 0;
+    var familySeen = {}, familyNames = {}, appSeen = {}, highest = 0;
     for (var i = 0; i < layout.families.length; ++i) {
         var f = layout.families[i];
         if (!f || typeof f !== "object" || Array.isArray(f)
@@ -84,9 +84,12 @@ function validLayout(layout) {
                 || !cleanName(f.name) || f.name !== cleanName(f.name)
                 || !Array.isArray(f.appIds) || typeof f.expanded !== "boolean")
             return false;
-        if (Object.prototype.hasOwnProperty.call(familySeen, f.id))
+        var folded = f.name.toLowerCase();
+        if (Object.prototype.hasOwnProperty.call(familySeen, f.id)
+                || Object.prototype.hasOwnProperty.call(familyNames, folded))
             return false;
         familySeen[f.id] = true;
+        familyNames[folded] = true;
         highest = Math.max(highest, numberedId(f.id, "family"));
         for (var j = 0; j < f.appIds.length; ++j) {
             var app = f.appIds[j];

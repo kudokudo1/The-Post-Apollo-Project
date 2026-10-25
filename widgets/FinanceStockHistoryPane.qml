@@ -1,7 +1,7 @@
 import QtQuick
 import "../components"
 
-// Market STOCKS M9: stand-alone dated EOD view, not an SEC filing inspector.
+// Market STOCKS M10: inclusive historical range, not an SEC event study.
 // No request until the operator presses LOAD HISTORY.
 Item {
     id: stocks
@@ -58,31 +58,70 @@ Item {
     GohuText {
         id: dateLabel
         anchors.top: issuers.bottom
-        anchors.topMargin: 13
+        anchors.topMargin: 11
         anchors.left: parent.left
         anchors.right: parent.right
-        text: "REFERENCE DATE // NOT AN SEC FILING DATE"
-        textFormat: Text.PlainText
+        text: "HISTORICAL RANGE // INCLUSIVE // MAX 180 DAYS"
         font.pixelSize: 10
         color: Colors.orange
     }
-    FinanceDateInput {
-        id: dateInput
+    Item {
+        id: dateControls
         anchors.top: dateLabel.bottom
-        anchors.topMargin: 8
+        anchors.topMargin: 6
         anchors.left: parent.left
         anchors.right: parent.right
-        height: 48
-        value: stocks.stockFeed ? stocks.stockFeed.referenceDate : ""
-        fallbackDate: stocks.stockFeed ? stocks.stockFeed.referenceDate : ""
-        canEdit: !!stocks.stockFeed && !stocks.stockFeed.loading
-        onValueEdited: function(value) {
-            if (stocks.stockFeed) stocks.stockFeed.selectReferenceDate(value);
+        readonly property bool sideBySide: width >= 640
+        height: sideBySide ? 66 : 136
+        Column {
+            id: fromGroup
+            anchors.top: parent.top
+            anchors.left: parent.left
+            width: dateControls.sideBySide ? (dateControls.width-12)/2 : dateControls.width
+            spacing: 4
+            GohuText {
+                text: "START DATE"
+                font.pixelSize: 9
+                color: Colors.cyan
+            }
+            FinanceDateInput {
+                width: parent.width
+                height: 48
+                value: stocks.stockFeed ? stocks.stockFeed.startDate : ""
+                fallbackDate: stocks.stockFeed ? stocks.stockFeed.startDate : ""
+                canEdit: !!stocks.stockFeed && !stocks.stockFeed.loading
+                onValueEdited: function(value) {
+                    if(stocks.stockFeed) stocks.stockFeed.selectStartDate(value);
+                }
+            }
+        }
+        Column {
+            anchors.top: dateControls.sideBySide ? parent.top : fromGroup.bottom
+            anchors.topMargin: dateControls.sideBySide ? 0 : 8
+            anchors.left: dateControls.sideBySide ? fromGroup.right : parent.left
+            anchors.leftMargin: dateControls.sideBySide ? 12 : 0
+            width: dateControls.sideBySide ? (dateControls.width-12)/2 : dateControls.width
+            spacing: 4
+            GohuText {
+                text: "END DATE"
+                font.pixelSize: 9
+                color: Colors.cyan
+            }
+            FinanceDateInput {
+                width: parent.width
+                height: 48
+                value: stocks.stockFeed ? stocks.stockFeed.endDate : ""
+                fallbackDate: stocks.stockFeed ? stocks.stockFeed.endDate : ""
+                canEdit: !!stocks.stockFeed && !stocks.stockFeed.loading
+                onValueEdited: function(value) {
+                    if(stocks.stockFeed) stocks.stockFeed.selectEndDate(value);
+                }
+            }
         }
     }
     Row {
         id: fetchControls
-        anchors.top: dateInput.bottom
+        anchors.top: dateControls.bottom
         anchors.topMargin: 11
         anchors.left: parent.left
         anchors.right: parent.right
@@ -93,11 +132,11 @@ Item {
             width: 122
             height: 28
             label: stocks.stockFeed && stocks.stockFeed.loading ? "READING"
-                : stocks.snapshot ? "REFRESH PRICE" : "LOAD HISTORY"
+                : stocks.snapshot ? "REFRESH RANGE" : "LOAD RANGE"
             labelPixelSize: 9
             accentColor: Colors.magenta
             available: stocks.stockFeed && stocks.stockFeed.monitoring
-                && !stocks.stockFeed.loading
+                && stocks.stockFeed.validSelection && !stocks.stockFeed.loading
             onLeftClicked: {
                 if (stocks.stockFeed) stocks.stockFeed.refresh();
             }
@@ -149,7 +188,7 @@ Item {
             spacing: 13
             GohuText {
                 width: parent.width
-                text: "Select an issuer and a past reference date. The window spans 10 calendar days before and up to 14 days after the anchor, limited to dates already elapsed. This is NOT an event study."
+                text: "Select an issuer and START/END dates, then LOAD RANGE. Dates are inclusive; only actual trading sessions appear."
                 textFormat: Text.PlainText
                 wrapMode: Text.WordWrap
                 font.pixelSize: 9
@@ -176,14 +215,15 @@ Item {
                 width: parent.width
                 visible: !!stocks.snapshot
                 text: stocks.snapshot
-                    ? "REFERENCE " + stocks.snapshot.filingDate
-                        + "\nPRIOR SESSION " + (stocks.snapshot.previous
-                            ? stocks.snapshot.previous.date + " // $"
-                                + stocks.snapshot.previous.price.toFixed(2) : "UNAVAILABLE")
-                        + "\nFOLLOWING SESSION " + (stocks.snapshot.next
-                            ? stocks.snapshot.next.date + " // $"
-                                + stocks.snapshot.next.price.toFixed(2) : "UNAVAILABLE")
-                        + "\nNEXT VS PRIOR " + (stocks.snapshot.changePct === null
+                    ? "REQUESTED " + stocks.snapshot.from + " to " + stocks.snapshot.to
+                        + "\nSESSIONS " + stocks.snapshot.bars.length
+                        + "\nFIRST CLOSE " + (stocks.snapshot.first
+                            ? stocks.snapshot.first.date + " // $"
+                                + stocks.snapshot.first.price.toFixed(2) : "UNAVAILABLE")
+                        + "\nLAST CLOSE " + (stocks.snapshot.last
+                            ? stocks.snapshot.last.date + " // $"
+                                + stocks.snapshot.last.price.toFixed(2) : "UNAVAILABLE")
+                        + "\nLAST VS FIRST " + (stocks.snapshot.changePct === null
                             ? "N/A" : stocks.snapshot.changePct.toFixed(2) + "%")
                     : ""
                 textFormat: Text.PlainText
@@ -224,24 +264,14 @@ Item {
                         ctx.strokeStyle = "#55CFCA";
                         ctx.lineWidth = 1.6;
                         ctx.stroke();
-                        const anchor = stocks.snapshot.filingDate;
-                        const index = bars.findIndex(function(x){ return x.date >= anchor; });
-                        if (index >= 0) {
-                            const x = index*(width-1)/(bars.length-1);
-                            ctx.beginPath();
-                            ctx.moveTo(x,0);
-                            ctx.lineTo(x,height);
-                            ctx.strokeStyle = "#ED981A";
-                            ctx.lineWidth = 1;
-                            ctx.stroke();
-                        }
+
                     }
                 }
             }
             GohuText {
                 width: parent.width
                 visible: stocks.priceBars.length >= 2
-                text: "CYAN = DAILY CLOSE // ORANGE = REFERENCE DATE POSITION"
+                text: "CYAN = ACTUAL DAILY CLOSES // SELECTED RANGE IS INCLUSIVE"
                 textFormat: Text.PlainText
                 wrapMode: Text.WordWrap
                 font.pixelSize: 9
@@ -249,7 +279,7 @@ Item {
             }
             GohuText {
                 width: parent.width
-                text: "Historical closes are not live quotes. The reference date is a comparison anchor, not a disclosure or evidence of a price reaction. Existing EODHD demo/key limits still apply."
+                text: "Historical closes are not live quotes or a price-reaction study. Adjusted prices can be recomputed after dividends and splits. EODHD demo/key limits still apply."
                 textFormat: Text.PlainText
                 wrapMode: Text.WordWrap
                 font.pixelSize: 9

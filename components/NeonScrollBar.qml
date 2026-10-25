@@ -190,12 +190,15 @@ Item {
     readonly property bool focusWithinPane:
         flickable && Window.activeFocusItem
         && isChildOf(Window.activeFocusItem, flickable)
+    // Hover/handle objects can already be gone while QML reevaluates a
+    // binding during startup, target reparenting, or teardown.
     readonly property bool revealTriggerActive:
         (triggerEnabled("hover")
-            && (paneHover.hovered || handleMouse.containsMouse))
+            && ((paneHover ? paneHover.hovered : false)
+                || (handleMouse ? handleMouse.containsMouse : false)))
         || (triggerEnabled("scroll") && scrollPulse)
         || (triggerEnabled("focus") && focusWithinPane)
-        || handleMouse.pressed
+        || (handleMouse ? handleMouse.pressed : false)
     readonly property bool handleHovered:
         handleMouse.containsMouse
         && handleMouse.mouseX >= handleLoader.x

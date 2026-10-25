@@ -814,7 +814,7 @@ for phrase in (
     "onActiveFocusChanged: todoMini.textFocusChanged(activeFocus)",
     "onTextFocusChanged: function(focused)",
     'label: todoEntry.awaitingDelete ? "YES" : "×"',
-    'label: todoEntry.awaitingDelete ? "NO" : "EDIT"',
+    'label: todoEntry.awaitingDelete ? "NO" : "⊹ ࣪✎˖"',
 ):
     if phrase == "MAXIMUM_LENGTH_PLACEHOLDER":
         phrase = "maximumLength: 160"

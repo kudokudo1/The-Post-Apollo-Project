@@ -83,12 +83,49 @@ pattern = re.compile(
     "|".join(re.escape(x) for x in sorted(ALL | {"stage"})) + r")\s*\(")
 actual = {}
 def without_comments(text):
-    # A prior M10q rehearsal documents todoStore.stage() in a comment.
-    # Do not mistake commentary for an executable write route. This is
-    # a narrow audit, not a complete QML parser.
-    text = re.sub(r"/\\*.*?\\*/", "", text, flags=re.DOTALL)
-    return re.sub(r"(?m)//[^\\n]*$", "", text)
-
+    # Keep quoted JS/QML strings intact, but remove both // and /* */
+    # comments before scanning executable mutation call expressions.
+    # This is a narrow lexer for source auditing, not a complete QML parser.
+    out = []
+    index = 0
+    state = "code"
+    escaped = False
+    while index < len(text):
+        char = text[index]
+        following = text[index + 1] if index + 1 < len(text) else ""
+        if state == "code":
+            if char == "/" and following == "/":
+                state = "line_comment"
+                index += 2
+                continue
+            if char == "/" and following == "*":
+                state = "block_comment"
+                index += 2
+                continue
+            if char in ("'", '"', "\x60"):
+                state = char
+            out.append(char)
+        elif state == "line_comment":
+            if char == "\n":
+                out.append(char)
+                state = "code"
+        elif state == "block_comment":
+            if char == "*" and following == "/":
+                state = "code"
+                index += 2
+                continue
+            if char == "\n":
+                out.append(char)
+        else:
+            out.append(char)
+            if escaped:
+                escaped = False
+            elif char == "\\":
+                escaped = True
+            elif char == state:
+                state = "code"
+        index += 1
+    return "".join(out)
 
 for path in files:
     text = without_comments(path.read_text())

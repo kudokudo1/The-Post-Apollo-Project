@@ -29,7 +29,7 @@ assert 'onMonitoringChanged:' in service and 'if (!monitoring) clear();' in serv
 assert 'if (reader.running)' in service
 assert 'if (desiredKey !== inFlightKey || !monitoring)' in service
 assert 'data.cik!==selectedCik' in service
-assert 'data.from!==startDate || data.to!==endDate' in service
+assert 'data.from!==activeWindow.from || data.to!==activeWindow.to' in service
 assert 'data.symbol!==symbols[selectedCik]' in service
 assert 'data.delivery.via==="HUB"' in service
 assert 'stockFeed.acceptOutput(text)' in service

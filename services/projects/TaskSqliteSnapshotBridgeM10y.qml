@@ -2,6 +2,7 @@ import QtQuick
 import Quickshell
 import Quickshell.Io
 import "../hub/ApolloHubTodoPolicy.js" as TodoPolicy
+import "TaskSqliteSnapshotLifecycleM10z.js" as Lifecycle
 
 // M10y independent TEST-ONLY read-only SQLite-v2 to live snapshot projection.
 // Not mounted in shell.qml or TASKS. No automatic path or startup, no writer.
@@ -17,10 +18,8 @@ Scope {
     property var snapshot: TodoPolicy.view(
         "loading", TodoPolicy.emptyDocument(), "")
 
-    property bool processExited: false
-    property bool stdoutFinished: false
-    property int exitCode: -1
-    property string stdoutBuffer: ""
+    property var flight: Lifecycle.idle()
+    readonly property bool cancelPending: flight.active && flight.cancelled
 
     readonly property bool writeReady: false
     readonly property bool remoteWriteAuthorized: false
@@ -41,13 +40,16 @@ Scope {
     }
 
     function requestSnapshot() {
-        if (busy) return false;
+        if (busy || worker.running) return false;
         // The extra private fixture-directory name prevents this UI from
         // accepting an arbitrary live tasks.db path. Host remains unmounted.
         if (!/^\/.+\/m10y-snapshot-test\/tasks\.db$/.test(candidatePath)) {
             unavailable("EXPLICIT_TEST_FIXTURE_REQUIRED");
             return false;
         }
+        var started = Lifecycle.begin(flight);
+        if (!started) return false;
+        flight = started;
         busy = true;
         status = "READING";
         errorCode = "";
@@ -56,24 +58,60 @@ Scope {
         blockedOperations = 0;
         snapshot = TodoPolicy.view(
             "loading", TodoPolicy.emptyDocument(), "");
-        processExited = false;
-        stdoutFinished = false;
-        exitCode = -1;
-        stdoutBuffer = "";
         worker.exec(["python3", "-B", "-I",
             Quickshell.shellPath("services/projects/TaskSqliteSnapshotProbeM10y.py"),
             "--db", candidatePath]);
         return true;
     }
 
+    function cancelSnapshot() {
+        if (!busy || !flight.active) return false;
+        flight = Lifecycle.cancel(flight);
+        status = "CANCEL_REQUESTED";
+        errorCode = "";
+        revision = -1;
+        sourceHash = "";
+        blockedOperations = 0;
+        snapshot = TodoPolicy.view(
+            "unsupported", TodoPolicy.emptyDocument(), "CANCEL_REQUESTED");
+        // Process.running=false requests SIGTERM. Never launch a replacement
+        // until both the exit and collector-finish signals have arrived.
+        worker.running = false;
+        return true;
+    }
+
+    function clearSnapshot() {
+        if (busy || worker.running) return false;
+        status = "NOT_CHECKED";
+        errorCode = "";
+        revision = -1;
+        sourceHash = "";
+        blockedOperations = 0;
+        snapshot = TodoPolicy.view(
+            "loading", TodoPolicy.emptyDocument(), "");
+        return true;
+    }
+
     function acceptResult() {
-        if (!busy || !processExited || !stdoutFinished) return;
-        if (exitCode !== 0 || stdoutBuffer.length > 1048576) {
+        if (!busy) return;
+        var joined = Lifecycle.outcome(flight);
+        if (joined.kind === "waiting" || joined.kind === "idle") return;
+        flight = Lifecycle.settle(flight);
+        if (joined.kind === "cancelled") {
+            busy = false;
+            status = "CANCELLED";
+            errorCode = "";
+            snapshot = TodoPolicy.view(
+                "unsupported", TodoPolicy.emptyDocument(), "CANCELLED");
+            inspected();
+            return;
+        }
+        if (joined.kind !== "response") {
             unavailable("READ_ONLY_PROBE_FAILED");
             return;
         }
         try {
-            var reply = JSON.parse(stdoutBuffer);
+            var reply = JSON.parse(joined.text);
             var keys = ["protocol","status","available","revision",
                 "sourceHash","blockedOperations","document",
                 "writeReady","remoteWriteAuthorized"];
@@ -140,16 +178,14 @@ Scope {
         id: worker
         stdout: StdioCollector {
             onStreamFinished: {
-                bridge.stdoutBuffer = this.text;
-                bridge.stdoutFinished = true;
+                bridge.flight = Lifecycle.onStreamFinished(bridge.flight, this.text);
                 bridge.acceptResult();
             }
         }
         // Never send private task descriptions or fixture paths to QS logs.
         stderr: StdioCollector {}
         onExited: function(code, exitStatus) {
-            bridge.exitCode = Number(code);
-            bridge.processExited = true;
+            bridge.flight = Lifecycle.onExit(bridge.flight, Number(code));
             bridge.acceptResult();
         }
     }

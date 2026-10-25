@@ -1,0 +1,49 @@
+name: TASKS M10z disposable Quickshell snapshot runtime harness
+
+on:
+  pull_request:
+    paths:
+      - 'TaskSqliteSnapshotHarnessM10z.qml'
+      - 'services/projects/TaskSqliteSnapshotBridgeM10y.qml'
+      - 'services/projects/TaskSqliteSnapshotLifecycleM10z.js'
+      - 'tests/tasks/fixtures/m10z_snapshot_fixture.py'
+      - 'tests/tasks/test_task_sqlite_snapshot_lifecycle_m10z.cjs'
+      - 'tests/tasks/test_task_sqlite_snapshot_runtime_m10z.py'
+      - 'docs/tasks-sqlite-runtime-harness-m10z.md'
+      - '.github/workflows/tasks-sqlite-runtime-harness-m10z.yml'
+  push:
+    branches:
+      - main
+    paths:
+      - 'TaskSqliteSnapshotHarnessM10z.qml'
+      - 'services/projects/TaskSqliteSnapshotBridgeM10y.qml'
+      - 'services/projects/TaskSqliteSnapshotLifecycleM10z.js'
+      - 'tests/tasks/fixtures/m10z_snapshot_fixture.py'
+      - 'tests/tasks/test_task_sqlite_snapshot_lifecycle_m10z.cjs'
+      - 'tests/tasks/test_task_sqlite_snapshot_runtime_m10z.py'
+      - 'docs/tasks-sqlite-runtime-harness-m10z.md'
+      - '.github/workflows/tasks-sqlite-runtime-harness-m10z.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  guarded-runtime-harness:
+    runs-on: ubuntu-latest
+    timeout-minutes: 7
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: M10z simulate Process exit/collector permutations and cancellation
+        run: node tests/tasks/test_task_sqlite_snapshot_lifecycle_m10z.cjs
+      - name: M10z private fixture generation, restart and QML safety boundary
+        run: python3 tests/tasks/test_task_sqlite_snapshot_runtime_m10z.py
+      - name: M10y record-v2 snapshot to legacy TODAY/PLANNER process parity
+        run: python3 tests/tasks/test_task_sqlite_snapshot_m10y.py
+      - name: M10r JSON/SQLite API ownership and isolation
+        run: python3 tests/tasks/test_task_sqlite_m10r_inventory.py

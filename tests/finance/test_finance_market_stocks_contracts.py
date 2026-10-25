@@ -74,5 +74,4 @@ for forbidden in ('financeWrite.submit(', 'financeFundingWrite.submit(',
 assert 'Process {' not in pane
 assert 'Process {' in service
 assert "fetch(" not in pane
-assert 'test' not in pane.lower() or 'test' in pane.lower()  # no hidden state mutation
 print("Finance M9 Market STOCKS second read-only consumer source contracts: PASS")

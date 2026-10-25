@@ -316,7 +316,7 @@ Item {
             Row {
                 id: actions
                 anchors.fill: parent
-                // Protect EDIT/DEL from the list's right-hand star rail.
+                // Protect task action buttons from the list's right-hand star rail.
                 // No empty gutter is reserved until scrolling is needed.
                 anchors.rightMargin: todoMini.taskScrollbarEnabled
                                      && taskListRail.scrollable
@@ -356,8 +356,11 @@ Item {
                     height: parent.height
                     trackLabelGlowLocally: true
                     softGlowEnabled: false
-                    labelPixelSize: 10
-                    label: todoEntry.awaitingDelete ? "NO" : "EDIT"
+                    labelPixelSize: todoEntry.awaitingDelete ? 10 : 12
+                    // Allow the full decorated pencil glyph to sit centered
+                    // in the existing 44px button without truncation.
+                    contentPadding: todoEntry.awaitingDelete ? 8 : 2
+                    label: todoEntry.awaitingDelete ? "NO" : "⊹ ࣪✎˖"
                     available: todoMini.writable
                     onLeftClicked: {
                         if (todoEntry.awaitingDelete)
@@ -371,7 +374,7 @@ Item {
                     height: parent.height
                     trackLabelGlowLocally: true
                     softGlowEnabled: false
-                    labelPixelSize: todoEntry.awaitingDelete ? 10 : 18
+                    labelPixelSize: todoEntry.awaitingDelete ? 10 : 14
                     destructive: true
                     accentColor: Colors.red
                     label: todoEntry.awaitingDelete ? "YES" : "×"

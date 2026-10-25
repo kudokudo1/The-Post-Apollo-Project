@@ -12,6 +12,7 @@ git = source("widgets/GitW.qml")
 tasks = source("widgets/TasksW.qml")
 time = source("widgets/TimeW.qml")
 deck = source("widgets/MediaDeckW.qml")
+weather = source("widgets/weather/WeatherStationW.qml")
 finance = source("widgets/FinanceW.qml")
 shell = source("shell.qml")
 
@@ -30,7 +31,7 @@ assert "root.chassisTopY - root.glowGutter" in tasks
 assert "y: root.frameTopInset" in tasks
 assert "anchors.topMargin: root.frameTopInset" in tasks
 assert "implicitHeight: frameHeight + frameTopInset + glowGutter" in tasks
-assert "frameHeight: 768" in tasks
+assert "frameHeight: 790" in tasks
 
 assert "readonly property int glowGutter: 12" in time
 assert "readonly property int frameTopInset: 9" in time
@@ -38,12 +39,27 @@ assert "    margins {\n        top: 0\n        right: 13\n    }" in time
 assert "y: timew.frameTopInset" in time
 assert "anchors.topMargin: timew.frameTopInset" in time
 assert "implicitHeight: frameHeight + frameTopInset + glowGutter" in time
-assert "frameHeight: 768" in time
+assert "frameHeight: 790" in time
 
 assert "property int panelTopMargin: 9" in deck
 assert "        top: panelTopMargin" in deck
 assert "    SurfaceFrame {\n        anchors.fill: parent" in deck
 assert "property int panelHeight: 850" in deck
+
+# Weather Station fills its own 1000x700 frame (no inner top gutter).
+# Shift the native weather window from 0px to the shared 9px visible line;
+# no changes to the frame size, side placement or terminal hole geometry.
+assert "implicitWidth: menuOpen ? 1000 : 0" in weather
+assert "implicitHeight: menuOpen ? 700 : 0" in weather
+assert "    margins {\n        top: 9\n        bottom: 0\n        right: 20\n        left: 0\n    }" in weather
+assert "width: weatherStation.menuOpen ? 1000 : 0" in weather
+assert "height: weatherStation.menuOpen ? 700 : 0" in weather
+
+# All three portrait widgets use a visible height of 790px on large outputs.
+policy = source("widgets/FinanceChassisPolicy.js")
+assert 'mode === "expanded" ? 900 : 790' in policy
+assert 'readonly property int frameHeight: 790' in tasks
+assert 'readonly property int frameHeight: 790' in time
 
 # Finance uses one 9px visible top line in Compact, Expanded and Fullscreen.
 assert "readonly property int frameTopInset: 9" in finance
@@ -62,4 +78,4 @@ assert "visible: true" in tasks and "visible: true" in time
 assert "visible: menuOpen" in deck
 assert "WlrLayershell.layer: WlrLayer.Overlay" in deck
 
-print("Five-widget visible top-edge alignment // 9px: PASS")
+print("Portrait height 790px / Weather and six-widget top edge 9px: PASS")

@@ -69,6 +69,12 @@ Scope {
         return stage(IdentityPolicy.select(document, id));
     }
 
+    // User-clicked family header. Persist only the current identity layout;
+    // no service, browser profile or account-session activation.
+    function toggleFamily(familyId) {
+        return stage(IdentityPolicy.toggleFamily(document, familyId));
+    }
+
     FileView {
         id: identityFile
         path: identities.storagePath

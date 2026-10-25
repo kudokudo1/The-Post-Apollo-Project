@@ -12,7 +12,7 @@ assert "PanelWindow {" in MENU
 assert 'import "Quickshell"' not in MENU  # built-in imports, not string imports
 assert 'import "../components"' in MENU
 assert "readonly property int frameWidth: 432" in MENU
-assert "readonly property int frameHeight: 768" in MENU
+assert "readonly property int frameHeight: 790" in MENU
 assert "readonly property int glowGutter: 12" in MENU
 assert "readonly property int frameTopInset: 9" in MENU
 assert "implicitWidth: frameWidth + glowGutter * 2" in MENU

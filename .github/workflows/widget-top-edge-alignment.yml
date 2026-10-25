@@ -8,6 +8,7 @@ on:
       - "widgets/TasksW.qml"
       - "widgets/TimeW.qml"
       - "widgets/MediaDeckW.qml"
+      - "widgets/weather/WeatherStationW.qml"
       - "widgets/FinanceW.qml"
       - "shell.qml"
       - "tests/components/test_widget_top_edge_alignment_contracts.py"
@@ -20,6 +21,7 @@ on:
       - "widgets/TasksW.qml"
       - "widgets/TimeW.qml"
       - "widgets/MediaDeckW.qml"
+      - "widgets/weather/WeatherStationW.qml"
       - "widgets/FinanceW.qml"
       - "shell.qml"
       - "tests/components/test_widget_top_edge_alignment_contracts.py"
@@ -33,7 +35,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Verify five widgets align their visible top to FinanceW 9px
+      - name: Verify visible top alignment and 790px portrait heights
         run: python3 tests/components/test_widget_top_edge_alignment_contracts.py
       - name: Verify dependent FinanceW top-edge contract
         run: python3 tests/finance/test_finance_adaptive_chassis_contracts.py

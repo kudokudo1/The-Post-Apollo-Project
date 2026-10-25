@@ -337,8 +337,10 @@ PanelWindow {
         left: false
     }
 
+    // Match the 9px visible top line of FinanceW, TasksW and TimeW.
+    // No weather station resizing or internal position changes.
     margins {
-        top: 0
+        top: 9
         bottom: 0
         right: 20
         left: 0

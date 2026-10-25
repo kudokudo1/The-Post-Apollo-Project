@@ -17,9 +17,9 @@ PanelWindow {
     property real chassisTopY: 0
     signal openGithubProjectsRequested()
 
-    // Reuse the FinanceW/TimeW 9:16 pilot geometry until live review.
+    // Match FinanceW Compact's 790px visible height; width remains 432px.
     readonly property int frameWidth: 432
-    readonly property int frameHeight: 768
+    readonly property int frameHeight: 790
     readonly property int glowGutter: 12
     readonly property int frameTopInset: 9 // shared visible top line
 

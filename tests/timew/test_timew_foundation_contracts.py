@@ -49,10 +49,9 @@ assert 'console.log("clockButton clicked");' in clock
 assert "SystemClock.Seconds" in clock
 assert "implicitHeight: 50" in clock
 
-# TimeW retains M1's fixed dimensions. FinanceW switched to a dynamic
-# chassis reference; validating identical string literals across separate
-# widgets is no longer a meaningful integration contract.
-for dim in ("frameWidth: 432", "frameHeight: 768", "glowGutter: 12"):
+# TimeW now matches FinanceW Compact's 790px visible frame height.
+# FinanceW remains dynamic; the source contract checks TimeW's fixed cap.
+for dim in ("frameWidth: 432", "frameHeight: 790", "glowGutter: 12"):
     assert dim in window, dim
 for dim in ("readonly property int frameWidth:", "readonly property int frameHeight:",
             "glowGutter: 12"):

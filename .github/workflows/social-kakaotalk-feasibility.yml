@@ -1,0 +1,19 @@
+name: Social KakaoTalk Feasibility Contract
+
+on:
+  pull_request:
+    paths:
+      - "services/messaging/bridges/kakaotalk/**"
+      - "tests/messaging/test_kakaotalk_feasibility_contract.py"
+      - ".github/workflows/social-kakaotalk-feasibility.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  feasibility:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate KakaoTalk personal-inbox blocker
+        run: python3 tests/messaging/test_kakaotalk_feasibility_contract.py

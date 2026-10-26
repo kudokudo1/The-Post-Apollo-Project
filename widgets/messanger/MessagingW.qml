@@ -204,30 +204,6 @@ PanelWindow {
         }
     }
 
-    // Safety fallback: if Vesktop keeps the splash-sized surface longer than
-    // expected, promote it after a few seconds instead of leaving Discord in
-    // startup mode forever. This does not change the launch lifecycle; it only
-    // decides when the visible window may be snapped to the shared slot.
-    Timer {
-        id: discordStartupFallback
-
-        interval: 6000
-        repeat: false
-
-        onTriggered: {
-            if (messagingWindow.menuOpen && messagingWindow.discordSelected && !messagingWindow.discordReady) {
-                // A stale Vesktop position cannot become authoritative while
-                // the Social FloatingWindow is still being positioned.
-                if (!messagingWindow.socialReady) {
-                    messagingWindow.requestGroupGeometry();
-                    return;
-                }
-                messagingWindow.discordReady = true;
-                messagingWindow.syncDiscordGeometry(true);
-            }
-        }
-    }
-
     // After a Mod-move/resize of the social window while Discord is active,
     // wait until the drag settles before raising Discord again. Doing it during
     // the drag would cancel Sway's move/resize operation.
@@ -383,6 +359,10 @@ PanelWindow {
     // Only after initial Social-owned placement may Vesktop lead $mod moves.
     property bool discordDocked: false
     property bool discordConfigured: false
+    // Splash and main are separate BrowserWindows upstream. A container-id
+    // replacement must restart the docking handshake before that window can
+    // influence shared Social geometry.
+    property int discordWindowConId: 0
     property bool xReady: false
     // A new browser must fit the Social slot before leading geometry.
     property bool xDocked: false
@@ -398,11 +378,11 @@ PanelWindow {
     // follower move itself, so there is no QML round trip in the hot path.
     property int geometryPollIntervalMs: 8
 
-    // Only used BEFORE the real Discord window is ready. A little Vesktop /
-    // Vencord splash window is centered inside the already-full Discord slot
-    // and is NEVER allowed to resize the social menu.
-    property int discordStartupMaxWidth: 760
-    property int discordStartupMaxHeight: 760
+    // Upstream Vesktop's splash BrowserWindow is exactly 300x350. Keep that
+    // size centered in the full external-app slot; it is never allowed to
+    // become shared geometry authority.
+    property int vesktopSplashWidth: 300
+    property int vesktopSplashHeight: 350
 
     implicitWidth: sharedPanelWidth
     implicitHeight: sharedPanelHeight
@@ -660,11 +640,13 @@ PanelWindow {
         });
     }
 
-    function helperCenterDiscord(x, y) {
+    function helperCenterDiscord(x, y, width, height) {
         sendGeometryHelper({
             op: "centerDiscord",
             x: Math.round(x),
-            y: Math.round(y)
+            y: Math.round(y),
+            width: Math.max(1, Math.round(width)),
+            height: Math.max(1, Math.round(height))
         });
     }
 
@@ -693,6 +675,28 @@ PanelWindow {
         var socialNode = payload.social;
         var discordNode = payload.discord;
         var socialRect = socialNode ? socialNode.rect : null;
+        var discordConId = discordNode ? Number(discordNode.conId || 0) : 0;
+
+        // Never carry docking authority from one Vesktop BrowserWindow to
+        // another. This is the critical splash -> main handoff guard.
+        if (discordSelected && discordConId > 0 && discordConId !== discordWindowConId) {
+            discordWindowConId = discordConId;
+            discordReady = false;
+            discordDocked = false;
+            discordConfigured = false;
+            ignoreDiscordGeometryUntil = 0;
+            updateGeometryHelperMode();
+        } else if (discordSelected && discordConId === 0 && discordWindowConId !== 0) {
+            // Tray-close/unmap is a full authority loss. A later reopen must
+            // complete a fresh main-window placement handshake.
+            discordWindowConId = 0;
+            discordReady = false;
+            discordDocked = false;
+            discordConfigured = false;
+            ignoreDiscordGeometryUntil = 0;
+            updateGeometryHelperMode();
+        }
+
         // Hidden scratchpad Vesktop nodes are still discoverable so the helper
         // can target them by con_id, but they do not participate in geometry
         // until the compositor reports the client visible.
@@ -782,15 +786,15 @@ PanelWindow {
         // The little Vesktop/Vencord startup window is a guest inside the
         // already-full Discord slot. It is centered, never adopted as geometry.
         if (!discordReady) {
-            if (discordLooksLikeStartup(discordRect)) {
-                centerDiscordStartup(discordRect);
+            if (discordLooksLikeStartup(discordNode)) {
+                centerDiscordStartup();
                 return;
             }
 
-            // The real Discord window has appeared. The existing shared social
-            // geometry wins for its INITIAL placement/size.
+            // The real Discord main BrowserWindow has appeared. The existing
+            // Social geometry wins its INITIAL placement/size. It still cannot
+            // lead until the compositor reports that exact main window docked.
             discordReady = true;
-            discordStartupFallback.stop();
             syncDiscordGeometry(true);
             return;
         }
@@ -851,31 +855,22 @@ PanelWindow {
         }
     }
 
-    function discordLooksLikeStartup(rect) {
-        if (!rect || discordReady)
-            return false;
-
-        var width = Math.round(Number(rect.width));
-        var height = Math.round(Number(rect.height));
-
-        return (width <= discordStartupMaxWidth && height <= discordStartupMaxHeight) || (width < discordWidth * 0.55 && height < discordHeight * 0.55);
+    function discordLooksLikeStartup(node) {
+        return !!node && !discordReady && String(node.kind || "") === "splash";
     }
 
-    function centerDiscordStartup(rect) {
-        if (!rect || !sharedPositionReady)
+    function centerDiscordStartup() {
+        if (!sharedPositionReady)
             return;
 
-        var width = Math.round(Number(rect.width));
-        var height = Math.round(Number(rect.height));
+        var x = Math.round(discordX + Math.max(0, discordWidth - vesktopSplashWidth) / 2);
+        var y = Math.round(discordY + Math.max(0, discordHeight - vesktopSplashHeight) / 2);
 
-        var x = Math.round(discordX + Math.max(0, discordWidth - width) / 2);
-
-        var y = Math.round(discordY + Math.max(0, discordHeight - height) / 2);
-
-        // Do not resize the splash. Only center it inside the full shell.
+        // The splash is a fixed provider-owned loading surface. Force its
+        // upstream nominal size and center it; never adopt or enlarge it.
         ignoreDiscordGeometryUntil = Date.now() + 180;
 
-        helperCenterDiscord(x, y);
+        helperCenterDiscord(x, y, vesktopSplashWidth, vesktopSplashHeight);
     }
 
     function syncSocialGeometry(focusWindow) {
@@ -945,9 +940,8 @@ PanelWindow {
         discordReady = false;
         discordDocked = false;
         discordConfigured = false;
+        discordWindowConId = 0;
         ignoreDiscordGeometryUntil = 0;
-
-        discordStartupFallback.restart();
 
         if (!swayGeometryReady)
             refreshSwayGeometry();
@@ -965,10 +959,10 @@ PanelWindow {
     function hideDiscord() {
         restoreSelectorAfterDiscordShow = false;
         discordRaiseDelay.stop();
-        discordStartupFallback.stop();
         discordReady = false;
         discordDocked = false;
         discordConfigured = false;
+        discordWindowConId = 0;
         ignoreDiscordGeometryUntil = 0;
 
         helperHideDiscord();

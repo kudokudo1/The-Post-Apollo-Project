@@ -157,6 +157,13 @@ BROWSER_SITES = ("x", "instagram", "facebook", "reddit", "threads", "pinterest",
 VESKTOP_WAYLAND_IDS = {"vesktop", "dev.vencord.vesktop"}
 VESKTOP_X11_CLASSES = {"vesktop"}
 
+# Upstream Vesktop's current splash BrowserWindow is 300x350, while the
+# normal client defaults to 1280x720 with a 940x500 minimum. Keep a generous
+# compositor tolerance, but never use the old "anything under 760x760"
+# heuristic that could promote a real-but-small window or a tiled splash.
+VESKTOP_SPLASH_MAX_WIDTH = 600
+VESKTOP_SPLASH_MAX_HEIGHT = 460
+
 
 def normalized_identity(value: Any) -> str:
     return str(value or "").strip().lower()
@@ -172,6 +179,15 @@ def is_vesktop_node(node: dict[str, Any]) -> bool:
         or window_class in VESKTOP_X11_CLASSES
         or instance in VESKTOP_X11_CLASSES
     )
+
+
+def vesktop_window_kind(rect: dict[str, int]) -> str:
+    if (
+        int(rect["width"]) <= VESKTOP_SPLASH_MAX_WIDTH
+        and int(rect["height"]) <= VESKTOP_SPLASH_MAX_HEIGHT
+    ):
+        return "splash"
+    return "main"
 
 
 def snapshot_from_tree(tree: dict[str, Any]) -> dict[str, Any]:
@@ -199,6 +215,7 @@ def snapshot_from_tree(tree: dict[str, Any]) -> dict[str, Any]:
             discord_entry["name"] = node.get("name")
             discord_entry["conId"] = int(node.get("id", 0))
             discord_entry["appId"] = node.get("app_id")
+            discord_entry["kind"] = vesktop_window_kind(rect)
             discord_entry["windowClass"] = (
                 (node.get("window_properties") or {}).get("class")
             )
@@ -223,8 +240,9 @@ def snapshot_from_tree(tree: dict[str, Any]) -> dict[str, Any]:
             discord_candidates,
             key=lambda item: (
                 bool(item.get("visible", False)),
-                bool(item.get("focused", False)),
+                item.get("kind") == "main",
                 item["rect"]["width"] * item["rect"]["height"],
+                bool(item.get("focused", False)),
             ),
         )
 
@@ -330,6 +348,8 @@ class Bridge:
         # Discord's runtime identity is learned from Sway. Never assume one
         # app_id spelling: current Vesktop may be native Wayland or XWayland.
         self.discord_con_id: int | None = None
+        self.discord_visible = False
+        self.discord_kind = ""
         self.discord_show_requested = False
         self.discord_show_focus = True
         self.discord_launch_attempted = False
@@ -622,10 +642,13 @@ class Bridge:
                     continue
                 x = int(message.get("x", 0))
                 y = int(message.get("y", 0))
+                width = max(1, int(message.get("width", 300)))
+                height = max(1, int(message.get("height", 350)))
                 criteria = sway_criteria("discord", self.discord_con_id)
                 self.queue_command(
                     f'{criteria} floating enable; '
                     f'{criteria} border none; '
+                    f'{criteria} resize set width {width} px height {height} px; '
                     f'{criteria} move absolute position {x} px {y} px'
                 )
                 continue
@@ -643,8 +666,9 @@ class Bridge:
                 if not self.discord_con_id:
                     self.sample_event.set()
                     continue
-                criteria = sway_criteria("discord", self.discord_con_id)
-                self.queue_command(f'{criteria} move scratchpad')
+                if self.discord_visible:
+                    criteria = sway_criteria("discord", self.discord_con_id)
+                    self.queue_command(f'{criteria} move scratchpad')
                 continue
 
             if op == "focusDiscord":
@@ -705,26 +729,64 @@ class Bridge:
 
         discord = snapshot.get("discord")
         if discord and int(discord.get("conId", 0)) > 0:
-            self.discord_con_id = int(discord["conId"])
+            new_con_id = int(discord["conId"])
+            new_visible = bool(discord.get("visible", False))
+            new_kind = str(discord.get("kind", ""))
+
+            # A splash->main replacement is a new geometry authority. Never
+            # carry ready/docked state across container identity changes.
+            if self.discord_con_id != new_con_id:
+                self.discord_con_id = new_con_id
+                self.discord_ready = False
+                self.discord_docked = False
+                with self.command_lock:
+                    self.pending_sync.pop("discord", None)
+
+            self.discord_visible = new_visible
+            self.discord_kind = new_kind
 
             if self.discord_show_requested:
                 criteria = sway_criteria("discord", self.discord_con_id)
-                commands = [
-                    f'{criteria} floating enable',
-                    f'{criteria} border none',
-                    f'{criteria} move scratchpad',
-                    f'{criteria} scratchpad show',
-                    f'{criteria} floating enable',
-                    f'{criteria} border none',
-                ]
-                if self.discord_show_focus:
-                    commands.append(f'{criteria} focus')
-                self.queue_command("; ".join(commands))
-                self.discord_show_requested = False
+
+                if new_kind == "splash":
+                    # Let QML center the real 300x350 splash. Do not consume the
+                    # request yet: the separately-created main window must still
+                    # receive floating/border/focus when it becomes visible.
+                    if not new_visible:
+                        self.queue_command(f'{criteria} scratchpad show')
+                else:
+                    commands = [
+                        f'{criteria} floating enable',
+                        f'{criteria} border none',
+                    ]
+                    # Reopening a Social-managed scratchpad window must SHOW it,
+                    # not issue another move-to-scratchpad first.
+                    if not new_visible:
+                        commands.append(f'{criteria} scratchpad show')
+                    commands.extend([
+                        f'{criteria} floating enable',
+                        f'{criteria} border none',
+                    ])
+                    if self.discord_show_focus:
+                        commands.append(f'{criteria} focus')
+                    self.queue_command("; ".join(commands))
+                    self.discord_show_requested = False
+                    self.discord_launch_attempted = False
         else:
+            if self.discord_con_id is not None:
+                self.discord_ready = False
+                self.discord_docked = False
+                with self.command_lock:
+                    self.pending_sync.pop("discord", None)
             self.discord_con_id = None
+            self.discord_visible = False
+            self.discord_kind = ""
+
             if self.discord_show_requested and not self.discord_launch_attempted:
                 try:
+                    # Vesktop is single-instance. If its tray-hidden main window
+                    # is currently unmapped, a second invocation asks upstream
+                    # to show/focus that existing main window.
                     subprocess.Popen(
                         ["flatpak", "run", "dev.vencord.Vesktop"],
                         start_new_session=True,

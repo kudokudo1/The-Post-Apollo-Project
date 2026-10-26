@@ -3,7 +3,7 @@
 // ApolloHub configuration is data, not QML source. The shell never writes its
 // own widget tree when a user rearranges a tile.
 var MODULE_IDS = ["time", "calendar", "todo", "notes", "weather", "uptime",
-                  "media", "apps", "cpu", "network", "social"];
+                  "media", "apps", "cpu", "network", "social", "audio"];
 var LAYOUT_VERSION = 2;
 var MAX_MODES = 6;
 var MAX_SUBMODES = 6;
@@ -70,7 +70,7 @@ function tileTitle(id) {
         time: "TIME", calendar: "CALENDAR", todo: "TO-DO",
         notes: "NOTES", weather: "WEATHER", uptime: "UPTIME",
         media: "MEDIA", apps: "APP LAUNCHER", cpu: "CPU++",
-        network: "NETWORK", social: "SOCIAL"
+        network: "NETWORK", social: "SOCIAL", audio: "SYSTEM AUDIO"
     };
     return names[String(id)] || "UNKNOWN";
 }

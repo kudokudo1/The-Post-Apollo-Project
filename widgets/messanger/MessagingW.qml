@@ -39,29 +39,6 @@ PanelWindow {
             messagingWindow.menuOpen = false;
         }
     }
-    Process {
-        id: discordShowProcess
-
-        onExited: function(exitCode, exitStatus) {
-            // Opening the native Discord window necessarily causes Sway to
-            // focus Vesktop. Only a keyboard-initiated Main Mode switch
-            // requests the Social selector back. Mouse clicks still open
-            // Discord with normal application focus.
-            if (!messagingWindow.restoreSelectorAfterDiscordShow)
-                return;
-            messagingWindow.restoreSelectorAfterDiscordShow = false;
-            if (!messagingWindow.menuOpen || !messagingWindow.discordSelected)
-                return;
-            messagingWindow.focusZone = messagingWindow.appZone;
-            messagingWindow.syncSocialGeometry(true);
-            Qt.callLater(function() {
-                if (messagingWindow.menuOpen && messagingWindow.discordSelected
-                        && messagingWindow.focusZone === messagingWindow.appZone)
-                    messagingWindow.focusAppSelector();
-            });
-        }
-    }
-
     // X runs as a separate browser app; Chromium owns its private profile.
     Process {
         id: xShowProcess
@@ -107,15 +84,6 @@ PanelWindow {
         // and exact provider process identity.
     }
 
-    Process {
-        id: discordHideProcess
-        command: ["swaymsg", "[app_id=\"vesktop\"] move scratchpad"]
-    }
-
-    Process {
-        id: discordLeaveProcess
-        command: ["swaymsg", "[app_id=\"vesktop\"]", "move", "scratchpad"]
-    }
     // Persistent Sway IPC helper.
     //
     // Unlike the old Timer -> bash -> swaymsg -> jq loop, this process stays
@@ -351,10 +319,22 @@ PanelWindow {
     onDiscordReadyChanged: updateGeometryHelperMode()
     onDiscordDockedChanged: {
         updateGeometryHelperMode();
-        // Only after the first verified placement may Vesktop rise above
-        // the empty Contact List / Chat Feed shells.
-        if (discordDocked && menuOpen && discordSelected)
+        if (!discordDocked || !menuOpen || !discordSelected)
+            return;
+
+        // Keyboard Main-Mode switching keeps the selector focused; direct
+        // Discord activation lets Vesktop own focus after the verified dock.
+        if (restoreSelectorAfterDiscordShow) {
+            restoreSelectorAfterDiscordShow = false;
+            focusZone = appZone;
+            syncSocialGeometry(true);
+            Qt.callLater(function() {
+                if (menuOpen && discordSelected)
+                    focusAppSelector();
+            });
+        } else {
             discordRaiseDelay.restart();
+        }
     }
     onXSelectedChanged: updateGeometryHelperMode()
     onXReadyChanged: updateGeometryHelperMode()
@@ -545,14 +525,6 @@ PanelWindow {
         }
     }
 
-    // The empty Discord shell is an independent bottom-layer surface.
-    // It is below every normal/floating Sway client and never captures input.
-    // The foreground Social window renders only the selector while Discord
-    // owns the rest of this visual slot.
-    DiscordBackingW {
-        hostSocial: messagingWindow
-    }
-
     // ============================================================
     // GEOMETRY HELPERS
     // ============================================================
@@ -696,6 +668,17 @@ PanelWindow {
         });
     }
 
+    function helperShowDiscord(focusWindow) {
+        sendGeometryHelper({
+            op: "showDiscord",
+            focus: focusWindow === true
+        });
+    }
+
+    function helperHideDiscord() {
+        sendGeometryHelper({ op: "hideDiscord" });
+    }
+
     function helperFocusDiscord() {
         sendGeometryHelper({
             op: "focusDiscord"
@@ -710,7 +693,10 @@ PanelWindow {
         var socialNode = payload.social;
         var discordNode = payload.discord;
         var socialRect = socialNode ? socialNode.rect : null;
-        var discordRect = discordNode ? discordNode.rect : null;
+        // Hidden scratchpad Vesktop nodes are still discoverable so the helper
+        // can target them by con_id, but they do not participate in geometry
+        // until the compositor reports the client visible.
+        var discordRect = discordNode && discordNode.visible ? discordNode.rect : null;
 
         // First map/configure the social FloatingWindow at the shared default
         // geometry. Do not adopt Sway's temporary tiled/map geometry.
@@ -963,34 +949,13 @@ PanelWindow {
 
         discordStartupFallback.restart();
 
-        if (discordLeaveProcess.running)
-            discordLeaveProcess.running = false;
-
-        if (discordShowProcess.running)
-            discordShowProcess.running = false;
-
         if (!swayGeometryReady)
             refreshSwayGeometry();
 
-        // Sway's default normal border draws a visible "Vesktop" titlebar,
-        // even after the app becomes floating. Force floating + border none
-        // before AND after scratchpad show; geometry follow and the later
-        // focusDiscord command reassert these on subsequent updates.
-        // Startup-sized splash windows still use centerDiscordStartup().
-        discordShowProcess.exec(["bash", "-lc",
-            "if ! swaymsg -t get_tree | grep -q '\"app_id\": \"vesktop\"'; then "
-            + "setsid -f flatpak run dev.vencord.Vesktop >/dev/null 2>&1; "
-            + "for i in $(seq 1 100); do "
-            + "swaymsg -t get_tree | grep -q '\"app_id\": \"vesktop\"' && break; "
-            + "sleep 0.1; done; fi; "
-            + "swaymsg '[app_id=\"vesktop\"] floating enable'; "
-            + "swaymsg '[app_id=\"vesktop\"] border none'; "
-            + "swaymsg '[app_id=\"vesktop\"] move scratchpad'; "
-            + "swaymsg '[app_id=\"vesktop\"] scratchpad show'; "
-            + "swaymsg '[app_id=\"vesktop\"] floating enable'; "
-            + "swaymsg '[app_id=\"vesktop\"] border none'; "
-            + "swaymsg '[app_id=\"vesktop\"] focus'"
-        ]);
+        // DiscordGeometry.py owns window discovery, provider launch when no
+        // Vesktop container exists, and all Sway mutations using the exact
+        // discovered con_id.
+        helperShowDiscord(restoreSelectorAfterDiscordShow !== true);
 
         Qt.callLater(function () {
             messagingWindow.requestGroupGeometry();
@@ -1006,13 +971,7 @@ PanelWindow {
         discordConfigured = false;
         ignoreDiscordGeometryUntil = 0;
 
-        if (discordShowProcess.running)
-            discordShowProcess.running = false;
-
-        if (discordHideProcess.running)
-            discordHideProcess.running = false;
-
-        discordHideProcess.running = true;
+        helperHideDiscord();
     }
 
     // ============================================================
@@ -1203,11 +1162,9 @@ PanelWindow {
         visible: messagingWindow.menuOpen
 
         fillColor: Colors.black
-        // Social uses a full-size FloatingWindow for shared Sway geometry.
-        // Its input mask is NOT a visual clipping mask. If this fill stays
-        // painted while Discord is selected, the entire Vesktop view gets
-        // tinted by the overlay despite receiving input normally.
-        fillOpacity: messagingWindow.discordSelected ? 0.0 : 0.20
+        // External apps float above the normal Social pane surfaces. Keep the
+        // same chassis underneath Discord that X/browser apps already use.
+        fillOpacity: 0.20
         borderVisible: false
         radius: 0
 
@@ -1302,8 +1259,7 @@ PanelWindow {
 
                     if (event.key === Qt.Key_Escape) {
                         if (messagingWindow.discordSelected)
-                            //if (activeAppIndex === DISCORD_INDEX)
-                            discordLeaveProcess.running = true;
+                            messagingWindow.hideDiscord();
 
                         messagingWindow.menuOpen = false;
 
@@ -1423,14 +1379,12 @@ PanelWindow {
             width: messagingWindow.contactListWidth
             height: messagingContent.height
 
-            // Keep the contact shell instantiated in Discord mode, with its
-            // inner content blank. Its paint/border move to the bottom backing
-            // so it cannot cover the actual floating Vesktop window.
+            // Discord keeps the normal contact panel instantiated underneath
+            // Vesktop; discordMode only empties its inner contents.
             visible: messagingWindow.menuOpen && !providerAccessPanel.visible
                      && !messagingWindow.providerDesktopManaged
 
             discordMode: messagingWindow.externalSelected
-            discordVisualBehind: messagingWindow.discordSelected
 
             z: 2
 
@@ -1526,14 +1480,13 @@ PanelWindow {
 
             height: messagingContent.height
 
-            // Keep the chat shell instantiated and empty for Discord, but
-            // paint it behind Vesktop via DiscordBackingW instead of over it.
+            // Discord keeps the normal chat panel instantiated underneath
+            // Vesktop; discordMode only empties its inner contents.
             visible: messagingWindow.menuOpen && !telegramConnectPanel.visible
                      && !providerAccessPanel.visible
                      && !messagingWindow.providerDesktopManaged
 
             discordMode: messagingWindow.externalSelected
-            discordVisualBehind: messagingWindow.discordSelected
 
             z: 1
 
@@ -1651,10 +1604,7 @@ PanelWindow {
         } else {
             messagingWindow.setGeometryWatch(false);
 
-            if (discordLeaveProcess.running)
-                discordLeaveProcess.running = false;
-
-            discordLeaveProcess.running = true;
+            messagingWindow.hideDiscord();
             messagingWindow.hideX();
 
             contactList.clearSelection();

@@ -73,7 +73,7 @@ tree = {
     "nodes": [
         {"visible": True, "name": "QS_SOCIAL_MENU",
          "rect": {"x": 0, "y": 0, "width": 800, "height": 700}},
-        {"visible": True, "app_id": "vesktop",
+        {"id": 77, "visible": True, "app_id": "dev.vencord.vesktop",
          "rect": {"x": 1, "y": 1, "width": 300, "height": 300}},
         {"visible": True, "window_properties": {"class": "post-apollo-x"},
          "rect": {"x": 120, "y": 1, "width": 680, "height": 700}},
@@ -85,7 +85,8 @@ snapshot = geometry.snapshot_from_tree(tree)
 assert snapshot["social"]["rect"]["width"] == 800
 assert snapshot["discord"]["rect"]["width"] == 300
 assert snapshot["x"]["rect"]["width"] == 680
-assert geometry.sway_criteria("discord") == '[app_id="vesktop"]'
+assert snapshot["discord"]["conId"] == 77
+assert geometry.sway_criteria("discord", 77) == '[con_id="77"]'
 assert geometry.sway_criteria("x") == '[class="post-apollo-x"]'
 assert '[class="post-apollo-x"]' in geometry.build_sync_command({
     "target": "x", "x": 1, "y": 2, "width": 300, "height": 400,
@@ -120,6 +121,8 @@ bridge.discord_ready = True
 bridge.discord_docked = True
 commands.clear()
 sample["discord"] = sample.pop("x")
+sample["discord"]["visible"] = True
+sample["discord"]["conId"] = 77
 result = bridge.fast_follow(sample)
 assert result["fastLeader"] == "discord"
 assert commands[0]["target"] == "social"

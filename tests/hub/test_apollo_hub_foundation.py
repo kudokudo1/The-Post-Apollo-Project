@@ -16,6 +16,10 @@ system_mini = (ROOT / "widgets/hub/ApolloHubSystemMini.qml").read_text(encoding=
 uptime_mini = (ROOT / "widgets/hub/ApolloHubUptimeMini.qml").read_text(encoding="utf-8")
 apps_mini = (ROOT / "widgets/hub/ApolloHubAppsMini.qml").read_text(encoding="utf-8")
 audio_mini = (ROOT / "widgets/hub/ApolloHubAudioMini.qml").read_text(encoding="utf-8")
+audio_streams = (ROOT / "widgets/hub/ApolloHubAudioStreams.qml").read_text(encoding="utf-8")
+audio_stream_gate = (ROOT / "services/hub/ApolloHubAudioStreamGate.qml").read_text(encoding="utf-8")
+audio_stream_policy = (ROOT / "services/hub/ApolloHubAudioStreamsPolicy.js").read_text(encoding="utf-8")
+team6_owner = (ROOT / "services/audio/ApplicationAudioService.qml").read_text(encoding="utf-8")
 volumebar_owner = (ROOT / "modules/Volumebar.qml").read_text(encoding="utf-8")
 apps_explore = (ROOT / "widgets/hub/ApolloHubAppsExplore.qml").read_text(encoding="utf-8")
 process_explore = (ROOT / "widgets/hub/ApolloHubProcessesExplore.qml").read_text(encoding="utf-8")
@@ -1689,6 +1693,86 @@ assert 'signal audioVolumeRequested(int percent)' in window
 assert 'signal audioMuteRequested(bool muted)' in window
 assert 'signal audioVolumeRequested(int percent)' in tile
 assert 'signal audioMuteRequested(bool muted)' in tile
+assert 'ApolloHubMediaExplore {' in tile
+
+
+# P3-B: user-operated stream controls, no fake canonical APP identity.
+for token in (
+    'import "services/audio" as AudioOwner',
+    'AudioOwner.ApplicationAudioService {',
+    'id: team6AudioOwner',
+    'ApolloHubAudioStreamGate {',
+    'id: hubAudioStreams',
+    'audioOwner: team6AudioOwner',
+    'audioStreamGate: hubAudioStreams',
+):
+    assert token in shell, f"Team 6 shared host route missing {token}"
+assert shell.count('AudioOwner.ApplicationAudioService {') == 1
+assert 'audioStreamGate: hub.audioStreamGate' in window
+assert 'audioStreamGate: tile.audioStreamGate' in tile
+assert 'audioStreamGate: audioMini.audioStreamGate' not in tile
+assert 'audioStreamGate: tile.audioStreamGate' in tile
+assert 'streamGate: audioMini.audioStreamGate' in audio_mini
+for token in (
+    'property string selectedPanel: "master"',
+    'label: "MASTER"',
+    'label: "STREAMS"',
+    'ApolloHubAudioStreams {',
+    'visible: audioMini.densityLevel > 1 && audioMini.selectedPanel === "streams"',
+    'visible: audioMini.densityLevel > 1 && audioMini.selectedPanel === "master"',
+):
+    assert token in audio_mini, f"Master/stream navigation missing {token}"
+for token in (
+    'property var streamGate: null',
+    'readonly property var selected:',
+    'function inspect(entry)',
+    'function requestMute()',
+    'function applyVolume()',
+    'signal inputFocusChanged(bool focused)',
+    'label: "REFRESH STREAMS"',
+    'label: "APPLY VOLUME"',
+    'label: "RESET DRAFT"',
+    'label: "BACK TO STREAMS"',
+    'Slider {',
+    'onActiveFocusChanged: streamsView.inputFocusChanged(activeFocus)',
+    'PIPEWIRE-REPORTED STREAM // NOT VERIFIED APP IDENTITY',
+):
+    assert token in audio_streams, f"Inline stream UI missing {token}"
+for token in (
+    'required property var audioOwner',
+    'readonly property var snapshot: StreamPolicy.snapshot(',
+    'function request(index, fingerprint, generation, action, value)',
+    'audioOwner.observationGeneration !== generation',
+    'StreamPolicy.findExact(audioOwner.sinkInputs,index,fingerprint)',
+    'audioOwner.refresh();',
+    'function observed(inputs)',
+    'if (audioOwner.observationGeneration <= req.generation) return;',
+    'StreamPolicy.findExact(inputs,req.index,req.identity)',
+    'audioOwner.setSinkInputMute([req.index],req.value)',
+    'audioOwner.setSinkInputVolumes([req.index],req.value)',
+    'STREAM RECHECK TIMED OUT // NO ACTION',
+    'REQUEST SENT // ACTUAL RESULT UNVERIFIED',
+):
+    assert token in audio_stream_gate, f"Owner-gated stream action missing {token}"
+for token in (
+    'var MAX_STREAMS = 16',
+    'function identity(input)',
+    'function snapshot(inputs, generation, loading, error)',
+    'function findExact(inputs, index, fingerprint)',
+    'source:"team6-sink-inputs"',
+):
+    assert token in audio_stream_policy, f"Audio projection contract missing {token}"
+for token in (
+    'function refresh()',
+    'function setSinkInputMute(indexes, muted)',
+    'function setSinkInputVolumes(indexes, percent)',
+    'signal refreshed(var inputs)',
+):
+    assert token in team6_owner, f"Team 6 mutation API missing {token}"
+for forbidden in ('"pactl"', 'Quickshell.execDetached(', 'Process {',
+                  'ApplicationAudioService {', 'PwObjectTracker {'):
+    assert forbidden not in audio_streams + audio_stream_gate, (
+        f"Stream UI/adapter created own audio mutation backend: {forbidden}")
 assert 'ApolloHubMediaExplore {' in tile
 
 # Launchers and widget backends are unchanged in this first stage.

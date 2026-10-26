@@ -20,6 +20,7 @@ PanelWindow {
     property var liveBridge: null
     // P3-A: passive master-output snapshot and explicit owner action route.
     property var audioSnapshot: null
+    property var audioStreamGate: null
     property bool audioInputFocused: false
     signal audioVolumeRequested(int percent)
     signal audioMuteRequested(bool muted)
@@ -1087,6 +1088,7 @@ PanelWindow {
                             // B6 passive desktop app catalog, without access
                             // to launch methods, command lines, or executables.
                             audioSnapshot: hub.audioSnapshot
+                            audioStreamGate: hub.audioStreamGate
                             onAudioVolumeRequested: function(percent) {
                                 hub.requestAudioVolume(percent);
                             }

@@ -9,6 +9,8 @@ Item {
     id: audioMini
 
     property var audioSnapshot: null
+    property var audioStreamGate: null
+    property string selectedPanel: "master"
     property int volumeDraft: 0
     property bool volumeDirty: false
     signal muteRequested(bool muted)
@@ -136,10 +138,37 @@ Item {
               : "DEFAULT SINK // DIRECT CONTROL"
     }
 
-    Column {
-        id: expanded
+    Row {
+        id: panelTabs
         visible: audioMini.densityLevel > 1
         anchors.top: quickActions.bottom
+        anchors.topMargin: 6
+        anchors.left: parent.left
+        anchors.right: parent.right
+        height: 28
+        spacing: 5
+        ActionButton {
+            width: Math.max(1,(parent.width-parent.spacing)/2)
+            height: parent.height
+            label: "MASTER"
+            selected: audioMini.selectedPanel === "master"
+            softGlowEnabled: false
+            onLeftClicked: audioMini.selectedPanel = "master"
+        }
+        ActionButton {
+            width: Math.max(1,(parent.width-parent.spacing)/2)
+            height: parent.height
+            label: "STREAMS"
+            selected: audioMini.selectedPanel === "streams"
+            softGlowEnabled: false
+            onLeftClicked: audioMini.selectedPanel = "streams"
+        }
+    }
+
+    Column {
+        id: expanded
+        visible: audioMini.densityLevel > 1 && audioMini.selectedPanel === "master"
+        anchors.top: panelTabs.bottom
         anchors.topMargin: 8
         anchors.left: parent.left
         anchors.right: parent.right
@@ -219,5 +248,19 @@ Item {
             text: audioMini.actionFeedback
                   + " // ACTION REQUESTS ARE NOT VERIFIED OUTCOMES"
         }
+    }
+
+    ApolloHubAudioStreams {
+        id: streamControls
+        visible: audioMini.densityLevel > 1 && audioMini.selectedPanel === "streams"
+        streamGate: audioMini.audioStreamGate
+        onInputFocusChanged: function(focused) {
+            audioMini.inputFocusChanged(focused);
+        }
+        anchors.top: panelTabs.bottom
+        anchors.topMargin: 6
+        anchors.left: parent.left
+        anchors.right: parent.right
+        anchors.bottom: parent.bottom
     }
 }

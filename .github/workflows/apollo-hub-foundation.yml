@@ -25,6 +25,12 @@ on:
       - "tests/hub/test_apollo_hub_processes_policy.cjs"
       - "widgets/hub/ApolloHubSocialMini.qml"
       - "widgets/hub/ApolloHubAudioMini.qml"
+      - "widgets/hub/ApolloHubAudioStreams.qml"
+      - "services/hub/ApolloHubAudioStreamGate.qml"
+      - "services/hub/ApolloHubAudioStreamsPolicy.js"
+      - "services/audio/ApplicationAudioService.qml"
+      - "services/hub/qmldir"
+      - "tests/hub/test_apollo_hub_audio_streams_policy.cjs"
       - "modules/Volumebar.qml"
       - "widgets/hub/ApolloHubTodoMini.qml"
       - "widgets/hub/ApolloHubTodoExplore.qml"
@@ -61,6 +67,12 @@ on:
       - "tests/hub/test_apollo_hub_processes_policy.cjs"
       - "widgets/hub/ApolloHubSocialMini.qml"
       - "widgets/hub/ApolloHubAudioMini.qml"
+      - "widgets/hub/ApolloHubAudioStreams.qml"
+      - "services/hub/ApolloHubAudioStreamGate.qml"
+      - "services/hub/ApolloHubAudioStreamsPolicy.js"
+      - "services/audio/ApplicationAudioService.qml"
+      - "services/hub/qmldir"
+      - "tests/hub/test_apollo_hub_audio_streams_policy.cjs"
       - "modules/Volumebar.qml"
       - "widgets/hub/ApolloHubTodoMini.qml"
       - "widgets/hub/ApolloHubTodoExplore.qml"
@@ -86,3 +98,5 @@ jobs:
         run: node tests/hub/test_apollo_hub_layout_v2.cjs
       - name: Verify sanitized AppControl process projection
         run: node tests/hub/test_apollo_hub_processes_policy.cjs
+      - name: Verify Team 6 live stream projection policy
+        run: node tests/hub/test_apollo_hub_audio_streams_policy.cjs

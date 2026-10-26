@@ -13,6 +13,7 @@ import "widgets/notifications"
 
 import "services/weather"
 import "services/system"
+import "services/audio" as AudioOwner
 import qs.services.hub
 import "services/hub/ApolloHubProcessesPolicy.js" as HubProcessesPolicy
 import qs.services.notifications
@@ -322,6 +323,18 @@ PanelWindow {
 
     WeatherService {
         id: weatherService
+    }
+
+    // P3-B DRAFT INTEGRATION GATE: Team 6's one shared stream owner.
+    // AppControl's old donor audio host still exists, so this lifetime
+    // insertion needs T3/Team 6 owner acceptance before merging.
+    // No automatic streams poll: refresh is a direct Hub user request.
+    AudioOwner.ApplicationAudioService {
+        id: team6AudioOwner
+    }
+    ApolloHubAudioStreamGate {
+        id: hubAudioStreams
+        audioOwner: team6AudioOwner
     }
 
     // ApolloHub reads the same live WeatherService as Weather Station.
@@ -790,6 +803,7 @@ PanelWindow {
             // MASTER OUTPUT ONLY, not Hi-Fi playback or Team 6 app streams.
             // This is the existing dock with its one PwObjectTracker.
             audioSnapshot: sharedVolumeDock.hubOutputSnapshot
+            audioStreamGate: hubAudioStreams
             onAudioVolumeRequested: function(percent) {
                 sharedVolumeDock.requestHubVolumePercent(percent);
             }

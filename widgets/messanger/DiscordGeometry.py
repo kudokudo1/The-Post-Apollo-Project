@@ -150,7 +150,7 @@ BROWSER_SITES = ("x", "instagram", "facebook", "reddit", "threads", "pinterest",
                  "truthsocial", "bluesky", "tumblr", "tiktok", "snapchat",
                  "linkedin", "mastodon", "nextdoor", "steamchat", "element",
                  "groupme", "lemon8", "quora", "pixelfed", "zalo",
-                 "whatsappweb", "messengerweb")
+                 "whatsappweb", "messengerweb", "linechrome")
 
 
 def snapshot_from_tree(tree: dict[str, Any]) -> dict[str, Any]:

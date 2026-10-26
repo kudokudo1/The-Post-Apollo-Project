@@ -99,11 +99,21 @@ assert.match(icon, /property color ink: "white"/);
 assert.doesNotMatch(icon, /🌕|🌗|🌒|✴|✦|✶/);
 assert.doesNotMatch(icon, /ColorAnimation|NumberAnimation|Timer|ShaderEffect/);
 
+// Both QML consumers import the components directory by path. Its explicit
+// qmldir manifest must register new types, or Quickshell aborts shell startup
+// with "WeatherCelestialGlyph is not a type" even if the .qml file exists.
+const componentManifest = fs.readFileSync(path.join(root, "components/qmldir"), "utf8");
+assert.match(componentManifest, /^WeatherCelestialGlyph\s+1\.0\s+WeatherCelestialGlyph\.qml\s*$/m);
+
 const service = fs.readFileSync(path.join(root, "services/weather/WeatherService.qml"), "utf8");
 const dock = fs.readFileSync(path.join(root, "modules/Weather.qml"), "utf8");
 const sky = fs.readFileSync(path.join(root, "widgets/weather/StationSky.qml"), "utf8");
 assert.match(service, /localObservationDateTime = String\(current\.localObsDateTime \|\| ""\)/);
 assert.match(service, /localObservationAnchorMs = Date\.now\(\)/);
+assert.match(dock, /^import "\.\.\/components"$/m);
+assert.match(sky, /^import "\.\.\/\.\.\/components"$/m);
+assert.match(dock, /WeatherCelestialGlyph\s*\{/);
+assert.match(sky, /WeatherCelestialGlyph\s*\{/);
 assert.match(dock, /WeatherCyclePolicy\.atObservation/);
 assert.match(dock, /WeatherCyclePolicy\.artworkFor\(weatherState, skyCycle\)/);
 assert.match(dock, /moonPhase: weatherDock\.skyCycle\.moonPhase/);

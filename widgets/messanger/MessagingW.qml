@@ -358,6 +358,7 @@ PanelWindow {
     }
     onXSelectedChanged: updateGeometryHelperMode()
     onXReadyChanged: updateGeometryHelperMode()
+    onXDockedChanged: updateGeometryHelperMode()
 
     // ============================================================
     // SHARED GEOMETRY
@@ -403,6 +404,8 @@ PanelWindow {
     property bool discordDocked: false
     property bool discordConfigured: false
     property bool xReady: false
+    // A new browser must fit the Social slot before leading geometry.
+    property bool xDocked: false
     property bool xConfigured: false
 
     property double ignoreSocialGeometryUntil: 0
@@ -654,6 +657,7 @@ PanelWindow {
             discordDocked: discordDocked,
             xSelected: xSelected,
             xReady: xReady,
+            xDocked: xDocked,
             browserSite: browserSite
         });
     }
@@ -729,9 +733,23 @@ PanelWindow {
                     adoptSocialGeometry(socialRect);
                 return;
             }
+            if (!socialReady)
+                return;
             if (!xReady) {
                 xReady = true;
                 syncXGeometry(true);
+                return;
+            }
+            if (!xDocked) {
+                // Startup geometry belongs to the new app, not Social.
+                // Wait for the existing sync settling interval and verify
+                // its actual Sway rectangle before enabling two-way follow.
+                if (now < ignoreXGeometryUntil)
+                    return;
+                if (initialDiscordDockAligned(xRect))
+                    xDocked = true;
+                else
+                    syncXGeometry(false);
                 return;
             }
             if (payload.fastLeader && payload.shared) {
@@ -794,6 +812,9 @@ PanelWindow {
         // On every activation Social places Discord first. A scratchpad view
         // can retain its old position; never let that pull Social away.
         if (!discordDocked) {
+            // Initial Sway move/resize must settle before Discord can lead.
+            if (now < ignoreDiscordGeometryUntil)
+                return;
             if (initialDiscordDockAligned(discordRect)) {
                 discordDocked = true;
             } else if (now >= ignoreDiscordGeometryUntil) {
@@ -1003,6 +1024,7 @@ PanelWindow {
             return;
         xError = "";
         xReady = false;
+        xDocked = false;
         xConfigured = false;
         ignoreXGeometryUntil = 0;
         if (xHideProcess.running)
@@ -1019,6 +1041,7 @@ PanelWindow {
         restoreSelectorAfterXShow = false;
         xRaiseDelay.stop();
         xReady = false;
+        xDocked = false;
         xConfigured = false;
         ignoreXGeometryUntil = 0;
         if (xHideProcess.running)
@@ -1095,6 +1118,12 @@ PanelWindow {
         if (index === 1) {
             discordReady = false;
             discordDocked = false;
+        }
+        // Disarm a previous browser leader BEFORE browserSite changes.
+        // Its transient focused rect must not pull Social while switching.
+        if (xSelected) {
+            xReady = false;
+            xDocked = false;
         }
         // Clear the old selection before swapping adapters; never briefly
         // render a Sessions thread under Telegram or vice versa.

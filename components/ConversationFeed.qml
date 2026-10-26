@@ -82,13 +82,9 @@ Rectangle {
         return out;
     }
 
-    // Discord mode keeps this panel's shell underneath Vesktop:
-    // the 0.85 background and cyan OUTER frame remain, while all inner
-    // chat/header/composer contents disappear.
+    // External-app mode keeps this normal shell underneath the provider
+    // window while hiding only chat/header/composer contents.
     property bool discordMode: false
-    // In Discord mode the blank shell exists but its paint is provided by
-    // the separate bottom-layer DiscordBackingW instead of this top-level UI.
-    property bool discordVisualBehind: false
 
     // Root must stay transparent or it blocks the translucent background.
     color: "transparent"
@@ -105,8 +101,7 @@ Rectangle {
 
         color: Colors.black
 
-        // Never tint the floating Vesktop window.
-        opacity: chatFeed.discordVisualBehind ? 0.0 : 0.85
+        opacity: 0.85
 
         radius: 0
         z: 0
@@ -918,9 +913,7 @@ Rectangle {
         border.width: 1
         border.color: Colors.cyan
 
-        // Remove the dividing line above Vesktop; keep the native chat
-        // frame when Sessions or Telegram is selected.
-        visible: !chatFeed.discordVisualBehind
+        visible: true
 
         z: 20
     }

@@ -5,7 +5,7 @@ DOC = ROOT / "services/messaging/bridges/kakaotalk/FEASIBILITY.md"
 ADAPTER = ROOT / "services/messaging/adapters/KakaoTalkAdapter.qml"
 
 assert DOC.is_file(), DOC
-text = DOC.read_text()
+text = " ".join(DOC.read_text().split())
 
 for required in (
     "BLOCKED / RESEARCH",

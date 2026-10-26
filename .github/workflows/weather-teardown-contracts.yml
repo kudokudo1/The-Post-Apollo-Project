@@ -35,6 +35,8 @@ jobs:
         run: node tests/weather/test_weather_dock_policy.js
       - name: Validate Weather data parsing and forecast contracts
         run: node tests/weather/test_weather_data_policy.js
+      - name: Validate Weather solar and lunar cycle with flat icon contracts
+        run: node tests/weather/test_weather_cycle_policy.js
       - name: Validate Weather Station Home relevance policy
         run: node tests/weather/test_station_home_policy.js
       - name: Validate Kitty Sway workarea coordinate contracts

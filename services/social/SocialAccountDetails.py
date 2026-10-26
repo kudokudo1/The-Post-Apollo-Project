@@ -116,7 +116,7 @@ def _assert_secure_dir(path: Path, create: bool) -> bool:
     if not path.exists() and not path.is_symlink():
         if not create:
             return False
-        path.mkdir(parents=True, mode=0o700)
+        path.mkdir(parents=True, mode=0o700, exist_ok=True)
     info = path.lstat()
     if not stat.S_ISDIR(info.st_mode) or info.st_uid != os.getuid() or info.st_mode & 0o077:
         raise StoreError("UNSAFE_DIRECTORY")

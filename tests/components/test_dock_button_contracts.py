@@ -151,7 +151,7 @@ DOCK_MODULES = {
     ),
     "modules/Sessions.qml": (
         "DockButton {",
-        "Math.max(65, Math.ceil(sessionsIcon.implicitWidth) + 16)",
+        "Math.max(63, Math.ceil(sessionsIcon.implicitWidth) + 14)",
         "implicitHeight: 50",
         "open: menuOpen",
         "normalDockGlowColor: Colors.omnitrix",
@@ -191,7 +191,8 @@ for needle in (
     "GohuText {",
     "id: sessionsIcon",
     "anchors.centerIn: parent",
-    "font.pixelSize: 22",
+    "font.pixelSize: 21",
+    "font.letterSpacing: -0.8",
     "textFormat: Text.StyledText",
     "color: Colors.white",
     'text: "࣪˖<font color=\'" + sessionsDock.foregroundColor',
@@ -211,6 +212,14 @@ assert "SafeDropShadow {" not in social_module
 assert social_module.count("contentGlowSource: sessionsIcon") == 1
 assert social_module.count("GohuText {") == 1
 assert social_module.count("NotoText {") == 0
+# Keep the original styled runs and state colors while tightening the Gohu
+# ornament grouping. The bar's vertical rail and click target stay 50px.
+assert "font.pixelSize: 22" not in social_module
+assert "Math.max(65, Math.ceil(sessionsIcon.implicitWidth) + 16)" not in social_module
+assert "implicitHeight: 50" in social_module
+assert social_module.count("font.letterSpacing: -0.8") == 1
+assert 'text: "࣪˖<font color=\'" + sessionsDock.foregroundColor' in social_module
+assert "              + \"'>☎︎</font>๋࣭✧\"" in social_module
 
 LEGACY_ROOT_MOUSE_IDS = (
     "appmenuMouse",

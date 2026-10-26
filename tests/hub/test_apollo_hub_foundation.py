@@ -1782,9 +1782,12 @@ assert 'ApolloHubMediaExplore {' in tile
 import re as _re
 assert "Item {" in audio_streams
 for reserved_name in ("data", "state"):
-    forbidden_property = (r"^\\s*(?:readonly\\s+)?property\\s+"
-                          r"(?:var|string|bool|int|real|double)\\s+"
-                          + reserved_name + r"\\s*:")
+    forbidden_property = (r"^\s*(?:readonly\s+)?property\s+"
+                          r"(?:var|string|bool|int|real|double)\s+"
+                          + reserved_name + r"\s*:")
+    assert _re.search(forbidden_property, "    readonly property var "
+                      + reserved_name + ": null", _re.M), (
+        "Reserved-property guard must detect Item." + reserved_name)
     assert not _re.search(forbidden_property, audio_streams, _re.M), (
         "ApolloHubAudioStreams overrides Item." + reserved_name
         + " and will prevent Quickshell from loading")

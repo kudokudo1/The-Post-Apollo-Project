@@ -15,6 +15,12 @@ Scope {
     readonly property string storagePath:
         Quickshell.dataDir + "/apollo-hub-todo-v1.json"
 
+    // M11l: no operator-facing activation exists. Enabling guarded mode
+    // without a verified OS host must fail closed, not fall through to JSON.
+    // A later, separately reviewed patch must replace this constant with a
+    // correctly fenced, opt-in integration before protected writes exist.
+    readonly property bool guardedWriterEnabled: false
+
     property string storageState: "loading"
     property string errorCode: ""
     property var document: TodoPolicy.emptyDocument()
@@ -50,6 +56,10 @@ Scope {
     }
 
     function stage(result) {
+        // The single shared write seam remains the only entry point.
+        // An unverified guarded-mode request may never use legacy FileView.
+        if (guardedWriterEnabled)
+            return false;
         if (storageState !== "ready" && storageState !== "empty")
             return false;
         if (!result || result.ok !== true)

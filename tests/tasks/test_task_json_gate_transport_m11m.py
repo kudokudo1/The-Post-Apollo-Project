@@ -170,6 +170,38 @@ class TransportTests(unittest.TestCase):
         self.assertEqual(third.wait(timeout=5),2)
         self.assertEqual(self.path.read_text(),raw(0))
 
+    def test_one_time_private_seed_refuses_overwrite(self):
+        import importlib.util
+        seed_path = ROOT / "tests/tasks/fixtures/TaskJsonGateSeedM11m.py"
+        spec = importlib.util.spec_from_file_location("m11m_private_seed", seed_path)
+        seed_mod = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(seed_mod)
+        parent = Path(self.temp.name) / "fresh-private-parent"
+        parent.mkdir(mode=0o700)
+        created = seed_mod.seed(parent)
+        self.assertEqual(created.parent.name, "m11l-tasks-copy")
+        self.assertEqual(created.name, "todo-copy.json")
+        self.assertEqual(json.loads(created.read_text())["tasks"][0]["title"],
+                         "M11M_TEST_0")
+        with self.assertRaises(ValueError):
+            seed_mod.seed(parent)
+        self.assertEqual(json.loads(created.read_text())["tasks"][0]["title"],
+                         "M11M_TEST_0")
+
+    def test_freeze_before_settlement_closes_transport(self):
+        proc, _ = self.start(bootstrap=True)
+        reserved = self.send(proc, {"requestId":1,"kind":"reserve",
+                                    "stageId":"m11m-test-stage-freeze",
+                                    "candidateText":raw(1)})
+        self.assertTrue(reserved["ok"])
+        refused = self.send(proc, {"requestId":2,"kind":"freeze",
+                                   "expectedEpoch":reserved["epoch"]})
+        self.assertFalse(refused["ok"])
+        self.assertEqual(proc.wait(timeout=5), 2)
+        _, next_hello = self.start()
+        self.assertEqual(next_hello["phase"], "RECOVERY_REVIEW")
+        self.assertTrue(next_hello["pending"])
+
     def test_qml_bridge_is_unmounted_and_defers_native_reload(self):
         path = ROOT / "services/projects/TaskJsonGateHostBridgeM11m.qml"
         bridge = path.read_text()

@@ -195,7 +195,7 @@ for needle in (
     "textFormat: Text.StyledText",
     "color: Colors.white",
     'text: "࣪˖<font color=\'" + sessionsDock.foregroundColor',
-    '"+ "\'>☎︎</font>๋࣭✧"',
+    "              + \"'>☎︎</font>๋࣭✧\"",
     "normalForegroundColor: Colors.omnitrix",
     "hoverForegroundColor: Colors.omnitrix",
     "pressedForegroundColor: Colors.omnitrix",

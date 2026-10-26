@@ -43,7 +43,7 @@ def distinct_pairs(pairs):
 
 
 def fixture_file(db):
-    if (type(db) is not Path or not db.is_absolute()
+    if (not isinstance(db, Path) or not db.is_absolute()
             or db.name!="handoff-test.db"
             or db.parent.name!="m11e-fileview-test"):
         raise AdmissionError("EXPLICIT_ISOLATED_HOST_PATH_REQUIRED")

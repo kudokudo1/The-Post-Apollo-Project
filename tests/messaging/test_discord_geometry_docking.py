@@ -294,7 +294,7 @@ class DiscordDockingTests(TestCase):
                     "name": "Vesktop",
                     "visible": False,
                     "focused": False,
-                    "rect": {"x": 700, "y": 300, "width": 500, "height": 400},
+                    "rect": {"x": 700, "y": 300, "width": 300, "height": 350},
                     "nodes": [],
                     "floating_nodes": [],
                 }
@@ -309,6 +309,27 @@ class DiscordDockingTests(TestCase):
                 self.assertEqual(snapshot["discord"]["conId"], node["id"])
                 self.assertFalse(snapshot["discord"]["visible"])
                 self.assertEqual(snapshot["discord"]["kind"], "splash")
+
+    def test_small_real_discord_window_is_not_misclassified_as_splash(self):
+        tree = {
+            "id": 1,
+            "visible": True,
+            "rect": {"x": 0, "y": 0, "width": 1920, "height": 1080},
+            "nodes": [{
+                "id": 106,
+                "name": "Friends",
+                "app_id": "dev.vencord.vesktop",
+                "visible": True,
+                "focused": True,
+                "rect": {"x": 700, "y": 300, "width": 360, "height": 350},
+                "nodes": [],
+                "floating_nodes": [],
+            }],
+            "floating_nodes": [],
+        }
+        snapshot = geometry.snapshot_from_tree(tree)
+        self.assertEqual(snapshot["discord"]["kind"], "main")
+        self.assertEqual(snapshot["discord"]["name"], "Friends")
 
     def test_discord_criteria_requires_discovered_container_id(self):
         self.assertEqual(
@@ -326,8 +347,10 @@ class DiscordDockingTests(TestCase):
         self.assertIn('String(node.kind || "") === "splash"', social)
         self.assertIn("helperCenterDiscord(x, y, vesktopSplashWidth, vesktopSplashHeight)", social)
         self.assertNotIn("discordStartupFallback", social)
-        self.assertIn("VESKTOP_SPLASH_MAX_WIDTH = 600", helper)
-        self.assertIn("VESKTOP_SPLASH_MAX_HEIGHT = 460", helper)
+        self.assertIn("VESKTOP_SPLASH_WIDTH = 300", helper)
+        self.assertIn("VESKTOP_SPLASH_HEIGHT = 350", helper)
+        self.assertIn("VESKTOP_SPLASH_TOLERANCE = 80", helper)
+        self.assertIn("splash_sized and splash_named", helper)
 
         cmd = geometry.build_sync_command({
             "target": "discord", "conId": 55,
@@ -472,7 +495,7 @@ class DiscordDockingTests(TestCase):
         bridge.queue_command.assert_not_called()
         self.assertTrue(bridge.discord_show_requested)
 
-    def test_visible_main_consumes_show_request_only_after_electron_showed_it(self):
+    def test_visible_main_snaps_directly_to_live_social_slot(self):
         bridge = geometry.Bridge(0.1)
         bridge.discord_show_requested = True
         bridge.discord_show_focus = True
@@ -482,25 +505,41 @@ class DiscordDockingTests(TestCase):
             "visible": True,
             "focused": False,
             "rect": {"x": 0, "y": 0, "width": 1920, "height": 1080},
-            "nodes": [{
-                "id": 7000,
-                "name": "Vesktop",
-                "app_id": "dev.vencord.vesktop",
-                "visible": True,
-                "focused": False,
-                "rect": {"x": 100, "y": 100, "width": 1280, "height": 720},
-                "nodes": [], "floating_nodes": [],
-            }],
+            "nodes": [
+                {
+                    "id": 99,
+                    "name": "QS_SOCIAL_MENU",
+                    "visible": True,
+                    "focused": False,
+                    "rect": {"x": 100, "y": 50, "width": 1210, "height": 700},
+                    "nodes": [], "floating_nodes": [],
+                },
+                {
+                    "id": 7000,
+                    "name": "Friends",
+                    "app_id": "dev.vencord.vesktop",
+                    "visible": True,
+                    "focused": False,
+                    "rect": {"x": 500, "y": 400, "width": 980, "height": 520},
+                    "nodes": [], "floating_nodes": [],
+                },
+            ],
             "floating_nodes": [],
         })
-        commands = []
-        bridge.queue_command = commands.append
+        syncs = []
+        bridge.queue_sync = syncs.append
         bridge.emit_snapshot(force=True)
+
         self.assertIn(7000, bridge.discord_main_seen_visible)
         self.assertFalse(bridge.discord_show_requested)
-        self.assertTrue(any("floating enable" in cmd for cmd in commands))
-        self.assertTrue(any("focus" in cmd for cmd in commands))
-        self.assertFalse(any("scratchpad show" in cmd for cmd in commands))
+        self.assertEqual(len(syncs), 1)
+        self.assertEqual(syncs[0]["target"], "discord")
+        self.assertEqual(syncs[0]["x"], 211)
+        self.assertEqual(syncs[0]["y"], 51)
+        self.assertEqual(syncs[0]["width"], 1098)
+        self.assertEqual(syncs[0]["height"], 698)
+        self.assertTrue(syncs[0]["setup"])
+        self.assertTrue(syncs[0]["focus"])
 
     def test_splash_request_stays_armed_for_real_main_window(self):
         bridge = geometry.Bridge(0.1)

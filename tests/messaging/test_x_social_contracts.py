@@ -94,6 +94,7 @@ assert '[class="post-apollo-x"]' in geometry.build_sync_command({
 bridge = geometry.Bridge(0.1)
 bridge.x_selected = True
 bridge.x_ready = True
+# Browser readiness does NOT grant geometry leadership before slot docking.
 commands = []
 bridge.queue_sync = commands.append
 sample = {
@@ -102,6 +103,11 @@ sample = {
     "x": {"rect": {"x": 120, "y": 1, "width": 700, "height": 690},
           "focused": True},
 }
+result = bridge.fast_follow(sample)
+assert result["fastLeader"] is None
+assert result["shared"] is None
+assert commands == []
+bridge.x_docked = True
 result = bridge.fast_follow(sample)
 assert result["fastLeader"] == "x"
 assert commands[0]["target"] == "social"
@@ -133,6 +139,13 @@ assert "readonly property bool externalSelected" in social
 assert "function showX()" in social
 assert "function hideX()" in social
 assert "function syncXGeometry(focusWindow)" in social
+assert "property bool xDocked: false" in social
+assert "onXDockedChanged: updateGeometryHelperMode()" in social
+assert "xDocked: xDocked," in social
+assert "if (!xDocked) {" in social
+assert "if (initialDiscordDockAligned(xRect))" in social
+assert "xDocked = true;" in social
+assert "xDocked = false;" in social
 assert 'Quickshell.shellPath("widgets/messanger/XBrowser.py")' in social
 assert "messagingWindow.externalSelected" in social
 assert "messageRouter.sendMessage(conversationId, text);" in social

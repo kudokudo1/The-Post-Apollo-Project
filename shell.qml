@@ -802,6 +802,14 @@ PanelWindow {
             liveBridge: apolloHubLive
             // Same monotonic TimeW stopwatch used by the standalone menu.
             // Hub neither creates a second stopwatch nor changes TimeW modes.
+            countdownSnapshot: timewWindow
+                               ? timewWindow.hubCountdownSnapshot : null
+            onCountdownActionRequested: function(id, action, name,
+                                                 hours, minutes, seconds) {
+                if (timewWindow)
+                    timewWindow.hubCountdownRequest(
+                        id, action, name, hours, minutes, seconds);
+            }
             stopwatchSnapshot: timewWindow
                                ? timewWindow.hubStopwatchSnapshot : null
             onStopwatchActionRequested: function(action) {

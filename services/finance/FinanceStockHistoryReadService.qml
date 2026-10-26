@@ -109,8 +109,8 @@ Scope {
         message = "DAY CLOSE FROM LOADED RANGE // NO NEW MARKET REQUEST";
         return true;
     }
-    // Explicit BACK TO RANGE restores a previously fetched, bounded RANGE
-    // snapshot; no reader.exec(), hub request or price calculation.
+    // Explicit BACK TO RANGE restores a previously fetched bounded RANGE
+    // snapshot, without querying the provider or recalculating prices.
     function returnToRange() {
         if (!canReturnToRange || loading || reader.running) return false;
         const restored = StockModePolicy.rangeFromReturnTicket(

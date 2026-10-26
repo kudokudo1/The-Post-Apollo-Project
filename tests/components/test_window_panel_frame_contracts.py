@@ -78,7 +78,7 @@ for needle, message in (
     ("WindowPanelFrame {\n        id: messagingContent", "Social shared chassis"),
     ("parent: socialWindow.contentItem\n        anchors.fill: parent", "Social FloatingWindow attachment"),
     ("fillColor: Colors.black", "Social base surface color"),
-    ("fillOpacity: messagingWindow.discordSelected ? 0.0 : 0.20", "Social surface transparent above Vesktop"),
+    ("fillOpacity: 0.20", "Social shared translucent surface"),
     ("borderVisible: false\n        radius: 0", "Social frame remains borderless"),
     ("glowVisible: false", "Social preserves internal glow composition"),
 ):

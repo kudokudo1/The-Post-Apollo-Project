@@ -111,18 +111,23 @@ assert "if (!swayGeometryReady || sharedPositionReady)" in social
 assert "sharedPanelY = Math.round(defaultPanelY);" in social
 assert "(screen ? screen.geometry.y : 0)" not in social
 assert "swayAreaY + swayAreaHeight - defaultPanelHeight" not in social
-# Operator requested +7px for Social's DEFAULT X only. Preserve the
-# 1210px width, existing 10px margin and shared Sway/Discord follow behavior.
-assert "readonly property int defaultPanelX: swayAreaX + swayAreaWidth - margins.right - defaultPanelWidth + 7" in social
+# Operator requested another +7px after merged PR #828's +7px:
+# Social's DEFAULT X is now +14px relative to its original position.
+# Preserve the 1210px width, existing margin and Sway/Discord following.
+assert "readonly property int defaultPanelX: swayAreaX + swayAreaWidth - margins.right - defaultPanelWidth + 14" in social
 assert "        right: 10" in social
 assert "property int defaultPanelWidth: 1210" in social
 assert "sharedPanelX = Math.round(defaultPanelX);" in social
 assert "readonly property int discordX: sharedPanelX + appSelectorWidth + discordGap + discordInset" in social
 for workspace_x, workspace_width in ((0, 2560), (2573, 1360), (-1920, 1920)):
-    former_x = workspace_x + workspace_width - 10 - 1210
-    new_x = workspace_x + workspace_width - 10 - 1210 + 7
-    assert new_x - former_x == 7
-    assert workspace_x + workspace_width - (new_x + 1210) == 3
+    original_x = workspace_x + workspace_width - 10 - 1210
+    previous_x = original_x + 7
+    new_x = original_x + 14
+    assert new_x - previous_x == 7
+    assert new_x - original_x == 14
+    # This is 4px past the workarea's right edge by operator request.
+    # Sway may independently constrain visible placement at runtime.
+    assert workspace_x + workspace_width - (new_x + 1210) == -4
 assert "property int defaultPanelHeight: Math.max(" in social
 assert "sharedPanelWidth = defaultPanelWidth;" in social
 assert "sharedPanelHeight = defaultPanelHeight;" in social

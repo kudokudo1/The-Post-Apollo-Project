@@ -631,3 +631,50 @@ safe-restart method with the new flag and `POST_APOLLO_UI_LAG_PROBE=1`,
 then correlate the last stage markers before a delayed event-loop tick.
 Rollback by restarting without the new environment flag. The resulting
 logging and the runtime causality claim must be verified separately.
+
+## October 26 // idle freeze follow-up, Git and SystemTelemetry completion coverage (draft)
+
+**Observation:** the operator's opt-in, live idle-desktop log
+`quickshell-subprocess-diagnostic.log` recorded event-loop delays of about
+19.8s, 44.8s, 4.0s, and 37.9s even with Git/Hospital/Notifications menus closed
+during several of the incidents. The instrumented GitHub and Hospital
+completion callbacks returned promptly in the sampled sections and were not
+running immediately before those major stalls. This is **not** proof that
+GitHub, Hospital, or QProcess cannot cause other stalls. The earlier
+100%-CPU native stack still shows `QProcess::finished`, QML signal evaluation,
+and `ArrayPrototype::method_slice`, without source-file provenance.
+
+The next draft extends the **existing**, opt-in
+`POST_APOLLO_SUBPROCESS_LAG_PROBE=1` flag. There is no new flag, timer,
+subprocess, mutation, or polling frequency:
+
+- `services/git/GitService.qml`: mark repo-scan and refresh `DONE` messages
+  before/after consuming them, in both the ordinary and optional startup-trace
+  paths. During refresh `DONE`, independently bracket
+  `publishPendingModels()` and `refreshed()`. Log action-process exit
+  fallback only when it actually runs. **Do not log every COMMIT or other
+  per-line protocol row.** No paths, commit messages, subjects, remotes, or
+  operation payload are logged.
+- `services/system/SystemTelemetry.qml`: mark existing stdout completion,
+  JSON parse, array publication, refreshed and monitor-observation signals,
+  and stderr completion before/after. Logs contain only static stage names,
+  payload character count or row count, and wall-clock timestamps; never
+  process lists, thermal sensor measurements, source paths, or JSON.
+- CI executes the new source guard, checking opt-in gates, entry/return
+  markers, existing subprocess counts, and no added diagnostic timers.
+
+**Limits:** markers on a single main thread cannot see the operations
+inside Qt before the QML handler begins. Both bracketing markers may be
+present even if a callback caused *deferred* heavy work. Absence of new
+markers immediately before the next delay excludes only these narrow
+instrumentation boundaries, not all Git, system, compositor, or Media work.
+A slow `Array.slice()` in another binding can remain unidentified.
+
+**Rollout:** draft PR and source-only checks do not activate the diagnostic.
+The operator's current live process is independent of GitHub; do not
+pull/restart/reset the dirty checkout without separate authorization.
+After authorized review/merge and a controlled local verification,
+correlate `SYNTAGMA_SUBPROCESS_PROBE` stage timestamps with the existing
+`SYNTAGMA_LAG_PROBE` event-loop delays. Keep the original native-stack
+evidence for comparison. Rollback by leaving the flag unset at the next
+authorized Quickshell launch; the default behavior and metrics are unchanged.

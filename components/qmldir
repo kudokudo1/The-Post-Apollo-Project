@@ -19,6 +19,7 @@ DockButton 1.0 DockButton.qml
 ActionButton 1.0 ActionButton.qml
 HospitalActionButton 1.0 HospitalActionButton.qml
 SafeDropShadow 1.0 SafeDropShadow.qml
+WeatherCelestialGlyph 1.0 WeatherCelestialGlyph.qml
 SurfaceFrame 1.0 SurfaceFrame.qml
 SectionFrame 1.0 SectionFrame.qml
 WindowPanelFrame 1.0 WindowPanelFrame.qml

@@ -157,12 +157,13 @@ BROWSER_SITES = ("x", "instagram", "facebook", "reddit", "threads", "pinterest",
 VESKTOP_WAYLAND_IDS = {"vesktop", "dev.vencord.vesktop"}
 VESKTOP_X11_CLASSES = {"vesktop"}
 
-# Upstream Vesktop's current splash BrowserWindow is 300x350, while the
-# normal client defaults to 1280x720 with a 940x500 minimum. Keep a generous
-# compositor tolerance, but never use the old "anything under 760x760"
-# heuristic that could promote a real-but-small window or a tiled splash.
-VESKTOP_SPLASH_MAX_WIDTH = 600
-VESKTOP_SPLASH_MAX_HEIGHT = 460
+# Upstream Vesktop's splash BrowserWindow is exactly 300x350 and has no
+# document title in splash.html. The real Discord window may legitimately be
+# restored very small, so size alone is never enough to call something splash.
+VESKTOP_SPLASH_WIDTH = 300
+VESKTOP_SPLASH_HEIGHT = 350
+VESKTOP_SPLASH_TOLERANCE = 80
+VESKTOP_SPLASH_GENERIC_TITLES = {"", "vesktop", "electron", "loading vesktop..."}
 
 
 def normalized_identity(value: Any) -> str:
@@ -183,13 +184,18 @@ def is_vesktop_node(node: dict[str, Any]) -> bool:
     )
 
 
-def vesktop_window_kind(rect: dict[str, int]) -> str:
-    if (
-        int(rect["width"]) <= VESKTOP_SPLASH_MAX_WIDTH
-        and int(rect["height"]) <= VESKTOP_SPLASH_MAX_HEIGHT
-    ):
-        return "splash"
-    return "main"
+def vesktop_window_kind(rect: dict[str, int], name: Any) -> str:
+    width = int(rect["width"])
+    height = int(rect["height"])
+    title = normalized_identity(name)
+
+    splash_sized = (
+        abs(width - VESKTOP_SPLASH_WIDTH) <= VESKTOP_SPLASH_TOLERANCE
+        and abs(height - VESKTOP_SPLASH_HEIGHT) <= VESKTOP_SPLASH_TOLERANCE
+    )
+    splash_named = title in VESKTOP_SPLASH_GENERIC_TITLES
+
+    return "splash" if splash_sized and splash_named else "main"
 
 
 def snapshot_from_tree(tree: dict[str, Any]) -> dict[str, Any]:
@@ -219,7 +225,10 @@ def snapshot_from_tree(tree: dict[str, Any]) -> dict[str, Any]:
             discord_entry["appId"] = node.get("app_id")
             discord_entry["sandboxAppId"] = node.get("sandbox_app_id")
             discord_entry["shell"] = node.get("shell")
-            discord_entry["kind"] = vesktop_window_kind(rect)
+            discord_entry["kind"] = vesktop_window_kind(
+                rect,
+                discord_entry["name"],
+            )
             discord_entry["windowClass"] = (
                 (node.get("window_properties") or {}).get("class")
             )
@@ -768,21 +777,30 @@ class Bridge:
                     # after Sway reports it visible.
                     pass
                 elif new_visible:
-                    # Only a main window Electron has actually shown may become
-                    # Social-managed. Now it is safe to float/focus and consume
-                    # the pending show request.
-                    commands = [
-                        f'{criteria} floating enable',
-                        f'{criteria} border none',
-                        f'{criteria} floating enable',
-                        f'{criteria} border none',
-                    ]
-                    if self.discord_show_focus:
-                        commands.append(f'{criteria} focus')
-                    self.queue_command("; ".join(commands))
-                    self.discord_show_requested = False
-                    self.discord_launch_attempted = False
-                    self.discord_reveal_attempted_con_id = None
+                    # First attachment is helper-owned, not a QML round trip.
+                    # Derive the exact external-app slot from the live Social
+                    # rectangle and snap this exact Vesktop con_id immediately.
+                    # QML will only verify that the compositor reached it before
+                    # arming bidirectional geometry leadership.
+                    social = snapshot.get("social")
+                    social_rect = social.get("rect") if social else None
+
+                    if social_rect:
+                        desired = self.discord_from_shared(social_rect)
+                        self.queue_sync({
+                            "op": "sync",
+                            "target": "discord",
+                            **desired,
+                            "focus": self.discord_show_focus,
+                            "setup": True,
+                        })
+                        self.discord_show_requested = False
+                        self.discord_launch_attempted = False
+                        self.discord_reveal_attempted_con_id = None
+                    else:
+                        # Social has not mapped yet. Keep the request armed and
+                        # let the next sampled tree perform the real attachment.
+                        self.sample_event.set()
                 elif self.discord_con_id in self.discord_main_seen_visible:
                     # This exact main window was visible before and is now a
                     # Social-managed scratchpad window. Reveal it once, then

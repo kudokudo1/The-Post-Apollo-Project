@@ -171,11 +171,13 @@ def normalized_identity(value: Any) -> str:
 
 def is_vesktop_node(node: dict[str, Any]) -> bool:
     app_id = normalized_identity(node.get("app_id"))
+    sandbox_app_id = normalized_identity(node.get("sandbox_app_id"))
     props = node.get("window_properties") or {}
     window_class = normalized_identity(props.get("class"))
     instance = normalized_identity(props.get("instance"))
     return (
         app_id in VESKTOP_WAYLAND_IDS
+        or sandbox_app_id == "dev.vencord.vesktop"
         or window_class in VESKTOP_X11_CLASSES
         or instance in VESKTOP_X11_CLASSES
     )
@@ -215,6 +217,8 @@ def snapshot_from_tree(tree: dict[str, Any]) -> dict[str, Any]:
             discord_entry["name"] = node.get("name")
             discord_entry["conId"] = int(node.get("id", 0))
             discord_entry["appId"] = node.get("app_id")
+            discord_entry["sandboxAppId"] = node.get("sandbox_app_id")
+            discord_entry["shell"] = node.get("shell")
             discord_entry["kind"] = vesktop_window_kind(rect)
             discord_entry["windowClass"] = (
                 (node.get("window_properties") or {}).get("class")
@@ -353,6 +357,11 @@ class Bridge:
         self.discord_show_requested = False
         self.discord_show_focus = True
         self.discord_launch_attempted = False
+        # A main BrowserWindow that Electron has never shown must not be
+        # treated as a Social-managed hidden/scratchpad window. During cold
+        # startup Vesktop creates the main window hidden before appLoaded.
+        self.discord_main_seen_visible: set[int] = set()
+        self.discord_reveal_attempted_con_id: int | None = None
 
     @staticmethod
     def rect_equal(a: dict[str, int] | None, b: dict[str, int] | None) -> bool:
@@ -657,12 +666,14 @@ class Bridge:
                 self.discord_show_requested = True
                 self.discord_show_focus = bool(message.get("focus", True))
                 self.discord_launch_attempted = False
+                self.discord_reveal_attempted_con_id = None
                 self.sample_event.set()
                 continue
 
             if op == "hideDiscord":
                 self.discord_show_requested = False
                 self.discord_launch_attempted = False
+                self.discord_reveal_attempted_con_id = None
                 if not self.discord_con_id:
                     self.sample_event.set()
                     continue
@@ -745,33 +756,61 @@ class Bridge:
             self.discord_visible = new_visible
             self.discord_kind = new_kind
 
+            if new_kind == "main" and new_visible:
+                self.discord_main_seen_visible.add(self.discord_con_id)
+
             if self.discord_show_requested:
                 criteria = sway_criteria("discord", self.discord_con_id)
 
                 if new_kind == "splash":
-                    # Let QML center the real 300x350 splash. Do not consume the
-                    # request yet: the separately-created main window must still
-                    # receive floating/border/focus when it becomes visible.
-                    if not new_visible:
-                        self.queue_command(f'{criteria} scratchpad show')
-                else:
+                    # Never force a hidden startup surface visible. Vesktop owns
+                    # its own splash->main transition; QML only centers a splash
+                    # after Sway reports it visible.
+                    pass
+                elif new_visible:
+                    # Only a main window Electron has actually shown may become
+                    # Social-managed. Now it is safe to float/focus and consume
+                    # the pending show request.
                     commands = [
                         f'{criteria} floating enable',
                         f'{criteria} border none',
-                    ]
-                    # Reopening a Social-managed scratchpad window must SHOW it,
-                    # not issue another move-to-scratchpad first.
-                    if not new_visible:
-                        commands.append(f'{criteria} scratchpad show')
-                    commands.extend([
                         f'{criteria} floating enable',
                         f'{criteria} border none',
-                    ])
+                    ]
                     if self.discord_show_focus:
                         commands.append(f'{criteria} focus')
                     self.queue_command("; ".join(commands))
                     self.discord_show_requested = False
                     self.discord_launch_attempted = False
+                    self.discord_reveal_attempted_con_id = None
+                elif self.discord_con_id in self.discord_main_seen_visible:
+                    # This exact main window was visible before and is now a
+                    # Social-managed scratchpad window. Reveal it once, then
+                    # wait for a visible snapshot before consuming the request.
+                    if self.discord_reveal_attempted_con_id != self.discord_con_id:
+                        self.queue_command(f'{criteria} scratchpad show')
+                        self.discord_reveal_attempted_con_id = self.discord_con_id
+                elif not self.discord_launch_attempted:
+                    # A hidden main window that this helper has never observed
+                    # visible is either a pre-existing tray-hidden Vesktop or a
+                    # cold-start main still waiting for appLoaded. If we did not
+                    # launch this startup ourselves, use Vesktop's single-
+                    # instance restore path instead of manipulating Sway early.
+                    try:
+                        subprocess.Popen(
+                            ["flatpak", "run", "dev.vencord.Vesktop"],
+                            start_new_session=True,
+                            stdin=subprocess.DEVNULL,
+                            stdout=subprocess.DEVNULL,
+                            stderr=subprocess.DEVNULL,
+                        )
+                        self.discord_launch_attempted = True
+                    except OSError as exc:
+                        print(
+                            f"Vesktop restore failed: {exc}",
+                            file=sys.stderr,
+                            flush=True,
+                        )
         else:
             if self.discord_con_id is not None:
                 self.discord_ready = False
@@ -781,6 +820,7 @@ class Bridge:
             self.discord_con_id = None
             self.discord_visible = False
             self.discord_kind = ""
+            self.discord_reveal_attempted_con_id = None
 
             if self.discord_show_requested and not self.discord_launch_attempted:
                 try:

@@ -232,7 +232,12 @@ def build_sync_command(message: dict[str, Any]) -> str:
 
     commands: list[str] = []
 
-    if bool(message.get("setup", False)):
+    # Discord's Sway titlebar can survive a completed/reused setup request:
+    # do not treat "discordConfigured" in QML as compositor acknowledgment.
+    # These operations are idempotent, and remain scoped to Vesktop. In
+    # particular, a routine fast-follow with setup=False must remove the
+    # titlebar and keep the client floating inside the Social slot.
+    if target == "discord" or bool(message.get("setup", False)):
         commands.append(f"{criteria} floating enable")
         commands.append(f"{criteria} border none")
 
@@ -565,6 +570,7 @@ class Bridge:
             if op == "focusDiscord":
                 self.queue_command(
                     '[app_id="vesktop"] floating enable; '
+                    '[app_id="vesktop"] border none; '
                     '[app_id="vesktop"] focus'
                 )
                 continue

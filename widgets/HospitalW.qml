@@ -841,14 +841,13 @@ PanelWindow {
 
     // 700px content chassis + 44px floor-selector lane.
     property int panelWidth: 744
-    // NotificationsHubW fills its output to a 5px bottom margin. Hospital
-    // keeps the canonical 9px visible top inset, so its visible frame is
-    // 9px shorter but ends at the exact same lower screen line.
-    readonly property int notificationBottomGap: 5
-    property int panelHeight: Math.max(
-        260, (screen ? Math.round(screen.height) : 1334)
-             - topGlowGutter - notificationBottomGap
-    )
+    // Notifications' *visible* WindowPanelFrame is inset by frameInset=8
+    // at BOTH ends of its stretched layer-shell window. Match that real
+    // content rectangle rather than comparing physical screen heights.
+    property var notificationsReference: null
+    readonly property int notificationBottomGap:
+        notificationsReference ? notificationsReference.panelBottomMargin : 5
+    property int panelHeight: Math.max(1, height - frameInset * 2)
     property int panelTopMargin: 0
     // Extend the new floor-selector lane to the screen edge while keeping
     // the original Hospital content at the same desktop position.
@@ -857,17 +856,14 @@ PanelWindow {
     property int glowGutter: 14
     property int topGlowGutter: 9
 
-    // Reserve transparent pixels above the visible chassis so its top glow
-    // renders inside the PanelWindow instead of being clipped by the top bar.
+    // Keep the same horizontal glow gutter as before. Vertically, the
+    // compositor determines the panel's full height from top/bottom anchors.
+    // No competing implicitHeight may reintroduce output overflow.
     implicitWidth: panelWidth + glowGutter * 2
-    // Do not grow the mapped PanelWindow past the output bottom: the
-    // side bloom retains its 14px gutter, while the bottom reserve follows
-    // Notifications' 5px edge clearance.
-    implicitHeight: panelHeight + topGlowGutter + notificationBottomGap
 
     anchors {
         top: true
-        bottom: false
+        bottom: true
         left: true
         right: false
     }
@@ -876,7 +872,7 @@ PanelWindow {
         top: panelTopMargin
         left: panelLeftMargin - glowGutter
         right: 0
-        bottom: 0
+        bottom: notificationBottomGap
     }
 
     exclusiveZone: 0
@@ -2976,7 +2972,10 @@ PanelWindow {
         width: root.panelWidth
         height: root.panelHeight
         anchors.top: parent.top
-        anchors.topMargin: root.topGlowGutter
+        // Notifications uses frameInset at its visible top border as well.
+        // Keep topGlowGutter=9 as the existing cross-widget reference, but
+        // align this Hospital frame to Notifications' 8px visible inset.
+        anchors.topMargin: root.frameInset
         anchors.horizontalCenter: parent.horizontalCenter
 
         fillColor: Colors.black

@@ -1,0 +1,49 @@
+name: TASKS M11i native FileView acceptance instrumentation
+
+on:
+  pull_request:
+    paths:
+      - 'services/projects/TaskFileViewNativeEvidenceM11i.js'
+      - 'services/projects/TaskFileViewHostBridgeM11g.qml'
+      - 'TaskFileViewHostHarnessM11g.qml'
+      - 'tests/tasks/test_task_fileview_native_evidence_m11i.cjs'
+      - 'tests/tasks/test_task_fileview_native_evidence_m11i.py'
+      - 'docs/tasks-fileview-native-acceptance-m11i.md'
+      - '.github/workflows/tasks-fileview-native-evidence-m11i.yml'
+  push:
+    branches:
+      - main
+    paths:
+      - 'services/projects/TaskFileViewNativeEvidenceM11i.js'
+      - 'services/projects/TaskFileViewHostBridgeM11g.qml'
+      - 'TaskFileViewHostHarnessM11g.qml'
+      - 'tests/tasks/test_task_fileview_native_evidence_m11i.cjs'
+      - 'tests/tasks/test_task_fileview_native_evidence_m11i.py'
+      - 'docs/tasks-fileview-native-acceptance-m11i.md'
+      - '.github/workflows/tasks-fileview-native-evidence-m11i.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  isolated-evidence:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: M11i native callback chronology and no false acceptance contract
+        run: node tests/tasks/test_task_fileview_native_evidence_m11i.cjs
+      - name: M11i evidence privacy and standalone native UI source boundary
+        run: python3 tests/tasks/test_task_fileview_native_evidence_m11i.py
+      - name: M11h actual Python host crash-window and restart regression
+        run: python3 tests/tasks/test_task_fileview_crash_windows_m11h.py
+      - name: M11g independent host disk-readback and restart regression
+        run: python3 tests/tasks/test_task_fileview_owner_host_m11g.py
+      - name: M11d production JSON writer inventory unchanged
+        run: python3 tests/tasks/test_task_writer_gate_inventory_m11d.py

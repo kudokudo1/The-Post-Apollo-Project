@@ -165,8 +165,10 @@ class ProviderAccessContracts(unittest.TestCase):
         # External apps float above the existing native panes. Discord must
         # empty their contents without replacing those panes with a separate
         # backing surface.
-        self.assertIn("visible: messagingWindow.menuOpen && !providerAccessPanel.visible", social)
-        self.assertIn("visible: messagingWindow.menuOpen && !telegramConnectPanel.visible", social)
+        self.assertIn("visible: messagingWindow.menuOpen && !appSelector.settingsOpen", social)
+        self.assertIn("&& !providerAccessPanel.visible", social)
+        self.assertIn("&& !telegramConnectPanel.visible", social)
+        self.assertIn("settingsWorkspaceParent: messagingContent.contentItem", social)
         self.assertIn("discordMode: messagingWindow.externalSelected", social)
         self.assertNotIn("discordVisualBehind", social)
         self.assertNotIn("DiscordBackingW {", social)

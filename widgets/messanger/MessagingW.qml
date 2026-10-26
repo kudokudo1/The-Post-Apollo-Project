@@ -319,10 +319,11 @@ PanelWindow {
     property string providerDesktopService: ""
     // xSelected retains the existing external-browser focus contract.
     readonly property bool xSelected: (activeAppIndex >= 3 && activeAppIndex <= 13) || (activeAppIndex >= 16 && activeAppIndex <= 25)
-        || ((activeAppIndex === 14 || activeAppIndex === 15) && providerWebOpen)
+        || ((activeAppIndex === 14 || activeAppIndex === 15 || activeAppIndex === 28) && providerWebOpen)
     readonly property string browserSite:
         activeAppIndex === 14 && providerWebOpen ? "whatsappweb" :
         activeAppIndex === 15 && providerWebOpen ? "messengerweb" :
+        activeAppIndex === 28 && providerWebOpen ? "linechrome" :
         activeAppIndex === 4 ? "instagram" :
         activeAppIndex === 5 ? "facebook" :
         activeAppIndex === 6 ? "reddit" :
@@ -1065,9 +1066,10 @@ PanelWindow {
         if (!menuOpen || providerWebOpen)
             return;
         if ((service === "whatsapp" && activeAppIndex !== 14)
-                || (service === "messenger" && activeAppIndex !== 15))
+                || (service === "messenger" && activeAppIndex !== 15)
+                || (service === "line" && activeAppIndex !== 28))
             return;
-        if (service !== "whatsapp" && service !== "messenger")
+        if (service !== "whatsapp" && service !== "messenger" && service !== "line")
             return;
         providerWebOpen = true;
         hideDiscord();

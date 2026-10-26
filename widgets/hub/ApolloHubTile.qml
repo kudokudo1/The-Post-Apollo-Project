@@ -121,6 +121,11 @@ SectionFrame {
     // B10 reuses the single existing one-second tile timer. The format
     // choice is view-local, not a persisted setting or system-clock change.
     property bool use24Hour: true
+    property var countdownSnapshot: null
+    signal countdownActionRequested(int id, string action,
+                                    string name, string hours,
+                                    string minutes, string seconds)
+    signal countdownInputFocusChanged(bool focused)
     property var stopwatchSnapshot: null
     signal stopwatchActionRequested(string action)
     signal stopwatchSampleRequested()
@@ -569,6 +574,15 @@ SectionFrame {
         id: timeMini
         visible: tile.moduleId === "time"
         timeSnapshot: tile.timeSnapshot
+        countdownSnapshot: tile.countdownSnapshot
+        onCountdownActionRequested: function(id, action, name,
+                                             hours, minutes, seconds) {
+            tile.countdownActionRequested(
+                id, action, name, hours, minutes, seconds);
+        }
+        onCountdownInputFocusChanged: function(focused) {
+            tile.countdownInputFocusChanged(focused);
+        }
         stopwatchSnapshot: tile.stopwatchSnapshot
         onStopwatchActionRequested: function(action) {
             tile.stopwatchActionRequested(action);

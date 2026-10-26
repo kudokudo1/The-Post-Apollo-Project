@@ -39,15 +39,26 @@ DockButton {
         id: sessionsIcon
         anchors.centerIn: parent
         font.pixelSize: 21
-        // Bring the left ornaments closer to the phone without splitting
-        // the combining-mark sequence into independently shaped text nodes.
-        font.letterSpacing: -0.8
         textFormat: Text.StyledText
         color: Colors.white
-        // Original glyph order: ࣪˖☎︎๋࣭✧.
-        // Only the telephone responds to Social's active-state color.
-        text: "࣪˖<font color='" + sessionsDock.foregroundColor
+        // Preserve the ORIGINAL glyph advances for the phone and right star.
+        // The left marks retain their original place in the shaping run but
+        // are transparent there; only their visible overlay moves right.
+        text: "<font color='transparent'>࣪˖</font><font color='" + sessionsDock.foregroundColor
               + "'>☎︎</font>๋࣭✧"
+
+        GohuText {
+            id: sessionsLeftOrnaments
+            // Move ONLY the left white marks 3px right. The phone and the
+            // entire right-side sequence remain at the original text positions.
+            anchors.left: parent.left
+            anchors.leftMargin: 3
+            anchors.baseline: parent.baseline
+            font.pixelSize: sessionsIcon.font.pixelSize
+            textFormat: Text.PlainText
+            color: Colors.white
+            text: "࣪˖"
+        }
     }
 
     onLeftClicked: {

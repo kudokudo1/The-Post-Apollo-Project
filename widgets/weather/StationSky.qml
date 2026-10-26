@@ -272,7 +272,8 @@ Rectangle {
                             anchors.centerIn: parent
                             text: sky.currentCelestialMode === "moon-cloud"
                                   ? "☁︎" : sky.conditionState.icon
-                            font.pixelSize: sky.skyCycle.solar === "night" ? 82 : 104
+                            font.pixelSize: 104
+                            scale: sky.skyCycle.solar === "night" ? 0.79 : 1
                             color: sky.iconColor(sky.conditionState.color)
                             visible: sky.currentCelestialMode === "weather"
                                      || sky.currentCelestialMode === "moon-cloud"
@@ -653,7 +654,8 @@ Rectangle {
                                 anchors.verticalCenterOffset: -8
                                 text: parent.forecastArt === "moon-cloud"
                                       ? "☁︎" : parent.forecastState.icon
-                                font.pixelSize: parent.forecastCycle.solar === "night" ? 64 : 80
+                                font.pixelSize: 80
+                                scale: parent.forecastCycle.solar === "night" ? 0.8 : 1
                                 color: sky.iconColor(parent.forecastState.color)
                                 visible: parent.forecastArt === "weather"
                                          || parent.forecastArt === "moon-cloud"

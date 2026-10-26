@@ -832,7 +832,7 @@ PanelWindow {
                             width: parent.width
                             height: mainModeLabel.implicitHeight
 
-                                GohuText {
+                            GohuText {
                                 id: mainModeLabel
                                 anchors.horizontalCenter: parent.horizontalCenter
                                 width: parent.width - 4

@@ -16,7 +16,7 @@ Scope {
     PanelWindow {
         visible: true
         implicitWidth: 580
-        implicitHeight: 352
+        implicitHeight: 432
         anchors { top: true; left: true }
         color: "#1B0623"
         Rectangle {
@@ -130,6 +130,26 @@ Scope {
                     text: "ERROR // " + (bridge.errorCode || "NONE")
                     color: "#F2BE4E"
                     font.pixelSize: 10
+                }
+                Text {
+                    text: "NATIVE TRACE // " + bridge.nativeSummary.label
+                    color: "#F2BE4E"
+                    font.pixelSize: 10
+                }
+                Text {
+                    text: "OBSERVED SAVE CHAINS // " + bridge.nativeSummary.saveChains
+                        + " // FROZEN " + bridge.nativeSummary.frozen
+                        + " // RECOVERY " + bridge.nativeSummary.recoveryObserved
+                    color: "#55CFCA"
+                    font.pixelSize: 10
+                }
+                Text {
+                    width: parent.width
+                    text: "RECENT CALLBACKS // " + bridge.nativeRecent
+                    color: "#DCF3FA"
+                    font.pixelSize: 10
+                    wrapMode: Text.WrapAnywhere
+                    maximumLineCount: 3
                 }
                 Text {
                     text: "PRODUCTION AUTHORITY // FALSE // NO MIGRATION"

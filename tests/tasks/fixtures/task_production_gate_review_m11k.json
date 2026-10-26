@@ -1,0 +1,115 @@
+{
+  "schemaVersion": 1,
+  "milestone": "M11k",
+  "classification": "PROPOSED_PRODUCTION_JSON_GATE_CONTRACT_ONLY",
+  "patient": "kudokudo1/The-Post-Apollo-Project",
+  "priorMilestone": "M11j",
+  "sourceOfTruth": "services/hub/ApolloHubTodoStore.qml",
+  "legacySourceSuffix": "/apollo-hub-todo-v1.json",
+  "supportedSourceVersions": [
+    1,
+    2,
+    3
+  ],
+  "owner": "TASKS storage succession (Proxy 1 to Proxy 2), external Hospital-compatible",
+  "approval": {
+    "m11kContractReviewRequested": true,
+    "realStorePatchApproved": false,
+    "localMachineChangesApproved": false,
+    "guardActivationApproved": false,
+    "sqliteMigrationApproved": false,
+    "remoteGitHubWritesApproved": false,
+    "mergeApproved": false
+  },
+  "existingBehavior": {
+    "activeWriter": "JSON_FILEVIEW_ONLY",
+    "mutationEntry": "stage(result)",
+    "mutationMethodCount": 9,
+    "fileViewWriterCount": 1,
+    "snapshotStates": [
+      "loading",
+      "saving",
+      "ready",
+      "empty",
+      "error",
+      "unsupported"
+    ]
+  },
+  "orderedProposedSteps": [
+    {
+      "id": "ADMISSION_CONFIG",
+      "requires": "explicit separate operator-enable control; disabled by default; never enable on startup from a persisted stale flag"
+    },
+    {
+      "id": "OWNER_START",
+      "requires": "single long-lived OS flock holder and durable owner epoch; inspect real source and journal before offering admission"
+    },
+    {
+      "id": "SOURCE_PREFLIGHT",
+      "requires": "stable exact source bytes, metadata, version 1/2/3 validation, backup and source readback, fail closed for missing or ambiguous source"
+    },
+    {
+      "id": "STAGE_RESERVE",
+      "requires": "single stage() entry waits for durable stage ID, matching epoch, source baseline and expected output digest before pendingDocument or setText"
+    },
+    {
+      "id": "NATIVE_WRITE",
+      "requires": "exactly one FileView.setText call with reserved candidate bytes; no second writer or fallback"
+    },
+    {
+      "id": "DEFERRED_READBACK",
+      "requires": "after onSaved callback returns, schedule FileView.reload with Qt.callLater and correlate stage and owner epoch"
+    },
+    {
+      "id": "HOST_VERIFY_SETTLE",
+      "requires": "OS host independently reads exact source bytes and verifies digest/identity before durably settling the stage"
+    },
+    {
+      "id": "CONFIRMED_PUBLISH",
+      "requires": "only host settlement for this reservation may publish pendingDocument to document"
+    },
+    {
+      "id": "RELOAD_FAILURE_FENCE",
+      "requires": "onLoadFailed/onLoaded/onSaveFailed/reloadFromDisk and process exits cannot reset RECOVERY_REVIEW or mispublish"
+    },
+    {
+      "id": "FREEZE_RESTART",
+      "requires": "durable closure before freeze acknowledgment, drain only reserved stages; fresh process starts RECOVERY_REVIEW until explicitly reconciled"
+    },
+    {
+      "id": "ROLLBACK",
+      "requires": "restore exact prior code/config with no task-data overwrite, hidden migration or simultaneous JSON/SQLite writers"
+    }
+  ],
+  "requiredFailureCases": [
+    "HOST_UNAVAILABLE",
+    "LOCK_CONTENDED",
+    "UNKNOWN_OWNER",
+    "SOURCE_MISSING_OR_REPLACED",
+    "INVALID_OR_FUTURE_VERSION",
+    "UNSETTLED_PREVIOUS_STAGE",
+    "SAVE_FAILED",
+    "DEFERRED_READBACK_MISMATCH",
+    "STALE_EPOCH_OR_CALLBACK",
+    "RELOAD_DURING_FREEZE",
+    "CRASH_AFTER_RESERVATION",
+    "CRASH_AFTER_SAVE_BEFORE_SETTLE",
+    "FREEZE_WITH_INFLIGHT_SAVE",
+    "RESTART_AFTER_FREEZE",
+    "ROLLBACK_WITH_UNSETTLED_STAGE"
+  ],
+  "sourceSnapshotPolicy": {
+    "unknownVersionToEmptyWritable": false,
+    "ambiguousMissingSourceToEmptyWritable": false,
+    "lastConfirmedDocumentPreservedOnFailure": true,
+    "proposedNewQmlStorageStateAllowedWithoutReview": false
+  },
+  "activation": {
+    "productionGateInstalled": false,
+    "guardedWritesEnabled": false,
+    "sqliteWriterEnabled": false,
+    "localRuntimeTestPerformedByM11k": false,
+    "actualTaskDataChangedByM11k": false,
+    "sourceStoreChangedByM11k": false
+  }
+}

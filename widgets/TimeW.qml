@@ -584,6 +584,104 @@ PanelWindow {
         selectedCountdownId = countdownTimers[0].id;
     }
 
+    // Hub COUNTDOWN reuses these same records and one monotonic anchor.
+    // Nothing here instantiates another countdown backend or heartbeat.
+    property string hubCountdownFeedback: "NO ACTION REQUESTED"
+    readonly property var hubCountdownSnapshot: {
+        const projected = [];
+        for (let i = 0; i < countdownTimers.length; i++) {
+            const timer = countdownTimers[i];
+            if (!timer) continue;
+            projected.push({
+                id: timer.id,
+                name: timer.name,
+                hours: timer.hours,
+                minutes: timer.minutes,
+                seconds: timer.seconds,
+                status: timer.status,
+                remaining: CountdownPolicy.format(
+                    CountdownPolicy.displayMs(timer)),
+                error: timer.error || ""
+            });
+        }
+        return {
+            source: "timew-monotonic-countdowns",
+            maxTimers: CountdownPolicy.MAX_TIMERS,
+            feedback: hubCountdownFeedback,
+            runningCount: countdownRunningCount,
+            selectedId: selectedCountdownId,
+            timers: projected
+        };
+    }
+
+    // This is the owner action API. Every target is an exact TimeW timer ID;
+    // selecting a timer in the Hub does not silently alter TimeW's selection.
+    function hubCountdownAction(id, action, name, hours, minutes, seconds) {
+        if (action === "create") {
+            if (countdownTimers.length >= CountdownPolicy.MAX_TIMERS)
+                return -1;
+            const createdId = countdownNextId;
+            createCountdown();
+            return CountdownPolicy.byId(countdownTimers, createdId)
+                   ? createdId : -1;
+        }
+        if (!Number.isSafeInteger(id) || id < 1)
+            return false;
+        const timer = CountdownPolicy.byId(countdownTimers, id);
+        if (!timer)
+            return false;
+        if (action === "edit") {
+            if (timer.status !== "ready"
+                    || typeof name !== "string"
+                    || name.trim().length === 0
+                    || name.length > CountdownPolicy.MAX_NAME_LENGTH)
+                return false;
+            const result = CountdownPolicy.parseDuration(hours, minutes, seconds);
+            if (!result.valid)
+                return false;
+            countdownTimers = CountdownPolicy.update(countdownTimers, id, {
+                name: name, hours: hours, minutes: minutes, seconds: seconds,
+                error: ""
+            });
+            return true;
+        }
+        if (action === "remove") {
+            if (countdownTimers.length <= 1)
+                return false;
+            countdownTimers = countdownTimers.filter(function(entry) {
+                return entry.id !== id;
+            });
+            if (selectedCountdownId === id)
+                selectedCountdownId = countdownTimers[0].id;
+            return true;
+        }
+        if (action === "start" || action === "pause" || action === "reset") {
+            if (action === "start" && timer.status === "running")
+                return false;
+            if (action === "pause" && timer.status !== "running")
+                return false;
+            // The original TimeW countdown policy owns the transition
+            // and monotonic timestamp. Reset is explicit at any state.
+            countdownTimers = CountdownPolicy.act(
+                countdownTimers, id, action, countdownNowMs());
+            const updated = CountdownPolicy.byId(countdownTimers, id);
+            return action === "start" ? updated.status === "running"
+                   : action === "pause" ? updated.status !== "running"
+                   : updated.status === "ready";
+        }
+        return false;
+    }
+
+    function hubCountdownRequest(id, action, name, hours, minutes, seconds) {
+        const result = hubCountdownAction(
+            id, action, name, hours, minutes, seconds);
+        const accepted = result !== false && result !== -1;
+        hubCountdownFeedback = accepted
+            ? "OWNER ACCEPTED // " + action.toUpperCase()
+            : "OWNER REJECTED // " + action.toUpperCase();
+        return result;
+    }
+
     // TOOLS / STOPWATCH. Monotonic measurement continues while the window
     // is closed; only the visible readout refresh pauses to conserve CPU.
     property bool stopwatchRunning: false

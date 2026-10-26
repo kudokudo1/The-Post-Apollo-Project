@@ -18,6 +18,20 @@ PanelWindow {
     property bool notesInputFocused: false
     // Injected read-only ApolloHubLiveBridge; do not construct a second provider.
     property var liveBridge: null
+    property var countdownSnapshot: null
+    property bool countdownInputFocused: false
+    signal countdownActionRequested(int id, string action,
+                                    string name, string hours,
+                                    string minutes, string seconds)
+    function requestCountdownAction(id, action, name, hours, minutes, seconds) {
+        if (!menuOpen || !countdownSnapshot
+                || countdownSnapshot.source !== "timew-monotonic-countdowns"
+                || !Number.isInteger(id)
+                || ["create","edit","start","pause","reset","remove"]
+                   .indexOf(action) === -1)
+            return;
+        countdownActionRequested(id,action,name,hours,minutes,seconds);
+    }
     property var stopwatchSnapshot: null
     signal stopwatchActionRequested(string action)
     signal stopwatchSampleRequested()
@@ -117,6 +131,7 @@ PanelWindow {
         && !notesInputFocused
         && !processInputFocused
         && !audioInputFocused
+        && !countdownInputFocused
     property bool writingLayout: false
     // In-session undo makes accidental tile deletion reversible.
     property var layoutUndoStack: []
@@ -536,6 +551,7 @@ PanelWindow {
             notesInputFocused = false;
             processInputFocused = false;
             audioInputFocused = false;
+            countdownInputFocused = false;
         }
         if (menuOpen && keyboardActive)
             Qt.callLater(function() {
@@ -1075,6 +1091,16 @@ PanelWindow {
                                   + tileFlow.spacing) : 0
                             y: gridCell ? gridCell.row * (140 + tileFlow.spacing) : 0
                             moduleId: tileConfig.module
+                            countdownSnapshot: hub.countdownSnapshot
+                            onCountdownActionRequested: function(id, action,
+                                                                 name, hours,
+                                                                 minutes, seconds) {
+                                hub.requestCountdownAction(
+                                    id, action, name, hours, minutes, seconds);
+                            }
+                            onCountdownInputFocusChanged: function(focused) {
+                                hub.countdownInputFocused = focused;
+                            }
                             stopwatchSnapshot: hub.stopwatchSnapshot
                             onStopwatchActionRequested: function(action) {
                                 hub.requestStopwatchAction(action);

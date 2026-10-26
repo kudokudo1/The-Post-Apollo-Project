@@ -193,7 +193,7 @@ Rectangle {
             if (!panel.visible || panel.serviceId !== "line")
                 return;
             if (action === "setup" && exitCode === 0)
-                panel.launchNotice = "Official LINE for Chrome setup opened. Install it there, then press CHECK LINE FOR CHROME.";
+                panel.launchNotice = "Official LINE for Chrome setup opened. Install it there, close that setup window, then press CHECK LINE FOR CHROME.";
             else if (exitCode !== 0)
                 panel.launchNotice = "LINE for Chrome action could not be started.";
         }

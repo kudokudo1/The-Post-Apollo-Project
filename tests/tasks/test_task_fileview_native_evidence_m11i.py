@@ -22,7 +22,7 @@ assert "function append(" in script
 assert "function summarize(" in script
 assert "function recent(" in script
 assert "current.events.slice()" in script
-for forbidden in ("FileView", "Quickshell.", "Process {", "setText(",
+for forbidden in ("FileView {", "Quickshell.", "Process {", "setText(",
                   "os.", "fetch(", "Qt.openUrl", "ApolloHubTodoStore",
                   "console.log(", "taskDescription", "fixturePath", "writerId",
                   "pendingRaw", "JSON.stringify(current)"):

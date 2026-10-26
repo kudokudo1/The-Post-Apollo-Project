@@ -471,8 +471,10 @@ PanelWindow {
 
     // shell.qml anchors this controller to the top/right. These values are only
     // used to seed the group the first time; after that the shared X/Y persist
-    // and can be changed from Sway move operations.
-    readonly property int defaultPanelX: swayAreaX + swayAreaWidth - margins.right - defaultPanelWidth
+    // and can be changed from Sway move operations. Shift the initial Social
+    // position 7px right without reducing the 1210px window or its resize range.
+    // The existing 10px workarea-right margin thus becomes a 3px open gap.
+    readonly property int defaultPanelX: swayAreaX + swayAreaWidth - margins.right - defaultPanelWidth + 7
 
     // Sway's visible workspace rect begins BELOW the reserved top bar/gap.
     // That is the same upper rail the other menus actually open against.

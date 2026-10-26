@@ -3,7 +3,7 @@ import Quickshell
 import Quickshell.Io
 import "../../widgets/FinanceStockModePolicy.js" as StockModePolicy
 
-// Finance M13: validated local RANGE -> DAY inspection without implicit requests.
+// Finance M14: bounded in-memory DAY -> RANGE restoration, no implicit reads.
 // Still uses the M10 bounded historical-range endpoint for both modes.
 Scope {
     id: stockFeed
@@ -16,6 +16,18 @@ Scope {
     property string state: "idle"
     property string message: "Select issuer, START and END dates, then LOAD RANGE."
     property var snapshot: null
+    // One ephemeral return ticket, valid only after OPEN IN DAY. Never persisted.
+    property var returnTicket: null
+    readonly property bool canReturnToRange: monitoring && ready
+        && displayMode === "day" && snapshot !== null
+        && snapshot.derivedFromRange === true && returnTicket !== null
+        && snapshot.from === dayDate
+        && returnTicket.cik === selectedCik
+        && returnTicket.openedDay === dayDate
+        && returnTicket.from === startDate && returnTicket.to === endDate
+        && StockModePolicy.selectWindow(
+            "range", dayDate, startDate, endDate, dateOffset(0)) !== null
+        && !reader.running
     property string desiredKey: ""
     property string inFlightKey: ""
     readonly property bool loading: state === "loading"
@@ -41,6 +53,7 @@ Scope {
         return !isNaN(date.getTime()) && date.toISOString().slice(0,10) === day;
     }
     function clear() {
+        returnTicket = null;
         desiredKey = "";
         snapshot = null;
         state = "idle";
@@ -83,6 +96,10 @@ Scope {
         const day = StockModePolicy.daySnapshotFromRange(
             snapshot, index, selectedCik, activeWindow.from, activeWindow.to);
         if (!day || day.from !== expectedDate) return false;
+        const ticket = StockModePolicy.rangeReturnTicket(
+            snapshot, index, selectedCik, activeWindow.from, activeWindow.to);
+        if (!ticket || ticket.openedDay !== expectedDate) return false;
+        returnTicket = ticket;
         dayDate = day.from;
         displayMode = "day";
         desiredKey = "";
@@ -90,6 +107,25 @@ Scope {
         snapshot = day;
         state = "ready";
         message = "DAY CLOSE FROM LOADED RANGE // NO NEW MARKET REQUEST";
+        return true;
+    }
+    // Explicit BACK TO RANGE restores a previously fetched bounded RANGE
+    // snapshot, without querying the provider or recalculating prices.
+    function returnToRange() {
+        if (!canReturnToRange || loading || reader.running) return false;
+        const restored = StockModePolicy.rangeFromReturnTicket(
+            returnTicket, snapshot, selectedCik, startDate, endDate);
+        if (!restored) {
+            returnTicket = null;
+            return false;
+        }
+        returnTicket = null;
+        displayMode = "range";
+        desiredKey = "";
+        inFlightKey = "";
+        snapshot = restored;
+        state = "ready";
+        message = "RANGE RESTORED FROM MEMORY // NO NEW MARKET REQUEST";
         return true;
     }
     function selectStartDate(day) {
@@ -119,6 +155,8 @@ Scope {
             message = "Previous history request is still running.";
             return false;
         }
+        // Any manual provider read invalidates the one-step return ticket.
+        returnTicket = null;
         const from=activeWindow.from, to=activeWindow.to;
         const key=displayMode+"/"+selectedCik+"/"+from+"/"+to;
         desiredKey=key;

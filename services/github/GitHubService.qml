@@ -1103,6 +1103,7 @@ Scope {
                 githubService.evidenceRunsStdoutText = this.text;
                 githubService.evidenceRunsStdoutSeen = true;
                 githubService.maybeFinishEvidenceRuns();
+                githubService.traceSubprocessLag("evidenceRunsProcess:stdout:end", 0);
             }
         }
 
@@ -1112,6 +1113,7 @@ Scope {
                 githubService.evidenceRunsStderrText = this.text;
                 githubService.evidenceRunsStderrSeen = true;
                 githubService.maybeFinishEvidenceRuns();
+                githubService.traceSubprocessLag("evidenceRunsProcess:stderr:end", 0);
             }
         }
 
@@ -1120,6 +1122,7 @@ Scope {
             githubService.evidenceRunsExitCode = Number(exitCode);
             githubService.evidenceRunsExitSeen = true;
             githubService.maybeFinishEvidenceRuns();
+            githubService.traceSubprocessLag("evidenceRunsProcess:exit:end", 0);
         }
     }
 
@@ -1132,6 +1135,7 @@ Scope {
                 githubService.inspectorMetaStdoutText = this.text;
                 githubService.inspectorMetaStdoutSeen = true;
                 githubService.maybeFinishInspector();
+                githubService.traceSubprocessLag("inspectorProcess:stdout:end", 0);
             }
         }
 
@@ -1141,6 +1145,7 @@ Scope {
                 githubService.inspectorMetaStderrText = this.text;
                 githubService.inspectorMetaStderrSeen = true;
                 githubService.maybeFinishInspector();
+                githubService.traceSubprocessLag("inspectorProcess:stderr:end", 0);
             }
         }
 
@@ -1149,6 +1154,7 @@ Scope {
             githubService.inspectorMetaExitCode = Number(exitCode);
             githubService.inspectorMetaExitSeen = true;
             githubService.maybeFinishInspector();
+            githubService.traceSubprocessLag("inspectorProcess:exit:end", 0);
         }
     }
 
@@ -1161,6 +1167,7 @@ Scope {
                 githubService.inspectorLogsStdoutText = this.text;
                 githubService.inspectorLogsStdoutSeen = true;
                 githubService.maybeFinishInspector();
+                githubService.traceSubprocessLag("inspectorLogsProcess:stdout:end", 0);
             }
         }
 
@@ -1170,6 +1177,7 @@ Scope {
                 githubService.inspectorLogsStderrText = this.text;
                 githubService.inspectorLogsStderrSeen = true;
                 githubService.maybeFinishInspector();
+                githubService.traceSubprocessLag("inspectorLogsProcess:stderr:end", 0);
             }
         }
 
@@ -1178,6 +1186,7 @@ Scope {
             githubService.inspectorLogsExitCode = Number(exitCode);
             githubService.inspectorLogsExitSeen = true;
             githubService.maybeFinishInspector();
+            githubService.traceSubprocessLag("inspectorLogsProcess:exit:end", 0);
         }
     }
 
@@ -1190,6 +1199,7 @@ Scope {
                 githubService.actionStdoutText = this.text;
                 githubService.actionStdoutSeen = true;
                 githubService.maybeFinishRemoteAction();
+                githubService.traceSubprocessLag("remoteActionProcess:stdout:end", 0);
             }
         }
 
@@ -1199,6 +1209,7 @@ Scope {
                 githubService.actionStderrText = this.text;
                 githubService.actionStderrSeen = true;
                 githubService.maybeFinishRemoteAction();
+                githubService.traceSubprocessLag("remoteActionProcess:stderr:end", 0);
             }
         }
 
@@ -1207,6 +1218,7 @@ Scope {
             githubService.actionExitCode = Number(exitCode);
             githubService.actionExitSeen = true;
             githubService.maybeFinishRemoteAction();
+            githubService.traceSubprocessLag("remoteActionProcess:exit:end", 0);
         }
     }
 
@@ -1219,6 +1231,7 @@ Scope {
                 githubService.factoryStdoutText = this.text;
                 githubService.factoryStdoutSeen = true;
                 githubService.maybeFinishFactory();
+                githubService.traceSubprocessLag("factoryProcess:stdout:end", 0);
             }
         }
 
@@ -1228,6 +1241,7 @@ Scope {
                 githubService.factoryStderrText = this.text;
                 githubService.factoryStderrSeen = true;
                 githubService.maybeFinishFactory();
+                githubService.traceSubprocessLag("factoryProcess:stderr:end", 0);
             }
         }
 
@@ -1236,6 +1250,7 @@ Scope {
             githubService.factoryExitCode = Number(exitCode);
             githubService.factoryExitSeen = true;
             githubService.maybeFinishFactory();
+            githubService.traceSubprocessLag("factoryProcess:exit:end", 0);
         }
     }
 
@@ -1246,6 +1261,7 @@ Scope {
             onStreamFinished: {
                 githubService.traceSubprocessLag("pxRuntimeProcess:stdout:begin", this.text.length);
                 githubService.parsePxRuntime(this.text);
+                githubService.traceSubprocessLag("pxRuntimeProcess:stdout:end", 0);
             }
         }
 
@@ -1260,6 +1276,7 @@ Scope {
                     githubService.pxRuntimeDetail =
                         "PX RUNTIME CHECK // " + error;
                 }
+                githubService.traceSubprocessLag("pxRuntimeProcess:stderr:end", 0);
             }
         }
 
@@ -1272,6 +1289,7 @@ Scope {
                     "PX RUNTIME CHECK EXIT "
                     + String(exitCode);
             }
+            githubService.traceSubprocessLag("pxRuntimeProcess:exit:end", 0);
         }
     }
 
@@ -1284,6 +1302,7 @@ Scope {
                 githubService.workflowStdoutText = this.text;
                 githubService.workflowStdoutSeen = true;
                 githubService.maybeFinishWorkflow();
+                githubService.traceSubprocessLag("workflowsProcess:stdout:end", 0);
             }
         }
 
@@ -1293,6 +1312,7 @@ Scope {
                 githubService.workflowStderrText = this.text;
                 githubService.workflowStderrSeen = true;
                 githubService.maybeFinishWorkflow();
+                githubService.traceSubprocessLag("workflowsProcess:stderr:end", 0);
             }
         }
 
@@ -1301,6 +1321,7 @@ Scope {
             githubService.workflowExitCode = Number(exitCode);
             githubService.workflowExitSeen = true;
             githubService.maybeFinishWorkflow();
+            githubService.traceSubprocessLag("workflowsProcess:exit:end", 0);
         }
     }
 
@@ -1313,6 +1334,7 @@ Scope {
                 githubService.runsStdoutText = this.text;
                 githubService.runsStdoutSeen = true;
                 githubService.maybeFinishRuns();
+                githubService.traceSubprocessLag("runsProcess:stdout:end", 0);
             }
         }
 
@@ -1322,6 +1344,7 @@ Scope {
                 githubService.runsStderrText = this.text;
                 githubService.runsStderrSeen = true;
                 githubService.maybeFinishRuns();
+                githubService.traceSubprocessLag("runsProcess:stderr:end", 0);
             }
         }
 
@@ -1330,6 +1353,7 @@ Scope {
             githubService.runsExitCode = Number(exitCode);
             githubService.runsExitSeen = true;
             githubService.maybeFinishRuns();
+            githubService.traceSubprocessLag("runsProcess:exit:end", 0);
         }
     }
 

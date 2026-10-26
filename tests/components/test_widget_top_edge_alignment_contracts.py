@@ -111,9 +111,18 @@ assert "if (!swayGeometryReady || sharedPositionReady)" in social
 assert "sharedPanelY = Math.round(defaultPanelY);" in social
 assert "(screen ? screen.geometry.y : 0)" not in social
 assert "swayAreaY + swayAreaHeight - defaultPanelHeight" not in social
-# X and the shared size/Discord geometry must not change.
-assert "readonly property int defaultPanelX: swayAreaX + swayAreaWidth - margins.right - defaultPanelWidth" in social
+# Operator requested +7px for Social's DEFAULT X only. Preserve the
+# 1210px width, existing 10px margin and shared Sway/Discord follow behavior.
+assert "readonly property int defaultPanelX: swayAreaX + swayAreaWidth - margins.right - defaultPanelWidth + 7" in social
+assert "        right: 10" in social
 assert "property int defaultPanelWidth: 1210" in social
+assert "sharedPanelX = Math.round(defaultPanelX);" in social
+assert "readonly property int discordX: sharedPanelX + appSelectorWidth + discordGap + discordInset" in social
+for workspace_x, workspace_width in ((0, 2560), (2573, 1360), (-1920, 1920)):
+    former_x = workspace_x + workspace_width - 10 - 1210
+    new_x = workspace_x + workspace_width - 10 - 1210 + 7
+    assert new_x - former_x == 7
+    assert workspace_x + workspace_width - (new_x + 1210) == 3
 assert "property int defaultPanelHeight: Math.max(" in social
 assert "sharedPanelWidth = defaultPanelWidth;" in social
 assert "sharedPanelHeight = defaultPanelHeight;" in social

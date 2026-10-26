@@ -182,21 +182,27 @@ for path, needles in DOCK_MODULES.items():
     for needle in needles:
         require(source, needle, f"DockButton migration contract for {path}")
 
-# Social uses the operator's exact Unicode phone-and-stars mark. Only
-# the ☎︎ core receives the interactive module color; the star ornaments
-# stay white even when Social's standard open foreground becomes magenta.
-# Keep a single sampled source instead of layering a recolored PNG on top.
+# Preserve the operator's Gohu icon and state colors, but shift the LEFT
+# ornaments alone. The full original shaping string stays in the source so
+# the central phone and RIGHT ornaments retain their natural advances.
+# Make the source's left glyphs transparent, then draw the white pair at +3px.
 social_module = (ROOT / "modules/Sessions.qml").read_text(encoding="utf-8")
 for needle in (
     "GohuText {",
     "id: sessionsIcon",
     "anchors.centerIn: parent",
     "font.pixelSize: 21",
-    "font.letterSpacing: -0.8",
     "textFormat: Text.StyledText",
     "color: Colors.white",
-    'text: "࣪˖<font color=\'" + sessionsDock.foregroundColor',
+    "text: \"<font color='transparent'>࣪˖</font><font color='\" + sessionsDock.foregroundColor",
     "              + \"'>☎︎</font>๋࣭✧\"",
+    "id: sessionsLeftOrnaments",
+    "anchors.left: parent.left",
+    "anchors.leftMargin: 3",
+    "anchors.baseline: parent.baseline",
+    "font.pixelSize: sessionsIcon.font.pixelSize",
+    "textFormat: Text.PlainText",
+    'text: "࣪˖"',
     "normalForegroundColor: Colors.omnitrix",
     "hoverForegroundColor: Colors.omnitrix",
     "pressedForegroundColor: Colors.omnitrix",
@@ -210,16 +216,19 @@ assert "Sessions.png" not in social_module
 assert "ColorOverlay {" not in social_module
 assert "SafeDropShadow {" not in social_module
 assert social_module.count("contentGlowSource: sessionsIcon") == 1
-assert social_module.count("GohuText {") == 1
+assert social_module.count("GohuText {") == 2
 assert social_module.count("NotoText {") == 0
-# Keep the original styled runs and state colors while tightening the Gohu
-# ornament grouping. The bar's vertical rail and click target stay 50px.
+# Previous global tracking tightened the right side and shifted the phone.
+# The left-only overlay moves +3px; no character spacing may touch phone/right.
+assert "font.letterSpacing:" not in social_module
+assert social_module.count("anchors.leftMargin: 3") == 1
 assert "font.pixelSize: 22" not in social_module
 assert "Math.max(65, Math.ceil(sessionsIcon.implicitWidth) + 16)" not in social_module
 assert "implicitHeight: 50" in social_module
-assert social_module.count("font.letterSpacing: -0.8") == 1
-assert 'text: "࣪˖<font color=\'" + sessionsDock.foregroundColor' in social_module
-assert "              + \"'>☎︎</font>๋࣭✧\"" in social_module
+assert "implicitWidth: Math.max(63, Math.ceil(sessionsIcon.implicitWidth) + 14)" in social_module
+# Left-star x moves by exactly +3; core and right-side run stay stationary.
+for original_left_x in (0, 7, 42):
+    assert (original_left_x + 3) - original_left_x == 3
 
 LEGACY_ROOT_MOUSE_IDS = (
     "appmenuMouse",

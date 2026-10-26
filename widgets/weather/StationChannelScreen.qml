@@ -21,6 +21,11 @@ Rectangle {
     readonly property string sourceUrl:
         selectedRecord ? ViewerPolicy.safeArticleUrl(selectedRecord.url) : ""
     readonly property bool playbackAvailable: false
+    // Coordinates relative to StationChannelScreen. This is the actual
+    // player bay (excluding CLOSE/MUTE header and footer), NOT a request
+    // to spawn or position any external process.
+    readonly property rect playerViewportRect:
+        Qt.rect(playerBay.x, playerBay.y, playerBay.width, playerBay.height)
     property string viewerProbeState: "VIEWER CHECK NOT RUN"
 
     // V0 probes only which external browser binary could be used. The helper

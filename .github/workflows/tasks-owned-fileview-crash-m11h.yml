@@ -1,0 +1,45 @@
+name: TASKS M11h owned FileView crash-window review
+
+on:
+  pull_request:
+    paths:
+      - 'tests/tasks/fixtures/TaskFileViewOwnerHostM11g.py'
+      - 'tests/tasks/test_task_fileview_crash_windows_m11h.py'
+      - 'docs/tasks-fileview-crash-acceptance-m11h.md'
+      - '.github/workflows/tasks-owned-fileview-crash-m11h.yml'
+  push:
+    branches:
+      - main
+    paths:
+      - 'tests/tasks/fixtures/TaskFileViewOwnerHostM11g.py'
+      - 'tests/tasks/test_task_fileview_crash_windows_m11h.py'
+      - 'docs/tasks-fileview-crash-acceptance-m11h.md'
+      - '.github/workflows/tasks-owned-fileview-crash-m11h.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  crash-window-review:
+    runs-on: ubuntu-latest
+    timeout-minutes: 7
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: M11h real abrupt subprocess crashes after each durable checkpoint
+        run: python3 tests/tasks/test_task_fileview_crash_windows_m11h.py
+      - name: M11g normal synthetic host, lock, readback and restart regression
+        run: python3 tests/tasks/test_task_fileview_owner_host_m11g.py
+      - name: M11f mocked host contract still denies production authority
+        run: node tests/tasks/test_task_writer_gate_mock_m11f.cjs
+      - name: M11e FileView event policy still fails closed
+        run: node tests/tasks/test_task_fileview_gate_policy_m11e.cjs
+      - name: M11d production writer call inventory remains unchanged
+        run: python3 tests/tasks/test_task_writer_gate_inventory_m11d.py
+      - name: M11c restart evidence remains non-authorizing
+        run: python3 tests/tasks/test_task_writer_recovery_m11c.py

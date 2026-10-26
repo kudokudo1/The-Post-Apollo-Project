@@ -1025,6 +1025,16 @@ Rectangle {
                     font.pixelSize: 9
                     wrapMode: Text.WrapAnywhere
                 }
+                ActionButton {
+                    width: parent.width
+                    height: 33
+                    label: "RELOAD DETAILS"
+                    labelPixelSize: 9
+                    contentPadding: 3
+                    interactive: SocialAccountDetailsStore.state === "error"
+                                 || SocialAccountDetailsStore.errorCode !== ""
+                    onTriggered: SocialAccountDetailsStore.refresh()
+                }
                 Rectangle {
                     width: parent.width
                     height: 1

@@ -125,6 +125,18 @@ with tempfile.TemporaryDirectory(prefix="machine-kitty-ci-") as folder:
                     last_failure = "native_client_error"
             time.sleep(0.2)
         if not ready:
+            # Older packaged Kitty versions can differ in optional flags.
+            # The plain `ls` command is documented to default to JSON.
+            # Never log either native response or raw stderr.
+            bare_cmd = [
+                "kitten", "@", "--to", "unix:" + str(endpoint), "ls"]
+            bare = subprocess.run(
+                bare_cmd, stdin=subprocess.DEVNULL,
+                stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                timeout=3, check=False)
+            if bare.returncode == 0:
+                raise AssertionError(
+                    "NATIVE KITTY DEFAULT JSON SUCCEEDED BUT OPTIONAL FLAG FAILED")
             raise AssertionError(
                 "DISPOSABLE KITTY NATIVE READ NEVER READY: " + last_failure)
 

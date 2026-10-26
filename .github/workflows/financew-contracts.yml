@@ -44,6 +44,9 @@ on:
       - "widgets/FinanceMarketPane.qml"
       - "widgets/FinanceStockHistoryPane.qml"
       - "widgets/FinanceStockModePolicy.js"
+      - "scripts/finance/MARKET_BACK_TO_RANGE_README.md"
+      - "tests/finance/test_stock_back_to_range.mjs"
+      - "tests/finance/test_stock_back_to_range_contracts.py"
       - "scripts/finance/MARKET_RANGE_OPEN_DAY_README.md"
       - "tests/finance/test_stock_range_to_day.mjs"
       - "tests/finance/test_stock_range_to_day_contracts.py"
@@ -149,6 +152,9 @@ on:
       - "widgets/FinanceMarketPane.qml"
       - "widgets/FinanceStockHistoryPane.qml"
       - "widgets/FinanceStockModePolicy.js"
+      - "scripts/finance/MARKET_BACK_TO_RANGE_README.md"
+      - "tests/finance/test_stock_back_to_range.mjs"
+      - "tests/finance/test_stock_back_to_range_contracts.py"
       - "scripts/finance/MARKET_RANGE_OPEN_DAY_README.md"
       - "tests/finance/test_stock_range_to_day.mjs"
       - "tests/finance/test_stock_range_to_day_contracts.py"
@@ -255,6 +261,10 @@ jobs:
         run: python3 tests/finance/test_stock_range_to_day_contracts.py
       - name: Test FinanceW exact RANGE session to DAY with fictional prices
         run: node tests/finance/test_stock_range_to_day.mjs
+      - name: Verify FinanceW guarded BACK TO RANGE without additional reads
+        run: python3 tests/finance/test_stock_back_to_range_contracts.py
+      - name: Test FinanceW in-memory DAY to RANGE return with fictional prices
+        run: node tests/finance/test_stock_back_to_range.mjs
       - name: Verify opt-in OSIRIS globe does not affect FinanceW startup
         run: python3 tests/finance/test_finance_osiris_globe_contracts.py
       - name: Verify FinanceW Research M1 safe Crawl pane

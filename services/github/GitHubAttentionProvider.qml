@@ -5,6 +5,18 @@ import Quickshell.Io
 Scope {
     id: root
 
+    readonly property bool subprocessLagProbeEnabled:
+        String(Quickshell.env("POST_APOLLO_SUBPROCESS_LAG_PROBE") || "").trim() === "1"
+
+    // Opt-in only; static stage IDs and counts, never subprocess output.
+    function traceSubprocessLag(stage, size) {
+        if (!subprocessLagProbeEnabled)
+            return;
+        console.warn("SYNTAGMA_SUBPROCESS_PROBE // service=github-attention"
+                     + " stage=" + stage + " size=" + Number(size || 0)
+                     + " tsMs=" + Date.now());
+    }
+
     property var repositories: []
     property int maxPullRequestsPerRepository: 50
 
@@ -561,6 +573,7 @@ Scope {
         busy = false;
         refreshWatchdog.stop();
 
+        traceSubprocessLag("complete:begin", refreshStdoutText.length);
         const output = String(refreshStdoutText || "").trim();
         const error = String(refreshStderrText || "").trim();
 
@@ -578,7 +591,9 @@ Scope {
         }
 
         try {
+            root.traceSubprocessLag("parse:begin", output.length);
             parseResponse(output || "{}");
+            root.traceSubprocessLag("parse:end", items.length);
 
             let failedRepositories = 0;
 
@@ -625,24 +640,30 @@ Scope {
 
         stdout: StdioCollector {
             onStreamFinished: {
+                root.traceSubprocessLag("stdout:begin", this.text.length);
                 root.refreshStdoutText = this.text;
                 root.refreshStdoutSeen = true;
                 root.maybeFinishRefresh();
+                root.traceSubprocessLag("stdout:end", 0);
             }
         }
 
         stderr: StdioCollector {
             onStreamFinished: {
+                root.traceSubprocessLag("stderr:begin", this.text.length);
                 root.refreshStderrText = this.text;
                 root.refreshStderrSeen = true;
                 root.maybeFinishRefresh();
+                root.traceSubprocessLag("stderr:end", 0);
             }
         }
 
         onExited: function(exitCode, exitStatus) {
+            root.traceSubprocessLag("exit:begin", 0);
             root.refreshExitCode = Number(exitCode);
             root.refreshExitSeen = true;
             root.maybeFinishRefresh();
+            root.traceSubprocessLag("exit:end", 0);
         }
     }
 

@@ -596,3 +596,38 @@ the specific radio PLAY → PAUSE → browser-show transition and during ordinar
 work. If severe freezes recur, compare against the same launch with temporary
 probes and keep the fault open. No automatic audio/MPD/radio-controller or
 notification behavior changes are authorized by this decision.
+
+## October 26 // subprocess completion to QML array-copy stall discriminator (draft)
+
+**Evidence:** A live 100% Quickshell main-thread CPU capture on October 26
+at 08:43:10 EDT recorded `QProcess::finished` -> QML signal expressions ->
+`ArrayPrototype::method_slice` -> Qt allocation. The stack does not identify
+the originating QML file. Do not label an individual service as the cause yet.
+
+**Opt-in source-only trace:** `POST_APOLLO_SUBPROCESS_LAG_PROBE=1`.
+There is **no additional timer, subprocess or polling**. The flag is off by
+default and does not change behavior, signal connections, saved state,
+network access, visual layout, or subprocess commands.
+
+This first bounded seam records `SYNTAGMA_SUBPROCESS_PROBE //` stage markers
+*before* potential slow work in the existing GitHubService collectors/exits,
+GitHubAttentionProvider completion and parsing, HospitalAuditService completion
+and auditing, and HospitalRoundsService's array-copy / sort and metrics work.
+The traces contain only a static service/stage label, size/count, and `tsMs`.
+No CLI payload, repository slug, audit JSON or notification text is logged.
+An unmatched `:begin` marker can localize a blocking handler; a paired
+`:end` marker bounds it. A negative result **does not clear other services**.
+
+This adds no general-purpose monkey patch of `Array.prototype.slice`, no
+instrumentation to Media's separately owned CAVA handler, and no interception
+of every QML signal. GitService has a separate startup/refresh trace; do not
+confuse it with this service-completion coverage.
+
+**Trial gate:** draft PR must pass source guards, receive review, be merged,
+and be explicitly applied to the live checkout *before* changing the
+Quickshell launch environment. Never reset/overwrite the dirty checkout.
+After the operator authorizes a controlled restart, use the already approved
+safe-restart method with the new flag and `POST_APOLLO_UI_LAG_PROBE=1`,
+then correlate the last stage markers before a delayed event-loop tick.
+Rollback by restarting without the new environment flag. The resulting
+logging and the runtime causality claim must be verified separately.

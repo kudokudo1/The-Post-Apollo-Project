@@ -16,6 +16,11 @@ on:
       - "tests/components/test_syntagma_bg_lag_probe.py"
       - "tests/components/test_syntagma_quickshell_thread_sampler.py"
       - "tests/components/test_syntagma_array_copy_probe.py"
+      - "tests/components/test_syntagma_subprocess_lag_probe.py"
+      - "services/hospital/HospitalAuditService.qml"
+      - "services/hospital/HospitalRoundsService.qml"
+      - "services/github/GitHubAttentionProvider.qml"
+      - "services/github/GitHubService.qml"
       - "services/system/GraphHistory.qml"
       - "services/notifications/NotificationsService.qml"
       - "OPERATE/syntagma-ui-lag-probe.md"
@@ -38,6 +43,11 @@ on:
       - "tests/components/test_syntagma_bg_lag_probe.py"
       - "tests/components/test_syntagma_quickshell_thread_sampler.py"
       - "tests/components/test_syntagma_array_copy_probe.py"
+      - "tests/components/test_syntagma_subprocess_lag_probe.py"
+      - "services/hospital/HospitalAuditService.qml"
+      - "services/hospital/HospitalRoundsService.qml"
+      - "services/github/GitHubAttentionProvider.qml"
+      - "services/github/GitHubService.qml"
       - "services/system/GraphHistory.qml"
       - "services/notifications/NotificationsService.qml"
       - "OPERATE/syntagma-ui-lag-probe.md"
@@ -59,5 +69,6 @@ jobs:
           python3 tests/components/test_syntagma_bg_lag_probe.py
           python3 tests/components/test_syntagma_quickshell_thread_sampler.py
           python3 tests/components/test_syntagma_array_copy_probe.py
+          python3 tests/components/test_syntagma_subprocess_lag_probe.py
           python3 -m unittest tests/media/test_media_pause_state_probe.py
           node --test tests/media/test_media_dock_performance.cjs

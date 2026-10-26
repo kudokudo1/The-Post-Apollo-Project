@@ -81,3 +81,20 @@ repository source remains unchanged by this PR except new CI test/docs.
 No PR merge or production runtime activation without operator approval.
 Follow `Meta-Apollo-Logos-Syntagma/AGENTS.md` and current GitHub and
 Hospital ownership before the next milestone.
+
+
+## CI compatibility finding and follow-up (2026-10-26)
+
+PR #819 was merged while its newly added **real native Kitty CI**
+job was still failing. The original M2d3 fixture tests and TimeW
+contracts passed, but disposable Ubuntu Kitty 0.32.2 created its
+socket and then rejected the first native `ls --output-format=json`
+request; retries did not fix that command-format rejection. That
+failure is **not** proof that the reader works on native Kitty.
+
+Corrective work is isolated in a follow-up draft PR: use the documented
+default JSON response from bare `kitten @ --to <socket> ls` without
+the optional output-format argument, and rerun both the fixture contracts
+and disposable native job. Preserve exact failure status until that
+job actually passes. Do not activate this reader on local Fedora Kitty
+or claim checkpoint/session recovery based on an Ubuntu Xvfb test.

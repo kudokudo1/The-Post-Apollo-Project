@@ -1,6 +1,7 @@
 import QtQuick
 import Quickshell
 import Quickshell.Io
+import "TaskFileViewNativeEvidenceM11i.js" as NativeEvidence
 
 // M11g standalone TEST ONLY. Do not mount in shell.qml/TASKS.
 // Process owns an M10p OS flock and synthetic SQLite admission journal.
@@ -28,6 +29,12 @@ Scope {
     property string errorCode: ""
     property string fileState: "UNLOADED"
     property int confirmedCounter: -1
+    property var nativeEvidence: NativeEvidence.empty()
+    readonly property var nativeSummary: NativeEvidence.summarize(nativeEvidence)
+    readonly property string nativeRecent: NativeEvidence.recent(nativeEvidence, 5)
+    function observeNative(kind) {
+        nativeEvidence = NativeEvidence.append(nativeEvidence, kind, phase);
+    }
     readonly property bool testStageEligible:
         connected && fileLoaded && !busy && !freezeQueued
         && phase === "JSON_ACTIVE" && fileState === "READY"
@@ -41,6 +48,7 @@ Scope {
     signal observed()
 
     function reject(reason) {
+        observeNative("RECOVERY_REVIEW");
         status = "RECOVERY_REVIEW";
         phase = "RECOVERY_REVIEW";
         errorCode = reason;
@@ -86,6 +94,7 @@ Scope {
                     + "handoff-test.db",
             "--writer-id", writerId];
         if (bootstrapTestAuthority) args.push("--bootstrap-fixture");
+        observeNative("ATTACH_REQUEST");
         host.exec(args);
         observed();
         return true;
@@ -116,6 +125,7 @@ Scope {
 
     function incrementSynthetic() {
         if (!testStageEligible) return false;
+        observeNative("STAGE_REQUEST");
         var stage = "m11g-synthetic-stage-" + nextRequestId;
         pendingStageId = stage;
         fileState = "RESERVING";
@@ -129,6 +139,7 @@ Scope {
     function freezeTest() {
         if (!connected || phase !== "JSON_ACTIVE" || freezeQueued)
             return false;
+        observeNative("FREEZE_REQUEST");
         // Close this QML's local test stage gate before asking the host.
         freezeQueued = true;
         if (!busy && pendingStageId === "") {
@@ -184,6 +195,7 @@ Scope {
             phase = msg.phase;
             epoch = msg.epoch === null ? -1 : msg.epoch;
             if (!msg.ok) {
+                observeNative("HOST_REFUSAL");
                 reject("HOST_" + msg.status);
                 return;
             }
@@ -191,6 +203,7 @@ Scope {
             status = "TEST_HOST_READY";
             errorCode = "";
             if (kind === "hello") {
+                observeNative("HOST_HELLO");
                 if (phase !== "JSON_ACTIVE" || msg.pending) {
                     reject("HOST_REQUIRES_RECOVERY_REVIEW");
                     return;
@@ -206,6 +219,7 @@ Scope {
                         || msg.payload.length > 2048)
                     throw new Error("INVALID_STAGE_PAYLOAD");
                 pendingRaw = msg.payload;
+                observeNative("HOST_ADMIT");
                 fileState = "SAVING";
                 fixtureFile.setText(pendingRaw);
             } else if (kind === "verify") {
@@ -213,6 +227,7 @@ Scope {
                         || fileState !== "SETTLING")
                     throw new Error("INVALID_SETTLEMENT");
                 confirmedCounter++;
+                observeNative("HOST_SETTLED");
                 afterSettle();
             } else if (kind === "fail") {
                 reject("FILEVIEW_FAILED_REVIEW_REQUIRED");
@@ -222,6 +237,7 @@ Scope {
                         || msg.pending)
                     throw new Error("FREEZE_NOT_DRAINED");
                 status = "TEST_FROZEN";
+                observeNative("HOST_FROZEN");
                 fileState = "FROZEN";
             }
             observed();
@@ -229,6 +245,7 @@ Scope {
     }
 
     function stopTest() {
+        observeNative("STOP_REQUEST");
         freezeQueued = true;
         fileState = "RECOVERY_REVIEW";
         status = "STOPPED";
@@ -260,13 +277,16 @@ Scope {
                     bridge.confirmedCounter = data.counter;
                     bridge.fileLoaded = true;
                     bridge.fileState = "READY";
+                    bridge.observeNative("FILE_INITIAL_LOAD");
                     bridge.observed();
                 } catch(e) {bridge.reject("BAD_INITIAL_TEST_FILE");}
             } else if (bridge.fileState === "VERIFYING") {
                 if (fixtureFile.text() !== bridge.pendingRaw) {
+                    bridge.observeNative("FILE_READBACK_MISMATCH");
                     if (!bridge.send("fail",{stageId:bridge.pendingStageId}))
                         bridge.reject("MISMATCH_REPORT_FAILED");
                 } else {
+                    bridge.observeNative("FILE_READBACK_OK");
                     bridge.fileState = "SETTLING";
                     if (!bridge.send("verify",{stageId:bridge.pendingStageId}))
                         bridge.reject("VERIFY_SEND_FAILED");
@@ -277,6 +297,7 @@ Scope {
         }
         onLoadFailed: function(error) {
             if (!bridge.attached) return;
+            bridge.observeNative("FILE_LOAD_FAILURE");
             if (bridge.pendingStageId !== "" && bridge.connected
                     && !bridge.busy) {
                 if (!bridge.send("fail",{stageId:bridge.pendingStageId}))
@@ -289,10 +310,12 @@ Scope {
                 return;
             }
             bridge.fileState = "VERIFYING";
+            bridge.observeNative("FILE_SAVED");
             fixtureFile.reload();
             bridge.observed();
         }
         onSaveFailed: function(error) {
+            bridge.observeNative("FILE_SAVE_FAILURE");
             if (bridge.pendingStageId !== "" && bridge.connected
                     && !bridge.busy) {
                 if (!bridge.send("fail",{stageId:bridge.pendingStageId}))
@@ -310,6 +333,7 @@ Scope {
         }
         stderr: StdioCollector {}
         onExited: function(code, exitStatus) {
+            bridge.observeNative("HOST_EXIT");
             bridge.connected = false;
             bridge.busy = false;
             bridge.freezeQueued = true;

@@ -91,8 +91,7 @@ class SafeFamilyRemovalContracts(unittest.TestCase):
         self.assertIn("messagingWindow.activateApp(index);",HOST)
         self.assertIn('label: "USER // SETTINGS"',SELECTOR)
         self.assertEqual(SELECTOR.count("id: settingsFooter"),1)
-        section=SELECTOR.split('text: "BUTTON FAMILIES"',1)[1].split(
-            'text: "LINKED ACCOUNTS"',1)[0]
+        section=SELECTOR.split('text: "BUTTON FAMILIES"',1)[1]
         for prohibited in ("activateApp(", "appActivated(", "Process {",
                            "FileView {", "Qt.openUrlExternally("):
             self.assertNotIn(prohibited,section,prohibited)

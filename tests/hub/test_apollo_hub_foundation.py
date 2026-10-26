@@ -15,6 +15,8 @@ media_explore = (ROOT / "widgets/hub/ApolloHubMediaExplore.qml").read_text(encod
 system_mini = (ROOT / "widgets/hub/ApolloHubSystemMini.qml").read_text(encoding="utf-8")
 uptime_mini = (ROOT / "widgets/hub/ApolloHubUptimeMini.qml").read_text(encoding="utf-8")
 apps_mini = (ROOT / "widgets/hub/ApolloHubAppsMini.qml").read_text(encoding="utf-8")
+audio_mini = (ROOT / "widgets/hub/ApolloHubAudioMini.qml").read_text(encoding="utf-8")
+volumebar_owner = (ROOT / "modules/Volumebar.qml").read_text(encoding="utf-8")
 apps_explore = (ROOT / "widgets/hub/ApolloHubAppsExplore.qml").read_text(encoding="utf-8")
 process_explore = (ROOT / "widgets/hub/ApolloHubProcessesExplore.qml").read_text(encoding="utf-8")
 process_policy = (ROOT / "services/hub/ApolloHubProcessesPolicy.js").read_text(encoding="utf-8")
@@ -1598,6 +1600,96 @@ assert "onOpenAppControlRequested:" not in apps_explore, (
 assert "signal openAppControlRequested()" not in process_explore
 assert "onInputFocusChanged: function(focused)" in apps_explore
 assert "signal inputFocusChanged(bool focused)" in process_explore
+
+
+# Phase P3-A: a fully interactive master-output module routes through the
+# EXISTING Volumebar owner; the audio tile itself never controls PipeWire.
+for token in (
+    'var MODULE_IDS = ["time"',
+    '"network", "social", "audio"]',
+    'network: "NETWORK", social: "SOCIAL", audio: "SYSTEM AUDIO"',
+):
+    assert token in layout, f"System Audio layout missing {token}"
+for token in (
+    'Volumebar { id: sharedVolumeDock }',
+    'audioSnapshot: sharedVolumeDock.hubOutputSnapshot',
+    'onAudioVolumeRequested: function(percent)',
+    'sharedVolumeDock.requestHubVolumePercent(percent);',
+    'onAudioMuteRequested: function(muted)',
+    'sharedVolumeDock.requestHubMute(muted);',
+):
+    assert token in shell, f"Shared master-output routing missing {token}"
+for token in (
+    'property var audioSnapshot: null',
+    'signal audioVolumeRequested(int percent)',
+    'signal audioMuteRequested(bool muted)',
+    'function requestAudioVolume(percent)',
+    'function requestAudioMute(muted)',
+    'audioSnapshot.state !== "ready"',
+    'onAudioVolumeRequested: function(percent)',
+    'onAudioMuteRequested: function(muted)',
+    'audioInputFocused = focused;',
+    '&& !audioInputFocused',
+):
+    assert token in window, f"System Audio request/focus seam missing {token}"
+for token in (
+    'property var audioSnapshot: null',
+    'signal audioVolumeRequested(int percent)',
+    'signal audioMuteRequested(bool muted)',
+    'ApolloHubAudioMini {',
+    'onVolumeRequested: function(percent)',
+    'onMuteRequested: function(muted)',
+    'onInputFocusChanged: function(focused)',
+    'audioMini.statusLine',
+    'tile.moduleId !== "audio"',
+):
+    assert token in tile, f"System Audio tile seam missing {token}"
+for token in (
+    'signal muteRequested(bool muted)',
+    'signal volumeRequested(int percent)',
+    'signal inputFocusChanged(bool focused)',
+    'readonly property bool outputReady:',
+    'function requestIncrement(delta)',
+    'function applyVolume()',
+    'label: "+5%"',
+    'label: "-5%"',
+    'label: "APPLY VOLUME"',
+    'label: "RESET DRAFT"',
+    'Slider {',
+    'from: 0',
+    'to: 300',
+    'onMoved:',
+    'onActiveFocusChanged: audioMini.inputFocusChanged(activeFocus)',
+    'ACTION REQUESTS ARE NOT VERIFIED OUTCOMES',
+):
+    assert token in audio_mini, f"Direct master audio controls missing {token}"
+for token in (
+    'readonly property var hubOutputSnapshot:',
+    'state: root.ready ? "ready" : "unavailable"',
+    'property string hubAudioRequestStatus:',
+    'function requestHubVolumePercent(percent)',
+    'function requestHubMute(muted)',
+    'typeof muted !== "boolean"',
+    'percent < 0 || percent > 300',
+    'root.sink.audio.volume = percent / 100;',
+    'root.sink.audio.muted = muted;',
+    'PwObjectTracker {',
+):
+    assert token in volumebar_owner, f"Original audio owner contract missing {token}"
+assert volumebar_owner.count('PwObjectTracker {') == 1
+for forbidden in ('PwObjectTracker {', 'Process {', 'Pipewire.defaultAudioSink',
+                  'Quickshell.execDetached(', 'AudioOutputHealthNotificationProducer {'):
+    assert forbidden not in audio_mini, (
+        f"Hub must not mount a duplicate audio owner: {forbidden}")
+# Quickshell rejects an unknown on<Signal> handler at component load time.
+assert 'signal volumeRequested(int percent)' in audio_mini
+assert 'signal muteRequested(bool muted)' in audio_mini
+assert 'signal inputFocusChanged(bool focused)' in audio_mini
+assert 'signal audioVolumeRequested(int percent)' in window
+assert 'signal audioMuteRequested(bool muted)' in window
+assert 'signal audioVolumeRequested(int percent)' in tile
+assert 'signal audioMuteRequested(bool muted)' in tile
+assert 'ApolloHubMediaExplore {' in tile
 
 # Launchers and widget backends are unchanged in this first stage.
 print("ApolloHubW foundation source contracts passed")

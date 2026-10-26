@@ -39,6 +39,21 @@ PanelWindow {
             messagingWindow.menuOpen = false;
         }
     }
+    // Provider launch is deliberately separate from Sway geometry ownership.
+    // Every Discord activation issues one detached Vesktop invocation:
+    // - stopped client: starts Vesktop;
+    // - already-running/tray-hidden client: Vesktop's single-instance handler
+    //   restores/focuses the existing main window.
+    // DiscordGeometry.py only discovers and docks the resulting Sway window.
+    Process {
+        id: discordLaunchProcess
+
+        onExited: function(exitCode, exitStatus) {
+            if (exitCode !== 0)
+                console.log("MessagingW: Vesktop launch request failed:", exitCode, exitStatus);
+        }
+    }
+
     // X runs as a separate browser app; Chromium owns its private profile.
     Process {
         id: xShowProcess
@@ -949,9 +964,17 @@ PanelWindow {
         if (!swayGeometryReady)
             refreshSwayGeometry();
 
-        // DiscordGeometry.py owns window discovery, provider launch when no
-        // Vesktop container exists, and all Sway mutations using the exact
-        // discovered con_id.
+        // Launch/restore the provider independently from geometry discovery.
+        // setsid -f makes this short-lived Process return immediately instead
+        // of staying attached to Vesktop for the lifetime of the application.
+        if (discordLaunchProcess.running)
+            discordLaunchProcess.running = false;
+        discordLaunchProcess.exec([
+            "bash", "-lc",
+            "setsid -f flatpak run dev.vencord.Vesktop >/dev/null 2>&1"
+        ]);
+
+        // Geometry helper only observes/docks the Sway window that appears.
         helperShowDiscord(restoreSelectorAfterDiscordShow !== true);
 
         Qt.callLater(function () {

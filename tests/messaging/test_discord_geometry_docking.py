@@ -439,7 +439,6 @@ class DiscordDockingTests(TestCase):
     def test_cold_start_hidden_main_is_not_forced_visible_before_app_loaded(self):
         bridge = geometry.Bridge(0.1)
         bridge.discord_show_requested = True
-        bridge.discord_launch_attempted = True
         bridge.poll_ipc.request = Mock(return_value={
             "id": 1,
             "visible": True,
@@ -457,16 +456,13 @@ class DiscordDockingTests(TestCase):
             "floating_nodes": [],
         })
         bridge.queue_command = Mock()
-        with patch.object(geometry.subprocess, "Popen") as spawn:
-            bridge.emit_snapshot(force=True)
+        bridge.emit_snapshot(force=True)
         bridge.queue_command.assert_not_called()
-        spawn.assert_not_called()
         self.assertTrue(bridge.discord_show_requested)
 
-    def test_preexisting_hidden_main_uses_vesktop_single_instance_restore(self):
+    def test_preexisting_hidden_main_waits_for_activation_owned_restore(self):
         bridge = geometry.Bridge(0.1)
         bridge.discord_show_requested = True
-        bridge.discord_launch_attempted = False
         bridge.poll_ipc.request = Mock(return_value={
             "id": 1,
             "visible": True,
@@ -484,14 +480,8 @@ class DiscordDockingTests(TestCase):
             "floating_nodes": [],
         })
         bridge.queue_command = Mock()
-        with patch.object(geometry.subprocess, "Popen") as spawn:
-            bridge.emit_snapshot(force=True)
-            bridge.emit_snapshot(force=True)
-        spawn.assert_called_once()
-        self.assertEqual(
-            spawn.call_args.args[0],
-            ["flatpak", "run", "dev.vencord.Vesktop"],
-        )
+        bridge.emit_snapshot(force=True)
+        bridge.emit_snapshot(force=True)
         bridge.queue_command.assert_not_called()
         self.assertTrue(bridge.discord_show_requested)
 
@@ -499,7 +489,6 @@ class DiscordDockingTests(TestCase):
         bridge = geometry.Bridge(0.1)
         bridge.discord_show_requested = True
         bridge.discord_show_focus = True
-        bridge.discord_launch_attempted = True
         bridge.poll_ipc.request = Mock(return_value={
             "id": 1,
             "visible": True,
@@ -595,15 +584,16 @@ class DiscordDockingTests(TestCase):
             self.assertNotIn("floating enable", cmd)
             self.assertNotIn("border none", cmd)
 
-    def test_discord_launch_delegates_window_control_to_runtime_con_id_helper(self):
+    def test_discord_activation_owns_launch_and_helper_owns_only_sway_control(self):
         social = SOCIAL.read_text(encoding="utf-8")
         helper = GEOMETRY.read_text(encoding="utf-8")
 
         launch = social.split("    function showDiscord() {", 1)[1].split(
             "    function hideDiscord()", 1
         )[0]
+        self.assertIn("discordLaunchProcess.exec(", launch)
+        self.assertIn("setsid -f flatpak run dev.vencord.Vesktop", launch)
         self.assertIn("helperShowDiscord(", launch)
-        self.assertNotIn("flatpak run", launch)
         self.assertNotIn("swaymsg", launch)
         self.assertNotIn('[app_id="vesktop"]', social)
 
@@ -614,9 +604,10 @@ class DiscordDockingTests(TestCase):
         self.assertIn('return f\'[con_id="{int(con_id)}"]\'', helper)
         self.assertIn('op == "showDiscord"', helper)
         self.assertIn('op == "hideDiscord"', helper)
+        self.assertNotIn("subprocess.Popen(", helper)
         self.assertNotIn("node.get(\"app_id\") == \"vesktop\"", helper)
 
-    def test_helper_launches_vesktop_only_when_no_container_is_discovered(self):
+    def test_helper_waits_without_launching_when_no_container_is_discovered(self):
         bridge = geometry.Bridge(0.1)
         bridge.discord_show_requested = True
         tree = {
@@ -628,18 +619,9 @@ class DiscordDockingTests(TestCase):
             "floating_nodes": [],
         }
         bridge.poll_ipc.request = Mock(return_value=tree)
-
-        with patch.object(geometry.subprocess, "Popen") as spawn:
-            bridge.emit_snapshot(force=True)
-            bridge.emit_snapshot(force=True)
-
-        spawn.assert_called_once()
-        args, kwargs = spawn.call_args
-        self.assertEqual(args[0], ["flatpak", "run", "dev.vencord.Vesktop"])
-        self.assertTrue(kwargs["start_new_session"])
-        self.assertIs(kwargs["stdin"], geometry.subprocess.DEVNULL)
-        self.assertIs(kwargs["stdout"], geometry.subprocess.DEVNULL)
-        self.assertIs(kwargs["stderr"], geometry.subprocess.DEVNULL)
+        bridge.emit_snapshot(force=True)
+        bridge.emit_snapshot(force=True)
+        self.assertTrue(bridge.discord_show_requested)
 
     def test_fast_follow_ignores_hidden_scratchpad_vesktop(self):
         bridge, commands = self.bridge(docked=True)

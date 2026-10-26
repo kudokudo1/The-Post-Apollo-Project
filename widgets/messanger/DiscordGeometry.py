@@ -31,7 +31,6 @@ import json
 import os
 import socket
 import struct
-import subprocess
 import sys
 import threading
 import time
@@ -365,7 +364,6 @@ class Bridge:
         self.discord_kind = ""
         self.discord_show_requested = False
         self.discord_show_focus = True
-        self.discord_launch_attempted = False
         # A main BrowserWindow that Electron has never shown must not be
         # treated as a Social-managed hidden/scratchpad window. During cold
         # startup Vesktop creates the main window hidden before appLoaded.
@@ -674,14 +672,12 @@ class Bridge:
             if op == "showDiscord":
                 self.discord_show_requested = True
                 self.discord_show_focus = bool(message.get("focus", True))
-                self.discord_launch_attempted = False
                 self.discord_reveal_attempted_con_id = None
                 self.sample_event.set()
                 continue
 
             if op == "hideDiscord":
                 self.discord_show_requested = False
-                self.discord_launch_attempted = False
                 self.discord_reveal_attempted_con_id = None
                 if not self.discord_con_id:
                     self.sample_event.set()
@@ -795,7 +791,6 @@ class Bridge:
                             "setup": True,
                         })
                         self.discord_show_requested = False
-                        self.discord_launch_attempted = False
                         self.discord_reveal_attempted_con_id = None
                     else:
                         # Social has not mapped yet. Keep the request armed and
@@ -808,27 +803,12 @@ class Bridge:
                     if self.discord_reveal_attempted_con_id != self.discord_con_id:
                         self.queue_command(f'{criteria} scratchpad show')
                         self.discord_reveal_attempted_con_id = self.discord_con_id
-                elif not self.discord_launch_attempted:
-                    # A hidden main window that this helper has never observed
-                    # visible is either a pre-existing tray-hidden Vesktop or a
-                    # cold-start main still waiting for appLoaded. If we did not
-                    # launch this startup ourselves, use Vesktop's single-
-                    # instance restore path instead of manipulating Sway early.
-                    try:
-                        subprocess.Popen(
-                            ["flatpak", "run", "dev.vencord.Vesktop"],
-                            start_new_session=True,
-                            stdin=subprocess.DEVNULL,
-                            stdout=subprocess.DEVNULL,
-                            stderr=subprocess.DEVNULL,
-                        )
-                        self.discord_launch_attempted = True
-                    except OSError as exc:
-                        print(
-                            f"Vesktop restore failed: {exc}",
-                            file=sys.stderr,
-                            flush=True,
-                        )
+                else:
+                    # Never launch or restore the provider from the geometry
+                    # helper. MessagingW issues the single-instance Vesktop
+                    # invocation on every Discord activation. A never-visible
+                    # hidden main simply waits for Electron to map it.
+                    pass
         else:
             if self.discord_con_id is not None:
                 self.discord_ready = False
@@ -840,25 +820,8 @@ class Bridge:
             self.discord_kind = ""
             self.discord_reveal_attempted_con_id = None
 
-            if self.discord_show_requested and not self.discord_launch_attempted:
-                try:
-                    # Vesktop is single-instance. If its tray-hidden main window
-                    # is currently unmapped, a second invocation asks upstream
-                    # to show/focus that existing main window.
-                    subprocess.Popen(
-                        ["flatpak", "run", "dev.vencord.Vesktop"],
-                        start_new_session=True,
-                        stdin=subprocess.DEVNULL,
-                        stdout=subprocess.DEVNULL,
-                        stderr=subprocess.DEVNULL,
-                    )
-                    self.discord_launch_attempted = True
-                except OSError as exc:
-                    print(
-                        f"Vesktop launch failed: {exc}",
-                        file=sys.stderr,
-                        flush=True,
-                    )
+            # No provider launch happens here. The QML activation path owns
+            # start/restore; this helper only waits for and manages Sway nodes.
 
         snapshot = self.fast_follow(snapshot)
 

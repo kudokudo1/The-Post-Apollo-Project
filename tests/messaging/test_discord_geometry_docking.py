@@ -138,7 +138,7 @@ class DiscordDockingTests(TestCase):
         self.assertIn("property bool discordDocked: false", text)
         self.assertIn("onDiscordDockedChanged: {", text)
         self.assertIn("updateGeometryHelperMode();", text)
-        self.assertIn("if (discordDocked && menuOpen && discordSelected)", text)
+        self.assertIn("if (!discordDocked || !menuOpen || !discordSelected)", text)
         self.assertIn("discordDocked: discordDocked,", text)
         self.assertIn("function initialDiscordDockAligned(rect)", text)
         self.assertIn("function initialSocialDockAligned(rect)", text)

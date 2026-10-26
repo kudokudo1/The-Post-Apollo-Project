@@ -128,6 +128,12 @@ for site in ("x", "instagram", "facebook", "reddit", "threads", "pinterest", "tr
         "social": {"rect": {"x": 0, "y": 0, "width": 800, "height": 700}, "focused": False},
         site: {"rect": {"x": 120, "y": 1, "width": 680, "height": 700}, "focused": True},
     }
+    # A focused just-opened site cannot resize Social during handoff.
+    result = bridge.fast_follow(focused)
+    assert result["fastLeader"] is None
+    assert commands == []
+    # Verified attachment restores all existing bidirectional Sway geometry.
+    bridge.x_docked = True
     result = bridge.fast_follow(focused)
     assert result["fastLeader"] == site
     assert commands and commands[0]["target"] == "social"

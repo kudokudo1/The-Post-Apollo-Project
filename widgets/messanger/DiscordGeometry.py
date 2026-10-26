@@ -739,7 +739,8 @@ class Bridge:
                 self.discord_con_id = new_con_id
                 self.discord_ready = False
                 self.discord_docked = False
-                self.pending_sync.pop("discord", None)
+                with self.command_lock:
+                    self.pending_sync.pop("discord", None)
 
             self.discord_visible = new_visible
             self.discord_kind = new_kind
@@ -775,7 +776,8 @@ class Bridge:
             if self.discord_con_id is not None:
                 self.discord_ready = False
                 self.discord_docked = False
-                self.pending_sync.pop("discord", None)
+                with self.command_lock:
+                    self.pending_sync.pop("discord", None)
             self.discord_con_id = None
             self.discord_visible = False
             self.discord_kind = ""

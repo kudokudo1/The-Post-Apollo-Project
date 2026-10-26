@@ -1,0 +1,155 @@
+{
+  "schemaVersion": 1,
+  "milestone": "M11j",
+  "scope": "ISOLATED_NATIVE_EVIDENCE_AND_PRODUCTION_PREPARATION_ONLY",
+  "provenance": {
+    "source": "OPERATOR_PROVIDED_SCREENSHOTS_AND_STATEMENTS_IN_CHAT",
+    "observedLocalDate": "2026-10-26",
+    "timezone": "America/New_York",
+    "screenshotsRetainedInRepository": false,
+    "rawUserFilePathsRetained": false,
+    "independentFileHashVerified": false,
+    "telemetryExported": false,
+    "traceQuality": "VISIBLE_UI_OBSERVATION_NOT_CRYPTOGRAPHIC_PROOF"
+  },
+  "testedEnvironment": {
+    "platform": "FEDORA_SWAY_QUICKSHELL",
+    "nativeHarness": "TaskFileViewHostHarnessM11g.qml",
+    "productionShellUsed": false,
+    "syntheticFixtureOnly": true,
+    "runtimeBuildStringDirectlyVerified": false
+  },
+  "testSequence": [
+    {
+      "name": "initial_host",
+      "state": "OBSERVED_PASS",
+      "evidence": [
+        "JSON_ACTIVE",
+        "FILE_READY",
+        "CONFIRMED_COUNTER_0",
+        "TEST_STAGE_ELIGIBLE_TRUE"
+      ]
+    },
+    {
+      "name": "first_save",
+      "state": "OBSERVED_PASS",
+      "evidence": [
+        "CONFIRMED_COUNTER_1",
+        "OBSERVED_SAVE_CHAINS_1",
+        "FILE_SAVED",
+        "FILE_READBACK_OK",
+        "HOST_SETTLED"
+      ]
+    },
+    {
+      "name": "second_save",
+      "state": "OBSERVED_PASS",
+      "evidence": [
+        "CONFIRMED_COUNTER_2",
+        "OBSERVED_SAVE_CHAINS_2"
+      ]
+    },
+    {
+      "name": "freeze",
+      "state": "OBSERVED_PASS",
+      "evidence": [
+        "TEST_FROZEN",
+        "FREEZE_REQUESTED",
+        "FILE_FROZEN",
+        "TEST_STAGE_ELIGIBLE_FALSE",
+        "CONFIRMED_COUNTER_2"
+      ]
+    },
+    {
+      "name": "reopen_existing_authority",
+      "state": "OBSERVED_PASS",
+      "evidence": [
+        "RECOVERY_REVIEW",
+        "HOST_EXITED",
+        "RECOVERED_EPOCH_2",
+        "TEST_STAGE_ELIGIBLE_FALSE",
+        "CONFIRMED_COUNTER_2"
+      ]
+    }
+  ],
+  "provenanceBoundary": {
+    "passingOutcome": "CORE_ISOLATED_NATIVE_SEQUENCE_OBSERVED",
+    "nativeFaultInjectionAcceptance": false,
+    "powerLossAcceptance": false,
+    "sourceBytesComparedAfterRestart": false,
+    "allNativePathsAccepted": false,
+    "productionWriterAccepted": false,
+    "productionDatabaseMigrationAccepted": false
+  },
+  "verifiedRepositoryDependencies": {
+    "nativeEvidence": "services/projects/TaskFileViewNativeEvidenceM11i.js",
+    "ui": "TaskFileViewHostHarnessM11g.qml",
+    "isolatedBridge": "services/projects/TaskFileViewHostBridgeM11g.qml",
+    "liveWriter": "services/hub/ApolloHubTodoStore.qml",
+    "productionIntegrationContract": "docs/tasks-writer-gate-production-review-m11f.md",
+    "writerInventory": "tests/tasks/fixtures/task_writer_gate_inventory_m11d.json"
+  },
+  "requiredBeforeRealWriterGate": [
+    {
+      "key": "OPERATOR_APPROVES_EXACT_LIVE_PATCH",
+      "done": false
+    },
+    {
+      "key": "DURABLE_OS_OWNERSHIP_ON_ACTUAL_TASKS_SOURCE",
+      "done": false
+    },
+    {
+      "key": "ALL_STAGE_ENTRYPOINTS_ATOMICALLY_FENCED",
+      "done": false
+    },
+    {
+      "key": "FILEVIEW_CALLBACK_AND_STAGE_EPOCH_CORRELATION",
+      "done": false
+    },
+    {
+      "key": "SOURCE_READBACK_AND_BACKUP_VERIFIED",
+      "done": false
+    },
+    {
+      "key": "RELOAD_AND_ERROR_RECOVERY_SAFE",
+      "done": false
+    },
+    {
+      "key": "PRODUCTION_ROLLBACK_DESIGNED_AND_TESTED",
+      "done": false
+    },
+    {
+      "key": "NATIVE_FAULT_PATHS_VALIDATED_OR_EXPLICITLY_DEFERRED",
+      "done": false
+    }
+  ],
+  "requiredBeforeSqliteCutover": [
+    {
+      "key": "SEPARATE_OPERATOR_MIGRATION_APPROVAL",
+      "done": false
+    },
+    {
+      "key": "ALL_TASK_PROJECT_SCHEMA_AND_JOURNAL_PARITY",
+      "done": false
+    },
+    {
+      "key": "BACKUP_RESTORE_TESTED_ON_DISPOSABLE_COPY",
+      "done": false
+    },
+    {
+      "key": "DUAL_WRITER_EXCLUSION_IN_PRODUCTION",
+      "done": false
+    },
+    {
+      "key": "EXPLICIT_CUTOVER_AND_ROLLBACK_ACCEPTANCE",
+      "done": false
+    }
+  ],
+  "authoritativeLiveWriter": "JSON_FILEVIEW_ONLY",
+  "realTaskSourceEdited": false,
+  "liveQuickshellProcessModifiedByThisMilestone": false,
+  "localMachineActionPerformedByThisMilestone": false,
+  "productionGateInstalled": false,
+  "sqliteWriteActivated": false,
+  "remoteGithubProjectWritePerformed": false
+}

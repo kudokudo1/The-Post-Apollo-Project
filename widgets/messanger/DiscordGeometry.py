@@ -329,6 +329,7 @@ class Bridge:
         self.discord_con_id: int | None = None
         self.discord_show_requested = False
         self.discord_show_focus = True
+        self.discord_launch_attempted = False
 
     @staticmethod
     def rect_equal(a: dict[str, int] | None, b: dict[str, int] | None) -> bool:
@@ -625,11 +626,13 @@ class Bridge:
             if op == "showDiscord":
                 self.discord_show_requested = True
                 self.discord_show_focus = bool(message.get("focus", True))
+                self.discord_launch_attempted = False
                 self.sample_event.set()
                 continue
 
             if op == "hideDiscord":
                 self.discord_show_requested = False
+                self.discord_launch_attempted = False
                 if not self.discord_con_id:
                     self.sample_event.set()
                     continue
@@ -713,6 +716,22 @@ class Bridge:
                 self.discord_show_requested = False
         else:
             self.discord_con_id = None
+            if self.discord_show_requested and not self.discord_launch_attempted:
+                try:
+                    subprocess.Popen(
+                        ["flatpak", "run", "dev.vencord.Vesktop"],
+                        start_new_session=True,
+                        stdin=subprocess.DEVNULL,
+                        stdout=subprocess.DEVNULL,
+                        stderr=subprocess.DEVNULL,
+                    )
+                    self.discord_launch_attempted = True
+                except OSError as exc:
+                    print(
+                        f"Vesktop launch failed: {exc}",
+                        file=sys.stderr,
+                        flush=True,
+                    )
 
         snapshot = self.fast_follow(snapshot)
 

@@ -16,6 +16,7 @@ Item {
     property bool editDirty: false
     property bool removeArmed: false
     property bool initialized: false
+    property int pendingCreateMaxId: -1
     property string localFeedback: ""
     signal actionRequested(int id, string action,
                            string name, string hours, string minutes, string seconds)
@@ -56,6 +57,16 @@ Item {
     }
     function syncSelection() {
         if (!ready) return;
+        if (pendingCreateMaxId >= 0) {
+            for (let i = 0; i < timers.length; ++i) {
+                if (timers[i].id > pendingCreateMaxId) {
+                    selectedTimerId = timers[i].id;
+                    pendingCreateMaxId = -1;
+                    loadDraft(timers[i]);
+                    return;
+                }
+            }
+        }
         let entry = null;
         for (let i = 0; i < timers.length; ++i) {
             if (timers[i].id === selectedTimerId) {
@@ -173,7 +184,10 @@ Item {
                                   < countdownUi.countdownSnapshot.maxTimers
                     softGlowEnabled: false
                     onLeftClicked: {
-                        countdownUi.selectedTimerId = -1;
+                        let highest = 0;
+                        for (let i = 0; i < countdownUi.timers.length; ++i)
+                            highest = Math.max(highest,countdownUi.timers[i].id);
+                        countdownUi.pendingCreateMaxId = highest;
                         countdownUi.localFeedback = "";
                         countdownUi.actionRequested(-1,"create","","","","");
                     }
@@ -253,56 +267,86 @@ Item {
                 width: parent.width
                 height: 30
                 spacing: 5
-                Repeater {
-                    model: ["HH", "MM", "SS"]
-                    delegate: Item {
-                        required property string modelData
-                        required property int index
-                        width: Math.max(1, (parent.width - parent.spacing * 2) / 3)
-                        height: parent.height
-                        TextField {
-                            id: digitField
-                            anchors.fill: parent
-                            objectName: modelData
-                            placeholderText: modelData
-                            maximumLength: 2
-                            font.pixelSize: 11
-                            horizontalAlignment: Text.AlignHCenter
-                            color: Colors.white
-                            enabled: countdownUi.timerReady
-                            validator: RegularExpressionValidator {
-                                regularExpression: /[0-9]{0,2}/
-                            }
-                            background: Rectangle {
-                                color: Colors.black
-                                border.color: digitField.activeFocus
-                                              ? Colors.orange : Colors.cyan
-                                radius: 0
-                            }
-                            Component.onCompleted: {
-                                text = index === 0 ? countdownUi.hoursDraft
-                                     : index === 1 ? countdownUi.minutesDraft
-                                     : countdownUi.secondsDraft;
-                            }
-                            Connections {
-                                target: countdownUi
-                                function onSelectedTimerIdChanged() {
-                                    digitField.text = index === 0 ? countdownUi.hoursDraft
-                                                    : index === 1 ? countdownUi.minutesDraft
-                                                    : countdownUi.secondsDraft;
-                                }
-                            }
-                            onTextEdited: {
-                                if (index === 0) countdownUi.hoursDraft = text;
-                                else if (index === 1) countdownUi.minutesDraft = text;
-                                else countdownUi.secondsDraft = text;
-                                countdownUi.editDirty = true;
-                                countdownUi.removeArmed = false;
-                            }
-                            onActiveFocusChanged:
-                                countdownUi.inputFocusChanged(activeFocus)
-                        }
+                TextField {
+                    id: hoursField
+                    width: Math.max(1,(parent.width - parent.spacing * 2) / 3)
+                    height: parent.height
+                    placeholderText: "HH"
+                    maximumLength: 2
+                    font.pixelSize: 11
+                    horizontalAlignment: Text.AlignHCenter
+                    color: Colors.white
+                    enabled: countdownUi.timerReady
+                    validator: RegularExpressionValidator {
+                        regularExpression: /[0-9]{0,2}/
                     }
+                    background: Rectangle {
+                        color: Colors.black
+                        border.color: hoursField.activeFocus
+                                      ? Colors.orange : Colors.cyan
+                        radius: 0
+                    }
+                    onTextEdited: {
+                        countdownUi.hoursDraft = text;
+                        countdownUi.editDirty = true;
+                        countdownUi.removeArmed = false;
+                    }
+                    onActiveFocusChanged:
+                        countdownUi.inputFocusChanged(activeFocus)
+                }
+                TextField {
+                    id: minutesField
+                    width: Math.max(1,(parent.width - parent.spacing * 2) / 3)
+                    height: parent.height
+                    placeholderText: "MM"
+                    maximumLength: 2
+                    font.pixelSize: 11
+                    horizontalAlignment: Text.AlignHCenter
+                    color: Colors.white
+                    enabled: countdownUi.timerReady
+                    validator: RegularExpressionValidator {
+                        regularExpression: /[0-9]{0,2}/
+                    }
+                    background: Rectangle {
+                        color: Colors.black
+                        border.color: minutesField.activeFocus
+                                      ? Colors.orange : Colors.cyan
+                        radius: 0
+                    }
+                    onTextEdited: {
+                        countdownUi.minutesDraft = text;
+                        countdownUi.editDirty = true;
+                        countdownUi.removeArmed = false;
+                    }
+                    onActiveFocusChanged:
+                        countdownUi.inputFocusChanged(activeFocus)
+                }
+                TextField {
+                    id: secondsField
+                    width: Math.max(1,(parent.width - parent.spacing * 2) / 3)
+                    height: parent.height
+                    placeholderText: "SS"
+                    maximumLength: 2
+                    font.pixelSize: 11
+                    horizontalAlignment: Text.AlignHCenter
+                    color: Colors.white
+                    enabled: countdownUi.timerReady
+                    validator: RegularExpressionValidator {
+                        regularExpression: /[0-9]{0,2}/
+                    }
+                    background: Rectangle {
+                        color: Colors.black
+                        border.color: secondsField.activeFocus
+                                      ? Colors.orange : Colors.cyan
+                        radius: 0
+                    }
+                    onTextEdited: {
+                        countdownUi.secondsDraft = text;
+                        countdownUi.editDirty = true;
+                        countdownUi.removeArmed = false;
+                    }
+                    onActiveFocusChanged:
+                        countdownUi.inputFocusChanged(activeFocus)
                 }
             }
             Row {

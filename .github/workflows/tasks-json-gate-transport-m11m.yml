@@ -1,0 +1,45 @@
+name: TASKS M11m disposable FileView owner transport
+
+on:
+  pull_request:
+    paths:
+      - 'services/projects/TaskJsonGateHostBridgeM11m.qml'
+      - 'tests/tasks/fixtures/TaskJsonGateTransportM11m.py'
+      - 'tests/tasks/fixtures/TaskJsonGateSeedM11m.py'
+      - 'TaskJsonGateHarnessM11m.qml'
+      - 'tests/tasks/test_task_json_gate_transport_m11m.py'
+      - 'docs/tasks-json-gate-host-transport-m11m.md'
+      - '.github/workflows/tasks-json-gate-transport-m11m.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'services/projects/TaskJsonGateHostBridgeM11m.qml'
+      - 'tests/tasks/fixtures/TaskJsonGateTransportM11m.py'
+      - 'tests/tasks/fixtures/TaskJsonGateSeedM11m.py'
+      - 'TaskJsonGateHarnessM11m.qml'
+      - 'tests/tasks/test_task_json_gate_transport_m11m.py'
+      - 'docs/tasks-json-gate-host-transport-m11m.md'
+      - '.github/workflows/tasks-json-gate-transport-m11m.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  disposable-handshake:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: M11m subprocess transport, disposable owner, restart and QML source fences
+        run: python3 tests/tasks/test_task_json_gate_transport_m11m.py
+      - name: M11l OS owner, reservation and backup tests
+        run: python3 tests/tasks/test_task_json_gate_candidate_m11l.py
+      - name: M11k still no production gate authorization
+        run: python3 tests/tasks/test_task_production_gate_review_m11k.py
+      - name: M11j observed native evidence scope remains intact
+        run: python3 tests/tasks/test_task_native_acceptance_m11j.py
+      - name: M11d only one production TASKS writer and nine mutation callers
+        run: python3 tests/tasks/test_task_writer_gate_inventory_m11d.py

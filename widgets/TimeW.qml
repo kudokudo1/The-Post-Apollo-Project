@@ -595,6 +595,62 @@ PanelWindow {
     property var stopwatchLaps: []
     readonly property int stopwatchMaxLaps: StopwatchPolicy.MAX_LAPS
 
+    // Hub integration is a second surface for this SAME stopwatch. The
+    // original TimeW owns the ElapsedTimer, cumulative time and lap storage.
+    // No new stopwatch worker, clock, or 10Hz observer is constructed.
+    readonly property var hubStopwatchSnapshot: {
+        const recent = [];
+        for (let i = 0; i < stopwatchLaps.length && i < 4; i++) {
+            const lap = stopwatchLaps[i];
+            if (!lap) continue;
+            recent.push({
+                index: lap.index,
+                total: StopwatchPolicy.format(lap.totalMs),
+                split: StopwatchPolicy.format(lap.splitMs)
+            });
+        }
+        return {
+            source: "timew-monotonic-stopwatch",
+            running: stopwatchRunning,
+            started: stopwatchStarted,
+            elapsed: StopwatchPolicy.format(stopwatchDisplayMs),
+            lapCount: stopwatchLapSequence,
+            lapLimit: stopwatchMaxLaps,
+            recentLaps: recent
+        };
+    }
+
+    function hubRefreshStopwatch() {
+        // Called on the Hub's EXISTING 1-second Time tile clock. This is
+        // presentation only; elapsed time still comes from TimeW's monotonic
+        // ElapsedTimer and does not lose time while both windows are closed.
+        if (stopwatchRunning)
+            refreshStopwatch();
+    }
+
+    function hubStopwatchAction(action) {
+        // Actions are gated here, not delegated to the Hub view.
+        if (action === "start" && !stopwatchRunning) {
+            startStopwatch();
+            return true;
+        }
+        if (action === "pause" && stopwatchRunning) {
+            pauseStopwatch();
+            return true;
+        }
+        if (action === "lap" && stopwatchRunning
+                && stopwatchLapSequence < stopwatchMaxLaps) {
+            lapStopwatch();
+            return true;
+        }
+        if (action === "reset" && !stopwatchRunning
+                && stopwatchStarted) {
+            resetStopwatch();
+            return true;
+        }
+        return false;
+    }
+
     function refreshStopwatch() {
         stopwatchDisplayMs = stopwatchRunning
                              ? StopwatchPolicy.sample(

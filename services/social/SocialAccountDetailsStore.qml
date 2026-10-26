@@ -18,6 +18,18 @@ Scope {
         var item = saved.identities[String(identityId)];
         return item || {email:"",phone:"",accounts:({})};
     }
+    // After a conflict or invalid field, the operator can explicitly reload.
+    // Read failure never initializes an empty file over corrupt/unsafe storage.
+    function refresh() {
+        if (state === "saving" || reader.running || writer.running)
+            return false;
+        state = "loading";
+        errorCode = "";
+        readText = "";
+        reader.running = true;
+        return true;
+    }
+
     function update(fields) {
         if (state !== "ready" || pending !== null || writer.running)
             return false;

@@ -101,9 +101,22 @@ assert "notificationsReference.panelBottomMargin : 5" in social
 assert "Math.round(notificationsReference.height) - 2 * notificationsFrameInset" in social
 assert "sharedPanelHeight = defaultPanelHeight;" in social
 assert "height: messagingWindow.sharedPanelHeight" in social
-assert "swayAreaY + swayAreaHeight - defaultPanelHeight" in social
-assert "- notificationsBottomMargin - notificationsFrameInset" in social
+# Social opens at Notifications/Hospital's visible top border, not at
+# an output-bottom-derived Y that can be displaced by Sway's work area.
+# QScreen.geometry.y includes the output's virtual-desktop origin.
+assert "readonly property int defaultPanelY: Math.round(" in social
+assert "(screen ? screen.geometry.y : 0)" in social
+assert "(notificationsReference ? notificationsReference.panelTopMargin : 0)" in social
+assert "+ notificationsFrameInset" in social
+assert "swayAreaY + swayAreaHeight - defaultPanelHeight" not in social
 assert "sharedPanelY = Math.round(defaultPanelY);" in social
+# X and the shared size/Discord geometry must not change.
+assert "readonly property int defaultPanelX: swayAreaX + swayAreaWidth - margins.right - defaultPanelWidth" in social
+assert "property int defaultPanelWidth: 1210" in social
+assert "property int defaultPanelHeight: Math.max(" in social
+assert "sharedPanelWidth = defaultPanelWidth;" in social
+assert "sharedPanelHeight = defaultPanelHeight;" in social
+assert "const" not in social.split("readonly property int defaultPanelY:", 1)[1].split("readonly property int discordX:", 1)[0]
 assert "notificationsReference: notificationsHubWindow" in shell
 assert shell.count("notificationsReference: notificationsHubWindow") == 2
 
@@ -116,6 +129,13 @@ for window_height in (763, 1075, 1435, 1595):
     social_frame = window_height - 16
     assert notification_frame == hospital_frame == social_frame
     assert 8 + hospital_frame + 8 == window_height
+
+# Different virtual monitor origins do not alter the target 8px
+# visible inset relative to each output.
+for output_y in (-1080, 0, 240, 1440):
+    top = output_y + 0 + 8
+    assert top - output_y == 8
+    assert top == output_y + 8
 
 # Other widget panel widths, top-edge geometry and visibility lifetimes remain.
 assert "property int panelWidth: 744" in hospital

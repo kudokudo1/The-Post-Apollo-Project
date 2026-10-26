@@ -15,6 +15,10 @@ SectionFrame {
     property var systemSnapshot: null
     property var uptimeSnapshot: null
     property var appsSnapshot: null
+    property var audioSnapshot: null
+    signal audioVolumeRequested(int percent)
+    signal audioMuteRequested(bool muted)
+    signal audioInputFocusChanged(bool focused)
     property var processSnapshot: null
     property var processActionGate: null
     signal processInputFocusChanged(bool focused)
@@ -503,6 +507,31 @@ SectionFrame {
         }
     }
 
+    // P3-A: explicit master output controls through existing Volumebar.
+    // This is NOT the Hi-Fi Media tile or an application-stream mixer.
+    ApolloHubAudioMini {
+        id: audioMini
+        visible: tile.moduleId === "audio"
+        audioSnapshot: tile.audioSnapshot
+        onVolumeRequested: function(percent) {
+            tile.audioVolumeRequested(percent);
+        }
+        onMuteRequested: function(muted) {
+            tile.audioMuteRequested(muted);
+        }
+        onInputFocusChanged: function(focused) {
+            tile.audioInputFocusChanged(focused);
+        }
+        anchors {
+            left: parent.left
+            right: parent.right
+            top: parent.top
+            bottom: parent.bottom
+            topMargin: tile.editing ? 32 : 22
+            bottomMargin: 23
+        }
+    }
+
     // P2-A: Social is a new opt-in tile, wired to the existing owner.
     ApolloHubSocialMini {
         id: socialMini
@@ -653,6 +682,7 @@ SectionFrame {
                  && tile.moduleId !== "uptime"
                  && tile.moduleId !== "apps"
                  && tile.moduleId !== "social"
+                 && tile.moduleId !== "audio"
                  && tile.moduleId !== "todo"
                  && tile.moduleId !== "notes"
                  && tile.moduleId !== "calendar"
@@ -707,6 +737,8 @@ SectionFrame {
               ? appsMini.statusLine
               : tile.moduleId === "social"
               ? socialMini.statusLine
+              : tile.moduleId === "audio"
+              ? audioMini.statusLine
               : tile.moduleId === "todo" && tile.tileRowSpan > 1
               ? todoExplore.statusLine
               : tile.moduleId === "todo"

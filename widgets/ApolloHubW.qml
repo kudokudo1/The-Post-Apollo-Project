@@ -18,6 +18,24 @@ PanelWindow {
     property bool notesInputFocused: false
     // Injected read-only ApolloHubLiveBridge; do not construct a second provider.
     property var liveBridge: null
+    // P3-A: passive master-output snapshot and explicit owner action route.
+    property var audioSnapshot: null
+    property bool audioInputFocused: false
+    signal audioVolumeRequested(int percent)
+    signal audioMuteRequested(bool muted)
+
+    function requestAudioVolume(percent) {
+        if (!menuOpen || !audioSnapshot || audioSnapshot.state !== "ready"
+                || !Number.isInteger(percent) || percent < 0 || percent > 300)
+            return;
+        audioVolumeRequested(percent);
+    }
+    function requestAudioMute(muted) {
+        if (!menuOpen || !audioSnapshot || audioSnapshot.state !== "ready"
+                || typeof muted !== "boolean")
+            return;
+        audioMuteRequested(muted);
+    }
 
     // Owner-owned windows are represented by bounded availability/state
     // and explicit signals, never passed into tile delegates as handles.
@@ -86,6 +104,7 @@ PanelWindow {
         && !todoInputFocused
         && !notesInputFocused
         && !processInputFocused
+        && !audioInputFocused
     property bool writingLayout: false
     // In-session undo makes accidental tile deletion reversible.
     property var layoutUndoStack: []
@@ -504,6 +523,7 @@ PanelWindow {
             todoInputFocused = false;
             notesInputFocused = false;
             processInputFocused = false;
+            audioInputFocused = false;
         }
         if (menuOpen && keyboardActive)
             Qt.callLater(function() {
@@ -1066,6 +1086,16 @@ PanelWindow {
                                             ? hub.liveBridge.uptimeSnapshot : null
                             // B6 passive desktop app catalog, without access
                             // to launch methods, command lines, or executables.
+                            audioSnapshot: hub.audioSnapshot
+                            onAudioVolumeRequested: function(percent) {
+                                hub.requestAudioVolume(percent);
+                            }
+                            onAudioMuteRequested: function(muted) {
+                                hub.requestAudioMute(muted);
+                            }
+                            onAudioInputFocusChanged: function(focused) {
+                                hub.audioInputFocused = focused;
+                            }
                             appsSnapshot: hub.liveBridge
                                           ? hub.liveBridge.appsSnapshot : null
                             appControlAvailable: hub.appControlAvailable

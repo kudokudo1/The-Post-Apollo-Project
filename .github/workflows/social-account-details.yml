@@ -1,0 +1,40 @@
+name: Social Identity Account Details Contracts
+
+on:
+  pull_request:
+    paths:
+      - 'services/social/SocialAccountDetails.py'
+      - 'services/social/SocialAccountDetailsStore.qml'
+      - 'services/social/qmldir'
+      - 'widgets/messanger/AppSelector.qml'
+      - 'tests/messaging/test_social_account_details*.py'
+      - '.github/workflows/social-account-details.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'services/social/SocialAccountDetails.py'
+      - 'services/social/SocialAccountDetailsStore.qml'
+      - 'services/social/qmldir'
+      - 'widgets/messanger/AppSelector.qml'
+      - 'tests/messaging/test_social_account_details*.py'
+      - '.github/workflows/social-account-details.yml'
+  workflow_dispatch:
+
+jobs:
+  account-details:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Exercise real atomic private storage and CLI guards
+        run: python3 -m unittest discover -s tests/messaging -p 'test_social_account_details.py' -v
+      - name: Verify QML identity setup isolation and fixed UI
+        run: python3 -m unittest discover -s tests/messaging -p 'test_social_account_details_ui.py' -v
+      - name: Preserve Social organization policies and identity UI
+        run: |
+          node tests/messaging/test_social_identity_policy.cjs
+          node tests/messaging/test_social_family_rail.cjs
+          node tests/messaging/test_social_family_manager.cjs
+          node tests/messaging/test_social_family_order_visibility.cjs
+          node tests/messaging/test_social_safe_family_removal.cjs
+          python3 -m unittest discover -s tests/messaging -p 'test_social_identity_store.py' -v
+          python3 -m unittest discover -s tests/messaging -p 'test_social_settings_workspace.py' -v

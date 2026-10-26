@@ -78,7 +78,8 @@ class SettingsContactChatWorkspaceContracts(unittest.TestCase):
         )[0]
         for part in (
             'text: "IDENTITIES"', 'text: "LINKED ACCOUNTS"',
-            'text: "API CREDENTIALS"', "id: newIdentityName",
+            'text: "IDENTITY DETAILS"', "id: newIdentityName",
+            'text: "DEFAULT EMAIL"', 'text: "DEFAULT PHONE"',
             "SocialIdentityStore.selectIdentity(modelData.id)",
             "SocialIdentityStore.createIdentity(",
         ):

@@ -28,6 +28,32 @@ Rectangle {
     readonly property var identitySnapshot: SocialIdentityStore.snapshot
     readonly property var railRows: identitySnapshot.railRows || []
     readonly property var visibleAppIndices: identitySnapshot.visibleAppIndices || []
+    // Non-authenticated profile hints and account labels, held in a private
+    // local file distinct from the existing organization layout document.
+    property string accountEditorIdentityId: ""
+    property string accountSelectedServiceId: ""
+    readonly property var accountDetails:
+        SocialAccountDetailsStore.recordFor(identitySnapshot.activeId)
+
+    function matchingAccountServices(query) {
+        var term = String(query || "").trim().toLowerCase();
+        return (identitySnapshot.appChoices || []).filter(function(c) {
+            var a = messagingApps[c.serviceIndex];
+            return a && (!term || a.name.toLowerCase().indexOf(term) !== -1
+                         || c.id.indexOf(term) !== -1);
+        }).slice(0, 8);
+    }
+
+    function refreshAccountForm() {
+        var id = identitySnapshot.activeId;
+        accountEditorIdentityId = id;
+        var entry = SocialAccountDetailsStore.recordFor(id);
+        accountEmailInput.text = entry.email || "";
+        accountPhoneInput.text = entry.phone || "";
+        if (accountSelectedServiceId)
+            accountLabelInput.text =
+                entry.accounts[accountSelectedServiceId] || "";
+    }
 
     // Family editing only touches metadata for the identity active when its
     // controls were selected. Switches clear stale selections, even if two
@@ -162,6 +188,12 @@ Rectangle {
         appSelector.ensureValidSelection();
         appSelector.ensureSelectedVisible();
         appSelector.resetFamilyRemovalConfirmation();
+        if (appSelector.accountEditorIdentityId !== appSelector.identitySnapshot.activeId) {
+            appSelector.accountSelectedServiceId = "";
+            accountServiceSearchInput.text = "";
+            accountLabelInput.text = "";
+            appSelector.refreshAccountForm();
+        }
         if (appSelector.familyEditorIdentityId !== appSelector.identitySnapshot.activeId) {
             appSelector.familyEditorIdentityId = appSelector.identitySnapshot.activeId;
             appSelector.editedFamilyId = "";
@@ -180,8 +212,25 @@ Rectangle {
         }
     })
 
+    // Inputs belong to one identity; the QML fields are never copied when
+    // CREATE uses another identity's organization layout.
+    onAccountDetailsChanged: Qt.callLater(function() {
+        if (SocialAccountDetailsStore.state === "ready"
+                && accountEditorIdentityId === identitySnapshot.activeId)
+            appSelector.refreshAccountForm();
+    })
+
+    Connections {
+        target: SocialAccountDetailsStore
+        function onStateChanged() {
+            if (SocialAccountDetailsStore.state === "ready")
+                Qt.callLater(function() { appSelector.refreshAccountForm(); });
+        }
+    }
+
     onSettingsOpenChanged: {
         if (settingsOpen) {
+            appSelector.refreshAccountForm();
             // The broader editor opens ready to organize, without requiring
             // a second click through the old narrow "EDIT FAMILIES" control.
             editingFamilies = true;
@@ -886,32 +935,231 @@ Rectangle {
                     font.pixelSize: 9
                     wrapMode: Text.WordWrap
                 }
+                Rectangle {
+                    width: parent.width
+                    height: 1
+                    color: Colors.cyan
+                }
                 Text {
                     width: parent.width
-                    text: "LINKED ACCOUNTS"
-                    color: Colors.cyan
-                    font.pixelSize: 9
+                    text: "IDENTITY DETAILS"
+                    color: Colors.orange
                     font.bold: true
+                    font.pixelSize: 11
                     wrapMode: Text.WordWrap
                 }
                 Text {
                     width: parent.width
-                    text: "Not connected to this menu"
+                    text: "Contact defaults are saved locally, not sent to any service."
                     color: Colors.white
                     font.pixelSize: 9
                     wrapMode: Text.WordWrap
                 }
                 Text {
                     width: parent.width
-                    text: "API CREDENTIALS"
+                    text: "DEFAULT EMAIL"
                     color: Colors.cyan
                     font.pixelSize: 9
+                }
+                Rectangle {
+                    width: parent.width
+                    height: 36
+                    color: Colors.dark
+                    border.color: Colors.orange
+                    TextInput {
+                        id: accountEmailInput
+                        anchors.fill: parent
+                        anchors.margins: 5
+                        clip: true
+                        selectByMouse: true
+                        color: Colors.white
+                        font.pixelSize: 11
+                        maximumLength: 254
+                        inputMethodHints: Qt.ImhEmailCharactersOnly
+                    }
+                }
+                Text {
+                    width: parent.width
+                    text: "DEFAULT PHONE"
+                    color: Colors.cyan
+                    font.pixelSize: 9
+                }
+                Rectangle {
+                    width: parent.width
+                    height: 36
+                    color: Colors.dark
+                    border.color: Colors.orange
+                    TextInput {
+                        id: accountPhoneInput
+                        anchors.fill: parent
+                        anchors.margins: 5
+                        clip: true
+                        selectByMouse: true
+                        color: Colors.white
+                        font.pixelSize: 11
+                        maximumLength: 24
+                        inputMethodHints: Qt.ImhDialableCharactersOnly
+                    }
+                }
+                ActionButton {
+                    width: parent.width
+                    height: 36
+                    label: "SAVE CONTACT"
+                    labelPixelSize: 9
+                    interactive: appSelector.identitySnapshot.writable
+                                 && SocialAccountDetailsStore.state === "ready"
+                                 && appSelector.accountEditorIdentityId ===
+                                    appSelector.identitySnapshot.activeId
+                    onTriggered: SocialAccountDetailsStore.saveContact(
+                        appSelector.identitySnapshot.activeId,
+                        accountEmailInput.text, accountPhoneInput.text)
+                }
+                Text {
+                    width: parent.width
+                    visible: SocialAccountDetailsStore.state !== "ready"
+                             || SocialAccountDetailsStore.errorCode !== ""
+                    text: SocialAccountDetailsStore.state === "saving"
+                          ? "Saving details..."
+                          : (SocialAccountDetailsStore.errorCode || "Loading details...")
+                    color: Colors.orange
+                    font.pixelSize: 9
+                    wrapMode: Text.WrapAnywhere
+                }
+                ActionButton {
+                    width: parent.width
+                    height: 33
+                    label: "RELOAD DETAILS"
+                    labelPixelSize: 9
+                    contentPadding: 3
+                    interactive: SocialAccountDetailsStore.state === "error"
+                                 || SocialAccountDetailsStore.errorCode !== ""
+                    onTriggered: SocialAccountDetailsStore.refresh()
+                }
+                Rectangle {
+                    width: parent.width
+                    height: 1
+                    color: Colors.cyan
+                }
+                Text {
+                    width: parent.width
+                    text: "LINKED ACCOUNTS"
+                    color: Colors.orange
                     font.bold: true
+                    font.pixelSize: 11
                     wrapMode: Text.WordWrap
                 }
                 Text {
                     width: parent.width
-                    text: "Existing service setup unchanged"
+                    text: "SETUP NOTES ONLY. A label does not connect or sign in."
+                    color: Colors.white
+                    font.pixelSize: 9
+                    wrapMode: Text.WordWrap
+                }
+                Rectangle {
+                    width: parent.width
+                    height: 36
+                    color: Colors.dark
+                    border.color: Colors.orange
+                    TextInput {
+                        id: accountServiceSearchInput
+                        anchors.fill: parent
+                        anchors.margins: 5
+                        color: Colors.white
+                        clip: true
+                        selectByMouse: true
+                        font.pixelSize: 11
+                        maximumLength: 40
+                    }
+                }
+                Repeater {
+                    model: appSelector.matchingAccountServices(
+                               accountServiceSearchInput.text)
+                    delegate: ActionButton {
+                        required property var modelData
+                        width: settingsIdentityColumn.width
+                        height: 31
+                        label: appSelector.messagingApps[modelData.serviceIndex].name
+                        labelPixelSize: 9
+                        labelMinimumPixelSize: 8
+                        contentPadding: 3
+                        selected: appSelector.accountSelectedServiceId === modelData.id
+                        interactive: appSelector.identitySnapshot.writable
+                                     && SocialAccountDetailsStore.state === "ready"
+                        onTriggered: {
+                            appSelector.accountSelectedServiceId = modelData.id;
+                            accountLabelInput.text = appSelector.accountDetails.accounts[modelData.id]
+                                                     || "";
+                        }
+                    }
+                }
+                Text {
+                    width: parent.width
+                    visible: appSelector.accountSelectedServiceId !== ""
+                    text: "ACCOUNT NICKNAME // NO SECRETS"
+                    color: Colors.cyan
+                    font.pixelSize: 9
+                    wrapMode: Text.WordWrap
+                }
+                Rectangle {
+                    width: parent.width
+                    height: 36
+                    visible: appSelector.accountSelectedServiceId !== ""
+                    color: Colors.dark
+                    border.color: Colors.orange
+                    TextInput {
+                        id: accountLabelInput
+                        anchors.fill: parent
+                        anchors.margins: 5
+                        color: Colors.white
+                        clip: true
+                        selectByMouse: true
+                        font.pixelSize: 11
+                        maximumLength: 48
+                    }
+                }
+                ActionButton {
+                    width: parent.width
+                    height: 36
+                    label: "SAVE ACCOUNT NOTE"
+                    labelPixelSize: 9
+                    labelMinimumPixelSize: 8
+                    contentPadding: 3
+                    interactive: appSelector.identitySnapshot.writable
+                                 && SocialAccountDetailsStore.state === "ready"
+                                 && appSelector.accountSelectedServiceId !== ""
+                                 && accountLabelInput.text.trim() !== ""
+                                 && appSelector.accountEditorIdentityId ===
+                                    appSelector.identitySnapshot.activeId
+                    onTriggered: SocialAccountDetailsStore.setAccountLabel(
+                        appSelector.identitySnapshot.activeId,
+                        appSelector.accountSelectedServiceId,
+                        accountLabelInput.text)
+                }
+                ActionButton {
+                    width: parent.width
+                    height: 33
+                    label: "CLEAR NOTE"
+                    labelPixelSize: 9
+                    contentPadding: 3
+                    interactive: appSelector.identitySnapshot.writable
+                                 && SocialAccountDetailsStore.state === "ready"
+                                 && appSelector.accountSelectedServiceId !== ""
+                                 && appSelector.accountDetails.accounts[
+                                       appSelector.accountSelectedServiceId] !== undefined
+                    onTriggered: SocialAccountDetailsStore.setAccountLabel(
+                        appSelector.identitySnapshot.activeId,
+                        appSelector.accountSelectedServiceId, "")
+                }
+                Text {
+                    width: parent.width
+                    text: "AUTHENTICATION // NOT CONNECTED BY THESE CONTROLS"
+                    color: Colors.orange
+                    font.pixelSize: 9
+                    wrapMode: Text.WordWrap
+                }
+                Text {
+                    width: parent.width
+                    text: "Existing Telegram and browser sign-in paths stay unchanged."
                     color: Colors.white
                     font.pixelSize: 9
                     wrapMode: Text.WordWrap

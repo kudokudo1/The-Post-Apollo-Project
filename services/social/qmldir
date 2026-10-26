@@ -2,3 +2,4 @@ module qs.services.social
 
 singleton SocialIdentityStore 1.0 SocialIdentityStore.qml
 singleton SocialAccountDetailsStore 1.0 SocialAccountDetailsStore.qml
+singleton SocialAccountDetailsStore 1.0 SocialAccountDetailsStore.qml

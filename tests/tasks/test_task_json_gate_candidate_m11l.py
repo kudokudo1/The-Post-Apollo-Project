@@ -88,10 +88,13 @@ class CandidateTests(unittest.TestCase):
             self.assertFalse(owner.state()["pending"])
             next2 = raw(document(label="Second confirmed"))
             owner.reserve("m11l-stage-0002", next2)
-            self.assertCode("FREEZE_REFUSED", lambda: owner.freeze(0))
+            pending_freeze = owner.freeze(0)
+            self.assertEqual(pending_freeze["phase"], "FREEZE_REQUESTED")
+            self.assertCode("STAGE_NOT_ADMISSIBLE",
+                            lambda: owner.reserve("m11l-stage-new", next1))
             atomic_fileview_simulation(self.source, next2)
             self.assertTrue(owner.verify("m11l-stage-0002", 0)["settled"])
-            frozen = owner.freeze(0)
+            frozen = owner.state()
             self.assertEqual(frozen["phase"], "JSON_QUIESCED")
             self.assertCode("STAGE_NOT_ADMISSIBLE",
                             lambda: owner.reserve("m11l-stage-0003", next1))
@@ -126,6 +129,15 @@ class CandidateTests(unittest.TestCase):
                             lambda: owner.reserve("m11l-stage-extern",
                                                   raw(document(label="Candidate"))))
             self.assertEqual(self.source.read_bytes(), external)
+
+    def test_backup_tampering_refuses_fresh_owner(self):
+        with self.owner(bootstrap=True) as owner:
+            self.assertEqual(owner.state()["phase"], "JSON_ACTIVE")
+        backup = self.root / "source-before-gate.bak"
+        old_backup = backup.read_bytes()
+        atomic_fileview_simulation(backup, raw(document(label="Tampered backup")))
+        self.assertCode("BACKUP_CHANGED", lambda: self.owner())
+        self.assertNotEqual(backup.read_bytes(), old_backup)
 
     def test_fixture_identity_and_missing_authority(self):
         self.assertCode("JOURNAL_MISSING", lambda: self.owner())

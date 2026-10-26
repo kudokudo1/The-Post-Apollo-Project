@@ -214,17 +214,17 @@ Rectangle {
 
     // Inputs belong to one identity; the QML fields are never copied when
     // CREATE uses another identity's organization layout.
-    onAccountDetailsChanged: {
+    onAccountDetailsChanged: Qt.callLater(function() {
         if (SocialAccountDetailsStore.state === "ready"
                 && accountEditorIdentityId === identitySnapshot.activeId)
             appSelector.refreshAccountForm();
-    }
+    })
 
     Connections {
         target: SocialAccountDetailsStore
         function onStateChanged() {
             if (SocialAccountDetailsStore.state === "ready")
-                appSelector.refreshAccountForm();
+                Qt.callLater(function() { appSelector.refreshAccountForm(); });
         }
     }
 

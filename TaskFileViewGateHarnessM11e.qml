@@ -1,5 +1,6 @@
 import QtQuick
 import Quickshell
+import Quickshell.Wayland
 import "./services/projects"
 
 // Explicit standalone Quickshell test configuration, NEVER shell.qml.
@@ -14,6 +15,12 @@ Scope {
     }
 
     PanelWindow {
+        // Standalone test needs keyboard focus to accept an absolute fixture
+        // path. Reuse the live TASKS/Hub on-demand layer-shell convention.
+        // NEVER claim exclusive keyboard ownership over the real desktop.
+        exclusiveZone: 0
+        WlrLayershell.keyboardFocus: WlrKeyboardFocus.OnDemand
+        focusable: true
         visible: true
         implicitWidth: 550
         implicitHeight: 340
@@ -58,6 +65,7 @@ Scope {
                         text: ""
                         font.pixelSize: 11
                         color: "#DCF3FA"
+                        focus: true
                         selectByMouse: true
                         clip: true
                     }

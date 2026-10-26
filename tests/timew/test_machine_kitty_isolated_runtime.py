@@ -91,6 +91,43 @@ with tempfile.TemporaryDirectory(prefix="machine-kitty-ci-") as folder:
         assert info.st_mode & 0o077 == 0
         assert endpoint.parent == base
 
+        # Socket existence can precede acceptance of Kitty control messages.
+        # Readiness requests are the same fixed native READ-ONLY command,
+        # but their raw JSON/stderr must never appear in build logs.
+        native_argv = [
+            "kitten", "@", "--to", "unix:" + str(endpoint),
+            "ls", "--output-format=json",
+        ]
+        ready = False
+        last_failure = "no_successful_read"
+        for attempt in range(25):
+            if proc.poll() is not None:
+                raise AssertionError("DISPOSABLE KITTY TERMINATED DURING READINESS")
+            try:
+                probe = subprocess.run(
+                    native_argv, stdin=subprocess.DEVNULL,
+                    stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                    timeout=3, check=False)
+            except subprocess.TimeoutExpired:
+                last_failure = "native_client_timeout"
+            else:
+                if probe.returncode == 0:
+                    ready = True
+                    break
+                error = probe.stderr.lower()
+                if b"connect" in error or b"socket" in error:
+                    last_failure = "native_connection_unavailable"
+                elif b"not allowed" in error or b"permission" in error:
+                    last_failure = "native_permission_refused"
+                elif b"invalid" in error or b"unknown" in error:
+                    last_failure = "native_protocol_rejected"
+                else:
+                    last_failure = "native_client_error"
+            time.sleep(0.2)
+        if not ready:
+            raise AssertionError(
+                "DISPOSABLE KITTY NATIVE READ NEVER READY: " + last_failure)
+
         # The production reader is exercised against ONE real Kitty instance,
         # but only inside this disposable, explicitly isolated GitHub runner.
         try:

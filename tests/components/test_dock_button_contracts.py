@@ -188,7 +188,7 @@ for path, needles in DOCK_MODULES.items():
 # Keep a single sampled source instead of layering a recolored PNG on top.
 social_module = (ROOT / "modules/Sessions.qml").read_text(encoding="utf-8")
 for needle in (
-    "NotoText {",
+    "GohuText {",
     "id: sessionsIcon",
     "anchors.centerIn: parent",
     "font.pixelSize: 22",
@@ -209,7 +209,8 @@ assert "Sessions.png" not in social_module
 assert "ColorOverlay {" not in social_module
 assert "SafeDropShadow {" not in social_module
 assert social_module.count("contentGlowSource: sessionsIcon") == 1
-assert social_module.count("NotoText {") == 1
+assert social_module.count("GohuText {") == 1
+assert social_module.count("NotoText {") == 0
 
 LEGACY_ROOT_MOUSE_IDS = (
     "appmenuMouse",

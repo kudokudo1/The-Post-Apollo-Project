@@ -5,6 +5,18 @@ import Quickshell.Io
 Scope {
     id: githubService
 
+    readonly property bool subprocessLagProbeEnabled:
+        String(Quickshell.env("POST_APOLLO_SUBPROCESS_LAG_PROBE") || "").trim() === "1"
+
+    // Opt-in only; static stage IDs and counts, never subprocess output.
+    function traceSubprocessLag(stage, size) {
+        if (!subprocessLagProbeEnabled)
+            return;
+        console.warn("SYNTAGMA_SUBPROCESS_PROBE // service=github-service"
+                     + " stage=" + stage + " size=" + Number(size || 0)
+                     + " tsMs=" + Date.now());
+    }
+
     property string originUrl: ""
 
     readonly property string repoSlug: {
@@ -1087,6 +1099,7 @@ Scope {
 
         stdout: StdioCollector {
             onStreamFinished: {
+                githubService.traceSubprocessLag("evidenceRunsProcess:stdout:begin", this.text.length);
                 githubService.evidenceRunsStdoutText = this.text;
                 githubService.evidenceRunsStdoutSeen = true;
                 githubService.maybeFinishEvidenceRuns();
@@ -1095,6 +1108,7 @@ Scope {
 
         stderr: StdioCollector {
             onStreamFinished: {
+                githubService.traceSubprocessLag("evidenceRunsProcess:stderr:begin", this.text.length);
                 githubService.evidenceRunsStderrText = this.text;
                 githubService.evidenceRunsStderrSeen = true;
                 githubService.maybeFinishEvidenceRuns();
@@ -1102,6 +1116,7 @@ Scope {
         }
 
         onExited: function(exitCode, exitStatus) {
+            githubService.traceSubprocessLag("evidenceRunsProcess:exit:begin", 0);
             githubService.evidenceRunsExitCode = Number(exitCode);
             githubService.evidenceRunsExitSeen = true;
             githubService.maybeFinishEvidenceRuns();
@@ -1113,6 +1128,7 @@ Scope {
 
         stdout: StdioCollector {
             onStreamFinished: {
+                githubService.traceSubprocessLag("inspectorProcess:stdout:begin", this.text.length);
                 githubService.inspectorMetaStdoutText = this.text;
                 githubService.inspectorMetaStdoutSeen = true;
                 githubService.maybeFinishInspector();
@@ -1121,6 +1137,7 @@ Scope {
 
         stderr: StdioCollector {
             onStreamFinished: {
+                githubService.traceSubprocessLag("inspectorProcess:stderr:begin", this.text.length);
                 githubService.inspectorMetaStderrText = this.text;
                 githubService.inspectorMetaStderrSeen = true;
                 githubService.maybeFinishInspector();
@@ -1128,6 +1145,7 @@ Scope {
         }
 
         onExited: function(exitCode, exitStatus) {
+            githubService.traceSubprocessLag("inspectorProcess:exit:begin", 0);
             githubService.inspectorMetaExitCode = Number(exitCode);
             githubService.inspectorMetaExitSeen = true;
             githubService.maybeFinishInspector();
@@ -1139,6 +1157,7 @@ Scope {
 
         stdout: StdioCollector {
             onStreamFinished: {
+                githubService.traceSubprocessLag("inspectorLogsProcess:stdout:begin", this.text.length);
                 githubService.inspectorLogsStdoutText = this.text;
                 githubService.inspectorLogsStdoutSeen = true;
                 githubService.maybeFinishInspector();
@@ -1147,6 +1166,7 @@ Scope {
 
         stderr: StdioCollector {
             onStreamFinished: {
+                githubService.traceSubprocessLag("inspectorLogsProcess:stderr:begin", this.text.length);
                 githubService.inspectorLogsStderrText = this.text;
                 githubService.inspectorLogsStderrSeen = true;
                 githubService.maybeFinishInspector();
@@ -1154,6 +1174,7 @@ Scope {
         }
 
         onExited: function(exitCode, exitStatus) {
+            githubService.traceSubprocessLag("inspectorLogsProcess:exit:begin", 0);
             githubService.inspectorLogsExitCode = Number(exitCode);
             githubService.inspectorLogsExitSeen = true;
             githubService.maybeFinishInspector();
@@ -1165,6 +1186,7 @@ Scope {
 
         stdout: StdioCollector {
             onStreamFinished: {
+                githubService.traceSubprocessLag("remoteActionProcess:stdout:begin", this.text.length);
                 githubService.actionStdoutText = this.text;
                 githubService.actionStdoutSeen = true;
                 githubService.maybeFinishRemoteAction();
@@ -1173,6 +1195,7 @@ Scope {
 
         stderr: StdioCollector {
             onStreamFinished: {
+                githubService.traceSubprocessLag("remoteActionProcess:stderr:begin", this.text.length);
                 githubService.actionStderrText = this.text;
                 githubService.actionStderrSeen = true;
                 githubService.maybeFinishRemoteAction();
@@ -1180,6 +1203,7 @@ Scope {
         }
 
         onExited: function(exitCode, exitStatus) {
+            githubService.traceSubprocessLag("remoteActionProcess:exit:begin", 0);
             githubService.actionExitCode = Number(exitCode);
             githubService.actionExitSeen = true;
             githubService.maybeFinishRemoteAction();
@@ -1191,6 +1215,7 @@ Scope {
 
         stdout: StdioCollector {
             onStreamFinished: {
+                githubService.traceSubprocessLag("factoryProcess:stdout:begin", this.text.length);
                 githubService.factoryStdoutText = this.text;
                 githubService.factoryStdoutSeen = true;
                 githubService.maybeFinishFactory();
@@ -1199,6 +1224,7 @@ Scope {
 
         stderr: StdioCollector {
             onStreamFinished: {
+                githubService.traceSubprocessLag("factoryProcess:stderr:begin", this.text.length);
                 githubService.factoryStderrText = this.text;
                 githubService.factoryStderrSeen = true;
                 githubService.maybeFinishFactory();
@@ -1206,6 +1232,7 @@ Scope {
         }
 
         onExited: function(exitCode, exitStatus) {
+            githubService.traceSubprocessLag("factoryProcess:exit:begin", 0);
             githubService.factoryExitCode = Number(exitCode);
             githubService.factoryExitSeen = true;
             githubService.maybeFinishFactory();
@@ -1217,12 +1244,14 @@ Scope {
 
         stdout: StdioCollector {
             onStreamFinished: {
+                githubService.traceSubprocessLag("pxRuntimeProcess:stdout:begin", this.text.length);
                 githubService.parsePxRuntime(this.text);
             }
         }
 
         stderr: StdioCollector {
             onStreamFinished: {
+                githubService.traceSubprocessLag("pxRuntimeProcess:stderr:begin", this.text.length);
                 const error = String(this.text || "").trim();
 
                 if (error
@@ -1235,6 +1264,7 @@ Scope {
         }
 
         onExited: function(exitCode, exitStatus) {
+            githubService.traceSubprocessLag("pxRuntimeProcess:exit:begin", 0);
             if (Number(exitCode) !== 0
                     && githubService.pxRuntimeState === "CHECKING") {
                 githubService.pxRuntimeState = "ERROR";
@@ -1250,6 +1280,7 @@ Scope {
 
         stdout: StdioCollector {
             onStreamFinished: {
+                githubService.traceSubprocessLag("workflowsProcess:stdout:begin", this.text.length);
                 githubService.workflowStdoutText = this.text;
                 githubService.workflowStdoutSeen = true;
                 githubService.maybeFinishWorkflow();
@@ -1258,6 +1289,7 @@ Scope {
 
         stderr: StdioCollector {
             onStreamFinished: {
+                githubService.traceSubprocessLag("workflowsProcess:stderr:begin", this.text.length);
                 githubService.workflowStderrText = this.text;
                 githubService.workflowStderrSeen = true;
                 githubService.maybeFinishWorkflow();
@@ -1265,6 +1297,7 @@ Scope {
         }
 
         onExited: function(exitCode, exitStatus) {
+            githubService.traceSubprocessLag("workflowsProcess:exit:begin", 0);
             githubService.workflowExitCode = Number(exitCode);
             githubService.workflowExitSeen = true;
             githubService.maybeFinishWorkflow();
@@ -1276,6 +1309,7 @@ Scope {
 
         stdout: StdioCollector {
             onStreamFinished: {
+                githubService.traceSubprocessLag("runsProcess:stdout:begin", this.text.length);
                 githubService.runsStdoutText = this.text;
                 githubService.runsStdoutSeen = true;
                 githubService.maybeFinishRuns();
@@ -1284,6 +1318,7 @@ Scope {
 
         stderr: StdioCollector {
             onStreamFinished: {
+                githubService.traceSubprocessLag("runsProcess:stderr:begin", this.text.length);
                 githubService.runsStderrText = this.text;
                 githubService.runsStderrSeen = true;
                 githubService.maybeFinishRuns();
@@ -1291,6 +1326,7 @@ Scope {
         }
 
         onExited: function(exitCode, exitStatus) {
+            githubService.traceSubprocessLag("runsProcess:exit:begin", 0);
             githubService.runsExitCode = Number(exitCode);
             githubService.runsExitSeen = true;
             githubService.maybeFinishRuns();

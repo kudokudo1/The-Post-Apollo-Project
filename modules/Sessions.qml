@@ -10,9 +10,9 @@ DockButton {
         messagingWindow && messagingWindow.menuOpen
 
     implicitHeight: 50
-    // The new decorated telephone needs more room than the original PNG.
-    // Follow the original text metrics rather than clipping its ornaments.
-    implicitWidth: Math.max(65, Math.ceil(sessionsIcon.implicitWidth) + 16)
+    // A modestly tighter icon footprint; preserve the shared bar's 50px
+    // vertical rail and keep 14px horizontal room for the Gohu ornaments.
+    implicitWidth: Math.max(63, Math.ceil(sessionsIcon.implicitWidth) + 14)
     radius: 0
 
     open: menuOpen
@@ -38,7 +38,10 @@ DockButton {
     GohuText {
         id: sessionsIcon
         anchors.centerIn: parent
-        font.pixelSize: 22
+        font.pixelSize: 21
+        // Bring the left ornaments closer to the phone without splitting
+        // the combining-mark sequence into independently shaped text nodes.
+        font.letterSpacing: -0.8
         textFormat: Text.StyledText
         color: Colors.white
         // Original glyph order: ࣪˖☎︎๋࣭✧.

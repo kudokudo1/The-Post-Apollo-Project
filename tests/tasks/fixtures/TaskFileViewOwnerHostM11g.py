@@ -133,12 +133,13 @@ def serve(db,writer_id,*,bootstrap=False,source=None,sink=None):
     try:
         file=fixture_file(db)
         # Fail before any SQLite init if the synthetic file is not safe.
-        _,model=stable_file(file)
+        initial_bytes,model=stable_file(file)
         with auth.Authority(db,writer_id,bootstrap=bootstrap) as host:
             send(outgoing,reply(0,"hello",True,"TEST_OWNER_ATTACHED",host))
             last=0
             active=None
             last_known_revision=model["revision"]
+            last_known_hash=hashlib.sha256(initial_bytes).hexdigest()
             for _ in range(MAX_REQUESTS):
                 line=incoming.readline(MAX_LINE+1)
                 if line==b"":
@@ -172,7 +173,8 @@ def serve(db,writer_id,*,bootstrap=False,source=None,sink=None):
                         if active is not None:
                             raise AdmissionError("STAGE_ALREADY_OWNED")
                         data,document=stable_file(file)
-                        if document["revision"]!=last_known_revision:
+                        if (document["revision"]!=last_known_revision
+                                or hashlib.sha256(data).hexdigest()!=last_known_hash):
                             raise AdmissionError("EXTERNAL_FIXTURE_CHANGE")
                         expected=encode_next(document)
                         reservation=host.admit_stage(req["stageId"])
@@ -193,6 +195,7 @@ def serve(db,writer_id,*,bootstrap=False,source=None,sink=None):
                             raise
                         host.settle_stage(active["stageId"],saved=True)
                         last_known_revision+=1
+                        last_known_hash=hashlib.sha256(data).hexdigest()
                         active=None
                     elif kind=="fail":
                         if active is None or req["stageId"]!=active["stageId"]:

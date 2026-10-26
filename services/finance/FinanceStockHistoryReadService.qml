@@ -3,7 +3,7 @@ import Quickshell
 import Quickshell.Io
 import "../../widgets/FinanceStockModePolicy.js" as StockModePolicy
 
-// Finance M11: separate DAY and RANGE selectors; no implicit requests.
+// Finance M13: validated local RANGE -> DAY inspection without implicit requests.
 // Still uses the M10 bounded historical-range endpoint for both modes.
 Scope {
     id: stockFeed
@@ -70,6 +70,26 @@ Scope {
         if (!validDate(day) || day < "2000-01-01"
                 || day > dateOffset(0)) return false;
         if (dayDate !== day) {dayDate=day;clear();}
+        return true;
+    }
+    // Explicit RANGE -> DAY handoff from already-validated trading-session
+    // history. No reader.exec(), provider request, cache mutation or reload.
+    // RANGE's start/end date selections remain untouched.
+    function openRangePointInDay(index, expectedDate) {
+        if (!monitoring || !ready || loading || reader.running
+                || displayMode !== "range" || !validSelection
+                || !activeWindow || !snapshot || !Number.isInteger(index))
+            return false;
+        const day = StockModePolicy.daySnapshotFromRange(
+            snapshot, index, selectedCik, activeWindow.from, activeWindow.to);
+        if (!day || day.from !== expectedDate) return false;
+        dayDate = day.from;
+        displayMode = "day";
+        desiredKey = "";
+        inFlightKey = "";
+        snapshot = day;
+        state = "ready";
+        message = "DAY CLOSE FROM LOADED RANGE // NO NEW MARKET REQUEST";
         return true;
     }
     function selectStartDate(day) {
@@ -156,8 +176,10 @@ Scope {
                     || !Array.isArray(data.bars) || data.bars.length>132
                     || (displayMode==="day" && data.bars.length>1)
                     || !data.bars.every(function(bar,index) {
-                        return bar && validDate(bar.date) && bar.date>=startDate
-                            && bar.date<=endDate && typeof bar.price==="number"
+                        return bar && validDate(bar.date)
+                            && bar.date>=activeWindow.from
+                            && bar.date<=activeWindow.to
+                            && typeof bar.price==="number"
                             && Number.isFinite(bar.price) && bar.price>0
                             && (index===0 || data.bars[index-1].date<bar.date);
                     })

@@ -194,6 +194,10 @@ class DiscordDockingTests(TestCase):
         self.assertIn("if (!xDocked) {", text)
         self.assertIn("if (now < ignoreXGeometryUntil)", text)
         self.assertIn("if (now < ignoreDiscordGeometryUntil)", text)
+        self.assertIn("property int discordWindowConId: 0", text)
+        self.assertIn("discordConId !== discordWindowConId", text)
+        self.assertIn("discordWindowConId = discordConId;", text)
+        self.assertNotIn("discordStartupFallback", text)
         self.assertIn("if (initialDiscordDockAligned(xRect))", text)
         self.assertIn("xDocked = true;", text)
         self.assertIn("xDocked = false;", text)
@@ -295,6 +299,7 @@ class DiscordDockingTests(TestCase):
                 snapshot = geometry.snapshot_from_tree(tree)
                 self.assertEqual(snapshot["discord"]["conId"], node["id"])
                 self.assertFalse(snapshot["discord"]["visible"])
+                self.assertEqual(snapshot["discord"]["kind"], "splash")
 
     def test_discord_criteria_requires_discovered_container_id(self):
         self.assertEqual(
@@ -303,6 +308,124 @@ class DiscordDockingTests(TestCase):
         )
         with self.assertRaises(ValueError):
             geometry.sway_criteria("discord")
+
+    def test_upstream_splash_is_exact_size_and_never_promoted_by_timeout(self):
+        social = SOCIAL.read_text(encoding="utf-8")
+        helper = GEOMETRY.read_text(encoding="utf-8")
+        self.assertIn("property int vesktopSplashWidth: 300", social)
+        self.assertIn("property int vesktopSplashHeight: 350", social)
+        self.assertIn('String(node.kind || "") === "splash"', social)
+        self.assertIn("helperCenterDiscord(x, y, vesktopSplashWidth, vesktopSplashHeight)", social)
+        self.assertNotIn("discordStartupFallback", social)
+        self.assertIn("VESKTOP_SPLASH_MAX_WIDTH = 600", helper)
+        self.assertIn("VESKTOP_SPLASH_MAX_HEIGHT = 460", helper)
+
+        cmd = geometry.build_sync_command({
+            "target": "discord", "conId": 55,
+            "x": 10, "y": 20, "width": 300, "height": 350,
+            "setup": False, "focus": False,
+        })
+        self.assertIn('[con_id="55"] resize set width 300 px height 350 px', cmd)
+
+    def test_splash_to_main_container_change_disarms_geometry_authority(self):
+        bridge, _ = self.bridge(docked=True)
+        bridge.discord_con_id = 100
+        bridge.discord_ready = True
+        bridge.discord_docked = True
+
+        main = {
+            "social": sample()["social"],
+            "discord": {
+                "rect": {"x": 900, "y": 600, "width": 980, "height": 520},
+                "focused": True,
+                "visible": True,
+                "conId": 200,
+                "kind": "main",
+            },
+        }
+        bridge.poll_ipc.request = Mock(return_value={
+            "id": 1,
+            "visible": True,
+            "focused": False,
+            "rect": {"x": 0, "y": 0, "width": 1920, "height": 1080},
+            "nodes": [
+                {
+                    "id": 99,
+                    "name": "QS_SOCIAL_MENU",
+                    "visible": True,
+                    "focused": False,
+                    "rect": main["social"]["rect"],
+                    "nodes": [], "floating_nodes": [],
+                },
+                {
+                    "id": 200,
+                    "name": "Vesktop",
+                    "app_id": "dev.vencord.vesktop",
+                    "visible": True,
+                    "focused": True,
+                    "rect": main["discord"]["rect"],
+                    "nodes": [], "floating_nodes": [],
+                },
+            ],
+            "floating_nodes": [],
+        })
+        bridge.emit_snapshot(force=True)
+        self.assertEqual(bridge.discord_con_id, 200)
+        self.assertFalse(bridge.discord_ready)
+        self.assertFalse(bridge.discord_docked)
+
+    def test_show_hidden_main_uses_scratchpad_show_without_move_scratchpad(self):
+        bridge = geometry.Bridge(0.1)
+        bridge.discord_show_requested = True
+        bridge.discord_show_focus = True
+        bridge.poll_ipc.request = Mock(return_value={
+            "id": 1,
+            "visible": True,
+            "focused": False,
+            "rect": {"x": 0, "y": 0, "width": 1920, "height": 1080},
+            "nodes": [{
+                "id": 4242,
+                "name": "Vesktop",
+                "app_id": "dev.vencord.vesktop",
+                "visible": False,
+                "focused": False,
+                "rect": {"x": 200, "y": 100, "width": 1280, "height": 720},
+                "nodes": [], "floating_nodes": [],
+            }],
+            "floating_nodes": [],
+        })
+        commands = []
+        bridge.queue_command = commands.append
+        bridge.emit_snapshot(force=True)
+        joined = "\n".join(commands)
+        self.assertIn('[con_id="4242"] scratchpad show', joined)
+        self.assertNotIn("move scratchpad", joined)
+        self.assertIn('[con_id="4242"] focus', joined)
+        self.assertFalse(bridge.discord_show_requested)
+
+    def test_splash_request_stays_armed_for_real_main_window(self):
+        bridge = geometry.Bridge(0.1)
+        bridge.discord_show_requested = True
+        bridge.poll_ipc.request = Mock(return_value={
+            "id": 1,
+            "visible": True,
+            "focused": False,
+            "rect": {"x": 0, "y": 0, "width": 1920, "height": 1080},
+            "nodes": [{
+                "id": 101,
+                "name": "Vesktop",
+                "app_id": "dev.vencord.vesktop",
+                "visible": True,
+                "focused": True,
+                "rect": {"x": 800, "y": 400, "width": 300, "height": 350},
+                "nodes": [], "floating_nodes": [],
+            }],
+            "floating_nodes": [],
+        })
+        bridge.queue_command = Mock()
+        bridge.emit_snapshot(force=True)
+        self.assertEqual(bridge.discord_kind, "splash")
+        self.assertTrue(bridge.discord_show_requested)
 
     def test_discord_sync_reasserts_floating_and_borderless_even_after_setup(self):
         # Screenshot regression: after PR #799 the visible "Vesktop"

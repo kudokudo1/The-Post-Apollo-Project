@@ -1,0 +1,65 @@
+{
+  "version": 1,
+  "assignment": "M11f production writer gate design review",
+  "status": "UNMOUNTED_MOCK_NO_ACTIVATION",
+  "liveStore": "services/hub/ApolloHubTodoStore.qml",
+  "writerEntry": "function stage(result)",
+  "fileViewWrite": "todoFile.setText(",
+  "mustRemainUnmodified": [
+    "services/hub/ApolloHubTodoStore.qml",
+    "shell.qml",
+    "widgets/TasksW.qml",
+    "widgets/ApolloHubW.qml"
+  ],
+  "observedCallbacks": [
+    "onLoaded:",
+    "onLoadFailed:",
+    "onSaved:",
+    "onSaveFailed:"
+  ],
+  "sourceStates": [
+    "loading",
+    "ready",
+    "empty",
+    "saving",
+    "error",
+    "unsupported"
+  ],
+  "mockStates": [
+    "BOOT_LOCKED",
+    "MOCK_READY",
+    "MOCK_RESERVING",
+    "MOCK_SAVING",
+    "MOCK_VERIFYING",
+    "MOCK_SETTLING",
+    "MOCK_FREEZING",
+    "MOCK_FROZEN",
+    "RECOVERY_REVIEW"
+  ],
+  "futurePatchSequence": [
+    "Host obtains OS lifetime lock and persists owner epoch before admitting stage.",
+    "Keep current live JSON behavior unchanged if production gate is not separately operator-enabled.",
+    "When enabled, stage() requests a durable reservation before pendingDocument, storageState=saving or FileView.setText.",
+    "No FileView callback may attribute success to a stage without persisted token and matching epoch.",
+    "After onSaved, reread bytes through safe OS-owned host before marking durable settlement and publishing pendingDocument.",
+    "onSaveFailed or source drift enters RECOVERY_REVIEW while preserving prior confirmed document.",
+    "freeze persists closed admission before reporting success, even if an already reserved save must drain.",
+    "reloadFromDisk, onLoaded and onLoadFailed must be epoch-aware and must not rearm the writer.",
+    "On process start or crash, host enters RECOVERY_REVIEW until independently reviewed; no implicit SQLite or JSON rearm.",
+    "Do not enable the SQLite writer, delete JSON, migrate or dispatch remote GitHub operations through this gate."
+  ],
+  "unverifiedGates": [
+    "Native QS 0.2.1 FileView callbacks verified in a second disposable QS instance",
+    "OS-owned lock and durable reservation-epoch protocol implemented and verified",
+    "Actual FileView callback identity and disk readback provenance proven",
+    "Normal Quickshell restart read-only UX and recovery reviewed",
+    "Backup restore and all task/project/custom/GIT journal parity accepted",
+    "Explicit operator authorization for production source patch",
+    "Separate explicit authorization for migration and activation"
+  ],
+  "automaticLiveWritesAuthorized": false,
+  "productionSourcePatchAuthorized": false,
+  "migrationAuthorized": false,
+  "sqliteActivationAuthorized": false,
+  "githubRemoteOperationsAuthorized": false
+}

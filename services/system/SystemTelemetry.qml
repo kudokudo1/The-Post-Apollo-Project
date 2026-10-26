@@ -5,6 +5,19 @@ import Quickshell.Io
 Scope {
     id: systemTelemetry
 
+    // Same disabled-by-default completion trace as PR #805. Never logs
+    // sensor values, commands, paths, or process lists.
+    readonly property bool subprocessLagProbeEnabled:
+        String(Quickshell.env("POST_APOLLO_SUBPROCESS_LAG_PROBE") || "").trim() === "1"
+
+    function traceSubprocessLag(stage, size) {
+        if (!subprocessLagProbeEnabled)
+            return;
+        console.warn("SYNTAGMA_SUBPROCESS_PROBE // service=system-telemetry"
+                     + " stage=" + stage + " size=" + Number(size || 0)
+                     + " tsMs=" + Date.now());
+    }
+
     property var thermalRows: []
     property var fanRows: []
     property var systemRows: []
@@ -40,8 +53,15 @@ Scope {
 
         stdout: StdioCollector {
             onStreamFinished: {
+                systemTelemetry.traceSubprocessLag("stdout:begin", this.text.length);
                 try {
+                    systemTelemetry.traceSubprocessLag("parse:begin", this.text.length);
                     const payload = JSON.parse(text || "{}");
+                    systemTelemetry.traceSubprocessLag("parse:end", 0);
+                    systemTelemetry.traceSubprocessLag("publish:begin",
+                        (Array.isArray(payload.thermal) ? payload.thermal.length : 0)
+                        + (Array.isArray(payload.fans) ? payload.fans.length : 0)
+                        + (Array.isArray(payload.system) ? payload.system.length : 0));
                     systemTelemetry.thermalRows =
                         Array.isArray(payload.thermal)
                         ? payload.thermal
@@ -56,7 +76,12 @@ Scope {
                         : [];
                     systemTelemetry.errorText =
                         String(payload.error || "");
+                    systemTelemetry.traceSubprocessLag("publish:end",
+                        systemTelemetry.thermalRows.length
+                        + systemTelemetry.fanRows.length
+                        + systemTelemetry.systemRows.length);
                 } catch (error) {
+                    systemTelemetry.traceSubprocessLag("parse-or-publish:error", 0);
                     systemTelemetry.thermalRows = [];
                     systemTelemetry.fanRows = [];
                     systemTelemetry.systemRows = [];
@@ -65,14 +90,20 @@ Scope {
                 }
 
                 systemTelemetry.loading = false;
+                systemTelemetry.traceSubprocessLag("refreshed:begin", 0);
                 systemTelemetry.refreshed();
+                systemTelemetry.traceSubprocessLag("refreshed:end", 0);
+                systemTelemetry.traceSubprocessLag("monitor-observation:begin", 0);
                 systemTelemetry.monitorObservation(
                     systemTelemetry.errorText === "");
+                systemTelemetry.traceSubprocessLag("monitor-observation:end", 0);
+                systemTelemetry.traceSubprocessLag("stdout:end", 0);
             }
         }
 
         stderr: StdioCollector {
             onStreamFinished: {
+                systemTelemetry.traceSubprocessLag("stderr:begin", this.text.length);
                 const message = String(text || "").trim();
 
                 if (message.length > 0) {
@@ -81,6 +112,7 @@ Scope {
                 }
 
                 systemTelemetry.loading = false;
+                systemTelemetry.traceSubprocessLag("stderr:end", 0);
             }
         }
     }

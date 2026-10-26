@@ -5,6 +5,19 @@ import Quickshell.Io
 Scope {
     id: gitService
 
+    // Narrow extension of PR #805: no new subprocess, polling, or model writes.
+    // Log only the DONE boundaries, not every git history line.
+    readonly property bool subprocessLagProbeEnabled:
+        String(Quickshell.env("POST_APOLLO_SUBPROCESS_LAG_PROBE") || "").trim() === "1"
+
+    function traceSubprocessLag(stage, size) {
+        if (!subprocessLagProbeEnabled)
+            return;
+        console.warn("SYNTAGMA_SUBPROCESS_PROBE // service=git-service"
+                     + " stage=" + stage + " size=" + Number(size || 0)
+                     + " tsMs=" + Date.now());
+    }
+
     // Diagnostic only. No extra polling, delayed initialization or changes
     // to repo discovery. The measurements are dormant unless opted in.
     readonly property bool syntagmaStartupTraceEnabled:
@@ -1540,7 +1553,9 @@ Scope {
 
             if (!staleRead && !lastError) {
                 if (trace) started = Date.now();
+                traceSubprocessLag("refresh:publish:begin", pendingTopology.length);
                 publishParts = publishPendingModels();
+                traceSubprocessLag("refresh:publish:end", pendingTopology.length);
                 if (trace) {
                     publishMs = Date.now() - started;
                     started = Date.now();
@@ -1565,7 +1580,9 @@ Scope {
                     availableMs = Date.now() - started;
                     started = Date.now();
                 }
+                traceSubprocessLag("refresh:refreshed:begin", pendingTopology.length);
                 refreshed();
+                traceSubprocessLag("refresh:refreshed:end", pendingTopology.length);
                 if (trace)
                     refreshedSignalMs = Date.now() - started;
             }
@@ -2712,8 +2729,14 @@ Scope {
 
         stdout: SplitParser {
             onRead: function(line) {
+                const probeDone = gitService.subprocessLagProbeEnabled
+                    && String(line || "").split("\t")[0] === "DONE";
+                if (probeDone)
+                    gitService.traceSubprocessLag("repo:DONE:begin", gitService.repoRows.count);
                 if (!gitService.syntagmaStartupTraceEnabled) {
                     gitService.consumeRepoLine(line);
+                    if (probeDone)
+                        gitService.traceSubprocessLag("repo:DONE:end", gitService.repoRows.count);
                     return;
                 }
 
@@ -2736,6 +2759,8 @@ Scope {
                         + " callbackMax=" + gitService.traceRepoPeakMs + "ms"
                     );
                 }
+                if (probeDone)
+                    gitService.traceSubprocessLag("repo:DONE:end", gitService.repoRows.count);
             }
         }
 
@@ -2753,8 +2778,14 @@ Scope {
 
         stdout: SplitParser {
             onRead: function(line) {
+                const probeDone = gitService.subprocessLagProbeEnabled
+                    && String(line || "").split("\t")[0] === "DONE";
+                if (probeDone)
+                    gitService.traceSubprocessLag("refresh:DONE:begin", gitService.pendingTopology.length);
                 if (!gitService.syntagmaStartupTraceEnabled) {
                     gitService.consumeRefreshLine(line);
+                    if (probeDone)
+                        gitService.traceSubprocessLag("refresh:DONE:end", gitService.pendingTopology.length);
                     return;
                 }
 
@@ -2787,6 +2818,8 @@ Scope {
                         + " callbackMax=" + gitService.traceRefreshPeakMs + "ms"
                     );
                 }
+                if (probeDone)
+                    gitService.traceSubprocessLag("refresh:DONE:end", gitService.pendingTopology.length);
             }
         }
 
@@ -2807,7 +2840,9 @@ Scope {
             // stdout has had time to emit the completion marker.
             if (!gitService.actionBusy || gitService.actionProcessDoneSeen)
                 return;
+            gitService.traceSubprocessLag("action:exit:begin", 0);
             actionExitFallback.restart();
+            gitService.traceSubprocessLag("action:exit:end", 0);
         }
 
         stdout: SplitParser {

@@ -17,6 +17,9 @@ on:
       - "tests/components/test_syntagma_quickshell_thread_sampler.py"
       - "tests/components/test_syntagma_array_copy_probe.py"
       - "tests/components/test_syntagma_subprocess_lag_probe.py"
+      - "tests/components/test_syntagma_idle_subprocess_probe.py"
+      - "services/git/GitService.qml"
+      - "services/system/SystemTelemetry.qml"
       - "services/hospital/HospitalAuditService.qml"
       - "services/hospital/HospitalRoundsService.qml"
       - "services/github/GitHubAttentionProvider.qml"
@@ -44,6 +47,9 @@ on:
       - "tests/components/test_syntagma_quickshell_thread_sampler.py"
       - "tests/components/test_syntagma_array_copy_probe.py"
       - "tests/components/test_syntagma_subprocess_lag_probe.py"
+      - "tests/components/test_syntagma_idle_subprocess_probe.py"
+      - "services/git/GitService.qml"
+      - "services/system/SystemTelemetry.qml"
       - "services/hospital/HospitalAuditService.qml"
       - "services/hospital/HospitalRoundsService.qml"
       - "services/github/GitHubAttentionProvider.qml"
@@ -70,5 +76,6 @@ jobs:
           python3 tests/components/test_syntagma_quickshell_thread_sampler.py
           python3 tests/components/test_syntagma_array_copy_probe.py
           python3 tests/components/test_syntagma_subprocess_lag_probe.py
+          python3 tests/components/test_syntagma_idle_subprocess_probe.py
           python3 -m unittest tests/media/test_media_pause_state_probe.py
           node --test tests/media/test_media_dock_performance.cjs

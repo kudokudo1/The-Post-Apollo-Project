@@ -8,6 +8,8 @@ def source(path):
     return (root / path).read_text(encoding="utf-8")
 
 hospital = source("widgets/HospitalW.qml")
+social = source("widgets/messanger/MessagingW.qml")
+notifications = source("widgets/notifications/NotificationsHubW.qml")
 git = source("widgets/GitW.qml")
 tasks = source("widgets/TasksW.qml")
 time = source("widgets/TimeW.qml")
@@ -70,12 +72,42 @@ assert "panelTopMargin: 0" in hospital
 assert "chassisTopY: hospitalWindow.panelTopMargin" in shell
 assert "+ hospitalWindow.topGlowGutter" in shell
 
-# Other widget panel dimensions and established visibility lifetimes remain.
-assert "property int panelHeight: 1320" in hospital
+# Notifications is the live reference: anchored top/bottom with an exact 5px
+# output-bottom margin. Social and Hospital must track screen height, rather
+# than freezing at their old 1355px / 1320px constants.
+assert "property int panelBottomMargin: 5" in notifications
+assert "        bottom: true" in notifications
+assert "        top: true" in notifications
+assert "        bottom: root.panelBottomMargin" in notifications
+assert "property int defaultPanelHeight: Math.max(" in social
+assert "(screen ? Math.round(screen.height) : 1360) - 5" in social
+assert "sharedPanelHeight = defaultPanelHeight;" in social
+assert "height: messagingWindow.sharedPanelHeight" in social
+# Sway workspaces start below the bar: the taller Social FloatingWindow
+# must start above the workspace top rather than spill off the output.
+assert "swayAreaY + swayAreaHeight - defaultPanelHeight - 5" in social
+assert "sharedPanelY = Math.round(defaultPanelY);" in social
+assert "readonly property int notificationBottomGap: 5" in hospital
+assert "property int panelHeight: Math.max(" in hospital
+assert "- topGlowGutter - notificationBottomGap" in hospital
+assert "implicitHeight: panelHeight + topGlowGutter + notificationBottomGap" in hospital
+# The Notification and Social panels have the same span on the selected
+# output; Hospital retains its 9px top reveal and shares their bottom edge.
+for screen_height in (768, 1080, 1440, 1600):
+    notification_height = screen_height - 5
+    social_height = max(260, notification_height)
+    hospital_frame = max(260, screen_height - 9 - 5)
+    assert social_height == notification_height
+    assert hospital_frame + 9 == notification_height
+    assert hospital_frame + 9 + 5 == screen_height
+
+# Other widget panel widths, top-edge geometry and visibility lifetimes remain.
+assert "property int panelWidth: 744" in hospital
+assert "property int defaultPanelWidth: 1210" in social
 assert "property int panelHeight: 790" in git
 assert "visible: true" in hospital and "visible: true" in git
 assert "visible: true" in tasks and "visible: true" in time
 assert "visible: menuOpen" in deck
 assert "WlrLayershell.layer: WlrLayer.Overlay" in deck
 
-print("Portrait height 790px / Weather and six-widget top edge 9px: PASS")
+print("Portrait 790px / Hospital+Social notification bottom line / top-edge alignment: PASS")

@@ -841,7 +841,14 @@ PanelWindow {
 
     // 700px content chassis + 44px floor-selector lane.
     property int panelWidth: 744
-    property int panelHeight: 1320
+    // NotificationsHubW fills its output to a 5px bottom margin. Hospital
+    // keeps the canonical 9px visible top inset, so its visible frame is
+    // 9px shorter but ends at the exact same lower screen line.
+    readonly property int notificationBottomGap: 5
+    property int panelHeight: Math.max(
+        260, (screen ? Math.round(screen.height) : 1334)
+             - topGlowGutter - notificationBottomGap
+    )
     property int panelTopMargin: 0
     // Extend the new floor-selector lane to the screen edge while keeping
     // the original Hospital content at the same desktop position.
@@ -853,7 +860,10 @@ PanelWindow {
     // Reserve transparent pixels above the visible chassis so its top glow
     // renders inside the PanelWindow instead of being clipped by the top bar.
     implicitWidth: panelWidth + glowGutter * 2
-    implicitHeight: panelHeight + topGlowGutter + glowGutter
+    // Do not grow the mapped PanelWindow past the output bottom: the
+    // side bloom retains its 14px gutter, while the bottom reserve follows
+    // Notifications' 5px edge clearance.
+    implicitHeight: panelHeight + topGlowGutter + notificationBottomGap
 
     anchors {
         top: true

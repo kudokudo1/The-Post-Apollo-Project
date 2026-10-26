@@ -373,7 +373,13 @@ PanelWindow {
     //   window also updates the same state and Discord follows.
 
     property int defaultPanelWidth: 1210
-    property int defaultPanelHeight: 1355
+    // NotificationsHubW is top+bottom anchored with a 5px bottom margin.
+    // Match that screen-relative height instead of a fixed 1355px. The
+    // legacy fallback applies only before a screen is attached.
+    property int defaultPanelHeight: Math.max(
+        minimumSharedHeight,
+        (screen ? Math.round(screen.height) : 1360) - 5
+    )
 
     property int sharedPanelWidth: defaultPanelWidth
     property int sharedPanelHeight: defaultPanelHeight
@@ -476,7 +482,14 @@ PanelWindow {
     // and can be changed from Sway move operations.
     readonly property int defaultPanelX: swayAreaX + swayAreaWidth - margins.right - defaultPanelWidth
 
-    readonly property int defaultPanelY: swayAreaY + margins.top
+    // A notification-height floating Social window would run past the
+    // output when Sway's workspace starts below the top bar. Shift its
+    // initial Y upward just enough to keep the requested 5px bottom gap;
+    // explicit operator Mod-move/resize still wins after initialization.
+    readonly property int defaultPanelY: Math.max(
+        0, Math.min(swayAreaY + margins.top,
+                    swayAreaY + swayAreaHeight - defaultPanelHeight - 5)
+    )
 
     readonly property int discordX: sharedPanelX + appSelectorWidth + discordGap + discordInset
 

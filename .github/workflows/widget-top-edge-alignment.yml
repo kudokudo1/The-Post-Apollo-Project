@@ -4,6 +4,8 @@ on:
   pull_request:
     paths:
       - "widgets/HospitalW.qml"
+      - "widgets/messanger/MessagingW.qml"
+      - "widgets/notifications/NotificationsHubW.qml"
       - "widgets/GitW.qml"
       - "widgets/TasksW.qml"
       - "widgets/TimeW.qml"
@@ -17,6 +19,8 @@ on:
     branches: [main]
     paths:
       - "widgets/HospitalW.qml"
+      - "widgets/messanger/MessagingW.qml"
+      - "widgets/notifications/NotificationsHubW.qml"
       - "widgets/GitW.qml"
       - "widgets/TasksW.qml"
       - "widgets/TimeW.qml"

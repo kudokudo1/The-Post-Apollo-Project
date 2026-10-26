@@ -18,9 +18,12 @@ assert 'readonly property int frameHeight: chassisFrame.height' in menu
 assert 'property int panelHeight: 790' in git
 assert 'property int topGlowGutter: 9' in git
 assert 'mode === "fullscreen" ? 1345' in policy
-# Large's height is based on Social's source default, minus 10px.
+# Finance Large retains its separately approved 1345px height cap.
+# Social now independently follows Notifications' output-relative height,
+# so its default may change without changing FinanceW's chassis.
 social = (root / "widgets/messanger/MessagingW.qml").read_text(encoding="utf-8")
-assert 'property int defaultPanelHeight: 1355' in social
+assert 'property int defaultPanelHeight: Math.max(' in social
+assert '(screen ? Math.round(screen.height) : 1360) - 5' in social
 assert 'mode === "expanded" ? 900 : 790' in policy
 assert 'readonly property int frameTopInset: 9' in menu
 assert 'readonly property int bottomScreenGap: 8' in menu

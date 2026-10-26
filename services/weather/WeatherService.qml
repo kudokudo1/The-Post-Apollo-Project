@@ -29,6 +29,10 @@ Scope {
     property real cloudCover: -1
     property real precipMm: -1
     property string observationTime: ""
+    // The provider's location-local observation clock; used only for
+    // sunrise/sunset presentation, never as a global system time zone.
+    property string localObservationDateTime: ""
+    property real localObservationAnchorMs: 0
 
     // Forecasts are parsed from the same wttr.in response, so this does not
     // introduce another weather request or another provider.
@@ -231,6 +235,8 @@ Scope {
             cloudCover = atmosphere.cloudCover;
             precipMm = atmosphere.precipMm;
             observationTime = atmosphere.observationTime;
+            localObservationDateTime = String(current.localObsDateTime || "");
+            localObservationAnchorMs = Date.now();
 
             weatherCode = current.weatherCode || "";
 

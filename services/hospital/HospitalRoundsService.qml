@@ -4,6 +4,18 @@ import Quickshell
 Scope {
     id: roundsService
 
+    readonly property bool subprocessLagProbeEnabled:
+        String(Quickshell.env("POST_APOLLO_SUBPROCESS_LAG_PROBE") || "").trim() === "1"
+
+    // Opt-in only; static stage IDs and counts, never subprocess output.
+    function traceSubprocessLag(stage, size) {
+        if (!subprocessLagProbeEnabled)
+            return;
+        console.warn("SYNTAGMA_SUBPROCESS_PROBE // service=hospital-rounds"
+                     + " stage=" + stage + " size=" + Number(size || 0)
+                     + " tsMs=" + Date.now());
+    }
+
     // Inject the existing HospitalFloorService. Rounds never mutates a Floor,
     // Bed, Room, or branch; it only walks discovered Floors and reuses the
     // existing PX audit contract through a private HospitalAuditService.
@@ -290,6 +302,7 @@ Scope {
             : [];
 
         let floorAttention = 0;
+        traceSubprocessLag("rooms-copy:begin", rooms.length);
         const nextRooms = rooms.slice();
 
         for (let i = 0; i < source.length; ++i) {
@@ -320,6 +333,7 @@ Scope {
 
         rooms = nextRooms;
 
+        traceSubprocessLag("floors-copy:begin", floors.length);
         const nextFloors = floors.slice();
         nextFloors.push({
             floorIndex: Number(floor.floorIndex || 0),
@@ -343,6 +357,7 @@ Scope {
     function finishRounds() {
         running = false;
 
+        traceSubprocessLag("rooms-sort-copy:begin", rooms.length);
         const orderedRooms = rooms.slice().sort(function(a, b) {
             const rankDelta =
                 Number(b.attentionRank || 0)
@@ -362,6 +377,7 @@ Scope {
                 .localeCompare(String(b.team || ""));
         });
 
+        traceSubprocessLag("floors-sort-copy:begin", floors.length);
         const orderedFloors = floors.slice().sort(function(a, b) {
             return String(a.floorLabel || "")
                 .localeCompare(String(b.floorLabel || ""));
@@ -393,6 +409,7 @@ Scope {
     }
 
     function rebuildMetrics() {
+        traceSubprocessLag("metrics:begin", rooms.length);
         let attention = 0;
         let diverged = 0;
         let missing = 0;
@@ -416,5 +433,6 @@ Scope {
         divergedCount = diverged;
         missingCount = missing;
         aheadCount = ahead;
+        traceSubprocessLag("metrics:end", rooms.length);
     }
 }

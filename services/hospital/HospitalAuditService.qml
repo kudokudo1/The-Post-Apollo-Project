@@ -5,6 +5,18 @@ import Quickshell.Io
 Scope {
     id: auditService
 
+    readonly property bool subprocessLagProbeEnabled:
+        String(Quickshell.env("POST_APOLLO_SUBPROCESS_LAG_PROBE") || "").trim() === "1"
+
+    // Opt-in only; static stage IDs and counts, never subprocess output.
+    function traceSubprocessLag(stage, size) {
+        if (!subprocessLagProbeEnabled)
+            return;
+        console.warn("SYNTAGMA_SUBPROCESS_PROBE // service=hospital-audit"
+                     + " stage=" + stage + " size=" + Number(size || 0)
+                     + " tsMs=" + Date.now());
+    }
+
     property string repository: ""
 
     property bool running: false
@@ -182,6 +194,7 @@ Scope {
         if (!running || !exitSeen || !stdoutSeen || !stderrSeen)
             return;
 
+        traceSubprocessLag("complete:begin", stdoutText.length);
         const wasQuiet = quietRun;
         const payload = String(stdoutText || "").trim();
 
@@ -206,11 +219,15 @@ Scope {
         }
 
         try {
+            traceSubprocessLag("parse:begin", payload.length);
             parseAudit(payload);
+            traceSubprocessLag("parse:end", rooms.length);
             lastAuditPayload = payload;
             available = true;
             lastError = "";
+            traceSubprocessLag("audited:begin", rooms.length);
             audited();
+            traceSubprocessLag("audited:end", rooms.length);
         } catch (error) {
             available = false;
             lastError = "AUDIT PARSE // " + String(error);
@@ -222,24 +239,30 @@ Scope {
 
         stdout: StdioCollector {
             onStreamFinished: {
+                auditService.traceSubprocessLag("stdout:begin", this.text.length);
                 auditService.stdoutText = this.text;
                 auditService.stdoutSeen = true;
                 auditService.maybeFinish();
+                auditService.traceSubprocessLag("stdout:end", 0);
             }
         }
 
         stderr: StdioCollector {
             onStreamFinished: {
+                auditService.traceSubprocessLag("stderr:begin", this.text.length);
                 auditService.stderrText = this.text;
                 auditService.stderrSeen = true;
                 auditService.maybeFinish();
+                auditService.traceSubprocessLag("stderr:end", 0);
             }
         }
 
         onExited: function(code, exitStatus) {
+            auditService.traceSubprocessLag("exit:begin", 0);
             auditService.exitCode = Number(code);
             auditService.exitSeen = true;
             auditService.maybeFinish();
+            auditService.traceSubprocessLag("exit:end", 0);
         }
     }
 

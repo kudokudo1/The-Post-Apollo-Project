@@ -96,7 +96,7 @@ with tempfile.TemporaryDirectory(prefix="machine-kitty-ci-") as folder:
         # but their raw JSON/stderr must never appear in build logs.
         native_argv = [
             "kitten", "@", "--to", "unix:" + str(endpoint),
-            "ls", "--output-format=json",
+            "ls",
         ]
         ready = False
         last_failure = "no_successful_read"

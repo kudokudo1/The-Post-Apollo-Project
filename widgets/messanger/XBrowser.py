@@ -21,6 +21,17 @@ from typing import Any
 X_CLASS = "post-apollo-x"
 X_URL = "https://x.com"
 CRITERIA = f'[class="{X_CLASS}"]'
+
+# LINE's official Chrome extension is the supported Linux personal-account
+# client surface. Post-Apollo never downloads or side-loads it: setup opens
+# the official Chrome Web Store inside LINE's isolated profile, and the user
+# explicitly installs/logs in there.
+LINE_EXTENSION_ID = "ophjlpahpchlmihnnnihgmmeilfjmjjc"
+LINE_EXTENSION_URL = f"chrome-extension://{LINE_EXTENSION_ID}/index.html#popout"
+LINE_EXTENSION_STORE_URL = (
+    "https://chromewebstore.google.com/detail/line/"
+    + LINE_EXTENSION_ID
+)
 # Each service gets a distinct app id and browser data directory.
 SITES = {
     "x": (X_URL, X_CLASS, "x-browser"),
@@ -56,7 +67,13 @@ WEB_FALLBACK_SITES = {
     "whatsappweb": ("https://web.whatsapp.com/", "post-apollo-whatsappweb", "whatsappweb-browser"),
     "messengerweb": ("https://www.facebook.com/messages/", "post-apollo-messengerweb", "messengerweb-browser"),
 }
-ALL_SITES = {**SITES, **WEB_FALLBACK_SITES}
+
+# Provider-owned extension UI. This is not a native inbox adapter and does not
+# grant Post-Apollo access to LINE messages or credentials.
+EXTENSION_SITES = {
+    "linechrome": (LINE_EXTENSION_URL, "post-apollo-linechrome", "linechrome-browser"),
+}
+ALL_SITES = {**SITES, **WEB_FALLBACK_SITES, **EXTENSION_SITES}
 
 
 def site_config(site: str) -> tuple[str, str, str]:
@@ -162,16 +179,35 @@ def browser_prefix() -> list[str]:
     )
 
 
-def browser_command(site: str = "x") -> list[str]:
-    url, window_class, profile_dir = site_config(site)
-    prefix = browser_prefix()
+def browser_profile(site: str, prefix: list[str] | None = None) -> Path:
+    _, _, profile_dir = site_config(site)
+    prefix = browser_prefix() if prefix is None else prefix
     if len(prefix) >= 3 and prefix[:2] == ["flatpak", "run"]:
         # Flatpak Chromium cannot normally write into the host XDG_DATA_HOME.
         # Its own sandbox data directory is persistent and accessible instead.
         data_root = Path.home() / ".var" / "app" / prefix[2] / "data"
     else:
         data_root = Path(os.environ.get("XDG_DATA_HOME") or (Path.home() / ".local/share"))
-    profile = data_root / "post-apollo" / profile_dir
+    return data_root / "post-apollo" / profile_dir
+
+
+def line_extension_installed(prefix: list[str] | None = None) -> bool:
+    profile = browser_profile("linechrome", prefix)
+    roots = [profile / "Default" / "Extensions" / LINE_EXTENSION_ID]
+    roots.extend(profile.glob(f"Profile */Extensions/{LINE_EXTENSION_ID}"))
+    return any(root.is_dir() and any(child.is_dir() for child in root.iterdir())
+               for root in roots)
+
+
+def browser_command(site: str = "x") -> list[str]:
+    url, window_class, _ = site_config(site)
+    prefix = browser_prefix()
+    profile = browser_profile(site, prefix)
+    if site == "linechrome" and not line_extension_installed(prefix):
+        raise RuntimeError(
+            "LINE for Chrome is not installed in the Post-Apollo LINE profile. "
+            "Use SET UP LINE FOR CHROME first."
+        )
     return prefix + [
         "--ozone-platform=x11",
         f"--class={window_class}",
@@ -180,6 +216,27 @@ def browser_command(site: str = "x") -> list[str]:
         "--no-default-browser-check",
         f"--app={url}",
     ]
+
+
+def setup(site: str) -> None:
+    if site != "linechrome":
+        raise ValueError("Setup is only available for LINE for Chrome")
+    prefix = browser_prefix()
+    profile = browser_profile(site, prefix)
+    command = prefix + [
+        "--ozone-platform=x11",
+        "--class=post-apollo-linechrome-setup",
+        f"--user-data-dir={profile}",
+        "--no-first-run",
+        "--no-default-browser-check",
+        f"--app={LINE_EXTENSION_STORE_URL}",
+    ]
+    subprocess.Popen(
+        command, start_new_session=True,
+        stdin=subprocess.DEVNULL,
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+    )
 
 
 def show(site: str = "x") -> None:
@@ -225,7 +282,7 @@ def hide_all() -> None:
 
 def main() -> int:
     parser = argparse.ArgumentParser()
-    parser.add_argument("action", choices=("show", "hide", "status"))
+    parser.add_argument("action", choices=("show", "hide", "status", "setup"))
     parser.add_argument("site", nargs="?", default="x", choices=(*ALL_SITES, "all"))
     args = parser.parse_args()
 
@@ -239,13 +296,21 @@ def main() -> int:
                 hide_all()
             else:
                 hide(args.site)
+        elif args.action == "setup":
+            if args.site == "all":
+                raise ValueError("Cannot set up all browser sites")
+            setup(args.site)
         elif args.site == "all":
             print(json.dumps({site: site_exists(site) for site in ALL_SITES}))
         else:
-            print(json.dumps({
+            payload = {
                 "window": site_exists(args.site),
                 "class": site_config(args.site)[1],
-            }))
+            }
+            if args.site == "linechrome":
+                payload["extensionInstalled"] = line_extension_installed()
+                payload["extensionId"] = LINE_EXTENSION_ID
+            print(json.dumps(payload))
         return 0
     except (OSError, subprocess.CalledProcessError, ValueError, RuntimeError) as exc:
         print(f"Post-Apollo X: {exc}", file=sys.stderr, flush=True)

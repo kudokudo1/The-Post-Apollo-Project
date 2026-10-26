@@ -66,7 +66,8 @@ assert "anchors.rightMargin: 12" in header_divider
 # Main and Budget sub-mode icon artwork uses Gohu, with fit to avoid
 # truncating decorated glyphs in the narrow 9:16 panel.
 assert "NotoText {" not in menu
-assert "Item {\n                            id: mainIcon" in menu
+assert "Item {\n                            id: mainIconSlot" in menu
+assert "Item {\n                                id: mainIcon" in menu
 assert "Item {\n                            id: subIcon" in menu
 assert "id: mainGlyphParts" in menu
 assert "id: subGlyphParts" in menu
@@ -159,6 +160,24 @@ assert "anchors.horizontalCenter: parent.horizontalCenter" in main_rail
 assert "id: mainModeLabel" in main_rail
 assert "customPrimaryGlowSource: mainIcon" in main_rail
 assert "customLabelGlowSource: mainModeLabel" in main_rail
+# Each source and its TextHashGlow must share a directly owned coordinate
+# plane, so mapToItem() cannot leave stale icon/label shadows scattered
+# when button contents are centered, resized, or reflowed.
+assert "primaryGlowHost: mainIconSlot" in main_rail
+assert "labelGlowHost: mainModeLabelSlot" in main_rail
+assert "id: mainIconSlot" in main_rail
+assert "id: mainModeLabelSlot" in main_rail
+assert "height: 31" in main_rail
+assert "height: mainModeLabel.implicitHeight" in main_rail
+assert "height: parent.height" in main_rail
+assert main_rail.count("customPrimaryGlowSource: mainIcon") == 1
+assert main_rail.count("customLabelGlowSource: mainModeLabel") == 1
+assert main_rail.count("primaryGlowHost: mainIconSlot") == 1
+assert main_rail.count("labelGlowHost: mainModeLabelSlot") == 1
+# Do not introduce additional shadows or flatten the shared close/wide halo.
+assert "SafeDropShadow {" not in main_rail
+assert "TextHashGlow {" not in main_rail
+assert "RectangularShadow {" not in main_rail
 # Ornaments are vertically centered relative to the larger core glyph
 # while retaining the 15/12 px small decorations and original source strings.
 for row_id, ornament_px, expected_color in (

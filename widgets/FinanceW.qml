@@ -719,6 +719,12 @@ PanelWindow {
                     customArtwork: true
                     customPrimaryGlowSource: mainIcon
                     customLabelGlowSource: mainModeLabel
+                    // Keep the sampled effect on the same coordinate plane
+                    // as its direct source, like AppControl's moving KILL icon.
+                    // No stale mapToItem() projection during centered layout,
+                    // hover transitions, or glyph width changes.
+                    primaryGlowHost: mainIconSlot
+                    labelGlowHost: mainModeLabelSlot
                     primaryGlowEnabled: !modelData.future
                     labelGlowEnabled: !modelData.future
                     bordered: false
@@ -731,98 +737,116 @@ PanelWindow {
                         width: parent.width
                         spacing: 2
 
+                        // A Column-owned slot positions the icon; the glow
+                        // is an independent sibling of the sampled mainIcon.
+                        // Avoid attaching sampled effects directly to a Column.
                         Item {
-                            id: mainIcon
-                            anchors.horizontalCenter: parent.horizontalCenter
-                            width: parent.width - 6
+                            id: mainIconSlot
+                            width: parent.width
                             height: 31
 
-                            GohuText {
-                                anchors.centerIn: parent
-                                visible: !modelData.core
-                                width: parent.width
-                                horizontalAlignment: Text.AlignHCenter
-                                text: modelData.icon
-                                textFormat: Text.PlainText
-                                font.pixelSize: 24
-                                fontSizeMode: Text.Fit
-                                minimumPixelSize: 15
-                                color: mainModeButton.primaryColor
-                            }
-
-                            // Center the meaningful core, not the uneven
-                            // prefix/core/suffix string. Decorations extend
-                            // outward from that stable rail centerline.
                             Item {
-                                id: mainGlyphParts
-                                anchors.centerIn: parent
-                                visible: !!modelData.core
-                                width: mainCoreGlyph.implicitWidth
-                                       + 2 * Math.max(mainLeadingGlyphs.implicitWidth,
-                                                      mainTrailingGlyph.implicitWidth)
-                                height: Math.max(mainCoreGlyph.implicitHeight,
-                                                 mainLeadingGlyphs.implicitHeight,
-                                                 mainTrailingGlyph.implicitHeight)
-                                scale: Math.min(1, mainIcon.width
-                                                / Math.max(1, width))
+                                id: mainIcon
+                                anchors.horizontalCenter: parent.horizontalCenter
+                                width: parent.width - 6
+                                height: parent.height
 
                                 GohuText {
-                                    id: mainCoreGlyph
                                     anchors.centerIn: parent
-                                    text: modelData.core || ""
-                                    font.pixelSize: modelData.coreSize || 34
+                                    visible: !modelData.core
+                                    width: parent.width
+                                    horizontalAlignment: Text.AlignHCenter
+                                    text: modelData.icon
+                                    textFormat: Text.PlainText
+                                    font.pixelSize: 24
+                                    fontSizeMode: Text.Fit
+                                    minimumPixelSize: 15
                                     color: mainModeButton.primaryColor
                                 }
 
-                                Row {
-                                    id: mainLeadingGlyphs
-                                    anchors.right: mainCoreGlyph.left
-                                    anchors.verticalCenter: mainCoreGlyph.verticalCenter
-                                    spacing: 0
+                                // Center the meaningful core, not the uneven
+                                // prefix/core/suffix string. Decorations extend
+                                // outward from that stable rail centerline.
+                                Item {
+                                    id: mainGlyphParts
+                                    anchors.centerIn: parent
+                                    visible: !!modelData.core
+                                    width: mainCoreGlyph.implicitWidth
+                                           + 2 * Math.max(mainLeadingGlyphs.implicitWidth,
+                                                          mainTrailingGlyph.implicitWidth)
+                                    height: Math.max(mainCoreGlyph.implicitHeight,
+                                                     mainLeadingGlyphs.implicitHeight,
+                                                     mainTrailingGlyph.implicitHeight)
+                                    scale: Math.min(1, mainIcon.width
+                                                    / Math.max(1, width))
 
                                     GohuText {
-                                        anchors.verticalCenter: parent.verticalCenter
-                                        text: modelData.prefix || ""
+                                        id: mainCoreGlyph
+                                        anchors.centerIn: parent
+                                        text: modelData.core || ""
+                                        font.pixelSize: modelData.coreSize || 34
+                                        color: mainModeButton.primaryColor
+                                    }
+
+                                    Row {
+                                        id: mainLeadingGlyphs
+                                        anchors.right: mainCoreGlyph.left
+                                        anchors.verticalCenter: mainCoreGlyph.verticalCenter
+                                        spacing: 0
+
+                                        GohuText {
+                                            anchors.verticalCenter: parent.verticalCenter
+                                            text: modelData.prefix || ""
+                                            font.pixelSize: 15
+                                            color: mainModeButton.primaryColor
+                                        }
+
+                                        // Keep Market's $ at Budget's font size,
+                                        // vertically centered with the core chart.
+                                        GohuText {
+                                            visible: !!modelData.dollar
+                                            anchors.verticalCenter: parent.verticalCenter
+                                            text: modelData.dollar || ""
+                                            font.pixelSize: 24
+                                            color: mainModeButton.primaryColor
+                                        }
+                                    }
+
+                                    GohuText {
+                                        id: mainTrailingGlyph
+                                        anchors.left: mainCoreGlyph.right
+                                        anchors.verticalCenter: mainCoreGlyph.verticalCenter
+                                        text: modelData.suffix || ""
                                         font.pixelSize: 15
                                         color: mainModeButton.primaryColor
                                     }
-
-                                    // Keep Market's $ at Budget's font size,
-                                    // vertically centered with the core chart.
-                                    GohuText {
-                                        visible: !!modelData.dollar
-                                        anchors.verticalCenter: parent.verticalCenter
-                                        text: modelData.dollar || ""
-                                        font.pixelSize: 24
-                                        color: mainModeButton.primaryColor
-                                    }
-                                }
-
-                                GohuText {
-                                    id: mainTrailingGlyph
-                                    anchors.left: mainCoreGlyph.right
-                                    anchors.verticalCenter: mainCoreGlyph.verticalCenter
-                                    text: modelData.suffix || ""
-                                    font.pixelSize: 15
-                                    color: mainModeButton.primaryColor
                                 }
                             }
                         }
 
-                        GohuText {
-                            id: mainModeLabel
-                            anchors.horizontalCenter: parent.horizontalCenter
-                            width: parent.width - 4
-                            horizontalAlignment: Text.AlignHCenter
-                            text: modelData.future ? "LATER" : modelData.name.toUpperCase()
-                            font.pixelSize: 10
-                            elide: Text.ElideRight
-                            // AppControl: muted secondary caption, with the
-                            // glyph carrying the primary mode identity.
-                            color: mainModeButton.pressed ? Colors.black : Colors.white
-                            opacity: mainModeButton.pressed ? 0.42
-                                     : mainModeButton.selected || mainModeButton.hovered
-                                     ? 0.48 : 0.34
+                        // The caption uses an identical local glow plane.
+                        // It remains a Column slot, not a layout-affecting
+                        // effect child or a separately projected texture.
+                        Item {
+                            id: mainModeLabelSlot
+                            width: parent.width
+                            height: mainModeLabel.implicitHeight
+
+                            GohuText {
+                                id: mainModeLabel
+                                anchors.horizontalCenter: parent.horizontalCenter
+                                width: parent.width - 4
+                                horizontalAlignment: Text.AlignHCenter
+                                text: modelData.future ? "LATER" : modelData.name.toUpperCase()
+                                font.pixelSize: 10
+                                elide: Text.ElideRight
+                                // AppControl: muted secondary caption, with the
+                                // glyph carrying the primary mode identity.
+                                color: mainModeButton.pressed ? Colors.black : Colors.white
+                                opacity: mainModeButton.pressed ? 0.42
+                                         : mainModeButton.selected || mainModeButton.hovered
+                                         ? 0.48 : 0.34
+                            }
                         }
                     }
 

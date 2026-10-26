@@ -4,6 +4,7 @@ import QtQuick.Effects
 import Quickshell
 import "../components"
 import "../services/weather/WeatherDockPolicy.js" as WeatherDockPolicy
+import "../services/weather/WeatherCyclePolicy.js" as WeatherCyclePolicy
 
 DockButton {
     id: weatherDock
@@ -42,6 +43,17 @@ DockButton {
         "aqiTimeMs": aqiTimeMs,
         "aqi": weatherService ? weatherService.aqi : -1
     })
+
+    // One service clock and one shared astronomy policy. No new weather
+    // requests or new day/night colors.
+    readonly property var skyCycle: WeatherCyclePolicy.atObservation(
+        observationClockMs,
+        weatherService ? weatherService.localObservationDateTime : "",
+        weatherService ? weatherService.localObservationAnchorMs : 0,
+        weatherService ? weatherService.dailyForecast : []
+    )
+    readonly property string celestialMode:
+        weatherFresh ? WeatherCyclePolicy.artworkFor(weatherState, skyCycle) : "weather"
 
     readonly property color weatherColor: {
         switch (weatherState.color) {
@@ -170,7 +182,7 @@ DockButton {
                 Item {
                     id: weatherConditionSlot
                     anchors.verticalCenter: parent.verticalCenter
-                    implicitWidth: Math.ceil(weatherCondition.implicitWidth)
+                    implicitWidth: Math.max(42, Math.ceil(weatherCondition.implicitWidth))
                     implicitHeight: 46
 
                     Text {
@@ -179,7 +191,36 @@ DockButton {
                         text: weatherDock.weatherState.icon
                         font.pixelSize: 42
                         color: weatherDock.foregroundColor
+                        visible: weatherDock.celestialMode === "weather"
                     }
+                }
+
+                // Swap only clear/partly-cloudy artwork for original flat
+                // sun/horizon/moon geometry. Preserve weather-condition hue.
+                WeatherCelestialGlyph {
+                    anchors.verticalCenter: parent.verticalCenter
+                    width: 42
+                    height: 42
+                    mode: weatherDock.celestialMode
+                    solar: weatherDock.skyCycle.solar
+                    moonPhase: weatherDock.skyCycle.moonPhase
+                    ink: weatherDock.foregroundColor
+                    visible: weatherDock.celestialMode !== "weather"
+                }
+
+                // Secondary moon phase remains visible alongside other
+                // weather conditions; don't duplicate a main nighttime moon.
+                WeatherCelestialGlyph {
+                    anchors.verticalCenter: parent.verticalCenter
+                    width: 18
+                    height: 18
+                    mode: "moon"
+                    moonPhase: weatherDock.skyCycle.moonPhase
+                    ink: weatherDock.foregroundColor
+                    visible: weatherDock.weatherFresh
+                             && weatherDock.skyCycle.moonPhase !== "unknown"
+                             && weatherDock.celestialMode !== "moon"
+                             && weatherDock.celestialMode !== "moon-cloud"
                 }
 
                 // Keep the icon-to-data gap at 6px; close only the readout-to-🌡 gap.

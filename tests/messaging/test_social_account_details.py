@@ -169,6 +169,34 @@ class AccountDetailsTests(unittest.TestCase):
         self.assertEqual(module.load()["revision"],1)
         self.assertEqual(stat.S_IMODE(module.storage_path().stat().st_mode),0o600)
 
+    def test_simultaneous_updates_are_serialized(self):
+        from concurrent.futures import ThreadPoolExecutor
+
+        payloads = [
+            {"action":"save_contact","identityId":"identity-1",
+             "expectedRevision":0,"email":"first@example.org","phone":""},
+            {"action":"save_contact","identityId":"identity-2",
+             "expectedRevision":0,"email":"second@example.org","phone":""},
+        ]
+        def one(payload):
+            return subprocess.run(
+                [sys.executable, str(BACKEND), "update"],
+                input=json.dumps(payload)+"\n",
+                capture_output=True, text=True, env=dict(os.environ),
+                check=False)
+        with ThreadPoolExecutor(max_workers=2) as executor:
+            results = list(executor.map(one, payloads))
+        successes = [r for r in results if r.returncode == 0]
+        failures = [r for r in results if r.returncode != 0]
+        self.assertEqual(len(successes), 1)
+        self.assertEqual(len(failures), 1)
+        self.assertEqual(json.loads(failures[0].stdout)["error"],"REVISION_CONFLICT")
+        saved = module.load()
+        self.assertEqual(saved["revision"],1)
+        self.assertEqual(len(saved["identities"]),1)
+        self.assertEqual(stat.S_IMODE(
+            (module.root_path()/".account-details.lock").stat().st_mode), 0o600)
+
     def test_file_capacity_and_whitelist(self):
         initial=module.new_document()
         initial["token"]="private"

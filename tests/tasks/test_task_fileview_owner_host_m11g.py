@@ -199,7 +199,7 @@ with tempfile.TemporaryDirectory(prefix="pa-m11g-owned-fileview-") as td:
     # changed source if its bytes were rewritten outside the owner.
     db,file=new_fixture(base,"same-revision-drift")
     host,hello=start(db,bootstrap=True)
-    synthetic_write(file,file.read_text()+"\\n")
+    synthetic_write(file,file.read_text()+"\n")
     drift=ask(host,1,"admit",stageId="m11g-same-counter-0001")
     assert not drift["ok"] and drift["status"]=="EXTERNAL_FIXTURE_CHANGE"
     close(host)

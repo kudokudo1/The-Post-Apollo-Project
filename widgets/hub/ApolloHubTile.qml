@@ -16,6 +16,7 @@ SectionFrame {
     property var uptimeSnapshot: null
     property var appsSnapshot: null
     property var audioSnapshot: null
+    property var audioStreamGate: null
     signal audioVolumeRequested(int percent)
     signal audioMuteRequested(bool muted)
     signal audioInputFocusChanged(bool focused)
@@ -513,6 +514,7 @@ SectionFrame {
         id: audioMini
         visible: tile.moduleId === "audio"
         audioSnapshot: tile.audioSnapshot
+        audioStreamGate: tile.audioStreamGate
         onVolumeRequested: function(percent) {
             tile.audioVolumeRequested(percent);
         }

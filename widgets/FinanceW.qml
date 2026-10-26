@@ -751,76 +751,76 @@ PanelWindow {
                                 width: parent.width - 6
                                 height: parent.height
 
-                            GohuText {
-                                anchors.centerIn: parent
-                                visible: !modelData.core
-                                width: parent.width
-                                horizontalAlignment: Text.AlignHCenter
-                                text: modelData.icon
-                                textFormat: Text.PlainText
-                                font.pixelSize: 24
-                                fontSizeMode: Text.Fit
-                                minimumPixelSize: 15
-                                color: mainModeButton.primaryColor
-                            }
-
-                            // Center the meaningful core, not the uneven
-                            // prefix/core/suffix string. Decorations extend
-                            // outward from that stable rail centerline.
-                            Item {
-                                id: mainGlyphParts
-                                anchors.centerIn: parent
-                                visible: !!modelData.core
-                                width: mainCoreGlyph.implicitWidth
-                                       + 2 * Math.max(mainLeadingGlyphs.implicitWidth,
-                                                      mainTrailingGlyph.implicitWidth)
-                                height: Math.max(mainCoreGlyph.implicitHeight,
-                                                 mainLeadingGlyphs.implicitHeight,
-                                                 mainTrailingGlyph.implicitHeight)
-                                scale: Math.min(1, mainIcon.width
-                                                / Math.max(1, width))
-
                                 GohuText {
-                                    id: mainCoreGlyph
                                     anchors.centerIn: parent
-                                    text: modelData.core || ""
-                                    font.pixelSize: modelData.coreSize || 34
+                                    visible: !modelData.core
+                                    width: parent.width
+                                    horizontalAlignment: Text.AlignHCenter
+                                    text: modelData.icon
+                                    textFormat: Text.PlainText
+                                    font.pixelSize: 24
+                                    fontSizeMode: Text.Fit
+                                    minimumPixelSize: 15
                                     color: mainModeButton.primaryColor
                                 }
 
-                                Row {
-                                    id: mainLeadingGlyphs
-                                    anchors.right: mainCoreGlyph.left
-                                    anchors.verticalCenter: mainCoreGlyph.verticalCenter
-                                    spacing: 0
+                                // Center the meaningful core, not the uneven
+                                // prefix/core/suffix string. Decorations extend
+                                // outward from that stable rail centerline.
+                                Item {
+                                    id: mainGlyphParts
+                                    anchors.centerIn: parent
+                                    visible: !!modelData.core
+                                    width: mainCoreGlyph.implicitWidth
+                                           + 2 * Math.max(mainLeadingGlyphs.implicitWidth,
+                                                          mainTrailingGlyph.implicitWidth)
+                                    height: Math.max(mainCoreGlyph.implicitHeight,
+                                                     mainLeadingGlyphs.implicitHeight,
+                                                     mainTrailingGlyph.implicitHeight)
+                                    scale: Math.min(1, mainIcon.width
+                                                    / Math.max(1, width))
 
                                     GohuText {
-                                        anchors.verticalCenter: parent.verticalCenter
-                                        text: modelData.prefix || ""
+                                        id: mainCoreGlyph
+                                        anchors.centerIn: parent
+                                        text: modelData.core || ""
+                                        font.pixelSize: modelData.coreSize || 34
+                                        color: mainModeButton.primaryColor
+                                    }
+
+                                    Row {
+                                        id: mainLeadingGlyphs
+                                        anchors.right: mainCoreGlyph.left
+                                        anchors.verticalCenter: mainCoreGlyph.verticalCenter
+                                        spacing: 0
+
+                                        GohuText {
+                                            anchors.verticalCenter: parent.verticalCenter
+                                            text: modelData.prefix || ""
+                                            font.pixelSize: 15
+                                            color: mainModeButton.primaryColor
+                                        }
+
+                                        // Keep Market's $ at Budget's font size,
+                                        // vertically centered with the core chart.
+                                        GohuText {
+                                            visible: !!modelData.dollar
+                                            anchors.verticalCenter: parent.verticalCenter
+                                            text: modelData.dollar || ""
+                                            font.pixelSize: 24
+                                            color: mainModeButton.primaryColor
+                                        }
+                                    }
+
+                                    GohuText {
+                                        id: mainTrailingGlyph
+                                        anchors.left: mainCoreGlyph.right
+                                        anchors.verticalCenter: mainCoreGlyph.verticalCenter
+                                        text: modelData.suffix || ""
                                         font.pixelSize: 15
                                         color: mainModeButton.primaryColor
                                     }
-
-                                    // Keep Market's $ at Budget's font size,
-                                    // vertically centered with the core chart.
-                                    GohuText {
-                                        visible: !!modelData.dollar
-                                        anchors.verticalCenter: parent.verticalCenter
-                                        text: modelData.dollar || ""
-                                        font.pixelSize: 24
-                                        color: mainModeButton.primaryColor
-                                    }
                                 }
-
-                                GohuText {
-                                    id: mainTrailingGlyph
-                                    anchors.left: mainCoreGlyph.right
-                                    anchors.verticalCenter: mainCoreGlyph.verticalCenter
-                                    text: modelData.suffix || ""
-                                    font.pixelSize: 15
-                                    color: mainModeButton.primaryColor
-                                }
-                            }
                             }
                         }
 
@@ -832,20 +832,20 @@ PanelWindow {
                             width: parent.width
                             height: mainModeLabel.implicitHeight
 
-                            GohuText {
-                            id: mainModeLabel
-                            anchors.horizontalCenter: parent.horizontalCenter
-                            width: parent.width - 4
-                            horizontalAlignment: Text.AlignHCenter
-                            text: modelData.future ? "LATER" : modelData.name.toUpperCase()
-                            font.pixelSize: 10
-                            elide: Text.ElideRight
-                            // AppControl: muted secondary caption, with the
-                            // glyph carrying the primary mode identity.
-                            color: mainModeButton.pressed ? Colors.black : Colors.white
-                            opacity: mainModeButton.pressed ? 0.42
-                                     : mainModeButton.selected || mainModeButton.hovered
-                                     ? 0.48 : 0.34
+                                GohuText {
+                                id: mainModeLabel
+                                anchors.horizontalCenter: parent.horizontalCenter
+                                width: parent.width - 4
+                                horizontalAlignment: Text.AlignHCenter
+                                text: modelData.future ? "LATER" : modelData.name.toUpperCase()
+                                font.pixelSize: 10
+                                elide: Text.ElideRight
+                                // AppControl: muted secondary caption, with the
+                                // glyph carrying the primary mode identity.
+                                color: mainModeButton.pressed ? Colors.black : Colors.white
+                                opacity: mainModeButton.pressed ? 0.42
+                                         : mainModeButton.selected || mainModeButton.hovered
+                                         ? 0.48 : 0.34
                             }
                         }
                     }

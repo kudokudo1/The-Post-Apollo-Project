@@ -621,11 +621,16 @@ Rectangle {
 
                             readonly property var forecastState:
                                 sky.iconState(modelData.condition, modelData.weatherCode, false)
+                            readonly property var forecastCycle:
+                                WeatherCyclePolicy.forecast(
+                                    modelData.date, modelData.time, sky.dailyForecast)
+                            readonly property string forecastArt:
+                                WeatherCyclePolicy.artworkFor(forecastState, forecastCycle)
 
                             SafeDropShadow {
                                 anchors.fill: hourlyIconGlyph
                                 safeSource: hourlyIconGlyph
-                                requestedVisible: true
+                                requestedVisible: parent.forecastArt === "weather"
                                 radius: 12
                                 samples: 25
                                 horizontalOffset: 0
@@ -642,6 +647,34 @@ Rectangle {
                                 text: parent.forecastState.icon
                                 font.pixelSize: 80
                                 color: sky.iconColor(parent.forecastState.color)
+                                visible: parent.forecastArt === "weather"
+                            }
+
+                            WeatherCelestialGlyph {
+                                id: hourlyCelestial
+                                anchors.centerIn: parent
+                                anchors.verticalCenterOffset: -8
+                                width: 70
+                                height: 70
+                                mode: parent.forecastArt
+                                solar: parent.forecastCycle.solar
+                                moonPhase: parent.forecastCycle.moonPhase
+                                ink: sky.iconColor(parent.forecastState.color)
+                                visible: parent.forecastArt !== "weather"
+                            }
+
+                            SafeDropShadow {
+                                anchors.fill: hourlyCelestial
+                                safeSource: hourlyCelestial
+                                requestedVisible: hourlyCelestial.visible
+                                radius: 12
+                                samples: 25
+                                horizontalOffset: 0
+                                verticalOffset: 0
+                                transparentBorder: true
+                                opacity: 0.95
+                                color: sky.iconColor(parent.forecastState.color)
+                                z: -1
                             }
                         }
 
@@ -740,6 +773,11 @@ Rectangle {
 
                             readonly property var forecastState:
                                 sky.iconState(modelData.condition, modelData.weatherCode, false)
+                            readonly property var forecastCycle:
+                                WeatherCyclePolicy.atLocal(
+                                    modelData.date, 12 * 60, sky.dailyForecast)
+                            readonly property string forecastArt:
+                                WeatherCyclePolicy.artworkFor(forecastState, forecastCycle)
 
                             Column {
                                 id: dailyWeatherDetails
@@ -800,7 +838,7 @@ Rectangle {
                             SafeDropShadow {
                                 anchors.fill: dailyIconGlyph
                                 safeSource: dailyIconGlyph
-                                requestedVisible: true
+                                requestedVisible: parent.forecastArt === "weather"
                                 radius: 12
                                 samples: 25
                                 horizontalOffset: 0
@@ -816,7 +854,45 @@ Rectangle {
                                 text: parent.forecastState.icon
                                 font.pixelSize: 100
                                 color: sky.iconColor(parent.forecastState.color)
+                                visible: parent.forecastArt === "weather"
                             }
+
+                            WeatherCelestialGlyph {
+                                id: dailyCelestial
+                                anchors.centerIn: parent
+                                width: 94
+                                height: 94
+                                mode: parent.forecastArt
+                                solar: parent.forecastCycle.solar
+                                moonPhase: parent.forecastCycle.moonPhase
+                                ink: sky.iconColor(parent.forecastState.color)
+                                visible: parent.forecastArt !== "weather"
+                            }
+
+                            SafeDropShadow {
+                                anchors.fill: dailyCelestial
+                                safeSource: dailyCelestial
+                                requestedVisible: dailyCelestial.visible
+                                radius: 12
+                                samples: 25
+                                horizontalOffset: 0
+                                verticalOffset: 0
+                                transparentBorder: true
+                                opacity: 0.95
+                                color: sky.iconColor(parent.forecastState.color)
+                                z: -1
+                            }
+                        }
+
+                        QuietText {
+                            anchors.horizontalCenter: parent.horizontalCenter
+                            text: "MOON " + (
+                                WeatherCyclePolicy.normalizedPhase(modelData.moonPhase) !== "unknown"
+                                ? modelData.moonPhase.toUpperCase() : "--")
+                                + (modelData.moonIllumination >= 0
+                                    ? " // " + Math.round(modelData.moonIllumination) + "%"
+                                    : "")
+                            font.pixelSize: 9
                         }
                     }
                 }

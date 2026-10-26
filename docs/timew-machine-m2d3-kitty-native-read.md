@@ -44,8 +44,8 @@ https://sw.kovidgoyal.net/kitty/conf/#opt-kitty.allow_remote_control
   supplied runtime directory, owner-only socket and directory validation,
   and an existing Kitty remote-control endpoint. It never creates or
   enables one. If an authorized future caller invokes it, it runs the
-  **fixed read-only command** `kitten @ --to unix:/... ls
-  --output-format=json` through `subprocess.run(shell=False)` with
+  **fixed read-only command** `kitten @ --to unix:/... ls`
+  (Kitty's default output is JSON) through `subprocess.run(shell=False)` with
   bounded timeout/output, then immediately projects away private fields.
   No command text is derived from browser content or user-supplied shell
   fragments.

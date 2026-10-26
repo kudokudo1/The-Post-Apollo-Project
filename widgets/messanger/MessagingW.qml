@@ -1575,10 +1575,7 @@ PanelWindow {
         } else {
             messagingWindow.setGeometryWatch(false);
 
-            if (discordLeaveProcess.running)
-                discordLeaveProcess.running = false;
-
-            discordLeaveProcess.running = true;
+            messagingWindow.hideDiscord();
             messagingWindow.hideX();
 
             contactList.clearSelection();

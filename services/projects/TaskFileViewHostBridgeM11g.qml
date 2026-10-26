@@ -311,7 +311,19 @@ Scope {
             }
             bridge.fileState = "VERIFYING";
             bridge.observeNative("FILE_SAVED");
-            fixtureFile.reload();
+            // Quickshell 0.2.1 emits saved() before clearing its active
+            // asynchronous writer. A same-path reload inside that signal
+            // does not start a fresh read. Defer until the callback unwinds,
+            // and fence late callbacks with the exact synthetic stage ID.
+            var savedStageId = bridge.pendingStageId;
+            Qt.callLater(function() {
+                if (bridge.attached && bridge.connected
+                        && bridge.fileState === "VERIFYING"
+                        && bridge.pendingStageId === savedStageId
+                        && savedStageId !== "" && bridge.pendingRaw !== "") {
+                    fixtureFile.reload();
+                }
+            });
             bridge.observed();
         }
         onSaveFailed: function(error) {

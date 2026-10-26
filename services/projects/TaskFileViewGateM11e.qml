@@ -100,10 +100,19 @@ Scope {
         onSaved: {
             if (!gate.attached) return;
             gate.gateState = GatePolicy.onSaved(gate.gateState);
-            // Accept only after a fresh FileView readback. If another event
-            // arrives out of order or the content differs, recovery locks.
-            if (gate.gateState.phase === "VERIFYING")
-                fixtureFile.reload();
+            // saved() fires while FileView still holds its async writer.
+            // Calling reload() synchronously can silently skip the read.
+            // Dispatch on the next event-loop turn, fenced to this stage.
+            if (gate.gateState.phase === "VERIFYING") {
+                var savedToken = gate.gateState.activeToken;
+                Qt.callLater(function() {
+                    if (gate.attached && gate.gateState.phase === "VERIFYING"
+                            && savedToken !== null
+                            && gate.gateState.activeToken === savedToken) {
+                        fixtureFile.reload();
+                    }
+                });
+            }
             gate.observed();
         }
         onSaveFailed: function(error) {

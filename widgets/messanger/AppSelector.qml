@@ -18,6 +18,9 @@ Rectangle {
     // Entry-point shell only. Identity storage, credentials and family layouts
     // are deliberately reserved for subsequent operator-reviewed slices.
     property bool settingsOpen: false
+    // Set by MessagingW to the shared content surface, not a new window.
+    property Item settingsWorkspaceParent: null
+    property int settingsContactWidth: 200
     property bool creatingIdentity: false
     property bool identityCreatePending: false
     property string identityCreateMode: "default"
@@ -178,7 +181,14 @@ Rectangle {
     })
 
     onSettingsOpenChanged: {
-        if (!settingsOpen) appSelector.resetFamilyRemovalConfirmation();
+        if (settingsOpen) {
+            // The broader editor opens ready to organize, without requiring
+            // a second click through the old narrow "EDIT FAMILIES" control.
+            editingFamilies = true;
+            familyEditorIdentityId = identitySnapshot.activeId;
+        } else {
+            appSelector.resetFamilyRemovalConfirmation();
+        }
     }
 
     // Only clear the form after the actual atomic FileView save succeeds.
@@ -405,7 +415,8 @@ Rectangle {
         }
         contentWidth: width
         contentHeight: appColumn.height + 20
-        visible: !appSelector.settingsOpen
+        // Live preview: family and app positions update after each saved edit.
+        visible: true
         clip: true
         flickableDirection: Flickable.VerticalFlick
         boundsBehavior: Flickable.StopAtBounds
@@ -586,6 +597,8 @@ Rectangle {
     
                         MouseArea {
                             id: appMouse
+                            // Preview remains visible but cannot switch live accounts.
+                            enabled: !appSelector.settingsOpen
     
                             anchors.fill: parent
     
@@ -651,37 +664,55 @@ Rectangle {
         }
     }
 
-    // Settings stays inside the selector's existing 110 px input region.
-    // A wider pop-out must be handled separately: external browser/Discord
-    // modes deliberately mask off the content region for pointer pass-through.
+    // The app rail remains an active, non-launching preview while settings
+    // occupies the EXISTING contact-list and chat-feed areas of Social.
+    // No second FloatingWindow or Sway geometry owner is introduced here.
     Rectangle {
         id: settingsPage
+        parent: appSelector.settingsWorkspaceParent
+                ? appSelector.settingsWorkspaceParent : appSelector
         anchors {
             top: parent.top
-            left: parent.left
+            bottom: parent.bottom
+            left: appSelector.settingsWorkspaceParent
+                  ? appSelector.right : parent.left
             right: parent.right
-            bottom: statusMessage.visible ? statusMessage.top : settingsFooter.top
         }
+        z: 10
         color: Colors.black
         visible: appSelector.settingsOpen
         clip: true
+        border.width: 1
+        border.color: Colors.cyan
 
-        Flickable {
+        Row {
             anchors.fill: parent
-            contentWidth: width
-            contentHeight: settingsColumn.height + 24
-            flickableDirection: Flickable.VerticalFlick
-            boundsBehavior: Flickable.StopAtBounds
-            clip: true
+            spacing: 0
 
-            Column {
-                id: settingsColumn
-                anchors.top: parent.top
-                anchors.topMargin: 12
-                anchors.horizontalCenter: parent.horizontalCenter
-                width: Math.max(1, parent.width - 14)
-                spacing: 12
+            // Contact-list-sized identity and account setup column.
+            Rectangle {
+                id: settingsIdentityPane
+                width: Math.min(parent.width, appSelector.settingsContactWidth)
+                height: parent.height
+                color: Colors.dark
+                border.width: 1
+                border.color: Colors.cyan
 
+                Flickable {
+                    anchors.fill: parent
+                    contentWidth: width
+                    contentHeight: settingsIdentityColumn.height + 24
+                    flickableDirection: Flickable.VerticalFlick
+                    boundsBehavior: Flickable.StopAtBounds
+                    clip: true
+
+                    Column {
+                        id: settingsIdentityColumn
+                        anchors.top: parent.top
+                        anchors.topMargin: 12
+                        anchors.horizontalCenter: parent.horizontalCenter
+                        width: Math.max(1, parent.width - 16)
+                        spacing: 12
                 Text {
                     width: parent.width
                     text: "USER //\nSETTINGS"
@@ -726,7 +757,7 @@ Rectangle {
                     model: appSelector.identitySnapshot.identities
                     delegate: ActionButton {
                         required property var modelData
-                        width: settingsColumn.width
+                        width: settingsIdentityColumn.width
                         height: 34
                         label: modelData.name
                         labelPixelSize: 9
@@ -793,7 +824,7 @@ Rectangle {
                         ]
                         delegate: ActionButton {
                             required property var modelData
-                            width: settingsColumn.width
+                            width: settingsIdentityColumn.width
                             height: 32
                             label: modelData.title
                             labelPixelSize: 9
@@ -822,7 +853,7 @@ Rectangle {
                                ? appSelector.identitySnapshot.identities : []
                         delegate: ActionButton {
                             required property var modelData
-                            width: settingsColumn.width
+                            width: settingsIdentityColumn.width
                             height: 31
                             label: modelData.name
                             labelPixelSize: 9
@@ -857,6 +888,76 @@ Rectangle {
                 }
                 Text {
                     width: parent.width
+                    text: "LINKED ACCOUNTS"
+                    color: Colors.cyan
+                    font.pixelSize: 9
+                    font.bold: true
+                    wrapMode: Text.WordWrap
+                }
+                Text {
+                    width: parent.width
+                    text: "Not connected to this menu"
+                    color: Colors.white
+                    font.pixelSize: 9
+                    wrapMode: Text.WordWrap
+                }
+                Text {
+                    width: parent.width
+                    text: "API CREDENTIALS"
+                    color: Colors.cyan
+                    font.pixelSize: 9
+                    font.bold: true
+                    wrapMode: Text.WordWrap
+                }
+                Text {
+                    width: parent.width
+                    text: "Existing service setup unchanged"
+                    color: Colors.white
+                    font.pixelSize: 9
+                    wrapMode: Text.WordWrap
+                }
+                    }
+                }
+            }
+
+            // Chat-feed-sized organization workspace. Independent scrolling
+            // means app edits do not lose the chosen family or identity.
+            Rectangle {
+                id: settingsEditorPane
+                width: Math.max(1, parent.width - settingsIdentityPane.width)
+                height: parent.height
+                color: Colors.black
+
+                Row {
+                    anchors.fill: parent
+                    spacing: 0
+
+                    Rectangle {
+                        id: settingsFamilyPane
+                        width: Math.min(parent.width,
+                                        Math.max(170, Math.round(parent.width * 0.36)))
+                        height: parent.height
+                        color: Colors.black
+                        border.width: 1
+                        border.color: Colors.cyan
+
+                        Flickable {
+                            anchors.fill: parent
+                            contentWidth: width
+                            contentHeight: settingsColumn.height + 24
+                            flickableDirection: Flickable.VerticalFlick
+                            boundsBehavior: Flickable.StopAtBounds
+                            clip: true
+
+                            Column {
+                                id: settingsColumn
+                                anchors.top: parent.top
+                                anchors.topMargin: 12
+                                anchors.horizontalCenter: parent.horizontalCenter
+                                width: Math.max(1, parent.width - 16)
+                                spacing: 12
+                Text {
+                    width: parent.width
                     text: "BUTTON FAMILIES"
                     color: Colors.cyan
                     font.pixelSize: 9
@@ -889,10 +990,10 @@ Rectangle {
                         familySearchInput.text = "";
                     }
                 }
-                Column {
-                    width: parent.width
-                    spacing: 8
-                    visible: appSelector.editingFamilies
+                                Column {
+                                    width: parent.width
+                                    spacing: 8
+                                    visible: appSelector.editingFamilies
                     Text {
                         width: parent.width
                         text: "SELECT FAMILY"
@@ -1127,6 +1228,54 @@ Rectangle {
                         height: 1
                         color: Colors.cyan
                     }
+                                }
+                            }
+                        }
+                    }
+
+                    Rectangle {
+                        id: settingsAppPane
+                        width: Math.max(1, parent.width - settingsFamilyPane.width)
+                        height: parent.height
+                        color: Colors.black
+                        border.width: 1
+                        border.color: Colors.cyan
+
+                        Flickable {
+                            anchors.fill: parent
+                            contentWidth: width
+                            contentHeight: settingsAppsColumn.height + 24
+                            flickableDirection: Flickable.VerticalFlick
+                            boundsBehavior: Flickable.StopAtBounds
+                            clip: true
+
+                            Column {
+                                id: settingsAppsColumn
+                                anchors.top: parent.top
+                                anchors.topMargin: 12
+                                anchors.horizontalCenter: parent.horizontalCenter
+                                width: Math.max(1, parent.width - 20)
+                                spacing: 12
+
+                                Text {
+                                    width: parent.width
+                                    text: "APP ORGANIZATION"
+                                    color: Colors.orange
+                                    font.pixelSize: 13
+                                    font.bold: true
+                                    wrapMode: Text.WordWrap
+                                }
+                                Text {
+                                    width: parent.width
+                                    text: "Saved edits update the live rail on the left."
+                                    color: Colors.white
+                                    font.pixelSize: 11
+                                    wrapMode: Text.WordWrap
+                                }
+                                Column {
+                                    width: parent.width
+                                    spacing: 8
+                                    visible: appSelector.editingFamilies
                     Text {
                         width: parent.width
                         text: "MOVE APP"
@@ -1168,7 +1317,7 @@ Rectangle {
                         model: appSelector.matchingFamilyApps(familySearchInput.text)
                         delegate: ActionButton {
                             required property var modelData
-                            width: settingsColumn.width
+                            width: settingsAppsColumn.width
                             height: 32
                             label: appSelector.messagingApps[modelData.serviceIndex].name
                             labelPixelSize: 9
@@ -1264,36 +1413,10 @@ Rectangle {
                         font.pixelSize: 9
                         wrapMode: Text.WordWrap
                     }
-                }
-                Text {
-                    width: parent.width
-                    text: "LINKED ACCOUNTS"
-                    color: Colors.cyan
-                    font.pixelSize: 9
-                    font.bold: true
-                    wrapMode: Text.WordWrap
-                }
-                Text {
-                    width: parent.width
-                    text: "Not connected to this menu"
-                    color: Colors.white
-                    font.pixelSize: 9
-                    wrapMode: Text.WordWrap
-                }
-                Text {
-                    width: parent.width
-                    text: "API CREDENTIALS"
-                    color: Colors.cyan
-                    font.pixelSize: 9
-                    font.bold: true
-                    wrapMode: Text.WordWrap
-                }
-                Text {
-                    width: parent.width
-                    text: "Existing service setup unchanged"
-                    color: Colors.white
-                    font.pixelSize: 9
-                    wrapMode: Text.WordWrap
+                                }
+                            }
+                        }
+                    }
                 }
             }
         }

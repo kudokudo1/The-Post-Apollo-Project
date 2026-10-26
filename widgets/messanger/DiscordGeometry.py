@@ -420,6 +420,11 @@ class Bridge:
         if not social or not discord:
             return snapshot
 
+        # Hidden scratchpad clients are discoverable for exact con_id control,
+        # but they are not allowed to lead shared geometry until shown.
+        if guest_id == "discord" and not bool(discord.get("visible", False)):
+            return snapshot
+
         social_rect = social.get("rect")
         discord_rect = discord.get("rect")
 
@@ -706,6 +711,8 @@ class Bridge:
                     commands.append(f'{criteria} focus')
                 self.queue_command("; ".join(commands))
                 self.discord_show_requested = False
+        else:
+            self.discord_con_id = None
 
         snapshot = self.fast_follow(snapshot)
 

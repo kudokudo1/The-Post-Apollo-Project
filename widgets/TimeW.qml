@@ -586,6 +586,7 @@ PanelWindow {
 
     // Hub COUNTDOWN reuses these same records and one monotonic anchor.
     // Nothing here instantiates another countdown backend or heartbeat.
+    property string hubCountdownFeedback: "NO ACTION REQUESTED"
     readonly property var hubCountdownSnapshot: {
         const projected = [];
         for (let i = 0; i < countdownTimers.length; i++) {
@@ -606,6 +607,7 @@ PanelWindow {
         return {
             source: "timew-monotonic-countdowns",
             maxTimers: CountdownPolicy.MAX_TIMERS,
+            feedback: hubCountdownFeedback,
             runningCount: countdownRunningCount,
             selectedId: selectedCountdownId,
             timers: projected
@@ -668,6 +670,16 @@ PanelWindow {
                    : updated.status === "ready";
         }
         return false;
+    }
+
+    function hubCountdownRequest(id, action, name, hours, minutes, seconds) {
+        const result = hubCountdownAction(
+            id, action, name, hours, minutes, seconds);
+        const accepted = result !== false && result !== -1;
+        hubCountdownFeedback = accepted
+            ? "OWNER ACCEPTED // " + action.toUpperCase()
+            : "OWNER REJECTED // " + action.toUpperCase();
+        return result;
     }
 
     // TOOLS / STOPWATCH. Monotonic measurement continues while the window

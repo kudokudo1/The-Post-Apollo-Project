@@ -18,6 +18,17 @@ PanelWindow {
     property bool notesInputFocused: false
     // Injected read-only ApolloHubLiveBridge; do not construct a second provider.
     property var liveBridge: null
+    property var stopwatchSnapshot: null
+    signal stopwatchActionRequested(string action)
+    signal stopwatchSampleRequested()
+
+    function requestStopwatchAction(action) {
+        if (!menuOpen || !stopwatchSnapshot
+                || stopwatchSnapshot.source !== "timew-monotonic-stopwatch"
+                || ["start", "pause", "lap", "reset"].indexOf(action) === -1)
+            return;
+        stopwatchActionRequested(action);
+    }
     // P3-A: passive master-output snapshot and explicit owner action route.
     property var audioSnapshot: null
     property var audioStreamGate: null
@@ -1064,6 +1075,14 @@ PanelWindow {
                                   + tileFlow.spacing) : 0
                             y: gridCell ? gridCell.row * (140 + tileFlow.spacing) : 0
                             moduleId: tileConfig.module
+                            stopwatchSnapshot: hub.stopwatchSnapshot
+                            onStopwatchActionRequested: function(action) {
+                                hub.requestStopwatchAction(action);
+                            }
+                            onStopwatchSampleRequested: {
+                                if (hub.menuOpen)
+                                    hub.stopwatchSampleRequested();
+                            }
                             // Live QML binding; changes to the shared bridge's
                             // weatherSnapshot update the tile without copying data.
                             weatherSnapshot: hub.liveBridge

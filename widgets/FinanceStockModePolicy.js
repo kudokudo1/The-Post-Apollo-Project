@@ -145,6 +145,11 @@ function rangeFromReturnTicket(ticket, daySnapshot, cik, from, to) {
     if (!ticket || ticket.cik !== cik || ticket.from !== from
             || ticket.to !== to || !ticket.snapshot || !daySnapshot
             || daySnapshot.derivedFromRange !== true
+            || daySnapshot.schemaVersion !== 1
+            || daySnapshot.source !== "eodhd-eod" || daySnapshot.readOnly !== true
+            || !daySnapshot.originRange
+            || daySnapshot.originRange.from !== from
+            || daySnapshot.originRange.to !== to
             || daySnapshot.cik !== cik
             || daySnapshot.from !== ticket.openedDay
             || daySnapshot.to !== ticket.openedDay
@@ -158,7 +163,9 @@ function rangeFromReturnTicket(ticket, daySnapshot, cik, from, to) {
             || daySnapshot.delivery.via !== ticket.snapshot.delivery.via
             || daySnapshot.delivery.state !== ticket.snapshot.delivery.state
             || daySnapshot.delivery.servedAt !== ticket.snapshot.delivery.servedAt
-            || daySnapshot.delivery.cachedAt !== ticket.snapshot.delivery.cachedAt)
+            || daySnapshot.delivery.cachedAt !== ticket.snapshot.delivery.cachedAt
+            || daySnapshot.delivery.expiresAt !== ticket.snapshot.delivery.expiresAt
+            || daySnapshot.delivery.ageSeconds !== ticket.snapshot.delivery.ageSeconds)
         return null;
     const rechecked = rangeReturnTicket(
         ticket.snapshot, ticket.index, cik, from, to);

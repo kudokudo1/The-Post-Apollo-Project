@@ -1,0 +1,39 @@
+name: TASKS M11l locked-off production seam and disposable owner
+
+on:
+  pull_request:
+    paths:
+      - 'services/hub/ApolloHubTodoStore.qml'
+      - 'services/projects/TaskJsonGateCandidateM11l.py'
+      - 'tests/tasks/test_task_json_gate_candidate_m11l.py'
+      - 'docs/tasks-json-gate-owner-m11l.md'
+      - '.github/workflows/tasks-json-gate-candidate-m11l.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'services/hub/ApolloHubTodoStore.qml'
+      - 'services/projects/TaskJsonGateCandidateM11l.py'
+      - 'tests/tasks/test_task_json_gate_candidate_m11l.py'
+      - 'docs/tasks-json-gate-owner-m11l.md'
+      - '.github/workflows/tasks-json-gate-candidate-m11l.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  isolated-real-schema:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: M11l real-schema disposable owner and fault tests
+        run: python3 tests/tasks/test_task_json_gate_candidate_m11l.py
+      - name: M11k contract remains nonactivating
+        run: python3 tests/tasks/test_task_production_gate_review_m11k.py
+      - name: M11j native observation provenance and production separation
+        run: python3 tests/tasks/test_task_native_acceptance_m11j.py
+      - name: M11d nine mutation callers and only one FileView
+        run: python3 tests/tasks/test_task_writer_gate_inventory_m11d.py

@@ -157,12 +157,13 @@ class DiscordDockingTests(TestCase):
             "xDocked": False, "browserSite": "x",
         }
         modes = [
-            state, {**state, "xDocked": True},
-            {**state, "xReady": False},
-            {**state, "xSelected": False},
+            state, {"op": "sample"},
+            {**state, "xDocked": True}, {"op": "sample"},
+            {**state, "xReady": False, "xDocked": True}, {"op": "sample"},
+            {**state, "xSelected": False, "xDocked": True}, {"op": "sample"},
             {"op": "stop"},
         ]
-        stream = io.StringIO("\\n".join(json.dumps(x) for x in modes) + "\\n")
+        stream = io.StringIO("\n".join(json.dumps(x) for x in modes) + "\n")
         captured = []
         with patch.object(geometry.sys, "stdin", stream):
             original = bridge.sample_event.set
@@ -173,8 +174,12 @@ class DiscordDockingTests(TestCase):
             bridge.sample_event.set = capture
             bridge.stdin_loop()
         self.assertFalse(bridge.x_docked)
-        # Direct modes are tested above; stdin guards must reject stale
-        # docked=True when selected/ready flags have already changed.
+        self.assertEqual(captured, [
+            (True, True, False), (True, True, True),
+            (True, False, False), (False, True, False),
+        ])
+        # A stale xDocked=True must be rejected as soon as readiness or
+        # selection changes, without touching the live Sway resize path.
         self.assertIn("self.x_docked = (", GEOMETRY.read_text())
         self.assertIn("and self.x_selected and self.x_ready", GEOMETRY.read_text())
 

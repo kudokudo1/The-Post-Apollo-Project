@@ -1775,5 +1775,38 @@ for forbidden in ('"pactl"', 'Quickshell.execDetached(', 'Process {',
         f"Stream UI/adapter created own audio mutation backend: {forbidden}")
 assert 'ApolloHubMediaExplore {' in tile
 
+# Regression // merged P3-B used "readonly property var data" on Item.
+# Item.data is the built-in child-object container. The readonly override
+# made the first Row child fail at QML construction and blocked all shell.qml.
+# Item.state is also reserved for state transitions. Guard BOTH names.
+import re as _re
+assert "Item {" in audio_streams
+for reserved_name in ("data", "state"):
+    forbidden_property = (r"^\s*(?:readonly\s+)?property\s+"
+                          r"(?:var|string|bool|int|real|double)\s+"
+                          + reserved_name + r"\s*:")
+    assert _re.search(forbidden_property, "    readonly property var "
+                      + reserved_name + ": null", _re.M), (
+        "Reserved-property guard must detect Item." + reserved_name)
+    assert not _re.search(forbidden_property, audio_streams, _re.M), (
+        "ApolloHubAudioStreams overrides Item." + reserved_name
+        + " and will prevent Quickshell from loading")
+for token in (
+    'readonly property var streamSnapshot:',
+    'readonly property string streamPhase:',
+    'streamSnapshot ? streamSnapshot.state : "unavailable"',
+    'streamSnapshot.generation,"mute"',
+    'streamSnapshot.generation,"volume"',
+    'streamsView.streamPhase === "ready"',
+    'streamsView.streamPhase === "unavailable"',
+    'streamsView.streamPhase === "empty"',
+    'streamSnapshot.shown',
+    'streamSnapshot.total',
+):
+    assert token in audio_streams, f"Renamed stream binding missing: {token}"
+for stale_reference in ("streamsView.state", "data.generation"):
+    assert stale_reference not in audio_streams, (
+        "Obsolete built-in QtQuick.Item property reference: " + stale_reference)
+
 # Launchers and widget backends are unchanged in this first stage.
 print("ApolloHubW foundation source contracts passed")

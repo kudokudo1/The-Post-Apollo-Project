@@ -14,11 +14,15 @@ Item {
     property bool draftDirty: false
     signal inputFocusChanged(bool focused)
 
-    readonly property var data: streamGate && streamGate.snapshot
-                                ? streamGate.snapshot : null
-    readonly property string state: data ? data.state : "unavailable"
-    readonly property var entries: data && Array.isArray(data.items)
-                                    ? data.items : []
+    // Avoid Item.data: it owns QML children and is not a stream record.
+    readonly property var streamSnapshot: streamGate && streamGate.snapshot
+                                         ? streamGate.snapshot : null
+    // Avoid Item.state: reserved for Qt Quick visual states.
+    readonly property string streamPhase:
+        streamSnapshot ? streamSnapshot.state : "unavailable"
+    readonly property var entries: streamSnapshot
+                                    && Array.isArray(streamSnapshot.items)
+                                    ? streamSnapshot.items : []
     readonly property var selected: {
         for (let i = 0; i < entries.length; i++) {
             const e = entries[i];
@@ -28,14 +32,15 @@ Item {
         return null;
     }
     readonly property bool actionReady:
-        streamGate !== null && data !== null && state === "ready"
+        streamGate !== null && streamSnapshot !== null && streamPhase === "ready"
         && selected !== null && !streamGate.busy
     readonly property string statusLine:
-        state === "ready" ? "STREAMS // " + data.shown + " OF " + data.total
-        : "STREAMS // " + state.toUpperCase()
+        streamPhase === "ready"
+        ? "STREAMS // " + streamSnapshot.shown + " OF " + streamSnapshot.total
+        : "STREAMS // " + streamPhase.toUpperCase()
 
     function inspect(entry) {
-        if (!entry || !data || state !== "ready") return;
+        if (!entry || !streamSnapshot || streamPhase !== "ready") return;
         selectedIndex = entry.index;
         selectedIdentity = entry.identity;
         draftVolume = entry.volumePercent >= 0
@@ -46,12 +51,12 @@ Item {
     function requestMute() {
         if (!actionReady) return;
         streamGate.request(selectedIndex,selectedIdentity,
-                           data.generation,"mute",!selected.muted);
+                           streamSnapshot.generation,"mute",!selected.muted);
     }
     function applyVolume() {
         if (!actionReady || !draftDirty) return;
         if (streamGate.request(selectedIndex,selectedIdentity,
-                data.generation,"volume",draftVolume))
+                streamSnapshot.generation,"volume",draftVolume))
             draftDirty = false;
     }
 
@@ -87,7 +92,7 @@ Item {
                                  - (parent.width - parent.spacing) * 0.46)
             height: parent.height
             font.pixelSize: 10
-            color: streamsView.state === "ready" ? Colors.cyan : Colors.orange
+            color: streamsView.streamPhase === "ready" ? Colors.cyan : Colors.orange
             horizontalAlignment: Text.AlignHCenter
             verticalAlignment: Text.AlignVCenter
             elide: Text.ElideRight
@@ -131,10 +136,10 @@ Item {
             horizontalAlignment: Text.AlignHCenter
             color: Colors.orange
             font.pixelSize: 10
-            text: streamsView.state === "unavailable"
+            text: streamsView.streamPhase === "unavailable"
                   ? "NO STREAM OBSERVATION // PRESS REFRESH"
-                  : streamsView.state === "empty" ? "NO LIVE PLAYBACK STREAMS"
-                  : "STREAM DATA // " + streamsView.state.toUpperCase()
+                  : streamsView.streamPhase === "empty" ? "NO LIVE PLAYBACK STREAMS"
+                  : "STREAM DATA // " + streamsView.streamPhase.toUpperCase()
         }
     }
 

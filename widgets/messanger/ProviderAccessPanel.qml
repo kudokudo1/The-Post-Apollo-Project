@@ -26,19 +26,20 @@ Rectangle {
     readonly property bool desktopSupported:
         serviceId === "signal" || serviceId === "wechat" || serviceId === "viber"
     readonly property bool webSupported:
-        serviceId === "whatsapp" || serviceId === "messenger"
+        serviceId === "whatsapp" || serviceId === "messenger" || serviceId === "line"
     readonly property string clientGuide:
         serviceId === "signal" ? "Signal Desktop: link from the Signal app on your phone. Install the official Linux client first." :
         serviceId === "viber" ? "Viber Desktop: requires an active Viber phone account. Install the Linux client first." :
         serviceId === "wechat" ? "WeChat: install the official Linux client. Device linking takes place in the provider application." :
-        serviceId === "line" ? "LINE on Linux uses LINE's official Chrome extension. It must be installed and authorized in Chrome separately." :
-        serviceId === "kakaotalk" ? "No official Linux desktop client or supported personal-message adapter verified." :
-        serviceId === "bereal" ? "Mobile-only connection; no supported Post-Apollo desktop adapter verified." :
+        serviceId === "line" ? "LINE on Linux uses LY Corporation's official LINE for Chrome extension. Post-Apollo gives it a separate browser profile; installation and account login stay inside Chrome/LINE." :
+        serviceId === "kakaotalk" ? "Kakao's official APIs can send permissioned messages to approved friends, but no ordinary KakaoTalk inbox/history API or Linux desktop client is available for a full Social chat feed." :
+        serviceId === "bereal" ? "BeReal chat remains app-only. No supported desktop/personal-message interface is available for Post-Apollo, and automated account operation is not permitted." :
         serviceId === "whatsapp" ? "WhatsApp Web lets you use your personal account through the official website. The native API remains unsupported." :
         serviceId === "messenger" ? "Messenger personal chats are available through Facebook Messages in a browser, not the old standalone app." : ""
 
     property bool desktopAvailable: false
     property bool windowAvailable: false
+    property bool lineExtensionInstalled: false
     property string launchNotice: ""
     property string dockNotice: ""
     property int windowProbeAttempts: 0
@@ -87,12 +88,36 @@ Rectangle {
         desktopProcess.running = true;
     }
 
+    function probeLineChrome() {
+        if (!visible || serviceId !== "line" || lineChromeProcess.running)
+            return;
+        lineChromeProcess.action = "status";
+        lineChromeProcess.command = [
+            "python3", Quickshell.shellPath("widgets/messanger/XBrowser.py"),
+            "status", "linechrome"
+        ];
+        lineChromeProcess.running = true;
+    }
+
+    function setupLineChrome() {
+        if (!visible || serviceId !== "line" || lineChromeProcess.running)
+            return;
+        launchNotice = "Opening the official LINE Chrome Web Store page in the isolated LINE profile...";
+        lineChromeProcess.action = "setup";
+        lineChromeProcess.command = [
+            "python3", Quickshell.shellPath("widgets/messanger/XBrowser.py"),
+            "setup", "linechrome"
+        ];
+        lineChromeProcess.running = true;
+    }
+
     onVisibleChanged: {
         if (visible) {
             launchNotice = "";
             dockNotice = "";
             probeDesktop();
             probeWindow();
+            probeLineChrome();
         }
     }
     onServiceIdChanged: {
@@ -103,6 +128,8 @@ Rectangle {
         desktopAvailable = false;
         probeDesktop();
         probeWindow();
+        lineExtensionInstalled = false;
+        probeLineChrome();
     }
 
     Process {
@@ -138,6 +165,37 @@ Rectangle {
             }
             if (exitCode !== 0)
                 panel.launchNotice = "Provider desktop launcher unavailable";
+        }
+    }
+
+    Process {
+        id: lineChromeProcess
+        property string action: ""
+        stdout: StdioCollector {
+            onStreamFinished: {
+                if (!panel.visible || panel.serviceId !== "line")
+                    return;
+                if (lineChromeProcess.action !== "status")
+                    return;
+                try {
+                    const result = JSON.parse(String(text || ""));
+                    panel.lineExtensionInstalled = result.extensionInstalled === true;
+                    panel.launchNotice = panel.lineExtensionInstalled
+                        ? "LINE for Chrome is installed in this Post-Apollo profile."
+                        : "LINE for Chrome is not installed in this Post-Apollo profile yet.";
+                } catch (e) {
+                    panel.lineExtensionInstalled = false;
+                    panel.launchNotice = "LINE for Chrome status could not be checked.";
+                }
+            }
+        }
+        onExited: function(exitCode, exitStatus) {
+            if (!panel.visible || panel.serviceId !== "line")
+                return;
+            if (action === "setup" && exitCode === 0)
+                panel.launchNotice = "Official LINE for Chrome setup opened. Install it there, close that setup window, then press CHECK LINE FOR CHROME.";
+            else if (exitCode !== 0)
+                panel.launchNotice = "LINE for Chrome action could not be started.";
         }
     }
 
@@ -263,20 +321,58 @@ Rectangle {
                 }
             }
             Rectangle {
-                id: webButton
+                id: lineSetupButton
                 width: Math.min(parent.width, 310)
                 height: 44
-                visible: panel.webSupported
+                visible: panel.serviceId === "line" && !panel.lineExtensionInstalled
                 color: Colors.dark
                 border.color: Colors.orange
                 Text {
                     anchors.centerIn: parent
-                    text: "OPEN OFFICIAL WEB MESSAGING"
+                    text: "SET UP LINE FOR CHROME"
                     color: Colors.cyan
                     font.pixelSize: 12
                 }
                 MouseArea {
                     anchors.fill: parent
+                    onClicked: panel.setupLineChrome()
+                }
+            }
+            Rectangle {
+                width: Math.min(parent.width, 310)
+                height: 36
+                visible: panel.serviceId === "line"
+                color: Colors.dark
+                border.color: Colors.cyan
+                Text {
+                    anchors.centerIn: parent
+                    text: "CHECK LINE FOR CHROME"
+                    color: Colors.cyan
+                    font.pixelSize: 12
+                }
+                MouseArea {
+                    anchors.fill: parent
+                    onClicked: panel.probeLineChrome()
+                }
+            }
+            Rectangle {
+                id: webButton
+                width: Math.min(parent.width, 310)
+                height: 44
+                visible: panel.webSupported
+                opacity: panel.serviceId !== "line" || panel.lineExtensionInstalled ? 1 : 0.6
+                color: Colors.dark
+                border.color: Colors.orange
+                Text {
+                    anchors.centerIn: parent
+                    text: panel.serviceId === "line" ? "OPEN LINE FOR CHROME"
+                                                     : "OPEN OFFICIAL WEB MESSAGING"
+                    color: Colors.cyan
+                    font.pixelSize: 12
+                }
+                MouseArea {
+                    anchors.fill: parent
+                    enabled: panel.serviceId !== "line" || panel.lineExtensionInstalled
                     onClicked: panel.browserRequested(panel.serviceId)
                 }
             }

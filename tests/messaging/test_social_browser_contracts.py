@@ -162,11 +162,18 @@ for index, key, label, url in additional_web_modes:
     assert f"--class=post-apollo-{key}" in command
     assert f"--user-data-dir=/tmp/social-browser-contract/post-apollo/{key}-browser" in command
 
-# Mobile/native-oriented services are explicitly inert placeholders.
+# LINE now has an explicit provider-owned Chrome extension path. It remains
+# outside browser.SITES because it is not an ordinary website.
+assert 'name: "LINE"' in selector
+assert "linechrome" in browser.EXTENSION_SITES
+assert browser.site_config("linechrome")[0] == browser.LINE_EXTENSION_URL
+assert geometry.sway_criteria("linechrome") == '[class="post-apollo-linechrome"]'
+assert 'activeAppIndex === 28 && providerWebOpen ? "linechrome"' in social
+
+# Remaining mobile/native-oriented services keep truthful provider states.
 pending_modes = (
     (26, "SIGNAL", "Native integration pending"),
     (27, "WECHAT", "Native integration pending"),
-    (28, "LINE", "Desktop integration pending"),
     (29, "VIBER", "Native integration pending"),
     (30, "KAKAOTALK", "Desktop integration pending"),
     (31, "BEREAL", "Mobile integration pending"),
@@ -184,6 +191,7 @@ assert 'name: "YOUTUBE"' not in selector
 assert len(browser.SITES) == 21
 assert set(browser.ALL_SITES) == set(geometry.BROWSER_SITES)
 assert set(browser.WEB_FALLBACK_SITES) == {"whatsappweb", "messengerweb"}
+assert set(browser.EXTENSION_SITES) == {"linechrome"}
 assert len({config[1] for config in browser.SITES.values()}) == len(browser.SITES)
 assert len({config[2] for config in browser.SITES.values()}) == len(browser.SITES)
 assert "activeAppIndex >= 16 && activeAppIndex <= 25" in social

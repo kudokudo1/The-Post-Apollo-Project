@@ -11,6 +11,7 @@ Unsupported/corrupt/unsafe files are refused rather than overwritten.
 from __future__ import annotations
 
 import argparse
+import fcntl
 import json
 import os
 from pathlib import Path
@@ -237,9 +238,25 @@ def run(action: str) -> dict[str, Any]:
         command = json.loads(raw)
     except (ValueError, UnicodeError):
         raise StoreError("INVALID_REQUEST") from None
-    current = load()
-    changed = apply(current, command)
-    save(changed)
+    # Serialize all readers-then-writers across separate Quickshell
+    # processes. The revision check is performed *inside* this lock.
+    root = root_path()
+    _assert_secure_dir(root, create=True)
+    lock_path = root / ".account-details.lock"
+    flags = os.O_RDWR | os.O_CREAT | getattr(os, "O_NOFOLLOW", 0)
+    lock_fd = os.open(lock_path, flags, 0o600)
+    try:
+        lock_info = os.fstat(lock_fd)
+        if (not stat.S_ISREG(lock_info.st_mode)
+                or lock_info.st_uid != os.getuid()
+                or lock_info.st_mode & 0o077):
+            raise StoreError("UNSAFE_LOCK")
+        fcntl.flock(lock_fd, fcntl.LOCK_EX)
+        current = load()
+        changed = apply(current, command)
+        save(changed)
+    finally:
+        os.close(lock_fd)
     return {"ok": True, "document": changed}
 
 

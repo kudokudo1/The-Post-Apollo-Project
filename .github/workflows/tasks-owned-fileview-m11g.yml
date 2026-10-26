@@ -1,0 +1,47 @@
+name: TASKS M11g isolated owner and FileView integration
+
+on:
+  pull_request:
+    paths:
+      - 'tests/tasks/fixtures/TaskFileViewOwnerHostM11g.py'
+      - 'services/projects/TaskFileViewHostBridgeM11g.qml'
+      - 'TaskFileViewHostHarnessM11g.qml'
+      - 'tests/tasks/test_task_fileview_owner_host_m11g.py'
+      - 'docs/tasks-fileview-owner-integration-m11g.md'
+      - '.github/workflows/tasks-owned-fileview-m11g.yml'
+  push:
+    branches:
+      - main
+    paths:
+      - 'tests/tasks/fixtures/TaskFileViewOwnerHostM11g.py'
+      - 'services/projects/TaskFileViewHostBridgeM11g.qml'
+      - 'TaskFileViewHostHarnessM11g.qml'
+      - 'tests/tasks/test_task_fileview_owner_host_m11g.py'
+      - 'docs/tasks-fileview-owner-integration-m11g.md'
+      - '.github/workflows/tasks-owned-fileview-m11g.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  synthetic-host:
+    runs-on: ubuntu-latest
+    timeout-minutes: 7
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: M11g OS-owned fixture and synthetic FileView host readback
+        run: python3 tests/tasks/test_task_fileview_owner_host_m11g.py
+      - name: M11e FileView callback policy still rejects false success
+        run: node tests/tasks/test_task_fileview_gate_policy_m11e.cjs
+      - name: M11d live TASKS stage mutation inventory remains exact
+        run: python3 tests/tasks/test_task_writer_gate_inventory_m11d.py
+      - name: M11c restart evidence does not silently rearm
+        run: python3 tests/tasks/test_task_writer_recovery_m11c.py
+      - name: M10q existing OS-owned process protocol regression
+        run: python3 tests/tasks/test_task_sqlite_handoff_host.py

@@ -1,0 +1,40 @@
+name: TASKS M11k production writer gate contract
+
+on:
+  pull_request:
+    paths:
+      - 'docs/tasks-production-writer-gate-m11k.md'
+      - 'tests/tasks/fixtures/task_production_gate_review_m11k.json'
+      - 'tests/tasks/test_task_production_gate_review_m11k.py'
+      - 'services/hub/ApolloHubTodoStore.qml'
+      - 'services/hub/ApolloHubTodoPolicy.js'
+      - '.github/workflows/tasks-production-gate-review-m11k.yml'
+  push:
+    branches:
+      - main
+    paths:
+      - 'docs/tasks-production-writer-gate-m11k.md'
+      - 'tests/tasks/fixtures/task_production_gate_review_m11k.json'
+      - 'tests/tasks/test_task_production_gate_review_m11k.py'
+      - 'services/hub/ApolloHubTodoStore.qml'
+      - 'services/hub/ApolloHubTodoPolicy.js'
+      - '.github/workflows/tasks-production-gate-review-m11k.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  review-only:
+    runs-on: ubuntu-latest
+    timeout-minutes: 7
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: M11k proposed gate and current JSON-only writer
+        run: python3 tests/tasks/test_task_production_gate_review_m11k.py
+      - name: M11j native observations remain correctly scoped
+        run: python3 tests/tasks/test_task_native_acceptance_m11j.py
+      - name: M11d shared writer call graph remains unchanged
+        run: python3 tests/tasks/test_task_writer_gate_inventory_m11d.py

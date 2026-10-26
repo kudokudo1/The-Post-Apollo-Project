@@ -228,6 +228,43 @@ class DiscordDockingTests(TestCase):
         self.assertIn("helperHideDiscord()", text)
         self.assertNotIn('[app_id=\\\"vesktop\\\"]', text)
 
+    def test_shared_external_geometry_round_trip_is_app_agnostic(self):
+        bridge = geometry.Bridge(0.1)
+        resized_external = {
+            "x": 480,
+            "y": 180,
+            "width": 1260,
+            "height": 820,
+        }
+
+        shared = bridge.shared_from_discord(resized_external)
+        next_external = bridge.discord_from_shared(shared)
+
+        # Discord and every browser-backed Social app use this same external
+        # slot conversion. A resize learned from one app therefore becomes the
+        # exact opening geometry of the next selected app.
+        self.assertEqual(next_external, resized_external)
+
+    def test_social_reopen_preserves_runtime_shared_geometry(self):
+        src = SOCIAL.read_text(encoding="utf-8")
+        open_block = src.split("    onMenuOpenChanged: {", 1)[1]
+
+        self.assertIn(
+            "sharedPanelX/Y/Width/Height are the canonical Social viewport",
+            open_block,
+        )
+        self.assertNotIn("sharedPanelWidth = defaultPanelWidth;", open_block)
+        self.assertNotIn("sharedPanelHeight = defaultPanelHeight;", open_block)
+        self.assertNotIn("sharedPanelX = Math.round(defaultPanelX);", open_block)
+        self.assertNotIn("sharedPanelY = Math.round(defaultPanelY);", open_block)
+
+        # Defaults still exist for the first runtime initialization only.
+        self.assertIn("property int sharedPanelWidth: defaultPanelWidth", src)
+        self.assertIn("property int sharedPanelHeight: defaultPanelHeight", src)
+        self.assertIn("sharedPanelX = Math.round(defaultPanelX);", src)
+        self.assertIn("sharedPanelY = Math.round(defaultPanelY);", src)
+        self.assertIn("function initializeSharedPosition()", src)
+
     def test_social_focus_retry_uses_real_readiness_and_repeats(self):
         src = SOCIAL.read_text(encoding="utf-8")
         chunk = src.split("id: socialFocusDelay", 1)[1].split(

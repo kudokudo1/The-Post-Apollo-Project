@@ -1,11 +1,12 @@
 import QtQuick
+import Quickshell
 import "ApolloHubAudioStreamsPolicy.js" as StreamPolicy
 
 // P3-B host adapter to the ONE Team 6 ApplicationAudioService instance.
 // It cannot invent app identities or mutate PipeWire independently.
 // Direct stream actions are checked against a new owner observation.
 // Future APP/WINDOW/TAB policy integration requires Team 7 semantic identity.
-QtObject {
+Scope {
     id: streamGate
     required property var audioOwner
     property var pending: null
@@ -86,13 +87,14 @@ QtObject {
             : "STREAM ACTION REJECTED BY AUDIO OWNER";
     }
 
-    property Connections ownerEvents: Connections {
+    Connections {
         target: streamGate.audioOwner
         function onRefreshed(inputs) {
             streamGate.observed(inputs);
         }
     }
-    property Timer requestTimeout: Timer {
+    Timer {
+        id: requestTimeout
         interval: 4000
         repeat: false
         onTriggered: {

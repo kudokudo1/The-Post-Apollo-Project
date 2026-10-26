@@ -35,7 +35,7 @@ DockButton {
     // open-fill, click handling, and state-transition behavior.
     contentGlowSource: sessionsIcon
 
-    NotoText {
+    GohuText {
         id: sessionsIcon
         anchors.centerIn: parent
         font.pixelSize: 22

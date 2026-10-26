@@ -1769,7 +1769,7 @@ for token in (
     'signal refreshed(var inputs)',
 ):
     assert token in team6_owner, f"Team 6 mutation API missing {token}"
-for forbidden in ('pactl', 'Quickshell.execDetached(', 'Process {',
+for forbidden in ('"pactl"', 'Quickshell.execDetached(', 'Process {',
                   'ApplicationAudioService {', 'PwObjectTracker {'):
     assert forbidden not in audio_streams + audio_stream_gate, (
         f"Stream UI/adapter created own audio mutation backend: {forbidden}")

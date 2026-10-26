@@ -374,12 +374,20 @@ PanelWindow {
     //   window also updates the same state and Discord follows.
 
     property int defaultPanelWidth: 1210
-    // NotificationsHubW is top+bottom anchored with a 5px bottom margin.
-    // Match that screen-relative height instead of a fixed 1355px. The
-    // legacy fallback applies only before a screen is attached.
+    // The Notification window's VISIBLE frame is inset by 8px on both
+    // ends. Social's FloatingWindow has no comparable visible-frame inset:
+    // size it to that actual frame, not to Notifications' outer window.
+    property var notificationsReference: null
+    readonly property int notificationsFrameInset:
+        notificationsReference ? notificationsReference.frameInset : 8
+    readonly property int notificationsBottomMargin:
+        notificationsReference ? notificationsReference.panelBottomMargin : 5
     property int defaultPanelHeight: Math.max(
         minimumSharedHeight,
-        (screen ? Math.round(screen.height) : 1360) - 5
+        notificationsReference
+        ? Math.round(notificationsReference.height) - 2 * notificationsFrameInset
+        : (screen ? Math.round(screen.height) : 1360)
+          - notificationsBottomMargin - 2 * notificationsFrameInset
     )
 
     property int sharedPanelWidth: defaultPanelWidth
@@ -483,13 +491,13 @@ PanelWindow {
     // and can be changed from Sway move operations.
     readonly property int defaultPanelX: swayAreaX + swayAreaWidth - margins.right - defaultPanelWidth
 
-    // A notification-height floating Social window would run past the
-    // output when Sway's workspace starts below the top bar. Shift its
-    // initial Y upward just enough to keep the requested 5px bottom gap;
-    // explicit operator Mod-move/resize still wins after initialization.
+    // Initial Social bottom matches Notifications' visible frame bottom,
+    // accounting for the 5px outer margin AND the frame's inner 8px inset.
+    // The Sway workspace rect gives us the output's bottom coordinate;
+    // operator Mod-move/resize keeps its existing authority afterward.
     readonly property int defaultPanelY: Math.max(
-        0, Math.min(swayAreaY + margins.top,
-                    swayAreaY + swayAreaHeight - defaultPanelHeight - 5)
+        0, Math.round(swayAreaY + swayAreaHeight - defaultPanelHeight
+                      - notificationsBottomMargin - notificationsFrameInset)
     )
 
     readonly property int discordX: sharedPanelX + appSelectorWidth + discordGap + discordInset

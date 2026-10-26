@@ -561,6 +561,8 @@ PanelWindow {
 
             HospitalW {
                 id: hospitalWindow
+                // Reuse the Notifications window's compositor-owned geometry.
+                notificationsReference: notificationsHubWindow
                 focusKeyTraceEnabled: shellRoot.focusKeyTraceEnabled
 
                 screen: Quickshell.screens.find(s => s.name === "DP-5")
@@ -929,6 +931,7 @@ PanelWindow {
 
             MessagingW {
                 id: messagingWindow
+                notificationsReference: notificationsHubWindow
 
                 anchors {
                     top: true

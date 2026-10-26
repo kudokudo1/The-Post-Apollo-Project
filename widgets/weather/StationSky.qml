@@ -884,15 +884,29 @@ Rectangle {
                             }
                         }
 
-                        QuietText {
+                        Row {
                             anchors.horizontalCenter: parent.horizontalCenter
-                            text: "MOON " + (
-                                WeatherCyclePolicy.normalizedPhase(modelData.moonPhase) !== "unknown"
-                                ? modelData.moonPhase.toUpperCase() : "--")
-                                + (modelData.moonIllumination >= 0
-                                    ? " // " + Math.round(modelData.moonIllumination) + "%"
-                                    : "")
-                            font.pixelSize: 9
+                            spacing: 4
+
+                            WeatherCelestialGlyph {
+                                width: 20
+                                height: 20
+                                mode: "moon"
+                                moonPhase: WeatherCyclePolicy.normalizedPhase(
+                                    modelData.moonPhase)
+                                ink: sky.iconColor(dailyForecastArtwork.forecastState.color)
+                            }
+
+                            QuietText {
+                                anchors.verticalCenter: parent.verticalCenter
+                                text: "MOON " + (
+                                    WeatherCyclePolicy.normalizedPhase(modelData.moonPhase) !== "unknown"
+                                    ? modelData.moonPhase.toUpperCase() : "--")
+                                    + (modelData.moonIllumination >= 0
+                                        ? " // " + Math.round(modelData.moonIllumination) + "%"
+                                        : "")
+                                font.pixelSize: 9
+                            }
                         }
                     }
                 }

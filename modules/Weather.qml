@@ -188,12 +188,25 @@ DockButton {
                     Text {
                         id: weatherCondition
                         anchors.centerIn: parent
-                        text: weatherDock.celestialMode === "moon-cloud"
-                              ? "☁︎" : weatherDock.weatherState.icon
-                        font.pixelSize: weatherDock.skyCycle.solar === "night" ? 35 : 42
+                        text: weatherDock.weatherState.icon
+                        font.pixelSize: 42
+                        scale: weatherDock.skyCycle.solar === "night" ? 0.85 : 1
+                        anchors.horizontalCenterOffset:
+                            weatherDock.skyCycle.solar === "night" ? -4 : 0
                         color: weatherDock.foregroundColor
                         visible: weatherDock.celestialMode === "weather"
-                                 || weatherDock.celestialMode === "moon-cloud"
+
+                    }
+
+                    // The ordinary 42px weather glyph stays untouched.
+                    // Partly cloudy nights use a cloud under the anchored moon.
+                    Text {
+                        anchors.centerIn: parent
+                        anchors.horizontalCenterOffset: -4
+                        text: "☁︎"
+                        font.pixelSize: 35
+                        color: weatherDock.foregroundColor
+                        visible: weatherDock.celestialMode === "moon-cloud"
                     }
 
                     // Swap the original icon in place, preserving the

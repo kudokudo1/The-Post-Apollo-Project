@@ -27,6 +27,12 @@ MARK="M11E_SYNTHETIC_ONLY"
 MAX_LINE=1024
 MAX_REQUESTS=100
 MAX_FIXTURE=2048
+# Explicit, isolated test-only crash windows. NEVER supplied by QML.
+FAULT_WINDOWS = frozenset({
+    "after_admit_commit", "after_readback_before_settle",
+    "after_settle_commit", "after_freeze_commit"
+})
+FAULT_EXIT_CODE = 86
 
 
 def exact(data, fields):
@@ -127,7 +133,15 @@ def send(sink,response):
     sink.flush()
 
 
-def serve(db,writer_id,*,bootstrap=False,source=None,sink=None):
+def serve(db,writer_id,*,bootstrap=False,source=None,sink=None,
+          fault_at=None):
+    if fault_at is not None and fault_at not in FAULT_WINDOWS:
+        raise ValueError("INVALID_TEST_FAULT")
+    def crash_at(window):
+        if fault_at == window:
+            # Uncatchable process death after an explicit fixture-only
+            # checkpoint. Does not fake a clean reply or close() the owner.
+            os._exit(FAULT_EXIT_CODE)
     incoming=source if source is not None else sys.stdin.buffer
     outgoing=sink if sink is not None else sys.stdout
     try:
@@ -178,6 +192,7 @@ def serve(db,writer_id,*,bootstrap=False,source=None,sink=None):
                             raise AdmissionError("EXTERNAL_FIXTURE_CHANGE")
                         expected=encode_next(document)
                         reservation=host.admit_stage(req["stageId"])
+                        crash_at("after_admit_commit")
                         active={"stageId":req["stageId"],"expected":expected,
                             "baseline":hashlib.sha256(data).hexdigest(),
                             "epoch":reservation["epoch"]}
@@ -193,7 +208,9 @@ def serve(db,writer_id,*,bootstrap=False,source=None,sink=None):
                             host.settle_stage(active["stageId"],saved=False)
                             active=None
                             raise
+                        crash_at("after_readback_before_settle")
                         host.settle_stage(active["stageId"],saved=True)
+                        crash_at("after_settle_commit")
                         last_known_revision+=1
                         last_known_hash=hashlib.sha256(data).hexdigest()
                         active=None
@@ -204,6 +221,7 @@ def serve(db,writer_id,*,bootstrap=False,source=None,sink=None):
                         active=None
                     elif kind=="freeze":
                         host.freeze(req["expectedEpoch"])
+                        crash_at("after_freeze_commit")
                     send(outgoing,reply(rid,kind,True,"TEST_ONLY_OBSERVATION",host,payload))
                 except (AdmissionError,TypeError,ValueError) as exc:
                     code=str(exc)
@@ -222,5 +240,7 @@ if __name__=="__main__":
     ap.add_argument("--db",type=Path,required=True)
     ap.add_argument("--writer-id",required=True)
     ap.add_argument("--bootstrap-fixture",action="store_true")
+    ap.add_argument("--m11h-test-fault",choices=sorted(FAULT_WINDOWS))
     args=ap.parse_args()
-    raise SystemExit(serve(args.db,args.writer_id,bootstrap=args.bootstrap_fixture))
+    raise SystemExit(serve(args.db,args.writer_id,bootstrap=args.bootstrap_fixture,
+                           fault_at=args.m11h_test_fault))

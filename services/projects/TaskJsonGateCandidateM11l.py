@@ -239,9 +239,8 @@ class CandidateOwner:
                 os.close(fd)
             else:
                 require(self.dbpath.exists(), "JOURNAL_MISSING")
-                require(source_bytes(folder / "source-before-gate.bak") ==
-                        source_bytes(folder / "source-before-gate.bak"),
-                        "BACKUP_UNAVAILABLE")
+                previous_backup = stable_source(folder / "source-before-gate.bak")
+                parse_task_document(previous_backup)
             owned_regular(self.dbpath)
             self._db = sqlite3.connect(str(self.dbpath),
                                        timeout=0.2, isolation_level=None)
@@ -254,10 +253,11 @@ class CandidateOwner:
                     id INTEGER PRIMARY KEY CHECK (id=1),
                     phase TEXT NOT NULL, epoch INTEGER NOT NULL,
                     writer TEXT NOT NULL, source_hash TEXT NOT NULL,
+                    backup_hash TEXT NOT NULL,
                     pending_stage TEXT, expected_hash TEXT,
                     reason TEXT NOT NULL)""")
-                self._db.execute("INSERT INTO owner VALUES (1,'JSON_ACTIVE',0,?,?,NULL,NULL,'')",
-                                 (writer_id, digest(raw)))
+                self._db.execute("INSERT INTO owner VALUES (1,'JSON_ACTIVE',0,?,?,?,NULL,NULL,'')",
+                                 (writer_id, digest(raw), digest(raw)))
                 self._db.execute("PRAGMA user_version=1")
                 self._db.commit()
             else:
@@ -266,6 +266,8 @@ class CandidateOwner:
                 self._db.execute("BEGIN IMMEDIATE")
                 row = self._row()
                 require(row["epoch"] < 1000000000, "EPOCH_EXHAUSTED")
+                require(row["backup_hash"] == digest(previous_backup),
+                        "BACKUP_CHANGED")
                 self._db.execute("""UPDATE owner SET phase='RECOVERY_REVIEW',
                     epoch=epoch+1, writer=?, reason='FRESH_OWNER_MUST_REVIEW'
                     WHERE id=1""", (writer_id,))
@@ -326,14 +328,18 @@ class CandidateOwner:
         self._db.execute("BEGIN IMMEDIATE")
         try:
             row = self._row()
-            require(row["phase"] == "JSON_ACTIVE" and
-                    row["writer"] == self.writer_id and
-                    row["epoch"] == expected_epoch and
+            phase_ok = (row["phase"] == "JSON_ACTIVE"
+                        and row["epoch"] == expected_epoch) or (
+                        row["phase"] == "FREEZE_REQUESTED"
+                        and row["epoch"] == expected_epoch + 1)
+            require(phase_ok and row["writer"] == self.writer_id and
                     row["pending_stage"] == stage_id, "STALE_STAGE")
             require(digest(current) == row["expected_hash"],
                     "READBACK_MISMATCH")
             self._db.execute("""UPDATE owner SET pending_stage=NULL,
-                expected_hash=NULL,source_hash=? WHERE id=1""",
+                expected_hash=NULL,source_hash=?,
+                phase=CASE WHEN phase='FREEZE_REQUESTED' THEN
+                    'JSON_QUIESCED' ELSE phase END WHERE id=1""",
                              (digest(current),))
             self._db.commit()
         except BaseException:
@@ -348,10 +354,12 @@ class CandidateOwner:
             row = self._row()
             require(row["writer"] == self.writer_id and
                     row["phase"] == "JSON_ACTIVE" and
-                    row["epoch"] == expected_epoch and
-                    row["pending_stage"] is None, "FREEZE_REFUSED")
-            self._db.execute("""UPDATE owner SET phase='JSON_QUIESCED',
-                epoch=epoch+1, reason='EXPLICIT_TEST_FREEZE' WHERE id=1""")
+                    row["epoch"] == expected_epoch, "FREEZE_REFUSED")
+            next_phase = ("FREEZE_REQUESTED" if row["pending_stage"] is not None
+                          else "JSON_QUIESCED")
+            self._db.execute("""UPDATE owner SET phase=?,
+                epoch=epoch+1, reason='EXPLICIT_TEST_FREEZE' WHERE id=1""",
+                             (next_phase,))
             self._db.commit()
         except BaseException:
             self._db.rollback()

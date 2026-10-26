@@ -1,0 +1,19 @@
+name: Social BeReal Feasibility Contract
+
+on:
+  pull_request:
+    paths:
+      - "services/messaging/bridges/bereal/**"
+      - "tests/messaging/test_bereal_feasibility_contract.py"
+      - ".github/workflows/social-bereal-feasibility.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  feasibility:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate BeReal provider blocker
+        run: python3 tests/messaging/test_bereal_feasibility_contract.py

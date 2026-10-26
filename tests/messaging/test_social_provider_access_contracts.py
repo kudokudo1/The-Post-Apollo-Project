@@ -4,6 +4,7 @@ import json
 from pathlib import Path
 import subprocess
 import sys
+import tempfile
 import unittest
 from unittest.mock import patch
 
@@ -64,6 +65,7 @@ class ProviderAccessContracts(unittest.TestCase):
 
     def test_web_fallback_sites_keep_existing_profiles_distinct(self):
         self.assertEqual(set(browser.WEB_FALLBACK_SITES), {"whatsappweb", "messengerweb"})
+        self.assertEqual(set(browser.EXTENSION_SITES), {"linechrome"})
         self.assertEqual(len(browser.SITES), 21)
         self.assertEqual(set(browser.ALL_SITES), set(geometry.BROWSER_SITES))
         self.assertEqual(browser.site_config("whatsappweb"),
@@ -74,6 +76,42 @@ class ProviderAccessContracts(unittest.TestCase):
             '[class="post-apollo-whatsappweb"]')
         self.assertEqual(geometry.sway_criteria("messengerweb"),
             '[class="post-apollo-messengerweb"]')
+        self.assertEqual(browser.site_config("linechrome"),
+            (browser.LINE_EXTENSION_URL, "post-apollo-linechrome", "linechrome-browser"))
+        self.assertEqual(geometry.sway_criteria("linechrome"),
+            '[class="post-apollo-linechrome"]')
+
+    def test_line_chrome_requires_explicit_install_in_isolated_profile(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            prefix = ["/usr/bin/chromium"]
+            with patch.object(browser, "browser_prefix", return_value=prefix):
+                with patch.dict(browser.os.environ, {"XDG_DATA_HOME": tmp}):
+                    self.assertFalse(browser.line_extension_installed(prefix))
+                    with patch.object(browser.subprocess, "Popen") as spawn:
+                        browser.setup("linechrome")
+                    spawn.assert_called_once()
+                    setup_command = spawn.call_args.args[0]
+                    self.assertIn(f"--app={browser.LINE_EXTENSION_STORE_URL}", setup_command)
+                    self.assertIn("--class=post-apollo-linechrome-setup", setup_command)
+                    self.assertIn(
+                        f"--user-data-dir={tmp}/post-apollo/linechrome-browser",
+                        setup_command,
+                    )
+
+                    extension = (
+                        Path(tmp) / "post-apollo" / "linechrome-browser"
+                        / "Default" / "Extensions" / browser.LINE_EXTENSION_ID
+                        / "3.7.2_0"
+                    )
+                    extension.mkdir(parents=True)
+                    self.assertTrue(browser.line_extension_installed(prefix))
+                    command = browser.browser_command("linechrome")
+                    self.assertIn(f"--app={browser.LINE_EXTENSION_URL}", command)
+                    self.assertIn("--class=post-apollo-linechrome", command)
+                    self.assertIn(
+                        f"--user-data-dir={tmp}/post-apollo/linechrome-browser",
+                        command,
+                    )
 
     def test_browser_launch_explicit_and_no_profile_collision(self):
         with patch.object(browser, "browser_prefix", return_value=["/usr/bin/chromium"]):
@@ -112,6 +150,11 @@ class ProviderAccessContracts(unittest.TestCase):
         self.assertIn("serviceIndex: messagingWindow.activeAppIndex", social)
         self.assertIn("messagingWindow.openProviderWeb(serviceId);", social)
         self.assertIn('panel.browserRequested(panel.serviceId)', panel)
+        self.assertIn('serviceId === "line"', panel)
+        self.assertIn('"setup", "linechrome"', panel)
+        self.assertIn('"status", "linechrome"', panel)
+        self.assertIn('"OPEN LINE FOR CHROME"', panel)
+        self.assertIn('activeAppIndex === 28 && providerWebOpen ? "linechrome"', social)
         self.assertIn('Quickshell.shellPath("services/messaging/DesktopServiceLauncher.py")', panel)
         self.assertIn('"probe", serviceId', panel)
         self.assertIn('"open", serviceId', panel)

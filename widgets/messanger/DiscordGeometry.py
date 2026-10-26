@@ -287,6 +287,9 @@ class Bridge:
         self.discord_docked = False
         self.x_selected = False
         self.x_ready = False
+        # Browser windows may lead only after Social verified their Sway
+        # placement; a transient splash/scratchpad rectangle cannot lead.
+        self.x_docked = False
         self.browser_site = "x"
 
     @staticmethod
@@ -368,7 +371,7 @@ class Bridge:
         # path unchanged while allowing the same fast-follow for X.
         guest_id = (
             "discord" if self.discord_selected and self.discord_ready and self.discord_docked else
-            self.browser_site if self.x_selected and self.x_ready else ""
+            self.browser_site if self.x_selected and self.x_ready and self.x_docked else ""
         )
         if not guest_id:
             return snapshot
@@ -548,6 +551,10 @@ class Bridge:
                 ) and self.discord_selected and self.discord_ready
                 self.x_selected = bool(message.get("xSelected", False))
                 self.x_ready = bool(message.get("xReady", False))
+                self.x_docked = (
+                    bool(message.get("xDocked", False))
+                    and self.x_selected and self.x_ready
+                )
                 candidate = str(message.get("browserSite", "x"))
                 self.browser_site = candidate if candidate in BROWSER_SITES else "x"
                 continue

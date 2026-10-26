@@ -43,7 +43,7 @@ class SocialFamilyManagerContracts(unittest.TestCase):
         self.assertIn('appSelector.settingsOpen = !appSelector.settingsOpen', SELECTOR)
         self.assertIn('bottom: statusMessage.visible ? statusMessage.top : settingsFooter.top',
                       SELECTOR)
-        self.assertIn('visible: !appSelector.settingsOpen', SELECTOR)
+        self.assertIn("enabled: !appSelector.settingsOpen", SELECTOR)
         self.assertNotIn('FloatingWindow {', SELECTOR)
 
     def test_stale_identity_and_not_yet_saved_action_guards(self):
@@ -107,8 +107,7 @@ class SocialFamilyManagerContracts(unittest.TestCase):
             'Qt.openUrlExternally(', 'Process {', 'Timer {',
         ):
             self.assertNotIn(prohibited, POLICY + STORE, prohibited)
-        section=SELECTOR.split('text: "BUTTON FAMILIES"',1)[1].split(
-            'text: "LINKED ACCOUNTS"',1)[0]
+        section=SELECTOR.split('text: "BUTTON FAMILIES"',1)[1]
         self.assertNotIn('appActivated(',section)
         self.assertNotIn('activateApp(',section)
         self.assertNotIn('FileView {',section)

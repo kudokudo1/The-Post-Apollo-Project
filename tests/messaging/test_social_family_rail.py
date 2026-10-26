@@ -76,8 +76,9 @@ class SocialFamilyRailSource(unittest.TestCase):
         self.assertNotIn("SocialIdentityStore", HOST)
         for forbidden in ("startLogin(", "sendMessage(", "activateApp("):
             self.assertNotIn(forbidden, POLICY + STORE)
-        self.assertIn("messagingWindow.externalSelected ? messagingWindow.appSelectorWidth : socialWindow.width",
+        self.assertIn("messagingWindow.appSelectorWidth : socialWindow.width",
                       HOST)
+        self.assertIn("appSelector.settingsOpen", HOST)
 
 
 if __name__ == "__main__":

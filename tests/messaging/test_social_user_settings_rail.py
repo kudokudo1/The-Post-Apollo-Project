@@ -44,7 +44,8 @@ class SocialUserSettingsRailContracts(unittest.TestCase):
             SELECTOR[footer:footer + 550],
         )
         self.assertNotIn("appSelector.appActivated", SELECTOR[footer:footer + 600])
-        self.assertIn("visible: !appSelector.settingsOpen", SELECTOR)
+        self.assertIn("visible: true", SELECTOR)
+        self.assertIn("enabled: !appSelector.settingsOpen", SELECTOR)
 
     def test_settings_page_and_status_do_not_hide_footer(self):
         self.assertIn("id: settingsPage", SELECTOR)
@@ -69,8 +70,11 @@ class SocialUserSettingsRailContracts(unittest.TestCase):
 
     def test_external_input_mask_and_routing_unchanged(self):
         self.assertIn(
-            "messagingWindow.externalSelected ? messagingWindow.appSelectorWidth : socialWindow.width",
+            "messagingWindow.appSelectorWidth : socialWindow.width",
             HOST,
+        )
+        self.assertIn(
+            "? socialWindow.width", HOST,
         )
         self.assertIn("activeAppIndex === 0 || activeAppIndex === 2", HOST)
         self.assertIn("activeAppIndex === 1", HOST)

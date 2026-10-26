@@ -517,7 +517,14 @@ PanelWindow {
             x: 0
             y: 0
 
-            width: messagingWindow.menuOpen ? (messagingWindow.externalSelected ? messagingWindow.appSelectorWidth : socialWindow.width) : 0
+            // Settings temporarily owns the contact/chat input surface.
+            // When closed, external apps retain the original rail mask.
+            width: messagingWindow.menuOpen
+                   ? (appSelector.settingsOpen
+                      ? socialWindow.width
+                      : (messagingWindow.externalSelected
+                         ? messagingWindow.appSelectorWidth : socialWindow.width))
+                   : 0
 
             height: messagingWindow.menuOpen ? socialWindow.height : 0
         }
@@ -928,13 +935,13 @@ PanelWindow {
     }
 
     function raiseX() {
-        if (!menuOpen || !xSelected || !xReady)
+        if (!menuOpen || !xSelected || !xReady || appSelector.settingsOpen)
             return;
         sendGeometryHelper({ op: "focusX" });
     }
 
     function raiseDiscord() {
-        if (!menuOpen || !discordSelected || !discordReady)
+        if (!menuOpen || !discordSelected || !discordReady || appSelector.settingsOpen)
             return;
 
         helperFocusDiscord();
@@ -1348,6 +1355,9 @@ PanelWindow {
 
         AppSelector {
             id: appSelector
+            // One existing Social window; contact/chat space hosts Settings.
+            settingsWorkspaceParent: messagingContent.contentItem
+            settingsContactWidth: messagingWindow.contactListWidth
             // WhatsApp and Messenger are reserved for future Session-style adapters.
             // Do not show fake contacts or launch external browser windows.
             statusText: messagingWindow.xSelected ? messagingWindow.xError
@@ -1375,8 +1385,19 @@ PanelWindow {
             }
 
             onSettingsOpenChanged: {
-                if (settingsOpen && messagingWindow.menuOpen)
+                if (!messagingWindow.menuOpen)
+                    return;
+                if (settingsOpen) {
+                    discordRaiseDelay.stop();
+                    xRaiseDelay.stop();
+                    // Focus the existing Social FloatingWindow for editing.
                     messagingWindow.focusAppSelector();
+                    socialWindow.requestActivate();
+                } else if (messagingWindow.discordSelected) {
+                    messagingWindow.raiseDiscord();
+                } else if (messagingWindow.xSelected) {
+                    messagingWindow.raiseX();
+                }
             }
 
             // The AppSelector's OWN MouseArea emits this only
@@ -1401,7 +1422,8 @@ PanelWindow {
 
             // Discord keeps the normal contact panel instantiated underneath
             // Vesktop; discordMode only empties its inner contents.
-            visible: messagingWindow.menuOpen && !providerAccessPanel.visible
+            visible: messagingWindow.menuOpen && !appSelector.settingsOpen
+                     && !providerAccessPanel.visible
                      && !messagingWindow.providerDesktopManaged
 
             discordMode: messagingWindow.externalSelected
@@ -1449,7 +1471,8 @@ PanelWindow {
             y: 0
             width: Math.max(1, messagingContent.width - x)
             height: messagingContent.height
-            visible: messagingWindow.menuOpen && messagingWindow.activeAppIndex === 2
+            visible: messagingWindow.menuOpen && !appSelector.settingsOpen
+                     && messagingWindow.activeAppIndex === 2
                      && messageRouter.telegramNeedsSetup
             z: 2
         }
@@ -1467,7 +1490,8 @@ PanelWindow {
             y: 0
             width: Math.max(1, messagingContent.width - x)
             height: messagingContent.height
-            visible: messagingWindow.menuOpen && messagingWindow.providerAccessSelected
+            visible: messagingWindow.menuOpen && !appSelector.settingsOpen
+                     && messagingWindow.providerAccessSelected
                      && !messagingWindow.providerWebOpen && !messagingWindow.providerDesktopManaged
             z: 2
             onBrowserRequested: function(serviceId) {
@@ -1502,7 +1526,8 @@ PanelWindow {
 
             // Discord keeps the normal chat panel instantiated underneath
             // Vesktop; discordMode only empties its inner contents.
-            visible: messagingWindow.menuOpen && !telegramConnectPanel.visible
+            visible: messagingWindow.menuOpen && !appSelector.settingsOpen
+                     && !telegramConnectPanel.visible
                      && !providerAccessPanel.visible
                      && !messagingWindow.providerDesktopManaged
 

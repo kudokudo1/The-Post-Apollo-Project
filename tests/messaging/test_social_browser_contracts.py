@@ -138,6 +138,14 @@ for site in ("x", "instagram", "facebook", "reddit", "threads", "pinterest", "tr
     assert result["fastLeader"] == site
     assert commands and commands[0]["target"] == "social"
 
+# All browser-backed apps consume the same canonical Social external slot.
+# Switching browserSite changes identity/profile only; geometry remains derived
+# from sharedPanel through the common Discord/external conversion.
+assert "syncHelperWindow(browserSite, discordX, discordY, discordWidth," in social
+assert "discordHeight, focusWindow, !xConfigured);" in social
+assert "sharedPanelWidth = defaultPanelWidth;" not in social.split("onMenuOpenChanged: {", 1)[1]
+assert "sharedPanelHeight = defaultPanelHeight;" not in social.split("onMenuOpenChanged: {", 1)[1]
+
 # Expanded social/network apps with actual desktop browser entry points.
 additional_web_modes = (
     (16, "linkedin", "LINKEDIN", "https://www.linkedin.com/"),

@@ -99,7 +99,7 @@ assert "property var notificationsReference: null" in social
 assert "notificationsReference.frameInset : 8" in social
 assert "notificationsReference.panelBottomMargin : 5" in social
 assert "Math.round(notificationsReference.height) - 2 * notificationsFrameInset" in social
-assert "sharedPanelHeight = defaultPanelHeight;" in social
+assert "property int sharedPanelHeight: defaultPanelHeight" in social
 assert "height: messagingWindow.sharedPanelHeight" in social
 # Sway's get_workspaces rect already begins below the reserved bar/gap.
 # Previous QScreen.geometry.y (physical top) positioned Social behind it.
@@ -129,8 +129,14 @@ for workspace_x, workspace_width in ((0, 2560), (2573, 1360), (-1920, 1920)):
     # Sway may independently constrain visible placement at runtime.
     assert workspace_x + workspace_width - (new_x + 1210) == -4
 assert "property int defaultPanelHeight: Math.max(" in social
-assert "sharedPanelWidth = defaultPanelWidth;" in social
-assert "sharedPanelHeight = defaultPanelHeight;" in social
+# Runtime geometry may diverge after the user resizes Social or any verified
+# external app. Defaults are first-runtime initialization only; reopening the
+# menu must not overwrite the canonical shared rectangle.
+menu_open = social.split("onMenuOpenChanged: {", 1)[1]
+assert "sharedPanelWidth = defaultPanelWidth;" not in menu_open
+assert "sharedPanelHeight = defaultPanelHeight;" not in menu_open
+assert "property int sharedPanelWidth: defaultPanelWidth" in social
+assert "property int sharedPanelHeight: defaultPanelHeight" in social
 assert "const" not in social.split("readonly property int defaultPanelY:", 1)[1].split("readonly property int discordX:", 1)[0]
 assert "notificationsReference: notificationsHubWindow" in shell
 assert shell.count("notificationsReference: notificationsHubWindow") == 2

@@ -119,6 +119,14 @@ for token in (
     'label: countdownUi.timerRunning ? "PAUSE"',
     'label: "RESET"',
     '"CONFIRM REMOVE TIMER"',
+    'EDIT REQUESTED // AWAIT OWNER STATE',
+    'if (editDirty && selectedTimer !== null',
+    'selectedTimer.name === nameDraft',
+    'selectedTimer.hours === hoursDraft',
+    'selectedTimer.minutes === minutesDraft',
+    'selectedTimer.seconds === secondsDraft',
+    'selectedTimer.status === "finished"',
+    '? "RESTART" : "START"',
     'countdownUi.issue("remove");',
 ):
     assert token in controls, "Countdown controls missing: " + token

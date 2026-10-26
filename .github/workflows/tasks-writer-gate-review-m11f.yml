@@ -1,0 +1,49 @@
+name: TASKS M11f production writer gate mock acceptance
+
+on:
+  pull_request:
+    paths:
+      - 'services/projects/TaskWriterGateMockM11f.js'
+      - 'tests/tasks/fixtures/task_writer_gate_review_m11f.json'
+      - 'tests/tasks/test_task_writer_gate_mock_m11f.cjs'
+      - 'tests/tasks/test_task_writer_gate_design_m11f.py'
+      - 'docs/tasks-writer-gate-production-review-m11f.md'
+      - '.github/workflows/tasks-writer-gate-review-m11f.yml'
+  push:
+    branches:
+      - main
+    paths:
+      - 'services/projects/TaskWriterGateMockM11f.js'
+      - 'tests/tasks/fixtures/task_writer_gate_review_m11f.json'
+      - 'tests/tasks/test_task_writer_gate_mock_m11f.cjs'
+      - 'tests/tasks/test_task_writer_gate_design_m11f.py'
+      - 'docs/tasks-writer-gate-production-review-m11f.md'
+      - '.github/workflows/tasks-writer-gate-review-m11f.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  gate-review:
+    runs-on: ubuntu-latest
+    timeout-minutes: 7
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: M11f mocked durable reservation callback readback settle freeze
+        run: node tests/tasks/test_task_writer_gate_mock_m11f.cjs
+      - name: M11f production integration source preflight and non-activation
+        run: python3 tests/tasks/test_task_writer_gate_design_m11f.py
+      - name: M11e disposable actual FileView policy callback regression
+        run: node tests/tasks/test_task_fileview_gate_policy_m11e.cjs
+      - name: M11d live writer entry and caller inventory regression
+        run: python3 tests/tasks/test_task_writer_gate_inventory_m11d.py
+      - name: M11c OS-owned recovery checkpoint regression
+        run: python3 tests/tasks/test_task_writer_recovery_m11c.py
+      - name: M10p cross-process durable ownership regression
+        run: python3 tests/tasks/test_sqlite_writer_authority_fixture.py

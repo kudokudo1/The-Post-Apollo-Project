@@ -10,6 +10,11 @@ Item {
     property var timeSnapshot: null
     property bool use24Hour: true
     signal toggleHourFormat()
+    property var countdownSnapshot: null
+    signal countdownActionRequested(int id, string action,
+                                    string name, string hours,
+                                    string minutes, string seconds)
+    signal countdownInputFocusChanged(bool focused)
     property var stopwatchSnapshot: null
     property string selectedTool: "clock"
     signal stopwatchActionRequested(string action)
@@ -25,7 +30,9 @@ Item {
         && typeof timeSnapshot.dateLabel === "string"
         && typeof timeSnapshot.utcOffsetLabel === "string"
     readonly property string statusLine:
-        densityLevel > 1 && selectedTool === "stopwatch"
+        densityLevel > 1 && selectedTool === "countdown"
+        ? countdownControls.statusLine
+        : densityLevel > 1 && selectedTool === "stopwatch"
         ? stopwatchControls.statusLine
         : timeReady
         ? "TIME // LOCAL CLOCK // " + (use24Hour ? "24H" : "12H")
@@ -43,7 +50,7 @@ Item {
         spacing: 5
 
         ActionButton {
-            width: Math.max(1,(parent.width-parent.spacing)/2)
+            width: Math.max(1,(parent.width-parent.spacing * 2)/3)
             height: parent.height
             label: "CLOCK"
             labelPixelSize: 11
@@ -52,13 +59,22 @@ Item {
             onLeftClicked: timeMini.selectedTool = "clock"
         }
         ActionButton {
-            width: Math.max(1,(parent.width-parent.spacing)/2)
+            width: Math.max(1,(parent.width-parent.spacing * 2)/3)
             height: parent.height
             label: "STOPWATCH"
             labelPixelSize: 11
             selected: timeMini.selectedTool === "stopwatch"
             softGlowEnabled: false
             onLeftClicked: timeMini.selectedTool = "stopwatch"
+        }
+        ActionButton {
+            width: Math.max(1,(parent.width-parent.spacing * 2)/3)
+            height: parent.height
+            label: "COUNTDOWN"
+            labelPixelSize: 10
+            selected: timeMini.selectedTool === "countdown"
+            softGlowEnabled: false
+            onLeftClicked: timeMini.selectedTool = "countdown"
         }
     }
 
@@ -69,6 +85,26 @@ Item {
         stopwatchSnapshot: timeMini.stopwatchSnapshot
         onActionRequested: function(action) {
             timeMini.stopwatchActionRequested(action);
+        }
+        anchors.top: timeToolsTabs.bottom
+        anchors.topMargin: 8
+        anchors.left: parent.left
+        anchors.right: parent.right
+        anchors.bottom: parent.bottom
+    }
+
+    ApolloHubCountdownControls {
+        id: countdownControls
+        visible: timeMini.densityLevel > 1
+                 && timeMini.selectedTool === "countdown"
+        countdownSnapshot: timeMini.countdownSnapshot
+        onActionRequested: function(id, action, name,
+                                    hours, minutes, seconds) {
+            timeMini.countdownActionRequested(
+                id, action, name, hours, minutes, seconds);
+        }
+        onInputFocusChanged: function(focused) {
+            timeMini.countdownInputFocusChanged(focused);
         }
         anchors.top: timeToolsTabs.bottom
         anchors.topMargin: 8

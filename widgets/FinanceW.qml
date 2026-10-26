@@ -719,6 +719,12 @@ PanelWindow {
                     customArtwork: true
                     customPrimaryGlowSource: mainIcon
                     customLabelGlowSource: mainModeLabel
+                    // Keep the sampled effect on the same coordinate plane
+                    // as its direct source, like AppControl's moving KILL icon.
+                    // No stale mapToItem() projection during centered layout,
+                    // hover transitions, or glyph width changes.
+                    primaryGlowHost: mainIconSlot
+                    labelGlowHost: mainModeLabelSlot
                     primaryGlowEnabled: !modelData.future
                     labelGlowEnabled: !modelData.future
                     bordered: false
@@ -731,11 +737,19 @@ PanelWindow {
                         width: parent.width
                         spacing: 2
 
+                        // A Column-owned slot positions the icon; the glow
+                        // is an independent sibling of the sampled mainIcon.
+                        // Avoid attaching sampled effects directly to a Column.
                         Item {
-                            id: mainIcon
-                            anchors.horizontalCenter: parent.horizontalCenter
-                            width: parent.width - 6
+                            id: mainIconSlot
+                            width: parent.width
                             height: 31
+
+                            Item {
+                                id: mainIcon
+                                anchors.horizontalCenter: parent.horizontalCenter
+                                width: parent.width - 6
+                                height: parent.height
 
                             GohuText {
                                 anchors.centerIn: parent
@@ -807,9 +821,18 @@ PanelWindow {
                                     color: mainModeButton.primaryColor
                                 }
                             }
+                            }
                         }
 
-                        GohuText {
+                        // The caption uses an identical local glow plane.
+                        // It remains a Column slot, not a layout-affecting
+                        // effect child or a separately projected texture.
+                        Item {
+                            id: mainModeLabelSlot
+                            width: parent.width
+                            height: mainModeLabel.implicitHeight
+
+                            GohuText {
                             id: mainModeLabel
                             anchors.horizontalCenter: parent.horizontalCenter
                             width: parent.width - 4
@@ -823,6 +846,7 @@ PanelWindow {
                             opacity: mainModeButton.pressed ? 0.42
                                      : mainModeButton.selected || mainModeButton.hovered
                                      ? 0.48 : 0.34
+                            }
                         }
                     }
 

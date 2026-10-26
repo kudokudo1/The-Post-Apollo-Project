@@ -1,0 +1,50 @@
+name: Social Contact and Chat Settings Workspace
+
+on:
+  pull_request:
+    paths:
+      - 'widgets/messanger/AppSelector.qml'
+      - 'widgets/messanger/MessagingW.qml'
+      - 'tests/messaging/test_social_settings_workspace.py'
+      - 'tests/messaging/test_social_user_settings_rail.py'
+      - 'tests/messaging/test_social_family_rail.py'
+      - 'tests/messaging/test_social_family_manager.py'
+      - 'tests/messaging/test_social_family_order_visibility.py'
+      - 'tests/messaging/test_social_safe_family_removal.py'
+      - 'tests/messaging/test_social_provider_access_contracts.py'
+      - '.github/workflows/social-settings-workspace.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'widgets/messanger/AppSelector.qml'
+      - 'widgets/messanger/MessagingW.qml'
+      - 'tests/messaging/test_social_settings_workspace.py'
+      - '.github/workflows/social-settings-workspace.yml'
+  workflow_dispatch:
+
+jobs:
+  workspace-contracts:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify contact/chat layout and live rail preview
+        run: python3 -m unittest discover -s tests/messaging -p 'test_social_settings_workspace.py' -v
+      - name: Preserve identity and family organization policy
+        run: |
+          node tests/messaging/test_social_identity_policy.cjs
+          node tests/messaging/test_social_family_rail.cjs
+          node tests/messaging/test_social_family_manager.cjs
+          node tests/messaging/test_social_family_order_visibility.cjs
+          node tests/messaging/test_social_safe_family_removal.cjs
+          python3 -m unittest discover -s tests/messaging -p 'test_social_user_settings_rail.py' -v
+          python3 -m unittest discover -s tests/messaging -p 'test_social_identity_store.py' -v
+          python3 -m unittest discover -s tests/messaging -p 'test_social_family_rail.py' -v
+          python3 -m unittest discover -s tests/messaging -p 'test_social_family_manager.py' -v
+          python3 -m unittest discover -s tests/messaging -p 'test_social_family_order_visibility.py' -v
+          python3 -m unittest discover -s tests/messaging -p 'test_social_safe_family_removal.py' -v
+      - name: Protect native messaging and Discord/X geometry
+        run: |
+          python3 -m unittest discover -s tests/messaging -p 'test_discord_geometry_docking.py' -v
+          python3 -m unittest discover -s tests/messaging -p 'test_social_provider_access_contracts.py' -v
+          python3 -m unittest discover -s tests/messaging -p 'test_social_native_router_contracts.py' -v
+          python3 tests/messaging/test_x_social_contracts.py

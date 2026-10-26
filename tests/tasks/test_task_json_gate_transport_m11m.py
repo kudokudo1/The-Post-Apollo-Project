@@ -52,6 +52,8 @@ class TransportTests(unittest.TestCase):
         for proc in self.procs:
             if proc.poll() is None:
                 proc.kill()
+            if proc.stdin is not None and proc.stdin.closed:
+                proc.stdin = None
             proc.communicate(timeout=5)
         self.temp.cleanup()
 

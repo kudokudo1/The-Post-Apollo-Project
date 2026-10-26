@@ -1,0 +1,38 @@
+name: TASKS M11 native FileView focus regression
+
+on:
+  pull_request:
+    paths:
+      - 'TaskFileViewHostHarnessM11g.qml'
+      - 'TaskFileViewGateHarnessM11e.qml'
+      - 'tests/tasks/test_native_fileview_keyboard_focus.py'
+      - '.github/workflows/tasks-native-fileview-focus.yml'
+  push:
+    branches:
+      - main
+    paths:
+      - 'TaskFileViewHostHarnessM11g.qml'
+      - 'TaskFileViewGateHarnessM11e.qml'
+      - 'tests/tasks/test_native_fileview_keyboard_focus.py'
+      - '.github/workflows/tasks-native-fileview-focus.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  focus-source-guard:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: On-demand keyboard focus in both isolated FileView test windows
+        run: python3 tests/tasks/test_native_fileview_keyboard_focus.py
+      - name: M11e test-only FileView source boundary remains unchanged
+        run: python3 tests/tasks/test_task_fileview_runtime_m11e.py
+      - name: M11i test-only native evidence display remains isolated
+        run: python3 tests/tasks/test_task_fileview_native_evidence_m11i.py
+      - name: M11g host fixture and source boundary regression
+        run: python3 tests/tasks/test_task_fileview_owner_host_m11g.py

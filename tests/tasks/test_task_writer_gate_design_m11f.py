@@ -59,7 +59,7 @@ for base in ("widgets","services","modules"):
 # must never be imported by ApolloHubTodoStore is not an import itself.
 # Checks still reject executable API usage in the pure review module.
 assert model.startswith(".pragma library")
-executable = re.sub(r"(?m)^\\s*//[^\\n]*$", "", model)
+executable = "\n".join(line for line in model.splitlines() if not line.lstrip().startswith("//"))
 for forbidden in ("FileView {","Process {","Quickshell.","ApolloHubTodoStore",
                   "fetch(","XMLHttpRequest","require(","fs.","setText(",
                   "execDetached(","Qt.openUrlExternally(",

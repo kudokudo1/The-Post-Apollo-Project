@@ -1095,7 +1095,7 @@ Rectangle {
                 Text {
                     width: parent.width
                     visible: appSelector.accountSelectedServiceId !== ""
-                    text: "ACCOUNT NICKNAME (NOT A PASSWORD)"
+                    text: "ACCOUNT NICKNAME // NO SECRETS"
                     color: Colors.cyan
                     font.pixelSize: 9
                     wrapMode: Text.WordWrap

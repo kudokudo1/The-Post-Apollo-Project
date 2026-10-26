@@ -55,13 +55,16 @@ for base in ("widgets","services","modules"):
         text=file.read_text()
         assert "TaskWriterGateMockM11f" not in text,file
 
-# The mocked protocol must stay free of disk/network/process primitives.
+# Ignore standalone JS comment-only lines: explaining that the mock
+# must never be imported by ApolloHubTodoStore is not an import itself.
+# Checks still reject executable API usage in the pure review module.
 assert model.startswith(".pragma library")
+executable = re.sub(r"(?m)^\\s*//[^\\n]*$", "", model)
 for forbidden in ("FileView {","Process {","Quickshell.","ApolloHubTodoStore",
                   "fetch(","XMLHttpRequest","require(","fs.","setText(",
                   "execDetached(","Qt.openUrlExternally(",
                   "ApolloHubTodoPolicy", "tasks.db"):
-    assert forbidden not in model,forbidden
+    assert forbidden not in executable,forbidden
 for name in ("state","reviewMockOwner","proposeStage","acceptReservation",
              "onSaved","verifyReadback","acceptSettle","requestFreeze",
              "acceptFreeze","failedCallback","restart"):

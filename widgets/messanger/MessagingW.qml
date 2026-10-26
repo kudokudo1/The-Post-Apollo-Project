@@ -39,28 +39,6 @@ PanelWindow {
             messagingWindow.menuOpen = false;
         }
     }
-    Process {
-        id: discordShowProcess
-
-        onExited: function(exitCode, exitStatus) {
-            // Opening the native Discord window necessarily causes Sway to
-            // focus Vesktop. Only a keyboard-initiated Main Mode switch
-            // requests the Social selector back. Mouse clicks still open
-            // Discord with normal application focus.
-            if (!messagingWindow.restoreSelectorAfterDiscordShow)
-                return;
-            if (!messagingWindow.menuOpen || !messagingWindow.discordSelected)
-                return;
-            messagingWindow.focusZone = messagingWindow.appZone;
-            messagingWindow.syncSocialGeometry(true);
-            Qt.callLater(function() {
-                if (messagingWindow.menuOpen && messagingWindow.discordSelected
-                        && messagingWindow.focusZone === messagingWindow.appZone)
-                    messagingWindow.focusAppSelector();
-            });
-        }
-    }
-
     // X runs as a separate browser app; Chromium owns its private profile.
     Process {
         id: xShowProcess
@@ -950,23 +928,12 @@ PanelWindow {
 
         discordStartupFallback.restart();
 
-        if (discordShowProcess.running)
-            discordShowProcess.running = false;
-
         if (!swayGeometryReady)
             refreshSwayGeometry();
 
-        // Launch only the provider process here. Window discovery and every
-        // Sway mutation are owned by DiscordGeometry.py after it finds the
-        // real runtime container id. This supports both native Wayland and
-        // XWayland Vesktop identities without hard-coded app_id commands.
-        discordShowProcess.exec(["bash", "-lc",
-            "if ! flatpak ps --columns=application 2>/dev/null "
-            + "| grep -Fxq 'dev.vencord.Vesktop'; then "
-            + "setsid -f flatpak run dev.vencord.Vesktop >/dev/null 2>&1; "
-            + "fi"
-        ]);
-
+        // DiscordGeometry.py owns window discovery, provider launch when no
+        // Vesktop container exists, and all Sway mutations using the exact
+        // discovered con_id.
         helperShowDiscord(restoreSelectorAfterDiscordShow !== true);
 
         Qt.callLater(function () {
@@ -982,9 +949,6 @@ PanelWindow {
         discordDocked = false;
         discordConfigured = false;
         ignoreDiscordGeometryUntil = 0;
-
-        if (discordShowProcess.running)
-            discordShowProcess.running = false;
 
         helperHideDiscord();
     }

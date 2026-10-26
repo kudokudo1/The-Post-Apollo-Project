@@ -41,6 +41,8 @@ jobs:
         run: node tests/weather/test_station_terminal_geometry.js
       - name: Validate internal NEWS viewer and URL boundary contracts
         run: node tests/weather/test_station_news_viewer.js
+      - name: Validate NEWS compositor host namespace and local viewport geometry
+        run: node tests/weather/test_station_news_viewport_geometry.js
       - name: Validate NEWS source catalog and creator subscriptions
         run: node tests/weather/test_station_news_channel_hub.js
       - name: Validate NEWS isolated browser preflight safety contract

@@ -117,23 +117,84 @@ class DiscordDockingTests(TestCase):
         self.assertFalse(bridge.discord_docked)
         self.assertEqual(captured, [False])
 
-    def test_x_follow_is_unchanged_by_discord_docking_gate(self):
+    def test_browser_startup_is_not_allowed_to_resize_social(self):
         bridge = geometry.Bridge(0.1)
         bridge.x_selected = True
         bridge.x_ready = True
         bridge.browser_site = "x"
-        bridge.discord_docked = False
         commands = []
         bridge.queue_sync = commands.append
-        snapshot = sample(focus="social", social_x=345)
+        snapshot = sample(focus="discord", discord_x=780, discord_y=450)
         snapshot["x"] = snapshot.pop("discord")
+
+        # A focused just-mapped app must not lead before a verified dock.
+        self.assertFalse(bridge.x_docked)
+        result = bridge.fast_follow(snapshot)
+        self.assertIsNone(result["fastLeader"])
+        self.assertIsNone(result["shared"])
+        self.assertEqual(commands, [])
+
+        # Once docking is confirmed, the *same* user-driven geometry change
+        # is adopted in both directions, preserving Mod-move/resize.
+        bridge.x_docked = True
+        result = bridge.fast_follow(snapshot)
+        self.assertEqual(result["fastLeader"], "x")
+        self.assertEqual(commands[0]["target"], "social")
+        commands.clear()
+        snapshot["x"]["rect"] = {"x": 211, "y": 51,
+                                 "width": 1098, "height": 698}
+        snapshot["social"]["rect"]["x"] = 345
+        snapshot["social"]["focused"] = True
+        snapshot["x"]["focused"] = False
         result = bridge.fast_follow(snapshot)
         self.assertEqual(result["fastLeader"], "social")
         self.assertEqual(commands[0]["target"], "x")
 
+    def test_browser_docking_mode_requires_selected_ready_and_verified(self):
+        bridge = geometry.Bridge(0.1)
+        state = {
+            "op": "mode", "xSelected": True, "xReady": True,
+            "xDocked": False, "browserSite": "x",
+        }
+        modes = [
+            state, {"op": "sample"},
+            {**state, "xDocked": True}, {"op": "sample"},
+            {**state, "xReady": False, "xDocked": True}, {"op": "sample"},
+            {**state, "xSelected": False, "xDocked": True}, {"op": "sample"},
+            {"op": "stop"},
+        ]
+        stream = io.StringIO("\n".join(json.dumps(x) for x in modes) + "\n")
+        captured = []
+        with patch.object(geometry.sys, "stdin", stream):
+            original = bridge.sample_event.set
+            def capture():
+                captured.append((bridge.x_selected, bridge.x_ready,
+                                 bridge.x_docked))
+                original()
+            bridge.sample_event.set = capture
+            bridge.stdin_loop()
+        self.assertFalse(bridge.x_docked)
+        self.assertEqual(captured, [
+            (True, True, False), (True, True, True),
+            (True, False, False), (False, True, False),
+        ])
+        # A stale xDocked=True must be rejected as soon as readiness or
+        # selection changes, without touching the live Sway resize path.
+        self.assertIn("self.x_docked = (", GEOMETRY.read_text())
+        self.assertIn("and self.x_selected and self.x_ready", GEOMETRY.read_text())
+
     def test_source_requires_confirmed_dock_and_resets_on_every_entry(self):
         text = SOCIAL.read_text(encoding="utf-8")
         self.assertIn("property bool discordDocked: false", text)
+        self.assertIn("property bool xDocked: false", text)
+        self.assertIn("onXDockedChanged: updateGeometryHelperMode()", text)
+        self.assertIn("xDocked: xDocked,", text)
+        self.assertIn("if (!xDocked) {", text)
+        self.assertIn("if (now < ignoreXGeometryUntil)", text)
+        self.assertIn("if (now < ignoreDiscordGeometryUntil)", text)
+        self.assertIn("if (initialDiscordDockAligned(xRect))", text)
+        self.assertIn("xDocked = true;", text)
+        self.assertIn("xDocked = false;", text)
         self.assertIn("onDiscordDockedChanged: {", text)
         self.assertIn("updateGeometryHelperMode();", text)
         self.assertIn("if (discordDocked && menuOpen && discordSelected)", text)

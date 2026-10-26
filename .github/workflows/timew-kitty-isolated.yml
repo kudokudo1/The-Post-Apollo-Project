@@ -1,0 +1,36 @@
+name: TimeW Kitty disposable native compatibility
+
+on:
+  pull_request:
+    paths:
+      - "tests/timew/test_machine_kitty_isolated_runtime.py"
+      - "services/time/MachineKittyRead.py"
+      - "docs/timew-machine-m2d4-isolated-kitty-runtime.md"
+      - ".github/workflows/timew-kitty-isolated.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  disposable-kitty-read:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Kitty and private virtual X server on ephemeral runner
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends kitty xvfb xauth
+          command -v kitty
+          command -v kitten
+          kitty --version
+      - name: Exercise native Kitty inventory in disposable Xvfb desktop
+        env:
+          GITHUB_ACTIONS: "true"
+          MACHINE_KITTY_ISOLATED_CI: explicit_disposable_runner
+          LIBGL_ALWAYS_SOFTWARE: "1"
+          QT_QPA_PLATFORM: xcb
+        run: |
+          xvfb-run -a -s "-screen 0 1280x720x24 +extension GLX" \
+            python3 -B -I tests/timew/test_machine_kitty_isolated_runtime.py

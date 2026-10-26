@@ -93,7 +93,6 @@ class SocialAccountDetailsUiContracts(unittest.TestCase):
         self.assertIn('expectedRevision',QMLSTORE)
         self.assertIn('REVISION_CONFLICT',PYHELPER)
         self.assertIn('SocialAccountCatalog import ITEM_BY_ID',PYHELPER)
-        self.assertIn('not a provider',PYHELPER.lower()) if False else None
         for banned in ('loginProcess', 'apiHash', 'refreshMessages(', 'sendMessage('):
             self.assertNotIn(banned,QMLSTORE)
         self.assertNotIn('SocialAccountDetailsStore',HOST)

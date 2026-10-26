@@ -491,15 +491,13 @@ PanelWindow {
     // and can be changed from Sway move operations.
     readonly property int defaultPanelX: swayAreaX + swayAreaWidth - margins.right - defaultPanelWidth
 
-    // Social's default TOP follows the same visible rail as Notifications
-    // and Hospital. The QScreen virtual origin (not the Sway workspace top)
-    // avoids offset from the reserved taskbar/work area. This is only the
-    // opening Y: width, height, X and operator Mod-move remain untouched.
-    readonly property int defaultPanelY: Math.round(
-        (screen ? screen.geometry.y : 0)
-        + (notificationsReference ? notificationsReference.panelTopMargin : 0)
-        + notificationsFrameInset
-    )
+    // Sway's visible workspace rect begins BELOW the reserved top bar/gap.
+    // That is the same upper rail the other menus actually open against.
+    // Do not use QScreen.geometry.y (the physical output top), which placed
+    // Social behind the bar and clipped its header in the live screenshot.
+    // The workspace origin already includes the rail offset: no extra inset.
+    // Only the default opening Y changes. Manual Sway moves still win.
+    readonly property int defaultPanelY: Math.round(swayAreaY)
 
     readonly property int discordX: sharedPanelX + appSelectorWidth + discordGap + discordInset
 

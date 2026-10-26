@@ -1,5 +1,6 @@
 import QtQuick
 import QtQuick.Shapes
+import QtQuick.Effects
 
 // Flat solar and lunar geometry shared by the Weather dock and SKY.
 // No emoji moons, independent fetches, special phase colors or animations.
@@ -11,6 +12,13 @@ Item {
     property string solar: "day"
     property string moonPhase: "unknown"
     property color ink: "white"
+    // Weather owns the illuminated portion; night owns only the atmospheric
+    // glow. Keep the dark face distinct from both the semantic ink and dock
+    // interaction glow. This is shared by dock, SKY and forecast sizes.
+    property color shadowInk: Colors.dark
+    property color nightHalo: Colors.magenta
+    readonly property bool nightGlowEnabled:
+        solar === "night" && moonVisible
 
     implicitWidth: 40
     implicitHeight: 40
@@ -95,13 +103,31 @@ Item {
             }
         }
 
+        // The dark lunar disk stays at the same center in all eight phases.
+        // A separate low-intensity magenta halo defines the night silhouette
+        // even when the disk nearly matches the panel background.
+        RectangularShadow {
+            x: 6
+            y: 6
+            width: 28
+            height: 28
+            radius: 14
+            blur: 10
+            spread: 2
+            color: glyph.nightHalo
+            opacity: glyph.nightGlowEnabled ? 0.42 : 0
+            visible: glyph.nightGlowEnabled
+        }
+
         // The 8 lunar phases always have exactly the same 28px perimeter.
         Rectangle {
             visible: glyph.moonVisible
             x: 6; y: 6; width: 28; height: 28
             radius: 14
-            color: glyph.moonPhase === "full" ? glyph.ink : "transparent"
-            border.width: glyph.moonPhase === "full" ? 0 : 1.4
+            color: glyph.moonPhase === "full" ? glyph.ink : glyph.shadowInk
+            // A lit outline would disguise the dark hemisphere and turn
+            // every phase into a ring. Only unknown phase needs a marker.
+            border.width: glyph.moonPhase === "unknown" ? 1.4 : 0
             border.color: glyph.ink
         }
         Shape {

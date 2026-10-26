@@ -126,4 +126,41 @@ assert.match(sky, /WeatherCyclePolicy\.atLocal/);
 assert.match(sky, /WeatherCyclePolicy\.normalizedPhase\(modelData\.moonPhase\)/);
 assert.match(sky, /mode: sky\.currentCelestialMode/);
 assert.doesNotMatch(dock + sky, /Colors\.dawn|Colors\.dusk|Colors\.moon|Colors\.night/);
+// Night rendering contract: illuminated phase = *weather* ink; shadow =
+// shared dark purple; atmosphere = magenta. The glow does not overwrite the
+// storm/UV/wind/rain semantic colors or change the actual phase geometry.
+assert.match(icon, /import QtQuick\.Effects/);
+assert.match(icon, /property color shadowInk:\s*Colors\.dark/);
+assert.match(icon, /property color nightHalo:\s*Colors\.magenta/);
+assert.match(icon, /nightGlowEnabled:[\s\S]*?solar === "night" && moonVisible/);
+assert.match(icon, /RectangularShadow\s*\{[\s\S]*?color:\s*glyph\.nightHalo[\s\S]*?visible:\s*glyph\.nightGlowEnabled/);
+assert.match(icon, /color:\s*glyph\.moonPhase === "full" \? glyph\.ink : glyph\.shadowInk/);
+assert.match(icon, /ShapePath\s*\{[\s\S]*?fillColor:\s*glyph\.ink/);
+assert.doesNotMatch(icon, /ColorAnimation|NumberAnimation|ShaderEffect|moonPhase.*Colors\./);
+
+// One upper-right moon per night state and per weather slot. In particular,
+// the dock badge must not be a Row sibling (which widened the dock), and
+// clear/moon-cloud states must not display an extra central moon.
+const dockConditionArea = dock.slice(dock.indexOf("id: weatherConditionSlot"),
+                                    dock.indexOf("id: weatherReadout"));
+assert.match(dockConditionArea, /id:\s*dockNightMoon[\s\S]*?anchors\.top: parent\.top[\s\S]*?anchors\.right: parent\.right/);
+assert.match(dockConditionArea, /ink:\s*weatherDock\.weatherColor/);
+assert.match(dockConditionArea, /skyCycle\.solar === "night"/);
+assert.match(dockConditionArea, /celestialMode !== "moon"[\s\S]*?celestialMode !== "moon-cloud"/);
+assert.doesNotMatch(dockConditionArea, /width:\s*18\s+height:\s*18\s+mode:\s*"moon"/);
+const currentArea = sky.slice(sky.indexOf("id: conditionIconGlyph"),
+                              sky.indexOf('text: "AIR QUALITY"'));
+assert.match(currentArea, /id:\s*currentNightMoon[\s\S]*?anchors\.top: parent\.top[\s\S]*?anchors\.right: parent\.right/);
+assert.match(currentArea, /ink:\s*sky\.iconColor\(sky\.conditionState\.color\)/);
+assert.match(currentArea, /sky\.skyCycle\.solar === "night"/);
+const hourlyArea = sky.slice(sky.indexOf('title: "FORECAST // NEXT HOURS"'),
+                             sky.indexOf('title: "FORECAST // DAILY"'));
+assert.match(hourlyArea, /anchors\.top: parent\.top[\s\S]*?anchors\.right: parent\.right[\s\S]*?mode:\s*"moon"/);
+assert.match(hourlyArea, /ink:\s*sky\.iconColor\(parent\.forecastState\.color\)/);
+assert.match(hourlyArea, /parent\.forecastCycle\.solar === "night"/);
+assert.match(hourlyArea, /forecastArt === "moon-cloud"/);
+assert.match(currentArea, /currentCelestialMode === "moon-cloud"/);
+// A day/forecast lunar *informational* glyph is allowed, but no nocturnal
+// atmosphere should be active outside the nighttime weather icon itself.
+
 console.log("Weather solar/lunar policy and QML wiring: PASS");

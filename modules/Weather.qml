@@ -190,8 +190,23 @@ DockButton {
                         anchors.centerIn: parent
                         text: weatherDock.weatherState.icon
                         font.pixelSize: 42
+                        scale: weatherDock.skyCycle.solar === "night" ? 0.85 : 1
+                        anchors.horizontalCenterOffset:
+                            weatherDock.skyCycle.solar === "night" ? -4 : 0
                         color: weatherDock.foregroundColor
                         visible: weatherDock.celestialMode === "weather"
+
+                    }
+
+                    // The ordinary 42px weather glyph stays untouched.
+                    // Partly cloudy nights use a cloud under the anchored moon.
+                    Text {
+                        anchors.centerIn: parent
+                        anchors.horizontalCenterOffset: -4
+                        text: "☁︎"
+                        font.pixelSize: 35
+                        color: weatherDock.foregroundColor
+                        visible: weatherDock.celestialMode === "moon-cloud"
                     }
 
                     // Swap the original icon in place, preserving the
@@ -205,22 +220,28 @@ DockButton {
                         moonPhase: weatherDock.skyCycle.moonPhase
                         ink: weatherDock.foregroundColor
                         visible: weatherDock.celestialMode !== "weather"
+                                 && weatherDock.celestialMode !== "moon"
+                                 && weatherDock.celestialMode !== "moon-cloud"
                     }
-                }
 
-                // Secondary moon phase remains visible alongside other
-                // weather conditions; don't duplicate a main nighttime moon.
-                WeatherCelestialGlyph {
-                    anchors.verticalCenter: parent.verticalCenter
-                    width: 18
-                    height: 18
-                    mode: "moon"
-                    moonPhase: weatherDock.skyCycle.moonPhase
-                    ink: weatherDock.foregroundColor
-                    visible: weatherDock.weatherFresh
-                             && weatherDock.skyCycle.moonPhase !== "unknown"
-                             && weatherDock.celestialMode !== "moon"
-                             && weatherDock.celestialMode !== "moon-cloud"
+                    // Shared moon position for *all* nighttime conditions:
+                    // moon-only, partly cloudy, rain, snow and thunderstorms.
+                    // Overlay the existing 46px art bay without widening the
+                    // dock or displacing temperature and thermometer.
+                    WeatherCelestialGlyph {
+                        id: dockNightMoon
+                        anchors.top: parent.top
+                        anchors.right: parent.right
+                        anchors.topMargin: 3
+                        width: 32
+                        height: 32
+                        mode: "moon"
+                        solar: weatherDock.skyCycle.solar
+                        moonPhase: weatherDock.skyCycle.moonPhase
+                        ink: weatherDock.weatherColor
+                        visible: weatherDock.weatherFresh
+                                 && weatherDock.skyCycle.solar === "night"
+                    }
                 }
 
                 // Keep the icon-to-data gap at 6px; close only the readout-to-🌡 gap.

@@ -95,6 +95,26 @@ PanelWindow {
         usesNewsSource && weatherContentLoader.item
         ? weatherContentLoader.item : null
 
+    // NEWS player viewport in the 1000x700 Station chassis's local logical
+    // coordinate system. The Station window's *global* coordinates remain
+    // compositor-owned. This read-only QML geometry is not browser authority.
+    readonly property rect newsViewerViewportRect: {
+        const hub = newsSourceItem;
+        if (!menuOpen || contextTerminalRequested || !hub || !hub.viewerOpen)
+            return Qt.rect(0, 0, 0, 0);
+        const bay = hub.playerViewportRect;
+        if (!bay || bay.width <= 0 || bay.height <= 0)
+            return Qt.rect(0, 0, 0, 0);
+        const origin = hub.mapToItem(stationBackground, bay.x, bay.y);
+        return Qt.rect(origin.x, origin.y, bay.width, bay.height);
+    }
+    readonly property bool newsViewerGeometryValid:
+        menuOpen && currentView === "news" && !contextTerminalRequested
+        && newsViewerViewportRect.x >= 0 && newsViewerViewportRect.y >= 0
+        && newsViewerViewportRect.width > 0 && newsViewerViewportRect.height > 0
+        && newsViewerViewportRect.x + newsViewerViewportRect.width <= stationBackground.width
+        && newsViewerViewportRect.y + newsViewerViewportRect.height <= stationBackground.height
+
     readonly property int weatherAgeMinutes: {
         sourceStatusClock;
 
@@ -308,6 +328,9 @@ PanelWindow {
     color: "transparent"
 
     exclusiveZone: 0
+    // Static before layer-shell connection. Stage Director recognizes this
+    // exact host candidate; a namespace alone never authenticates ownership.
+    WlrLayershell.namespace: "post-apollo-weather-station"
     WlrLayershell.layer: WlrLayer.Overlay
 
     // Ordinary Weather use is OnDemand so an open widget never monopolizes

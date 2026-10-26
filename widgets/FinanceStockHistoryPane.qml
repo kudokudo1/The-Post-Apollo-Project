@@ -3,7 +3,7 @@ import "../components"
 import "FinanceStockModePolicy.js" as StockModePolicy
 import "FinanceStockChartPointPolicy.js" as ChartPointPolicy
 
-// Market STOCKS M12: chart-session selection in RANGE, without new price reads.
+// Market STOCKS M13: explicit point-to-DAY handoff, preserving RANGE dates.
 Item {
     id: stocks
     property var stockFeed: null
@@ -294,6 +294,9 @@ Item {
                         + "\nSERVED " + stocks.snapshot.delivery.servedAt
                         + (stocks.snapshot.delivery.cachedAt
                             ? "\nCACHED " + stocks.snapshot.delivery.cachedAt : "")
+                        + (stocks.snapshot.derivedFromRange
+                            ? "\nDAY SOURCE // PREVIOUSLY LOADED RANGE // NO NEW REQUEST"
+                            : "")
                     : ""
                 textFormat: Text.PlainText
                 wrapMode: Text.WordWrap
@@ -427,6 +430,23 @@ Item {
                 font.pixelSize: 11
                 color: Colors.orange
                 wrapMode: Text.WordWrap
+            }
+            ActionButton {
+                id: openSelectedInDay
+                visible: !stocks.dayMode && stocks.inspectedPoint !== null
+                width: 136
+                height: visible ? 28 : 0
+                label: "OPEN IN DAY"
+                labelPixelSize: 10
+                accentColor: Colors.magenta
+                available: stocks.stockFeed && stocks.stockFeed.monitoring
+                    && stocks.stockFeed.ready && !stocks.stockFeed.loading
+                    && stocks.inspectedPoint !== null
+                onLeftClicked: {
+                    if (stocks.stockFeed && stocks.inspectedPoint)
+                        stocks.stockFeed.openRangePointInDay(
+                            stocks.selectedPointIndex, stocks.inspectedPoint.date);
+                }
             }
             GohuText {
                 width: parent.width

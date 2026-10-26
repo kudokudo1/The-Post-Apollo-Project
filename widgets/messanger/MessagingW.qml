@@ -1627,12 +1627,12 @@ PanelWindow {
             messagingWindow.hideDiscord();
             messagingWindow.hideX();
 
-            sharedPanelWidth = defaultPanelWidth;
-            sharedPanelHeight = defaultPanelHeight;
-
-            sharedPanelX = Math.round(defaultPanelX);
-            sharedPanelY = Math.round(defaultPanelY);
-
+            // sharedPanelX/Y/Width/Height are the canonical Social viewport
+            // for this Quickshell runtime. Do NOT reset them on reopen:
+            // whichever verified Social/external window the user last moved
+            // or resized already updated this shared rectangle. Every newly
+            // selected external app will snap to that same slot before it may
+            // become a geometry leader.
             focusZone = appZone;
             appSelector.keyboardActive = true;
 

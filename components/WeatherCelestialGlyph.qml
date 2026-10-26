@@ -97,7 +97,7 @@ Item {
 
         // The 8 lunar phases always have exactly the same 28px perimeter.
         Rectangle {
-            visible: glyph.moonVisible && glyph.moonPhase !== "unknown"
+            visible: glyph.moonVisible
             x: 6; y: 6; width: 28; height: 28
             radius: 14
             color: glyph.moonPhase === "full" ? glyph.ink : "transparent"
@@ -129,6 +129,16 @@ Item {
                     control2Y: 11
                 }
             }
+        }
+
+        // Unknown lunar phase never masquerades as new moon or a crescent.
+        // Keep a small outline and question mark rather than a blank icon.
+        Text {
+            anchors.centerIn: parent
+            visible: glyph.moonVisible && glyph.moonPhase === "unknown"
+            text: "?"
+            font.pixelSize: 18
+            color: glyph.ink
         }
 
         // Keep the existing flat cloud glyph, scaled over either celestial

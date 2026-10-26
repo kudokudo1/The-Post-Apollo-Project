@@ -491,13 +491,14 @@ PanelWindow {
     // and can be changed from Sway move operations.
     readonly property int defaultPanelX: swayAreaX + swayAreaWidth - margins.right - defaultPanelWidth
 
-    // Initial Social bottom matches Notifications' visible frame bottom,
-    // accounting for the 5px outer margin AND the frame's inner 8px inset.
-    // The Sway workspace rect gives us the output's bottom coordinate;
-    // operator Mod-move/resize keeps its existing authority afterward.
-    readonly property int defaultPanelY: Math.max(
-        0, Math.round(swayAreaY + swayAreaHeight - defaultPanelHeight
-                      - notificationsBottomMargin - notificationsFrameInset)
+    // Social's default TOP follows the same visible rail as Notifications
+    // and Hospital. The QScreen virtual origin (not the Sway workspace top)
+    // avoids offset from the reserved taskbar/work area. This is only the
+    // opening Y: width, height, X and operator Mod-move remain untouched.
+    readonly property int defaultPanelY: Math.round(
+        (screen ? screen.geometry.y : 0)
+        + (notificationsReference ? notificationsReference.panelTopMargin : 0)
+        + notificationsFrameInset
     )
 
     readonly property int discordX: sharedPanelX + appSelectorWidth + discordGap + discordInset

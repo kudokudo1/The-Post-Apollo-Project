@@ -1,0 +1,43 @@
+name: TASKS FileView deferred post-save readback
+
+on:
+  pull_request:
+    paths:
+      - 'services/projects/TaskFileViewHostBridgeM11g.qml'
+      - 'services/projects/TaskFileViewGateM11e.qml'
+      - 'tests/tasks/test_fileview_deferred_readback_m11.py'
+      - '.github/workflows/tasks-fileview-deferred-readback.yml'
+  push:
+    branches:
+      - main
+    paths:
+      - 'services/projects/TaskFileViewHostBridgeM11g.qml'
+      - 'services/projects/TaskFileViewGateM11e.qml'
+      - 'tests/tasks/test_fileview_deferred_readback_m11.py'
+      - '.github/workflows/tasks-fileview-deferred-readback.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  deferred-readback:
+    runs-on: ubuntu-latest
+    timeout-minutes: 7
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Defer M11g and M11e FileView reload beyond saved callback
+        run: python3 tests/tasks/test_fileview_deferred_readback_m11.py
+      - name: M11g synthetic host and OS ownership regression
+        run: python3 tests/tasks/test_task_fileview_owner_host_m11g.py
+      - name: M11e callback state machine regression
+        run: node tests/tasks/test_task_fileview_gate_policy_m11e.cjs
+      - name: M11i native callback evidence remains isolated
+        run: python3 tests/tasks/test_task_fileview_native_evidence_m11i.py
+      - name: Production TASKS mutation inventory unchanged
+        run: python3 tests/tasks/test_task_writer_gate_inventory_m11d.py

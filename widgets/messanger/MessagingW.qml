@@ -686,6 +686,15 @@ PanelWindow {
             discordConfigured = false;
             ignoreDiscordGeometryUntil = 0;
             updateGeometryHelperMode();
+        } else if (discordSelected && discordConId === 0 && discordWindowConId !== 0) {
+            // Tray-close/unmap is a full authority loss. A later reopen must
+            // complete a fresh main-window placement handshake.
+            discordWindowConId = 0;
+            discordReady = false;
+            discordDocked = false;
+            discordConfigured = false;
+            ignoreDiscordGeometryUntil = 0;
+            updateGeometryHelperMode();
         }
 
         // Hidden scratchpad Vesktop nodes are still discoverable so the helper

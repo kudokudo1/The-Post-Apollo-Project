@@ -47,6 +47,22 @@ def atomic_fileview_simulation(path, data):
     os.replace(replacement, path)
 
 
+class SourceBoundaryTests(unittest.TestCase):
+    def test_compiled_off_live_gate_and_one_fileview(self):
+        store = (ROOT / "services/hub/ApolloHubTodoStore.qml").read_text()
+        shell = (ROOT / "shell.qml").read_text()
+        assert "readonly property bool guardedWriterEnabled: false" in store
+        stage = store.split("function stage(result) {", 1)[1].split(
+            "\n    function addTask(", 1)[0]
+        assert "if (guardedWriterEnabled)" in stage
+        assert stage.index("if (guardedWriterEnabled)") < stage.index(
+            "pendingDocument = result.document")
+        assert store.count("FileView {") == 1
+        assert store.count("todoFile.setText(") == 1
+        assert "TaskJsonGateCandidateM11l" not in store
+        assert "TaskJsonGateCandidateM11l" not in shell
+
+
 class CandidateTests(unittest.TestCase):
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory()

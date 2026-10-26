@@ -930,10 +930,10 @@ PanelWindow {
         if (!swayGeometryReady)
             refreshSwayGeometry();
 
-        // Opening the existing app is a real Sway window operation: force
-        // floating BEFORE scratchpad handoff, then explicitly focus the shown
-        // client. Previously only the later geometry sync requested floating,
-        // allowing a tiled Vesktop to remain beneath the Social surface.
+        // Sway's default normal border draws a visible "Vesktop" titlebar,
+        // even after the app becomes floating. Force floating + border none
+        // before AND after scratchpad show; geometry follow and the later
+        // focusDiscord command reassert these on subsequent updates.
         // Startup-sized splash windows still use centerDiscordStartup().
         discordShowProcess.exec(["bash", "-lc",
             "if ! swaymsg -t get_tree | grep -q '\"app_id\": \"vesktop\"'; then "
@@ -942,9 +942,11 @@ PanelWindow {
             + "swaymsg -t get_tree | grep -q '\"app_id\": \"vesktop\"' && break; "
             + "sleep 0.1; done; fi; "
             + "swaymsg '[app_id=\"vesktop\"] floating enable'; "
+            + "swaymsg '[app_id=\"vesktop\"] border none'; "
             + "swaymsg '[app_id=\"vesktop\"] move scratchpad'; "
             + "swaymsg '[app_id=\"vesktop\"] scratchpad show'; "
             + "swaymsg '[app_id=\"vesktop\"] floating enable'; "
+            + "swaymsg '[app_id=\"vesktop\"] border none'; "
             + "swaymsg '[app_id=\"vesktop\"] focus'"
         ]);
 

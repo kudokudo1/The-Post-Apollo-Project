@@ -205,6 +205,35 @@ class DiscordDockingTests(TestCase):
         self.assertIn("height: 0", backing)
         self.assertIn("opacity: 0.85", backing)
 
+    def test_discord_sync_reasserts_floating_and_borderless_even_after_setup(self):
+        # Screenshot regression: after PR #799 the visible "Vesktop"
+        # decoration remains because setup=False may be sent before a
+        # successful compositor border update. Every Discord resize/move must
+        # still enforce the borderless Sway window.
+        for setup in (False, True):
+            with self.subTest(setup=setup):
+                cmd = geometry.build_sync_command({
+                    "target": "discord",
+                    "x": 211, "y": 51, "width": 1098, "height": 698,
+                    "setup": setup, "focus": False,
+                })
+                self.assertIn('[app_id="vesktop"] floating enable', cmd)
+                self.assertIn('[app_id="vesktop"] border none', cmd)
+                self.assertLess(cmd.index("floating enable"), cmd.index("border none"))
+                self.assertLess(cmd.index("border none"), cmd.index("resize set"))
+                self.assertNotIn(" focus", cmd)
+
+        # This must remain Discord-only: browser and Social commands retain
+        # their previous one-time setup behavior and fast-follow performance.
+        for target in ("social", "x"):
+            cmd = geometry.build_sync_command({
+                "target": target, "x": 1, "y": 2,
+                "width": 300, "height": 400,
+                "setup": False,
+            })
+            self.assertNotIn("floating enable", cmd)
+            self.assertNotIn("border none", cmd)
+
     def test_discord_launch_requests_real_sway_floating_and_raise(self):
         social = SOCIAL.read_text(encoding="utf-8")
         launch = social.split("    function showDiscord() {", 1)[1].split(
@@ -212,8 +241,13 @@ class DiscordDockingTests(TestCase):
         float_cmd = 'swaymsg \'[app_id=\\\"vesktop\\\"] floating enable\''
         show_cmd = 'swaymsg \'[app_id=\\\"vesktop\\\"] scratchpad show\''
         focus_cmd = 'swaymsg \'[app_id=\\\"vesktop\\\"] focus\''
+        border_cmd = float_cmd.replace("floating enable", "border none")
         self.assertGreaterEqual(launch.count(float_cmd), 2)
+        self.assertGreaterEqual(launch.count(border_cmd), 2)
+        self.assertLess(launch.index(float_cmd), launch.index(border_cmd))
         self.assertIn(show_cmd, launch)
+        self.assertLess(launch.index(show_cmd), launch.rindex(border_cmd))
+        self.assertLess(launch.rindex(border_cmd), launch.index(focus_cmd))
         self.assertIn(focus_cmd, launch)
         self.assertLess(launch.index(float_cmd), launch.index(show_cmd))
         self.assertLess(launch.index(show_cmd), launch.index(focus_cmd))

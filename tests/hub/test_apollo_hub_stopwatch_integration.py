@@ -98,8 +98,8 @@ for forbidden in ("Timer {", "ElapsedTimer {", "SystemClock {",
 # Regression for the QtQuick.Item reserved data/state property failures.
 for component in (mini, controls):
     for prop in ("data", "state", "children", "resources", "parent"):
-        pattern = (r"^\\s*(?:readonly\\s+)?property\\s+"
-                   r"\\w+\\s+" + prop + r"\\s*:")
+        pattern = (r"^\s*(?:readonly\s+)?property\s+"
+                   r"\w+\s+" + prop + r"\s*:")
         # Ensure this check would reject an intentionally injected mistake.
         assert re.search(pattern, "    readonly property var " + prop + ": null", re.M)
         assert not re.search(pattern, component, re.M), (

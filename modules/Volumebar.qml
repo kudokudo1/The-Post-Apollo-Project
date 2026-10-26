@@ -18,6 +18,44 @@ DockButton {
     // existing typography while guaranteeing a small edge buffer.
     implicitWidth: Math.max(130, Math.ceil(root.implicitWidth) + (contentEdgePadding * 2))
 
+    // P3-A: owner-routed Hub action seam. This is the SAME tracked
+    // PipeWire.defaultAudioSink used by the dock, not another observer.
+    // Snapshot reports observed state, not a claimed mutation outcome.
+    property string hubAudioRequestStatus: "NO ACTION REQUESTED"
+    readonly property var hubOutputSnapshot: ({
+        state: root.ready ? "ready" : "unavailable",
+        volumePercent: root.ready ? root.vol : -1,
+        muted: root.ready ? root.muted : false,
+        outputName: "DEFAULT OUTPUT",
+        requestStatus: hubAudioRequestStatus
+    })
+
+    function requestHubVolumePercent(percent) {
+        if (!root.ready) {
+            hubAudioRequestStatus = "NO OUTPUT // REQUEST REFUSED";
+            return false;
+        }
+        if (typeof percent !== "number" || !isFinite(percent)
+                || !Number.isInteger(percent) || percent < 0 || percent > 300) {
+            hubAudioRequestStatus = "INVALID VOLUME // REQUEST REFUSED";
+            return false;
+        }
+        root.sink.audio.volume = percent / 100;
+        hubAudioRequestStatus = "VOLUME REQUESTED // OBSERVE SINK";
+        return true;
+    }
+
+    function requestHubMute(muted) {
+        if (!root.ready || typeof muted !== "boolean") {
+            hubAudioRequestStatus = "MUTE REQUEST REFUSED // OUTPUT UNAVAILABLE";
+            return false;
+        }
+        root.sink.audio.muted = muted;
+        hubAudioRequestStatus = (muted ? "MUTE" : "UNMUTE")
+                                + " REQUESTED // OBSERVE SINK";
+        return true;
+    }
+
     contentGlowEnabled: false
 
     normalDockGlowColor:

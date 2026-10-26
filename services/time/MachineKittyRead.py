@@ -167,7 +167,7 @@ def read_existing_kitty_inventory(*, target, runtime_directory, opt_in,
     if opt_in != "explicit_read_only_kitty_inventory":
         raise KittyInventoryError("KITTY INVENTORY CONSENT REQUIRED")
     endpoint = _explicit_socket(target, runtime_directory, inspector=inspector)
-    argv = ["kitten", "@", "--to", endpoint, "ls", "--output-format=json"]
+    argv = ["kitten", "@", "--to", endpoint, "ls"]
     try:
         response = runner(argv, check=True, capture_output=True,
                           timeout=READ_TIMEOUT_SECONDS, shell=False)

@@ -22,13 +22,9 @@ Rectangle {
     property bool keyboardActive: false
     property bool keyboardFocused: false
 
-    // Discord mode keeps the panel shell visible underneath Vesktop.
-    // Only the inner header/list contents disappear; the 0.85 background
-    // and cyan OUTER border remain.
+    // External-app mode keeps this normal panel shell underneath the provider
+    // window while hiding only the native contact contents.
     property bool discordMode: false
-    // The empty shell is still instantiated; only its visual underlay is
-    // rendered in DiscordBackingW below the actual Vesktop app.
-    property bool discordVisualBehind: false
 
     signal contactClicked
 
@@ -36,14 +32,11 @@ Rectangle {
     // PANEL
     // ============================================================
 
-    color: discordVisualBehind ? "transparent"
-                               : Qt.rgba(Colors.black.r, Colors.black.g, Colors.black.b, 0.85)
+    color: Qt.rgba(Colors.black.r, Colors.black.g, Colors.black.b, 0.85)
 
     radius: 0
 
-    // No cyan separator line over the Discord client. Native contact
-    // modes keep their original outer border.
-    border.width: discordVisualBehind ? 0 : 1
+    border.width: 1
     border.color: Colors.cyan
 
     clip: true

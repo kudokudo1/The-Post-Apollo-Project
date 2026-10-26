@@ -1,8 +1,6 @@
 import QtQuick
 import Quickshell
 import "../components"
-import QtQuick.Effects
-import Qt5Compat.GraphicalEffects
 
 DockButton {
     id: sessionsDock
@@ -12,10 +10,18 @@ DockButton {
         messagingWindow && messagingWindow.menuOpen
 
     implicitHeight: 50
-    implicitWidth: 25
+    // The new decorated telephone needs more room than the original PNG.
+    // Follow the original text metrics rather than clipping its ornaments.
+    implicitWidth: Math.max(65, Math.ceil(sessionsIcon.implicitWidth) + 16)
     radius: 0
 
     open: menuOpen
+
+    // Keep Social's existing green identity while closed and the standard
+    // magenta foreground while open. Decorations stay white in both states.
+    normalForegroundColor: Colors.omnitrix
+    hoverForegroundColor: Colors.omnitrix
+    pressedForegroundColor: Colors.omnitrix
 
     normalDockGlowColor: Colors.omnitrix
     hoverDockGlowColor: Colors.omnitrix
@@ -25,27 +31,20 @@ DockButton {
     hoverContentGlowColor: Colors.omnitrix
     pressedContentGlowColor: Colors.omnitrix
 
+    // Sample the complete ornament once; DockButton still owns all glow,
+    // open-fill, click handling, and state-transition behavior.
     contentGlowSource: sessionsIcon
 
-    Image {
+    NotoText {
         id: sessionsIcon
-
         anchors.centerIn: parent
-
-        source: Qt.resolvedUrl("../assets/Sessions.png")
-
-        width: sessionsDock.width - 10
-        height: sessionsDock.height - 5
-
-        fillMode: Image.PreserveAspectFit
-        smooth: false
-    }
-
-    ColorOverlay {
-        anchors.fill: sessionsIcon
-        source: sessionsIcon
-        color: Colors.magenta
-        visible: sessionsDock.open
+        font.pixelSize: 22
+        textFormat: Text.StyledText
+        color: Colors.white
+        // Original glyph order: ࣪˖☎︎๋࣭✧.
+        // Only the telephone responds to Social's active-state color.
+        text: "࣪˖<font color='" + sessionsDock.foregroundColor
+              + "'>☎︎</font>๋࣭✧"
     }
 
     onLeftClicked: {

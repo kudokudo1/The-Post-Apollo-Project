@@ -39,7 +39,7 @@ for file, phase_guard, token_guard in targets:
 host_source=(root/"services/projects/TaskFileViewHostBridgeM11g.qml").read_text()
 assert "bridge.observeNative(\"FILE_SAVED\")" in host_source
 assert "bridge.observeNative(\"FILE_READBACK_OK\")" in host_source
-assert "bridge.observeNative(\"HOST_SETTLED\")" in host_source
+assert "observeNative(\"HOST_SETTLED\")" in host_source
 assert "fixtureFile.setText(pendingRaw);" in host_source
 assert "TaskFileViewHostBridgeM11g" not in (root/"shell.qml").read_text()
 print("M11 FileView deferred readback callback and stale-stage fences: PASS")

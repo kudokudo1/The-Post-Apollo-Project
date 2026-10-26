@@ -128,9 +128,8 @@ Item {
             localFeedback = "INVALID NAME OR DURATION // 1S MIN";
             return;
         }
-        editDirty = false;
         removeArmed = false;
-        localFeedback = "";
+        localFeedback = "EDIT REQUESTED // AWAIT OWNER STATE";
         actionRequested(selectedTimer.id, "edit", nameDraft,
                         hoursDraft, minutesDraft, secondsDraft);
     }
@@ -140,7 +139,16 @@ Item {
         syncSelection();
     }
     onCountdownSnapshotChanged: {
-        if (initialized) syncSelection();
+        if (!initialized) return;
+        // A request is not proof that the owner accepted a draft. Preserve
+        // uncommitted user input until the TimeW record matches exactly.
+        if (editDirty && selectedTimer !== null
+                && selectedTimer.name === nameDraft
+                && selectedTimer.hours === hoursDraft
+                && selectedTimer.minutes === minutesDraft
+                && selectedTimer.seconds === secondsDraft)
+            editDirty = false;
+        syncSelection();
     }
     onVisibleChanged: {
         if (!visible) inputFocusChanged(false);
@@ -387,11 +395,13 @@ Item {
                     label: countdownUi.timerRunning ? "PAUSE"
                            : countdownUi.selectedTimer
                              && countdownUi.selectedTimer.status === "paused"
-                           ? "RESUME" : "START"
+                           ? "RESUME"
+                           : countdownUi.selectedTimer
+                             && countdownUi.selectedTimer.status === "finished"
+                           ? "RESTART" : "START"
                     labelPixelSize: 11
                     available: countdownUi.selectedTimer !== null
                                && !countdownUi.editDirty
-                               && countdownUi.selectedTimer.status !== "finished"
                     softGlowEnabled: false
                     onLeftClicked: countdownUi.issue(
                         countdownUi.timerRunning ? "pause" : "start")

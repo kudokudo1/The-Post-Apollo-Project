@@ -1,0 +1,49 @@
+name: TASKS M11j native evidence and production preflight
+
+on:
+  pull_request:
+    paths:
+      - 'tests/tasks/fixtures/task_native_acceptance_m11j.json'
+      - 'tests/tasks/test_task_native_acceptance_m11j.py'
+      - 'docs/tasks-native-acceptance-production-readiness-m11j.md'
+      - '.github/workflows/tasks-native-acceptance-record-m11j.yml'
+      - 'services/hub/ApolloHubTodoStore.qml'
+      - 'services/projects/TaskFileViewHostBridgeM11g.qml'
+      - 'TaskFileViewHostHarnessM11g.qml'
+  push:
+    branches:
+      - main
+    paths:
+      - 'tests/tasks/fixtures/task_native_acceptance_m11j.json'
+      - 'tests/tasks/test_task_native_acceptance_m11j.py'
+      - 'docs/tasks-native-acceptance-production-readiness-m11j.md'
+      - '.github/workflows/tasks-native-acceptance-record-m11j.yml'
+      - 'services/hub/ApolloHubTodoStore.qml'
+      - 'services/projects/TaskFileViewHostBridgeM11g.qml'
+      - 'TaskFileViewHostHarnessM11g.qml'
+
+permissions:
+  contents: read
+
+jobs:
+  native-evidence-review:
+    runs-on: ubuntu-latest
+    timeout-minutes: 7
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: M11j native observation provenance and production separation
+        run: python3 tests/tasks/test_task_native_acceptance_m11j.py
+      - name: M11d live writer route inventory
+        run: python3 tests/tasks/test_task_writer_gate_inventory_m11d.py
+      - name: M11 post-save native FileView readback regression
+        run: python3 tests/tasks/test_fileview_deferred_readback_m11.py
+      - name: M11h real synthetic-host crash-window regressions
+        run: python3 tests/tasks/test_task_fileview_crash_windows_m11h.py
+      - name: M11i isolated native callback observation policy
+        run: node tests/tasks/test_task_fileview_native_evidence_m11i.cjs

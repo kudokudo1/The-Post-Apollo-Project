@@ -107,7 +107,7 @@ def capture(**kwargs):
 
 assert capture() == read
 assert len(cmds)==1
-assert cmds[0][0] == ["kitten","@","--to","unix:"+sock,"ls","--output-format=json"]
+assert cmds[0][0] == ["kitten","@","--to","unix:"+sock,"ls"]
 assert cmds[0][1] == {
     "check":True, "capture_output":True, "timeout":3, "shell":False}
 assert SENSITIVE not in str(cmds)

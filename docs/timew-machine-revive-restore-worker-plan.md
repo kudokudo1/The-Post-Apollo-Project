@@ -219,3 +219,35 @@ private-mode exclusion, duplicate-host handling, TTL/replay control and
 a rollback plan. Coordinate with Notifications/Proton component owners.
 Never enable general session access, native host installations or terminal
 remote-control sockets based on this simulated passing test.
+
+
+## M2d3 // Dormant Kitty native-format inventory reader (2026-10-26)
+
+After M2d2's simulation policy was merged (PR #808), the first **actual
+application-specific payload implementation** is
+`services/time/MachineKittyRead.py`. It validates and strips the documented
+Kitty `kitten @ ls` JSON tree, retaining OS window/tab/pane **ephemeral
+numeric IDs and counts only**. Titles, directories, process IDs, commands,
+environment, credentials, and private data are never returned.
+
+The adapter also contains a dormant, explicit-target one-shot function for
+reading an **already enabled** Kitty owner-only UNIX socket with the fixed
+read-only `kitten @ ... ls` command. This function has no CLI or QML
+activation, no implicit target discovery, no socket creation, no config
+changes and no trusted operator-consent mechanism yet. CI only exercises
+injected fake responders and fake socket metadata; the operator's running
+Kitty instances are NOT accessed. See
+`docs/timew-machine-m2d3-kitty-native-read.md`.
+
+**Important risks:** Enabling Kitty remote control allows more than
+read-only introspection unless access is separately restricted. The
+existing module cannot verify which Kitty OS window corresponds to which
+SwayFX window; numeric native IDs are not restart-stable and must not
+authorize MOVE, REVIVE or RESTORE. This remains one adapter under the
+universal application registry, not a Kitty-only product.
+
+**Next gate:** explicit operator-approved isolated Kitty instance,
+version-specific socket permission audit and peer provenance, real native
+response shape compatibility, independently verified host-window binding
+and separately authorized retention or launch. No live-data collection,
+broad remote-control activation or unsupervised command replay.

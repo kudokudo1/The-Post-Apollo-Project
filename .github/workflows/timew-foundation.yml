@@ -22,6 +22,8 @@ on:
       - "services/time/MachineAdapterRegistry.py"
       - "services/time/MachineAdapterFixtureCorrelation.py"
       - "services/time/MachineAdapterHandshakeTrial.py"
+      - "services/time/MachineKittyRead.py"
+      - "docs/timew-machine-m2d3-kitty-native-read.md"
       - "docs/timew-machine-m2d2-handshake-trial.md"
       - "docs/timew-machine-m2d-fixture-session-correlation.md"
       - "services/time/MachineAdapterEvidencePolicy.py"
@@ -74,6 +76,8 @@ on:
       - "services/time/MachineAdapterRegistry.py"
       - "services/time/MachineAdapterFixtureCorrelation.py"
       - "services/time/MachineAdapterHandshakeTrial.py"
+      - "services/time/MachineKittyRead.py"
+      - "docs/timew-machine-m2d3-kitty-native-read.md"
       - "docs/timew-machine-m2d2-handshake-trial.md"
       - "docs/timew-machine-m2d-fixture-session-correlation.md"
       - "services/time/MachineAdapterEvidencePolicy.py"
@@ -181,6 +185,10 @@ jobs:
         run: python3 -B -I tests/timew/test_machine_adapter_handshake_trial.py
       - name: Verify MACHINE handshake policy has no live actions
         run: python3 -B -I tests/timew/test_machine_adapter_handshake_trial_contract.py
+      - name: Verify MACHINE native Kitty read-only inventory and private field redaction
+        run: python3 -B -I tests/timew/test_machine_kitty_read.py
+      - name: Verify MACHINE Kitty inventory remains dormant and non-executable
+        run: python3 -B -I tests/timew/test_machine_kitty_read_contract.py
       - name: Verify MACHINE durable move journal crash and permissions
         run: python3 -B -I tests/timew/test_machine_move_journal.py
       - name: Verify MACHINE single-use approval and read-only reconciliation

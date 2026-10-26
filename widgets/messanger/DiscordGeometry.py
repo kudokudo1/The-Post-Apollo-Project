@@ -13,6 +13,8 @@ Protocol on stdin: newline-delimited JSON.
   {"op":"sync","target":"social|discord","x":0,"y":0,
    "width":100,"height":100,"focus":false,"setup":false}
   {"op":"centerDiscord","x":0,"y":0}
+  {"op":"showDiscord","focus":true}
+  {"op":"hideDiscord"}
   {"op":"focusDiscord"}
 
 stdout: newline-delimited JSON snapshots:
@@ -152,6 +154,25 @@ BROWSER_SITES = ("x", "instagram", "facebook", "reddit", "threads", "pinterest",
                  "groupme", "lemon8", "quora", "pixelfed", "zalo",
                  "whatsappweb", "messengerweb", "linechrome")
 
+VESKTOP_WAYLAND_IDS = {"vesktop", "dev.vencord.vesktop"}
+VESKTOP_X11_CLASSES = {"vesktop"}
+
+
+def normalized_identity(value: Any) -> str:
+    return str(value or "").strip().lower()
+
+
+def is_vesktop_node(node: dict[str, Any]) -> bool:
+    app_id = normalized_identity(node.get("app_id"))
+    props = node.get("window_properties") or {}
+    window_class = normalized_identity(props.get("class"))
+    instance = normalized_identity(props.get("instance"))
+    return (
+        app_id in VESKTOP_WAYLAND_IDS
+        or window_class in VESKTOP_X11_CLASSES
+        or instance in VESKTOP_X11_CLASSES
+    )
+
 
 def snapshot_from_tree(tree: dict[str, Any]) -> dict[str, Any]:
     social: dict[str, Any] | None = None
@@ -159,25 +180,35 @@ def snapshot_from_tree(tree: dict[str, Any]) -> dict[str, Any]:
     browser_candidates: dict[str, list[dict[str, Any]]] = {site: [] for site in BROWSER_SITES}
 
     for node in walk_tree(tree):
-        if not node.get("visible", False):
-            continue
-
         rect = compact_rect(node.get("rect"))
         if rect is None:
             continue
 
+        visible = bool(node.get("visible", False))
         entry = {
             "rect": rect,
             "focused": bool(node.get("focused", False)),
+            "visible": visible,
         }
+
+        # Vesktop may be a native Wayland client or an XWayland client, and a
+        # scratchpad window is not necessarily visible. Discover it before the
+        # visible-only filtering and carry its exact Sway container id.
+        if is_vesktop_node(node):
+            discord_entry = dict(entry)
+            discord_entry["name"] = node.get("name")
+            discord_entry["conId"] = int(node.get("id", 0))
+            discord_entry["appId"] = node.get("app_id")
+            discord_entry["windowClass"] = (
+                (node.get("window_properties") or {}).get("class")
+            )
+            discord_candidates.append(discord_entry)
+
+        if not visible:
+            continue
 
         if social is None and node.get("name") == "QS_SOCIAL_MENU":
             social = entry
-
-        if node.get("app_id") == "vesktop":
-            discord_entry = dict(entry)
-            discord_entry["name"] = node.get("name")
-            discord_candidates.append(discord_entry)
 
         # Isolated Chromium profiles expose one XWayland class per Social site.
         window_class = (node.get("window_properties") or {}).get("class")
@@ -191,7 +222,9 @@ def snapshot_from_tree(tree: dict[str, Any]) -> dict[str, Any]:
         discord = max(
             discord_candidates,
             key=lambda item: (
-                item["rect"]["width"] * item["rect"]["height"]
+                bool(item.get("visible", False)),
+                bool(item.get("focused", False)),
+                item["rect"]["width"] * item["rect"]["height"],
             ),
         )
 
@@ -211,11 +244,13 @@ def snapshot_from_tree(tree: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-def sway_criteria(target: str) -> str:
+def sway_criteria(target: str, con_id: int | None = None) -> str:
     if target == "social":
         return '[title="QS_SOCIAL_MENU"]'
     if target == "discord":
-        return '[app_id="vesktop"]'
+        if con_id is None or int(con_id) <= 0:
+            raise ValueError("Discord commands require a discovered Sway con_id")
+        return f'[con_id="{int(con_id)}"]'
     if target in BROWSER_SITES:
         return f'[class="post-apollo-{target}"]'
     raise ValueError(f"Unknown sync target: {target}")
@@ -223,7 +258,7 @@ def sway_criteria(target: str) -> str:
 
 def build_sync_command(message: dict[str, Any]) -> str:
     target = str(message["target"])
-    criteria = sway_criteria(target)
+    criteria = sway_criteria(target, message.get("conId"))
 
     x = int(message["x"])
     y = int(message["y"])
@@ -288,6 +323,12 @@ class Bridge:
         self.x_selected = False
         self.x_ready = False
         self.browser_site = "x"
+
+        # Discord's runtime identity is learned from Sway. Never assume one
+        # app_id spelling: current Vesktop may be native Wayland or XWayland.
+        self.discord_con_id: int | None = None
+        self.discord_show_requested = False
+        self.discord_show_focus = True
 
     @staticmethod
     def rect_equal(a: dict[str, int] | None, b: dict[str, int] | None) -> bool:
@@ -449,6 +490,12 @@ class Bridge:
         if target not in ("social", "discord", *BROWSER_SITES):
             return
 
+        if target == "discord":
+            if not self.discord_con_id:
+                return
+            message = dict(message)
+            message["conId"] = self.discord_con_id
+
         with self.command_lock:
             previous = self.pending_sync.get(target)
 
@@ -557,21 +604,43 @@ class Bridge:
                 continue
 
             if op == "centerDiscord":
+                if not self.discord_con_id:
+                    self.sample_event.set()
+                    continue
                 x = int(message.get("x", 0))
                 y = int(message.get("y", 0))
+                criteria = sway_criteria("discord", self.discord_con_id)
                 self.queue_command(
-                    '[app_id="vesktop"] floating enable; '
-                    '[app_id="vesktop"] border none; '
-                    f'[app_id="vesktop"] move absolute position '
-                    f'{x} px {y} px'
+                    f'{criteria} floating enable; '
+                    f'{criteria} border none; '
+                    f'{criteria} move absolute position {x} px {y} px'
                 )
                 continue
 
+            if op == "showDiscord":
+                self.discord_show_requested = True
+                self.discord_show_focus = bool(message.get("focus", True))
+                self.sample_event.set()
+                continue
+
+            if op == "hideDiscord":
+                self.discord_show_requested = False
+                if not self.discord_con_id:
+                    self.sample_event.set()
+                    continue
+                criteria = sway_criteria("discord", self.discord_con_id)
+                self.queue_command(f'{criteria} move scratchpad')
+                continue
+
             if op == "focusDiscord":
+                if not self.discord_con_id:
+                    self.sample_event.set()
+                    continue
+                criteria = sway_criteria("discord", self.discord_con_id)
                 self.queue_command(
-                    '[app_id="vesktop"] floating enable; '
-                    '[app_id="vesktop"] border none; '
-                    '[app_id="vesktop"] focus'
+                    f'{criteria} floating enable; '
+                    f'{criteria} border none; '
+                    f'{criteria} focus'
                 )
                 continue
 
@@ -618,6 +687,26 @@ class Bridge:
     def emit_snapshot(self, force: bool = False) -> None:
         tree = self.poll_ipc.request(IPC_GET_TREE)
         snapshot = snapshot_from_tree(tree)
+
+        discord = snapshot.get("discord")
+        if discord and int(discord.get("conId", 0)) > 0:
+            self.discord_con_id = int(discord["conId"])
+
+            if self.discord_show_requested:
+                criteria = sway_criteria("discord", self.discord_con_id)
+                commands = [
+                    f'{criteria} floating enable',
+                    f'{criteria} border none',
+                    f'{criteria} move scratchpad',
+                    f'{criteria} scratchpad show',
+                    f'{criteria} floating enable',
+                    f'{criteria} border none',
+                ]
+                if self.discord_show_focus:
+                    commands.append(f'{criteria} focus')
+                self.queue_command("; ".join(commands))
+                self.discord_show_requested = False
+
         snapshot = self.fast_follow(snapshot)
 
         if force or snapshot != self.last_snapshot:

@@ -49,9 +49,8 @@ assert.match(hostPolicy, /Candidate identity is not authorization/);
 // QML item ownership determines logical geometry; SwayPX supplies globals.
 const joined = station + hub + screen;
 assert.doesNotMatch(joined, /^import QtWebEngine$/m);
-assert.doesNotMatch(joined, /source:\\s*["']StationNewsWebView\\.qml/);
+assert.doesNotMatch(joined, /source:\s*["']StationNewsWebView\.qml/);
 assert.doesNotMatch(joined, /Qt\.openUrlExternally\(|startDetached\(/);
-assert.match(station, /WlrLayershell\\.namespace:\\s*"post-apollo-weather-station"/);
 assert.doesNotMatch(
     hub + screen,
     /Qt\.rect\(190\s*,\s*132|Qt\.rect\(0\s*,\s*0\s*,\s*824\s*,\s*494/

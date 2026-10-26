@@ -32,6 +32,8 @@ def sample(*, focus="discord", discord_x=211, discord_y=51,
             "rect": {"x": discord_x, "y": discord_y,
                      "width": 1098, "height": 698},
             "focused": focus == "discord",
+            "visible": True,
+            "conId": 4242,
         },
     }
 
@@ -156,7 +158,10 @@ class DiscordDockingTests(TestCase):
             self.assertIn("discordReady = false;", method)
             self.assertIn("discordDocked = false;", method)
         self.assertIn('Quickshell.shellPath("widgets/messanger/DiscordGeometry.py")', text)
-        self.assertIn("DiscordBackingW {", text)
+        self.assertNotIn("DiscordBackingW {", text)
+        self.assertIn("helperShowDiscord(", text)
+        self.assertIn("helperHideDiscord()", text)
+        self.assertNotIn('[app_id=\\\"vesktop\\\"]', text)
 
     def test_social_focus_retry_uses_real_readiness_and_repeats(self):
         src = SOCIAL.read_text(encoding="utf-8")
@@ -168,42 +173,75 @@ class DiscordDockingTests(TestCase):
         self.assertIn("syncSocialGeometry(!messagingWindow.externalSelected)", chunk)
         self.assertIn("if (!messagingWindow.socialReady)", src)
 
-    def test_discord_shells_remain_empty_but_exist_above_backing(self):
-        # The Social FloatingWindow still contains the component instances,
-        # yet they must paint no translucent surface/border above Vesktop.
+    def test_discord_uses_normal_empty_panes_without_backing_window(self):
         social = SOCIAL.read_text(encoding="utf-8")
         contact = (ROOT / "widgets/messanger/ContactList.qml").read_text()
         feed = (ROOT / "components/ConversationFeed.qml").read_text()
-        self.assertIn("fillOpacity: messagingWindow.discordSelected ? 0.0 : 0.20", social)
+
+        # Discord is the same external-window model as X/browser apps: native
+        # panes remain as the normal visual surface underneath, while
+        # discordMode hides only their contents.
+        self.assertIn("fillOpacity: 0.20", social)
         self.assertIn("id: contactList", social)
         self.assertIn("id: chatFeed", social)
-        self.assertIn("discordVisualBehind: messagingWindow.discordSelected", social)
-        self.assertIn("visible: messagingWindow.menuOpen && !providerAccessPanel.visible", social)
-        self.assertIn("visible: messagingWindow.menuOpen && !telegramConnectPanel.visible", social)
         self.assertIn("discordMode: messagingWindow.externalSelected", social)
-        self.assertIn('color: discordVisualBehind ? "transparent"', contact)
-        self.assertIn("border.width: discordVisualBehind ? 0 : 1", contact)
-        self.assertIn("opacity: chatFeed.discordVisualBehind ? 0.0 : 0.85", feed)
-        self.assertIn("visible: !chatFeed.discordVisualBehind", feed)
-        self.assertIn("visible: !contactRoot.discordMode", contact)
-        self.assertIn("visible: !chatFeed.discordMode", feed)
-        self.assertIn("z: 3", social)
+        self.assertNotIn("discordVisualBehind", social)
+        self.assertNotIn("DiscordBackingW {", social)
+        self.assertFalse(BACKING.exists())
 
-    def test_discord_backing_restored_on_bottom_layer_and_screen(self):
-        social = SOCIAL.read_text(encoding="utf-8")
-        backing = BACKING.read_text(encoding="utf-8")
-        self.assertIn("DiscordBackingW {", social)
-        self.assertIn("hostSocial: messagingWindow", social)
-        self.assertIn("property var hostSocial: null", backing)
-        self.assertIn("WlrLayershell.layer: WlrLayer.Bottom", backing)
-        self.assertIn("discordBackingWindow", backing)
-        self.assertIn("hostSocial.discordX", backing)
-        self.assertIn("hostSocial.discordWidth", backing)
-        self.assertIn("hostSocial.menuOpen", backing)
-        self.assertIn("hostSocial.discordSelected", backing)
-        self.assertIn("width: 0", backing)
-        self.assertIn("height: 0", backing)
-        self.assertIn("opacity: 0.85", backing)
+        self.assertNotIn("discordVisualBehind", contact)
+        self.assertIn(
+            "color: Qt.rgba(Colors.black.r, Colors.black.g, Colors.black.b, 0.85)",
+            contact,
+        )
+        self.assertIn("border.width: 1", contact)
+        self.assertIn("visible: !contactRoot.discordMode", contact)
+
+        self.assertNotIn("discordVisualBehind", feed)
+        self.assertIn("opacity: 0.85", feed)
+        self.assertIn("visible: true", feed)
+        self.assertIn("visible: !chatFeed.discordMode", feed)
+
+    def test_vesktop_discovery_handles_wayland_xwayland_and_scratchpad(self):
+        variants = (
+            {"id": 101, "app_id": "vesktop", "window_properties": {}},
+            {"id": 102, "app_id": "dev.vencord.vesktop", "window_properties": {}},
+            {"id": 103, "app_id": "dev.vencord.Vesktop", "window_properties": {}},
+            {
+                "id": 104,
+                "app_id": None,
+                "window_properties": {"class": "Vesktop", "instance": "vesktop"},
+            },
+        )
+        for node in variants:
+            with self.subTest(node=node):
+                candidate = {
+                    **node,
+                    "name": "Vesktop",
+                    "visible": False,
+                    "focused": False,
+                    "rect": {"x": 700, "y": 300, "width": 500, "height": 400},
+                    "nodes": [],
+                    "floating_nodes": [],
+                }
+                tree = {
+                    "id": 1,
+                    "visible": True,
+                    "rect": {"x": 0, "y": 0, "width": 1920, "height": 1080},
+                    "nodes": [candidate],
+                    "floating_nodes": [],
+                }
+                snapshot = geometry.snapshot_from_tree(tree)
+                self.assertEqual(snapshot["discord"]["conId"], node["id"])
+                self.assertFalse(snapshot["discord"]["visible"])
+
+    def test_discord_criteria_requires_discovered_container_id(self):
+        self.assertEqual(
+            geometry.sway_criteria("discord", 4242),
+            '[con_id="4242"]',
+        )
+        with self.assertRaises(ValueError):
+            geometry.sway_criteria("discord")
 
     def test_discord_sync_reasserts_floating_and_borderless_even_after_setup(self):
         # Screenshot regression: after PR #799 the visible "Vesktop"
@@ -213,12 +251,13 @@ class DiscordDockingTests(TestCase):
         for setup in (False, True):
             with self.subTest(setup=setup):
                 cmd = geometry.build_sync_command({
-                    "target": "discord",
+                    "target": "discord", "conId": 4242,
                     "x": 211, "y": 51, "width": 1098, "height": 698,
                     "setup": setup, "focus": False,
                 })
-                self.assertIn('[app_id="vesktop"] floating enable', cmd)
-                self.assertIn('[app_id="vesktop"] border none', cmd)
+                self.assertIn('[con_id="4242"] floating enable', cmd)
+                self.assertIn('[con_id="4242"] border none', cmd)
+                self.assertNotIn('[app_id=', cmd)
                 self.assertLess(cmd.index("floating enable"), cmd.index("border none"))
                 self.assertLess(cmd.index("border none"), cmd.index("resize set"))
                 self.assertNotIn(" focus", cmd)
@@ -234,30 +273,34 @@ class DiscordDockingTests(TestCase):
             self.assertNotIn("floating enable", cmd)
             self.assertNotIn("border none", cmd)
 
-    def test_discord_launch_requests_real_sway_floating_and_raise(self):
+    def test_discord_launch_delegates_window_control_to_runtime_con_id_helper(self):
         social = SOCIAL.read_text(encoding="utf-8")
-        launch = social.split("    function showDiscord() {", 1)[1].split(
-            "    function hideDiscord()", 1)[0]
-        float_cmd = 'swaymsg \'[app_id=\\\"vesktop\\\"] floating enable\''
-        show_cmd = 'swaymsg \'[app_id=\\\"vesktop\\\"] scratchpad show\''
-        focus_cmd = 'swaymsg \'[app_id=\\\"vesktop\\\"] focus\''
-        border_cmd = float_cmd.replace("floating enable", "border none")
-        self.assertGreaterEqual(launch.count(float_cmd), 2)
-        self.assertGreaterEqual(launch.count(border_cmd), 2)
-        self.assertLess(launch.index(float_cmd), launch.index(border_cmd))
-        self.assertIn(show_cmd, launch)
-        self.assertLess(launch.index(show_cmd), launch.rindex(border_cmd))
-        self.assertLess(launch.rindex(border_cmd), launch.index(focus_cmd))
-        self.assertIn(focus_cmd, launch)
-        self.assertLess(launch.index(float_cmd), launch.index(show_cmd))
-        self.assertLess(launch.index(show_cmd), launch.index(focus_cmd))
-        self.assertIn("if (discordDocked && menuOpen && discordSelected)", social)
-        self.assertIn("discordRaiseDelay.restart();", social)
+        helper = GEOMETRY.read_text(encoding="utf-8")
 
-        helper = GEOMETRY.read_text()
-        self.assertIn("""'[app_id="vesktop"] floating enable; '""", helper)
-        self.assertIn("""'[app_id="vesktop"] focus'""", helper)
-        self.assertIn("""'[app_id="vesktop"] move absolute position '""", helper)
+        launch = social.split("    function showDiscord() {", 1)[1].split(
+            "    function hideDiscord()", 1
+        )[0]
+        self.assertIn("flatpak ps --columns=application", launch)
+        self.assertIn("flatpak run dev.vencord.Vesktop", launch)
+        self.assertIn("helperShowDiscord(", launch)
+        self.assertNotIn("swaymsg", launch)
+        self.assertNotIn('[app_id="vesktop"]', social)
+
+        self.assertIn('VESKTOP_WAYLAND_IDS = {"vesktop", "dev.vencord.vesktop"}', helper)
+        self.assertIn('VESKTOP_X11_CLASSES = {"vesktop"}', helper)
+        self.assertIn('return f\'[con_id="{int(con_id)}"]\'', helper)
+        self.assertIn('op == "showDiscord"', helper)
+        self.assertIn('op == "hideDiscord"', helper)
+        self.assertNotIn("node.get(\"app_id\") == \"vesktop\"", helper)
+
+    def test_fast_follow_ignores_hidden_scratchpad_vesktop(self):
+        bridge, commands = self.bridge(docked=True)
+        hidden = sample()
+        hidden["discord"]["visible"] = False
+        result = bridge.fast_follow(hidden)
+        self.assertIsNone(result["fastLeader"])
+        self.assertEqual(commands, [])
+
 
 
 if __name__ == "__main__":

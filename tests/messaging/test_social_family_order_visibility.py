@@ -99,8 +99,7 @@ class SocialFamilyOrderVisibility(unittest.TestCase):
         self.assertIn("model: appSelector.railRows",SELECTOR)
         self.assertIn("bottom: statusMessage.visible ? statusMessage.top : settingsFooter.top",
                       SELECTOR)
-        section=SELECTOR.split('text: "BUTTON FAMILIES"',1)[1].split(
-            'text: "LINKED ACCOUNTS"',1)[0]
+        section=SELECTOR.split('text: "BUTTON FAMILIES"',1)[1]
         for forbidden in ("appActivated(", "activateApp(", "FileView {",
                           "Qt.openUrlExternally(", "Process {"):
             self.assertNotIn(forbidden,section)

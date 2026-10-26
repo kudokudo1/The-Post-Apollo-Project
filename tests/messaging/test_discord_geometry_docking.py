@@ -231,12 +231,15 @@ class DiscordDockingTests(TestCase):
     def test_social_focus_retry_uses_real_readiness_and_repeats(self):
         src = SOCIAL.read_text(encoding="utf-8")
         chunk = src.split("id: socialFocusDelay", 1)[1].split(
-            "id: discordStartupFallback", 1)[0]
+            "id: xRaiseDelay", 1
+        )[0]
         self.assertIn("repeat: true", chunk)
         self.assertIn("messagingWindow.socialReady || attempts >= 6", chunk)
         self.assertNotIn("socailReady", src)
         self.assertIn("syncSocialGeometry(!messagingWindow.externalSelected)", chunk)
-        self.assertIn("if (!messagingWindow.socialReady)", src)
+        # Splash promotion used to supply this extra readiness fallback.
+        # It is deliberately gone: only the Social positioning retry remains.
+        self.assertNotIn("discordStartupFallback", src)
 
     def test_discord_uses_normal_empty_panes_without_backing_window(self):
         social = SOCIAL.read_text(encoding="utf-8")

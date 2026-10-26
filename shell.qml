@@ -787,6 +787,15 @@ PanelWindow {
             id: apolloHubWindow
             screen: shellRoot.screen
             liveBridge: apolloHubLive
+            // MASTER OUTPUT ONLY, not Hi-Fi playback or Team 6 app streams.
+            // This is the existing dock with its one PwObjectTracker.
+            audioSnapshot: sharedVolumeDock.hubOutputSnapshot
+            onAudioVolumeRequested: function(percent) {
+                sharedVolumeDock.requestHubVolumePercent(percent);
+            }
+            onAudioMuteRequested: function(muted) {
+                sharedVolumeDock.requestHubMute(muted);
+            }
             // Owner windows retain the controller, subprocesses and Sway
             // geometry. Hub receives only a tiny state projection and
             // explicit typed action routing at direct button presses.
@@ -913,7 +922,7 @@ PanelWindow {
 
         // Volume
 
-        Volumebar {}
+        Volumebar { id: sharedVolumeDock }
 
         // Messaging
 

@@ -38,6 +38,8 @@ on:
       - "widgets/hub/ApolloHubCalendarMini.qml"
       - "widgets/hub/ApolloHubTimeMini.qml"
       - "widgets/hub/ApolloHubStopwatchControls.qml"
+      - "widgets/hub/ApolloHubCountdownControls.qml"
+      - "tests/hub/test_apollo_hub_countdown_integration.py"
       - "tests/hub/test_apollo_hub_stopwatch_integration.py"
       - "modules/ApolloHub.qml"
       - "components/ActionButton.qml"
@@ -82,6 +84,8 @@ on:
       - "widgets/hub/ApolloHubCalendarMini.qml"
       - "widgets/hub/ApolloHubTimeMini.qml"
       - "widgets/hub/ApolloHubStopwatchControls.qml"
+      - "widgets/hub/ApolloHubCountdownControls.qml"
+      - "tests/hub/test_apollo_hub_countdown_integration.py"
       - "tests/hub/test_apollo_hub_stopwatch_integration.py"
       - "modules/ApolloHub.qml"
       - "components/ActionButton.qml"
@@ -100,6 +104,8 @@ jobs:
         run: python3 tests/hub/test_apollo_hub_foundation.py
       - name: Verify same-owner TimeW stopwatch controls
         run: python3 tests/hub/test_apollo_hub_stopwatch_integration.py
+      - name: Verify same-owner TimeW countdown controls
+        run: python3 tests/hub/test_apollo_hub_countdown_integration.py
       - name: Exercise layout v1 migration, v2 tile identity and guarded remove
         run: node tests/hub/test_apollo_hub_layout_v2.cjs
       - name: Verify sanitized AppControl process projection

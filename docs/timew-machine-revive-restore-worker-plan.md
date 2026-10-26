@@ -194,3 +194,28 @@ opt-in privacy choices and only then consideration of owner-only v2 storage.
 Coordinate with Notifications/Proton ownership; do not repurpose its
 narrow browser extension. Preserve REVIVE current-work and RESTORE
 historical-checkpoint semantics.
+
+
+## M2d2 // Synthetic one-shot handshake policy (2026-10-26)
+
+Stage 1's synthetic app/host correlation PR #793 is merged.
+`services/time/MachineAdapterHandshakeTrial.py` now models the separate,
+required **one-shot, scope-bound, expiring, cancelled/replay-safe handshake**
+for 17 Brave + four Kitty + Firefox + VS Code + Ghostty test fixtures.
+See `docs/timew-machine-m2d2-handshake-trial.md`.
+
+**All flags and observations in the test harness are simulated**, including
+the apparent user permission and source labels. The simulator **cannot**
+authenticate real applications, verify SwayFX mapping, inspect sessions,
+issue a usable permission token, save v2 sidecars or restore anything.
+A successful synthetic echo still reports `real_app_identity_verified=false`,
+`real_host_binding_verified=false`, `operator_consent_verified=false`
+and `safe_actions=[]`.
+
+**Next required decision:** design and obtain operator permission for one
+isolated **real read-only authenticated app-to-host bridge**, including
+per-application identity, extension/OS transport provenance, consent,
+private-mode exclusion, duplicate-host handling, TTL/replay control and
+a rollback plan. Coordinate with Notifications/Proton component owners.
+Never enable general session access, native host installations or terminal
+remote-control sockets based on this simulated passing test.

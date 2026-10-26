@@ -6,6 +6,8 @@ on:
       - "services/hub/ApolloHubTimePolicy.js"
       - "widgets/hub/ApolloHubTile.qml"
       - "widgets/hub/ApolloHubTimeMini.qml"
+      - "widgets/hub/ApolloHubStopwatchControls.qml"
+      - "tests/hub/test_apollo_hub_stopwatch_integration.py"
       - "tests/hub/test_apollo_hub_time_policy.cjs"
       - "tests/hub/test_apollo_hub_time_contract.py"
       - "widgets/TimeW.qml"
@@ -17,6 +19,8 @@ on:
       - "services/hub/ApolloHubTimePolicy.js"
       - "widgets/hub/ApolloHubTile.qml"
       - "widgets/hub/ApolloHubTimeMini.qml"
+      - "widgets/hub/ApolloHubStopwatchControls.qml"
+      - "tests/hub/test_apollo_hub_stopwatch_integration.py"
       - "tests/hub/test_apollo_hub_time_policy.cjs"
       - "tests/hub/test_apollo_hub_time_contract.py"
       - "widgets/TimeW.qml"
@@ -34,6 +38,8 @@ jobs:
       - uses: actions/checkout@v4
       - name: Guard pure time adapter and existing clock-tick ownership
         run: python3 tests/hub/test_apollo_hub_time_contract.py
+      - name: Verify owner-based direct stopwatch controls
+        run: python3 tests/hub/test_apollo_hub_stopwatch_integration.py
       - name: Test local clock and DST transitions in New York
         run: TZ=America/New_York node tests/hub/test_apollo_hub_time_policy.cjs
       - name: Test zero UTC offset

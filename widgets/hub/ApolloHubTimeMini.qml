@@ -10,6 +10,9 @@ Item {
     property var timeSnapshot: null
     property bool use24Hour: true
     signal toggleHourFormat()
+    property var stopwatchSnapshot: null
+    property string selectedTool: "clock"
+    signal stopwatchActionRequested(string action)
 
     // Stage 7B only adapts presentation to the size already granted by the
     // Hub tile (H:1/H:2/H:3). No second timer or modified clock semantics.
@@ -22,14 +25,62 @@ Item {
         && typeof timeSnapshot.dateLabel === "string"
         && typeof timeSnapshot.utcOffsetLabel === "string"
     readonly property string statusLine:
-        timeReady
+        densityLevel > 1 && selectedTool === "stopwatch"
+        ? stopwatchControls.statusLine
+        : timeReady
         ? "TIME // LOCAL CLOCK // " + (use24Hour ? "24H" : "12H")
         : "TIME // UNAVAILABLE"
           + (timeSnapshot && timeSnapshot.error
              ? " // " + String(timeSnapshot.error) : "")
 
+    Row {
+        id: timeToolsTabs
+        visible: timeMini.densityLevel > 1
+        anchors.top: parent.top
+        anchors.left: parent.left
+        anchors.right: parent.right
+        height: 28
+        spacing: 5
+
+        ActionButton {
+            width: Math.max(1,(parent.width-parent.spacing)/2)
+            height: parent.height
+            label: "CLOCK"
+            labelPixelSize: 11
+            selected: timeMini.selectedTool === "clock"
+            softGlowEnabled: false
+            onLeftClicked: timeMini.selectedTool = "clock"
+        }
+        ActionButton {
+            width: Math.max(1,(parent.width-parent.spacing)/2)
+            height: parent.height
+            label: "STOPWATCH"
+            labelPixelSize: 11
+            selected: timeMini.selectedTool === "stopwatch"
+            softGlowEnabled: false
+            onLeftClicked: timeMini.selectedTool = "stopwatch"
+        }
+    }
+
+    ApolloHubStopwatchControls {
+        id: stopwatchControls
+        visible: timeMini.densityLevel > 1
+                 && timeMini.selectedTool === "stopwatch"
+        stopwatchSnapshot: timeMini.stopwatchSnapshot
+        onActionRequested: function(action) {
+            timeMini.stopwatchActionRequested(action);
+        }
+        anchors.top: timeToolsTabs.bottom
+        anchors.topMargin: 8
+        anchors.left: parent.left
+        anchors.right: parent.right
+        anchors.bottom: parent.bottom
+    }
+
     Column {
         id: timeContent
+        visible: timeMini.densityLevel === 1
+                 || timeMini.selectedTool === "clock"
         width: parent.width
         height: childrenRect.height
         spacing: timeMini.densityLevel === 3 ? 9
@@ -37,7 +88,8 @@ Item {
         // Compact H:1 stays top-aligned. Bigger tile chassis centers its
         // actual clock content instead of leaving a huge blank lower half.
         y: timeMini.densityLevel > 1
-           ? Math.max(0, Math.floor((timeMini.height - height) / 2)) : 0
+           ? Math.max(timeToolsTabs.height + 6,
+                     Math.floor((timeMini.height - height) / 2)) : 0
 
         Row {
             id: timeRow

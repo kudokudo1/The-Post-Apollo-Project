@@ -800,6 +800,18 @@ PanelWindow {
             id: apolloHubWindow
             screen: shellRoot.screen
             liveBridge: apolloHubLive
+            // Same monotonic TimeW stopwatch used by the standalone menu.
+            // Hub neither creates a second stopwatch nor changes TimeW modes.
+            stopwatchSnapshot: timewWindow
+                               ? timewWindow.hubStopwatchSnapshot : null
+            onStopwatchActionRequested: function(action) {
+                if (timewWindow)
+                    timewWindow.hubStopwatchAction(action);
+            }
+            onStopwatchSampleRequested: {
+                if (timewWindow)
+                    timewWindow.hubRefreshStopwatch();
+            }
             // MASTER OUTPUT ONLY, not Hi-Fi playback or Team 6 app streams.
             // This is the existing dock with its one PwObjectTracker.
             audioSnapshot: sharedVolumeDock.hubOutputSnapshot

@@ -121,6 +121,16 @@ SectionFrame {
     // B10 reuses the single existing one-second tile timer. The format
     // choice is view-local, not a persisted setting or system-clock change.
     property bool use24Hour: true
+    property var stopwatchSnapshot: null
+    signal stopwatchActionRequested(string action)
+    signal stopwatchSampleRequested()
+    onNowChanged: {
+        // The tile's pre-existing 1-second clock drives Hub presentation.
+        // No extra stopwatch Timer or second ElapsedTimer is created.
+        if (visible && moduleId === "time" && tileRowSpan > 1
+                && stopwatchSnapshot && stopwatchSnapshot.running === true)
+            stopwatchSampleRequested();
+    }
     readonly property var timeSnapshot:
         TimePolicy.snapshot(tile.now.getTime(), tile.use24Hour)
 
@@ -559,6 +569,10 @@ SectionFrame {
         id: timeMini
         visible: tile.moduleId === "time"
         timeSnapshot: tile.timeSnapshot
+        stopwatchSnapshot: tile.stopwatchSnapshot
+        onStopwatchActionRequested: function(action) {
+            tile.stopwatchActionRequested(action);
+        }
         use24Hour: tile.use24Hour
         onToggleHourFormat: tile.use24Hour = !tile.use24Hour
         anchors {

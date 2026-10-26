@@ -67,9 +67,10 @@ expected = (
 assert len(processes) == len(expected)
 for name, process in zip(expected, processes):
     assert f"\n        id: {name}" in process, name
-    for marker in ("stdout:begin", "stderr:begin", "exit:begin"):
+    for marker in ("stdout:begin", "stdout:end", "stderr:begin",
+                   "stderr:end", "exit:begin", "exit:end"):
         assert f'traceSubprocessLag("{name}:{marker}"' in process, (name, marker)
-    assert process.count('githubService.traceSubprocessLag("') == 3, name
+    assert process.count('githubService.traceSubprocessLag("') == 6, name
 
 # Keep the diagnostics read-only: no new process or timer added, and never
 # interpolate raw stdout/stderr into marker text. Only stage and size are used.

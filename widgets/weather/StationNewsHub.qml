@@ -14,6 +14,20 @@ Rectangle {
     property string section: "LIVE"
     property bool viewerOpen: false
     property var chosenRecord: null
+
+    // Channel-only player geometry relative to this NEWS hub. A REPORTS
+    // article and a closed channel have no browser viewport. Never hardcode
+    // the Station shell, monitor or terminal-bay dimensions here.
+    readonly property rect playerViewportRect: {
+        const screen = channelScreenLoader.item;
+        if (!stationOpen || !viewerOpen || !screen)
+            return Qt.rect(0, 0, 0, 0);
+        const bay = screen.playerViewportRect;
+        if (bay.width <= 0 || bay.height <= 0)
+            return Qt.rect(0, 0, 0, 0);
+        const origin = screen.mapToItem(stationNewsHub, bay.x, bay.y);
+        return Qt.rect(origin.x, origin.y, bay.width, bay.height);
+    }
     // Preserve an explicit muted presentation preference for a future
     // independent player. Audio controls are disabled while playback is off.
     property bool channelMuted: true
@@ -417,6 +431,7 @@ Rectangle {
         visible: catalogScroll.visible && scrollable
     }
     Loader {
+        id: channelScreenLoader
         anchors.fill: parent
         active: stationNewsHub.viewerOpen
         visible: active

@@ -9,7 +9,7 @@ import io
 import json
 from pathlib import Path
 from unittest import TestCase, main
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 ROOT = Path(__file__).resolve().parents[2]
 GEOMETRY = ROOT / "widgets/messanger/DiscordGeometry.py"
@@ -280,9 +280,8 @@ class DiscordDockingTests(TestCase):
         launch = social.split("    function showDiscord() {", 1)[1].split(
             "    function hideDiscord()", 1
         )[0]
-        self.assertIn("flatpak ps --columns=application", launch)
-        self.assertIn("flatpak run dev.vencord.Vesktop", launch)
         self.assertIn("helperShowDiscord(", launch)
+        self.assertNotIn("flatpak run", launch)
         self.assertNotIn("swaymsg", launch)
         self.assertNotIn('[app_id="vesktop"]', social)
 
@@ -292,6 +291,31 @@ class DiscordDockingTests(TestCase):
         self.assertIn('op == "showDiscord"', helper)
         self.assertIn('op == "hideDiscord"', helper)
         self.assertNotIn("node.get(\"app_id\") == \"vesktop\"", helper)
+
+    def test_helper_launches_vesktop_only_when_no_container_is_discovered(self):
+        bridge = geometry.Bridge(0.1)
+        bridge.discord_show_requested = True
+        tree = {
+            "id": 1,
+            "visible": True,
+            "focused": False,
+            "rect": {"x": 0, "y": 0, "width": 1920, "height": 1080},
+            "nodes": [],
+            "floating_nodes": [],
+        }
+        bridge.poll_ipc.request = Mock(return_value=tree)
+
+        with patch.object(geometry.subprocess, "Popen") as spawn:
+            bridge.emit_snapshot(force=True)
+            bridge.emit_snapshot(force=True)
+
+        spawn.assert_called_once()
+        args, kwargs = spawn.call_args
+        self.assertEqual(args[0], ["flatpak", "run", "dev.vencord.Vesktop"])
+        self.assertTrue(kwargs["start_new_session"])
+        self.assertIs(kwargs["stdin"], geometry.subprocess.DEVNULL)
+        self.assertIs(kwargs["stdout"], geometry.subprocess.DEVNULL)
+        self.assertIs(kwargs["stderr"], geometry.subprocess.DEVNULL)
 
     def test_fast_follow_ignores_hidden_scratchpad_vesktop(self):
         bridge, commands = self.bridge(docked=True)

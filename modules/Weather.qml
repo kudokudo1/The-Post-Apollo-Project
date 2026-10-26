@@ -193,19 +193,19 @@ DockButton {
                         color: weatherDock.foregroundColor
                         visible: weatherDock.celestialMode === "weather"
                     }
-                }
 
-                // Swap only clear/partly-cloudy artwork for original flat
-                // sun/horizon/moon geometry. Preserve weather-condition hue.
-                WeatherCelestialGlyph {
-                    anchors.verticalCenter: parent.verticalCenter
-                    width: 42
-                    height: 42
-                    mode: weatherDock.celestialMode
-                    solar: weatherDock.skyCycle.solar
-                    moonPhase: weatherDock.skyCycle.moonPhase
-                    ink: weatherDock.foregroundColor
-                    visible: weatherDock.celestialMode !== "weather"
+                    // Swap the original icon in place, preserving the
+                    // center and width of the existing 46px condition bay.
+                    WeatherCelestialGlyph {
+                        anchors.centerIn: parent
+                        width: 42
+                        height: 42
+                        mode: weatherDock.celestialMode
+                        solar: weatherDock.skyCycle.solar
+                        moonPhase: weatherDock.skyCycle.moonPhase
+                        ink: weatherDock.foregroundColor
+                        visible: weatherDock.celestialMode !== "weather"
+                    }
                 }
 
                 // Secondary moon phase remains visible alongside other

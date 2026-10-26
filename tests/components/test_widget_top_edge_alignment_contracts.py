@@ -22,7 +22,7 @@ shell = source("shell.qml")
 # measurements. All five visible top edges are 9px when anchored to the output.
 assert "property int panelTopMargin: 0" in hospital
 assert "property int topGlowGutter: 9" in hospital
-assert "anchors.topMargin: root.topGlowGutter" in hospital
+assert "anchors.topMargin: root.frameInset" in hospital
 assert "property int panelTopMargin: 0" in git
 assert "property int topGlowGutter: 9" in git
 assert git.count("anchors.topMargin: root.topGlowGutter") >= 2
@@ -72,34 +72,50 @@ assert "panelTopMargin: 0" in hospital
 assert "chassisTopY: hospitalWindow.panelTopMargin" in shell
 assert "+ hospitalWindow.topGlowGutter" in shell
 
-# Notifications is the live reference: anchored top/bottom with an exact 5px
-# output-bottom margin. Social and Hospital must track screen height, rather
-# than freezing at their old 1355px / 1320px constants.
+# This is a *visible frame* alignment, not a comparison of QsWindow heights.
+# Notifications draws its WindowPanelFrame with 8px on BOTH edges; its
+# PanelWindow has top/bottom anchors and a 5px screen-bottom margin.
 assert "property int panelBottomMargin: 5" in notifications
+assert "property int frameInset: 8" in notifications
+assert "anchors.fill: parent\n            anchors.margins: root.frameInset" in notifications
 assert "        bottom: true" in notifications
 assert "        top: true" in notifications
 assert "        bottom: root.panelBottomMargin" in notifications
-assert "property int defaultPanelHeight: Math.max(" in social
-assert "(screen ? Math.round(screen.height) : 1360) - 5" in social
+
+# Hospital must use the identical vertical anchor mode/margins and frame
+# inset; screen.height is not equivalent to the compositor-owned QsWindow
+# height when panels reserve work area above the actual viewport.
+assert "property var notificationsReference: null" in hospital
+assert "notificationsReference.panelBottomMargin : 5" in hospital
+assert "property int panelHeight: Math.max(1, height - frameInset * 2)" in hospital
+assert "implicitHeight: panelHeight" not in hospital
+assert "        bottom: notificationBottomGap" in hospital
+assert "anchors.topMargin: root.frameInset" in hospital
+assert "property int frameInset: 8" in hospital
+
+# Social is a separate Sway FloatingWindow. The shared social window and
+# Discord/X follower geometry are sized from the visible notification panel.
+assert "property var notificationsReference: null" in social
+assert "notificationsReference.frameInset : 8" in social
+assert "notificationsReference.panelBottomMargin : 5" in social
+assert "Math.round(notificationsReference.height) - 2 * notificationsFrameInset" in social
 assert "sharedPanelHeight = defaultPanelHeight;" in social
 assert "height: messagingWindow.sharedPanelHeight" in social
-# Sway workspaces start below the bar: the taller Social FloatingWindow
-# must start above the workspace top rather than spill off the output.
-assert "swayAreaY + swayAreaHeight - defaultPanelHeight - 5" in social
+assert "swayAreaY + swayAreaHeight - defaultPanelHeight" in social
+assert "- notificationsBottomMargin - notificationsFrameInset" in social
 assert "sharedPanelY = Math.round(defaultPanelY);" in social
-assert "readonly property int notificationBottomGap: 5" in hospital
-assert "property int panelHeight: Math.max(" in hospital
-assert "- topGlowGutter - notificationBottomGap" in hospital
-assert "implicitHeight: panelHeight + topGlowGutter + notificationBottomGap" in hospital
-# The Notification and Social panels have the same span on the selected
-# output; Hospital retains its 9px top reveal and shares their bottom edge.
-for screen_height in (768, 1080, 1440, 1600):
-    notification_height = screen_height - 5
-    social_height = max(260, notification_height)
-    hospital_frame = max(260, screen_height - 9 - 5)
-    assert social_height == notification_height
-    assert hospital_frame + 9 == notification_height
-    assert hospital_frame + 9 + 5 == screen_height
+assert "notificationsReference: notificationsHubWindow" in shell
+assert shell.count("notificationsReference: notificationsHubWindow") == 2
+
+# Geometry arithmetic. All three visible frames use identical 8px insets
+# and lower screen clearance. The Sway floating position is a separately
+# reviewed initial-placement estimate, not proof of compositor placement.
+for window_height in (763, 1075, 1435, 1595):
+    notification_frame = window_height - 16
+    hospital_frame = window_height - 16
+    social_frame = window_height - 16
+    assert notification_frame == hospital_frame == social_frame
+    assert 8 + hospital_frame + 8 == window_height
 
 # Other widget panel widths, top-edge geometry and visibility lifetimes remain.
 assert "property int panelWidth: 744" in hospital
@@ -110,4 +126,4 @@ assert "visible: true" in tasks and "visible: true" in time
 assert "visible: menuOpen" in deck
 assert "WlrLayershell.layer: WlrLayer.Overlay" in deck
 
-print("Portrait 790px / Hospital+Social notification bottom line / top-edge alignment: PASS")
+print("Visible Notification/Social/Hospital frame-size alignment + top-edge contracts: PASS")

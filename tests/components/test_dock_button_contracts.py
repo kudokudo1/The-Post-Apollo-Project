@@ -151,7 +151,7 @@ DOCK_MODULES = {
     ),
     "modules/Sessions.qml": (
         "DockButton {",
-        "implicitWidth: 25",
+        "Math.max(65, Math.ceil(sessionsIcon.implicitWidth) + 16)",
         "implicitHeight: 50",
         "open: menuOpen",
         "normalDockGlowColor: Colors.omnitrix",
@@ -181,6 +181,35 @@ for path, needles in DOCK_MODULES.items():
     source = (ROOT / path).read_text(encoding="utf-8")
     for needle in needles:
         require(source, needle, f"DockButton migration contract for {path}")
+
+# Social uses the operator's exact Unicode phone-and-stars mark. Only
+# the ☎︎ core receives the interactive module color; the star ornaments
+# stay white even when Social's standard open foreground becomes magenta.
+# Keep a single sampled source instead of layering a recolored PNG on top.
+social_module = (ROOT / "modules/Sessions.qml").read_text(encoding="utf-8")
+for needle in (
+    "NotoText {",
+    "id: sessionsIcon",
+    "anchors.centerIn: parent",
+    "font.pixelSize: 22",
+    "textFormat: Text.StyledText",
+    "color: Colors.white",
+    'text: "࣪˖<font color=\'" + sessionsDock.foregroundColor',
+    '"+ "\'>☎︎</font>๋࣭✧"',
+    "normalForegroundColor: Colors.omnitrix",
+    "hoverForegroundColor: Colors.omnitrix",
+    "pressedForegroundColor: Colors.omnitrix",
+    "contentGlowSource: sessionsIcon",
+    "onLeftClicked: {",
+    "Qt.callLater(function () {",
+    "sessionsDock.messagingWindow.menuOpen =",
+):
+    require(social_module, needle, "Social telephone dock identity")
+assert "Sessions.png" not in social_module
+assert "ColorOverlay {" not in social_module
+assert "SafeDropShadow {" not in social_module
+assert social_module.count("contentGlowSource: sessionsIcon") == 1
+assert social_module.count("NotoText {") == 1
 
 LEGACY_ROOT_MOUSE_IDS = (
     "appmenuMouse",

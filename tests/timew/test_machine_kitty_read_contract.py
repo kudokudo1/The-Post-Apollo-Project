@@ -15,7 +15,7 @@ assert 'load_parser = choices.add_parser("load")' in store
 for fragment in (
     "def normalize_kitty_ls(payload):",
     "def read_existing_kitty_inventory(*, target, runtime_directory, opt_in,",
-    '["kitten", "@", "--to", endpoint, "ls", "--output-format=json"]',
+    '["kitten", "@", "--to", endpoint, "ls"]',
     'if opt_in != "explicit_read_only_kitty_inventory":',
     '"host_window_binding_verified": False',
     '"checkpoint_session_match": False',

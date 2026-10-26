@@ -3,7 +3,7 @@ import "../components"
 import "FinanceStockModePolicy.js" as StockModePolicy
 import "FinanceStockChartPointPolicy.js" as ChartPointPolicy
 
-// Market STOCKS M13: explicit point-to-DAY handoff, preserving RANGE dates.
+// Market STOCKS M14: one-step BACK TO RANGE restores previously loaded chart.
 Item {
     id: stocks
     property var stockFeed: null
@@ -297,6 +297,9 @@ Item {
                         + (stocks.snapshot.derivedFromRange
                             ? "\nDAY SOURCE // PREVIOUSLY LOADED RANGE // NO NEW REQUEST"
                             : "")
+                        + (stocks.snapshot.restoredFromDay
+                            ? "\nRANGE SOURCE // RESTORED FROM MEMORY // NO NEW REQUEST"
+                            : "")
                     : ""
                 textFormat: Text.PlainText
                 wrapMode: Text.WordWrap
@@ -330,6 +333,20 @@ Item {
                 wrapMode: Text.WordWrap
                 font.pixelSize: 10
                 color: Colors.white
+            }
+            ActionButton {
+                id: backToRange
+                visible: stocks.dayMode && stocks.stockFeed
+                    && stocks.stockFeed.canReturnToRange
+                width: 136
+                height: visible ? 28 : 0
+                label: "BACK TO RANGE"
+                labelPixelSize: 10
+                accentColor: Colors.magenta
+                available: stocks.stockFeed && stocks.stockFeed.canReturnToRange
+                onLeftClicked: {
+                    if (stocks.stockFeed) stocks.stockFeed.returnToRange();
+                }
             }
             Rectangle {
                 width: parent.width

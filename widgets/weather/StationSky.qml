@@ -1,6 +1,7 @@
 import QtQuick
 import "../../components"
 import "../../services/weather/WeatherDockPolicy.js" as WeatherDockPolicy
+import "../../services/weather/WeatherCyclePolicy.js" as WeatherCyclePolicy
 
 Rectangle {
     id: sky
@@ -35,6 +36,22 @@ Rectangle {
         weatherService ? weatherService.hourlyForecast : []
     readonly property var dailyForecast:
         weatherService ? weatherService.dailyForecast : []
+    property real cycleClockMs: Date.now()
+    Timer {
+        interval: 60000
+        running: true
+        repeat: true
+        onTriggered: sky.cycleClockMs = Date.now()
+    }
+    readonly property var skyCycle: WeatherCyclePolicy.atObservation(
+        cycleClockMs,
+        weatherService ? weatherService.localObservationDateTime : "",
+        weatherService ? weatherService.localObservationAnchorMs : 0,
+        dailyForecast
+    )
+    readonly property string currentCelestialMode:
+        weatherReady
+        ? WeatherCyclePolicy.artworkFor(conditionState, skyCycle) : "weather"
 
     function numericText(value, digits, suffix) {
         return isFinite(value) && value >= 0
@@ -71,7 +88,7 @@ Rectangle {
         : weatherLoading ? "RECEIVING..." : "DATA OFFLINE"
     // SKY shares the dock's condition glyphs and semantic colors.
     function iconState(condition, weatherCode, current) {
-        const now = Date.now();
+        const now = sky.cycleClockMs;
         return WeatherDockPolicy.classify({
             ready: true, errorText: "", weatherTimeMs: now, nowMs: now,
             weatherCode: weatherCode || "", condition: condition || "",
@@ -239,7 +256,7 @@ Rectangle {
                         SafeDropShadow {
                             anchors.fill: conditionIconGlyph
                             safeSource: conditionIconGlyph
-                            requestedVisible: true
+                            requestedVisible: sky.currentCelestialMode === "weather"
                             radius: 12
                             samples: 25
                             horizontalOffset: 0
@@ -255,6 +272,48 @@ Rectangle {
                             text: sky.conditionState.icon
                             font.pixelSize: 104
                             color: sky.iconColor(sky.conditionState.color)
+                            visible: sky.currentCelestialMode === "weather"
+                        }
+
+                        WeatherCelestialGlyph {
+                            id: currentCelestialIcon
+                            anchors.centerIn: parent
+                            width: 86
+                            height: 86
+                            mode: sky.currentCelestialMode
+                            solar: sky.skyCycle.solar
+                            moonPhase: sky.skyCycle.moonPhase
+                            ink: sky.iconColor(sky.conditionState.color)
+                            visible: sky.currentCelestialMode !== "weather"
+                        }
+
+                        SafeDropShadow {
+                            anchors.fill: currentCelestialIcon
+                            safeSource: currentCelestialIcon
+                            requestedVisible: currentCelestialIcon.visible
+                            radius: 12
+                            samples: 25
+                            horizontalOffset: 0
+                            verticalOffset: 0
+                            transparentBorder: true
+                            opacity: 0.95
+                            color: sky.iconColor(sky.conditionState.color)
+                            z: -1
+                        }
+
+                        // Keep a separate moon phase even when the main
+                        // condition is rain, fog, wind or other weather.
+                        WeatherCelestialGlyph {
+                            anchors.right: parent.right
+                            anchors.bottom: parent.bottom
+                            width: 24
+                            height: 24
+                            mode: "moon"
+                            moonPhase: sky.skyCycle.moonPhase
+                            ink: sky.iconColor(sky.conditionState.color)
+                            visible: sky.skyCycle.moonPhase !== "unknown"
+                                     && sky.currentCelestialMode !== "moon"
+                                     && sky.currentCelestialMode !== "moon-cloud"
                         }
                     }
                 }

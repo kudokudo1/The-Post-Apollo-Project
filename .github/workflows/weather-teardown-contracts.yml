@@ -5,6 +5,7 @@ on:
     paths:
       - "widgets/weather/**"
       - "modules/Weather.qml"
+      - "components/WeatherCelestialGlyph.qml"
       - "services/weather/**"
       - "shell.qml"
       - "tests/weather/**"
@@ -15,6 +16,7 @@ on:
     paths:
       - "widgets/weather/**"
       - "modules/Weather.qml"
+      - "components/WeatherCelestialGlyph.qml"
       - "services/weather/**"
       - "shell.qml"
       - "tests/weather/**"

@@ -1,0 +1,38 @@
+name: Social Telegram Identity Credential and Session Foundation
+
+on:
+  pull_request:
+    paths:
+      - 'services/messaging/bridges/telegram/bridge.py'
+      - 'services/messaging/bridges/telegram/login_ui.py'
+      - 'tests/messaging/test_telegram_identity_scopes.py'
+      - 'services/messaging/TELEGRAM-IDENTITY-SCOPES.md'
+      - '.github/workflows/social-telegram-identity-scopes.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'services/messaging/bridges/telegram/bridge.py'
+      - 'services/messaging/bridges/telegram/login_ui.py'
+      - 'tests/messaging/test_telegram_identity_scopes.py'
+      - 'services/messaging/TELEGRAM-IDENTITY-SCOPES.md'
+      - '.github/workflows/social-telegram-identity-scopes.yml'
+  workflow_dispatch:
+
+jobs:
+  identity-boundary:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Execute isolated Telegram key and session tests without provider access
+        run: python3 -m unittest discover -s tests/messaging -p 'test_telegram_identity_scopes.py' -v
+      - name: Preserve legacy shared Telegram client and login wizard
+        run: |
+          python3 -m unittest discover -s tests/messaging -p 'test_telegram_adapter_contracts.py' -v
+          python3 -m unittest discover -s tests/messaging -p 'test_telegram_bridge_cli_contracts.py' -v
+          python3 -m unittest discover -s tests/messaging -p 'test_telegram_login_ui_contracts.py' -v
+      - name: Preserve Social Settings and source ownership boundaries
+        run: |
+          node tests/messaging/test_social_telegram_shared_status.cjs
+          python3 -m unittest discover -s tests/messaging -p 'test_social_account_details_ui.py' -v
+          python3 -m unittest discover -s tests/messaging -p 'test_social_settings_workspace.py' -v
+          python3 -m unittest discover -s tests/messaging -p 'test_social_provider_access_contracts.py' -v

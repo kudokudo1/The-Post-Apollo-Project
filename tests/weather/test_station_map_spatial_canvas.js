@@ -16,7 +16,7 @@ vm.runInNewContext(
     ctx
 );
 
-for (const fn of ["clampView","project","unproject","pan","zoomAt","plottable"])
+for (const fn of ["clampView","project","unproject","visibleBounds","pan","zoomAt","plottable"])
     assert.equal(typeof ctx[fn], "function", fn);
 
 let view = ctx.clampView(1, 90, 40);
@@ -90,7 +90,7 @@ assert.match(ui, /property real mapZoom: 1/);
 assert.match(ui, /property real mapCenterLon: 0/);
 assert.match(ui, /property real mapCenterLat: 0/);
 assert.match(ui, /MapProjection\.plottable\(source \? source\.rows : \[\]\)/);
-assert.match(ui, /title: "SPATIAL PLOT \/\/ EONET POINT GEOMETRIES"/);
+assert.match(ui, /title: "SPATIAL PLOT \/\/ EONET \+ FIRMS POINTS"/);
 assert.match(ui, /id: mapPlot/);
 assert.match(ui, /height: 270/);
 assert.match(ui, /id: mapPanArea/);
@@ -103,7 +103,7 @@ assert.match(ui, /model: stationDiscovery\.mapPointRows/);
 assert.match(ui, /MapProjection\.project\(\s*modelData\.longitude,\s*modelData\.latitude/);
 assert.match(ui, /stationDiscovery\.selectedMapEvent = modelData/);
 assert.match(ui, /LAT\/LON GRID \/\/ NO BASEMAP/);
-assert.match(ui, /POINTS ONLY \/\/ POLYGONS LISTED BELOW/);
+assert.match(ui, /EONET \+ FIRMS POINTS \/\/ POLYGONS LISTED BELOW/);
 assert.match(ui, /EONET POINT CANVAS \/\/ PAN \+ ZOOM/);
 assert.match(ui, /BASEMAP \/ POLYGON LAYERS", state:"NOT WIRED"/);
 

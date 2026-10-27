@@ -3,6 +3,7 @@ import "../../components"
 import "../../services/weather" as WeatherServices
 import "StationViewerPolicy.js" as ViewerPolicy
 import "StationMapProjectionPolicy.js" as MapProjection
+import "../../services/weather/FirmsHotspotPolicy.js" as FirmsAreaPolicy
 
 // Source-first stage. All records shown come from a backend, never examples.
 // MAP now owns a source-driven geographic point canvas plus its event list.
@@ -17,12 +18,27 @@ Rectangle {
     property var selectedNews: null
     property string mapFilter: "all"
     property var selectedMapEvent: null
+    property var selectedMapHotspot: null
     property real mapZoom: 1
     property real mapCenterLon: 0
     property real mapCenterLat: 0
 
     readonly property var mapPointRows:
         MapProjection.plottable(source ? source.rows : [])
+    readonly property var firmsVisibleBounds:
+        MapProjection.visibleBounds(
+            mapPlot ? mapPlot.width : 0,
+            mapPlot ? mapPlot.height : 0,
+            mapZoom, mapCenterLon, mapCenterLat
+        )
+    readonly property var firmsArea:
+        firmsService
+        ? FirmsAreaPolicy.boundedArea(firmsVisibleBounds, 60, 40)
+        : { "valid": false, "reason": "FIRMS SERVICE UNAVAILABLE" }
+    readonly property bool firmsAreaReady:
+        firmsArea && firmsArea.valid
+    readonly property bool hotspotInspectorOpen:
+        domain === "map" && selectedMapHotspot !== null
 
     readonly property var mapFilterOptions: [
         { "id": "all", "label": "ALL EVENTS", "category": "" },
@@ -52,6 +68,7 @@ Rectangle {
         if (domain !== "map" || source.loading || mapFilter === id)
             return;
         selectedMapEvent = null;
+        selectedMapHotspot = null;
         mapFilter = id;
         resetMapView();
         discoveryScroll.contentY = 0;
@@ -59,6 +76,17 @@ Rectangle {
 
     function closeMapInspector() {
         selectedMapEvent = null;
+    }
+
+    function closeHotspotInspector() {
+        selectedMapHotspot = null;
+    }
+
+    function fetchVisibleHotspots() {
+        if (!firmsService || !firmsAreaReady)
+            return false;
+        selectedMapHotspot = null;
+        return firmsService.request(firmsVisibleBounds);
     }
 
     function applyMapView(view) {
@@ -124,8 +152,10 @@ Rectangle {
             return;
         }
         if (domain === "map") {
-            if (row)
+            if (row) {
+                selectedMapHotspot = null;
                 selectedMapEvent = row;
+            }
             return;
         }
         if (row && row.url)
@@ -140,6 +170,7 @@ Rectangle {
     onDomainChanged: {
         closeViewer();
         selectedMapEvent = null;
+        selectedMapHotspot = null;
     }
     onStationOpenChanged: { if (!stationOpen) closeViewer(); }
 
@@ -152,7 +183,7 @@ Rectangle {
         : domain === "news" ? "GDELT DOC // WORLD EVENT HEADLINES"
         : "RADIO BROWSER // TOP VOTED STREAMS"
     readonly property string sourceCaution:
-        domain === "map" ? "EONET FILTER + INSPECTOR + POINT PLOT CONNECTED // BASEMAP + POLYGON RENDERING NOT YET WIRED"
+        domain === "map" ? "EONET + OPTIONAL FIRMS POINT PLOT CONNECTED // BASEMAP + POLYGON RENDERING NOT YET WIRED"
         : domain === "news" ? "ARTICLE DISCOVERY // NOT YET LIVE VIDEO OR STORY CLUSTERS"
         : "STATION DIRECTORY // PERSISTENT PLAYBACK NOT YET WIRED"
     readonly property var plannedSources: {
@@ -162,7 +193,14 @@ Rectangle {
                 {name:"EONET POINT CANVAS // PAN + ZOOM", state:"CONNECTED"},
                 {name:"USGS // EARTHQUAKES", state:"GROUND FEED EXISTS"},
                 {name:"RAINVIEWER // RADAR TILES", state:"NOT WIRED"},
-                {name:"NASA FIRMS // FIRE HOTSPOTS", state:"NOT WIRED"},
+                {
+                    name:"NASA FIRMS // VIIRS NOAA-21 HOTSPOTS",
+                    state: firmsService.configured
+                           ? (firmsService.ready
+                              ? "FETCHED " + firmsService.hotspots.length
+                              : "MANUAL READY")
+                           : "KEY REQUIRED"
+                },
                 {name:"BASEMAP / POLYGON LAYERS", state:"NOT WIRED"}
             ];
         if (domain === "news")
@@ -188,6 +226,10 @@ Rectangle {
             stationDiscovery.mapFilter
         )
         active: stationDiscovery.stationOpen && stationDiscovery.visible
+    }
+
+    WeatherServices.FirmsHotspotService {
+        id: firmsService
     }
 
     color: Colors.black
@@ -260,6 +302,8 @@ Rectangle {
                             color: modelData.state === "SOURCE CONNECTED"
                                    || modelData.state === "CONNECTED"
                                    || modelData.state === "GROUND FEED EXISTS"
+                                   || modelData.state === "MANUAL READY"
+                                   || String(modelData.state).indexOf("FETCHED ") === 0
                                    ? Colors.cyan : Colors.orange
                             font.pixelSize: 11
                         }
@@ -319,7 +363,7 @@ Rectangle {
 
                 StationSectionDivider {
                     width: parent.width
-                    title: "SPATIAL PLOT // EONET POINT GEOMETRIES"
+                    title: "SPATIAL PLOT // EONET + FIRMS POINTS"
                 }
 
                 Row {
@@ -347,6 +391,69 @@ Rectangle {
                                    || Math.abs(stationDiscovery.mapCenterLat) > 0.001
                         onClicked: stationDiscovery.resetMapView()
                     }
+                }
+
+                StationSectionDivider {
+                    width: parent.width
+                    title: "FIRE HOTSPOTS // NASA FIRMS"
+                }
+
+                Row {
+                    width: parent.width
+                    height: 32
+                    spacing: 10
+
+                    ActionButton {
+                        width: 142
+                        height: 30
+                        label: "FETCH HOTSPOTS"
+                        labelPixelSize: 10
+                        available: firmsService.configured
+                                   && stationDiscovery.firmsAreaReady
+                                   && !firmsService.loading
+                        accentColor: Colors.orange
+                        onClicked:
+                            stationDiscovery.fetchVisibleHotspots()
+                    }
+
+                    GohuText {
+                        anchors.verticalCenter: parent.verticalCenter
+                        width: 190
+                        text: !firmsService.configured
+                              ? "KEY REQUIRED"
+                              : firmsService.loading
+                                ? "FETCHING"
+                                : firmsService.failed
+                                  ? firmsService.errorText
+                                  : firmsService.ready
+                                    ? "HOTSPOTS " + firmsService.hotspots.length
+                                    : stationDiscovery.firmsAreaReady
+                                      ? "MANUAL READY"
+                                      : stationDiscovery.firmsArea.reason
+                        elide: Text.ElideRight
+                        font.pixelSize: 10
+                        color: !firmsService.configured ? Colors.orange
+                               : firmsService.failed ? Colors.yellow
+                               : firmsService.ready ? Colors.orange
+                               : Colors.cyan
+                    }
+
+                    QuietText {
+                        anchors.verticalCenter: parent.verticalCenter
+                        width: Math.max(0, parent.width - 352)
+                        text: firmsService.ready
+                              ? "LAST BBOX // " + firmsService.lastBounds
+                              : "ONE DAY // MAX 60° × 40° VIEW // NO AUTO-FETCH"
+                        elide: Text.ElideRight
+                        font.pixelSize: 9
+                    }
+                }
+
+                QuietText {
+                    width: parent.width
+                    text: "POST_APOLLO_FIRMS_MAP_KEY // OPTIONAL // KEY NEVER SHOWN OR PASSED IN PROCESS ARGV"
+                    font.pixelSize: 9
+                    color: Colors.orange
                 }
 
                 Rectangle {
@@ -526,6 +633,59 @@ Rectangle {
                         }
                     }
 
+                    Repeater {
+                        model: firmsService.ready ? firmsService.hotspots : []
+
+                        delegate: Item {
+                            required property var modelData
+                            readonly property var projected:
+                                MapProjection.project(
+                                    modelData.longitude,
+                                    modelData.latitude,
+                                    mapPlot.width,
+                                    mapPlot.height,
+                                    stationDiscovery.mapZoom,
+                                    stationDiscovery.mapCenterLon,
+                                    stationDiscovery.mapCenterLat
+                                )
+
+                            width: 14
+                            height: 14
+                            x: projected.x - width / 2
+                            y: projected.y - height / 2
+                            visible: projected.visible
+                            z: 2
+
+                            Rectangle {
+                                anchors.centerIn: parent
+                                width: 7
+                                height: 7
+                                radius: 3.5
+                                color: Colors.orange
+                                border.width: 1
+                                border.color:
+                                    stationDiscovery.selectedMapHotspot
+                                    && stationDiscovery.selectedMapHotspot.id
+                                       === modelData.id
+                                    ? Colors.yellow : Colors.white
+                                opacity:
+                                    modelData.confidenceLabel === "HIGH" ? 1.0
+                                    : modelData.confidenceLabel === "NOMINAL"
+                                      ? 0.82 : 0.62
+                            }
+
+                            MouseArea {
+                                anchors.fill: parent
+                                hoverEnabled: true
+                                cursorShape: Qt.PointingHandCursor
+                                onClicked: {
+                                    stationDiscovery.selectedMapEvent = null;
+                                    stationDiscovery.selectedMapHotspot = modelData;
+                                }
+                            }
+                        }
+                    }
+
                     QuietText {
                         anchors.left: parent.left
                         anchors.top: parent.top
@@ -556,7 +716,7 @@ Rectangle {
                         anchors.bottom: parent.bottom
                         anchors.margins: 7
                         z: 3
-                        text: "POINTS ONLY // POLYGONS LISTED BELOW"
+                        text: "EONET + FIRMS POINTS // POLYGONS LISTED BELOW"
                         font.pixelSize: 9
                     }
                 }
@@ -689,6 +849,97 @@ Rectangle {
                                   : ""
                             wrapMode: Text.WordWrap
                             maximumLineCount: 2
+                            elide: Text.ElideRight
+                            font.pixelSize: 9
+                        }
+                    }
+                }
+            }
+
+            Column {
+                width: parent.width
+                spacing: 7
+                visible: stationDiscovery.hotspotInspectorOpen
+
+                StationSectionDivider {
+                    width: parent.width
+                    title: "HOTSPOT INSPECTOR // NASA FIRMS"
+                }
+
+                Rectangle {
+                    width: parent.width
+                    height: 138
+                    color: Colors.dark
+                    border.width: 1
+                    border.color: Colors.orange
+
+                    Column {
+                        anchors.fill: parent
+                        anchors.margins: 10
+                        spacing: 5
+
+                        Row {
+                            width: parent.width
+                            spacing: 10
+
+                            GohuText {
+                                width: Math.max(0, parent.width - 96)
+                                text: "VIIRS NOAA-21 // SATELLITE HOTSPOT"
+                                color: Colors.orange
+                                font.pixelSize: 14
+                            }
+
+                            ActionButton {
+                                width: 86
+                                height: 26
+                                label: "CLOSE"
+                                labelPixelSize: 10
+                                accentColor: Colors.red
+                                destructive: true
+                                onClicked:
+                                    stationDiscovery.closeHotspotInspector()
+                            }
+                        }
+
+                        SecondaryText {
+                            width: parent.width
+                            text: stationDiscovery.selectedMapHotspot
+                                  ? stationDiscovery.selectedMapHotspot.coordinates
+                                    + " // "
+                                    + stationDiscovery.selectedMapHotspot.acquiredUtc
+                                  : ""
+                            elide: Text.ElideRight
+                            font.pixelSize: 10
+                        }
+
+                        QuietText {
+                            width: parent.width
+                            text: stationDiscovery.selectedMapHotspot
+                                  ? "CONFIDENCE "
+                                    + stationDiscovery.selectedMapHotspot.confidenceLabel
+                                    + " // BRIGHTNESS "
+                                    + (stationDiscovery.selectedMapHotspot.brightnessK >= 0
+                                       ? stationDiscovery.selectedMapHotspot.brightnessK.toFixed(1)
+                                         + " K" : "--")
+                                    + " // FRP "
+                                    + (stationDiscovery.selectedMapHotspot.frpMw >= 0
+                                       ? stationDiscovery.selectedMapHotspot.frpMw.toFixed(1)
+                                         + " MW" : "--")
+                                  : ""
+                            elide: Text.ElideRight
+                            font.pixelSize: 9
+                        }
+
+                        QuietText {
+                            width: parent.width
+                            text: stationDiscovery.selectedMapHotspot
+                                  ? stationDiscovery.selectedMapHotspot.satellite
+                                    + " // "
+                                    + stationDiscovery.selectedMapHotspot.instrument
+                                    + " // "
+                                    + stationDiscovery.selectedMapHotspot.dayNight
+                                    + " // SATELLITE HOTSPOT, NOT FIRE PERIMETER"
+                                  : ""
                             elide: Text.ElideRight
                             font.pixelSize: 9
                         }

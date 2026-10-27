@@ -75,6 +75,45 @@ function unproject(xValue, yValue, widthValue, heightValue,
     };
 }
 
+function visibleBounds(widthValue, heightValue,
+                       zoomValue, centerLonValue, centerLatValue) {
+    const width = Number(widthValue);
+    const height = Number(heightValue);
+    if (!validViewport(width, height))
+        return {valid: false, west: 0, south: 0, east: 0, north: 0,
+                longitudeSpan: 0, latitudeSpan: 0};
+
+    const northWest = unproject(
+        0, 0, width, height,
+        zoomValue, centerLonValue, centerLatValue
+    );
+    const southEast = unproject(
+        width, height, width, height,
+        zoomValue, centerLonValue, centerLatValue
+    );
+    if (!northWest.valid || !southEast.valid)
+        return {valid: false, west: 0, south: 0, east: 0, north: 0,
+                longitudeSpan: 0, latitudeSpan: 0};
+
+    const west = clamp(northWest.longitude, -180, 180);
+    const east = clamp(southEast.longitude, -180, 180);
+    const north = clamp(northWest.latitude, -90, 90);
+    const south = clamp(southEast.latitude, -90, 90);
+    if (!(west < east) || !(south < north))
+        return {valid: false, west: west, south: south, east: east, north: north,
+                longitudeSpan: 0, latitudeSpan: 0};
+
+    return {
+        valid: true,
+        west: west,
+        south: south,
+        east: east,
+        north: north,
+        longitudeSpan: east - west,
+        latitudeSpan: north - south
+    };
+}
+
 function pan(zoomValue, centerLonValue, centerLatValue,
              deltaXValue, deltaYValue, widthValue, heightValue) {
     const dx = finite(deltaXValue);

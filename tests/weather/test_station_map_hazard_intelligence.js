@@ -138,11 +138,12 @@ assert.ok(
 );
 assert.match(ui, /stationDiscovery\.domain === "map" \? "INSPECT HERE"/);
 assert.match(ui, /SESSION CACHE \/\/ 15m/);
-assert.match(ui, /EONET FILTER \+ INSPECTOR \+ POINT PLOT CONNECTED/);
+assert.match(ui, /EONET \+ OPTIONAL FIRMS POINT PLOT CONNECTED/);
 assert.match(ui, /BASEMAP \+ POLYGON RENDERING NOT YET WIRED/);
 
-// Richer satellite hotspots and radar remain honest future layers.
-assert.match(ui, /NASA FIRMS \/\/ FIRE HOTSPOTS", state:"NOT WIRED"/);
+// Radar remains future work; FIRMS is explicitly optional/manual.
+assert.match(ui, /NASA FIRMS \/\/ VIIRS NOAA-21 HOTSPOTS/);
+assert.match(ui, /KEY REQUIRED/);
 assert.match(ui, /RAINVIEWER \/\/ RADAR TILES", state:"NOT WIRED"/);
 
 console.log("Weather MAP EONET hazard filters, cache and inspector: PASS");

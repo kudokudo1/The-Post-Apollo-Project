@@ -185,4 +185,14 @@ assert.doesNotMatch(hourlyArea, /anchors\.top: parent\.top[\s\S]*?mode: "moon"/)
 // No new color vocabulary or clock mechanism is introduced by this patch.
 assert.match(sky, /WeatherCyclePolicy\.normalizedPhase\(modelData\.moonPhase\)/);
 
+// The moon owns its magenta halo. The extra SKY weather-color shadow is
+// for daylight solar icons, not lunar nighttime art. Keep semantic weather
+// ink for the phase's illuminated portion.
+assert.match(sky, /requestedVisible: currentCelestialIcon\.visible\s*&& sky\.skyCycle\.solar !== "night"/);
+assert.match(sky, /requestedVisible: hourlyCelestial\.visible\s*&& parent\.forecastCycle\.solar !== "night"/);
+assert.match(sky, /requestedVisible: dailyCelestial\.visible\s*&& parent\.forecastCycle\.solar !== "night"/);
+assert.match(sky, /ink: sky\.iconColor\(parent\.forecastState\.color\)/);
+assert.match(icon, /property color nightHalo: Colors\.magenta/);
+assert.match(icon, /color: glyph\.moonPhase === "full" \? glyph\.ink : glyph\.shadowInk/);
+
 console.log("Weather solar/lunar policy and QML wiring: PASS");

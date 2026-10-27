@@ -304,8 +304,8 @@ class GeometryIdentityBoundary(unittest.TestCase):
         self.assertIn("function selectIdentity(id)", IDENTITY_STORE)
         self.assertNotIn("browserIdentityId: appSelector.identitySnapshot.activeId",
                          HOST)
-        self.assertIn("Identity-scoped browser launch awaits geometry integration",
-                      BROWSER.read_text())
+        self.assertIn("def show_scoped(site: str, identity_id: str)", BROWSER.read_text())
+        self.assertIn("EXPLICIT_ISOLATED_MODE_REQUIRED", BROWSER.read_text())
 
 if __name__ == "__main__":
     unittest.main()

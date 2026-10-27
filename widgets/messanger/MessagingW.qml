@@ -58,16 +58,21 @@ PanelWindow {
     Process {
         id: xShowProcess
         property string launchSite: "x"
+        property string launchIdentityId: ""
         stderr: StdioCollector {
             onStreamFinished: {
                 var detail = String(text || "").trim();
-                if (detail !== "" && xShowProcess.launchSite === messagingWindow.browserSite)
+                if (detail !== "" && xShowProcess.launchSite === messagingWindow.browserSite
+                        && xShowProcess.launchIdentityId ===
+                           messagingWindow.selectedBrowserScopeId())
                     messagingWindow.xError = detail;
             }
         }
         onExited: function(exitCode, exitStatus) {
             // A previous site's startup must not seize the current selection.
-            if (xShowProcess.launchSite !== messagingWindow.browserSite)
+            if (xShowProcess.launchSite !== messagingWindow.browserSite
+                    || xShowProcess.launchIdentityId !==
+                       messagingWindow.selectedBrowserScopeId())
                 return;
             if (exitCode !== 0 && messagingWindow.xError === "")
                 messagingWindow.xError = xShowProcess.launchSite.toUpperCase() + " window could not be opened";
@@ -91,6 +96,11 @@ PanelWindow {
     Process {
         id: xHideProcess
         command: ["python3", Quickshell.shellPath("widgets/messanger/XBrowser.py"), "hide", "all"]
+    }
+
+    // Scoped hide never runs through the service-wide legacy class.
+    Process {
+        id: xScopedHideProcess
     }
 
     Process {
@@ -304,7 +314,10 @@ PanelWindow {
         activeAppIndex === 24 ? "pixelfed" :
         activeAppIndex === 25 ? "zalo" : "x"
     readonly property bool externalSelected: discordSelected || xSelected || providerDesktopManaged
-    onBrowserSiteChanged: updateGeometryHelperMode()
+    onBrowserSiteChanged: {
+        scopedBrowserConId = 0;
+        updateGeometryHelperMode();
+    }
 
     onDiscordSelectedChanged: updateGeometryHelperMode()
     onDiscordReadyChanged: updateGeometryHelperMode()
@@ -382,6 +395,82 @@ PanelWindow {
     // A new browser must fit the Social slot before leading geometry.
     property bool xDocked: false
     property bool xConfigured: false
+
+    // Session-only opt-in. Never treat the layout ID or stored account
+    // nickname as a login token. The active scope is set only after the
+    // identity store confirms a saved selection.
+    property bool browserIsolationEnabled: false
+    property string browserActiveIdentityId: ""
+    property int scopedBrowserConId: 0
+    onBrowserActiveIdentityIdChanged: updateGeometryHelperMode()
+
+    function selectedBrowserScopeId() {
+        return browserIsolationEnabled && xSelected
+               ? browserActiveIdentityId : "";
+    }
+
+    function validBrowserIdentity(id) {
+        return /^identity-[1-9][0-9]{0,8}$/.test(String(id || ""));
+    }
+
+    function hideScopedIdentity(id) {
+        if (!validBrowserIdentity(id))
+            return;
+        if (xScopedHideProcess.running)
+            xScopedHideProcess.running = false;
+        xScopedHideProcess.exec([
+            "python3", Quickshell.shellPath("widgets/messanger/XBrowser.py"),
+            "hide", "all", "--identity", id
+        ]);
+    }
+
+    function toggleBrowserIsolation() {
+        var snapshot = appSelector.identitySnapshot;
+        if (!snapshot.writable || !validBrowserIdentity(snapshot.activeId)
+                || xShowProcess.running)
+            return;
+        if (browserIsolationEnabled) {
+            hideX();
+            browserIsolationEnabled = false;
+            browserActiveIdentityId = "";
+        } else {
+            // Existing shared browser windows are hidden; their profiles
+            // are not migrated, copied, removed or logged out.
+            hideX();
+            browserActiveIdentityId = snapshot.activeId;
+            browserIsolationEnabled = true;
+        }
+        scopedBrowserConId = 0;
+        xReady = false;
+        xDocked = false;
+        xConfigured = false;
+        updateGeometryHelperMode();
+    }
+
+    function reconcilePersistedBrowserIdentity() {
+        if (!browserIsolationEnabled)
+            return;
+        var snapshot = appSelector.identitySnapshot;
+        if (!snapshot.writable || !validBrowserIdentity(snapshot.activeId)
+                || snapshot.activeId === browserActiveIdentityId)
+            return;
+        var oldIdentity = browserActiveIdentityId;
+        // Discard a prior startup result before moving to the saved identity.
+        if (xShowProcess.running)
+            xShowProcess.running = false;
+        if (validBrowserIdentity(oldIdentity))
+            hideScopedIdentity(oldIdentity);
+        browserActiveIdentityId = snapshot.activeId;
+        scopedBrowserConId = 0;
+        xReady = false;
+        xDocked = false;
+        xConfigured = false;
+        updateGeometryHelperMode();
+        // Identity selection occurs in Settings. Never reveal the target
+        // browser over the editor; open/restore when Settings closes.
+        if (menuOpen && xSelected && !appSelector.settingsOpen)
+            showX();
+    }
 
     property double ignoreSocialGeometryUntil: 0
     property double ignoreDiscordGeometryUntil: 0
@@ -635,7 +724,8 @@ PanelWindow {
             xSelected: xSelected,
             xReady: xReady,
             xDocked: xDocked,
-            browserSite: browserSite
+            browserSite: browserSite,
+            browserIdentityId: selectedBrowserScopeId() || null
         });
     }
 
@@ -653,7 +743,7 @@ PanelWindow {
     }
 
     function syncHelperWindow(target, x, y, width, height, focusWindow, setupWindow) {
-        sendGeometryHelper({
+        var payload = {
             op: "sync",
             target: target,
             x: Math.round(x),
@@ -662,7 +752,18 @@ PanelWindow {
             height: Math.max(1, Math.round(height)),
             focus: focusWindow === true,
             setup: setupWindow === true
-        });
+        };
+        if (selectedBrowserScopeId() !== "" && target === browserSite) {
+            // Sway con_id came from the bridge's scoped, exact-class
+            // discovery snapshot, never from the account nickname.
+            if (scopedBrowserConId <= 0)
+                return;
+            payload.browserIdentityId = browserActiveIdentityId;
+            payload.windowClass = "post-apollo-" + browserSite
+                                  + "-" + browserActiveIdentityId;
+            payload.conId = scopedBrowserConId;
+        }
+        sendGeometryHelper(payload);
     }
 
     function helperCenterDiscord(x, y, width, height) {
@@ -742,6 +843,30 @@ PanelWindow {
         if (xSelected) {
             // X uses the shared external window slot, but its own lifecycle.
             var xNode = payload[browserSite];
+            if (selectedBrowserScopeId() !== "") {
+                var expectedClass = "post-apollo-" + browserSite
+                                    + "-" + browserActiveIdentityId;
+                var cid = xNode ? Number(xNode.conId || 0) : 0;
+                if (!xNode || xNode.browserIdentityId !== browserActiveIdentityId
+                        || xNode.windowClass !== expectedClass
+                        || !Number.isInteger(cid) || cid <= 0
+                        || !xNode.visible) {
+                    xReady = false;
+                    xDocked = false;
+                    scopedBrowserConId = 0;
+                    if (socialChanged)
+                        adoptSocialGeometry(socialRect);
+                    return;
+                }
+                if (scopedBrowserConId !== cid) {
+                    // A new Chromium container cannot inherit old docking.
+                    scopedBrowserConId = cid;
+                    xReady = false;
+                    xDocked = false;
+                    xConfigured = false;
+                    updateGeometryHelperMode();
+                }
+            }
             var xRect = xNode ? xNode.rect : null;
             if (!xRect) {
                 if (socialChanged)
@@ -1020,7 +1145,19 @@ PanelWindow {
         if (xShowProcess.running)
             xShowProcess.running = false;
         xShowProcess.launchSite = browserSite;
-        xShowProcess.exec(["python3", Quickshell.shellPath("widgets/messanger/XBrowser.py"), "show", browserSite]);
+        var identity = selectedBrowserScopeId();
+        if (browserIsolationEnabled && (!validBrowserIdentity(identity)
+                || !appSelector.identitySnapshot.writable
+                || appSelector.identitySnapshot.activeId !== identity)) {
+            xError = "Selected identity is not yet saved";
+            return;
+        }
+        xShowProcess.launchIdentityId = identity;
+        var command = ["python3", Quickshell.shellPath("widgets/messanger/XBrowser.py"),
+                       "show", browserSite];
+        if (identity !== "")
+            command.push("--identity", identity);
+        xShowProcess.exec(command);
     }
 
     function hideX() {
@@ -1030,6 +1167,8 @@ PanelWindow {
         xDocked = false;
         xConfigured = false;
         ignoreXGeometryUntil = 0;
+        if (browserIsolationEnabled && validBrowserIdentity(browserActiveIdentityId))
+            hideScopedIdentity(browserActiveIdentityId);
         if (xHideProcess.running)
             xHideProcess.running = false;
         xHideProcess.running = true;
@@ -1355,6 +1494,13 @@ PanelWindow {
 
         AppSelector {
             id: appSelector
+            isolatedBrowserModeActive: messagingWindow.browserIsolationEnabled
+            isolatedBrowserToggleAllowed: !xShowProcess.running
+                                           && !xScopedHideProcess.running
+            onIsolatedBrowserModeToggleRequested:
+                messagingWindow.toggleBrowserIsolation()
+            onIdentitySnapshotChanged:
+                messagingWindow.reconcilePersistedBrowserIdentity()
             // One existing Social window; contact/chat space hosts Settings.
             settingsWorkspaceParent: messagingContent.contentItem
             settingsContactWidth: messagingWindow.contactListWidth
@@ -1396,7 +1542,10 @@ PanelWindow {
                 } else if (messagingWindow.discordSelected) {
                     messagingWindow.raiseDiscord();
                 } else if (messagingWindow.xSelected) {
-                    messagingWindow.raiseX();
+                    if (messagingWindow.browserIsolationEnabled)
+                        messagingWindow.showX();
+                    else
+                        messagingWindow.raiseX();
                 }
             }
 

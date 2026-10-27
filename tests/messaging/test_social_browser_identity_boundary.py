@@ -146,12 +146,12 @@ class ScopedBrowserBoundary(unittest.TestCase):
             '[class="post-apollo-reddit-identity-2"] move scratchpad',
         ])
 
-    def test_scoped_launch_and_extension_setup_are_blocked_before_any_side_effect(self):
+    def test_scoped_launch_requires_visible_social_and_extension_setup_stays_blocked(self):
         with patch.object(browser.subprocess, "Popen") as spawn:
             with patch.object(browser, "sway_tree") as tree:
                 with patch.object(browser, "browser_prefix") as prefix:
                     for site in ("x", "reddit", "linechrome", "whatsappweb"):
-                        with self.assertRaisesRegex(RuntimeError, "awaits geometry integration"):
+                        with self.assertRaises(RuntimeError):
                             browser.show(site, "identity-2")
                     with self.assertRaisesRegex(RuntimeError, "awaits geometry integration"):
                         browser.setup("linechrome", "identity-2")
@@ -167,7 +167,7 @@ class ScopedBrowserBoundary(unittest.TestCase):
             "site": "instagram",
             "windowClass": "post-apollo-instagram-identity-2",
             "profileRelative": "post-apollo/identities/identity-2/instagram-browser",
-            "status": "GEOMETRY_INTEGRATION_PENDING",
+            "status": "EXPLICIT_ISOLATED_MODE_REQUIRED",
             "authenticated": None,
             "launchAvailable": False,
             "migrationPerformed": False,
@@ -181,7 +181,7 @@ class ScopedBrowserBoundary(unittest.TestCase):
             with contextlib.redirect_stdout(stream):
                 self.assertEqual(browser.main(), 0)
             result = json.loads(stream.getvalue())
-            self.assertEqual(result["status"], "GEOMETRY_INTEGRATION_PENDING")
+            self.assertEqual(result["status"], "EXPLICIT_ISOLATED_MODE_REQUIRED")
             self.assertIsNone(result["authenticated"])
         with patch.object(sys, "argv", ["XBrowser.py", "show", "x",
                                         "--identity", "identity-2"]):

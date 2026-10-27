@@ -634,13 +634,18 @@ class Bridge:
         if target not in ("social", "discord", *BROWSER_SITES):
             return
 
-        # No scoped browser actuation until the exact host and provider are
-        # bound in one subsequent transition. Refuse both the browser target
-        # and its old Social fast-follow command.
-        if (message.get("browserIdentityId") is not None
-                or (self.browser_identity_id is not None
-                    and self.x_selected
-                    and target in ("social", *BROWSER_SITES))):
+        # Scoped browser commands need the active site, exact identity,
+        # discovered container and matching XWayland class. They cannot
+        # silently fall back to the legacy site-wide class selector.
+        if self.browser_identity_id is not None and self.x_selected:
+            if (target != self.browser_site or not self.scoped_browser_con_id
+                    or not self.x_ready
+                    or message.get("browserIdentityId") != self.browser_identity_id
+                    or message.get("windowClass") != browser_window_class(
+                        self.browser_site, self.browser_identity_id)
+                    or message.get("conId") != self.scoped_browser_con_id):
+                return
+        elif message.get("browserIdentityId") is not None:
             return
 
         if target == "discord":
@@ -666,6 +671,9 @@ class Bridge:
 
             # Latest geometry wins. This is the key to preventing a backlog of
             # stale follower positions while the user drags quickly.
+            if (self.browser_identity_id is not None and self.x_selected
+                    and target == self.browser_site):
+                message["scopeIdentity"] = self.browser_identity_id
             self.pending_sync[target] = message
 
         self.command_event.set()
@@ -845,9 +853,34 @@ class Bridge:
                     if self.immediate_commands:
                         command = self.immediate_commands.popleft()
                     elif self.pending_sync:
-                        # Dict insertion order is stable; either target can be
-                        # overwritten repeatedly without building a stale queue.
+                        # Take the newest intended geometry, never replaying
+                        # an old provider's queued drag/focus after a switch.
                         _, message = self.pending_sync.popitem()
+                        if message.get("scopeIdentity") is not None:
+                            identity = message["scopeIdentity"]
+                            site = message.get("target")
+                            cid = message.get("conId")
+                            if (identity != self.browser_identity_id
+                                    or site != self.browser_site
+                                    or cid != self.scoped_browser_con_id
+                                    or not self.x_selected or not self.x_ready):
+                                continue
+                            # Keep the lock during last-moment Sway con_id
+                            # verification + command execution: mode changes
+                            # cannot overtake a scoped move.
+                            try:
+                                tree = self.command_ipc.request(IPC_GET_TREE)
+                                exact = snapshot_from_tree(tree, identity).get(site)
+                                if (not exact or exact.get("conId") != cid
+                                        or exact.get("windowClass") !=
+                                        message.get("windowClass")):
+                                    continue
+                                command = build_sync_command(message)
+                                self.command_ipc.request(IPC_COMMAND, command)
+                            except Exception as exc:
+                                print(f"Scoped browser geometry failed: {exc}",
+                                      file=sys.stderr, flush=True)
+                            continue
                         command = build_sync_command(message)
 
                 if command is None:

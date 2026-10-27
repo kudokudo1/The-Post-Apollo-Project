@@ -1,0 +1,46 @@
+name: Social Isolated Browser Identity Handoff
+
+on:
+  pull_request:
+    paths:
+      - 'widgets/messanger/XBrowser.py'
+      - 'widgets/messanger/DiscordGeometry.py'
+      - 'widgets/messanger/MessagingW.qml'
+      - 'widgets/messanger/AppSelector.qml'
+      - 'tests/messaging/test_social_browser_live_handoff.py'
+      - 'tests/messaging/test_social_browser_identity_boundary.py'
+      - 'tests/messaging/test_social_browser_identity_geometry.py'
+      - 'services/messaging/BROWSER-IDENTITY-LIVE-HANDOFF.md'
+      - '.github/workflows/social-browser-live-handoff.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'widgets/messanger/XBrowser.py'
+      - 'widgets/messanger/DiscordGeometry.py'
+      - 'widgets/messanger/MessagingW.qml'
+      - 'widgets/messanger/AppSelector.qml'
+      - 'tests/messaging/test_social_browser_live_handoff.py'
+      - 'services/messaging/BROWSER-IDENTITY-LIVE-HANDOFF.md'
+      - '.github/workflows/social-browser-live-handoff.yml'
+  workflow_dispatch:
+
+jobs:
+  handoff:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Test actual scoped show/hide, private directories and stale selection guards
+        run: python3 -m unittest discover -s tests/messaging -p 'test_social_browser_live_handoff.py' -v
+      - name: Preserve scoped profile and geometry boundary tests
+        run: |
+          python3 -m unittest discover -s tests/messaging -p 'test_social_browser_identity_boundary.py' -v
+          python3 -m unittest discover -s tests/messaging -p 'test_social_browser_identity_geometry.py' -v
+      - name: Preserve legacy Social browser, Discord geometry and identity Settings
+        run: |
+          python3 tests/messaging/test_social_browser_contracts.py
+          python3 tests/messaging/test_x_social_contracts.py
+          python3 -m unittest discover -s tests/messaging -p 'test_discord_geometry_docking.py' -v
+          python3 -m unittest discover -s tests/messaging -p 'test_social_settings_workspace.py' -v
+          python3 -m unittest discover -s tests/messaging -p 'test_social_account_details_ui.py' -v
+          python3 -m unittest discover -s tests/messaging -p 'test_social_account_details.py' -v
+          node tests/messaging/test_social_identity_policy.cjs

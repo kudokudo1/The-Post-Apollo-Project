@@ -1,7 +1,6 @@
 import QtQuick
 import QtQuick.Shapes
 import QtQuick.Effects
-import "WeatherMoonGeometry.js" as MoonGeometry
 
 // Flat solar and lunar geometry shared by the Weather dock and SKY.
 // No emoji moons, independent fetches, special phase colors or animations.
@@ -40,8 +39,10 @@ Item {
                                    || moonPhase === "first-quarter"
     readonly property bool waning: moonPhase.indexOf("waning") === 0
                                    || moonPhase === "last-quarter"
-    // The precise QML contour is defined by a single symmetric helper.
-    // No orientation-specific PathArc implementation is required.
+    readonly property real terminatorX:
+        moonPhase.indexOf("crescent") !== -1 ? (waxing ? 31 : 9)
+        : moonPhase.indexOf("gibbous") !== -1 ? (waxing ? 9 : 31)
+        : 20
 
     Item {
         id: art
@@ -152,8 +153,23 @@ Item {
             ShapePath {
                 strokeWidth: 0
                 fillColor: glyph.ink
-                PathSvg {
-                    path: MoonGeometry.litPath(glyph.moonPhase)
+                startX: 20
+                startY: 6
+                PathArc {
+                    x: 20
+                    y: 34
+                    radiusX: 14
+                    radiusY: 14
+                    direction: glyph.waxing
+                               ? PathArc.Clockwise : PathArc.Counterclockwise
+                }
+                PathCubic {
+                    x: 20
+                    y: 6
+                    control1X: glyph.terminatorX
+                    control1Y: 29
+                    control2X: glyph.terminatorX
+                    control2Y: 11
                 }
             }
         }

@@ -32,6 +32,22 @@ PanelWindow {
         appIndex: messagingWindow.activeAppIndex
     }
 
+    Connections {
+        target: messageRouter.telegramBackend
+        function onLoginStateChanged() {
+            // Universal app setup continues with the existing QR pairing
+            // or conversation view, rather than trapping the user in an
+            // always-visible application-key form.
+            if (messagingWindow.telegramAppKeyEditorOpen
+                    && messagingWindow.telegramAppKeyEditorIdentityId === ""
+                    && messageRouter.telegramBackend.loginMode === "configure"
+                    && messageRouter.telegramBackend.runningAppKeyIdentityId === ""
+                    && messageRouter.telegramBackend.loginState === "APP_SAVED") {
+                messagingWindow.telegramAppKeyEditorOpen = false;
+            }
+        }
+    }
+
     IpcHandler {
         target: "messaging"
 

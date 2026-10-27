@@ -31,18 +31,20 @@ Scope {
     property string loadedKey: ""
     property string lastAttemptKey: ""
     property double lastAttemptMs: 0
+    property var inflightSpec: null
+    property string inflightKey: ""
 
     readonly property bool loading: fetchProcess.running
     readonly property var requestSpec:
         HistoryPolicy.requestSpec(latitude, longitude, anchorDateTime)
-    readonly property string endpoint: {
-        if (!requestSpec.valid)
+    function endpointFor(spec) {
+        if (!spec || !spec.valid)
             return "";
         return "https://historical-forecast-api.open-meteo.com/v1/forecast"
-               + "?latitude=" + requestSpec.latitude
-               + "&longitude=" + requestSpec.longitude
-               + "&start_date=" + requestSpec.startDate
-               + "&end_date=" + requestSpec.endDate
+               + "?latitude=" + spec.latitude
+               + "&longitude=" + spec.longitude
+               + "&start_date=" + spec.startDate
+               + "&end_date=" + spec.endDate
                + "&hourly=temperature_2m,relative_humidity_2m,"
                + "apparent_temperature,pressure_msl,wind_speed_10m"
                + "&daily=temperature_2m_max,temperature_2m_min,"
@@ -54,8 +56,7 @@ Scope {
     }
 
     function refresh(force) {
-        if (!active || !requestSpec.valid || endpoint === ""
-                || fetchProcess.running)
+        if (!active || !requestSpec.valid || fetchProcess.running)
             return false;
 
         const now = Date.now();
@@ -69,10 +70,25 @@ Scope {
                 && now - lastUpdated.getTime() < 21600000)
             return false;
 
-        lastAttemptKey = requestSpec.key;
+        const spec = {
+            "valid": true,
+            "latitude": requestSpec.latitude,
+            "longitude": requestSpec.longitude,
+            "startDate": requestSpec.startDate,
+            "endDate": requestSpec.endDate,
+            "localHour": requestSpec.localHour,
+            "key": requestSpec.key
+        };
+        const requestUrl = endpointFor(spec);
+        if (requestUrl === "")
+            return false;
+
+        lastAttemptKey = spec.key;
         lastAttemptMs = now;
+        inflightSpec = spec;
+        inflightKey = spec.key;
         fetchProcess.command = [
-            "curl", "-fsSL", "--max-time", "15", endpoint
+            "curl", "-fsSL", "--max-time", "15", requestUrl
         ];
         fetchProcess.running = true;
         return true;
@@ -82,14 +98,14 @@ Scope {
         try {
             const parsed = HistoryPolicy.parseResponse(
                 JSON.parse(String(raw || "")),
-                requestSpec
+                inflightSpec
             );
             daily = parsed.daily;
             sameHour = parsed.sameHour;
             summary = parsed.summary;
             timezone = parsed.timezone;
             timezoneAbbreviation = parsed.timezoneAbbreviation;
-            loadedKey = requestSpec.key;
+            loadedKey = inflightKey;
             lastUpdated = new Date();
             ready = true;
             failed = false;

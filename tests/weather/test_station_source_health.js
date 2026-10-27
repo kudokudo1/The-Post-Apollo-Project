@@ -20,7 +20,7 @@ assert.equal(typeof health.sourceRow, "function");
 assert.equal(typeof health.buildCoreSources, "function");
 assert.equal(typeof health.ageMinutes, "function");
 
-const now = 1_000_000;
+const now = 10_000_000;
 function row(overrides = {}) {
     return health.sourceRow({
         id: "weather",

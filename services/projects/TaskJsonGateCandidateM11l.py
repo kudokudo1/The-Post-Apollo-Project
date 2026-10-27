@@ -12,6 +12,7 @@ from datetime import date
 import fcntl
 import hashlib
 import json
+import math
 import os
 from pathlib import Path
 import re
@@ -94,13 +95,27 @@ def no_duplicates(pairs):
     return value
 
 
+# JSON's 1.0 and 1e0 are integer-valued JS Numbers, not different
+# types in ApolloHubTodoPolicy.isInteger(). Reject booleans/non-finite numbers.
 def valid_number(v, minimum=1, maximum=1000000000):
-    return type(v) is int and minimum <= v <= maximum
+    return (type(v) in (int, float) and minimum <= v <= maximum
+            and (type(v) is int or math.isfinite(v) and v.is_integer()))
+
+
+# ECMAScript String.trim whitespace, independent of Python str.strip() quirks.
+JS_TRIM_CHARS = ("\u0009\u000a\u000b\u000c\u000d\u0020\u00a0\u1680"
+                 "\u2000\u2001\u2002\u2003\u2004\u2005\u2006\u2007"
+                 "\u2008\u2009\u200a\u2028\u2029\u202f\u205f\u3000\ufeff")
+
+
+def js_units(value):
+    # JavaScript String.length counts UTF-16 code units, not code points.
+    return len(value.encode("utf-16-le", "surrogatepass")) // 2
 
 
 def valid_text(s, limit, *, allow_empty=False, multiline=False):
     return (type(s) is str and (allow_empty or bool(s))
-            and len(s) <= limit and (allow_empty or s == s.strip())
+            and js_units(s) <= limit and (allow_empty or s == s.strip(JS_TRIM_CHARS))
             and not any(ord(ch) == 127 or ord(ch) < 32 and
                         (not multiline or ch not in "\t\n\r")
                         for ch in s))
@@ -118,11 +133,17 @@ def valid_date(value):
         return False
 
 
+def _reject_json_constant(value):
+    # Python accepts NaN and Infinity by default; JSON.parse rejects both.
+    raise ValueError("NONSTANDARD_JSON_CONSTANT")
+
+
 def parse_task_document(raw):
     require(type(raw) is bytes and 0 < len(raw) <= MAX_BYTES,
             "INVALID_JSON_BYTES")
     try:
-        doc = json.loads(raw.decode("utf-8"), object_pairs_hook=no_duplicates)
+        doc = json.loads(raw.decode("utf-8"), object_pairs_hook=no_duplicates,
+                         parse_constant=_reject_json_constant)
     except (ValueError, UnicodeError) as exc:
         raise GateError("INVALID_JSON_DOCUMENT") from exc
     require(type(doc) is dict, "INVALID_DOCUMENT")
@@ -178,6 +199,8 @@ def parse_task_document(raw):
         if version == 3:
             require("projectId" in task and
                     (task["projectId"] is None or
+                     type(task["projectId"]) is str and
+                     re.fullmatch(r"p[1-9][0-9]*", task["projectId"]) and
                      task["projectId"] in project_ids),
                     "INVALID_TASK_PROJECT")
     require(all(int(t["id"][1:]) < doc["nextId"] for t in tasks),

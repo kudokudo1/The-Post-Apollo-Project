@@ -11,6 +11,7 @@ import importlib.util
 import json
 import os
 from pathlib import Path
+import signal
 
 ROOT = Path(__file__).resolve().parents[3]
 OWNER_FILE = ROOT / "services/projects/TaskJsonGateCandidateM11l.py"
@@ -56,7 +57,9 @@ def main():
     parser.add_argument("--directory", required=True, type=Path)
     parser.add_argument("--mode", required=True,
                         choices=["before-reserve", "after-reserve",
-                                 "after-file-write", "after-settlement"])
+                                 "after-file-write", "after-settlement",
+                                 "hold-after-reserve", "hold-after-file-write",
+                                 "hold-after-settlement"])
     parser.add_argument("--stage-id", default="m11p-crash-stage-001")
     args = parser.parse_args()
     # Bootstrap exclusively in a fresh disposable folder; the test runner
@@ -70,12 +73,21 @@ def main():
     token = owner.reserve(args.stage_id, candidate)
     if args.mode == "after-reserve":
         os._exit(81)
+    if args.mode == "hold-after-reserve":
+        print("M11P_SYNTHETIC_FAULT_READY", flush=True)
+        signal.pause()
     test_atomic_file_replace(owner.source, candidate)
     if args.mode == "after-file-write":
         os._exit(82)
+    if args.mode == "hold-after-file-write":
+        print("M11P_SYNTHETIC_FAULT_READY", flush=True)
+        signal.pause()
     owner.verify(args.stage_id, token["epoch"])
     if args.mode == "after-settlement":
         os._exit(83)
+    if args.mode == "hold-after-settlement":
+        print("M11P_SYNTHETIC_FAULT_READY", flush=True)
+        signal.pause()
     raise AssertionError("UNEXPECTED_MODE")
 
 

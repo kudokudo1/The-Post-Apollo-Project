@@ -63,7 +63,7 @@
       "snapshot": "todoSnapshot: todoExplore.todoSnapshot"
     },
     "widgets/tasks/TaskPlannerPane.qml": {
-      "store": "todoStore: planner.todoStore",
+      "store": "todoStore: planner.schedulingAllowed ? planner.todoStore : null",
       "snapshot": "todoSnapshot: planner.todoSnapshot"
     }
   },

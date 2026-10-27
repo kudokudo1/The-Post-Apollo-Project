@@ -60,6 +60,8 @@ Rectangle {
         weatherService ? weatherService.localObservationAnchorMs : 0,
         dailyForecast
     )
+    readonly property var astronomySummary:
+        WeatherCyclePolicy.astronomySummary(skyCycle.date, dailyForecast)
     readonly property string currentCelestialMode:
         weatherReady
         ? WeatherCyclePolicy.artworkFor(conditionState, skyCycle) : "weather"
@@ -572,6 +574,117 @@ Rectangle {
                     }
                 }
             }
+        }
+
+        StationSectionDivider {
+            width: parent.width
+            title: "ASTRONOMY // SUN + MOON"
+        }
+
+        Row {
+            spacing: 12
+            visible: sky.astronomySummary.available
+
+            Column {
+                width: 118
+                spacing: 4
+
+                SecondaryText {
+                    text: "DATE"
+                    font.pixelSize: 10
+                }
+
+                GohuText {
+                    text: sky.astronomySummary.date
+                    font.pixelSize: 13
+                    color: Colors.white
+                }
+            }
+
+            Column {
+                width: 126
+                spacing: 4
+
+                SecondaryText {
+                    text: "SUNRISE"
+                    font.pixelSize: 10
+                }
+
+                GohuText {
+                    text: sky.astronomySummary.sunrise
+                    font.pixelSize: 14
+                    color: Colors.white
+                }
+            }
+
+            Column {
+                width: 126
+                spacing: 4
+
+                SecondaryText {
+                    text: "SUNSET"
+                    font.pixelSize: 10
+                }
+
+                GohuText {
+                    text: sky.astronomySummary.sunset
+                    font.pixelSize: 14
+                    color: Colors.white
+                }
+            }
+
+            Column {
+                width: 126
+                spacing: 4
+
+                SecondaryText {
+                    text: "DAYLIGHT"
+                    font.pixelSize: 10
+                }
+
+                GohuText {
+                    text: sky.astronomySummary.daylightLabel
+                    font.pixelSize: 14
+                    color: Colors.white
+                }
+            }
+
+            Column {
+                width: 238
+                spacing: 4
+
+                SecondaryText {
+                    text: "MOON"
+                    font.pixelSize: 10
+                }
+
+                GohuText {
+                    text: sky.astronomySummary.moonPhaseLabel
+                    font.pixelSize: 12
+                    color: Colors.white
+                }
+
+                QuietText {
+                    text: sky.astronomySummary.moonIllumination >= 0
+                          ? "ILLUMINATION "
+                            + Math.round(sky.astronomySummary.moonIllumination)
+                            + "%"
+                          : "ILLUMINATION --"
+                    font.pixelSize: 9
+                }
+            }
+        }
+
+        QuietText {
+            visible: !sky.astronomySummary.available
+            text: "ASTRONOMY DATA UNAVAILABLE IN CURRENT DAILY PROVIDER PAYLOAD"
+            font.pixelSize: 9
+        }
+
+        QuietText {
+            visible: sky.astronomySummary.available
+            text: "WTTR.IN DAILY ASTRONOMY // DAYLIGHT DERIVED FROM PROVIDER SUNRISE + SUNSET"
+            font.pixelSize: 9
         }
 
         Column {

@@ -68,6 +68,15 @@ def _ensure_scoped_parent(file_path: Path, identity_id: str) -> None:
         raise BridgeError("ERROR", "Identity scope is required")
     base = file_path.parent.parent.parent
     # base = .../telegram, identity parent = .../identities/identity-N.
+    # Reject an existing symlinked post-apollo ancestor before mkdir(parents)
+    # can accidentally create a scoped secret outside the expected namespace.
+    common = base.parent
+    if common.is_symlink():
+        raise BridgeError("ERROR", "Unsafe Telegram identity directory")
+    if common.exists():
+        meta = common.lstat()
+        if not stat.S_ISDIR(meta.st_mode) or meta.st_uid != os.getuid():
+            raise BridgeError("ERROR", "Unsafe Telegram identity directory")
     for folder in (base, base / "identities", base / "identities" / identity):
         if not folder.exists() and not folder.is_symlink():
             folder.mkdir(mode=0o700, parents=True, exist_ok=True)
@@ -124,18 +133,29 @@ def _app_credentials_from_private_file(
 
 def _credentials(identity_id: str | None = None) -> tuple[int, str]:
     identity = _validate_identity(identity_id)
-    config = _app_credentials_from_private_file(identity)
-    # Profile-specific *complete* override has priority over global/env.
-    scoped_override = (identity is not None
-                       and _app_config_path(identity).exists())
+    # Per-identity overrides win as a complete pair, even when universal
+    # credentials exist in the environment. A malformed/unsafe override must
+    # fail rather than silently access another Telegram application.
+    scoped_override = False
+    if identity is not None:
+        try:
+            _app_config_path(identity).lstat()
+            scoped_override = True
+        except FileNotFoundError:
+            pass
     if scoped_override:
+        config = _read_private_config(_app_config_path(identity), scoped=True)
         id_text = str(config.get("apiId", "")).strip()
         api_hash = str(config.get("apiHash", "")).strip()
     else:
+        # Maintain legacy precedence and avoid touching the global file at
+        # all when both environment values are already present.
         id_text = os.environ.get("POST_APOLLO_TELEGRAM_API_ID", "").strip()
         api_hash = os.environ.get("POST_APOLLO_TELEGRAM_API_HASH", "").strip()
-        id_text = id_text or str(config.get("apiId", "")).strip()
-        api_hash = api_hash or str(config.get("apiHash", "")).strip()
+        if not id_text or not api_hash:
+            config = _app_credentials_from_private_file()
+            id_text = id_text or str(config.get("apiId", "")).strip()
+            api_hash = api_hash or str(config.get("apiHash", "")).strip()
     if not id_text or not api_hash:
         raise BridgeError("AUTH_REQUIRED", "Configure Telegram API ID/hash, then run explicit login")
     try:

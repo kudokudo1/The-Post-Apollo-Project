@@ -11,6 +11,8 @@ import importlib.util
 import json
 import os
 from pathlib import Path
+import selectors
+import signal
 import sqlite3
 import subprocess
 import sys
@@ -206,6 +208,58 @@ class DurableStageHistoryTests(unittest.TestCase):
             self.denied("STAGE_NOT_ADMISSIBLE",lambda:upgraded.reserve(
                 "m11p-legacy-pending-001",test_json(1)))
         self.assertEqual(self.source.read_bytes(),self.initial)
+
+    def test_real_sigkill_at_reserved_written_and_settled_boundaries(self):
+        # A real OS signal releases the flock without running owner.close().
+        # Its post-kill journal, not parent-side callbacks, is authoritative.
+        fault_modes = [
+            ("hold-after-reserve", "RESERVED", True, test_json(0)),
+            ("hold-after-file-write", "RESERVED", True, test_json(1)),
+            ("hold-after-settlement", "SETTLED", False, test_json(1))
+        ]
+        for mode, expected_state, pending, expected_bytes in fault_modes:
+            with self.subTest(mode=mode), tempfile.TemporaryDirectory() as root:
+                folder=Path(root)/"m11l-tasks-copy"
+                folder.mkdir(mode=0o700)
+                source=folder/"todo-copy.json"
+                write_new(source,test_json(0))
+                command=[sys.executable,"-B","-I",str(PROBE),
+                         "--directory",str(folder),"--mode",mode]
+                proc=subprocess.Popen(command,stdin=subprocess.DEVNULL,
+                                      stdout=subprocess.PIPE,
+                                      stderr=subprocess.PIPE,bufsize=0)
+                try:
+                    with selectors.DefaultSelector() as poller:
+                        poller.register(proc.stdout,selectors.EVENT_READ)
+                        events=poller.select(timeout=6)
+                    self.assertTrue(events, "Synthetic crash checkpoint not reached")
+                    self.assertEqual(
+                        proc.stdout.readline(),b"M11P_SYNTHETIC_FAULT_READY\n")
+                    proc.kill()
+                    self.assertEqual(proc.wait(timeout=5),-signal.SIGKILL)
+                finally:
+                    if proc.poll() is None:
+                        proc.kill()
+                    proc.communicate(timeout=5)
+                self.assertEqual(source.read_bytes(),expected_bytes)
+                with sqlite3.connect(folder/"gate-review.db") as db:
+                    row=db.execute("""SELECT phase,epoch,pending_stage,
+                        source_hash FROM owner WHERE id=1""").fetchone()
+                    ledger=db.execute("SELECT state FROM stage_history").fetchall()
+                self.assertEqual(row[0],"JSON_ACTIVE")
+                self.assertEqual(row[1],0)
+                self.assertEqual(row[2] is not None,pending)
+                self.assertEqual(ledger,[(expected_state,)])
+                if mode=="hold-after-file-write":
+                    self.assertNotEqual(row[3],hashlib.sha256(expected_bytes).hexdigest())
+                with gate.CandidateOwner(folder,"m11p-fresh-after-sigkill",
+                                         bootstrap=False) as recovered:
+                    self.assertEqual(recovered.state()["phase"],"RECOVERY_REVIEW")
+                    self.assertEqual(recovered.state()["pending"],pending)
+                    self.assertTrue(recovered.state()["historyComplete"])
+                    with self.assertRaises(gate.GateError):
+                        recovered.reserve("m11p-crash-stage-001",test_json(2))
+                self.assertEqual(source.read_bytes(),expected_bytes)
 
     def test_four_abrupt_process_windows_are_fenced_on_reopen(self):
         cases = [

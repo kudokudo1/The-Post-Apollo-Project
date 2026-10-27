@@ -171,7 +171,8 @@ const astronomyArea = sky.slice(
     sky.indexOf('title: "FORECAST // NEXT HOURS"')
 );
 assert.doesNotMatch(astronomyArea, /Process\s*\{|Timer\s*\{|Qt\.openUrlExternally/);
-assert.doesNotMatch(astronomyArea, /TWILIGHT|GOLDEN|BLUE HOUR/);
+assert.match(astronomyArea, /TWILIGHT \/\/ SOLAR WINDOWS/);
+assert.doesNotMatch(astronomyArea, /GOLDEN HOUR|BLUE HOUR/);
 assert.match(sky, /mode: sky\.currentCelestialMode/);
 assert.doesNotMatch(dock + sky, /Colors\.dawn|Colors\.dusk|Colors\.moon|Colors\.night/);
 // Night rendering contract: illuminated phase = *weather* ink; shadow =

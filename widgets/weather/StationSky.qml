@@ -3,6 +3,7 @@ import "../../components"
 import "../../services/weather/WeatherDockPolicy.js" as WeatherDockPolicy
 import "../../services/weather/WeatherCyclePolicy.js" as WeatherCyclePolicy
 import "StationSkyHourlyPolicy.js" as HourlyDetails
+import "StationSkyTwilightPolicy.js" as TwilightPolicy
 
 Rectangle {
     id: sky
@@ -62,6 +63,13 @@ Rectangle {
     )
     readonly property var astronomySummary:
         WeatherCyclePolicy.astronomySummary(skyCycle.date, dailyForecast)
+    readonly property var twilightSummary:
+        TwilightPolicy.summary(
+            astronomySummary.date,
+            weatherService ? weatherService.latitude : "",
+            weatherService ? weatherService.longitude : "",
+            astronomySummary.sunrise
+        )
     readonly property string currentCelestialMode:
         weatherReady
         ? WeatherCyclePolicy.artworkFor(conditionState, skyCycle) : "weather"
@@ -685,6 +693,155 @@ Rectangle {
             visible: sky.astronomySummary.available
             text: "WTTR.IN DAILY ASTRONOMY // DAYLIGHT DERIVED FROM PROVIDER SUNRISE + SUNSET"
             font.pixelSize: 9
+        }
+
+        StationSectionDivider {
+            width: parent.width
+            title: "TWILIGHT // SOLAR WINDOWS"
+        }
+
+        Column {
+            width: parent.width
+            spacing: 7
+            visible: sky.twilightSummary.available
+
+            Row {
+                width: parent.width
+                spacing: 12
+
+                SecondaryText {
+                    width: 92
+                    text: "MORNING"
+                    font.pixelSize: 10
+                    color: Colors.cyan
+                }
+
+                Column {
+                    width: 136
+                    spacing: 3
+                    SecondaryText { text: "ASTRONOMICAL"; font.pixelSize: 9 }
+                    GohuText {
+                        text: sky.twilightSummary.astronomicalDawn
+                        font.pixelSize: 13
+                        color: Colors.white
+                    }
+                }
+
+                Column {
+                    width: 126
+                    spacing: 3
+                    SecondaryText { text: "NAUTICAL"; font.pixelSize: 9 }
+                    GohuText {
+                        text: sky.twilightSummary.nauticalDawn
+                        font.pixelSize: 13
+                        color: Colors.white
+                    }
+                }
+
+                Column {
+                    width: 116
+                    spacing: 3
+                    SecondaryText { text: "CIVIL"; font.pixelSize: 9 }
+                    GohuText {
+                        text: sky.twilightSummary.civilDawn
+                        font.pixelSize: 13
+                        color: Colors.white
+                    }
+                }
+
+                Column {
+                    width: 122
+                    spacing: 3
+                    SecondaryText { text: "SUNRISE"; font.pixelSize: 9 }
+                    GohuText {
+                        text: sky.astronomySummary.sunrise
+                        font.pixelSize: 13
+                        color: Colors.orange
+                    }
+                }
+
+                Column {
+                    width: 126
+                    spacing: 3
+                    SecondaryText { text: "SOLAR NOON"; font.pixelSize: 9 }
+                    GohuText {
+                        text: sky.twilightSummary.solarNoon
+                        font.pixelSize: 13
+                        color: Colors.yellow
+                    }
+                }
+            }
+
+            Row {
+                width: parent.width
+                spacing: 12
+
+                SecondaryText {
+                    width: 92
+                    text: "EVENING"
+                    font.pixelSize: 10
+                    color: Colors.magenta
+                }
+
+                Column {
+                    width: 136
+                    spacing: 3
+                    SecondaryText { text: "SUNSET"; font.pixelSize: 9 }
+                    GohuText {
+                        text: sky.astronomySummary.sunset
+                        font.pixelSize: 13
+                        color: Colors.orange
+                    }
+                }
+
+                Column {
+                    width: 126
+                    spacing: 3
+                    SecondaryText { text: "CIVIL"; font.pixelSize: 9 }
+                    GohuText {
+                        text: sky.twilightSummary.civilDusk
+                        font.pixelSize: 13
+                        color: Colors.white
+                    }
+                }
+
+                Column {
+                    width: 116
+                    spacing: 3
+                    SecondaryText { text: "NAUTICAL"; font.pixelSize: 9 }
+                    GohuText {
+                        text: sky.twilightSummary.nauticalDusk
+                        font.pixelSize: 13
+                        color: Colors.white
+                    }
+                }
+
+                Column {
+                    width: 176
+                    spacing: 3
+                    SecondaryText { text: "ASTRONOMICAL"; font.pixelSize: 9 }
+                    GohuText {
+                        text: sky.twilightSummary.astronomicalDusk
+                        font.pixelSize: 13
+                        color: Colors.white
+                    }
+                }
+            }
+
+            QuietText {
+                width: parent.width
+                text: "CALCULATED SOLAR GEOMETRY // DATE + WEATHER COORDINATES // CLOCK CALIBRATED TO PROVIDER SUNRISE // NOT OBSERVED"
+                font.pixelSize: 9
+            }
+        }
+
+        QuietText {
+            visible: sky.astronomySummary.available
+                     && !sky.twilightSummary.available
+            width: parent.width
+            text: "TWILIGHT WINDOWS UNAVAILABLE // REQUIRES VALID DATE, COORDINATES, PROVIDER SUNRISE, AND A DAILY SUNRISE SOLUTION"
+            font.pixelSize: 9
+            color: Colors.orange
         }
 
         Column {

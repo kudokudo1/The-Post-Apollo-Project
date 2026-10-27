@@ -1,0 +1,46 @@
+name: TASKS M11o JS Python parity and disposable failure gates
+
+on:
+  pull_request:
+    paths:
+      - 'services/projects/TaskJsonGateCandidateM11l.py'
+      - 'tests/tasks/fixtures/task_json_policy_oracle_m11o.cjs'
+      - 'tests/tasks/test_task_json_policy_parity_m11o.py'
+      - 'docs/tasks-json-policy-parity-failure-gates-m11o.md'
+      - '.github/workflows/tasks-json-policy-parity-m11o.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'services/projects/TaskJsonGateCandidateM11l.py'
+      - 'tests/tasks/fixtures/task_json_policy_oracle_m11o.cjs'
+      - 'tests/tasks/test_task_json_policy_parity_m11o.py'
+      - 'docs/tasks-json-policy-parity-failure-gates-m11o.md'
+      - '.github/workflows/tasks-json-policy-parity-m11o.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  parity-and-faults:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: M11o actual JS policy versus Python owner corpus and OS fault tests
+        run: python3 tests/tasks/test_task_json_policy_parity_m11o.py
+      - name: M11m subprocess/transport guard regressions
+        run: python3 tests/tasks/test_task_json_gate_transport_m11m.py
+      - name: M11l disposable owner/regression matrix
+        run: python3 tests/tasks/test_task_json_gate_candidate_m11l.py
+      - name: TASKS production JS v1/v2/v3 policy
+        run: node tests/hub/test_apollo_hub_todo_policy.cjs
+      - name: TASKS production JS projects policy
+        run: node tests/tasks/test_task_projects_policy.cjs
+      - name: Live TASKS writer remains a single compiled-off gate
+        run: python3 tests/tasks/test_task_writer_gate_inventory_m11d.py

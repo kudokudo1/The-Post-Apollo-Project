@@ -115,9 +115,10 @@ function newsTopics(value) {
     const title = String(value || "").toLowerCase();
     const topics = [];
 
-    if (headlineHas(title,
-            /\b(weather|forecast|storm|hurricane|cyclone|typhoon|tornado|rain|snow|blizzard|flood|drought|heatwave|heat wave|cold snap|temperature|wind)\b/))
-        topics.push("weather");
+    const spaceWeather = headlineHas(title,
+        /\b(aurora|geomagnetic|solar|sunspot|space weather|solar flare|coronal mass|cme)\b/);
+    if (spaceWeather)
+        topics.push("space");
 
     if (headlineHas(title,
             /\b(earthquake|quake|seismic|volcano|volcanic|eruption|tsunami|landslide)\b/))
@@ -127,9 +128,14 @@ function newsTopics(value) {
             /\b(wildfire|wild fire|bushfire|forest fire|brush fire|fire|blaze|smoke)\b/))
         topics.push("fire");
 
-    if (headlineHas(title,
-            /\b(aurora|geomagnetic|solar|sunspot|space weather|solar flare|coronal mass|cme)\b/))
-        topics.push("space");
+    const ordinaryWeather = headlineHas(title,
+        /\b(weather|forecast|storm|hurricane|cyclone|typhoon|tornado|rain|snow|blizzard|flood|drought|heatwave|heat wave|cold snap|temperature|wind)\b/);
+    const spaceStormOnly =
+        /\b(geomagnetic|solar)\s+storm\b/.test(title)
+        && !headlineHas(title,
+            /\b(weather|forecast|hurricane|cyclone|typhoon|tornado|rain|snow|blizzard|flood|drought|heatwave|heat wave|cold snap|temperature|wind)\b/);
+    if (ordinaryWeather && !spaceStormOnly)
+        topics.push("weather");
 
     return topics;
 }

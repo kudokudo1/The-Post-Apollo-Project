@@ -2,6 +2,7 @@ import QtQuick
 import "../../components"
 import "../../services/weather" as WeatherServices
 import "../../services/weather/SeismicPolicy.js" as SeismicPolicy
+import "StationGroundPollenPolicy.js" as PollenDetails
 
 Rectangle {
     id: ground
@@ -50,6 +51,17 @@ Rectangle {
         weatherService ? Number(weatherService.nitrogenDioxideAqi) : -1
     readonly property real carbonMonoxideAqiValue:
         weatherService ? Number(weatherService.carbonMonoxideAqi) : -1
+
+    readonly property var pollenSpecies: PollenDetails.species(
+        !!(aqiReady && weatherService.pollenAvailable), {
+            alderPollen: weatherService ? weatherService.alderPollen : -1,
+            birchPollen: weatherService ? weatherService.birchPollen : -1,
+            grassPollen: weatherService ? weatherService.grassPollen : -1,
+            mugwortPollen: weatherService ? weatherService.mugwortPollen : -1,
+            olivePollen: weatherService ? weatherService.olivePollen : -1,
+            ragweedPollen: weatherService ? weatherService.ragweedPollen : -1
+        }
+    )
 
     readonly property var pollenPeak: {
         if (!weatherService || !weatherService.pollenAvailable)
@@ -522,6 +534,50 @@ Rectangle {
                     font.pixelSize: 10
                 }
             }
+        }
+
+        // The peak is only a summary. Show the six already-received
+        // per-species readings without requesting a second pollen source.
+        StationSectionDivider {
+            width: parent.width
+            title: "POLLEN // SPECIES"
+        }
+
+        Row {
+            width: parent.width
+            spacing: 8
+            visible: ground.pollenSpecies.length > 0
+
+            Repeater {
+                model: ground.pollenSpecies
+
+                delegate: Column {
+                    required property var modelData
+                    width: (groundContent.width - 5 * 8) / 6
+                    spacing: 5
+
+                    SecondaryText {
+                        text: modelData.name
+                        font.pixelSize: 10
+                    }
+
+                    GohuText {
+                        width: parent.width
+                        text: modelData.label
+                        font.pixelSize: 13
+                        color: modelData.available ? Colors.green : Colors.white
+                        elide: Text.ElideRight
+                    }
+                }
+            }
+        }
+
+        QuietText {
+            width: parent.width
+            font.pixelSize: 10
+            text: ground.pollenSpecies.length > 0
+                  ? "OPEN-METEO // CURRENT CONCENTRATION IN GRAINS/M³ // -- = NO READING, NOT ZERO"
+                  : "POLLEN SPECIES UNAVAILABLE FOR THIS PROVIDER / LOCATION"
         }
 
         StationSectionDivider {

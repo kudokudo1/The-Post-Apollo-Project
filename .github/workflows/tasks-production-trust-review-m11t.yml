@@ -1,0 +1,56 @@
+name: TASKS M11t source-only production trust and rollback review
+
+on:
+  pull_request:
+    paths:
+      - 'docs/tasks-production-trust-and-rollback-m11t.md'
+      - 'tests/tasks/fixtures/task_production_trust_review_m11t.json'
+      - 'tests/tasks/test_task_production_trust_contract_m11t.py'
+      - '.github/workflows/tasks-production-trust-review-m11t.yml'
+      - 'services/hub/ApolloHubTodoStore.qml'
+      - 'services/hub/ApolloHubTodoPolicy.js'
+      - 'services/projects/TaskJsonGateHostBridgeM11m.qml'
+      - 'services/projects/TaskJsonGateCandidateM11l.py'
+      - 'tests/tasks/fixtures/TaskJsonGateTransportM11m.py'
+  push:
+    branches: [main]
+    paths:
+      - 'docs/tasks-production-trust-and-rollback-m11t.md'
+      - 'tests/tasks/fixtures/task_production_trust_review_m11t.json'
+      - 'tests/tasks/test_task_production_trust_contract_m11t.py'
+      - '.github/workflows/tasks-production-trust-review-m11t.yml'
+      - 'services/hub/ApolloHubTodoStore.qml'
+      - 'services/hub/ApolloHubTodoPolicy.js'
+      - 'services/projects/TaskJsonGateHostBridgeM11m.qml'
+      - 'services/projects/TaskJsonGateCandidateM11l.py'
+      - 'tests/tasks/fixtures/TaskJsonGateTransportM11m.py'
+
+permissions:
+  contents: read
+
+jobs:
+  source-only-contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: M11t proposed trust / rollback source contract
+        run: python3 tests/tasks/test_task_production_trust_contract_m11t.py
+      - name: Prior M11k and M11q production preflight boundaries
+        run: |
+          python3 tests/tasks/test_task_production_gate_review_m11k.py
+          python3 tests/tasks/test_task_production_preflight_m11q.py
+      - name: M11r / M11s disposable journal inspector regressions
+        run: |
+          python3 tests/tasks/test_task_native_fault_inspector_m11r.py
+          python3 tests/tasks/test_task_native_fault_matrix_m11s.py
+      - name: Native callback pure policy and exact TASKS writer inventory
+        run: |
+          node tests/tasks/test_task_native_callback_guard_m11q.cjs
+          python3 tests/tasks/test_task_writer_gate_inventory_m11d.py

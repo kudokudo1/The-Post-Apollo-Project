@@ -17,6 +17,10 @@ Scope {
     readonly property bool ready: kpReady && solarWindReady && magneticFieldReady && solarFluxReady
 
     readonly property bool loading: kpFetch.running || solarWindFetch.running || magneticFieldFetch.running || solarFluxFetch.running
+    readonly property bool kpLoading: kpFetch.running
+    readonly property bool solarWindLoading: solarWindFetch.running
+    readonly property bool magneticFieldLoading: magneticFieldFetch.running
+    readonly property bool solarFluxLoading: solarFluxFetch.running
 
     // ─────────────────────────────────────────────
     // Kp / GEOMAGNETIC
@@ -113,12 +117,34 @@ Scope {
     // distinct from the NOAA sample timestamps above because those products
     // publish at different cadences.
     property date lastUpdated
+    property date kpLastUpdated
+    property date solarWindLastUpdated
+    property date magneticFieldLastUpdated
+    property date solarFluxLastUpdated
 
     // ─────────────────────────────────────────────
     // ERROR STATE
     // ─────────────────────────────────────────────
 
-    property string errorText: ""
+    property string kpErrorText: ""
+    property string solarWindErrorText: ""
+    property string magneticFieldErrorText: ""
+    property string solarFluxErrorText: ""
+
+    // Preserve the old aggregate API for existing consumers while retaining
+    // the exact failing NOAA product for the source-health rack.
+    readonly property string errorText: {
+        const failures = [];
+        if (kpErrorText.length > 0)
+            failures.push(kpErrorText);
+        if (solarWindErrorText.length > 0)
+            failures.push(solarWindErrorText);
+        if (magneticFieldErrorText.length > 0)
+            failures.push(magneticFieldErrorText);
+        if (solarFluxErrorText.length > 0)
+            failures.push(solarFluxErrorText);
+        return failures.join(" // ");
+    }
 
     // ─────────────────────────────────────────────
     // ENDPOINTS
@@ -149,7 +175,7 @@ Scope {
 
         onExited: function (exitCode, exitStatus) {
             if (exitCode !== 0) {
-                spaceService.errorText = "Kp request failed";
+                spaceService.kpErrorText = "Kp request failed";
             }
         }
     }
@@ -171,7 +197,7 @@ Scope {
 
         onExited: function (exitCode, exitStatus) {
             if (exitCode !== 0) {
-                spaceService.errorText = "solar wind request failed";
+                spaceService.solarWindErrorText = "solar wind request failed";
             }
         }
     }
@@ -193,7 +219,7 @@ Scope {
 
         onExited: function (exitCode, exitStatus) {
             if (exitCode !== 0) {
-                spaceService.errorText = "magnetic field request failed";
+                spaceService.magneticFieldErrorText = "magnetic field request failed";
             }
         }
     }
@@ -215,7 +241,7 @@ Scope {
 
         onExited: function (exitCode, exitStatus) {
             if (exitCode !== 0) {
-                spaceService.errorText = "solar flux request failed";
+                spaceService.solarFluxErrorText = "solar flux request failed";
             }
         }
     }
@@ -238,12 +264,15 @@ Scope {
 
             kpTime = latest.time_tag || "";
 
+            const receivedAt = new Date();
             kpReady = true;
-            lastUpdated = new Date();
+            kpErrorText = "";
+            kpLastUpdated = receivedAt;
+            lastUpdated = receivedAt;
         } catch (error) {
             console.log("SpaceService Kp parse error:", error);
 
-            errorText = "Kp parse failed";
+            kpErrorText = "Kp parse failed";
         }
     }
 
@@ -265,12 +294,15 @@ Scope {
 
             solarWindTime = latest.time_tag || "";
 
+            const receivedAt = new Date();
             solarWindReady = true;
-            lastUpdated = new Date();
+            solarWindErrorText = "";
+            solarWindLastUpdated = receivedAt;
+            lastUpdated = receivedAt;
         } catch (error) {
             console.log("SpaceService solar wind parse error:", error);
 
-            errorText = "solar wind parse failed";
+            solarWindErrorText = "solar wind parse failed";
         }
     }
 
@@ -294,12 +326,15 @@ Scope {
 
             magneticFieldTime = latest.time_tag || "";
 
+            const receivedAt = new Date();
             magneticFieldReady = true;
-            lastUpdated = new Date();
+            magneticFieldErrorText = "";
+            magneticFieldLastUpdated = receivedAt;
+            lastUpdated = receivedAt;
         } catch (error) {
             console.log("SpaceService magnetic field parse error:", error);
 
-            errorText = "magnetic field parse failed";
+            magneticFieldErrorText = "magnetic field parse failed";
         }
     }
 
@@ -321,12 +356,15 @@ Scope {
 
             solarFluxTime = latest.time_tag || "";
 
+            const receivedAt = new Date();
             solarFluxReady = true;
-            lastUpdated = new Date();
+            solarFluxErrorText = "";
+            solarFluxLastUpdated = receivedAt;
+            lastUpdated = receivedAt;
         } catch (error) {
             console.log("SpaceService solar flux parse error:", error);
 
-            errorText = "solar flux parse failed";
+            solarFluxErrorText = "solar flux parse failed";
         }
     }
 

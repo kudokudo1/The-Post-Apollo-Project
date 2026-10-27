@@ -70,6 +70,20 @@ Rectangle {
             weatherService ? weatherService.longitude : "",
             astronomySummary.sunrise
         )
+    readonly property int providerLocalMinute:
+        TwilightPolicy.providerObservationMinute(
+            cycleClockMs,
+            weatherService ? weatherService.localObservationDateTime : "",
+            weatherService ? weatherService.localObservationAnchorMs : 0
+        )
+    readonly property var currentSolarPosition:
+        TwilightPolicy.solarPosition(
+            skyCycle.date,
+            providerLocalMinute,
+            weatherService ? weatherService.latitude : "",
+            weatherService ? weatherService.longitude : "",
+            twilightSummary.calibrationOffsetMinutes
+        )
     readonly property string currentCelestialMode:
         weatherReady
         ? WeatherCyclePolicy.artworkFor(conditionState, skyCycle) : "weather"
@@ -828,9 +842,82 @@ Rectangle {
                 }
             }
 
+            Row {
+                width: parent.width
+                spacing: 12
+                visible: sky.currentSolarPosition.available
+
+                SecondaryText {
+                    width: 92
+                    text: "SUN NOW"
+                    font.pixelSize: 10
+                    color: Colors.yellow
+                }
+
+                Column {
+                    width: 150
+                    spacing: 3
+                    SecondaryText { text: "ALTITUDE"; font.pixelSize: 9 }
+                    GohuText {
+                        text: sky.currentSolarPosition.available
+                              ? sky.currentSolarPosition.altitudeDegrees.toFixed(1)
+                                + "°"
+                              : "--"
+                        font.pixelSize: 14
+                        color: Colors.white
+                    }
+                }
+
+                Column {
+                    width: 190
+                    spacing: 3
+                    SecondaryText { text: "AZIMUTH"; font.pixelSize: 9 }
+                    GohuText {
+                        text: sky.currentSolarPosition.available
+                              ? sky.currentSolarPosition.azimuthDegrees.toFixed(1)
+                                + "° "
+                                + sky.currentSolarPosition.azimuthLabel
+                              : "--"
+                        font.pixelSize: 14
+                        color: Colors.white
+                    }
+                }
+
+                Column {
+                    width: 190
+                    spacing: 3
+                    SecondaryText { text: "HORIZON"; font.pixelSize: 9 }
+                    GohuText {
+                        text: sky.currentSolarPosition.available
+                              ? (sky.currentSolarPosition.aboveHorizon
+                                 ? "ABOVE HORIZON" : "BELOW HORIZON")
+                              : "--"
+                        font.pixelSize: 12
+                        color: sky.currentSolarPosition.aboveHorizon
+                               ? Colors.yellow : Colors.magenta
+                    }
+                }
+            }
+
+            QuietText {
+                visible: sky.twilightSummary.available
+                         && !sky.currentSolarPosition.available
+                width: parent.width
+                text: "CURRENT SUN POSITION UNAVAILABLE // PROVIDER OBSERVATION CLOCK IS MISSING OR STALE"
+                font.pixelSize: 9
+                color: Colors.orange
+            }
+
             QuietText {
                 width: parent.width
                 text: "CALCULATED SOLAR GEOMETRY // DATE + WEATHER COORDINATES // CLOCK CALIBRATED TO PROVIDER SUNRISE // NOT OBSERVED"
+                font.pixelSize: 9
+            }
+
+            QuietText {
+                visible: sky.currentSolarPosition.available
+                width: parent.width
+                text: "GEOMETRIC SUN POSITION // ALTITUDE ABOVE HORIZON // AZIMUTH CLOCKWISE FROM NORTH"
                 font.pixelSize: 9
             }
         }

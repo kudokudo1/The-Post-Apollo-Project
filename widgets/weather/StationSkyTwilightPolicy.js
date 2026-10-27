@@ -243,6 +243,115 @@ function localLabel(utcMinute, offsetMinute) {
     return clockLabelFromMinute(utcMinute + offsetMinute);
 }
 
+function observationEpoch(value) {
+    const match = String(value || "").trim().match(
+        /^(\d{4})-(\d{2})-(\d{2})\s+(\d{1,2}):(\d{2})(?::\d{2})?\s*(AM|PM)?$/i
+    );
+    if (!match)
+        return NaN;
+    const year = Number(match[1]);
+    const month = Number(match[2]);
+    const day = Number(match[3]);
+    let hour = Number(match[4]);
+    const minute = Number(match[5]);
+    if (match[6]) {
+        if (hour < 1 || hour > 12)
+            return NaN;
+        hour = hour % 12
+             + (String(match[6]).toUpperCase() === "PM" ? 12 : 0);
+    }
+    if (hour > 23 || minute > 59 || month < 1 || month > 12
+            || day < 1 || day > 31)
+        return NaN;
+    const epoch = Date.UTC(year, month - 1, day, hour, minute);
+    const check = new Date(epoch);
+    return check.getUTCFullYear() === year
+        && check.getUTCMonth() === month - 1
+        && check.getUTCDate() === day ? epoch : NaN;
+}
+
+function providerObservationMinute(nowMs, observation, anchorMs) {
+    const epoch = observationEpoch(observation);
+    const now = Number(nowMs);
+    const anchor = Number(anchorMs);
+    if (!isFinite(epoch) || !isFinite(now) || !isFinite(anchor)
+            || anchor <= 0 || now < anchor - 300000
+            || now - anchor > 3600000)
+        return -1;
+    const local = new Date(epoch + Math.max(0, now - anchor));
+    return local.getUTCHours() * 60 + local.getUTCMinutes();
+}
+
+function compassLabel(azimuthRaw) {
+    const azimuth = finite(azimuthRaw);
+    if (azimuth === null)
+        return "--";
+    const names = [
+        "N", "NNE", "NE", "ENE", "E", "ESE", "SE", "SSE",
+        "S", "SSW", "SW", "WSW", "W", "WNW", "NW", "NNW"
+    ];
+    return names[Math.round(wrapDegrees(azimuth) / 22.5) % 16];
+}
+
+function solarPosition(dateRaw, localMinuteRaw, latitudeRaw, longitudeRaw,
+                       calibrationOffsetRaw) {
+    const date = parseDate(dateRaw);
+    const localMinute = finite(localMinuteRaw);
+    const latitude = finite(latitudeRaw);
+    const longitude = finite(longitudeRaw);
+    const offset = finite(calibrationOffsetRaw);
+    if (!date || localMinute === null || localMinute < 0 || localMinute >= 1440
+            || latitude === null || Math.abs(latitude) >= 90
+            || longitude === null || Math.abs(longitude) > 180
+            || offset === null || offset < -720 || offset > 840) {
+        return {
+            available: false,
+            altitudeDegrees: null,
+            azimuthDegrees: null,
+            azimuthLabel: "--",
+            aboveHorizon: false
+        };
+    }
+
+    const utcMinute = localMinute - offset;
+    const t = julianCentury(julianDay(date) + utcMinute / 1440);
+    const declination = solarDeclination(t);
+    const eqTime = equationOfTime(t);
+    const trueSolarMinute = wrapMinutes(
+        utcMinute + eqTime + 4 * longitude
+    );
+    const hourAngleDegrees = trueSolarMinute / 4 - 180;
+
+    const lat = radians(latitude);
+    const dec = radians(declination);
+    const hour = radians(hourAngleDegrees);
+    const sineElevation =
+        Math.sin(lat) * Math.sin(dec)
+        + Math.cos(lat) * Math.cos(dec) * Math.cos(hour);
+    const elevation = degrees(Math.asin(
+        Math.max(-1, Math.min(1, sineElevation))
+    ));
+
+    // atan2 form gives azimuth clockwise from north after +180°.
+    const azimuth = wrapDegrees(
+        degrees(Math.atan2(
+            Math.sin(hour),
+            Math.cos(hour) * Math.sin(lat)
+                - Math.tan(dec) * Math.cos(lat)
+        )) + 180
+    );
+
+    return {
+        available: isFinite(elevation) && isFinite(azimuth),
+        altitudeDegrees: elevation,
+        azimuthDegrees: azimuth,
+        azimuthLabel: compassLabel(azimuth),
+        aboveHorizon: elevation >= 0,
+        utcMinute: utcMinute,
+        hourAngleDegrees: hourAngleDegrees
+    };
+}
+
 function summary(dateRaw, latitudeRaw, longitudeRaw, providerSunriseRaw) {
     const date = parseDate(dateRaw);
     const latitude = finite(latitudeRaw);

@@ -15,6 +15,9 @@ Scope {
     // M11q: volatile evidence and generation checks are diagnostics only.
     // They confer no host authority and do not survive a process restart.
     property int sessionGeneration: 0
+    // Explicit operator-armed fault in the STANDALONE synthetic harness.
+    // Never parsed from production config, persisted or triggered by default.
+    property string armedTestFault: "NONE"
     property var nativeEvidence: NativeEvidence.empty()
     readonly property var nativeSummary: NativeEvidence.summarize(nativeEvidence)
     readonly property string nativeRecent: NativeEvidence.recent(nativeEvidence, 6)
@@ -84,6 +87,7 @@ Scope {
     function reject(reason) {
         // Fence any Qt.callLater readback scheduled for an old session.
         sessionGeneration++;
+        armedTestFault = "NONE";
         status = "RECOVERY_REVIEW";
         phase = "RECOVERY_REVIEW";
         errorCode = reason;
@@ -100,6 +104,26 @@ Scope {
         if (host.running) host.running = false;
     }
 
+    function cycleSyntheticFault() {
+        if (!testStageEligible) return false;
+        var variants = ["NONE", "AFTER_RESERVE", "AFTER_SAVED",
+                        "AFTER_READBACK", "AFTER_SETTLEMENT"];
+        var index = variants.indexOf(armedTestFault);
+        armedTestFault = variants[(index + 1) % variants.length];
+        event("FAULT_ARMED");
+        return true;
+    }
+
+    function maybeSyntheticFault(point) {
+        if (armedTestFault !== point) return false;
+        armedTestFault = "NONE";
+        event("FAULT_INJECTED");
+        // Discard volatile pending data and kill ONLY this disposable host.
+        // Leave the durable journal in its observed state for fresh review.
+        reject("M11Q_SYNTHETIC_FAULT_" + point);
+        return true;
+    }
+
     function beginTest() {
         if (attached || host.running || busy) return false;
         if (typeof fixturePath !== "string"
@@ -111,6 +135,7 @@ Scope {
             return false;
         }
         sessionGeneration++;
+        armedTestFault = "NONE";
         nativeEvidence = NativeEvidence.empty();
         attached = true;
         connected = false;
@@ -212,6 +237,7 @@ Scope {
     }
 
     function finishStage() {
+        armedTestFault = "NONE";
         pendingStageId = "";
         pendingRaw = "";
         fileState = "READY";
@@ -283,6 +309,7 @@ Scope {
                     throw new Error("INVALID_RESERVATION");
                 fileState = "SAVING";
                 event("HOST_RESERVED");
+                if (maybeSyntheticFault("AFTER_RESERVE")) return;
                 fixtureFile.setText(pendingRaw);
             } else if (kind === "verify") {
                 if (!CallbackGuard.settledReplyEligible({
@@ -292,6 +319,9 @@ Scope {
                         epoch:previousEpoch
                     }, reply, previousEpoch))
                     throw new Error("INVALID_SETTLEMENT");
+                // Durable journal may have settled even though this QML
+                // process dies before it publishes the confirmed snapshot.
+                if (maybeSyntheticFault("AFTER_SETTLEMENT")) return;
                 confirmedRaw = pendingRaw;
                 confirmedCounter++;
                 event("HOST_SETTLED");
@@ -314,6 +344,7 @@ Scope {
 
     function stopTest() {
         sessionGeneration++;
+        armedTestFault = "NONE";
         event("STOP_REQUESTED");
         attached = false;
         connected = false;
@@ -360,6 +391,7 @@ Scope {
                 } else {
                     bridge.fileState = "SETTLING";
                     bridge.event("FILE_READBACK_OK");
+                    if (bridge.maybeSyntheticFault("AFTER_READBACK")) return;
                     if (!bridge.send("verify", {stageId:bridge.pendingStageId}))
                         bridge.reject("VERIFY_SEND_FAILED");
                 }
@@ -379,6 +411,7 @@ Scope {
             }
             bridge.fileState = "VERIFYING";
             bridge.event("FILE_SAVED");
+            if (bridge.maybeSyntheticFault("AFTER_SAVED")) return;
             var savedTicket = CallbackGuard.ticket(
                 bridge.sessionGeneration, bridge.epoch,
                 bridge.pendingStageId, bridge.fixturePath);

@@ -193,7 +193,7 @@ assert.match(windowSource, /weatherStation\.currentView === "radio"[\s\S]*?\? ra
 assert.match(discoveryViewSource, /SOURCE RACK \/\/ WHAT IS CONNECTED/);
 assert.match(discoveryViewSource, /STATION DIRECTORY \/\/ PERSISTENT PLAYBACK NOT YET WIRED/);
 assert.match(discoveryViewSource, /SPATIAL PLOT \/\/ EONET \+ FIRMS POINTS/);
-assert.match(discoveryViewSource, /LAT\/LON GRID \/\/ NO BASEMAP/);
+assert.match(discoveryViewSource, /LAT\/LON GRID \/\/ NOAA RADAR IS DATA LAYER, NOT BASEMAP/);
 assert.match(discoveryViewSource, /BASEMAP \/ POLYGON LAYERS", state:"NOT WIRED"/);
 assert.match(discoveryViewSource, /WeatherServices\.StationDiscoveryService/);
 assert.match(discoveryServiceSource, /eonet\.gsfc\.nasa\.gov\/api\/v3\/events/);

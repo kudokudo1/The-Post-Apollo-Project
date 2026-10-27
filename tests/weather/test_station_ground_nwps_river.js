@@ -126,6 +126,12 @@ assert.equal(ctx.readingText(925, "cfs"), "925.00 cfs");
 assert.equal(ctx.readingText(null, "ft"), "--");
 
 const service = read("services/weather/NwpsRiverService.qml");
+assert.match(
+    service,
+    /^import QtQuick\s*\nimport Quickshell\s*\nimport Quickshell\.Io/m,
+    "NwpsRiverService Scope requires the Quickshell module import"
+);
+assert.match(service, /\nScope\s*\{/);
 assert.match(service, /api\.water\.noaa\.gov\/nwps\/v1\/gauges/);
 assert.match(service, /bbox\.xmin=/);
 assert.match(service, /bbox\.ymin=/);

@@ -306,10 +306,19 @@ Item {
                 return;
             if (adapter.loginState === "APP_SAVED") {
                 if (adapter.runningAppKeyIdentityId === "") {
-                    // Existing universal flow: continue QR pairing within
-                    // this very widget, never a separate browser or terminal.
-                    adapter.requestedLoginMode = "qr";
-                    Qt.callLater(function() { adapter.launchRequestedLogin(); });
+                    if (adapter.backendMode === "READY") {
+                        // Updating the app's universal key pair must not
+                        // silently start a new login over an already
+                        // authorized shared Telegram session.
+                        adapter.loginDetail = "Universal application keys saved. "
+                                              + "Rechecking the current shared account.";
+                        Qt.callLater(function() { adapter.probe(); });
+                    } else {
+                        // First-time setup stays in the same widget and
+                        // continues through existing QR/phone pairing.
+                        adapter.requestedLoginMode = "qr";
+                        Qt.callLater(function() { adapter.launchRequestedLogin(); });
+                    }
                 } else {
                     // Only the per-identity application override was saved.
                     // NEVER start the legacy shared Telegram account here.

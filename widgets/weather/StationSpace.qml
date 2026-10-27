@@ -1,11 +1,23 @@
 import QtQuick
 import "../../components"
 import "../../services/weather" as WeatherServices
+import "StationSolarImagePolicy.js" as SolarImagePolicy
 
 Rectangle {
     id: space
 
     property var spaceService: null
+
+    property string solarImageMode: "195"
+    property string solarImageUrl: ""
+    property double solarImageLastLoadedMs: 0
+    property string solarImageError: ""
+    readonly property var solarImageInfo:
+        SolarImagePolicy.modeInfo(solarImageMode)
+    readonly property bool solarImageReady:
+        solarImage.status === Image.Ready
+    readonly property bool solarImageLoading:
+        solarImage.status === Image.Loading
 
     // OVATION's gridded model fetch exists only while SPACE is instantiated.
     WeatherServices.AuroraService {
@@ -157,6 +169,42 @@ Rectangle {
 
         return text.replace("T", " ").replace("Z", "").slice(5, 16);
     }
+
+    function solarImageReceiveLabel() {
+        if (solarImageLastLoadedMs <= 0)
+            return "--";
+        const iso = new Date(solarImageLastLoadedMs).toISOString();
+        return iso.slice(5, 10) + " " + iso.slice(11, 16) + "Z";
+    }
+
+    function refreshSolarImage() {
+        solarImageError = "";
+        solarImageUrl = "";
+        Qt.callLater(function() {
+            space.solarImageUrl = SolarImagePolicy.imageUrl(
+                space.solarImageMode,
+                Date.now()
+            );
+        });
+    }
+
+    function selectSolarImageMode(mode) {
+        const next = SolarImagePolicy.cleanMode(mode);
+        if (solarImageMode === next && solarImageUrl !== "")
+            return;
+        solarImageMode = next;
+        refreshSolarImage();
+    }
+
+    Timer {
+        id: solarImageRefreshClock
+        interval: 300000
+        repeat: true
+        running: space.visible
+        onTriggered: space.refreshSolarImage()
+    }
+
+    Component.onCompleted: refreshSolarImage()
 
     readonly property color meterBorderColor: Colors.cyan
     readonly property color meterFillColor: Colors.magenta
@@ -673,6 +721,202 @@ Rectangle {
                         font.pixelSize: 12
                         color: Colors.cyan
                     }
+                }
+            }
+        }
+
+        StationSectionDivider {
+            width: parent.width
+            title: "SOLAR IMAGER // NOAA SWPC SUVI"
+        }
+
+        Row {
+            width: parent.width
+            height: 342
+            spacing: 14
+
+            Rectangle {
+                width: 342
+                height: 342
+                color: Colors.dark
+                border.width: 1
+                border.color: space.solarImageReady
+                              ? Colors.magenta : Colors.cyan
+                clip: true
+
+                Image {
+                    id: solarImage
+                    anchors.fill: parent
+                    anchors.margins: 4
+                    source: space.solarImageUrl
+                    fillMode: Image.PreserveAspectFit
+                    asynchronous: true
+                    cache: false
+                    smooth: true
+
+                    onStatusChanged: {
+                        if (status === Image.Ready) {
+                            space.solarImageLastLoadedMs = Date.now();
+                            space.solarImageError = "";
+                        } else if (status === Image.Error) {
+                            space.solarImageError =
+                                "SUVI IMAGE LOAD FAILED";
+                        }
+                    }
+                }
+
+                GohuText {
+                    anchors.centerIn: parent
+                    visible: space.solarImageLoading
+                             || space.solarImageUrl === ""
+                    text: space.solarImageUrl === ""
+                          ? "PREPARING SUVI"
+                          : "RECEIVING SUVI"
+                    font.pixelSize: 12
+                    color: Colors.orange
+                }
+
+                GohuText {
+                    anchors.centerIn: parent
+                    visible: solarImage.status === Image.Error
+                    text: "IMAGE UNAVAILABLE"
+                    font.pixelSize: 12
+                    color: Colors.orange
+                }
+            }
+
+            Column {
+                width: Math.max(0, parent.width - 342 - parent.spacing)
+                height: parent.height
+                spacing: 10
+
+                Row {
+                    width: parent.width
+                    spacing: 8
+
+                    ModeButton {
+                        width: 132
+                        height: 32
+                        textOnly: true
+                        horizontalContent: true
+                        bordered: false
+                        selected: space.solarImageMode === "195"
+                        labelText: "195 Å"
+                        labelFontSize: 10
+                        idlePrimaryColor: Colors.cyan
+                        selectedPrimaryColor: Colors.magenta
+                        perimeterGlowColor: Colors.orange
+                        onTriggered:
+                            space.selectSolarImageMode("195")
+                    }
+
+                    ModeButton {
+                        width: 154
+                        height: 32
+                        textOnly: true
+                        horizontalContent: true
+                        bordered: false
+                        selected: space.solarImageMode === "map"
+                        labelText: "THERMAL MAP"
+                        labelFontSize: 10
+                        idlePrimaryColor: Colors.cyan
+                        selectedPrimaryColor: Colors.magenta
+                        perimeterGlowColor: Colors.orange
+                        onTriggered:
+                            space.selectSolarImageMode("map")
+                    }
+
+                    ActionButton {
+                        width: 104
+                        height: 30
+                        label: "REFRESH"
+                        labelPixelSize: 10
+                        available: !space.solarImageLoading
+                        onClicked: space.refreshSolarImage()
+                    }
+                }
+
+                GohuText {
+                    width: parent.width
+                    text: space.solarImageInfo.title
+                    elide: Text.ElideRight
+                    font.pixelSize: 18
+                    color: Colors.white
+                }
+
+                SecondaryText {
+                    width: parent.width
+                    text: space.solarImageInfo.detail
+                    wrapMode: Text.WordWrap
+                    font.pixelSize: 10
+                }
+
+                Rectangle {
+                    width: parent.width
+                    height: 92
+                    color: Colors.black
+                    border.width: 1
+                    border.color: Colors.cyan
+
+                    Column {
+                        anchors.fill: parent
+                        anchors.margins: 9
+                        spacing: 5
+
+                        GohuText {
+                            text: "NOAA SWPC // SUVI PRIMARY"
+                            font.pixelSize: 11
+                            color: Colors.cyan
+                        }
+
+                        QuietText {
+                            text: "LATEST ENDPOINT // ONE SELECTED IMAGE"
+                            font.pixelSize: 9
+                        }
+
+                        QuietText {
+                            text: "LOCAL RECEIVE // "
+                                  + space.solarImageReceiveLabel()
+                            font.pixelSize: 9
+                        }
+
+                        QuietText {
+                            text: space.solarImageError !== ""
+                                  ? space.solarImageError
+                                  : space.solarImageLoading
+                                    ? "SOURCE // RECEIVING"
+                                    : space.solarImageReady
+                                      ? "SOURCE // IMAGE READY"
+                                      : "SOURCE // WAITING"
+                            font.pixelSize: 9
+                            color: space.solarImageError !== ""
+                                   ? Colors.orange : Colors.white
+                        }
+                    }
+                }
+
+                QuietText {
+                    width: parent.width
+                    wrapMode: Text.WordWrap
+                    text: "195 Å // WARM CORONAL PLASMA FOR GLOBAL STRUCTURE, ACTIVE REGIONS + CORONAL HOLES"
+                    font.pixelSize: 9
+                    color: Colors.magenta
+                }
+
+                QuietText {
+                    width: parent.width
+                    wrapMode: Text.WordWrap
+                    text: "THERMAL MAP // NOAA SWPC SUVI TEMPERATURE-MAP PRODUCT // DISPLAY IMAGE, NOT A LOCAL TEMPERATURE READING"
+                    font.pixelSize: 9
+                    color: Colors.cyan
+                }
+
+                QuietText {
+                    width: parent.width
+                    wrapMode: Text.WordWrap
+                    text: "5-MIN VIEW-SCOPED REFRESH // NO FRAME ARCHIVE // LOCAL RECEIVE TIME IS NOT SPACECRAFT OBSERVATION TIME"
+                    font.pixelSize: 9
+                    color: Colors.orange
                 }
             }
         }

@@ -192,7 +192,9 @@ assert.match(windowSource, /weatherStation\.currentView === "news"[\s\S]*?\? new
 assert.match(windowSource, /weatherStation\.currentView === "radio"[\s\S]*?\? radioViewComponent/);
 assert.match(discoveryViewSource, /SOURCE RACK \/\/ WHAT IS CONNECTED/);
 assert.match(discoveryViewSource, /STATION DIRECTORY \/\/ PERSISTENT PLAYBACK NOT YET WIRED/);
-assert.match(discoveryViewSource, /SPATIAL MAP CANVAS NOT YET WIRED/);
+assert.match(discoveryViewSource, /SPATIAL PLOT \/\/ EONET POINT GEOMETRIES/);
+assert.match(discoveryViewSource, /LAT\/LON GRID \/\/ NO BASEMAP/);
+assert.match(discoveryViewSource, /BASEMAP \/ POLYGON LAYERS", state:"NOT WIRED"/);
 assert.match(discoveryViewSource, /WeatherServices\.StationDiscoveryService/);
 assert.match(discoveryServiceSource, /eonet\.gsfc\.nasa\.gov\/api\/v3\/events/);
 assert.match(discoveryServiceSource, /gdeltproject\.org\/api\/v2\/doc\/doc/);

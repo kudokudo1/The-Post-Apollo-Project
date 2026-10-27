@@ -243,3 +243,141 @@ function readingText(value, units) {
     const suffix = shortText(units, 16);
     return number.toFixed(2) + (suffix ? " " + suffix : "");
 }
+
+function isoMillis(value) {
+    const raw = String(value || "").trim();
+    const millis = Date.parse(raw);
+    return isFinite(millis) ? millis : -1;
+}
+
+function utcLabel(value) {
+    const millis = isoMillis(value);
+    if (millis < 0)
+        return "--";
+    const iso = new Date(millis).toISOString();
+    return iso.slice(0, 10) + " " + iso.slice(11, 16) + "Z";
+}
+
+function normalizeStageflowProduct(product) {
+    if (!product || typeof product !== "object")
+        return {
+            available:false,
+            pedts:"",
+            issuedTime:"",
+            issuedLabel:"--",
+            wfo:"",
+            timeZone:"",
+            primaryName:"PRIMARY",
+            primaryUnits:"",
+            secondaryName:"",
+            secondaryUnits:"",
+            data:[]
+        };
+
+    const rawData = Array.isArray(product.data) ? product.data : [];
+    const rows = [];
+    for (let i = 0; i < rawData.length; i++) {
+        const item = rawData[i];
+        if (!item || typeof item !== "object")
+            continue;
+        const validTime = shortText(
+            field(item, ["validTime", "valid_time", "time"]), 40
+        );
+        const validMillis = isoMillis(validTime);
+        const primary = validNumber(
+            field(item, ["primary", "primaryValue", "stage", "value"])
+        );
+        const secondary = validNumber(
+            field(item, ["secondary", "secondaryValue", "flow"])
+        );
+        if (validMillis < 0 || (primary === null && secondary === null))
+            continue;
+
+        rows.push({
+            validTime: validTime,
+            validMillis: validMillis,
+            validLabel: utcLabel(validTime),
+            generatedTime: shortText(
+                field(item, ["generatedTime", "generated_time"]), 40
+            ),
+            primary: primary,
+            secondary: secondary
+        });
+    }
+    rows.sort(function(a, b) {
+        return a.validMillis - b.validMillis;
+    });
+
+    const primaryName = shortText(
+        field(product, ["primaryName", "primary_name"]), 36
+    ) || "PRIMARY";
+    const secondaryName = shortText(
+        field(product, ["secondaryName", "secondary_name"]), 36
+    );
+
+    return {
+        available: rows.length > 0,
+        pedts: shortText(field(product, ["pedts", "peds"]), 24),
+        issuedTime: shortText(
+            field(product, ["issuedTime", "issued_time"]), 40
+        ),
+        issuedLabel: utcLabel(
+            field(product, ["issuedTime", "issued_time"])
+        ),
+        wfo: shortText(field(product, ["wfo"]), 16),
+        timeZone: shortText(
+            field(product, ["timeZone", "timezone", "time_zone"]), 24
+        ),
+        primaryName: primaryName.toUpperCase(),
+        primaryUnits: shortText(
+            field(product, ["primaryUnits", "primaryUnit"]), 24
+        ),
+        secondaryName: secondaryName.toUpperCase(),
+        secondaryUnits: shortText(
+            field(product, ["secondaryUnits", "secondaryUnit"]), 24
+        ),
+        data: rows
+    };
+}
+
+function parseStageflow(root) {
+    if (!root || typeof root !== "object" || Array.isArray(root))
+        throw new Error("Invalid NWPS stageflow response");
+
+    const observed = normalizeStageflowProduct(root.observed);
+    const forecast = normalizeStageflowProduct(root.forecast);
+    if (!observed.available && !forecast.available
+            && !root.observed && !root.forecast)
+        throw new Error("NWPS stageflow products missing");
+
+    return {
+        observed: observed,
+        forecast: forecast
+    };
+}
+
+function seriesTail(product, count) {
+    if (!product || !Array.isArray(product.data))
+        return [];
+    const size = Math.max(0, Math.min(8, Math.floor(Number(count) || 0)));
+    return product.data.slice(Math.max(0, product.data.length - size));
+}
+
+function seriesHead(product, count) {
+    if (!product || !Array.isArray(product.data))
+        return [];
+    const size = Math.max(0, Math.min(8, Math.floor(Number(count) || 0)));
+    return product.data.slice(0, size);
+}
+
+function pointReading(product, point) {
+    if (!product || !point)
+        return "--";
+    const first = readingText(point.primary, product.primaryUnits);
+    const secondary = validNumber(point.secondary);
+    if (secondary === null || !product.secondaryName)
+        return first;
+    return first + " // "
+         + product.secondaryName + " "
+         + readingText(secondary, product.secondaryUnits);
+}

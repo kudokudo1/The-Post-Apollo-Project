@@ -89,5 +89,7 @@ jobs:
         run: node tests/weather/test_station_ground_nws_alerts.js
       - name: Verify GROUND nearby NOAA NWPS river status
         run: node tests/weather/test_station_ground_nwps_river.js
+      - name: Verify GROUND separate NWPS observed and forecast stageflow
+        run: node tests/weather/test_station_ground_nwps_stageflow.js
       - name: Verify official NWS alert hierarchy across HOME and header
         run: node tests/weather/test_station_official_alert_hierarchy.js

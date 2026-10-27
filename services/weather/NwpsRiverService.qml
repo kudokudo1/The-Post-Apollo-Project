@@ -18,10 +18,22 @@ Scope {
     property var gauge: null
     property date lastUpdated
 
+    property bool stageflowReady: false
+    property bool stageflowFailed: false
+    property string stageflowErrorText: ""
+    property var stageflow: ({
+        "observed": RiverPolicy.normalizeStageflowProduct(null),
+        "forecast": RiverPolicy.normalizeStageflowProduct(null)
+    })
+    property date stageflowLastUpdated
+    property string stageflowGaugeId: ""
+    property string inflightStageflowGaugeId: ""
+
     readonly property var requestBox:
         RiverPolicy.boundedBox(latitude, longitude, 0.6)
     readonly property bool configured: requestBox !== null
     readonly property bool loading: riverFetch.running
+    readonly property bool stageflowLoading: stageflowFetch.running
     readonly property string endpoint: {
         if (!requestBox)
             return "";
@@ -32,12 +44,68 @@ Scope {
              + "&bbox.ymax=" + requestBox.ymax.toFixed(4)
              + "&srid=EPSG_4326";
     }
+    readonly property string stageflowEndpoint:
+        gauge && gauge.lid
+        ? "https://api.water.noaa.gov/nwps/v1/gauges/"
+          + encodeURIComponent(gauge.lid) + "/stageflow"
+        : ""
+
 
     function refresh() {
         if (!active || !configured || riverFetch.running)
             return false;
         riverFetch.running = true;
         return true;
+    }
+
+    function clearStageflow() {
+        stageflowReady = false;
+        stageflowFailed = false;
+        stageflowErrorText = "";
+        stageflow = {
+            "observed": RiverPolicy.normalizeStageflowProduct(null),
+            "forecast": RiverPolicy.normalizeStageflowProduct(null)
+        };
+        stageflowGaugeId = "";
+    }
+
+    function refreshStageflow() {
+        if (!active || !gauge || !gauge.lid
+                || stageflowFetch.running)
+            return false;
+        inflightStageflowGaugeId = String(gauge.lid);
+        stageflowFetch.command = [
+            "curl", "-fsSL", "--max-time", "12",
+            "-H", "Accept: application/json",
+            "-A", "Post-Apollo-WeatherStation/0.4",
+            "https://api.water.noaa.gov/nwps/v1/gauges/"
+              + encodeURIComponent(inflightStageflowGaugeId)
+              + "/stageflow"
+        ];
+        stageflowFetch.running = true;
+        return true;
+    }
+
+    function acceptStageflow(raw) {
+        if (!gauge
+                || String(gauge.lid || "")
+                   !== inflightStageflowGaugeId)
+            return;
+        try {
+            const parsed = RiverPolicy.parseStageflow(
+                JSON.parse(String(raw || ""))
+            );
+            stageflow = parsed;
+            stageflowGaugeId = inflightStageflowGaugeId;
+            stageflowLastUpdated = new Date();
+            stageflowReady = true;
+            stageflowFailed = false;
+            stageflowErrorText = "";
+        } catch (error) {
+            stageflowFailed = true;
+            stageflowErrorText = "NWPS STAGEFLOW UNAVAILABLE";
+            console.log("NwpsRiverService stageflow parse error:", error);
+        }
     }
 
     function accept(raw) {
@@ -47,11 +115,20 @@ Scope {
                 latitude,
                 longitude
             );
+            const nextId = parsed ? String(parsed.lid || "") : "";
+            const previousId = gauge ? String(gauge.lid || "") : "";
             gauge = parsed;
             ready = true;
             failed = false;
             errorText = "";
             lastUpdated = new Date();
+
+            if (nextId !== previousId)
+                clearStageflow();
+            if (nextId !== "")
+                Qt.callLater(function() { river.refreshStageflow(); });
+            else
+                clearStageflow();
         } catch (error) {
             failed = true;
             errorText = "NWPS GAUGE FEED UNAVAILABLE";
@@ -75,6 +152,29 @@ Scope {
                 river.failed = true;
                 river.errorText = "NWPS REQUEST FAILED";
             }
+        }
+    }
+
+    Process {
+        id: stageflowFetch
+        command: []
+        stdout: StdioCollector {
+            onStreamFinished: river.acceptStageflow(text)
+        }
+        onExited: function(exitCode, exitStatus) {
+            const currentId = river.gauge
+                ? String(river.gauge.lid || "") : "";
+            if (exitCode !== 0
+                    && currentId === river.inflightStageflowGaugeId) {
+                river.stageflowFailed = true;
+                river.stageflowErrorText =
+                    "NWPS STAGEFLOW REQUEST FAILED";
+            }
+            if (river.active && currentId !== ""
+                    && currentId !== river.inflightStageflowGaugeId)
+                Qt.callLater(function() {
+                    river.refreshStageflow();
+                });
         }
     }
 

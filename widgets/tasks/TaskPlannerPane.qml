@@ -8,7 +8,16 @@ Item {
     id: planner
     property var todoSnapshot: null
     property var todoStore: null
+    // Standalone TASKS retains its existing scheduling writer. The Hub can
+    // mount this SAME pane in read-only mode without creating a new editor.
+    property bool schedulingAllowed: true
     property bool scheduleMode: false
+    onSchedulingAllowedChanged: {
+        if (!schedulingAllowed) scheduleMode = false;
+    }
+    onScheduleModeChanged: {
+        if (!schedulingAllowed && scheduleMode) scheduleMode = false;
+    }
     property string monthKey: ""
     property string selectedDate: ""
     property string todayKey: ""
@@ -139,8 +148,11 @@ Item {
                 height: 26
                 label: "SCHEDULE"
                 labelPixelSize: 10
-                selected: planner.scheduleMode
-                onLeftClicked: planner.scheduleMode = true
+                selected: planner.scheduleMode && planner.schedulingAllowed
+                available: planner.schedulingAllowed
+                onLeftClicked: {
+                    if (planner.schedulingAllowed) planner.scheduleMode = true;
+                }
             }
         }
     }
@@ -318,9 +330,9 @@ Item {
         anchors.left: parent.left
         anchors.right: parent.right
         anchors.bottom: parent.bottom
-        visible: planner.scheduleMode
+        visible: planner.scheduleMode && planner.schedulingAllowed
         todoSnapshot: planner.todoSnapshot
-        todoStore: planner.todoStore
+        todoStore: planner.schedulingAllowed ? planner.todoStore : null
         selectedDate: planner.selectedDate
     }
     GohuText {

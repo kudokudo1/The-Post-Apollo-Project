@@ -70,6 +70,7 @@ Item {
     property string appKeyConfigurationScope: ""
     property string appKeyConfigurationOutput: ""
     property string runningAppKeyStatusScope: ""
+    readonly property bool appKeyStatusBusy: appKeyStatusProcess.running
 
     function inspectApplicationKeys(identityId) {
         if (!active || appKeyStatusProcess.running)

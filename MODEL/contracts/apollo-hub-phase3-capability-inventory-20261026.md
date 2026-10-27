@@ -69,6 +69,8 @@
 
 TimeW stopwatch/countdown functionality already flows through the owner instance; **do not duplicate monotonic clocks, countdown journals, heartbeats or timer identities**. Distinguish the pure time-format adapter from the separate Date/Planner task domain.
 
+**TimeW CALC/WORLD owner-seam audit (2026-10-26):** [source-backed boundary and proposed owner contract](apollo-hub-timew-owner-seam-audit-20261026.md). At inspected HEAD, TimeW has private process-backed converter/arithmetic/difference/zone lookup operations and **no Hub-facing CALC/WORLD request/snapshot contract**. The existing shell bridge only forwards stopwatch/countdown. Functional CALC/WORLD integration is **BLOCKED on TimeW + serialized shell owner approval**, not authorized for Hub-only implementation. Do not create duplicate processes or fake IANA/DST results. Existing TASKS and TimeW Hub controls still require desktop acceptance.
+
 ## 5. TASKS // parent and Hub
 
 **Owner UI:** `widgets/TasksW.qml` with modes TASKS, TODAY, PROJECTS, PLANNER, SYNC; `widgets/tasks/{TaskDetailsPane,TaskTodayPane,TaskProjectsPane,TaskPlannerPane,TaskPlannerSchedulePane,TaskSyncConnectionsPane,TaskSyncPreviewPane}.qml`.  

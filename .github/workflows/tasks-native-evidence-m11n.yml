@@ -1,0 +1,37 @@
+name: TASKS M11n observed native evidence and recovery boundary
+
+on:
+  pull_request:
+    paths:
+      - 'docs/tasks-native-evidence-and-recovery-m11n.md'
+      - 'tests/tasks/fixtures/task_m11n_native_evidence_20261026.json'
+      - 'tests/tasks/test_task_native_evidence_m11n.py'
+      - '.github/workflows/tasks-native-evidence-m11n.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'docs/tasks-native-evidence-and-recovery-m11n.md'
+      - 'tests/tasks/fixtures/task_m11n_native_evidence_20261026.json'
+      - 'tests/tasks/test_task_native_evidence_m11n.py'
+      - '.github/workflows/tasks-native-evidence-m11n.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  observed-evidence-only:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: M11n observation provenance and no activation
+        run: python3 tests/tasks/test_task_native_evidence_m11n.py
+      - name: M11m disposable subprocess transport regressions
+        run: python3 tests/tasks/test_task_json_gate_transport_m11m.py
+      - name: M11l test-only owner and durable recovery regressions
+        run: python3 tests/tasks/test_task_json_gate_candidate_m11l.py
+      - name: M11d live single writer boundary
+        run: python3 tests/tasks/test_task_writer_gate_inventory_m11d.py

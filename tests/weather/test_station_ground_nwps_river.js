@@ -138,7 +138,10 @@ assert.match(service, /interval: 900000/);
 assert.match(service, /running: river\.active && river\.configured/);
 assert.match(service, /Post-Apollo-WeatherStation\/0\.4/);
 assert.equal((service.match(/\bProcess\s*\{/g) || []).length, 2);
-assert.match(service, /\/gauges\/" \+ encodeURIComponent\(inflightStageflowGaugeId\)[\s\S]*?"\/stageflow"/);
+assert.match(
+    service,
+    /\/gauges\/"\s*\+\s*encodeURIComponent\(inflightStageflowGaugeId\)[\s\S]*?\+\s*"\/stageflow"/
+);
 assert.doesNotMatch(service, /waterservices\.usgs\.gov|nwm|National Water Model/i);
 
 const ground = read("widgets/weather/StationGround.qml");

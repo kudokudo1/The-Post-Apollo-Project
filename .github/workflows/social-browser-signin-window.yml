@@ -1,0 +1,43 @@
+name: Social Browser Sign-In Window Status
+
+on:
+  pull_request:
+    paths:
+      - 'widgets/messanger/XBrowser.py'
+      - 'widgets/messanger/MessagingW.qml'
+      - 'widgets/messanger/AppSelector.qml'
+      - 'tests/messaging/test_social_browser_signin_window.py'
+      - 'services/messaging/BROWSER-SIGNIN-WINDOW-STATUS.md'
+      - '.github/workflows/social-browser-signin-window.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'widgets/messanger/XBrowser.py'
+      - 'widgets/messanger/MessagingW.qml'
+      - 'widgets/messanger/AppSelector.qml'
+      - 'tests/messaging/test_social_browser_signin_window.py'
+      - 'services/messaging/BROWSER-SIGNIN-WINDOW-STATUS.md'
+      - '.github/workflows/social-browser-signin-window.yml'
+  workflow_dispatch:
+
+jobs:
+  browser-status:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify exact-class, non-authenticating inspection
+        run: python3 -m unittest discover -s tests/messaging -p 'test_social_browser_signin_window.py' -v
+      - name: Preserve browser isolation, geometry and account setup
+        run: |
+          python3 -m unittest discover -s tests/messaging -p 'test_social_browser_identity_boundary.py' -v
+          python3 -m unittest discover -s tests/messaging -p 'test_social_browser_live_handoff.py' -v
+          python3 -m unittest discover -s tests/messaging -p 'test_social_browser_identity_geometry.py' -v
+          python3 tests/messaging/test_social_browser_contracts.py
+          python3 tests/messaging/test_x_social_contracts.py
+          python3 -m unittest discover -s tests/messaging -p 'test_discord_geometry_docking.py' -v
+      - name: Preserve Settings layout and account details
+        run: |
+          python3 -m unittest discover -s tests/messaging -p 'test_social_settings_workspace.py' -v
+          python3 -m unittest discover -s tests/messaging -p 'test_social_account_details_ui.py' -v
+          python3 -m unittest discover -s tests/messaging -p 'test_social_account_details.py' -v
+          node tests/messaging/test_social_identity_policy.cjs

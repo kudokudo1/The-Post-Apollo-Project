@@ -2,10 +2,12 @@ import QtQuick
 import "../../components"
 import "../../services/weather" as WeatherServices
 import "StationViewerPolicy.js" as ViewerPolicy
+import "StationMapProjectionPolicy.js" as MapProjection
 
 // Source-first stage. All records shown come from a backend, never examples.
-// MAP is an event index before an actual map canvas is integrated; RADIO is
-// a stream directory before MediaDeck's persistent transport is connected.
+// MAP now owns a source-driven geographic point canvas plus its event list.
+// No basemap or polygon renderer is implied; RADIO remains a stream directory
+// before MediaDeck's persistent transport is connected.
 Rectangle {
     id: stationDiscovery
 
@@ -15,6 +17,12 @@ Rectangle {
     property var selectedNews: null
     property string mapFilter: "all"
     property var selectedMapEvent: null
+    property real mapZoom: 1
+    property real mapCenterLon: 0
+    property real mapCenterLat: 0
+
+    readonly property var mapPointRows:
+        MapProjection.plottable(source ? source.rows : [])
 
     readonly property var mapFilterOptions: [
         { "id": "all", "label": "ALL EVENTS", "category": "" },
@@ -45,11 +53,32 @@ Rectangle {
             return;
         selectedMapEvent = null;
         mapFilter = id;
+        resetMapView();
         discoveryScroll.contentY = 0;
     }
 
     function closeMapInspector() {
         selectedMapEvent = null;
+    }
+
+    function applyMapView(view) {
+        if (!view)
+            return;
+        mapZoom = view.zoom;
+        mapCenterLon = view.centerLon;
+        mapCenterLat = view.centerLat;
+    }
+
+    function resetMapView() {
+        applyMapView(MapProjection.clampView(1, 0, 0));
+    }
+
+    function mapPointColor(categoryId) {
+        switch (String(categoryId || "")) {
+        case "wildfires": return Colors.orange;
+        case "severeStorms": return Colors.magenta;
+        default: return Colors.cyan;
+        }
     }
 
     // Live MM:SS display, keeping even long provider cooldowns readable.
@@ -123,17 +152,18 @@ Rectangle {
         : domain === "news" ? "GDELT DOC // WORLD EVENT HEADLINES"
         : "RADIO BROWSER // TOP VOTED STREAMS"
     readonly property string sourceCaution:
-        domain === "map" ? "FILTERED EVENT INTELLIGENCE + INSPECTOR CONNECTED // SPATIAL MAP CANVAS NOT YET WIRED"
+        domain === "map" ? "EONET FILTER + INSPECTOR + POINT PLOT CONNECTED // BASEMAP + POLYGON RENDERING NOT YET WIRED"
         : domain === "news" ? "ARTICLE DISCOVERY // NOT YET LIVE VIDEO OR STORY CLUSTERS"
         : "STATION DIRECTORY // PERSISTENT PLAYBACK NOT YET WIRED"
     readonly property var plannedSources: {
         if (domain === "map")
             return [
                 {name:"NASA EONET // FILTERED EVENTS + INSPECTOR", state:"SOURCE CONNECTED"},
+                {name:"EONET POINT CANVAS // PAN + ZOOM", state:"CONNECTED"},
                 {name:"USGS // EARTHQUAKES", state:"GROUND FEED EXISTS"},
                 {name:"RAINVIEWER // RADAR TILES", state:"NOT WIRED"},
                 {name:"NASA FIRMS // FIRE HOTSPOTS", state:"NOT WIRED"},
-                {name:"MAP CANVAS / LAYER SWITCHER", state:"NOT WIRED"}
+                {name:"BASEMAP / POLYGON LAYERS", state:"NOT WIRED"}
             ];
         if (domain === "news")
             return [
@@ -228,6 +258,7 @@ Rectangle {
                         GohuText {
                             text: modelData.state
                             color: modelData.state === "SOURCE CONNECTED"
+                                   || modelData.state === "CONNECTED"
                                    || modelData.state === "GROUND FEED EXISTS"
                                    ? Colors.cyan : Colors.orange
                             font.pixelSize: 11
@@ -277,6 +308,257 @@ Rectangle {
                           : source.loading ? "QUERYING EONET"
                             : "ONE ACTIVE EONET QUERY"
                     font.pixelSize: 9
+                }
+            }
+
+            Column {
+                id: mapCanvasSection
+                width: parent.width
+                spacing: 7
+                visible: stationDiscovery.domain === "map"
+
+                StationSectionDivider {
+                    width: parent.width
+                    title: "SPATIAL PLOT // EONET POINT GEOMETRIES"
+                }
+
+                Row {
+                    width: parent.width
+                    height: 28
+                    spacing: 10
+
+                    QuietText {
+                        anchors.verticalCenter: parent.verticalCenter
+                        width: Math.max(0, parent.width - 120)
+                        text: "PLOTTABLE "
+                              + stationDiscovery.mapPointRows.length
+                              + " / " + source.rows.length
+                              + " // WHEEL ZOOM // DRAG PAN"
+                        font.pixelSize: 9
+                    }
+
+                    ActionButton {
+                        width: 110
+                        height: 26
+                        label: "RESET VIEW"
+                        labelPixelSize: 10
+                        available: stationDiscovery.mapZoom > 1.001
+                                   || Math.abs(stationDiscovery.mapCenterLon) > 0.001
+                                   || Math.abs(stationDiscovery.mapCenterLat) > 0.001
+                        onClicked: stationDiscovery.resetMapView()
+                    }
+                }
+
+                Rectangle {
+                    id: mapPlot
+                    width: parent.width
+                    height: 270
+                    clip: true
+                    color: Colors.black
+                    border.width: 1
+                    border.color: Colors.cyan
+
+                    readonly property var longitudeGrid:
+                        [-180, -120, -60, 0, 60, 120, 180]
+                    readonly property var latitudeGrid:
+                        [-90, -60, -30, 0, 30, 60, 90]
+
+                    Repeater {
+                        model: mapPlot.longitudeGrid
+
+                        delegate: Rectangle {
+                            required property var modelData
+                            readonly property var projected:
+                                MapProjection.project(
+                                    modelData,
+                                    stationDiscovery.mapCenterLat,
+                                    mapPlot.width,
+                                    mapPlot.height,
+                                    stationDiscovery.mapZoom,
+                                    stationDiscovery.mapCenterLon,
+                                    stationDiscovery.mapCenterLat
+                                )
+                            width: Number(modelData) === 0 ? 2 : 1
+                            height: mapPlot.height
+                            x: projected.x - width / 2
+                            visible: projected.valid
+                                     && projected.x >= 0
+                                     && projected.x <= mapPlot.width
+                            color: Number(modelData) === 0
+                                   ? Colors.cyan : Colors.white
+                            opacity: Number(modelData) === 0 ? 0.42 : 0.14
+                            z: 0
+                        }
+                    }
+
+                    Repeater {
+                        model: mapPlot.latitudeGrid
+
+                        delegate: Rectangle {
+                            required property var modelData
+                            readonly property var projected:
+                                MapProjection.project(
+                                    stationDiscovery.mapCenterLon,
+                                    modelData,
+                                    mapPlot.width,
+                                    mapPlot.height,
+                                    stationDiscovery.mapZoom,
+                                    stationDiscovery.mapCenterLon,
+                                    stationDiscovery.mapCenterLat
+                                )
+                            width: mapPlot.width
+                            height: Number(modelData) === 0 ? 2 : 1
+                            y: projected.y - height / 2
+                            visible: projected.valid
+                                     && projected.y >= 0
+                                     && projected.y <= mapPlot.height
+                            color: Number(modelData) === 0
+                                   ? Colors.cyan : Colors.white
+                            opacity: Number(modelData) === 0 ? 0.42 : 0.14
+                            z: 0
+                        }
+                    }
+
+                    MouseArea {
+                        id: mapPanArea
+                        anchors.fill: parent
+                        z: 1
+                        acceptedButtons: Qt.LeftButton
+                        hoverEnabled: true
+                        preventStealing: true
+                        cursorShape: pressed
+                                     ? Qt.ClosedHandCursor
+                                     : Qt.OpenHandCursor
+
+                        property real previousX: 0
+                        property real previousY: 0
+
+                        onPressed: function(mouse) {
+                            previousX = mouse.x;
+                            previousY = mouse.y;
+                        }
+
+                        onPositionChanged: function(mouse) {
+                            if (!pressed)
+                                return;
+                            const view = MapProjection.pan(
+                                stationDiscovery.mapZoom,
+                                stationDiscovery.mapCenterLon,
+                                stationDiscovery.mapCenterLat,
+                                mouse.x - previousX,
+                                mouse.y - previousY,
+                                mapPlot.width,
+                                mapPlot.height
+                            );
+                            stationDiscovery.applyMapView(view);
+                            previousX = mouse.x;
+                            previousY = mouse.y;
+                        }
+
+                        onWheel: function(wheel) {
+                            const direction = wheel.angleDelta.y > 0 ? 1
+                                            : wheel.angleDelta.y < 0 ? -1 : 0;
+                            const view = MapProjection.zoomAt(
+                                stationDiscovery.mapZoom,
+                                stationDiscovery.mapCenterLon,
+                                stationDiscovery.mapCenterLat,
+                                wheel.x,
+                                wheel.y,
+                                mapPlot.width,
+                                mapPlot.height,
+                                direction
+                            );
+                            stationDiscovery.applyMapView(view);
+                            wheel.accepted = true;
+                        }
+
+                        onDoubleClicked:
+                            stationDiscovery.resetMapView()
+                    }
+
+                    Repeater {
+                        model: stationDiscovery.mapPointRows
+
+                        delegate: Item {
+                            required property var modelData
+                            readonly property var projected:
+                                MapProjection.project(
+                                    modelData.longitude,
+                                    modelData.latitude,
+                                    mapPlot.width,
+                                    mapPlot.height,
+                                    stationDiscovery.mapZoom,
+                                    stationDiscovery.mapCenterLon,
+                                    stationDiscovery.mapCenterLat
+                                )
+
+                            width: 16
+                            height: 16
+                            x: projected.x - width / 2
+                            y: projected.y - height / 2
+                            visible: projected.visible
+                            z: 2
+
+                            Rectangle {
+                                anchors.centerIn: parent
+                                width: 9
+                                height: 9
+                                rotation: 45
+                                color: Colors.black
+                                border.width: 2
+                                border.color:
+                                    stationDiscovery.selectedMapEvent
+                                    && stationDiscovery.selectedMapEvent.id
+                                       === modelData.id
+                                    ? Colors.yellow
+                                    : stationDiscovery.mapPointColor(
+                                          modelData.categoryId
+                                      )
+                            }
+
+                            MouseArea {
+                                anchors.fill: parent
+                                hoverEnabled: true
+                                cursorShape: Qt.PointingHandCursor
+                                onClicked:
+                                    stationDiscovery.selectedMapEvent = modelData
+                            }
+                        }
+                    }
+
+                    QuietText {
+                        anchors.left: parent.left
+                        anchors.top: parent.top
+                        anchors.margins: 7
+                        z: 3
+                        text: "LAT/LON GRID // NO BASEMAP"
+                        color: Colors.orange
+                        font.pixelSize: 9
+                    }
+
+                    QuietText {
+                        anchors.left: parent.left
+                        anchors.bottom: parent.bottom
+                        anchors.margins: 7
+                        z: 3
+                        text: "ZOOM "
+                              + stationDiscovery.mapZoom.toFixed(2)
+                              + "x // CENTER "
+                              + stationDiscovery.mapCenterLat.toFixed(1)
+                              + "°, "
+                              + stationDiscovery.mapCenterLon.toFixed(1)
+                              + "°"
+                        font.pixelSize: 9
+                    }
+
+                    QuietText {
+                        anchors.right: parent.right
+                        anchors.bottom: parent.bottom
+                        anchors.margins: 7
+                        z: 3
+                        text: "POINTS ONLY // POLYGONS LISTED BELOW"
+                        font.pixelSize: 9
+                    }
                 }
             }
 

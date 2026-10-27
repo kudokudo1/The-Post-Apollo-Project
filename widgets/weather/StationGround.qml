@@ -8,6 +8,19 @@ Rectangle {
     id: ground
 
     property var weatherService: null
+    property var nwsAlertSource: null
+
+    readonly property bool nwsConfigured:
+        nwsAlertSource && nwsAlertSource.configured
+    readonly property bool nwsReady:
+        nwsAlertSource && nwsAlertSource.ready
+    readonly property bool nwsLoading:
+        nwsAlertSource && nwsAlertSource.loading
+    readonly property string nwsErrorText:
+        nwsAlertSource ? String(nwsAlertSource.errorText || "") : ""
+    readonly property var officialAlerts:
+        nwsAlertSource && Array.isArray(nwsAlertSource.alertList)
+        ? nwsAlertSource.alertList : []
 
     // View-scoped service: no USGS polling while GROUND is unmounted.
     WeatherServices.SeismicService {
@@ -90,6 +103,36 @@ Rectangle {
         return isFinite(value) && value >= 0
                ? value.toFixed(1) + suffix
                : "--";
+    }
+
+    function alertSeverityColor(value) {
+        switch (String(value || "").toLowerCase()) {
+        case "extreme": return Colors.red;
+        case "severe": return Colors.orange;
+        case "moderate": return Colors.yellow;
+        case "minor": return Colors.cyan;
+        default: return Colors.white;
+        }
+    }
+
+    function alertTimeUtc(value) {
+        const raw = String(value || "");
+        const millis = Date.parse(raw);
+        if (!isFinite(millis))
+            return "--";
+        const iso = new Date(millis).toISOString();
+        return iso.slice(0, 10) + " " + iso.slice(11, 16) + "Z";
+    }
+
+    function nwsReceiveAge() {
+        if (!nwsAlertSource || !nwsAlertSource.lastUpdated
+                || typeof nwsAlertSource.lastUpdated.getTime !== "function")
+            return "--";
+        const millis = nwsAlertSource.lastUpdated.getTime();
+        if (!isFinite(millis) || millis <= 0)
+            return "--";
+        const age = Math.max(0, Math.floor((Date.now() - millis) / 60000));
+        return age === 0 ? "<1m" : age + "m";
     }
 
     // These are normalized views of real telemetry, preserved from the
@@ -194,6 +237,162 @@ Rectangle {
                         : "OFFLINE"
                 font.pixelSize: 12
                 color: ground.aqiReady ? Colors.cyan : Colors.orange
+            }
+        }
+
+        StationSectionDivider {
+            width: parent.width
+            title: "OFFICIAL ALERTS // NWS"
+        }
+
+        Column {
+            width: parent.width
+            spacing: 8
+
+            Row {
+                width: parent.width
+                spacing: 14
+
+                SecondaryText {
+                    text: "ACTIVE POINT FEED"
+                    font.pixelSize: 11
+                    color: Colors.green
+                }
+
+                GohuText {
+                    text: !ground.nwsConfigured
+                          ? "NOT CONFIGURED"
+                          : ground.nwsLoading && !ground.nwsReady
+                            ? "RECEIVING"
+                            : ground.nwsErrorText.length > 0
+                              ? (ground.nwsReady ? "DEGRADED" : "OFFLINE")
+                              : ground.nwsReady
+                                ? "RECEIVED " + ground.officialAlerts.length
+                                : "WAITING"
+                    font.pixelSize: 11
+                    color: !ground.nwsConfigured ? Colors.orange
+                           : ground.nwsErrorText.length > 0 ? Colors.yellow
+                           : ground.nwsReady ? Colors.cyan : Colors.orange
+                }
+
+                QuietText {
+                    text: ground.nwsConfigured && ground.nwsAlertSource
+                          ? "PINNED " + ground.nwsAlertSource.alertPoint
+                            + " // LAST SUCCESS " + ground.nwsReceiveAge()
+                          : "EXPLICIT OPERATOR POINT REQUIRED"
+                    font.pixelSize: 9
+                }
+            }
+
+            QuietText {
+                visible: !ground.nwsConfigured
+                width: parent.width
+                text: "SET POST_APOLLO_NWS_ALERT_POINT=LAT,LON // WEATHER FIX IS NEVER USED FOR EMERGENCY TARGETING"
+                font.pixelSize: 10
+            }
+
+            QuietText {
+                visible: ground.nwsConfigured
+                         && ground.nwsErrorText.length > 0
+                width: parent.width
+                text: ground.nwsErrorText
+                      + " // LAST-GOOD ALERT STATE RETAINED"
+                font.pixelSize: 10
+            }
+
+            QuietText {
+                visible: ground.nwsConfigured
+                         && ground.nwsReady
+                         && ground.officialAlerts.length === 0
+                width: parent.width
+                text: "NO ACTIVE NWS ALERTS LISTED FOR THE PINNED POINT"
+                font.pixelSize: 11
+            }
+
+            Repeater {
+                model: ground.officialAlerts
+
+                delegate: Rectangle {
+                    required property var modelData
+
+                    width: groundContent.width
+                    height: 126
+                    color: Colors.dark
+                    border.width: 1
+                    border.color: modelData.listingState === "RECHECK PENDING"
+                                  ? Colors.yellow
+                                  : ground.alertSeverityColor(modelData.severity)
+
+                    Column {
+                        anchors.fill: parent
+                        anchors.margins: 9
+                        spacing: 4
+
+                        Row {
+                            width: parent.width
+                            spacing: 10
+
+                            GohuText {
+                                width: Math.max(0, parent.width - 292)
+                                text: String(modelData.event || "NWS ALERT").toUpperCase()
+                                elide: Text.ElideRight
+                                font.pixelSize: 14
+                                color: ground.alertSeverityColor(modelData.severity)
+                            }
+
+                            QuietText {
+                                width: 122
+                                text: String(modelData.severity || "UNKNOWN").toUpperCase()
+                                      + " // "
+                                      + String(modelData.urgency || "UNKNOWN").toUpperCase()
+                                elide: Text.ElideRight
+                                font.pixelSize: 9
+                            }
+
+                            GohuText {
+                                width: 140
+                                text: modelData.listingState
+                                horizontalAlignment: Text.AlignRight
+                                font.pixelSize: 10
+                                color: modelData.listingState === "RECHECK PENDING"
+                                       ? Colors.yellow : Colors.green
+                            }
+                        }
+
+                        GohuText {
+                            width: parent.width
+                            text: modelData.headline
+                                  ? modelData.headline : modelData.event
+                            elide: Text.ElideRight
+                            font.pixelSize: 11
+                            color: Colors.white
+                        }
+
+                        QuietText {
+                            width: parent.width
+                            text: "AREA // " + (modelData.area || "NOT PROVIDED")
+                                  + " // CERTAINTY "
+                                  + String(modelData.certainty || "UNKNOWN").toUpperCase()
+                            elide: Text.ElideRight
+                            font.pixelSize: 9
+                        }
+
+                        QuietText {
+                            width: parent.width
+                            text: "EFFECTIVE " + ground.alertTimeUtc(modelData.effective)
+                                  + " // EXPIRES " + ground.alertTimeUtc(modelData.expires)
+                            font.pixelSize: 9
+                        }
+
+                        QuietText {
+                            width: parent.width
+                            text: "ISSUER // " + (modelData.issuer || "NWS")
+                                  + " // OFFICIAL API PRODUCT, NOT FORECAST INFERENCE"
+                            elide: Text.ElideRight
+                            font.pixelSize: 9
+                        }
+                    }
+                }
             }
         }
 

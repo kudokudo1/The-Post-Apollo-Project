@@ -56,6 +56,28 @@ function project(longitudeValue, latitudeValue, widthValue, heightValue,
     };
 }
 
+function projectUnwrapped(longitudeValue, latitudeValue, widthValue, heightValue,
+                          zoomValue, centerLonValue, centerLatValue) {
+    const lon = finite(longitudeValue);
+    const lat = finite(latitudeValue);
+    const width = Number(widthValue);
+    const height = Number(heightValue);
+    if (lon === null || lat === null || Math.abs(lat) > 90
+            || !validViewport(width, height)) {
+        return {valid: false, visible: false, x: 0, y: 0};
+    }
+
+    const view = clampView(zoomValue, centerLonValue, centerLatValue);
+    const x = width / 2 + ((lon - view.centerLon) / 360) * width * view.zoom;
+    const y = height / 2 - ((lat - view.centerLat) / 180) * height * view.zoom;
+    return {
+        valid: true,
+        visible: x >= 0 && x <= width && y >= 0 && y <= height,
+        x: x,
+        y: y
+    };
+}
+
 function unproject(xValue, yValue, widthValue, heightValue,
                    zoomValue, centerLonValue, centerLatValue) {
     const x = finite(xValue);

@@ -89,7 +89,7 @@ assert.match(ui, /stationDiscovery\.radarSnapshotBounds\.east/);
 assert.match(ui, /stationDiscovery\.radarSnapshotBounds\.south/);
 assert.match(ui, /z: 0\.1/);
 assert.match(ui, /z: 0\.3/);
-assert.match(ui, /LAT\/LON GRID \/\/ NOAA RADAR IS DATA LAYER, NOT BASEMAP/);
+assert.match(ui, /LAT\/LON GRID \/\/ RADAR \+ SMOKE ARE DATA LAYERS, NOT BASEMAP/);
 assert.match(ui, /NOAA\/NWS MRMS \/\/ BASE REFLECTIVITY/);
 assert.match(ui, /RAINVIEWER \/\/ RADAR FALLBACK", state:"NOT WIRED"/);
 

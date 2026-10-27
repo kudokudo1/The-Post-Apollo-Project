@@ -1726,6 +1726,10 @@ PanelWindow {
                     // Focus the existing Social FloatingWindow for editing.
                     messagingWindow.focusAppSelector();
                     socialWindow.requestActivate();
+                } else if (messagingWindow.browserConnectionNavigationPending) {
+                    // Any manual provider navigation from Settings must skip
+                    // raising the previous Discord/browser surface first.
+                    return;
                 } else if (messagingWindow.discordSelected) {
                     messagingWindow.raiseDiscord();
                 } else if (messagingWindow.xSelected) {

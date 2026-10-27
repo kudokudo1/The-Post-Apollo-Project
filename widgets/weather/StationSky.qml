@@ -2,6 +2,7 @@ import QtQuick
 import "../../components"
 import "../../services/weather/WeatherDockPolicy.js" as WeatherDockPolicy
 import "../../services/weather/WeatherCyclePolicy.js" as WeatherCyclePolicy
+import "StationSkyHourlyPolicy.js" as HourlyDetails
 
 Rectangle {
     id: sky
@@ -34,6 +35,14 @@ Rectangle {
 
     readonly property var hourlyForecast:
         weatherService ? weatherService.hourlyForecast : []
+    // Selection only affects the UI. The same six parsed forecast samples
+    // back both the icons and the detail readout; no second collector.
+    property int inspectedHourIndex: 0
+    onHourlyForecastChanged: inspectedHourIndex = 0
+    readonly property var inspectedHour:
+        HourlyDetails.selectedHour(hourlyForecast, inspectedHourIndex)
+    readonly property var inspectedHourMetrics:
+        HourlyDetails.hourlyMetrics(inspectedHour)
     readonly property var dailyForecast:
         weatherService ? weatherService.dailyForecast : []
     property real cycleClockMs: Date.now()
@@ -589,7 +598,8 @@ Rectangle {
                             GohuText {
                                 text: modelData.timeLabel
                                 font.pixelSize: 12
-                                color: Colors.cyan
+                                color: sky.inspectedHourIndex === index
+                                       ? Colors.magenta : Colors.cyan
                             }
 
                             GohuText {
@@ -702,6 +712,81 @@ Rectangle {
                                            )
                                     height: parent.height - 4
                                     color: sky.meterFillColor
+                                }
+                            }
+                        }
+
+                        // One-click inspection of already-received forecast
+                        // records; no change to the meteorological artwork.
+                        MouseArea {
+                            anchors.fill: parent
+                            cursorShape: Qt.PointingHandCursor
+                            onClicked: sky.inspectedHourIndex = index
+                        }
+                    }
+                }
+            }
+
+            StationSectionDivider {
+                width: skyContent.width
+                title: "HOURLY // INSPECT SELECTED FORECAST"
+                visible: sky.inspectedHour !== null
+            }
+
+            Rectangle {
+                width: skyContent.width
+                height: inspectorContents.implicitHeight + 20
+                visible: sky.inspectedHour !== null
+                color: Colors.dark
+                border.width: 1
+                border.color: Colors.cyan
+
+                Column {
+                    id: inspectorContents
+                    x: 10
+                    y: 10
+                    width: parent.width - 20
+                    spacing: 9
+
+                    Row {
+                        width: parent.width
+                        spacing: 12
+
+                        GohuText {
+                            text: HourlyDetails.hourCaption(sky.inspectedHour)
+                            font.pixelSize: 11
+                            color: Colors.magenta
+                        }
+
+                        QuietText {
+                            text: "WTTR.IN // FORECAST, NOT OBSERVED"
+                            font.pixelSize: 9
+                        }
+                    }
+
+                    Grid {
+                        width: parent.width
+                        columns: 4
+                        columnSpacing: 12
+                        rowSpacing: 9
+
+                        Repeater {
+                            model: sky.inspectedHourMetrics
+
+                            delegate: Column {
+                                required property var modelData
+                                width: (inspectorContents.width - 36) / 4
+                                spacing: 4
+
+                                SecondaryText {
+                                    text: modelData.title
+                                    font.pixelSize: 10
+                                }
+
+                                GohuText {
+                                    text: modelData.value
+                                    font.pixelSize: 14
+                                    color: Colors.white
                                 }
                             }
                         }

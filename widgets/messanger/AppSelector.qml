@@ -34,6 +34,36 @@ Rectangle {
     property bool browserWindowInspectionBusy: false
     property bool browserWindowActionAllowed: false
 
+    // Telegram authorization is provider-reported, but the Telethon adapter
+    // currently owns ONE shared personal.session, not per-identity sessions.
+    // Never display this as a status belonging to the selected layout ID.
+    property bool sharedTelegramActive: false
+    property string sharedTelegramBackendMode: "UNAVAILABLE"
+    property bool sharedTelegramLoginInProgress: false
+    signal sharedTelegramOpenRequested()
+    signal sharedTelegramRecheckRequested()
+
+    function sharedTelegramStatusText() {
+        if (appSelector.accountSelectedServiceId !== "telegram")
+            return "";
+        if (!appSelector.sharedTelegramActive)
+            return "NOT CHECKED IN THIS VIEW // OPEN TELEGRAM";
+        if (appSelector.sharedTelegramLoginInProgress)
+            return "TELEGRAM PAIRING IN PROGRESS // SHARED SESSION";
+        var mode = String(appSelector.sharedTelegramBackendMode || "UNAVAILABLE");
+        if (mode === "READY")
+            return "PROVIDER AUTHORIZED AT LAST CHECK // SHARED SESSION";
+        if (mode === "AUTH_REQUIRED")
+            return "SIGN-IN REQUIRED // SHARED SESSION";
+        if (mode === "APP_REQUIRED")
+            return "TELEGRAM APP SETUP REQUIRED // SHARED SESSION";
+        if (mode === "DEPENDENCY_MISSING")
+            return "TELEGRAM PROVIDER UNAVAILABLE // DEPENDENCY MISSING";
+        if (mode === "PROBING")
+            return "CHECKING TELEGRAM PROVIDER...";
+        return "TELEGRAM STATUS UNAVAILABLE // SHARED SESSION";
+    }
+
     function browserAccountServiceSupported(serviceId) {
         // Browser-backed providers only; Telegram, Discord and unsupported
         // personal services cannot share the Chromium sign-in workflow.
@@ -1304,6 +1334,65 @@ Rectangle {
                     color: Colors.white
                     font.pixelSize: 9
                     wrapMode: Text.WordWrap
+                }
+                Rectangle {
+                    width: parent.width
+                    height: 1
+                    visible: appSelector.accountSelectedServiceId === "telegram"
+                    color: Colors.cyan
+                }
+                Text {
+                    width: parent.width
+                    visible: appSelector.accountSelectedServiceId === "telegram"
+                    text: "TELEGRAM // SHARED SESSION"
+                    color: Colors.cyan
+                    font.bold: true
+                    font.pixelSize: 10
+                    wrapMode: Text.WordWrap
+                }
+                Text {
+                    width: parent.width
+                    visible: appSelector.accountSelectedServiceId === "telegram"
+                    text: "Telegram uses one legacy personal session. Switching Post-Apollo identities does not switch Telegram accounts."
+                    color: Colors.white
+                    font.pixelSize: 9
+                    wrapMode: Text.WordWrap
+                }
+                Text {
+                    width: parent.width
+                    visible: appSelector.accountSelectedServiceId === "telegram"
+                    text: appSelector.sharedTelegramStatusText()
+                    color: Colors.orange
+                    font.pixelSize: 9
+                    wrapMode: Text.WordWrap
+                }
+                ActionButton {
+                    width: parent.width
+                    height: 33
+                    visible: appSelector.accountSelectedServiceId === "telegram"
+                    label: "OPEN TELEGRAM"
+                    labelPixelSize: 9
+                    contentPadding: 3
+                    interactive: appSelector.identitySnapshot.writable
+                                 && appSelector.accountEditorIdentityId ===
+                                    appSelector.identitySnapshot.activeId
+                    onTriggered: appSelector.sharedTelegramOpenRequested()
+                }
+                ActionButton {
+                    width: parent.width
+                    height: 33
+                    visible: appSelector.accountSelectedServiceId === "telegram"
+                    label: "RECHECK SHARED TELEGRAM"
+                    labelPixelSize: 9
+                    labelMinimumPixelSize: 8
+                    contentPadding: 3
+                    interactive: appSelector.identitySnapshot.writable
+                                 && appSelector.accountEditorIdentityId ===
+                                    appSelector.identitySnapshot.activeId
+                                 && appSelector.sharedTelegramActive
+                                 && !appSelector.sharedTelegramLoginInProgress
+                                 && appSelector.sharedTelegramBackendMode !== "PROBING"
+                    onTriggered: appSelector.sharedTelegramRecheckRequested()
                 }
                 Text {
                     width: parent.width

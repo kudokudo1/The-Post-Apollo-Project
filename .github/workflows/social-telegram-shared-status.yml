@@ -1,0 +1,40 @@
+name: Social Shared Telegram Session Status
+
+on:
+  pull_request:
+    paths:
+      - 'widgets/messanger/AppSelector.qml'
+      - 'widgets/messanger/MessagingW.qml'
+      - 'tests/messaging/test_social_telegram_shared_status.cjs'
+      - 'services/messaging/TELEGRAM-SHARED-STATUS.md'
+      - '.github/workflows/social-telegram-shared-status.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'widgets/messanger/AppSelector.qml'
+      - 'widgets/messanger/MessagingW.qml'
+      - 'tests/messaging/test_social_telegram_shared_status.cjs'
+      - 'services/messaging/TELEGRAM-SHARED-STATUS.md'
+      - '.github/workflows/social-telegram-shared-status.yml'
+  workflow_dispatch:
+
+jobs:
+  shared-provider-status:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Execute Telegram status mapping and shared-session guard tests
+        run: node tests/messaging/test_social_telegram_shared_status.cjs
+      - name: Preserve Settings layout and account detail isolation
+        run: |
+          python3 -m unittest discover -s tests/messaging -p 'test_social_settings_workspace.py' -v
+          python3 -m unittest discover -s tests/messaging -p 'test_social_account_details_ui.py' -v
+          python3 -m unittest discover -s tests/messaging -p 'test_social_account_details.py' -v
+          node tests/messaging/test_social_identity_policy.cjs
+      - name: Preserve Telegram and browser sign-in behavior
+        run: |
+          python3 -m unittest discover -s tests/messaging -p 'test_social_browser_signin_window.py' -v
+          python3 -m unittest discover -s tests/messaging -p 'test_social_browser_live_handoff.py' -v
+          python3 -m unittest discover -s tests/messaging -p 'test_social_browser_identity_geometry.py' -v
+          python3 -m unittest discover -s tests/messaging -p 'test_social_browser_identity_boundary.py' -v
+          python3 -m unittest discover -s tests/messaging -p 'test_social_provider_access_contracts.py' -v

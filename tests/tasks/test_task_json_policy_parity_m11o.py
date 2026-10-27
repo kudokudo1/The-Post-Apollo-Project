@@ -152,7 +152,10 @@ class PolicyComparisonTests(unittest.TestCase):
         add("host_stricter_task_id_trailing_lf",
             changed(1, task=lambda t:t.update(id="t1\n")), strict=True)
         add("host_stricter_project_id_trailing_lf",
-            changed(project=lambda p:p.update(id="p1\n")),
+            changed(root=lambda d:(
+                d["projects"][0].update(id="p1\n"),
+                d["tasks"][0].update(projectId="p1\n")
+            )),
             strict=True)
         add("host_stricter_due_date_trailing_lf",
             changed(task=lambda t:t.update(dueDate="2026-10-26\n")),

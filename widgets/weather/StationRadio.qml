@@ -1,6 +1,8 @@
 import QtQuick
+import Quickshell
 import "../../components"
 import "../../services/media" as MediaServices
+import "StationRadioMemoryPolicy.js" as RadioMemory
 
 // A news-first RADIO surface using the SAME private Hi-Fi controller and
 // guarded MPD relay. No second Radio Browser fetcher, MPD or direct stream URLs.
@@ -14,6 +16,16 @@ Rectangle {
     property string notice: "NEWS FIRST // CHOOSE A STATION"
     property string lastLoadRequestedId: ""
     property bool initialSearchSent: false
+    property string recallTargetId: ""
+    property string recallTargetTitle: ""
+    property int recallAttempts: 0
+    property string lastRememberedLoadedId: ""
+
+    readonly property var favoriteItems:
+        RadioMemory.decodeList(radioMemoryAdapter.favoriteEntries, 10)
+    readonly property var recentItems:
+        RadioMemory.decodeList(radioMemoryAdapter.recentEntries, 8)
+
     readonly property var presets: [
         {name: "NEWS", query: "tag:news"},
         {name: "TALK", query: "tag:talk"},
@@ -28,6 +40,11 @@ Rectangle {
     readonly property var highlightedItem:
         browseIndex >= 0 && browseIndex < browseItems.length
         ? browseItems[browseIndex] : null
+    readonly property bool highlightedFavorite:
+        RadioMemory.isFavorite(
+            radioMemoryAdapter.favoriteEntries,
+            highlightedItem
+        )
     readonly property var selectedRef: controller.selection
     readonly property var loadedMedia: controller.loaded
     readonly property bool loadedIsRadio:
@@ -52,6 +69,20 @@ Rectangle {
         pollingInterval: 6000
     }
 
+    FileView {
+        id: radioMemoryFile
+        path: Quickshell.dataDir + "/weather-radio-memory.json"
+        watchChanges: true
+        onFileChanged: reload()
+        onAdapterUpdated: writeAdapter()
+
+        JsonAdapter {
+            id: radioMemoryAdapter
+            property list<string> favoriteEntries: []
+            property list<string> recentEntries: []
+        }
+    }
+
     // Directory tags are community-supplied, not editorial certification.
     function broadcastTag(item) {
         const tags = String(item && (item.genre || item.album) || "").toLowerCase();
@@ -67,6 +98,10 @@ Rectangle {
     function search(query, cursor) {
         if (!canOperate)
             return false;
+        recallTargetId = "";
+        recallTargetTitle = "";
+        recallAttempts = 0;
+        recallDelay.stop();
         const requested = String(query || "").trim();
         if (controller.searchMedia("radio-browser", requested, cursor)) {
             browseIndex = 0;
@@ -95,6 +130,102 @@ Rectangle {
     function highlight(index) {
         if (index >= 0 && index < browseItems.length)
             browseIndex = index;
+    }
+
+    function toggleHighlightedFavorite() {
+        if (!highlightedItem)
+            return;
+        if (highlightedFavorite) {
+            radioMemoryAdapter.favoriteEntries =
+                RadioMemory.removeFavorite(
+                    radioMemoryAdapter.favoriteEntries,
+                    highlightedItem
+                );
+            notice = "FAVORITE REMOVED";
+        } else {
+            radioMemoryAdapter.favoriteEntries =
+                RadioMemory.addFavorite(
+                    radioMemoryAdapter.favoriteEntries,
+                    highlightedItem,
+                    10
+                );
+            notice = "FAVORITE SAVED // UUID + DISPLAY METADATA ONLY";
+        }
+    }
+
+    function removeFavorite(item) {
+        if (!item)
+            return;
+        radioMemoryAdapter.favoriteEntries =
+            RadioMemory.removeFavorite(
+                radioMemoryAdapter.favoriteEntries,
+                item
+            );
+        notice = "FAVORITE REMOVED";
+    }
+
+    function rememberLoaded(item) {
+        if (!item)
+            return;
+        radioMemoryAdapter.recentEntries =
+            RadioMemory.touchRecent(
+                radioMemoryAdapter.recentEntries,
+                item,
+                8
+            );
+    }
+
+    function recallSaved(item) {
+        const row = RadioMemory.normalize(item);
+        if (!row || !canOperate)
+            return false;
+        const query = "name:" + row.title;
+        queryInput.text = query;
+        if (!search(query, null))
+            return false;
+        recallTargetId = row.ref.id;
+        recallTargetTitle = row.title;
+        recallAttempts = 0;
+        notice = "RECALL SEARCH // VERIFYING SAVED UUID";
+        return true;
+    }
+
+    function resolveRecall() {
+        if (recallTargetId === "")
+            return;
+        if (!canOperate) {
+            if (recallAttempts < 6) {
+                recallAttempts += 1;
+                recallDelay.restart();
+            } else {
+                notice = "RECALL BUSY // RETRY";
+                recallTargetId = "";
+                recallTargetTitle = "";
+            }
+            return;
+        }
+
+        for (let i = 0; i < browseItems.length; i++) {
+            const item = browseItems[i];
+            if (item && item.ref
+                    && item.ref.source === "radio-browser"
+                    && item.ref.id === recallTargetId) {
+                browseIndex = i;
+                const foundTitle = recallTargetTitle;
+                recallTargetId = "";
+                recallTargetTitle = "";
+                if (controller.selectMedia(item.ref))
+                    notice = "RECALL VERIFIED // " + foundTitle
+                           + " // SELECTED // LOAD THEN PLAY";
+                else
+                    notice = "RECALL VERIFIED // SELECT BUSY";
+                return;
+            }
+        }
+
+        notice = "SAVED UUID NOT IN CURRENT DIRECTORY RESULTS";
+        recallTargetId = "";
+        recallTargetTitle = "";
     }
 
     function selectHighlighted() {
@@ -134,6 +265,30 @@ Rectangle {
             notice = action.toUpperCase() + " REQUESTED // VERIFY STATUS";
         else
             notice = "NO VERIFIED RADIO CONTROL // SELECT + LOAD";
+    }
+
+    onBrowseItemsChanged: {
+        if (recallTargetId !== "")
+            recallDelay.restart();
+    }
+
+    onLoadedMediaChanged: {
+        if (!loadedIsRadio || !loadedMedia || !loadedMedia.ref
+                || !loadedMedia.item)
+            return;
+        const id = String(loadedMedia.ref.id || "");
+        if (id === "" || id !== lastLoadRequestedId
+                || id === lastRememberedLoadedId)
+            return;
+        rememberLoaded(loadedMedia.item);
+        lastRememberedLoadedId = id;
+    }
+
+    Timer {
+        id: recallDelay
+        interval: 120
+        repeat: false
+        onTriggered: stationRadio.resolveRecall()
     }
 
     // Start the default NEWS directory query once this view is mounted.
@@ -284,6 +439,151 @@ Rectangle {
 
             StationSectionDivider {
                 width: parent.width
+                title: "SAVED // FAVORITES + RECENTLY LOADED"
+            }
+
+            Row {
+                width: parent.width
+                spacing: 10
+
+                Column {
+                    width: Math.max(0, (parent.width - 10) / 2)
+                    spacing: 5
+
+                    GohuText {
+                        text: "FAVORITES // "
+                              + stationRadio.favoriteItems.length
+                              + " / 10"
+                        color: Colors.magenta
+                        font.pixelSize: 11
+                    }
+
+                    QuietText {
+                        visible: stationRadio.favoriteItems.length === 0
+                        width: parent.width
+                        text: "NO SAVED STATIONS // HIGHLIGHT + FAVORITE"
+                        font.pixelSize: 9
+                    }
+
+                    Repeater {
+                        model: stationRadio.favoriteItems
+
+                        delegate: Rectangle {
+                            required property var modelData
+                            width: parent.width
+                            height: 44
+                            color: Colors.dark
+                            border.width: 1
+                            border.color: Colors.magenta
+
+                            GohuText {
+                                anchors.left: parent.left
+                                anchors.verticalCenter: parent.verticalCenter
+                                anchors.leftMargin: 9
+                                width: Math.max(40, parent.width - 154)
+                                text: modelData.title
+                                elide: Text.ElideRight
+                                color: Colors.white
+                                font.pixelSize: 10
+                            }
+
+                            ActionButton {
+                                anchors.right: removeFavoriteButton.left
+                                anchors.verticalCenter: parent.verticalCenter
+                                anchors.rightMargin: 6
+                                width: 78
+                                height: 28
+                                label: "RECALL"
+                                labelPixelSize: 9
+                                available: stationRadio.canOperate
+                                onClicked:
+                                    stationRadio.recallSaved(modelData)
+                            }
+
+                            ActionButton {
+                                id: removeFavoriteButton
+                                anchors.right: parent.right
+                                anchors.verticalCenter: parent.verticalCenter
+                                anchors.rightMargin: 6
+                                width: 44
+                                height: 28
+                                label: "X"
+                                labelPixelSize: 10
+                                accentColor: Colors.red
+                                destructive: true
+                                onClicked:
+                                    stationRadio.removeFavorite(modelData)
+                            }
+                        }
+                    }
+                }
+
+                Column {
+                    width: Math.max(0, (parent.width - 10) / 2)
+                    spacing: 5
+
+                    GohuText {
+                        text: "RECENTLY LOADED // "
+                              + stationRadio.recentItems.length
+                              + " / 8"
+                        color: Colors.cyan
+                        font.pixelSize: 11
+                    }
+
+                    QuietText {
+                        visible: stationRadio.recentItems.length === 0
+                        width: parent.width
+                        text: "NO WEATHER RADIO LOADS RECORDED"
+                        font.pixelSize: 9
+                    }
+
+                    Repeater {
+                        model: stationRadio.recentItems
+
+                        delegate: Rectangle {
+                            required property var modelData
+                            width: parent.width
+                            height: 44
+                            color: Colors.dark
+                            border.width: 1
+                            border.color: Colors.cyan
+
+                            GohuText {
+                                anchors.left: parent.left
+                                anchors.verticalCenter: parent.verticalCenter
+                                anchors.leftMargin: 9
+                                width: Math.max(40, parent.width - 102)
+                                text: modelData.title
+                                elide: Text.ElideRight
+                                color: Colors.white
+                                font.pixelSize: 10
+                            }
+
+                            ActionButton {
+                                anchors.right: parent.right
+                                anchors.verticalCenter: parent.verticalCenter
+                                anchors.rightMargin: 6
+                                width: 78
+                                height: 28
+                                label: "RECALL"
+                                labelPixelSize: 9
+                                available: stationRadio.canOperate
+                                onClicked:
+                                    stationRadio.recallSaved(modelData)
+                            }
+                        }
+                    }
+                }
+            }
+
+            QuietText {
+                width: parent.width
+                text: "RECALL SEARCHES THE LIVE DIRECTORY BY NAME, THEN REQUIRES THE EXACT SAVED UUID // NO STORED STREAM URL // NO AUTOPLAY"
+                font.pixelSize: 9
+            }
+
+            StationSectionDivider {
+                width: parent.width
                 title: "STATIONS // BROWSE + SELECT"
             }
 
@@ -335,7 +635,7 @@ Rectangle {
                         }
 
                         Column {
-                            width: Math.max(80, parent.width - 258)
+                            width: Math.max(80, parent.width - 282)
                             anchors.verticalCenter: parent.verticalCenter
                             spacing: 5
 
@@ -354,6 +654,18 @@ Rectangle {
                                 elide: Text.ElideRight
                                 font.pixelSize: 10
                             }
+                        }
+
+                        GohuText {
+                            width: 24
+                            anchors.verticalCenter: parent.verticalCenter
+                            text: RadioMemory.isFavorite(
+                                      radioMemoryAdapter.favoriteEntries,
+                                      modelData
+                                  ) ? "★" : ""
+                            font.pixelSize: 13
+                            color: Colors.magenta
+                            horizontalAlignment: Text.AlignHCenter
                         }
 
                         GohuText {
@@ -454,6 +766,18 @@ Rectangle {
                     labelPixelSize: 12
                     available: stationRadio.canTransport
                     onClicked: stationRadio.playbackAction("stop")
+                }
+
+                ActionButton {
+                    width: 122
+                    height: 36
+                    label: stationRadio.highlightedFavorite
+                           ? "UNFAVORITE" : "FAVORITE"
+                    labelPixelSize: 10
+                    available: stationRadio.canOperate
+                               && !!stationRadio.highlightedItem
+                    selected: stationRadio.highlightedFavorite
+                    onClicked: stationRadio.toggleHighlightedFavorite()
                 }
             }
 

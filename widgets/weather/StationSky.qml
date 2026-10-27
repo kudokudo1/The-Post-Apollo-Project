@@ -292,6 +292,7 @@ Rectangle {
                             anchors.fill: currentCelestialIcon
                             safeSource: currentCelestialIcon
                             requestedVisible: currentCelestialIcon.visible
+                                             && sky.skyCycle.solar !== "night"
                             radius: 12
                             samples: 25
                             horizontalOffset: 0
@@ -655,6 +656,7 @@ Rectangle {
                                 anchors.fill: hourlyCelestial
                                 safeSource: hourlyCelestial
                                 requestedVisible: hourlyCelestial.visible
+                                                 && parent.forecastCycle.solar !== "night"
                                 radius: 12
                                 samples: 25
                                 horizontalOffset: 0
@@ -862,6 +864,7 @@ Rectangle {
                                 anchors.fill: dailyCelestial
                                 safeSource: dailyCelestial
                                 requestedVisible: dailyCelestial.visible
+                                                 && parent.forecastCycle.solar !== "night"
                                 radius: 12
                                 samples: 25
                                 horizontalOffset: 0

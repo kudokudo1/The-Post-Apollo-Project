@@ -9,11 +9,15 @@ This never reads or stores X credentials. Chromium owns its persistent profile.
 from __future__ import annotations
 
 import argparse
+import fcntl
 import json
 import os
 from pathlib import Path
 import re
+import secrets
 import shutil
+import stat
+import tempfile
 import subprocess
 import sys
 import time
@@ -275,6 +279,164 @@ def setup(site: str, identity_id: str | None = None) -> None:
         stdout=subprocess.DEVNULL,
         stderr=subprocess.DEVNULL,
     )
+
+
+
+# Session selection is ephemeral, not account authentication or a credentials
+# store. It arbitrates overlapping show/hide requests across helper processes.
+SELECTION_FILE = "browser-selection.json"
+SELECTION_LOCK = ".browser-selection.lock"
+
+
+def selection_runtime() -> Path:
+    runtime = os.environ.get("XDG_RUNTIME_DIR")
+    if not runtime:
+        raise RuntimeError("Isolated browsers require XDG_RUNTIME_DIR")
+    base = Path(runtime)
+    st = base.lstat()
+    if not stat.S_ISDIR(st.st_mode) or st.st_uid != os.getuid() or st.st_mode & 0o077:
+        raise RuntimeError("Unsafe browser runtime directory")
+    root = base / "post-apollo-social"
+    if not root.exists() and not root.is_symlink():
+        root.mkdir(mode=0o700, exist_ok=True)
+    st = root.lstat()
+    if not stat.S_ISDIR(st.st_mode) or st.st_uid != os.getuid() or st.st_mode & 0o077:
+        raise RuntimeError("Unsafe browser session directory")
+    return root
+
+
+def session_lock() -> tuple[int, Path]:
+    root = selection_runtime()
+    fd = os.open(root / SELECTION_LOCK,
+                 os.O_CREAT | os.O_RDWR | getattr(os, "O_NOFOLLOW", 0), 0o600)
+    st = os.fstat(fd)
+    if not stat.S_ISREG(st.st_mode) or st.st_uid != os.getuid() or st.st_mode & 0o077:
+        os.close(fd)
+        raise RuntimeError("Unsafe browser session lock")
+    fcntl.flock(fd, fcntl.LOCK_EX)
+    return fd, root
+
+
+def load_selection(root: Path) -> dict[str, str]:
+    file = root / SELECTION_FILE
+    try:
+        st = file.lstat()
+    except FileNotFoundError:
+        return {}
+    if not stat.S_ISREG(st.st_mode) or st.st_uid != os.getuid() or st.st_mode & 0o077:
+        raise RuntimeError("Unsafe browser selection marker")
+    fd = os.open(file, os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0))
+    with os.fdopen(fd, "rb") as handle:
+        raw = handle.read(257)
+    if len(raw) > 256:
+        raise RuntimeError("Invalid browser selection marker")
+    try:
+        value = json.loads(raw)
+    except (UnicodeError, ValueError):
+        raise RuntimeError("Invalid browser selection marker") from None
+    if not isinstance(value, dict) or set(value) != {"identityId", "site", "token"}:
+        raise RuntimeError("Invalid browser selection marker")
+    if validated_identity(value["identityId"]) is None:
+        raise RuntimeError("Invalid browser selection marker")
+    site_config(value["site"])
+    if not isinstance(value["token"], str) or not re.fullmatch("[a-f0-9]{32}", value["token"]):
+        raise RuntimeError("Invalid browser selection marker")
+    return value
+
+
+def store_selection(root: Path, selection: dict[str, str]) -> None:
+    fd, temporary = tempfile.mkstemp(dir=root, prefix=".browser-session-")
+    try:
+        os.fchmod(fd, 0o600)
+        with os.fdopen(fd, "w", encoding="utf-8") as handle:
+            fd = -1
+            json.dump(selection, handle, separators=(",", ":"))
+            handle.flush()
+            os.fsync(handle.fileno())
+        os.replace(temporary, root / SELECTION_FILE)
+    finally:
+        if fd >= 0:
+            os.close(fd)
+        if os.path.exists(temporary):
+            os.unlink(temporary)
+
+
+def claim_selection(site: str, identity_id: str) -> str:
+    token = secrets.token_hex(16)
+    fd, root = session_lock()
+    try:
+        load_selection(root)  # Never overwrite corrupt or unsafe runtime data.
+        store_selection(root, {"site": site, "identityId": identity_id,
+                               "token": token})
+    finally:
+        os.close(fd)
+    return token
+
+
+def selection_is_current(site: str, identity_id: str, token: str) -> bool:
+    fd, root = session_lock()
+    try:
+        return load_selection(root) == {
+            "site": site, "identityId": identity_id, "token": token}
+    finally:
+        os.close(fd)
+
+
+def revoke_selection(identity_id: str, site: str | None = None) -> None:
+    fd, root = session_lock()
+    try:
+        current = load_selection(root)
+        if current.get("identityId") == identity_id and (
+                site is None or current.get("site") == site):
+            store_selection(root, {"site": current["site"],
+                                   "identityId": identity_id,
+                                   "token": secrets.token_hex(16)})
+    finally:
+        os.close(fd)
+
+
+def ensure_private_profile(site: str, identity_id: str,
+                           prefix: list[str]) -> Path:
+    profile = browser_profile(site, prefix, identity_id)
+    # Preserve the preexisting post-apollo base, which may hold the legacy
+    # profiles. Protect the newly-created identities/ID/site directories.
+    for folder in [profile.parents[2], profile.parents[1],
+                   profile.parent, profile]:
+        if not folder.exists() and not folder.is_symlink():
+            folder.mkdir(mode=0o700, parents=True, exist_ok=True)
+        st = folder.lstat()
+        if not stat.S_ISDIR(st.st_mode) or st.st_uid != os.getuid():
+            raise RuntimeError("Unsafe isolated profile directory")
+        if folder != profile.parents[2] and st.st_mode & 0o077:
+            raise RuntimeError("Insecure isolated profile permissions")
+    return profile
+
+
+def managed_browser_nodes(tree: dict[str, Any]) -> list[dict[str, Any]]:
+    windows = []
+    for node in walk_tree(tree):
+        cls = (node.get("window_properties") or {}).get("class")
+        if not isinstance(cls, str):
+            continue
+        if not any(cls == site_config(site)[1] or
+                   (cls.startswith(site_config(site)[1] + "-")
+                    and IDENTITY_ID.fullmatch(cls[len(site_config(site)[1])+1:]))
+                   for site in ALL_SITES):
+            continue
+        cid = node.get("id")
+        if type(cid) is not int or cid <= 0:
+            raise RuntimeError("Managed browser window lacks Sway con_id")
+        windows.append({"class": cls, "conId": cid,
+                        "visible": bool(node.get("visible", False))})
+    return windows
+
+
+def scoped_target(windows: list[dict[str, Any]],
+                  window_class: str) -> dict[str, Any] | None:
+    found = [w for w in windows if w["class"] == window_class]
+    if len(found) > 1:
+        raise RuntimeError("Ambiguous isolated browser window")
+    return found[0] if found else None
 
 
 def show(site: str = "x", identity_id: str | None = None) -> None:

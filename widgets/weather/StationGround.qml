@@ -2,6 +2,7 @@ import QtQuick
 import "../../components"
 import "../../services/weather" as WeatherServices
 import "../../services/weather/SeismicPolicy.js" as SeismicPolicy
+import "../../services/weather/NwpsRiverPolicy.js" as RiverPolicy
 import "StationGroundPollenPolicy.js" as PollenDetails
 
 Rectangle {
@@ -28,6 +29,13 @@ Rectangle {
         active: ground.visible
     }
 
+    WeatherServices.NwpsRiverService {
+        id: riverService
+        active: ground.visible
+        latitude: weatherService ? weatherService.latitude : ""
+        longitude: weatherService ? weatherService.longitude : ""
+    }
+
     function distanceLabel(latitude, longitude) {
         const km = SeismicPolicy.distanceKm(
             weatherService ? weatherService.latitude : "",
@@ -35,6 +43,32 @@ Rectangle {
             latitude, longitude
         );
         return km >= 0 ? Math.round(km) + " KM FROM FIX" : "DISTANCE --";
+    }
+
+    function riverCategoryColor(category) {
+        const id = category ? String(category.id || "") : "";
+        switch (id) {
+        case "major": return Colors.red;
+        case "moderate": return Colors.orange;
+        case "minor": return Colors.yellow;
+        case "action": return Colors.cyan;
+        case "none": return Colors.green;
+        default: return Colors.white;
+        }
+    }
+
+    function riverReceiveAge() {
+        if (!riverService.lastUpdated
+                || typeof riverService.lastUpdated.getTime !== "function")
+            return "--";
+        const millis = riverService.lastUpdated.getTime();
+        if (!isFinite(millis) || millis <= 0)
+            return "--";
+        const age = Math.max(
+            0,
+            Math.floor((Date.now() - millis) / 60000)
+        );
+        return age === 0 ? "<1m" : age + "m";
     }
 
     readonly property bool aqiReady: weatherService && weatherService.aqiReady
@@ -393,6 +427,256 @@ Rectangle {
                         }
                     }
                 }
+            }
+        }
+
+        StationSectionDivider {
+            width: parent.width
+            title: "RIVER // NOAA NWPS"
+        }
+
+        Column {
+            width: parent.width
+            spacing: 7
+
+            Row {
+                width: parent.width
+                spacing: 14
+
+                SecondaryText {
+                    text: "NEARBY GAUGE"
+                    font.pixelSize: 11
+                    color: Colors.green
+                }
+
+                GohuText {
+                    text: !riverService.configured
+                          ? "LOCATION UNAVAILABLE"
+                          : riverService.loading && !riverService.ready
+                            ? "RECEIVING"
+                            : riverService.failed
+                              ? (riverService.ready
+                                 ? "DEGRADED" : "OFFLINE")
+                              : riverService.ready && riverService.gauge
+                                ? "RECEIVED"
+                                : riverService.ready
+                                  ? "NO GAUGE IN SEARCH BOX"
+                                  : "WAITING"
+                    font.pixelSize: 11
+                    color: riverService.failed ? Colors.yellow
+                           : riverService.ready ? Colors.cyan
+                           : Colors.orange
+                }
+
+                QuietText {
+                    text: riverService.ready
+                          ? "LAST SUCCESS " + ground.riverReceiveAge()
+                          : "NOAA/NWS NATIONAL WATER PREDICTION SERVICE"
+                    font.pixelSize: 9
+                }
+            }
+
+            QuietText {
+                visible: riverService.failed
+                width: parent.width
+                text: riverService.errorText
+                      + (riverService.ready
+                         ? " // LAST-GOOD GAUGE STATE RETAINED" : "")
+                font.pixelSize: 10
+                color: Colors.yellow
+            }
+
+            QuietText {
+                visible: riverService.ready && !riverService.gauge
+                width: parent.width
+                text: "NO NWPS GAUGE RETURNED WITHIN THE BOUNDED WEATHER-LOCATION SEARCH"
+                font.pixelSize: 10
+            }
+
+            Rectangle {
+                visible: riverService.ready && !!riverService.gauge
+                width: parent.width
+                height: 154
+                color: Colors.dark
+                border.width: 1
+                border.color:
+                    riverService.gauge
+                    ? ground.riverCategoryColor(
+                          riverService.gauge.observedCategory
+                      )
+                    : Colors.cyan
+
+                Column {
+                    anchors.fill: parent
+                    anchors.margins: 10
+                    spacing: 5
+
+                    Row {
+                        width: parent.width
+                        spacing: 10
+
+                        GohuText {
+                            width: Math.max(0, parent.width - 270)
+                            text: riverService.gauge
+                                  ? riverService.gauge.name
+                                  : ""
+                            elide: Text.ElideRight
+                            font.pixelSize: 14
+                            color: Colors.white
+                        }
+
+                        GohuText {
+                            width: 260
+                            horizontalAlignment: Text.AlignRight
+                            text: riverService.gauge
+                                  ? Math.round(
+                                        riverService.gauge.distanceKm
+                                    ) + " KM FROM WEATHER FIX"
+                                  : ""
+                            font.pixelSize: 10
+                            color: Colors.cyan
+                        }
+                    }
+
+                    QuietText {
+                        width: parent.width
+                        text: riverService.gauge
+                              ? "LID // " + riverService.gauge.lid
+                                + (riverService.gauge.state
+                                   ? " // " + riverService.gauge.state : "")
+                                + (riverService.gauge.wfo
+                                   ? " // WFO "
+                                     + riverService.gauge.wfo : "")
+                                + (riverService.gauge.rfc
+                                   ? " // RFC "
+                                     + riverService.gauge.rfc : "")
+                              : ""
+                        elide: Text.ElideRight
+                        font.pixelSize: 9
+                    }
+
+                    Row {
+                        width: parent.width
+                        spacing: 12
+
+                        Rectangle {
+                            width: (parent.width - 12) / 2
+                            height: 72
+                            color: Colors.black
+                            border.width: 1
+                            border.color: riverService.gauge
+                                          ? ground.riverCategoryColor(
+                                                riverService.gauge
+                                                .observedCategory
+                                            )
+                                          : Colors.cyan
+
+                            Column {
+                                anchors.fill: parent
+                                anchors.margins: 8
+                                spacing: 4
+
+                                SecondaryText {
+                                    text: "OBSERVED // PRIMARY"
+                                    font.pixelSize: 9
+                                }
+
+                                GohuText {
+                                    text: riverService.gauge
+                                          ? RiverPolicy.readingText(
+                                                riverService.gauge
+                                                .observedPrimary,
+                                                riverService.gauge
+                                                .primaryUnits
+                                            )
+                                          : "--"
+                                    font.pixelSize: 16
+                                    color: Colors.white
+                                }
+
+                                GohuText {
+                                    text: riverService.gauge
+                                          ? "CATEGORY // "
+                                            + riverService.gauge
+                                              .observedCategory.label
+                                          : "CATEGORY // --"
+                                    font.pixelSize: 10
+                                    color: riverService.gauge
+                                           ? ground.riverCategoryColor(
+                                                 riverService.gauge
+                                                 .observedCategory
+                                             )
+                                           : Colors.white
+                                }
+                            }
+                        }
+
+                        Rectangle {
+                            width: (parent.width - 12) / 2
+                            height: 72
+                            color: Colors.black
+                            border.width: 1
+                            border.color: riverService.gauge
+                                          ? ground.riverCategoryColor(
+                                                riverService.gauge
+                                                .forecastCategory
+                                            )
+                                          : Colors.cyan
+
+                            Column {
+                                anchors.fill: parent
+                                anchors.margins: 8
+                                spacing: 4
+
+                                SecondaryText {
+                                    text: "FORECAST // PRIMARY"
+                                    font.pixelSize: 9
+                                }
+
+                                GohuText {
+                                    text: riverService.gauge
+                                          ? RiverPolicy.readingText(
+                                                riverService.gauge
+                                                .forecastPrimary,
+                                                riverService.gauge
+                                                .primaryUnits
+                                            )
+                                          : "--"
+                                    font.pixelSize: 16
+                                    color: Colors.white
+                                }
+
+                                GohuText {
+                                    text: riverService.gauge
+                                          ? "CATEGORY // "
+                                            + riverService.gauge
+                                              .forecastCategory.label
+                                          : "CATEGORY // --"
+                                    font.pixelSize: 10
+                                    color: riverService.gauge
+                                           ? ground.riverCategoryColor(
+                                                 riverService.gauge
+                                                 .forecastCategory
+                                             )
+                                           : Colors.white
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            QuietText {
+                width: parent.width
+                text: "BOUNDED WEATHER-LOCATION PROXIMITY LOOKUP // INFORMATIONAL ONLY // DOES NOT CHANGE THE EXPLICIT NWS ALERT TARGET"
+                font.pixelSize: 9
+            }
+
+            QuietText {
+                width: parent.width
+                text: "STAGE IS RELATIVE TO THE GAUGE DATUM // NEARBY GAUGE ≠ YOUR PROPERTY // NOT A FLOOD WARNING"
+                font.pixelSize: 9
+                color: Colors.orange
             }
         }
 

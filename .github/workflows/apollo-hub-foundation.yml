@@ -40,6 +40,10 @@ on:
       - "widgets/tasks/TaskPlannerPolicy.js"
       - "tests/hub/test_apollo_hub_planner_integration.py"
       - "tests/tasks/test_task_planner_policy.cjs"
+      - "widgets/tasks/TaskProjectsPane.qml"
+      - "widgets/tasks/TaskProjectsAck.js"
+      - "tests/hub/test_apollo_hub_projects_integration.py"
+      - "tests/tasks/test_task_projects_ui_contracts.py"
       - "widgets/hub/ApolloHubNotesMini.qml"
       - "widgets/hub/ApolloHubCalendarMini.qml"
       - "widgets/hub/ApolloHubTimeMini.qml"
@@ -92,6 +96,10 @@ on:
       - "widgets/tasks/TaskPlannerPolicy.js"
       - "tests/hub/test_apollo_hub_planner_integration.py"
       - "tests/tasks/test_task_planner_policy.cjs"
+      - "widgets/tasks/TaskProjectsPane.qml"
+      - "widgets/tasks/TaskProjectsAck.js"
+      - "tests/hub/test_apollo_hub_projects_integration.py"
+      - "tests/tasks/test_task_projects_ui_contracts.py"
       - "widgets/hub/ApolloHubNotesMini.qml"
       - "widgets/hub/ApolloHubCalendarMini.qml"
       - "widgets/hub/ApolloHubTimeMini.qml"
@@ -128,6 +136,10 @@ jobs:
         run: node tests/tasks/test_task_planner_policy.cjs
       - name: Verify standalone TASKS Planner owner contracts
         run: python3 tests/tasks/test_task_planner_ui_contracts.py
+      - name: Verify read-only Hub TASKS Projects integration
+        run: python3 tests/hub/test_apollo_hub_projects_integration.py
+      - name: Verify standalone TASKS Projects owner contracts
+        run: python3 tests/tasks/test_task_projects_ui_contracts.py
       - name: Exercise layout v1 migration, v2 tile identity and guarded remove
         run: node tests/hub/test_apollo_hub_layout_v2.cjs
       - name: Verify sanitized AppControl process projection

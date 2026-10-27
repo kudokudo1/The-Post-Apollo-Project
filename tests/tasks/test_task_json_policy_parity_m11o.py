@@ -149,19 +149,19 @@ class PolicyComparisonTests(unittest.TestCase):
             encode(baseline()).replace('"updatedAtMs":1000',
                                        '"updatedAtMs":NaN', 1))
 
-        # Deliberate host-side strictness: policy regex $ permits one final
-        # newline, while the OS owner demands an entire unambiguous ID/date.
-        add("host_stricter_task_id_trailing_lf",
-            changed(1, task=lambda t:t.update(id="t1\n")), strict=True)
-        add("host_stricter_project_id_trailing_lf",
+        # Non-multiline JavaScript end anchors reject terminal line breaks,
+        # exactly as Python fullmatch does. These MUST NOT be marked as
+        # deliberate host-only rejections.
+        add("invalid_task_id_trailing_lf",
+            changed(1, task=lambda t:t.update(id="t1\n")))
+        add("invalid_project_id_trailing_lf",
             changed(root=lambda d:(
                 d["projects"][0].update(id="p1\n"),
                 d["tasks"][0].update(projectId="p1\n")
-            )),
-            strict=True)
-        add("host_stricter_due_date_trailing_lf",
-            changed(task=lambda t:t.update(dueDate="2026-10-26\n")),
-            strict=True)
+            )))
+        add("invalid_due_date_trailing_lf",
+            changed(task=lambda t:t.update(dueDate="2026-10-26\n")))
+
         # Production JSON.parse last-key-wins; OS-host refuses duplicate keys.
         add("host_stricter_duplicate_json_keys",
             encode(baseline()).replace('"version":3',

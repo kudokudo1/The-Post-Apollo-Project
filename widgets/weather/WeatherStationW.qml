@@ -4,6 +4,7 @@ import Quickshell.Wayland
 import QtQuick.Effects
 import Qt5Compat.GraphicalEffects
 import "../../components"
+import "StationOfficialAlertPolicy.js" as OfficialAlertPolicy
 
 PanelWindow {
     id: weatherStation
@@ -73,6 +74,22 @@ PanelWindow {
     }
 
     readonly property string currentContext: currentViewName
+
+    readonly property var officialAlertSummary:
+        OfficialAlertPolicy.summary(
+            nwsAlertSource && Array.isArray(nwsAlertSource.alertList)
+            ? nwsAlertSource.alertList : []
+        )
+
+    function officialAlertColor(token) {
+        switch (String(token || "")) {
+        case "red": return Colors.red;
+        case "orange": return Colors.orange;
+        case "yellow": return Colors.yellow;
+        case "cyan": return Colors.cyan;
+        default: return Colors.white;
+        }
+    }
 
     // Header source indicator follows the selected Main Mode's provider.
     // HOME is an aggregate surface now, so its badge represents both the
@@ -190,6 +207,9 @@ PanelWindow {
             && String(spaceService.errorText || "").length > 0)
 
     readonly property string sourceStatusText: {
+        if (officialAlertSummary.available)
+            return officialAlertSummary.headerText;
+
         if (usesHomeSources) {
             if (homeWeatherUsable && homeSpaceUsable)
                 return "HOME LIVE";
@@ -233,6 +253,9 @@ PanelWindow {
     }
 
     readonly property string sourceStatusDisplay: {
+        if (officialAlertSummary.available)
+            return officialAlertSummary.headerText;
+
         if (usesHomeSources) {
             if (homeWeatherUsable && homeSpaceUsable)
                 return "HOME LIVE // 2 FEEDS";
@@ -272,6 +295,9 @@ PanelWindow {
     }
 
     readonly property color sourceStatusColor: {
+        if (officialAlertSummary.available)
+            return officialAlertColor(officialAlertSummary.colorToken);
+
         if (usesHomeSources) {
             if (homeWeatherUsable && homeSpaceUsable)
                 return Colors.magenta;
@@ -928,6 +954,7 @@ PanelWindow {
             StationHome {
                 weatherService: weatherStation.weatherService
                 spaceService: weatherStation.spaceService
+                nwsAlertSource: weatherStation.nwsAlertSource
             }
         }
 

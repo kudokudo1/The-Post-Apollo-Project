@@ -39,7 +39,7 @@ assert.equal(point.valid, true);
 assert.ok(point.x > 1000);
 point = projection.projectUnwrapped(181, 50, 1000, 500, 8, 157.5, 50);
 assert.equal(point.valid, true);
-assert.equal(point.visible, false === false ? point.visible : point.visible);
+assert.equal(point.visible, false);
 
 const summary = smoke.summary([
     {density:"Light", ring:[[0,0],[1,0],[1,1],[0,0]]},

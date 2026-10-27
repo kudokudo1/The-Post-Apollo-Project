@@ -67,3 +67,5 @@ jobs:
         run: node tests/weather/test_station_ground_pollen_species.js
       - name: Verify GROUND shared official NWS alert surface
         run: node tests/weather/test_station_ground_nws_alerts.js
+      - name: Verify official NWS alert hierarchy across HOME header and dock
+        run: node tests/weather/test_station_official_alert_hierarchy.js

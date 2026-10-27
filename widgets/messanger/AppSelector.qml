@@ -818,7 +818,11 @@ Rectangle {
                         labelPixelSize: 9
                         contentPadding: 4
                         selected: appSelector.identitySnapshot.activeId === modelData.id
+                        // Do not accept another identity while its predecessor
+                        // is starting a browser or being hidden.
                         interactive: appSelector.identitySnapshot.writable
+                                     && (!appSelector.isolatedBrowserModeActive
+                                         || appSelector.isolatedBrowserToggleAllowed)
                         onTriggered: SocialIdentityStore.selectIdentity(modelData.id)
                     }
                 }

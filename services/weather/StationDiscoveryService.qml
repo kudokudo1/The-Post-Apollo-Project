@@ -9,6 +9,7 @@ Scope {
     id: discovery
 
     property string domain: "map"
+    property string mapCategory: ""
     property bool active: true
     property bool ready: false
     property bool usingCache: false
@@ -25,8 +26,11 @@ Scope {
     readonly property bool canRetry:
         active && !loading && retryWaitSeconds === 0
     readonly property string endpoint: {
-        if (domain === "map")
-            return "https://eonet.gsfc.nasa.gov/api/v3/events?status=open&limit=30";
+        if (domain === "map") {
+            const category = String(mapCategory || "").trim();
+            return "https://eonet.gsfc.nasa.gov/api/v3/events?status=open&limit=40"
+                   + (category !== "" ? "&category=" + category : "");
+        }
         if (domain === "news")
             return "https://api.gdeltproject.org/api/v2/doc/doc"
                    + "?query=(weather%20OR%20earthquake%20OR%20wildfire%20OR%20aurora)"
@@ -36,6 +40,46 @@ Scope {
                    + "?hidebroken=true";
         return "";
     }
+    function restoreMapCache(allowRefresh) {
+        if (domain !== "map")
+            return false;
+        const snapshot = DiscoveryPolicy.cachedMapRows(mapCategory, Date.now());
+        if (snapshot.updatedAtMs <= 0)
+            return false;
+        rows = snapshot.rows;
+        lastUpdated = new Date(snapshot.updatedAtMs);
+        ready = true;
+        usingCache = true;
+        failed = false;
+        errorText = "";
+        if (allowRefresh && !snapshot.fresh)
+            Qt.callLater(function() { discovery.refresh(); });
+        return snapshot.fresh;
+    }
+
+    function changeMapCategory() {
+        if (domain !== "map" || fetchProcess.running)
+            return;
+        const snapshot = DiscoveryPolicy.cachedMapRows(mapCategory, Date.now());
+        if (snapshot.updatedAtMs > 0) {
+            rows = snapshot.rows;
+            lastUpdated = new Date(snapshot.updatedAtMs);
+            ready = true;
+            usingCache = true;
+            failed = false;
+            errorText = "";
+            if (snapshot.fresh)
+                return;
+        } else {
+            rows = [];
+            ready = false;
+            usingCache = false;
+            failed = false;
+            errorText = "";
+        }
+        refresh();
+    }
+
     function restoreNewsCache() {
         if (domain !== "news") return;
         const snapshot = DiscoveryPolicy.cachedNewsRows();
@@ -104,6 +148,8 @@ Scope {
             failed = false;
             errorText = "";
             lastUpdated = new Date(now);
+            if (domain === "map")
+                DiscoveryPolicy.storeMapRows(mapCategory, parsed, now);
             if (domain === "news")
                 DiscoveryPolicy.storeNewsRows(parsed, now);
         } catch (error) {
@@ -147,15 +193,28 @@ Scope {
         running: discovery.active && discovery.domain === "news"
         onTriggered: discovery.sourceClockMs = Date.now()
     }
-    onActiveChanged: { if (active) refresh(); }
+    onActiveChanged: {
+        if (!active)
+            return;
+        if (domain === "map" && restoreMapCache(false))
+            return;
+        refresh();
+    }
+
+    onMapCategoryChanged: {
+        if (domain === "map")
+            changeMapCategory();
+    }
+
     Component.onCompleted: {
+        const mapFresh = restoreMapCache(false);
         restoreNewsCache();
         if (domain === "news" && DiscoveryPolicy.newsManualRetryRequired()) {
             // Preserve the provider refusal across page reconstruction.
             failed = true;
             errorText = "RATE LIMITED";
             sourceClockMs = Date.now();
-        } else if (active) {
+        } else if (active && !(domain === "map" && mapFresh)) {
             refresh();
         }
     }

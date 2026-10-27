@@ -88,8 +88,7 @@ function summary(alerts) {
             recheckPending: false,
             expires: "",
             expiresLabel: "--",
-            headerText: "",
-            dockText: ""
+            headerText: ""
         };
     }
 
@@ -115,7 +114,6 @@ function summary(alerts) {
         recheckPending: pending,
         expires: String(top.expires || ""),
         expiresLabel: utcLabel(top.expires),
-        headerText: "NWS " + severity + " // " + (pending ? "?" : rows.length),
-        dockText: rows.length > 1 ? String(Math.min(rows.length, 9)) : "!"
+        headerText: "NWS " + severity + " // " + (pending ? "?" : rows.length)
     };
 }

@@ -64,6 +64,32 @@ Item {
     property string runningAppKeyIdentityId: ""
     readonly property bool loginInProgress: loginProcess.running
 
+    // UI shows only whether an app key pair is configured, NEVER the keys.
+    // This read-only helper does not connect to Telegram or open sessions.
+    property string appKeyConfigurationStatus: "NOT_CHECKED"
+    property string appKeyConfigurationScope: ""
+    property string appKeyConfigurationOutput: ""
+    property string runningAppKeyStatusScope: ""
+
+    function inspectApplicationKeys(identityId) {
+        if (!active || appKeyStatusProcess.running)
+            return false;
+        const scope = identityId === undefined || identityId === null
+                      ? "" : String(identityId);
+        if (scope !== "" && !/^identity-[1-9][0-9]{0,8}$/.test(scope))
+            return false;
+        appKeyConfigurationScope = scope;
+        runningAppKeyStatusScope = scope;
+        appKeyConfigurationStatus = "CHECKING";
+        appKeyConfigurationOutput = "";
+        var commandArgs = [pythonPath, loginBridgePath, "status"];
+        if (scope !== "")
+            commandArgs.push("--identity", scope);
+        appKeyStatusProcess.command = commandArgs;
+        appKeyStatusProcess.running = true;
+        return true;
+    }
+
     function startLogin(mode) {
         if (!active || (mode !== "qr" && mode !== "phone" && mode !== "configure"))
             return;
@@ -116,6 +142,8 @@ Item {
         pendingAppHash = "";
         requestedAppKeyIdentityId = "";
         runningAppKeyIdentityId = "";
+        appKeyConfigurationStatus = "NOT_CHECKED";
+        appKeyConfigurationScope = "";
     }
 
     function submitPhone(value) {
@@ -287,6 +315,8 @@ Item {
                     adapter.loginDetail = "Identity application keys saved privately. "
                                           + "Telegram account pairing will use them only "
                                           + "when per-identity sessions are enabled.";
+                    adapter.inspectApplicationKeys(
+                        adapter.runningAppKeyIdentityId);
                 }
                 adapter.runningAppKeyIdentityId = "";
             } else if (adapter.loginState === "READY") {
@@ -295,6 +325,39 @@ Item {
                 adapter.loginState = "ERROR";
                 adapter.loginDetail = "Telegram connection stopped; retry";
             }
+        }
+    }
+
+    Process {
+        id: appKeyStatusProcess
+        stdout: StdioCollector {
+            onStreamFinished: adapter.appKeyConfigurationOutput = String(text || "")
+        }
+        onExited: function(exitCode) {
+            if (!adapter.active
+                    || adapter.runningAppKeyStatusScope
+                       !== adapter.appKeyConfigurationScope)
+                return;
+            var result = null;
+            try { result = JSON.parse(adapter.appKeyConfigurationOutput); }
+            catch (e) { }
+            if (exitCode !== 0 || !result || result.state !== "APP_KEY_STATUS"
+                    || result.scope !== (adapter.appKeyConfigurationScope || "universal")
+                    || (result.configuration !== "CONFIGURED"
+                        && result.configuration !== "UNAVAILABLE")
+                    || ["UNIVERSAL", "IDENTITY_OVERRIDE", "UNAVAILABLE"]
+                       .indexOf(result.source) < 0) {
+                adapter.appKeyConfigurationStatus = "UNAVAILABLE";
+                return;
+            }
+            if (result.configuration === "CONFIGURED")
+                adapter.appKeyConfigurationStatus =
+                    result.source === "IDENTITY_OVERRIDE"
+                    ? "IDENTITY OVERRIDE CONFIGURED"
+                    : "UNIVERSAL APP KEYS CONFIGURED";
+            else
+                adapter.appKeyConfigurationStatus =
+                    "APP KEYS MISSING OR INVALID";
         }
     }
 

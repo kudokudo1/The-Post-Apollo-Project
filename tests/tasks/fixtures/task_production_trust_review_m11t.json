@@ -1,0 +1,206 @@
+{
+  "schemaVersion": 1,
+  "milestone": "M11t",
+  "classification": "PROPOSED_PRODUCTION_TRUST_ROLLBACK_CONTRACT_ONLY",
+  "patient": "kudokudo1/The-Post-Apollo-Project",
+  "reviewedMain": "481f9f603818b78bd4da72cf2f643e0481b731e8",
+  "predecessorContracts": [
+    "M11k",
+    "M11q",
+    "M11r",
+    "M11s"
+  ],
+  "existingProduction": {
+    "singleton": "services/hub/ApolloHubTodoStore.qml",
+    "policy": "services/hub/ApolloHubTodoPolicy.js",
+    "sourceSuffix": "/apollo-hub-todo-v1.json",
+    "guardFlag": "readonly property bool guardedWriterEnabled: false",
+    "fileViewCount": 1,
+    "mutationMethodCount": 9,
+    "onlyStage": "stage(result)",
+    "publicStates": [
+      "loading",
+      "saving",
+      "ready",
+      "empty",
+      "error",
+      "unsupported"
+    ],
+    "legacyHasOSOwnedLock": false,
+    "legacyFileViewSavedIsDurableSettled": false
+  },
+  "operatorNativeEvidence": {
+    "classification": "OBSERVED_SYNTHETIC_QML_PLUS_INDEPENDENT_READ_ONLY_JOURNAL",
+    "source": "operator-supplied screenshots and sanitized inspector output in conversation",
+    "rawScreenshotsInRepository": false,
+    "inspectorObservedNativeCallbacks": false,
+    "originalM11sBatchAggregateClaimedComplete": false,
+    "finalSettlementCaseUsesSeparateReplacementFixture": true,
+    "cases": [
+      {
+        "fault": "AFTER_RESERVE",
+        "nativeScreenObserved": true,
+        "inspectorExpectationMetBeforeAndAfterExisting": true,
+        "before": {
+          "counter": 0,
+          "epoch": 0,
+          "phase": "JSON_ACTIVE",
+          "pending": true,
+          "stageState": "RESERVED",
+          "sourceHashMatchesJournal": true
+        },
+        "afterExisting": {
+          "counter": 0,
+          "epoch": 1,
+          "phase": "RECOVERY_REVIEW",
+          "pending": true,
+          "stageState": "RESERVED",
+          "sourceHashMatchesJournal": true
+        }
+      },
+      {
+        "fault": "AFTER_SAVED",
+        "nativeScreenObserved": true,
+        "inspectorExpectationMetBeforeAndAfterExisting": true,
+        "before": {
+          "counter": 1,
+          "epoch": 0,
+          "phase": "JSON_ACTIVE",
+          "pending": true,
+          "stageState": "RESERVED",
+          "sourceHashMatchesJournal": false
+        },
+        "afterExisting": {
+          "counter": 1,
+          "epoch": 1,
+          "phase": "RECOVERY_REVIEW",
+          "pending": true,
+          "stageState": "RESERVED",
+          "sourceHashMatchesJournal": false
+        }
+      },
+      {
+        "fault": "AFTER_READBACK",
+        "nativeScreenObserved": true,
+        "inspectorExpectationMetBeforeAndAfterExisting": true,
+        "before": {
+          "counter": 1,
+          "epoch": 0,
+          "phase": "JSON_ACTIVE",
+          "pending": true,
+          "stageState": "RESERVED",
+          "sourceHashMatchesJournal": false
+        },
+        "afterExisting": {
+          "counter": 1,
+          "epoch": 1,
+          "phase": "RECOVERY_REVIEW",
+          "pending": true,
+          "stageState": "RESERVED",
+          "sourceHashMatchesJournal": false
+        }
+      },
+      {
+        "fault": "AFTER_SETTLEMENT",
+        "nativeScreenObserved": true,
+        "inspectorExpectationMetBeforeAndAfterExisting": true,
+        "before": {
+          "counter": 1,
+          "epoch": 0,
+          "phase": "JSON_ACTIVE",
+          "pending": false,
+          "stageState": "SETTLED",
+          "sourceHashMatchesJournal": true
+        },
+        "afterExisting": {
+          "counter": 1,
+          "epoch": 1,
+          "phase": "RECOVERY_REVIEW",
+          "pending": false,
+          "stageState": "SETTLED",
+          "sourceHashMatchesJournal": true
+        }
+      }
+    ]
+  },
+  "testOnlyLimits": {
+    "sessionNonceAuthenticatesExecutable": false,
+    "osAdvisoryLockExcludesNoncooperatingWriters": false,
+    "FileViewCallbacksCarryDurableStageId": false,
+    "hardwarePowerLossDurabilityProven": false,
+    "productionRealSourceWasUsed": false,
+    "liveRollbackWasTested": false,
+    "actualGuardedIntegrationImplemented": false,
+    "sqliteTaskDataWriterEnabled": false
+  },
+  "gates": [
+    {
+      "id": "TRUST_EXEC",
+      "state": "OPEN",
+      "required": "Pinned production interpreter/script identity, trusted path/ownership, no symlink or replacement race, executable-substitution tests"
+    },
+    {
+      "id": "PROCESS_BINDING",
+      "state": "OPEN",
+      "required": "OS process origin, protocol nonce, owner epoch, source identity and stage correlation; malicious/replayed host-output denial"
+    },
+    {
+      "id": "SOURCE_BACKUP",
+      "state": "OPEN",
+      "required": "Exact separately authorized real-source metadata+bytes, independent backup readback, advisory-lock external-writer conflict tests"
+    },
+    {
+      "id": "STAGE_CALLBACK",
+      "state": "OPEN",
+      "required": "Nine mutations through single stage(); durable reserve before one FileView write; stale/native callback and false-confirmation refusal"
+    },
+    {
+      "id": "UI_CONTRACT",
+      "state": "OPEN",
+      "required": "Synchronous return versus asynchronous durable completion semantics and six snapshot states across TASKS/TODAY/PLANNER/Hub"
+    },
+    {
+      "id": "RECOVERY_FREEZE",
+      "state": "OPEN",
+      "required": "Host death, replay, reservation, settled-without-ack, reload, freeze, fresh-owner review and indefinite journal preservation"
+    },
+    {
+      "id": "ROLLBACK",
+      "state": "OPEN",
+      "required": "Reversible code/config with quiesced writers; no task JSON overwrite; manual reconciliation/restore only by separate consent"
+    },
+    {
+      "id": "RUNTIME_ACCEPTANCE",
+      "state": "OPEN",
+      "required": "Operator-approved isolated production-shaped native test and independent redacted fault/backup/restart evidence"
+    },
+    {
+      "id": "ACTIVATION_APPROVAL",
+      "state": "OPEN",
+      "required": "Separate exact operator authorization, after all gates; no implicit local deployment, SQLite migration or remote writes"
+    }
+  ],
+  "authorizations": {
+    "contractProposalOnly": true,
+    "mergeM11t": false,
+    "productionHostSourcePatch": false,
+    "productionStoreSourcePatch": false,
+    "productionSourceInspection": false,
+    "localMachineModification": false,
+    "guardedWriterActivation": false,
+    "sqliteTaskMigration": false,
+    "remoteGitHubTaskWrites": false,
+    "taskDataRestore": false,
+    "finalAcceptance": false
+  },
+  "changedByM11t": {
+    "productionStore": false,
+    "productionPolicy": false,
+    "shell": false,
+    "isolatedHost": false,
+    "taskData": false,
+    "localCheckout": false,
+    "localProcesses": false,
+    "gitHubPullRequestMerge": false
+  }
+}

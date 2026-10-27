@@ -1373,6 +1373,55 @@ for forbidden in ('ApolloHubTodoStore {', 'FileView {', 'Process {',
                   'setTaskDone(', 'createProject(', 'saveDetails(',
                   'Qt.openUrlExternally('):
     assert forbidden not in todo_explore, f"Stage 8G double write forbidden: {forbidden}"
+
+# Phase 3 TASKS TODAY: mount the existing read-only TASKS pane ONLY
+# inside expanded H:2/H:3 To-do, and OPEN through the canonical details
+# editor without switching targets when unsaved/pending details exist.
+today_pane = (ROOT / "widgets/tasks/TaskTodayPane.qml").read_text(encoding="utf-8")
+today_policy = (ROOT / "widgets/tasks/TaskTodayPolicy.js").read_text(encoding="utf-8")
+assert 'ApolloHubTodoExplore {' in tile
+assert 'visible: tile.moduleId === "todo" && tile.tileRowSpan > 1' in tile
+for token in (
+    'readonly property bool todayMode: selectedView === "today"',
+    'readonly property string todayStatus:',
+    'taskToday.projection.overdue',
+    'taskToday.projection.dueToday',
+    'function chooseView(view)',
+    'function openTask(taskId)',
+    'if (taskDetails.pendingWrite || taskDetails.dirty)',
+    'taskDetails.selectedTaskId !== taskId',
+    'taskDetails.chooseTask(taskId)',
+    'taskDetails.selectedTask.id !== taskId',
+    'navigationFeedback = "SAVE OR DISCARD FIRST"',
+    'selectedView = "details"',
+    'label: "LIST"',
+    'label: "TODAY"',
+    'label: "DETAILS"',
+    'onLeftClicked: todoExplore.chooseView("today")',
+    'TaskTodayPane {',
+    'visible: todoExplore.todayMode',
+    'todoSnapshot: todoExplore.todoSnapshot',
+    'onOpenTaskRequested: function(taskId)',
+    'todoExplore.openTask(taskId);',
+    'TaskDetailsPane {',
+    'todoStore: todoExplore.todoStore',
+    'todoSnapshot: todoExplore.todoSnapshot',
+):
+    assert token in todo_explore, f"Phase 3 TASKS TODAY integration missing {token}"
+assert todo_explore.count("TaskTodayPane {") == 1
+assert todo_explore.count("TaskDetailsPane {") == 1
+assert 'onDetailModeChanged: textFocusChanged(detailMode)' in todo_explore
+assert 'running: todayPane.visible' in today_pane
+assert 'TodayPolicy.view(todoSnapshot, todayKey)' in today_pane
+assert 'function view(snapshot, today)' in today_policy
+for forbidden in ('ApolloHubTodoStore {', 'FileView {', 'Process {',
+                  'Timer {', 'JsonAdapter {', 'new Date(', 'createProject(',
+                  'updateTaskDetails(', 'setTaskDone(', 'removeTask(',
+                  'saveDetails(', 'Qt.openUrlExternally('):
+    assert forbidden not in todo_explore, (
+        f"Phase 3 wrapper cannot own another writer/clock/action: {forbidden}")
+
+
 for token in (
     'readonly property int densityLevel: height >= 300 ? 3',
     ': height >= 180 ? 2 : 1',

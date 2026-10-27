@@ -81,6 +81,8 @@ jobs:
         run: node tests/weather/test_station_map_hms_smoke.js
       - name: Validate NOAA HMS latest KML fetch helper
         run: python3 tests/weather/test_station_hms_smoke_fetch.py
+      - name: Validate RADIO favorites recents and safe recall
+        run: node tests/weather/test_station_radio_memory.js
       - name: Validate Weather Station domain palette and live meter contracts
         run: node tests/weather/test_domain_palette_contracts.js
       - name: Verify GROUND individual pollen readings and unavailable states

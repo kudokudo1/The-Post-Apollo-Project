@@ -5,6 +5,7 @@ import "StationViewerPolicy.js" as ViewerPolicy
 import "StationMapProjectionPolicy.js" as MapProjection
 import "../../services/weather/FirmsHotspotPolicy.js" as FirmsAreaPolicy
 import "StationRadarPolicy.js" as RadarPolicy
+import "../../services/weather/HmsSmokePolicy.js" as SmokePolicy
 
 // Source-first stage. All records shown come from a backend, never examples.
 // MAP now owns a source-driven geographic point canvas plus its event list.
@@ -45,6 +46,9 @@ Rectangle {
     property string radarImageUrl: ""
     property var radarSnapshotBounds: null
     property date radarRequestedAt
+    readonly property var smokeSummary:
+        hmsSmokeService ? hmsSmokeService.summary
+                        : { "count": 0, "light": 0, "medium": 0, "heavy": 0 }
     readonly property bool hotspotInspectorOpen:
         domain === "map" && selectedMapHotspot !== null
 
@@ -123,6 +127,17 @@ Rectangle {
     function clearRadarSnapshot() {
         radarImageUrl = "";
         radarSnapshotBounds = null;
+    }
+
+    function loadSmokePolygons() {
+        if (!hmsSmokeService || hmsSmokeService.loading)
+            return false;
+        return hmsSmokeService.request();
+    }
+
+    function clearSmokePolygons() {
+        if (hmsSmokeService)
+            hmsSmokeService.clear();
     }
 
     function applyMapView(view) {
@@ -219,7 +234,7 @@ Rectangle {
         : domain === "news" ? "GDELT DOC // WORLD EVENT HEADLINES"
         : "RADIO BROWSER // TOP VOTED STREAMS"
     readonly property string sourceCaution:
-        domain === "map" ? "EONET + FIRMS + NOAA MRMS RADAR CONNECTED // BASEMAP + POLYGON RENDERING NOT YET WIRED"
+        domain === "map" ? "EONET + FIRMS + MRMS + HMS SMOKE CONNECTED // BASEMAP NOT WIRED"
         : domain === "news" ? "ARTICLE DISCOVERY // NOT YET LIVE VIDEO OR STORY CLUSTERS"
         : "STATION DIRECTORY // PERSISTENT PLAYBACK NOT YET WIRED"
     readonly property var plannedSources: {
@@ -235,6 +250,12 @@ Rectangle {
                 },
                 {name:"RAINVIEWER // RADAR FALLBACK", state:"NOT WIRED"},
                 {
+                    name:"NOAA HMS // SMOKE PLUME POLYGONS",
+                    state: hmsSmokeService.ready
+                           ? "LOADED " + hmsSmokeService.polygons.length
+                           : "MANUAL READY"
+                },
+                {
                     name:"NASA FIRMS // VIIRS NOAA-21 HOTSPOTS",
                     state: firmsService.configured
                            ? (firmsService.ready
@@ -242,7 +263,7 @@ Rectangle {
                               : "MANUAL READY")
                            : "KEY REQUIRED"
                 },
-                {name:"BASEMAP / POLYGON LAYERS", state:"NOT WIRED"}
+                {name:"BASEMAP / OTHER POLYGON LAYERS", state:"NOT WIRED"}
             ];
         if (domain === "news")
             return [
@@ -271,6 +292,10 @@ Rectangle {
 
     WeatherServices.FirmsHotspotService {
         id: firmsService
+    }
+
+    WeatherServices.HmsSmokeService {
+        id: hmsSmokeService
     }
 
     color: Colors.black
@@ -569,6 +594,88 @@ Rectangle {
                     color: Colors.cyan
                 }
 
+                StationSectionDivider {
+                    width: parent.width
+                    title: "SMOKE PLUMES // NOAA HMS"
+                }
+
+                Row {
+                    width: parent.width
+                    height: 32
+                    spacing: 10
+
+                    ActionButton {
+                        width: 142
+                        height: 30
+                        label: hmsSmokeService.ready
+                               ? "REFRESH SMOKE" : "LOAD SMOKE"
+                        labelPixelSize: 10
+                        available: !hmsSmokeService.loading
+                        accentColor: Colors.yellow
+                        onClicked:
+                            stationDiscovery.loadSmokePolygons()
+                    }
+
+                    ActionButton {
+                        width: 90
+                        height: 30
+                        label: "CLEAR"
+                        labelPixelSize: 10
+                        available: hmsSmokeService.ready
+                        onClicked:
+                            stationDiscovery.clearSmokePolygons()
+                    }
+
+                    GohuText {
+                        anchors.verticalCenter: parent.verticalCenter
+                        width: 180
+                        text: hmsSmokeService.loading ? "LOADING"
+                              : hmsSmokeService.failed
+                                ? hmsSmokeService.errorText
+                                : hmsSmokeService.ready
+                                  ? "PLUMES " + hmsSmokeService.polygons.length
+                                  : "MANUAL READY"
+                        elide: Text.ElideRight
+                        font.pixelSize: 10
+                        color: hmsSmokeService.failed ? Colors.yellow
+                               : hmsSmokeService.ready ? Colors.yellow
+                               : Colors.white
+                    }
+
+                    QuietText {
+                        anchors.verticalCenter: parent.verticalCenter
+                        width: Math.max(0, parent.width - 442)
+                        text: hmsSmokeService.ready
+                              ? "PRODUCT " + hmsSmokeService.analysisDate
+                                + " // AGE " + hmsSmokeService.ageDays + "d"
+                              : "LATEST AVAILABLE DAILY ANALYSIS // NO AUTO-FETCH"
+                        elide: Text.ElideRight
+                        font.pixelSize: 9
+                    }
+                }
+
+                Row {
+                    width: parent.width
+                    spacing: 16
+
+                    QuietText {
+                        text: "LIGHT " + stationDiscovery.smokeSummary.light
+                              + " // MEDIUM " + stationDiscovery.smokeSummary.medium
+                              + " // HEAVY " + stationDiscovery.smokeSummary.heavy
+                        font.pixelSize: 9
+                        color: Colors.white
+                    }
+
+                    QuietText {
+                        text: hmsSmokeService.truncated
+                              ? "SOURCE CLIPPED BY SAFETY LIMIT"
+                              : "QUALITATIVE PLUME DENSITY // NOT GROUND-LEVEL PM2.5"
+                        font.pixelSize: 9
+                        color: hmsSmokeService.truncated ? Colors.orange
+                                                       : Colors.cyan
+                    }
+                }
+
                 Rectangle {
                     id: mapPlot
                     width: parent.width
@@ -627,6 +734,85 @@ Rectangle {
                         visible: source !== ""
                                  && northWest.valid && southEast.valid
                                  && width > 0 && height > 0
+                    }
+
+                    Canvas {
+                        id: smokeCanvas
+                        anchors.fill: parent
+                        z: 0.2
+
+                        property var smokeRows: hmsSmokeService.polygons
+                        property real viewZoom: stationDiscovery.mapZoom
+                        property real viewCenterLon: stationDiscovery.mapCenterLon
+                        property real viewCenterLat: stationDiscovery.mapCenterLat
+
+                        onSmokeRowsChanged: requestPaint()
+                        onViewZoomChanged: requestPaint()
+                        onViewCenterLonChanged: requestPaint()
+                        onViewCenterLatChanged: requestPaint()
+                        onWidthChanged: requestPaint()
+                        onHeightChanged: requestPaint()
+
+                        onPaint: {
+                            const ctx = getContext("2d");
+                            ctx.clearRect(0, 0, width, height);
+                            const offsets = [-360, 0, 360];
+
+                            for (let rowIndex = 0;
+                                 rowIndex < smokeRows.length;
+                                 rowIndex++) {
+                                const row = smokeRows[rowIndex];
+                                const ring = SmokePolicy.unwrapRing(row.ring);
+                                if (ring.length < 4)
+                                    continue;
+
+                                for (let copy = 0; copy < offsets.length; copy++) {
+                                    const offset = offsets[copy];
+                                    const projected = [];
+                                    let minX = Infinity;
+                                    let maxX = -Infinity;
+                                    let minY = Infinity;
+                                    let maxY = -Infinity;
+
+                                    for (let i = 0; i < ring.length; i++) {
+                                        const point = MapProjection.projectUnwrapped(
+                                            ring[i][0] + offset,
+                                            ring[i][1],
+                                            width,
+                                            height,
+                                            viewZoom,
+                                            viewCenterLon,
+                                            viewCenterLat
+                                        );
+                                        if (!point.valid) {
+                                            projected.length = 0;
+                                            break;
+                                        }
+                                        projected.push(point);
+                                        minX = Math.min(minX, point.x);
+                                        maxX = Math.max(maxX, point.x);
+                                        minY = Math.min(minY, point.y);
+                                        maxY = Math.max(maxY, point.y);
+                                    }
+
+                                    if (projected.length < 4
+                                            || maxX < 0 || minX > width
+                                            || maxY < 0 || minY > height)
+                                        continue;
+
+                                    ctx.beginPath();
+                                    ctx.moveTo(projected[0].x, projected[0].y);
+                                    for (let i = 1; i < projected.length; i++)
+                                        ctx.lineTo(projected[i].x, projected[i].y);
+                                    ctx.closePath();
+                                    ctx.fillStyle = SmokePolicy.fillStyle(row.density);
+                                    ctx.strokeStyle = SmokePolicy.strokeStyle(row.density);
+                                    ctx.lineWidth = 1;
+                                    ctx.fill();
+                                    ctx.stroke();
+                                }
+                            }
+                        }
                     }
 
                     Repeater {
@@ -850,7 +1036,7 @@ Rectangle {
                         anchors.top: parent.top
                         anchors.margins: 7
                         z: 3
-                        text: "LAT/LON GRID // NOAA RADAR IS DATA LAYER, NOT BASEMAP"
+                        text: "LAT/LON GRID // RADAR + SMOKE ARE DATA LAYERS, NOT BASEMAP"
                         color: Colors.orange
                         font.pixelSize: 9
                     }

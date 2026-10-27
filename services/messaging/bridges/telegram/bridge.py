@@ -13,11 +13,14 @@ from datetime import datetime
 import json
 import os
 from pathlib import Path
+import re
+import stat
 import sys
 from typing import Any
 
 SERVICE = "telegram"
 MAX_TEXT_LENGTH = 4096
+IDENTITY_ID = re.compile(r"^identity-[1-9][0-9]{0,8}$")
 
 
 class BridgeError(Exception):
@@ -27,34 +30,110 @@ class BridgeError(Exception):
         self.detail = detail
 
 
-def _session_path() -> Path:
+def _validate_identity(identity_id: str | None) -> str | None:
+    """Stable organization ID only; never a display name or arbitrary path."""
+    if identity_id is None:
+        return None
+    if not isinstance(identity_id, str) or not IDENTITY_ID.fullmatch(identity_id):
+        raise BridgeError("ERROR", "Invalid Telegram identity scope")
+    return identity_id
+
+
+def _session_path(identity_id: str | None = None) -> Path:
+    identity = _validate_identity(identity_id)
     root = Path(os.environ.get("XDG_DATA_HOME") or (Path.home() / ".local/share"))
-    return root / "post-apollo" / "telegram" / "personal.session"
+    base = root / "post-apollo" / "telegram"
+    if identity is None:
+        return base / "personal.session"  # Existing shared login, unchanged.
+    return base / "identities" / identity / "personal.session"
 
 
-def _app_config_path() -> Path:
+def _app_config_path(identity_id: str | None = None) -> Path:
+    identity = _validate_identity(identity_id)
     root = Path(os.environ.get("XDG_CONFIG_HOME") or (Path.home() / ".config"))
-    return root / "post-apollo" / "telegram" / "client.json"
+    base = root / "post-apollo" / "telegram"
+    if identity is None:
+        return base / "client.json"  # Universal application configuration.
+    return base / "identities" / identity / "client.json"
 
 
-def _app_credentials_from_private_file() -> dict[str, str]:
-    path = _app_config_path()
-    if not path.exists():
-        return {}
-    if path.is_symlink() or (path.stat().st_mode & 0o077):
-        raise BridgeError("AUTH_REQUIRED", "Telegram application key file permissions are unsafe")
+def _ensure_scoped_parent(file_path: Path, identity_id: str) -> None:
+    """Reject symlinks and insecure dirs rather than changing user data modes.
+
+    Only create the Telegram base + identity namespace after explicit
+    per-identity login/configuration. Never rewrite the legacy shared session.
+    """
+    identity = _validate_identity(identity_id)
+    if identity is None:
+        raise BridgeError("ERROR", "Identity scope is required")
+    base = file_path.parent.parent.parent
+    # base = .../telegram, identity parent = .../identities/identity-N.
+    for folder in (base, base / "identities", base / "identities" / identity):
+        if not folder.exists() and not folder.is_symlink():
+            folder.mkdir(mode=0o700, parents=True, exist_ok=True)
+        info = folder.lstat()
+        if (not stat.S_ISDIR(info.st_mode) or info.st_uid != os.getuid()
+                or info.st_mode & 0o077):
+            raise BridgeError("ERROR", "Unsafe Telegram identity directory")
+
+
+def _read_private_config(path: Path, *, scoped: bool = False) -> dict[str, str]:
     try:
-        data = json.loads(path.read_text(encoding="utf-8"))
+        info = path.lstat()
+    except FileNotFoundError:
+        return {}
+    if (not stat.S_ISREG(info.st_mode) or info.st_uid != os.getuid()
+            or info.st_mode & 0o077):
+        raise BridgeError("AUTH_REQUIRED", "Telegram application key file permissions are unsafe")
+    # Scoped config parent must also be private; don't silently fall back
+    # when an identity override exists but has unsafe metadata.
+    if scoped:
+        for folder in (path.parent, path.parent.parent, path.parent.parent.parent):
+            meta = folder.lstat()
+            if (not stat.S_ISDIR(meta.st_mode) or meta.st_uid != os.getuid()
+                    or meta.st_mode & 0o077):
+                raise BridgeError("AUTH_REQUIRED", "Telegram identity key directory is unsafe")
+    try:
+        fd = os.open(path, os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0))
+        with os.fdopen(fd, "rb") as source:
+            content = source.read(4097)
+        if len(content) > 4096:
+            raise ValueError("Oversized Telegram configuration")
+        data = json.loads(content)
     except (OSError, ValueError):
-        raise BridgeError("AUTH_REQUIRED", "Telegram application key file is unreadable")
-    return data if isinstance(data, dict) else {}
+        raise BridgeError("AUTH_REQUIRED", "Telegram application key file is unreadable") from None
+    if not isinstance(data, dict):
+        raise BridgeError("AUTH_REQUIRED", "Telegram application key file is invalid")
+    if scoped and set(data) != {"apiId", "apiHash"}:
+        raise BridgeError("AUTH_REQUIRED", "Telegram identity application keys are invalid")
+    return data
 
 
-def _credentials() -> tuple[int, str]:
-    id_text = os.environ.get("POST_APOLLO_TELEGRAM_API_ID", "").strip()
-    api_hash = os.environ.get("POST_APOLLO_TELEGRAM_API_HASH", "").strip()
-    if not id_text or not api_hash:
-        config = _app_credentials_from_private_file()
+def _app_credentials_from_private_file(
+    identity_id: str | None = None,
+) -> dict[str, str]:
+    identity = _validate_identity(identity_id)
+    # Optional complete override; absent override falls back to universal.
+    if identity is not None:
+        path = _app_config_path(identity)
+        data = _read_private_config(path, scoped=True)
+        if data:
+            return data
+    return _read_private_config(_app_config_path())
+
+
+def _credentials(identity_id: str | None = None) -> tuple[int, str]:
+    identity = _validate_identity(identity_id)
+    config = _app_credentials_from_private_file(identity)
+    # Profile-specific *complete* override has priority over global/env.
+    scoped_override = (identity is not None
+                       and _app_config_path(identity).exists())
+    if scoped_override:
+        id_text = str(config.get("apiId", "")).strip()
+        api_hash = str(config.get("apiHash", "")).strip()
+    else:
+        id_text = os.environ.get("POST_APOLLO_TELEGRAM_API_ID", "").strip()
+        api_hash = os.environ.get("POST_APOLLO_TELEGRAM_API_HASH", "").strip()
         id_text = id_text or str(config.get("apiId", "")).strip()
         api_hash = api_hash or str(config.get("apiHash", "")).strip()
     if not id_text or not api_hash:
@@ -68,17 +147,33 @@ def _credentials() -> tuple[int, str]:
     return api_id, api_hash
 
 
-def _telegram_client(*, receive_updates: bool = False):
-    api_id, api_hash = _credentials()
+def _telegram_client(*, receive_updates: bool = False,
+                     identity_id: str | None = None):
+    identity = _validate_identity(identity_id)
+    api_id, api_hash = _credentials(identity)
     try:
         from telethon import TelegramClient
     except ImportError as exc:
         raise BridgeError("UNSUPPORTED", "Install the supported Telethon 1.x Python library") from exc
-    session = _session_path()
-    session.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
-    session.parent.chmod(0o700)
-    if session.exists():
-        session.chmod(0o600)
+    session = _session_path(identity)
+    if identity is None:
+        session.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
+        session.parent.chmod(0o700)
+        if session.exists():
+            session.chmod(0o600)
+    else:
+        _ensure_scoped_parent(session, identity)
+        # No symlinks, no world-readable sessions; do not chmod an
+        # unknown preexisting file to make it appear safe.
+        try:
+            info = session.lstat()
+        except FileNotFoundError:
+            info = None
+        if info is not None and (
+            not stat.S_ISREG(info.st_mode) or info.st_uid != os.getuid()
+            or info.st_mode & 0o077
+        ):
+            raise BridgeError("ERROR", "Unsafe Telegram identity session file")
     # SQLite session creation can happen inside TelegramClient's constructor.
     # Ensure it is private *from creation*, not merely after disconnect.
     prior_umask = os.umask(0o077)
@@ -88,10 +183,20 @@ def _telegram_client(*, receive_updates: bool = False):
         os.umask(prior_umask)
 
 
-def _protect_session_file() -> None:
-    path = _session_path()
-    if path.exists():
-        path.chmod(0o600)
+def _protect_session_file(identity_id: str | None = None) -> None:
+    identity = _validate_identity(identity_id)
+    path = _session_path(identity)
+    if identity is None:
+        if path.exists():
+            path.chmod(0o600)
+    else:
+        try:
+            info = path.lstat()
+        except FileNotFoundError:
+            return
+        if (not stat.S_ISREG(info.st_mode) or info.st_uid != os.getuid()
+                or info.st_mode & 0o077):
+            raise BridgeError("ERROR", "Unsafe Telegram identity session file")
 
 
 def _seconds(value: Any) -> int:
@@ -183,7 +288,9 @@ async def _run(args: argparse.Namespace) -> Any:
     if args.command == "login" and not sys.stdin.isatty():
         raise BridgeError("AUTH_REQUIRED", "Telegram login requires an interactive terminal")
     # Don't touch a profile without credentials and the provider dependency.
-    client = _telegram_client()
+    identity = _validate_identity(getattr(args, "identity", None))
+    client = (_telegram_client(identity_id=identity)
+              if identity is not None else _telegram_client())
     if args.command == "login":
         try:
             await client.start()
@@ -192,7 +299,7 @@ async def _run(args: argparse.Namespace) -> Any:
             return {"mode": "READY", "detail": "Telegram account linked"}
         finally:
             await client.disconnect()
-            _protect_session_file()
+            _protect_session_file(identity)
     try:
         await client.connect()
         if not await client.is_user_authorized():
@@ -208,7 +315,7 @@ async def _run(args: argparse.Namespace) -> Any:
         raise BridgeError("ERROR", "Unknown Telegram bridge command")
     finally:
         await client.disconnect()
-        _protect_session_file()
+        _protect_session_file(identity)
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -222,8 +329,11 @@ def main(argv: list[str] | None = None) -> int:
     messages.add_argument("--limit", type=int, default=100)
     send = sub.add_parser("send")
     send.add_argument("conversation_id")
+    parser.add_argument("--identity", default=None,
+                        help="Explicit isolated Post-Apollo identity-N scope")
     args = parser.parse_args(argv)
     try:
+        _validate_identity(args.identity)
         payload = asyncio.run(_run(args))
         print(json.dumps(payload, ensure_ascii=False))
         return 0

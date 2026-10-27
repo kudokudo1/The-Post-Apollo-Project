@@ -191,8 +191,8 @@ assert.doesNotMatch(
 const policySource = read("services/weather/StationDiscoveryPolicy.js");
 assert.doesNotMatch(
     policySource,
-    /Levenshtein|similarity|embedding|cosine|cluster/i,
-    "dedupe must remain exact/canonical rather than fuzzy story clustering"
+    /Levenshtein|Jaro|embedding|cosine|editDistance|fuzzyMatch/i,
+    "dedupe must remain exact/canonical rather than fuzzy story matching"
 );
 
 console.log("Weather NEWS conservative dedupe and local topic filters: PASS");

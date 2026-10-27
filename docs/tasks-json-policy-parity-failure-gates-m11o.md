@@ -20,6 +20,8 @@ M11o corrects **only** `TaskJsonGateCandidateM11l.py`, the already test-restrict
 
 No changes to `ApolloHubTodoPolicy.js`, `ApolloHubTodoStore.qml`, `shell.qml`, task mutations or any production file paths.
 
+**Concurrent Planner source compatibility:** another already-merged Hub change added `schedulingAllowed` to the shared `TaskPlannerPane.qml`, preserving the same `ApolloHubTodoStore` injection only when scheduling is permitted. The older M11d source-audit test and fixture hardcoded the prior unguarded binding string, so this PR updates **only those test expectations** to require the new safety guard. No Planner or Hub QML is modified.
+
 ### Explicit strict-only differences
 
 The Python owner remains deliberately **stricter** than the reader for duplicate JSON keys: JavaScript `JSON.parse` takes the last key, whereas the durable host refuses an ambiguous source. This is the **single** intentional discrepancy in the M11o sample corpus and is asserted by name.

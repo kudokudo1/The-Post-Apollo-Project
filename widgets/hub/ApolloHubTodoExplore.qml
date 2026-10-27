@@ -2,8 +2,9 @@ import QtQuick
 import "../../components"
 import "../tasks"
 
-// Phase 3 TASKS / TODAY: use canonical TaskTodayPane and TaskDetailsPane
-// against the ONE existing TodoStore. No second writer or task poller.
+// Phase 3 TASKS / TODAY + PLANNER: mount the canonical TASKS panes
+// against the ONE existing TodoStore. PLANNER is read-only in Hub;
+// standalone TASKS retains its separately guarded scheduling controls.
 // Switching internal tabs cannot discard a pending or dirty details draft.
 Item {
     id: todoExplore
@@ -15,6 +16,12 @@ Item {
 
     readonly property bool detailMode: selectedView === "details"
     readonly property bool todayMode: selectedView === "today"
+    readonly property bool plannerMode: selectedView === "planner"
+    readonly property string plannerStatus:
+        !taskPlanner.calendar.available
+        ? "TO-DO // PLANNER // " + String(taskPlanner.calendar.state).toUpperCase()
+        : "TO-DO // PLANNER // " + taskPlanner.viewMode.toUpperCase()
+          + " // " + taskPlanner.selectedDate
     readonly property string todayStatus:
         !taskToday.projection.available
         ? "TO-DO // TODAY // " + taskToday.storeState.toUpperCase()
@@ -32,12 +39,14 @@ Item {
                ? "TO-DO // TASK DETAILS // " + String(taskDetails.selectedTask.title)
                : "TO-DO // SELECT A TASK")
         : todayMode ? todayStatus
+        : plannerMode ? plannerStatus
         : taskList.statusLine
 
     // Dirty details remain mounted on an internal tab switch, but keep the
     // tab itself visible until the operator explicitly saves or discards.
     function chooseView(view) {
-        if (view !== "list" && view !== "today" && view !== "details")
+        if (view !== "list" && view !== "today"
+                && view !== "planner" && view !== "details")
             return;
         if (view === selectedView) {
             navigationFeedback = "";
@@ -94,7 +103,7 @@ Item {
         spacing: 6
 
         ActionButton {
-            width: Math.max(1, (modeSelector.width - 2 * modeSelector.spacing) / 3)
+            width: Math.max(1, (modeSelector.width - 3 * modeSelector.spacing) / 4)
             height: parent.height
             label: "LIST"
             selected: todoExplore.selectedView === "list"
@@ -103,7 +112,7 @@ Item {
             onLeftClicked: todoExplore.chooseView("list")
         }
         ActionButton {
-            width: Math.max(1, (modeSelector.width - 2 * modeSelector.spacing) / 3)
+            width: Math.max(1, (modeSelector.width - 3 * modeSelector.spacing) / 4)
             height: parent.height
             label: "TODAY"
             selected: todoExplore.todayMode
@@ -112,7 +121,16 @@ Item {
             onLeftClicked: todoExplore.chooseView("today")
         }
         ActionButton {
-            width: Math.max(1, (modeSelector.width - 2 * modeSelector.spacing) / 3)
+            width: Math.max(1, (modeSelector.width - 3 * modeSelector.spacing) / 4)
+            height: parent.height
+            label: "PLANNER"
+            selected: todoExplore.plannerMode
+            trackLabelGlowLocally: true
+            softGlowEnabled: false
+            onLeftClicked: todoExplore.chooseView("planner")
+        }
+        ActionButton {
+            width: Math.max(1, (modeSelector.width - 3 * modeSelector.spacing) / 4)
             height: parent.height
             label: "DETAILS"
             selected: todoExplore.detailMode
@@ -149,6 +167,25 @@ Item {
         id: taskToday
         visible: todoExplore.todayMode
         todoSnapshot: todoExplore.todoSnapshot
+        anchors.top: modeSelector.bottom
+        anchors.topMargin: 6
+        anchors.left: parent.left
+        anchors.right: parent.right
+        anchors.bottom: parent.bottom
+        onOpenTaskRequested: function(taskId) {
+            todoExplore.openTask(taskId);
+        }
+    }
+
+    // Same TASKS planner and date projection; action path remains disabled
+    // inside Hub. MONTH/WEEK/DAY/TODAY and agenda OPEN are supported; SCHEDULE
+    // must stay in standalone TASKS until separately approved for Hub.
+    TaskPlannerPane {
+        id: taskPlanner
+        visible: todoExplore.plannerMode
+        todoSnapshot: todoExplore.todoSnapshot
+        todoStore: null
+        schedulingAllowed: false
         anchors.top: modeSelector.bottom
         anchors.topMargin: 6
         anchors.left: parent.left

@@ -2,12 +2,20 @@ import QtQuick
 import "../../components"
 import "StationHomePolicy.js" as StationHomePolicy
 import "StationSourceHealthPolicy.js" as SourceHealth
+import "StationOfficialAlertPolicy.js" as OfficialAlertPolicy
 
 Rectangle {
     id: home
 
     property var weatherService: null
     property var spaceService: null
+    property var nwsAlertSource: null
+
+    readonly property var officialAlertSummary:
+        OfficialAlertPolicy.summary(
+            nwsAlertSource && Array.isArray(nwsAlertSource.alertList)
+            ? nwsAlertSource.alertList : []
+        )
 
     readonly property bool weatherReady:
         weatherService && weatherService.ready
@@ -525,6 +533,16 @@ Rectangle {
         }
     }
 
+    function officialAlertColor(token) {
+        switch (String(token || "")) {
+        case "red": return Colors.red;
+        case "orange": return Colors.orange;
+        case "yellow": return Colors.yellow;
+        case "cyan": return Colors.cyan;
+        default: return Colors.white;
+        }
+    }
+
     Timer {
         interval: 60000
         repeat: true
@@ -656,6 +674,108 @@ Rectangle {
                 text: "AUTO SNAPSHOT"
                 font.pixelSize: 12
                 color: Colors.orange
+            }
+        }
+
+        Column {
+            width: parent.width
+            spacing: 8
+            visible: home.officialAlertSummary.available
+
+            StationSectionDivider {
+                width: parent.width
+                title: "OFFICIAL ALERT // NWS"
+            }
+
+            Rectangle {
+                width: parent.width
+                height: 108
+                color: Colors.dark
+                border.width: 1
+                border.color:
+                    home.officialAlertColor(
+                        home.officialAlertSummary.colorToken
+                    )
+
+                Rectangle {
+                    anchors.left: parent.left
+                    anchors.top: parent.top
+                    anchors.bottom: parent.bottom
+                    width: 5
+                    color:
+                        home.officialAlertColor(
+                            home.officialAlertSummary.colorToken
+                        )
+                }
+
+                Column {
+                    anchors.fill: parent
+                    anchors.leftMargin: 16
+                    anchors.rightMargin: 10
+                    anchors.topMargin: 9
+                    anchors.bottomMargin: 8
+                    spacing: 4
+
+                    Row {
+                        width: parent.width
+                        spacing: 10
+
+                        GohuText {
+                            width: Math.max(0, parent.width - 300)
+                            text: home.officialAlertSummary.event
+                            elide: Text.ElideRight
+                            font.pixelSize: 15
+                            color:
+                                home.officialAlertColor(
+                                    home.officialAlertSummary.colorToken
+                                )
+                        }
+
+                        GohuText {
+                            width: 290
+                            horizontalAlignment: Text.AlignRight
+                            text:
+                                home.officialAlertSummary.listingState
+                                + " // "
+                                + home.officialAlertSummary.severity
+                                + " // "
+                                + home.officialAlertSummary.urgency
+                            elide: Text.ElideRight
+                            font.pixelSize: 10
+                            color:
+                                home.officialAlertColor(
+                                    home.officialAlertSummary.colorToken
+                                )
+                        }
+                    }
+
+                    GohuText {
+                        width: parent.width
+                        text: home.officialAlertSummary.headline
+                        elide: Text.ElideRight
+                        font.pixelSize: 11
+                        color: Colors.white
+                    }
+
+                    QuietText {
+                        width: parent.width
+                        text: "AREA // " + home.officialAlertSummary.area
+                              + " // CERTAINTY "
+                              + home.officialAlertSummary.certainty
+                        elide: Text.ElideRight
+                        font.pixelSize: 9
+                    }
+
+                    QuietText {
+                        width: parent.width
+                        text: "EXPIRES "
+                              + home.officialAlertSummary.expiresLabel
+                              + " // ISSUER // "
+                              + home.officialAlertSummary.issuer
+                        elide: Text.ElideRight
+                        font.pixelSize: 9
+                    }
+                }
             }
         }
 

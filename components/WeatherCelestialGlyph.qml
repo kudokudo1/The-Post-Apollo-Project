@@ -1,6 +1,7 @@
 import QtQuick
 import QtQuick.Shapes
 import QtQuick.Effects
+import "WeatherMoonGeometry.js" as MoonGeometry
 
 // Flat solar and lunar geometry shared by the Weather dock and SKY.
 // No emoji moons, independent fetches, special phase colors or animations.
@@ -39,13 +40,8 @@ Item {
                                    || moonPhase === "first-quarter"
     readonly property bool waning: moonPhase.indexOf("waning") === 0
                                    || moonPhase === "last-quarter"
-    // Build illuminated geometry ONCE on the right, then mirror the same
-    // path for waning phases. Switching Qt PathArc direction had made waxing
-    // and waning crescent/gibbous areas asymmetric in actual pixel renders.
-    readonly property real terminatorX:
-        moonPhase.indexOf("crescent") !== -1 ? 31
-        : moonPhase.indexOf("gibbous") !== -1 ? 9
-        : 20
+    // The precise QML contour is defined by a single symmetric helper.
+    // No orientation-specific PathArc implementation is required.
 
     Item {
         id: art
@@ -153,30 +149,11 @@ Item {
         Shape {
             anchors.fill: parent
             visible: glyph.moonVisible && (glyph.waxing || glyph.waning)
-            transform: Scale {
-                origin.x: 20
-                origin.y: 20
-                xScale: glyph.waning ? -1 : 1
-            }
             ShapePath {
                 strokeWidth: 0
                 fillColor: glyph.ink
-                startX: 20
-                startY: 6
-                PathArc {
-                    x: 20
-                    y: 34
-                    radiusX: 14
-                    radiusY: 14
-                    direction: PathArc.Clockwise
-                }
-                PathCubic {
-                    x: 20
-                    y: 6
-                    control1X: glyph.terminatorX
-                    control1Y: 29
-                    control2X: glyph.terminatorX
-                    control2Y: 11
+                PathSvg {
+                    path: MoonGeometry.litPath(glyph.moonPhase)
                 }
             }
         }

@@ -51,6 +51,8 @@ jobs:
         run: node tests/weather/test_station_home_recent_history.js
       - name: Validate Weather core source-health and per-feed state
         run: node tests/weather/test_station_source_health.js
+      - name: Validate SPACE Kp history from existing NOAA feed
+        run: node tests/weather/test_station_space_kp_history.js
       - name: Validate Kitty Sway workarea coordinate contracts
         run: node tests/weather/test_station_terminal_geometry.js
       - name: Validate internal NEWS viewer and URL boundary contracts

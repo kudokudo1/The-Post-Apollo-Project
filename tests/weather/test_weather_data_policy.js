@@ -613,7 +613,12 @@ const mapped = discovery.parse("map", {
 assert.equal(mapped.length, 1);
 assert.equal(mapped[0].title, "Tropical Storm Sample");
 assert.match(mapped[0].detail, /20\.40, -70\.20/);
-assert.equal(mapped[0].action, "OPEN NASA EVENT");
+assert.equal(mapped[0].action, "INSPECT HERE");
+assert.equal(mapped[0].categoryId, "severeStorms");
+assert.equal(mapped[0].category, "Severe Storms");
+assert.equal(mapped[0].coordinates, "20.40, -70.20");
+assert.equal(mapped[0].geometryType, "Point");
+assert.equal(mapped[0].time, "2026-10-23 12:00 UTC");
 assert.throws(() => discovery.parse("map", {}));
 
 const headlines = discovery.parse("news", {

@@ -9,6 +9,41 @@ function safeUrl(value) {
 function shortText(value, limit) {
     return String(value || "").trim().replace(/\s+/g, " ").slice(0, limit);
 }
+
+function formatEventTime(value) {
+    const millis = Date.parse(String(value || ""));
+    if (!isFinite(millis))
+        return String(value || "").slice(0, 22);
+    const iso = new Date(millis).toISOString();
+    return iso.slice(0, 10) + " " + iso.slice(11, 16) + " UTC";
+}
+
+function magnitudeLabel(event) {
+    if (!event)
+        return "";
+    const value = Number(event.magnitudeValue);
+    if (!isFinite(value))
+        return "";
+    const unit = shortText(event.magnitudeUnit, 24);
+    const description = shortText(event.magnitudeDescription, 80);
+    let label = String(value);
+    if (unit)
+        label += " " + unit;
+    if (description)
+        label += " // " + description;
+    return label;
+}
+
+function sourceLabel(event) {
+    const source = event && Array.isArray(event.sources) ? event.sources : [];
+    const ids = [];
+    for (let i = 0; i < source.length; i++) {
+        const id = shortText(source[i] ? source[i].id : "", 40);
+        if (id && ids.indexOf(id) < 0)
+            ids.push(id);
+    }
+    return ids.slice(0, 6).join(" / ");
+}
 function formatDate(value) {
     const raw = String(value || "");
     const match = raw.match(/^(\d{8})T(\d{4})/);
@@ -26,29 +61,54 @@ function parseEvents(root) {
         if (!event || !event.id || !event.title || seen[event.id])
             continue;
         seen[event.id] = true;
-        const cat = Array.isArray(event.categories) && event.categories.length
-                    ? shortText(event.categories[0].title, 60) : "NATURAL EVENT";
+
+        const categories = Array.isArray(event.categories) ? event.categories : [];
+        const category = categories.length && categories[0] ? categories[0] : {};
+        const categoryId = shortText(category.id, 48);
+        const categoryTitle = shortText(category.title, 60) || "NATURAL EVENT";
+
         const points = Array.isArray(event.geometry) ? event.geometry : [];
         const latest = points.length ? points[points.length - 1] : null;
-        let coords = "";
+        const geometryType = latest ? shortText(latest.type, 24) : "";
+        let latitude = null;
+        let longitude = null;
+        let coordinateText = geometryType || "LOCATION UNAVAILABLE";
+
         if (latest && latest.type === "Point"
                 && Array.isArray(latest.coordinates)
                 && latest.coordinates.length >= 2) {
             const lon = Number(latest.coordinates[0]);
             const lat = Number(latest.coordinates[1]);
             if (isFinite(lon) && isFinite(lat)
-                    && Math.abs(lon) <= 180 && Math.abs(lat) <= 90)
-                coords = lat.toFixed(2) + ", " + lon.toFixed(2);
+                    && Math.abs(lon) <= 180 && Math.abs(lat) <= 90) {
+                latitude = lat;
+                longitude = lon;
+                coordinateText = lat.toFixed(2) + ", " + lon.toFixed(2);
+            }
         }
+
+        const sources = sourceLabel(event);
+        const magnitude = magnitudeLabel(event);
         rows.push({
+            id: shortText(event.id, 80),
             title: shortText(event.title, 160),
-            detail: cat + (coords ? " // " + coords : ""),
-            time: latest ? shortText(latest.date, 22) : "",
+            description: shortText(event.description, 360),
+            category: categoryTitle,
+            categoryId: categoryId,
+            detail: categoryTitle + " // " + coordinateText,
+            time: latest ? formatEventTime(latest.date) : "",
+            rawTime: latest ? shortText(latest.date, 45) : "",
+            geometryType: geometryType || "UNKNOWN",
+            latitude: latitude,
+            longitude: longitude,
+            coordinates: coordinateText,
+            sourceNames: sources || "SOURCE NOT LISTED",
+            magnitude: magnitude || "NOT REPORTED",
             url: safeUrl(event.link),
-            action: "OPEN NASA EVENT"
+            action: "INSPECT HERE"
         });
     }
-    return rows.slice(0, 20);
+    return rows.slice(0, 40);
 }
 function parseNews(root) {
     if (!root || !Array.isArray(root.articles))
@@ -113,6 +173,37 @@ function parse(kind, root) {
 // shared between those instances for this one external GDELT endpoint. Never
 // request again on remount within a cooldown, and preserve the last good rows.
 // This cache is session-only; no disk, background server, or new fetch owner.
+var _mapCache = {};
+var _mapCacheTtlMs = 900000;
+
+function mapCacheKey(category) {
+    const key = String(category || "").trim();
+    return key || "all";
+}
+
+function storeMapRows(category, rows, nowMs) {
+    const now = Number(nowMs);
+    if (!Array.isArray(rows) || !isFinite(now) || now <= 0)
+        return;
+    _mapCache[mapCacheKey(category)] = {
+        rows: rows.slice(0, 40),
+        updatedAtMs: now
+    };
+}
+
+function cachedMapRows(category, nowMs) {
+    const entry = _mapCache[mapCacheKey(category)];
+    if (!entry)
+        return {rows: [], updatedAtMs: 0, fresh: false};
+    const now = Number(nowMs);
+    const age = isFinite(now) && now > 0 ? now - entry.updatedAtMs : Infinity;
+    return {
+        rows: entry.rows.slice(),
+        updatedAtMs: entry.updatedAtMs,
+        fresh: age >= 0 && age < _mapCacheTtlMs
+    };
+}
+
 var _newsNextAllowedMs = 0;
 var _newsThrottleUntilMs = 0;
 var _newsCachedRows = [];

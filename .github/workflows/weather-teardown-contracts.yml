@@ -61,6 +61,14 @@ jobs:
         run: python3 tests/weather/test_station_youtube_feed.py
       - name: Validate GDELT NEWS rate limit, cache and live source reporting
         run: node tests/weather/test_station_discovery_rate_limit.js
+      - name: Validate MAP EONET hazard filters cache and inspector
+        run: node tests/weather/test_station_map_hazard_intelligence.js
+      - name: Validate MAP spatial projection zoom pan and point canvas
+        run: node tests/weather/test_station_map_spatial_canvas.js
+      - name: Validate bounded manual FIRMS hotspot overlay
+        run: node tests/weather/test_station_map_firms_hotspots.js
+      - name: Validate secret-safe FIRMS fetch helper
+        run: python3 tests/weather/test_station_firms_fetch_helper.py
       - name: Validate Weather Station domain palette and live meter contracts
         run: node tests/weather/test_domain_palette_contracts.js
       - name: Verify GROUND individual pollen readings and unavailable states

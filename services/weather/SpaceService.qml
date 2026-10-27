@@ -1,6 +1,7 @@
 import QtQuick
 import Quickshell
 import Quickshell.Io
+import "SpaceHistoryPolicy.js" as SpaceHistoryPolicy
 
 Scope {
     id: spaceService
@@ -27,6 +28,12 @@ Scope {
     // ─────────────────────────────────────────────
 
     property real kp: -1
+    property var kpHistory: []
+    property var kpHistorySummary: ({
+        bins: 0, hours: 0, maxKp: -1, averageKp: -1,
+        activeBins: 0, stormBins: 0, latestDelta: 0,
+        latestA: -1, latestStationCount: -1, minStationCount: -1
+    })
 
     readonly property string kpText: kp >= 0 ? kp.toFixed(1) : "--"
 
@@ -252,17 +259,14 @@ Scope {
 
     function parseKp(rawText) {
         try {
-            const data = JSON.parse(rawText);
+            const parsed = SpaceHistoryPolicy.parseKpHistory(
+                JSON.parse(rawText), 24
+            );
 
-            if (!Array.isArray(data) || data.length === 0) {
-                throw new Error("No Kp data");
-            }
-
-            const latest = data[data.length - 1];
-
-            kp = Number(latest.Kp);
-
-            kpTime = latest.time_tag || "";
+            kp = parsed.latest.kp;
+            kpTime = parsed.latest.time;
+            kpHistory = parsed.rows;
+            kpHistorySummary = parsed.summary;
 
             const receivedAt = new Date();
             kpReady = true;

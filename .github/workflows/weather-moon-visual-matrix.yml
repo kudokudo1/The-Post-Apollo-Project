@@ -4,7 +4,6 @@ on:
   pull_request:
     paths:
       - "components/WeatherCelestialGlyph.qml"
-      - "components/WeatherMoonGeometry.js"
       - "components/qmldir"
       - "services/weather/WeatherCyclePolicy.js"
       - "tests/weather/fixtures/WeatherMoonMatrix.qml"

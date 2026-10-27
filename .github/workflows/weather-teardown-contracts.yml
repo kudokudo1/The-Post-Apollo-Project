@@ -65,3 +65,5 @@ jobs:
         run: node tests/weather/test_domain_palette_contracts.js
       - name: Verify GROUND individual pollen readings and unavailable states
         run: node tests/weather/test_station_ground_pollen_species.js
+      - name: Verify GROUND shared official NWS alert surface
+        run: node tests/weather/test_station_ground_nws_alerts.js

@@ -2,6 +2,7 @@ import QtQuick
 import Quickshell
 import Quickshell.Io
 import "TaskFileViewNativeEvidenceM11i.js" as NativeEvidence
+import "TaskJsonNativeCallbackGuardM11q.js" as CallbackGuard
 
 // M11m ISOLATED NATIVE TEST: never mount this in shell.qml or TASKS.
 // The host's real OS lock/journal are limited to an owned, pre-existing,
@@ -263,6 +264,7 @@ Scope {
             if (reply.kind !== awaitingKind)
                 throw new Error("STALE_HOST_REPLY");
             var kind = awaitingKind;
+            var previousEpoch = epoch;
             awaitingId = -1;
             awaitingKind = "";
             busy = false;
@@ -283,15 +285,20 @@ Scope {
                 event("HOST_RESERVED");
                 fixtureFile.setText(pendingRaw);
             } else if (kind === "verify") {
-                if (reply.pending || reply.stageId !== pendingStageId
-                        || phase !== "JSON_ACTIVE" || fileState !== "SETTLING")
+                if (!CallbackGuard.settledReplyEligible({
+                        attached:attached, connected:connected,
+                        hostRunning:host.running, fileState:fileState,
+                        pendingStageId:pendingStageId, pendingRaw:pendingRaw,
+                        epoch:previousEpoch
+                    }, reply, previousEpoch))
                     throw new Error("INVALID_SETTLEMENT");
                 confirmedRaw = pendingRaw;
                 confirmedCounter++;
                 event("HOST_SETTLED");
                 finishStage();
             } else if (kind === "freeze") {
-                if (phase !== "JSON_QUIESCED" || reply.pending || !freezeQueued)
+                if (phase !== "JSON_QUIESCED" || reply.pending || !freezeQueued
+                        || reply.epoch !== previousEpoch + 1)
                     throw new Error("INVALID_FREEZE");
                 status = "TEST_FROZEN";
                 fileState = "FROZEN";
@@ -372,20 +379,23 @@ Scope {
             }
             bridge.fileState = "VERIFYING";
             bridge.event("FILE_SAVED");
-            var savedStageId = bridge.pendingStageId;
-            var savedEpoch = bridge.epoch;
-            var savedGeneration = bridge.sessionGeneration;
-            var savedFixturePath = bridge.fixturePath;
+            var savedTicket = CallbackGuard.ticket(
+                bridge.sessionGeneration, bridge.epoch,
+                bridge.pendingStageId, bridge.fixturePath);
             Qt.callLater(function() {
                 // Neither a canceled host nor a replacement session may
                 // initiate a delayed readback from a prior reservation.
-                if (bridge.attached && bridge.connected && host.running
-                        && bridge.sessionGeneration === savedGeneration
-                        && bridge.epoch === savedEpoch
-                        && bridge.fixturePath === savedFixturePath
-                        && bridge.fileState === "VERIFYING"
-                        && bridge.pendingStageId === savedStageId
-                        && savedStageId !== "" && bridge.pendingRaw !== "") {
+                if (CallbackGuard.canDeferredReadback({
+                        attached:bridge.attached,
+                        connected:bridge.connected,
+                        hostRunning:host.running,
+                        generation:bridge.sessionGeneration,
+                        epoch:bridge.epoch,
+                        pendingStageId:bridge.pendingStageId,
+                        fixturePath:bridge.fixturePath,
+                        fileState:bridge.fileState,
+                        pendingRaw:bridge.pendingRaw
+                    }, savedTicket)) {
                     fixtureFile.reload();
                 }
             });

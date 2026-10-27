@@ -843,6 +843,30 @@ PanelWindow {
         if (xSelected) {
             // X uses the shared external window slot, but its own lifecycle.
             var xNode = payload[browserSite];
+            if (selectedBrowserScopeId() !== "") {
+                var expectedClass = "post-apollo-" + browserSite
+                                    + "-" + browserActiveIdentityId;
+                var cid = xNode ? Number(xNode.conId || 0) : 0;
+                if (!xNode || xNode.browserIdentityId !== browserActiveIdentityId
+                        || xNode.windowClass !== expectedClass
+                        || !Number.isInteger(cid) || cid <= 0
+                        || !xNode.visible) {
+                    xReady = false;
+                    xDocked = false;
+                    scopedBrowserConId = 0;
+                    if (socialChanged)
+                        adoptSocialGeometry(socialRect);
+                    return;
+                }
+                if (scopedBrowserConId !== cid) {
+                    // A new Chromium container cannot inherit old docking.
+                    scopedBrowserConId = cid;
+                    xReady = false;
+                    xDocked = false;
+                    xConfigured = false;
+                    updateGeometryHelperMode();
+                }
+            }
             var xRect = xNode ? xNode.rect : null;
             if (!xRect) {
                 if (socialChanged)
@@ -1121,7 +1145,19 @@ PanelWindow {
         if (xShowProcess.running)
             xShowProcess.running = false;
         xShowProcess.launchSite = browserSite;
-        xShowProcess.exec(["python3", Quickshell.shellPath("widgets/messanger/XBrowser.py"), "show", browserSite]);
+        var identity = selectedBrowserScopeId();
+        if (browserIsolationEnabled && (!validBrowserIdentity(identity)
+                || !appSelector.identitySnapshot.writable
+                || appSelector.identitySnapshot.activeId !== identity)) {
+            xError = "Selected identity is not yet saved";
+            return;
+        }
+        xShowProcess.launchIdentityId = identity;
+        var command = ["python3", Quickshell.shellPath("widgets/messanger/XBrowser.py"),
+                       "show", browserSite];
+        if (identity !== "")
+            command.push("--identity", identity);
+        xShowProcess.exec(command);
     }
 
     function hideX() {
@@ -1131,6 +1167,8 @@ PanelWindow {
         xDocked = false;
         xConfigured = false;
         ignoreXGeometryUntil = 0;
+        if (browserIsolationEnabled && validBrowserIdentity(browserActiveIdentityId))
+            hideScopedIdentity(browserActiveIdentityId);
         if (xHideProcess.running)
             xHideProcess.running = false;
         xHideProcess.running = true;
@@ -1456,6 +1494,13 @@ PanelWindow {
 
         AppSelector {
             id: appSelector
+            isolatedBrowserModeActive: messagingWindow.browserIsolationEnabled
+            isolatedBrowserToggleAllowed: !xShowProcess.running
+                                           && !xScopedHideProcess.running
+            onIsolatedBrowserModeToggleRequested:
+                messagingWindow.toggleBrowserIsolation()
+            onIdentitySnapshotChanged:
+                messagingWindow.reconcilePersistedBrowserIdentity()
             // One existing Social window; contact/chat space hosts Settings.
             settingsWorkspaceParent: messagingContent.contentItem
             settingsContactWidth: messagingWindow.contactListWidth
@@ -1497,7 +1542,10 @@ PanelWindow {
                 } else if (messagingWindow.discordSelected) {
                     messagingWindow.raiseDiscord();
                 } else if (messagingWindow.xSelected) {
-                    messagingWindow.raiseX();
+                    if (messagingWindow.browserIsolationEnabled)
+                        messagingWindow.showX();
+                    else
+                        messagingWindow.raiseX();
                 }
             }
 

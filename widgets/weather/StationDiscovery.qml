@@ -20,6 +20,7 @@ Rectangle {
     property bool viewerOpen: false
     property var selectedNews: null
     property string newsTopic: "all"
+    property string newsSourceQuery: ""
     readonly property var newsTopicOptions: [
         { "id": "all", "label": "ALL" },
         { "id": "weather", "label": "WEATHER" },
@@ -31,7 +32,8 @@ Rectangle {
         domain === "news"
         ? DiscoveryPolicy.filterNewsRows(
               source && Array.isArray(source.rows) ? source.rows : [],
-              newsTopic
+              newsTopic,
+              newsSourceQuery
           )
         : (source && Array.isArray(source.rows) ? source.rows : [])
 
@@ -267,7 +269,7 @@ Rectangle {
         : "RADIO BROWSER // TOP VOTED STREAMS"
     readonly property string sourceCaution:
         domain === "map" ? "EONET + FIRMS + MRMS + HMS SMOKE CONNECTED // BASEMAP NOT WIRED"
-        : domain === "news" ? "ARTICLE DISCOVERY // LOCAL TOPIC FILTER + CONSERVATIVE DEDUPE // NOT STORY CLUSTERING"
+        : domain === "news" ? "ARTICLE DISCOVERY // LOCAL TOPIC + PUBLISHER/COUNTRY FILTERS // CONSERVATIVE DEDUPE // NOT STORY CLUSTERING"
         : "STATION DIRECTORY // PERSISTENT PLAYBACK NOT YET WIRED"
     readonly property var plannedSources: {
         if (domain === "map")
@@ -301,7 +303,8 @@ Rectangle {
             return [
                 {name:"GDELT DOC // ARTICLE LIST", state:"ENDPOINT CONFIGURED"},
                 {name:"LOCAL TOPIC FILTER + URL/TITLE DEDUPE", state:"CONNECTED"},
-                {name:"SOURCE / REGION FILTERS", state:"NOT WIRED"},
+                {name:"PUBLISHER / SOURCE COUNTRY FILTER", state:"CONNECTED"},
+                {name:"REGION / LANGUAGE FILTERS", state:"NOT WIRED"},
                 {name:"LIVE NEWS / VIDEO", state:"NOT WIRED"},
                 {name:"STORY CLUSTERS / DOSSIERS", state:"NOT WIRED"}
             ];
@@ -1163,7 +1166,83 @@ Rectangle {
                             + stationDiscovery.visibleRows.length
                             + " / " + source.rows.length
                             + " // LOCAL FILTER"
+                            + (stationDiscovery.newsSourceQuery !== ""
+                               ? " // SOURCE MATCH" : "")
                           : "LOCAL FILTER // WAITING FOR HEADLINES"
+                    elide: Text.ElideRight
+                    font.pixelSize: 9
+                }
+            }
+
+            Row {
+                id: newsSourceFilter
+                width: parent.width
+                height: stationDiscovery.domain === "news" ? 34 : 0
+                visible: stationDiscovery.domain === "news"
+                spacing: 8
+
+                Rectangle {
+                    width: 320
+                    height: 30
+                    color: Colors.dark
+                    border.width: 1
+                    border.color: newsSourceInput.activeFocus
+                                  ? Colors.magenta : Colors.cyan
+
+                    QuietText {
+                        anchors.left: parent.left
+                        anchors.verticalCenter: parent.verticalCenter
+                        anchors.leftMargin: 10
+                        visible: newsSourceInput.text.length === 0
+                                 && !newsSourceInput.activeFocus
+                        text: "PUBLISHER DOMAIN / SOURCE COUNTRY"
+                        font.pixelSize: 10
+                    }
+
+                    TextInput {
+                        id: newsSourceInput
+                        anchors.fill: parent
+                        anchors.leftMargin: 10
+                        anchors.rightMargin: 10
+                        verticalAlignment: TextInput.AlignVCenter
+                        color: Colors.white
+                        selectionColor: Colors.magenta
+                        selectedTextColor: Colors.black
+                        font.family: "GohuFont 11 Nerd Font Mono"
+                        font.pixelSize: 11
+                        clip: true
+                        text: stationDiscovery.newsSourceQuery
+                        onTextEdited:
+                            stationDiscovery.newsSourceQuery = text
+                        Keys.onEscapePressed: {
+                            stationDiscovery.newsSourceQuery = "";
+                            text = "";
+                            event.accepted = true;
+                        }
+                    }
+                }
+
+                ActionButton {
+                    width: 72
+                    height: 30
+                    label: "CLEAR"
+                    labelPixelSize: 10
+                    available: stationDiscovery.newsSourceQuery !== ""
+                    onClicked: {
+                        stationDiscovery.newsSourceQuery = "";
+                        newsSourceInput.text = "";
+                    }
+                }
+
+                QuietText {
+                    anchors.verticalCenter: parent.verticalCenter
+                    width: Math.max(0, parent.width - 408)
+                    text: stationDiscovery.newsSourceQuery === ""
+                          ? "LOCAL // MATCHES GDELT DOMAIN OR SOURCE COUNTRY"
+                          : "MATCH // "
+                            + stationDiscovery.newsSourceQuery.toUpperCase()
+                            + " // "
+                            + stationDiscovery.visibleRows.length
                     elide: Text.ElideRight
                     font.pixelSize: 9
                 }
@@ -1378,6 +1457,10 @@ Rectangle {
                       + stationDiscovery.newsTopicLabel(
                             stationDiscovery.newsTopic
                         )
+                      + (stationDiscovery.newsSourceQuery !== ""
+                         ? " // SOURCE "
+                           + stationDiscovery.newsSourceQuery.toUpperCase()
+                         : "")
                       + " // FILTER IS LOCAL // SOURCE NOT REFETCHED"
                 font.pixelSize: 11
                 color: Colors.orange

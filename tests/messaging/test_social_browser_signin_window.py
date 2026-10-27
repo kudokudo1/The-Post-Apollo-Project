@@ -151,7 +151,6 @@ class BrowserSigninWindowTests(unittest.TestCase):
                 self.assertIn(part,pane,part)
         self.assertIn('id: settingsFamilyPane',UI)
         self.assertIn('id: settingsAppPane',UI)
-        self.assertIn('label: "USE LEGACY BROWSERS"',UI) if False else None
         self.assertIn('label: "USER // SETTINGS"',UI)
         self.assertEqual(UI.count('id: settingsFooter'),1)
 

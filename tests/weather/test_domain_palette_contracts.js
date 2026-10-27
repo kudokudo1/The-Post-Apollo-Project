@@ -289,9 +289,21 @@ assert.match(
 assert.doesNotMatch(windowSource, /WEATHER LINK ONLINE/);
 assert.match(spaceServiceSource, /property date lastUpdated/);
 assert.ok(
-    spaceServiceSource.split("lastUpdated = new Date();").length - 1 >= 4,
-    "each successful Space parser refreshes local receive age"
+    spaceServiceSource.split("lastUpdated = receivedAt;").length - 1 >= 4,
+    "each successful Space parser refreshes aggregate local receive age"
 );
+for (const sourceClock of [
+    "kpLastUpdated",
+    "solarWindLastUpdated",
+    "magneticFieldLastUpdated",
+    "solarFluxLastUpdated",
+]) {
+    assert.match(
+        spaceServiceSource,
+        new RegExp(sourceClock + " = receivedAt;"),
+        sourceClock + " shares the successful receive timestamp"
+    );
+}
 
 // Stable domain identities survive the structural split.
 assert.match(groundSource, /text: "⌁  GROUND"[\s\S]*?color: Colors\.green/);

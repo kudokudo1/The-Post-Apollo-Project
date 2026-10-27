@@ -1,6 +1,7 @@
 import QtQuick
 import Quickshell
 import Quickshell.Io
+import "TaskFileViewNativeEvidenceM11i.js" as NativeEvidence
 
 // M11m ISOLATED NATIVE TEST: never mount this in shell.qml or TASKS.
 // The host's real OS lock/journal are limited to an owned, pre-existing,
@@ -10,6 +11,12 @@ Scope {
 
     property string fixturePath: ""
     property string writerId: ""
+    // M11q: volatile evidence and generation checks are diagnostics only.
+    // They confer no host authority and do not survive a process restart.
+    property int sessionGeneration: 0
+    property var nativeEvidence: NativeEvidence.empty()
+    readonly property var nativeSummary: NativeEvidence.summarize(nativeEvidence)
+    readonly property string nativeRecent: NativeEvidence.recent(nativeEvidence, 6)
     property bool bootstrapTestAuthority: false
     property bool attached: false
     property bool connected: false
@@ -45,10 +52,37 @@ Scope {
         var copy = recentEvents.slice(-5);
         copy.push(label);
         recentEvents = copy;
+        // Reuse the existing M11i privacy-safe enum and chain verifier.
+        // No paths, JSON payloads, stage IDs or host stdout are recorded.
+        var tags = {
+            "ATTACH_REQUEST":"ATTACH_REQUEST",
+            "FILE_INITIAL_LOAD":"FILE_INITIAL_LOAD",
+            "HOST_HELLO":"HOST_HELLO",
+            "STAGE_REQUEST":"STAGE_REQUEST",
+            "HOST_RESERVED":"HOST_ADMIT",
+            "FILE_SAVED":"FILE_SAVED",
+            "FILE_READBACK_OK":"FILE_READBACK_OK",
+            "HOST_SETTLED":"HOST_SETTLED",
+            "FREEZE_REQUESTED":"FREEZE_REQUEST",
+            "HOST_FROZEN":"HOST_FROZEN",
+            "FILE_SAVE_FAILED":"FILE_SAVE_FAILURE",
+            "FILE_LOAD_FAILED":"FILE_LOAD_FAILURE",
+            "FILE_READBACK_MISMATCH":"FILE_READBACK_MISMATCH",
+            "HOST_REFUSAL":"HOST_REFUSAL",
+            "REJECTED":"RECOVERY_REVIEW",
+            "STOP_REQUESTED":"STOP_REQUEST",
+            "HOST_EXIT":"HOST_EXIT"
+        };
+        if (Object.prototype.hasOwnProperty.call(tags, label)) {
+            nativeEvidence = NativeEvidence.append(nativeEvidence,
+                                                   tags[label], phase);
+        }
         observed();
     }
 
     function reject(reason) {
+        // Fence any Qt.callLater readback scheduled for an old session.
+        sessionGeneration++;
         status = "RECOVERY_REVIEW";
         phase = "RECOVERY_REVIEW";
         errorCode = reason;
@@ -75,6 +109,8 @@ Scope {
             reject("DISPOSABLE_COPY_PATH_REQUIRED");
             return false;
         }
+        sessionGeneration++;
+        nativeEvidence = NativeEvidence.empty();
         attached = true;
         connected = false;
         fileLoaded = false;
@@ -220,6 +256,7 @@ Scope {
                             || reply.stageId.length > 96)))
                 throw new Error("UNSAFE_HOST_REPLY");
             if (!reply.ok) {
+                event("HOST_REFUSAL");
                 reject("HOST_REFUSED_" + reply.status);
                 return;
             }
@@ -269,6 +306,7 @@ Scope {
     }
 
     function stopTest() {
+        sessionGeneration++;
         event("STOP_REQUESTED");
         attached = false;
         connected = false;
@@ -310,6 +348,7 @@ Scope {
                 } catch (e) { bridge.reject("NOT_A_TEST_FIXTURE"); }
             } else if (bridge.fileState === "VERIFYING") {
                 if (fixtureFile.text() !== bridge.pendingRaw) {
+                    bridge.event("FILE_READBACK_MISMATCH");
                     bridge.reject("FILE_READBACK_MISMATCH");
                 } else {
                     bridge.fileState = "SETTLING";
@@ -320,7 +359,10 @@ Scope {
             } else bridge.reject("UNEXPECTED_FILE_LOAD");
         }
         onLoadFailed: function(error) {
-            if (bridge.attached) bridge.reject("FILE_LOAD_FAILED");
+            if (bridge.attached) {
+                bridge.event("FILE_LOAD_FAILED");
+                bridge.reject("FILE_LOAD_FAILED");
+            }
         }
         onSaved: {
             if (!bridge.attached || bridge.fileState !== "SAVING"
@@ -331,8 +373,16 @@ Scope {
             bridge.fileState = "VERIFYING";
             bridge.event("FILE_SAVED");
             var savedStageId = bridge.pendingStageId;
+            var savedEpoch = bridge.epoch;
+            var savedGeneration = bridge.sessionGeneration;
+            var savedFixturePath = bridge.fixturePath;
             Qt.callLater(function() {
-                if (bridge.attached && bridge.connected
+                // Neither a canceled host nor a replacement session may
+                // initiate a delayed readback from a prior reservation.
+                if (bridge.attached && bridge.connected && host.running
+                        && bridge.sessionGeneration === savedGeneration
+                        && bridge.epoch === savedEpoch
+                        && bridge.fixturePath === savedFixturePath
                         && bridge.fileState === "VERIFYING"
                         && bridge.pendingStageId === savedStageId
                         && savedStageId !== "" && bridge.pendingRaw !== "") {
@@ -359,6 +409,7 @@ Scope {
         }
         stderr: StdioCollector {}
         onExited: function(code, exitStatus) {
+            bridge.sessionGeneration++;
             bridge.connected = false;
             bridge.fileLoaded = false;
             bridge.busy = false;

@@ -32,7 +32,7 @@ jobs:
       - name: Render and verify all eight real Qt Quick lunar phases
         run: |
           xvfb-run -a -s "-screen 0 1280x720x24" \
-            env QT_QPA_PLATFORM=xcb QT_QUICK_BACKEND=software \
+            env QT_QPA_PLATFORM=offscreen QT_QUICK_BACKEND=software \
             python3 tests/weather/test_weather_moon_visual.py
       - name: Preserve exact rendered QML image for operator review
         if: always()

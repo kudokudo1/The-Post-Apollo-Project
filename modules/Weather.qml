@@ -5,12 +5,20 @@ import Quickshell
 import "../components"
 import "../services/weather/WeatherDockPolicy.js" as WeatherDockPolicy
 import "../services/weather/WeatherCyclePolicy.js" as WeatherCyclePolicy
+import "../widgets/weather/StationOfficialAlertPolicy.js" as OfficialAlertPolicy
 
 DockButton {
     id: weatherDock
 
     property var weatherStationWindow: null
     property var weatherService: null
+    property var nwsAlertSource: null
+
+    readonly property var officialAlertSummary:
+        OfficialAlertPolicy.summary(
+            nwsAlertSource && Array.isArray(nwsAlertSource.alertList)
+            ? nwsAlertSource.alertList : []
+        )
     // Right-click toggles the displayed unit while this Quickshell session runs.
     property bool useCelsius: false
     property real observationClockMs: Date.now()
@@ -54,6 +62,16 @@ DockButton {
     )
     readonly property string celestialMode:
         weatherFresh ? WeatherCyclePolicy.artworkFor(weatherState, skyCycle) : "weather"
+
+    function officialAlertColor(token) {
+        switch (String(token || "")) {
+        case "red": return Colors.red;
+        case "orange": return Colors.orange;
+        case "yellow": return Colors.yellow;
+        case "cyan": return Colors.cyan;
+        default: return Colors.white;
+        }
+    }
 
     readonly property color weatherColor: {
         switch (weatherState.color) {
@@ -104,6 +122,7 @@ DockButton {
     // Precisely fit the visible content with 3px left and right padding.
     // This width follows temperature digits, units, and condition glyph changes.
     implicitWidth: Math.ceil(weatherContent.implicitWidth) + 6
+                   + (officialAlertSummary.available ? 18 : 0)
 
     open: menuOpen
     // Follow the shared dock recipe: yellow open fill, magenta opened mark/glow.
@@ -147,7 +166,8 @@ DockButton {
     Row {
         id: weatherContent
         anchors.centerIn: parent
-        anchors.horizontalCenterOffset: -1
+        anchors.horizontalCenterOffset:
+            officialAlertSummary.available ? -9 : -1
         spacing: 0
 
         // Weather art glow stays behind its icon and readout, not over the
@@ -661,6 +681,34 @@ DockButton {
                     }
                 }
             }
+        }
+    }
+
+    // Separate official-alert mark. It never changes weatherState,
+    // weatherColor, celestial artwork, or thermometer classification.
+    Rectangle {
+        id: officialAlertDockBadge
+        visible: weatherDock.officialAlertSummary.available
+        width: 16
+        height: 20
+        anchors.right: parent.right
+        anchors.rightMargin: 1
+        anchors.verticalCenter: parent.verticalCenter
+        color: Colors.black
+        border.width: 1
+        border.color:
+            weatherDock.officialAlertColor(
+                weatherDock.officialAlertSummary.colorToken
+            )
+
+        GohuText {
+            anchors.centerIn: parent
+            text: weatherDock.officialAlertSummary.dockText
+            font.pixelSize: 11
+            color:
+                weatherDock.officialAlertColor(
+                    weatherDock.officialAlertSummary.colorToken
+                )
         }
     }
 

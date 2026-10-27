@@ -4,6 +4,7 @@ import "../../services/weather" as WeatherServices
 import "StationViewerPolicy.js" as ViewerPolicy
 import "StationMapProjectionPolicy.js" as MapProjection
 import "../../services/weather/FirmsHotspotPolicy.js" as FirmsAreaPolicy
+import "StationRadarPolicy.js" as RadarPolicy
 
 // Source-first stage. All records shown come from a backend, never examples.
 // MAP now owns a source-driven geographic point canvas plus its event list.
@@ -25,7 +26,7 @@ Rectangle {
 
     readonly property var mapPointRows:
         MapProjection.plottable(source ? source.rows : [])
-    readonly property var firmsVisibleBounds:
+    readonly property var mapVisibleBounds:
         MapProjection.visibleBounds(
             mapPlot ? mapPlot.width : 0,
             mapPlot ? mapPlot.height : 0,
@@ -33,10 +34,17 @@ Rectangle {
         )
     readonly property var firmsArea:
         firmsService
-        ? FirmsAreaPolicy.boundedArea(firmsVisibleBounds, 60, 40)
+        ? FirmsAreaPolicy.boundedArea(mapVisibleBounds, 60, 40)
         : { "valid": false, "reason": "FIRMS SERVICE UNAVAILABLE" }
+    readonly property var radarArea:
+        RadarPolicy.boundedArea(mapVisibleBounds, 90, 50)
     readonly property bool firmsAreaReady:
         firmsArea && firmsArea.valid
+    readonly property bool radarAreaReady:
+        radarArea && radarArea.valid
+    property string radarImageUrl: ""
+    property var radarSnapshotBounds: null
+    property date radarRequestedAt
     readonly property bool hotspotInspectorOpen:
         domain === "map" && selectedMapHotspot !== null
 
@@ -86,7 +94,35 @@ Rectangle {
         if (!firmsService || !firmsAreaReady)
             return false;
         selectedMapHotspot = null;
-        return firmsService.request(firmsVisibleBounds);
+        return firmsService.request(mapVisibleBounds);
+    }
+
+    function loadRadarSnapshot() {
+        if (!radarAreaReady || radarImage.status === Image.Loading)
+            return false;
+        const snapshot = RadarPolicy.snapshot(radarArea);
+        const nextUrl = RadarPolicy.exportImageUrl(
+            radarArea,
+            Math.round(mapPlot.width),
+            Math.round(mapPlot.height)
+        );
+        if (!snapshot || nextUrl === "")
+            return false;
+
+        radarSnapshotBounds = snapshot;
+        radarRequestedAt = new Date();
+        // Explicit empty -> next URL guarantees a manual same-viewport refresh
+        // even with the Image cache disabled.
+        radarImageUrl = "";
+        Qt.callLater(function() {
+            stationDiscovery.radarImageUrl = nextUrl;
+        });
+        return true;
+    }
+
+    function clearRadarSnapshot() {
+        radarImageUrl = "";
+        radarSnapshotBounds = null;
     }
 
     function applyMapView(view) {
@@ -183,7 +219,7 @@ Rectangle {
         : domain === "news" ? "GDELT DOC // WORLD EVENT HEADLINES"
         : "RADIO BROWSER // TOP VOTED STREAMS"
     readonly property string sourceCaution:
-        domain === "map" ? "EONET + OPTIONAL FIRMS POINT PLOT CONNECTED // BASEMAP + POLYGON RENDERING NOT YET WIRED"
+        domain === "map" ? "EONET + FIRMS + NOAA MRMS RADAR CONNECTED // BASEMAP + POLYGON RENDERING NOT YET WIRED"
         : domain === "news" ? "ARTICLE DISCOVERY // NOT YET LIVE VIDEO OR STORY CLUSTERS"
         : "STATION DIRECTORY // PERSISTENT PLAYBACK NOT YET WIRED"
     readonly property var plannedSources: {
@@ -192,7 +228,12 @@ Rectangle {
                 {name:"NASA EONET // FILTERED EVENTS + INSPECTOR", state:"SOURCE CONNECTED"},
                 {name:"EONET POINT CANVAS // PAN + ZOOM", state:"CONNECTED"},
                 {name:"USGS // EARTHQUAKES", state:"GROUND FEED EXISTS"},
-                {name:"RAINVIEWER // RADAR TILES", state:"NOT WIRED"},
+                {
+                    name:"NOAA/NWS MRMS // BASE REFLECTIVITY",
+                    state: radarImage.status === Image.Ready
+                           ? "SNAPSHOT LOADED" : "MANUAL READY"
+                },
+                {name:"RAINVIEWER // RADAR FALLBACK", state:"NOT WIRED"},
                 {
                     name:"NASA FIRMS // VIIRS NOAA-21 HOTSPOTS",
                     state: firmsService.configured
@@ -303,6 +344,7 @@ Rectangle {
                                    || modelData.state === "CONNECTED"
                                    || modelData.state === "GROUND FEED EXISTS"
                                    || modelData.state === "MANUAL READY"
+                                   || modelData.state === "SNAPSHOT LOADED"
                                    || String(modelData.state).indexOf("FETCHED ") === 0
                                    ? Colors.cyan : Colors.orange
                             font.pixelSize: 11
@@ -456,6 +498,77 @@ Rectangle {
                     color: Colors.orange
                 }
 
+                StationSectionDivider {
+                    width: parent.width
+                    title: "RADAR // NOAA/NWS MRMS BASE REFLECTIVITY"
+                }
+
+                Row {
+                    width: parent.width
+                    height: 32
+                    spacing: 10
+
+                    ActionButton {
+                        width: 142
+                        height: 30
+                        label: stationDiscovery.radarImageUrl !== ""
+                               ? "REFRESH RADAR" : "LOAD RADAR"
+                        labelPixelSize: 10
+                        available: stationDiscovery.radarAreaReady
+                                   && radarImage.status !== Image.Loading
+                        accentColor: Colors.cyan
+                        onClicked:
+                            stationDiscovery.loadRadarSnapshot()
+                    }
+
+                    ActionButton {
+                        width: 90
+                        height: 30
+                        label: "CLEAR"
+                        labelPixelSize: 10
+                        available: stationDiscovery.radarImageUrl !== ""
+                                   || stationDiscovery.radarSnapshotBounds !== null
+                        onClicked:
+                            stationDiscovery.clearRadarSnapshot()
+                    }
+
+                    GohuText {
+                        anchors.verticalCenter: parent.verticalCenter
+                        width: 170
+                        text: !stationDiscovery.radarAreaReady
+                              ? stationDiscovery.radarArea.reason
+                              : radarImage.status === Image.Loading
+                                ? "LOADING"
+                                : radarImage.status === Image.Error
+                                  ? "IMAGE ERROR"
+                                  : radarImage.status === Image.Ready
+                                    ? "RADAR LOADED"
+                                    : "MANUAL READY"
+                        elide: Text.ElideRight
+                        font.pixelSize: 10
+                        color: radarImage.status === Image.Error ? Colors.yellow
+                               : radarImage.status === Image.Ready ? Colors.cyan
+                               : Colors.white
+                    }
+
+                    QuietText {
+                        anchors.verticalCenter: parent.verticalCenter
+                        width: Math.max(0, parent.width - 432)
+                        text: radarImage.status === Image.Ready
+                              ? "LATEST AVAILABLE AT REQUEST // SNAPSHOT TRACKS MAP"
+                              : "MAX 90° × 50° VIEW // MANUAL LOAD // NO PAN AUTO-FETCH"
+                        elide: Text.ElideRight
+                        font.pixelSize: 9
+                    }
+                }
+
+                QuietText {
+                    width: parent.width
+                    text: "NOAA / NWS / MRMS // OFFICIAL BASE REFLECTIVITY // COVERAGE IS NOT GLOBAL"
+                    font.pixelSize: 9
+                    color: Colors.cyan
+                }
+
                 Rectangle {
                     id: mapPlot
                     width: parent.width
@@ -469,6 +582,52 @@ Rectangle {
                         [-180, -120, -60, 0, 60, 120, 180]
                     readonly property var latitudeGrid:
                         [-90, -60, -30, 0, 30, 60, 90]
+
+                    Image {
+                        id: radarImage
+                        readonly property var northWest:
+                            stationDiscovery.radarSnapshotBounds
+                            ? MapProjection.project(
+                                stationDiscovery.radarSnapshotBounds.west,
+                                stationDiscovery.radarSnapshotBounds.north,
+                                mapPlot.width,
+                                mapPlot.height,
+                                stationDiscovery.mapZoom,
+                                stationDiscovery.mapCenterLon,
+                                stationDiscovery.mapCenterLat
+                              )
+                            : { "valid": false, "x": 0, "y": 0 }
+                        readonly property var southEast:
+                            stationDiscovery.radarSnapshotBounds
+                            ? MapProjection.project(
+                                stationDiscovery.radarSnapshotBounds.east,
+                                stationDiscovery.radarSnapshotBounds.south,
+                                mapPlot.width,
+                                mapPlot.height,
+                                stationDiscovery.mapZoom,
+                                stationDiscovery.mapCenterLon,
+                                stationDiscovery.mapCenterLat
+                              )
+                            : { "valid": false, "x": 0, "y": 0 }
+
+                        source: stationDiscovery.radarImageUrl
+                        cache: false
+                        asynchronous: true
+                        fillMode: Image.Stretch
+                        smooth: true
+                        opacity: 0.68
+                        z: 0.1
+
+                        x: northWest.valid ? northWest.x : 0
+                        y: northWest.valid ? northWest.y : 0
+                        width: northWest.valid && southEast.valid
+                               ? Math.max(0, southEast.x - northWest.x) : 0
+                        height: northWest.valid && southEast.valid
+                                ? Math.max(0, southEast.y - northWest.y) : 0
+                        visible: source !== ""
+                                 && northWest.valid && southEast.valid
+                                 && width > 0 && height > 0
+                    }
 
                     Repeater {
                         model: mapPlot.longitudeGrid
@@ -494,7 +653,7 @@ Rectangle {
                             color: Number(modelData) === 0
                                    ? Colors.cyan : Colors.white
                             opacity: Number(modelData) === 0 ? 0.42 : 0.14
-                            z: 0
+                            z: 0.3
                         }
                     }
 
@@ -522,7 +681,7 @@ Rectangle {
                             color: Number(modelData) === 0
                                    ? Colors.cyan : Colors.white
                             opacity: Number(modelData) === 0 ? 0.42 : 0.14
-                            z: 0
+                            z: 0.3
                         }
                     }
 
@@ -691,7 +850,7 @@ Rectangle {
                         anchors.top: parent.top
                         anchors.margins: 7
                         z: 3
-                        text: "LAT/LON GRID // NO BASEMAP"
+                        text: "LAT/LON GRID // NOAA RADAR IS DATA LAYER, NOT BASEMAP"
                         color: Colors.orange
                         font.pixelSize: 9
                     }

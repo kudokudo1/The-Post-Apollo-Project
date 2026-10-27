@@ -13,6 +13,44 @@ Rectangle {
     property bool stationOpen: true
     property bool viewerOpen: false
     property var selectedNews: null
+    property string mapFilter: "all"
+    property var selectedMapEvent: null
+
+    readonly property var mapFilterOptions: [
+        { "id": "all", "label": "ALL EVENTS", "category": "" },
+        { "id": "wildfires", "label": "WILDFIRE", "category": "wildfires" },
+        { "id": "severeStorms", "label": "SEVERE STORM", "category": "severeStorms" }
+    ]
+    readonly property bool mapInspectorOpen:
+        domain === "map" && selectedMapEvent !== null
+
+    function mapCategoryForFilter(id) {
+        for (let i = 0; i < mapFilterOptions.length; i++) {
+            if (mapFilterOptions[i].id === id)
+                return mapFilterOptions[i].category;
+        }
+        return "";
+    }
+
+    function mapFilterLabel(id) {
+        for (let i = 0; i < mapFilterOptions.length; i++) {
+            if (mapFilterOptions[i].id === id)
+                return mapFilterOptions[i].label;
+        }
+        return "ALL EVENTS";
+    }
+
+    function selectMapFilter(id) {
+        if (domain !== "map" || source.loading || mapFilter === id)
+            return;
+        selectedMapEvent = null;
+        mapFilter = id;
+        discoveryScroll.contentY = 0;
+    }
+
+    function closeMapInspector() {
+        selectedMapEvent = null;
+    }
 
     // Live MM:SS display, keeping even long provider cooldowns readable.
     function retryClock(value) {
@@ -46,7 +84,8 @@ Rectangle {
 
 
     // NEWS selection stays in the Station. GDELT supplies a headline record,
-    // not verified article body text.
+    // not verified article body text. MAP uses an internal EONET inspector
+    // instead of yanking the operator into an external browser.
     function openRow(row) {
         if (domain === "news") {
             const next = ViewerPolicy.normalizeNews(row);
@@ -55,8 +94,11 @@ Rectangle {
             viewerOpen = true;
             return;
         }
-        // MAP's real internal event/map adapter is a later bounded stage.
-        // Preserve its existing path without changing other domain ownership.
+        if (domain === "map") {
+            if (row)
+                selectedMapEvent = row;
+            return;
+        }
         if (row && row.url)
             Qt.openUrlExternally(row.url);
     }
@@ -66,7 +108,10 @@ Rectangle {
         selectedNews = null;
     }
 
-    onDomainChanged: closeViewer()
+    onDomainChanged: {
+        closeViewer();
+        selectedMapEvent = null;
+    }
     onStationOpenChanged: { if (!stationOpen) closeViewer(); }
 
     readonly property string modeTitle:
@@ -74,17 +119,17 @@ Rectangle {
         : domain === "news" ? "▤  NEWS // HEADLINES"
         : "◉  RADIO // STATIONS"
     readonly property string providerTitle:
-        domain === "map" ? "NASA EONET // OPEN NATURAL EVENTS"
+        domain === "map" ? "NASA EONET // " + mapFilterLabel(mapFilter)
         : domain === "news" ? "GDELT DOC // WORLD EVENT HEADLINES"
         : "RADIO BROWSER // TOP VOTED STREAMS"
     readonly property string sourceCaution:
-        domain === "map" ? "EVENT INDEX CONNECTED // SPATIAL MAP CANVAS NOT YET WIRED"
+        domain === "map" ? "FILTERED EVENT INTELLIGENCE + INSPECTOR CONNECTED // SPATIAL MAP CANVAS NOT YET WIRED"
         : domain === "news" ? "ARTICLE DISCOVERY // NOT YET LIVE VIDEO OR STORY CLUSTERS"
         : "STATION DIRECTORY // PERSISTENT PLAYBACK NOT YET WIRED"
     readonly property var plannedSources: {
         if (domain === "map")
             return [
-                {name:"NASA EONET // EVENT INDEX", state:"SOURCE CONNECTED"},
+                {name:"NASA EONET // FILTERED EVENTS + INSPECTOR", state:"SOURCE CONNECTED"},
                 {name:"USGS // EARTHQUAKES", state:"GROUND FEED EXISTS"},
                 {name:"RAINVIEWER // RADAR TILES", state:"NOT WIRED"},
                 {name:"NASA FIRMS // FIRE HOTSPOTS", state:"NOT WIRED"},
@@ -109,6 +154,9 @@ Rectangle {
     WeatherServices.StationDiscoveryService {
         id: source
         domain: stationDiscovery.domain
+        mapCategory: stationDiscovery.mapCategoryForFilter(
+            stationDiscovery.mapFilter
+        )
         active: stationDiscovery.stationOpen && stationDiscovery.visible
     }
 
@@ -143,7 +191,9 @@ Rectangle {
                 GohuText {
                     text: source.failed ? source.errorText
                           : source.loading ? "RECEIVING"
-                          : source.ready ? "RECEIVED " + source.rows.length
+                          : source.ready
+                            ? (source.usingCache ? "CACHED " : "RECEIVED ")
+                              + source.rows.length
                             : source.retryWaitSeconds > 0 ? "WAITING" : "OFFLINE"
                     font.pixelSize: 12
                     color: source.failed ? Colors.orange
@@ -192,6 +242,45 @@ Rectangle {
             }
 
             Row {
+                id: mapFilterRail
+                width: parent.width
+                height: stationDiscovery.domain === "map" ? 34 : 0
+                visible: stationDiscovery.domain === "map"
+                spacing: 8
+
+                Repeater {
+                    model: stationDiscovery.mapFilterOptions
+
+                    delegate: ModeButton {
+                        required property var modelData
+                        width: modelData.id === "severeStorms" ? 156 : 136
+                        height: 32
+                        textOnly: true
+                        horizontalContent: true
+                        bordered: false
+                        selected: stationDiscovery.mapFilter === modelData.id
+                        interactive: !source.loading
+                        labelText: modelData.label
+                        labelFontSize: 10
+                        idlePrimaryColor: Colors.cyan
+                        selectedPrimaryColor: Colors.magenta
+                        perimeterGlowColor: Colors.orange
+                        onTriggered:
+                            stationDiscovery.selectMapFilter(modelData.id)
+                    }
+                }
+
+                QuietText {
+                    anchors.verticalCenter: parent.verticalCenter
+                    text: source.usingCache
+                          ? "SESSION CACHE // 15m"
+                          : source.loading ? "QUERYING EONET"
+                            : "ONE ACTIVE EONET QUERY"
+                    font.pixelSize: 9
+                }
+            }
+
+            Row {
                 width: parent.width
                 height: stationDiscovery.domain === "news" ? 34 : 0
                 visible: stationDiscovery.domain === "news"
@@ -221,6 +310,108 @@ Rectangle {
                 width: parent.width
                 text: stationDiscovery.sourceCaution
                 font.pixelSize: 11
+            }
+
+            Column {
+                width: parent.width
+                spacing: 7
+                visible: stationDiscovery.mapInspectorOpen
+
+                StationSectionDivider {
+                    width: parent.width
+                    title: "EVENT INSPECTOR // NASA EONET"
+                }
+
+                Rectangle {
+                    width: parent.width
+                    height: stationDiscovery.selectedMapEvent
+                            && stationDiscovery.selectedMapEvent.description
+                            ? 172 : 142
+                    color: Colors.dark
+                    border.width: 1
+                    border.color: Colors.magenta
+
+                    Column {
+                        anchors.fill: parent
+                        anchors.margins: 10
+                        spacing: 5
+
+                        Row {
+                            width: parent.width
+                            spacing: 10
+
+                            GohuText {
+                                width: Math.max(0, parent.width - 96)
+                                text: stationDiscovery.selectedMapEvent
+                                      ? stationDiscovery.selectedMapEvent.title
+                                      : ""
+                                color: Colors.white
+                                elide: Text.ElideRight
+                                font.pixelSize: 15
+                            }
+
+                            ActionButton {
+                                width: 86
+                                height: 26
+                                label: "CLOSE"
+                                labelPixelSize: 10
+                                accentColor: Colors.red
+                                destructive: true
+                                onClicked:
+                                    stationDiscovery.closeMapInspector()
+                            }
+                        }
+
+                        SecondaryText {
+                            width: parent.width
+                            text: stationDiscovery.selectedMapEvent
+                                  ? stationDiscovery.selectedMapEvent.category
+                                    + " // "
+                                    + stationDiscovery.selectedMapEvent.coordinates
+                                  : ""
+                            elide: Text.ElideRight
+                            font.pixelSize: 11
+                        }
+
+                        QuietText {
+                            width: parent.width
+                            text: stationDiscovery.selectedMapEvent
+                                  ? "OBSERVED // "
+                                    + stationDiscovery.selectedMapEvent.time
+                                    + " // GEOMETRY // "
+                                    + stationDiscovery.selectedMapEvent.geometryType
+                                  : ""
+                            elide: Text.ElideRight
+                            font.pixelSize: 9
+                        }
+
+                        QuietText {
+                            width: parent.width
+                            text: stationDiscovery.selectedMapEvent
+                                  ? "MAGNITUDE // "
+                                    + stationDiscovery.selectedMapEvent.magnitude
+                                    + " // SOURCES // "
+                                    + stationDiscovery.selectedMapEvent.sourceNames
+                                  : ""
+                            elide: Text.ElideRight
+                            font.pixelSize: 9
+                        }
+
+                        QuietText {
+                            visible: stationDiscovery.selectedMapEvent
+                                     && stationDiscovery.selectedMapEvent.description
+                                     !== ""
+                            width: parent.width
+                            text: stationDiscovery.selectedMapEvent
+                                  ? stationDiscovery.selectedMapEvent.description
+                                  : ""
+                            wrapMode: Text.WordWrap
+                            maximumLineCount: 2
+                            elide: Text.ElideRight
+                            font.pixelSize: 9
+                        }
+                    }
+                }
             }
 
             QuietText {
@@ -286,6 +477,7 @@ Rectangle {
                         anchors.verticalCenter: parent.verticalCenter
                         anchors.rightMargin: 12
                         text: stationDiscovery.domain === "news" ? "VIEW HERE"
+                              : stationDiscovery.domain === "map" ? "INSPECT HERE"
                               : modelData.url !== "" ? modelData.action : "NO LINK"
                         color: entryMouse.containsMouse ? Colors.yellow : Colors.cyan
                         font.pixelSize: 11
@@ -296,6 +488,7 @@ Rectangle {
                         anchors.fill: parent
                         hoverEnabled: true
                         cursorShape: stationDiscovery.domain === "news"
+                                     || stationDiscovery.domain === "map"
                                      || modelData.url !== ""
                                      ? Qt.PointingHandCursor : Qt.ArrowCursor
                         onClicked: stationDiscovery.openRow(modelData)

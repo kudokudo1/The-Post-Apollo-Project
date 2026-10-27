@@ -2,9 +2,9 @@ import QtQuick
 import "../../components"
 import "../tasks"
 
-// Phase 3 TASKS / TODAY + PLANNER: mount the canonical TASKS panes
-// against the ONE existing TodoStore. PLANNER is read-only in Hub;
-// standalone TASKS retains its separately guarded scheduling controls.
+// Phase 3 TASKS / TODAY + PLANNER + PROJECTS: mount canonical TASKS panes
+// against the ONE existing TodoStore. PLANNER and PROJECTS are read-only
+// inside Hub; standalone TASKS retains its guarded scheduling/project writes.
 // Switching internal tabs cannot discard a pending or dirty details draft.
 Item {
     id: todoExplore
@@ -17,6 +17,14 @@ Item {
     readonly property bool detailMode: selectedView === "details"
     readonly property bool todayMode: selectedView === "today"
     readonly property bool plannerMode: selectedView === "planner"
+    readonly property bool projectsMode: selectedView === "projects"
+    readonly property string projectsStatus:
+        taskProjects.storeState === "ready" || taskProjects.storeState === "empty"
+        ? "TO-DO // PROJECTS // READ ONLY // "
+          + taskProjects.projects.length + " LOCAL"
+          + (taskProjects.selectedProject
+             ? " // " + taskProjects.selectedProject.name : "")
+        : "TO-DO // PROJECTS // " + taskProjects.storeState.toUpperCase()
     readonly property string plannerStatus:
         !taskPlanner.calendar.available
         ? "TO-DO // PLANNER // " + String(taskPlanner.calendar.state).toUpperCase()
@@ -40,13 +48,15 @@ Item {
                : "TO-DO // SELECT A TASK")
         : todayMode ? todayStatus
         : plannerMode ? plannerStatus
+        : projectsMode ? projectsStatus
         : taskList.statusLine
 
     // Dirty details remain mounted on an internal tab switch, but keep the
     // tab itself visible until the operator explicitly saves or discards.
     function chooseView(view) {
         if (view !== "list" && view !== "today"
-                && view !== "planner" && view !== "details")
+                && view !== "planner" && view !== "projects"
+                && view !== "details")
             return;
         if (view === selectedView) {
             navigationFeedback = "";
@@ -103,7 +113,7 @@ Item {
         spacing: 6
 
         ActionButton {
-            width: Math.max(1, (modeSelector.width - 3 * modeSelector.spacing) / 4)
+            width: Math.max(1, (modeSelector.width - 4 * modeSelector.spacing) / 5)
             height: parent.height
             label: "LIST"
             selected: todoExplore.selectedView === "list"
@@ -112,7 +122,7 @@ Item {
             onLeftClicked: todoExplore.chooseView("list")
         }
         ActionButton {
-            width: Math.max(1, (modeSelector.width - 3 * modeSelector.spacing) / 4)
+            width: Math.max(1, (modeSelector.width - 4 * modeSelector.spacing) / 5)
             height: parent.height
             label: "TODAY"
             selected: todoExplore.todayMode
@@ -121,7 +131,7 @@ Item {
             onLeftClicked: todoExplore.chooseView("today")
         }
         ActionButton {
-            width: Math.max(1, (modeSelector.width - 3 * modeSelector.spacing) / 4)
+            width: Math.max(1, (modeSelector.width - 4 * modeSelector.spacing) / 5)
             height: parent.height
             label: "PLANNER"
             selected: todoExplore.plannerMode
@@ -130,7 +140,16 @@ Item {
             onLeftClicked: todoExplore.chooseView("planner")
         }
         ActionButton {
-            width: Math.max(1, (modeSelector.width - 3 * modeSelector.spacing) / 4)
+            width: Math.max(1, (modeSelector.width - 4 * modeSelector.spacing) / 5)
+            height: parent.height
+            label: "PROJECTS"
+            selected: todoExplore.projectsMode
+            trackLabelGlowLocally: true
+            softGlowEnabled: false
+            onLeftClicked: todoExplore.chooseView("projects")
+        }
+        ActionButton {
+            width: Math.max(1, (modeSelector.width - 4 * modeSelector.spacing) / 5)
             height: parent.height
             label: "DETAILS"
             selected: todoExplore.detailMode
@@ -203,6 +222,45 @@ Item {
             todoSnapshot: todoExplore.todoSnapshot
             todoStore: null
             schedulingAllowed: false
+            onOpenTaskRequested: function(taskId) {
+                todoExplore.openTask(taskId);
+            }
+        }
+    }
+
+    // The canonical local TASKS PROJECTS pane is mounted only once.
+    // Its existing create/rename/delete/assign actions all require
+    // writable === true; passing no store makes this Hub view read-only.
+    // Selection and OPEN still use the same task snapshot/details target.
+    Flickable {
+        id: projectsViewport
+        visible: todoExplore.projectsMode
+        anchors.top: modeSelector.bottom
+        anchors.topMargin: 6
+        anchors.left: parent.left
+        anchors.right: parent.right
+        anchors.bottom: parent.bottom
+        clip: true
+        boundsBehavior: Flickable.StopAtBounds
+        contentWidth: width
+        contentHeight: taskProjects.y + taskProjects.height
+
+        GohuText {
+            id: projectsReadOnlyBanner
+            width: projectsViewport.width
+            height: 18
+            text: "LOCAL PROJECTS // READ ONLY IN HUB"
+            font.pixelSize: 10
+            color: Colors.cyan
+            elide: Text.ElideRight
+        }
+        TaskProjectsPane {
+            id: taskProjects
+            y: projectsReadOnlyBanner.height + 5
+            width: projectsViewport.width
+            height: Math.max(projectsViewport.height - y, 520)
+            todoSnapshot: todoExplore.todoSnapshot
+            todoStore: null
             onOpenTaskRequested: function(taskId) {
                 todoExplore.openTask(taskId);
             }

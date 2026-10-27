@@ -87,10 +87,16 @@ for index in (2, 6):
 for index in (3, 5):
     between(fractions[index], 0.62, 0.95, PHASES[index])
 between(fractions[4], 0.95, 1.0, "full")
-for index in (1, 2, 3):
-    assert centroids[index] > 1.8, f"waxing light is not on right: {PHASES[index]}"
-for index in (5, 6, 7):
-    assert centroids[index] < -1.8, f"waning light is not on left: {PHASES[index]}"
+# Crescent, quarter and gibbous must use the *same* lit silhouette
+# under horizontal mirroring. This catches the QML PathArc direction bug.
+for waxing, waning in ((1, 7), (2, 6), (3, 5)):
+    assert abs(fractions[waxing] - fractions[waning]) < 0.035, (
+        f"asymmetric pair {PHASES[waxing]}/{PHASES[waning]}: "
+        f"{fractions[waxing]:.3f}/{fractions[waning]:.3f}")
+    assert centroids[waxing] > 0.8, f"waxing light wrong: {PHASES[waxing]}"
+    assert centroids[waning] < -0.8, f"waning light wrong: {PHASES[waning]}"
+    assert abs(centroids[waxing] + centroids[waning]) < 1.2, (
+        f"shape centroids not mirrored: {PHASES[waxing]} / {PHASES[waning]}")
 assert len({round(x, 2) for x in fractions}) >= 4, "moon phases indistinguishable"
 
 # New moon's dark lower disk must be covered by an opaque orange foreground

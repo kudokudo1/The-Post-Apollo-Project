@@ -45,6 +45,8 @@ jobs:
         run: node tests/weather/test_weather_cycle_policy.js
       - name: Validate Weather Station Home relevance policy
         run: node tests/weather/test_station_home_policy.js
+      - name: Validate HOME recent archived-model history
+        run: node tests/weather/test_station_home_recent_history.js
       - name: Validate Weather core source-health and per-feed state
         run: node tests/weather/test_station_source_health.js
       - name: Validate Kitty Sway workarea coordinate contracts

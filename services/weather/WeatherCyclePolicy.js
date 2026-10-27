@@ -59,6 +59,71 @@ function dayFor(date, daily) {
     return null;
 }
 
+function daylightMinutes(day) {
+    if (!day)
+        return -1;
+    const sunrise = clockMinute(day.sunrise);
+    const sunset = clockMinute(day.sunset);
+    if (sunrise < 0 || sunset < 0 || sunrise >= sunset)
+        return -1;
+    return sunset - sunrise;
+}
+
+function durationLabel(minutes) {
+    const value = Number(minutes);
+    if (!isFinite(value) || value < 0)
+        return "--";
+    const total = Math.round(value);
+    const hours = Math.floor(total / 60);
+    const remainder = total % 60;
+    return hours + "H " + String(remainder).padStart(2, "0") + "M";
+}
+
+// Summarize astronomy that is already present in the daily weather payload.
+// Prefer the provider-local observation date. If that clock cannot be
+// trusted, fall back to the first provider forecast day rather than the PC
+// date. This adds no ephemeris model and makes no twilight claim.
+function astronomySummary(date, daily) {
+    let day = dayFor(date, daily);
+    if (!day && Array.isArray(daily) && daily.length > 0)
+        day = daily[0];
+
+    if (!day) {
+        return {
+            available: false,
+            date: "--",
+            sunrise: "--",
+            sunset: "--",
+            daylightMinutes: -1,
+            daylightLabel: "--",
+            moonPhase: "unknown",
+            moonPhaseLabel: "--",
+            moonIllumination: -1
+        };
+    }
+
+    const sunriseValid = clockMinute(day.sunrise) >= 0;
+    const sunsetValid = clockMinute(day.sunset) >= 0;
+    const phase = normalizedPhase(day.moonPhase);
+    const illumination = Number(day.moonIllumination);
+    const light = isFinite(illumination) && illumination >= 0
+                  && illumination <= 100 ? illumination : -1;
+    const daylight = daylightMinutes(day);
+
+    return {
+        available: sunriseValid || sunsetValid || phase !== "unknown" || light >= 0,
+        date: String(day.date || "--"),
+        sunrise: sunriseValid ? String(day.sunrise) : "--",
+        sunset: sunsetValid ? String(day.sunset) : "--",
+        daylightMinutes: daylight,
+        daylightLabel: durationLabel(daylight),
+        moonPhase: phase,
+        moonPhaseLabel: phase !== "unknown"
+                        ? String(day.moonPhase || "").toUpperCase() : "--",
+        moonIllumination: light
+    };
+}
+
 function atLocal(date, minute, daily) {
     const day = dayFor(date, daily);
     const phase = day ? normalizedPhase(day.moonPhase) : "unknown";

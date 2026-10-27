@@ -48,6 +48,35 @@ assert.equal(context.atObservation(1000000 - 400000, "2026-10-26 04:20 AM", 1000
 assert.equal(context.atLocal("2026-10-26", 720, [{date: "2026-10-26", sunrise: "--", sunset: "--"}]).solar, "unknown");
 assert.equal(context.atLocal("2026-10-26", 720, [{date: "2026-10-26", sunrise: "10:00 PM", sunset: "06:00 AM"}]).solar, "unknown");
 assert.equal(context.atLocal("2026-10-30", 720, daily).moonPhase, "unknown");
+
+// Daily astronomy uses only fields already parsed from the weather provider.
+// Daylight is the interval between provider sunrise and sunset; it is not
+// presented as civil/nautical/astronomical twilight.
+const astronomy = context.astronomySummary("2026-10-26", daily);
+assert.equal(astronomy.available, true);
+assert.equal(astronomy.date, "2026-10-26");
+assert.equal(astronomy.sunrise, "07:20 AM");
+assert.equal(astronomy.sunset, "06:10 PM");
+assert.equal(astronomy.daylightMinutes, 650);
+assert.equal(astronomy.daylightLabel, "10H 50M");
+assert.equal(astronomy.moonPhase, "waxing-crescent");
+assert.equal(astronomy.moonPhaseLabel, "WAXING CRESCENT");
+assert.equal(astronomy.moonIllumination, 24);
+assert.equal(context.daylightMinutes(today), 650);
+assert.equal(context.durationLabel(65), "1H 05M");
+assert.equal(context.daylightMinutes({sunrise:"--", sunset:"06:10 PM"}), -1);
+assert.equal(context.durationLabel(-1), "--");
+// When the provider-local clock cannot select a day, the summary falls back
+// to the provider's first forecast day, never the PC's date.
+assert.equal(context.astronomySummary("", daily).date, "2026-10-26");
+assert.equal(context.astronomySummary("", []).available, false);
+const moonOnly = context.astronomySummary("2026-10-26", [{
+    date:"2026-10-26", sunrise:"--", sunset:"--",
+    moonPhase:"Full Moon", moonIllumination:100
+}]);
+assert.equal(moonOnly.available, true);
+assert.equal(moonOnly.daylightLabel, "--");
+assert.equal(moonOnly.moonPhase, "full");
 // The provider-local time, not the PC zone, drives day/night boundaries.
 assert.equal(context.atObservation(1000000, "2026-10-26 06:49 AM", 1000000, daily).solar, "night");
 assert.equal(context.atObservation(1000000 + 60000, "2026-10-26 06:49 AM", 1000000, daily).solar, "dawn");
@@ -132,6 +161,17 @@ assert.match(sky, /WeatherCyclePolicy\.atObservation/);
 assert.match(sky, /WeatherCyclePolicy\.forecast/);
 assert.match(sky, /WeatherCyclePolicy\.atLocal/);
 assert.match(sky, /WeatherCyclePolicy\.normalizedPhase\(modelData\.moonPhase\)/);
+assert.match(sky, /WeatherCyclePolicy\.astronomySummary\(skyCycle\.date, dailyForecast\)/);
+assert.match(sky, /title: "ASTRONOMY \/\/ SUN \+ MOON"/);
+assert.match(sky, /text: sky\.astronomySummary\.daylightLabel/);
+assert.match(sky, /text: sky\.astronomySummary\.moonPhaseLabel/);
+assert.match(sky, /DAYLIGHT DERIVED FROM PROVIDER SUNRISE \+ SUNSET/);
+const astronomyArea = sky.slice(
+    sky.indexOf('title: "ASTRONOMY // SUN + MOON"'),
+    sky.indexOf('title: "FORECAST // NEXT HOURS"')
+);
+assert.doesNotMatch(astronomyArea, /Process\s*\{|Timer\s*\{|Qt\.openUrlExternally/);
+assert.doesNotMatch(astronomyArea, /TWILIGHT|GOLDEN|BLUE HOUR/);
 assert.match(sky, /mode: sky\.currentCelestialMode/);
 assert.doesNotMatch(dock + sky, /Colors\.dawn|Colors\.dusk|Colors\.moon|Colors\.night/);
 // Night rendering contract: illuminated phase = *weather* ink; shadow =

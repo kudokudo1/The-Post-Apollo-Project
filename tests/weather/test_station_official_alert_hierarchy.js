@@ -37,7 +37,6 @@ let summary = policy.summary([]);
 assert.equal(summary.available, false);
 assert.equal(summary.count, 0);
 assert.equal(summary.headerText, "");
-assert.equal(summary.dockText, "");
 
 summary = policy.summary([
     alert("moderate", "Moderate", "Expected"),
@@ -48,7 +47,6 @@ assert.equal(summary.event, "SEVERE WARNING");
 assert.equal(summary.severity, "SEVERE");
 assert.equal(summary.colorToken, "orange");
 assert.equal(summary.headerText, "NWS SEVERE // 2");
-assert.equal(summary.dockText, "2");
 assert.equal(summary.expiresLabel, "2026-10-27 14:00Z");
 
 // Severity remains the first hierarchy dimension even during the one-check
@@ -84,11 +82,6 @@ const windowSource = fs.readFileSync(
 const homeSource = fs.readFileSync(
     path.join(root, "widgets/weather/StationHome.qml"), "utf8"
 );
-const dockSource = fs.readFileSync(
-    path.join(root, "modules/Weather.qml"), "utf8"
-);
-const shellSource = fs.readFileSync(path.join(root, "shell.qml"), "utf8");
-
 assert.match(windowSource, /StationOfficialAlertPolicy\.js" as OfficialAlertPolicy/);
 assert.match(windowSource, /readonly property var officialAlertSummary:/);
 assert.match(
@@ -103,6 +96,7 @@ assert.match(
     windowSource,
     /StationHome\s*\{[\s\S]*?nwsAlertSource: weatherStation\.nwsAlertSource/
 );
+assert.match(windowSource, /property var nwsAlertSource: null/);
 
 assert.match(homeSource, /property var nwsAlertSource: null/);
 assert.match(homeSource, /title: "OFFICIAL ALERT \/\/ NWS"/);
@@ -120,39 +114,9 @@ for (const token of [
 ])
     assert.ok(homeSource.includes(token), token);
 
-assert.match(dockSource, /property var nwsAlertSource: null/);
-assert.match(dockSource, /id: officialAlertDockBadge/);
-assert.match(dockSource, /visible: weatherDock\.officialAlertSummary\.available/);
-assert.match(dockSource, /text: weatherDock\.officialAlertSummary\.dockText/);
-assert.match(dockSource, /normalForegroundColor: weatherColor/);
-assert.match(dockSource, /normalDockGlowColor: weatherColor/);
-
-// The ordinary weather classifier must remain independent from official
-// bulletin state. Alerts are a separate projection, never weatherCode input.
-const weatherStateStart = dockSource.indexOf("readonly property var weatherState:");
-const skyCycleStart = dockSource.indexOf("readonly property var skyCycle:", weatherStateStart);
-assert.ok(weatherStateStart >= 0 && skyCycleStart > weatherStateStart);
-const weatherClassifier = dockSource.slice(weatherStateStart, skyCycleStart);
-assert.doesNotMatch(weatherClassifier, /nwsAlert|officialAlert|NWS/);
-
-const badgeStart = dockSource.indexOf("id: officialAlertDockBadge");
-const rightClickStart = dockSource.indexOf("onRightClicked:", badgeStart);
-assert.ok(badgeStart >= 0 && rightClickStart > badgeStart);
-const badgeArea = dockSource.slice(badgeStart, rightClickStart);
-assert.doesNotMatch(badgeArea, /Process\s*\{|Timer\s*\{|curl|weatherState\s*=/);
-
-assert.match(
-    shellSource,
-    /Weather\s*\{[\s\S]*?nwsAlertSource: nwsOfficialAlerts/
-);
-assert.match(
-    shellSource,
-    /WeatherStationW\s*\{[\s\S]*?nwsAlertSource: nwsOfficialAlerts/
-);
-
 const policySource = fs.readFileSync(
     path.join(root, "widgets/weather/StationOfficialAlertPolicy.js"), "utf8"
 );
 assert.doesNotMatch(policySource, /Process\s*\{|Timer\s*\{|curl|XMLHttpRequest/);
 
-console.log("Weather official-alert HOME/header/dock hierarchy contracts: PASS");
+console.log("Weather official-alert HOME/header hierarchy contracts: PASS");

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import os
+import sqlite3
 from pathlib import Path
 import subprocess
 import sys
@@ -210,6 +211,58 @@ class TransportTests(unittest.TestCase):
         _, next_hello = self.start()
         self.assertEqual(next_hello["phase"], "RECOVERY_REVIEW")
         self.assertTrue(next_hello["pending"])
+
+    def test_m11r_session_is_fresh_and_required_for_each_request(self):
+        first, hello1 = self.start(bootstrap=True)
+        self.assertTrue(hello1["ok"])
+        self.assertRegex(hello1["sessionId"], r"^[0-9a-f]{48}$")
+        matched = self.send(first, {"requestId":1, "kind":"status"})
+        self.assertTrue(matched["ok"])
+        self.assertEqual(matched["sessionId"], hello1["sessionId"])
+        missing = self.send(first, {"requestId":2, "kind":"status",
+                                    "sessionId":""})
+        self.assertFalse(missing["ok"])
+        self.assertEqual(missing["sessionId"], hello1["sessionId"])
+        self.assertEqual(first.wait(timeout=5), 2)
+        self.assertEqual(self.path.read_text(), raw(0))
+
+        # Two independently bootstrapped private copies have different
+        # identities even with the same writerId and requestId.
+        second_dir = Path(self.temp.name) / "another" / "m11l-tasks-copy"
+        second_dir.mkdir(parents=True, mode=0o700)
+        write_exclusive(second_dir / "todo-copy.json", raw(0))
+        second, hello2 = self.start(bootstrap=True, directory=second_dir)
+        self.assertTrue(hello2["ok"])
+        self.assertNotEqual(hello1["sessionId"], hello2["sessionId"])
+        stale = self.send(second, {"requestId":1, "kind":"reserve",
+                                   "sessionId":hello1["sessionId"],
+                                   "stageId":"m11r-stale-stage-001",
+                                   "candidateText":raw(1)})
+        self.assertFalse(stale["ok"])
+        self.assertEqual(stale["sessionId"], hello2["sessionId"])
+        self.assertEqual(second.wait(timeout=5), 2)
+        self.assertEqual((second_dir / "todo-copy.json").read_text(), raw(0))
+        with sqlite3.connect(second_dir / "gate-review.db") as db:
+            self.assertEqual(db.execute(
+                "SELECT COUNT(*) FROM stage_history").fetchone()[0], 0)
+
+    def test_m11r_session_must_be_present_even_for_status_and_freeze(self):
+        for kind, body in (("status",{}), ("freeze",{"expectedEpoch":0})):
+            with self.subTest(kind=kind), tempfile.TemporaryDirectory() as root:
+                folder = Path(root) / "m11l-tasks-copy"
+                folder.mkdir(mode=0o700)
+                write_exclusive(folder / "todo-copy.json", raw(0))
+                proc, hello = self.start(bootstrap=True, directory=folder)
+                self.assertTrue(hello["ok"])
+                # Bypass the auto-session helper to exercise missing keys.
+                proc.stdin.write((json.dumps({"requestId":1,"kind":kind,
+                                               **body})+"\\n").encode())
+                proc.stdin.flush()
+                reply = json.loads(proc.stdout.readline())
+                self.assertFalse(reply["ok"])
+                self.assertEqual(reply["sessionId"], hello["sessionId"])
+                self.assertEqual(proc.wait(timeout=5),2)
+                self.assertEqual((folder/"todo-copy.json").read_text(),raw(0))
 
     def test_qml_bridge_is_unmounted_and_defers_native_reload(self):
         path = ROOT / "services/projects/TaskJsonGateHostBridgeM11m.qml"

@@ -4,6 +4,7 @@ import Quickshell.Wayland
 import QtQuick.Effects
 import Qt5Compat.GraphicalEffects
 import "../../components"
+import "../../services/weather" as WeatherServices
 import "StationOfficialAlertPolicy.js" as OfficialAlertPolicy
 
 PanelWindow {
@@ -12,6 +13,19 @@ PanelWindow {
     property var weatherService: null
     property var spaceService: null
     property var nwsAlertSource: null
+
+    WeatherServices.WeatherHistoryService {
+        id: weatherHistoryService
+        active: weatherStation.menuOpen
+                && weatherStation.currentView === "home"
+        latitude: weatherStation.weatherService
+                  ? weatherStation.weatherService.latitude : ""
+        longitude: weatherStation.weatherService
+                   ? weatherStation.weatherService.longitude : ""
+        anchorDateTime: weatherStation.weatherService
+                        ? weatherStation.weatherService.localObservationDateTime
+                        : ""
+    }
 
     // Shared keyboard-ownership contract. Weather stays usable with the
     // existing shell even before shell-level ownership wiring lands because
@@ -955,6 +969,7 @@ PanelWindow {
                 weatherService: weatherStation.weatherService
                 spaceService: weatherStation.spaceService
                 nwsAlertSource: weatherStation.nwsAlertSource
+                historyService: weatherHistoryService
             }
         }
 

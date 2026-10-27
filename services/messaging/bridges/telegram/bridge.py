@@ -329,8 +329,11 @@ def main(argv: list[str] | None = None) -> int:
     messages.add_argument("--limit", type=int, default=100)
     send = sub.add_parser("send")
     send.add_argument("conversation_id")
-    parser.add_argument("--identity", default=None,
-                        help="Explicit isolated Post-Apollo identity-N scope")
+    # The scope flag belongs to each command: `health --identity identity-N`
+    # is opt-in. Existing `health`, `list`, `messages`, etc stay shared.
+    for action in sub.choices.values():
+        action.add_argument("--identity", default=None,
+                            help="Explicit isolated Post-Apollo identity-N scope")
     args = parser.parse_args(argv)
     try:
         _validate_identity(args.identity)

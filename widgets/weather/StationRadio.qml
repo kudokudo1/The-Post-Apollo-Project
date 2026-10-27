@@ -1,5 +1,6 @@
 import QtQuick
 import Quickshell
+import Quickshell.Io
 import "../../components"
 import "../../services/media" as MediaServices
 import "StationRadioMemoryPolicy.js" as RadioMemory

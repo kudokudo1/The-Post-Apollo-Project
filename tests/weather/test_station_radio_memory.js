@@ -115,6 +115,11 @@ assert.deepEqual(decoded.map(x => x.ref.id), [
 ]);
 
 const ui = read("widgets/weather/StationRadio.qml");
+assert.match(
+    ui,
+    /^import QtQuick\s*\nimport Quickshell\s*\nimport Quickshell\.Io/m,
+    "StationRadio FileView/JsonAdapter requires Quickshell.Io"
+);
 assert.match(ui, /import Quickshell/);
 assert.match(ui, /StationRadioMemoryPolicy\.js" as RadioMemory/);
 assert.match(ui, /FileView\s*\{/);

@@ -940,7 +940,6 @@ PanelWindow {
 
                 weatherStationWindow: weatherStationWindow
                 weatherService: weatherService
-                nwsAlertSource: nwsOfficialAlerts
             }
 
             WeatherStationW {

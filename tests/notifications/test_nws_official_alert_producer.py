@@ -11,7 +11,17 @@ QM = ROOT / "services/notifications/qmldir"
 BASE = ROOT / "services/notifications/NotificationsService.qml"
 
 qml = PRODUCER.read_text()
-assert "NwsOfficialAlertNotificationProducer {" in SHELL.read_text()
+shell_text = SHELL.read_text()
+assert "NwsOfficialAlertNotificationProducer {" in shell_text
+assert "id: nwsOfficialAlerts" in shell_text
+assert "nwsAlertSource: nwsOfficialAlerts" in shell_text
+assert "readonly property bool configured:" in qml
+assert "readonly property bool loading:" in qml
+assert "readonly property bool ready:" in qml
+assert "readonly property var alertList:" in qml
+assert "readonly property int activeCount:" in qml
+assert "property date lastUpdated" in qml
+assert 'property string errorText: ""' in qml
 assert "NwsOfficialAlertNotificationProducer 1.0 NwsOfficialAlertNotificationProducer.qml" in QM.read_text()
 assert "POST_APOLLO_NWS_ALERT_POINT" in qml
 assert "Quickshell.env(" in qml
@@ -54,9 +64,13 @@ const now=Date.parse('2026-10-20T13:00:00Z');
 function alert(id,props={}){
   return {type:'Feature',id,properties:{
     id,event:'Tornado Warning',status:'Actual',severity:'Severe',
+    urgency:'Immediate',certainty:'Observed',messageType:'Alert',
+    category:'Met',response:'Shelter',
     headline:'Tornado Warning for TEST county',areaDesc:'TEST County',
     senderName:'NWS TEST Office',sent:'2026-10-20T12:00:00Z',
-    updated:'2026-10-20T12:05:00Z',expires:'2026-10-20T14:00:00Z',
+    updated:'2026-10-20T12:05:00Z',
+    effective:'2026-10-20T12:00:00Z',onset:'2026-10-20T12:05:00Z',
+    expires:'2026-10-20T14:00:00Z',ends:'2026-10-20T14:00:00Z',
     ...props
   }};
 }
@@ -75,11 +89,22 @@ assert.strictEqual(one[0].id,'abc');
 assert.strictEqual(one[0].displaySeverity,'critical');
 assert.strictEqual(one[0].area,'TEST County');
 assert.strictEqual(one[0].issuer,'NWS TEST Office');
+assert.strictEqual(one[0].urgency,'Immediate');
+assert.strictEqual(one[0].certainty,'Observed');
+assert.strictEqual(one[0].effective,'2026-10-20T12:00:00.000Z');
+assert.strictEqual(one[0].onset,'2026-10-20T12:05:00.000Z');
+assert.strictEqual(one[0].ends,'2026-10-20T14:00:00.000Z');
+assert.strictEqual(one[0].messageType,'Alert');
+assert.strictEqual(one[0].category,'Met');
+assert.strictEqual(one[0].response,'Shelter');
 let state={};
 let result=p.advance(state,one);
 state=result.state;
 assert.strictEqual(result.changes.length,1);
 assert.strictEqual(result.changes[0].kind,'observed');
+let visible=p.visibleAlerts(state);
+assert.strictEqual(visible.length,1);
+assert.strictEqual(visible[0].listingState,'ACTIVE');
 result=p.advance(state,one);
 state=result.state;
 assert.strictEqual(result.changes.length,0);
@@ -91,9 +116,14 @@ assert.strictEqual(result.changes.length,0,'failed request cannot clear');
 result=p.advance(state,[]);
 assert.strictEqual(result.changes.length,0,'first absence silent');
 state=result.state;
+visible=p.visibleAlerts(state);
+assert.strictEqual(visible.length,1);
+assert.strictEqual(visible[0].listingState,'RECHECK PENDING');
+assert.strictEqual(visible[0].absentChecks,1);
 result=p.advance(state,[]);
 assert.strictEqual(result.changes[0].kind,'not-listed');
 state=result.state;
+assert.strictEqual(p.visibleAlerts(state).length,0);
 assert.strictEqual(p.advance(state,[]).changes.length,0,'single departure event');
 
 const qml=fs.readFileSync(process.argv[2],'utf8');
@@ -137,7 +167,11 @@ runtime.acceptResponse(feed([alert('abc')]));
 assert.strictEqual(entries.length,1);
 runtime.acceptResponse('bad json');
 assert.strictEqual(entries.length,1,'malformed response must not resolve alert');
+assert.strictEqual(runtime.producer.errorText,'NWS RESPONSE INVALID');
 runtime.acceptResponse(feed([alert('abc',{updated:'2026-10-20T12:10:00Z'})]));
+assert.strictEqual(runtime.producer.errorText,'');
+assert.strictEqual(runtime.producer.fetchSucceeded,true);
+assert(runtime.producer.lastUpdated instanceof Clock);
 assert.strictEqual(entries.length,2);
 assert(entries[1].title.includes('UPDATED'));
 runtime.acceptResponse(feed([]));

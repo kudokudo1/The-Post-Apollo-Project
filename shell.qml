@@ -355,7 +355,7 @@ PanelWindow {
     }
 
     // Official NWS alerts only when an operator-pinned geographic point exists.
-    NwsOfficialAlertNotificationProducer {}
+    NwsOfficialAlertNotificationProducer { id: nwsOfficialAlerts }
 
     // Observe existing AQI readings without touching Weather Station fetching.
     WeatherAqiNotificationProducer {
@@ -949,6 +949,7 @@ PanelWindow {
 
                 weatherService: weatherService
                 spaceService: spaceService
+                nwsAlertSource: nwsOfficialAlerts
                 relationshipFocusModeActive: relationshipFocus.active
                 relationshipFocused: relationshipFocus.owner === "weather"
             }

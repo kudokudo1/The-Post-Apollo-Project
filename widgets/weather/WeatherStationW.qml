@@ -10,6 +10,7 @@ PanelWindow {
 
     property var weatherService: null
     property var spaceService: null
+    property var nwsAlertSource: null
 
     // Shared keyboard-ownership contract. Weather stays usable with the
     // existing shell even before shell-level ownership wiring lands because
@@ -935,6 +936,7 @@ PanelWindow {
 
             StationGround {
                 weatherService: weatherStation.weatherService
+                nwsAlertSource: weatherStation.nwsAlertSource
             }
         }
 

@@ -526,6 +526,40 @@ PanelWindow {
         browserConnectionNavigationPending = false;
         return true;
     }
+    // Telegram currently uses one shared personal.session. Only its existing
+    // provider adapter can report authorization, and that result is NEVER
+    // bound to a Post-Apollo identity or saved account nickname.
+    function openSharedTelegram() {
+        var snap = appSelector.identitySnapshot;
+        if (!menuOpen || !appSelector.settingsOpen || !snap.writable
+                || appSelector.accountSelectedServiceId !== "telegram"
+                || appSelector.accountEditorIdentityId !== snap.activeId
+                || browserConnectionNavigationPending)
+            return false;
+        // Closing Settings must not reopen an old Chromium site before the
+        // Telegram adapter becomes active and performs its own health probe.
+        browserConnectionNavigationPending = true;
+        appSelector.settingsOpen = false;
+        activateApp(2);
+        browserConnectionNavigationPending = false;
+        return true;
+    }
+
+    function recheckSharedTelegram() {
+        var snap = appSelector.identitySnapshot;
+        if (!menuOpen || !appSelector.settingsOpen || !snap.writable
+                || appSelector.accountSelectedServiceId !== "telegram"
+                || appSelector.accountEditorIdentityId !== snap.activeId
+                || activeAppIndex !== 2
+                || !messageRouter.telegramBackend.active
+                || messageRouter.telegramBackend.loginInProgress
+                || messageRouter.telegramBackend.backendMode === "PROBING")
+            return false;
+        // The existing Telethon health check calls is_user_authorized().
+        // It is meaningful ONLY for the one shared Telegram session.
+        messageRouter.telegramBackend.probe();
+        return true;
+    }
     onBrowserActiveIdentityIdChanged: updateGeometryHelperMode()
 
     function selectedBrowserScopeId() {
@@ -1620,6 +1654,12 @@ PanelWindow {
 
         AppSelector {
             id: appSelector
+            sharedTelegramActive: messageRouter.telegramBackend.active
+            sharedTelegramBackendMode: messageRouter.telegramBackend.backendMode
+            sharedTelegramLoginInProgress:
+                messageRouter.telegramBackend.loginInProgress
+            onSharedTelegramOpenRequested: messagingWindow.openSharedTelegram()
+            onSharedTelegramRecheckRequested: messagingWindow.recheckSharedTelegram()
             browserWindowInspection: messagingWindow.browserWindowInspection
             browserWindowInspectionServiceId:
                 messagingWindow.browserWindowInspectionServiceId

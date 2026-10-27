@@ -1,0 +1,43 @@
+{
+  "milestone": "M11n",
+  "classification": "OPERATOR_TERMINAL_OBSERVED_PARTIAL_NATIVE_ACCEPTANCE",
+  "operatorLocalDate": "2026-10-26",
+  "affectedComponent": "isolated TaskJsonGateHarnessM11m.qml / TaskJsonGateHostBridgeM11m.qml",
+  "evidenceProvenance": "operator-pasted terminal output in ChatGPT; no screenshots or actual task bytes uploaded",
+  "fixtureOnly": true,
+  "storedPrivatePaths": false,
+  "observed": {
+    "standaloneQuickshellLaunch": "Configuration Loaded",
+    "launchConfigurationErrorReported": false,
+    "fixtureCreation": "Synthetic disposable test created",
+    "finalTaskTitle": "M11M_TEST_2",
+    "testShellExit": "operator keyboard interrupt ^C",
+    "journalPhase": "RECOVERY_REVIEW",
+    "journalEpoch": 3,
+    "journalPendingStage": null,
+    "journalSourceHashMatchesFile": true,
+    "journalReason": "FRESH_OWNER_MUST_REVIEW"
+  },
+  "supportedConclusions": [
+    "The disposable JSON file contained the synthetic revision-2 title when inspected after standalone harness termination.",
+    "At the time of the read-only journal inspection, the recorded owner source hash matched the independently read fixture file.",
+    "The durable journal had no pending stage and recorded RECOVERY_REVIEW with a fresh owner review reason.",
+    "The recorded epoch of 3 is not itself an error; the exact number of owner reattachments and freeze actions is not recoverable from the supplied terminal excerpts."
+  ],
+  "unobserved": [
+    "Native UI visible status and callback event chain FILE_SAVED/FILE_READBACK_OK/HOST_SETTLED for each individual stage.",
+    "Which of NEW TEST, FREEZE, STOP, and EXISTING was clicked and the precise order/count.",
+    "Independent backup hash and filesystem rollback inspection for this native run.",
+    "Native fault injection for host death during reservation or readback and stale callback windows.",
+    "Any production ApolloHubTodoStore gated write, operator's personal TASKS data, or SQLite migration."
+  ],
+  "acceptance": {
+    "disposableSavedBytesAndDurableJournalCheckpoint": "observed",
+    "completeNativeButtonSequence": "not_proven",
+    "allNativeFailures": "not_proven",
+    "productionWriterGate": "not_implemented",
+    "localProductionActivation": "not_authorized",
+    "migration": "not_authorized",
+    "finalOperatorAcceptance": "not_claimed"
+  }
+}

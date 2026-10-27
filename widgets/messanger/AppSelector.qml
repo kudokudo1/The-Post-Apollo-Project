@@ -18,6 +18,11 @@ Rectangle {
     // Entry-point shell only. Identity storage, credentials and family layouts
     // are deliberately reserved for subsequent operator-reviewed slices.
     property bool settingsOpen: false
+    // Browser identity sessions are explicitly opt-in and live in MessagingW.
+    // The launcher rail, family metadata, and credential notes stay separate.
+    property bool isolatedBrowserModeActive: false
+    property bool isolatedBrowserToggleAllowed: false
+    signal isolatedBrowserModeToggleRequested()
     // Set by MessagingW to the shared content surface, not a new window.
     property Item settingsWorkspaceParent: null
     property int settingsContactWidth: 200
@@ -786,7 +791,8 @@ Rectangle {
                 }
                 Text {
                     width: parent.width
-                    text: "LAYOUT ONLY"
+                    text: appSelector.isolatedBrowserModeActive
+                          ? "BROWSER SESSIONS // ISOLATED" : "LAYOUT ONLY"
                     color: Colors.orange
                     font.pixelSize: 9
                 }
@@ -1047,6 +1053,42 @@ Rectangle {
                     font.bold: true
                     font.pixelSize: 11
                     wrapMode: Text.WordWrap
+                }
+                Text {
+                    width: parent.width
+                    text: "BROWSER SESSIONS"
+                    color: Colors.cyan
+                    font.bold: true
+                    font.pixelSize: 10
+                    wrapMode: Text.WordWrap
+                }
+                Text {
+                    width: parent.width
+                    text: appSelector.isolatedBrowserModeActive
+                          ? "ISOLATED // EACH IDENTITY HAS NEW, SEPARATE BROWSER SIGN-IN"
+                          : "LEGACY // CURRENT BROWSER ACCOUNTS ARE SHARED"
+                    color: Colors.white
+                    font.pixelSize: 9
+                    wrapMode: Text.WordWrap
+                }
+                Text {
+                    width: parent.width
+                    text: "This session only. Existing profiles stay untouched. New profiles start signed out."
+                    color: Colors.orange
+                    font.pixelSize: 9
+                    wrapMode: Text.WordWrap
+                }
+                ActionButton {
+                    width: parent.width
+                    height: 36
+                    label: appSelector.isolatedBrowserModeActive
+                           ? "USE LEGACY BROWSERS" : "USE ISOLATED BROWSERS"
+                    labelPixelSize: 9
+                    labelMinimumPixelSize: 8
+                    contentPadding: 3
+                    interactive: appSelector.isolatedBrowserToggleAllowed
+                                 && appSelector.identitySnapshot.writable
+                    onTriggered: appSelector.isolatedBrowserModeToggleRequested()
                 }
                 Text {
                     width: parent.width

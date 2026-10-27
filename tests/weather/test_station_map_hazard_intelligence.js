@@ -138,13 +138,14 @@ assert.ok(
 );
 assert.match(ui, /stationDiscovery\.domain === "map" \? "INSPECT HERE"/);
 assert.match(ui, /SESSION CACHE \/\/ 15m/);
-assert.match(ui, /EONET \+ FIRMS \+ NOAA MRMS RADAR CONNECTED/);
-assert.match(ui, /BASEMAP \+ POLYGON RENDERING NOT YET WIRED/);
+assert.match(ui, /EONET \+ FIRMS \+ MRMS \+ HMS SMOKE CONNECTED/);
+assert.match(ui, /BASEMAP NOT WIRED/);
 
 // Official NOAA MRMS radar is manual; RainViewer remains fallback-only.
 assert.match(ui, /NASA FIRMS \/\/ VIIRS NOAA-21 HOTSPOTS/);
 assert.match(ui, /KEY REQUIRED/);
 assert.match(ui, /NOAA\/NWS MRMS \/\/ BASE REFLECTIVITY/);
 assert.match(ui, /RAINVIEWER \/\/ RADAR FALLBACK", state:"NOT WIRED"/);
+assert.match(ui, /NOAA HMS \/\/ SMOKE PLUME POLYGONS/);
 
 console.log("Weather MAP EONET hazard filters, cache and inspector: PASS");

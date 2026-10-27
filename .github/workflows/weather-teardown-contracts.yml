@@ -55,6 +55,8 @@ jobs:
         run: node tests/weather/test_station_source_health.js
       - name: Validate SPACE Kp history from existing NOAA feed
         run: node tests/weather/test_station_space_kp_history.js
+      - name: Validate SPACE NOAA SUVI solar imagery
+        run: node tests/weather/test_station_space_suvi_image.js
       - name: Validate Kitty Sway workarea coordinate contracts
         run: node tests/weather/test_station_terminal_geometry.js
       - name: Validate internal NEWS viewer and URL boundary contracts

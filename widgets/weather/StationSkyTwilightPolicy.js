@@ -29,6 +29,11 @@ function wrapMinutes(value) {
     return result;
 }
 
+function twoDigit(value) {
+    const number = Math.max(0, Math.floor(Number(value) || 0));
+    return number < 10 ? "0" + number : String(number);
+}
+
 function parseDate(raw) {
     const match = String(raw || "").match(/^(\d{4})-(\d{2})-(\d{2})$/);
     if (!match)
@@ -229,7 +234,7 @@ function clockLabelFromMinute(rawMinute) {
     const mm = minute % 60;
     const suffix = hour24 >= 12 ? "PM" : "AM";
     const hour12 = hour24 % 12 === 0 ? 12 : hour24 % 12;
-    return hour12 + ":" + String(mm).padStart(2, "0") + " " + suffix;
+    return hour12 + ":" + twoDigit(mm) + " " + suffix;
 }
 
 function localLabel(utcMinute, offsetMinute) {

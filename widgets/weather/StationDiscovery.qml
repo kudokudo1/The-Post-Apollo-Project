@@ -2,6 +2,7 @@ import QtQuick
 import "../../components"
 import "../../services/weather" as WeatherServices
 import "StationViewerPolicy.js" as ViewerPolicy
+import "../../services/weather/StationDiscoveryPolicy.js" as DiscoveryPolicy
 import "StationMapProjectionPolicy.js" as MapProjection
 import "../../services/weather/FirmsHotspotPolicy.js" as FirmsAreaPolicy
 import "StationRadarPolicy.js" as RadarPolicy
@@ -18,6 +19,22 @@ Rectangle {
     property bool stationOpen: true
     property bool viewerOpen: false
     property var selectedNews: null
+    property string newsTopic: "all"
+    readonly property var newsTopicOptions: [
+        { "id": "all", "label": "ALL" },
+        { "id": "weather", "label": "WEATHER" },
+        { "id": "earth", "label": "EARTH" },
+        { "id": "fire", "label": "FIRE" },
+        { "id": "space", "label": "SPACE" }
+    ]
+    readonly property var visibleRows:
+        domain === "news"
+        ? DiscoveryPolicy.filterNewsRows(
+              source && Array.isArray(source.rows) ? source.rows : [],
+              newsTopic
+          )
+        : (source && Array.isArray(source.rows) ? source.rows : [])
+
     property string mapFilter: "all"
     property var selectedMapEvent: null
     property var selectedMapHotspot: null
@@ -74,6 +91,21 @@ Rectangle {
                 return mapFilterOptions[i].label;
         }
         return "ALL EVENTS";
+    }
+
+    function newsTopicLabel(id) {
+        for (let i = 0; i < newsTopicOptions.length; i++) {
+            if (newsTopicOptions[i].id === id)
+                return newsTopicOptions[i].label;
+        }
+        return "ALL";
+    }
+
+    function selectNewsTopic(id) {
+        if (domain !== "news" || newsTopic === id)
+            return;
+        newsTopic = id;
+        discoveryScroll.contentY = 0;
     }
 
     function selectMapFilter(id) {
@@ -235,7 +267,7 @@ Rectangle {
         : "RADIO BROWSER // TOP VOTED STREAMS"
     readonly property string sourceCaution:
         domain === "map" ? "EONET + FIRMS + MRMS + HMS SMOKE CONNECTED // BASEMAP NOT WIRED"
-        : domain === "news" ? "ARTICLE DISCOVERY // NOT YET LIVE VIDEO OR STORY CLUSTERS"
+        : domain === "news" ? "ARTICLE DISCOVERY // LOCAL TOPIC FILTER + CONSERVATIVE DEDUPE // NOT STORY CLUSTERING"
         : "STATION DIRECTORY // PERSISTENT PLAYBACK NOT YET WIRED"
     readonly property var plannedSources: {
         if (domain === "map")
@@ -268,7 +300,8 @@ Rectangle {
         if (domain === "news")
             return [
                 {name:"GDELT DOC // ARTICLE LIST", state:"ENDPOINT CONFIGURED"},
-                {name:"TOPICS / SOURCES / REGIONS", state:"NOT WIRED"},
+                {name:"LOCAL TOPIC FILTER + URL/TITLE DEDUPE", state:"CONNECTED"},
+                {name:"SOURCE / REGION FILTERS", state:"NOT WIRED"},
                 {name:"LIVE NEWS / VIDEO", state:"NOT WIRED"},
                 {name:"STORY CLUSTERS / DOSSIERS", state:"NOT WIRED"}
             ];
@@ -1094,6 +1127,48 @@ Rectangle {
                 }
             }
 
+            Row {
+                id: newsTopicRail
+                width: parent.width
+                height: stationDiscovery.domain === "news" ? 34 : 0
+                visible: stationDiscovery.domain === "news"
+                spacing: 7
+
+                Repeater {
+                    model: stationDiscovery.newsTopicOptions
+
+                    delegate: ModeButton {
+                        required property var modelData
+                        width: modelData.id === "weather" ? 122 : 102
+                        height: 32
+                        textOnly: true
+                        horizontalContent: true
+                        bordered: false
+                        selected: stationDiscovery.newsTopic === modelData.id
+                        labelText: modelData.label
+                        labelFontSize: 10
+                        idlePrimaryColor: Colors.cyan
+                        selectedPrimaryColor: Colors.magenta
+                        perimeterGlowColor: Colors.orange
+                        onTriggered:
+                            stationDiscovery.selectNewsTopic(modelData.id)
+                    }
+                }
+
+                QuietText {
+                    anchors.verticalCenter: parent.verticalCenter
+                    width: Math.max(0, parent.width - 550)
+                    text: source.ready
+                          ? "SHOWING "
+                            + stationDiscovery.visibleRows.length
+                            + " / " + source.rows.length
+                            + " // LOCAL FILTER"
+                          : "LOCAL FILTER // WAITING FOR HEADLINES"
+                    elide: Text.ElideRight
+                    font.pixelSize: 9
+                }
+            }
+
             QuietText {
                 width: parent.width
                 text: stationDiscovery.sourceCaution
@@ -1294,6 +1369,21 @@ Rectangle {
             }
 
             QuietText {
+                visible: stationDiscovery.domain === "news"
+                         && source.ready
+                         && source.rows.length > 0
+                         && stationDiscovery.visibleRows.length === 0
+                width: parent.width
+                text: "NO HEADLINES MATCH // "
+                      + stationDiscovery.newsTopicLabel(
+                            stationDiscovery.newsTopic
+                        )
+                      + " // FILTER IS LOCAL // SOURCE NOT REFETCHED"
+                font.pixelSize: 11
+                color: Colors.orange
+            }
+
+            QuietText {
                 visible: source.failed || !source.ready || source.rows.length === 0
                 width: parent.width
                 text: source.failed
@@ -1307,7 +1397,7 @@ Rectangle {
             }
 
             Repeater {
-                model: source.ready ? source.rows : []
+                model: source.ready ? stationDiscovery.visibleRows : []
 
                 delegate: Rectangle {
                     required property var modelData
@@ -1337,7 +1427,13 @@ Rectangle {
 
                         SecondaryText {
                             width: parent.width
-                            text: modelData.detail
+                            text: stationDiscovery.domain === "news"
+                                  ? modelData.detail
+                                    + " // "
+                                    + String(
+                                          modelData.primaryTopic || "other"
+                                      ).toUpperCase()
+                                  : modelData.detail
                             elide: Text.ElideRight
                             font.pixelSize: 12
                         }

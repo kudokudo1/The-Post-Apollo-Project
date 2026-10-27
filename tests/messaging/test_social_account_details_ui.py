@@ -110,8 +110,12 @@ class SocialAccountDetailsUiContracts(unittest.TestCase):
         self.assertIn('def browser_profile(', BROWSER)
         self.assertIn('site: str, prefix: list[str] | None = None,', BROWSER)
         self.assertIn('return data_root / "post-apollo" / profile_dir', BROWSER)
-        self.assertIn('return root / "post-apollo" / "telegram" / "personal.session"',
-                      TELEGRAM)
+        # Scoped Telegram sessions add a namespace without changing the
+        # legacy shared default used by the existing native QML adapter.
+        self.assertIn('base = root / "post-apollo" / "telegram"', TELEGRAM)
+        self.assertIn('if identity is None:', TELEGRAM)
+        self.assertIn('return base / "personal.session"', TELEGRAM)
+        self.assertIn('base / "identities" / identity / "personal.session"', TELEGRAM)
         self.assertEqual(QMLSTORE.count("Process {"),2)
         self.assertEqual(QMLSTORE.count("FileView {"),0)
         self.assertEqual(QMLSTORE.count("Qt.openUrlExternally("),0)

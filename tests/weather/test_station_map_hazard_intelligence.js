@@ -138,7 +138,8 @@ assert.ok(
 );
 assert.match(ui, /stationDiscovery\.domain === "map" \? "INSPECT HERE"/);
 assert.match(ui, /SESSION CACHE \/\/ 15m/);
-assert.match(ui, /FILTERED EVENT INTELLIGENCE \+ INSPECTOR CONNECTED/);
+assert.match(ui, /EONET FILTER \+ INSPECTOR \+ POINT PLOT CONNECTED/);
+assert.match(ui, /BASEMAP \+ POLYGON RENDERING NOT YET WIRED/);
 
 // Richer satellite hotspots and radar remain honest future layers.
 assert.match(ui, /NASA FIRMS \/\/ FIRE HOTSPOTS", state:"NOT WIRED"/);

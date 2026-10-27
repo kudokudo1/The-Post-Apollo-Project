@@ -256,7 +256,7 @@ class TransportTests(unittest.TestCase):
                 self.assertTrue(hello["ok"])
                 # Bypass the auto-session helper to exercise missing keys.
                 proc.stdin.write((json.dumps({"requestId":1,"kind":kind,
-                                               **body})+"\\n").encode())
+                                               **body})+"\n").encode())
                 proc.stdin.flush()
                 reply = json.loads(proc.stdout.readline())
                 self.assertFalse(reply["ok"])

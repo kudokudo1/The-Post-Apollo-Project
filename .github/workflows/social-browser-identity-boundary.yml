@@ -1,0 +1,34 @@
+name: Social Browser Identity Profile Boundary
+
+on:
+  pull_request:
+    paths:
+      - 'widgets/messanger/XBrowser.py'
+      - 'tests/messaging/test_social_browser_identity_boundary.py'
+      - 'services/messaging/BROWSER-IDENTITY-PROFILES.md'
+      - '.github/workflows/social-browser-identity-boundary.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'widgets/messanger/XBrowser.py'
+      - 'tests/messaging/test_social_browser_identity_boundary.py'
+      - 'services/messaging/BROWSER-IDENTITY-PROFILES.md'
+      - '.github/workflows/social-browser-identity-boundary.yml'
+  workflow_dispatch:
+
+jobs:
+  scoped-profile-boundary:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify scoped paths/classes and fail-closed nonactivation
+        run: python3 -m unittest discover -s tests/messaging -p 'test_social_browser_identity_boundary.py' -v
+      - name: Preserve all legacy Social browser and geometry contracts
+        run: |
+          python3 tests/messaging/test_x_social_contracts.py
+          python3 tests/messaging/test_social_browser_contracts.py
+      - name: Preserve identity organization and account-details separation
+        run: |
+          node tests/messaging/test_social_identity_policy.cjs
+          python3 -m unittest discover -s tests/messaging -p 'test_social_identity_store.py' -v
+          python3 -m unittest discover -s tests/messaging -p 'test_social_account_details_ui.py' -v

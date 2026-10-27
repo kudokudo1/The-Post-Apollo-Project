@@ -12,6 +12,7 @@ import argparse
 import json
 import os
 from pathlib import Path
+import re
 import shutil
 import subprocess
 import sys
@@ -75,6 +76,19 @@ EXTENSION_SITES = {
 }
 ALL_SITES = {**SITES, **WEB_FALLBACK_SITES, **EXTENSION_SITES}
 
+# Stable Post-Apollo organization IDs. An identity number is never a
+# Chromium account ID, token, login assertion, shell fragment, or filesystem
+# path supplied by the caller. Unknown IDs are rejected before path use.
+IDENTITY_ID = re.compile(r"^identity-[1-9][0-9]{0,8}$")
+
+
+def validated_identity(identity_id: str | None) -> str | None:
+    if identity_id is None:
+        return None  # Preserve the existing, unscoped browser lane as-is.
+    if not isinstance(identity_id, str) or not IDENTITY_ID.fullmatch(identity_id):
+        raise ValueError("Invalid Post-Apollo identity ID")
+    return identity_id
+
 
 def site_config(site: str) -> tuple[str, str, str]:
     if site not in ALL_SITES:
@@ -82,8 +96,14 @@ def site_config(site: str) -> tuple[str, str, str]:
     return ALL_SITES[site]
 
 
-def site_criteria(site: str) -> str:
-    return f'[class="{site_config(site)[1]}"]'
+def site_window_class(site: str, identity_id: str | None = None) -> str:
+    legacy_class = site_config(site)[1]
+    scoped_id = validated_identity(identity_id)
+    return legacy_class if scoped_id is None else f"{legacy_class}-{scoped_id}"
+
+
+def site_criteria(site: str, identity_id: str | None = None) -> str:
+    return f'[class="{site_window_class(site, identity_id)}"]'
 
 BROWSERS = (
     "brave-browser",
@@ -129,10 +149,11 @@ def x_exists() -> bool:
     return any(is_x_window(node) for node in walk_tree(sway_tree()))
 
 
-def site_exists(site: str) -> bool:
-    if site == "x":
+def site_exists(site: str, identity_id: str | None = None) -> bool:
+    validated_identity(identity_id)
+    if site == "x" and identity_id is None:
         return x_exists()
-    _, window_class, _ = site_config(site)
+    window_class = site_window_class(site, identity_id)
     return any(
         (node.get("window_properties") or {}).get("class") == window_class
         for node in walk_tree(sway_tree())
@@ -179,8 +200,12 @@ def browser_prefix() -> list[str]:
     )
 
 
-def browser_profile(site: str, prefix: list[str] | None = None) -> Path:
+def browser_profile(
+    site: str, prefix: list[str] | None = None,
+    identity_id: str | None = None,
+) -> Path:
     _, _, profile_dir = site_config(site)
+    scoped_id = validated_identity(identity_id)
     prefix = browser_prefix() if prefix is None else prefix
     if len(prefix) >= 3 and prefix[:2] == ["flatpak", "run"]:
         # Flatpak Chromium cannot normally write into the host XDG_DATA_HOME.
@@ -188,22 +213,31 @@ def browser_profile(site: str, prefix: list[str] | None = None) -> Path:
         data_root = Path.home() / ".var" / "app" / prefix[2] / "data"
     else:
         data_root = Path(os.environ.get("XDG_DATA_HOME") or (Path.home() / ".local/share"))
-    return data_root / "post-apollo" / profile_dir
+    if scoped_id is None:
+        # Do not auto-migrate or repurpose the operator's legacy profiles.
+        return data_root / "post-apollo" / profile_dir
+    return data_root / "post-apollo" / "identities" / scoped_id / profile_dir
 
 
-def line_extension_installed(prefix: list[str] | None = None) -> bool:
-    profile = browser_profile("linechrome", prefix)
+def line_extension_installed(
+    prefix: list[str] | None = None, identity_id: str | None = None,
+) -> bool:
+    profile = browser_profile("linechrome", prefix, identity_id)
     roots = [profile / "Default" / "Extensions" / LINE_EXTENSION_ID]
     roots.extend(profile.glob(f"Profile */Extensions/{LINE_EXTENSION_ID}"))
     return any(root.is_dir() and any(child.is_dir() for child in root.iterdir())
                for root in roots)
 
 
-def browser_command(site: str = "x") -> list[str]:
-    url, window_class, _ = site_config(site)
+def browser_command(
+    site: str = "x", identity_id: str | None = None,
+) -> list[str]:
+    url, _, _ = site_config(site)
+    scoped_id = validated_identity(identity_id)
+    window_class = site_window_class(site, scoped_id)
     prefix = browser_prefix()
-    profile = browser_profile(site, prefix)
-    if site == "linechrome" and not line_extension_installed(prefix):
+    profile = browser_profile(site, prefix, scoped_id)
+    if site == "linechrome" and not line_extension_installed(prefix, scoped_id):
         raise RuntimeError(
             "LINE for Chrome is not installed in the Post-Apollo LINE profile. "
             "Use SET UP LINE FOR CHROME first."
@@ -218,7 +252,11 @@ def browser_command(site: str = "x") -> list[str]:
     ]
 
 
-def setup(site: str) -> None:
+def setup(site: str, identity_id: str | None = None) -> None:
+    # The shared geometry bridge does not yet recognize identity-scoped
+    # Chromium classes. Never open an undockable login window by surprise.
+    if validated_identity(identity_id) is not None:
+        raise RuntimeError("Identity-scoped browser setup awaits geometry integration")
     if site != "linechrome":
         raise ValueError("Setup is only available for LINE for Chrome")
     prefix = browser_prefix()
@@ -239,7 +277,12 @@ def setup(site: str) -> None:
     )
 
 
-def show(site: str = "x") -> None:
+def show(site: str = "x", identity_id: str | None = None) -> None:
+    # Only the legacy site-window classes are handled by DiscordGeometry.py.
+    # Disable scoped launches until the host, Sway bridge and active identity
+    # transition are all updated together. No profile or window is reused.
+    if validated_identity(identity_id) is not None:
+        raise RuntimeError("Identity-scoped browser launch awaits geometry integration")
     # Hiding a different site never logs it out or kills its browser process.
     site_config(site)
     for other in ALL_SITES:
@@ -270,46 +313,86 @@ def show(site: str = "x") -> None:
     sway_command(f"{criteria} scratchpad show")
 
 
-def hide(site: str = "x") -> None:
-    if site_exists(site):
-        sway_command(f"{site_criteria(site)} move scratchpad")
+def hide(site: str = "x", identity_id: str | None = None) -> None:
+    validated_identity(identity_id)
+    if identity_id is None:
+        # Preserve the existing one-argument path for normal Social use.
+        if site_exists(site):
+            sway_command(f"{site_criteria(site)} move scratchpad")
+    elif site_exists(site, identity_id):
+        sway_command(f"{site_criteria(site, identity_id)} move scratchpad")
 
 
-def hide_all() -> None:
+def hide_all(identity_id: str | None = None) -> None:
+    validated_identity(identity_id)
     for site in ALL_SITES:
-        hide(site)
+        hide(site, identity_id) if identity_id is not None else hide(site)
+
+
+def profile_plan(site: str, identity_id: str) -> dict[str, Any]:
+    """Pure, non-mutating scoped profile proposal; never reports login success."""
+    scoped_id = validated_identity(identity_id)
+    if scoped_id is None:
+        raise ValueError("Identity ID required for scoped profile plan")
+    _, _, profile_leaf = site_config(site)
+    return {
+        "identityId": scoped_id,
+        "site": site,
+        "windowClass": site_window_class(site, scoped_id),
+        "profileRelative": f"post-apollo/identities/{scoped_id}/{profile_leaf}",
+        "status": "GEOMETRY_INTEGRATION_PENDING",
+        "authenticated": None,
+        "launchAvailable": False,
+        "migrationPerformed": False,
+    }
 
 
 def main() -> int:
     parser = argparse.ArgumentParser()
-    parser.add_argument("action", choices=("show", "hide", "status", "setup"))
+    parser.add_argument("action", choices=("show", "hide", "status", "setup", "profile"))
     parser.add_argument("site", nargs="?", default="x", choices=(*ALL_SITES, "all"))
+    parser.add_argument("--identity", dest="identity_id", default=None)
     args = parser.parse_args()
 
     try:
-        if args.action == "show":
+        identity_id = validated_identity(args.identity_id)
+        if args.action == "profile":
+            if args.site == "all" or identity_id is None:
+                raise ValueError("Scoped profile plan requires one site and --identity")
+            print(json.dumps(profile_plan(args.site, identity_id)))
+        elif args.action == "show":
             if args.site == "all":
                 raise ValueError("Cannot show all browser sites")
-            show(args.site)
+            show(args.site, identity_id) if identity_id is not None else show(args.site)
         elif args.action == "hide":
             if args.site == "all":
-                hide_all()
+                hide_all(identity_id) if identity_id is not None else hide_all()
             else:
-                hide(args.site)
+                hide(args.site, identity_id) if identity_id is not None else hide(args.site)
         elif args.action == "setup":
             if args.site == "all":
                 raise ValueError("Cannot set up all browser sites")
-            setup(args.site)
+            setup(args.site, identity_id) if identity_id is not None else setup(args.site)
         elif args.site == "all":
-            print(json.dumps({site: site_exists(site) for site in ALL_SITES}))
+            print(json.dumps({
+                site: site_exists(site, identity_id)
+                if identity_id is not None else site_exists(site)
+                for site in ALL_SITES
+            }))
         else:
             payload = {
-                "window": site_exists(args.site),
-                "class": site_config(args.site)[1],
+                "window": site_exists(args.site, identity_id)
+                          if identity_id is not None else site_exists(args.site),
+                "class": site_window_class(args.site, identity_id),
             }
             if args.site == "linechrome":
-                payload["extensionInstalled"] = line_extension_installed()
+                payload["extensionInstalled"] = line_extension_installed(
+                    identity_id=identity_id)
                 payload["extensionId"] = LINE_EXTENSION_ID
+            if identity_id is not None:
+                payload["identityId"] = identity_id
+                payload["authenticated"] = None
+                payload["launchAvailable"] = False
             print(json.dumps(payload))
         return 0
     except (OSError, subprocess.CalledProcessError, ValueError, RuntimeError) as exc:

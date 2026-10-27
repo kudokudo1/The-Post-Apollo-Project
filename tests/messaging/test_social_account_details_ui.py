@@ -107,7 +107,9 @@ class SocialAccountDetailsUiContracts(unittest.TestCase):
         self.assertIn('model: appSelector.railRows',SELECTOR)
         self.assertIn('settingsWorkspaceParent: messagingContent.contentItem',HOST)
         self.assertIn('function showDiscord()',HOST)
-        self.assertIn('def browser_profile(site: str, prefix:',BROWSER)
+        self.assertIn('def browser_profile(', BROWSER)
+        self.assertIn('site: str, prefix: list[str] | None = None,', BROWSER)
+        self.assertIn('return data_root / "post-apollo" / profile_dir', BROWSER)
         self.assertIn('return root / "post-apollo" / "telegram" / "personal.session"',
                       TELEGRAM)
         self.assertEqual(QMLSTORE.count("Process {"),2)

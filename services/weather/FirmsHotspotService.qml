@@ -10,9 +10,10 @@ Scope {
     id: firms
 
     readonly property string sourceName: "NASA FIRMS // VIIRS NOAA-21 NRT"
-    readonly property string mapKey:
-        FirmsPolicy.configuredKey(Quickshell.env("POST_APOLLO_FIRMS_MAP_KEY"))
-    readonly property bool configured: mapKey !== ""
+    readonly property bool configured:
+        FirmsPolicy.configuredKey(
+            Quickshell.env("POST_APOLLO_FIRMS_MAP_KEY")
+        ) !== ""
     readonly property bool loading: fetchProcess.running
 
     property bool ready: false

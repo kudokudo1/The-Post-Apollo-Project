@@ -34,6 +34,8 @@ on:
       - "modules/Volumebar.qml"
       - "widgets/hub/ApolloHubTodoMini.qml"
       - "widgets/hub/ApolloHubTodoExplore.qml"
+      - "widgets/tasks/TaskTodayPane.qml"
+      - "widgets/tasks/TaskTodayPolicy.js"
       - "widgets/hub/ApolloHubNotesMini.qml"
       - "widgets/hub/ApolloHubCalendarMini.qml"
       - "widgets/hub/ApolloHubTimeMini.qml"
@@ -80,6 +82,8 @@ on:
       - "modules/Volumebar.qml"
       - "widgets/hub/ApolloHubTodoMini.qml"
       - "widgets/hub/ApolloHubTodoExplore.qml"
+      - "widgets/tasks/TaskTodayPane.qml"
+      - "widgets/tasks/TaskTodayPolicy.js"
       - "widgets/hub/ApolloHubNotesMini.qml"
       - "widgets/hub/ApolloHubCalendarMini.qml"
       - "widgets/hub/ApolloHubTimeMini.qml"
@@ -106,6 +110,10 @@ jobs:
         run: python3 tests/hub/test_apollo_hub_stopwatch_integration.py
       - name: Verify same-owner TimeW countdown controls
         run: python3 tests/hub/test_apollo_hub_countdown_integration.py
+      - name: Verify TASKS TODAY civil-date projection
+        run: node tests/tasks/test_task_today_policy.cjs
+      - name: Verify canonical TASKS TODAY UI safety
+        run: python3 tests/tasks/test_task_today_ui_contracts.py
       - name: Exercise layout v1 migration, v2 tile identity and guarded remove
         run: node tests/hub/test_apollo_hub_layout_v2.cjs
       - name: Verify sanitized AppControl process projection

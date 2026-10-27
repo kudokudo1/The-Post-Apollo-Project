@@ -251,7 +251,10 @@ class TelegramIdentityConfigTests(unittest.TestCase):
 
     def test_existing_native_ui_and_router_stay_shared_until_separate_review(self):
         self.assertIn('property string loginMode:',ADAPTER)
-        self.assertIn('loginProcess.command = [pythonPath, loginBridgePath, loginMode]',ADAPTER)
+        self.assertIn('var commandArgs = [pythonPath, loginBridgePath, loginMode];',ADAPTER)
+        self.assertIn('if (loginMode === "configure" && requestedAppKeyIdentityId !== "")',ADAPTER)
+        self.assertIn('commandArgs.push("--identity", requestedAppKeyIdentityId)',ADAPTER)
+        self.assertIn('loginProcess.command = commandArgs;',ADAPTER)
         self.assertIn('healthProcess.command = command(["health"])',ADAPTER)
         self.assertIn('active: router.appIndex === 2',ROUTER)
         self.assertIn('social-identities-v1.json',IDENTITIES)

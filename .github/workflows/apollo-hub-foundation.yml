@@ -36,6 +36,10 @@ on:
       - "widgets/hub/ApolloHubTodoExplore.qml"
       - "widgets/tasks/TaskTodayPane.qml"
       - "widgets/tasks/TaskTodayPolicy.js"
+      - "widgets/tasks/TaskPlannerPane.qml"
+      - "widgets/tasks/TaskPlannerPolicy.js"
+      - "tests/hub/test_apollo_hub_planner_integration.py"
+      - "tests/tasks/test_task_planner_policy.cjs"
       - "widgets/hub/ApolloHubNotesMini.qml"
       - "widgets/hub/ApolloHubCalendarMini.qml"
       - "widgets/hub/ApolloHubTimeMini.qml"
@@ -84,6 +88,10 @@ on:
       - "widgets/hub/ApolloHubTodoExplore.qml"
       - "widgets/tasks/TaskTodayPane.qml"
       - "widgets/tasks/TaskTodayPolicy.js"
+      - "widgets/tasks/TaskPlannerPane.qml"
+      - "widgets/tasks/TaskPlannerPolicy.js"
+      - "tests/hub/test_apollo_hub_planner_integration.py"
+      - "tests/tasks/test_task_planner_policy.cjs"
       - "widgets/hub/ApolloHubNotesMini.qml"
       - "widgets/hub/ApolloHubCalendarMini.qml"
       - "widgets/hub/ApolloHubTimeMini.qml"
@@ -114,6 +122,12 @@ jobs:
         run: node tests/tasks/test_task_today_policy.cjs
       - name: Verify canonical TASKS TODAY UI safety
         run: python3 tests/tasks/test_task_today_ui_contracts.py
+      - name: Verify read-only Hub TASKS Planner integration
+        run: python3 tests/hub/test_apollo_hub_planner_integration.py
+      - name: Verify Gregorian MONTH WEEK DAY Planner projection
+        run: node tests/tasks/test_task_planner_policy.cjs
+      - name: Verify standalone TASKS Planner owner contracts
+        run: python3 tests/tasks/test_task_planner_ui_contracts.py
       - name: Exercise layout v1 migration, v2 tile identity and guarded remove
         run: node tests/hub/test_apollo_hub_layout_v2.cjs
       - name: Verify sanitized AppControl process projection

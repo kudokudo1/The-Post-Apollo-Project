@@ -141,11 +141,20 @@ Scope {
                 }
                 Text {
                     width: parent.width
-                    text: "EVENTS // " + bridge.recentEvents.join(" / ")
-                    color: "#DCF3FA"
+                    text: "NATIVE CHAINS // " + bridge.nativeSummary.saveChains
+                        + " // FROZEN " + bridge.nativeSummary.frozen
+                        + " // RECOVERY " + bridge.nativeSummary.recoveryObserved
+                    color: "#55CFCA"
                     font.pixelSize: 11
+                    wrapMode: Text.WordWrap
+                }
+                Text {
+                    width: parent.width
+                    text: "NATIVE TRACE // " + bridge.nativeRecent
+                    color: "#DCF3FA"
+                    font.pixelSize: 10
                     wrapMode: Text.WrapAnywhere
-                    maximumLineCount: 4
+                    maximumLineCount: 3
                 }
                 Text {
                     text: "LIVE WRITER: FALSE // SQLITE: FALSE // MIGRATION: FALSE"

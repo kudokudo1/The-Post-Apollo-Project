@@ -102,10 +102,10 @@ assert.match(ui, /onDoubleClicked:\s*stationDiscovery\.resetMapView\(\)/);
 assert.match(ui, /model: stationDiscovery\.mapPointRows/);
 assert.match(ui, /MapProjection\.project\(\s*modelData\.longitude,\s*modelData\.latitude/);
 assert.match(ui, /stationDiscovery\.selectedMapEvent = modelData/);
-assert.match(ui, /LAT\/LON GRID \/\/ NOAA RADAR IS DATA LAYER, NOT BASEMAP/);
+assert.match(ui, /LAT\/LON GRID \/\/ RADAR \+ SMOKE ARE DATA LAYERS, NOT BASEMAP/);
 assert.match(ui, /EONET \+ FIRMS POINTS \/\/ POLYGONS LISTED BELOW/);
 assert.match(ui, /EONET POINT CANVAS \/\/ PAN \+ ZOOM/);
-assert.match(ui, /BASEMAP \/ POLYGON LAYERS", state:"NOT WIRED"/);
+assert.match(ui, /BASEMAP \/ OTHER POLYGON LAYERS", state:"NOT WIRED"/);
 
 const policySource = read("widgets/weather/StationMapProjectionPolicy.js");
 assert.doesNotMatch(policySource, /Process\s*\{|Timer\s*\{|curl|XMLHttpRequest|Qt\.openUrlExternally/);

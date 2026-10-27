@@ -37,10 +37,12 @@ Rectangle {
         weatherService ? weatherService.hourlyForecast : []
     // Selection only affects the UI. The same six parsed forecast samples
     // back both the icons and the detail readout; no second collector.
-    property int inspectedHourIndex: 0
-    onHourlyForecastChanged: inspectedHourIndex = 0
-    readonly property var inspectedHour:
-        HourlyDetails.selectedHour(hourlyForecast, inspectedHourIndex)
+    // Default to the familiar icon forecast. The detail view appears
+    // only after a deliberate hour selection and can be dismissed.
+    property int inspectedHourIndex: -1
+    onHourlyForecastChanged: inspectedHourIndex = -1
+    readonly property var inspectedHour: inspectedHourIndex >= 0
+        ? HourlyDetails.selectedHour(hourlyForecast, inspectedHourIndex) : null
     readonly property var inspectedHourMetrics:
         HourlyDetails.hourlyMetrics(inspectedHour)
     readonly property var dailyForecast:
@@ -580,6 +582,12 @@ Rectangle {
                 title: "FORECAST // NEXT HOURS"
             }
 
+            QuietText {
+                text: "SELECT A FORECAST HOUR TO INSPECT"
+                font.pixelSize: 9
+                visible: sky.hourlyForecast.length > 0
+            }
+
             Row {
                 spacing: 10
 
@@ -588,6 +596,7 @@ Rectangle {
 
                     delegate: Column {
                         required property var modelData
+                        required property int index
 
                         width: 112
                         spacing: 2
@@ -716,12 +725,15 @@ Rectangle {
                             }
                         }
 
-                        // One-click inspection of already-received forecast
-                        // records; no change to the meteorological artwork.
-                        MouseArea {
-                            anchors.fill: parent
+                        // Pointer handlers do NOT participate in Column
+                        // positioner sizing. An anchors.fill MouseArea inside
+                        // this implicit-height Column collapsed all 6 icons.
+                        TapHandler {
+                            onTapped: sky.inspectedHourIndex = index
+                        }
+
+                        HoverHandler {
                             cursorShape: Qt.PointingHandCursor
-                            onClicked: sky.inspectedHourIndex = index
                         }
                     }
                 }
@@ -748,19 +760,40 @@ Rectangle {
                     width: parent.width - 20
                     spacing: 9
 
-                    Row {
+                    // Close returns to the original icon forecast. Keep
+                    // the dismiss control inside this detail section, not
+                    // in the global Weather Station header.
+                    Item {
                         width: parent.width
-                        spacing: 12
+                        height: 39
 
                         GohuText {
+                            anchors.top: parent.top
+                            anchors.left: parent.left
+                            anchors.right: inspectorClose.left
+                            anchors.rightMargin: 8
                             text: HourlyDetails.hourCaption(sky.inspectedHour)
                             font.pixelSize: 11
                             color: Colors.magenta
+                            elide: Text.ElideRight
                         }
 
                         QuietText {
+                            anchors.left: parent.left
+                            anchors.bottom: parent.bottom
                             text: "WTTR.IN // FORECAST, NOT OBSERVED"
                             font.pixelSize: 9
+                        }
+
+                        ActionButton {
+                            id: inspectorClose
+                            anchors.top: parent.top
+                            anchors.right: parent.right
+                            width: 30
+                            height: 27
+                            label: "X"
+                            accentColor: Colors.magenta
+                            onClicked: sky.inspectedHourIndex = -1
                         }
                     }
 

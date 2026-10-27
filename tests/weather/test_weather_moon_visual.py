@@ -53,14 +53,15 @@ def pixels_for(phase_index, row, scale):
     oy = row * 110 + 8
     cx, cy = (20, 20) if row == 0 else (16, 15)
     values = []
-    for y in range(40):
-        for x in range(40):
-            if math.hypot(x - cx, y - cy) < 11.8:
-                # Sample the actual Qt framebuffer at the middle of
-                # normalized pixel cells, regardless of widget size.
-                sx = ox + (x + 0.5) * scale
-                sy = oy + (y + 0.5) * scale
-                values.append((x - cx, is_lit(sx, sy)))
+    # Iterate actual framebuffer pixels rather than sampling only odd
+    # pixels. The previous odd-pixel-only sampling introduced an artificial
+    # 1.5px right bias that made perfectly mirrored lunar areas look unequal.
+    for py in range(scale * 40):
+        for px in range(scale * 40):
+            nx = (px + 0.5) / scale
+            ny = (py + 0.5) / scale
+            if math.hypot(nx - cx, ny - cy) < 11.8:
+                values.append((nx - cx, is_lit(ox + px, oy + py)))
     return values
 
 fractions = []

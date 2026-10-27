@@ -17,6 +17,16 @@ Scope {
 
     property var activeAlerts: ({})
     property bool fetchSucceeded: false
+    property date lastUpdated
+    property string errorText: ""
+
+    // Public read-only seam for Weather Station. The notification producer
+    // remains the ONE owner of the NWS request and pinned-point lifecycle.
+    readonly property bool configured: alertPoint !== ""
+    readonly property bool loading: nwsFetch.running
+    readonly property bool ready: fetchSucceeded
+    readonly property var alertList: NwsPolicy.visibleAlerts(activeAlerts)
+    readonly property int activeCount: alertList.length
 
     function historyContains(alertId, revision, kind) {
         const model = NotificationsService.notifications;
@@ -76,11 +86,15 @@ Scope {
         if (!NotificationsService.historyReady)
             return;
         const alerts = NwsPolicy.parseActive(text, Date.now());
-        if (!alerts)
+        if (!alerts) {
+            producer.errorText = "NWS RESPONSE INVALID";
             return; // malformed/failed request is NOT an all-clear
+        }
         const outcome = NwsPolicy.advance(producer.activeAlerts, alerts);
         producer.activeAlerts = outcome.state;
         producer.fetchSucceeded = true;
+        producer.lastUpdated = new Date();
+        producer.errorText = "";
         for (const change of outcome.changes)
             producer.publish(change);
     }
@@ -95,6 +109,10 @@ Scope {
         ]
         stdout: StdioCollector {
             onStreamFinished: producer.acceptResponse(text)
+        }
+        onExited: function(exitCode, exitStatus) {
+            if (exitCode !== 0)
+                producer.errorText = "NWS REQUEST FAILED";
         }
     }
 

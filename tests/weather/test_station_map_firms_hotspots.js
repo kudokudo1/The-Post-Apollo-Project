@@ -89,7 +89,7 @@ assert.doesNotMatch(command, /mapKey|POST_APOLLO_FIRMS_MAP_KEY|firms\.modaps/);
 
 const ui = read("widgets/weather/StationDiscovery.qml");
 assert.match(ui, /WeatherServices\.FirmsHotspotService\s*\{/);
-assert.match(ui, /FirmsAreaPolicy\.boundedArea\(firmsVisibleBounds, 60, 40\)/);
+assert.match(ui, /FirmsAreaPolicy\.boundedArea\(mapVisibleBounds, 60, 40\)/);
 assert.match(ui, /label: "FETCH HOTSPOTS"/);
 assert.match(ui, /available: firmsService\.configured[\s\S]*?firmsAreaReady[\s\S]*?!firmsService\.loading/);
 assert.match(ui, /ONE DAY \/\/ MAX 60° × 40° VIEW \/\/ NO AUTO-FETCH/);

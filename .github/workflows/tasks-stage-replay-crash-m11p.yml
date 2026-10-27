@@ -1,0 +1,46 @@
+name: TASKS M11p durable stage replay and abrupt recovery
+
+on:
+  pull_request:
+    paths:
+      - 'services/projects/TaskJsonGateCandidateM11l.py'
+      - 'tests/tasks/fixtures/task_stage_crash_probe_m11p.py'
+      - 'tests/tasks/test_task_stage_replay_crash_m11p.py'
+      - 'docs/tasks-durable-stage-replay-crash-m11p.md'
+      - '.github/workflows/tasks-stage-replay-crash-m11p.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'services/projects/TaskJsonGateCandidateM11l.py'
+      - 'tests/tasks/fixtures/task_stage_crash_probe_m11p.py'
+      - 'tests/tasks/test_task_stage_replay_crash_m11p.py'
+      - 'docs/tasks-durable-stage-replay-crash-m11p.md'
+      - '.github/workflows/tasks-stage-replay-crash-m11p.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  disposable-stage-durability:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: M11p durable history, v1 quarantine and four process exits
+        run: python3 tests/tasks/test_task_stage_replay_crash_m11p.py
+      - name: M11o actual JS policy parity and failure matrix
+        run: python3 tests/tasks/test_task_json_policy_parity_m11o.py
+      - name: M11m disposable Process FileView protocol
+        run: python3 tests/tasks/test_task_json_gate_transport_m11m.py
+      - name: M11l OS owner regression
+        run: python3 tests/tasks/test_task_json_gate_candidate_m11l.py
+      - name: M11n observed-only evidence guard
+        run: python3 tests/tasks/test_task_native_evidence_m11n.py
+      - name: M11d one live task writer
+        run: python3 tests/tasks/test_task_writer_gate_inventory_m11d.py

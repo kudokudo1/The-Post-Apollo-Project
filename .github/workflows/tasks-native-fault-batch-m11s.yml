@@ -1,0 +1,48 @@
+name: TASKS M11s private native fault batch preparation and read-only summary
+
+on:
+  pull_request:
+    paths:
+      - 'tests/tasks/fixtures/TaskNativeFaultMatrixM11s.py'
+      - 'tests/tasks/test_task_native_fault_matrix_m11s.py'
+      - 'docs/tasks-native-four-case-batch-m11s.md'
+      - '.github/workflows/tasks-native-fault-batch-m11s.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'tests/tasks/fixtures/TaskNativeFaultMatrixM11s.py'
+      - 'tests/tasks/test_task_native_fault_matrix_m11s.py'
+      - 'docs/tasks-native-four-case-batch-m11s.md'
+      - '.github/workflows/tasks-native-fault-batch-m11s.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  disposable-four-case:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: M11s one-time private batch seed, safe output and read-only matrix
+        run: python3 tests/tasks/test_task_native_fault_matrix_m11s.py
+      - name: M11r single-case inspector and host session-bound transport
+        run: |
+          python3 tests/tasks/test_task_native_fault_inspector_m11r.py
+          python3 tests/tasks/test_task_json_gate_transport_m11m.py
+      - name: M11q isolated native callback guards and source-only gate
+        run: |
+          node tests/tasks/test_task_native_callback_guard_m11q.cjs
+          python3 tests/tasks/test_task_production_preflight_m11q.py
+      - name: M11p durable owner / killed process
+        run: python3 tests/tasks/test_task_stage_replay_crash_m11p.py
+      - name: M11o JavaScript schema versus Python admission
+        run: python3 tests/tasks/test_task_json_policy_parity_m11o.py
+      - name: M11d one original live TASKS writer
+        run: python3 tests/tasks/test_task_writer_gate_inventory_m11d.py

@@ -69,6 +69,8 @@ jobs:
         run: node tests/weather/test_station_discovery_rate_limit.js
       - name: Validate NEWS conservative dedupe and local topic filters
         run: node tests/weather/test_station_news_report_filter.js
+      - name: Validate NEWS publisher and source-country filter
+        run: node tests/weather/test_station_news_source_filter.js
       - name: Validate MAP EONET hazard filters cache and inspector
         run: node tests/weather/test_station_map_hazard_intelligence.js
       - name: Validate MAP spatial projection zoom pan and point canvas

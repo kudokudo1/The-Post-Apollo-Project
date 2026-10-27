@@ -47,6 +47,7 @@ class TransportTests(unittest.TestCase):
         self.path = self.folder / "todo-copy.json"
         write_exclusive(self.path, raw(0))
         self.procs = []
+        self.sessions = {}
 
     def tearDown(self):
         for proc in self.procs:
@@ -72,9 +73,17 @@ class TransportTests(unittest.TestCase):
         self.assertFalse(hello["sqliteWriteAuthorized"])
         self.assertFalse(hello["migrationAuthorized"])
         self.assertFalse(hello["remoteWriteAuthorized"])
+        if hello["ok"]:
+            self.assertRegex(hello["sessionId"], r"^[0-9a-f]{48}$")
+            self.sessions[proc] = hello["sessionId"]
+        else:
+            self.assertIsNone(hello["sessionId"])
         return proc, hello
 
     def send(self, proc, body):
+        body = dict(body)
+        if proc in self.sessions:
+            body.setdefault("sessionId", self.sessions[proc])
         proc.stdin.write((json.dumps(body) + "\n").encode())
         proc.stdin.flush()
         return json.loads(proc.stdout.readline())
@@ -217,6 +226,9 @@ class TransportTests(unittest.TestCase):
         assert "fixtureFile.setText(pendingRaw);" in bridge
         assert 'bridge.send("verify", {stageId:bridge.pendingStageId})' in bridge
         assert "TaskJsonGateTransportM11m.py" in bridge
+        assert "sessionId:hostSessionId" in bridge
+        assert "STALE_HOST_SESSION" in bridge
+        assert 'property string hostSessionId: ""' in bridge
         assert "m11l-tasks-copy/todo-copy.json" in bridge
         assert "liveWriterAuthorized: false" in bridge
         assert "productionActivation: false" in bridge

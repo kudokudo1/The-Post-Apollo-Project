@@ -321,6 +321,18 @@ PanelWindow {
     // activeAppIndex is the app that is actually open.
     property int activeAppIndex: 0
 
+    // The universal / identity app-key editor is hosted in the existing
+    // Telegram chat pane, not an external browser, terminal or new window.
+    // Scope is cleared when Telegram or the Social widget is left.
+    property bool telegramAppKeyEditorOpen: false
+    property string telegramAppKeyEditorIdentityId: ""
+    onActiveAppIndexChanged: {
+        if (activeAppIndex !== 2) {
+            telegramAppKeyEditorOpen = false;
+            telegramAppKeyEditorIdentityId = "";
+        }
+    }
+
     // Leave a 1 px cyan shell visible around Vesktop.
     property int discordInset: 1
 
@@ -543,6 +555,51 @@ PanelWindow {
         activateApp(2);
         browserConnectionNavigationPending = false;
         return true;
+    }
+
+    function openTelegramAppKeyEditor(keyScope) {
+        var snap = appSelector.identitySnapshot;
+        if (!menuOpen || !appSelector.settingsOpen || !snap.writable
+                || appSelector.accountSelectedServiceId !== "telegram"
+                || appSelector.accountEditorIdentityId !== snap.activeId
+                || messageRouter.telegramBackend.loginInProgress
+                || browserConnectionNavigationPending)
+            return false;
+        if (keyScope !== "universal" && keyScope !== "identity")
+            return false;
+        if (keyScope === "identity" && !validBrowserIdentity(snap.activeId))
+            return false;
+        // This is application-key configuration ONLY. The current native
+        // Telegram adapter remains on shared personal.session even if an
+        // identity's separate API keys are saved.
+        telegramAppKeyEditorIdentityId =
+            keyScope === "identity" ? snap.activeId : "";
+        telegramAppKeyEditorOpen = true;
+        browserConnectionNavigationPending = true;
+        appSelector.settingsOpen = false;
+        activateApp(2);
+        browserConnectionNavigationPending = false;
+        return true;
+    }
+
+    function closeTelegramAppKeyEditor() {
+        if (messageRouter.telegramBackend.loginInProgress)
+            return;
+        telegramAppKeyEditorOpen = false;
+        telegramAppKeyEditorIdentityId = "";
+    }
+
+    function invalidateTelegramKeyEditorScope() {
+        if (telegramAppKeyEditorOpen
+                && telegramAppKeyEditorIdentityId !== ""
+                && appSelector.identitySnapshot.activeId
+                   !== telegramAppKeyEditorIdentityId) {
+            telegramAppKeyEditorOpen = false;
+            telegramAppKeyEditorIdentityId = "";
+            // Prevent a stale identity editor from retaining a verification
+            // process or secret inputs after another identity is selected.
+            messageRouter.telegramBackend.cancelLogin();
+        }
     }
 
     function recheckSharedTelegram() {
@@ -1660,6 +1717,9 @@ PanelWindow {
                 messageRouter.telegramBackend.loginInProgress
             onSharedTelegramOpenRequested: messagingWindow.openSharedTelegram()
             onSharedTelegramRecheckRequested: messagingWindow.recheckSharedTelegram()
+            onSharedTelegramApplicationKeysRequested: function(keyScope) {
+                messagingWindow.openTelegramAppKeyEditor(keyScope);
+            }
             browserWindowInspection: messagingWindow.browserWindowInspection
             browserWindowInspectionServiceId:
                 messagingWindow.browserWindowInspectionServiceId
@@ -1686,8 +1746,10 @@ PanelWindow {
                                            && !xScopedHideProcess.running
             onIsolatedBrowserModeToggleRequested:
                 messagingWindow.toggleBrowserIsolation()
-            onIdentitySnapshotChanged:
-                messagingWindow.reconcilePersistedBrowserIdentity()
+            onIdentitySnapshotChanged: {
+                messagingWindow.reconcilePersistedBrowserIdentity();
+                messagingWindow.invalidateTelegramKeyEditorScope();
+            }
             // One existing Social window; contact/chat space hosts Settings.
             settingsWorkspaceParent: messagingContent.contentItem
             settingsContactWidth: messagingWindow.contactListWidth
@@ -1809,13 +1871,17 @@ PanelWindow {
         TelegramConnectPanel {
             id: telegramConnectPanel
             adapter: messageRouter.telegramBackend
+            editApplicationKeys: messagingWindow.telegramAppKeyEditorOpen
+            keyIdentityId: messagingWindow.telegramAppKeyEditorIdentityId
+            onCloseKeyEditorRequested: messagingWindow.closeTelegramAppKeyEditor()
             x: messagingWindow.appSelectorWidth + messagingWindow.contactListWidth
             y: 0
             width: Math.max(1, messagingContent.width - x)
             height: messagingContent.height
             visible: messagingWindow.menuOpen && !appSelector.settingsOpen
                      && messagingWindow.activeAppIndex === 2
-                     && messageRouter.telegramNeedsSetup
+                     && (messageRouter.telegramNeedsSetup
+                         || messagingWindow.telegramAppKeyEditorOpen)
             z: 2
         }
 
@@ -1948,8 +2014,11 @@ PanelWindow {
     // ============================================================
 
     onMenuOpenChanged: {
-        if (!menuOpen)
+        if (!menuOpen) {
             hideProviderDesktop();
+            telegramAppKeyEditorOpen = false;
+            telegramAppKeyEditorIdentityId = "";
+        }
         // Do not resume into a stale settings page after Social closes.
         // External-web fallbacks stay separate from each provider's native
         // unsupported status; reset without touching provider login sessions.

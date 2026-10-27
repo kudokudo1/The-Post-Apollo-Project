@@ -1,0 +1,44 @@
+name: Weather Lunar Phase Visual Matrix
+
+on:
+  pull_request:
+    paths:
+      - "components/WeatherCelestialGlyph.qml"
+      - "components/qmldir"
+      - "services/weather/WeatherCyclePolicy.js"
+      - "tests/weather/fixtures/WeatherMoonMatrix.qml"
+      - "tests/weather/test_weather_moon_visual.py"
+      - ".github/workflows/weather-moon-visual-matrix.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  actual-qml-render:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Configure Python for Qt Quick test
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Prepare Qt runtime and a disposable virtual display
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq xvfb libxkbcommon-x11-0 libxcb-cursor0 libegl1 libgl1 libopengl0 libx11-xcb1
+          python3 -m pip install "PySide6==6.9.3"
+      - name: Render and verify all eight real Qt Quick lunar phases
+        run: |
+          xvfb-run -a -s "-screen 0 1280x720x24" \
+            env QT_QPA_PLATFORM=offscreen QT_QUICK_BACKEND=software \
+            python3 tests/weather/test_weather_moon_visual.py
+      - name: Preserve exact rendered QML image for operator review
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: weather-moon-phase-matrix
+          path: weather-moon-matrix.png
+          if-no-files-found: warn
+          retention-days: 7

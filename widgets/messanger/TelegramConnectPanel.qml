@@ -140,8 +140,6 @@ Rectangle {
                         panel.adapter.saveApplicationKeys(
                             idValue, hashValue,
                             panel.identityKeyEditor ? panel.keyIdentityId : "");
-                        if (panel.identityKeyEditor)
-                            panel.closeKeyEditorRequested();
                     }
                 }
                 Text {

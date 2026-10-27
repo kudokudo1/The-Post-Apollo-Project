@@ -39,6 +39,8 @@ jobs:
         run: node tests/weather/test_weather_dock_policy.js
       - name: Validate Weather data parsing and forecast contracts
         run: node tests/weather/test_weather_data_policy.js
+      - name: Verify GROUND individual pollen readings and unavailable states
+        run: node tests/weather/test_station_ground_pollen_species.js
       - name: Validate Weather solar and lunar cycle with flat icon contracts
         run: node tests/weather/test_weather_cycle_policy.js
       - name: Validate Weather Station Home relevance policy

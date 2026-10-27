@@ -1,6 +1,8 @@
 .pragma library
 
 function finite(value) {
+    if (value === undefined || value === null || value === "")
+        return null;
     const number = Number(value);
     return isFinite(number) ? number : null;
 }

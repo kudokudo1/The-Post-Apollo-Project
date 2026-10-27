@@ -3,6 +3,7 @@ import "../../components"
 import "StationHomePolicy.js" as StationHomePolicy
 import "StationSourceHealthPolicy.js" as SourceHealth
 import "StationOfficialAlertPolicy.js" as OfficialAlertPolicy
+import "../../services/weather/WeatherHistoryPolicy.js" as HistoryPolicy
 
 Rectangle {
     id: home
@@ -10,6 +11,23 @@ Rectangle {
     property var weatherService: null
     property var spaceService: null
     property var nwsAlertSource: null
+    property var historyService: null
+
+    readonly property bool historyReady:
+        historyService && historyService.ready
+    readonly property var historyDaily:
+        historyReady ? historyService.daily : []
+    readonly property var historySameHour:
+        historyReady ? historyService.sameHour : null
+    readonly property var historySummary:
+        historyReady ? historyService.summary
+                     : ({
+                           days: 0, maxHighF: -999, minLowF: -999,
+                           avgHighF: -999, avgLowF: -999,
+                           precipitationIn: 0, wetDays: 0,
+                           maxPrecipIn: -1, maxPrecipDate: ""
+                       })
+
 
     readonly property var officialAlertSummary:
         OfficialAlertPolicy.summary(
@@ -273,6 +291,29 @@ Rectangle {
     function finiteNumber(value, fallback) {
         const number = Number(value);
         return isFinite(number) ? number : fallback;
+    }
+
+    function historyTemp(value) {
+        const number = Number(value);
+        return isFinite(number) && number > -900
+               ? Math.round(number) + "°F" : "--°F";
+    }
+
+    function historyPrecip(value) {
+        const number = Number(value);
+        return isFinite(number) && number >= 0
+               ? number.toFixed(2) + " in" : "-- in";
+    }
+
+    function historyDateLabel(value) {
+        const text = String(value || "");
+        const match = text.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+        return match ? match[2] + "/" + match[3] : "--/--";
+    }
+
+    function historyDelta(current, past, suffix, digits) {
+        const value = HistoryPolicy.signedDelta(current, past, digits);
+        return value === "--" ? "--" : value + suffix;
     }
 
     function clamp01(value) {
@@ -879,6 +920,196 @@ Rectangle {
                 meterValue:
                     home.clamp01(home.aqiValue / 500)
                 meterFillColor: Colors.green
+            }
+        }
+
+        StationSectionDivider {
+            width: parent.width
+            title: "RECENT HISTORY // ARCHIVED MODEL"
+        }
+
+        Column {
+            width: parent.width
+            spacing: 9
+
+            Row {
+                width: parent.width
+                spacing: 12
+
+                SecondaryText {
+                    text: "OPEN-METEO // HISTORICAL FORECAST"
+                    font.pixelSize: 10
+                    color: Colors.cyan
+                }
+
+                GohuText {
+                    text: !home.historyService
+                          ? "NO SERVICE"
+                          : home.historyService.loading
+                            ? "RECEIVING"
+                            : home.historyService.failed
+                              ? (home.historyReady ? "DEGRADED" : "OFFLINE")
+                              : home.historyReady
+                                ? "7 COMPLETED DAYS"
+                                : "WAITING"
+                    font.pixelSize: 10
+                    color: home.historyReady ? Colors.cyan
+                           : home.historyService
+                             && home.historyService.failed
+                             ? Colors.yellow : Colors.orange
+                }
+
+                QuietText {
+                    width: Math.max(0, parent.width - 430)
+                    text: home.historyReady
+                          ? "ARCHIVED MODEL // "
+                            + (home.historyService.timezoneAbbreviation || "LOCAL")
+                            + " // NOT STATION OBSERVATIONS"
+                          : "RECENT MODEL HISTORY // NO LOCAL DATABASE"
+                    elide: Text.ElideRight
+                    font.pixelSize: 9
+                }
+            }
+
+            Row {
+                width: parent.width
+                height: 104
+                spacing: 12
+
+                StationHomeMetricCard {
+                    width: (parent.width - 24) / 3
+                    height: parent.height
+                    title: "YESTERDAY // SAME HOUR"
+                    valueText: home.historySameHour
+                               ? home.historyTemp(home.historySameHour.tempF)
+                               : "--°F"
+                    detailText: home.historySameHour && home.weatherReady
+                                ? "NOW "
+                                  + home.historyTemp(home.temperatureValue)
+                                  + " // Δ "
+                                  + home.historyDelta(
+                                      home.temperatureValue,
+                                      home.historySameHour.tempF,
+                                      "°F", 0
+                                    )
+                                : "SAME-HOUR ARCHIVE UNAVAILABLE"
+                    footerText: home.historySameHour
+                                ? "HUM "
+                                  + Math.round(home.historySameHour.humidity)
+                                  + "% // WIND "
+                                  + Math.round(home.historySameHour.windMph)
+                                  + " MPH"
+                                : "OPEN-METEO ARCHIVED MODEL"
+                    accentColor: Colors.cyan
+                    valueColor: Colors.white
+                    meterVisible: false
+                }
+
+                StationHomeMetricCard {
+                    width: (parent.width - 24) / 3
+                    height: parent.height
+                    title: "7-DAY TEMP RANGE"
+                    valueText: home.historyReady
+                               ? home.historyTemp(home.historySummary.maxHighF)
+                                 + " / "
+                                 + home.historyTemp(home.historySummary.minLowF)
+                               : "--°F / --°F"
+                    detailText: home.historyReady
+                                ? "AVG HIGH "
+                                  + home.historyTemp(home.historySummary.avgHighF)
+                                  + " // AVG LOW "
+                                  + home.historyTemp(home.historySummary.avgLowF)
+                                : "HISTORY UNAVAILABLE"
+                    footerText: "MAX HIGH / MIN LOW"
+                    accentColor: Colors.orange
+                    valueColor: Colors.white
+                    meterVisible: false
+                }
+
+                StationHomeMetricCard {
+                    width: (parent.width - 24) / 3
+                    height: parent.height
+                    title: "PRECIP // 7 DAYS"
+                    valueText: home.historyReady
+                               ? home.historyPrecip(
+                                   home.historySummary.precipitationIn
+                                 )
+                               : "-- in"
+                    detailText: home.historyReady
+                                ? "WET DAYS "
+                                  + home.historySummary.wetDays
+                                  + " // MAX "
+                                  + home.historyPrecip(
+                                      home.historySummary.maxPrecipIn
+                                    )
+                                : "HISTORY UNAVAILABLE"
+                    footerText: home.historyReady
+                                && home.historySummary.maxPrecipDate
+                                ? "WETTEST "
+                                  + home.historyDateLabel(
+                                      home.historySummary.maxPrecipDate
+                                    )
+                                : "COMPLETED LOCAL DAYS"
+                    accentColor: Colors.cyan
+                    valueColor: Colors.white
+                    meterVisible: false
+                }
+            }
+
+            Row {
+                id: historyDailyRow
+                width: parent.width
+                height: 66
+                spacing: 6
+
+                Repeater {
+                    model: home.historyDaily
+
+                    delegate: Rectangle {
+                        required property var modelData
+                        width: (historyDailyRow.width
+                                - historyDailyRow.spacing
+                                  * Math.max(0, home.historyDaily.length - 1))
+                               / Math.max(1, home.historyDaily.length)
+                        height: parent.height
+                        color: Colors.dark
+                        border.width: 1
+                        border.color: Colors.cyan
+
+                        Column {
+                            anchors.fill: parent
+                            anchors.margins: 5
+                            spacing: 3
+
+                            SecondaryText {
+                                width: parent.width
+                                horizontalAlignment: Text.AlignHCenter
+                                text: home.historyDateLabel(modelData.date)
+                                font.pixelSize: 9
+                            }
+
+                            GohuText {
+                                width: parent.width
+                                horizontalAlignment: Text.AlignHCenter
+                                text: home.historyTemp(modelData.maxTempF)
+                                      + " / "
+                                      + home.historyTemp(modelData.minTempF)
+                                font.pixelSize: 10
+                                color: Colors.white
+                            }
+
+                            QuietText {
+                                width: parent.width
+                                horizontalAlignment: Text.AlignHCenter
+                                text: "P "
+                                      + home.historyPrecip(
+                                          modelData.precipitationIn
+                                        )
+                                font.pixelSize: 8
+                            }
+                        }
+                    }
+                }
             }
         }
 

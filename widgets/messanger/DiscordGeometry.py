@@ -417,6 +417,11 @@ class Bridge:
         # placement; a transient splash/scratchpad rectangle cannot lead.
         self.x_docked = False
         self.browser_site = "x"
+        # Scoped identity discovery is passive until a separate operator-
+        # approved host integration can coordinate the saved identity and
+        # exact browser process. Never infer it from an account nickname.
+        self.browser_identity_id: str | None = None
+        self.scoped_browser_con_id: int | None = None
 
         # Discord's runtime identity is learned from Sway. Never assume one
         # app_id spelling: current Vesktop may be native Wayland or XWayland.
@@ -430,6 +435,33 @@ class Bridge:
         # startup Vesktop creates the main window hidden before appLoaded.
         self.discord_main_seen_visible: set[int] = set()
         self.discord_reveal_attempted_con_id: int | None = None
+
+    def select_browser_scope(
+        self, site: str, identity_id: str | None,
+    ) -> None:
+        """Select one exact browser namespace, with no provider actuation."""
+        identity = validate_browser_identity(identity_id)
+        if identity is not None and site not in BROWSER_SITES:
+            raise ValueError("Invalid scoped browser site")
+        selected_site = site if site in BROWSER_SITES else "x"
+        if (self.browser_identity_id != identity
+                or self.browser_site != selected_site):
+            # Never carry old dock/readiness or a browser/Social follower
+            # command into another identity. Discord's commands are owned by
+            # the separate Vesktop path and must be retained.
+            self.x_ready = False
+            self.x_docked = False
+            self.scoped_browser_con_id = None
+            with self.command_lock:
+                for target in (*BROWSER_SITES, "social"):
+                    self.pending_sync.pop(target, None)
+                self.immediate_commands = deque(
+                    c for c in self.immediate_commands
+                    if not c.startswith('[class="post-apollo-')
+                )
+            self.last_snapshot = None
+        self.browser_site = selected_site
+        self.browser_identity_id = identity
 
     @staticmethod
     def rect_equal(a: dict[str, int] | None, b: dict[str, int] | None) -> bool:
@@ -515,6 +547,12 @@ class Bridge:
         if not guest_id:
             return snapshot
 
+        # Passive scoped discovery is safe. Geometry leadership is NOT:
+        # the live host still launches the legacy classes and cannot yet
+        # certify an identity-scoped provider as the selected account.
+        if self.x_selected and self.browser_identity_id is not None:
+            return snapshot
+
         social = snapshot.get("social")
         discord = snapshot.get(guest_id)
 
@@ -594,6 +632,15 @@ class Bridge:
         target = str(message.get("target", ""))
 
         if target not in ("social", "discord", *BROWSER_SITES):
+            return
+
+        # No scoped browser actuation until the exact host and provider are
+        # bound in one subsequent transition. Refuse both the browser target
+        # and its old Social fast-follow command.
+        if (message.get("browserIdentityId") is not None
+                or (self.browser_identity_id is not None
+                    and self.x_selected
+                    and target in ("social", *BROWSER_SITES))):
             return
 
         if target == "discord":
@@ -690,6 +737,18 @@ class Bridge:
                 continue
 
             if op == "mode":
+                try:
+                    # Reject the entire mode message on malformed identity
+                    # rather than silently falling back to the legacy lane.
+                    scope_id = validate_browser_identity(
+                        message.get("browserIdentityId"))
+                    candidate = str(message.get("browserSite", "x"))
+                    if scope_id is not None and candidate not in BROWSER_SITES:
+                        raise ValueError("Invalid scoped browser site")
+                except ValueError:
+                    print("invalid scoped browser mode", file=sys.stderr, flush=True)
+                    continue
+                self.select_browser_scope(candidate, scope_id)
                 self.discord_selected = bool(
                     message.get("discordSelected", False)
                 )
@@ -705,8 +764,6 @@ class Bridge:
                     bool(message.get("xDocked", False))
                     and self.x_selected and self.x_ready
                 )
-                candidate = str(message.get("browserSite", "x"))
-                self.browser_site = candidate if candidate in BROWSER_SITES else "x"
                 continue
 
             if op == "sync":
@@ -761,6 +818,12 @@ class Bridge:
                 continue
 
             if op == "focusX":
+                # The legacy lane retains original one-class focus. For a
+                # selected browser identity, even a confirmed con_id is not
+                # permission for a focus transition until the host owns it.
+                if self.browser_identity_id is not None:
+                    self.sample_event.set()
+                    continue
                 self.queue_command(f'[class="post-apollo-{self.browser_site}"] focus')
                 continue
 
@@ -802,7 +865,29 @@ class Bridge:
 
     def emit_snapshot(self, force: bool = False) -> None:
         tree = self.poll_ipc.request(IPC_GET_TREE)
-        snapshot = snapshot_from_tree(tree)
+        snapshot = (
+            snapshot_from_tree(tree, self.browser_identity_id)
+            if self.browser_identity_id is not None else
+            snapshot_from_tree(tree)
+        )
+
+        if self.browser_identity_id is not None:
+            active = snapshot.get(self.browser_site)
+            current_con_id = (
+                active.get("conId")
+                if active and active.get("browserIdentityId")
+                == self.browser_identity_id
+                and active.get("windowClass")
+                == browser_window_class(self.browser_site, self.browser_identity_id)
+                else None
+            )
+            if current_con_id != self.scoped_browser_con_id:
+                self.scoped_browser_con_id = current_con_id
+                self.x_ready = False
+                self.x_docked = False
+                with self.command_lock:
+                    for target in (*BROWSER_SITES, "social"):
+                        self.pending_sync.pop(target, None)
 
         discord = snapshot.get("discord")
         if discord and int(discord.get("conId", 0)) > 0:

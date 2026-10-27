@@ -148,7 +148,8 @@ def parse_task_document(raw):
         raise GateError("INVALID_JSON_DOCUMENT") from exc
     require(type(doc) is dict, "INVALID_DOCUMENT")
     version = doc.get("version")
-    require(type(version) is int and version in (1, 2, 3),
+    # JSON numeric 3.0 is the same Number as 3 to the production JS policy.
+    require(type(version) in (int, float) and version in (1, 2, 3),
             "UNSUPPORTED_VERSION")
     require(valid_number(doc.get("nextId")), "INVALID_NEXT_ID")
     tasks = doc.get("tasks")

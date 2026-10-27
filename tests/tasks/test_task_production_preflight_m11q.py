@@ -89,7 +89,7 @@ class NativeCallbackPreflight(unittest.TestCase):
         for title in ("IMPLEMENTATION", "HOW TO USE", "VERIFY", "WATCH OUT FOR",
                       "CHECKLIST", "NEXT", "DECISIONS"):
             self.assertIn("## " + title, document)
-        self.assertIn("**not** a production writer", document.lower())
+        self.assertIn("not an active or installable production writer", document.lower())
         for label in ("AFTER_RESERVE", "AFTER_SAVED",
                       "AFTER_READBACK", "AFTER_SETTLEMENT"):
             self.assertIn(label, document)

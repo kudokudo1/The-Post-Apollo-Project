@@ -34,8 +34,11 @@ class ScopedBrowserBoundary(unittest.TestCase):
         directory = tempfile.TemporaryDirectory(prefix="post-apollo-browser-boundary-")
         self.addCleanup(directory.cleanup)
         self.root = Path(directory.name)
+        self.runtime = self.root / "runtime"
+        self.runtime.mkdir(mode=0o700)
         env = patch.dict(os.environ, {
             "XDG_DATA_HOME": str(self.root),
+            "XDG_RUNTIME_DIR": str(self.runtime),
             "POST_APOLLO_X_BROWSER": "/usr/bin/chromium",
         })
         env.start()
@@ -120,13 +123,16 @@ class ScopedBrowserBoundary(unittest.TestCase):
         self.assertFalse((self.root / "post-apollo").exists())
 
     def test_exact_scoped_window_match_no_legacy_or_other_identity_fallback(self):
-        def leaf(cls):
-            return {"window_properties": {"class": cls}, "nodes": []}
+        # Scoped hide now uses an exact Sway con_id, not the old class-wide
+        # scratchpad command. Synthetic windows must model that requirement.
+        def leaf(cls, con_id):
+            return {"window_properties": {"class": cls}, "id": con_id,
+                    "visible": True, "nodes": []}
         tree = {
             "nodes": [
-                leaf("post-apollo-x"),
-                leaf("post-apollo-x-identity-1"),
-                leaf("post-apollo-reddit-identity-2"),
+                leaf("post-apollo-x", 10),
+                leaf("post-apollo-x-identity-1", 11),
+                leaf("post-apollo-reddit-identity-2", 12),
             ]
         }
         with patch.object(browser, "sway_tree", return_value=tree):
@@ -142,23 +148,45 @@ class ScopedBrowserBoundary(unittest.TestCase):
                 browser.hide("x", "identity-2")
                 browser.hide("reddit", "identity-2")
         self.assertEqual(commands, [
-            '[class="post-apollo-x-identity-1"] move scratchpad',
-            '[class="post-apollo-reddit-identity-2"] move scratchpad',
+            '[con_id="11"] move scratchpad',
+            '[con_id="12"] move scratchpad',
         ])
 
+    def test_scoped_hide_fails_closed_without_sway_container_id(self):
+        malformed = {"nodes": [
+            {"window_properties": {"class": "post-apollo-x-identity-1"},
+             "visible": True, "nodes": []},
+        ]}
+        with patch.object(browser, "sway_tree", return_value=malformed):
+            with patch.object(browser, "sway_command") as command:
+                with self.assertRaisesRegex(
+                    RuntimeError, "Managed browser window lacks Sway con_id"
+                ):
+                    browser.hide("x", "identity-1")
+                command.assert_not_called()
+
     def test_scoped_launch_requires_visible_social_and_extension_setup_stays_blocked(self):
-        with patch.object(browser.subprocess, "Popen") as spawn:
-            with patch.object(browser, "sway_tree") as tree:
+        # Scoped show may now inspect Sway, but it must not start Chromium,
+        # create a profile or claim a session without a visible Social window.
+        with patch.object(browser, "sway_tree",
+                          return_value={"nodes": []}) as tree:
+            with patch.object(browser.subprocess, "Popen") as spawn:
                 with patch.object(browser, "browser_prefix") as prefix:
                     for site in ("x", "reddit", "linechrome", "whatsappweb"):
-                        with self.assertRaises(RuntimeError):
-                            browser.show(site, "identity-2")
-                    with self.assertRaisesRegex(RuntimeError, "awaits geometry integration"):
+                        with self.subTest(site=site):
+                            with self.assertRaisesRegex(
+                                RuntimeError, "Social window must be visible"
+                            ):
+                                browser.show(site, "identity-2")
+                    with self.assertRaisesRegex(
+                        RuntimeError, "awaits geometry integration"
+                    ):
                         browser.setup("linechrome", "identity-2")
                     spawn.assert_not_called()
-                    tree.assert_not_called()
+                    self.assertEqual(tree.call_count, 4)
                     prefix.assert_not_called()
         self.assertFalse((self.root / "post-apollo").exists())
+        self.assertFalse((self.runtime / "post-apollo-social").exists())
 
     def test_read_only_profile_plan_does_not_claim_auth_or_migration(self):
         result = browser.profile_plan("instagram", "identity-2")
@@ -185,10 +213,15 @@ class ScopedBrowserBoundary(unittest.TestCase):
             self.assertIsNone(result["authenticated"])
         with patch.object(sys, "argv", ["XBrowser.py", "show", "x",
                                         "--identity", "identity-2"]):
-            with patch.object(browser.subprocess, "Popen") as spawn:
-                with contextlib.redirect_stderr(io.StringIO()):
-                    self.assertEqual(browser.main(), 1)
-                spawn.assert_not_called()
+            # Mock the Sway tree read separately. Mocking Popen alone also
+            # intercepts subprocess.run's *own* internal Popen for swaymsg.
+            with patch.object(browser, "sway_tree",
+                              return_value={"nodes": []}) as tree:
+                with patch.object(browser.subprocess, "Popen") as spawn:
+                    with contextlib.redirect_stderr(io.StringIO()):
+                        self.assertEqual(browser.main(), 1)
+                    tree.assert_called_once()
+                    spawn.assert_not_called()
         with patch.object(sys, "argv", ["XBrowser.py", "profile", "x",
                                         "--identity", "../identity-2"]):
             with contextlib.redirect_stderr(io.StringIO()):
@@ -206,12 +239,18 @@ class ScopedBrowserBoundary(unittest.TestCase):
             '[class="post-apollo-x"] move scratchpad',
             '[class="post-apollo-x"] scratchpad show',
         ])
-        self.assertIn('XBrowser.py"), "show", browserSite', HOST)
+        # The host now constructs the command before appending --identity,
+        # so verify the default legacy lane and explicit opt-in separately.
+        self.assertIn('Quickshell.shellPath("widgets/messanger/XBrowser.py")', HOST)
+        self.assertIn('"show", browserSite]', HOST)
+        self.assertIn('if (identity !== "")', HOST)
+        self.assertIn('command.push("--identity", identity)', HOST)
+        self.assertIn('xShowProcess.exec(command)', HOST)
+        self.assertIn('property bool browserIsolationEnabled: false', HOST)
         self.assertIn('XBrowser.py"), "hide", "all"', HOST)
         self.assertIn('function showX()', HOST)
         self.assertIn('function hideX()', HOST)
         self.assertIn('function selectIdentity(id)', IDENTITIES)
-        self.assertNotIn('XBrowser.py"), "show", browserSite, "--identity"', HOST)
         self.assertIn('if window_class != browser_window_class(site, scoped_identity):',
                       GEOMETRY)
         self.assertIn('browser_identity_id: str | None = None', GEOMETRY)

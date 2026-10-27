@@ -22,14 +22,11 @@ No changes to `ApolloHubTodoPolicy.js`, `ApolloHubTodoStore.qml`, `shell.qml`, t
 
 ### Explicit strict-only differences
 
-The Python owner remains deliberately **stricter** than the reader in these narrow cases:
+The Python owner remains deliberately **stricter** than the reader for duplicate JSON keys: JavaScript `JSON.parse` takes the last key, whereas the durable host refuses an ambiguous source. This is the **single** intentional discrepancy in the M11o sample corpus and is asserted by name.
 
-1. Duplicate JSON keys: JavaScript `JSON.parse` takes the last key, but the durable host refuses an ambiguous source.
-2. Trailing line feed in task ID: the policy's `$` regex anchor may match before the final newline; the host requires whole-string IDs.
-3. Trailing line feed in project ID and matching reference: same strict host requirement.
-4. Trailing line feed in due date: host requires an exact calendar string without extra terminators.
+**No divergence for trailing line breaks:** direct execution of the production JS policy confirmed that its non-multiline end anchors reject newline-terminated task IDs, project IDs and due dates, just like the Python host. The M11o tests require matching rejection rather than claiming a host-only rule.
 
-These stricter differences must be explicit expected outcomes in tests. Any **Python-only acceptance** is a failure, not an acceptable discrepancy. A new or undocumented JS-accepted/Python-rejected case also fails parity until classified.
+Any **Python-only acceptance** is a failure, not an acceptable discrepancy. A new or undocumented JS-accepted/Python-rejected case also fails parity until classified.
 
 **Limits to the comparison:** The corpus covers canonical v1/v2/v3, nested references, invalid/extra fields, Unicode text, dates, counters, duplicate IDs/names, malformed JSON and the strict-only cases. This is a tested corpus, not a mathematical proof for every possible input. The OS host enforces an additional private file ownership/identity and 1 MiB **byte** ceiling, whereas the JS policy measures string code units; longer multibyte sources can also be intentionally refused under the host's data-safety policy and are not granted production eligibility.
 

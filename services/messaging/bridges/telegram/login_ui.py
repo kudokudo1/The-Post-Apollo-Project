@@ -93,6 +93,31 @@ def save_app_keys(identity_id: str | None = None) -> None:
     emit("APP_SAVED", "Application configuration saved privately")
 
 
+def report_app_key_status(identity_id: str | None = None) -> None:
+    """Report only presence/source, never the Telegram API ID or API hash.
+
+    This intentionally does not construct a Telethon client, touch session
+    files, or try to register an application with Telegram's web portal.
+    """
+    identity = _validate_identity(identity_id)
+    source = "UNIVERSAL"
+    if identity is not None:
+        try:
+            _app_config_path(identity).lstat()
+            source = "IDENTITY_OVERRIDE"
+        except FileNotFoundError:
+            source = "UNIVERSAL"
+    try:
+        _credentials(identity)
+        state = "CONFIGURED"
+    except BridgeError:
+        state = "UNAVAILABLE"
+        source = "UNAVAILABLE"
+    emit("APP_KEY_STATUS", "Telegram application configuration checked",
+         configuration=state, source=source,
+         scope=identity or "universal")
+
+
 def qr_matrix_rows(url: str) -> list[str]:
     """Return QR modules only, not the sensitive login URL or an image file.
 
@@ -214,7 +239,7 @@ async def connect(mode: str, identity_id: str | None = None) -> None:
 
 def main(argv=None) -> int:
     parser = argparse.ArgumentParser(description="Post-Apollo in-menu Telegram pairing bridge")
-    parser.add_argument("mode", choices=("qr", "phone", "configure"))
+    parser.add_argument("mode", choices=("qr", "phone", "configure", "status"))
     parser.add_argument("--identity", default=None,
                         help="Explicit separate Post-Apollo identity-N scope")
     args = parser.parse_args(argv)
@@ -222,6 +247,8 @@ def main(argv=None) -> int:
         identity = _validate_identity(args.identity)
         if args.mode == "configure":
             save_app_keys(identity)
+        elif args.mode == "status":
+            report_app_key_status(identity)
         else:
             asyncio.run(connect(args.mode, identity))
         return 0

@@ -42,6 +42,7 @@ Rectangle {
     property bool sharedTelegramLoginInProgress: false
     signal sharedTelegramOpenRequested()
     signal sharedTelegramRecheckRequested()
+    signal sharedTelegramApplicationKeysRequested(string keyScope)
 
     function sharedTelegramStatusText() {
         if (appSelector.accountSelectedServiceId !== "telegram")
@@ -1362,6 +1363,61 @@ Rectangle {
                     width: parent.width
                     visible: appSelector.accountSelectedServiceId === "telegram"
                     text: appSelector.sharedTelegramStatusText()
+                    color: Colors.orange
+                    font.pixelSize: 9
+                    wrapMode: Text.WordWrap
+                }
+                Text {
+                    width: parent.width
+                    visible: appSelector.accountSelectedServiceId === "telegram"
+                    text: "TELEGRAM APP CREDENTIALS // INSIDE SOCIAL"
+                    color: Colors.cyan
+                    font.bold: true
+                    font.pixelSize: 10
+                    wrapMode: Text.WordWrap
+                }
+                Text {
+                    width: parent.width
+                    visible: appSelector.accountSelectedServiceId === "telegram"
+                    text: "Universal API keys work across local identities. An optional override changes only this identity's application credentials, not the active shared Telegram login."
+                    color: Colors.white
+                    font.pixelSize: 9
+                    wrapMode: Text.WordWrap
+                }
+                ActionButton {
+                    width: parent.width
+                    height: 34
+                    visible: appSelector.accountSelectedServiceId === "telegram"
+                    label: "CONFIGURE UNIVERSAL API KEYS"
+                    labelPixelSize: 9
+                    labelMinimumPixelSize: 8
+                    contentPadding: 3
+                    interactive: appSelector.identitySnapshot.writable
+                                 && appSelector.accountEditorIdentityId ===
+                                    appSelector.identitySnapshot.activeId
+                                 && !appSelector.sharedTelegramLoginInProgress
+                    onTriggered:
+                        appSelector.sharedTelegramApplicationKeysRequested("universal")
+                }
+                ActionButton {
+                    width: parent.width
+                    height: 34
+                    visible: appSelector.accountSelectedServiceId === "telegram"
+                    label: "OPTIONAL IDENTITY API KEYS"
+                    labelPixelSize: 9
+                    labelMinimumPixelSize: 8
+                    contentPadding: 3
+                    interactive: appSelector.identitySnapshot.writable
+                                 && appSelector.accountEditorIdentityId ===
+                                    appSelector.identitySnapshot.activeId
+                                 && !appSelector.sharedTelegramLoginInProgress
+                    onTriggered:
+                        appSelector.sharedTelegramApplicationKeysRequested("identity")
+                }
+                Text {
+                    width: parent.width
+                    visible: appSelector.accountSelectedServiceId === "telegram"
+                    text: "Telegram alone issues new application keys. If Post-Apollo's universal keys are already configured, you do not need to register another app."
                     color: Colors.orange
                     font.pixelSize: 9
                     wrapMode: Text.WordWrap

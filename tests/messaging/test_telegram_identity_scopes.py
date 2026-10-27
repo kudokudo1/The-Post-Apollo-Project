@@ -251,11 +251,22 @@ class TelegramIdentityConfigTests(unittest.TestCase):
 
     def test_existing_native_ui_and_router_stay_shared_until_separate_review(self):
         self.assertIn('property string loginMode:',ADAPTER)
-        self.assertIn('loginProcess.command = [pythonPath, loginBridgePath, loginMode]',ADAPTER)
+        self.assertIn('var commandArgs = [pythonPath, loginBridgePath, loginMode];',ADAPTER)
+        self.assertIn('if (loginMode === "configure" && requestedAppKeyIdentityId !== "")',ADAPTER)
+        self.assertIn('commandArgs.push("--identity", requestedAppKeyIdentityId)',ADAPTER)
+        self.assertIn('loginProcess.command = commandArgs;',ADAPTER)
         self.assertIn('healthProcess.command = command(["health"])',ADAPTER)
         self.assertIn('active: router.appIndex === 2',ROUTER)
         self.assertIn('social-identities-v1.json',IDENTITIES)
-        self.assertNotIn("--identity",ADAPTER)
+        # The app-key editor may use --identity for CONFIGURE/STATUS,
+        # while existing health, list, message and send operations must
+        # continue using the original shared native Telegram session.
+        self.assertIn('if (loginMode === "configure" && requestedAppKeyIdentityId !== "")',ADAPTER)
+        self.assertIn('commandArgs.push("--identity", requestedAppKeyIdentityId)',ADAPTER)
+        self.assertIn('healthProcess.command = command(["health"])',ADAPTER)
+        self.assertIn('listProcess.command = command(["list"])',ADAPTER)
+        self.assertIn('messageProcess.command = command(["messages"',ADAPTER)
+        self.assertIn('sendProcess.command = command(["send"',ADAPTER)
         self.assertNotIn("--identity",ROUTER)
         self.assertIn('return base / "personal.session"',BRIDGE.read_text())
         self.assertIn('return base / "client.json"',BRIDGE.read_text())

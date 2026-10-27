@@ -214,7 +214,7 @@ class TelegramMenuLoginContracts(unittest.TestCase):
             'function submitPhone(value)',
             'function submitCode(value)',
             'function submitPassword(value)',
-            'function saveApplicationKeys(apiId, apiHash)',
+            'function saveApplicationKeys(apiId, apiHash, identityId)',
             'stdinEnabled: true',
             'stdout: SplitParser',
             'onRead: function(line)',

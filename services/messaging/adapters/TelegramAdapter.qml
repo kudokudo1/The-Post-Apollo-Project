@@ -60,7 +60,36 @@ Item {
     property bool loginCancelled: false
     property string pendingAppId: ""
     property string pendingAppHash: ""
+    property string requestedAppKeyIdentityId: ""
+    property string runningAppKeyIdentityId: ""
     readonly property bool loginInProgress: loginProcess.running
+
+    // UI shows only whether an app key pair is configured, NEVER the keys.
+    // This read-only helper does not connect to Telegram or open sessions.
+    property string appKeyConfigurationStatus: "NOT_CHECKED"
+    property string appKeyConfigurationScope: ""
+    property string appKeyConfigurationOutput: ""
+    property string runningAppKeyStatusScope: ""
+    readonly property bool appKeyStatusBusy: appKeyStatusProcess.running
+
+    function inspectApplicationKeys(identityId) {
+        if (!active || appKeyStatusProcess.running)
+            return false;
+        const scope = identityId === undefined || identityId === null
+                      ? "" : String(identityId);
+        if (scope !== "" && !/^identity-[1-9][0-9]{0,8}$/.test(scope))
+            return false;
+        appKeyConfigurationScope = scope;
+        runningAppKeyStatusScope = scope;
+        appKeyConfigurationStatus = "CHECKING";
+        appKeyConfigurationOutput = "";
+        var commandArgs = [pythonPath, loginBridgePath, "status"];
+        if (scope !== "")
+            commandArgs.push("--identity", scope);
+        appKeyStatusProcess.command = commandArgs;
+        appKeyStatusProcess.running = true;
+        return true;
+    }
 
     function startLogin(mode) {
         if (!active || (mode !== "qr" && mode !== "phone" && mode !== "configure"))
@@ -83,7 +112,23 @@ Item {
         loginState = "CONNECTING";
         loginDetail = "Connecting to Telegram...";
         qrModules = [];
-        loginProcess.command = [pythonPath, loginBridgePath, loginMode];
+        // An identity-specific configuration is a distinct complete API key
+        // pair, not a Telegram login and never a different live chat account.
+        var commandArgs = [pythonPath, loginBridgePath, loginMode];
+        if (loginMode === "configure" && requestedAppKeyIdentityId !== "") {
+            if (!/^identity-[1-9][0-9]{0,8}$/.test(requestedAppKeyIdentityId)) {
+                loginState = "ERROR";
+                loginDetail = "Invalid Telegram identity configuration target";
+                pendingAppId = "";
+                pendingAppHash = "";
+                return;
+            }
+            commandArgs.push("--identity", requestedAppKeyIdentityId);
+        }
+        runningAppKeyIdentityId = loginMode === "configure"
+                                  ? requestedAppKeyIdentityId : "";
+        requestedAppKeyIdentityId = "";
+        loginProcess.command = commandArgs;
         loginProcess.running = true;
     }
 
@@ -96,6 +141,10 @@ Item {
         qrModules = [];
         pendingAppId = "";
         pendingAppHash = "";
+        requestedAppKeyIdentityId = "";
+        runningAppKeyIdentityId = "";
+        appKeyConfigurationStatus = "NOT_CHECKED";
+        appKeyConfigurationScope = "";
     }
 
     function submitPhone(value) {
@@ -113,11 +162,16 @@ Item {
             loginProcess.write(JSON.stringify({action: "password", value: String(value)}) + "\n");
     }
 
-    function saveApplicationKeys(apiId, apiHash) {
+    function saveApplicationKeys(apiId, apiHash, identityId) {
         if (!active)
+            return;
+        const scope = identityId === undefined || identityId === null
+                      ? "" : String(identityId);
+        if (scope !== "" && !/^identity-[1-9][0-9]{0,8}$/.test(scope))
             return;
         pendingAppId = String(apiId);
         pendingAppHash = String(apiHash);
+        requestedAppKeyIdentityId = scope;
         startLogin("configure");
     }
 
@@ -251,15 +305,69 @@ Item {
             if (!adapter.active)
                 return;
             if (adapter.loginState === "APP_SAVED") {
-                // Keys saved, now attempt QR pairing without leaving Social.
-                adapter.requestedLoginMode = "qr";
-                Qt.callLater(function() { adapter.launchRequestedLogin(); });
+                if (adapter.runningAppKeyIdentityId === "") {
+                    if (adapter.backendMode === "READY") {
+                        // Updating the app's universal key pair must not
+                        // silently start a new login over an already
+                        // authorized shared Telegram session.
+                        adapter.loginDetail = "Universal application keys saved. "
+                                              + "Rechecking the current shared account.";
+                        Qt.callLater(function() { adapter.probe(); });
+                    } else {
+                        // First-time setup stays in the same widget and
+                        // continues through existing QR/phone pairing.
+                        adapter.requestedLoginMode = "qr";
+                        Qt.callLater(function() { adapter.launchRequestedLogin(); });
+                    }
+                } else {
+                    // Only the per-identity application override was saved.
+                    // NEVER start the legacy shared Telegram account here.
+                    adapter.loginDetail = "Identity application keys saved privately. "
+                                          + "Telegram account pairing will use them only "
+                                          + "when per-identity sessions are enabled.";
+                    adapter.inspectApplicationKeys(
+                        adapter.runningAppKeyIdentityId);
+                }
+                adapter.runningAppKeyIdentityId = "";
             } else if (adapter.loginState === "READY") {
                 Qt.callLater(function() { adapter.probe(); });
             } else if (adapter.loginState === "CONNECTING") {
                 adapter.loginState = "ERROR";
                 adapter.loginDetail = "Telegram connection stopped; retry";
             }
+        }
+    }
+
+    Process {
+        id: appKeyStatusProcess
+        stdout: StdioCollector {
+            onStreamFinished: adapter.appKeyConfigurationOutput = String(text || "")
+        }
+        onExited: function(exitCode) {
+            if (!adapter.active
+                    || adapter.runningAppKeyStatusScope
+                       !== adapter.appKeyConfigurationScope)
+                return;
+            var result = null;
+            try { result = JSON.parse(adapter.appKeyConfigurationOutput); }
+            catch (e) { }
+            if (exitCode !== 0 || !result || result.state !== "APP_KEY_STATUS"
+                    || result.scope !== (adapter.appKeyConfigurationScope || "universal")
+                    || (result.configuration !== "CONFIGURED"
+                        && result.configuration !== "UNAVAILABLE")
+                    || ["UNIVERSAL", "IDENTITY_OVERRIDE", "UNAVAILABLE"]
+                       .indexOf(result.source) < 0) {
+                adapter.appKeyConfigurationStatus = "UNAVAILABLE";
+                return;
+            }
+            if (result.configuration === "CONFIGURED")
+                adapter.appKeyConfigurationStatus =
+                    result.source === "IDENTITY_OVERRIDE"
+                    ? "IDENTITY OVERRIDE CONFIGURED"
+                    : "UNIVERSAL APP KEYS CONFIGURED";
+            else
+                adapter.appKeyConfigurationStatus =
+                    "APP KEYS MISSING OR INVALID";
         }
     }
 

@@ -76,16 +76,24 @@ assert.equal(context.forecast("2026-10-26", "2500", daily).solar, "unknown");
 assert.equal(context.forecast("2026-10-26", null, daily).solar, "unknown");
 
 function state(label) { return { label: label, color: "orange", icon: "☀︎" }; }
+for (const [label, kind] of [
+    ["SUNNY / CLEAR", "clear"], ["PARTLY SUNNY", "cloud"],
+    ["CLOUDS / FOG", "cloud"], ["RAIN", "rain"],
+    ["SNOW / SLEET", "snow"], ["HAIL / ICE PELLETS", "hail"],
+    ["THUNDERSTORM", "storm"], ["HIGH WIND // 28 MPH", "wind"],
+    ["VERY HIGH UV 9", "none"], ["UNHEALTHY AIR // AQI 180", "none"],
+    ["WEATHER UNAVAILABLE", "none"], ["UNKNOWN CONDITION", "none"]
+]) {
+    assert.equal(context.nightKind(state(label)), kind, label);
+    assert.equal(context.artworkFor(state(label), {solar: "night"}),
+                 kind === "none" ? "weather" : "night-weather", label);
+}
 assert.equal(context.artworkFor(state("SUNNY / CLEAR"), {solar:"day"}), "sun");
 assert.equal(context.artworkFor(state("SUNNY / CLEAR"), {solar:"dawn"}), "sun");
 assert.equal(context.artworkFor(state("SUNNY / CLEAR"), {solar:"dusk"}), "sun");
-assert.equal(context.artworkFor(state("SUNNY / CLEAR"), {solar:"night"}), "moon");
-assert.equal(context.artworkFor(state("PARTLY SUNNY"), {solar:"night"}), "moon-cloud");
 assert.equal(context.artworkFor(state("PARTLY SUNNY"), {solar:"day"}), "sun-cloud");
+assert.equal(context.artworkFor(state("RAIN"), {solar:"day"}), "weather");
 assert.equal(context.artworkFor(state("SUNNY / CLEAR"), {solar:"unknown"}), "weather");
-for (const label of ["THUNDERSTORM", "RAIN", "HIGH WIND", "CLOUDS / FOG",
-                     "VERY HIGH UV 9", "UNHEALTHY AIR // AQI 180", "WEATHER UNAVAILABLE"])
-    assert.equal(context.artworkFor(state(label), {solar:"night"}), "weather", label);
 
 const icon = fs.readFileSync(path.join(root, "components/WeatherCelestialGlyph.qml"), "utf8");
 assert.match(icon, /import QtQuick\.Shapes/);
@@ -138,29 +146,43 @@ assert.match(icon, /color:\s*glyph\.moonPhase === "full" \? glyph\.ink : glyph\.
 assert.match(icon, /ShapePath\s*\{[\s\S]*?fillColor:\s*glyph\.ink/);
 assert.doesNotMatch(icon, /ColorAnimation|NumberAnimation|ShaderEffect|moonPhase.*Colors\./);
 
-// One upper-right moon per night state and per weather slot. In particular,
-// the dock badge must not be a Row sibling (which widened the dock), and
-// clear/moon-cloud states must not display an extra central moon.
+// Canonical moon geometry has one origin. Its lunar body moves upper-left
+// inside a shared 40x40 scene, never by weather type or per-consumer anchor.
+assert.match(icon, /nightComposition: mode === "night-weather"/);
+assert.match(icon, /moonVisible:[\\s\\S]*?nightComposition/);
+assert.match(icon, /x: glyph\\.nightComposition \\? -4 : 0/);
+assert.match(icon, /y: glyph\\.nightComposition \\? -5 : 0/);
+assert.match(icon, /readonly property bool foregroundCloud: nightComposition/);
+assert.match(icon, /visible: glyph\\.foregroundCloud[\\s\\S]*?fillColor: glyph\\.ink/);
+const lunarStart = icon.indexOf('id: lunarBody');
+const filledCloud = icon.indexOf('// A FILLED foreground cloud');
+assert.ok(lunarStart > 0 && filledCloud > lunarStart);
+assert.match(icon.slice(lunarStart, filledCloud), /moonPhase === "full"/);
+assert.match(icon.slice(filledCloud), /PathCubic/);
+for (const kind of ["rain", "snow", "hail", "storm", "wind"])
+    assert.match(icon, new RegExp('weatherKind === "' + kind + '"'));
+assert.doesNotMatch(icon, /anchors\\.right: parent\\.right/);
 const dockConditionArea = dock.slice(dock.indexOf("id: weatherConditionSlot"),
                                     dock.indexOf("id: weatherReadout"));
-assert.match(dockConditionArea, /id:\s*dockNightMoon[\s\S]*?anchors\.top: parent\.top[\s\S]*?anchors\.right: parent\.right/);
-assert.match(dockConditionArea, /ink:\s*weatherDock\.weatherColor/);
-assert.match(dockConditionArea, /skyCycle\.solar === "night"/);
-assert.match(dockConditionArea, /celestialMode !== "moon"[\s\S]*?celestialMode !== "moon-cloud"/);
-assert.doesNotMatch(dockConditionArea, /width:\s*18\s+height:\s*18\s+mode:\s*"moon"/);
+assert.match(dockConditionArea, /id:\\s*dockWeatherArt/);
+assert.match(dockConditionArea, /weatherKind: WeatherCyclePolicy\\.nightKind\\(weatherDock\\.weatherState\\)/);
+assert.match(dockConditionArea, /mode: weatherDock\\.celestialMode/);
+assert.match(dockConditionArea, /ink: weatherDock\\.foregroundColor/);
+assert.doesNotMatch(dockConditionArea, /dockNightMoon|anchors\\.top: parent\\.top|anchors\\.right: parent\\.right/);
 const currentArea = sky.slice(sky.indexOf("id: conditionIconGlyph"),
                               sky.indexOf('text: "AIR QUALITY"'));
-assert.match(currentArea, /id:\s*currentNightMoon[\s\S]*?anchors\.top: parent\.top[\s\S]*?anchors\.right: parent\.right/);
-assert.match(currentArea, /ink:\s*sky\.iconColor\(sky\.conditionState\.color\)/);
-assert.match(currentArea, /sky\.skyCycle\.solar === "night"/);
+assert.match(currentArea, /weatherKind: WeatherCyclePolicy\\.nightKind\\(sky\\.conditionState\\)/);
+assert.match(currentArea, /mode: sky\\.currentCelestialMode/);
+assert.match(currentArea, /ink: sky\\.iconColor\\(sky\\.conditionState\\.color\\)/);
+assert.doesNotMatch(currentArea, /currentNightMoon|anchors\\.top: parent\\.top|anchors\\.right: parent\\.right/);
 const hourlyArea = sky.slice(sky.indexOf('title: "FORECAST // NEXT HOURS"'),
                              sky.indexOf('title: "FORECAST // DAILY"'));
-assert.match(hourlyArea, /anchors\.top: parent\.top[\s\S]*?anchors\.right: parent\.right[\s\S]*?mode:\s*"moon"/);
-assert.match(hourlyArea, /ink:\s*sky\.iconColor\(parent\.forecastState\.color\)/);
-assert.match(hourlyArea, /parent\.forecastCycle\.solar === "night"/);
-assert.match(hourlyArea, /forecastArt === "moon-cloud"/);
-assert.match(currentArea, /currentCelestialMode === "moon-cloud"/);
-// A day/forecast lunar *informational* glyph is allowed, but no nocturnal
-// atmosphere should be active outside the nighttime weather icon itself.
+assert.match(hourlyArea, /weatherKind: WeatherCyclePolicy\\.nightKind\\(parent\\.forecastState\\)/);
+assert.match(hourlyArea, /mode: parent\\.forecastArt/);
+assert.match(hourlyArea, /ink: sky\\.iconColor\\(parent\\.forecastState\\.color\\)/);
+assert.doesNotMatch(hourlyArea, /anchors\\.top: parent\\.top[\\s\\S]*?mode: "moon"/);
+// Daily lunar phase information remains separate from daily weather art.
+// No new color vocabulary or clock mechanism is introduced by this patch.
+assert.match(sky, /WeatherCyclePolicy\\.normalizedPhase\\(modelData\\.moonPhase\\)/);
 
 console.log("Weather solar/lunar policy and QML wiring: PASS");

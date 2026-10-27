@@ -51,6 +51,123 @@ function formatDate(value) {
             + " " + match[2].slice(0, 2) + ":" + match[2].slice(2) + " UTC"
           : raw.slice(0, 16).replace("T", " ");
 }
+
+function canonicalNewsUrl(value) {
+    const safe = safeUrl(value);
+    if (!safe)
+        return "";
+
+    const withoutFragment = safe.split("#")[0];
+    const match = withoutFragment.match(
+        /^([a-z][a-z0-9+.-]*):\/\/([^\/?#]+)([^?#]*)(?:\?([^#]*))?$/i
+    );
+    if (!match)
+        return withoutFragment;
+
+    const scheme = String(match[1] || "").toLowerCase();
+    let host = String(match[2] || "").toLowerCase();
+    let path = String(match[3] || "");
+    const query = String(match[4] || "");
+
+    if (host.indexOf("www.") === 0)
+        host = host.slice(4);
+    if (path.length > 1 && path[path.length - 1] === "/")
+        path = path.slice(0, -1);
+
+    const kept = [];
+    const parts = query ? query.split("&") : [];
+    for (let i = 0; i < parts.length; i++) {
+        const part = String(parts[i] || "").trim();
+        if (!part)
+            continue;
+        const name = part.split("=")[0].toLowerCase();
+        if (/^utm_/.test(name)
+                || name === "fbclid"
+                || name === "gclid"
+                || name === "dclid"
+                || name === "mc_cid"
+                || name === "mc_eid")
+            continue;
+        kept.push(part);
+    }
+    kept.sort();
+
+    return scheme + "://" + host + (path || "/")
+         + (kept.length ? "?" + kept.join("&") : "");
+}
+
+function newsTitleKey(value) {
+    return shortText(value, 180)
+        .toLowerCase()
+        .replace(/&amp;/g, "&")
+        .replace(/&quot;|&#34;/g, '"')
+        .replace(/&#39;|&apos;/g, "'")
+        .replace(/[.,!?;:'"()[\]{}|/_—–-]+/g, " ")
+        .replace(/\s+/g, " ")
+        .trim();
+}
+
+function headlineHas(text, pattern) {
+    return pattern.test(String(text || "").toLowerCase());
+}
+
+function newsTopics(value) {
+    const title = String(value || "").toLowerCase();
+    const topics = [];
+
+    const spaceWeather = headlineHas(title,
+        /\b(aurora|geomagnetic|solar|sunspot|space weather|solar flare|coronal mass|cme)\b/);
+    if (spaceWeather)
+        topics.push("space");
+
+    if (headlineHas(title,
+            /\b(earthquake|quake|seismic|volcano|volcanic|eruption|tsunami|landslide)\b/))
+        topics.push("earth");
+
+    if (headlineHas(title,
+            /\b(wildfire|wild fire|bushfire|forest fire|brush fire|fire|blaze|smoke)\b/))
+        topics.push("fire");
+
+    const ordinaryWeather = headlineHas(title,
+        /\b(weather|forecast|storm|hurricane|cyclone|typhoon|tornado|rain|snow|blizzard|flood|drought|heatwave|heat wave|cold snap|temperature|winds?)\b/);
+    const spaceStormOnly =
+        /\b(geomagnetic|solar)\s+storm\b/.test(title)
+        && !headlineHas(title,
+            /\b(weather|forecast|hurricane|cyclone|typhoon|tornado|rain|snow|blizzard|flood|drought|heatwave|heat wave|cold snap|temperature|winds?)\b/);
+    if (ordinaryWeather && !spaceStormOnly)
+        topics.push("weather");
+
+    return topics;
+}
+
+function filterNewsRows(rows, topic, sourceQuery) {
+    if (!Array.isArray(rows))
+        return [];
+
+    const wanted = String(topic || "all").toLowerCase();
+    const query = shortText(sourceQuery, 80).toLowerCase();
+    const result = [];
+
+    for (let i = 0; i < rows.length; i++) {
+        const row = rows[i];
+        if (!row)
+            continue;
+
+        const topics = Array.isArray(row.topics) ? row.topics : [];
+        if (wanted !== "all" && topics.indexOf(wanted) < 0)
+            continue;
+
+        if (query) {
+            const domain = String(row.domain || "").toLowerCase();
+            const country = String(row.country || "").toLowerCase();
+            if (domain.indexOf(query) < 0 && country.indexOf(query) < 0)
+                continue;
+        }
+
+        result.push(row);
+    }
+    return result;
+}
 function parseEvents(root) {
     if (!root || !Array.isArray(root.events))
         throw new Error("Invalid NASA EONET response");
@@ -113,24 +230,51 @@ function parseEvents(root) {
 function parseNews(root) {
     if (!root || !Array.isArray(root.articles))
         throw new Error("Invalid GDELT article list");
-    const seen = {};
+
+    const seenUrl = {};
+    const seenTitle = {};
     const rows = [];
+
     for (let i = 0; i < root.articles.length; ++i) {
-        const a = root.articles[i];
-        const url = a ? safeUrl(a.url) : "";
-        if (!url || seen[url] || !a.title)
+        const article = root.articles[i];
+        const url = article ? safeUrl(article.url) : "";
+        const title = article ? shortText(article.title, 180) : "";
+        if (!url || !title)
             continue;
-        seen[url] = true;
+
+        const canonicalUrl = canonicalNewsUrl(url);
+        const titleKey = newsTitleKey(title);
+        if (!canonicalUrl)
+            continue;
+
+        // URL canonicalization removes only fragments and common tracking
+        // parameters. Headline de-dupe is intentionally exact after
+        // punctuation/whitespace normalization; this is not story clustering.
+        if (seenUrl[canonicalUrl]
+                || (titleKey.length >= 12 && seenTitle[titleKey]))
+            continue;
+        seenUrl[canonicalUrl] = true;
+        if (titleKey.length >= 12)
+            seenTitle[titleKey] = true;
+
+        const domain = shortText(article.domain, 80);
+        const country = shortText(article.sourcecountry, 48);
+        const topics = newsTopics(title);
         rows.push({
-            title: shortText(a.title, 180),
-            detail: shortText(a.domain, 45)
-                    + (a.sourcecountry ? " // " + shortText(a.sourcecountry, 36) : ""),
-            time: formatDate(a.seendate),
+            title: title,
+            detail: domain + (country ? " // " + country : ""),
+            domain: domain,
+            country: country,
+            time: formatDate(article.seendate),
+            rawTime: shortText(article.seendate, 32),
             url: url,
+            canonicalUrl: canonicalUrl,
+            topics: topics,
+            primaryTopic: topics.length ? topics[0] : "other",
             action: "READ ARTICLE"
         });
     }
-    return rows.slice(0, 20);
+    return rows.slice(0, 30);
 }
 function parseRadio(payload) {
     if (!Array.isArray(payload))

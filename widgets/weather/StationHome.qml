@@ -1,6 +1,7 @@
 import QtQuick
 import "../../components"
 import "StationHomePolicy.js" as StationHomePolicy
+import "StationSourceHealthPolicy.js" as SourceHealth
 
 Rectangle {
     id: home
@@ -109,6 +110,13 @@ Rectangle {
         );
     }
 
+    function dateMillis(value) {
+        if (!value || typeof value.getTime !== "function")
+            return -1;
+        const millis = value.getTime();
+        return isFinite(millis) && millis > 0 ? millis : -1;
+    }
+
     readonly property int kpAgeMinutes:
         spaceService && spaceService.kpReady
         ? sourceAgeMinutes(spaceService.kpTime) : -1
@@ -144,6 +152,86 @@ Rectangle {
                ? "STALE // " + parts.join(" // ")
                : "";
     }
+
+    // One read-only view over the services already mounted by Weather.
+    // It never starts a provider itself. Space freshness uses provider sample
+    // age; Weather/AQI use their receive-success clocks.
+    readonly property var sourceHealthRows:
+        SourceHealth.buildCoreSources({
+            "nowMs": relevanceClockMs,
+            "weather": {
+                "id": "weather",
+                "title": "WEATHER",
+                "provider": "WTTR.IN",
+                "ready": weatherReady,
+                "loading": weatherService ? weatherService.loading : false,
+                "error": weatherService ? weatherService.errorText : "NO SERVICE",
+                "lastSuccessMs":
+                    dateMillis(weatherService ? weatherService.lastUpdated : null),
+                "sampleAgeMinutes": -1,
+                "staleAfterMinutes": 20
+            },
+            "aqi": {
+                "id": "aqi",
+                "title": "AIR QUALITY",
+                "provider": "OPEN-METEO",
+                "ready": aqiReady,
+                "loading": weatherService ? weatherService.aqiLoading : false,
+                "error": weatherService ? weatherService.aqiErrorText : "NO SERVICE",
+                "lastSuccessMs":
+                    dateMillis(weatherService ? weatherService.aqiLastUpdated : null),
+                "sampleAgeMinutes": -1,
+                "staleAfterMinutes": 20
+            },
+            "kp": {
+                "id": "kp",
+                "title": "KP INDEX",
+                "provider": "NOAA SWPC",
+                "ready": spaceService ? spaceService.kpReady : false,
+                "loading": spaceService ? spaceService.kpLoading : false,
+                "error": spaceService ? spaceService.kpErrorText : "NO SERVICE",
+                "lastSuccessMs":
+                    dateMillis(spaceService ? spaceService.kpLastUpdated : null),
+                "sampleAgeMinutes": kpAgeMinutes,
+                "staleAfterMinutes": kpStaleAfterMinutes
+            },
+            "solarWind": {
+                "id": "solar-wind",
+                "title": "SOLAR WIND",
+                "provider": "NOAA SWPC",
+                "ready": spaceService ? spaceService.solarWindReady : false,
+                "loading": spaceService ? spaceService.solarWindLoading : false,
+                "error": spaceService ? spaceService.solarWindErrorText : "NO SERVICE",
+                "lastSuccessMs":
+                    dateMillis(spaceService ? spaceService.solarWindLastUpdated : null),
+                "sampleAgeMinutes": solarWindAgeMinutes,
+                "staleAfterMinutes": solarWindStaleAfterMinutes
+            },
+            "magneticField": {
+                "id": "imf",
+                "title": "IMF",
+                "provider": "NOAA SWPC",
+                "ready": spaceService ? spaceService.magneticFieldReady : false,
+                "loading": spaceService ? spaceService.magneticFieldLoading : false,
+                "error": spaceService ? spaceService.magneticFieldErrorText : "NO SERVICE",
+                "lastSuccessMs":
+                    dateMillis(spaceService ? spaceService.magneticFieldLastUpdated : null),
+                "sampleAgeMinutes": magneticFieldAgeMinutes,
+                "staleAfterMinutes": magneticFieldStaleAfterMinutes
+            },
+            "solarFlux": {
+                "id": "solar-flux",
+                "title": "F10.7 FLUX",
+                "provider": "NOAA SWPC",
+                "ready": spaceService ? spaceService.solarFluxReady : false,
+                "loading": spaceService ? spaceService.solarFluxLoading : false,
+                "error": spaceService ? spaceService.solarFluxErrorText : "NO SERVICE",
+                "lastSuccessMs":
+                    dateMillis(spaceService ? spaceService.solarFluxLastUpdated : null),
+                "sampleAgeMinutes": solarFluxAgeMinutes,
+                "staleAfterMinutes": solarFluxStaleAfterMinutes
+            }
+        })
 
     // HOME tracks only session-local deltas between completed provider
     // observations. The services remain the single owners of fetching.
@@ -426,6 +514,17 @@ Rectangle {
         return Colors.orange;
     }
 
+    function healthAccent(token) {
+        switch (String(token || "")) {
+        case "red": return Colors.red;
+        case "orange": return Colors.orange;
+        case "yellow": return Colors.yellow;
+        case "magenta": return Colors.magenta;
+        case "cyan": return Colors.cyan;
+        default: return Colors.white;
+        }
+    }
+
     Timer {
         interval: 60000
         repeat: true
@@ -518,10 +617,23 @@ Rectangle {
 
     color: Colors.black
 
-    Column {
+    Flickable {
+        id: homeScroll
         anchors.fill: parent
-        anchors.margins: 24
-        spacing: 14
+        clip: true
+        boundsBehavior: Flickable.StopAtBounds
+        contentWidth: width
+        contentHeight: Math.max(
+            height,
+            homeContent.y + homeContent.implicitHeight + 24
+        )
+
+        Column {
+            id: homeContent
+            x: 24
+            y: 24
+            width: Math.max(0, homeScroll.width - 48)
+            spacing: 14
 
         Row {
             width: parent.width
@@ -740,6 +852,37 @@ Rectangle {
 
         StationSectionDivider {
             width: parent.width
+            title: "CORE SOURCE HEALTH // LAST SUCCESS + FRESHNESS"
+        }
+
+        Grid {
+            id: sourceHealthGrid
+            width: parent.width
+            columns: 3
+            columnSpacing: 12
+            rowSpacing: 12
+
+            Repeater {
+                model: home.sourceHealthRows
+
+                delegate: StationHomeMetricCard {
+                    required property var modelData
+
+                    width: (sourceHealthGrid.width - 24) / 3
+                    height: 92
+                    title: modelData.title
+                    valueText: modelData.state
+                    detailText: modelData.detail
+                    footerText: modelData.footer
+                    accentColor: home.healthAccent(modelData.accent)
+                    valueColor: home.healthAccent(modelData.accent)
+                    meterVisible: false
+                }
+            }
+        }
+
+        StationSectionDivider {
+            width: parent.width
             title: "AUTO // RELEVANT"
         }
 
@@ -796,5 +939,13 @@ Rectangle {
                 }
             }
         }
+        }
+    }
+
+    NeonScrollBar {
+        flickable: homeScroll
+        handleStyle: "star"
+        geometryHost: home
+        visible: scrollable
     }
 }

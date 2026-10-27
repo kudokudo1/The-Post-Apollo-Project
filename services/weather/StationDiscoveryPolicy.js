@@ -129,11 +129,11 @@ function newsTopics(value) {
         topics.push("fire");
 
     const ordinaryWeather = headlineHas(title,
-        /\b(weather|forecast|storm|hurricane|cyclone|typhoon|tornado|rain|snow|blizzard|flood|drought|heatwave|heat wave|cold snap|temperature|wind)\b/);
+        /\b(weather|forecast|storm|hurricane|cyclone|typhoon|tornado|rain|snow|blizzard|flood|drought|heatwave|heat wave|cold snap|temperature|winds?)\b/);
     const spaceStormOnly =
         /\b(geomagnetic|solar)\s+storm\b/.test(title)
         && !headlineHas(title,
-            /\b(weather|forecast|hurricane|cyclone|typhoon|tornado|rain|snow|blizzard|flood|drought|heatwave|heat wave|cold snap|temperature|wind)\b/);
+            /\b(weather|forecast|hurricane|cyclone|typhoon|tornado|rain|snow|blizzard|flood|drought|heatwave|heat wave|cold snap|temperature|winds?)\b/);
     if (ordinaryWeather && !spaceStormOnly)
         topics.push("weather");
 

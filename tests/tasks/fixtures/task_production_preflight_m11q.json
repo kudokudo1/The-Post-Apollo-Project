@@ -1,0 +1,107 @@
+{
+  "milestone": "M11q",
+  "classification": "DISABLED_PRODUCTION_INTEGRATION_PREFLIGHT_NOT_IMPLEMENTED",
+  "observedNativeEvidence": "M11n partial source/journal evidence only",
+  "currentWriter": "services/hub/ApolloHubTodoStore.qml",
+  "currentGuardFlag": "readonly property bool guardedWriterEnabled: false",
+  "ownership": "existing ApolloHubTodoStore singleton; 9 mutation callers; 1 FileView",
+  "noLiveProcessStarted": true,
+  "newTestHarnessComponents": [
+    "services/projects/TaskJsonNativeCallbackGuardM11q.js",
+    "services/projects/TaskJsonGateHostBridgeM11m.qml",
+    "TaskJsonGateHarnessM11m.qml"
+  ],
+  "faultPoints": [
+    {
+      "name": "AFTER_RESERVE",
+      "fileviewWriteExpected": false,
+      "hostHistory": "RESERVED",
+      "nextOwner": "RECOVERY_REVIEW",
+      "nativeObserved": false
+    },
+    {
+      "name": "AFTER_SAVED",
+      "fileviewWriteExpected": true,
+      "hostHistory": "RESERVED",
+      "nextOwner": "RECOVERY_REVIEW",
+      "nativeObserved": false
+    },
+    {
+      "name": "AFTER_READBACK",
+      "fileviewWriteExpected": true,
+      "hostHistory": "RESERVED",
+      "nextOwner": "RECOVERY_REVIEW",
+      "nativeObserved": false
+    },
+    {
+      "name": "AFTER_SETTLEMENT",
+      "fileviewWriteExpected": true,
+      "hostHistory": "SETTLED",
+      "nextOwner": "RECOVERY_REVIEW",
+      "nativeObserved": false
+    }
+  ],
+  "productionRequiredChanges": [
+    {
+      "file": "services/hub/ApolloHubTodoStore.qml",
+      "seam": "stage(result)",
+      "change": "Add separate operator-approved asynchronous reserve before modifying pendingDocument or calling FileView.setText",
+      "implemented": false
+    },
+    {
+      "file": "services/hub/ApolloHubTodoStore.qml",
+      "seam": "FileView.onSaved",
+      "change": "Do not publish on saved callback; defer reload, independently verify, correlate reservation/epoch and publish only after host settlement",
+      "implemented": false
+    },
+    {
+      "file": "services/hub/ApolloHubTodoStore.qml",
+      "seam": "FileView.onLoadFailed/onLoaded/onSaveFailed",
+      "change": "Never re-open admission, publish speculative document or erase recovery fencing after callbacks or host death",
+      "implemented": false
+    },
+    {
+      "file": "services/hub/ApolloHubTodoStore.qml",
+      "seam": "reloadFromDisk()",
+      "change": "Keep reload blocked during reservation, save, verify, freeze, review; authenticate actual owner",
+      "implemented": false
+    },
+    {
+      "file": "services/hub/ApolloHubTodoStore.qml",
+      "seam": "guardedWriterEnabled",
+      "change": "Maintain hard-coded false until distinct operator-approved native host, guarded staging path, local acceptance and rollback",
+      "implemented": false
+    },
+    {
+      "file": "services/hub/ApolloHubTodoPolicy.js",
+      "seam": "view(storageState, doc, issue)",
+      "change": "Preserve loading/saving/ready/empty/error/unsupported public states and last confirmed document",
+      "implemented": false
+    },
+    {
+      "file": "production-specific native host (new, exact location to be approved)",
+      "seam": "source identity/owner lock/journal",
+      "change": "Do not relax disposable m11l-tasks-copy path restriction; preflight actual source, backup, epoch and permanent replay history",
+      "implemented": false
+    }
+  ],
+  "externalBoundaries": [
+    "Live JSON task file and user's local checkout not read or modified",
+    "M11q synthetic faults require explicit ARM FAULT in standalone harness",
+    "M11i in-memory event summary is observation-only, not OS authority",
+    "Qt FileView saved/failed callbacks lack durable stage ID metadata",
+    "QML sessionGeneration only fences deferred closures, not untrusted or interleaved host stdout",
+    "Production host must provide independently fenced authenticated session/owner identity and generation",
+    "GitHub CI does not execute the native Wayland callback chains",
+    "Original JSON FileView keeps its existing behavior while guardedWriterEnabled is false",
+    "SQLite TASKS migration, remote writes and production activation remain separately unauthorized"
+  ],
+  "authorizations": {
+    "standaloneTestHarnessSourcePatch": true,
+    "productionIntegrationSourcePatch": false,
+    "productionActivation": false,
+    "localMachineWrites": false,
+    "merge": false,
+    "sqliteTaskMigration": false
+  }
+}

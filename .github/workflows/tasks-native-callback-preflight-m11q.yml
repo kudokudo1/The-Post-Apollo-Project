@@ -1,0 +1,58 @@
+name: TASKS M11q native callback fence and production preflight
+
+on:
+  pull_request:
+    paths:
+      - 'services/projects/TaskJsonGateHostBridgeM11m.qml'
+      - 'services/projects/TaskJsonNativeCallbackGuardM11q.js'
+      - 'TaskJsonGateHarnessM11m.qml'
+      - 'tests/tasks/test_task_json_gate_transport_m11m.py'
+      - 'tests/tasks/test_task_native_callback_guard_m11q.cjs'
+      - 'tests/tasks/test_task_production_preflight_m11q.py'
+      - 'tests/tasks/fixtures/task_production_preflight_m11q.json'
+      - 'docs/tasks-native-callback-preflight-m11q.md'
+      - '.github/workflows/tasks-native-callback-preflight-m11q.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'services/projects/TaskJsonGateHostBridgeM11m.qml'
+      - 'services/projects/TaskJsonNativeCallbackGuardM11q.js'
+      - 'TaskJsonGateHarnessM11m.qml'
+      - 'tests/tasks/test_task_json_gate_transport_m11m.py'
+      - 'tests/tasks/test_task_native_callback_guard_m11q.cjs'
+      - 'tests/tasks/test_task_production_preflight_m11q.py'
+      - 'tests/tasks/fixtures/task_production_preflight_m11q.json'
+      - 'docs/tasks-native-callback-preflight-m11q.md'
+      - '.github/workflows/tasks-native-callback-preflight-m11q.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  callback-and-preflight:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: M11q imported native callback guard and M11i event chronology
+        run: node tests/tasks/test_task_native_callback_guard_m11q.cjs
+      - name: M11q source-only production integration preflight
+        run: python3 tests/tasks/test_task_production_preflight_m11q.py
+      - name: M11m disposable transport and QML wiring regression
+        run: python3 tests/tasks/test_task_json_gate_transport_m11m.py
+      - name: M11p v2 durable stage ledger and SIGKILL regression
+        run: python3 tests/tasks/test_task_stage_replay_crash_m11p.py
+      - name: M11o production-JS versus isolated-host parser parity
+        run: python3 tests/tasks/test_task_json_policy_parity_m11o.py
+      - name: M11i bounded native evidence regression
+        run: node tests/tasks/test_task_fileview_native_evidence_m11i.cjs
+      - name: M11k unimplemented real-production gate contract
+        run: python3 tests/tasks/test_task_production_gate_review_m11k.py
+      - name: M11d original single TASKS writer source inventory
+        run: python3 tests/tasks/test_task_writer_gate_inventory_m11d.py

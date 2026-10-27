@@ -20,7 +20,7 @@ Scope {
         focusable: true
         visible: true
         implicitWidth: 610
-        implicitHeight: 438
+        implicitHeight: 498
         anchors { top: true; left: true }
         color: "#1B0623"
 
@@ -73,7 +73,7 @@ Scope {
                     width: parent.width
                     spacing: 6
                     Repeater {
-                        model: ["NEW TEST", "EXISTING", "INCREMENT", "FREEZE", "STOP"]
+                        model: ["NEW TEST", "EXISTING", "INCREMENT", "FREEZE", "STOP", "ARM FAULT"]
                         Rectangle {
                             id: button
                             required property string modelData
@@ -105,6 +105,8 @@ Scope {
                                         bridge.freezeTest();
                                     } else if (button.modelData === "STOP") {
                                         bridge.stopTest();
+                                    } else if (button.modelData === "ARM FAULT") {
+                                        bridge.cycleSyntheticFault();
                                     }
                                 }
                             }
@@ -119,6 +121,11 @@ Scope {
                 Text {
                     text: "FILE // " + bridge.fileState + " // EPOCH " + bridge.epoch
                     color: "#55CFCA"
+                    font.pixelSize: 11
+                }
+                Text {
+                    text: "ARMED TEST FAULT // " + bridge.armedTestFault
+                    color: "#F2BE4E"
                     font.pixelSize: 11
                 }
                 Text {
@@ -141,11 +148,20 @@ Scope {
                 }
                 Text {
                     width: parent.width
-                    text: "EVENTS // " + bridge.recentEvents.join(" / ")
-                    color: "#DCF3FA"
+                    text: "NATIVE CHAINS // " + bridge.nativeSummary.saveChains
+                        + " // FROZEN " + bridge.nativeSummary.frozen
+                        + " // RECOVERY " + bridge.nativeSummary.recoveryObserved
+                    color: "#55CFCA"
                     font.pixelSize: 11
+                    wrapMode: Text.WordWrap
+                }
+                Text {
+                    width: parent.width
+                    text: "NATIVE TRACE // " + bridge.nativeRecent
+                    color: "#DCF3FA"
+                    font.pixelSize: 10
                     wrapMode: Text.WrapAnywhere
-                    maximumLineCount: 4
+                    maximumLineCount: 3
                 }
                 Text {
                     text: "LIVE WRITER: FALSE // SQLITE: FALSE // MIGRATION: FALSE"

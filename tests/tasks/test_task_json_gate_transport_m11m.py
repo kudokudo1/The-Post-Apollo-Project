@@ -209,7 +209,11 @@ class TransportTests(unittest.TestCase):
         store = (ROOT / "services/hub/ApolloHubTodoStore.qml").read_text()
         assert "Qt.callLater(function()" in bridge
         assert "fixtureFile.reload();" in bridge
-        assert "pendingStageId === savedStageId" in bridge
+        assert "CallbackGuard.canDeferredReadback" in bridge
+        assert "CallbackGuard.settledReplyEligible" in bridge
+        assert "var savedTicket = CallbackGuard.ticket(" in bridge
+        assert "bridge.sessionGeneration" in bridge
+        assert "TaskFileViewNativeEvidenceM11i.js" in bridge
         assert "fixtureFile.setText(pendingRaw);" in bridge
         assert 'bridge.send("verify", {stageId:bridge.pendingStageId})' in bridge
         assert "TaskJsonGateTransportM11m.py" in bridge

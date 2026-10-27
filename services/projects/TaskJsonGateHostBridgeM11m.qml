@@ -1,6 +1,8 @@
 import QtQuick
 import Quickshell
 import Quickshell.Io
+import "TaskFileViewNativeEvidenceM11i.js" as NativeEvidence
+import "TaskJsonNativeCallbackGuardM11q.js" as CallbackGuard
 
 // M11m ISOLATED NATIVE TEST: never mount this in shell.qml or TASKS.
 // The host's real OS lock/journal are limited to an owned, pre-existing,
@@ -10,6 +12,15 @@ Scope {
 
     property string fixturePath: ""
     property string writerId: ""
+    // M11q: volatile evidence and generation checks are diagnostics only.
+    // They confer no host authority and do not survive a process restart.
+    property int sessionGeneration: 0
+    // Explicit operator-armed fault in the STANDALONE synthetic harness.
+    // Never parsed from production config, persisted or triggered by default.
+    property string armedTestFault: "NONE"
+    property var nativeEvidence: NativeEvidence.empty()
+    readonly property var nativeSummary: NativeEvidence.summarize(nativeEvidence)
+    readonly property string nativeRecent: NativeEvidence.recent(nativeEvidence, 6)
     property bool bootstrapTestAuthority: false
     property bool attached: false
     property bool connected: false
@@ -45,10 +56,38 @@ Scope {
         var copy = recentEvents.slice(-5);
         copy.push(label);
         recentEvents = copy;
+        // Reuse the existing M11i privacy-safe enum and chain verifier.
+        // No paths, JSON payloads, stage IDs or host stdout are recorded.
+        var tags = {
+            "ATTACH_REQUEST":"ATTACH_REQUEST",
+            "FILE_INITIAL_LOAD":"FILE_INITIAL_LOAD",
+            "HOST_HELLO":"HOST_HELLO",
+            "STAGE_REQUEST":"STAGE_REQUEST",
+            "HOST_RESERVED":"HOST_ADMIT",
+            "FILE_SAVED":"FILE_SAVED",
+            "FILE_READBACK_OK":"FILE_READBACK_OK",
+            "HOST_SETTLED":"HOST_SETTLED",
+            "FREEZE_REQUESTED":"FREEZE_REQUEST",
+            "HOST_FROZEN":"HOST_FROZEN",
+            "FILE_SAVE_FAILED":"FILE_SAVE_FAILURE",
+            "FILE_LOAD_FAILED":"FILE_LOAD_FAILURE",
+            "FILE_READBACK_MISMATCH":"FILE_READBACK_MISMATCH",
+            "HOST_REFUSAL":"HOST_REFUSAL",
+            "REJECTED":"RECOVERY_REVIEW",
+            "STOP_REQUESTED":"STOP_REQUEST",
+            "HOST_EXIT":"HOST_EXIT"
+        };
+        if (Object.prototype.hasOwnProperty.call(tags, label)) {
+            nativeEvidence = NativeEvidence.append(nativeEvidence,
+                                                   tags[label], phase);
+        }
         observed();
     }
 
     function reject(reason) {
+        // Fence any Qt.callLater readback scheduled for an old session.
+        sessionGeneration++;
+        armedTestFault = "NONE";
         status = "RECOVERY_REVIEW";
         phase = "RECOVERY_REVIEW";
         errorCode = reason;
@@ -65,6 +104,26 @@ Scope {
         if (host.running) host.running = false;
     }
 
+    function cycleSyntheticFault() {
+        if (!testStageEligible) return false;
+        var variants = ["NONE", "AFTER_RESERVE", "AFTER_SAVED",
+                        "AFTER_READBACK", "AFTER_SETTLEMENT"];
+        var index = variants.indexOf(armedTestFault);
+        armedTestFault = variants[(index + 1) % variants.length];
+        event("FAULT_ARMED");
+        return true;
+    }
+
+    function maybeSyntheticFault(point) {
+        if (armedTestFault !== point) return false;
+        armedTestFault = "NONE";
+        event("FAULT_INJECTED");
+        // Discard volatile pending data and kill ONLY this disposable host.
+        // Leave the durable journal in its observed state for fresh review.
+        reject("M11Q_SYNTHETIC_FAULT_" + point);
+        return true;
+    }
+
     function beginTest() {
         if (attached || host.running || busy) return false;
         if (typeof fixturePath !== "string"
@@ -75,6 +134,9 @@ Scope {
             reject("DISPOSABLE_COPY_PATH_REQUIRED");
             return false;
         }
+        sessionGeneration++;
+        armedTestFault = "NONE";
+        nativeEvidence = NativeEvidence.empty();
         attached = true;
         connected = false;
         fileLoaded = false;
@@ -175,6 +237,7 @@ Scope {
     }
 
     function finishStage() {
+        armedTestFault = "NONE";
         pendingStageId = "";
         pendingRaw = "";
         fileState = "READY";
@@ -220,12 +283,14 @@ Scope {
                             || reply.stageId.length > 96)))
                 throw new Error("UNSAFE_HOST_REPLY");
             if (!reply.ok) {
+                event("HOST_REFUSAL");
                 reject("HOST_REFUSED_" + reply.status);
                 return;
             }
             if (reply.kind !== awaitingKind)
                 throw new Error("STALE_HOST_REPLY");
             var kind = awaitingKind;
+            var previousEpoch = epoch;
             awaitingId = -1;
             awaitingKind = "";
             busy = false;
@@ -244,17 +309,26 @@ Scope {
                     throw new Error("INVALID_RESERVATION");
                 fileState = "SAVING";
                 event("HOST_RESERVED");
+                if (maybeSyntheticFault("AFTER_RESERVE")) return;
                 fixtureFile.setText(pendingRaw);
             } else if (kind === "verify") {
-                if (reply.pending || reply.stageId !== pendingStageId
-                        || phase !== "JSON_ACTIVE" || fileState !== "SETTLING")
+                if (!CallbackGuard.settledReplyEligible({
+                        attached:attached, connected:connected,
+                        hostRunning:host.running, fileState:fileState,
+                        pendingStageId:pendingStageId, pendingRaw:pendingRaw,
+                        epoch:previousEpoch
+                    }, reply, previousEpoch))
                     throw new Error("INVALID_SETTLEMENT");
+                // Durable journal may have settled even though this QML
+                // process dies before it publishes the confirmed snapshot.
+                if (maybeSyntheticFault("AFTER_SETTLEMENT")) return;
                 confirmedRaw = pendingRaw;
                 confirmedCounter++;
                 event("HOST_SETTLED");
                 finishStage();
             } else if (kind === "freeze") {
-                if (phase !== "JSON_QUIESCED" || reply.pending || !freezeQueued)
+                if (phase !== "JSON_QUIESCED" || reply.pending || !freezeQueued
+                        || reply.epoch !== previousEpoch + 1)
                     throw new Error("INVALID_FREEZE");
                 status = "TEST_FROZEN";
                 fileState = "FROZEN";
@@ -269,6 +343,8 @@ Scope {
     }
 
     function stopTest() {
+        sessionGeneration++;
+        armedTestFault = "NONE";
         event("STOP_REQUESTED");
         attached = false;
         connected = false;
@@ -310,17 +386,22 @@ Scope {
                 } catch (e) { bridge.reject("NOT_A_TEST_FIXTURE"); }
             } else if (bridge.fileState === "VERIFYING") {
                 if (fixtureFile.text() !== bridge.pendingRaw) {
+                    bridge.event("FILE_READBACK_MISMATCH");
                     bridge.reject("FILE_READBACK_MISMATCH");
                 } else {
                     bridge.fileState = "SETTLING";
                     bridge.event("FILE_READBACK_OK");
+                    if (bridge.maybeSyntheticFault("AFTER_READBACK")) return;
                     if (!bridge.send("verify", {stageId:bridge.pendingStageId}))
                         bridge.reject("VERIFY_SEND_FAILED");
                 }
             } else bridge.reject("UNEXPECTED_FILE_LOAD");
         }
         onLoadFailed: function(error) {
-            if (bridge.attached) bridge.reject("FILE_LOAD_FAILED");
+            if (bridge.attached) {
+                bridge.event("FILE_LOAD_FAILED");
+                bridge.reject("FILE_LOAD_FAILED");
+            }
         }
         onSaved: {
             if (!bridge.attached || bridge.fileState !== "SAVING"
@@ -330,12 +411,24 @@ Scope {
             }
             bridge.fileState = "VERIFYING";
             bridge.event("FILE_SAVED");
-            var savedStageId = bridge.pendingStageId;
+            if (bridge.maybeSyntheticFault("AFTER_SAVED")) return;
+            var savedTicket = CallbackGuard.ticket(
+                bridge.sessionGeneration, bridge.epoch,
+                bridge.pendingStageId, bridge.fixturePath);
             Qt.callLater(function() {
-                if (bridge.attached && bridge.connected
-                        && bridge.fileState === "VERIFYING"
-                        && bridge.pendingStageId === savedStageId
-                        && savedStageId !== "" && bridge.pendingRaw !== "") {
+                // Neither a canceled host nor a replacement session may
+                // initiate a delayed readback from a prior reservation.
+                if (CallbackGuard.canDeferredReadback({
+                        attached:bridge.attached,
+                        connected:bridge.connected,
+                        hostRunning:host.running,
+                        generation:bridge.sessionGeneration,
+                        epoch:bridge.epoch,
+                        pendingStageId:bridge.pendingStageId,
+                        fixturePath:bridge.fixturePath,
+                        fileState:bridge.fileState,
+                        pendingRaw:bridge.pendingRaw
+                    }, savedTicket)) {
                     fixtureFile.reload();
                 }
             });
@@ -359,6 +452,7 @@ Scope {
         }
         stderr: StdioCollector {}
         onExited: function(code, exitStatus) {
+            bridge.sessionGeneration++;
             bridge.connected = false;
             bridge.fileLoaded = false;
             bridge.busy = false;

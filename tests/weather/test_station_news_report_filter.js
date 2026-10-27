@@ -175,7 +175,8 @@ assert.match(
 );
 assert.match(ui, /LOCAL TOPIC FILTER \+ URL\/TITLE DEDUPE/);
 assert.match(ui, /CONSERVATIVE DEDUPE \/\/ NOT STORY CLUSTERING/);
-assert.match(ui, /SOURCE \/ REGION FILTERS", state:"NOT WIRED"/);
+assert.match(ui, /PUBLISHER \/ SOURCE COUNTRY FILTER", state:"CONNECTED"/);
+assert.match(ui, /REGION \/ LANGUAGE FILTERS", state:"NOT WIRED"/);
 
 const selectStart = ui.indexOf("function selectNewsTopic(id)");
 const selectEnd = ui.indexOf("function selectMapFilter(id)", selectStart);

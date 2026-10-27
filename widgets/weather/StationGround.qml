@@ -71,6 +71,32 @@ Rectangle {
         return age === 0 ? "<1m" : age + "m";
     }
 
+    function stageflowReceiveAge() {
+        if (!riverService.stageflowLastUpdated
+                || typeof riverService.stageflowLastUpdated.getTime
+                   !== "function")
+            return "--";
+        const millis = riverService.stageflowLastUpdated.getTime();
+        if (!isFinite(millis) || millis <= 0)
+            return "--";
+        const age = Math.max(
+            0,
+            Math.floor((Date.now() - millis) / 60000)
+        );
+        return age === 0 ? "<1m" : age + "m";
+    }
+
+    readonly property var observedStageflowRows:
+        riverService.stageflowReady
+        ? RiverPolicy.seriesTail(
+              riverService.stageflow.observed, 3
+          ) : []
+    readonly property var forecastStageflowRows:
+        riverService.stageflowReady
+        ? RiverPolicy.seriesHead(
+              riverService.stageflow.forecast, 4
+          ) : []
+
     readonly property bool aqiReady: weatherService && weatherService.aqiReady
     readonly property bool aqiLoading: weatherService && weatherService.aqiLoading
     readonly property var airQualityForecast:
@@ -663,6 +689,238 @@ Rectangle {
                             }
                         }
                     }
+                }
+            }
+
+            Column {
+                width: parent.width
+                spacing: 7
+                visible: riverService.ready && !!riverService.gauge
+
+                StationSectionDivider {
+                    width: parent.width
+                    title: "STAGEFLOW // OBSERVED + OFFICIAL FORECAST"
+                }
+
+                Row {
+                    width: parent.width
+                    spacing: 12
+
+                    GohuText {
+                        text: riverService.stageflowLoading
+                              ? "RECEIVING"
+                              : riverService.stageflowFailed
+                                ? (riverService.stageflowReady
+                                   ? "DEGRADED" : "UNAVAILABLE")
+                                : riverService.stageflowReady
+                                  ? "RECEIVED"
+                                  : "WAITING"
+                        font.pixelSize: 10
+                        color: riverService.stageflowFailed
+                               ? Colors.yellow
+                               : riverService.stageflowReady
+                                 ? Colors.cyan : Colors.orange
+                    }
+
+                    QuietText {
+                        width: Math.max(0, parent.width - 110)
+                        text: riverService.stageflowReady
+                              ? "LID "
+                                + riverService.stageflowGaugeId
+                                + " // LAST SUCCESS "
+                                + ground.stageflowReceiveAge()
+                              : "NWPS /GAUGES/{LID}/STAGEFLOW"
+                        elide: Text.ElideRight
+                        font.pixelSize: 9
+                    }
+                }
+
+                QuietText {
+                    visible: riverService.stageflowFailed
+                    width: parent.width
+                    text: riverService.stageflowErrorText
+                          + (riverService.stageflowReady
+                             ? " // LAST-GOOD SERIES RETAINED" : "")
+                    font.pixelSize: 9
+                    color: Colors.yellow
+                }
+
+                Row {
+                    width: parent.width
+                    spacing: 12
+                    visible: riverService.stageflowReady
+
+                    Rectangle {
+                        width: (parent.width - 12) / 2
+                        height: 150
+                        color: Colors.dark
+                        border.width: 1
+                        border.color: Colors.cyan
+
+                        Column {
+                            anchors.fill: parent
+                            anchors.margins: 8
+                            spacing: 5
+
+                            GohuText {
+                                text: "OBSERVED // LAST "
+                                      + ground.observedStageflowRows.length
+                                color: Colors.cyan
+                                font.pixelSize: 11
+                            }
+
+                            QuietText {
+                                width: parent.width
+                                text: riverService.stageflow.observed.available
+                                      ? riverService.stageflow.observed
+                                        .primaryName
+                                        + (riverService.stageflow.observed
+                                           .primaryUnits
+                                           ? " // "
+                                             + riverService.stageflow.observed
+                                               .primaryUnits
+                                           : "")
+                                      : "NO OBSERVED SERIES RETURNED"
+                                elide: Text.ElideRight
+                                font.pixelSize: 9
+                            }
+
+                            Repeater {
+                                model: ground.observedStageflowRows
+
+                                delegate: Row {
+                                    required property var modelData
+                                    width: parent.width
+                                    spacing: 8
+
+                                    QuietText {
+                                        width: 116
+                                        text: modelData.validLabel
+                                        elide: Text.ElideRight
+                                        font.pixelSize: 9
+                                    }
+
+                                    GohuText {
+                                        width: Math.max(
+                                            0, parent.width - 124
+                                        )
+                                        text: RiverPolicy.pointReading(
+                                            riverService.stageflow.observed,
+                                            modelData
+                                        )
+                                        elide: Text.ElideRight
+                                        font.pixelSize: 10
+                                        color: Colors.white
+                                    }
+                                }
+                            }
+
+                            QuietText {
+                                visible:
+                                    riverService.stageflow.observed.available
+                                    && ground.observedStageflowRows.length === 0
+                                text: "NO VALID OBSERVED POINTS"
+                                font.pixelSize: 9
+                            }
+                        }
+                    }
+
+                    Rectangle {
+                        width: (parent.width - 12) / 2
+                        height: 150
+                        color: Colors.dark
+                        border.width: 1
+                        border.color: Colors.magenta
+
+                        Column {
+                            anchors.fill: parent
+                            anchors.margins: 8
+                            spacing: 5
+
+                            GohuText {
+                                text: "OFFICIAL FORECAST // NEXT "
+                                      + ground.forecastStageflowRows.length
+                                color: Colors.magenta
+                                font.pixelSize: 11
+                            }
+
+                            QuietText {
+                                width: parent.width
+                                text: riverService.stageflow.forecast.available
+                                      ? riverService.stageflow.forecast
+                                        .primaryName
+                                        + (riverService.stageflow.forecast
+                                           .primaryUnits
+                                           ? " // "
+                                             + riverService.stageflow.forecast
+                                               .primaryUnits
+                                           : "")
+                                      : "NO OFFICIAL FORECAST SERIES RETURNED"
+                                elide: Text.ElideRight
+                                font.pixelSize: 9
+                            }
+
+                            Repeater {
+                                model: ground.forecastStageflowRows
+
+                                delegate: Row {
+                                    required property var modelData
+                                    width: parent.width
+                                    spacing: 8
+
+                                    QuietText {
+                                        width: 116
+                                        text: modelData.validLabel
+                                        elide: Text.ElideRight
+                                        font.pixelSize: 9
+                                    }
+
+                                    GohuText {
+                                        width: Math.max(
+                                            0, parent.width - 124
+                                        )
+                                        text: RiverPolicy.pointReading(
+                                            riverService.stageflow.forecast,
+                                            modelData
+                                        )
+                                        elide: Text.ElideRight
+                                        font.pixelSize: 10
+                                        color: Colors.white
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
+                Row {
+                    width: parent.width
+                    spacing: 12
+                    visible: riverService.stageflowReady
+
+                    QuietText {
+                        width: (parent.width - 12) / 2
+                        text: "OBS ISSUED // "
+                              + riverService.stageflow.observed.issuedLabel
+                        elide: Text.ElideRight
+                        font.pixelSize: 9
+                    }
+
+                    QuietText {
+                        width: (parent.width - 12) / 2
+                        text: "FORECAST ISSUED // "
+                              + riverService.stageflow.forecast.issuedLabel
+                        elide: Text.ElideRight
+                        font.pixelSize: 9
+                        color: Colors.magenta
+                    }
+                }
+
+                QuietText {
+                    width: parent.width
+                    text: "OBSERVED AND FORECAST SERIES ARE SEPARATE NWPS PRODUCTS // FORECAST VALUES ARE PREDICTIONS, NOT MEASUREMENTS"
+                    font.pixelSize: 9
+                    color: Colors.orange
                 }
             }
 

@@ -212,8 +212,12 @@ class ScopedBrowserBoundary(unittest.TestCase):
         self.assertIn('function hideX()', HOST)
         self.assertIn('function selectIdentity(id)', IDENTITIES)
         self.assertNotIn('XBrowser.py"), "show", browserSite, "--identity"', HOST)
-        self.assertIn('if window_class == f"post-apollo-{site}":', GEOMETRY)
-        self.assertNotIn("-identity-", GEOMETRY)
+        self.assertIn('if window_class != browser_window_class(site, scoped_identity):',
+                      GEOMETRY)
+        self.assertIn('browser_identity_id: str | None = None', GEOMETRY)
+        self.assertIn('if scoped_identity is None:', GEOMETRY)
+        self.assertNotIn('browserIdentityId: appSelector.identitySnapshot.activeId',
+                         HOST)
 
 if __name__ == "__main__":
     unittest.main()

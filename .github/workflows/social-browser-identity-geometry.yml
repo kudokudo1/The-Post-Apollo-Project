@@ -1,0 +1,38 @@
+name: Social Browser Identity Geometry Boundary
+
+on:
+  pull_request:
+    paths:
+      - 'widgets/messanger/DiscordGeometry.py'
+      - 'tests/messaging/test_social_browser_identity_geometry.py'
+      - 'tests/messaging/test_social_browser_identity_boundary.py'
+      - 'services/messaging/BROWSER-IDENTITY-GEOMETRY.md'
+      - '.github/workflows/social-browser-identity-geometry.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'widgets/messanger/DiscordGeometry.py'
+      - 'tests/messaging/test_social_browser_identity_geometry.py'
+      - 'tests/messaging/test_social_browser_identity_boundary.py'
+      - 'services/messaging/BROWSER-IDENTITY-GEOMETRY.md'
+      - '.github/workflows/social-browser-identity-geometry.yml'
+  workflow_dispatch:
+
+jobs:
+  passive-scoped-geometry:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify exact identity-scoped Sway discovery and actuation guards
+        run: python3 -m unittest discover -s tests/messaging -p 'test_social_browser_identity_geometry.py' -v
+      - name: Preserve scoped profile isolation and legacy geometry
+        run: |
+          python3 -m unittest discover -s tests/messaging -p 'test_social_browser_identity_boundary.py' -v
+          python3 -m unittest discover -s tests/messaging -p 'test_discord_geometry_docking.py' -v
+          python3 tests/messaging/test_x_social_contracts.py
+          python3 tests/messaging/test_social_browser_contracts.py
+      - name: Preserve organization and account-details contracts
+        run: |
+          node tests/messaging/test_social_identity_policy.cjs
+          python3 -m unittest discover -s tests/messaging -p 'test_social_identity_store.py' -v
+          python3 -m unittest discover -s tests/messaging -p 'test_social_account_details_ui.py' -v

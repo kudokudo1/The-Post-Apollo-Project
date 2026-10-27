@@ -72,6 +72,8 @@ class PolicyComparisonTests(unittest.TestCase):
             add(f"canonical_v{version}", encode(baseline(version)))
         add("empty_v3", encode({"version":3, "nextId":1,
                                "nextProjectId":1, "projects":[], "tasks":[]}))
+        add("valid_float_integer_version", changed(root=lambda d:d.update(
+            version=3.0)))
         add("valid_float_integer_counters", changed(root=lambda d:d.update(
             nextId=2.0, nextProjectId=2.0)))
         add("valid_float_integer_timestamp", changed(task=lambda t:t.update(

@@ -16,7 +16,9 @@ import re
 import sys
 import tempfile
 
-from bridge import BridgeError, _app_config_path, _credentials, _protect_session_file, _telegram_client
+from bridge import (BridgeError, _app_config_path, _credentials,
+                    _ensure_scoped_parent, _protect_session_file,
+                    _telegram_client, _validate_identity)
 
 PHONE_RE = re.compile(r"^\+[1-9][0-9]{6,14}$")
 APP_HASH_RE = re.compile(r"^[a-fA-F0-9]{32}$")
@@ -47,7 +49,8 @@ async def await_event(expected_action: str) -> str:
     return item["value"]
 
 
-def save_app_keys() -> None:
+def save_app_keys(identity_id: str | None = None) -> None:
+    identity = _validate_identity(identity_id)
     item = read_event()
     if item.get("action") != "configure":
         raise BridgeError("ERROR", "Expected application key configuration")
@@ -55,13 +58,25 @@ def save_app_keys() -> None:
     api_hash = str(item.get("apiHash", "")).strip()
     if not api_id.isascii() or not api_id.isdigit() or int(api_id) <= 0 or not APP_HASH_RE.fullmatch(api_hash):
         raise BridgeError("ERROR", "Enter a valid Telegram API ID and 32-character API hash")
-    path = _app_config_path()
-    path.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
-    if path.parent.is_symlink():
-        raise BridgeError("ERROR", "Application key location is unsafe")
-    path.parent.chmod(0o700)
-    if path.is_symlink():
-        raise BridgeError("ERROR", "Application key location is unsafe")
+    path = _app_config_path(identity)
+    if identity is None:
+        # Original universal application-keys behavior.
+        path.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
+        if path.parent.is_symlink():
+            raise BridgeError("ERROR", "Application key location is unsafe")
+        path.parent.chmod(0o700)
+    else:
+        # Per-identity override is opt-in, never changes the universal file.
+        _ensure_scoped_parent(path, identity)
+    try:
+        prior = path.lstat()
+    except FileNotFoundError:
+        prior = None
+    if prior is not None:
+        import stat
+        if (not stat.S_ISREG(prior.st_mode) or prior.st_uid != os.getuid()
+                or prior.st_mode & 0o077):
+            raise BridgeError("ERROR", "Application key location is unsafe")
     # File remains private from creation. Atomic rename prevents partial values.
     payload = json.dumps({"apiId": api_id, "apiHash": api_hash}) + "\n"
     fd, temp = tempfile.mkstemp(prefix=".telegram-keys-", dir=str(path.parent))
@@ -162,9 +177,10 @@ async def phone_sign_in(client) -> None:
     raise BridgeError("ERROR", "Verification attempt limit reached; reconnect to retry")
 
 
-async def connect(mode: str) -> None:
+async def connect(mode: str, identity_id: str | None = None) -> None:
+    identity = _validate_identity(identity_id)
     try:
-        _credentials()
+        _credentials(identity)
     except BridgeError as exc:
         if exc.mode == "AUTH_REQUIRED":
             emit("APP_REQUIRED", "Telegram application keys are needed once for this installation")
@@ -175,7 +191,10 @@ async def connect(mode: str) -> None:
         qr_matrix_rows("tg://login?token=preflight")
     # QR waits for an UpdateLoginToken event. Ordinary read/send bridges
     # deliberately disable updates, but QR authorization MUST enable them.
-    client = _telegram_client(receive_updates=(mode == "qr"))
+    client = (_telegram_client(receive_updates=(mode == "qr"),
+                               identity_id=identity)
+              if identity is not None else
+              _telegram_client(receive_updates=(mode == "qr")))
     try:
         await client.connect()
         if await client.is_user_authorized():
@@ -190,18 +209,21 @@ async def connect(mode: str) -> None:
         emit("READY", "Telegram account connected")
     finally:
         await client.disconnect()
-        _protect_session_file()
+        _protect_session_file(identity)
 
 
 def main(argv=None) -> int:
     parser = argparse.ArgumentParser(description="Post-Apollo in-menu Telegram pairing bridge")
     parser.add_argument("mode", choices=("qr", "phone", "configure"))
+    parser.add_argument("--identity", default=None,
+                        help="Explicit separate Post-Apollo identity-N scope")
     args = parser.parse_args(argv)
     try:
+        identity = _validate_identity(args.identity)
         if args.mode == "configure":
-            save_app_keys()
+            save_app_keys(identity)
         else:
-            asyncio.run(connect(args.mode))
+            asyncio.run(connect(args.mode, identity))
         return 0
     except BridgeError as exc:
         if exc.mode != "CANCELLED":

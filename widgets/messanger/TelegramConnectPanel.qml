@@ -18,6 +18,25 @@ Rectangle {
     readonly property bool busy: adapter ? adapter.loginInProgress : false
     readonly property var qrMatrixRows: adapter ? adapter.qrModules : []
     onQrMatrixRowsChanged: qrCanvas.requestPaint()
+    function clearUnsubmittedAppKeys() {
+        apiIdInput.text = "";
+        apiHashInput.text = "";
+    }
+    function inspectCurrentAppKeys() {
+        if (panel.adapter && panel.adapter.active && panel.editApplicationKeys)
+            panel.adapter.inspectApplicationKeys(
+                panel.identityKeyEditor ? panel.keyIdentityId : "");
+    }
+    onEditApplicationKeysChanged: {
+        clearUnsubmittedAppKeys();
+        if (editApplicationKeys)
+            Qt.callLater(function() { panel.inspectCurrentAppKeys(); });
+    }
+    onKeyIdentityIdChanged: clearUnsubmittedAppKeys()
+    onVisibleChanged: {
+        if (!visible)
+            clearUnsubmittedAppKeys();
+    }
 
     color: Colors.black
     border.color: Colors.cyan
@@ -103,6 +122,25 @@ Rectangle {
                     color: Colors.white
                     font.pixelSize: 13
                 }
+                Text {
+                    width: parent.width
+                    wrapMode: Text.WordWrap
+                    color: Colors.cyan
+                    font.pixelSize: 12
+                    visible: panel.editApplicationKeys
+                    text: "CONFIGURATION // "
+                          + (panel.adapter && panel.adapter.appKeyConfigurationScope
+                             === (panel.identityKeyEditor ? panel.keyIdentityId : "")
+                             ? panel.adapter.appKeyConfigurationStatus
+                             : "NOT CHECKED")
+                }
+                ActionButton {
+                    title: "CHECK API CONFIGURATION"
+                    visible: panel.editApplicationKeys
+                    enabled: panel.adapter && panel.adapter.active
+                             && !panel.busy && !panel.adapter.appKeyStatusBusy
+                    onClicked: panel.inspectCurrentAppKeys()
+                }
                 Text { text: "API ID"; color: Colors.cyan }
                 Rectangle {
                     width: Math.min(parent.width, 350); height: 39
@@ -130,6 +168,7 @@ Rectangle {
                 ActionButton {
                     title: "SAVE APP KEYS"
                     enabled: !panel.busy
+                             && panel.adapter && !panel.adapter.appKeyStatusBusy
                              && /^\d+$/.test(apiIdInput.text.trim())
                              && /^[a-fA-F0-9]{32}$/.test(apiHashInput.text.trim())
                     onClicked: {

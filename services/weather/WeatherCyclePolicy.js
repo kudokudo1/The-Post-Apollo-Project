@@ -108,16 +108,42 @@ function forecast(date, time, daily) {
     return atLocal(date, hour <= 23 && minute <= 59 ? hour * 60 + minute : -1, daily);
 }
 
+// Shared night composition selector. It maps the *existing* condition
+// classification to foreground artwork; it does not invent new weather
+// classifications or override alerts. In particular, wind alone is not a
+// cloud, and warning/unknown conditions remain their original icon.
+function nightKind(conditionState) {
+    const label = conditionState ? String(conditionState.label || "") : "";
+    if (label === "SUNNY / CLEAR")
+        return "clear";
+    if (label === "PARTLY SUNNY" || label === "CLOUDS / FOG")
+        return "cloud";
+    if (label === "RAIN")
+        return "rain";
+    if (label === "SNOW / SLEET")
+        return "snow";
+    if (label === "HAIL / ICE PELLETS")
+        return "hail";
+    if (label === "THUNDERSTORM")
+        return "storm";
+    if (label.indexOf("HIGH WIND //") === 0)
+        return "wind";
+    return "none";
+}
+
 function artworkFor(conditionState, cycle) {
-    // Existing emergency and condition colors remain authoritative.
-    // Only clear and partly-cloudy glyphs are replaced by celestial variants.
+    // Alert and unknown precedence is inherited from WeatherDockPolicy.
+    // One shared night component composes a back-left moon and any needed
+    // cloud/precipitation foreground; day and dawn/dusk icons are untouched.
     const label = conditionState ? conditionState.label : "";
     const phase = cycle ? cycle.solar : "unknown";
     if (phase === "unknown")
         return "weather";
+    if (phase === "night")
+        return nightKind(conditionState) === "none" ? "weather" : "night-weather";
     if (label === "SUNNY / CLEAR")
-        return phase === "night" ? "moon" : "sun";
+        return "sun";
     if (label === "PARTLY SUNNY")
-        return phase === "night" ? "moon-cloud" : "sun-cloud";
+        return "sun-cloud";
     return "weather";
 }

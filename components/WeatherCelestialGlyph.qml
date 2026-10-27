@@ -7,10 +7,11 @@ import QtQuick.Effects
 Item {
     id: glyph
 
-    // "sun", "moon", "sun-cloud" or "moon-cloud".
+    // "sun", "moon", "sun-cloud", or the shared "night-weather" scene.
     property string mode: "moon"
     property string solar: "day"
     property string moonPhase: "unknown"
+    property string weatherKind: "clear"  // clear/cloud/rain/snow/hail/storm/wind
     property color ink: "white"
     // Weather owns the illuminated portion; night owns only the atmospheric
     // glow. Keep the dark face distinct from both the semantic ink and dock
@@ -25,7 +26,13 @@ Item {
     width: implicitWidth
     height: implicitHeight
 
+    readonly property bool nightComposition: mode === "night-weather"
     readonly property bool moonVisible: mode === "moon" || mode === "moon-cloud"
+                                        || nightComposition
+    readonly property bool foregroundCloud: nightComposition
+        && (weatherKind === "cloud" || weatherKind === "rain"
+            || weatherKind === "snow" || weatherKind === "hail"
+            || weatherKind === "storm")
     readonly property bool sunVisible: mode === "sun" || mode === "sun-cloud"
     readonly property bool horizon: solar === "dawn" || solar === "dusk"
     readonly property bool waxing: moonPhase.indexOf("waxing") === 0
@@ -103,6 +110,16 @@ Item {
             }
         }
 
+        // The moon is offset within the *same* 40x40 artboard for every
+        // night-weather scene: fixed upper-left, constant lunar orientation.
+        // Pure moon-phase detail (mode: moon) stays centered.
+        Item {
+            id: lunarBody
+            x: glyph.nightComposition ? -4 : 0
+            y: glyph.nightComposition ? -5 : 0
+            width: 40
+            height: 40
+
         // The dark lunar disk stays at the same center in all eight phases.
         // A separate low-intensity magenta halo defines the night silhouette
         // even when the disk nearly matches the panel background.
@@ -164,6 +181,91 @@ Item {
             visible: glyph.moonVisible && glyph.moonPhase === "unknown"
             text: "?"
             font.pixelSize: 18
+            color: glyph.ink
+        }
+
+        } // lunarBody
+
+        // A FILLED foreground cloud physically occludes the lower moon.
+        // No font baseline or emoji bearings can shift its position.
+        Shape {
+            anchors.fill: parent
+            visible: glyph.foregroundCloud
+            ShapePath {
+                strokeWidth: 0
+                fillColor: glyph.ink
+                startX: 7
+                startY: 31
+                PathCubic { x: 7; y: 22; control1X: 3; control1Y: 29; control2X: 3; control2Y: 23 }
+                PathCubic { x: 15; y: 19; control1X: 8; control1Y: 18; control2X: 11; control2Y: 17 }
+                PathCubic { x: 27; y: 19; control1X: 16; control1Y: 9; control2X: 26; control2Y: 11 }
+                PathCubic { x: 35; y: 23; control1X: 31; control1Y: 18; control2X: 34; control2Y: 19 }
+                PathCubic { x: 34; y: 31; control1X: 39; control1Y: 26; control2X: 37; control2Y: 30 }
+                PathLine { x: 7; y: 31 }
+            }
+        }
+        // Weather details are layered IN FRONT of the cloud, never between
+        // the moon and cloud; no independent badges or condition offsets.
+        Repeater {
+            model: 3
+            delegate: Rectangle {
+                visible: glyph.nightComposition && glyph.weatherKind === "rain"
+                x: 13 + index * 8
+                y: 33
+                width: 2
+                height: 5
+                radius: 1
+                rotation: 20
+                color: glyph.ink
+            }
+        }
+        Repeater {
+            model: 3
+            delegate: Text {
+                visible: glyph.nightComposition && glyph.weatherKind === "snow"
+                text: "❆"
+                font.family: "GohuFont 11 Nerd Font Mono"
+                font.pixelSize: 10
+                x: 10 + index * 9
+                y: 28
+                color: glyph.ink
+            }
+        }
+        Repeater {
+            model: 3
+            delegate: Rectangle {
+                visible: glyph.nightComposition && glyph.weatherKind === "hail"
+                x: 13 + index * 8
+                y: 34
+                width: 3
+                height: 3
+                rotation: 45
+                color: glyph.ink
+            }
+        }
+        Shape {
+            anchors.fill: parent
+            visible: glyph.nightComposition && glyph.weatherKind === "storm"
+            ShapePath {
+                strokeWidth: 0
+                fillColor: glyph.ink
+                startX: 23; startY: 27
+                PathLine { x: 18; y: 34 }
+                PathLine { x: 23; y: 34 }
+                PathLine { x: 20; y: 40 }
+                PathLine { x: 30; y: 31 }
+                PathLine { x: 25; y: 31 }
+                PathLine { x: 28; y: 27 }
+                PathLine { x: 23; y: 27 }
+            }
+        }
+        Text {
+            visible: glyph.nightComposition && glyph.weatherKind === "wind"
+            text: "༄"
+            font.family: "GohuFont 11 Nerd Font Mono"
+            font.pixelSize: 27
+            x: 15
+            y: 14
             color: glyph.ink
         }
 

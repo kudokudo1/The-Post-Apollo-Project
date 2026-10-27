@@ -257,7 +257,6 @@ Rectangle {
                             anchors.fill: conditionIconGlyph
                             safeSource: conditionIconGlyph
                             requestedVisible: sky.currentCelestialMode === "weather"
-                                              || sky.currentCelestialMode === "moon-cloud"
                             radius: 12
                             samples: 25
                             horizontalOffset: 0
@@ -270,13 +269,10 @@ Rectangle {
                         Text {
                             id: conditionIconGlyph
                             anchors.centerIn: parent
-                            text: sky.currentCelestialMode === "moon-cloud"
-                                  ? "☁︎" : sky.conditionState.icon
+                            text: sky.conditionState.icon
                             font.pixelSize: 104
-                            scale: sky.skyCycle.solar === "night" ? 0.79 : 1
                             color: sky.iconColor(sky.conditionState.color)
                             visible: sky.currentCelestialMode === "weather"
-                                     || sky.currentCelestialMode === "moon-cloud"
                         }
 
                         WeatherCelestialGlyph {
@@ -285,12 +281,11 @@ Rectangle {
                             width: 86
                             height: 86
                             mode: sky.currentCelestialMode
+                            weatherKind: WeatherCyclePolicy.nightKind(sky.conditionState)
                             solar: sky.skyCycle.solar
                             moonPhase: sky.skyCycle.moonPhase
                             ink: sky.iconColor(sky.conditionState.color)
                             visible: sky.currentCelestialMode !== "weather"
-                                     && sky.currentCelestialMode !== "moon"
-                                     && sky.currentCelestialMode !== "moon-cloud"
                         }
 
                         SafeDropShadow {
@@ -307,21 +302,6 @@ Rectangle {
                             z: -1
                         }
 
-                        // One shared top-right position for the night moon,
-                        // regardless of the weather glyph below it.
-                        WeatherCelestialGlyph {
-                            id: currentNightMoon
-                            anchors.top: parent.top
-                            anchors.right: parent.right
-                            width: 54
-                            height: 54
-                            mode: "moon"
-                            solar: sky.skyCycle.solar
-                            moonPhase: sky.skyCycle.moonPhase
-                            ink: sky.iconColor(sky.conditionState.color)
-                            visible: sky.weatherReady
-                                     && sky.skyCycle.solar === "night"
-                        }
                     }
                 }
             }
@@ -638,7 +618,6 @@ Rectangle {
                                 anchors.fill: hourlyIconGlyph
                                 safeSource: hourlyIconGlyph
                                 requestedVisible: parent.forecastArt === "weather"
-                                                  || parent.forecastArt === "moon-cloud"
                                 radius: 12
                                 samples: 25
                                 horizontalOffset: 0
@@ -652,13 +631,10 @@ Rectangle {
                                 id: hourlyIconGlyph
                                 anchors.centerIn: parent
                                 anchors.verticalCenterOffset: -8
-                                text: parent.forecastArt === "moon-cloud"
-                                      ? "☁︎" : parent.forecastState.icon
+                                text: parent.forecastState.icon
                                 font.pixelSize: 80
-                                scale: parent.forecastCycle.solar === "night" ? 0.8 : 1
                                 color: sky.iconColor(parent.forecastState.color)
                                 visible: parent.forecastArt === "weather"
-                                         || parent.forecastArt === "moon-cloud"
                             }
 
                             WeatherCelestialGlyph {
@@ -668,12 +644,11 @@ Rectangle {
                                 width: 70
                                 height: 70
                                 mode: parent.forecastArt
+                                weatherKind: WeatherCyclePolicy.nightKind(parent.forecastState)
                                 solar: parent.forecastCycle.solar
                                 moonPhase: parent.forecastCycle.moonPhase
                                 ink: sky.iconColor(parent.forecastState.color)
                                 visible: parent.forecastArt !== "weather"
-                                         && parent.forecastArt !== "moon"
-                                         && parent.forecastArt !== "moon-cloud"
                             }
 
                             SafeDropShadow {
@@ -690,19 +665,6 @@ Rectangle {
                                 z: -1
                             }
 
-                            // The moon remains in the upper-right art corner
-                            // for clear, cloudy, rain and other night entries.
-                            WeatherCelestialGlyph {
-                                anchors.top: parent.top
-                                anchors.right: parent.right
-                                width: 42
-                                height: 42
-                                mode: "moon"
-                                solar: parent.forecastCycle.solar
-                                moonPhase: parent.forecastCycle.moonPhase
-                                ink: sky.iconColor(parent.forecastState.color)
-                                visible: parent.forecastCycle.solar === "night"
-                            }
                         }
 
                         Row {

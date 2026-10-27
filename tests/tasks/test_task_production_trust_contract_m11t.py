@@ -99,7 +99,7 @@ class ProductionTrustReview(unittest.TestCase):
         shell = (ROOT / "shell.qml").read_text(encoding="utf-8")
         self.assertIn(source["guardFlag"], store)
         self.assertIn('Quickshell.dataDir + "/apollo-hub-todo-v1.json"', store)
-        self.assertEqual(len(re.findall(r"\\bFileView\\s*\\{", store)), 1)
+        self.assertEqual(len(re.findall(r"\bFileView\s*\{", store)), 1)
         self.assertEqual(store.count("todoFile.setText("), 1)
         self.assertEqual(store.count("return stage(TodoPolicy."), 9)
         self.assertIn("function stage(result)", store)
@@ -159,9 +159,7 @@ class ProductionTrustReview(unittest.TestCase):
             self.assertIn(gate, doc)
         self.assertIn("PROPOSED CONTRACT ONLY", doc)
         self.assertIn("new one-off replacement fixture", doc)
-        self.assertIn("a draft/CI pass".lower(), doc.lower().replace(" is not", " is not")
-                      if "a draft/CI pass" in doc.lower()
-                      else "A draft/CI pass".lower())
+        self.assertIn("a draft/ci pass is not", doc.lower())
 
 
 if __name__ == "__main__":

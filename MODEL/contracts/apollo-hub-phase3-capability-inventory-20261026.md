@@ -5,6 +5,7 @@
 **Source baseline:** GitHub `main` `b44a16826c111adb202e50c090009deff066c5dd` (2026-10-26). Recheck HEAD/ownership before using this to implement anything.  
 **Operator observation:** 2026-10-26: "all existing controls and mini widgets seem to work". Record as broad positive **operator smoke feedback**, not individual lifecycle/data-safety acceptance for every control.  
 **Scope of this inventory:** System Audio, AppControl, TimeW, TASKS; Hub capability/geometry/state invariants and next gaps.  
+**Phase 3 TODAY implementation update:** 2026-10-26, `ApolloHubTodoExplore.qml` mounts canonical `TaskTodayPane` in H:2/H:3 with safe OPEN-to-details, no new writer. Source contracts and repository validation passed at `5b4c77218c8505fdd796d8c215a6724eff839434`. Live desktop acceptance remains pending.  
 **Canonical context:** [capability levels proposal](apollo-hub-capability-levels-v0.md), [layout v2](../../services/hub/LAYOUT_EDITOR_V2_CONTRACT.md), [B11 acceptance](../../services/hub/INTEGRATION_ACCEPTANCE.md), Syntagma `AGENTS.md`. No local device, branch, service, or persistence changes were made by this inventory.
 
 ## 1. Shared semantics
@@ -76,7 +77,7 @@ TimeW stopwatch/countdown functionality already flows through the owner instance
 | --- | --- | --- | --- |
 | Local task create/done/rename/delete | Shared store/UI | **Present** in mini | Explicit confirmed writes/delete; preserve draft/error state across layout changes. |
 | Task description, priority and due-date editing | `TaskDetailsPane` | **Present in H:2/H:3** via canonical TaskDetailsPane | Same editor and store; prevent task selection switch when dirty/pending. |
-| TODAY/due-date projection | `TaskTodayPane` / `TaskTodayPolicy.js` | **Missing Hub internal TODAY view** | Small low-risk owner-backed read-only projection. |
+| TODAY/due-date projection | `TaskTodayPane` / `TaskTodayPolicy.js` | **Implemented in H:2/H:3 expanded To-do at Phase 3 commit `5b4c7721`** | Same read-only TASKS view; OPEN selects existing details with dirty/pending guard. Desktop acceptance still needed. |
 | Local PROJECTS grouping/rename/delete/assignment | `TaskProjectsPane`; same local store | **Missing Hub PROJECTS view** | Reuse canonical project controls; avoid second writer or confusing local projects with GitHub Projects. |
 | PLANNER MONTH/WEEK/DAY/TODAY + agenda | `TaskPlannerPane` | Hub Calendar remains civil dates; **no shared Planner experience** | Read-only projected views first, owner navigation/selection preserved. |
 | Deliberate scheduling and due-date changes | `TaskPlannerSchedulePane` | **Not integrated** | Reuse explicit save/clear date and shared writer; do not auto-run second write after create. |
@@ -100,7 +101,7 @@ For any new functional Hub view, use these checks, not simply a screenshot:
 
 ## 7. Bounded next implementation sequence (proposed)
 
-1. **Pilot:** TASKS **TODAY read-only**, from the existing `TaskTodayPolicy`/canonical view, in the expanded To-do tile. This adds meaningful power without touching the M11m writer path.
+1. **DONE at source / awaiting desktop acceptance:** TASKS **TODAY read-only** now uses canonical `TaskTodayPane` in expanded To-do with guarded navigation. Verify TODAY → OPEN → DETAILS, draft blocking, date rollover, scroll and H:2/H:3 display; H:1 compact tile remains unchanged.
 2. **Follow-on:** TASKS **PLANNER read-only**, with stable date navigation, then a separately approved scheduling command path. Keep local task scheduling distinct from provider-connected Calendar events.
 3. **TimeW calculator / timezone tools:** pure calculations and owner-owned zone choices first. Preserve separate monotonic stopwatch/countdown state.
 4. **System Audio completion:** finish output selection and re-observed effects once Team 6/T3 owner coordination is resolved. Do not conflate sink inputs with semantic app identities.

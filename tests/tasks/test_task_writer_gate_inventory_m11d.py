@@ -161,7 +161,9 @@ assert "signal openTaskRequested(string taskId)" in today
 planner = (ROOT/"widgets/tasks/TaskPlannerPane.qml").read_text()
 assert "Planner.view(todoSnapshot, monthKey, selectedDate, todayKey)" in planner
 assert "TaskPlannerSchedulePane {" in planner
-assert "todoStore: planner.todoStore" in planner
+# A read-only Hub embed may not receive the scheduling mutation handle.
+assert "property bool schedulingAllowed: true" in planner
+assert "todoStore: planner.schedulingAllowed ? planner.todoStore : null" in planner
 
 # Follow injection routes to preserve the one shared singleton: TASKS and
 # ApolloHub both inject the same actual store and snapshot.

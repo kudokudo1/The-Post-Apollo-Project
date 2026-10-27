@@ -140,19 +140,31 @@ function newsTopics(value) {
     return topics;
 }
 
-function filterNewsRows(rows, topic) {
+function filterNewsRows(rows, topic, sourceQuery) {
     if (!Array.isArray(rows))
         return [];
-    const wanted = String(topic || "all").toLowerCase();
-    if (wanted === "all")
-        return rows.slice();
 
+    const wanted = String(topic || "all").toLowerCase();
+    const query = shortText(sourceQuery, 80).toLowerCase();
     const result = [];
+
     for (let i = 0; i < rows.length; i++) {
         const row = rows[i];
-        const topics = row && Array.isArray(row.topics) ? row.topics : [];
-        if (topics.indexOf(wanted) >= 0)
-            result.push(row);
+        if (!row)
+            continue;
+
+        const topics = Array.isArray(row.topics) ? row.topics : [];
+        if (wanted !== "all" && topics.indexOf(wanted) < 0)
+            continue;
+
+        if (query) {
+            const domain = String(row.domain || "").toLowerCase();
+            const country = String(row.country || "").toLowerCase();
+            if (domain.indexOf(query) < 0 && country.indexOf(query) < 0)
+                continue;
+        }
+
+        result.push(row);
     }
     return result;
 }

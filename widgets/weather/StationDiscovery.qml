@@ -371,6 +371,7 @@ Rectangle {
                                    || modelData.state === "MANUAL READY"
                                    || modelData.state === "SNAPSHOT LOADED"
                                    || String(modelData.state).indexOf("FETCHED ") === 0
+                                   || String(modelData.state).indexOf("LOADED ") === 0
                                    ? Colors.cyan : Colors.orange
                             font.pixelSize: 11
                         }

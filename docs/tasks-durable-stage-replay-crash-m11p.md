@@ -25,6 +25,8 @@ M11o had one pending stage slot in its SQLite journal. After a successful `verif
 
 Two additional SQLite transaction-abort injections verify that an exception during reservation or settlement rolls back both changes atomically, leaving no half-committed ledger. Missing history rows and orphaned pending rows fail closed.
 
+**Separate actual OS SIGKILL test:** a disposable child announces three precise checkpoints (reservation committed, file replaced before verify, or settlement committed). The CI test kills that child using `SIGKILL`, confirms Linux released the owner's lifetime file lock, and then checks the SQLite ledger/source bytes under a new owner. The new owner must enter `RECOVERY_REVIEW`, preserving unsettled vs settled distinctions. These are genuine killed subprocesses, still **not** a physical power-loss test.
+
 **Important:** `os._exit` tests skip process cleanup but do not simulate kernel panic, real disk power loss, fsynced hardware write-cache semantics, or adversarial filesystem corruption. Those boundaries remain unproven.
 
 ## HOW TO USE

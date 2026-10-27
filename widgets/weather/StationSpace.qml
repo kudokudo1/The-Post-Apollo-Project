@@ -58,6 +58,17 @@ Rectangle {
 
     readonly property real kpValue:
         spaceService && spaceService.kp >= 0 ? Number(spaceService.kp) : 0
+    readonly property var kpHistory:
+        spaceService && Array.isArray(spaceService.kpHistory)
+        ? spaceService.kpHistory : []
+    readonly property var kpHistorySummary:
+        spaceService ? spaceService.kpHistorySummary
+                     : ({
+                           bins: 0, hours: 0, maxKp: -1, averageKp: -1,
+                           activeBins: 0, stormBins: 0, latestDelta: 0,
+                           latestA: -1, latestStationCount: -1,
+                           minStationCount: -1
+                       })
     readonly property real solarWindValue:
         spaceService && spaceService.solarWindSpeed >= 0
         ? Number(spaceService.solarWindSpeed) : 0
@@ -93,6 +104,26 @@ Rectangle {
         if (kpValue < 6)
             return Colors.orange;
         return Colors.red;
+    }
+
+    function kpHistoryColor(value) {
+        const reading = Number(value);
+        if (!isFinite(reading) || reading < 0)
+            return Colors.white;
+        if (reading < 4)
+            return Colors.cyan;
+        if (reading < 5)
+            return Colors.yellow;
+        if (reading < 6)
+            return Colors.orange;
+        return Colors.red;
+    }
+
+    function signedKpDelta(value) {
+        const reading = Number(value);
+        if (!isFinite(reading))
+            return "--";
+        return (reading > 0 ? "+" : "") + reading.toFixed(2);
     }
 
     readonly property color solarWindColor: {
@@ -374,6 +405,147 @@ Rectangle {
                         font.pixelSize: 10
                     }
                 }
+            }
+        }
+
+        StationSectionDivider {
+            width: parent.width
+            title: "GEOMAGNETIC // KP 72-HOUR HISTORY"
+        }
+
+        Column {
+            width: parent.width
+            spacing: 8
+
+            Row {
+                width: parent.width
+                spacing: 10
+
+                Repeater {
+                    model: [
+                        {
+                            "title": "MAX // 72H",
+                            "value": space.kpHistorySummary.maxKp >= 0
+                                     ? space.kpHistorySummary.maxKp.toFixed(2)
+                                     : "--",
+                            "detail": "HIGHEST PUBLISHED BIN"
+                        },
+                        {
+                            "title": "AVG // 72H",
+                            "value": space.kpHistorySummary.averageKp >= 0
+                                     ? space.kpHistorySummary.averageKp.toFixed(2)
+                                     : "--",
+                            "detail": "24 × 3H WINDOW"
+                        },
+                        {
+                            "title": "ACTIVE / STORM",
+                            "value": space.kpHistorySummary.activeBins
+                                     + " / "
+                                     + space.kpHistorySummary.stormBins,
+                            "detail": "KP≥4 / KP≥5 BINS"
+                        },
+                        {
+                            "title": "LATEST // Δ",
+                            "value": space.signedKpDelta(
+                                space.kpHistorySummary.latestDelta
+                            ),
+                            "detail": space.kpHistorySummary.latestStationCount >= 0
+                                      ? "A "
+                                        + space.kpHistorySummary.latestA
+                                        + " // STATIONS "
+                                        + space.kpHistorySummary.latestStationCount
+                                      : "A -- // STATIONS --"
+                        }
+                    ]
+
+                    delegate: StationHomeMetricCard {
+                        required property var modelData
+                        width: (spaceContent.width - 3 * 10) / 4
+                        height: 88
+                        title: modelData.title
+                        valueText: modelData.value
+                        detailText: modelData.detail
+                        accentColor: Colors.magenta
+                        valueColor: Colors.white
+                        meterVisible: false
+                    }
+                }
+            }
+
+            Row {
+                id: kpHistoryBars
+                width: parent.width
+                height: 92
+                spacing: 3
+
+                Repeater {
+                    model: space.kpHistory
+
+                    delegate: Column {
+                        required property var modelData
+                        width: (kpHistoryBars.width
+                                - 23 * kpHistoryBars.spacing) / 24
+                        height: parent.height
+                        spacing: 3
+
+                        Item {
+                            width: parent.width
+                            height: 68
+
+                            Rectangle {
+                                anchors.horizontalCenter: parent.horizontalCenter
+                                anchors.bottom: parent.bottom
+                                width: Math.max(5, parent.width - 5)
+                                height: 4 + 60 * modelData.level
+                                color: space.kpHistoryColor(modelData.kp)
+                                opacity: 0.9
+                            }
+                        }
+
+                        QuietText {
+                            width: parent.width
+                            horizontalAlignment: Text.AlignHCenter
+                            text: index % 4 === 0
+                                  ? modelData.timeLabel.slice(6, 9)
+                                  : ""
+                            font.pixelSize: 7
+                        }
+                    }
+                }
+            }
+
+            Row {
+                width: parent.width
+
+                QuietText {
+                    text: space.kpHistory.length > 0
+                          ? "START "
+                            + space.kpHistory[0].timeLabel
+                          : "START -- UTC"
+                    font.pixelSize: 9
+                }
+
+                Item {
+                    width: Math.max(0, parent.width - 330)
+                    height: 1
+                }
+
+                QuietText {
+                    text: space.kpHistory.length > 0
+                          ? "LATEST "
+                            + space.kpHistory[
+                                space.kpHistory.length - 1
+                              ].timeLabel
+                          : "LATEST -- UTC"
+                    font.pixelSize: 9
+                }
+            }
+
+            QuietText {
+                width: parent.width
+                text: "NOAA PLANETARY K-INDEX // 3-HOUR PUBLISHED BINS // SAME EXISTING 5-MIN FETCH // NO NEW REQUEST"
+                font.pixelSize: 9
+                color: Colors.cyan
             }
         }
 

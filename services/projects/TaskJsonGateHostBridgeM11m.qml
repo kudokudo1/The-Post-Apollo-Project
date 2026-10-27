@@ -12,6 +12,8 @@ Scope {
 
     property string fixturePath: ""
     property string writerId: ""
+    // M11r disposable-host session binding, never a production credential.
+    property string hostSessionId: ""
     // M11q: volatile evidence and generation checks are diagnostics only.
     // They confer no host authority and do not survive a process restart.
     property int sessionGeneration: 0
@@ -85,6 +87,7 @@ Scope {
     }
 
     function reject(reason) {
+        hostSessionId = "";
         // Fence any Qt.callLater readback scheduled for an old session.
         sessionGeneration++;
         armedTestFault = "NONE";
@@ -138,6 +141,7 @@ Scope {
         armedTestFault = "NONE";
         nativeEvidence = NativeEvidence.empty();
         attached = true;
+        hostSessionId = "";
         connected = false;
         fileLoaded = false;
         busy = true;
@@ -166,9 +170,11 @@ Scope {
 
     function send(kind, extra) {
         if (!attached || !connected || !host.running || busy
+                || !/^[0-9a-f]{48}$/.test(hostSessionId)
                 || nextRequestId > 50 || freezeQueued && kind === "reserve")
             return false;
-        var request = {requestId:nextRequestId, kind:kind};
+        var request = {requestId:nextRequestId, kind:kind,
+                       sessionId:hostSessionId};
         if (kind === "reserve") {
             if (!extra || typeof extra.stageId !== "string"
                     || typeof extra.candidateText !== "string"
@@ -255,7 +261,8 @@ Scope {
         }
         try {
             var reply = JSON.parse(line);
-            var keys = ["protocol", "requestId", "kind", "ok", "status",
+            var keys = ["protocol", "requestId", "kind", "sessionId",
+                        "ok", "status",
                         "phase", "epoch", "pending", "stageId",
                         "liveWriterAuthorized", "sqliteWriteAuthorized",
                         "migrationAuthorized", "remoteWriteAuthorized"];
@@ -282,6 +289,11 @@ Scope {
                         && (typeof reply.stageId !== "string"
                             || reply.stageId.length > 96)))
                 throw new Error("UNSAFE_HOST_REPLY");
+            if ((awaitingKind === "hello" && reply.ok
+                     && !/^[0-9a-f]{48}$/.test(reply.sessionId))
+                    || (awaitingKind !== "hello"
+                        && reply.sessionId !== hostSessionId))
+                throw new Error("STALE_HOST_SESSION");
             if (!reply.ok) {
                 event("HOST_REFUSAL");
                 reject("HOST_REFUSED_" + reply.status);
@@ -298,6 +310,7 @@ Scope {
             phase = reply.phase;
             epoch = reply.epoch === null ? -1 : reply.epoch;
             if (kind === "hello") {
+                hostSessionId = reply.sessionId;
                 if (phase !== "JSON_ACTIVE" || reply.pending)
                     throw new Error("HOST_REQUIRES_REVIEW");
                 status = "TEST_HOST_READY";
@@ -343,6 +356,7 @@ Scope {
     }
 
     function stopTest() {
+        hostSessionId = "";
         sessionGeneration++;
         armedTestFault = "NONE";
         event("STOP_REQUESTED");
@@ -452,6 +466,7 @@ Scope {
         }
         stderr: StdioCollector {}
         onExited: function(code, exitStatus) {
+            bridge.hostSessionId = "";
             bridge.sessionGeneration++;
             bridge.connected = false;
             bridge.fileLoaded = false;

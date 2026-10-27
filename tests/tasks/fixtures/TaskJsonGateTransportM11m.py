@@ -11,6 +11,7 @@ import argparse
 import hashlib
 import importlib.util
 import json
+import secrets
 from pathlib import Path
 import sys
 
@@ -34,10 +35,11 @@ def unique(pairs):
     return obj
 
 
-def response(rid, kind, ok, status, owner=None, *, stage=None):
+def response(rid, kind, ok, status, owner=None, *, stage=None, session_id=None):
     snap = owner.state() if owner is not None else None
     return {
         "protocol": 1, "requestId": rid, "kind": kind,
+        "sessionId": session_id,
         "ok": bool(ok), "status": status,
         "phase": snap["phase"] if snap else "UNVERIFIED",
         "epoch": snap["epoch"] if snap else None,
@@ -59,7 +61,11 @@ def serve(directory: Path, writer_id: str, *, bootstrap=False, incoming=None,
     sink = outgoing if outgoing is not None else sys.stdout
     try:
         with candidate.CandidateOwner(directory, writer_id, bootstrap=bootstrap) as owner:
-            emit(sink, response(0, "hello", True, "TEST_OWNER_ATTACHED", owner))
+            session_id = secrets.token_hex(24)
+            def reply(rid, kind, ok, status, *, stage=None):
+                return response(rid, kind, ok, status, owner, stage=stage,
+                                session_id=session_id)
+            emit(sink, reply(0, "hello", True, "TEST_OWNER_ATTACHED"))
             last_request = 0
             active = None
             for _ in range(MAX_REQUESTS):
@@ -67,8 +73,8 @@ def serve(directory: Path, writer_id: str, *, bootstrap=False, incoming=None,
                 if not line:
                     return 0
                 if len(line) > MAX_LINE or not line.endswith(b"\n"):
-                    emit(sink, response(None, "protocol", False,
-                                        "INVALID_REQUEST_FRAME", owner))
+                    emit(sink, reply(None, "protocol", False,
+                                     "INVALID_REQUEST_FRAME"))
                     return 2
                 try:
                     req = json.loads(line.decode("utf-8"), object_pairs_hook=unique)
@@ -85,8 +91,11 @@ def serve(directory: Path, writer_id: str, *, bootstrap=False, incoming=None,
                         "fail": {"requestId", "kind", "stageId"},
                         "freeze": {"requestId", "kind", "expectedEpoch"}
                     }
-                    if kind not in shapes or set(req) != shapes[kind]:
+                    if kind not in shapes or set(req) != shapes[kind] | {"sessionId"}:
                         raise ValueError("UNSUPPORTED_REQUEST")
+                    if (type(req["sessionId"]) is not str or
+                            not secrets.compare_digest(req["sessionId"], session_id)):
+                        raise ValueError("STALE_OR_INVALID_SESSION")
                     last_request = rid
                     stage = None
                     if kind == "reserve":
@@ -118,23 +127,23 @@ def serve(directory: Path, writer_id: str, *, bootstrap=False, incoming=None,
                             raise ValueError("STALE_STAGE")
                         # No pretend settlement after a failed FileView save:
                         # persist pending stage for fresh-owner recovery review.
-                        emit(sink, response(rid, kind, False,
-                                            "FILEVIEW_FAILURE_REVIEW", owner))
+                        emit(sink, reply(rid, kind, False,
+                                         "FILEVIEW_FAILURE_REVIEW"))
                         return 2
                     elif kind == "freeze":
                         if (active is not None
                                 or type(req["expectedEpoch"]) is not int):
                             raise ValueError("DRAIN_REQUIRED")
                         owner.freeze(req["expectedEpoch"])
-                    emit(sink, response(rid, kind, True, "TEST_ONLY", owner, stage=stage))
+                    emit(sink, reply(rid, kind, True, "TEST_ONLY", stage=stage))
                 except (ValueError, TypeError, candidate.GateError):
                     # Malformed/stale/mismatched traffic is a closed session.
                     # Do not disclose user-supplied contents in diagnostics.
-                    emit(sink, response(last_request, "refused", False,
-                                        "RECOVERY_REVIEW_REQUIRED", owner))
+                    emit(sink, reply(last_request, "refused", False,
+                                     "RECOVERY_REVIEW_REQUIRED"))
                     return 2
-            emit(sink, response(last_request, "limit", False,
-                                "REQUEST_LIMIT", owner))
+            emit(sink, reply(last_request, "limit", False,
+                             "REQUEST_LIMIT"))
             return 2
     except (candidate.GateError, OSError, ValueError, TypeError):
         emit(sink, response(0, "hello", False, "TEST_HOST_UNAVAILABLE"))

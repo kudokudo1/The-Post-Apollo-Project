@@ -1,0 +1,54 @@
+name: TASKS M11r disposable session transport and native fault inspector
+
+on:
+  pull_request:
+    paths:
+      - 'tests/tasks/fixtures/TaskJsonGateTransportM11m.py'
+      - 'services/projects/TaskJsonGateHostBridgeM11m.qml'
+      - 'tests/tasks/test_task_json_gate_transport_m11m.py'
+      - 'tests/tasks/fixtures/TaskNativeFaultInspectorM11r.py'
+      - 'tests/tasks/test_task_native_fault_inspector_m11r.py'
+      - 'docs/tasks-native-fault-session-boundary-m11r.md'
+      - '.github/workflows/tasks-native-session-inspector-m11r.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'tests/tasks/fixtures/TaskJsonGateTransportM11m.py'
+      - 'services/projects/TaskJsonGateHostBridgeM11m.qml'
+      - 'tests/tasks/test_task_json_gate_transport_m11m.py'
+      - 'tests/tasks/fixtures/TaskNativeFaultInspectorM11r.py'
+      - 'tests/tasks/test_task_native_fault_inspector_m11r.py'
+      - 'docs/tasks-native-fault-session-boundary-m11r.md'
+      - '.github/workflows/tasks-native-session-inspector-m11r.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  disposable-session-and-audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: M11r mandatory host session and old transport regression
+        run: python3 tests/tasks/test_task_json_gate_transport_m11m.py
+      - name: M11r read-only private fault inspector matrix
+        run: python3 tests/tasks/test_task_native_fault_inspector_m11r.py
+      - name: M11q callback generation, epoch, save chronology
+        run: node tests/tasks/test_task_native_callback_guard_m11q.cjs
+      - name: M11q hard-disabled production integration preflight
+        run: python3 tests/tasks/test_task_production_preflight_m11q.py
+      - name: M11p stage replay/crash durability
+        run: python3 tests/tasks/test_task_stage_replay_crash_m11p.py
+      - name: M11o JS/Python task JSON parity
+        run: python3 tests/tasks/test_task_json_policy_parity_m11o.py
+      - name: M11l restricted owner
+        run: python3 tests/tasks/test_task_json_gate_candidate_m11l.py
+      - name: M11d one live TASKS writer
+        run: python3 tests/tasks/test_task_writer_gate_inventory_m11d.py

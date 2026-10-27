@@ -23,6 +23,49 @@ Rectangle {
     property bool isolatedBrowserModeActive: false
     property bool isolatedBrowserToggleAllowed: false
     signal isolatedBrowserModeToggleRequested()
+    // The controller owns diagnostics and launching. Settings only requests
+    // actions for the selected, confirmed identity and service.
+    signal browserWindowCheckRequested(string serviceId, string identityId)
+    signal browserOpenSignInRequested(string serviceId, string identityId)
+    property var browserWindowInspection: ({ windowState: "NOT_CHECKED",
+                                             authentication: "UNKNOWN" })
+    property string browserWindowInspectionServiceId: ""
+    property string browserWindowInspectionIdentityId: ""
+    property bool browserWindowInspectionBusy: false
+    property bool browserWindowActionAllowed: false
+
+    function browserAccountServiceSupported(serviceId) {
+        // Browser-backed providers only; Telegram, Discord and unsupported
+        // personal services cannot share the Chromium sign-in workflow.
+        var options = identitySnapshot.appChoices || [];
+        return options.some(function(candidate) {
+            var idx = candidate.serviceIndex;
+            return candidate.id === serviceId
+                   && ((idx >= 3 && idx <= 13) || (idx >= 16 && idx <= 25));
+        });
+    }
+
+    function browserWindowStatusText() {
+        if (!isolatedBrowserModeActive)
+            return "ISOLATED BROWSERS OFF // NO IDENTITY-SPECIFIC CHECK";
+        if (!browserAccountServiceSupported(accountSelectedServiceId))
+            return "SELECT A WEBSITE-BACKED APP TO CHECK ITS WINDOW";
+        if (browserWindowInspectionBusy)
+            return "CHECKING THIS IDENTITY'S BROWSER WINDOW...";
+        if (browserWindowInspectionServiceId !== accountSelectedServiceId
+                || browserWindowInspectionIdentityId !== identitySnapshot.activeId)
+            return "NOT CHECKED // SIGN-IN UNKNOWN";
+        var state = String(browserWindowInspection.windowState || "UNAVAILABLE");
+        if (state === "OPEN_VISIBLE")
+            return "WINDOW VISIBLE // SIGN-IN UNKNOWN";
+        if (state === "OPEN_HIDDEN")
+            return "WINDOW HIDDEN // SIGN-IN UNKNOWN";
+        if (state === "NOT_OPEN")
+            return "WINDOW NOT OPEN // SIGN-IN UNKNOWN";
+        if (state === "AMBIGUOUS_WINDOW" || state === "UNVERIFIED_WINDOW")
+            return "WINDOW AMBIGUOUS OR UNVERIFIED // NO AUTOMATIC RECONNECT";
+        return "WINDOW CHECK UNAVAILABLE // SIGN-IN UNKNOWN";
+    }
     // Set by MessagingW to the shared content surface, not a new window.
     property Item settingsWorkspaceParent: null
     property int settingsContactWidth: 200
@@ -1195,6 +1238,72 @@ Rectangle {
                     onTriggered: SocialAccountDetailsStore.setAccountLabel(
                         appSelector.identitySnapshot.activeId,
                         appSelector.accountSelectedServiceId, "")
+                }
+                Rectangle {
+                    width: parent.width
+                    height: 1
+                    color: Colors.cyan
+                }
+                Text {
+                    width: parent.width
+                    text: "BROWSER SIGN-IN // MANUAL"
+                    color: Colors.cyan
+                    font.bold: true
+                    font.pixelSize: 10
+                    wrapMode: Text.WordWrap
+                }
+                Text {
+                    width: parent.width
+                    text: appSelector.browserWindowStatusText()
+                    color: Colors.orange
+                    font.pixelSize: 9
+                    wrapMode: Text.WordWrap
+                }
+                Text {
+                    width: parent.width
+                    text: "A running website window never proves login or an unexpired session."
+                    color: Colors.white
+                    font.pixelSize: 9
+                    wrapMode: Text.WordWrap
+                }
+                ActionButton {
+                    width: parent.width
+                    height: 33
+                    label: "CHECK WINDOW"
+                    labelPixelSize: 9
+                    contentPadding: 3
+                    interactive: appSelector.browserWindowActionAllowed
+                                 && !appSelector.browserWindowInspectionBusy
+                                 && appSelector.browserAccountServiceSupported(
+                                        appSelector.accountSelectedServiceId)
+                                 && appSelector.accountEditorIdentityId ===
+                                    appSelector.identitySnapshot.activeId
+                    onTriggered: appSelector.browserWindowCheckRequested(
+                        appSelector.accountSelectedServiceId,
+                        appSelector.identitySnapshot.activeId)
+                }
+                ActionButton {
+                    width: parent.width
+                    height: 36
+                    label: "OPEN SIGN-IN WINDOW"
+                    labelPixelSize: 9
+                    labelMinimumPixelSize: 8
+                    contentPadding: 3
+                    interactive: appSelector.browserWindowActionAllowed
+                                 && appSelector.browserAccountServiceSupported(
+                                        appSelector.accountSelectedServiceId)
+                                 && appSelector.accountEditorIdentityId ===
+                                    appSelector.identitySnapshot.activeId
+                    onTriggered: appSelector.browserOpenSignInRequested(
+                        appSelector.accountSelectedServiceId,
+                        appSelector.identitySnapshot.activeId)
+                }
+                Text {
+                    width: parent.width
+                    text: "The provider website owns sign-in and reconnection. No cookies are inspected."
+                    color: Colors.white
+                    font.pixelSize: 9
+                    wrapMode: Text.WordWrap
                 }
                 Text {
                     width: parent.width

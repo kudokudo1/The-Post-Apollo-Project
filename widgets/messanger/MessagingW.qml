@@ -103,6 +103,54 @@ PanelWindow {
         id: xScopedHideProcess
     }
 
+    // Read-only, selected-identity Sway WINDOW check. This never reads
+    // Chromium profile contents, login cookies, or provider authentication.
+    Process {
+        id: browserWindowInspectProcess
+        property string requestSite: ""
+        property string requestIdentity: ""
+        property string readOutput: ""
+        stdout: StdioCollector {
+            onStreamFinished: browserWindowInspectProcess.readOutput = String(text || "")
+        }
+        onExited: function(exitCode) {
+            messagingWindow.browserWindowInspectionBusy = false;
+            // A delayed result must not be shown after an identity switch,
+            // different service selection or Settings close.
+            if (!messagingWindow.browserIsolationEnabled
+                    || !appSelector.settingsOpen
+                    || !appSelector.identitySnapshot.writable
+                    || requestIdentity !== appSelector.identitySnapshot.activeId
+                    || requestIdentity !== messagingWindow.browserActiveIdentityId
+                    || requestSite !== appSelector.accountSelectedServiceId
+                    || messagingWindow.browserWindowInspectionServiceId !== requestSite
+                    || messagingWindow.browserWindowInspectionIdentityId !== requestIdentity)
+                return;
+            var response = null;
+            try { response = JSON.parse(readOutput); } catch (e) { }
+            if (exitCode !== 0 || !response
+                    || response.schema !== "post-apollo.social-browser-window.v1"
+                    || response.identityId !== requestIdentity
+                    || response.site !== requestSite
+                    || response.authentication !== "UNKNOWN"
+                    || response.checkedVia !== "EXACT_SWAY_WINDOW_CLASS_ONLY") {
+                messagingWindow.browserWindowInspection = ({
+                    windowState: "UNAVAILABLE", authentication: "UNKNOWN"
+                });
+                return;
+            }
+            var validStates = [
+                "NOT_OPEN", "OPEN_VISIBLE", "OPEN_HIDDEN",
+                "AMBIGUOUS_WINDOW", "UNVERIFIED_WINDOW"
+            ];
+            messagingWindow.browserWindowInspection = ({
+                windowState: validStates.indexOf(response.windowState) !== -1
+                             ? response.windowState : "UNAVAILABLE",
+                authentication: "UNKNOWN"
+            });
+        }
+    }
+
     Process {
         id: providerDesktopHideProcess
         // The helper refuses to hide anything without our Sway window mark
@@ -402,6 +450,82 @@ PanelWindow {
     property bool browserIsolationEnabled: false
     property string browserActiveIdentityId: ""
     property int scopedBrowserConId: 0
+    property var browserWindowInspection: ({
+        windowState: "NOT_CHECKED", authentication: "UNKNOWN"
+    })
+    property string browserWindowInspectionServiceId: ""
+    property string browserWindowInspectionIdentityId: ""
+    property bool browserWindowInspectionBusy: false
+    property bool browserConnectionNavigationPending: false
+
+    function clearBrowserWindowInspection() {
+        browserWindowInspection = ({
+            windowState: "NOT_CHECKED", authentication: "UNKNOWN"
+        });
+        browserWindowInspectionServiceId = "";
+        browserWindowInspectionIdentityId = "";
+        // A currently running read-only process may finish; its result
+        // is dropped by the request/identity guard in onExited.
+    }
+
+    function browserAccountServiceIndex(serviceId, identityId) {
+        var snap = appSelector.identitySnapshot;
+        if (!menuOpen || !appSelector.settingsOpen
+                || !browserIsolationEnabled || !snap.writable
+                || !validBrowserIdentity(identityId)
+                || identityId !== snap.activeId
+                || identityId !== browserActiveIdentityId
+                || appSelector.accountSelectedServiceId !== serviceId
+                || !appSelector.browserAccountServiceSupported(serviceId))
+            return -1;
+        var choices = snap.appChoices || [];
+        for (var i = 0; i < choices.length; i++) {
+            if (choices[i].id === serviceId) {
+                var index = Number(choices[i].serviceIndex);
+                if (Number.isInteger(index)
+                        && ((index >= 3 && index <= 13)
+                            || (index >= 16 && index <= 25)))
+                    return index;
+            }
+        }
+        return -1;
+    }
+
+    function inspectBrowserAccountWindow(serviceId, identityId) {
+        if (browserAccountServiceIndex(serviceId, identityId) < 0
+                || browserWindowInspectProcess.running
+                || xShowProcess.running || xScopedHideProcess.running)
+            return false;
+        browserWindowInspection = ({
+            windowState: "NOT_CHECKED", authentication: "UNKNOWN"
+        });
+        browserWindowInspectionServiceId = serviceId;
+        browserWindowInspectionIdentityId = identityId;
+        browserWindowInspectionBusy = true;
+        browserWindowInspectProcess.readOutput = "";
+        browserWindowInspectProcess.requestSite = serviceId;
+        browserWindowInspectProcess.requestIdentity = identityId;
+        browserWindowInspectProcess.exec([
+            "python3", Quickshell.shellPath("widgets/messanger/XBrowser.py"),
+            "inspect", serviceId, "--identity", identityId
+        ]);
+        return true;
+    }
+
+    function openBrowserAccountSignIn(serviceId, identityId) {
+        var index = browserAccountServiceIndex(serviceId, identityId);
+        if (index < 0 || xShowProcess.running || xScopedHideProcess.running
+                || browserWindowInspectProcess.running)
+            return false;
+        clearBrowserWindowInspection();
+        browserConnectionNavigationPending = true;
+        // Prevent the old selected browser from being opened once on closing
+        // Settings, before activateApp switches to the requested service.
+        appSelector.settingsOpen = false;
+        activateApp(index);
+        browserConnectionNavigationPending = false;
+        return true;
+    }
     onBrowserActiveIdentityIdChanged: updateGeometryHelperMode()
 
     function selectedBrowserScopeId() {
@@ -425,6 +549,7 @@ PanelWindow {
     }
 
     function toggleBrowserIsolation() {
+        clearBrowserWindowInspection();
         var snapshot = appSelector.identitySnapshot;
         if (!snapshot.writable || !validBrowserIdentity(snapshot.activeId)
                 || xShowProcess.running)
@@ -448,6 +573,7 @@ PanelWindow {
     }
 
     function reconcilePersistedBrowserIdentity() {
+        clearBrowserWindowInspection();
         if (!browserIsolationEnabled)
             return;
         var snapshot = appSelector.identitySnapshot;
@@ -1494,6 +1620,27 @@ PanelWindow {
 
         AppSelector {
             id: appSelector
+            browserWindowInspection: messagingWindow.browserWindowInspection
+            browserWindowInspectionServiceId:
+                messagingWindow.browserWindowInspectionServiceId
+            browserWindowInspectionIdentityId:
+                messagingWindow.browserWindowInspectionIdentityId
+            browserWindowInspectionBusy:
+                messagingWindow.browserWindowInspectionBusy
+            browserWindowActionAllowed:
+                messagingWindow.browserIsolationEnabled
+                && !xShowProcess.running && !xScopedHideProcess.running
+                && !browserWindowInspectProcess.running
+                && messagingWindow.browserActiveIdentityId ===
+                   appSelector.identitySnapshot.activeId
+            onAccountSelectedServiceIdChanged:
+                messagingWindow.clearBrowserWindowInspection()
+            onBrowserWindowCheckRequested: function(serviceId, identityId) {
+                messagingWindow.inspectBrowserAccountWindow(serviceId, identityId);
+            }
+            onBrowserOpenSignInRequested: function(serviceId, identityId) {
+                messagingWindow.openBrowserAccountSignIn(serviceId, identityId);
+            }
             isolatedBrowserModeActive: messagingWindow.browserIsolationEnabled
             isolatedBrowserToggleAllowed: !xShowProcess.running
                                            && !xScopedHideProcess.running
@@ -1542,6 +1689,8 @@ PanelWindow {
                 } else if (messagingWindow.discordSelected) {
                     messagingWindow.raiseDiscord();
                 } else if (messagingWindow.xSelected) {
+                    if (messagingWindow.browserConnectionNavigationPending)
+                        return;
                     if (messagingWindow.browserIsolationEnabled)
                         messagingWindow.showX();
                     else

@@ -329,9 +329,9 @@ def sway_criteria(
     if target == "discord":
         if scoped_identity is not None:
             raise ValueError("Browser identity cannot target Vesktop")
-        if con_id is None or type(con_id) is not int or con_id <= 0:
+        if con_id is None or int(con_id) <= 0:
             raise ValueError("Discord commands require a discovered Sway con_id")
-        return f'[con_id="{con_id}"]'
+        return f'[con_id="{int(con_id)}"]'
     if target in BROWSER_SITES:
         if scoped_identity is not None:
             if type(con_id) is not int or con_id <= 0:
@@ -445,7 +445,7 @@ class Bridge:
             raise ValueError("Invalid scoped browser site")
         selected_site = site if site in BROWSER_SITES else "x"
         if (self.browser_identity_id != identity
-                or self.browser_site != selected_site):
+                or (identity is not None and self.browser_site != selected_site)):
             # Never carry old dock/readiness or a browser/Social follower
             # command into another identity. Discord's commands are owned by
             # the separate Vesktop path and must be retained.

@@ -582,6 +582,44 @@ def hide_all(identity_id: str | None = None) -> None:
         hide(site)
 
 
+def inspect_scoped_window(site: str, identity_id: str) -> dict[str, Any]:
+    """Read-only Sway window diagnostic, NEVER provider authentication status.
+
+    A mapped Chromium app is not evidence of website sign-in, unexpired
+    cookies, an active account, or reconnection success. No profile files,
+    cookies, network requests, or login state are read.
+    """
+    site_config(site)
+    identity = validated_identity(identity_id)
+    if identity is None:
+        raise ValueError("An identity is required for browser window inspection")
+    cls = site_window_class(site, identity)
+    matches = [
+        node for node in walk_tree(sway_tree())
+        if (node.get("window_properties") or {}).get("class") == cls
+    ]
+    if len(matches) > 1:
+        state = "AMBIGUOUS_WINDOW"
+    elif len(matches) == 0:
+        state = "NOT_OPEN"
+    else:
+        window = matches[0]
+        cid = window.get("id")
+        if type(cid) is not int or cid <= 0:
+            state = "UNVERIFIED_WINDOW"
+        else:
+            state = "OPEN_VISIBLE" if window.get("visible", False) else "OPEN_HIDDEN"
+    return {
+        "schema": "post-apollo.social-browser-window.v1",
+        "identityId": identity,
+        "site": site,
+        "windowState": state,
+        "authentication": "UNKNOWN",
+        "checkedVia": "EXACT_SWAY_WINDOW_CLASS_ONLY",
+        "reconnectAction": "OPEN_PROVIDER_WINDOW_MANUALLY",
+    }
+
+
 def profile_plan(site: str, identity_id: str) -> dict[str, Any]:
     """Pure, non-mutating scoped profile proposal; never reports login success."""
     scoped_id = validated_identity(identity_id)
@@ -602,7 +640,7 @@ def profile_plan(site: str, identity_id: str) -> dict[str, Any]:
 
 def main() -> int:
     parser = argparse.ArgumentParser()
-    parser.add_argument("action", choices=("show", "hide", "status", "setup", "profile"))
+    parser.add_argument("action", choices=("show", "hide", "status", "setup", "profile", "inspect"))
     parser.add_argument("site", nargs="?", default="x", choices=(*ALL_SITES, "all"))
     parser.add_argument("--identity", dest="identity_id", default=None)
     args = parser.parse_args()
@@ -613,6 +651,11 @@ def main() -> int:
             if args.site == "all" or identity_id is None:
                 raise ValueError("Scoped profile plan requires one site and --identity")
             print(json.dumps(profile_plan(args.site, identity_id)))
+        elif args.action == "inspect":
+            if args.site == "all" or identity_id is None:
+                raise ValueError("Window inspection requires one site and --identity")
+            print(json.dumps(inspect_scoped_window(args.site, identity_id),
+                             separators=(",", ":")))
         elif args.action == "show":
             if args.site == "all":
                 raise ValueError("Cannot show all browser sites")

@@ -194,6 +194,10 @@ class TelegramWidgetApplicationKeys(unittest.TestCase):
                 self.assertIn('write(JSON.stringify({', ADAPTER)
             else:
                 self.assertIn(mark, ADAPTER, mark)
+        self.assertIn('if (adapter.backendMode === "READY")', ADAPTER)
+        self.assertIn('adapter.loginDetail = "Universal application keys saved. "', ADAPTER)
+        self.assertIn('adapter.requestedLoginMode = "qr";', ADAPTER)
+        self.assertIn('Qt.callLater(function() { adapter.probe(); });', ADAPTER)
         self.assertIn('healthProcess.command = command(["health"])', ADAPTER)
         self.assertIn('listProcess.command = command(["list"])', ADAPTER)
         self.assertIn('messageProcess.command = command(["messages"', ADAPTER)

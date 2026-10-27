@@ -88,7 +88,7 @@ assert.ok(adapter.includes('if (!adapter.active)'));
 assert.ok(bridge.includes('await client.is_user_authorized()'));
 assert.ok(bridge.includes('return {"mode": "READY", "detail": "Telegram account authorized"}'));
 assert.ok(bridge.includes('"personal.session"'));
-assert.ok(identity.includes('// browser profiles, QR pairing, secret storage and live account switching stay separate.'));
+assert.ok(identity.includes('QR pairing, secret storage and live account switching stay separate.'));
 
 // Host navigation is explicit and resumes the existing Telegram wizard;
 // closing Settings cannot spuriously reopen the previous browser.

@@ -1,0 +1,49 @@
+name: Social Telegram In-Widget App Credential Setup
+
+on:
+  pull_request:
+    paths:
+      - 'services/messaging/bridges/telegram/login_ui.py'
+      - 'services/messaging/adapters/TelegramAdapter.qml'
+      - 'widgets/messanger/TelegramConnectPanel.qml'
+      - 'widgets/messanger/MessagingW.qml'
+      - 'widgets/messanger/AppSelector.qml'
+      - 'tests/messaging/test_telegram_in_widget_key_setup.py'
+      - 'tests/messaging/test_telegram_identity_scopes.py'
+      - 'tests/messaging/test_telegram_login_ui_contracts.py'
+      - 'services/messaging/TELEGRAM-IN-WIDGET-APP-SETUP.md'
+      - '.github/workflows/social-telegram-in-widget-app-setup.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'services/messaging/bridges/telegram/login_ui.py'
+      - 'services/messaging/adapters/TelegramAdapter.qml'
+      - 'widgets/messanger/TelegramConnectPanel.qml'
+      - 'widgets/messanger/MessagingW.qml'
+      - 'widgets/messanger/AppSelector.qml'
+      - 'tests/messaging/test_telegram_in_widget_key_setup.py'
+      - 'services/messaging/TELEGRAM-IN-WIDGET-APP-SETUP.md'
+      - '.github/workflows/social-telegram-in-widget-app-setup.yml'
+  workflow_dispatch:
+
+jobs:
+  in-widget-app-keys:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Exercise in-widget configuration, status, privacy and no provider launch
+        run: python3 -m unittest discover -s tests/messaging -p 'test_telegram_in_widget_key_setup.py' -v
+      - name: Preserve Telegram login, universal/identity backend and native adapter
+        run: |
+          python3 -m unittest discover -s tests/messaging -p 'test_telegram_login_ui_contracts.py' -v
+          python3 -m unittest discover -s tests/messaging -p 'test_telegram_identity_scopes.py' -v
+          python3 -m unittest discover -s tests/messaging -p 'test_telegram_adapter_contracts.py' -v
+          python3 -m unittest discover -s tests/messaging -p 'test_telegram_bridge_cli_contracts.py' -v
+          node tests/messaging/test_social_telegram_shared_status.cjs
+      - name: Preserve account identity, contact Settings and browser boundaries
+        run: |
+          python3 -m unittest discover -s tests/messaging -p 'test_social_account_details_ui.py' -v
+          python3 -m unittest discover -s tests/messaging -p 'test_social_settings_workspace.py' -v
+          python3 -m unittest discover -s tests/messaging -p 'test_social_browser_signin_window.py' -v
+          python3 -m unittest discover -s tests/messaging -p 'test_social_browser_live_handoff.py' -v
+          node tests/messaging/test_social_identity_policy.cjs

@@ -102,7 +102,7 @@ assert.match(ui, /onDoubleClicked:\s*stationDiscovery\.resetMapView\(\)/);
 assert.match(ui, /model: stationDiscovery\.mapPointRows/);
 assert.match(ui, /MapProjection\.project\(\s*modelData\.longitude,\s*modelData\.latitude/);
 assert.match(ui, /stationDiscovery\.selectedMapEvent = modelData/);
-assert.match(ui, /LAT\/LON GRID \/\/ NO BASEMAP/);
+assert.match(ui, /LAT\/LON GRID \/\/ NOAA RADAR IS DATA LAYER, NOT BASEMAP/);
 assert.match(ui, /EONET \+ FIRMS POINTS \/\/ POLYGONS LISTED BELOW/);
 assert.match(ui, /EONET POINT CANVAS \/\/ PAN \+ ZOOM/);
 assert.match(ui, /BASEMAP \/ POLYGON LAYERS", state:"NOT WIRED"/);

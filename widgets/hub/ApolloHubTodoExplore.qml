@@ -180,19 +180,32 @@ Item {
     // Same TASKS planner and date projection; action path remains disabled
     // inside Hub. MONTH/WEEK/DAY/TODAY and agenda OPEN are supported; SCHEDULE
     // must stay in standalone TASKS until separately approved for Hub.
-    TaskPlannerPane {
-        id: taskPlanner
+    // The original TASKS pane assumes a tall parent window. A viewport
+    // keeps MONTH/WEEK/DAY and the lower agenda reachable at H:2 or H:3.
+    // This wrapper has no writer, timer or independent calendar state.
+    Flickable {
+        id: plannerViewport
         visible: todoExplore.plannerMode
-        todoSnapshot: todoExplore.todoSnapshot
-        todoStore: null
-        schedulingAllowed: false
         anchors.top: modeSelector.bottom
         anchors.topMargin: 6
         anchors.left: parent.left
         anchors.right: parent.right
         anchors.bottom: parent.bottom
-        onOpenTaskRequested: function(taskId) {
-            todoExplore.openTask(taskId);
+        clip: true
+        boundsBehavior: Flickable.StopAtBounds
+        contentWidth: width
+        contentHeight: taskPlanner.height
+
+        TaskPlannerPane {
+            id: taskPlanner
+            width: plannerViewport.width
+            height: Math.max(plannerViewport.height, 485)
+            todoSnapshot: todoExplore.todoSnapshot
+            todoStore: null
+            schedulingAllowed: false
+            onOpenTaskRequested: function(taskId) {
+                todoExplore.openTask(taskId);
+            }
         }
     }
 

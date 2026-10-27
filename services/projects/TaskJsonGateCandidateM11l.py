@@ -27,6 +27,7 @@ class GateError(RuntimeError):
 MAX_BYTES = 1048576
 MAX_TASKS = 200
 MAX_PROJECTS = 30
+JOURNAL_SCHEMA = 2
 ID_RE = re.compile(r"[A-Za-z0-9][A-Za-z0-9._:-]{7,95}\Z")
 
 
@@ -279,27 +280,103 @@ class CandidateOwner:
                     writer TEXT NOT NULL, source_hash TEXT NOT NULL,
                     backup_hash TEXT NOT NULL,
                     pending_stage TEXT, expected_hash TEXT,
+                    history_complete INTEGER NOT NULL CHECK (history_complete IN (0,1)),
                     reason TEXT NOT NULL)""")
-                self._db.execute("INSERT INTO owner VALUES (1,'JSON_ACTIVE',0,?,?,?,NULL,NULL,'')",
-                                 (writer_id, digest(raw), digest(raw)))
-                self._db.execute("PRAGMA user_version=1")
+                self._create_stage_history()
+                self._db.execute("""INSERT INTO owner VALUES
+                    (1,'JSON_ACTIVE',0,?,?,?,NULL,NULL,1,'')""",
+                    (writer_id, digest(raw), digest(raw)))
+                self._db.execute("PRAGMA user_version=2")
                 self._db.commit()
+                self._sync_directory()
             else:
-                require(self._db.execute("PRAGMA user_version").fetchone()[0] == 1,
-                        "UNKNOWN_JOURNAL_SCHEMA")
+                version = self._db.execute("PRAGMA user_version").fetchone()[0]
+                require(version in (1, JOURNAL_SCHEMA), "UNKNOWN_JOURNAL_SCHEMA")
                 self._db.execute("BEGIN IMMEDIATE")
-                row = self._row()
-                require(row["epoch"] < 1000000000, "EPOCH_EXHAUSTED")
-                require(row["backup_hash"] == digest(previous_backup),
-                        "BACKUP_CHANGED")
-                self._db.execute("""UPDATE owner SET phase='RECOVERY_REVIEW',
-                    epoch=epoch+1, writer=?, reason='FRESH_OWNER_MUST_REVIEW'
-                    WHERE id=1""", (writer_id,))
-                self._db.commit()
+                try:
+                    row = self._row()
+                    require(row["epoch"] < 1000000000, "EPOCH_EXHAUSTED")
+                    require(row["backup_hash"] == digest(previous_backup),
+                            "BACKUP_CHANGED")
+                    if version == 1:
+                        # Old disposable journals forgot settled IDs. Carry
+                        # any pending ID, but NEVER grant history completeness
+                        # or rearm an upgraded legacy authority.
+                        self._db.execute("""ALTER TABLE owner ADD COLUMN
+                            history_complete INTEGER NOT NULL DEFAULT 0
+                            CHECK (history_complete IN (0,1))""")
+                        self._create_stage_history()
+                        self._validate_pending_pair(row)
+                        if row["pending_stage"] is not None:
+                            require(type(row["pending_stage"]) is str and
+                                    ID_RE.fullmatch(row["pending_stage"]) and
+                                    self._valid_hash(row["expected_hash"]),
+                                    "LEGACY_PENDING_CORRUPT")
+                            self._db.execute("""INSERT INTO stage_history
+                                (stage_id,epoch,expected_hash,source_hash_before,state)
+                                VALUES (?,?,?,?,'RESERVED')""",
+                                (row["pending_stage"], row["epoch"],
+                                 row["expected_hash"], row["source_hash"]))
+                        self._db.execute("PRAGMA user_version=2")
+                    else:
+                        self._validate_stage_journal(row)
+                    self._db.execute("""UPDATE owner SET phase='RECOVERY_REVIEW',
+                        epoch=epoch+1, writer=?, reason='FRESH_OWNER_MUST_REVIEW'
+                        WHERE id=1""", (writer_id,))
+                    self._db.commit()
+                except BaseException:
+                    self._db.rollback()
+                    raise
             self.writer_id = writer_id
         except BaseException:
             self.close()
             raise
+
+    @staticmethod
+    def _valid_hash(value):
+        return type(value) is str and re.fullmatch(r"[0-9a-f]{64}", value) is not None
+
+    def _sync_directory(self):
+        # Test-copy metadata durability after creating the initial database.
+        fd = os.open(self.folder, os.O_RDONLY | getattr(os, "O_DIRECTORY", 0))
+        try:
+            os.fsync(fd)
+        finally:
+            os.close(fd)
+
+    def _create_stage_history(self):
+        self._db.execute("""CREATE TABLE stage_history (
+            stage_id TEXT PRIMARY KEY NOT NULL,
+            epoch INTEGER NOT NULL,
+            expected_hash TEXT NOT NULL,
+            source_hash_before TEXT NOT NULL,
+            state TEXT NOT NULL CHECK (state IN ('RESERVED','SETTLED'))
+        ) WITHOUT ROWID""")
+
+    @staticmethod
+    def _validate_pending_pair(row):
+        require((row["pending_stage"] is None) ==
+                (row["expected_hash"] is None), "JOURNAL_PENDING_CORRUPT")
+
+    def _validate_stage_journal(self, row):
+        self._validate_pending_pair(row)
+        require(row["history_complete"] in (0, 1), "JOURNAL_HISTORY_CORRUPT")
+        try:
+            pending = self._db.execute("""SELECT epoch, expected_hash, state
+                FROM stage_history WHERE stage_id=?""",
+                (row["pending_stage"],)).fetchone() if row["pending_stage"] is not None else None
+            if row["pending_stage"] is not None:
+                require(pending is not None and
+                        pending["state"] == "RESERVED" and
+                        pending["expected_hash"] == row["expected_hash"] and
+                        pending["epoch"] <= row["epoch"],
+                        "JOURNAL_HISTORY_CORRUPT")
+            require(self._db.execute("""SELECT 1 FROM stage_history
+                WHERE state='RESERVED' AND stage_id IS NOT ? LIMIT 1""",
+                (row["pending_stage"],)).fetchone() is None,
+                "JOURNAL_HISTORY_CORRUPT")
+        except sqlite3.DatabaseError as exc:
+            raise GateError("JOURNAL_HISTORY_CORRUPT") from exc
 
     def _guard(self):
         require(not self._closed and os.getpid() == self._pid and
@@ -318,6 +395,7 @@ class CandidateOwner:
         require(row["writer"] == self.writer_id, "STALE_OWNER")
         return {"phase": row["phase"], "epoch": row["epoch"],
                 "pending": row["pending_stage"] is not None,
+                "historyComplete": row["history_complete"] == 1,
                 "liveWriterAuthorized": False, "sqliteWriteAuthorized": False}
 
     def reserve(self, stage_id: str, candidate: bytes):
@@ -331,12 +409,26 @@ class CandidateOwner:
             row = self._row()
             require(row["writer"] == self.writer_id and
                     row["phase"] == "JSON_ACTIVE" and
-                    row["pending_stage"] is None, "STAGE_NOT_ADMISSIBLE")
+                    row["pending_stage"] is None and
+                    row["history_complete"] == 1, "STAGE_NOT_ADMISSIBLE")
+            self._validate_stage_journal(row)
+            require(self._db.execute("""SELECT 1 FROM stage_history
+                WHERE stage_id=?""", (stage_id,)).fetchone() is None,
+                "STAGE_ID_REPLAY")
             require(digest(current) == row["source_hash"],
                     "SOURCE_CHANGED_EXTERNALLY")
             require(candidate != current, "NO_CHANGE")
-            self._db.execute("UPDATE owner SET pending_stage=?, expected_hash=? WHERE id=1",
-                             (stage_id, digest(candidate)))
+            # Crucial: persistent ID tombstone and pending reservation are
+            # one FULL-synchronous SQLite transaction. Neither can outlive
+            # the other after crash/restart.
+            self._db.execute("""INSERT INTO stage_history
+                (stage_id,epoch,expected_hash,source_hash_before,state)
+                VALUES (?,?,?,?,'RESERVED')""",
+                (stage_id, row["epoch"], digest(candidate),
+                 row["source_hash"]))
+            self._db.execute("""UPDATE owner SET pending_stage=?,
+                expected_hash=? WHERE id=1""",
+                (stage_id, digest(candidate)))
             self._db.commit()
         except BaseException:
             self._db.rollback()
@@ -358,8 +450,14 @@ class CandidateOwner:
                         and row["epoch"] == expected_epoch + 1)
             require(phase_ok and row["writer"] == self.writer_id and
                     row["pending_stage"] == stage_id, "STALE_STAGE")
+            self._validate_stage_journal(row)
             require(digest(current) == row["expected_hash"],
                     "READBACK_MISMATCH")
+            changed = self._db.execute("""UPDATE stage_history SET state='SETTLED'
+                WHERE stage_id=? AND epoch=? AND state='RESERVED'
+                AND expected_hash=?""",
+                (stage_id, expected_epoch, row["expected_hash"]))
+            require(changed.rowcount == 1, "STAGE_HISTORY_MISMATCH")
             self._db.execute("""UPDATE owner SET pending_stage=NULL,
                 expected_hash=NULL,source_hash=?,
                 phase=CASE WHEN phase='FREEZE_REQUESTED' THEN
@@ -378,7 +476,9 @@ class CandidateOwner:
             row = self._row()
             require(row["writer"] == self.writer_id and
                     row["phase"] == "JSON_ACTIVE" and
+                    row["history_complete"] == 1 and
                     row["epoch"] == expected_epoch, "FREEZE_REFUSED")
+            self._validate_stage_journal(row)
             next_phase = ("FREEZE_REQUESTED" if row["pending_stage"] is not None
                           else "JSON_QUIESCED")
             self._db.execute("""UPDATE owner SET phase=?,

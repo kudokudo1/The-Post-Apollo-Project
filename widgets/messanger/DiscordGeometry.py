@@ -29,6 +29,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import re
 import socket
 import struct
 import sys
@@ -153,6 +154,25 @@ BROWSER_SITES = ("x", "instagram", "facebook", "reddit", "threads", "pinterest",
                  "groupme", "lemon8", "quora", "pixelfed", "zalo",
                  "whatsappweb", "messengerweb", "linechrome")
 
+# Keep exactly the same stable identity shape as XBrowser.py. Do not use the
+# display name or a substring match for a Sway window's XWayland class.
+BROWSER_IDENTITY_ID = re.compile(r"^identity-[1-9][0-9]{0,8}$")
+
+
+def validate_browser_identity(value: Any) -> str | None:
+    if value is None:
+        return None
+    if not isinstance(value, str) or not BROWSER_IDENTITY_ID.fullmatch(value):
+        raise ValueError("Invalid Post-Apollo browser identity ID")
+    return value
+
+
+def browser_window_class(site: str, identity_id: str | None = None) -> str:
+    if site not in BROWSER_SITES:
+        raise ValueError("Unsupported Social browser site")
+    identity = validate_browser_identity(identity_id)
+    return f"post-apollo-{site}" + (f"-{identity}" if identity is not None else "")
+
 VESKTOP_WAYLAND_IDS = {"vesktop", "dev.vencord.vesktop"}
 VESKTOP_X11_CLASSES = {"vesktop"}
 
@@ -197,7 +217,11 @@ def vesktop_window_kind(rect: dict[str, int], name: Any) -> str:
     return "splash" if splash_sized and splash_named else "main"
 
 
-def snapshot_from_tree(tree: dict[str, Any]) -> dict[str, Any]:
+def snapshot_from_tree(
+    tree: dict[str, Any], browser_identity_id: str | None = None,
+) -> dict[str, Any]:
+    # Pass None to preserve the exact existing legacy window discovery.
+    scoped_identity = validate_browser_identity(browser_identity_id)
     social: dict[str, Any] | None = None
     discord_candidates: list[dict[str, Any]] = []
     browser_candidates: dict[str, list[dict[str, Any]]] = {site: [] for site in BROWSER_SITES}
@@ -233,17 +257,29 @@ def snapshot_from_tree(tree: dict[str, Any]) -> dict[str, Any]:
             )
             discord_candidates.append(discord_entry)
 
-        if not visible:
-            continue
-
-        if social is None and node.get("name") == "QS_SOCIAL_MENU":
+        if visible and social is None and node.get("name") == "QS_SOCIAL_MENU":
             social = entry
 
-        # Isolated Chromium profiles expose one XWayland class per Social site.
+        # Legacy browser discovery stays visible-only. In the scoped mode,
+        # hidden scratchpad windows are discovered with their exact con_id so
+        # they cannot be mistaken for a different identity's visible window.
+        if not visible and scoped_identity is None:
+            continue
         window_class = (node.get("window_properties") or {}).get("class")
         for site in BROWSER_SITES:
-            if window_class == f"post-apollo-{site}":
+            if window_class != browser_window_class(site, scoped_identity):
+                continue
+            if scoped_identity is None:
                 browser_candidates[site].append(entry)
+            else:
+                con_id = node.get("id")
+                if type(con_id) is not int or con_id <= 0:
+                    continue
+                scoped_entry = dict(entry)
+                scoped_entry["conId"] = con_id
+                scoped_entry["windowClass"] = window_class
+                scoped_entry["browserIdentityId"] = scoped_identity
+                browser_candidates[site].append(scoped_entry)
 
     discord: dict[str, Any] | None = None
 
@@ -259,10 +295,15 @@ def snapshot_from_tree(tree: dict[str, Any]) -> dict[str, Any]:
         )
 
     browser_windows = {
-        site: max(
-            browser_candidates[site],
-            key=lambda item: item["rect"]["width"] * item["rect"]["height"],
-            default=None,
+        site: (
+            max(browser_candidates[site],
+                key=lambda item: item["rect"]["width"] * item["rect"]["height"],
+                default=None)
+            if scoped_identity is None else
+            # More than one window with the *same* identity class is ambiguous.
+            # Fail closed rather than choosing whichever happens to be bigger.
+            (browser_candidates[site][0]
+             if len(browser_candidates[site]) == 1 else None)
         )
         for site in BROWSER_SITES
     }
@@ -274,21 +315,41 @@ def snapshot_from_tree(tree: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-def sway_criteria(target: str, con_id: int | None = None) -> str:
+def sway_criteria(
+    target: str, con_id: int | None = None,
+    browser_identity_id: str | None = None,
+) -> str:
+    scoped_identity = validate_browser_identity(browser_identity_id)
     if target == "social":
+        if scoped_identity is not None:
+            # A scoped browser identity cannot establish Social leadership
+            # by constructing an arbitrary host-window command.
+            raise ValueError("Scoped browser geometry requires verified host state")
         return '[title="QS_SOCIAL_MENU"]'
     if target == "discord":
-        if con_id is None or int(con_id) <= 0:
+        if scoped_identity is not None:
+            raise ValueError("Browser identity cannot target Vesktop")
+        if con_id is None or type(con_id) is not int or con_id <= 0:
             raise ValueError("Discord commands require a discovered Sway con_id")
-        return f'[con_id="{int(con_id)}"]'
+        return f'[con_id="{con_id}"]'
     if target in BROWSER_SITES:
+        if scoped_identity is not None:
+            if type(con_id) is not int or con_id <= 0:
+                raise ValueError("Identity browser commands require a verified Sway con_id")
+            return f'[con_id="{con_id}"]'
         return f'[class="post-apollo-{target}"]'
     raise ValueError(f"Unknown sync target: {target}")
 
 
 def build_sync_command(message: dict[str, Any]) -> str:
     target = str(message["target"])
-    criteria = sway_criteria(target, message.get("conId"))
+    identity = validate_browser_identity(message.get("browserIdentityId"))
+    if identity is not None:
+        if target not in BROWSER_SITES:
+            raise ValueError("Scoped browser sync cannot target Social or Vesktop")
+        if message.get("windowClass") != browser_window_class(target, identity):
+            raise ValueError("Stale or mismatched browser window class")
+    criteria = sway_criteria(target, message.get("conId"), identity)
 
     x = int(message["x"])
     y = int(message["y"])

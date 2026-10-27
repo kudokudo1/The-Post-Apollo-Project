@@ -60,6 +60,8 @@ Item {
     property bool loginCancelled: false
     property string pendingAppId: ""
     property string pendingAppHash: ""
+    property string requestedAppKeyIdentityId: ""
+    property string runningAppKeyIdentityId: ""
     readonly property bool loginInProgress: loginProcess.running
 
     function startLogin(mode) {
@@ -83,7 +85,23 @@ Item {
         loginState = "CONNECTING";
         loginDetail = "Connecting to Telegram...";
         qrModules = [];
-        loginProcess.command = [pythonPath, loginBridgePath, loginMode];
+        // An identity-specific configuration is a distinct complete API key
+        // pair, not a Telegram login and never a different live chat account.
+        var commandArgs = [pythonPath, loginBridgePath, loginMode];
+        if (loginMode === "configure" && requestedAppKeyIdentityId !== "") {
+            if (!/^identity-[1-9][0-9]{0,8}$/.test(requestedAppKeyIdentityId)) {
+                loginState = "ERROR";
+                loginDetail = "Invalid Telegram identity configuration target";
+                pendingAppId = "";
+                pendingAppHash = "";
+                return;
+            }
+            commandArgs.push("--identity", requestedAppKeyIdentityId);
+        }
+        runningAppKeyIdentityId = loginMode === "configure"
+                                  ? requestedAppKeyIdentityId : "";
+        requestedAppKeyIdentityId = "";
+        loginProcess.command = commandArgs;
         loginProcess.running = true;
     }
 
@@ -96,6 +114,8 @@ Item {
         qrModules = [];
         pendingAppId = "";
         pendingAppHash = "";
+        requestedAppKeyIdentityId = "";
+        runningAppKeyIdentityId = "";
     }
 
     function submitPhone(value) {
@@ -113,11 +133,16 @@ Item {
             loginProcess.write(JSON.stringify({action: "password", value: String(value)}) + "\n");
     }
 
-    function saveApplicationKeys(apiId, apiHash) {
+    function saveApplicationKeys(apiId, apiHash, identityId) {
         if (!active)
+            return;
+        const scope = identityId === undefined || identityId === null
+                      ? "" : String(identityId);
+        if (scope !== "" && !/^identity-[1-9][0-9]{0,8}$/.test(scope))
             return;
         pendingAppId = String(apiId);
         pendingAppHash = String(apiHash);
+        requestedAppKeyIdentityId = scope;
         startLogin("configure");
     }
 
@@ -251,9 +276,19 @@ Item {
             if (!adapter.active)
                 return;
             if (adapter.loginState === "APP_SAVED") {
-                // Keys saved, now attempt QR pairing without leaving Social.
-                adapter.requestedLoginMode = "qr";
-                Qt.callLater(function() { adapter.launchRequestedLogin(); });
+                if (adapter.runningAppKeyIdentityId === "") {
+                    // Existing universal flow: continue QR pairing within
+                    // this very widget, never a separate browser or terminal.
+                    adapter.requestedLoginMode = "qr";
+                    Qt.callLater(function() { adapter.launchRequestedLogin(); });
+                } else {
+                    // Only the per-identity application override was saved.
+                    // NEVER start the legacy shared Telegram account here.
+                    adapter.loginDetail = "Identity application keys saved privately. "
+                                          + "Telegram account pairing will use them only "
+                                          + "when per-identity sessions are enabled.";
+                }
+                adapter.runningAppKeyIdentityId = "";
             } else if (adapter.loginState === "READY") {
                 Qt.callLater(function() { adapter.probe(); });
             } else if (adapter.loginState === "CONNECTING") {

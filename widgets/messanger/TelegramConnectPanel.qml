@@ -8,12 +8,22 @@ Rectangle {
     property var adapter: null
     // The very same login panel also serves explicit key editing from Social
     // Settings, including after a Telegram account has already connected.
-    // Identity overrides are APPLICATION keys only; the live adapter still
-    // uses the one shared Telegram personal.session until a separate rollout.
+    // Identity overrides are APPLICATION keys, separate from account pairing.
+    // The adapter can use a private session only after explicit opt-in.
     property bool editApplicationKeys: false
     property string keyIdentityId: ""
     signal closeKeyEditorRequested()
     readonly property bool identityKeyEditor: editApplicationKeys && keyIdentityId !== ""
+    readonly property string currentIdentityId: adapter ? String(adapter.identityId || "") : ""
+    function clearUnsubmittedLoginSecrets() {
+        phoneInput.text = "";
+        codeInput.text = "";
+        passwordInput.text = "";
+    }
+    onCurrentIdentityIdChanged: {
+        clearUnsubmittedLoginSecrets();
+        clearUnsubmittedAppKeys();
+    }
     readonly property string step: adapter ? String(adapter.loginState || "IDLE") : "IDLE"
     readonly property bool busy: adapter ? adapter.loginInProgress : false
     readonly property var qrMatrixRows: adapter ? adapter.qrModules : []
@@ -34,8 +44,10 @@ Rectangle {
     }
     onKeyIdentityIdChanged: clearUnsubmittedAppKeys()
     onVisibleChanged: {
-        if (!visible)
+        if (!visible) {
             clearUnsubmittedAppKeys();
+            clearUnsubmittedLoginSecrets();
+        }
     }
 
     color: Colors.black
@@ -83,7 +95,9 @@ Rectangle {
             Text {
                 text: panel.editApplicationKeys
                       ? "TELEGRAM // APP CONFIGURATION"
-                      : "TELEGRAM // CONNECT ACCOUNT"
+                      : panel.currentIdentityId !== ""
+                          ? "TELEGRAM // PRIVATE ACCOUNT // " + panel.currentIdentityId
+                          : "TELEGRAM // CONNECT SHARED ACCOUNT"
                 color: Colors.orange
                 font.family: "GohuFont 11 Nerd Font Mono"
                 font.pixelSize: 19

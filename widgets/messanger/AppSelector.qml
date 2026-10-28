@@ -34,12 +34,15 @@ Rectangle {
     property bool browserWindowInspectionBusy: false
     property bool browserWindowActionAllowed: false
 
-    // Telegram authorization is provider-reported, but the Telethon adapter
-    // currently owns ONE shared personal.session, not per-identity sessions.
-    // Never display this as a status belonging to the selected layout ID.
+    // Telegram authorization is provider-reported for the actual shared or
+    // explicitly selected private session, never inferred from account labels.
     property bool sharedTelegramActive: false
     property string sharedTelegramBackendMode: "UNAVAILABLE"
     property bool sharedTelegramLoginInProgress: false
+    property bool telegramIdentityModeActive: false
+    property string telegramIdentityScopeId: ""
+    property bool telegramIsolationToggleAllowed: true
+    signal telegramIdentityModeToggleRequested()
     signal sharedTelegramOpenRequested()
     signal sharedTelegramRecheckRequested()
     signal sharedTelegramApplicationKeysRequested(string keyScope)
@@ -47,22 +50,28 @@ Rectangle {
     function sharedTelegramStatusText() {
         if (appSelector.accountSelectedServiceId !== "telegram")
             return "";
+        if (appSelector.telegramIdentityModeActive
+                && appSelector.telegramIdentityScopeId !== appSelector.identitySnapshot.activeId)
+            return "CHANGING TELEGRAM IDENTITY // NOT YET CHECKED";
+        const sessionLabel = appSelector.telegramIdentityModeActive
+                           ? "PRIVATE SESSION // " + appSelector.telegramIdentityScopeId
+                           : "SHARED SESSION";
         if (!appSelector.sharedTelegramActive)
             return "NOT CHECKED IN THIS VIEW // OPEN TELEGRAM";
         if (appSelector.sharedTelegramLoginInProgress)
-            return "TELEGRAM PAIRING IN PROGRESS // SHARED SESSION";
+            return "TELEGRAM PAIRING IN PROGRESS // " + sessionLabel;
         var mode = String(appSelector.sharedTelegramBackendMode || "UNAVAILABLE");
         if (mode === "READY")
-            return "PROVIDER AUTHORIZED AT LAST CHECK // SHARED SESSION";
+            return "PROVIDER AUTHORIZED AT LAST CHECK // " + sessionLabel;
         if (mode === "AUTH_REQUIRED")
-            return "SIGN-IN REQUIRED // SHARED SESSION";
+            return "SIGN-IN REQUIRED // " + sessionLabel;
         if (mode === "APP_REQUIRED")
-            return "TELEGRAM APP SETUP REQUIRED // SHARED SESSION";
+            return "TELEGRAM APP SETUP REQUIRED // " + sessionLabel;
         if (mode === "DEPENDENCY_MISSING")
             return "TELEGRAM PROVIDER UNAVAILABLE // DEPENDENCY MISSING";
         if (mode === "PROBING")
             return "CHECKING TELEGRAM PROVIDER...";
-        return "TELEGRAM STATUS UNAVAILABLE // SHARED SESSION";
+        return "TELEGRAM STATUS UNAVAILABLE // " + sessionLabel;
     }
 
     function browserAccountServiceSupported(serviceId) {
@@ -865,8 +874,10 @@ Rectangle {
                 }
                 Text {
                     width: parent.width
-                    text: appSelector.isolatedBrowserModeActive
-                          ? "BROWSER SESSIONS // ISOLATED" : "LAYOUT ONLY"
+                    text: appSelector.telegramIdentityModeActive
+                          ? "TELEGRAM // PRIVATE ACCOUNTS"
+                          : appSelector.isolatedBrowserModeActive
+                              ? "BROWSER SESSIONS // ISOLATED" : "LAYOUT ONLY"
                     color: Colors.orange
                     font.pixelSize: 9
                 }
@@ -895,6 +906,7 @@ Rectangle {
                         // Do not accept another identity while its predecessor
                         // is starting a browser or being hidden.
                         interactive: appSelector.identitySnapshot.writable
+                                     && appSelector.telegramIsolationToggleAllowed
                                      && (!appSelector.isolatedBrowserModeActive
                                          || appSelector.isolatedBrowserToggleAllowed)
                         onTriggered: SocialIdentityStore.selectIdentity(modelData.id)
@@ -1001,6 +1013,7 @@ Rectangle {
                         label: appSelector.identityCreatePending ? "SAVING" : "CREATE"
                         labelPixelSize: 9
                         interactive: appSelector.identitySnapshot.writable
+                                     && appSelector.telegramIsolationToggleAllowed
                                      && newIdentityName.text.trim().length > 0
                                      && !appSelector.identityCreatePending
                         onTriggered: {
@@ -1345,7 +1358,8 @@ Rectangle {
                 Text {
                     width: parent.width
                     visible: appSelector.accountSelectedServiceId === "telegram"
-                    text: "TELEGRAM // SHARED SESSION"
+                    text: appSelector.telegramIdentityModeActive
+                          ? "TELEGRAM // PRIVATE ACCOUNT" : "TELEGRAM // SHARED SESSION"
                     color: Colors.cyan
                     font.bold: true
                     font.pixelSize: 10
@@ -1354,7 +1368,9 @@ Rectangle {
                 Text {
                     width: parent.width
                     visible: appSelector.accountSelectedServiceId === "telegram"
-                    text: "Telegram uses one legacy personal session. Switching Post-Apollo identities does not switch Telegram accounts."
+                    text: appSelector.telegramIdentityModeActive
+                          ? "Only this selected identity's private Telegram session is used. New identities start signed out. The old shared Telegram account remains untouched."
+                          : "Telegram uses one legacy personal session. Switching Post-Apollo identities does not switch Telegram accounts."
                     color: Colors.white
                     font.pixelSize: 9
                     wrapMode: Text.WordWrap
@@ -1366,6 +1382,19 @@ Rectangle {
                     color: Colors.orange
                     font.pixelSize: 9
                     wrapMode: Text.WordWrap
+                }
+                ActionButton {
+                    width: parent.width
+                    height: 36
+                    visible: appSelector.accountSelectedServiceId === "telegram"
+                    label: appSelector.telegramIdentityModeActive
+                           ? "USE SHARED TELEGRAM" : "USE PRIVATE TELEGRAM ACCOUNTS"
+                    labelPixelSize: 9
+                    labelMinimumPixelSize: 8
+                    contentPadding: 3
+                    interactive: appSelector.identitySnapshot.writable
+                                 && appSelector.telegramIsolationToggleAllowed
+                    onTriggered: appSelector.telegramIdentityModeToggleRequested()
                 }
                 Text {
                     width: parent.width
@@ -1379,7 +1408,7 @@ Rectangle {
                 Text {
                     width: parent.width
                     visible: appSelector.accountSelectedServiceId === "telegram"
-                    text: "Universal API keys work across local identities. An optional override changes only this identity's application credentials, not the active shared Telegram login."
+                    text: "Universal API keys work across local identities. Optional identity API keys are used only when that identity's private Telegram account is active. Keys do not automatically sign in an account."
                     color: Colors.white
                     font.pixelSize: 9
                     wrapMode: Text.WordWrap

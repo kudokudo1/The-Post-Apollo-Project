@@ -61,7 +61,10 @@ class NativeIntegrationContracts(unittest.TestCase):
         self.assertIn('function confirmSend(service, conversationId)', router)
         self.assertIn('next[key] = Number(next[key] || 0) + 1', router)
         self.assertIn('router.confirmSend("session", router.pendingSessionConversationId)', router)
-        self.assertIn('router.confirmSend("telegram", router.pendingTelegramConversationId)', router)
+        self.assertIn('router.confirmSend(router.pendingTelegramScope, router.pendingTelegramConversationId)', router)
+        self.assertIn('telegramScopedServiceId', router)
+        self.assertIn('identityId: router.telegramIdentityId', router)
+        self.assertIn('messageRouter.telegramScopedServiceId', social)
         self.assertIn('if (accepted)', router)
         self.assertIn('selectedBackend.sendMessage(String(conversationId), body)', router)
         for unsupported in ('services/messaging/adapters/SignalAdapter.qml',

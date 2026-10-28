@@ -137,7 +137,8 @@ assert.match(service, /--proto", "=https"/);
 assert.match(service, /Post-Apollo-WeatherStation\/0\.7/);
 assert.doesNotMatch(
     service,
-    /noaa-planetary-k-index|xray|flares|proton|solar-wind/i
+    /noaa-planetary-k-index\.json|goes\/primary\/xray|summary\/solar-wind|solar_probabilities\.json/i,
+    "NOAA scale service must not fetch raw measurement feeds to derive G/R/S"
 );
 
 const space = read("widgets/weather/StationSpace.qml");

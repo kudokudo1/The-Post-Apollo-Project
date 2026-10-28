@@ -2732,11 +2732,11 @@ Scope {
                 const probeDone = gitService.subprocessLagProbeEnabled
                     && String(line || "").split("\t")[0] === "DONE";
                 if (probeDone)
-                    gitService.traceSubprocessLag("repo:DONE:begin", gitService.repoRows.count);
+                    gitService.traceSubprocessLag("repo:DONE:begin", gitService.repoCount);
                 if (!gitService.syntagmaStartupTraceEnabled) {
                     gitService.consumeRepoLine(line);
                     if (probeDone)
-                        gitService.traceSubprocessLag("repo:DONE:end", gitService.repoRows.count);
+                        gitService.traceSubprocessLag("repo:DONE:end", gitService.repoCount);
                     return;
                 }
 
@@ -2760,7 +2760,7 @@ Scope {
                     );
                 }
                 if (probeDone)
-                    gitService.traceSubprocessLag("repo:DONE:end", gitService.repoRows.count);
+                    gitService.traceSubprocessLag("repo:DONE:end", gitService.repoCount);
             }
         }
 

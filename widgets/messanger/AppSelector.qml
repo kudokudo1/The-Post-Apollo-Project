@@ -34,9 +34,8 @@ Rectangle {
     property bool browserWindowInspectionBusy: false
     property bool browserWindowActionAllowed: false
 
-    // Telegram authorization is provider-reported, but the Telethon adapter
-    // currently owns ONE shared personal.session, not per-identity sessions.
-    // Never display this as a status belonging to the selected layout ID.
+    // Telegram authorization is provider-reported for the actual shared or
+    // explicitly selected private session, never inferred from account labels.
     property bool sharedTelegramActive: false
     property string sharedTelegramBackendMode: "UNAVAILABLE"
     property bool sharedTelegramLoginInProgress: false

@@ -1,5 +1,6 @@
 import QtQuick
 import "../../components"
+import "../../services/weather" as WeatherServices
 import "../../services/weather/WeatherDockPolicy.js" as WeatherDockPolicy
 import "../../services/weather/WeatherCyclePolicy.js" as WeatherCyclePolicy
 import "StationSkyHourlyPolicy.js" as HourlyDetails
@@ -84,6 +85,15 @@ Rectangle {
             weatherService ? weatherService.longitude : "",
             twilightSummary.calibrationOffsetMinutes
         )
+    WeatherServices.UsnoMoonService {
+        id: moonService
+        active: sky.visible
+        date: sky.skyCycle.date
+        latitude: sky.weatherService ? sky.weatherService.latitude : ""
+        longitude: sky.weatherService ? sky.weatherService.longitude : ""
+        offsetMinutes: sky.twilightSummary.calibrationOffsetMinutes
+    }
+
     readonly property string currentCelestialMode:
         weatherReady
         ? WeatherCyclePolicy.artworkFor(conditionState, skyCycle) : "weather"
@@ -92,6 +102,14 @@ Rectangle {
         return isFinite(value) && value >= 0
                ? Number(value).toFixed(digits) + suffix
                : "--";
+    }
+
+    function utcOffsetLabel(value) {
+        const text = String(value === undefined || value === null ? "" : value);
+        if (text === "")
+            return "UTC --";
+        const number = Number(text);
+        return "UTC" + (isFinite(number) && number >= 0 ? "+" : "") + text;
     }
 
     // Normalized live telemetry scales preserved from the original page.
@@ -707,6 +725,156 @@ Rectangle {
             visible: sky.astronomySummary.available
             text: "WTTR.IN DAILY ASTRONOMY // DAYLIGHT DERIVED FROM PROVIDER SUNRISE + SUNSET"
             font.pixelSize: 9
+        }
+
+        StationSectionDivider {
+            width: parent.width
+            title: "MOON // USNO EPHEMERIS"
+        }
+
+        Column {
+            width: parent.width
+            spacing: 7
+
+            Row {
+                width: parent.width
+                spacing: 12
+
+                GohuText {
+                    text: !moonService.configured
+                          ? "UNAVAILABLE"
+                          : moonService.loading
+                            ? "RECEIVING"
+                            : moonService.failed
+                              ? "OFFLINE"
+                              : moonService.ready
+                                ? "RECEIVED"
+                                : "WAITING"
+                    font.pixelSize: 10
+                    color: moonService.failed
+                           ? Colors.orange
+                           : moonService.ready
+                             ? Colors.cyan : Colors.white
+                }
+
+                QuietText {
+                    width: Math.max(0, parent.width - 110)
+                    text: moonService.configured
+                          ? "U.S. NAVAL OBSERVATORY // "
+                            + sky.utcOffsetLabel(
+                                  moonService.request.tzHours
+                              )
+                            + " // " + moonService.request.date
+                          : "REQUIRES WEATHER DATE + COORDINATES + CALIBRATED CIVIL OFFSET"
+                    elide: Text.ElideRight
+                    font.pixelSize: 9
+                }
+            }
+
+            Row {
+                width: parent.width
+                spacing: 12
+                visible: moonService.ready
+
+                Column {
+                    width: 126
+                    spacing: 4
+                    SecondaryText {
+                        text: "MOONRISE"
+                        font.pixelSize: 9
+                    }
+                    GohuText {
+                        text: moonService.ephemeris.rise
+                        font.pixelSize: 14
+                        color: Colors.cyan
+                    }
+                }
+
+                Column {
+                    width: 126
+                    spacing: 4
+                    SecondaryText {
+                        text: "UPPER TRANSIT"
+                        font.pixelSize: 9
+                    }
+                    GohuText {
+                        text: moonService.ephemeris.transit
+                        font.pixelSize: 14
+                        color: Colors.white
+                    }
+                }
+
+                Column {
+                    width: 126
+                    spacing: 4
+                    SecondaryText {
+                        text: "MOONSET"
+                        font.pixelSize: 9
+                    }
+                    GohuText {
+                        text: moonService.ephemeris.set
+                        font.pixelSize: 14
+                        color: Colors.magenta
+                    }
+                }
+
+                Column {
+                    width: 220
+                    spacing: 4
+                    SecondaryText {
+                        text: "USNO PHASE"
+                        font.pixelSize: 9
+                    }
+                    GohuText {
+                        width: parent.width
+                        text: moonService.ephemeris.phase
+                        elide: Text.ElideRight
+                        font.pixelSize: 12
+                        color: Colors.white
+                    }
+                }
+
+                Column {
+                    width: 126
+                    spacing: 4
+                    SecondaryText {
+                        text: "ILLUMINATION"
+                        font.pixelSize: 9
+                    }
+                    GohuText {
+                        text: moonService.ephemeris.illumination >= 0
+                              ? Math.round(
+                                    moonService.ephemeris.illumination
+                                ) + "%"
+                              : "--"
+                        font.pixelSize: 14
+                        color: Colors.yellow
+                    }
+                }
+            }
+
+            QuietText {
+                visible: moonService.ready
+                         && moonService.ephemeris.noRiseSet
+                width: parent.width
+                text: "USNO RETURNED NO MOONRISE OR MOONSET FOR THIS LOCAL DATE // NO EVENT IS INVENTED"
+                font.pixelSize: 9
+                color: Colors.orange
+            }
+
+            QuietText {
+                visible: moonService.failed
+                width: parent.width
+                text: moonService.errorText
+                font.pixelSize: 9
+                color: Colors.orange
+            }
+
+            QuietText {
+                width: parent.width
+                text: "USNO ONE-DAY RISE/SET/TRANSIT // LOCAL CLOCK FROM CALIBRATED WEATHER CIVIL OFFSET // DATE-SCOPED REQUEST"
+                font.pixelSize: 9
+            }
         }
 
         StationSectionDivider {

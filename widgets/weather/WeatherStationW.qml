@@ -995,6 +995,7 @@ PanelWindow {
 
             StationSpace {
                 spaceService: weatherStation.spaceService
+                weatherService: weatherStation.weatherService
             }
         }
 

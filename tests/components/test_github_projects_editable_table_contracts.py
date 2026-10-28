@@ -125,6 +125,12 @@ assert 'day.padStart(2, "0")' in date_input
 assert 'onSubmitted: function(isoDate) { root.save(isoDate, false); }' in editor
 assert 'root.isDate ? dateInput.isoValue() : valueEditor.text' in editor
 
+# Item already owns the auto-generated focusChanged signal for its inherited
+# focus property. Do not declare a root method with the same name.
+assert "function handleEditorFocusChanged(editor, active)" in date_input
+assert "part.focusOwner.handleEditorFocusChanged(entry, activeFocus);" in date_input
+assert "function focusChanged(" not in date_input
+
 # Missing fields require a second explicit click before any schema mutation,
 # and iteration is never synthesized from guessed IDs.
 assert 'property bool setupArmed: false' in editor

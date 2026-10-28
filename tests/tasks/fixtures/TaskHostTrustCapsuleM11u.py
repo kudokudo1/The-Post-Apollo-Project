@@ -18,7 +18,6 @@ from pathlib import Path
 import re
 import stat
 import subprocess
-import sys
 
 FOLDER = "m11u-host-copy"
 NAME = "synthetic-host.py"
@@ -123,7 +122,7 @@ def run_sealed_synthetic(snapshot: SyntheticSnapshot) -> str:
     """Run verified bytes from a sealed, inherited Linux memfd; not source path.
 
     Only a tightly scoped synthetic marker is accepted as a successful reply.
-    The current Python interpreter is an explicitly UNATTESTED dependency.
+    The fixed root-owned system Python is an explicitly UNATTESTED dependency.
     """
     require(isinstance(snapshot, SyntheticSnapshot)
             and type(snapshot.script) is bytes
@@ -138,13 +137,20 @@ def run_sealed_synthetic(snapshot: SyntheticSnapshot) -> str:
             and hasattr(fcntl, "F_ADD_SEALS")
             and hasattr(fcntl, "F_SEAL_WRITE"),
             "SEALED_LINUX_MEMFD_REQUIRED")
-    interpreter = Path(os.path.realpath(sys.executable))
-    require(interpreter.is_absolute() and interpreter.is_file(),
-            "INTERPRETER_UNAVAILABLE")
-    istat = interpreter.stat()
-    require(stat.S_ISREG(istat.st_mode)
+    # A test-runner toolcache interpreter may be writable by that user.
+    # Never weaken the refusal: use a fixed system path, not PATH or
+    # sys.executable. This is still NOT interpreter binary attestation.
+    try:
+        interpreter = Path("/usr/bin/python3").resolve(strict=True)
+        istat = interpreter.stat()
+    except OSError:
+        raise TrustRefusal("INTERPRETER_UNAVAILABLE") from None
+    require(interpreter.is_absolute() and interpreter.is_file()
+            and interpreter.parent == Path("/usr/bin")
+            and stat.S_ISREG(istat.st_mode)
+            and istat.st_uid == 0
             and stat.S_IMODE(istat.st_mode) & 0o022 == 0,
-            "WRITABLE_INTERPRETER_REFUSED")
+            "UNTRUSTED_SYSTEM_INTERPRETER")
     fd = -1
     try:
         fd = os.memfd_create("m11u-synthetic-capsule",

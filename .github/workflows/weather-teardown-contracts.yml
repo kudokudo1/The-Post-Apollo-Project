@@ -57,6 +57,10 @@ jobs:
         run: node tests/weather/test_station_source_health.js
       - name: Validate SPACE Kp history from existing NOAA feed
         run: node tests/weather/test_station_space_kp_history.js
+      - name: Validate SPACE NOAA predicted planetary K bins
+        run: node tests/weather/test_station_space_kp_forecast.js
+      - name: Validate SPACE local OVATION nearest-cell relevance
+        run: node tests/weather/test_station_space_local_ovation.js
       - name: Validate SPACE NOAA solar-cycle prediction context
         run: node tests/weather/test_station_space_solar_cycle.js
       - name: Validate SPACE official NOAA G R S scales

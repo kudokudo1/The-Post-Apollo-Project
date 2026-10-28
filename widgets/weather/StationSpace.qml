@@ -8,6 +8,7 @@ Rectangle {
     id: space
 
     property var spaceService: null
+    property var weatherService: null
 
     property string solarImageMode: "195"
     property string solarImageUrl: ""
@@ -24,6 +25,10 @@ Rectangle {
     WeatherServices.AuroraService {
         id: auroraService
         active: space.visible
+        targetLatitude: space.weatherService
+                        ? space.weatherService.latitude : ""
+        targetLongitude: space.weatherService
+                         ? space.weatherService.longitude : ""
     }
 
     WeatherServices.SolarFlareService {
@@ -48,6 +53,11 @@ Rectangle {
 
     WeatherServices.NoaaScalesService {
         id: scalesService
+        active: space.visible
+    }
+
+    WeatherServices.KpForecastService {
+        id: kpForecastService
         active: space.visible
     }
 
@@ -209,6 +219,18 @@ Rectangle {
                 || typeof scalesService.lastUpdated.getTime !== "function")
             return "--";
         const millis = scalesService.lastUpdated.getTime();
+        if (!isFinite(millis) || millis <= 0)
+            return "--";
+        const iso = new Date(millis).toISOString();
+        return iso.slice(5, 10) + " " + iso.slice(11, 16) + "Z";
+    }
+
+    function kpForecastReceiveLabel() {
+        if (!kpForecastService.lastUpdated
+                || typeof kpForecastService.lastUpdated.getTime
+                   !== "function")
+            return "--";
+        const millis = kpForecastService.lastUpdated.getTime();
         if (!isFinite(millis) || millis <= 0)
             return "--";
         const iso = new Date(millis).toISOString();
@@ -946,6 +968,202 @@ Rectangle {
 
         StationSectionDivider {
             width: parent.width
+            title: "GEOMAGNETIC // NOAA KP FORECAST"
+        }
+
+        Column {
+            width: parent.width
+            spacing: 8
+
+            Row {
+                width: parent.width
+                spacing: 10
+
+                GohuText {
+                    text: kpForecastService.loading
+                          && !kpForecastService.ready
+                          ? "RECEIVING"
+                          : kpForecastService.failed
+                            ? (kpForecastService.ready
+                               ? "DEGRADED" : "OFFLINE")
+                            : kpForecastService.ready
+                              ? "FORECAST READY"
+                              : "WAITING"
+                    font.pixelSize: 10
+                    color: kpForecastService.failed
+                           ? Colors.orange
+                           : kpForecastService.ready
+                             ? Colors.cyan : Colors.white
+                }
+
+                QuietText {
+                    width: Math.max(0, parent.width - 230)
+                    text: kpForecastService.ready
+                          ? "LOCAL RECEIVE "
+                            + space.kpForecastReceiveLabel()
+                            + " // NOAA TIME TAG "
+                            + kpForecastService.summary.firstTimeLabel
+                            + " → "
+                            + kpForecastService.summary.lastTimeLabel
+                          : "NOAA SWPC // PLANETARY K-INDEX FORECAST"
+                    elide: Text.ElideRight
+                    font.pixelSize: 9
+                }
+
+                ActionButton {
+                    width: 112
+                    height: 30
+                    label: "REFRESH"
+                    labelPixelSize: 10
+                    available: !kpForecastService.loading
+                    onClicked: kpForecastService.refresh()
+                }
+            }
+
+            Row {
+                width: parent.width
+                spacing: 10
+                visible: kpForecastService.ready
+
+                Repeater {
+                    model: [
+                        {
+                            "title": "MAX KP // NEXT BINS",
+                            "value":
+                                kpForecastService.summary.maxKp >= 0
+                                ? kpForecastService.summary.maxKp.toFixed(2)
+                                : "--",
+                            "detail": "PREDICTED ROWS ONLY",
+                            "accent": Colors.magenta
+                        },
+                        {
+                            "title": "NOAA SCALE // NEXT BINS",
+                            "value":
+                                kpForecastService.summary.maxNoaaScale !== ""
+                                ? kpForecastService.summary.maxNoaaScale
+                                : "--",
+                            "detail": "ONLY IF PROVIDER PUBLISHES IT",
+                            "accent":
+                                kpForecastService.summary.maxNoaaScale !== ""
+                                ? Colors.orange : Colors.cyan
+                        },
+                        {
+                            "title": "PREDICTED BINS",
+                            "value":
+                                kpForecastService.summary.displayedBins
+                                + " / "
+                                + kpForecastService.summary.totalPredicted,
+                            "detail": "DISPLAYED / AVAILABLE",
+                            "accent": Colors.cyan
+                        }
+                    ]
+
+                    delegate: StationHomeMetricCard {
+                        required property var modelData
+                        width: (spaceContent.width - 2 * 10) / 3
+                        height: 88
+                        title: modelData.title
+                        valueText: modelData.value
+                        detailText: modelData.detail
+                        accentColor: modelData.accent
+                        valueColor: Colors.white
+                        meterVisible: false
+                    }
+                }
+            }
+
+            Row {
+                id: kpForecastBars
+                width: parent.width
+                height: 112
+                spacing: 5
+                visible: kpForecastService.ready
+
+                Repeater {
+                    model: kpForecastService.summary.rows
+
+                    delegate: Column {
+                        required property var modelData
+                        width: (kpForecastBars.width
+                                - 7 * kpForecastBars.spacing) / 8
+                        height: parent.height
+                        spacing: 3
+
+                        Item {
+                            width: parent.width
+                            height: 64
+
+                            Rectangle {
+                                anchors.horizontalCenter:
+                                    parent.horizontalCenter
+                                anchors.bottom: parent.bottom
+                                width: Math.max(8, parent.width - 14)
+                                height: 4 + 56 * modelData.level
+                                color: space.kpHistoryColor(modelData.kp)
+                                opacity: 0.9
+                            }
+                        }
+
+                        GohuText {
+                            width: parent.width
+                            horizontalAlignment: Text.AlignHCenter
+                            text: modelData.kp.toFixed(2)
+                            font.pixelSize: 9
+                            color: space.kpHistoryColor(modelData.kp)
+                        }
+
+                        QuietText {
+                            width: parent.width
+                            horizontalAlignment: Text.AlignHCenter
+                            text: modelData.timeLabel.slice(0, 5)
+                            font.pixelSize: 7
+                        }
+
+                        QuietText {
+                            width: parent.width
+                            horizontalAlignment: Text.AlignHCenter
+                            text: modelData.timeLabel.slice(6)
+                            font.pixelSize: 7
+                        }
+
+                        GohuText {
+                            width: parent.width
+                            horizontalAlignment: Text.AlignHCenter
+                            text: modelData.noaaScale !== ""
+                                  ? modelData.noaaScale : ""
+                            font.pixelSize: 8
+                            color: Colors.orange
+                        }
+                    }
+                }
+            }
+
+            QuietText {
+                visible: kpForecastService.failed
+                width: parent.width
+                text: kpForecastService.errorText
+                      + (kpForecastService.ready
+                         ? " // LAST-GOOD FORECAST RETAINED" : "")
+                font.pixelSize: 9
+                color: Colors.orange
+            }
+
+            QuietText {
+                width: parent.width
+                text: "ONLY NOAA ROWS TAGGED PREDICTED // OBSERVED + ESTIMATED EXCLUDED // NOAA SCALE SHOWN ONLY WHEN PUBLISHED"
+                font.pixelSize: 9
+            }
+
+            QuietText {
+                width: parent.width
+                text: "NEXT 8 PREDICTED PRODUCT BINS // NOAA TIME TAG SHOWN AS PUBLISHED // NO LOCAL G-SCALE DERIVATION"
+                font.pixelSize: 9
+                color: Colors.cyan
+            }
+        }
+
+        StationSectionDivider {
+            width: parent.width
             title: "FIELD // SOURCE TIMES"
         }
 
@@ -1419,9 +1637,118 @@ Rectangle {
                 }
             }
 
+            Rectangle {
+                width: parent.width
+                height: 112
+                color: Colors.dark
+                border.width: 1
+                border.color: auroraService.localReady
+                              ? Colors.magenta : Colors.cyan
+
+                Row {
+                    anchors.fill: parent
+                    anchors.margins: 10
+                    spacing: 14
+
+                    Column {
+                        width: 250
+                        spacing: 5
+
+                        SecondaryText {
+                            text: "WEATHER FIX // NEAREST OVATION CELL"
+                            font.pixelSize: 10
+                        }
+
+                        GohuText {
+                            text: auroraService.localReady
+                                  ? Math.round(
+                                        auroraService.localIntensity
+                                    ) + " / 100"
+                                  : "-- / 100"
+                            font.pixelSize: 30
+                            color: auroraService.localReady
+                                   ? Colors.magenta : Colors.white
+                        }
+
+                        QuietText {
+                            text: "MODEL INTENSITY"
+                            font.pixelSize: 9
+                        }
+                    }
+
+                    Column {
+                        width: 260
+                        spacing: 5
+
+                        SecondaryText {
+                            text: "GRID CELL"
+                            font.pixelSize: 10
+                        }
+
+                        GohuText {
+                            text: auroraService.localReady
+                                  ? auroraService.localCellLatitude
+                                      .toFixed(1) + "°, "
+                                    + auroraService.localCellLongitude
+                                      .toFixed(1) + "°"
+                                  : "LOCATION UNAVAILABLE"
+                            font.pixelSize: 13
+                            color: Colors.white
+                        }
+
+                        QuietText {
+                            text: auroraService.localReady
+                                  ? Math.round(
+                                        auroraService.localCellDistanceKm
+                                    ) + " KM FROM WEATHER FIX"
+                                  : "WAITING FOR WEATHER COORDINATES + OVATION"
+                            font.pixelSize: 9
+                        }
+                    }
+
+                    Column {
+                        width: Math.max(0, parent.width - 538)
+                        spacing: 5
+
+                        SecondaryText {
+                            text: "LOCAL MODEL"
+                            font.pixelSize: 10
+                        }
+
+                        GohuText {
+                            width: parent.width
+                            wrapMode: Text.WordWrap
+                            text: auroraService.localReady
+                                  ? (auroraService.forecastFresh
+                                     ? "CELL CURRENT"
+                                     : "CELL FROM STALE MODEL")
+                                  : "UNAVAILABLE"
+                            font.pixelSize: 11
+                            color: auroraService.localReady
+                                   && auroraService.forecastFresh
+                                   ? Colors.cyan : Colors.orange
+                        }
+
+                        QuietText {
+                            width: parent.width
+                            wrapMode: Text.WordWrap
+                            text: "NOT A LOCAL OBSERVATION"
+                            font.pixelSize: 9
+                        }
+                    }
+                }
+            }
+
             QuietText {
                 width: parent.width
-                text: "NOAA OVATION GRID // HIGHEST CELL PER HEMISPHERE // NOT LOCAL VISIBILITY"
+                text: "NEAREST OVATION GRID CELL // MODEL INTENSITY, NOT A GUARANTEE OF VISIBLE AURORA // NO EXTRA NOAA REQUEST"
+                font.pixelSize: 9
+                color: Colors.orange
+            }
+
+            QuietText {
+                width: parent.width
+                text: "NOAA OVATION GRID // 30–90 MIN LOCATION + INTENSITY FORECAST // HEMISPHERE PEAKS + WEATHER-FIX CELL"
                 font.pixelSize: 10
             }
         }

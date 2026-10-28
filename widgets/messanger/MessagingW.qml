@@ -595,9 +595,8 @@ PanelWindow {
             return false;
         if (keyScope === "identity" && !validBrowserIdentity(snap.activeId))
             return false;
-        // This is application-key configuration ONLY. The current native
-        // Telegram adapter remains on shared personal.session even if an
-        // identity's separate API keys are saved.
+        // This editor configures only application keys. Private session
+        // selection is a separate opt-in; keys do not authorize an account.
         telegramAppKeyEditorIdentityId =
             keyScope === "identity" ? snap.activeId : "";
         telegramAppKeyEditorOpen = true;

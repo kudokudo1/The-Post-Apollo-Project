@@ -46,6 +46,11 @@ Rectangle {
         active: space.visible
     }
 
+    WeatherServices.NoaaScalesService {
+        id: scalesService
+        active: space.visible
+    }
+
     function bulletinColor(kind) {
         if (kind === "ALERT")
             return Colors.magenta;
@@ -144,6 +149,18 @@ Rectangle {
         return (reading > 0 ? "+" : "") + reading.toFixed(2);
     }
 
+    function noaaScaleColor(level) {
+        switch (Number(level)) {
+        case 0: return Colors.cyan;
+        case 1: return Colors.yellow;
+        case 2: return Colors.orange;
+        case 3: return Colors.magenta;
+        case 4: return Colors.red;
+        case 5: return Colors.red;
+        default: return Colors.white;
+        }
+    }
+
     readonly property color solarWindColor: {
         if (!spaceService || !spaceService.solarWindReady)
             return Colors.white;
@@ -181,6 +198,17 @@ Rectangle {
                 || typeof solarCycleService.lastUpdated.getTime !== "function")
             return "--";
         const millis = solarCycleService.lastUpdated.getTime();
+        if (!isFinite(millis) || millis <= 0)
+            return "--";
+        const iso = new Date(millis).toISOString();
+        return iso.slice(5, 10) + " " + iso.slice(11, 16) + "Z";
+    }
+
+    function scalesReceiveLabel() {
+        if (!scalesService.lastUpdated
+                || typeof scalesService.lastUpdated.getTime !== "function")
+            return "--";
+        const millis = scalesService.lastUpdated.getTime();
         if (!isFinite(millis) || millis <= 0)
             return "--";
         const iso = new Date(millis).toISOString();
@@ -470,6 +498,109 @@ Rectangle {
                         font.pixelSize: 10
                     }
                 }
+            }
+        }
+
+        StationSectionDivider {
+            width: parent.width
+            title: "NOAA SCALES // CURRENT SNAPSHOT"
+        }
+
+        Column {
+            width: parent.width
+            spacing: 8
+
+            Row {
+                width: parent.width
+                spacing: 10
+
+                GohuText {
+                    text: scalesService.loading && !scalesService.ready
+                          ? "RECEIVING"
+                          : scalesService.failed
+                            ? (scalesService.ready
+                               ? "DEGRADED" : "OFFLINE")
+                            : scalesService.ready
+                              ? "OFFICIAL SNAPSHOT"
+                              : "WAITING"
+                    font.pixelSize: 10
+                    color: scalesService.failed
+                           ? Colors.orange
+                           : scalesService.ready
+                             ? Colors.cyan : Colors.white
+                }
+
+                QuietText {
+                    width: Math.max(0, parent.width - 230)
+                    text: scalesService.ready
+                          ? "PRODUCT STAMP // "
+                            + scalesService.current.productStamp
+                            + " // LOCAL RECEIVE "
+                            + space.scalesReceiveLabel()
+                          : "NOAA SPACE WEATHER SCALES // CURRENT SLOT 0"
+                    elide: Text.ElideRight
+                    font.pixelSize: 9
+                }
+
+                ActionButton {
+                    width: 112
+                    height: 30
+                    label: "REFRESH"
+                    labelPixelSize: 10
+                    available: !scalesService.loading
+                    onClicked: scalesService.refresh()
+                }
+            }
+
+            Row {
+                width: parent.width
+                spacing: 10
+                visible: scalesService.ready
+
+                Repeater {
+                    model: [
+                        scalesService.current.G,
+                        scalesService.current.R,
+                        scalesService.current.S
+                    ]
+
+                    delegate: StationHomeMetricCard {
+                        required property var modelData
+                        width: (spaceContent.width - 2 * 10) / 3
+                        height: 94
+                        title: modelData.prefix + " // " + modelData.category
+                        valueText: modelData.code
+                        detailText: modelData.providerText
+                        accentColor:
+                            space.noaaScaleColor(modelData.level)
+                        valueColor:
+                            space.noaaScaleColor(modelData.level)
+                        meterVisible: false
+                    }
+                }
+            }
+
+            QuietText {
+                visible: scalesService.failed
+                width: parent.width
+                text: scalesService.errorText
+                      + (scalesService.ready
+                         ? " // LAST-GOOD SNAPSHOT RETAINED" : "")
+                font.pixelSize: 9
+                color: Colors.orange
+            }
+
+            QuietText {
+                width: parent.width
+                text: "G // GEOMAGNETIC STORM  •  R // RADIO BLACKOUT  •  S // SOLAR RADIATION STORM // NOAA-PUBLISHED SCALE, NOT DERIVED FROM LOCAL KP/X-RAY VALUES"
+                font.pixelSize: 9
+            }
+
+            QuietText {
+                width: parent.width
+                text: "PRODUCT STAMP SHOWN AS PUBLISHED // NO TIME ZONE INFERRED // FIVE-MIN SPACE-VIEW REFRESH"
+                font.pixelSize: 9
+                color: Colors.cyan
             }
         }
 

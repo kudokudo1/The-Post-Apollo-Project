@@ -32,6 +32,13 @@ for label, consumer in (("repo", "consumeRepoLine"), ("refresh", "consumeRefresh
     assert section.index(begin) < section.index(f"gitService.{consumer}(line);")
     assert '&& String(line || "").split("\\t")[0] === "DONE"' in section
     assert 'if (probeDone)' in section
+    # The QML id repoRows is private to the Scope; accessing it through
+    # gitService.repoRows throws a runtime TypeError in onRead(DONE).
+    # The public repoCount property is intentionally exported by GitService.
+    if label == "repo":
+        assert 'readonly property int repoCount: repoRows.count' in git
+        assert section.count('gitService.repoCount') == 3
+        assert 'gitService.repoRows.count' not in section
 for marker, call in (
     ("refresh:publish:begin", "publishParts = publishPendingModels();"),
     ("refresh:refreshed:begin", "refreshed();"),

@@ -8,6 +8,7 @@ Rectangle {
     id: space
 
     property var spaceService: null
+    property var weatherService: null
 
     property string solarImageMode: "195"
     property string solarImageUrl: ""
@@ -24,6 +25,10 @@ Rectangle {
     WeatherServices.AuroraService {
         id: auroraService
         active: space.visible
+        targetLatitude: space.weatherService
+                        ? space.weatherService.latitude : ""
+        targetLongitude: space.weatherService
+                         ? space.weatherService.longitude : ""
     }
 
     WeatherServices.SolarFlareService {
@@ -1632,9 +1637,118 @@ Rectangle {
                 }
             }
 
+            Rectangle {
+                width: parent.width
+                height: 112
+                color: Colors.dark
+                border.width: 1
+                border.color: auroraService.localReady
+                              ? Colors.magenta : Colors.cyan
+
+                Row {
+                    anchors.fill: parent
+                    anchors.margins: 10
+                    spacing: 14
+
+                    Column {
+                        width: 250
+                        spacing: 5
+
+                        SecondaryText {
+                            text: "WEATHER FIX // NEAREST OVATION CELL"
+                            font.pixelSize: 10
+                        }
+
+                        GohuText {
+                            text: auroraService.localReady
+                                  ? Math.round(
+                                        auroraService.localIntensity
+                                    ) + " / 100"
+                                  : "-- / 100"
+                            font.pixelSize: 30
+                            color: auroraService.localReady
+                                   ? Colors.magenta : Colors.white
+                        }
+
+                        QuietText {
+                            text: "MODEL INTENSITY"
+                            font.pixelSize: 9
+                        }
+                    }
+
+                    Column {
+                        width: 260
+                        spacing: 5
+
+                        SecondaryText {
+                            text: "GRID CELL"
+                            font.pixelSize: 10
+                        }
+
+                        GohuText {
+                            text: auroraService.localReady
+                                  ? auroraService.localCellLatitude
+                                      .toFixed(1) + "°, "
+                                    + auroraService.localCellLongitude
+                                      .toFixed(1) + "°"
+                                  : "LOCATION UNAVAILABLE"
+                            font.pixelSize: 13
+                            color: Colors.white
+                        }
+
+                        QuietText {
+                            text: auroraService.localReady
+                                  ? Math.round(
+                                        auroraService.localCellDistanceKm
+                                    ) + " KM FROM WEATHER FIX"
+                                  : "WAITING FOR WEATHER COORDINATES + OVATION"
+                            font.pixelSize: 9
+                        }
+                    }
+
+                    Column {
+                        width: Math.max(0, parent.width - 538)
+                        spacing: 5
+
+                        SecondaryText {
+                            text: "LOCAL MODEL"
+                            font.pixelSize: 10
+                        }
+
+                        GohuText {
+                            width: parent.width
+                            wrapMode: Text.WordWrap
+                            text: auroraService.localReady
+                                  ? (auroraService.forecastFresh
+                                     ? "CELL CURRENT"
+                                     : "CELL FROM STALE MODEL")
+                                  : "UNAVAILABLE"
+                            font.pixelSize: 11
+                            color: auroraService.localReady
+                                   && auroraService.forecastFresh
+                                   ? Colors.cyan : Colors.orange
+                        }
+
+                        QuietText {
+                            width: parent.width
+                            wrapMode: Text.WordWrap
+                            text: "NOT A LOCAL OBSERVATION"
+                            font.pixelSize: 9
+                        }
+                    }
+                }
+            }
+
             QuietText {
                 width: parent.width
-                text: "NOAA OVATION GRID // HIGHEST CELL PER HEMISPHERE // NOT LOCAL VISIBILITY"
+                text: "NEAREST OVATION GRID CELL // MODEL INTENSITY, NOT A GUARANTEE OF VISIBLE AURORA // NO EXTRA NOAA REQUEST"
+                font.pixelSize: 9
+                color: Colors.orange
+            }
+
+            QuietText {
+                width: parent.width
+                text: "NOAA OVATION GRID // 30–90 MIN LOCATION + INTENSITY FORECAST // HEMISPHERE PEAKS + WEATHER-FIX CELL"
                 font.pixelSize: 10
             }
         }

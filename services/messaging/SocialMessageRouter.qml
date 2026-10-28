@@ -7,6 +7,8 @@ Item {
     id: router
 
     property int appIndex: 0
+    // Empty until the operator explicitly opts into private Telegram sessions.
+    property string telegramIdentityId: ""
     readonly property bool nativeSelected: appIndex === 0 || appIndex === 2
     readonly property var selectedBackend: appIndex === 0 ? sessions
                                             : appIndex === 2 ? telegram : null
@@ -27,8 +29,12 @@ Item {
     property var confirmedByScope: ({})
     property string pendingSessionConversationId: ""
     property string pendingTelegramConversationId: ""
+    property string pendingTelegramScope: ""
+    readonly property string telegramScopedServiceId: telegram.identityId !== ""
+        ? "telegram@" + telegram.identityId : "telegram"
     readonly property string selectedScope: selectedConversationId !== ""
-        ? serviceId + ":" + selectedConversationId : ""
+        ? (appIndex === 2 ? telegramScopedServiceId : serviceId)
+          + ":" + selectedConversationId : ""
     readonly property int sendSuccessSerial: selectedScope !== ""
         ? Number(confirmedByScope[selectedScope] || 0) : 0
 
@@ -87,8 +93,10 @@ Item {
         if (accepted) {
             if (appIndex === 0)
                 pendingSessionConversationId = String(conversationId);
-            else if (appIndex === 2)
+            else if (appIndex === 2) {
                 pendingTelegramConversationId = String(conversationId);
+                pendingTelegramScope = telegramScopedServiceId;
+            }
         }
         return accepted;
     }
@@ -113,14 +121,20 @@ Item {
         function onSendSuccessSerialChanged() {
             if (router.pendingTelegramConversationId === "")
                 return;
-            router.confirmSend("telegram", router.pendingTelegramConversationId);
+            router.confirmSend(router.pendingTelegramScope, router.pendingTelegramConversationId);
             router.pendingTelegramConversationId = "";
+            router.pendingTelegramScope = "";
         }
     }
 
     TelegramAdapter {
         id: telegram
+        identityId: router.telegramIdentityId
         active: router.appIndex === 2
+        onIdentityIdChanged: {
+            router.pendingTelegramConversationId = "";
+            router.pendingTelegramScope = "";
+        }
     }
 
     SignalAdapter {

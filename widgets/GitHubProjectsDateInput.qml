@@ -33,7 +33,7 @@ Item {
             + day.padStart(2, "0");
     }
 
-    function focusChanged(editor, active) {
+    function handleEditorFocusChanged(editor, active) {
         if (!keyboardHost)
             return;
         if (active)
@@ -114,7 +114,7 @@ Item {
                     }
                     onActiveFocusChanged: {
                         if (part.focusOwner)
-                            part.focusOwner.focusChanged(entry, activeFocus);
+                            part.focusOwner.handleEditorFocusChanged(entry, activeFocus);
                     }
                     onAccepted: {
                         if (part.focusOwner)

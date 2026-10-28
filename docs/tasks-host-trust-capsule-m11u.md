@@ -13,7 +13,7 @@ M11t established nine open production gates. M11u makes **one narrow part of `TR
 - `tests/tasks/fixtures/TaskHostTrustCapsuleM11u.py`: an importable, **no CLI** Linux preflight that accepts exactly an explicitly named private folder `m11u-host-copy` and file `synthetic-host.py`. It rejects relative and traversal paths, symlinked folder/leaf, hardlinks, loose owner permissions, missing/large/changing files and hash mismatches.
 - The expected SHA-256 digest must be supplied **independently** by the caller. The probe never trusts a digest inside the inspected source folder. A synthetic-only header is mandatory in addition to the pinned digest.
 - The probe reads the source through an `O_NOFOLLOW` directory FD and then a directory-relative `O_NOFOLLOW` regular-file FD. It matches initial/final file identity and metadata before returning a private in-memory snapshot.
-- For a test-only launch, the snapshot bytes are copied into a Linux `memfd`, sealed against writes, growth and truncation, and passed as `/proc/self/fd/<fd>` to the current Python interpreter with `-I -S -B`. This avoids **reopening the original script path at launch**, closing the tested pathname-replacement window. The subprocess has no stdin, bounded output, a bounded timeout, and a reduced environment; only exact `M11U_SYNTHETIC_OK` output is accepted.
+- For a test-only launch, the snapshot bytes are copied into a Linux `memfd`, sealed against writes, growth and truncation, and passed as `/proc/self/fd/<fd>` to a fixed `/usr/bin/python3` interpreter, required to resolve within `/usr/bin`, be owned by root and not be group/other writable, with `-I -S -B`. This avoids **reopening the original script path at launch**, closing the tested pathname-replacement window. The subprocess has no stdin, bounded output, a bounded timeout, and a reduced environment; only exact `M11U_SYNTHETIC_OK` output is accepted.
 - The tests use disposable `tempfile.TemporaryDirectory` files. The task JSON singleton, M11l SQLite journal, M11m subprocess bridge and shell imports are never involved. The module has no `__main__` invocation and no task-directory option.
 
 ### Exact security claim
@@ -32,7 +32,7 @@ M11t established nine open production gates. M11u makes **one narrow part of `TR
 | Symlink directory/leaf, hardlink | Refuse |
 | World-readable script or loose private directory | Refuse |
 | Missing, wrong directory name or oversized script | Refuse |
-| Fake `python3` earlier in `PATH`, poisoned `PYTHONPATH` and `PYTHONHOME` | Use the current absolute interpreter with isolated args and sanitized environment |
+| Fake `python3` earlier in `PATH`, poisoned `PYTHONPATH` and `PYTHONHOME` | Use fixed, root-owned `/usr/bin/python3` with isolated args and sanitized environment |
 | Valid digest but unexpected subprocess output | Refuse; matching digest is content pinning, **not** host authority |
 | Snapshot mutated after capture | Refuse |
 | Existing TASKS writer or shell mount | Remain unchanged and unconnected |
@@ -45,7 +45,7 @@ No operator local action required. This is GitHub CI or disposable checked-out s
 python3 tests/tasks/test_task_host_trust_capsule_m11u.py
 ```
 
-The test needs Linux `memfd_create` and sealing. If unavailable, the capsule refuses rather than launching with a fallback. It does **not** start a background service, create a real TASKS journal, read real tasks or open a Quickshell window.
+The test needs Linux `memfd_create` and sealing. If unavailable, or if the fixed system interpreter cannot pass owner/permission checks, the capsule refuses rather than launching with an untrusted fallback. It does **not** start a background service, create a real TASKS journal, read real tasks or open a Quickshell window.
 
 The user-facing TASKS, TODAY, PLANNER and Hub continue using the existing JSON singleton. The `guardedWriterEnabled: false` source guard is unchanged.
 
@@ -60,7 +60,7 @@ The user-facing TASKS, TODAY, PLANNER and Hub continue using the existing JSON s
 
 - **No production host exists in this patch.** The name “host trust capsule” must not be read as a deployment mechanism or a new authorized TASKS writer.
 - File content attestation requires an **independently trusted** digest. Taking the digest from the same untrusted directory defeats the premise. The test fixture constructs its own known digest only for testing.
-- The sealed memfd removes one source-path TOCTOU window. The test interpreter comes from `sys.executable`; inspecting its pathname is not a cryptographic process-identity or supply-chain guarantee.
+- The sealed memfd removes one source-path TOCTOU window. The test uses a fixed, root-owned `/usr/bin/python3` executable and refuses user-writable interpreters (including hosted CI toolcache installations). Owner/mode checks still do not prove the interpreter's content, entire path ancestry, process identity, or supply chain.
 - Same-user processes that already control the calling Python process, runtime, or deployment directory can defeat user-space checks. No mechanism here establishes hard isolation against them.
 - A normal advisory `flock` and M11r session nonce likewise do not authenticate independent executable provenance.
 - There is no new `TaskJsonGateCandidateM11l` import, production `ApolloHubTodoStore.qml` patch, `shell.qml` mount, SQLite task-data migration, actual task-file read or write, GitHub Projects operation, operator-local file change, Quickshell restart, or live Hospital registration.

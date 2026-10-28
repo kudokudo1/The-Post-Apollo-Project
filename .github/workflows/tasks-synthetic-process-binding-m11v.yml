@@ -1,0 +1,46 @@
+name: TASKS M11v isolated interpreter pin and process-bound synthetic exchange
+
+on:
+  pull_request:
+    paths:
+      - 'tests/tasks/fixtures/TaskInterpreterProcessProbeM11v.py'
+      - 'tests/tasks/test_task_interpreter_process_probe_m11v.py'
+      - 'docs/tasks-synthetic-process-binding-m11v.md'
+      - '.github/workflows/tasks-synthetic-process-binding-m11v.yml'
+      - 'services/hub/ApolloHubTodoStore.qml'
+      - 'tests/tasks/fixtures/TaskHostTrustCapsuleM11u.py'
+  push:
+    branches: [main]
+    paths:
+      - 'tests/tasks/fixtures/TaskInterpreterProcessProbeM11v.py'
+      - 'tests/tasks/test_task_interpreter_process_probe_m11v.py'
+      - 'docs/tasks-synthetic-process-binding-m11v.md'
+      - '.github/workflows/tasks-synthetic-process-binding-m11v.yml'
+      - 'services/hub/ApolloHubTodoStore.qml'
+      - 'tests/tasks/fixtures/TaskHostTrustCapsuleM11u.py'
+
+permissions:
+  contents: read
+
+jobs:
+  synthetic-linux-process:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: M11v pinned interpreter, pidfd and single-session regression
+        run: python3 tests/tasks/test_task_interpreter_process_probe_m11v.py
+      - name: M11u sealed script content and failure matrix
+        run: python3 tests/tasks/test_task_host_trust_capsule_m11u.py
+      - name: M11t all production acceptance gates remain open
+        run: python3 tests/tasks/test_task_production_trust_contract_m11t.py
+      - name: M11q callback and M11d single-writer inventory
+        run: |
+          python3 tests/tasks/test_task_production_preflight_m11q.py
+          python3 tests/tasks/test_task_writer_gate_inventory_m11d.py

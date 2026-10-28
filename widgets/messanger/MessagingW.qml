@@ -30,6 +30,8 @@ PanelWindow {
     SocialMessageRouter {
         id: messageRouter
         appIndex: messagingWindow.activeAppIndex
+        telegramIdentityId: messagingWindow.telegramIsolationEnabled
+                            ? messagingWindow.telegramActiveIdentityId : ""
     }
 
     Connections {
@@ -337,6 +339,15 @@ PanelWindow {
     // activeAppIndex is the app that is actually open.
     property int activeAppIndex: 0
 
+    // Private Telegram sessions are opt-in for this Quickshell run. Never
+    // migrate, copy or assign the existing shared personal.session to an ID.
+    property bool telegramIsolationEnabled: false
+    property string telegramActiveIdentityId: ""
+    readonly property bool telegramScopeChangeAllowed:
+        !messageRouter.telegramBackend.loginInProgress
+        && !messageRouter.telegramBackend.sending
+        && !messageRouter.telegramBackend.appKeyStatusBusy
+
     // The universal / identity app-key editor is hosted in the existing
     // Telegram chat pane, not an external browser, terminal or new window.
     // Scope is cleared when Telegram or the Social widget is left.
@@ -554,9 +565,8 @@ PanelWindow {
         browserConnectionNavigationPending = false;
         return true;
     }
-    // Telegram currently uses one shared personal.session. Only its existing
-    // provider adapter can report authorization, and that result is NEVER
-    // bound to a Post-Apollo identity or saved account nickname.
+    // Opening the Telegram pane is explicit. Private login is separately
+    // authorized per selected identity, never inferred from an account note.
     function openSharedTelegram() {
         var snap = appSelector.identitySnapshot;
         if (!menuOpen || !appSelector.settingsOpen || !snap.writable
@@ -618,6 +628,36 @@ PanelWindow {
         }
     }
 
+    function toggleTelegramIsolation() {
+        var snap = appSelector.identitySnapshot;
+        if (!menuOpen || !appSelector.settingsOpen || !snap.writable
+                || !validBrowserIdentity(snap.activeId)
+                || !telegramScopeChangeAllowed)
+            return false;
+        contactList.clearSelection();
+        if (telegramIsolationEnabled) {
+            telegramIsolationEnabled = false;
+            telegramActiveIdentityId = "";
+        } else {
+            telegramActiveIdentityId = snap.activeId;
+            telegramIsolationEnabled = true;
+        }
+        // The adapter performs only a scoped health check here. It NEVER
+        // pairs a new account, reuses a legacy session or signs anyone in.
+        return true;
+    }
+
+    function reconcilePersistedTelegramIdentity() {
+        if (!telegramIsolationEnabled)
+            return;
+        var snap = appSelector.identitySnapshot;
+        if (!snap.writable || !validBrowserIdentity(snap.activeId)
+                || snap.activeId === telegramActiveIdentityId)
+            return;
+        contactList.clearSelection();
+        telegramActiveIdentityId = snap.activeId;
+    }
+
     function recheckSharedTelegram() {
         var snap = appSelector.identitySnapshot;
         if (!menuOpen || !appSelector.settingsOpen || !snap.writable
@@ -628,8 +668,8 @@ PanelWindow {
                 || messageRouter.telegramBackend.loginInProgress
                 || messageRouter.telegramBackend.backendMode === "PROBING")
             return false;
-        // The existing Telethon health check calls is_user_authorized().
-        // It is meaningful ONLY for the one shared Telegram session.
+        // Health checks only the currently selected shared/private session;
+        // they never prove browser authentication or another identity's login.
         messageRouter.telegramBackend.probe();
         return true;
     }
@@ -1728,6 +1768,10 @@ PanelWindow {
         AppSelector {
             id: appSelector
             sharedTelegramActive: messageRouter.telegramBackend.active
+            telegramIdentityModeActive: messagingWindow.telegramIsolationEnabled
+            telegramIdentityScopeId: messagingWindow.telegramActiveIdentityId
+            telegramIsolationToggleAllowed: messagingWindow.telegramScopeChangeAllowed
+            onTelegramIdentityModeToggleRequested: messagingWindow.toggleTelegramIsolation()
             sharedTelegramBackendMode: messageRouter.telegramBackend.backendMode
             sharedTelegramLoginInProgress:
                 messageRouter.telegramBackend.loginInProgress
@@ -1764,6 +1808,7 @@ PanelWindow {
                 messagingWindow.toggleBrowserIsolation()
             onIdentitySnapshotChanged: {
                 messagingWindow.reconcilePersistedBrowserIdentity();
+                messagingWindow.reconcilePersistedTelegramIdentity();
                 messagingWindow.invalidateTelegramKeyEditorScope();
             }
             // One existing Social window; contact/chat space hosts Settings.
@@ -1965,7 +2010,10 @@ PanelWindow {
 
             conversation: messagingWindow.nativeChatSelected ? contactList.selectedConversation : null
             scopeId: messagingWindow.nativeChatSelected && conversation
-                     ? messageRouter.serviceId + ":" + String(conversation.id) : ""
+                     ? (messagingWindow.activeAppIndex === 2
+                         ? messageRouter.telegramScopedServiceId
+                         : messageRouter.serviceId)
+                       + ":" + String(conversation.id) : ""
             sendEnabled: messageRouter.sendEnabled
 
             // ----------------------------------------------------

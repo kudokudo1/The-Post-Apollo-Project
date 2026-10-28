@@ -177,7 +177,7 @@ class TelegramWidgetApplicationKeys(unittest.TestCase):
         self.assertIn('panel.adapter.saveApplicationKeys(', PANEL)
         self.assertNotIn('console.log', PANEL)
 
-    def test_adapter_never_switches_shared_messages_or_logs_credentials(self):
+    def test_adapter_scopes_messages_and_does_not_log_credentials(self):
         for mark in (
             'function inspectApplicationKeys(identityId)',
             'function saveApplicationKeys(apiId, apiHash, identityId)',
@@ -199,6 +199,10 @@ class TelegramWidgetApplicationKeys(unittest.TestCase):
         self.assertIn('adapter.requestedLoginMode = "qr";', ADAPTER)
         self.assertIn('Qt.callLater(function() { adapter.probe(); });', ADAPTER)
         self.assertIn('healthProcess.command = command(["health"])', ADAPTER)
+        self.assertIn('property string identityId: ""', ADAPTER)
+        self.assertIn('commandArgs.push("--identity", identityId)', ADAPTER)
+        self.assertIn('onIdentityIdChanged:', ADAPTER)
+        self.assertIn('sendRequestSerial = activationSerial', ADAPTER)
         self.assertIn('listProcess.command = command(["list"])', ADAPTER)
         self.assertIn('messageProcess.command = command(["messages"', ADAPTER)
         self.assertIn('sendProcess.command = command(["send"', ADAPTER)

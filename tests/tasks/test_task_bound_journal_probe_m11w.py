@@ -86,7 +86,8 @@ class BoundJournalTests(unittest.TestCase):
         client = probe.attach_synthetic(
             self.folder, mode, snapshot or self.snapshot(),
             self.interpreter,
-            self.owner_code if owner_code is None else owner_code)
+            self.owner_code if owner_code is None else owner_code,
+            self.owner_digest)
         self.clients.append(client)
         return client
 
@@ -205,7 +206,7 @@ class BoundJournalTests(unittest.TestCase):
         broken = self.owner_code.replace(
             b"class CandidateOwner:", b"class BrokenOwner:",1)
         with self.assertRaisesRegex(probe.SyntheticOwnerRefusal,
-                                    "SYNTHETIC_ATTACH_REFUSED"):
+                                    "SYNTHETIC_SEALED_SOURCES_REQUIRED"):
             self.attach("NEW",owner_code=broken)
 
     def test_no_wrong_task_file_and_no_production_integration(self):
@@ -225,7 +226,7 @@ class BoundJournalTests(unittest.TestCase):
         with self.assertRaisesRegex(probe.SyntheticOwnerRefusal,
                                     "SYNTHETIC_ATTACH_SCOPE_REQUIRED"):
             probe.attach_synthetic(bad,"NEW",self.snapshot(),
-                                   self.interpreter,self.owner_code)
+                                   self.interpreter,self.owner_code,self.owner_digest)
 
 
 if __name__ == "__main__":

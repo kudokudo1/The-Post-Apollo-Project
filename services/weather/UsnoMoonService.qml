@@ -17,7 +17,7 @@ Scope {
     property bool ready: false
     property bool failed: false
     property string errorText: ""
-    property var data: MoonPolicy.emptyResult()
+    property var ephemeris: MoonPolicy.emptyResult()
     property date lastUpdated
 
     property string loadedKey: ""
@@ -34,7 +34,7 @@ Scope {
         ready = false;
         failed = false;
         errorText = "";
-        data = MoonPolicy.emptyResult();
+        ephemeris = MoonPolicy.emptyResult();
         loadedKey = "";
     }
 
@@ -50,7 +50,7 @@ Scope {
             ready = false;
             failed = false;
             errorText = "";
-            data = MoonPolicy.emptyResult();
+            ephemeris = MoonPolicy.emptyResult();
             refreshDelay.restart();
         }
     }
@@ -76,7 +76,7 @@ Scope {
         if (!configured || request.key !== inflightKey)
             return;
         try {
-            data = MoonPolicy.parse(JSON.parse(String(raw || "")));
+            ephemeris = MoonPolicy.parse(JSON.parse(String(raw || "")));
             loadedKey = inflightKey;
             lastUpdated = new Date();
             ready = true;

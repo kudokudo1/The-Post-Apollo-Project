@@ -19,6 +19,9 @@ on:
       - "tests/components/test_syntagma_subprocess_lag_probe.py"
       - "tests/components/test_syntagma_idle_subprocess_probe.py"
       - "services/git/GitService.qml"
+      - "services/git/GitHistoryService.qml"
+      - "services/hospital/HospitalService.qml"
+      - "tests/components/test_syntagma_completion_source_attribution.py"
       - "services/system/SystemTelemetry.qml"
       - "services/hospital/HospitalAuditService.qml"
       - "services/hospital/HospitalRoundsService.qml"
@@ -49,6 +52,9 @@ on:
       - "tests/components/test_syntagma_subprocess_lag_probe.py"
       - "tests/components/test_syntagma_idle_subprocess_probe.py"
       - "services/git/GitService.qml"
+      - "services/git/GitHistoryService.qml"
+      - "services/hospital/HospitalService.qml"
+      - "tests/components/test_syntagma_completion_source_attribution.py"
       - "services/system/SystemTelemetry.qml"
       - "services/hospital/HospitalAuditService.qml"
       - "services/hospital/HospitalRoundsService.qml"
@@ -77,5 +83,6 @@ jobs:
           python3 tests/components/test_syntagma_array_copy_probe.py
           python3 tests/components/test_syntagma_subprocess_lag_probe.py
           python3 tests/components/test_syntagma_idle_subprocess_probe.py
+          python3 tests/components/test_syntagma_completion_source_attribution.py
           python3 -m unittest tests/media/test_media_pause_state_probe.py
           node --test tests/media/test_media_dock_performance.cjs

@@ -5,6 +5,19 @@ import Quickshell.Io
 Scope {
     id: hospitalService
 
+    // Opt-in, static-label source attribution for synchronous completion work.
+    // No process output, repository paths, or command arguments are logged.
+    readonly property bool subprocessLagProbeEnabled:
+        String(Quickshell.env("POST_APOLLO_SUBPROCESS_LAG_PROBE") || "").trim() === "1"
+
+    function traceSubprocessLag(stage, size) {
+        if (!subprocessLagProbeEnabled)
+            return;
+        console.warn("SYNTAGMA_SUBPROCESS_PROBE // service=hospital-topology"
+                     + " stage=" + stage + " size=" + Number(size || 0)
+                     + " tsMs=" + Date.now());
+    }
+
     // The selected Hospital floor supplies the repository path.
     property string repoPath: ""
 
@@ -116,6 +129,7 @@ Scope {
     }
 
     function appendCommit(sha, parentField, refs, subject) {
+        traceSubprocessLag("commit-copy:begin", pendingTopologyRows.length);
         const parentText = String(parentField || "").trim();
         const parents = parentText ? parentText.split(/\s+/) : [];
         const lane = allocateLane(sha, parents);
@@ -134,6 +148,7 @@ Scope {
         });
 
         pendingTopologyRows = rows;
+        traceSubprocessLag("commit-copy:end", pendingTopologyRows.length);
     }
 
     function commitAt(index) {
@@ -238,6 +253,7 @@ Scope {
             available = false;
             lastError = value;
         } else if (key === "DONE") {
+            traceSubprocessLag("topology-publish:begin", pendingTopologyRows.length);
             refreshing = false;
             watchdog.stop();
 
@@ -255,6 +271,7 @@ Scope {
             }
 
             resetPendingTopology();
+            traceSubprocessLag("topology-publish:end", topologyRows.count);
         }
     }
 

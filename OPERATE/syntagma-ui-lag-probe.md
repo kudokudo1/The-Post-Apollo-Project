@@ -678,3 +678,40 @@ correlate `SYNTAGMA_SUBPROCESS_PROBE` stage timestamps with the existing
 `SYNTAGMA_LAG_PROBE` event-loop delays. Keep the original native-stack
 evidence for comparison. Rollback by leaving the flag unset at the next
 authorized Quickshell launch; the default behavior and metrics are unchanged.
+
+
+## October 28 // V5 main-thread CPU / native-stack source attribution (draft)
+
+**Evidence:** the operator's independent thread sampler measured sustained
+~98–99% use of one logical CPU by the Quickshell main thread during the
+49.18-second 10:27 EDT stall and other episodes. The native `eu-stack`
+capture for PID/TID 4040770 again shows `QProcess::finished` ->
+`Process::onFinished` -> QML bound signals -> `ArrayPrototype::method_slice`
+-> Qt array allocation. It **does not** identify the QML file or prove
+that the array copy accounts for an entire long stall.
+
+**New diagnostic boundary:** extend the existing opt-in
+`POST_APOLLO_SUBPROCESS_LAG_PROBE=1` to additional uninstrumented,
+array-processing completion paths without adding any subprocesses or timers:
+
+- `services/git/GitHistoryService.qml`: begin/end around the existing stdout,
+  stderr, and exit handlers on its six query/reflog/inspect/detail/diff/action
+  subprocesses. Each marker uses a static process slot/stage and an output
+  character count on entry, never the output itself.
+- `services/hospital/HospitalService.qml`: begin/end around each bounded
+  history-commit array-copy/append and the final topology publication. The
+  existing command limits output to 36 commits. Markers carry counts only.
+- Source-only CI tests assert opt-in gating, paired markers, unchanged
+  process/timer counts, and no sensitive data in the logger. No producer
+  commands, polling intervals, topology semantics, UI, or mutation paths change.
+
+**Interpretation:** a `:begin` without the matching `:end` around a lag
+or native stack is a lead to investigate further, not proof of causation.
+Neither path is guaranteed to be running during an idle freeze.
+Existing GitService/SystemTelemetry and HospitalAudit/GitHub probes remain
+unchanged. Uninstrumented completion paths still exist.
+
+**Rollout:** draft only. Do not merge, pull, or restart until reviewed and
+approved. After an authorized merge, the current opt-in subprocess flag
+automatically enables these labels on the next controlled Quickshell launch.
+Rollback: relaunch without that flag; no persistent data is changed.

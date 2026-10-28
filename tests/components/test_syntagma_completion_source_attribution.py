@@ -49,7 +49,7 @@ for begin, operation, end in (
     ("topology-publish:begin", "topologyRows.clear();", "topology-publish:end"),
 ):
     start = hospital.index(f'traceSubprocessLag("{begin}"')
-    op = hospital.index(operation)
+    op = hospital.index(operation, start)
     finish = hospital.index(f'traceSubprocessLag("{end}"')
     assert start < op < finish, begin
 # Process invocations, timer counts, and existing execution contracts untouched.

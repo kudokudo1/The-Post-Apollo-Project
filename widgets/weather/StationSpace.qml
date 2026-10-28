@@ -1,6 +1,7 @@
 import QtQuick
 import "../../components"
 import "../../services/weather" as WeatherServices
+import "../../services/weather/SolarCyclePolicy.js" as SolarCyclePolicy
 import "StationSolarImagePolicy.js" as SolarImagePolicy
 
 Rectangle {
@@ -37,6 +38,11 @@ Rectangle {
 
     WeatherServices.SwpcAlertService {
         id: alertService
+        active: space.visible
+    }
+
+    WeatherServices.SolarCycleService {
+        id: solarCycleService
         active: space.visible
     }
 
@@ -168,6 +174,17 @@ Rectangle {
             return "--";
 
         return text.replace("T", " ").replace("Z", "").slice(5, 16);
+    }
+
+    function solarCycleReceiveLabel() {
+        if (!solarCycleService.lastUpdated
+                || typeof solarCycleService.lastUpdated.getTime !== "function")
+            return "--";
+        const millis = solarCycleService.lastUpdated.getTime();
+        if (!isFinite(millis) || millis <= 0)
+            return "--";
+        const iso = new Date(millis).toISOString();
+        return iso.slice(5, 10) + " " + iso.slice(11, 16) + "Z";
     }
 
     function solarImageReceiveLabel() {
@@ -453,6 +470,205 @@ Rectangle {
                         font.pixelSize: 10
                     }
                 }
+            }
+        }
+
+        StationSectionDivider {
+            width: parent.width
+            title: "SOLAR CYCLE // NOAA MONTHLY PREDICTION"
+        }
+
+        Column {
+            width: parent.width
+            spacing: 8
+
+            Row {
+                width: parent.width
+                spacing: 10
+
+                GohuText {
+                    text: solarCycleService.loading
+                          ? "RECEIVING"
+                          : solarCycleService.failed
+                            ? (solarCycleService.ready
+                               ? "DEGRADED" : "OFFLINE")
+                            : solarCycleService.ready
+                              ? "MODEL READY"
+                              : "WAITING"
+                    font.pixelSize: 10
+                    color: solarCycleService.failed
+                           ? Colors.orange
+                           : solarCycleService.ready
+                             ? Colors.cyan : Colors.white
+                }
+
+                QuietText {
+                    width: Math.max(0, parent.width - 230)
+                    text: solarCycleService.ready
+                          ? "LOCAL RECEIVE "
+                            + space.solarCycleReceiveLabel()
+                            + " // " + solarCycleService.summary.rowCount
+                            + " MODEL MONTHS"
+                          : "NOAA SWPC // PREDICTED SOLAR CYCLE JSON"
+                    elide: Text.ElideRight
+                    font.pixelSize: 9
+                }
+
+                ActionButton {
+                    width: 112
+                    height: 30
+                    label: "REFRESH"
+                    labelPixelSize: 10
+                    available: !solarCycleService.loading
+                    onClicked: solarCycleService.refresh(true)
+                }
+            }
+
+            Row {
+                width: parent.width
+                spacing: 10
+                visible: solarCycleService.ready
+
+                Repeater {
+                    model: [
+                        {
+                            "title": "MODEL SSN // "
+                                     + solarCycleService.summary.modelMonth,
+                            "value":
+                                SolarCyclePolicy.numberText(
+                                    solarCycleService.summary.predictedSsn, 1
+                                ),
+                            "detail":
+                                solarCycleService.summary.exactMonth
+                                ? "TARGET MONTH // "
+                                  + solarCycleService.summary.targetMonth
+                                : "NEAREST AVAILABLE // TARGET "
+                                  + solarCycleService.summary.targetMonth,
+                            "accent": Colors.magenta
+                        },
+                        {
+                            "title": "SSN RANGE",
+                            "value":
+                                solarCycleService.summary.ssnRangeValid
+                                ? SolarCyclePolicy.rangeText(
+                                      solarCycleService.summary.lowSsn,
+                                      solarCycleService.summary.highSsn,
+                                      1
+                                  )
+                                : "INVALID",
+                            "detail": "PUBLISHED LOW–HIGH",
+                            "accent":
+                                solarCycleService.summary.ssnRangeValid
+                                ? Colors.cyan : Colors.orange
+                        },
+                        {
+                            "title": "MODEL F10.7",
+                            "value":
+                                SolarCyclePolicy.numberText(
+                                    solarCycleService.summary.predictedFlux, 1
+                                ) + " SFU",
+                            "detail":
+                                solarCycleService.summary.fluxRangeValid
+                                ? "RANGE "
+                                  + SolarCyclePolicy.rangeText(
+                                        solarCycleService.summary.lowFlux,
+                                        solarCycleService.summary.highFlux,
+                                        1
+                                    ) + " SFU"
+                                : "SOURCE RANGE INVALID",
+                            "accent":
+                                solarCycleService.summary.fluxRangeValid
+                                ? Colors.yellow : Colors.orange
+                        },
+                        {
+                            "title": "CURVE PEAK",
+                            "value":
+                                SolarCyclePolicy.numberText(
+                                    solarCycleService.summary.peakPredictedSsn,
+                                    1
+                                ),
+                            "detail":
+                                solarCycleService.summary.peakMonth !== ""
+                                ? solarCycleService.summary.peakMonth
+                                : "MONTH --",
+                            "accent": Colors.orange
+                        }
+                    ]
+
+                    delegate: StationHomeMetricCard {
+                        required property var modelData
+                        width: (spaceContent.width - 3 * 10) / 4
+                        height: 88
+                        title: modelData.title
+                        valueText: modelData.value
+                        detailText: modelData.detail
+                        accentColor: modelData.accent
+                        valueColor: Colors.white
+                        meterVisible: false
+                    }
+                }
+            }
+
+            QuietText {
+                visible: solarCycleService.ready
+                         && !solarCycleService.summary.exactMonth
+                width: parent.width
+                text: "NO EXACT MODEL ROW FOR CURRENT UTC MONTH // SHOWING "
+                      + solarCycleService.summary.modelMonth
+                      + " // NOT RELABELED AS CURRENT"
+                font.pixelSize: 9
+                color: Colors.orange
+            }
+
+            QuietText {
+                visible: solarCycleService.ready
+                         && (!solarCycleService.summary.ssnRangeValid
+                             || !solarCycleService.summary.fluxRangeValid)
+                width: parent.width
+                text: "NOAA PUBLISHED AN INVALID LOW/HIGH RANGE // POINT ESTIMATE RETAINED // RANGE NOT REPAIRED"
+                font.pixelSize: 9
+                color: Colors.orange
+            }
+
+            Row {
+                width: parent.width
+                spacing: 16
+                visible: solarCycleService.ready
+
+                GohuText {
+                    text: "LIVE F10.7 // "
+                          + (spaceService
+                             ? spaceService.solarFluxText : "-- SFU")
+                    font.pixelSize: 11
+                    color: Colors.cyan
+                }
+
+                QuietText {
+                    text:
+                        solarCycleService.summary.nextMonth !== ""
+                        ? "NEXT MODEL // "
+                          + solarCycleService.summary.nextMonth
+                          + " // SSN "
+                          + SolarCyclePolicy.numberText(
+                                solarCycleService.summary.nextPredictedSsn, 1
+                            )
+                        : "NEXT MODEL // --"
+                    font.pixelSize: 9
+                }
+            }
+
+            QuietText {
+                visible: solarCycleService.failed
+                width: parent.width
+                text: solarCycleService.errorText
+                font.pixelSize: 9
+                color: Colors.orange
+            }
+
+            QuietText {
+                width: parent.width
+                text: "MONTHLY PREDICTION CURVE // LIVE F10.7 ABOVE IS A SEPARATE OBSERVATION WITH A DIFFERENT CADENCE // NOT A MODEL-ERROR CALCULATION"
+                font.pixelSize: 9
             }
         }
 

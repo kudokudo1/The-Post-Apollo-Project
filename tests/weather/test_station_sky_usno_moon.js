@@ -35,8 +35,10 @@ assert.equal(ctx.snappedOffsetMinutes(-240.868), -240);
 assert.equal(ctx.offsetHoursText(-240.868), "-4");
 assert.equal(ctx.offsetHoursText(330.2), "5.5");
 assert.equal(ctx.offsetHoursText(345.1), "5.75");
-assert.equal(ctx.snappedOffsetMinutes(-721), null);
-assert.equal(ctx.snappedOffsetMinutes(841), null);
+assert.equal(ctx.snappedOffsetMinutes(-721), -720);
+assert.equal(ctx.snappedOffsetMinutes(841), 840);
+assert.equal(ctx.snappedOffsetMinutes(-730), null);
+assert.equal(ctx.snappedOffsetMinutes(850), null);
 assert.equal(ctx.snappedOffsetMinutes(null), null);
 
 const request = ctx.requestInfo(

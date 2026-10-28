@@ -176,23 +176,32 @@ class TelegramIdentityConfigTests(unittest.TestCase):
         self.assertEqual(bridge._credentials(),(123456,UNIVERSAL_HASH))
         self.assertNotIn(OVERRIDE_HASH, override.stdout+override.stderr)
 
-    def test_explicit_scoped_health_never_uses_legacy_session(self):
+    def test_passive_private_health_does_not_create_or_reuse_a_session(self):
         self.assertEqual(self.configure("identity-2","234567",OVERRIDE_HASH).returncode,0)
-        for args in (("health",), ("health","--identity","identity-1"),
-                     ("health","--identity","identity-2")):
-            outcome = self.cli(BRIDGE,*args)
-            self.assertEqual(outcome.returncode,0,outcome.stderr)
-            self.assertEqual(json.loads(outcome.stdout)["mode"],"READY")
-            self.assertNotIn(OVERRIDE_HASH,outcome.stdout+outcome.stderr)
         legacy=self.data/"post-apollo/telegram/personal.session"
         first=self.data/"post-apollo/telegram/identities/identity-1/personal.session"
         second=self.data/"post-apollo/telegram/identities/identity-2/personal.session"
-        self.assertEqual(len({legacy.resolve(),first.resolve(),second.resolve()}),3)
-        for target in (legacy,first,second):
-            self.assertTrue(target.exists())
-            self.assertEqual(stat.S_IMODE(target.stat().st_mode),0o600)
-        self.assertEqual(first.parent.stat().st_mode & 0o077,0)
-        self.assertEqual(second.parent.stat().st_mode & 0o077,0)
+        for identity in ("identity-1","identity-2"):
+            outcome=self.cli(BRIDGE,"health","--identity",identity)
+            self.assertEqual(outcome.returncode,0,outcome.stderr)
+            self.assertEqual(json.loads(outcome.stdout)["mode"],"AUTH_REQUIRED")
+            self.assertNotIn(OVERRIDE_HASH,outcome.stdout+outcome.stderr)
+        self.assertFalse(first.exists())
+        self.assertFalse(second.exists())
+        self.assertFalse(legacy.exists())
+        paired=self.cli(LOGIN,"phone","--identity","identity-1",
+                        value='{"action":"phone","value":"+15551234567"}\n'
+                              '{"action":"code","value":"12345"}\n')
+        self.assertEqual(paired.returncode,0,paired.stderr)
+        scoped_health=self.cli(BRIDGE,"health","--identity","identity-1")
+        self.assertEqual(json.loads(scoped_health.stdout)["mode"],"READY")
+        self.assertTrue(first.exists())
+        self.assertEqual(stat.S_IMODE(first.stat().st_mode),0o600)
+        self.assertFalse(second.exists())
+        self.assertFalse(legacy.exists())
+        global_health=self.cli(BRIDGE,"health")
+        self.assertEqual(json.loads(global_health.stdout)["mode"],"READY")
+        self.assertTrue(legacy.exists())
         self.assertEqual(legacy.read_text(),"FAKE SESSION ONLY -- NO TELEGRAM DATA")
 
     def test_explicit_phone_pairing_only_touches_scoped_session(self):
@@ -249,7 +258,7 @@ class TelegramIdentityConfigTests(unittest.TestCase):
             bridge._credentials("identity-2")
         self.assertEqual(bridge._credentials("identity-1"),(123456,UNIVERSAL_HASH))
 
-    def test_existing_native_ui_and_router_stay_shared_until_separate_review(self):
+    def test_native_ui_defaults_shared_but_can_opt_in_to_scoped_accounts(self):
         self.assertIn('property string loginMode:',ADAPTER)
         self.assertIn('var commandArgs = [pythonPath, loginBridgePath, loginMode];',ADAPTER)
         self.assertIn('if (loginMode === "configure" && requestedAppKeyIdentityId !== "")',ADAPTER)
@@ -258,16 +267,21 @@ class TelegramIdentityConfigTests(unittest.TestCase):
         self.assertIn('healthProcess.command = command(["health"])',ADAPTER)
         self.assertIn('active: router.appIndex === 2',ROUTER)
         self.assertIn('social-identities-v1.json',IDENTITIES)
-        # The app-key editor may use --identity for CONFIGURE/STATUS,
-        # while existing health, list, message and send operations must
-        # continue using the original shared native Telegram session.
+        # Key configuration and account pairing are separate operations;
+        # native reads and sends use the identity scope only when enabled.
         self.assertIn('if (loginMode === "configure" && requestedAppKeyIdentityId !== "")',ADAPTER)
         self.assertIn('commandArgs.push("--identity", requestedAppKeyIdentityId)',ADAPTER)
         self.assertIn('healthProcess.command = command(["health"])',ADAPTER)
         self.assertIn('listProcess.command = command(["list"])',ADAPTER)
         self.assertIn('messageProcess.command = command(["messages"',ADAPTER)
         self.assertIn('sendProcess.command = command(["send"',ADAPTER)
-        self.assertNotIn("--identity",ROUTER)
+        self.assertIn('property string telegramIdentityId: ""', ROUTER)
+        self.assertIn('identityId: router.telegramIdentityId', ROUTER)
+        self.assertIn('property string identityId: ""', ADAPTER)
+        self.assertIn('commandArgs.push("--identity", identityId)', ADAPTER)
+        self.assertIn('loginMode !== "configure" && identityId !== ""', ADAPTER)
+        self.assertIn('onIdentityIdChanged:', ADAPTER)
+        self.assertIn('adapter.sendRequestSerial !== adapter.activationSerial', ADAPTER)
         self.assertIn('return base / "personal.session"',BRIDGE.read_text())
         self.assertIn('return base / "client.json"',BRIDGE.read_text())
 

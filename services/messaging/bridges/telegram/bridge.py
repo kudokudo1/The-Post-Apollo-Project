@@ -309,6 +309,13 @@ async def _run(args: argparse.Namespace) -> Any:
         raise BridgeError("AUTH_REQUIRED", "Telegram login requires an interactive terminal")
     # Don't touch a profile without credentials and the provider dependency.
     identity = _validate_identity(getattr(args, "identity", None))
+    if args.command == "health" and identity is not None:
+        # A passive status check must not create a new private SQLite session.
+        # Only explicit pairing creates a new per-identity account namespace.
+        try:
+            _session_path(identity).lstat()
+        except FileNotFoundError:
+            raise BridgeError("AUTH_REQUIRED", "Telegram account not linked for this identity") from None
     client = (_telegram_client(identity_id=identity)
               if identity is not None else _telegram_client())
     if args.command == "login":

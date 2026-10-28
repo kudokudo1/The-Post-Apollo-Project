@@ -9,6 +9,11 @@ Item {
 
     readonly property string serviceId: "telegram"
     property bool active: false
+    // Empty scope deliberately preserves the existing shared personal.session.
+    // Private account scopes only activate by an explicit Social Settings toggle.
+    property string identityId: ""
+    readonly property bool scopeValid: identityId === ""
+        || /^identity-[1-9][0-9]{0,8}$/.test(identityId)
     property string backendMode: "PROBING"
     property string backendDetail: "Select Telegram to check account status"
     // Capability-key naming remains provisional until the shared integration
@@ -46,6 +51,8 @@ Item {
     property string listResult: ""
     property string messageResult: ""
     property string healthResult: ""
+    property int sendRequestSerial: -1
+    property string sendingIdentityId: ""
 
     readonly property string bridgePath: Quickshell.shellPath("services/messaging/bridges/telegram/bridge.py")
     property string pythonPath: "/usr/bin/python3"
@@ -104,7 +111,7 @@ Item {
     }
 
     function launchRequestedLogin() {
-        if (!active || !requestedLoginMode || loginProcess.running)
+        if (!active || !scopeValid || !requestedLoginMode || loginProcess.running)
             return;
         loginMode = requestedLoginMode;
         requestedLoginMode = "";
@@ -115,6 +122,8 @@ Item {
         // An identity-specific configuration is a distinct complete API key
         // pair, not a Telegram login and never a different live chat account.
         var commandArgs = [pythonPath, loginBridgePath, loginMode];
+        if (loginMode !== "configure" && identityId !== "")
+            commandArgs.push("--identity", identityId);
         if (loginMode === "configure" && requestedAppKeyIdentityId !== "") {
             if (!/^identity-[1-9][0-9]{0,8}$/.test(requestedAppKeyIdentityId)) {
                 loginState = "ERROR";
@@ -195,17 +204,42 @@ Item {
     }
 
     function command(args) {
-        return [pythonPath, bridgePath].concat(args || []);
+        var commandArgs = [pythonPath, bridgePath].concat(args || []);
+        if (identityId !== "" && scopeValid)
+            commandArgs.push("--identity", identityId);
+        return commandArgs;
     }
 
     function probe() {
-        if (!active || healthProcess.running)
+        if (!active || !scopeValid || healthProcess.running)
             return;
         backendMode = "PROBING";
         healthResult = "";
         healthRequestSerial = activationSerial;
         healthProcess.command = command(["health"]);
         healthProcess.running = true;
+    }
+
+    onIdentityIdChanged: {
+        // Never display conversations from the previous account while a new
+        // scoped health check runs. Generation guards discard late read replies.
+        activationSerial++;
+        cancelLogin();
+        selectedConversationId = "";
+        requestedConversationId = "";
+        conversations = [];
+        messages = [];
+        queuedMessageRefresh = false;
+        loading = false;
+        messagesLoading = false;
+        messagesError = "";
+        error = "";
+        sendError = "";
+        backendMode = scopeValid ? "PROBING" : "ERROR";
+        backendDetail = scopeValid ? "Checking the selected Telegram account"
+                                   : "Invalid Telegram account scope";
+        if (active && scopeValid)
+            probe();
     }
 
     onActiveChanged: {
@@ -226,7 +260,7 @@ Item {
     }
 
     function refresh() {
-        if (!active || backendMode !== "READY" || listProcess.running)
+        if (!active || !scopeValid || backendMode !== "READY" || listProcess.running)
             return;
         loading = true;
         error = "";
@@ -245,7 +279,7 @@ Item {
     }
 
     function refreshMessages() {
-        if (!active || backendMode !== "READY" || !selectedConversationId)
+        if (!active || !scopeValid || backendMode !== "READY" || !selectedConversationId)
             return;
         if (messageProcess.running) {
             queuedMessageRefresh = true;
@@ -261,7 +295,7 @@ Item {
     }
 
     function sendMessage(conversationId, text) {
-        if (!active || backendMode !== "READY" || !capabilities.sendText)
+        if (!active || !scopeValid || backendMode !== "READY" || !capabilities.sendText)
             return false;
         if (sending || sendProcess.running || !conversationId || String(conversationId) !== selectedConversationId)
             return false;
@@ -272,6 +306,8 @@ Item {
         sendError = "";
         sendResult = "";
         pendingSendText = body;
+        sendRequestSerial = activationSerial;
+        sendingIdentityId = identityId;
         sendProcess.command = command(["send", String(conversationId)]);
         sendProcess.running = true;
         return true;
@@ -454,6 +490,11 @@ Item {
         onExited: function(exitCode, exitStatus) {
             adapter.pendingSendText = "";
             adapter.sending = false;
+            // A send can finish after an identity change. Never turn its ack
+            // into a different account's composer success or history refresh.
+            if (!adapter.active || adapter.sendRequestSerial !== adapter.activationSerial
+                    || adapter.sendingIdentityId !== adapter.identityId)
+                return;
             if (exitCode !== 0) {
                 adapter.sendError = "Telegram send failed; delivery not confirmed";
                 return;

@@ -1,43 +1,41 @@
-# Telegram // universal application keys and isolated identity sessions
+# Telegram // optional private accounts inside Social
 
-**Phase:** Backend foundation only, pending operator approval and UI integration. No Telegram account has been migrated, logged in, activated or switched.
+**State:** GitHub review candidate. No local deployment, Telegram login, identity migration, or runtime acceptance has been performed.
 
-## Key distinction
+## How to use after operator-reviewed merge and safe desktop deployment
 
-A Telegram `apiId` and `apiHash` identify an application, not a Telegram account. The existing Post-Apollo **Telegram Connect** wizard already supports one private local universal configuration:
+1. Open **Social → USER // SETTINGS → LINKED ACCOUNTS → Telegram**.
+2. The default is **SHARED TELEGRAM**. It continues to use the existing `$XDG_DATA_HOME/post-apollo/telegram/personal.session` and universal app keys. No identity is assigned ownership of that old session.
+3. Select **USE PRIVATE TELEGRAM ACCOUNTS** to opt in *for the current Quickshell run*. The currently saved Social identity selects its own session at `$XDG_DATA_HOME/post-apollo/telegram/identities/identity-N/personal.session`.
+4. Choose **OPEN TELEGRAM**, then deliberately pair this identity with Telegram QR or phone, code, and optional 2FA **inside the existing Social pane**. Simply selecting an identity never initiates pairing.
+5. Returning to Settings and selecting another saved identity changes the Telegram session scope. Unpaired identities show **SIGN-IN REQUIRED**, not another identity's conversations. Provider status and account nicknames are separate.
+6. **USE SHARED TELEGRAM** returns to the legacy session without migrating, copying, deleting or revoking any account. Private mode is intentionally OFF after a Quickshell restart until a separate persistence decision and runtime verification.
 
-- `$XDG_CONFIG_HOME/post-apollo/telegram/client.json` (legacy universal application keys)
+## Credential versus account boundary
 
-The existing single shared authorization session remains:
+Universal application `apiId`/`apiHash` belong to the Post-Apollo application and are shared by default:
+`$XDG_CONFIG_HOME/post-apollo/telegram/client.json`.
 
-- `$XDG_DATA_HOME/post-apollo/telegram/personal.session`
+An optional full per-identity *application* key pair may be configured at
+`$XDG_CONFIG_HOME/post-apollo/telegram/identities/identity-N/client.json`.
+It is not a Telegram login and does not prove an account is linked. Invalid or unsafe scoped overrides fail closed. API hashes, phone codes, passwords and QR tokens are never placed into process command arguments or GitHub.
 
-Those existing paths and default Telegram adapter commands remain unchanged.
+The Telegram provider issues API keys externally. This feature does not automate Telegram developer registration. A privately provisioned universal app pair means normal account owners can complete all subsequent Telegram pairing inside Social.
 
-## Optional isolated identity namespace
+## Implementation boundaries
 
-This PR adds an opt-in CLI/backend `--identity identity-N` scope to both `bridge.py` and `login_ui.py`. Each explicitly selected saved-style identity has:
+- `MessagingW.qml` owns the operator-controlled **Shared / Private** mode, using only the confirmed persisted active Social identity. No new Social window.
+- `SocialMessageRouter.qml` passes that scope to the Telegram adapter, and scopes conversation composer drafts and send-success acknowledgements by `telegram@identity-N` rather than treating matching conversation IDs as the same chat.
+- `TelegramAdapter.qml` adds `--identity identity-N` only when private mode is active, to **health, list, messages, send, QR and phone** commands. The original commands with no scope retain shared behavior. Switching scope resets old conversations and login input, increments read generations, and ignores stale send acknowledgements.
+- `bridge.py health --identity identity-N` returns `AUTH_REQUIRED` **without creating an empty private session** for an unpaired identity. Only deliberate pairing creates a new private session and permissions remain owner-only.
+- Identity switching controls are disabled while Telegram login/send or key-status checks are in progress. Real provider send submission may already be in flight; do not force scope changes through another process during a send.
 
-- Session: `$XDG_DATA_HOME/post-apollo/telegram/identities/identity-N/personal.session`
-- Optional full API credential override: `$XDG_CONFIG_HOME/post-apollo/telegram/identities/identity-N/client.json`
+## Verification and remaining gates
 
-An identity **without** an override inherits the universal API ID/hash (the existing environment/config preference). A valid identity override takes precedence as a complete pair; invalid or unsafe overrides fail closed and cannot fall back into another application's credentials. The API hash is never printed, included in process arguments, written to identity layout metadata or inferred from the account nickname.
+Offline tests exercise scope routing and the status formatter, session path separation, fake-Telethon explicit login and passive health, stale-result safeguards, no secret output and preservation of the legacy shared route. The tests do **not** authenticate a real Telegram account or execute Quickshell.
 
-The new config/session locations are created **only** when an explicit scoped command needs them. Newly created identity dirs must be owner-only (0700), existing files private (0600) and symlinks are refused. The existing `personal.session` and any Telegram credentials are never copied, migrated or deleted.
+**Live acceptance required:** default shared account unchanged; private identity-1 unpaired shows no messages; pair a test identity deliberately; switch to identity-2 and back without cross-account contacts/drafts; try switching while login/send is in progress; confirm persistence within the running widget, no cross-account send acknowledgment and safe restart. Test on a controlled account or Saved Messages and never upload session files or QR codes.
 
-## Example private commands (future approved deployment only)
+**Rollback:** in Social Settings select **USE SHARED TELEGRAM**. This changes only current runtime routing, not session files. If a repository rollback is later approved, revert this bounded PR; do not remove or copy any Telegram private session as part of routine rollback.
 
-- Shared health: `python3 services/messaging/bridges/telegram/bridge.py health`
-- Scoped health: `python3 services/messaging/bridges/telegram/bridge.py health --identity identity-2`
-- Scoped phone pairing: `python3 services/messaging/bridges/telegram/login_ui.py phone --identity identity-2` (interactive stdin events handled by a future identity-aware UI)
-- Per-identity override: `python3 services/messaging/bridges/telegram/login_ui.py configure --identity identity-2` (stdin JSON secret fields only, never place keys in shell argv).
-
-These are a backend contract, **not** a recommendation to run live login commands or paste secrets into a terminal. The current Quickshell Telegram adapter intentionally continues using the shared session until a separate change wires a confirmed saved identity, pairing UI, conversation cache isolation, and all async result guards together.
-
-## Verification and safety gates
-
-The new synthetic tests exercise distinct session paths with a fake Telethon provider, universal fallback, override precedence, private files, profile-specific sign-in, no secret output, invalid IDs, refusal of symlinked or insecure files, and preservation of default shared QML commands. Existing Telegram bridge/QR/login/adapter suites continue running.
-
-The next PR should add an explicit **Shared / Per-Identity Telegram** choice to the Settings and login wizard, and pass the confirmed saved identity to every Telegram health/list/messages/send/login call while resetting old conversations and rejecting delayed results on switch. The mode must default to the existing shared session, without assigning its ownership to identity-1. Only after live Quickshell/provider tests and operator acceptance should it be enabled.
-
-**Rollback:** ignore or revert this PR. Existing shared session and universal credentials stay in their original paths. This branch contains no local deployment and no live Hospital assignment/room.
+**Open work:** finished provider account identity switching for Discord, Sessions and other desktop apps; Account Manager orchestration; restart-safe persistence (opt-in only); real Quickshell/Sway acceptance. This is a Hospital-compatible external report, not registration to a live Room or Session.

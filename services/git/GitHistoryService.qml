@@ -5,6 +5,19 @@ import Quickshell.Io
 Scope {
     id: root
 
+    // Opt-in, static-label source attribution for synchronous completion work.
+    // No process output, repository paths, or command arguments are logged.
+    readonly property bool subprocessLagProbeEnabled:
+        String(Quickshell.env("POST_APOLLO_SUBPROCESS_LAG_PROBE") || "").trim() === "1"
+
+    function traceSubprocessLag(stage, size) {
+        if (!subprocessLagProbeEnabled)
+            return;
+        console.warn("SYNTAGMA_SUBPROCESS_PROBE // service=git-history"
+                     + " stage=" + stage + " size=" + Number(size || 0)
+                     + " tsMs=" + Date.now());
+    }
+
     property string repositoryPath: ""
     property var operationJournal: null
     property var snapshotService: null
@@ -1295,24 +1308,30 @@ Scope {
 
         stdout: StdioCollector {
             onStreamFinished: {
+                root.traceSubprocessLag("queryProcess:stdout:begin", this.text.length);
                 root.queryStdoutText = this.text;
                 root.queryStdoutSeen = true;
                 root.maybeFinishQuery();
+                root.traceSubprocessLag("queryProcess:stdout:end", 0);
             }
         }
 
         stderr: StdioCollector {
             onStreamFinished: {
+                root.traceSubprocessLag("queryProcess:stderr:begin", this.text.length);
                 root.queryStderrText = this.text;
                 root.queryStderrSeen = true;
                 root.maybeFinishQuery();
+                root.traceSubprocessLag("queryProcess:stderr:end", 0);
             }
         }
 
         onExited: function(code, exitStatus) {
+            root.traceSubprocessLag("queryProcess:exit:begin", 0);
             root.queryExitCode = Number(code);
             root.queryExitSeen = true;
             root.maybeFinishQuery();
+            root.traceSubprocessLag("queryProcess:exit:end", 0);
         }
     }
 
@@ -1321,24 +1340,30 @@ Scope {
 
         stdout: StdioCollector {
             onStreamFinished: {
+                root.traceSubprocessLag("reflogProcess:stdout:begin", this.text.length);
                 root.reflogStdoutText = this.text;
                 root.reflogStdoutSeen = true;
                 root.maybeFinishReflog();
+                root.traceSubprocessLag("reflogProcess:stdout:end", 0);
             }
         }
 
         stderr: StdioCollector {
             onStreamFinished: {
+                root.traceSubprocessLag("reflogProcess:stderr:begin", this.text.length);
                 root.reflogStderrText = this.text;
                 root.reflogStderrSeen = true;
                 root.maybeFinishReflog();
+                root.traceSubprocessLag("reflogProcess:stderr:end", 0);
             }
         }
 
         onExited: function(code, exitStatus) {
+            root.traceSubprocessLag("reflogProcess:exit:begin", 0);
             root.reflogExitCode = Number(code);
             root.reflogExitSeen = true;
             root.maybeFinishReflog();
+            root.traceSubprocessLag("reflogProcess:exit:end", 0);
         }
     }
 
@@ -1347,24 +1372,30 @@ Scope {
 
         stdout: StdioCollector {
             onStreamFinished: {
+                root.traceSubprocessLag("inspectProcess:stdout:begin", this.text.length);
                 root.inspectStdoutText = this.text;
                 root.inspectStdoutSeen = true;
                 root.maybeFinishInspection();
+                root.traceSubprocessLag("inspectProcess:stdout:end", 0);
             }
         }
 
         stderr: StdioCollector {
             onStreamFinished: {
+                root.traceSubprocessLag("inspectProcess:stderr:begin", this.text.length);
                 root.inspectStderrText = this.text;
                 root.inspectStderrSeen = true;
                 root.maybeFinishInspection();
+                root.traceSubprocessLag("inspectProcess:stderr:end", 0);
             }
         }
 
         onExited: function(code, exitStatus) {
+            root.traceSubprocessLag("inspectProcess:exit:begin", 0);
             root.inspectExitCode = Number(code);
             root.inspectExitSeen = true;
             root.maybeFinishInspection();
+            root.traceSubprocessLag("inspectProcess:exit:end", 0);
         }
     }
 
@@ -1373,24 +1404,30 @@ Scope {
 
         stdout: StdioCollector {
             onStreamFinished: {
+                root.traceSubprocessLag("detailProcess:stdout:begin", this.text.length);
                 root.detailStdoutText = this.text;
                 root.detailStdoutSeen = true;
                 root.maybeFinishDetail();
+                root.traceSubprocessLag("detailProcess:stdout:end", 0);
             }
         }
 
         stderr: StdioCollector {
             onStreamFinished: {
+                root.traceSubprocessLag("detailProcess:stderr:begin", this.text.length);
                 root.detailStderrText = this.text;
                 root.detailStderrSeen = true;
                 root.maybeFinishDetail();
+                root.traceSubprocessLag("detailProcess:stderr:end", 0);
             }
         }
 
         onExited: function(code, exitStatus) {
+            root.traceSubprocessLag("detailProcess:exit:begin", 0);
             root.detailExitCode = Number(code);
             root.detailExitSeen = true;
             root.maybeFinishDetail();
+            root.traceSubprocessLag("detailProcess:exit:end", 0);
         }
     }
 
@@ -1399,24 +1436,30 @@ Scope {
 
         stdout: StdioCollector {
             onStreamFinished: {
+                root.traceSubprocessLag("diffProcess:stdout:begin", this.text.length);
                 root.diffStdoutText = this.text;
                 root.diffStdoutSeen = true;
                 root.maybeFinishDiff();
+                root.traceSubprocessLag("diffProcess:stdout:end", 0);
             }
         }
 
         stderr: StdioCollector {
             onStreamFinished: {
+                root.traceSubprocessLag("diffProcess:stderr:begin", this.text.length);
                 root.diffStderrText = this.text;
                 root.diffStderrSeen = true;
                 root.maybeFinishDiff();
+                root.traceSubprocessLag("diffProcess:stderr:end", 0);
             }
         }
 
         onExited: function(code, exitStatus) {
+            root.traceSubprocessLag("diffProcess:exit:begin", 0);
             root.diffExitCode = Number(code);
             root.diffExitSeen = true;
             root.maybeFinishDiff();
+            root.traceSubprocessLag("diffProcess:exit:end", 0);
         }
     }
 
@@ -1425,24 +1468,30 @@ Scope {
 
         stdout: StdioCollector {
             onStreamFinished: {
+                root.traceSubprocessLag("actionProcess:stdout:begin", this.text.length);
                 root.actionStdoutText = this.text;
                 root.actionStdoutSeen = true;
                 root.maybeFinishAction();
+                root.traceSubprocessLag("actionProcess:stdout:end", 0);
             }
         }
 
         stderr: StdioCollector {
             onStreamFinished: {
+                root.traceSubprocessLag("actionProcess:stderr:begin", this.text.length);
                 root.actionStderrText = this.text;
                 root.actionStderrSeen = true;
                 root.maybeFinishAction();
+                root.traceSubprocessLag("actionProcess:stderr:end", 0);
             }
         }
 
         onExited: function(code, exitStatus) {
+            root.traceSubprocessLag("actionProcess:exit:begin", 0);
             root.actionExitCode = Number(code);
             root.actionExitSeen = true;
             root.maybeFinishAction();
+            root.traceSubprocessLag("actionProcess:exit:end", 0);
         }
     }
 }

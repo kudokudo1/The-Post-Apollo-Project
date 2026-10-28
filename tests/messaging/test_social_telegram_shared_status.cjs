@@ -75,7 +75,7 @@ for(const part of [
     '? "TELEGRAM // PRIVATE ACCOUNT" : "TELEGRAM // SHARED SESSION"',
     'label: appSelector.telegramIdentityModeActive',
     '? "USE SHARED TELEGRAM" : "USE PRIVATE TELEGRAM ACCOUNTS"',
-    'text: "Telegram uses one legacy personal session.',
+    ': "Telegram uses one legacy personal session.',
     'text: appSelector.sharedTelegramStatusText()',
     'label: "OPEN TELEGRAM"',
     'label: "RECHECK SHARED TELEGRAM"',

@@ -243,7 +243,8 @@ class BoundDisposableSession:
 def attach_synthetic(folder: Path, mode: str,
                      child: m11v.capsule.SyntheticSnapshot,
                      interpreter: m11v.InterpreterPin,
-                     owner_bytes: bytes) -> BoundDisposableSession:
+                     owner_bytes: bytes,
+                     expected_owner_digest: str) -> BoundDisposableSession:
     """Launch a sealed synthetic child that owns ONE real disposable lock."""
     require(mode in ("NEW","EXISTING")
             and folder.is_absolute() and folder.name == "m11l-tasks-copy"
@@ -255,7 +256,12 @@ def attach_synthetic(folder: Path, mode: str,
             and hmac.compare_digest(hashlib.sha256(child.script).hexdigest(),
                                     child.sha256)
             and type(owner_bytes) is bytes
-            and 1024 < len(owner_bytes) <= MAX_OWNER_BYTES,
+            and 1024 < len(owner_bytes) <= MAX_OWNER_BYTES
+            and type(expected_owner_digest) is str
+            and re.fullmatch("[0-9a-f]{64}", expected_owner_digest)
+            and hmac.compare_digest(
+                hashlib.sha256(owner_bytes).hexdigest(),
+                expected_owner_digest),
             "SYNTHETIC_SEALED_SOURCES_REQUIRED")
     require(m11v.pinned_interpreter(interpreter.digest) == interpreter,
             "INTERPRETER_PIN_CHANGED")

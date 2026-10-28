@@ -1,0 +1,50 @@
+name: TASKS M11w sealed child and disposable durable journal ownership
+
+on:
+  pull_request:
+    paths:
+      - 'tests/tasks/fixtures/TaskBoundJournalChildM11w.py'
+      - 'tests/tasks/fixtures/TaskBoundJournalProbeM11w.py'
+      - 'tests/tasks/test_task_bound_journal_probe_m11w.py'
+      - 'docs/tasks-synthetic-durable-owner-binding-m11w.md'
+      - '.github/workflows/tasks-synthetic-journal-owner-m11w.yml'
+      - 'services/projects/TaskJsonGateCandidateM11l.py'
+      - 'services/hub/ApolloHubTodoStore.qml'
+  push:
+    branches: [main]
+    paths:
+      - 'tests/tasks/fixtures/TaskBoundJournalChildM11w.py'
+      - 'tests/tasks/fixtures/TaskBoundJournalProbeM11w.py'
+      - 'tests/tasks/test_task_bound_journal_probe_m11w.py'
+      - 'docs/tasks-synthetic-durable-owner-binding-m11w.md'
+      - '.github/workflows/tasks-synthetic-journal-owner-m11w.yml'
+      - 'services/projects/TaskJsonGateCandidateM11l.py'
+      - 'services/hub/ApolloHubTodoStore.qml'
+
+permissions:
+  contents: read
+
+jobs:
+  sealed-disposable-owner:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: M11w sealed child and durable owner restart matrix
+        run: python3 tests/tasks/test_task_bound_journal_probe_m11w.py
+      - name: M11v interpreter process and session correlation
+        run: python3 tests/tasks/test_task_interpreter_process_probe_m11v.py
+      - name: M11u synthetic script source identity
+        run: python3 tests/tasks/test_task_host_trust_capsule_m11u.py
+      - name: M11p existing journal crash and replay semantics
+        run: python3 tests/tasks/test_task_stage_replay_crash_m11p.py
+      - name: M11t production gate contract and M11d single writer
+        run: |
+          python3 tests/tasks/test_task_production_trust_contract_m11t.py
+          python3 tests/tasks/test_task_writer_gate_inventory_m11d.py

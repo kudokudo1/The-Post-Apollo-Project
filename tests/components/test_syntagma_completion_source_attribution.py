@@ -56,4 +56,36 @@ for begin, operation, end in (
 assert git.count("    Process {") == 6
 assert hospital.count("    Timer {") == 1
 assert hospital.count("    Process {") == 1
-print("SYNTAGMA V5 COMPLETION ATTRIBUTION // SOURCE GUARDS PASS; RUNTIME UNTESTED")
+
+# Opt-in SplitParser read attribution. The source keeps the existing process
+# and timer lifecycle, samples ordinary lines, and logs only static slot labels,
+# lengths, monotonically increasing sequence numbers, and handler timings.
+git_service = (root / "services/git/GitService.qml").read_text(encoding="utf-8")
+hospital_service = sources["hospital-topology"]
+for service_name, src in (("git-service", git_service),
+                          ("hospital-topology", hospital_service)):
+    assert 'function beginSplitRead(slot, line)' in src, service_name
+    assert 'function endSplitRead(slot, trace)' in src, service_name
+    assert 'if (!subprocessLagProbeEnabled)\n            return null;' in src, service_name
+    assert 'size >= 2048 || sequence % 64 === 1' in src, service_name
+    assert 'elapsedMs >= 25' in src, service_name
+    assert src.count(f'SYNTAGMA_SPLIT_READ_PROBE // service={service_name}') == 2
+    helper = src.split('function beginSplitRead(slot, line)', 1)[1].split('function endSplitRead(slot, trace)', 1)[0]
+    assert 'String(line || "").length' in helper
+    assert 'console.warn(' in helper
+    assert 'line +' not in helper and 'line)' not in helper.split('console.warn(', 1)[1]
+for slot in ("repo", "refresh", "action"):
+    for channel in ("stdout", "stderr"):
+        label = f'{slot}-{channel}'
+        assert git_service.count(f'beginSplitRead("{label}", line)') == 1, label
+        assert git_service.count(f'endSplitRead("{label}", splitReadTrace)') >= 1, label
+assert git_service.count("    Process {") == 3
+assert git_service.count("    Timer {") >= 1
+for channel in ("stdout", "stderr"):
+    label = f'topology-{channel}'
+    assert hospital_service.count(f'beginSplitRead("{label}", line)') == 1
+    assert hospital_service.count(f'endSplitRead("{label}", splitReadTrace)') == 1
+assert hospital_service.count("    Process {") == 1
+assert hospital_service.count("    Timer {") == 1
+
+print("SYNTAGMA V5 COMPLETION + SPLIT READ ATTRIBUTION // SOURCE GUARDS PASS; RUNTIME UNTESTED")

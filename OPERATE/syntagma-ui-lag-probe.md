@@ -715,3 +715,56 @@ unchanged. Uninstrumented completion paths still exist.
 approved. After an authorized merge, the current opt-in subprocess flag
 automatically enables these labels on the next controlled Quickshell launch.
 Rollback: relaunch without that flag; no persistent data is changed.
+
+
+## October 29 // SplitParser.onRead attribution trial (draft)
+
+**Evidence:** The operator captured three nearly identical `eu-stack -1`
+samples at 18:34:01, 18:34:03, and 18:34:05 on October 28. The main
+thread was inside `StringPrototype::method_split` and Qt array allocation,
+called from `QQmlBoundSignalExpression` via `SplitParser::parseBytes` /
+`Process::onStdoutReadyRead`. This identifies the type of work but **not**
+the originating QML file, command, or byte content.
+
+**Narrow source coverage:** The Git repo-scan, Git refresh, Git action, and
+Hospital topology `SplitParser.onRead` stdout/stderr handlers receive
+opt-in entry/exit probes, using the existing
+`POST_APOLLO_SUBPROCESS_LAG_PROBE=1` flag. The sole new log prefix is
+`SYNTAGMA_SPLIT_READ_PROBE //`. It records a static service/slot/stage label,
+input **character** length, monotonically increasing per-service sequence,
+timestamp, and handler wall time on exit. It never logs line content,
+paths, Git subjects, credentials, or stderr details.
+
+To avoid making an existing performance problem worse, entry and paired
+exit markers are generated for every 64th ordinary line and all lines
+of 2,048 or more characters. **Every callback reaching 25 ms still logs
+an exit marker**, even if its entry was unsampled. A stalled ordinary
+unsampled line might produce no marker, so lack of a matching entry does
+not rule out a handler. A very large line is always sampled. A native
+stack within Qt's `SplitParser::parseBytes` *before* delivery of onRead
+would likewise not be visible to these QML markers.
+
+**Ownership boundary:** Media/CAVA is deliberately **not modified** in
+this PR; it has a separate worker/owner. Its `modules/Mediaplayer.qml`
+`SplitParser` remains a candidate and requires a separate owner-coordinated
+diagnostic or review. The Network bool warnings are a different issue.
+
+**Verification/rollout:** Source-only contract checks run in the
+existing `syntagma-ui-lag-probe.yml` workflow. This is not a performance
+fix. After operator review/merge and a safe local update (do not
+overwrite untracked or dirty files), an **explicitly approved** Quickshell
+restart with the existing flag can gather:
+
+```bash
+qs log --tail 5000 | rg 'SYNTAGMA_(SPLIT_READ|SUBPROCESS|LAG)_PROBE'
+```
+
+Align markers by `tsMs` with the frozen thread stack and event-loop
+gap. If a sampled begin is present without its end during a captured
+freeze, inspect that static slot. Do not infer guilt from log proximity
+alone; instrumentation itself imposes some overhead.
+
+**Rollback:** relaunch without `POST_APOLLO_SUBPROCESS_LAG_PROBE=1`
+after operator authorization. Default startup gains only dormant guards.
+No timer, process, parsing algorithm, data store, UI, or poll frequency
+is added or changed by this draft.

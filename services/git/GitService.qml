@@ -18,6 +18,38 @@ Scope {
                      + " tsMs=" + Date.now());
     }
 
+    // Opt-in, low-volume attribution of the existing SplitParser.onRead work.
+    // Every 64th ordinary line and every >=2 KiB line gets paired markers.
+    // Slow callbacks always get a completion marker; raw data is never logged.
+    property int splitReadProbeSequence: 0
+
+    function beginSplitRead(slot, line) {
+        if (!subprocessLagProbeEnabled)
+            return null;
+        const size = String(line || "").length;
+        const sequence = ++splitReadProbeSequence;
+        const now = Date.now();
+        const sampled = size >= 2048 || sequence % 64 === 1;
+        if (sampled)
+            console.warn("SYNTAGMA_SPLIT_READ_PROBE // service=git-service"
+                         + " stage=" + slot + ":begin"
+                         + " size=" + size + " seq=" + sequence
+                         + " tsMs=" + now);
+        return { startedAtMs: now, size: size, seq: sequence, sampled: sampled };
+    }
+
+    function endSplitRead(slot, trace) {
+        if (!trace)
+            return;
+        const now = Date.now();
+        const elapsedMs = now - trace.startedAtMs;
+        if (trace.sampled || elapsedMs >= 25)
+            console.warn("SYNTAGMA_SPLIT_READ_PROBE // service=git-service"
+                         + " stage=" + slot + ":end"
+                         + " size=" + trace.size + " seq=" + trace.seq
+                         + " elapsedMs=" + elapsedMs + " tsMs=" + now);
+    }
+
     // Diagnostic only. No extra polling, delayed initialization or changes
     // to repo discovery. The measurements are dormant unless opted in.
     readonly property bool syntagmaStartupTraceEnabled:
@@ -2729,6 +2761,7 @@ Scope {
 
         stdout: SplitParser {
             onRead: function(line) {
+                const splitReadTrace = gitService.beginSplitRead("repo-stdout", line);
                 const probeDone = gitService.subprocessLagProbeEnabled
                     && String(line || "").split("\t")[0] === "DONE";
                 if (probeDone)
@@ -2737,6 +2770,7 @@ Scope {
                     gitService.consumeRepoLine(line);
                     if (probeDone)
                         gitService.traceSubprocessLag("repo:DONE:end", gitService.repoCount);
+                    gitService.endSplitRead("repo-stdout", splitReadTrace);
                     return;
                 }
 
@@ -2761,14 +2795,17 @@ Scope {
                 }
                 if (probeDone)
                     gitService.traceSubprocessLag("repo:DONE:end", gitService.repoCount);
+                gitService.endSplitRead("repo-stdout", splitReadTrace);
             }
         }
 
         stderr: SplitParser {
             onRead: function(line) {
+                const splitReadTrace = gitService.beginSplitRead("repo-stderr", line);
                 const message = String(line || "").trim();
                 if (message)
                     gitService.lastError = message;
+                gitService.endSplitRead("repo-stderr", splitReadTrace);
             }
         }
     }
@@ -2778,6 +2815,7 @@ Scope {
 
         stdout: SplitParser {
             onRead: function(line) {
+                const splitReadTrace = gitService.beginSplitRead("refresh-stdout", line);
                 const probeDone = gitService.subprocessLagProbeEnabled
                     && String(line || "").split("\t")[0] === "DONE";
                 if (probeDone)
@@ -2786,6 +2824,7 @@ Scope {
                     gitService.consumeRefreshLine(line);
                     if (probeDone)
                         gitService.traceSubprocessLag("refresh:DONE:end", gitService.pendingTopology.length);
+                    gitService.endSplitRead("refresh-stdout", splitReadTrace);
                     return;
                 }
 
@@ -2820,14 +2859,17 @@ Scope {
                 }
                 if (probeDone)
                     gitService.traceSubprocessLag("refresh:DONE:end", gitService.pendingTopology.length);
+                gitService.endSplitRead("refresh-stdout", splitReadTrace);
             }
         }
 
         stderr: SplitParser {
             onRead: function(line) {
+                const splitReadTrace = gitService.beginSplitRead("refresh-stderr", line);
                 const message = String(line || "").trim();
                 if (message.length > 0)
                     gitService.lastError = message;
+                gitService.endSplitRead("refresh-stderr", splitReadTrace);
             }
         }
     }
@@ -2847,18 +2889,22 @@ Scope {
 
         stdout: SplitParser {
             onRead: function(line) {
+                const splitReadTrace = gitService.beginSplitRead("action-stdout", line);
                 gitService.consumeActionLine(line);
+                gitService.endSplitRead("action-stdout", splitReadTrace);
             }
         }
 
         stderr: SplitParser {
             onRead: function(line) {
+                const splitReadTrace = gitService.beginSplitRead("action-stderr", line);
                 const message = String(line || "").trim();
 
                 if (message.length > 0)
                     gitService.actionOutput += (
                         gitService.actionOutput.length > 0 ? "\n" : ""
                     ) + gitService.friendlyActionError(message);
+                gitService.endSplitRead("action-stderr", splitReadTrace);
             }
         }
     }

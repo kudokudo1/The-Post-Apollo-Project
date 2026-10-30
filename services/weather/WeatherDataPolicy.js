@@ -192,6 +192,20 @@ function parseForecast(data, current, hourlyLimit) {
     };
 }
 
+function parseAirQualityContext(root) {
+    const source = root || {};
+    const seconds = finiteNumber(source.utc_offset_seconds, null);
+    const offsetValid = seconds !== null
+        && seconds >= -43200 && seconds <= 50400;
+
+    return {
+        utcOffsetMinutes: offsetValid ? seconds / 60 : null,
+        timezone: textValue(source.timezone, ""),
+        timezoneAbbreviation:
+            textValue(source.timezone_abbreviation, "")
+    };
+}
+
 function parseAirQuality(current) {
     const source = current || {};
     const result = {

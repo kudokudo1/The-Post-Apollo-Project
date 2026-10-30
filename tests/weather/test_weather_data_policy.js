@@ -19,6 +19,7 @@ for (const name of [
     "currentAtmosphere",
     "parseForecast",
     "parseAirQuality",
+    "parseAirQualityContext",
     "parseAirQualityForecast",
 ])
     assert.equal(typeof context[name], "function", name);
@@ -156,6 +157,31 @@ assert.equal(air.grassPollen, 3.5);
 assert.equal(air.ragweedPollen, 8.4);
 assert.equal(air.alderPollen, -1);
 assert.equal(air.pollenAvailable, true);
+
+const airContext = context.parseAirQualityContext({
+    utc_offset_seconds: -14400,
+    timezone: "America/New_York",
+    timezone_abbreviation: "EDT",
+});
+assert.equal(airContext.utcOffsetMinutes, -240);
+assert.equal(airContext.timezone, "America/New_York");
+assert.equal(airContext.timezoneAbbreviation, "EDT");
+
+const quarterHourContext = context.parseAirQualityContext({
+    utc_offset_seconds: 20700,
+    timezone: "Asia/Kathmandu",
+    timezone_abbreviation: "+0545",
+});
+assert.equal(quarterHourContext.utcOffsetMinutes, 345);
+assert.equal(
+    context.parseAirQualityContext({utc_offset_seconds: -50000})
+        .utcOffsetMinutes,
+    null
+);
+assert.equal(
+    context.parseAirQualityContext({}).utcOffsetMinutes,
+    null
+);
 
 const noPollen = context.parseAirQuality({
     us_aqi: 20,

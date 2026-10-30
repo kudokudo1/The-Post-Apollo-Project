@@ -768,3 +768,54 @@ alone; instrumentation itself imposes some overhead.
 after operator authorization. Default startup gains only dormant guards.
 No timer, process, parsing algorithm, data store, UI, or poll frequency
 is added or changed by this draft.
+
+
+## October 30 // ProcessTelemetry completion source attribution (draft, owner review required)
+
+The operator's completed 14:46–14:49 native capture sampled a hot Quickshell
+main thread during 30–62.5-second event-loop stalls. Native stacks repeatedly
+showed Qt V4 array allocation in `String.split`, `Array.slice`, and
+`Array.push`, reached through both `Process::onFinished` and
+`SplitParser::parseBytes`. These show the engine operation, **not** a QML
+file identity.
+
+The existing Git History and GitHub service source already has
+`SYNTAGMA_SUBPROCESS_PROBE` completion markers, but **neither appeared**
+in the operator's 1,650-line filtered capture. The absence of those markers
+does not prove those services cannot cause future freezes; it makes another
+patch to those same callbacks uninformative for this incident.
+
+This draft covers the missing `StdioCollector.onStreamFinished` entry/exit
+identity in `services/system/ProcessTelemetry.qml`, for the existing
+`detailProbeProcess`, `snapshotProcess`, and `miniProbeProcess`, both
+stdout and stderr. Its `parseSnapshot` output uses `split()`, `slice()`
+and `push()`, so it is a relevant **candidate**, not a demonstrated root cause.
+The same existing flag `POST_APOLLO_SUBPROCESS_LAG_PROBE=1` enables it;
+default startup remains unchanged.
+
+Marker prefix: `SYNTAGMA_COMPLETION_PROBE // service=process-telemetry`.
+Static slot labels and input character length, per-instance sequence, entry
+timestamp, and exit elapsed milliseconds are the only recorded fields.
+No raw input, process arguments, command, PID or task identity are logged.
+Logs are paired for every 16th ordinary callback and every input >=2,048
+characters; any callback of >=25ms additionally logs an end marker.
+Missing an unsampled short entry does not exclude a handler. `try/finally`
+ensures the end marker survives a JavaScript exception (if the runtime does
+not itself terminate). No processes, timers, execution frequency, parser,
+error handling, result publication, or UI state are changed.
+
+**Rollout:** Do not merge or restart locally as part of this diagnostic PR.
+Request Process/System Team 1 review of `ProcessTelemetry.qml` ownership
+before integration. After operator-reviewed merge, clean local update and
+approved restart with the flag, inspect:
+
+```bash
+qs log --tail 5000 | rg 'SYNTAGMA_(COMPLETION|LAG)_PROBE'
+```
+
+Compare same-session `tsMs` and `elapsedMs`; a completion entry without
+an end marker during a freeze is strong evidence of that callback being
+active, not independent proof of root cause. If these callbacks are absent
+or short, move to another uninstrumented owner rather than rewriting this
+parser. To disable instrumentation, relaunch without
+`POST_APOLLO_SUBPROCESS_LAG_PROBE=1` after operator approval.

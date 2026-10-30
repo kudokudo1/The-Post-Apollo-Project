@@ -1,0 +1,58 @@
+name: TASKS M11x production host architecture source-only review
+
+on:
+  pull_request:
+    paths:
+      - 'docs/tasks-production-host-architecture-m11x.md'
+      - 'tests/tasks/fixtures/task_production_architecture_review_m11x.json'
+      - 'tests/tasks/test_task_production_architecture_m11x.py'
+      - '.github/workflows/tasks-production-architecture-m11x.yml'
+      - 'services/hub/ApolloHubTodoStore.qml'
+      - 'services/hub/ApolloHubTodoPolicy.js'
+      - 'widgets/hub/ApolloHubTodoMini.qml'
+      - 'widgets/tasks/TaskDetailsPane.qml'
+      - 'widgets/tasks/TaskPlannerSchedulePane.qml'
+      - 'widgets/tasks/TaskProjectsPane.qml'
+      - 'tests/tasks/fixtures/task_writer_gate_inventory_m11d.json'
+  push:
+    branches: [main]
+    paths:
+      - 'docs/tasks-production-host-architecture-m11x.md'
+      - 'tests/tasks/fixtures/task_production_architecture_review_m11x.json'
+      - 'tests/tasks/test_task_production_architecture_m11x.py'
+      - '.github/workflows/tasks-production-architecture-m11x.yml'
+      - 'services/hub/ApolloHubTodoStore.qml'
+      - 'services/hub/ApolloHubTodoPolicy.js'
+      - 'widgets/hub/ApolloHubTodoMini.qml'
+      - 'widgets/tasks/TaskDetailsPane.qml'
+      - 'widgets/tasks/TaskPlannerSchedulePane.qml'
+      - 'widgets/tasks/TaskProjectsPane.qml'
+      - 'tests/tasks/fixtures/task_writer_gate_inventory_m11d.json'
+
+permissions:
+  contents: read
+
+jobs:
+  architecture-contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: M11x production architecture proposal, source UI and no activation
+        run: python3 tests/tasks/test_task_production_architecture_m11x.py
+      - name: M11t production trust contract is still unactivated
+        run: python3 tests/tasks/test_task_production_trust_contract_m11t.py
+      - name: M11k / M11q earlier production preflight source consistency
+        run: |
+          python3 tests/tasks/test_task_production_gate_review_m11k.py
+          python3 tests/tasks/test_task_production_preflight_m11q.py
+      - name: M11d one real TASKS writer and shared caller inventory
+        run: python3 tests/tasks/test_task_writer_gate_inventory_m11d.py
+      - name: M11w synthetic durable journal owner regression
+        run: python3 tests/tasks/test_task_bound_journal_probe_m11w.py

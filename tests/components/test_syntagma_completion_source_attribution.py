@@ -88,4 +88,31 @@ for channel in ("stdout", "stderr"):
 assert hospital_service.count("    Process {") == 1
 assert hospital_service.count("    Timer {") == 1
 
-print("SYNTAGMA V5 COMPLETION + SPLIT READ ATTRIBUTION // SOURCE GUARDS PASS; RUNTIME UNTESTED")
+
+# Owner-isolated opt-in completion probe for ProcessTelemetry.
+# Test verifies that all original stdout/stderr collectors retain their
+# parsing paths, process count and invocation lifecycle, while adding paired
+# exception-safe markers without ever logging subprocess content.
+process_telemetry = (root / "services/system/ProcessTelemetry.qml").read_text(encoding="utf-8")
+assert process_telemetry.count("    Process {") == 3
+assert 'Quickshell.env("POST_APOLLO_SUBPROCESS_LAG_PROBE")' in process_telemetry
+assert 'readonly property bool processCompletionProbeEnabled:' in process_telemetry
+assert 'if (!processCompletionProbeEnabled)\n            return null;' in process_telemetry
+assert process_telemetry.count("SYNTAGMA_COMPLETION_PROBE // service=process-telemetry") == 2
+assert 'count >= 2048 || seq % 16 === 1' in process_telemetry
+assert 'trace.sampled || elapsedMs >= 25' in process_telemetry
+assert process_telemetry.count("onStreamFinished: {") == 6
+assert process_telemetry.count("                } finally {") == 6
+assert process_telemetry.count("                const completionTrace = processTelemetry.beginCompletionProbe(") == 6
+assert process_telemetry.count("                    processTelemetry.endCompletionProbe(") == 6
+assert "const lines = String(output || \"\").split(\"\\n\");" in process_telemetry
+for stage in ("detail", "snapshot", "mini"):
+    for channel in ("stdout", "stderr"):
+        label = f"{stage}-{channel}"
+        assert process_telemetry.count(f'beginCompletionProbe("{label}", this.text.length)') == 1, label
+        assert process_telemetry.count(f'endCompletionProbe("{label}", completionTrace)') == 1, label
+probe_helpers = process_telemetry.split("function beginCompletionProbe(stage, characterCount)", 1)[1].split("\n    // Read-only process telemetry", 1)[0]
+for forbidden in ("this.text", "command:", "payload", "args", ".exec(", "processId"):
+    assert forbidden not in probe_helpers, forbidden
+
+print("SYNTAGMA V5 + PROCESS TELEMETRY COMPLETION ATTRIBUTION // SOURCE GUARDS PASS; RUNTIME UNTESTED")

@@ -1,0 +1,233 @@
+{
+  "schemaVersion": 1,
+  "milestone": "M11x",
+  "classification": "PROPOSED_ARCHITECTURE_REVIEW_ONLY",
+  "patient": "kudokudo1/The-Post-Apollo-Project",
+  "inspectedMain": "d348991eeb5895cd260d0bf06971784eae00f1ee",
+  "inherits": [
+    "M11k",
+    "M11t",
+    "M11w"
+  ],
+  "authority": {
+    "activeWriter": "JSON_FILEVIEW_SINGLETON_ONLY",
+    "path": "services/hub/ApolloHubTodoStore.qml",
+    "storageSuffix": "/apollo-hub-todo-v1.json",
+    "hardDisabledFlag": "readonly property bool guardedWriterEnabled: false",
+    "fileViewCount": 1,
+    "stageFunction": "stage(result)",
+    "publicMutationReturnsSynchronousBoolean": true,
+    "onSavedPublishesWithoutHostReadback": true,
+    "hostProductionIntegrationImplemented": false,
+    "taskSqliteMigrationImplemented": false
+  },
+  "callerContracts": {
+    "mutationMethods": [
+      "addTask",
+      "setTaskDone",
+      "renameTask",
+      "updateTaskDetails",
+      "createProject",
+      "assignTaskProject",
+      "renameProject",
+      "deleteProject",
+      "removeTask"
+    ],
+    "mutationCallers": {
+      "widgets/hub/ApolloHubTodoMini.qml": [
+        "addTask",
+        "renameTask",
+        "setTaskDone",
+        "removeTask"
+      ],
+      "widgets/tasks/TaskDetailsPane.qml": [
+        "updateTaskDetails"
+      ],
+      "widgets/tasks/TaskPlannerSchedulePane.qml": [
+        "addTask",
+        "updateTaskDetails"
+      ],
+      "widgets/tasks/TaskProjectsPane.qml": [
+        "createProject",
+        "renameProject",
+        "deleteProject",
+        "assignTaskProject"
+      ]
+    },
+    "readonlyConsumers": [
+      "widgets/tasks/TaskTodayPane.qml",
+      "widgets/tasks/TaskPlannerPane.qml",
+      "widgets/hub/ApolloHubCalendarMini.qml"
+    ],
+    "publicStates": [
+      "loading",
+      "saving",
+      "ready",
+      "empty",
+      "error",
+      "unsupported"
+    ],
+    "publicErrorViewMayHideConfirmedRows": true,
+    "guardedRecoveryMustPreserveConfirmedRowsAndDrafts": true,
+    "schedulingCreateAndDateAreSeparateActions": true
+  },
+  "architectureDecisions": [
+    {
+      "id": "INDEPENDENT_TRUST_ANCHOR",
+      "decision": "OPEN",
+      "choices": [
+        "Root/admin-managed signed deployment artifacts with independently verified identities",
+        "Equivalent independently authenticated and pinned deployment with separately reviewed threat model"
+      ],
+      "unacceptable": [
+        "Using a digest supplied by the untrusted child",
+        "Self-hashing mutable script as authority",
+        "Treating PIDFD/session nonce as executable attestation"
+      ]
+    },
+    {
+      "id": "SOURCE_BACKUP_BOUNDARY",
+      "decision": "OPEN",
+      "choices": [
+        "Stable source preflight plus independently rereadable exact backup and journal",
+        "Fail closed on changed/missing/ambiguous source"
+      ],
+      "unacceptable": [
+        "Changing M11l disposable directory rule",
+        "Restoring backup automatically",
+        "Assuming advisory flock excludes unrelated writers"
+      ]
+    },
+    {
+      "id": "ASYNC_MUTATION_RESULT",
+      "decision": "OPEN",
+      "choices": [
+        "A: retain Boolean for validation/queued request, never durable confirmation",
+        "B: replace with structured request ticket and explicit completion, update all four callers"
+      ],
+      "unacceptable": [
+        "Treat queued request as saved",
+        "Publish on FileView.onSaved without independent settlement",
+        "Allow second stage during existing pending stage"
+      ]
+    },
+    {
+      "id": "GUARDED_LAST_CONFIRMED_SNAPSHOT",
+      "decision": "OPEN",
+      "choices": [
+        "Separate read-only last-confirmed overlay in review",
+        "Explicitly review six-state TodoPolicy mapping and all consumers"
+      ],
+      "unacceptable": [
+        "Error/review empties confirmed visible tasks",
+        "Ambiguous source becomes writable empty document",
+        "Unreviewed seventh state"
+      ]
+    },
+    {
+      "id": "ROLLBACK_AND_RECOVERY",
+      "decision": "OPEN",
+      "choices": [
+        "Code-only rollback after quiescing writers; preserve data/journal/backup",
+        "Separate operator-authorized data recovery with comparison report"
+      ],
+      "unacceptable": [
+        "Silent overwrite of live JSON",
+        "Production startup auto replay",
+        "Dual JSON and SQLite writers"
+      ]
+    }
+  ],
+  "requiredOrderedStages": [
+    "TRUST_PRECHECK",
+    "SOURCE_PREFLIGHT",
+    "EXACT_BACKUP",
+    "HOST_OWNER_ATTACH",
+    "STAGE_RESERVE",
+    "SINGLE_FILEVIEW_WRITE",
+    "DEFERRED_NATIVE_READBACK",
+    "HOST_VERIFY_SETTLE",
+    "CONFIRMED_PUBLISH",
+    "FREEZE_OR_REVIEW",
+    "CODE_ONLY_ROLLBACK"
+  ],
+  "gates": [
+    {
+      "id": "TRUST_EXEC",
+      "state": "OPEN"
+    },
+    {
+      "id": "PROCESS_BINDING",
+      "state": "OPEN"
+    },
+    {
+      "id": "SOURCE_BACKUP",
+      "state": "OPEN"
+    },
+    {
+      "id": "STAGE_CALLBACK",
+      "state": "OPEN"
+    },
+    {
+      "id": "UI_CONTRACT",
+      "state": "OPEN"
+    },
+    {
+      "id": "RECOVERY_FREEZE",
+      "state": "OPEN"
+    },
+    {
+      "id": "ROLLBACK",
+      "state": "OPEN"
+    },
+    {
+      "id": "RUNTIME_ACCEPTANCE",
+      "state": "OPEN"
+    },
+    {
+      "id": "ACTIVATION_APPROVAL",
+      "state": "OPEN"
+    }
+  ],
+  "failureTestsPending": [
+    "WRONG_EXECUTABLE_PIN",
+    "UNKNOWN_HOST",
+    "SOURCE_REPLACED_DURING_PREFLIGHT",
+    "BACKUP_READBACK_MISMATCH",
+    "NONCOOPERATING_WRITER",
+    "DUPLICATE_STAGE",
+    "LATE_ONSAVED",
+    "DELAYED_ONLOADED",
+    "HOST_EXIT_BEFORE_RESERVATION",
+    "HOST_EXIT_AFTER_RESERVE",
+    "HOST_EXIT_AFTER_SAVED",
+    "HOST_EXIT_AFTER_READBACK",
+    "HOST_EXIT_AFTER_SETTLEMENT",
+    "FREEZE_WITH_PENDING_STAGE",
+    "RECOVERY_RESTART",
+    "WRONG_UI_COMMIT_CONFIRMATION",
+    "ROLLBACK_PRESERVES_TASK_JSON",
+    "DATA_RESTORE_REQUIRES_OPERATOR"
+  ],
+  "permission": {
+    "architectureReview": true,
+    "productionHostSourcePatch": false,
+    "productionTodoStorePatch": false,
+    "sourceDataAccess": false,
+    "localWorktreeChanges": false,
+    "merge": false,
+    "productionActivation": false,
+    "dataRestore": false,
+    "sqliteTaskMigration": false,
+    "liveHospitalRegistration": false
+  },
+  "changedByM11x": {
+    "productionStore": false,
+    "productionPolicy": false,
+    "uiCallers": false,
+    "productionHost": false,
+    "shell": false,
+    "userTasks": false,
+    "localMachine": false
+  }
+}

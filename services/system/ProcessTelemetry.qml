@@ -5,6 +5,39 @@ import Quickshell.Io
 Scope {
     id: processTelemetry
 
+
+    // Optional diagnostic of QProcess completion-induced QML allocations.
+    // No payload text, executable command, PID, or arguments are logged.
+    readonly property bool processCompletionProbeEnabled:
+        String(Quickshell.env("POST_APOLLO_SUBPROCESS_LAG_PROBE") || "").trim() === "1"
+    property int processCompletionProbeSequence: 0
+
+    function beginCompletionProbe(stage, characterCount) {
+        if (!processCompletionProbeEnabled)
+            return null;
+        const count = Math.max(0, Number(characterCount || 0));
+        const seq = ++processCompletionProbeSequence;
+        const now = Date.now();
+        const sampled = count >= 2048 || seq % 16 === 1;
+        if (sampled)
+            console.warn("SYNTAGMA_COMPLETION_PROBE // service=process-telemetry"
+                         + " stage=" + stage + ":begin"
+                         + " size=" + count + " seq=" + seq + " tsMs=" + now);
+        return { startedAtMs: now, count: count, seq: seq, sampled: sampled };
+    }
+
+    function endCompletionProbe(stage, trace) {
+        if (!trace)
+            return;
+        const now = Date.now();
+        const elapsedMs = now - trace.startedAtMs;
+        if (trace.sampled || elapsedMs >= 25)
+            console.warn("SYNTAGMA_COMPLETION_PROBE // service=process-telemetry"
+                         + " stage=" + stage + ":end"
+                         + " size=" + trace.count + " seq=" + trace.seq
+                         + " elapsedMs=" + elapsedMs + " tsMs=" + now);
+    }
+
     // Read-only process telemetry. Mutation (freeze/limit/terminate/restart)
     // deliberately remains outside this service.
     property var rows: []
@@ -474,20 +507,30 @@ Scope {
 
         stdout: StdioCollector {
             onStreamFinished: {
-                const sample = processTelemetry.parseDetailProbe(text);
-                processTelemetry.detailProbeLoading = false;
+                const completionTrace = processTelemetry.beginCompletionProbe("detail-stdout", this.text.length);
+                try {
+                    const sample = processTelemetry.parseDetailProbe(text);
+                    processTelemetry.detailProbeLoading = false;
 
-                if (sample)
-                    processTelemetry.detailProbeReady(sample);
-                else
-                    processTelemetry.detailProbeRetryRequested();
+                    if (sample)
+                        processTelemetry.detailProbeReady(sample);
+                    else
+                        processTelemetry.detailProbeRetryRequested();
+                } finally {
+                    processTelemetry.endCompletionProbe("detail-stdout", completionTrace);
+                }
             }
         }
 
         stderr: StdioCollector {
             onStreamFinished: {
-                processTelemetry.detailProbeLoading = false;
-                processTelemetry.detailProbeRetryRequested();
+                const completionTrace = processTelemetry.beginCompletionProbe("detail-stderr", this.text.length);
+                try {
+                    processTelemetry.detailProbeLoading = false;
+                    processTelemetry.detailProbeRetryRequested();
+                } finally {
+                    processTelemetry.endCompletionProbe("detail-stderr", completionTrace);
+                }
             }
         }
     }
@@ -497,24 +540,34 @@ Scope {
 
         stdout: StdioCollector {
             onStreamFinished: {
-                const parsed = processTelemetry.parseSnapshot(text);
-                processTelemetry.snapshotReady(parsed);
-                processTelemetry.processCount = parsed.length;
-                processTelemetry.snapshotLoading = false;
-                processTelemetry.snapshotError = "";
+                const completionTrace = processTelemetry.beginCompletionProbe("snapshot-stdout", this.text.length);
+                try {
+                    const parsed = processTelemetry.parseSnapshot(text);
+                    processTelemetry.snapshotReady(parsed);
+                    processTelemetry.processCount = parsed.length;
+                    processTelemetry.snapshotLoading = false;
+                    processTelemetry.snapshotError = "";
+                } finally {
+                    processTelemetry.endCompletionProbe("snapshot-stdout", completionTrace);
+                }
             }
         }
 
         stderr: StdioCollector {
             onStreamFinished: {
-                const message = String(text || "").trim();
+                const completionTrace = processTelemetry.beginCompletionProbe("snapshot-stderr", this.text.length);
+                try {
+                    const message = String(text || "").trim();
 
-                if (message.length > 0) {
-                    processTelemetry.snapshotError = message;
-                    console.log("ProcessTelemetry: task manager:", message);
+                    if (message.length > 0) {
+                        processTelemetry.snapshotError = message;
+                        console.log("ProcessTelemetry: task manager:", message);
+                    }
+
+                    processTelemetry.snapshotLoading = false;
+                } finally {
+                    processTelemetry.endCompletionProbe("snapshot-stderr", completionTrace);
                 }
-
-                processTelemetry.snapshotLoading = false;
             }
         }
     }
@@ -524,15 +577,25 @@ Scope {
 
         stdout: StdioCollector {
             onStreamFinished: {
-                const parsed = processTelemetry.parseMiniProbe(text);
-                processTelemetry.miniProbeReady(parsed);
-                processTelemetry.miniProbeLoading = false;
+                const completionTrace = processTelemetry.beginCompletionProbe("mini-stdout", this.text.length);
+                try {
+                    const parsed = processTelemetry.parseMiniProbe(text);
+                    processTelemetry.miniProbeReady(parsed);
+                    processTelemetry.miniProbeLoading = false;
+                } finally {
+                    processTelemetry.endCompletionProbe("mini-stdout", completionTrace);
+                }
             }
         }
 
         stderr: StdioCollector {
             onStreamFinished: {
-                processTelemetry.miniProbeLoading = false;
+                const completionTrace = processTelemetry.beginCompletionProbe("mini-stderr", this.text.length);
+                try {
+                    processTelemetry.miniProbeLoading = false;
+                } finally {
+                    processTelemetry.endCompletionProbe("mini-stderr", completionTrace);
+                }
             }
         }
     }

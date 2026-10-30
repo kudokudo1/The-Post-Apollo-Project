@@ -82,7 +82,11 @@ class ArchitectureContract(unittest.TestCase):
         self.assertEqual(set(callers["mutationCallers"]),
                          set(inventory["callers"]))
         for name, methods in callers["mutationCallers"].items():
-            self.assertEqual(set(methods), set(inventory["callers"][name]))
+            # M11d inventories both mutations and reloadFromDisk (read).
+            # M11x lists mutation ownership only, so filter out read routes.
+            inventory_mutations = set(inventory["callers"][name]) - set(
+                inventory["readMethods"])
+            self.assertEqual(set(methods), inventory_mutations)
             source = (ROOT / name).read_text(encoding="utf-8")
             for method in methods:
                 with self.subTest(file=name, method=method):

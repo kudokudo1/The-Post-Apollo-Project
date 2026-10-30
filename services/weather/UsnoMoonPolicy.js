@@ -67,13 +67,19 @@ function requestInfo(dateValue, latitudeValue, longitudeValue, offsetMinutes) {
     const latitude = finite(latitudeValue);
     const longitude = finite(longitudeValue);
     const tz = offsetHoursText(offsetMinutes);
-    if (!validDate(date)
-            || latitude === null || Math.abs(latitude) > 90
-            || longitude === null || Math.abs(longitude) > 180
-            || tz === "") {
+    const dateValid = validDate(date);
+    const coordinatesValid =
+        latitude !== null && Math.abs(latitude) <= 90
+        && longitude !== null && Math.abs(longitude) <= 180;
+    const offsetValid = tz !== "";
+
+    if (!dateValid || !coordinatesValid || !offsetValid) {
         return {
             valid:false, key:"", endpoint:"", tzHours:"",
-            date:date, latitude:latitude, longitude:longitude
+            date:date, latitude:latitude, longitude:longitude,
+            dateValid:dateValid,
+            coordinatesValid:coordinatesValid,
+            offsetValid:offsetValid
         };
     }
 
@@ -87,6 +93,9 @@ function requestInfo(dateValue, latitudeValue, longitudeValue, offsetMinutes) {
         latitude:latitude,
         longitude:longitude,
         tzHours:tz,
+        dateValid:true,
+        coordinatesValid:true,
+        offsetValid:true,
         endpoint:
             "https://aa.usno.navy.mil/api/rstt/oneday"
             + "?date=" + encodeURIComponent(date)

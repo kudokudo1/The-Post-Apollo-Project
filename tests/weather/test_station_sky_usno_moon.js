@@ -46,6 +46,9 @@ const request = ctx.requestInfo(
 );
 assert.equal(request.valid, true);
 assert.equal(request.tzHours, "-4");
+assert.equal(request.dateValid, true);
+assert.equal(request.coordinatesValid, true);
+assert.equal(request.offsetValid, true);
 assert.equal(
     request.endpoint,
     "https://aa.usno.navy.mil/api/rstt/oneday"
@@ -62,7 +65,15 @@ assert.equal(
     false
 );
 assert.equal(
+    ctx.requestInfo("bad-date", 38.9, -77, -240).dateValid,
+    false
+);
+assert.equal(
     ctx.requestInfo("2026-10-28", "", -77, -240).valid,
+    false
+);
+assert.equal(
+    ctx.requestInfo("2026-10-28", "", -77, -240).coordinatesValid,
     false
 );
 assert.equal(
@@ -71,6 +82,10 @@ assert.equal(
 );
 assert.equal(
     ctx.requestInfo("2026-10-28", 38.9, -77, null).valid,
+    false
+);
+assert.equal(
+    ctx.requestInfo("2026-10-28", 38.9, -77, null).offsetValid,
     false
 );
 
@@ -197,12 +212,27 @@ assert.doesNotMatch(service, /dst=/);
 assert.match(service, /--proto", "=https"/);
 assert.match(service, /Post-Apollo-WeatherStation\/0\.5/);
 
+const weatherService = read("services/weather/WeatherService.qml");
+assert.match(weatherService, /property var airQualityUtcOffsetMinutes: null/);
+assert.match(weatherService, /property string airQualityTimezone: ""/);
+assert.match(weatherService, /WeatherDataPolicy\.parseAirQualityContext\(root\)/);
+assert.match(weatherService, /airQualityUtcOffsetMinutes = context\.utcOffsetMinutes/);
+assert.match(weatherService, /&timezone=auto/);
+
 const sky = read("widgets/weather/StationSky.qml");
 assert.match(sky, /import "\.\.\/\.\.\/services\/weather" as WeatherServices/);
 assert.match(sky, /WeatherServices\.UsnoMoonService\s*\{/);
 assert.match(sky, /active: sky\.visible/);
 assert.match(sky, /date: sky\.skyCycle\.date/);
-assert.match(sky, /offsetMinutes: sky\.twilightSummary\.calibrationOffsetMinutes/);
+assert.match(sky, /readonly property bool openMeteoCivilOffsetAvailable/);
+assert.match(sky, /weatherService\.airQualityUtcOffsetMinutes/);
+assert.match(sky, /readonly property var moonCivilOffsetMinutes/);
+assert.match(sky, /\? Number\(weatherService\.airQualityUtcOffsetMinutes\)/);
+assert.match(sky, /: twilightSummary\.calibrationOffsetMinutes/);
+assert.match(sky, /offsetMinutes: sky\.moonCivilOffsetMinutes/);
+assert.match(sky, /moonCivilOffsetSource/);
+assert.match(sky, /OPEN-METEO TIMEZONE/);
+assert.match(sky, /SUNRISE CALIBRATION/);
 assert.match(sky, /title: "MOON \/\/ USNO EPHEMERIS"/);
 assert.match(sky, /text: "MOONRISE"/);
 assert.match(sky, /text: "UPPER TRANSIT"/);
@@ -216,7 +246,10 @@ assert.match(sky, /moonService\.ephemeris\.phase/);
 assert.match(sky, /moonService\.ephemeris\.illumination/);
 assert.match(sky, /NO MOONRISE OR MOONSET FOR THIS LOCAL DATE/);
 assert.match(sky, /DATE-SCOPED REQUEST/);
-assert.match(sky, /CALIBRATED WEATHER CIVIL OFFSET/);
+assert.match(sky, /OPEN-METEO RESOLVED CIVIL OFFSET/);
+assert.match(sky, /SUNRISE CALIBRATION FALLBACK/);
+assert.match(sky, /function moonInputIssue\(\)/);
+assert.match(sky, /INVALID\/MISSING/);
 
 const astronomyStart = sky.indexOf(
     'title: "ASTRONOMY // SUN + MOON"'

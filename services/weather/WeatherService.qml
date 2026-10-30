@@ -82,6 +82,11 @@ Scope {
     property real ragweedPollen: -1
     property bool pollenAvailable: false
     property string airQualitySourceTime: ""
+    // timezone=auto metadata from the SAME Open-Meteo AQ response.
+    // Used by SKY for civil-time astronomy; no extra request.
+    property var airQualityUtcOffsetMinutes: null
+    property string airQualityTimezone: ""
+    property string airQualityTimezoneAbbreviation: ""
 
     // Forecast points ride along with the existing AQI request.
     property var airQualityForecast: []
@@ -309,6 +314,12 @@ Scope {
     function parseAirQuality(rawText) {
         try {
             const root = JSON.parse(rawText);
+            const context =
+                WeatherDataPolicy.parseAirQualityContext(root);
+            airQualityUtcOffsetMinutes = context.utcOffsetMinutes;
+            airQualityTimezone = context.timezone;
+            airQualityTimezoneAbbreviation =
+                context.timezoneAbbreviation;
 
             if (!root.current)
                 throw new Error("No current AQI data");

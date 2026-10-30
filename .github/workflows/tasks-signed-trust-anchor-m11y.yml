@@ -1,0 +1,44 @@
+name: TASKS M11y signed synthetic release trust-anchor refusal matrix
+
+on:
+  pull_request:
+    paths:
+      - 'tests/tasks/fixtures/TaskSignedReleaseVerifierM11y.cjs'
+      - 'tests/tasks/test_task_signed_release_verifier_m11y.cjs'
+      - 'docs/tasks-signed-release-trust-anchor-m11y.md'
+      - '.github/workflows/tasks-signed-trust-anchor-m11y.yml'
+      - 'services/hub/ApolloHubTodoStore.qml'
+      - 'shell.qml'
+  push:
+    branches: [main]
+    paths:
+      - 'tests/tasks/fixtures/TaskSignedReleaseVerifierM11y.cjs'
+      - 'tests/tasks/test_task_signed_release_verifier_m11y.cjs'
+      - 'docs/tasks-signed-release-trust-anchor-m11y.md'
+      - '.github/workflows/tasks-signed-trust-anchor-m11y.yml'
+      - 'services/hub/ApolloHubTodoStore.qml'
+      - 'shell.qml'
+
+permissions:
+  contents: read
+
+jobs:
+  synthetic-signed-release:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: M11y Ed25519 independent-input and synthetic release negative tests
+        run: node --test tests/tasks/test_task_signed_release_verifier_m11y.cjs
+      - name: M11x no-authority production architecture review
+        run: python3 tests/tasks/test_task_production_architecture_m11x.py
+      - name: M11t nine open production trust gates
+        run: python3 tests/tasks/test_task_production_trust_contract_m11t.py
+      - name: M11d single TASKS writer source inventory
+        run: python3 tests/tasks/test_task_writer_gate_inventory_m11d.py

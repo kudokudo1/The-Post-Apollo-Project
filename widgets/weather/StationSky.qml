@@ -85,13 +85,29 @@ Rectangle {
             weatherService ? weatherService.longitude : "",
             twilightSummary.calibrationOffsetMinutes
         )
+    readonly property bool openMeteoCivilOffsetAvailable: {
+        if (!weatherService
+                || weatherService.airQualityUtcOffsetMinutes === undefined
+                || weatherService.airQualityUtcOffsetMinutes === null)
+            return false;
+        const value = Number(weatherService.airQualityUtcOffsetMinutes);
+        return isFinite(value) && value >= -720 && value <= 840;
+    }
+    readonly property var moonCivilOffsetMinutes:
+        openMeteoCivilOffsetAvailable
+        ? Number(weatherService.airQualityUtcOffsetMinutes)
+        : twilightSummary.calibrationOffsetMinutes
+    readonly property string moonCivilOffsetSource:
+        openMeteoCivilOffsetAvailable
+        ? "OPEN-METEO TIMEZONE"
+        : "SUNRISE CALIBRATION"
     WeatherServices.UsnoMoonService {
         id: moonService
         active: sky.visible
         date: sky.skyCycle.date
         latitude: sky.weatherService ? sky.weatherService.latitude : ""
         longitude: sky.weatherService ? sky.weatherService.longitude : ""
-        offsetMinutes: sky.twilightSummary.calibrationOffsetMinutes
+        offsetMinutes: sky.moonCivilOffsetMinutes
     }
 
     readonly property string currentCelestialMode:
@@ -110,6 +126,20 @@ Rectangle {
             return "UTC --";
         const number = Number(text);
         return "UTC" + (isFinite(number) && number >= 0 ? "+" : "") + text;
+    }
+
+    function moonInputIssue() {
+        const request = moonService.request || {};
+        const missing = [];
+        if (!request.dateValid)
+            missing.push("DATE");
+        if (!request.coordinatesValid)
+            missing.push("COORDINATES");
+        if (!request.offsetValid)
+            missing.push("CIVIL OFFSET");
+        return missing.length > 0
+            ? "INVALID/MISSING " + missing.join(" + ")
+            : "INPUTS WAITING";
     }
 
     // Normalized live telemetry scales preserved from the original page.
@@ -764,8 +794,9 @@ Rectangle {
                             + sky.utcOffsetLabel(
                                   moonService.request.tzHours
                               )
+                            + " // " + sky.moonCivilOffsetSource
                             + " // " + moonService.request.date
-                          : "REQUIRES WEATHER DATE + COORDINATES + CALIBRATED CIVIL OFFSET"
+                          : sky.moonInputIssue()
                     elide: Text.ElideRight
                     font.pixelSize: 9
                 }
@@ -872,7 +903,7 @@ Rectangle {
 
             QuietText {
                 width: parent.width
-                text: "USNO ONE-DAY RISE/SET/TRANSIT // LOCAL CLOCK FROM CALIBRATED WEATHER CIVIL OFFSET // DATE-SCOPED REQUEST"
+                text: "USNO ONE-DAY RISE/SET/TRANSIT // OPEN-METEO RESOLVED CIVIL OFFSET // SUNRISE CALIBRATION FALLBACK // DATE-SCOPED REQUEST"
                 font.pixelSize: 9
             }
         }

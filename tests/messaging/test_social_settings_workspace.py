@@ -77,7 +77,7 @@ class SettingsContactChatWorkspaceContracts(unittest.TestCase):
             "// This entry point is always visible", 1
         )[0]
         for part in (
-            'text: "IDENTITIES"', 'text: "LINKED ACCOUNTS"',
+            'text: "IDENTITIES"', 'text: "ACCOUNT NAMES"',
             'text: "IDENTITY DETAILS"', "id: newIdentityName",
             'text: "DEFAULT EMAIL"', 'text: "DEFAULT PHONE"',
             "SocialIdentityStore.selectIdentity(modelData.id)",

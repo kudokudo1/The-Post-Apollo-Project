@@ -173,6 +173,14 @@ Rectangle {
 
     function refreshAccountForm() {
         var id = identitySnapshot.activeId;
+        // On an identity switch never temporarily rebind the previous
+        // identity's selected service/account ID to the new identity.
+        if (accountEditorIdentityId !== id) {
+            accountSelectedServiceId = "";
+            accountSelectedEntryId = "";
+            pendingAccountRemovalId = "";
+            accountAppPickerOpen = false;
+        }
         accountEditorIdentityId = id;
         var entry = SocialAccountDetailsStore.recordFor(id);
         accountEmailInput.text = entry.email || "";
@@ -1279,49 +1287,6 @@ Rectangle {
                     font.pixelSize: 11
                     wrapMode: Text.WordWrap
                 }
-                Text {
-                    width: parent.width
-                    text: "BROWSER SESSIONS"
-                    color: Colors.cyan
-                    font.bold: true
-                    font.pixelSize: 10
-                    wrapMode: Text.WordWrap
-                }
-                Text {
-                    width: parent.width
-                    text: appSelector.isolatedBrowserModeActive
-                          ? "ISOLATED // EACH IDENTITY HAS NEW, SEPARATE BROWSER SIGN-IN"
-                          : "LEGACY // CURRENT BROWSER ACCOUNTS ARE SHARED"
-                    color: Colors.white
-                    font.pixelSize: 9
-                    wrapMode: Text.WordWrap
-                }
-                Text {
-                    width: parent.width
-                    text: "This session only. Existing profiles stay untouched. New profiles start signed out."
-                    color: Colors.orange
-                    font.pixelSize: 9
-                    wrapMode: Text.WordWrap
-                }
-                ActionButton {
-                    width: parent.width
-                    height: 36
-                    label: appSelector.isolatedBrowserModeActive
-                           ? "USE LEGACY BROWSERS" : "USE ISOLATED BROWSERS"
-                    labelPixelSize: 9
-                    labelMinimumPixelSize: 8
-                    contentPadding: 3
-                    interactive: appSelector.isolatedBrowserToggleAllowed
-                                 && appSelector.identitySnapshot.writable
-                    onTriggered: appSelector.isolatedBrowserModeToggleRequested()
-                }
-                Text {
-                    width: parent.width
-                    text: "SETUP NOTES ONLY. A label does not connect or sign in."
-                    color: Colors.white
-                    font.pixelSize: 9
-                    wrapMode: Text.WordWrap
-                }
                 // The closed picker consumes one row instead of 32 stacked
                 // buttons. On open it shows the entire canonical service list,
                 // not just the old eight matching entries.
@@ -1593,6 +1558,49 @@ Rectangle {
                             appSelector.accountSelectedServiceId,
                             appSelector.accountSelectedEntryId);
                     }
+                }
+                Text {
+                    width: parent.width
+                    text: "BROWSER SESSIONS"
+                    color: Colors.cyan
+                    font.bold: true
+                    font.pixelSize: 10
+                    wrapMode: Text.WordWrap
+                }
+                Text {
+                    width: parent.width
+                    text: appSelector.isolatedBrowserModeActive
+                          ? "ISOLATED // EACH IDENTITY HAS NEW, SEPARATE BROWSER SIGN-IN"
+                          : "LEGACY // CURRENT BROWSER ACCOUNTS ARE SHARED"
+                    color: Colors.white
+                    font.pixelSize: 9
+                    wrapMode: Text.WordWrap
+                }
+                Text {
+                    width: parent.width
+                    text: "This session only. Existing profiles stay untouched. New profiles start signed out."
+                    color: Colors.orange
+                    font.pixelSize: 9
+                    wrapMode: Text.WordWrap
+                }
+                ActionButton {
+                    width: parent.width
+                    height: 36
+                    label: appSelector.isolatedBrowserModeActive
+                           ? "USE LEGACY BROWSERS" : "USE ISOLATED BROWSERS"
+                    labelPixelSize: 9
+                    labelMinimumPixelSize: 8
+                    contentPadding: 3
+                    interactive: appSelector.isolatedBrowserToggleAllowed
+                                 && appSelector.identitySnapshot.writable
+                    onTriggered: appSelector.isolatedBrowserModeToggleRequested()
+                }
+                Text {
+                    width: parent.width
+                    text: "SETUP NOTES ONLY. A label does not connect or sign in."
+                    color: Colors.white
+                    font.pixelSize: 9
+                    wrapMode: Text.WordWrap
                 }
                 Rectangle {
                     width: parent.width

@@ -188,12 +188,13 @@ function parse(root) {
         throw new Error("USNO CelNav data missing");
 
     const result = emptyResult();
-    result.date = shortText(
-        properties.year + "-"
-        + twoDigit(properties.month) + "-"
-        + twoDigit(properties.day),
-        16
-    );
+    const year = finite(properties.year);
+    const month = finite(properties.month);
+    const day = finite(properties.day);
+    result.date = year !== null && month !== null && day !== null
+        ? String(Math.floor(year)) + "-"
+          + twoDigit(month) + "-" + twoDigit(day)
+        : "";
     result.time = shortText(properties.time, 16);
 
     const planets = [];

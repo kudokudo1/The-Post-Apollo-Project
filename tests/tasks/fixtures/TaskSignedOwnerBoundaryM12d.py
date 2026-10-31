@@ -107,23 +107,15 @@ def execute(request):
     folder = safe_root(request.get("folder") if type(request) is dict else None)
     snapshots, interpreter_hash = read_artifacts(request)
     try:
-        raw = probe.m11v.capsule.capture_synthetic_script
         # Reconstruct the already captured signed bytes directly. Do not
         # reopen the release artifact pathname after signature verification.
         snap = probe.m11v.capsule.SyntheticSnapshot(
             script=snapshots["host"],
             sha256=hashlib.sha256(snapshots["host"]).hexdigest())
         interpreter = probe.m11v.pinned_interpreter(interpreter_hash)
-        source = probe.m11v.capsule  # fixture marker is enforced in attach()
-        require(snap.script.startswith(source.MARKER),
+        require(snap.script.startswith(probe.m11v.capsule.MARKER),
                 "UNREVIEWED_SYNTHETIC_SCRIPT")
-        prior = probe.m11v.capsule  # No real task path is imported here.
-        del raw, prior
-        current = probe.m11v.capsule
-        del current
         # Existing M11l stable source and schema, plus exact test seed.
-        baseline = probe.M11L  # location of test-checked-out OWNER source only
-        del baseline
         file = folder / "todo-copy.json"
         require(file.is_file() and not file.is_symlink(),
                 "SYNTHETIC_SOURCE_MISSING")

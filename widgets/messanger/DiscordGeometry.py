@@ -248,6 +248,12 @@ def snapshot_from_tree(
             discord_entry["appId"] = node.get("app_id")
             discord_entry["sandboxAppId"] = node.get("sandbox_app_id")
             discord_entry["shell"] = node.get("shell")
+            # Sway retains this across a Quickshell/geometry-helper restart.
+            # Unlike the helper's in-memory seen-visible set, it identifies
+            # a hidden scratchpad main window without guessing from its size.
+            discord_entry["scratchpadState"] = normalized_identity(
+                node.get("scratchpad_state")
+            )
             discord_entry["kind"] = vesktop_window_kind(
                 rect,
                 discord_entry["name"],
@@ -935,6 +941,7 @@ class Bridge:
             new_con_id = int(discord["conId"])
             new_visible = bool(discord.get("visible", False))
             new_kind = str(discord.get("kind", ""))
+            new_scratchpad_state = str(discord.get("scratchpadState", ""))
 
             # A splash->main replacement is a new geometry authority. Never
             # carry ready/docked state across container identity changes.
@@ -983,10 +990,15 @@ class Bridge:
                         # Social has not mapped yet. Keep the request armed and
                         # let the next sampled tree perform the real attachment.
                         self.sample_event.set()
-                elif self.discord_con_id in self.discord_main_seen_visible:
-                    # This exact main window was visible before and is now a
-                    # Social-managed scratchpad window. Reveal it once, then
-                    # wait for a visible snapshot before consuming the request.
+                elif (new_scratchpad_state == "fresh"
+                      or self.discord_con_id in self.discord_main_seen_visible):
+                    # A fresh Quickshell helper may never have seen the still-
+                    # running Vesktop main window visible: Sway's scratchpad
+                    # flag survives that restart. Restore this exact con_id,
+                    # never a hidden cold-start main (scratchpad_state=none).
+                    # The old seen-visible fallback preserves same-run reuse.
+                    # Reveal once, then wait for a visible snapshot before
+                    # accepting its geometry or consuming the show request.
                     if self.discord_reveal_attempted_con_id != self.discord_con_id:
                         self.queue_command(f'{criteria} scratchpad show')
                         self.discord_reveal_attempted_con_id = self.discord_con_id

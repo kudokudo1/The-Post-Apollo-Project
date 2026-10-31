@@ -1,0 +1,50 @@
+name: TASKS M12a synthetic guarded completion and last-confirmed UI contract
+
+on:
+  pull_request:
+    paths:
+      - 'tests/tasks/fixtures/TaskGuardedCompletionModelM12a.cjs'
+      - 'tests/tasks/test_task_guarded_completion_model_m12a.cjs'
+      - 'docs/tasks-guarded-completion-state-m12a.md'
+      - '.github/workflows/tasks-guarded-completion-model-m12a.yml'
+      - 'services/hub/ApolloHubTodoStore.qml'
+      - 'services/hub/ApolloHubTodoPolicy.js'
+      - 'shell.qml'
+  push:
+    branches: [main]
+    paths:
+      - 'tests/tasks/fixtures/TaskGuardedCompletionModelM12a.cjs'
+      - 'tests/tasks/test_task_guarded_completion_model_m12a.cjs'
+      - 'docs/tasks-guarded-completion-state-m12a.md'
+      - '.github/workflows/tasks-guarded-completion-model-m12a.yml'
+      - 'services/hub/ApolloHubTodoStore.qml'
+      - 'services/hub/ApolloHubTodoPolicy.js'
+      - 'shell.qml'
+
+permissions:
+  contents: read
+
+jobs:
+  synthetic-completion-model:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: M12a queued, reserved, settled, recovery and last-confirmed tests
+        run: node --test tests/tasks/test_task_guarded_completion_model_m12a.cjs
+      - name: M11z isolated source backup and code-only rollback regressions
+        run: python3 tests/tasks/test_task_synthetic_backup_rollback_m11z.py
+      - name: M11y signed-release synthetic trust checks
+        run: node --test tests/tasks/test_task_signed_release_verifier_m11y.cjs
+      - name: M11x source-only production architecture audit
+        run: python3 tests/tasks/test_task_production_architecture_m11x.py
+      - name: M11t production gates remain open
+        run: python3 tests/tasks/test_task_production_trust_contract_m11t.py
+      - name: M11d single live writer inventory
+        run: python3 tests/tasks/test_task_writer_gate_inventory_m11d.py

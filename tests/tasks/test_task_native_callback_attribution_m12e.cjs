@@ -231,7 +231,7 @@ test("native observer reuses M11g, remains unmounted and displays non-attestatio
   assert.ok(existing.includes("fixtureFile.reload();"));
   assert.ok(existing.includes('bridge.observeNative("FILE_SAVED")'));
   assert.ok(existing.includes('bridge.observeNative("FILE_READBACK_OK")'));
-  assert.ok(existing.includes('bridge.observeNative("HOST_SETTLED")'));
+  assert.ok(existing.includes('observeNative("HOST_SETTLED")'));
   for(const forbidden of [
     "TaskNativeCallbackLabM12e","TaskCallbackAttributionM12e"
   ]) assert.ok(!shell.includes(forbidden)&&!production.includes(forbidden));

@@ -255,7 +255,7 @@ These are **proposed lanes, not assignments**. Confirm actual Hospital Room, Sta
 
 | Lane | Bounded deliverable | Dependencies | Acceptance evidence |
 | --- | --- | --- | --- |
-| **A. Architecture, governance and threat model** | Portfolio vs tenant boundary, independent legal/nonprofit governance, IdP choice evaluation, cross-org threat model, versioned APIs | Operator direction here; unresolved policy decisions in `11 | Architecture review, authority graph, no accidental root rights |
+| **A. Architecture, governance and threat model** | Portfolio vs tenant boundary, independent legal/nonprofit governance, IdP choice evaluation, cross-org threat model, versioned APIs | Operator direction here; unresolved policy decisions in section 11 | Architecture review, authority graph, no accidental root rights |
 | **B. Human authentication** | IdP-backed individual login, passkeys/MFA/recovery, devices and session lifecycle | A | Test IdP, signed-token validation, expired/revoked/step-up cases |
 | **C. Multi-tenant portfolio and membership graph** | Independent LLC/nonprofit/customer tenants, portfolio aggregation, many-to-many participation, organization invitation, cross-org roles | A+B | Two+ unrelated tenant isolation, person with several roles, portfolio admin denied tenant-private records |
 | **D. Functional/geographic authorization** | Division/program and location graphs, explicit scopes, time-bound grants, server enforcement | A+C | National division vs one branch intersect correctly, no implicit inherited access |

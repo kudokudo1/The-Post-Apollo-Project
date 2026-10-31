@@ -52,6 +52,36 @@ for (const token of [
     "f=image"
 ])
     assert.ok(url.includes(token), token);
+assert.equal(url.includes("&time="), false);
+
+assert.equal(radar.normalizeHistoryMinutes(-5), 0);
+assert.equal(radar.normalizeHistoryMinutes(30), 30);
+assert.equal(radar.normalizeHistoryMinutes(999), 240);
+
+const fixedNow = Date.UTC(2026, 9, 31, 21, 57, 23);
+const roundedNow = Date.UTC(2026, 9, 31, 21, 50, 0);
+assert.equal(radar.historyTimeMillis(fixedNow, 0), 0);
+assert.equal(
+    radar.historyTimeMillis(fixedNow, 30),
+    roundedNow - 30 * 60 * 1000
+);
+assert.equal(
+    radar.historyTimeMillis(fixedNow, 240),
+    roundedNow - 240 * 60 * 1000
+);
+
+const options = Array.from(radar.historyOptions());
+assert.deepEqual(
+    options.map(row => [row.minutes, row.label]),
+    [[0, "NOW"], [30, "-30M"], [60, "-1H"], [120, "-2H"], [240, "-4H"]]
+);
+
+const historicalTime = radar.historyTimeMillis(fixedNow, 120);
+const historyUrl = radar.exportImageUrl(
+    area, 900, 450, historicalTime
+);
+assert.ok(historyUrl.includes("&time=" + historicalTime));
+assert.ok(historyUrl.endsWith("&f=image"));
 
 assert.equal(radar.exportImageUrl(area, 10, 450), "");
 assert.equal(radar.exportImageUrl(area, 900, 5000), "");
@@ -69,15 +99,22 @@ assert.match(ui, /StationRadarPolicy\.js" as RadarPolicy/);
 assert.match(ui, /readonly property var mapVisibleBounds:/);
 assert.match(ui, /FirmsAreaPolicy\.boundedArea\(mapVisibleBounds, 60, 40\)/);
 assert.match(ui, /RadarPolicy\.boundedArea\(mapVisibleBounds, 90, 50\)/);
+assert.match(ui, /function selectRadarHistory\(minutes\)/);
+assert.match(ui, /function radarHistoryLabel\(minutes\)/);
+assert.match(ui, /function radarUtcLabel\(timeMs\)/);
 assert.match(ui, /function loadRadarSnapshot\(\)/);
+assert.match(ui, /RadarPolicy\.historyTimeMillis\(/);
 assert.match(ui, /RadarPolicy\.snapshot\(radarArea\)/);
 assert.match(ui, /RadarPolicy\.exportImageUrl\(/);
+assert.match(ui, /radarHistoryOptions:\s*RadarPolicy\.historyOptions\(\)/);
+assert.match(ui, /model: stationDiscovery\.radarHistoryOptions/);
+assert.match(ui, /SELECT FRAME \/\/ THEN LOAD \/\/ NOAA TIME WINDOW \/\/ NO AUTO-FETCH/);
 assert.match(ui, /radarImageUrl = "";/);
 assert.match(ui, /Qt\.callLater\(function\(\)[\s\S]*stationDiscovery\.radarImageUrl = nextUrl/);
-assert.match(ui, /title: "RADAR \/\/ NOAA\/NWS MRMS BASE REFLECTIVITY"/);
+assert.match(ui, /title: "RADAR \/\/ NOAA\/NWS MRMS BASE REFLECTIVITY \+ 4H HISTORY"/);
 assert.match(ui, /"REFRESH RADAR" : "LOAD RADAR"/);
 assert.match(ui, /MAX 90° × 50° VIEW \/\/ MANUAL LOAD \/\/ NO PAN AUTO-FETCH/);
-assert.match(ui, /NOAA \/ NWS \/ MRMS \/\/ OFFICIAL BASE REFLECTIVITY/);
+assert.match(ui, /NOAA \/ NWS \/ MRMS \/\/ OFFICIAL BASE REFLECTIVITY \/\/ 4H MOVING HISTORY/);
 assert.match(ui, /id: radarImage/);
 assert.match(ui, /cache: false/);
 assert.match(ui, /asynchronous: true/);
@@ -90,13 +127,14 @@ assert.match(ui, /stationDiscovery\.radarSnapshotBounds\.south/);
 assert.match(ui, /z: 0\.1/);
 assert.match(ui, /z: 0\.3/);
 assert.match(ui, /NATURAL EARTH LAND \+ CONTEXT \/\/ LAT\/LON GRID \/\/ RADAR \+ SMOKE OVERLAYS/);
-assert.match(ui, /NOAA\/NWS MRMS \/\/ BASE REFLECTIVITY/);
+assert.match(ui, /NOAA\/NWS MRMS \/\/ BASE REFLECTIVITY \+ 4H HISTORY/);
 assert.match(ui, /RAINVIEWER \/\/ RADAR FALLBACK", state:"NOT WIRED"/);
 
-// Loading is explicit only. Panning/zooming transforms the stored snapshot
-// geometry but must not trigger another provider request.
+// Loading is explicit only. Panning/zooming and selecting a historical
+// frame must not trigger another provider request.
 for (const forbidden of [
-    "onMapZoomChanged", "onMapCenterLonChanged", "onMapCenterLatChanged"
+    "onMapZoomChanged", "onMapCenterLonChanged", "onMapCenterLatChanged",
+    "onRadarHistoryMinutesChanged"
 ]) {
     const at = ui.indexOf(forbidden);
     if (at >= 0) {
@@ -111,4 +149,4 @@ assert.doesNotMatch(
     /Process\s*\{|Timer\s*\{|curl|XMLHttpRequest|Qt\.openUrlExternally/
 );
 
-console.log("Weather MAP manual NOAA MRMS radar snapshot overlay: PASS");
+console.log("Weather MAP NOAA MRMS current + four-hour history overlay: PASS");

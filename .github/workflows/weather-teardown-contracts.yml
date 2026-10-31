@@ -119,7 +119,7 @@ jobs:
         run: node tests/weather/test_station_map_firms_hotspots.js
       - name: Validate secret-safe FIRMS fetch helper
         run: python3 tests/weather/test_station_firms_fetch_helper.py
-      - name: Validate manual NOAA MRMS radar overlay
+      - name: Validate NOAA MRMS current and four-hour radar history
         run: node tests/weather/test_station_map_noaa_radar.js
       - name: Validate NOAA HMS smoke polygon overlay
         run: node tests/weather/test_station_map_hms_smoke.js

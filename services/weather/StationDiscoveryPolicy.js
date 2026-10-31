@@ -447,7 +447,7 @@ function newsStoryFamilies(rows) {
                 languages:[],
                 topics:[],
                 latestSeenMillis:-1,
-                strongestJaccard:1,
+                strongestJaccard:0,
                 sourceCount:0
             };
             addRow(group, row, {jaccard:1});

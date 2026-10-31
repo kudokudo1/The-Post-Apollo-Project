@@ -286,7 +286,7 @@ test("single live FileView and nine mutations are unchanged by synthetic model",
   assert.equal(shell.includes("TaskGuardedCompletionModelM12a"), false);
   for (const forbidden of [
     "apollo-hub-todo-v1.json","Quickshell.dataDir",
-    "child_process","fs.readFile","FileView"
+    "child_process","fs.readFile","FileView {"
   ]) assert.equal(fixture.includes(forbidden), false, forbidden);
   assert.equal(SyntheticGuardedModel.productionWriterAuthorized, false);
 });

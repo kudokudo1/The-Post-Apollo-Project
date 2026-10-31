@@ -51,6 +51,8 @@ jobs:
         run: python3 tests/weather/test_station_sky_iss_passes.py
       - name: Validate SKY USNO moon ephemeris
         run: node tests/weather/test_station_sky_usno_moon.js
+      - name: Validate SKY NASA GSFC eclipse calendar
+        run: python3 tests/weather/test_station_sky_nasa_eclipses.py
       - name: Validate SKY USNO current Moon planets and stars
         run: node tests/weather/test_station_sky_usno_celnav.js
       - name: Validate SKY USNO planet rise transit and set clock

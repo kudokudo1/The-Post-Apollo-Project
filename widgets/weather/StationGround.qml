@@ -4,6 +4,7 @@ import "../../services/weather" as WeatherServices
 import "../../services/weather/SeismicPolicy.js" as SeismicPolicy
 import "../../services/weather/NwpsRiverPolicy.js" as RiverPolicy
 import "../../services/weather/NdbcMarinePolicy.js" as MarinePolicy
+import "../../services/weather/CoopsCoastalPolicy.js" as CoastalPolicy
 import "StationGroundPollenPolicy.js" as PollenDetails
 import "StationGroundEnvironmentPolicy.js" as EnvironmentPolicy
 
@@ -40,6 +41,13 @@ Rectangle {
 
     WeatherServices.NdbcMarineService {
         id: marineService
+        active: ground.visible
+        latitude: weatherService ? weatherService.latitude : ""
+        longitude: weatherService ? weatherService.longitude : ""
+    }
+
+    WeatherServices.CoopsCoastalService {
+        id: coastalService
         active: ground.visible
         latitude: weatherService ? weatherService.latitude : ""
         longitude: weatherService ? weatherService.longitude : ""
@@ -122,6 +130,25 @@ Rectangle {
         const feet = MarinePolicy.metersToFeet(meters);
         return meters.toFixed(1) + " m // "
             + feet.toFixed(1) + " ft";
+    }
+
+    function coastalSampleAge() {
+        if (!coastalService.waterLevel)
+            return "--";
+        const millis = Number(coastalService.waterLevel.sampleMillis);
+        if (!isFinite(millis) || millis <= 0)
+            return "--";
+        const age = Math.max(0, Math.floor((Date.now() - millis) / 60000));
+        return age < 60 ? age + "m"
+            : Math.floor(age / 60) + "h " + (age % 60) + "m";
+    }
+
+    function coastalPredictionColor(high) {
+        if (high === true)
+            return Colors.orange;
+        if (high === false)
+            return Colors.cyan;
+        return Colors.white;
     }
 
     function riverReceiveAge() {
@@ -1800,6 +1827,295 @@ Rectangle {
             QuietText {
                 width: parent.width
                 text: "NEAREST REPORTING NDBC-HOSTED STATION // DISTANCE IS GEOGRAPHIC, NOT COASTAL RELEVANCE // MISSING SENSOR FIELDS STAY UNAVAILABLE"
+                font.pixelSize: 9
+                color: Colors.orange
+            }
+        }
+
+
+        StationSectionDivider {
+            width: parent.width
+            title: "COAST // NOAA CO-OPS"
+        }
+
+        Column {
+            width: parent.width
+            spacing: 7
+
+            Row {
+                width: parent.width
+                spacing: 12
+
+                GohuText {
+                    text: !coastalService.configured
+                          ? "LOCATION UNAVAILABLE"
+                          : coastalService.loading
+                            && !coastalService.ready
+                            ? "RECEIVING"
+                            : coastalService.ready
+                              && (coastalService.waterFailed
+                                  || coastalService.tideFailed)
+                                ? "DEGRADED"
+                                : coastalService.ready
+                                  ? "RECEIVED"
+                                  : coastalService.failed
+                                    ? "OFFLINE" : "WAITING"
+                    font.pixelSize: 10
+                    color: coastalService.ready
+                           ? Colors.cyan
+                           : coastalService.failed
+                             ? Colors.yellow : Colors.orange
+                }
+
+                QuietText {
+                    width: Math.max(0, parent.width - 150)
+                    text: coastalService.waterStation
+                          ? "WATER "
+                            + coastalService.waterStation.id
+                            + " // "
+                            + Math.round(
+                                  coastalService.waterStation.distanceKm
+                              )
+                            + " KM"
+                            + (coastalService.tideStation
+                               ? "   TIDES "
+                                 + coastalService.tideStation.id
+                                 + " // "
+                                 + Math.round(
+                                       coastalService.tideStation.distanceKm
+                                   )
+                                 + " KM"
+                               : "")
+                          : "NOAA CO-OPS WATER LEVEL + TIDE-PREDICTION CATALOGS"
+                    elide: Text.ElideRight
+                    font.pixelSize: 9
+                }
+            }
+
+            QuietText {
+                visible: coastalService.failed
+                         || coastalService.waterFailed
+                         || coastalService.tideFailed
+                width: parent.width
+                text: [
+                    coastalService.errorText,
+                    coastalService.waterErrorText,
+                    coastalService.tideErrorText
+                ].filter(function(value) {
+                    return String(value || "").length > 0;
+                }).join(" // ")
+                font.pixelSize: 9
+                color: Colors.yellow
+            }
+
+            Row {
+                width: parent.width
+                spacing: 12
+
+                Rectangle {
+                    width: 350
+                    height: 164
+                    color: Colors.dark
+                    border.width: 1
+                    border.color: coastalService.waterReady
+                                  ? Colors.cyan : Colors.orange
+
+                    Column {
+                        anchors.fill: parent
+                        anchors.margins: 9
+                        spacing: 6
+
+                        SecondaryText {
+                            text: "OBSERVED WATER LEVEL"
+                            font.pixelSize: 9
+                        }
+
+                        GohuText {
+                            text: coastalService.waterReady
+                                  && coastalService.waterLevel
+                                  ? CoastalPolicy.feetLabel(
+                                        coastalService.waterLevel.value
+                                    )
+                                  : "--"
+                            font.pixelSize: 22
+                            color: Colors.cyan
+                        }
+
+                        QuietText {
+                            width: parent.width
+                            text: coastalService.waterStation
+                                  ? coastalService.waterStation.name
+                                    + " // "
+                                    + coastalService.waterStation.id
+                                  : "WAITING FOR NEAREST WATER-LEVEL STATION"
+                            elide: Text.ElideRight
+                            font.pixelSize: 9
+                        }
+
+                        QuietText {
+                            width: parent.width
+                            text: coastalService.waterStation
+                                  ? "DATUM "
+                                    + CoastalPolicy.observationDatum(
+                                          coastalService.waterStation
+                                      )
+                                    + " // DIST "
+                                    + Math.round(
+                                          coastalService.waterStation.distanceKm
+                                      )
+                                    + " KM"
+                                  : "DATUM -- // DIST --"
+                            font.pixelSize: 9
+                        }
+
+                        QuietText {
+                            width: parent.width
+                            text: coastalService.waterReady
+                                  && coastalService.waterLevel
+                                  ? "SAMPLE "
+                                    + coastalService.waterLevel.sampleUtc
+                                    + " // AGE "
+                                    + ground.coastalSampleAge()
+                                  : "SAMPLE --"
+                            font.pixelSize: 9
+                        }
+
+                        QuietText {
+                            width: parent.width
+                            text: coastalService.waterReady
+                                  && coastalService.waterLevel
+                                  ? coastalService.waterLevel.qualityLabel
+                                  : "QUALITY --"
+                            font.pixelSize: 8
+                            color: Colors.orange
+                        }
+                    }
+                }
+
+                Rectangle {
+                    width: Math.max(0, parent.width - 362)
+                    height: 164
+                    color: Colors.dark
+                    border.width: 1
+                    border.color: coastalService.tideReady
+                                  ? Colors.magenta : Colors.orange
+
+                    Column {
+                        anchors.fill: parent
+                        anchors.margins: 9
+                        spacing: 6
+
+                        SecondaryText {
+                            text: "TIDE PREDICTIONS // NEXT HIGH + LOW"
+                            font.pixelSize: 9
+                        }
+
+                        QuietText {
+                            width: parent.width
+                            text: coastalService.tideStation
+                                  ? coastalService.tideStation.name
+                                    + " // "
+                                    + coastalService.tideStation.id
+                                    + " // "
+                                    + Math.round(
+                                          coastalService.tideStation.distanceKm
+                                      )
+                                    + " KM"
+                                  : "WAITING FOR NEAREST TIDE STATION"
+                            elide: Text.ElideRight
+                            font.pixelSize: 9
+                        }
+
+                        Row {
+                            id: tidePredictionRow
+                            width: parent.width
+                            spacing: 7
+
+                            Repeater {
+                                model: coastalService.tideReady
+                                       ? coastalService.tidePredictions.slice(
+                                             0, 4
+                                         ) : []
+
+                                delegate: Rectangle {
+                                    required property var modelData
+                                    width: Math.max(
+                                        0,
+                                        (tidePredictionRow.width
+                                         - 3 * tidePredictionRow.spacing) / 4
+                                    )
+                                    height: 92
+                                    color: Colors.black
+                                    border.width: 1
+                                    border.color:
+                                        ground.coastalPredictionColor(
+                                            modelData.high
+                                        )
+
+                                    Column {
+                                        anchors.fill: parent
+                                        anchors.margins: 6
+                                        spacing: 4
+
+                                        GohuText {
+                                            text: modelData.label
+                                            font.pixelSize: 9
+                                            color:
+                                                ground.coastalPredictionColor(
+                                                    modelData.high
+                                                )
+                                        }
+
+                                        GohuText {
+                                            text: CoastalPolicy.feetLabel(
+                                                modelData.value
+                                            )
+                                            font.pixelSize: 11
+                                            color: Colors.white
+                                        }
+
+                                        QuietText {
+                                            text: modelData.sampleUtc
+                                            elide: Text.ElideRight
+                                            font.pixelSize: 8
+                                        }
+                                    }
+                                }
+                            }
+                        }
+
+                        QuietText {
+                            visible: !coastalService.tideReady
+                                     || coastalService.tidePredictions.length
+                                        === 0
+                            width: parent.width
+                            text: coastalService.tideFailed
+                                  ? coastalService.tideErrorText
+                                  : "NO UPCOMING HIGH / LOW PREDICTIONS IN CURRENT WINDOW"
+                            font.pixelSize: 9
+                            color: coastalService.tideFailed
+                                   ? Colors.yellow : Colors.white
+                        }
+                    }
+                }
+            }
+
+            QuietText {
+                width: parent.width
+                text: "OBSERVATION STATION AND TIDE STATION MAY DIFFER // BOTH ARE CHOSEN BY GEOGRAPHIC PROXIMITY TO THE WEATHER FIX"
+                font.pixelSize: 9
+            }
+
+            QuietText {
+                width: parent.width
+                text: "MLLW DATUM IS USED FOR COASTAL TIDE PREDICTIONS // OBSERVED WATER LEVEL USES MLLW, LWD OR STND ACCORDING TO STATION TYPE"
+                font.pixelSize: 9
+                color: Colors.orange
+            }
+
+            QuietText {
+                width: parent.width
+                text: "NEAREST CO-OPS STATION ≠ LOCAL COAST // HEIGHT IS STATION-REFERENCED // NOT A STORM-SURGE OR FLOOD-IMPACT CLAIM"
                 font.pixelSize: 9
                 color: Colors.orange
             }

@@ -14,6 +14,7 @@ Rectangle {
     property string section: "LIVE"
     property bool viewerOpen: false
     property var chosenRecord: null
+    signal newsMapRequested(var payload)
 
     // Channel-only player geometry relative to this NEWS hub. A REPORTS
     // article and a closed channel have no browser viewport. Never hardcode
@@ -208,6 +209,9 @@ Rectangle {
             StationDiscovery {
                 domain: "news"
                 stationOpen: stationNewsHub.stationOpen
+                onNewsMapRequested: function(payload) {
+                    stationNewsHub.newsMapRequested(payload);
+                }
             }
         }
     }

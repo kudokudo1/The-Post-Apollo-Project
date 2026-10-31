@@ -40,8 +40,9 @@ class SocialAccountDetailsUiContracts(unittest.TestCase):
             'id: accountLabelInput',
             'label: "+ NEW ACCOUNT NAME"',
             '+ ACCOUNT NAME" : "SAVE ACCOUNT NAME"',
-            'label: "MOVE UP"',
-            'label: "MOVE DOWN"',
+            'id: accountNameRow',
+            'label: "↑"',
+            'label: "↓"',
             'CONFIRM REMOVE NAME',
             'SocialAccountDetailsStore.addAccountName(',
             'SocialAccountDetailsStore.renameAccountName(',
@@ -54,6 +55,39 @@ class SocialAccountDetailsUiContracts(unittest.TestCase):
         self.assertIn('id: settingsIdentityPane',SELECTOR)
         self.assertIn('label: "USER // SETTINGS"',SELECTOR)
         self.assertEqual(SELECTOR.count("id: settingsFooter"),1)
+
+    def test_each_account_name_has_inline_up_and_down_arrows(self):
+        sidebar = SELECTOR.split("id: settingsIdentityPane", 1)[1].split(
+            "id: settingsEditorPane", 1
+        )[0]
+        row = sidebar.split("id: accountNameRow", 1)[1].split(
+            'label: "+ NEW ACCOUNT NAME"', 1
+        )[0]
+        self.assertIn("required property var modelData", row)
+        self.assertIn("required property int index", row)
+        self.assertIn("width: ListView.view.width", row)
+        self.assertIn("spacing: 3", row)
+        self.assertEqual(row.count("accentColor: Colors.orange"), 2)
+        self.assertEqual(row.count(
+            "SocialAccountDetailsStore.moveAccountName("), 2)
+        self.assertIn('label: "↑"', row)
+        self.assertIn('label: "↓"', row)
+        self.assertLess(row.index('label: "↑"'), row.index(
+            "label: accountNameRow.modelData.label"))
+        self.assertLess(row.index("label: accountNameRow.modelData.label"),
+                        row.index('label: "↓"'))
+        self.assertIn("accountNameRow.index > 0", row)
+        self.assertIn("accountNameRow.index <", row)
+        self.assertIn("accountNameRow.modelData.id, -1", row)
+        self.assertIn("accountNameRow.modelData.id, 1", row)
+        self.assertIn("SocialAccountDetailsStore.state === \"ready\"", row)
+        self.assertIn("accountEditorIdentityId ===", row)
+        self.assertIn("accountNameRow.modelData.id", row)
+        self.assertIn("appSelector.selectAccountEntry(", row)
+        self.assertIn("appSelector.accountSelectedEntryId ===", row)
+        self.assertNotIn('label: "MOVE UP"', sidebar)
+        self.assertNotIn('label: "MOVE DOWN"', sidebar)
+        self.assertIn('CONFIRM REMOVE NAME', sidebar)
 
     def test_browser_sessions_moved_to_family_pane_bottom_without_signin_moving(self):
         sidebar = SELECTOR.split("id: settingsIdentityPane", 1)[1].split(

@@ -106,38 +106,69 @@ class SettingsContactChatWorkspaceContracts(unittest.TestCase):
         self.assertIn("visible: appSelector.editingFamilies", app)
         self.assertIn("editingFamilies = true;", SELECTOR)
 
-    def test_marked_family_and_app_actions_use_orange_and_remove_uses_red(self):
+    def test_family_and_app_rows_have_inline_orange_order_arrows(self):
         family = SELECTOR.split("id: settingsFamilyPane", 1)[1].split(
             "id: settingsAppPane", 1
         )[0]
         app = SELECTOR.split("id: settingsAppPane", 1)[1].split(
             "// This entry point is always visible", 1
         )[0]
-        for label in ("FAMILY UP", "FAMILY DOWN", "RENAME"):
-            with self.subTest(label=label):
-                button = family.split('label: "' + label + '"', 1)[1].split(
-                    "onTriggered:", 1
-                )[0]
-                self.assertIn("accentColor: Colors.orange", button)
 
-        for label in ("APP UP", "APP DOWN"):
-            with self.subTest(label=label):
-                button = app.split('label: "' + label + '"', 1)[1].split(
-                    "onTriggered:", 1
+        # Both panes use up/name/down rows, not separate global actions
+        # operating on a previously selected item.
+        for source, row_id, label, writer in (
+            (family, "familyOptionRow", "familyOptionRow.modelData.title",
+             "SocialIdentityStore.reorderFamily("),
+            (app, "organizationAppRow",
+             "appSelector.messagingApps[", "SocialIdentityStore.reorderApp("),
+        ):
+            with self.subTest(row=row_id):
+                row = source.split("id: " + row_id, 1)[1].split(
+                    'text: "NO MATCH"' if row_id == "organizationAppRow"
+                    else 'text: "NO FAMILIES"', 1
                 )[0]
-                self.assertIn("accentColor: Colors.orange", button)
+                self.assertIn('label: "↑"', row)
+                self.assertIn('label: "↓"', row)
+                self.assertLess(row.index('label: "↑"'), row.index(label))
+                self.assertLess(row.index(label), row.index('label: "↓"'))
+                self.assertEqual(row.count("accentColor: Colors.orange"), 2)
+                self.assertEqual(row.count(writer), 2)
+                self.assertIn('width: 28', row)
+                self.assertIn('height: parent.height', row)
+                self.assertIn('spacing: 3', row)
+                self.assertIn('width: Math.max(1, ', row)
+                self.assertNotIn('"FAMILY UP"', source)
+                self.assertNotIn('"FAMILY DOWN"', source)
+                self.assertNotIn('"APP UP"', source)
+                self.assertNotIn('"APP DOWN"', source)
 
+        # Arrows reorder their own explicit item IDs using persisted
+        # indices, even when a different row is currently selected.
+        self.assertIn("familyOptionRow.modelData.id, -1", family)
+        self.assertIn("familyOptionRow.modelData.id, 1", family)
+        self.assertIn("familyOptionRow.modelData.orderIndex > 0", family)
+        self.assertIn("familyOptionRow.modelData.familyCount - 1", family)
+        self.assertIn("familyEditorIdentityId ===", family)
+        self.assertIn("!appSelector.familyCreatePending", family)
+        self.assertIn("organizationAppRow.modelData.id, -1", app)
+        self.assertIn("organizationAppRow.modelData.id, 1", app)
+        self.assertIn("organizationAppRow.modelData.orderIndex > 0", app)
+        self.assertIn("organizationAppRow.modelData.siblingCount - 1", app)
+        self.assertIn("appSelector.familyIsSelected()", app)
+        self.assertIn("organizationAppRow.modelData.familyId ===", app)
+        self.assertIn("appSelector.editedFamilyId", app)
+        self.assertIn("appSelector.editedAppId =", app)
+
+        # Family removal remains a separate confirmed destructive action.
         removal = family.split(
             'label: appSelector.familyRemovalConfirmationMatches()', 1
         )[1].split("onTriggered:", 1)[0]
         self.assertIn('CONFIRM REMOVE" : "REMOVE FAMILY"', removal)
         self.assertIn('destructive: true', removal)
         self.assertIn('accentColor: Colors.red', removal)
-        # The new semantic color must not replace the two-step guard.
         self.assertIn("familyRemovalConfirmationMatches()", family)
         self.assertIn("SocialIdentityStore.removeFamily(", family)
         self.assertIn("appSelector.selectedAppNeedsMove()", app)
-        self.assertIn("SocialIdentityStore.reorderApp(", app)
 
     def test_operator_marked_settings_button_accents(self):
         # The marked actions use shared semantic states. The existing

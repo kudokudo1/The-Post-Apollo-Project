@@ -36,9 +36,13 @@ class SocialFamilyManagerContracts(unittest.TestCase):
             'appSelector.identitySnapshot.activeName',
             'appSelector.identitySnapshot.familyOptions || []',
             'appSelector.matchingFamilyApps(familySearchInput.text)',
-            'appSelector.messagingApps[modelData.serviceIndex].name',
+            'organizationAppRow.modelData.serviceIndex].name',
         ):
             self.assertIn(needle, SELECTOR, needle)
+        self.assertIn('id: familyOptionRow', SELECTOR)
+        self.assertIn('id: organizationAppRow', SELECTOR)
+        self.assertIn('label: "↑"', SELECTOR)
+        self.assertIn('label: "↓"', SELECTOR)
         self.assertEqual(SELECTOR.count('id: settingsFooter'), 1)
         self.assertIn('appSelector.settingsOpen = !appSelector.settingsOpen', SELECTOR)
         self.assertIn('bottom: statusMessage.visible ? statusMessage.top : settingsFooter.top',

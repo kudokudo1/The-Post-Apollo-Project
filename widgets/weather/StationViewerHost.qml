@@ -9,7 +9,17 @@ Rectangle {
     id: stationViewer
 
     property var selectedRecord: null
+    property bool locationLoading: false
+    property bool locationReady: false
+    property bool locationFailed: false
+    property string locationError: ""
+    property var locationRows: []
+    property string locationFeedName: ""
+    property string locationSliceUtc: ""
+    property string locationMatchMethod: ""
+    property string locationSemantics: ""
     signal backRequested()
+    signal locateRequested()
 
     readonly property string articleUrl:
         selectedRecord ? ViewerPolicy.safeArticleUrl(selectedRecord.url) : ""
@@ -92,18 +102,162 @@ Rectangle {
             spacing: 10
 
             ActionButton {
-                width: 160
+                width: 150
                 height: 34
                 label: "READER DISABLED"
-                labelPixelSize: 11
+                labelPixelSize: 10
                 available: false
             }
+
+            ActionButton {
+                width: 170
+                height: 34
+                label: stationViewer.locationLoading
+                       ? "LOCATING..."
+                       : "LOCATE MENTIONS"
+                labelPixelSize: 10
+                accentColor: Colors.magenta
+                available: !stationViewer.isChannel
+                           && stationViewer.articleUrl !== ""
+                           && stationViewer.selectedRecord
+                           && String(
+                                  stationViewer.selectedRecord.rawTime || ""
+                              ) !== ""
+                           && !stationViewer.locationLoading
+                onClicked: stationViewer.locateRequested()
+            }
+
             QuietText {
                 anchors.verticalCenter: parent.verticalCenter
-                width: Math.max(90, parent.width - 170)
-                font.pixelSize: 11
+                width: Math.max(90, parent.width - 340)
+                font.pixelSize: 10
                 elide: Text.ElideRight
-                text: "CRASH PROTECTION // REPORT METADATA STILL AVAILABLE"
+                text: "GKG LOOKUP IS MANUAL // ARTICLE URL + SEENDATE JOIN"
+            }
+        }
+
+        Rectangle {
+            width: parent.width
+            height: visible ? 170 : 0
+            visible: !stationViewer.isChannel
+                     && (stationViewer.locationLoading
+                         || stationViewer.locationReady
+                         || stationViewer.locationFailed)
+            clip: true
+            color: Colors.dark
+            border.width: 1
+            border.color: stationViewer.locationFailed
+                          ? Colors.orange
+                          : stationViewer.locationReady
+                            ? Colors.magenta : Colors.cyan
+
+            Column {
+                anchors.fill: parent
+                anchors.margins: 9
+                spacing: 5
+
+                Row {
+                    width: parent.width
+                    spacing: 10
+
+                    GohuText {
+                        width: 210
+                        text: stationViewer.locationLoading
+                              ? "READING GKG SLICE"
+                              : stationViewer.locationFailed
+                                ? "LOCATION LOOKUP FAILED"
+                                : "MENTIONED LOCATIONS // "
+                                  + stationViewer.locationRows.length
+                        font.pixelSize: 10
+                        color: stationViewer.locationFailed
+                               ? Colors.orange : Colors.magenta
+                    }
+
+                    QuietText {
+                        width: Math.max(0, parent.width - 220)
+                        text: stationViewer.locationReady
+                              ? (stationViewer.locationFeedName || "GKG")
+                                + " // "
+                                + (stationViewer.locationSliceUtc || "--")
+                                + " // "
+                                + (stationViewer.locationMatchMethod || "--")
+                              : stationViewer.locationError
+                        elide: Text.ElideRight
+                        font.pixelSize: 9
+                    }
+                }
+
+                Column {
+                    width: parent.width
+                    spacing: 3
+                    visible: stationViewer.locationReady
+                             && stationViewer.locationRows.length > 0
+
+                    Repeater {
+                        model: stationViewer.locationRows.slice(0, 5)
+
+                        delegate: Row {
+                            required property var modelData
+                            width: parent.width
+                            spacing: 10
+
+                            GohuText {
+                                width: 290
+                                text: modelData.name
+                                elide: Text.ElideRight
+                                font.pixelSize: 9
+                                color: Colors.white
+                            }
+
+                            QuietText {
+                                width: 170
+                                text: modelData.typeLabel
+                                elide: Text.ElideRight
+                                font.pixelSize: 8
+                                color: Colors.cyan
+                            }
+
+                            QuietText {
+                                width: 220
+                                text: Number(modelData.latitude).toFixed(2)
+                                      + ", "
+                                      + Number(modelData.longitude).toFixed(2)
+                                font.pixelSize: 8
+                            }
+
+                            QuietText {
+                                width: Math.max(0, parent.width - 710)
+                                text: "MENTIONS "
+                                      + modelData.mentionCount
+                                      + " // OFFSET "
+                                      + modelData.firstOffset
+                                elide: Text.ElideRight
+                                font.pixelSize: 8
+                            }
+                        }
+                    }
+                }
+
+                QuietText {
+                    visible: stationViewer.locationReady
+                             && stationViewer.locationRows.length === 0
+                    width: parent.width
+                    text: stationViewer.locationError !== ""
+                          ? stationViewer.locationError
+                          : "ARTICLE MATCHED // NO GKG LOCATION MENTIONS"
+                    font.pixelSize: 9
+                    color: Colors.orange
+                }
+
+                QuietText {
+                    width: parent.width
+                    text: stationViewer.locationSemantics !== ""
+                          ? stationViewer.locationSemantics
+                          : "MENTIONED PLACES ONLY // NOT VERIFIED EVENT LOCATION"
+                    elide: Text.ElideRight
+                    font.pixelSize: 8
+                    color: Colors.orange
+                }
             }
         }
 

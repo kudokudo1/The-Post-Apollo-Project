@@ -125,6 +125,138 @@ class DiscordDockingTests(TestCase):
         self.assertFalse(bridge.discord_docked)
         self.assertEqual(bridge.pending_sync, {"x": {"target": "x", "width": 1000}})
 
+    def test_app_rail_detects_hidden_browser_without_geometry_authority(self):
+        # The UI may show a magenta background-open label for an existing
+        # managed browser in Sway scratchpad. Geometry must remain hidden from
+        # the legacy helper until its active browser handoff.
+        tree = {
+            "id": 1, "visible": True,
+            "rect": {"x": 0, "y": 0, "width": 1920, "height": 1080},
+            "nodes": [
+                {
+                    "id": 4001, "name": "X",
+                    "window_properties": {"class": "post-apollo-x"},
+                    "visible": False, "focused": False,
+                    "rect": {"x": 300, "y": 100, "width": 700, "height": 600},
+                    "nodes": [], "floating_nodes": [],
+                },
+                {
+                    "id": 4002, "name": "Reddit",
+                    "window_properties": {"class": "post-apollo-reddit"},
+                    "visible": True, "focused": False,
+                    "rect": {"x": 300, "y": 100, "width": 700, "height": 600},
+                    "nodes": [], "floating_nodes": [],
+                },
+                {
+                    "id": 4003, "name": "Unrelated Chrome",
+                    "window_properties": {"class": "post-apollo-x-clone"},
+                    "visible": True, "focused": False,
+                    "rect": {"x": 300, "y": 100, "width": 700, "height": 600},
+                    "nodes": [], "floating_nodes": [],
+                },
+                {
+                    "id": 0, "name": "Unmapped",
+                    "window_properties": {"class": "post-apollo-instagram"},
+                    "visible": True, "focused": False,
+                    "rect": {"x": 300, "y": 100, "width": 700, "height": 600},
+                    "nodes": [], "floating_nodes": [],
+                },
+            ],
+            "floating_nodes": [],
+        }
+        snapshot = geometry.snapshot_from_tree(tree)
+        self.assertEqual(snapshot["openBrowserSites"], ["reddit", "x"])
+        self.assertIsNone(snapshot["x"])  # no hidden legacy geometry authority
+        self.assertEqual(snapshot["reddit"]["rect"]["width"], 700)
+
+        # A closed background provider disappears on the next observed Sway
+        # snapshot, rather than remaining highlighted from click history.
+        tree["nodes"] = tree["nodes"][1:]
+        self.assertEqual(
+            geometry.snapshot_from_tree(tree)["openBrowserSites"], ["reddit"]
+        )
+
+    def test_background_browser_observation_respects_identity_scope(self):
+        rect = {"x": 0, "y": 0, "width": 900, "height": 700}
+        def scoped_node(cid, cls):
+            return {
+                "id": cid, "name": cls,
+                "window_properties": {"class": cls},
+                "visible": False, "focused": False, "rect": rect,
+                "nodes": [], "floating_nodes": [],
+            }
+        tree = {
+            "id": 1, "visible": True, "rect": rect,
+            "nodes": [
+                scoped_node(11, "post-apollo-x-identity-1"),
+                scoped_node(12, "post-apollo-reddit-identity-2"),
+                scoped_node(13, "post-apollo-instagram"),
+                scoped_node(14, "post-apollo-x-identity-invalid"),
+            ],
+            "floating_nodes": [],
+        }
+        self.assertEqual(
+            geometry.snapshot_from_tree(tree, "identity-1")["openBrowserSites"],
+            ["x"],
+        )
+        self.assertEqual(
+            geometry.snapshot_from_tree(tree, "identity-2")["openBrowserSites"],
+            ["reddit"],
+        )
+        self.assertEqual(
+            geometry.snapshot_from_tree(tree)["openBrowserSites"], ["instagram"]
+        )
+
+    def test_app_rail_active_and_background_color_contract(self):
+        selector = (ROOT / "widgets/messanger/AppSelector.qml").read_text(
+            encoding="utf-8")
+        social = SOCIAL.read_text(encoding="utf-8")
+        self.assertIn("property int activeAppIndex: -1", selector)
+        self.assertIn("property var backgroundOpenServiceIds: []", selector)
+        self.assertIn(
+            "appSelector.activeAppIndex === buttonContainer.modelData.serviceIndex",
+            selector,
+        )
+        self.assertIn(
+            "appSelector.backgroundOpenServiceIds.indexOf(", selector,
+        )
+        self.assertIn("readonly property bool isOpenStyled: isActive || isBackgroundOpen", selector)
+        self.assertIn("color: appButton.isActive ? Colors.yellow", selector)
+        self.assertIn(": appButton.isBackgroundOpen ? Colors.dark", selector)
+        self.assertIn("color: appButton.isOpenStyled ? Colors.magenta", selector)
+        self.assertIn(
+            "layer.enabled: appButton.isOpenStyled", selector,
+        )
+        self.assertIn(
+            "color: appButton.isOpenStyled ? Colors.magenta : Colors.orange",
+            selector,
+        )
+        self.assertIn("opacity: appButton.isActive ? 0.55", selector)
+        self.assertIn("opacity: appButton.isActive ? 0.12", selector)
+        self.assertEqual(selector.count("appButton.isBackgroundOpen ? 0.0"), 2)
+        # Hover and keyboard selection only preview. They cannot paint the
+        # yellow active state or falsely claim a different displayed app.
+        self.assertIn("appSelector.selectedIndex = buttonContainer.modelData.serviceIndex;", selector)
+        self.assertNotIn(
+            "appButton.isSelected ? Colors.yellow", selector,
+        )
+        self.assertIn("activeAppIndex: messagingWindow.activeAppIndex", social)
+        self.assertIn(
+            "backgroundOpenServiceIds: messagingWindow.openProviderServiceIds",
+            social,
+        )
+        self.assertIn("function updateOpenProviderServiceIds(payload)", social)
+        self.assertIn("updateOpenProviderServiceIds(payload);", social)
+        self.assertIn("present.every(function(id, i)", social)
+        self.assertIn('sites[i] === "whatsappweb" ? "whatsapp"', social)
+        self.assertIn('sites[i] === "messengerweb" ? "messenger"', social)
+        self.assertIn('sites[i] === "linechrome" ? "line"', social)
+        # No new app launching, authentication inference, or geometry side
+        # effects are added to presence observation.
+        helper = GEOMETRY.read_text(encoding="utf-8")
+        self.assertIn('"openBrowserSites": sorted(observed_browser_sites)', helper)
+        self.assertIn("expected_browser_classes.get(window_class)", helper)
+
     def bridge(self, docked=False):
         bridge = geometry.Bridge(0.1)
         bridge.discord_selected = True

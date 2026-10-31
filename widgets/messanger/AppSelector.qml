@@ -13,6 +13,10 @@ Rectangle {
     // ============================================================
 
     property int selectedIndex: 0
+    // Controller-owned visible app, not the keyboard/hover preview cursor.
+    property int activeAppIndex: -1
+    // Exact existing Sway windows, including scratchpad, not visit history.
+    property var backgroundOpenServiceIds: []
     property bool keyboardActive: false
     property string statusText: ""
     // Entry-point shell only. Identity storage, credentials and family layouts
@@ -623,6 +627,11 @@ Rectangle {
                         clip: false
     
                         property bool isSelected: appSelector.selectedIndex === buttonContainer.modelData.serviceIndex
+                        property bool isActive: appSelector.activeAppIndex === buttonContainer.modelData.serviceIndex
+                        property bool isBackgroundOpen: !isActive
+                            && appSelector.backgroundOpenServiceIds.indexOf(
+                                buttonContainer.modelData.serviceId) !== -1
+                        readonly property bool isOpenStyled: isActive || isBackgroundOpen
     
                         property bool isHovered: !appSelector.keyboardActive && appMouse.containsMouse
     
@@ -632,7 +641,12 @@ Rectangle {
                         // POWER-STYLE BUTTON COLOR
                         // ============================================
     
-                        color: appButton.isPressed ? Colors.magenta : appButton.isHovered ? Colors.yellow : appButton.isSelected ? Colors.yellow : Colors.dark
+                        // The displayed app alone gets yellow fill. Hover, keyboard
+                        // preview and background-open providers stay dark.
+                        color: appButton.isActive ? Colors.yellow
+                             : appButton.isBackgroundOpen ? Colors.dark
+                             : appButton.isPressed ? Colors.magenta
+                             : Colors.dark
     
                         // ============================================
                         // CONTENT
@@ -672,7 +686,8 @@ Rectangle {
     
                                     smooth: false
     
-                                    opacity: appButton.isPressed ? 1.0 : appButton.isSelected || appButton.isHovered ? 1.0 : 0.80
+                                    opacity: appButton.isOpenStyled || appButton.isPressed
+                                             || appButton.isSelected || appButton.isHovered ? 1.0 : 0.80
                                 }
     
                                 DropShadow {
@@ -685,9 +700,13 @@ Rectangle {
                                     radius: 8
                                     samples: 12
     
-                                    color: appButton.isPressed ? Colors.magenta : appButton.isHovered ? Colors.orange : appButton.isSelected ? Colors.orange : Colors.cyan
+                                    color: appButton.isOpenStyled ? Colors.magenta
+                                           : appButton.isPressed ? Colors.magenta
+                                           : (appButton.isHovered || appButton.isSelected) ? Colors.orange
+                                           : Colors.cyan
     
-                                    opacity: appButton.isPressed ? 0.55 : appButton.isHovered ? 0.45 : appButton.isSelected ? 0.45 : 0.18
+                                    opacity: appButton.isOpenStyled || appButton.isPressed ? 0.55
+                                             : (appButton.isHovered || appButton.isSelected) ? 0.45 : 0.18
     
                                     transparentBorder: true
                                 }
@@ -708,12 +727,18 @@ Rectangle {
     
                                 font.pixelSize: buttonContainer.appData.name === "TRUTH SOCIAL" ? 9 : buttonContainer.appData.icon !== "" ? 10 : 11
     
-                                color: appButton.isPressed ? Colors.black : appButton.isHovered ? Colors.orange : appButton.isSelected ? Colors.orange : Colors.cyan
+                                // Magenta foreground always carries matching magenta
+                                // sampled text glow, active or background-open.
+                                color: appButton.isOpenStyled ? Colors.magenta
+                                       : appButton.isPressed ? Colors.black
+                                       : (appButton.isHovered || appButton.isSelected) ? Colors.orange
+                                       : Colors.cyan
     
-                                layer.enabled: appButton.isSelected || appButton.isHovered
+                                layer.enabled: appButton.isOpenStyled
+                                               || appButton.isSelected || appButton.isHovered
     
                                 layer.effect: DropShadow {
-                                    color: Colors.orange
+                                    color: appButton.isOpenStyled ? Colors.magenta : Colors.orange
     
                                     opacity: 1.0
     
@@ -773,9 +798,16 @@ Rectangle {
     
                             spread: 3
     
-                            color: appButton.isPressed ? Colors.magenta : appButton.isHovered ? Colors.orange : appButton.isSelected ? Colors.orange : Colors.cyan
+                            color: appButton.isActive ? Colors.yellow
+                                   : appButton.isBackgroundOpen ? Colors.magenta
+                                   : appButton.isPressed ? Colors.magenta
+                                   : (appButton.isHovered || appButton.isSelected) ? Colors.orange
+                                   : Colors.cyan
     
-                            opacity: appButton.isPressed ? 0.60 : appButton.isHovered ? 0.50 : appButton.isSelected ? 0.50 : 0.0
+                            opacity: appButton.isActive ? 0.55
+                                     : appButton.isBackgroundOpen ? 0.0
+                                     : appButton.isPressed ? 0.60
+                                     : (appButton.isHovered || appButton.isSelected) ? 0.50 : 0.0
     
                             z: -1
                         }
@@ -789,9 +821,16 @@ Rectangle {
     
                             spread: 10
     
-                            color: appButton.isPressed ? Colors.magenta : appButton.isHovered ? Colors.orange : appButton.isSelected ? Colors.orange : Colors.cyan
+                            color: appButton.isActive ? Colors.yellow
+                                   : appButton.isBackgroundOpen ? Colors.magenta
+                                   : appButton.isPressed ? Colors.magenta
+                                   : (appButton.isHovered || appButton.isSelected) ? Colors.orange
+                                   : Colors.cyan
     
-                            opacity: appButton.isPressed ? 0.12 : appButton.isHovered ? 0.09 : appButton.isSelected ? 0.09 : 0.0
+                            opacity: appButton.isActive ? 0.12
+                                     : appButton.isBackgroundOpen ? 0.0
+                                     : appButton.isPressed ? 0.12
+                                     : (appButton.isHovered || appButton.isSelected) ? 0.09 : 0.0
     
                             z: -2
                         }

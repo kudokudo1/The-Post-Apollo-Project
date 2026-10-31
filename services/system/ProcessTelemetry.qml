@@ -38,6 +38,35 @@ Scope {
                          + " elapsedMs=" + elapsedMs + " tsMs=" + now);
     }
 
+
+    // Subdivide the same snapshot stdout completion into synchronous stages.
+    // Uses the existing completion sequence so stages correlate to one callback.
+    // No text, process arguments, PID or command is logged.
+    function beginSnapshotPhase(stage, completionTrace) {
+        if (!completionTrace)
+            return null;
+        const now = Date.now();
+        if (completionTrace.sampled)
+            console.warn("SYNTAGMA_COMPLETION_PROBE // service=process-telemetry"
+                         + " stage=snapshot:" + stage + ":begin"
+                         + " size=" + completionTrace.count
+                         + " seq=" + completionTrace.seq + " tsMs=" + now);
+        return { startedAtMs: now, sampled: completionTrace.sampled,
+                 count: completionTrace.count, seq: completionTrace.seq };
+    }
+
+    function endSnapshotPhase(stage, trace) {
+        if (!trace)
+            return;
+        const now = Date.now();
+        const elapsedMs = now - trace.startedAtMs;
+        if (trace.sampled || elapsedMs >= 25)
+            console.warn("SYNTAGMA_COMPLETION_PROBE // service=process-telemetry"
+                         + " stage=snapshot:" + stage + ":end"
+                         + " size=" + trace.count + " seq=" + trace.seq
+                         + " elapsedMs=" + elapsedMs + " tsMs=" + now);
+    }
+
     // Read-only process telemetry. Mutation (freeze/limit/terminate/restart)
     // deliberately remains outside this service.
     property var rows: []
@@ -542,11 +571,29 @@ Scope {
             onStreamFinished: {
                 const completionTrace = processTelemetry.beginCompletionProbe("snapshot-stdout", this.text.length);
                 try {
-                    const parsed = processTelemetry.parseSnapshot(text);
-                    processTelemetry.snapshotReady(parsed);
-                    processTelemetry.processCount = parsed.length;
-                    processTelemetry.snapshotLoading = false;
-                    processTelemetry.snapshotError = "";
+                    let parsed;
+                    const parseTrace = processTelemetry.beginSnapshotPhase("parse", completionTrace);
+                    try {
+                        parsed = processTelemetry.parseSnapshot(text);
+                    } finally {
+                        processTelemetry.endSnapshotPhase("parse", parseTrace);
+                    }
+
+                    const publishTrace = processTelemetry.beginSnapshotPhase("publish", completionTrace);
+                    try {
+                        processTelemetry.snapshotReady(parsed);
+                    } finally {
+                        processTelemetry.endSnapshotPhase("publish", publishTrace);
+                    }
+
+                    const settleTrace = processTelemetry.beginSnapshotPhase("settle", completionTrace);
+                    try {
+                        processTelemetry.processCount = parsed.length;
+                        processTelemetry.snapshotLoading = false;
+                        processTelemetry.snapshotError = "";
+                    } finally {
+                        processTelemetry.endSnapshotPhase("settle", settleTrace);
+                    }
                 } finally {
                     processTelemetry.endCompletionProbe("snapshot-stdout", completionTrace);
                 }

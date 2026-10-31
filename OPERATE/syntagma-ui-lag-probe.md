@@ -819,3 +819,43 @@ active, not independent proof of root cause. If these callbacks are absent
 or short, move to another uninstrumented owner rather than rewriting this
 parser. To disable instrumentation, relaunch without
 `POST_APOLLO_SUBPROCESS_LAG_PROBE=1` after operator approval.
+
+
+## October 30 // Snapshot completion: parse/publish/settle attribution (draft)
+
+The operator's 23:12 log captured five matching long `ProcessTelemetry`
+`snapshot-stdout` completion callbacks and immediately subsequent event-loop
+stalls; two measured 14.046 seconds and 16.29 seconds. This proves a
+**synchronous completion callback bottleneck**, but the previous whole-callback
+probe cannot distinguish parsing from synchronous `snapshotReady` listeners.
+The earlier 15.43-second startup freeze is not attributed to this callback.
+
+The next opt-in measurement reuses `POST_APOLLO_SUBPROCESS_LAG_PROBE=1`
+and the existing `SYNTAGMA_COMPLETION_PROBE` marker. It divides the *same*
+`snapshot-stdout` callback, retaining its outer entry/end pair, into:
+
+- `snapshot:parse`: `parseSnapshot(text)`;
+- `snapshot:publish`: synchronous `snapshotReady(parsed)` emission and listeners;
+- `snapshot:settle`: `processCount`, `snapshotLoading`, `snapshotError` assignments.
+
+Each new entry/end record uses the outer callback's `seq` and `size`, plus
+`tsMs` and end `elapsedMs`. No subprocess contents, argv, commands, PIDs, or
+process-row data are logged. The outer sampling rule remains unchanged:
+large snapshots are paired, and any unsampled slow phase emits an end marker
+at >=25 ms. `try/finally` preserves the exception path and stage end
+records. There is **no** change to subprocesses, timers, parsing algorithm,
+signal order or result values; logging is disabled by default.
+
+The existing operator's capture filter (`SYNTAGMA_(COMPLETION|LAG|SPLIT_READ|SUBPROCESS)_PROBE`)
+will capture these records without modification. During the next large freeze,
+compare per-stage elapsed times with the outer `snapshot-stdout` duration and
+the subsequent `SYNTAGMA_LAG_PROBE` gap. A slow `publish` identifies a
+signal listener as the remaining target, not automatically the service parser.
+A slow `parse` identifies the direct parser work. A slow `settle` identifies
+property updates/bindings. Do not infer that a fast stage rules out independent
+untraced freezes.
+
+**Integration gate:** draft, Process/System Team 1 owner review and operator
+merge decision. Only source CI is available remotely; no local Quickshell
+restart or runtime success has been verified. Rollback: omit the probe flag
+on the next authorized launch or revert the draft's commit before integration.

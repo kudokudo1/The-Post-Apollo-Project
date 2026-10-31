@@ -121,8 +121,9 @@ assert.match(
 );
 assert.match(
     service,
-    /api\.tidesandcurrents\.noaa\.gov\/mdapi\/prod\/webapi\/stations\.json/
+    /api\.tidesandcurrents\.noaa\.gov\/mdapi\/prod\//
 );
+assert.match(service, /webapi\/stations\.json\?type=/);
 assert.match(
     service,
     /api\.tidesandcurrents\.noaa\.gov\/api\/prod\/datagetter/

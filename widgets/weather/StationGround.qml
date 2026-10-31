@@ -3,7 +3,9 @@ import "../../components"
 import "../../services/weather" as WeatherServices
 import "../../services/weather/SeismicPolicy.js" as SeismicPolicy
 import "../../services/weather/NwpsRiverPolicy.js" as RiverPolicy
+import "../../services/weather/NdbcMarinePolicy.js" as MarinePolicy
 import "StationGroundPollenPolicy.js" as PollenDetails
+import "StationGroundEnvironmentPolicy.js" as EnvironmentPolicy
 
 Rectangle {
     id: ground
@@ -31,6 +33,13 @@ Rectangle {
 
     WeatherServices.NwpsRiverService {
         id: riverService
+        active: ground.visible
+        latitude: weatherService ? weatherService.latitude : ""
+        longitude: weatherService ? weatherService.longitude : ""
+    }
+
+    WeatherServices.NdbcMarineService {
+        id: marineService
         active: ground.visible
         latitude: weatherService ? weatherService.latitude : ""
         longitude: weatherService ? weatherService.longitude : ""
@@ -64,6 +73,55 @@ Rectangle {
         case "STEADY": return Colors.green;
         default: return Colors.white;
         }
+    }
+
+    function heatBandColor(id) {
+        switch (String(id || "")) {
+        case "caution": return Colors.yellow;
+        case "extreme-caution": return Colors.orange;
+        case "danger": return Colors.red;
+        case "extreme-danger": return Colors.magenta;
+        case "below": return Colors.cyan;
+        default: return Colors.white;
+        }
+    }
+
+    function marineSampleAge() {
+        if (!marineService.station)
+            return "--";
+        const millis = Number(marineService.station.sampleMillis);
+        if (!isFinite(millis) || millis <= 0)
+            return "--";
+        const age = Math.max(0, Math.floor((Date.now() - millis) / 60000));
+        return age < 60 ? age + "m"
+            : Math.floor(age / 60) + "h " + (age % 60) + "m";
+    }
+
+    function marineTempLabel(value) {
+        const celsius = Number(value);
+        if (!isFinite(celsius))
+            return "--";
+        const fahrenheit = MarinePolicy.celsiusToF(celsius);
+        return celsius.toFixed(1) + "°C // "
+            + fahrenheit.toFixed(1) + "°F";
+    }
+
+    function marineWindLabel(value) {
+        const speed = Number(value);
+        if (!isFinite(speed))
+            return "--";
+        const mph = MarinePolicy.metersPerSecondToMph(speed);
+        return speed.toFixed(1) + " m/s // "
+            + mph.toFixed(1) + " mph";
+    }
+
+    function marineWaveLabel(value) {
+        const meters = Number(value);
+        if (!isFinite(meters))
+            return "--";
+        const feet = MarinePolicy.metersToFeet(meters);
+        return meters.toFixed(1) + " m // "
+            + feet.toFixed(1) + " ft";
     }
 
     function riverReceiveAge() {
@@ -122,6 +180,14 @@ Rectangle {
         ? RiverPolicy.normalizedSeriesBars(
               riverService.stageflow.observed, 12
           ) : []
+
+    readonly property var heatIndexSummary:
+        EnvironmentPolicy.heatIndex(
+            weatherService ? weatherService.tempF : "",
+            weatherService ? weatherService.humidity : ""
+        )
+    readonly property var fireWeatherAlertRows:
+        EnvironmentPolicy.fireWeatherAlerts(officialAlerts)
 
     readonly property bool aqiReady: weatherService && weatherService.aqiReady
     readonly property bool aqiLoading: weatherService && weatherService.aqiLoading
@@ -854,6 +920,248 @@ Rectangle {
 
                 StationSectionDivider {
                     width: parent.width
+                    title: "FLOOD CONTEXT // IMPACTS + CRESTS"
+                }
+
+                Row {
+                    width: parent.width
+                    spacing: 12
+
+                    GohuText {
+                        text: riverService.contextLoading
+                              ? "RECEIVING"
+                              : riverService.contextFailed
+                                ? (riverService.contextReady
+                                   ? "DEGRADED" : "UNAVAILABLE")
+                                : riverService.contextReady
+                                  ? "RECEIVED"
+                                  : "WAITING"
+                        font.pixelSize: 10
+                        color: riverService.contextFailed
+                               ? Colors.yellow
+                               : riverService.contextReady
+                                 ? Colors.cyan : Colors.orange
+                    }
+
+                    QuietText {
+                        width: Math.max(0, parent.width - 110)
+                        text: riverService.contextReady
+                              ? "LID " + riverService.contextGaugeId
+                                + " // COUNTY "
+                                + (riverService.gaugeContext.county || "--")
+                                + (riverService.gaugeContext.usgsId
+                                   ? " // USGS "
+                                     + riverService.gaugeContext.usgsId
+                                   : "")
+                              : "NWPS /GAUGES/{LID} METADATA"
+                        elide: Text.ElideRight
+                        font.pixelSize: 9
+                    }
+                }
+
+                QuietText {
+                    visible: riverService.contextFailed
+                    width: parent.width
+                    text: riverService.contextErrorText
+                          + (riverService.contextReady
+                             ? " // LAST-GOOD CONTEXT RETAINED" : "")
+                    font.pixelSize: 9
+                    color: Colors.yellow
+                }
+
+                Row {
+                    width: parent.width
+                    spacing: 8
+                    visible: riverService.contextReady
+                             && riverService.gaugeContext.thresholds.length > 0
+
+                    Repeater {
+                        model: riverService.gaugeContext.thresholds
+
+                        delegate: Rectangle {
+                            required property var modelData
+                            width: 155
+                            height: 54
+                            color: Colors.dark
+                            border.width: 1
+                            border.color: ground.riverCategoryColor(
+                                {"id": modelData.id}
+                            )
+
+                            Column {
+                                anchors.fill: parent
+                                anchors.margins: 6
+                                spacing: 3
+
+                                SecondaryText {
+                                    text: modelData.label + " THRESHOLD"
+                                    font.pixelSize: 8
+                                }
+
+                                GohuText {
+                                    text: modelData.stage !== null
+                                          ? RiverPolicy.readingText(
+                                                modelData.stage,
+                                                riverService.gaugeContext
+                                                    .stageUnits
+                                            )
+                                          : RiverPolicy.readingText(
+                                                modelData.flow,
+                                                riverService.gaugeContext
+                                                    .flowUnits
+                                            )
+                                    font.pixelSize: 12
+                                    color: ground.riverCategoryColor(
+                                        {"id": modelData.id}
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+
+                Column {
+                    width: parent.width
+                    spacing: 5
+                    visible: riverService.contextReady
+                             && riverService.gaugeContext.impacts.length > 0
+
+                    GohuText {
+                        text: "OFFICIAL FLOOD IMPACT STATEMENTS // "
+                              + riverService.gaugeContext.impacts.length
+                        font.pixelSize: 10
+                        color: Colors.orange
+                    }
+
+                    Repeater {
+                        model: riverService.gaugeContext.impacts.slice(0, 4)
+
+                        delegate: Rectangle {
+                            required property var modelData
+                            width: parent.width
+                            height: 52
+                            color: Colors.dark
+                            border.width: 1
+                            border.color: Colors.orange
+
+                            Row {
+                                anchors.fill: parent
+                                anchors.margins: 7
+                                spacing: 10
+
+                                GohuText {
+                                    width: 105
+                                    text: RiverPolicy.readingText(
+                                        modelData.stage,
+                                        riverService.gaugeContext.stageUnits
+                                    )
+                                    font.pixelSize: 11
+                                    color: Colors.orange
+                                }
+
+                                QuietText {
+                                    width: Math.max(0, parent.width - 115)
+                                    text: modelData.statement
+                                    wrapMode: Text.WordWrap
+                                    maximumLineCount: 2
+                                    elide: Text.ElideRight
+                                    font.pixelSize: 9
+                                }
+                            }
+                        }
+                    }
+                }
+
+                Row {
+                    width: parent.width
+                    spacing: 12
+                    visible: riverService.contextReady
+                             && (riverService.gaugeContext.recentCrests.length > 0
+                                 || riverService.gaugeContext.historicCrests.length > 0)
+
+                    Column {
+                        width: (parent.width - 12) / 2
+                        spacing: 4
+
+                        GohuText {
+                            text: "RECENT CRESTS"
+                            font.pixelSize: 10
+                            color: Colors.cyan
+                        }
+
+                        Repeater {
+                            model: riverService.gaugeContext.recentCrests.slice(0, 4)
+
+                            delegate: QuietText {
+                                required property var modelData
+                                width: parent.width
+                                text: modelData.occurredLabel
+                                      + " // "
+                                      + RiverPolicy.crestReading(
+                                            modelData,
+                                            riverService.gaugeContext.stageUnits,
+                                            riverService.gaugeContext.flowUnits
+                                        )
+                                      + (modelData.preliminary
+                                         ? " // " + modelData.preliminary
+                                         : "")
+                                elide: Text.ElideRight
+                                font.pixelSize: 9
+                            }
+                        }
+                    }
+
+                    Column {
+                        width: (parent.width - 12) / 2
+                        spacing: 4
+
+                        GohuText {
+                            text: "HISTORIC CRESTS"
+                            font.pixelSize: 10
+                            color: Colors.magenta
+                        }
+
+                        Repeater {
+                            model: riverService.gaugeContext.historicCrests.slice(0, 4)
+
+                            delegate: QuietText {
+                                required property var modelData
+                                width: parent.width
+                                text: modelData.occurredLabel
+                                      + " // "
+                                      + RiverPolicy.crestReading(
+                                            modelData,
+                                            riverService.gaugeContext.stageUnits,
+                                            riverService.gaugeContext.flowUnits
+                                        )
+                                      + (modelData.oldDatum
+                                         ? " // OLD DATUM" : "")
+                                elide: Text.ElideRight
+                                font.pixelSize: 9
+                            }
+                        }
+                    }
+                }
+
+                QuietText {
+                    visible: riverService.contextReady
+                    width: parent.width
+                    text: "NWPS OFFICIAL GAUGE METADATA // IMPACT STATEMENTS + CREST RECORDS ARE LOCATION-SPECIFIC"
+                          + (riverService.gaugeContext.inundationAvailable
+                             ? " // INUNDATION PRODUCT AVAILABLE"
+                             : "")
+                    font.pixelSize: 9
+                    color: Colors.orange
+                }
+            }
+
+            Column {
+                width: parent.width
+                spacing: 7
+                visible: riverService.ready && !!riverService.gauge
+
+                StationSectionDivider {
+                    width: parent.width
                     title: "STAGEFLOW // OBSERVED + OFFICIAL FORECAST"
                 }
 
@@ -1229,6 +1537,456 @@ Rectangle {
                 text: "STAGE IS RELATIVE TO THE GAUGE DATUM // NEARBY GAUGE ≠ YOUR PROPERTY // NOT A FLOOD WARNING"
                 font.pixelSize: 9
                 color: Colors.orange
+            }
+        }
+
+        StationSectionDivider {
+            width: parent.width
+            title: "MARINE // NOAA NDBC"
+        }
+
+        Column {
+            width: parent.width
+            spacing: 7
+
+            Row {
+                width: parent.width
+                spacing: 12
+
+                GohuText {
+                    text: !marineService.configured
+                          ? "LOCATION UNAVAILABLE"
+                          : marineService.loading && !marineService.ready
+                            ? "RECEIVING"
+                            : marineService.failed
+                              ? (marineService.ready
+                                 ? "DEGRADED" : "OFFLINE")
+                              : marineService.ready && marineService.station
+                                ? "RECEIVED"
+                                : marineService.ready
+                                  ? "NO REPORTING STATION"
+                                  : "WAITING"
+                    font.pixelSize: 10
+                    color: marineService.failed
+                           ? Colors.yellow
+                           : marineService.ready && marineService.station
+                             ? Colors.cyan : Colors.orange
+                }
+
+                QuietText {
+                    width: Math.max(0, parent.width - 150)
+                    text: marineService.station
+                          ? "STATION "
+                            + marineService.station.stationId
+                            + " // "
+                            + Math.round(
+                                  marineService.station.distanceKm
+                              )
+                            + " KM FROM WEATHER FIX"
+                            + " // SAMPLE "
+                            + marineService.station.sampleUtc
+                          : "NDBC LATEST OBSERVATIONS // ALL REPORTING STATIONS"
+                    elide: Text.ElideRight
+                    font.pixelSize: 9
+                }
+            }
+
+            QuietText {
+                visible: marineService.failed
+                width: parent.width
+                text: marineService.errorText
+                      + (marineService.ready
+                         ? " // LAST-GOOD MARINE STATE RETAINED" : "")
+                font.pixelSize: 9
+                color: Colors.yellow
+            }
+
+            Rectangle {
+                visible: marineService.ready && !!marineService.station
+                width: parent.width
+                height: 164
+                color: Colors.dark
+                border.width: 1
+                border.color: Colors.cyan
+
+                Column {
+                    anchors.fill: parent
+                    anchors.margins: 9
+                    spacing: 7
+
+                    Row {
+                        width: parent.width
+                        spacing: 12
+
+                        GohuText {
+                            width: 180
+                            text: marineService.station
+                                  ? "NDBC "
+                                    + marineService.station.stationId
+                                  : "NDBC --"
+                            font.pixelSize: 13
+                            color: Colors.cyan
+                        }
+
+                        QuietText {
+                            width: 190
+                            text: "AGE // " + ground.marineSampleAge()
+                            font.pixelSize: 9
+                        }
+
+                        QuietText {
+                            width: Math.max(0, parent.width - 394)
+                            horizontalAlignment: Text.AlignRight
+                            text: "REPORTING STATIONS // "
+                                  + marineService.reportingStations
+                            font.pixelSize: 9
+                        }
+                    }
+
+                    Row {
+                        width: parent.width
+                        spacing: 12
+
+                        Column {
+                            width: 180
+                            spacing: 4
+                            SecondaryText {
+                                text: "WAVES // SIGNIFICANT"
+                                font.pixelSize: 8
+                            }
+                            GohuText {
+                                text: ground.marineWaveLabel(
+                                    marineService.station.waveHeightM
+                                )
+                                font.pixelSize: 11
+                                color: Colors.cyan
+                            }
+                            QuietText {
+                                text: "DPD "
+                                      + MarinePolicy.numericLabel(
+                                            marineService.station
+                                                .dominantPeriodS,
+                                            1, " s"
+                                        )
+                                      + " // APD "
+                                      + MarinePolicy.numericLabel(
+                                            marineService.station
+                                                .averagePeriodS,
+                                            1, " s"
+                                        )
+                                font.pixelSize: 8
+                            }
+                        }
+
+                        Column {
+                            width: 220
+                            spacing: 4
+                            SecondaryText {
+                                text: "WIND"
+                                font.pixelSize: 8
+                            }
+                            GohuText {
+                                text: ground.marineWindLabel(
+                                    marineService.station.windSpeedMs
+                                )
+                                font.pixelSize: 11
+                                color: Colors.white
+                            }
+                            QuietText {
+                                text: "DIR "
+                                      + MarinePolicy.numericLabel(
+                                            marineService.station
+                                                .windDirection,
+                                            0, "°T"
+                                        )
+                                      + " // GUST "
+                                      + ground.marineWindLabel(
+                                            marineService.station.gustMs
+                                        )
+                                elide: Text.ElideRight
+                                font.pixelSize: 8
+                            }
+                        }
+
+                        Column {
+                            width: 210
+                            spacing: 4
+                            SecondaryText {
+                                text: "WATER"
+                                font.pixelSize: 8
+                            }
+                            GohuText {
+                                text: ground.marineTempLabel(
+                                    marineService.station.waterTempC
+                                )
+                                font.pixelSize: 11
+                                color: Colors.blue
+                            }
+                            QuietText {
+                                text: "TIDE "
+                                      + MarinePolicy.numericLabel(
+                                            marineService.station.tideFt,
+                                            2, " ft"
+                                        )
+                                font.pixelSize: 8
+                            }
+                        }
+
+                        Column {
+                            width: 210
+                            spacing: 4
+                            SecondaryText {
+                                text: "AIR"
+                                font.pixelSize: 8
+                            }
+                            GohuText {
+                                text: ground.marineTempLabel(
+                                    marineService.station.airTempC
+                                )
+                                font.pixelSize: 11
+                                color: Colors.orange
+                            }
+                            QuietText {
+                                text: "PRES "
+                                      + MarinePolicy.numericLabel(
+                                            marineService.station.pressureHpa,
+                                            1, " hPa"
+                                        )
+                                      + " // DEW "
+                                      + ground.marineTempLabel(
+                                            marineService.station.dewpointC
+                                        )
+                                elide: Text.ElideRight
+                                font.pixelSize: 8
+                            }
+                        }
+                    }
+
+                    Row {
+                        width: parent.width
+                        spacing: 12
+
+                        QuietText {
+                            width: 250
+                            text: "MEAN WAVE DIR // "
+                                  + MarinePolicy.numericLabel(
+                                        marineService.station
+                                            .meanWaveDirection,
+                                        0, "°T"
+                                    )
+                            font.pixelSize: 8
+                        }
+
+                        QuietText {
+                            width: 200
+                            text: "VIS // "
+                                  + MarinePolicy.numericLabel(
+                                        marineService.station.visibilityNm,
+                                        1, " nmi"
+                                    )
+                            font.pixelSize: 8
+                        }
+
+                        QuietText {
+                            width: Math.max(0, parent.width - 474)
+                            text: "SOURCE METRIC // CONVERSIONS SHOWN FOR DISPLAY"
+                            horizontalAlignment: Text.AlignRight
+                            font.pixelSize: 8
+                        }
+                    }
+                }
+            }
+
+            QuietText {
+                width: parent.width
+                text: "NEAREST REPORTING NDBC-HOSTED STATION // DISTANCE IS GEOGRAPHIC, NOT COASTAL RELEVANCE // MISSING SENSOR FIELDS STAY UNAVAILABLE"
+                font.pixelSize: 9
+                color: Colors.orange
+            }
+        }
+
+        StationSectionDivider {
+            width: parent.width
+            title: "HEAT + FIRE WEATHER // NWS CONTEXT"
+        }
+
+        Row {
+            width: parent.width
+            spacing: 12
+
+            Rectangle {
+                width: 360
+                height: 112
+                color: Colors.dark
+                border.width: 1
+                border.color: ground.heatBandColor(
+                    ground.heatIndexSummary.band.id
+                )
+
+                Column {
+                    anchors.fill: parent
+                    anchors.margins: 9
+                    spacing: 5
+
+                    SecondaryText {
+                        text: "NWS HEAT INDEX // SHADE"
+                        font.pixelSize: 9
+                    }
+
+                    Row {
+                        width: parent.width
+                        spacing: 14
+
+                        GohuText {
+                            width: 112
+                            text: ground.heatIndexSummary.available
+                                  ? ground.heatIndexSummary.valueF.toFixed(1)
+                                    + "°F"
+                                  : "--"
+                            font.pixelSize: 22
+                            color: ground.heatBandColor(
+                                ground.heatIndexSummary.band.id
+                            )
+                        }
+
+                        GohuText {
+                            width: Math.max(0, parent.width - 126)
+                            text: ground.heatIndexSummary.band.label
+                            elide: Text.ElideRight
+                            font.pixelSize: 11
+                            color: ground.heatBandColor(
+                                ground.heatIndexSummary.band.id
+                            )
+                        }
+                    }
+
+                    QuietText {
+                        width: parent.width
+                        text: ground.heatIndexSummary.available
+                              ? ground.heatIndexSummary.method
+                                + " // T "
+                                + weatherService.tempF + "°F // RH "
+                                + weatherService.humidity + "%"
+                              : "TEMPERATURE / HUMIDITY UNAVAILABLE"
+                        elide: Text.ElideRight
+                        font.pixelSize: 9
+                    }
+
+                    QuietText {
+                        width: parent.width
+                        text: "NWS HEAT INDEX IS FOR SHADE // DIRECT SUN CAN FEEL HOTTER"
+                        font.pixelSize: 8
+                        color: Colors.orange
+                    }
+                }
+            }
+
+            Rectangle {
+                width: Math.max(0, parent.width - 372)
+                height: 112
+                color: Colors.dark
+                border.width: 1
+                border.color: ground.fireWeatherAlertRows.length > 0
+                              ? Colors.red : Colors.cyan
+
+                Column {
+                    anchors.fill: parent
+                    anchors.margins: 9
+                    spacing: 5
+
+                    SecondaryText {
+                        text: "FIRE WEATHER // OFFICIAL + LOCAL OBS"
+                        font.pixelSize: 9
+                    }
+
+                    GohuText {
+                        width: parent.width
+                        text: ground.fireWeatherAlertRows.length > 0
+                              ? ground.fireWeatherAlertRows.length
+                                + " OFFICIAL NWS PRODUCT"
+                                + (ground.fireWeatherAlertRows.length === 1
+                                   ? "" : "S")
+                              : "NO MATCHING FIRE PRODUCT IN ALERT FEED"
+                        elide: Text.ElideRight
+                        font.pixelSize: 11
+                        color: ground.fireWeatherAlertRows.length > 0
+                               ? Colors.red : Colors.cyan
+                    }
+
+                    QuietText {
+                        width: parent.width
+                        text: "RH "
+                              + (weatherService
+                                 ? weatherService.humidity : "--")
+                              + "% // WIND "
+                              + (weatherService
+                                 ? weatherService.windMph : "--")
+                              + " MPH // TEMP "
+                              + (weatherService
+                                 ? weatherService.tempF : "--")
+                              + "°F"
+                        font.pixelSize: 9
+                    }
+
+                    QuietText {
+                        width: parent.width
+                        text: "LOCAL WEATHER VALUES ARE DESCRIPTIVE ONLY // RED FLAG CRITERIA VARY BY NWS OFFICE + FUEL STATE"
+                        wrapMode: Text.WordWrap
+                        font.pixelSize: 8
+                        color: Colors.orange
+                    }
+                }
+            }
+        }
+
+        Column {
+            width: parent.width
+            spacing: 5
+            visible: ground.fireWeatherAlertRows.length > 0
+
+            Repeater {
+                model: ground.fireWeatherAlertRows.slice(0, 3)
+
+                delegate: Rectangle {
+                    required property var modelData
+                    width: parent.width
+                    height: 58
+                    color: Colors.dark
+                    border.width: 1
+                    border.color: Colors.red
+
+                    Column {
+                        anchors.fill: parent
+                        anchors.margins: 7
+                        spacing: 3
+
+                        GohuText {
+                            width: parent.width
+                            text: String(
+                                modelData.event
+                                || modelData.headline
+                                || "FIRE WEATHER PRODUCT"
+                            ).toUpperCase()
+                            elide: Text.ElideRight
+                            font.pixelSize: 10
+                            color: Colors.red
+                        }
+
+                        QuietText {
+                            width: parent.width
+                            text: "EFFECTIVE "
+                                  + ground.alertTimeUtc(
+                                        modelData.effective
+                                    )
+                                  + " // EXPIRES "
+                                  + ground.alertTimeUtc(
+                                        modelData.expires
+                                    )
+                            elide: Text.ElideRight
+                            font.pixelSize: 8
+                        }
+                    }
+                }
             }
         }
 

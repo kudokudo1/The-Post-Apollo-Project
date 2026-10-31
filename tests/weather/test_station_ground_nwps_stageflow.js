@@ -170,7 +170,11 @@ assert.match(
     service,
     /currentId !== river\.inflightStageflowGaugeId[\s\S]*?river\.refreshStageflow\(\)/
 );
-assert.equal((service.match(/\bProcess\s*\{/g) || []).length, 2);
+assert.equal(
+    (service.match(/\bProcess\s*\{/g) || []).length,
+    3,
+    "NWPS stack owns bbox + stageflow + selected-gauge metadata processes"
+);
 assert.equal((service.match(/interval: 900000/g) || []).length, 1);
 assert.doesNotMatch(service, /National Water Model|\/reaches\/|streamflow\?series=/i);
 

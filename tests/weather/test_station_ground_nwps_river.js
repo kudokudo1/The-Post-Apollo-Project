@@ -155,7 +155,11 @@ assert.match(service, /nearbyGauges = rows/);
 assert.match(service, /interval: 900000/);
 assert.match(service, /running: river\.active && river\.configured/);
 assert.match(service, /Post-Apollo-WeatherStation\/0\.4/);
-assert.equal((service.match(/\bProcess\s*\{/g) || []).length, 2);
+assert.equal(
+    (service.match(/\bProcess\s*\{/g) || []).length,
+    3,
+    "NWPS river stack owns bbox + stageflow + selected-gauge metadata processes"
+);
 assert.match(
     service,
     /\/gauges\/"\s*\+\s*encodeURIComponent\(inflightStageflowGaugeId\)[\s\S]*?\+\s*"\/stageflow"/

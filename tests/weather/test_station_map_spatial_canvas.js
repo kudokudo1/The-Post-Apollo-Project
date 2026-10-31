@@ -124,7 +124,8 @@ assert.match(ui, /stationDiscovery\.selectedMapNewsMention = modelData/);
 assert.match(ui, /label: "FOCUS NEWS"/);
 assert.match(ui, /label: "CLEAR NEWS"/);
 assert.match(ui, /NEWS MENTION INSPECTOR \/\/ GDELT GKG/);
-assert.match(ui, /NATURAL EARTH 1:110m LAND BASEMAP", state:"CONNECTED"/);\nassert.match(ui, /OTHER POLYGON LAYERS", state:"NOT WIRED"/);
+assert.match(ui, /NATURAL EARTH 1:110m LAND BASEMAP", state:"CONNECTED"/);
+assert.match(ui, /OTHER POLYGON LAYERS", state:"NOT WIRED"/);
 
 const policySource = read("widgets/weather/StationMapProjectionPolicy.js");
 assert.doesNotMatch(policySource, /Process\s*\{|Timer\s*\{|curl|XMLHttpRequest|Qt\.openUrlExternally/);

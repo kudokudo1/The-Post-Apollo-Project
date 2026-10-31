@@ -138,6 +138,8 @@ def fixture_snapshot(file: Path):
     require(first == second, "FIXTURE_SOURCE_DRIFT")
     try:
         data = json.loads(first.decode("utf-8"), object_pairs_hook=unique)
+    except EvidenceRefusal:
+        raise
     except (ValueError, UnicodeError):
         raise EvidenceRefusal("INVALID_FIXTURE_JSON") from None
     require(type(data) is dict and

@@ -391,7 +391,7 @@ Rectangle {
     function clearRainViewerFallback() {
         rainViewerRadarService.clear();
         if (radarDisplaySource === "rainviewer")
-            radarDisplaySource = radarImageUrl !== "" ? "noaa" : "noaa";
+            radarDisplaySource = "noaa";
     }
 
     function showRadarSource(sourceId) {

@@ -84,6 +84,15 @@ Rectangle {
         : (source && Array.isArray(source.rows) ? source.rows : [])
     readonly property var newsVisibleSummary:
         DiscoveryPolicy.newsBatchSummary(visibleRows)
+    readonly property var newsReportingTrend:
+        DiscoveryPolicy.newsReportingTrend(
+            visibleRows,
+            source ? source.sourceClockMs : 0,
+            4,
+            6
+        )
+    readonly property var newsStoryFamilies:
+        DiscoveryPolicy.newsStoryFamilies(visibleRows)
 
     property string mapFilter: "all"
     property var selectedMapEvent: null
@@ -172,6 +181,28 @@ Rectangle {
             return;
         newsSourceRegion = next;
         discoveryScroll.contentY = 0;
+    }
+
+    function newsTrendColor(direction) {
+        switch (String(direction || "")) {
+        case "RISING": return Colors.magenta;
+        case "FALLING": return Colors.blue;
+        case "SPARSE": return Colors.yellow;
+        case "NO TIME DATA": return Colors.orange;
+        default: return Colors.cyan;
+        }
+    }
+
+    function newsAgeLabel(millis) {
+        const seen = Number(millis);
+        const now = source ? Number(source.sourceClockMs) : NaN;
+        if (!isFinite(seen) || seen <= 0 || !isFinite(now) || now <= seen)
+            return seen > 0 ? "<1m" : "--";
+        const minutes = Math.floor((now - seen) / 60000);
+        if (minutes < 60)
+            return minutes + "m";
+        const hours = Math.floor(minutes / 60);
+        return hours + "h";
     }
 
     function selectMapFilter(id) {
@@ -371,9 +402,11 @@ Rectangle {
                 {name:"LANGUAGE + TIME WINDOW FILTERS", state:"CONNECTED"},
                 {name:"EXACT-HEADLINE SOURCE GROUPS", state:"CONNECTED"},
                 {name:"SOURCE-COUNTRY REGION GROUPS", state:"CONNECTED"},
+                {name:"REPORTING TREND / SOURCE COUNT", state:"CONNECTED"},
+                {name:"CONSERVATIVE STORY FAMILIES", state:"CONNECTED"},
                 {name:"EVENT / MENTIONED-LOCATION LINKING", state:"NOT WIRED"},
                 {name:"LIVE NEWS / VIDEO", state:"NOT WIRED"},
-                {name:"SEMANTIC STORY CLUSTERS / DOSSIERS", state:"NOT WIRED"}
+                {name:"SEMANTIC / EMBEDDING DOSSIERS", state:"NOT WIRED"}
             ];
         return [
             {name:"RADIO BROWSER // STATION LIST", state:"SOURCE CONNECTED"},
@@ -1488,6 +1521,241 @@ Rectangle {
                             + " ARTICLES"
                     elide: Text.ElideRight
                     font.pixelSize: 9
+                }
+            }
+
+            Column {
+                width: parent.width
+                spacing: 7
+                visible: stationDiscovery.domain === "news"
+
+                StationSectionDivider {
+                    width: parent.width
+                    title: "REPORTING TREND // CURRENT FILTERED BATCH"
+                }
+
+                Row {
+                    width: parent.width
+                    spacing: 12
+
+                    Rectangle {
+                        width: 174
+                        height: 104
+                        color: Colors.dark
+                        border.width: 1
+                        border.color: stationDiscovery.newsTrendColor(
+                            stationDiscovery.newsReportingTrend.direction
+                        )
+
+                        Column {
+                            anchors.fill: parent
+                            anchors.margins: 9
+                            spacing: 5
+
+                            SecondaryText {
+                                text: "LAST 24H // 4H BUCKETS"
+                                font.pixelSize: 8
+                            }
+
+                            GohuText {
+                                text: stationDiscovery.newsReportingTrend.direction
+                                font.pixelSize: 14
+                                color: stationDiscovery.newsTrendColor(
+                                    stationDiscovery.newsReportingTrend.direction
+                                )
+                            }
+
+                            QuietText {
+                                text: "RECENT // "
+                                      + stationDiscovery.newsReportingTrend.recentArticles
+                                      + " ARTICLES"
+                                font.pixelSize: 8
+                            }
+
+                            QuietText {
+                                text: "PRIOR // "
+                                      + stationDiscovery.newsReportingTrend.previousArticles
+                                      + " ARTICLES"
+                                font.pixelSize: 8
+                            }
+
+                            QuietText {
+                                text: "TIMED // "
+                                      + stationDiscovery.newsReportingTrend.timedRows
+                                font.pixelSize: 8
+                            }
+                        }
+                    }
+
+                    Row {
+                        id: newsTrendBars
+                        width: Math.max(0, parent.width - 186)
+                        spacing: 7
+
+                        Repeater {
+                            model: stationDiscovery.newsReportingTrend.buckets
+
+                            delegate: Column {
+                                required property var modelData
+                                width: Math.max(
+                                    64,
+                                    (newsTrendBars.width
+                                     - 5 * newsTrendBars.spacing) / 6
+                                )
+                                spacing: 3
+
+                                Item {
+                                    width: parent.width
+                                    height: 72
+
+                                    Rectangle {
+                                        anchors.bottom: parent.bottom
+                                        anchors.horizontalCenter: parent.horizontalCenter
+                                        anchors.horizontalCenterOffset: -9
+                                        width: 12
+                                        height:
+                                            stationDiscovery.newsReportingTrend.maxArticles > 0
+                                            ? 6 + 58
+                                              * modelData.articles
+                                              / stationDiscovery.newsReportingTrend.maxArticles
+                                            : 6
+                                        color: Colors.orange
+                                    }
+
+                                    Rectangle {
+                                        anchors.bottom: parent.bottom
+                                        anchors.horizontalCenter: parent.horizontalCenter
+                                        anchors.horizontalCenterOffset: 9
+                                        width: 12
+                                        height:
+                                            stationDiscovery.newsReportingTrend.maxSources > 0
+                                            ? 6 + 58
+                                              * modelData.sources
+                                              / stationDiscovery.newsReportingTrend.maxSources
+                                            : 6
+                                        color: Colors.cyan
+                                    }
+                                }
+
+                                QuietText {
+                                    width: parent.width
+                                    horizontalAlignment: Text.AlignHCenter
+                                    text: modelData.label
+                                    font.pixelSize: 8
+                                }
+
+                                QuietText {
+                                    width: parent.width
+                                    horizontalAlignment: Text.AlignHCenter
+                                    text: "A" + modelData.articles
+                                          + " // S" + modelData.sources
+                                    font.pixelSize: 8
+                                }
+                            }
+                        }
+                    }
+                }
+
+                QuietText {
+                    width: parent.width
+                    text: "ORANGE = ARTICLES // CYAN = UNIQUE PUBLISHERS // LOCAL HISTOGRAM FROM GDELT SEENDATE // FILTER CHANGES RECOMPUTE WITHOUT REFETCH"
+                    font.pixelSize: 9
+                    color: Colors.orange
+                }
+
+                StationSectionDivider {
+                    width: parent.width
+                    title: "STORY FAMILIES // CONSERVATIVE TITLE TOKENS"
+                }
+
+                Column {
+                    width: parent.width
+                    spacing: 5
+                    visible: stationDiscovery.newsStoryFamilies.length > 0
+
+                    Repeater {
+                        model: stationDiscovery.newsStoryFamilies.slice(0, 4)
+
+                        delegate: Rectangle {
+                            required property var modelData
+                            width: parent.width
+                            height: 82
+                            color: Colors.dark
+                            border.width: 1
+                            border.color: Colors.magenta
+
+                            Column {
+                                anchors.fill: parent
+                                anchors.margins: 8
+                                spacing: 4
+
+                                GohuText {
+                                    width: parent.width
+                                    text: modelData.title
+                                    elide: Text.ElideRight
+                                    font.pixelSize: 11
+                                    color: Colors.white
+                                }
+
+                                QuietText {
+                                    width: parent.width
+                                    text: modelData.variantCount
+                                          + " TITLE VARIANTS // "
+                                          + modelData.sourceCount
+                                          + " SOURCES // "
+                                          + modelData.articleRecords
+                                          + " SOURCE RECORDS"
+                                    elide: Text.ElideRight
+                                    font.pixelSize: 8
+                                    color: Colors.cyan
+                                }
+
+                                QuietText {
+                                    width: parent.width
+                                    text: "COUNTRIES // "
+                                          + (modelData.countries.length
+                                             ? modelData.countries.join(" / ")
+                                             : "--")
+                                          + " // TOPICS // "
+                                          + (modelData.topics.length
+                                             ? modelData.topics.join(" / ").toUpperCase()
+                                             : "OTHER")
+                                    elide: Text.ElideRight
+                                    font.pixelSize: 8
+                                }
+
+                                QuietText {
+                                    width: parent.width
+                                    text: "STRONGEST TOKEN JACCARD // "
+                                          + Math.round(
+                                                modelData.strongestJaccard * 100
+                                            )
+                                          + "% // LATEST "
+                                          + stationDiscovery.newsAgeLabel(
+                                                modelData.latestSeenMillis
+                                            )
+                                          + " AGO"
+                                    elide: Text.ElideRight
+                                    font.pixelSize: 8
+                                    color: Colors.magenta
+                                }
+                            }
+                        }
+                    }
+                }
+
+                QuietText {
+                    visible: stationDiscovery.newsStoryFamilies.length === 0
+                    width: parent.width
+                    text: "NO MULTI-HEADLINE FAMILY CLEARS THE STRICT LOCAL TOKEN THRESHOLD IN THIS FILTERED BATCH"
+                    font.pixelSize: 9
+                }
+
+                QuietText {
+                    width: parent.width
+                    text: "LOCAL TITLE-TOKEN CLUSTERS // ≥3 SHARED TOKENS + ≥75% SHORTER-TITLE OVERLAP + ≥62% JACCARD // NOT EMBEDDING SEMANTICS OR VERIFIED EVENT IDENTITY"
+                    font.pixelSize: 9
+                    color: Colors.orange
                 }
             }
 

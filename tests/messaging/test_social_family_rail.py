@@ -43,6 +43,59 @@ class SocialFamilyRailSource(unittest.TestCase):
                       SELECTOR)
         self.assertIn("appSelector.settingsOpen = !appSelector.settingsOpen", SELECTOR)
 
+    def test_open_app_magenta_border_halo_preserves_active_yellow(self):
+        # Only app rows receive the new outline. Their active/background
+        # identity still comes from controller and real Sway observations,
+        # not keyboard or pointer preview.
+        app = SELECTOR.split("id: appButton", 1)[1].split(
+            "// The app rail remains", 1
+        )[0]
+        self.assertIn(
+            "readonly property bool isOpenStyled: isActive || isBackgroundOpen",
+            app,
+        )
+        self.assertIn("border.width: appButton.isOpenStyled ? 1 : 0", app)
+        self.assertIn("border.color: Colors.magenta", app)
+        halo = app.split("// OPEN-APP MAGENTA BORDER HALO", 1)[1].split(
+            "// CLOCK-STYLE CLOSE GLOW", 1
+        )[0]
+        self.assertIn("RectangularShadow {", halo)
+        self.assertIn("anchors.fill: parent", halo)
+        self.assertIn("spread: 3", halo)
+        self.assertIn("color: Colors.magenta", halo)
+        self.assertIn("opacity: appButton.isOpenStyled ? 0.55 : 0.0", halo)
+        # New glow is stronger than the yellow close/wide planes but
+        # remains behind the app rectangle, preserving visible yellow fill.
+        self.assertIn("z: -0.5", halo)
+        self.assertIn("color: appButton.isActive ? Colors.yellow", app)
+        self.assertIn("opacity: appButton.isActive ? 0.55", app)
+        self.assertIn("opacity: appButton.isActive ? 0.12", app)
+        self.assertIn("appButton.isBackgroundOpen ? Colors.dark", app)
+        self.assertIn("appButton.isBackgroundOpen ? 0.0", app)
+        self.assertIn("color: appButton.isOpenStyled ? Colors.magenta", app)
+        self.assertIn(
+            "color: appButton.isOpenStyled ? Colors.magenta : Colors.orange",
+            app,
+        )
+
+    def test_expanded_folder_uses_orange_without_becoming_selected(self):
+        # Family expand/collapse is an organization filter, not selection
+        # of the currently displayed app. Only its idle foreground/border/
+        # content glow identity changes to orange while expanded.
+        family = SELECTOR.split("ActionButton {", 1)[1].split(
+            "onTriggered: SocialIdentityStore.toggleFamily(", 1
+        )[0]
+        self.assertIn("visible: buttonContainer.isFamilyRow", family)
+        self.assertIn("buttonContainer.modelData.expanded ? \"▾ \" : \"▸ \"", family)
+        self.assertIn(
+            "accentColor: buttonContainer.modelData.expanded", family
+        )
+        self.assertIn("? Colors.orange : Colors.cyan", family)
+        self.assertNotIn("selected: buttonContainer.modelData.expanded", family)
+        self.assertNotIn("selectedFillColor:", family)
+        self.assertIn("SocialIdentityStore.toggleFamily(", SELECTOR)
+        self.assertEqual(SELECTOR.count("id: appButton"), 1)
+
     def test_hidden_actions_cannot_be_launched_from_navigation(self):
         for required in (
             "function isAppVisible(index)", "function moveSelection(direction)",

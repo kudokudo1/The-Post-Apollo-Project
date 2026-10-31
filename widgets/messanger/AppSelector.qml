@@ -601,7 +601,11 @@ Rectangle {
                         labelPixelSize: 9
                         labelMinimumPixelSize: 8
                         contentPadding: 3
-                        accentColor: Colors.cyan
+                        // Expanded folder filters use orange foreground,
+                        // border and matching glows. Collapsed stays cyan.
+                        // Avoid selected=true: it introduces a yellow fill.
+                        accentColor: buttonContainer.modelData.expanded
+                                     ? Colors.orange : Colors.cyan
                         onTriggered: SocialIdentityStore.toggleFamily(
                             buttonContainer.modelData.familyId)
                     }
@@ -626,6 +630,11 @@ Rectangle {
                         radius: 0
                         clip: false
     
+                        // Outline is independent of yellow active fill and
+                        // has no effect on hover/keyboard preview.
+                        border.width: appButton.isOpenStyled ? 1 : 0
+                        border.color: Colors.magenta
+
                         property bool isSelected: appSelector.selectedIndex === buttonContainer.modelData.serviceIndex
                         property bool isActive: appSelector.activeAppIndex === buttonContainer.modelData.serviceIndex
                         property bool isBackgroundOpen: !isActive
@@ -789,6 +798,20 @@ Rectangle {
                             }
                         }
     
+                        // ============================================
+                        // OPEN-APP MAGENTA BORDER HALO
+                        // ============================================
+                        // Preserve existing yellow active close/wide glows;
+                        // this separately lights active and background-open
+                        // borders without filling background app buttons.
+                        RectangularShadow {
+                            anchors.fill: parent
+                            spread: 3
+                            color: Colors.magenta
+                            opacity: appButton.isOpenStyled ? 0.55 : 0.0
+                            z: -0.5
+                        }
+
                         // ============================================
                         // CLOCK-STYLE CLOSE GLOW
                         // ============================================

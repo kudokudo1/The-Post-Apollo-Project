@@ -223,7 +223,8 @@ const sky = read("widgets/weather/StationSky.qml");
 assert.match(sky, /import "\.\.\/\.\.\/services\/weather" as WeatherServices/);
 assert.match(sky, /WeatherServices\.UsnoMoonService\s*\{/);
 assert.match(sky, /active: sky\.visible/);
-assert.match(sky, /date: sky\.skyCycle\.date/);
+assert.match(sky, /date: sky\.astronomySummary\.date/);
+assert.doesNotMatch(sky, /date: sky\.skyCycle\.date/);
 assert.match(sky, /readonly property bool openMeteoCivilOffsetAvailable/);
 assert.match(sky, /weatherService\.airQualityUtcOffsetMinutes/);
 assert.match(sky, /readonly property var moonCivilOffsetMinutes/);
@@ -250,6 +251,45 @@ assert.match(sky, /OPEN-METEO RESOLVED CIVIL OFFSET/);
 assert.match(sky, /SUNRISE CALIBRATION FALLBACK/);
 assert.match(sky, /function moonInputIssue\(\)/);
 assert.match(sky, /INVALID\/MISSING/);
+
+const cycleContext = {
+    Date, Number, String, Array, Object, Math, JSON, isFinite
+};
+vm.runInNewContext(
+    read("services/weather/WeatherCyclePolicy.js")
+        .replace(/^\.pragma library\s*/m, ""),
+    cycleContext
+);
+const staleCycle = cycleContext.atObservation(
+    Date.parse("2026-10-31T09:00:00Z"),
+    "2026-10-31 05:00 AM",
+    Date.parse("2026-10-31T05:00:00Z"),
+    [{
+        date:"2026-10-31",
+        sunrise:"07:35 AM",
+        sunset:"06:09 PM",
+        moonPhase:"Waning Gibbous",
+        moonIllumination:78
+    }]
+);
+assert.equal(staleCycle.date, "");
+const fallbackAstronomy = cycleContext.astronomySummary(
+    staleCycle.date,
+    [{
+        date:"2026-10-31",
+        sunrise:"07:35 AM",
+        sunset:"06:09 PM",
+        moonPhase:"Waning Gibbous",
+        moonIllumination:78
+    }]
+);
+assert.equal(fallbackAstronomy.date, "2026-10-31");
+assert.equal(
+    ctx.requestInfo(
+        fallbackAstronomy.date, 38.9, -77.0, -240
+    ).dateValid,
+    true
+);
 
 const astronomyStart = sky.indexOf(
     'title: "ASTRONOMY // SUN + MOON"'

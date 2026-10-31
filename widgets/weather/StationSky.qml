@@ -104,7 +104,10 @@ Rectangle {
     WeatherServices.UsnoMoonService {
         id: moonService
         active: sky.visible
-        date: sky.skyCycle.date
+        // Use the same provider forecast date shown by ASTRONOMY.
+        // skyCycle.date intentionally clears when the observation anchor is
+        // stale, while astronomySummary safely falls back to dailyForecast[0].
+        date: sky.astronomySummary.date
         latitude: sky.weatherService ? sky.weatherService.latitude : ""
         longitude: sky.weatherService ? sky.weatherService.longitude : ""
         offsetMinutes: sky.moonCivilOffsetMinutes

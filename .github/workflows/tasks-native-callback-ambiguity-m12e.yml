@@ -1,0 +1,56 @@
+name: TASKS M12e native callback ambiguity and isolated observer source checks
+
+on:
+  pull_request:
+    paths:
+      - 'tests/tasks/fixtures/TaskCallbackAttributionM12e.cjs'
+      - 'tests/tasks/fixtures/TaskNativeCallbackLabM12e.qml'
+      - 'tests/tasks/test_task_native_callback_attribution_m12e.cjs'
+      - 'docs/tasks-native-callback-ambiguity-m12e.md'
+      - '.github/workflows/tasks-native-callback-ambiguity-m12e.yml'
+      - 'services/projects/TaskFileViewHostBridgeM11g.qml'
+      - 'services/projects/TaskJsonGateHostBridgeM11m.qml'
+      - 'services/hub/ApolloHubTodoStore.qml'
+      - 'shell.qml'
+  push:
+    branches: [main]
+    paths:
+      - 'tests/tasks/fixtures/TaskCallbackAttributionM12e.cjs'
+      - 'tests/tasks/fixtures/TaskNativeCallbackLabM12e.qml'
+      - 'tests/tasks/test_task_native_callback_attribution_m12e.cjs'
+      - 'docs/tasks-native-callback-ambiguity-m12e.md'
+      - '.github/workflows/tasks-native-callback-ambiguity-m12e.yml'
+      - 'services/projects/TaskFileViewHostBridgeM11g.qml'
+      - 'services/projects/TaskJsonGateHostBridgeM11m.qml'
+      - 'services/hub/ApolloHubTodoStore.qml'
+      - 'shell.qml'
+
+permissions:
+  contents: read
+
+jobs:
+  callback-ambiguity-source:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: M12e callback ambiguity, stale tickets and unmounted native observer
+        run: node --test tests/tasks/test_task_native_callback_attribution_m12e.cjs
+      - name: M11q existing synthetic native callback, deferred readback tickets
+        run: node tests/tasks/test_task_native_callback_guard_m11q.cjs
+      - name: M11 FileView deferred readback source regression
+        run: python3 tests/tasks/test_fileview_deferred_readback_m11.py
+      - name: M12d signed synthetic process and disposable owner boundary
+        run: node --test tests/tasks/test_task_signed_owner_boundary_m12d.cjs
+      - name: M12a synthetic queued/settled last-confirmed model
+        run: node --test tests/tasks/test_task_guarded_completion_model_m12a.cjs
+      - name: M11t production gates remain open
+        run: python3 tests/tasks/test_task_production_trust_contract_m11t.py
+      - name: M11d one existing TASKS writer
+        run: python3 tests/tasks/test_task_writer_gate_inventory_m11d.py

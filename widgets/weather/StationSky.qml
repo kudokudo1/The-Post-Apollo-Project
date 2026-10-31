@@ -1321,6 +1321,94 @@ Rectangle {
                 }
             }
 
+            StationSectionDivider {
+                width: parent.width
+                title: "PHOTO LIGHT // STATION CONVENTION"
+            }
+
+            Row {
+                width: parent.width
+                spacing: 12
+
+                SecondaryText {
+                    width: 92
+                    text: "MORNING"
+                    font.pixelSize: 10
+                    color: Colors.cyan
+                }
+
+                Column {
+                    width: 220
+                    spacing: 3
+                    SecondaryText { text: "BLUE // -6° → -4°"; font.pixelSize: 9 }
+                    GohuText {
+                        text: sky.twilightSummary.blueMorningStart
+                              + " → "
+                              + sky.twilightSummary.blueMorningEnd
+                        font.pixelSize: 12
+                        color: Colors.blue
+                    }
+                }
+
+                Column {
+                    width: 250
+                    spacing: 3
+                    SecondaryText { text: "GOLDEN // -4° → +6°"; font.pixelSize: 9 }
+                    GohuText {
+                        text: sky.twilightSummary.goldenMorningStart
+                              + " → "
+                              + sky.twilightSummary.goldenMorningEnd
+                        font.pixelSize: 12
+                        color: Colors.orange
+                    }
+                }
+            }
+
+            Row {
+                width: parent.width
+                spacing: 12
+
+                SecondaryText {
+                    width: 92
+                    text: "EVENING"
+                    font.pixelSize: 10
+                    color: Colors.magenta
+                }
+
+                Column {
+                    width: 220
+                    spacing: 3
+                    SecondaryText { text: "GOLDEN // +6° → -4°"; font.pixelSize: 9 }
+                    GohuText {
+                        text: sky.twilightSummary.goldenEveningStart
+                              + " → "
+                              + sky.twilightSummary.goldenEveningEnd
+                        font.pixelSize: 12
+                        color: Colors.orange
+                    }
+                }
+
+                Column {
+                    width: 250
+                    spacing: 3
+                    SecondaryText { text: "BLUE // -4° → -6°"; font.pixelSize: 9 }
+                    GohuText {
+                        text: sky.twilightSummary.blueEveningStart
+                              + " → "
+                              + sky.twilightSummary.blueEveningEnd
+                        font.pixelSize: 12
+                        color: Colors.blue
+                    }
+                }
+            }
+
+            QuietText {
+                width: parent.width
+                text: "POST-APOLLO PHOTO CONVENTION // SOLAR CENTER ALTITUDE // BLUE -6°..-4° // GOLDEN -4°..+6° // CALCULATED, NOT OBSERVED"
+                font.pixelSize: 9
+                color: Colors.orange
+            }
+
             Row {
                 width: parent.width
                 spacing: 12

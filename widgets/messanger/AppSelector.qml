@@ -951,8 +951,38 @@ Rectangle {
         border.width: 1
         border.color: Colors.cyan
 
+        // One fixed header spans the entire settings workspace. settingsPage
+        // already excludes the app selector rail, so the rail keeps its own
+        // buttons and scroll state. Scrolling below remains column-local.
+        Rectangle {
+            id: settingsHeader
+            anchors.top: parent.top
+            anchors.left: parent.left
+            anchors.right: parent.right
+            height: 38
+            color: Colors.dark
+            border.width: 1
+            border.color: Colors.magenta
+            z: 1
+
+            Text {
+                anchors.centerIn: parent
+                text: "USER // SETTINGS"
+                color: Colors.magenta
+                horizontalAlignment: Text.AlignHCenter
+                font.family: "GohuFont 11 Nerd Font Mono"
+                font.pixelSize: 12
+                font.bold: true
+            }
+        }
+
         Row {
-            anchors.fill: parent
+            anchors {
+                top: settingsHeader.bottom
+                left: parent.left
+                right: parent.right
+                bottom: parent.bottom
+            }
             spacing: 0
 
             // Contact-list-sized identity and account setup column.
@@ -979,20 +1009,6 @@ Rectangle {
                         anchors.horizontalCenter: parent.horizontalCenter
                         width: Math.max(1, parent.width - 16)
                         spacing: 12
-                Text {
-                    width: parent.width
-                    text: "USER //\nSETTINGS"
-                    color: Colors.orange
-                    horizontalAlignment: Text.AlignHCenter
-                    font.family: "GohuFont 11 Nerd Font Mono"
-                    font.pixelSize: 11
-                    font.bold: true
-                }
-                Rectangle {
-                    width: parent.width
-                    height: 1
-                    color: Colors.cyan
-                }
                 Text {
                     width: parent.width
                     text: "IDENTITIES"
@@ -1316,10 +1332,12 @@ Rectangle {
                            : (appSelector.accountSelectedServiceId === ""
                               ? "▾ CHOOSE APP (32)"
                               : "▾ " + appSelector.accountSelectedServiceId.toUpperCase())
-                    // Yellow fill/magenta label when idle. When expanded,
-                    // reuse ActionButton's standard selected-state appearance.
-                    idleFillColor: Colors.yellow
-                    accentColor: Colors.magenta
+                    // Closed: dark background with orange text, border and
+                    // halo. Expanded: shared selected-state yellow fill with
+                    // magenta text, border and selected glow.
+                    idleFillColor: Colors.dark
+                    accentColor: appSelector.accountAppPickerOpen
+                                 ? Colors.magenta : Colors.orange
                     selected: appSelector.accountAppPickerOpen
                     labelPixelSize: 9
                     contentPadding: 3
@@ -1517,7 +1535,9 @@ Rectangle {
                     width: parent.width
                     height: 36
                     label: appSelector.accountSelectedEntryId === ""
-                           ? "ADD ACCOUNT NAME" : "SAVE ACCOUNT NAME"
+                           ? "+ ACCOUNT NAME" : "SAVE ACCOUNT NAME"
+                    accentColor: appSelector.accountSelectedEntryId === ""
+                                 ? Colors.magenta : Colors.cyan
                     labelPixelSize: 9
                     labelMinimumPixelSize: 8
                     contentPadding: 3
@@ -1653,6 +1673,7 @@ Rectangle {
                     width: parent.width
                     height: 36
                     label: "OPEN SIGN-IN WINDOW"
+                    accentColor: Colors.orange
                     labelPixelSize: 9
                     labelMinimumPixelSize: 8
                     contentPadding: 3

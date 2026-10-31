@@ -39,7 +39,7 @@ class SocialAccountDetailsUiContracts(unittest.TestCase):
             'id: accountAppList',
             'id: accountLabelInput',
             'label: "+ NEW ACCOUNT NAME"',
-            'ADD ACCOUNT NAME" : "SAVE ACCOUNT NAME"',
+            '+ ACCOUNT NAME" : "SAVE ACCOUNT NAME"',
             'label: "MOVE UP"',
             'label: "MOVE DOWN"',
             'CONFIRM REMOVE NAME',
@@ -103,6 +103,19 @@ class SocialAccountDetailsUiContracts(unittest.TestCase):
         self.assertIn('SocialIdentityStore.selectIdentity(modelData.id)',SELECTOR)
         self.assertIn('SocialIdentityStore.createIdentity(',SELECTOR)
         self.assertIn('appSelector.identitySnapshot.writable',SELECTOR)
+
+    def test_account_submission_renamed_without_changing_creation_or_editing(self):
+        sidebar = SELECTOR.split("id: settingsIdentityPane", 1)[1].split(
+            "id: settingsEditorPane", 1
+        )[0]
+        self.assertIn('label: "+ NEW ACCOUNT NAME"', sidebar)
+        self.assertIn('"+ ACCOUNT NAME" : "SAVE ACCOUNT NAME"', sidebar)
+        self.assertIn("accentColor: appSelector.accountSelectedEntryId", sidebar)
+        self.assertIn("? Colors.magenta : Colors.cyan", sidebar)
+        self.assertIn("SocialAccountDetailsStore.addAccountName(", sidebar)
+        self.assertIn("SocialAccountDetailsStore.renameAccountName(", sidebar)
+        self.assertIn("SocialAccountDetailsStore.removeAccountName(", sidebar)
+        self.assertNotIn('?"ADD ACCOUNT NAME"', sidebar)
 
     def test_collapsed_all_app_picker_fades_unrecorded_without_blocking_setup(self):
         sidebar = SELECTOR.split("id: settingsIdentityPane", 1)[1].split(

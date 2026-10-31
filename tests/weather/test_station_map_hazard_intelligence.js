@@ -139,7 +139,7 @@ assert.ok(
 assert.match(ui, /stationDiscovery\.domain === "map" \? "INSPECT HERE"/);
 assert.match(ui, /SESSION CACHE \/\/ 15m/);
 assert.match(ui, /EONET \+ FIRMS \+ MRMS \+ HMS SMOKE CONNECTED/);
-assert.match(ui, /BASEMAP NOT WIRED/);
+assert.match(ui, /NATURAL EARTH BASEMAP \+ EONET \+ FIRMS \+ MRMS \+ HMS SMOKE CONNECTED/);
 
 // Official NOAA MRMS radar is manual; RainViewer remains fallback-only.
 assert.match(ui, /NASA FIRMS \/\/ VIIRS NOAA-21 HOTSPOTS/);

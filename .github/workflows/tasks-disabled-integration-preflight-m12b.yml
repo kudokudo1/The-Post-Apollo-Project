@@ -1,0 +1,54 @@
+name: TASKS M12b disabled production integration source preflight
+
+on:
+  pull_request:
+    paths:
+      - 'tests/tasks/fixtures/task_disabled_integration_preflight_m12b.json'
+      - 'tests/tasks/test_task_disabled_integration_preflight_m12b.py'
+      - 'docs/tasks-disabled-production-integration-preflight-m12b.md'
+      - '.github/workflows/tasks-disabled-integration-preflight-m12b.yml'
+      - 'services/hub/ApolloHubTodoStore.qml'
+      - 'services/hub/ApolloHubTodoPolicy.js'
+      - 'services/projects/TaskJsonGateCandidateM11l.py'
+      - 'shell.qml'
+  push:
+    branches: [main]
+    paths:
+      - 'tests/tasks/fixtures/task_disabled_integration_preflight_m12b.json'
+      - 'tests/tasks/test_task_disabled_integration_preflight_m12b.py'
+      - 'docs/tasks-disabled-production-integration-preflight-m12b.md'
+      - '.github/workflows/tasks-disabled-integration-preflight-m12b.yml'
+      - 'services/hub/ApolloHubTodoStore.qml'
+      - 'services/hub/ApolloHubTodoPolicy.js'
+      - 'services/projects/TaskJsonGateCandidateM11l.py'
+      - 'shell.qml'
+
+permissions:
+  contents: read
+
+jobs:
+  disabled-integration-review:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: M12b production disabled integration evidence audit
+        run: python3 tests/tasks/test_task_disabled_integration_preflight_m12b.py
+      - name: M12a synthetic queued/settled UI model
+        run: node --test tests/tasks/test_task_guarded_completion_model_m12a.cjs
+      - name: M11z synthetic backup and code-only rollback
+        run: python3 tests/tasks/test_task_synthetic_backup_rollback_m11z.py
+      - name: M11y signed synthetic release
+        run: node --test tests/tasks/test_task_signed_release_verifier_m11y.cjs
+      - name: M11x architecture and UI source audit
+        run: python3 tests/tasks/test_task_production_architecture_m11x.py
+      - name: M11t all production activation gates open
+        run: python3 tests/tasks/test_task_production_trust_contract_m11t.py
+      - name: M11d one existing TASKS writer
+        run: python3 tests/tasks/test_task_writer_gate_inventory_m11d.py

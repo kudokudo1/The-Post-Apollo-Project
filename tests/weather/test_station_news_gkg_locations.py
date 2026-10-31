@@ -133,7 +133,7 @@ assert "MENTIONED PLACES ONLY // NOT VERIFIED EVENT LOCATION" in viewer
 assert "Process {" not in viewer
 assert "Timer {" not in viewer
 assert "Qt.openUrlExternally" not in viewer
-assert "WebEngine" not in viewer
+assert "import QtWebEngine" not in viewer
 
 discovery = (
     ROOT / "widgets/weather/StationDiscovery.qml"

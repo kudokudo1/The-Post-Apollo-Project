@@ -1204,6 +1204,111 @@ Rectangle {
                         }
                     }
                 }
+
+                Row {
+                    width: parent.width
+                    spacing: 12
+                    visible: celnavService.snapshot.constellations
+                             && celnavService.snapshot.constellations.length > 0
+
+                    GohuText {
+                        width: 240
+                        text: "CONSTELLATION ANCHORS // "
+                              + celnavService.snapshot.constellations.length
+                        font.pixelSize: 10
+                        color: Colors.magenta
+                    }
+
+                    QuietText {
+                        width: Math.max(0, parent.width - 252)
+                        text: "GROUPED FROM THE SAME CURRENT USNO NAVIGATION-STAR SNAPSHOT"
+                        font.pixelSize: 9
+                    }
+                }
+
+                Row {
+                    id: constellationAnchorRow
+                    width: parent.width
+                    spacing: 7
+                    visible: celnavService.snapshot.constellations
+                             && celnavService.snapshot.constellations.length > 0
+
+                    Repeater {
+                        model: celnavService.snapshot.constellations
+                               ? celnavService.snapshot.constellations.slice(0, 4)
+                               : []
+
+                        delegate: Rectangle {
+                            required property var modelData
+                            width: Math.max(
+                                0,
+                                (constellationAnchorRow.width
+                                 - 3 * constellationAnchorRow.spacing) / 4
+                            )
+                            height: 98
+                            color: Colors.dark
+                            border.width: 1
+                            border.color: Colors.magenta
+
+                            Column {
+                                anchors.fill: parent
+                                anchors.margins: 7
+                                spacing: 4
+
+                                GohuText {
+                                    width: parent.width
+                                    text: modelData.name
+                                    elide: Text.ElideRight
+                                    font.pixelSize: 10
+                                    color: Colors.magenta
+                                }
+
+                                QuietText {
+                                    width: parent.width
+                                    text: modelData.count
+                                          + (modelData.count === 1
+                                             ? " NAV STAR" : " NAV STARS")
+                                    font.pixelSize: 8
+                                }
+
+                                QuietText {
+                                    width: parent.width
+                                    text: "ANCHOR // "
+                                          + modelData.anchorStar
+                                    elide: Text.ElideRight
+                                    font.pixelSize: 8
+                                    color: Colors.white
+                                }
+
+                                QuietText {
+                                    width: parent.width
+                                    text: "ALT "
+                                          + sky.skyAngleText(
+                                                modelData.anchorAltitude
+                                            )
+                                          + " // "
+                                          + modelData.anchorDirection
+                                    font.pixelSize: 8
+                                    color: Colors.cyan
+                                }
+
+                                QuietText {
+                                    width: parent.width
+                                    text: modelData.starNames.join(" / ")
+                                    elide: Text.ElideRight
+                                    font.pixelSize: 8
+                                }
+                            }
+                        }
+                    }
+                }
+
+                QuietText {
+                    width: parent.width
+                    text: "CONSTELLATION ANCHORS GROUP RETURNED NAVIGATION STARS ONLY // NOT FULL IAU CONSTELLATION BOUNDARIES OR ALL VISIBLE STARS"
+                    font.pixelSize: 9
+                    color: Colors.orange
+                }
             }
 
             QuietText {

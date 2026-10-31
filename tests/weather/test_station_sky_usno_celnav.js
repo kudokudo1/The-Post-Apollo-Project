@@ -21,7 +21,8 @@ vm.runInNewContext(
 
 for (const fn of [
     "requestInfo", "compassDirection", "constellationForNavStar",
-    "almanacData", "normalizeObject", "emptyResult", "parse"
+    "constellationGroups", "almanacData", "normalizeObject",
+    "emptyResult", "parse"
 ])
     assert.equal(typeof ctx[fn], "function", fn);
 
@@ -63,6 +64,40 @@ assert.equal(ctx.constellationForNavStar(18, "Sirius"), "CANIS MAJOR");
 assert.equal(ctx.constellationForNavStar(49, "Vega"), "LYRA");
 assert.equal(ctx.constellationForNavStar(null, "Polaris"), "URSA MINOR");
 assert.equal(ctx.constellationForNavStar(null, "Unknown"), "");
+
+const grouped = Array.from(ctx.constellationGroups([
+    {
+        name:"RIGEL", constellation:"ORION",
+        altitude:25, azimuth:160, direction:"SSE"
+    },
+    {
+        name:"BETELGEUSE", constellation:"ORION",
+        altitude:42, azimuth:145, direction:"SE"
+    },
+    {
+        name:"VEGA", constellation:"LYRA",
+        altitude:65, azimuth:290, direction:"WNW"
+    },
+    {
+        name:"UNKNOWN", constellation:"",
+        altitude:80, azimuth:10, direction:"N"
+    }
+]));
+assert.equal(grouped.length, 2);
+assert.equal(grouped[0].name, "LYRA");
+assert.equal(grouped[0].count, 1);
+assert.equal(grouped[0].anchorStar, "VEGA");
+assert.equal(grouped[0].anchorAltitude, 65);
+assert.equal(grouped[0].anchorDirection, "WNW");
+assert.deepEqual(Array.from(grouped[0].starNames), ["VEGA"]);
+assert.equal(grouped[1].name, "ORION");
+assert.equal(grouped[1].count, 2);
+assert.equal(grouped[1].anchorStar, "BETELGEUSE");
+assert.equal(grouped[1].anchorAltitude, 42);
+assert.deepEqual(
+    Array.from(grouped[1].starNames),
+    ["BETELGEUSE", "RIGEL"]
+);
 
 const fixture = {
     type:"Feature",
@@ -129,6 +164,12 @@ assert.deepEqual(
 assert.equal(parsed.stars[0].constellation, "LYRA");
 assert.equal(parsed.stars[1].constellation, "CANIS MAJOR");
 
+assert.equal(parsed.constellations.length, 2);
+assert.equal(parsed.constellations[0].name, "LYRA");
+assert.equal(parsed.constellations[0].anchorStar, "VEGA");
+assert.equal(parsed.constellations[1].name, "CANIS MAJOR");
+assert.equal(parsed.constellations[1].anchorStar, "SIRIUS");
+
 assert.throws(() => ctx.parse(null));
 assert.throws(() => ctx.parse({error:"bad request"}));
 assert.throws(() => ctx.parse({properties:{data:[]}}));
@@ -169,6 +210,14 @@ assert.match(sky, /ALTITUDE \/\/ HC/);
 assert.match(sky, /AZIMUTH \/\/ ZN/);
 assert.match(sky, /PLANETS ABOVE HORIZON/);
 assert.match(sky, /NAVIGATION STARS \/\/ CONSTELLATION CONTEXT/);
+assert.match(sky, /CONSTELLATION ANCHORS \/\//);
+assert.match(sky, /celnavService\.snapshot\.constellations/);
+assert.match(sky, /modelData\.anchorStar/);
+assert.match(sky, /modelData\.anchorAltitude/);
+assert.match(sky, /modelData\.anchorDirection/);
+assert.match(sky, /modelData\.starNames\.join\(" \/ "\)/);
+assert.match(sky, /GROUP RETURNED NAVIGATION STARS ONLY/);
+assert.match(sky, /NOT FULL IAU CONSTELLATION BOUNDARIES OR ALL VISIBLE STARS/);
 assert.match(sky, /celnavService\.snapshot\.planets/);
 assert.match(sky, /celnavService\.snapshot\.stars/);
 assert.match(sky, /celnavService\.snapshot\.moon/);

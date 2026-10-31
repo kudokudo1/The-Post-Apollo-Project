@@ -111,6 +111,8 @@ jobs:
         run: node tests/weather/test_station_map_spatial_canvas.js
       - name: Validate local Natural Earth MAP basemap
         run: node tests/weather/test_station_map_natural_earth_basemap.js
+      - name: Validate Natural Earth MAP boundaries and places
+        run: node tests/weather/test_station_map_natural_earth_context.js
       - name: Validate bounded manual FIRMS hotspot overlay
         run: node tests/weather/test_station_map_firms_hotspots.js
       - name: Validate secret-safe FIRMS fetch helper

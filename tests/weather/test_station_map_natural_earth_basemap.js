@@ -91,7 +91,7 @@ assert.match(
 );
 assert.match(
     ui,
-    /NATURAL EARTH LAND \/\/ LAT\/LON GRID \/\/ RADAR \+ SMOKE OVERLAYS/
+    /NATURAL EARTH LAND \+ CONTEXT \/\/ LAT\/LON GRID \/\/ RADAR \+ SMOKE OVERLAYS/
 );
 
 const basemapStart = ui.indexOf("id: basemapCanvas");

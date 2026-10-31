@@ -47,7 +47,6 @@ class SocialAccountDetailsUiContracts(unittest.TestCase):
             'SocialAccountDetailsStore.renameAccountName(',
             'SocialAccountDetailsStore.removeAccountName(',
             'SocialAccountDetailsStore.moveAccountName(',
-            'SETUP NOTES ONLY. A label does not connect or sign in.',
         ):
             self.assertIn(part,sidebar,part)
         self.assertIn('id: settingsAppPane',SELECTOR)
@@ -55,6 +54,29 @@ class SocialAccountDetailsUiContracts(unittest.TestCase):
         self.assertIn('id: settingsIdentityPane',SELECTOR)
         self.assertIn('label: "USER // SETTINGS"',SELECTOR)
         self.assertEqual(SELECTOR.count("id: settingsFooter"),1)
+
+    def test_browser_sessions_moved_to_family_pane_bottom_without_signin_moving(self):
+        sidebar = SELECTOR.split("id: settingsIdentityPane", 1)[1].split(
+            "id: settingsEditorPane", 1
+        )[0]
+        middle = SELECTOR.split("id: settingsFamilyPane", 1)[1].split(
+            "id: settingsAppPane", 1
+        )[0]
+        self.assertNotIn('text: "BROWSER SESSIONS"', sidebar)
+        self.assertIn('text: "BROWSER SIGN-IN // MANUAL"', sidebar)
+        self.assertIn('label: "CHECK WINDOW"', sidebar)
+        self.assertIn('label: "OPEN SIGN-IN WINDOW"', sidebar)
+        self.assertIn('text: "BROWSER SESSIONS"', middle)
+        self.assertIn("appSelector.isolatedBrowserModeToggleRequested()", middle)
+        self.assertIn("SETUP NOTES ONLY. A label does not connect or sign in.", middle)
+        # Independent section follows the editing column, not hidden inside
+        # its visible: editingFamilies gate or the account names accordion.
+        self.assertLess(
+            middle.index('} // end family editing actions'),
+            middle.index('text: "BROWSER SESSIONS"'),
+        )
+        self.assertEqual(SELECTOR.count('text: "BROWSER SESSIONS"'), 1)
+        self.assertEqual(SELECTOR.count("appSelector.isolatedBrowserModeToggleRequested()"), 1)
 
     def test_account_record_scoped_to_selected_identity(self):
         for part in (

@@ -85,7 +85,8 @@ assert.match(ui, /label: "CLEAR"/);
 assert.match(ui, /LOCAL \/\/ MATCHES GDELT DOMAIN OR SOURCE COUNTRY/);
 assert.match(ui, /SOURCE MATCH/);
 assert.match(ui, /PUBLISHER \/ SOURCE COUNTRY FILTER", state:"CONNECTED"/);
-assert.match(ui, /REGION \/ LANGUAGE FILTERS", state:"NOT WIRED"/);
+assert.match(ui, /LANGUAGE \+ TIME WINDOW FILTERS", state:"CONNECTED"/);
+assert.match(ui, /REGION GROUPING", state:"NOT WIRED"/);
 assert.match(ui, /FILTER IS LOCAL \/\/ SOURCE NOT REFETCHED/);
 
 const inputStart = ui.indexOf("id: newsSourceInput");

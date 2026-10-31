@@ -2,6 +2,7 @@ import QtQuick
 import Quickshell
 import QtQuick.Layouts
 import Quickshell.Services.SystemTray
+import qs.services.social
 import "../components"
 import QtQuick.Effects
 import Qt5Compat.GraphicalEffects
@@ -22,15 +23,17 @@ Rectangle {
     function isDiscordTrayItem(item) {
         const id = String(item.id || "").trim().toLowerCase().replace(/\.desktop$/, "");
         const title = String(item.title || "").trim().toLowerCase();
+        const tooltip = String(item.tooltipTitle || "").trim().toLowerCase();
         return id === "vesktop" || id === "dev.vencord.vesktop"
-               || id === "discord" || title === "vesktop" || title === "discord";
+               || id === "discord" || title === "vesktop" || title === "discord"
+               || tooltip === "vesktop" || tooltip === "discord";
     }
 
     function openDiscordFromTray() {
-        // MessagingW already exposes a dedicated Quickshell IPC target.
-        // Reuse it rather than editing the concurrently-owned shell.qml
-        // or calling Vesktop's desktop-window restore action.
-        Quickshell.execDetached(["qs", "ipc", "call", "messaging", "openDiscordFromTray"]);
+        // Both Tray and MessagingW run in this Quickshell instance. Signal
+        // Social directly instead of spawning a qs CLI process, which may
+        // target a different instance or fail without reporting to this UI.
+        SocialTrayBridge.requestDiscordActivation();
     }
 
     // ===== DOCK GLOW ============================================

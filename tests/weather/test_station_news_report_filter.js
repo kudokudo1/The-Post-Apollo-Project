@@ -176,7 +176,8 @@ assert.match(
 assert.match(ui, /LOCAL TOPIC FILTER \+ URL\/TITLE DEDUPE/);
 assert.match(ui, /EXACT-HEADLINE SOURCE GROUPS \/\/ NOT FUZZY STORY CLUSTERING/);
 assert.match(ui, /EXACT-HEADLINE SOURCE GROUPS", state:"CONNECTED"/);
-assert.match(ui, /SEMANTIC STORY CLUSTERS \/ DOSSIERS", state:"NOT WIRED"/);
+assert.match(ui, /CONSERVATIVE STORY FAMILIES", state:"CONNECTED"/);
+assert.match(ui, /SEMANTIC \/ EMBEDDING DOSSIERS", state:"NOT WIRED"/);
 assert.match(ui, /PUBLISHER \/ SOURCE COUNTRY FILTER", state:"CONNECTED"/);
 assert.match(ui, /LANGUAGE \+ TIME WINDOW FILTERS", state:"CONNECTED"/);
 assert.match(ui, /SOURCE-COUNTRY REGION GROUPS", state:"CONNECTED"/);
@@ -197,7 +198,7 @@ const policySource = read("services/weather/StationDiscoveryPolicy.js");
 assert.doesNotMatch(
     policySource,
     /Levenshtein|Jaro|embedding|cosine|editDistance|fuzzyMatch/i,
-    "dedupe must remain exact/canonical rather than fuzzy story matching"
+    "base dedupe must remain exact/canonical; story families are a separate transparent layer"
 );
 
 console.log("Weather NEWS conservative dedupe and local topic filters: PASS");

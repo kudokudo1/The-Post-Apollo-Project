@@ -1,0 +1,54 @@
+name: TASKS M12d signed synthetic release and disposable OS owner boundary
+
+on:
+  pull_request:
+    paths:
+      - 'tests/tasks/fixtures/TaskSignedOwnerBoundaryM12d.py'
+      - 'tests/tasks/test_task_signed_owner_boundary_m12d.cjs'
+      - 'docs/tasks-signed-disposable-owner-boundary-m12d.md'
+      - '.github/workflows/tasks-signed-disposable-owner-m12d.yml'
+      - 'tests/tasks/fixtures/TaskSignedReleaseVerifierM11y.cjs'
+      - 'tests/tasks/fixtures/TaskBoundJournalProbeM11w.py'
+      - 'tests/tasks/fixtures/TaskBoundJournalChildM11w.py'
+      - 'services/projects/TaskJsonGateCandidateM11l.py'
+      - 'services/hub/ApolloHubTodoStore.qml'
+      - 'shell.qml'
+  push:
+    branches: [main]
+    paths:
+      - 'tests/tasks/fixtures/TaskSignedOwnerBoundaryM12d.py'
+      - 'tests/tasks/test_task_signed_owner_boundary_m12d.cjs'
+      - 'docs/tasks-signed-disposable-owner-boundary-m12d.md'
+      - '.github/workflows/tasks-signed-disposable-owner-m12d.yml'
+      - 'services/projects/TaskJsonGateCandidateM11l.py'
+      - 'services/hub/ApolloHubTodoStore.qml'
+
+permissions:
+  contents: read
+
+jobs:
+  signed-disposable-owner:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: M12d signed release to sealed child and disposable owner
+        run: node --test tests/tasks/test_task_signed_owner_boundary_m12d.cjs
+      - name: M11w original process, journal and restart safety
+        run: python3 tests/tasks/test_task_bound_journal_probe_m11w.py
+      - name: M11y Ed25519 signed release negative matrix
+        run: node --test tests/tasks/test_task_signed_release_verifier_m11y.cjs
+      - name: M12c governance authority remains proposed
+        run: python3 tests/tasks/test_task_trust_authority_review_m12c.py
+      - name: M12b disabled integration preflight
+        run: python3 tests/tasks/test_task_disabled_integration_preflight_m12b.py
+      - name: M11t all production activation gates still open
+        run: python3 tests/tasks/test_task_production_trust_contract_m11t.py
+      - name: M11d one existing real TASKS writer
+        run: python3 tests/tasks/test_task_writer_gate_inventory_m11d.py

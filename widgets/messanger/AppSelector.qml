@@ -1443,7 +1443,7 @@ Rectangle {
                     width: parent.width
                     visible: appSelector.accountSelectedServiceId !== ""
                     text: appSelector.accountSelectedEntryId === ""
-                          ? "NEW NAME // NO PASSWORDS"
+                          ? "NEW NAME // NO SECRETS"
                           : "EDIT SELECTED NAME"
                     color: Colors.cyan
                     font.pixelSize: 9

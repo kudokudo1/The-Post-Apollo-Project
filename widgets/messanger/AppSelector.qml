@@ -1045,6 +1045,7 @@ Rectangle {
                     width: parent.width
                     height: 36
                     label: appSelector.creatingIdentity ? "CANCEL NEW" : "+ NEW ID"
+                    accentColor: Colors.orange
                     labelPixelSize: 9
                     contentPadding: 3
                     interactive: appSelector.identitySnapshot.writable
@@ -1234,6 +1235,7 @@ Rectangle {
                     width: parent.width
                     height: 36
                     label: "SAVE CONTACT"
+                    accentColor: Colors.green
                     labelPixelSize: 9
                     interactive: appSelector.identitySnapshot.writable
                                  && SocialAccountDetailsStore.state === "ready"
@@ -1258,6 +1260,7 @@ Rectangle {
                     width: parent.width
                     height: 33
                     label: "RELOAD DETAILS"
+                    accentColor: Colors.orange
                     labelPixelSize: 9
                     contentPadding: 3
                     interactive: SocialAccountDetailsStore.state === "error"
@@ -1868,6 +1871,8 @@ Rectangle {
                     width: parent.width
                     height: 36
                     label: appSelector.editingFamilies ? "CLOSE EDIT" : "EDIT FAMILIES"
+                    // Closing is red; opening retains the normal cyan accent.
+                    accentColor: appSelector.editingFamilies ? Colors.red : Colors.cyan
                     labelPixelSize: 9
                     contentPadding: 3
                     interactive: appSelector.identitySnapshot.writable
@@ -2168,6 +2173,7 @@ Rectangle {
                     height: 36
                     label: appSelector.isolatedBrowserModeActive
                            ? "USE LEGACY BROWSERS" : "USE ISOLATED BROWSERS"
+                    accentColor: Colors.magenta
                     labelPixelSize: 9
                     labelMinimumPixelSize: 8
                     contentPadding: 3
@@ -2296,6 +2302,7 @@ Rectangle {
                         width: parent.width
                         height: 36
                         label: "MOVE HERE"
+                        accentColor: Colors.orange
                         labelPixelSize: 9
                         contentPadding: 3
                         interactive: appSelector.identitySnapshot.writable
@@ -2344,6 +2351,11 @@ Rectangle {
                         label: appSelector.selectedAppOption()
                                && appSelector.selectedAppOption().hidden
                                ? "SHOW APP" : "HIDE APP"
+                        // Hiding uses red, but the reversible SHOW action
+                        // remains cyan and no destructive action is introduced.
+                        accentColor: appSelector.selectedAppOption()
+                                     && !appSelector.selectedAppOption().hidden
+                                     ? Colors.red : Colors.cyan
                         labelPixelSize: 9
                         contentPadding: 3
                         interactive: appSelector.identitySnapshot.writable

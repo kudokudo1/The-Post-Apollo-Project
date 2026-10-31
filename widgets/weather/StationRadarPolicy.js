@@ -54,7 +54,37 @@ function boundedArea(bounds, maxLongitudeSpan, maxLatitudeSpan) {
     };
 }
 
-function exportImageUrl(area, widthValue, heightValue) {
+function normalizeHistoryMinutes(value) {
+    const minutes = Math.round(Number(value));
+    if (!isFinite(minutes) || minutes <= 0)
+        return 0;
+    return Math.min(240, Math.max(0, minutes));
+}
+
+function historyTimeMillis(nowValue, minutesAgo) {
+    const now = Number(nowValue);
+    const minutes = normalizeHistoryMinutes(minutesAgo);
+    if (!isFinite(now) || now <= 0 || minutes <= 0)
+        return 0;
+
+    // MRMS history is updated on an approximately ten-minute cadence.
+    // Snap to that cadence so manual historical requests are stable.
+    const cadenceMs = 10 * 60 * 1000;
+    const roundedNow = Math.floor(now / cadenceMs) * cadenceMs;
+    return roundedNow - minutes * 60 * 1000;
+}
+
+function historyOptions() {
+    return [
+        {minutes: 0, label: "NOW"},
+        {minutes: 30, label: "-30M"},
+        {minutes: 60, label: "-1H"},
+        {minutes: 120, label: "-2H"},
+        {minutes: 240, label: "-4H"}
+    ];
+}
+
+function exportImageUrl(area, widthValue, heightValue, timeMillis) {
     if (!area || !area.valid || !area.bbox)
         return "";
 
@@ -69,6 +99,11 @@ function exportImageUrl(area, widthValue, heightValue) {
         "https://mapservices.weather.noaa.gov/eventdriven/rest/services/"
         + "radar/radar_base_reflectivity_time/ImageServer/exportImage";
 
+    const requestedTime = Number(timeMillis);
+    const timePart = isFinite(requestedTime) && requestedTime > 0
+                   ? "&time=" + Math.round(requestedTime)
+                   : "";
+
     return endpoint
         + "?bbox=" + area.bbox
         + "&bboxSR=4326"
@@ -77,6 +112,7 @@ function exportImageUrl(area, widthValue, heightValue) {
         + "&format=png32"
         + "&transparent=true"
         + "&adjustAspectRatio=false"
+        + timePart
         + "&f=image";
 }
 

@@ -125,6 +125,8 @@ viewer = (
 assert 'label: stationViewer.locationLoading' in viewer
 assert '"LOCATE MENTIONS"' in viewer
 assert "signal locateRequested()" in viewer
+assert "signal showOnMapRequested()" in viewer
+assert '"SHOW ON MAP"' in viewer
 assert "MENTIONED LOCATIONS // " in viewer
 assert "modelData.typeLabel" in viewer
 assert "modelData.latitude" in viewer
@@ -143,7 +145,7 @@ assert "id: articleLocationService" in discovery
 assert "articleLocationService.request(" in discovery
 assert "newsLocationMatchesSelection" in discovery
 assert 'ARTICLE → GKG MENTIONED LOCATIONS", state:"CONNECTED"' in discovery
-assert 'NEWS → MAP LOCATION HANDOFF", state:"NOT WIRED"' in discovery
+assert 'NEWS → MAP LOCATION HANDOFF", state:"CONNECTED"' in discovery
 
 policy = (
     ROOT / "widgets/weather/StationViewerPolicy.js"

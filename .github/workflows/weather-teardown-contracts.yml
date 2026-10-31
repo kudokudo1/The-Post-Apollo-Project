@@ -119,6 +119,8 @@ jobs:
         run: node tests/weather/test_station_ground_nwps_stageflow.js
       - name: Verify GROUND nearest NOAA NDBC marine observations
         run: node tests/weather/test_station_ground_ndbc_marine.js
+      - name: Verify GROUND NOAA CO-OPS coastal water levels and tides
+        run: node tests/weather/test_station_ground_coops_coastal.js
       - name: Verify GROUND NWS heat-index and fire-weather context
         run: node tests/weather/test_station_ground_heat_fire.js
       - name: Verify GROUND NWPS flood impacts and crest context

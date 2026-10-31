@@ -20,7 +20,7 @@ Rectangle {
     // Exact application identity, never a substring match on a random tray
     // tooltip. Other applications retain their own native tray activation.
     function isDiscordTrayItem(item) {
-        const id = String(item.id || "").trim().toLowerCase().replace(/\\.desktop$/, "");
+        const id = String(item.id || "").trim().toLowerCase().replace(/\.desktop$/, "");
         const title = String(item.title || "").trim().toLowerCase();
         return id === "vesktop" || id === "dev.vencord.vesktop"
                || id === "discord" || title === "vesktop" || title === "discord";

@@ -128,7 +128,7 @@ assert.match(ui, /z: 0\.1/);
 assert.match(ui, /z: 0\.3/);
 assert.match(ui, /NATURAL EARTH LAND \+ CONTEXT \/\/ LAT\/LON GRID \/\/ RADAR \+ SMOKE OVERLAYS/);
 assert.match(ui, /NOAA\/NWS MRMS \/\/ BASE REFLECTIVITY \+ 4H HISTORY/);
-assert.match(ui, /RAINVIEWER \/\/ RADAR FALLBACK", state:"NOT WIRED"/);
+assert.match(ui, /RAINVIEWER \/\/ PAST RADAR FALLBACK \/\/ 2H/);
 
 // Loading is explicit only. Panning/zooming and selecting a historical
 // frame must not trigger another provider request.

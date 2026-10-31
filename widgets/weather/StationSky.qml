@@ -113,6 +113,11 @@ Rectangle {
         offsetMinutes: sky.moonCivilOffsetMinutes
     }
 
+    WeatherServices.NasaEclipseService {
+        id: eclipseService
+        active: sky.visible
+    }
+
     WeatherServices.UsnoCelnavService {
         id: celnavService
         active: sky.visible
@@ -164,6 +169,33 @@ Rectangle {
         return missing.length > 0
             ? "INVALID/MISSING " + missing.join(" + ")
             : "INPUTS WAITING";
+    }
+
+    function eclipseDateLabel(value) {
+        const text = String(value || "");
+        return /^\d{4}-\d{2}-\d{2}$/.test(text)
+            ? text.slice(0, 4) + " "
+              + text.slice(5, 7) + "/" + text.slice(8, 10)
+            : "--";
+    }
+
+    function eclipseDaysLabel(value) {
+        const days = Number(value);
+        if (!isFinite(days) || days < 0)
+            return "--";
+        if (days === 0)
+            return "TODAY";
+        return days === 1 ? "1 DAY" : Math.round(days) + " DAYS";
+    }
+
+    function eclipseColor(row) {
+        if (!row)
+            return Colors.white;
+        if (String(row.body || "") === "SOLAR")
+            return String(row.phase || "") === "TOTAL"
+                ? Colors.orange : Colors.yellow;
+        return String(row.phase || "") === "TOTAL"
+            ? Colors.magenta : Colors.cyan;
     }
 
     function planetStatusColor(status) {
@@ -946,6 +978,240 @@ Rectangle {
                 width: parent.width
                 text: "USNO ONE-DAY RISE/SET/TRANSIT // OPEN-METEO RESOLVED CIVIL OFFSET // SUNRISE CALIBRATION FALLBACK // DATE-SCOPED REQUEST"
                 font.pixelSize: 9
+            }
+        }
+
+
+        StationSectionDivider {
+            width: parent.width
+            title: "ECLIPSES // NASA GSFC"
+        }
+
+        Column {
+            width: parent.width
+            spacing: 7
+
+            Row {
+                width: parent.width
+                spacing: 12
+
+                GohuText {
+                    text: eclipseService.loading
+                          ? "READING CATALOG"
+                          : eclipseService.failed
+                            ? (eclipseService.ready
+                               ? "DEGRADED" : "OFFLINE")
+                            : eclipseService.ready
+                              ? "RECEIVED" : "WAITING"
+                    font.pixelSize: 10
+                    color: eclipseService.failed
+                           ? Colors.yellow
+                           : eclipseService.ready
+                             ? Colors.cyan : Colors.orange
+                }
+
+                QuietText {
+                    width: Math.max(0, parent.width - 150)
+                    text: eclipseService.ready
+                          ? eclipseService.sourceName
+                            + " // "
+                            + eclipseService.eventCount
+                            + " UPCOMING EVENTS IN FETCH WINDOW"
+                          : "NASA GODDARD ECLIPSE WEB SITE // GLOBAL UTC CALENDAR"
+                    elide: Text.ElideRight
+                    font.pixelSize: 9
+                }
+            }
+
+            QuietText {
+                visible: eclipseService.failed
+                width: parent.width
+                text: eclipseService.errorText
+                font.pixelSize: 9
+                color: Colors.yellow
+            }
+
+            Row {
+                width: parent.width
+                spacing: 12
+                visible: eclipseService.ready
+
+                Rectangle {
+                    width: Math.max(0, (parent.width - 12) / 2)
+                    height: 108
+                    color: Colors.dark
+                    border.width: 1
+                    border.color: sky.eclipseColor(
+                        eclipseService.nextSolar
+                    )
+
+                    Column {
+                        anchors.fill: parent
+                        anchors.margins: 9
+                        spacing: 5
+
+                        SecondaryText {
+                            text: "NEXT SOLAR"
+                            font.pixelSize: 9
+                        }
+
+                        GohuText {
+                            width: parent.width
+                            text: eclipseService.nextSolar
+                                  ? eclipseService.nextSolar.event
+                                  : "NO EVENT IN WINDOW"
+                            elide: Text.ElideRight
+                            font.pixelSize: 12
+                            color: sky.eclipseColor(
+                                eclipseService.nextSolar
+                            )
+                        }
+
+                        QuietText {
+                            width: parent.width
+                            text: eclipseService.nextSolar
+                                  ? sky.eclipseDateLabel(
+                                        eclipseService.nextSolar.date
+                                    )
+                                    + " // "
+                                    + sky.eclipseDaysLabel(
+                                          eclipseService.nextSolar.daysUntil
+                                      )
+                                  : "DATE --"
+                            font.pixelSize: 9
+                        }
+
+                        QuietText {
+                            width: parent.width
+                            text: "GLOBAL EVENT DATE // LOCAL VISIBILITY NOT YET CALCULATED"
+                            font.pixelSize: 8
+                            color: Colors.orange
+                        }
+                    }
+                }
+
+                Rectangle {
+                    width: Math.max(0, (parent.width - 12) / 2)
+                    height: 108
+                    color: Colors.dark
+                    border.width: 1
+                    border.color: sky.eclipseColor(
+                        eclipseService.nextLunar
+                    )
+
+                    Column {
+                        anchors.fill: parent
+                        anchors.margins: 9
+                        spacing: 5
+
+                        SecondaryText {
+                            text: "NEXT LUNAR"
+                            font.pixelSize: 9
+                        }
+
+                        GohuText {
+                            width: parent.width
+                            text: eclipseService.nextLunar
+                                  ? eclipseService.nextLunar.event
+                                  : "NO EVENT IN WINDOW"
+                            elide: Text.ElideRight
+                            font.pixelSize: 12
+                            color: sky.eclipseColor(
+                                eclipseService.nextLunar
+                            )
+                        }
+
+                        QuietText {
+                            width: parent.width
+                            text: eclipseService.nextLunar
+                                  ? sky.eclipseDateLabel(
+                                        eclipseService.nextLunar.date
+                                    )
+                                    + " // "
+                                    + sky.eclipseDaysLabel(
+                                          eclipseService.nextLunar.daysUntil
+                                      )
+                                  : "DATE --"
+                            font.pixelSize: 9
+                        }
+
+                        QuietText {
+                            width: parent.width
+                            text: "GLOBAL EVENT DATE // LOCAL VISIBILITY NOT YET CALCULATED"
+                            font.pixelSize: 8
+                            color: Colors.orange
+                        }
+                    }
+                }
+            }
+
+            Row {
+                id: eclipseEventRow
+                width: parent.width
+                spacing: 7
+                visible: eclipseService.ready
+
+                Repeater {
+                    model: eclipseService.events.slice(0, 5)
+
+                    delegate: Rectangle {
+                        required property var modelData
+                        width: Math.max(
+                            0,
+                            (eclipseEventRow.width
+                             - 4 * eclipseEventRow.spacing) / 5
+                        )
+                        height: 82
+                        color: Colors.dark
+                        border.width: 1
+                        border.color: sky.eclipseColor(modelData)
+
+                        Column {
+                            anchors.fill: parent
+                            anchors.margins: 6
+                            spacing: 4
+
+                            GohuText {
+                                width: parent.width
+                                text: modelData.phase
+                                      + " " + modelData.body
+                                elide: Text.ElideRight
+                                font.pixelSize: 9
+                                color: sky.eclipseColor(modelData)
+                            }
+
+                            QuietText {
+                                width: parent.width
+                                text: sky.eclipseDateLabel(
+                                    modelData.date
+                                )
+                                font.pixelSize: 8
+                            }
+
+                            QuietText {
+                                width: parent.width
+                                text: sky.eclipseDaysLabel(
+                                    modelData.daysUntil
+                                )
+                                font.pixelSize: 8
+                            }
+                        }
+                    }
+                }
+            }
+
+            QuietText {
+                width: parent.width
+                text: "NASA GSFC YEAR CATALOG // EVENT DATE + TYPE ONLY IN THIS SLICE // EXACT MAXIMUM TIME, CONTACTS, MAGNITUDE + OBSCURATION ARE NOT NORMALIZED HERE"
+                font.pixelSize: 9
+                color: Colors.orange
+            }
+
+            QuietText {
+                width: parent.width
+                text: "GLOBAL ECLIPSE ≠ VISIBLE FROM WEATHER FIX // LOCAL VISIBILITY + CONTACT CIRCUMSTANCES REMAIN A SEPARATE FUTURE LAYER"
+                font.pixelSize: 9
+                color: Colors.orange
             }
         }
 

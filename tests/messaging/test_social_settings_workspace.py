@@ -124,7 +124,7 @@ class SettingsContactChatWorkspaceContracts(unittest.TestCase):
         ):
             with self.subTest(row=row_id):
                 row = source.split("id: " + row_id, 1)[1].split(
-                    'label: "NO MATCH"' if row_id == "organizationAppRow"
+                    'text: "NO MATCH"' if row_id == "organizationAppRow"
                     else 'text: "NO FAMILIES"', 1
                 )[0]
                 self.assertIn('label: "↑"', row)

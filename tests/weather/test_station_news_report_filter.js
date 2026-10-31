@@ -179,7 +179,8 @@ assert.match(ui, /EXACT-HEADLINE SOURCE GROUPS", state:"CONNECTED"/);
 assert.match(ui, /SEMANTIC STORY CLUSTERS \/ DOSSIERS", state:"NOT WIRED"/);
 assert.match(ui, /PUBLISHER \/ SOURCE COUNTRY FILTER", state:"CONNECTED"/);
 assert.match(ui, /LANGUAGE \+ TIME WINDOW FILTERS", state:"CONNECTED"/);
-assert.match(ui, /REGION GROUPING", state:"NOT WIRED"/);
+assert.match(ui, /SOURCE-COUNTRY REGION GROUPS", state:"CONNECTED"/);
+assert.match(ui, /EVENT \/ MENTIONED-LOCATION LINKING", state:"NOT WIRED"/);
 
 const selectStart = ui.indexOf("function selectNewsTopic(id)");
 const selectEnd = ui.indexOf("function selectMapFilter(id)", selectStart);

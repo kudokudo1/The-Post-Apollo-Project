@@ -142,22 +142,23 @@ class NativeReceiptHostTests(unittest.TestCase):
         self.assertEqual(wrong["phase"],"RECOVERY_REVIEW")
         self.assertTrue(wrong["pending"])
 
-    def test_stale_epoch_or_stage_terminates_without_clearing_reservation(self):
-        for wrong in ("stage","epoch"):
-            with self.subTest(case=wrong):
-                if wrong=="epoch":
-                    # Reuse a fresh independent test fixture, not an existing DB.
-                    self.tearDown()
-                    self.setUp()
-                h=self.start(writer="m12i-owner-"+wrong+"-0001")
-                r=h.send("reserve",stageId="m12i-stage-000001")
-                self.assertTrue(r["ok"])
-                reply=h.send("verify",stageId="m12i-stage-000001" if wrong=="epoch"
-                             else "m12i-foreign-stage",
-                             epoch=r["epoch"]+1 if wrong=="epoch" else r["epoch"])
-                self.assertFalse(reply["ok"])
-                self.assertTrue(reply["pending"])
-                self.assertEqual(reply["status"],"TEST_HOST_REFUSED")
+    def test_stale_stage_terminates_without_clearing_reservation(self):
+        h=self.start()
+        r=h.send("reserve",stageId="m12i-stage-000001")
+        self.assertTrue(r["ok"])
+        reply=h.send("verify",stageId="m12i-foreign-stage",epoch=r["epoch"])
+        self.assertFalse(reply["ok"])
+        self.assertTrue(reply["pending"])
+        self.assertEqual(reply["status"],"TEST_HOST_REFUSED")
+
+    def test_stale_epoch_terminates_without_clearing_reservation(self):
+        h=self.start()
+        r=h.send("reserve",stageId="m12i-stage-000001")
+        self.assertTrue(r["ok"])
+        reply=h.send("verify",stageId=r["stageId"],epoch=r["epoch"]+1)
+        self.assertFalse(reply["ok"])
+        self.assertTrue(reply["pending"])
+        self.assertEqual(reply["status"],"TEST_HOST_REFUSED")
 
     def test_fresh_owner_never_auto_rearms_after_settlement(self):
         h=self.start()

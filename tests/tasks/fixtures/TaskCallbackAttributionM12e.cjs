@@ -171,7 +171,7 @@ class CallbackAttributionProbe {
       confirmed: copy(this.#confirmed),
       confirmedHash: digest(this.#confirmedRaw),
       pending: this.#pending !== null,
-      confirmedPublicationAllowed: false,
+      nativeCallbackAloneConfirmsNothing: true,
       writable: this.#phase === "READY",
       nativeTags: [...this.#callbacks],
       syntheticOnly: true,

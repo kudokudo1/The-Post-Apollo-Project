@@ -3,8 +3,8 @@ import Quickshell
 import Quickshell.Io
 import "SeismicPolicy.js" as SeismicPolicy
 
-// Loaded by StationGround only. No global background daemon, no location
-// requests, and no extra polling from the weather/NOAA services.
+// Weather Station shared owner for recent USGS M2.5+ earthquakes.
+// GROUND and MAP consume the same retained event set; no duplicate fetcher.
 Scope {
     id: seismic
 
@@ -26,7 +26,7 @@ Scope {
 
     function parseResponse(raw) {
         try {
-            const parsed = SeismicPolicy.parseFeed(JSON.parse(raw), 3);
+            const parsed = SeismicPolicy.parseFeed(JSON.parse(raw), 100);
             events = parsed;
             lastUpdated = new Date();
             ready = true;
@@ -53,8 +53,8 @@ Scope {
         }
     }
 
-    // USGS publishes frequent updates; the station does not need to poll at
-    // that cadence. This timer exists only while the GROUND view is mounted.
+    // USGS publishes frequent updates; Weather Station intentionally polls at
+    // a slower 15-minute cadence only while GROUND or MAP owns seismic use.
     Timer {
         interval: 900000
         repeat: true

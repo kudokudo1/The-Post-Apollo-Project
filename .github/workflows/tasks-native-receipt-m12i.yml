@@ -1,0 +1,53 @@
+name: TASKS M12i isolated native FileView receipt bridge source and OS host checks
+
+on:
+  pull_request:
+    paths:
+      - 'TaskNativeReceiptHarnessM12i.qml'
+      - 'tests/tasks/fixtures/TaskNativeReceiptLabM12i.qml'
+      - 'tests/tasks/fixtures/TaskNativeReceiptHostM12i.py'
+      - 'tests/tasks/test_task_native_receipt_host_m12i.py'
+      - 'docs/tasks-native-receipt-integration-m12i.md'
+      - '.github/workflows/tasks-native-receipt-m12i.yml'
+      - 'tests/tasks/fixtures/TaskStageSourceReceiptM12h.py'
+      - 'services/hub/ApolloHubTodoStore.qml'
+      - 'shell.qml'
+  push:
+    branches: [main]
+    paths:
+      - 'TaskNativeReceiptHarnessM12i.qml'
+      - 'tests/tasks/fixtures/TaskNativeReceiptLabM12i.qml'
+      - 'tests/tasks/fixtures/TaskNativeReceiptHostM12i.py'
+      - 'tests/tasks/test_task_native_receipt_host_m12i.py'
+      - 'docs/tasks-native-receipt-integration-m12i.md'
+      - '.github/workflows/tasks-native-receipt-m12i.yml'
+      - 'services/hub/ApolloHubTodoStore.qml'
+      - 'shell.qml'
+
+permissions:
+  contents: read
+
+jobs:
+  disposable-native-receipt:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: M12i host process protocol and standalone QML source checks
+        run: python3 tests/tasks/test_task_native_receipt_host_m12i.py
+      - name: M12h durable stage receipt and crash recovery
+        run: python3 tests/tasks/test_task_stage_source_receipt_m12h.py
+      - name: M12f disposable post-native journal evidence safeguards
+        run: python3 tests/tasks/test_task_native_evidence_inspector_m12f.py
+      - name: M12e native callback tags cannot prove stage identity
+        run: node --test tests/tasks/test_task_native_callback_attribution_m12e.cjs
+      - name: M11t production trust activation gates stay OPEN
+        run: python3 tests/tasks/test_task_production_trust_contract_m11t.py
+      - name: M11d one real TASKS FileView owner
+        run: python3 tests/tasks/test_task_writer_gate_inventory_m11d.py

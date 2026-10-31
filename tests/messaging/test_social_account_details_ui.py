@@ -39,7 +39,7 @@ class SocialAccountDetailsUiContracts(unittest.TestCase):
             'id: accountAppList',
             'id: accountLabelInput',
             'label: "+ NEW ACCOUNT NAME"',
-            'label: "ADD ACCOUNT NAME" : "SAVE ACCOUNT NAME"',
+            'ADD ACCOUNT NAME" : "SAVE ACCOUNT NAME"',
             'label: "MOVE UP"',
             'label: "MOVE DOWN"',
             'CONFIRM REMOVE NAME',

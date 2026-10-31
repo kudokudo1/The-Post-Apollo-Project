@@ -28,10 +28,12 @@ def _load(name, path):
     return module
 
 
-auth = _load("m12h_disposable_m10p_authority",
-             FIXTURES / "TaskSqliteWriterAuthorityFixture.py")
 host = _load("m12h_disposable_m11g_host",
              FIXTURES / "TaskFileViewOwnerHostM11g.py")
+# Reuse M11g's already loaded M10p module. Importing the same Python file
+# twice under distinct names creates unrelated AdmissionError classes and
+# would break fail-closed handling for missing/unsafe source readbacks.
+auth = host.auth
 AdmissionError = auth.AdmissionError
 SHA = re.compile(r"[a-f0-9]{64}\Z")
 

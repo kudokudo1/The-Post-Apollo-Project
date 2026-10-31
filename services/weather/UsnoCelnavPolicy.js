@@ -122,6 +122,74 @@ function constellationForNavStar(numberRaw, nameRaw) {
     return byName[String(nameRaw || "").trim().toUpperCase()] || "";
 }
 
+function constellationGroups(stars) {
+    const source = Array.isArray(stars) ? stars : [];
+    const groups = {};
+
+    for (let i = 0; i < source.length; i++) {
+        const star = source[i];
+        if (!star || typeof star !== "object")
+            continue;
+        const name = shortText(star.constellation, 64).toUpperCase();
+        const altitude = finite(star.altitude);
+        if (!name || altitude === null)
+            continue;
+
+        if (!groups[name]) {
+            groups[name] = {
+                name:name,
+                stars:[],
+                starNames:[],
+                count:0,
+                anchorStar:"",
+                anchorAltitude:-91,
+                anchorAzimuth:null,
+                anchorDirection:"--",
+                directions:[]
+            };
+        }
+
+        const group = groups[name];
+        group.stars.push(star);
+        group.starNames.push(shortText(star.name, 64).toUpperCase());
+        group.count += 1;
+
+        const direction = shortText(star.direction, 8).toUpperCase();
+        if (direction && group.directions.indexOf(direction) < 0)
+            group.directions.push(direction);
+
+        if (altitude > group.anchorAltitude) {
+            group.anchorStar = shortText(star.name, 64).toUpperCase();
+            group.anchorAltitude = altitude;
+            group.anchorAzimuth = finite(star.azimuth);
+            group.anchorDirection = direction || "--";
+        }
+    }
+
+    const output = [];
+    const names = Object.keys(groups);
+    for (let i = 0; i < names.length; i++) {
+        const group = groups[names[i]];
+        group.stars.sort(function(a, b) {
+            return b.altitude - a.altitude;
+        });
+        group.starNames = group.stars.map(function(star) {
+            return shortText(star.name, 64).toUpperCase();
+        });
+        group.directions.sort();
+        output.push(group);
+    }
+
+    output.sort(function(a, b) {
+        if (a.anchorAltitude !== b.anchorAltitude)
+            return b.anchorAltitude - a.anchorAltitude;
+        if (a.count !== b.count)
+            return b.count - a.count;
+        return a.name.localeCompare(b.name);
+    });
+    return output;
+}
+
 function almanacData(row) {
     if (!row || typeof row !== "object")
         return null;
@@ -171,7 +239,8 @@ function emptyResult() {
         moon:null,
         sun:null,
         planets:[],
-        stars:[]
+        stars:[],
+        constellations:[]
     };
 }
 
@@ -229,6 +298,7 @@ function parse(root) {
 
     result.planets = planets.slice(0, 8);
     result.stars = stars.slice(0, 8);
+    result.constellations = constellationGroups(result.stars);
     result.available = result.moon !== null
         || result.sun !== null
         || result.planets.length > 0

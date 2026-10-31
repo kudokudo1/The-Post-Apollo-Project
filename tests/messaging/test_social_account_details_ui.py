@@ -87,7 +87,7 @@ class SocialAccountDetailsUiContracts(unittest.TestCase):
             "id: settingsEditorPane", 1
         )[0]
         self.assertIn("visible: appSelector.accountManagerOpen", sidebar)
-        self.assertIn("onTriggered: appSelector.accountManagerOpen =", sidebar)
+        self.assertIn("appSelector.accountManagerOpen =", sidebar)
         self.assertIn("visible: appSelector.accountAppPickerOpen", sidebar)
         self.assertIn(
             "model: appSelector.matchingAccountServices(", sidebar

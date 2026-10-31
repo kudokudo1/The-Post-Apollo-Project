@@ -192,7 +192,7 @@ assert.match(windowSource, /weatherStation\.currentView === "news"[\s\S]*?\? new
 assert.match(windowSource, /weatherStation\.currentView === "radio"[\s\S]*?\? radioViewComponent/);
 assert.match(discoveryViewSource, /SOURCE RACK \/\/ WHAT IS CONNECTED/);
 assert.match(discoveryViewSource, /STATION DIRECTORY \/\/ PERSISTENT PLAYBACK NOT YET WIRED/);
-assert.match(discoveryViewSource, /SPATIAL PLOT \/\/ EONET \+ FIRMS \+ NEWS MENTIONS/);
+assert.match(discoveryViewSource, /SPATIAL PLOT \/\/ USGS QUAKES \+ EONET \+ FIRMS \+ NEWS/);
 assert.match(discoveryViewSource, /NATURAL EARTH LAND \+ CONTEXT \/\/ LAT\/LON GRID \/\/ RADAR \+ SMOKE OVERLAYS/);
 assert.match(discoveryViewSource, /NATURAL EARTH 1:110m LAND BASEMAP", state:"CONNECTED"/);
 assert.match(discoveryViewSource, /OTHER POLYGON LAYERS", state:"NOT WIRED"/);

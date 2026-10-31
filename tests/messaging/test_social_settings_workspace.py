@@ -179,8 +179,11 @@ class SettingsContactChatWorkspaceContracts(unittest.TestCase):
             "onTriggered:", 1
         )[0]
         self.assertIn('"▾ CHOOSE APP (32)"', picker)
-        self.assertIn("idleFillColor: Colors.yellow", picker)
-        self.assertIn("accentColor: Colors.magenta", picker)
+        self.assertIn("idleFillColor: Colors.dark", picker)
+        self.assertIn(
+            "accentColor: appSelector.accountAppPickerOpen", picker,
+        )
+        self.assertIn("? Colors.magenta : Colors.orange", picker)
         self.assertIn("selected: appSelector.accountAppPickerOpen", picker)
         self.assertIn("interactive: appSelector.identitySnapshot.writable", picker)
         self.assertIn("labelPixelSize: 9", picker)
@@ -225,6 +228,63 @@ class SettingsContactChatWorkspaceContracts(unittest.TestCase):
         self.assertIn("SocialAccountDetailsStore.refresh()", identity)
         self.assertIn("SocialIdentityStore.moveAppToFamily(", app)
         self.assertIn("SocialIdentityStore.setAppHidden(", app)
+
+    def test_magenta_header_spans_workspace_above_all_three_columns(self):
+        # The workspace is already rail-excluding via settingsPage's parent
+        # and anchors. A single fixed header spans it above all scroll panes.
+        settings = SELECTOR.split("id: settingsPage", 1)[1].split(
+            "// This entry point is always visible", 1
+        )[0]
+        header = settings.split("id: settingsHeader", 1)[1].split(
+            "id: settingsIdentityPane", 1
+        )[0]
+        self.assertIn("? appSelector.right : parent.left", settings)
+        self.assertIn("anchors.left: parent.left", header)
+        self.assertIn("anchors.right: parent.right", header)
+        self.assertIn("anchors.top: parent.top", header)
+        self.assertIn('text: "USER // SETTINGS"', header)
+        self.assertIn("color: Colors.magenta", header)
+        self.assertIn("border.color: Colors.magenta", header)
+        self.assertIn("top: settingsHeader.bottom", header)
+        self.assertLess(settings.index("id: settingsHeader"),
+                        settings.index("id: settingsIdentityPane"))
+        self.assertEqual(SELECTOR.count('text: "USER // SETTINGS"'), 1)
+        # The header no longer scrolls with the narrow Identity column.
+        identity_column = settings.split("id: settingsIdentityColumn", 1)[1].split(
+            'text: "IDENTITIES"', 1
+        )[0]
+        self.assertNotIn("USER //", identity_column)
+        self.assertIn("contentHeight: settingsIdentityColumn.height + 24", settings)
+        self.assertIn("contentHeight: settingsColumn.height + 24", settings)
+        self.assertIn("contentHeight: settingsAppsColumn.height + 24", settings)
+
+    def test_updated_account_button_colors_and_labels_keep_actions(self):
+        identity = SELECTOR.split("id: settingsIdentityPane", 1)[1].split(
+            "id: settingsEditorPane", 1
+        )[0]
+        picker = identity.split("label: appSelector.accountAppPickerOpen", 1)[1].split(
+            "onTriggered:", 1
+        )[0]
+        self.assertIn("idleFillColor: Colors.dark", picker)
+        self.assertIn("Colors.magenta : Colors.orange", picker)
+        self.assertIn("selected: appSelector.accountAppPickerOpen", picker)
+
+        save = identity.split('label: appSelector.accountSelectedEntryId === ""', 1)[1].split(
+            "onTriggered:", 1
+        )[0]
+        self.assertIn('"+ ACCOUNT NAME" : "SAVE ACCOUNT NAME"', save)
+        self.assertIn("accentColor: appSelector.accountSelectedEntryId", save)
+        self.assertIn("? Colors.magenta : Colors.cyan", save)
+        self.assertIn("SocialAccountDetailsStore.addAccountName(", identity)
+        self.assertIn("SocialAccountDetailsStore.renameAccountName(", identity)
+
+        signin = identity.split('label: "OPEN SIGN-IN WINDOW"', 1)[1].split(
+            "onTriggered:", 1
+        )[0]
+        self.assertIn("accentColor: Colors.orange", signin)
+        self.assertIn("appSelector.browserWindowActionAllowed", signin)
+        self.assertIn("appSelector.browserAccountServiceSupported(", signin)
+        self.assertIn("appSelector.browserOpenSignInRequested(", identity)
 
     def test_input_mask_is_full_only_during_settings_and_restores(self):
         mask = HOST.split("id: socialWindow", 1)[1].split(

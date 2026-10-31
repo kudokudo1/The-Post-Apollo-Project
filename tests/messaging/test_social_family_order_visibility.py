@@ -76,24 +76,37 @@ class SocialFamilyOrderVisibility(unittest.TestCase):
             "function appCanStep(direction)",
             "familyEditorIdentityId !== identitySnapshot.activeId",
             "app.familyId === editedFamilyId",
-            "label: \"FAMILY UP\"",
-            "label: \"FAMILY DOWN\"",
-            "label: \"APP UP\"",
-            "label: \"APP DOWN\"",
+            'id: familyOptionRow',
+            'id: organizationAppRow',
+            'label: "↑"',
+            'label: "↓"',
             '"SHOW APP" : "HIDE APP"',
             "SocialIdentityStore.reorderFamily(",
             "SocialIdentityStore.reorderApp(",
             "SocialIdentityStore.setAppHidden(",
-            "appSelector.familyCanStep(-1)",
-            "appSelector.familyCanStep(1)",
-            "appSelector.appCanStep(-1)",
-            "appSelector.appCanStep(1)",
+            "familyOptionRow.modelData.id, -1",
+            "familyOptionRow.modelData.id, 1",
+            "organizationAppRow.modelData.id, -1",
+            "organizationAppRow.modelData.id, 1",
+            "familyOptionRow.modelData.orderIndex > 0",
+            "familyOptionRow.modelData.familyCount - 1",
+            "organizationAppRow.modelData.orderIndex > 0",
+            "organizationAppRow.modelData.siblingCount - 1",
             "appSelector.identitySnapshot.writable",
             "appSelector.selectedAppOption().familyId !== \"\"",
             "Hidden apps keep their family and account.",
             "Only button placement changes. Logins stay unchanged.",
         ):
             self.assertIn(required,SELECTOR,required)
+        # Reordering is now on every item row, not a global selected-item
+        # action. Keep the shared store backend and bounds constraints intact.
+        self.assertEqual(SELECTOR.count('label: "↑"'), 3)
+        self.assertEqual(SELECTOR.count('label: "↓"'), 3)
+        for removed in ('"FAMILY UP"', '"FAMILY DOWN"', '"APP UP"',
+                        '"APP DOWN"', '"MOVE UP"', '"MOVE DOWN"'):
+            self.assertNotIn(removed, SELECTOR)
+        self.assertIn("appSelector.familyIsSelected()", SELECTOR)
+        self.assertIn("organizationAppRow.modelData.familyId ===", SELECTOR)
         self.assertEqual(SELECTOR.count("id: settingsFooter"),1)
         self.assertIn('label: "USER // SETTINGS"',SELECTOR)
         self.assertIn("model: appSelector.railRows",SELECTOR)

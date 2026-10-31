@@ -140,12 +140,66 @@ function newsTopics(value) {
     return topics;
 }
 
-function filterNewsRows(rows, topic, sourceQuery) {
+function gdeltSeenMillis(value) {
+    const raw = String(value || "").trim();
+    const compact = raw.match(
+        /^(\d{4})(\d{2})(\d{2})T(\d{2})(\d{2})(\d{2})Z?$/
+    );
+    if (compact) {
+        const millis = Date.UTC(
+            Number(compact[1]), Number(compact[2]) - 1,
+            Number(compact[3]), Number(compact[4]),
+            Number(compact[5]), Number(compact[6])
+        );
+        return isFinite(millis) ? millis : -1;
+    }
+    const millis = Date.parse(raw);
+    return isFinite(millis) ? millis : -1;
+}
+
+function newsBatchSummary(rows) {
+    const source = Array.isArray(rows) ? rows : [];
+    const domains = {};
+    const countries = {};
+    const languages = {};
+    let timedRows = 0;
+    for (let i = 0; i < source.length; i++) {
+        const row = source[i];
+        if (!row)
+            continue;
+        const domain = String(row.domain || "").trim().toLowerCase();
+        const country = String(row.country || "").trim().toLowerCase();
+        const language = String(row.language || "").trim().toLowerCase();
+        if (domain)
+            domains[domain] = true;
+        if (country)
+            countries[country] = true;
+        if (language)
+            languages[language] = true;
+        if (Number(row.seenMillis) > 0)
+            timedRows++;
+    }
+    return {
+        articles:source.length,
+        publishers:Object.keys(domains).length,
+        countries:Object.keys(countries).length,
+        languages:Object.keys(languages).length,
+        timedRows:timedRows
+    };
+}
+
+function filterNewsRows(rows, topic, sourceQuery, languageQuery, maxAgeHours, nowMs) {
     if (!Array.isArray(rows))
         return [];
 
     const wanted = String(topic || "all").toLowerCase();
     const query = shortText(sourceQuery, 80).toLowerCase();
+    const language = shortText(languageQuery, 48).toLowerCase();
+    const hours = Number(maxAgeHours);
+    const timeLimited = isFinite(hours) && hours > 0;
+    const now = Number(nowMs);
+    const cutoff = timeLimited && isFinite(now) && now > 0
+        ? now - hours * 3600000 : -1;
     const result = [];
 
     for (let i = 0; i < rows.length; i++) {
@@ -161,6 +215,18 @@ function filterNewsRows(rows, topic, sourceQuery) {
             const domain = String(row.domain || "").toLowerCase();
             const country = String(row.country || "").toLowerCase();
             if (domain.indexOf(query) < 0 && country.indexOf(query) < 0)
+                continue;
+        }
+
+        if (language) {
+            const rowLanguage = String(row.language || "").toLowerCase();
+            if (rowLanguage.indexOf(language) < 0)
+                continue;
+        }
+
+        if (cutoff > 0) {
+            const seen = Number(row.seenMillis);
+            if (!isFinite(seen) || seen <= 0 || seen < cutoff || seen > now)
                 continue;
         }
 
@@ -259,14 +325,22 @@ function parseNews(root) {
 
         const domain = shortText(article.domain, 80);
         const country = shortText(article.sourcecountry, 48);
+        const language = shortText(
+            article.language || article.lang || article.sourcelang,
+            48
+        );
+        const rawTime = shortText(article.seendate, 32);
+        const seenMillis = gdeltSeenMillis(rawTime);
         const topics = newsTopics(title);
         rows.push({
             title: title,
             detail: domain + (country ? " // " + country : ""),
             domain: domain,
             country: country,
+            language: language,
             time: formatDate(article.seendate),
-            rawTime: shortText(article.seendate, 32),
+            rawTime: rawTime,
+            seenMillis: seenMillis,
             url: url,
             canonicalUrl: canonicalUrl,
             topics: topics,

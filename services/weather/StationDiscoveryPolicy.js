@@ -140,6 +140,65 @@ function newsTopics(value) {
     return topics;
 }
 
+function newsExactSourceGroups(articles) {
+    const source = Array.isArray(articles) ? articles : [];
+    const groups = {};
+
+    function addUnique(list, value) {
+        const text = shortText(value, 80);
+        if (text && list.indexOf(text) < 0)
+            list.push(text);
+    }
+
+    for (let i = 0; i < source.length; i++) {
+        const article = source[i];
+        if (!article)
+            continue;
+
+        const title = shortText(article.title, 180);
+        const key = newsTitleKey(title);
+        const url = safeUrl(article.url);
+        const canonicalUrl = canonicalNewsUrl(url);
+        if (key.length < 12 || !canonicalUrl)
+            continue;
+
+        const domain = shortText(article.domain, 80);
+        const country = shortText(article.sourcecountry, 48);
+        const language = shortText(
+            article.language || article.lang || article.sourcelang,
+            48
+        );
+
+        if (!groups[key]) {
+            groups[key] = {
+                titleKey:key,
+                articleCount:0,
+                urls:[],
+                domains:[],
+                countries:[],
+                languages:[]
+            };
+        }
+
+        const group = groups[key];
+        if (group.urls.indexOf(canonicalUrl) < 0) {
+            group.urls.push(canonicalUrl);
+            group.articleCount++;
+        }
+        addUnique(group.domains, domain);
+        addUnique(group.countries, country);
+        addUnique(group.languages, language);
+    }
+
+    const keys = Object.keys(groups);
+    for (let i = 0; i < keys.length; i++) {
+        const group = groups[keys[i]];
+        group.sourceCount = group.domains.length;
+        group.multiSource = group.sourceCount >= 2;
+    }
+    return groups;
+}
+
 function gdeltSeenMillis(value) {
     const raw = String(value || "").trim();
     const compact = raw.match(
@@ -297,6 +356,7 @@ function parseNews(root) {
     if (!root || !Array.isArray(root.articles))
         throw new Error("Invalid GDELT article list");
 
+    const sourceGroups = newsExactSourceGroups(root.articles);
     const seenUrl = {};
     const seenTitle = {};
     const rows = [];
@@ -332,6 +392,15 @@ function parseNews(root) {
         const rawTime = shortText(article.seendate, 32);
         const seenMillis = gdeltSeenMillis(rawTime);
         const topics = newsTopics(title);
+        const sourceGroup = sourceGroups[titleKey] || {
+            articleCount:1,
+            sourceCount:domain ? 1 : 0,
+            multiSource:false,
+            urls:[canonicalUrl],
+            domains:domain ? [domain] : [],
+            countries:country ? [country] : [],
+            languages:language ? [language] : []
+        };
         rows.push({
             title: title,
             detail: domain
@@ -345,6 +414,14 @@ function parseNews(root) {
             seenMillis: seenMillis,
             url: url,
             canonicalUrl: canonicalUrl,
+            sourceGroup: {
+                articleCount: sourceGroup.articleCount,
+                sourceCount: sourceGroup.sourceCount,
+                multiSource: sourceGroup.multiSource,
+                domains: sourceGroup.domains.slice(0, 8),
+                countries: sourceGroup.countries.slice(0, 8),
+                languages: sourceGroup.languages.slice(0, 8)
+            },
             topics: topics,
             primaryTopic: topics.length ? topics[0] : "other",
             action: "READ ARTICLE"

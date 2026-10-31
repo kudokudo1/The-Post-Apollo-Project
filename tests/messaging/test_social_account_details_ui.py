@@ -33,12 +33,20 @@ class SocialAccountDetailsUiContracts(unittest.TestCase):
             'SocialAccountDetailsStore.saveContact(',
             'label: "RELOAD DETAILS"',
             'SocialAccountDetailsStore.refresh()',
-            'text: "LINKED ACCOUNTS"',
+            'text: "ACCOUNT NAMES"',
+            'id: accountNameManager',
             'id: accountServiceSearchInput',
+            'id: accountAppList',
             'id: accountLabelInput',
-            'label: "SAVE ACCOUNT NOTE"',
-            'label: "CLEAR NOTE"',
-            'SocialAccountDetailsStore.setAccountLabel(',
+            'label: "+ NEW ACCOUNT NAME"',
+            'ADD ACCOUNT NAME" : "SAVE ACCOUNT NAME"',
+            'label: "MOVE UP"',
+            'label: "MOVE DOWN"',
+            'CONFIRM REMOVE NAME',
+            'SocialAccountDetailsStore.addAccountName(',
+            'SocialAccountDetailsStore.renameAccountName(',
+            'SocialAccountDetailsStore.removeAccountName(',
+            'SocialAccountDetailsStore.moveAccountName(',
             'SETUP NOTES ONLY. A label does not connect or sign in.',
         ):
             self.assertIn(part,sidebar,part)
@@ -54,6 +62,12 @@ class SocialAccountDetailsUiContracts(unittest.TestCase):
             'function refreshAccountForm()',
             'property string accountEditorIdentityId: ""',
             'property string accountSelectedServiceId: ""',
+            'property string accountSelectedEntryId: ""',
+            'property bool accountManagerOpen: false',
+            'property bool accountAppPickerOpen: false',
+            'function accountNamesFor(serviceId)',
+            'function selectAccountService(serviceId)',
+            'function selectedAccountPosition()',
             'readonly property var accountDetails:',
             'SocialAccountDetailsStore.recordFor(identitySnapshot.activeId)',
             'accountEditorIdentityId !== appSelector.identitySnapshot.activeId',
@@ -68,6 +82,29 @@ class SocialAccountDetailsUiContracts(unittest.TestCase):
         self.assertIn('SocialIdentityStore.createIdentity(',SELECTOR)
         self.assertIn('appSelector.identitySnapshot.writable',SELECTOR)
 
+    def test_collapsed_all_app_picker_fades_unrecorded_without_blocking_setup(self):
+        sidebar = SELECTOR.split("id: settingsIdentityPane", 1)[1].split(
+            "id: settingsEditorPane", 1
+        )[0]
+        self.assertIn("visible: appSelector.accountManagerOpen", sidebar)
+        self.assertIn("appSelector.accountManagerOpen =", sidebar)
+        self.assertIn("visible: appSelector.accountAppPickerOpen", sidebar)
+        self.assertIn(
+            "model: appSelector.matchingAccountServices(", sidebar
+        )
+        self.assertIn('label: "+ NEW ACCOUNT NAME"', sidebar)
+        self.assertIn("available: savedNames > 0", sidebar)
+        self.assertIn("unavailableOpacity: 0.38", sidebar)
+        self.assertIn("interactive: appSelector.identitySnapshot.writable", sidebar)
+        self.assertIn("FADED = NO NAME SAVED HERE. SELECT TO ADD.", sidebar)
+        self.assertNotIn("}).slice(0, 8);", SELECTOR.split(
+            "function matchingAccountServices(query)", 1
+        )[1].split("function accountNamesFor(", 1)[0])
+        # The user cannot be told a label proves provider authentication.
+        self.assertIn("Names belong to this Post-Apollo identity.", sidebar)
+        self.assertIn("A running website window never proves login", sidebar)
+        self.assertIn("Existing Telegram and browser sign-in paths stay unchanged.", sidebar)
+
     def test_helper_only_persists_local_non_auth_account_notes(self):
         for part in (
             'stdinEnabled: true',
@@ -76,6 +113,11 @@ class SocialAccountDetailsUiContracts(unittest.TestCase):
             'id: writer',
             'function saveContact(identityId, email, phone)',
             'function setAccountLabel(identityId, serviceId, label)',
+            'function accountNamesFor(identityId, serviceId)',
+            'function addAccountName(identityId, serviceId, label)',
+            'function renameAccountName(identityId, serviceId, accountId, label)',
+            'function moveAccountName(identityId, serviceId, accountId, direction)',
+            'function removeAccountName(identityId, serviceId, accountId)',
             'function refresh()',
             'property string state: "loading"',
             'state = "saving"',

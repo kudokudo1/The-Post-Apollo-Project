@@ -71,7 +71,7 @@ assert.doesNotMatch(render({sharedTelegramActive:false,sharedTelegramBackendMode
 
 // UI remains in the current narrow contact pane with reused ActionButtons.
 for(const part of [
-    'text: "LINKED ACCOUNTS"',
+    'text: "ACCOUNT NAMES"',
     '? "TELEGRAM // PRIVATE ACCOUNT" : "TELEGRAM // SHARED SESSION"',
     'label: appSelector.telegramIdentityModeActive',
     '? "USE SHARED TELEGRAM" : "USE PRIVATE TELEGRAM ACCOUNTS"',

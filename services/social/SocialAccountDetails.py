@@ -31,6 +31,8 @@ FILE_NAME = "identity-account-details-v1.json"
 MAX_BYTES = 65536
 MAX_REQUEST_BYTES = 4096
 MAX_IDENTITIES = 12
+MAX_NAMES_PER_SERVICE = 12
+ACCOUNT_ID = re.compile(r"^account-[1-9][0-9]{0,8}$")
 IDENTITY_ID = re.compile(r"^identity-[1-9][0-9]{0,8}$")
 CONTROL = re.compile(r"[\x00-\x1f\x7f]")
 EMAIL = re.compile(r"^[^@\s]{1,64}@[^@\s]{1,190}$")
@@ -80,6 +82,40 @@ def validate_contact(email: Any, phone: Any) -> tuple[str, str]:
     return e, p
 
 
+def account_names(value: Any) -> list[dict[str, str]]:
+    """Normalize old single labels and newer sortable named entries.
+
+    These are user-defined display names, not credentials or session IDs.
+    A legacy single label is mapped to account-1 only in the view/transaction;
+    the old on-disk string is not rewritten until an explicit account edit.
+    """
+    if value is None:
+        return []
+    if isinstance(value, str):
+        label = require_string(value, 48)
+        if not label:
+            raise StoreError("INVALID_FIELD")
+        return [{"id": "account-1", "label": label}]
+    if not isinstance(value, list) or not 1 <= len(value) <= MAX_NAMES_PER_SERVICE:
+        raise StoreError("INVALID_DOCUMENT")
+    result: list[dict[str, str]] = []
+    seen: set[str] = set()
+    for item in value:
+        if not isinstance(item, dict) or set(item) != {"id", "label"}:
+            raise StoreError("INVALID_DOCUMENT")
+        account_id = item["id"]
+        if not isinstance(account_id, str) or not ACCOUNT_ID.fullmatch(account_id):
+            raise StoreError("INVALID_DOCUMENT")
+        if account_id in seen:
+            raise StoreError("INVALID_DOCUMENT")
+        seen.add(account_id)
+        label = require_string(item["label"], 48)
+        if not label:
+            raise StoreError("INVALID_FIELD")
+        result.append({"id": account_id, "label": label})
+    return result
+
+
 def validate_document(document: Any) -> dict[str, Any]:
     if not isinstance(document, dict) or document.get("schema") != SCHEMA:
         raise StoreError("UNSUPPORTED_VERSION")
@@ -100,14 +136,14 @@ def validate_document(document: Any) -> dict[str, Any]:
         accounts = values["accounts"]
         if not isinstance(accounts, dict) or len(accounts) > len(ITEM_BY_ID):
             raise StoreError("INVALID_DOCUMENT")
-        labels: dict[str, str] = {}
-        for service_id, label in accounts.items():
+        labels: dict[str, Any] = {}
+        for service_id, value in accounts.items():
             if service_id not in ITEM_BY_ID:
                 raise StoreError("INVALID_SERVICE")
-            text = require_string(label, 48)
-            if not text:
-                raise StoreError("INVALID_FIELD")
-            labels[service_id] = text
+            # Preserve original v1 single-label values byte-for-byte in the
+            # logical document. Only new explicit account edits write lists.
+            entries = account_names(value)
+            labels[service_id] = value if isinstance(value, str) else entries
         clean[identity_id] = {"email": email, "phone": phone, "accounts": labels}
     return {"schema": SCHEMA, "revision": revision, "identities": clean}
 
@@ -164,7 +200,16 @@ def apply(document: dict[str, Any], command: Any) -> dict[str, Any]:
     fields = ({"action", "identityId", "expectedRevision", "email", "phone"}
               if op == "save_contact" else
               {"action", "identityId", "expectedRevision", "serviceId", "label"}
-              if op == "set_account_label" else set())
+              if op in ("set_account_label", "add_account") else
+              {"action", "identityId", "expectedRevision", "serviceId",
+               "accountId", "label"}
+              if op == "rename_account" else
+              {"action", "identityId", "expectedRevision", "serviceId",
+               "accountId"}
+              if op == "remove_account" else
+              {"action", "identityId", "expectedRevision", "serviceId",
+               "accountId", "direction"}
+              if op == "move_account" else set())
     if not fields or set(command) != fields:
         raise StoreError("INVALID_REQUEST")
     identity_id = require_identity(command["identityId"])
@@ -184,11 +229,63 @@ def apply(document: dict[str, Any], command: Any) -> dict[str, Any]:
         service = command["serviceId"]
         if not isinstance(service, str) or service not in ITEM_BY_ID:
             raise StoreError("INVALID_SERVICE")
-        label = require_string(command["label"], 48)
-        if label:
-            record["accounts"][service] = label
+        values = record["accounts"]
+        previous = values.get(service)
+        if op == "set_account_label":
+            # Old clients can still edit their single label; never let one
+            # stale old-client write overwrite a newer multi-account list.
+            if isinstance(previous, list):
+                raise StoreError("MULTI_ACCOUNT_MODE")
+            label = require_string(command["label"], 48)
+            if label:
+                values[service] = label
+            else:
+                values.pop(service, None)
+        elif op == "add_account":
+            label = require_string(command["label"], 48)
+            if not label:
+                raise StoreError("INVALID_FIELD")
+            entries = account_names(previous)
+            if len(entries) >= MAX_NAMES_PER_SERVICE:
+                raise StoreError("ACCOUNT_CAPACITY")
+            maximum = max(
+                (int(item["id"].split("-")[1]) for item in entries),
+                default=0,
+            )
+            entries.append({"id": f"account-{maximum + 1}", "label": label})
+            values[service] = entries
         else:
-            record["accounts"].pop(service, None)
+            entries = account_names(previous)
+            account_id = command["accountId"]
+            if not isinstance(account_id, str) or not ACCOUNT_ID.fullmatch(account_id):
+                raise StoreError("INVALID_ACCOUNT")
+            index = next(
+                (i for i, entry in enumerate(entries) if entry["id"] == account_id),
+                -1,
+            )
+            if index < 0:
+                raise StoreError("ACCOUNT_NOT_FOUND")
+            if op == "rename_account":
+                label = require_string(command["label"], 48)
+                if not label:
+                    raise StoreError("INVALID_FIELD")
+                entries[index]["label"] = label
+            elif op == "remove_account":
+                entries.pop(index)
+            elif op == "move_account":
+                direction = command["direction"]
+                if type(direction) is not int or direction not in (-1, 1):
+                    raise StoreError("INVALID_DIRECTION")
+                next_index = index + direction
+                if not 0 <= next_index < len(entries):
+                    raise StoreError("NO_CHANGE")
+                entries[index], entries[next_index] = (
+                    entries[next_index], entries[index]
+                )
+            if entries:
+                values[service] = entries
+            else:
+                values.pop(service, None)
     if record == {"email": "", "phone": "", "accounts": {}}:
         doc["identities"].pop(identity_id, None)
     doc["revision"] += 1

@@ -65,6 +65,114 @@ class AccountDetailsTests(unittest.TestCase):
         self.assertEqual(stat.S_IMODE(module.root_path().stat().st_mode),0o700)
         self.assertEqual(stat.S_IMODE(module.storage_path().stat().st_mode),0o600)
 
+    def test_multi_account_names_preserve_legacy_and_sort_within_identity(self):
+        def update(doc, action, identity="identity-1", service="discord", **fields):
+            return module.apply(doc, {
+                "action": action, "identityId": identity,
+                "expectedRevision": doc["revision"], "serviceId": service,
+                **fields,
+            })
+
+        doc = update(module.new_document(), "set_account_label", label="Original")
+        legacy = json.loads(json.dumps(doc))
+        self.assertEqual(doc["identities"]["identity-1"]["accounts"]["discord"],
+                         "Original")
+        doc = update(doc, "add_account", label="Gaming")
+        self.assertEqual(legacy["identities"]["identity-1"]["accounts"]["discord"],
+                         "Original")
+        entries = doc["identities"]["identity-1"]["accounts"]["discord"]
+        self.assertEqual(entries, [
+            {"id": "account-1", "label": "Original"},
+            {"id": "account-2", "label": "Gaming"},
+        ])
+        doc = update(doc, "add_account", label="Community")
+        doc = update(doc, "move_account", accountId="account-3", direction=-1)
+        self.assertEqual([x["label"] for x in
+            doc["identities"]["identity-1"]["accounts"]["discord"]],
+            ["Original", "Community", "Gaming"])
+        doc = update(doc, "rename_account", accountId="account-2", label="Work")
+        self.assertEqual([x["label"] for x in
+            doc["identities"]["identity-1"]["accounts"]["discord"]],
+            ["Original", "Community", "Work"])
+        doc = update(doc, "add_account", identity="identity-2", label="Private")
+        self.assertEqual(
+            doc["identities"]["identity-2"]["accounts"]["discord"],
+            [{"id": "account-1", "label": "Private"}],
+        )
+        doc = update(doc, "remove_account", accountId="account-1")
+        doc = update(doc, "remove_account", accountId="account-3")
+        doc = update(doc, "remove_account", accountId="account-2")
+        self.assertNotIn("identity-1", doc["identities"])
+        self.assertIn("identity-2", doc["identities"])
+        module.save(doc)
+        self.assertEqual(module.load(), doc)
+
+    def test_account_name_edits_reject_ambiguity_and_credentials(self):
+        def update(doc, action, **fields):
+            return module.apply(doc, {
+                "action": action, "identityId": "identity-1",
+                "serviceId": "discord", "expectedRevision": doc["revision"],
+                **fields,
+            })
+        doc = module.new_document()
+        doc = update(doc, "add_account", label="Personal")
+        unchanged = json.loads(json.dumps(doc))
+        invalid = [
+            ("move_account", {"accountId": "account-1", "direction": -1},
+             "NO_CHANGE"),
+            ("move_account", {"accountId": "account-1", "direction": 0},
+             "INVALID_DIRECTION"),
+            ("rename_account", {"accountId": "account-999", "label": "Other"},
+             "ACCOUNT_NOT_FOUND"),
+            ("remove_account", {"accountId": "bad id"}, "INVALID_ACCOUNT"),
+            ("add_account", {"label": "password\nsecret"}, "INVALID_FIELD"),
+            ("add_account", {"label": ""}, "INVALID_FIELD"),
+            ("add_account", {"label": "demo", "accessToken": "fake"},
+             "INVALID_REQUEST"),
+            ("set_account_label", {"label": "overwrite all"},
+             "MULTI_ACCOUNT_MODE"),
+        ]
+        for action, fields, expected in invalid:
+            with self.subTest(action=action, fields=fields):
+                with self.assertRaises(module.StoreError) as error:
+                    update(doc, action, **fields)
+                self.assertEqual(error.exception.code, expected)
+        self.assertEqual(doc, unchanged)
+        for n in range(2, module.MAX_NAMES_PER_SERVICE + 1):
+            doc = update(doc, "add_account", label=f"Alias {n}")
+        with self.assertRaises(module.StoreError) as error:
+            update(doc, "add_account", label="Too many")
+        self.assertEqual(error.exception.code, "ACCOUNT_CAPACITY")
+        self.assertEqual(len(doc["identities"]["identity-1"]["accounts"]["discord"]),
+                         module.MAX_NAMES_PER_SERVICE)
+
+    def test_multi_name_storage_rejects_untrusted_or_malformed_records(self):
+        initial = module.new_document()
+        bad_values = [
+            [],
+            [{"id": "account-1", "label": "Personal"},
+             {"id": "account-1", "label": "Duplicate"}],
+            [{"id": "../escape", "label": "Bad"}],
+            [{"id": "account-1", "label": "OK", "token": "NO"}],
+            [{"id": "account-1", "label": ""}],
+        ]
+        for value in bad_values:
+            with self.subTest(value=value):
+                doc = json.loads(json.dumps(initial))
+                doc["identities"] = {
+                    "identity-1": {"email": "", "phone": "",
+                                   "accounts": {"discord": value}}
+                }
+                with self.assertRaises(module.StoreError):
+                    module.validate_document(doc)
+        # Legacy v1 single-label records still validate without migration.
+        legacy = {
+            "schema": module.SCHEMA, "revision": 1,
+            "identities": {"identity-1": {"email": "", "phone": "",
+                "accounts": {"discord": "My old saved name"}}},
+        }
+        self.assertEqual(module.validate_document(legacy), legacy)
+
     def test_notes_are_not_login_or_link_status(self):
         cmd={"action":"set_account_label","identityId":"identity-1",
              "expectedRevision":0,"serviceId":"telegram","label":"Personal Telegram"}

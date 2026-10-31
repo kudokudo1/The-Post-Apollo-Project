@@ -123,7 +123,47 @@ assert "/geoserver/observations/lightning_detection/ows" in source
 assert "MAX_BYTES = 2 * 1024 * 1024" in source
 assert "NowcoastOnlyRedirects" in source
 assert "Post-Apollo-WeatherStation/0.8" in source
-assert "TRANSPARENT" in source
-assert "python" not in source.lower().split("User-Agent")[0]
+assert '"TRANSPARENT": "true"' in source
+assert "urllib.request" in source
+assert "requests" not in source
 
-print("NOAA nowCOAST lightning WMS snapshot helper: PASS")
+service = (
+    ROOT / "services/weather/NowcoastLightningService.qml"
+).read_text(encoding="utf-8")
+assert "Scope {" in service
+assert "property bool active: true" in service
+assert "property string inflightKey" in service
+assert "currentKey !== inflightKey" in service
+assert "nowcoast_lightning_snapshot.py" in service
+assert "interval: 900000" in service
+assert "running: lightning.active && lightning.configured" in service
+assert service.count("Process {") == 1
+assert service.count("Timer {") == 2
+assert "Qt.openUrlExternally" not in service
+
+ground = (
+    ROOT / "widgets/weather/StationGround.qml"
+).read_text(encoding="utf-8")
+assert "WeatherServices.NowcoastLightningService {" in ground
+assert 'title: "LIGHTNING // NOAA NOWCOAST"' in ground
+assert "15-MIN STRIKE DENSITY" in ground
+assert "WEATHER FIX = CENTER CROSSHAIR" in ground
+assert "DERIVED NLDN / GLD360 PRODUCT" in ground
+assert "NOT RAW STRIKE LOCATIONS" in ground
+assert "USE OFFICIAL NWS ALERTS FOR WARNING DECISIONS" in ground
+start = ground.index('title: "LIGHTNING // NOAA NOWCOAST"')
+end = ground.index('title: "HEAT + FIRE WEATHER // NWS CONTEXT"', start)
+lightning_ui = ground[start:end]
+assert "Process {" not in lightning_ui
+assert "curl" not in lightning_ui
+assert "Qt.openUrlExternally" not in lightning_ui
+
+workflow = (
+    ROOT / ".github/workflows/weather-teardown-contracts.yml"
+).read_text(encoding="utf-8")
+assert (
+    "python3 tests/weather/test_station_ground_nowcoast_lightning.py"
+    in workflow
+)
+
+print("NOAA nowCOAST lightning WMS snapshot helper + GROUND contract: PASS")

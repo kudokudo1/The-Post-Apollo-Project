@@ -53,6 +53,8 @@ jobs:
         run: node tests/weather/test_station_sky_usno_celnav.js
       - name: Validate SKY USNO planet rise transit and set clock
         run: python3 tests/weather/test_station_sky_usno_planet_rise_set.py
+      - name: Validate SKY NASA GSFC eclipse calendar
+        run: python3 tests/weather/test_station_sky_nasa_eclipses.py
       - name: Validate Weather Station Home relevance policy
         run: node tests/weather/test_station_home_policy.js
       - name: Validate HOME recent archived-model history

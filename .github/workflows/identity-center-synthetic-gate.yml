@@ -1,0 +1,33 @@
+name: Identity Center Synthetic Tenant Permission Gate
+
+on:
+  pull_request:
+    paths:
+      - 'services/identity/synthetic_policy_v0.py'
+      - 'tests/identity/test_synthetic_policy_v0.py'
+      - 'MODEL/contracts/identity-center-synthetic-gate-v0.md'
+      - '.github/workflows/identity-center-synthetic-gate.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'services/identity/synthetic_policy_v0.py'
+      - 'tests/identity/test_synthetic_policy_v0.py'
+      - 'MODEL/contracts/identity-center-synthetic-gate-v0.md'
+      - '.github/workflows/identity-center-synthetic-gate.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  tenant-isolation:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Compile the isolated synthetic policy
+        run: python3 -m py_compile services/identity/synthetic_policy_v0.py tests/identity/test_synthetic_policy_v0.py
+      - name: Verify portfolio, division, geography and default-deny policy
+        run: python3 -m unittest discover -s tests/identity -p 'test_*.py' -v

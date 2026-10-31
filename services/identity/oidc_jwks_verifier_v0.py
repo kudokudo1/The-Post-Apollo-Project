@@ -121,10 +121,8 @@ class OfflineJWKSVerifier:
                     or expires <= now or expires <= issued
                     or expires - issued > self._max_lifetime):
                 return None
-            if type(self._is_revoked(self._issuer, claims["sid"],
-                                     claims["jti"])) is not bool:
-                return None
-            if self._is_revoked(self._issuer, claims["sid"], claims["jti"]):
+            revoked = self._is_revoked(self._issuer, claims["sid"], claims["jti"])
+            if type(revoked) is not bool or revoked:
                 return None
             return VerifiedSession(
                 principal_id=claims["sub"], issuer=self._issuer,

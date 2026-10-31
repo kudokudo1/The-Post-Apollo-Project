@@ -57,6 +57,15 @@ Rectangle {
         }
     }
 
+    function riverTrendColor(direction) {
+        switch (String(direction || "")) {
+        case "RISING": return Colors.orange;
+        case "FALLING": return Colors.cyan;
+        case "STEADY": return Colors.green;
+        default: return Colors.white;
+        }
+    }
+
     function riverReceiveAge() {
         if (!riverService.lastUpdated
                 || typeof riverService.lastUpdated.getTime !== "function")
@@ -95,6 +104,23 @@ Rectangle {
         riverService.stageflowReady
         ? RiverPolicy.seriesHead(
               riverService.stageflow.forecast, 4
+          ) : []
+
+    readonly property var observedHydrographRows:
+        riverService.stageflowReady
+        ? RiverPolicy.seriesWindow(
+              riverService.stageflow.observed, 12
+          ) : []
+    readonly property var observedHydrographStats:
+        riverService.stageflowReady
+        ? RiverPolicy.seriesStats(
+              riverService.stageflow.observed, 12
+          )
+        : RiverPolicy.seriesStats(null, 12)
+    readonly property var observedHydrographBars:
+        riverService.stageflowReady
+        ? RiverPolicy.normalizedSeriesBars(
+              riverService.stageflow.observed, 12
           ) : []
 
     readonly property bool aqiReady: weatherService && weatherService.aqiReady
@@ -694,6 +720,135 @@ Rectangle {
 
             Column {
                 width: parent.width
+                spacing: 6
+                visible: riverService.ready
+                         && riverService.nearbyGauges.length > 1
+
+                StationSectionDivider {
+                    width: parent.width
+                    title: "NEARBY COMPARE // SAME NWPS SNAPSHOT"
+                }
+
+                Repeater {
+                    model: riverService.nearbyGauges
+
+                    delegate: Rectangle {
+                        required property var modelData
+                        required property int index
+                        width: parent.width
+                        height: 50
+                        color: index === 0 ? Colors.dark : Colors.black
+                        border.width: 1
+                        border.color:
+                            ground.riverCategoryColor(
+                                modelData.observedCategory
+                            )
+
+                        Row {
+                            anchors.fill: parent
+                            anchors.margins: 7
+                            spacing: 10
+
+                            GohuText {
+                                width: 22
+                                text: String(index + 1)
+                                font.pixelSize: 12
+                                color: index === 0
+                                       ? Colors.magenta : Colors.cyan
+                            }
+
+                            Column {
+                                width: Math.max(0, parent.width - 540)
+                                spacing: 2
+
+                                GohuText {
+                                    width: parent.width
+                                    text: modelData.name
+                                    elide: Text.ElideRight
+                                    font.pixelSize: 10
+                                    color: Colors.white
+                                }
+
+                                QuietText {
+                                    width: parent.width
+                                    text: modelData.lid
+                                          + " // "
+                                          + Math.round(
+                                                modelData.distanceKm
+                                            )
+                                          + " KM"
+                                    elide: Text.ElideRight
+                                    font.pixelSize: 9
+                                }
+                            }
+
+                            Column {
+                                width: 150
+                                spacing: 2
+
+                                SecondaryText {
+                                    text: "OBSERVED"
+                                    font.pixelSize: 8
+                                }
+
+                                GohuText {
+                                    text: RiverPolicy.readingText(
+                                        modelData.observedPrimary,
+                                        modelData.primaryUnits
+                                    )
+                                    elide: Text.ElideRight
+                                    font.pixelSize: 10
+                                    color: ground.riverCategoryColor(
+                                        modelData.observedCategory
+                                    )
+                                }
+                            }
+
+                            Column {
+                                width: 150
+                                spacing: 2
+
+                                SecondaryText {
+                                    text: "FORECAST"
+                                    font.pixelSize: 8
+                                }
+
+                                GohuText {
+                                    text: RiverPolicy.readingText(
+                                        modelData.forecastPrimary,
+                                        modelData.primaryUnits
+                                    )
+                                    elide: Text.ElideRight
+                                    font.pixelSize: 10
+                                    color: ground.riverCategoryColor(
+                                        modelData.forecastCategory
+                                    )
+                                }
+                            }
+
+                            QuietText {
+                                width: 170
+                                text: modelData.observedCategory.label
+                                      + " // "
+                                      + modelData.forecastCategory.label
+                                horizontalAlignment: Text.AlignRight
+                                elide: Text.ElideRight
+                                font.pixelSize: 8
+                            }
+                        }
+                    }
+                }
+
+                QuietText {
+                    width: parent.width
+                    text: "PROXIMITY COMPARISON ONLY // DIFFERENT RIVERS / TRIBUTARIES MAY NOT BE HYDROLOGICALLY COMPARABLE"
+                    font.pixelSize: 9
+                    color: Colors.orange
+                }
+            }
+
+            Column {
+                width: parent.width
                 spacing: 7
                 visible: riverService.ready && !!riverService.gauge
 
@@ -743,6 +898,145 @@ Rectangle {
                              ? " // LAST-GOOD SERIES RETAINED" : "")
                     font.pixelSize: 9
                     color: Colors.yellow
+                }
+
+                Rectangle {
+                    visible: riverService.stageflowReady
+                             && ground.observedHydrographStats.available
+                    width: parent.width
+                    height: 104
+                    color: Colors.dark
+                    border.width: 1
+                    border.color: ground.riverTrendColor(
+                        ground.observedHydrographStats.direction
+                    )
+
+                    Column {
+                        anchors.fill: parent
+                        anchors.margins: 8
+                        spacing: 5
+
+                        Row {
+                            width: parent.width
+                            spacing: 12
+
+                            GohuText {
+                                width: 220
+                                text: "OBSERVED HYDROGRAPH // "
+                                      + ground.observedHydrographStats.points
+                                      + " POINTS"
+                                font.pixelSize: 10
+                                color: Colors.cyan
+                            }
+
+                            GohuText {
+                                width: 90
+                                text: ground.observedHydrographStats.direction
+                                font.pixelSize: 10
+                                color: ground.riverTrendColor(
+                                    ground.observedHydrographStats.direction
+                                )
+                            }
+
+                            QuietText {
+                                width: Math.max(0, parent.width - 334)
+                                horizontalAlignment: Text.AlignRight
+                                text: ground.observedHydrographStats.spanHours >= 0
+                                      ? ground.observedHydrographStats
+                                        .spanHours.toFixed(1) + " H WINDOW"
+                                      : "WINDOW --"
+                                font.pixelSize: 9
+                            }
+                        }
+
+                        Row {
+                            width: parent.width
+                            spacing: 14
+
+                            QuietText {
+                                width: 170
+                                text: "MIN // "
+                                      + RiverPolicy.readingText(
+                                          ground.observedHydrographStats.minimum,
+                                          riverService.stageflow.observed
+                                              .primaryUnits
+                                      )
+                                font.pixelSize: 9
+                            }
+
+                            QuietText {
+                                width: 170
+                                text: "MAX // "
+                                      + RiverPolicy.readingText(
+                                          ground.observedHydrographStats.maximum,
+                                          riverService.stageflow.observed
+                                              .primaryUnits
+                                      )
+                                font.pixelSize: 9
+                            }
+
+                            QuietText {
+                                width: 190
+                                text: "DELTA // "
+                                      + (ground.observedHydrographStats.delta
+                                         !== null
+                                         ? (ground.observedHydrographStats.delta
+                                            >= 0 ? "+" : "")
+                                           + ground.observedHydrographStats
+                                             .delta.toFixed(2)
+                                           + (riverService.stageflow.observed
+                                              .primaryUnits
+                                              ? " "
+                                                + riverService.stageflow
+                                                  .observed.primaryUnits
+                                              : "")
+                                         : "--")
+                                font.pixelSize: 9
+                            }
+                        }
+
+                        Row {
+                            width: parent.width
+                            height: 32
+                            spacing: 3
+
+                            Repeater {
+                                model: ground.observedHydrographBars
+
+                                delegate: Item {
+                                    required property var modelData
+                                    width: Math.max(
+                                        3,
+                                        (parent.width
+                                         - Math.max(
+                                             0,
+                                             ground.observedHydrographBars
+                                             .length - 1
+                                           ) * 3)
+                                        / Math.max(
+                                            1,
+                                            ground.observedHydrographBars
+                                            .length
+                                          )
+                                    )
+                                    height: parent.height
+
+                                    Rectangle {
+                                        anchors.bottom: parent.bottom
+                                        width: parent.width
+                                        height: Math.max(
+                                            4,
+                                            parent.height
+                                            * (0.2
+                                               + 0.8
+                                                 * modelData.fraction)
+                                        )
+                                        color: Colors.cyan
+                                    }
+                                }
+                            }
+                        }
+                    }
                 }
 
                 Row {

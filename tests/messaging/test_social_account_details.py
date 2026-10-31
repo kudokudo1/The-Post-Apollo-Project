@@ -125,7 +125,7 @@ class AccountDetailsTests(unittest.TestCase):
             ("rename_account", {"accountId": "account-999", "label": "Other"},
              "ACCOUNT_NOT_FOUND"),
             ("remove_account", {"accountId": "bad id"}, "INVALID_ACCOUNT"),
-            ("add_account", {"label": "password\\nsecret"}, "INVALID_FIELD"),
+            ("add_account", {"label": "password\nsecret"}, "INVALID_FIELD"),
             ("add_account", {"label": ""}, "INVALID_FIELD"),
             ("add_account", {"label": "demo", "accessToken": "fake"},
              "INVALID_REQUEST"),

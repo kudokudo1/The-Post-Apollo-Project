@@ -4,6 +4,7 @@ import Quickshell.Io
 import Quickshell.Wayland
 import "../../components"
 import "../../services/messaging"
+import qs.services.social
 import QtQuick.Effects
 import Qt5Compat.GraphicalEffects
 
@@ -63,6 +64,17 @@ PanelWindow {
             messagingWindow.openDiscordFromTray();
         }
     }
+
+    // The tray is another component in the SAME shell. Its signal should
+    // reach this controller synchronously, without launching a qs IPC client.
+    Connections {
+        target: SocialTrayBridge
+
+        function onDiscordActivationRequested() {
+            messagingWindow.openDiscordFromTray();
+        }
+    }
+
     // Provider launch is deliberately separate from Sway geometry ownership.
     // Every Discord activation issues one detached Vesktop invocation:
     // - stopped client: starts Vesktop;

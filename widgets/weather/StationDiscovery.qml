@@ -154,7 +154,12 @@ Rectangle {
         radarArea && radarArea.valid
     property string radarImageUrl: ""
     property var radarSnapshotBounds: null
+    property int radarHistoryMinutes: 0
+    property int radarLoadedHistoryMinutes: 0
+    property double radarRequestedTimeMs: 0
     property date radarRequestedAt
+    readonly property var radarHistoryOptions:
+        RadarPolicy.historyOptions()
     readonly property var smokeSummary:
         hmsSmokeService ? hmsSmokeService.summary
                         : { "count": 0, "light": 0, "medium": 0, "heavy": 0 }
@@ -306,20 +311,42 @@ Rectangle {
         return firmsService.request(mapVisibleBounds);
     }
 
+    function selectRadarHistory(minutes) {
+        radarHistoryMinutes =
+            RadarPolicy.normalizeHistoryMinutes(minutes);
+    }
+
+    function radarHistoryLabel(minutes) {
+        const value = Number(minutes);
+        if (!isFinite(value) || value <= 0)
+            return "NOW";
+        if (value < 60)
+            return "-" + Math.round(value) + "M";
+        return "-" + Math.round(value / 60) + "H";
+    }
+
     function loadRadarSnapshot() {
         if (!radarAreaReady || radarImage.status === Image.Loading)
             return false;
         const snapshot = RadarPolicy.snapshot(radarArea);
+        const requestNow = Date.now();
+        const historicalTime = RadarPolicy.historyTimeMillis(
+            requestNow,
+            radarHistoryMinutes
+        );
         const nextUrl = RadarPolicy.exportImageUrl(
             radarArea,
             Math.round(mapPlot.width),
-            Math.round(mapPlot.height)
+            Math.round(mapPlot.height),
+            historicalTime
         );
         if (!snapshot || nextUrl === "")
             return false;
 
         radarSnapshotBounds = snapshot;
-        radarRequestedAt = new Date();
+        radarRequestedAt = new Date(requestNow);
+        radarLoadedHistoryMinutes = radarHistoryMinutes;
+        radarRequestedTimeMs = historicalTime;
         // Explicit empty -> next URL guarantees a manual same-viewport refresh
         // even with the Image cache disabled.
         radarImageUrl = "";
@@ -332,6 +359,8 @@ Rectangle {
     function clearRadarSnapshot() {
         radarImageUrl = "";
         radarSnapshotBounds = null;
+        radarLoadedHistoryMinutes = 0;
+        radarRequestedTimeMs = 0;
     }
 
     function loadSmokePolygons() {
@@ -505,9 +534,11 @@ Rectangle {
                            : "UNAVAILABLE"
                 },
                 {
-                    name:"NOAA/NWS MRMS // BASE REFLECTIVITY",
+                    name:"NOAA/NWS MRMS // BASE REFLECTIVITY + 4H HISTORY",
                     state: radarImage.status === Image.Ready
-                           ? "SNAPSHOT LOADED" : "MANUAL READY"
+                           ? "FRAME "
+                             + radarHistoryLabel(radarLoadedHistoryMinutes)
+                           : "MANUAL READY"
                 },
                 {name:"RAINVIEWER // RADAR FALLBACK", state:"NOT WIRED"},
                 {
@@ -942,7 +973,46 @@ Rectangle {
 
                 StationSectionDivider {
                     width: parent.width
-                    title: "RADAR // NOAA/NWS MRMS BASE REFLECTIVITY"
+                    title: "RADAR // NOAA/NWS MRMS BASE REFLECTIVITY + 4H HISTORY"
+                }
+
+                Row {
+                    width: parent.width
+                    height: 30
+                    spacing: 7
+
+                    Repeater {
+                        model: stationDiscovery.radarHistoryOptions
+
+                        delegate: ModeButton {
+                            required property var modelData
+                            width: 74
+                            height: 28
+                            textOnly: true
+                            horizontalContent: true
+                            bordered: false
+                            selected:
+                                stationDiscovery.radarHistoryMinutes
+                                === modelData.minutes
+                            labelText: modelData.label
+                            labelFontSize: 9
+                            idlePrimaryColor: Colors.cyan
+                            selectedPrimaryColor: Colors.magenta
+                            perimeterGlowColor: Colors.orange
+                            onTriggered:
+                                stationDiscovery.selectRadarHistory(
+                                    modelData.minutes
+                                )
+                        }
+                    }
+
+                    QuietText {
+                        anchors.verticalCenter: parent.verticalCenter
+                        width: Math.max(0, parent.width - 390)
+                        text: "SELECT FRAME // THEN LOAD // NOAA TIME WINDOW // NO AUTO-FETCH"
+                        elide: Text.ElideRight
+                        font.pixelSize: 9
+                    }
                 }
 
                 Row {
@@ -997,7 +1067,24 @@ Rectangle {
                         anchors.verticalCenter: parent.verticalCenter
                         width: Math.max(0, parent.width - 432)
                         text: radarImage.status === Image.Ready
-                              ? "LATEST AVAILABLE AT REQUEST // SNAPSHOT TRACKS MAP"
+                              ? "LOADED "
+                                + stationDiscovery.radarHistoryLabel(
+                                      stationDiscovery
+                                      .radarLoadedHistoryMinutes
+                                  )
+                                + (stationDiscovery
+                                   .radarRequestedTimeMs > 0
+                                   ? " // "
+                                     + Qt.formatDateTime(
+                                           new Date(
+                                               stationDiscovery
+                                               .radarRequestedTimeMs
+                                           ),
+                                           "hh:mm"
+                                       )
+                                     + " UTC TARGET"
+                                   : " // LATEST AVAILABLE")
+                                + " // SNAPSHOT TRACKS MAP"
                               : "MAX 90° × 50° VIEW // MANUAL LOAD // NO PAN AUTO-FETCH"
                         elide: Text.ElideRight
                         font.pixelSize: 9
@@ -1006,7 +1093,7 @@ Rectangle {
 
                 QuietText {
                     width: parent.width
-                    text: "NOAA / NWS / MRMS // OFFICIAL BASE REFLECTIVITY // COVERAGE IS NOT GLOBAL"
+                    text: "NOAA / NWS / MRMS // OFFICIAL BASE REFLECTIVITY // 4H MOVING HISTORY // COVERAGE IS NOT GLOBAL"
                     font.pixelSize: 9
                     color: Colors.cyan
                 }

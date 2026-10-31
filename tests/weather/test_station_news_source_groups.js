@@ -165,7 +165,7 @@ assert.doesNotMatch(
 );
 assert.match(
     source,
-    /titleKey\.length < 12/
+    /key\.length < 12/
 );
 assert.match(
     source,

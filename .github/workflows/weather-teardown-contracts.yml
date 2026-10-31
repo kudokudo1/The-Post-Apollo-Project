@@ -47,6 +47,8 @@ jobs:
         run: node tests/weather/test_station_sky_twilight.js
       - name: Validate SKY provider-clock solar position
         run: node tests/weather/test_station_sky_solar_position.js
+      - name: Validate SKY ISS geometric passes
+        run: python3 tests/weather/test_station_sky_iss_passes.py
       - name: Validate SKY USNO moon ephemeris
         run: node tests/weather/test_station_sky_usno_moon.js
       - name: Validate SKY USNO current Moon planets and stars

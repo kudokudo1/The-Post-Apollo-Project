@@ -248,6 +248,7 @@ Rectangle {
         selectedMapEvent = null;
         selectedMapHotspot = null;
         selectedMapNewsMention = null;
+        selectedMapEarthquake = null;
         mapFilter = id;
         resetMapView();
         discoveryScroll.contentY = 0;
@@ -1946,7 +1947,7 @@ Rectangle {
                         anchors.bottom: parent.bottom
                         anchors.margins: 7
                         z: 3
-                        text: "BASEMAP LOCAL // EONET DIAMONDS // FIRMS ORANGE // NEWS MAGENTA"
+                        text: "QUAKES CIRCLES // EONET DIAMONDS // FIRMS ORANGE // NEWS MAGENTA"
                         font.pixelSize: 9
                     }
                 }

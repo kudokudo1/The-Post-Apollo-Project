@@ -56,6 +56,12 @@ PanelWindow {
         function closeMenu(): void {
             messagingWindow.menuOpen = false;
         }
+
+        // Tray activation must enter the Social controller, not Vesktop's
+        // native tray restore path. The menu itself owns the docking handshake.
+        function openDiscordFromTray(): void {
+            messagingWindow.openDiscordFromTray();
+        }
     }
     // Provider launch is deliberately separate from Sway geometry ownership.
     // Every Discord activation issues one detached Vesktop invocation:
@@ -407,6 +413,13 @@ PanelWindow {
     }
 
     onDiscordSelectedChanged: updateGeometryHelperMode()
+
+    // A cold Social FloatingWindow must reach its intended Sway rectangle
+    // before Vesktop is launched, restored, or allowed to provide geometry.
+    onSocialReadyChanged: {
+        if (socialReady && menuOpen && discordSelected && !discordReady)
+            showDiscord();
+    }
     onDiscordReadyChanged: updateGeometryHelperMode()
     onDiscordDockedChanged: {
         updateGeometryHelperMode();
@@ -1355,6 +1368,18 @@ PanelWindow {
     // DISCORD LIFECYCLE
     // ============================================================
 
+    function openDiscordFromTray() {
+        if (!menuOpen)
+            menuOpen = true;
+
+        // Finish the existing menu-open reset and map before selecting Discord.
+        // This is the same controller path as a direct Social app selection.
+        Qt.callLater(function () {
+            if (messagingWindow.menuOpen)
+                messagingWindow.activateApp(1);
+        });
+    }
+
     function showDiscord() {
         if (!menuOpen || !discordSelected)
             return;
@@ -1368,6 +1393,16 @@ PanelWindow {
         if (!swayGeometryReady)
             refreshSwayGeometry();
 
+        // Do not launch/restore Vesktop against a transient, half-mapped Social
+        // window. onSocialReadyChanged resumes this request after verified
+        // placement, including when Social is opened by the tray.
+        if (!socialReady)
+            return;
+
+        // Arm the exact-window docking request before the single-instance
+        // restore can publish a visible main BrowserWindow.
+        helperShowDiscord(restoreSelectorAfterDiscordShow !== true);
+
         // Launch/restore the provider independently from geometry discovery.
         // setsid -f makes this short-lived Process return immediately instead
         // of staying attached to Vesktop for the lifetime of the application.
@@ -1378,9 +1413,8 @@ PanelWindow {
             "setsid -f flatpak run dev.vencord.Vesktop >/dev/null 2>&1"
         ]);
 
-        // Geometry helper only observes/docks the Sway window that appears.
-        helperShowDiscord(restoreSelectorAfterDiscordShow !== true);
-
+        // The helper consumes the armed request only for the discovered main
+        // window; no desktop geometry is promoted before a verified dock.
         Qt.callLater(function () {
             messagingWindow.requestGroupGeometry();
         });

@@ -409,7 +409,8 @@ function newsStoryFamilies(rows) {
         const seen = Number(row.seenMillis);
         if (isFinite(seen) && seen > group.latestSeenMillis)
             group.latestSeenMillis = seen;
-        if (score && score.jaccard > group.strongestJaccard)
+        if (group.rows.length > 1
+                && score && score.jaccard > group.strongestJaccard)
             group.strongestJaccard = score.jaccard;
     }
 

@@ -184,6 +184,45 @@ function zoomAt(zoomValue, centerLonValue, centerLatValue,
     return clampView(nextZoom, centerLon, centerLat);
 }
 
+
+function fitRows(rows, paddingFactor) {
+    const points = plottable(rows);
+    if (points.length === 0)
+        return clampView(1, 0, 0);
+
+    let minLon = 180;
+    let maxLon = -180;
+    let minLat = 90;
+    let maxLat = -90;
+    for (let i = 0; i < points.length; i++) {
+        const lon = finite(points[i].longitude);
+        const lat = finite(points[i].latitude);
+        minLon = Math.min(minLon, lon);
+        maxLon = Math.max(maxLon, lon);
+        minLat = Math.min(minLat, lat);
+        maxLat = Math.max(maxLat, lat);
+    }
+
+    const centerLon = (minLon + maxLon) / 2;
+    const centerLat = (minLat + maxLat) / 2;
+    if (points.length === 1)
+        return clampView(4, centerLon, centerLat);
+
+    const padding = clamp(
+        finite(paddingFactor) === null ? 1.35 : Number(paddingFactor),
+        1.05,
+        3
+    );
+    const lonSpan = Math.max(1, (maxLon - minLon) * padding);
+    const latSpan = Math.max(0.5, (maxLat - minLat) * padding);
+    const zoom = clamp(
+        Math.min(360 / lonSpan, 180 / latSpan),
+        1,
+        8
+    );
+    return clampView(zoom, centerLon, centerLat);
+}
+
 function plottable(rows) {
     if (!Array.isArray(rows))
         return [];

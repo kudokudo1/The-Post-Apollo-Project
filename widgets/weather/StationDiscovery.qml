@@ -19,6 +19,10 @@ Rectangle {
     property bool stationOpen: true
     property bool viewerOpen: false
     property var selectedNews: null
+    readonly property bool newsLocationMatchesSelection:
+        selectedNews
+        && articleLocationService.requestedUrl !== ""
+        && articleLocationService.requestedUrl === selectedNews.url
     property string newsTopic: "all"
     property string newsSourceQuery: ""
     property string newsLanguageQuery: ""
@@ -327,6 +331,8 @@ Rectangle {
         if (domain === "news") {
             const next = ViewerPolicy.normalizeNews(row);
             if (!next) return;
+            if (!articleLocationService.loading)
+                articleLocationService.clear();
             selectedNews = next;
             viewerOpen = true;
             return;
@@ -345,6 +351,8 @@ Rectangle {
     function closeViewer() {
         viewerOpen = false;
         selectedNews = null;
+        if (!articleLocationService.loading)
+            articleLocationService.clear();
     }
 
     onDomainChanged: {
@@ -404,7 +412,8 @@ Rectangle {
                 {name:"SOURCE-COUNTRY REGION GROUPS", state:"CONNECTED"},
                 {name:"REPORTING TREND / SOURCE COUNT", state:"CONNECTED"},
                 {name:"CONSERVATIVE STORY FAMILIES", state:"CONNECTED"},
-                {name:"EVENT / MENTIONED-LOCATION LINKING", state:"NOT WIRED"},
+                {name:"ARTICLE → GKG MENTIONED LOCATIONS", state:"CONNECTED"},
+                {name:"NEWS → MAP LOCATION HANDOFF", state:"NOT WIRED"},
                 {name:"LIVE NEWS / VIDEO", state:"NOT WIRED"},
                 {name:"SEMANTIC / EMBEDDING DOSSIERS", state:"NOT WIRED"}
             ];
@@ -432,6 +441,10 @@ Rectangle {
 
     WeatherServices.HmsSmokeService {
         id: hmsSmokeService
+    }
+
+    WeatherServices.GdeltArticleLocationService {
+        id: articleLocationService
     }
 
     color: Colors.black
@@ -2109,6 +2122,37 @@ Rectangle {
         id: newsViewerComponent
         StationViewerHost {
             selectedRecord: stationDiscovery.selectedNews
+            locationLoading:
+                stationDiscovery.newsLocationMatchesSelection
+                && articleLocationService.loading
+            locationReady:
+                stationDiscovery.newsLocationMatchesSelection
+                && articleLocationService.ready
+            locationFailed:
+                stationDiscovery.newsLocationMatchesSelection
+                && articleLocationService.failed
+            locationError:
+                stationDiscovery.newsLocationMatchesSelection
+                ? articleLocationService.errorText : ""
+            locationRows:
+                stationDiscovery.newsLocationMatchesSelection
+                ? articleLocationService.rows : []
+            locationFeedName:
+                stationDiscovery.newsLocationMatchesSelection
+                ? articleLocationService.feedName : ""
+            locationSliceUtc:
+                stationDiscovery.newsLocationMatchesSelection
+                ? articleLocationService.sliceUtc : ""
+            locationMatchMethod:
+                stationDiscovery.newsLocationMatchesSelection
+                ? articleLocationService.matchMethod : ""
+            locationSemantics:
+                stationDiscovery.newsLocationMatchesSelection
+                ? articleLocationService.semantics : ""
+            onLocateRequested:
+                articleLocationService.request(
+                    stationDiscovery.selectedNews
+                )
             onBackRequested: stationDiscovery.closeViewer()
         }
     }

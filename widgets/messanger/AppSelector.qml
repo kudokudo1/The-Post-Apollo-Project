@@ -1287,41 +1287,102 @@ Rectangle {
                     font.pixelSize: 9
                     wrapMode: Text.WordWrap
                 }
-                Rectangle {
+                // The closed picker consumes one row instead of 32 stacked
+                // buttons. On open it shows the entire canonical service list,
+                // not just the old eight matching entries.
+                ActionButton {
                     width: parent.width
                     height: 36
-                    color: Colors.dark
-                    border.color: Colors.orange
-                    TextInput {
-                        id: accountServiceSearchInput
-                        anchors.fill: parent
-                        anchors.margins: 5
-                        color: Colors.white
-                        clip: true
-                        selectByMouse: true
-                        font.pixelSize: 11
-                        maximumLength: 40
-                    }
+                    label: appSelector.accountAppPickerOpen
+                           ? "▴ CLOSE APP LIST"
+                           : (appSelector.accountSelectedServiceId === ""
+                              ? "▾ CHOOSE APP (32)"
+                              : "▾ " + appSelector.accountSelectedServiceId.toUpperCase())
+                    labelPixelSize: 9
+                    contentPadding: 3
+                    interactive: appSelector.identitySnapshot.writable
+                    onTriggered: appSelector.accountAppPickerOpen =
+                        !appSelector.accountAppPickerOpen
                 }
-                Repeater {
-                    model: appSelector.matchingAccountServices(
-                               accountServiceSearchInput.text)
-                    delegate: ActionButton {
-                        required property var modelData
-                        width: settingsIdentityColumn.width
-                        height: 31
-                        label: appSelector.messagingApps[modelData.serviceIndex].name
-                        labelPixelSize: 9
-                        labelMinimumPixelSize: 8
-                        contentPadding: 3
-                        selected: appSelector.accountSelectedServiceId === modelData.id
-                        interactive: appSelector.identitySnapshot.writable
-                                     && SocialAccountDetailsStore.state === "ready"
-                        onTriggered: {
-                            appSelector.accountSelectedServiceId = modelData.id;
-                            accountLabelInput.text = appSelector.accountDetails.accounts[modelData.id]
-                                                     || "";
+                Column {
+                    width: parent.width
+                    spacing: 5
+                    visible: appSelector.accountAppPickerOpen
+
+                    Rectangle {
+                        width: parent.width
+                        height: 33
+                        color: Colors.dark
+                        border.color: Colors.orange
+                        TextInput {
+                            id: accountServiceSearchInput
+                            anchors.fill: parent
+                            anchors.margins: 5
+                            color: Colors.white
+                            clip: true
+                            selectByMouse: true
+                            font.pixelSize: 11
+                            maximumLength: 40
                         }
+                    }
+                    Rectangle {
+                        width: parent.width
+                        height: Math.min(234, appSelector.matchingAccountServices(
+                            accountServiceSearchInput.text).length * 31 + 6)
+                        color: Colors.dark
+                        border.color: Colors.cyan
+
+                        Flickable {
+                            anchors.fill: parent
+                            contentWidth: width
+                            contentHeight: accountAppList.height + 8
+                            flickableDirection: Flickable.VerticalFlick
+                            boundsBehavior: Flickable.StopAtBounds
+                            clip: true
+
+                            Column {
+                                id: accountAppList
+                                width: parent.width
+                                spacing: 1
+                                Repeater {
+                                    model: appSelector.matchingAccountServices(
+                                        accountServiceSearchInput.text)
+                                    delegate: ActionButton {
+                                        required property var modelData
+                                        readonly property int savedNames:
+                                            appSelector.accountNamesFor(
+                                                modelData.id).length
+                                        width: accountAppList.width
+                                        height: 30
+                                        label: appSelector.messagingApps[
+                                            modelData.serviceIndex].name
+                                            + (savedNames ? " (" + savedNames + ")"
+                                                          : " // NOT ADDED")
+                                        labelPixelSize: 9
+                                        labelMinimumPixelSize: 8
+                                        contentPadding: 2
+                                        selected: appSelector.accountSelectedServiceId ===
+                                                  modelData.id
+                                        // A faded app is not yet recorded
+                                        // here. It stays selectable so the
+                                        // first name can be added; never
+                                        // infer real provider login state.
+                                        available: savedNames > 0
+                                        unavailableOpacity: 0.38
+                                        interactive: appSelector.identitySnapshot.writable
+                                        onTriggered: appSelector.selectAccountService(
+                                            modelData.id)
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    Text {
+                        width: parent.width
+                        text: "FADED = NO NAME SAVED HERE. SELECT TO ADD."
+                        color: Colors.orange
+                        font.pixelSize: 9
+                        wrapMode: Text.WordWrap
                     }
                 }
                 Text {

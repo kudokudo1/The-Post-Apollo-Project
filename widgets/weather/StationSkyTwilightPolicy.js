@@ -370,6 +370,14 @@ function summary(dateRaw, latitudeRaw, longitudeRaw, providerSunriseRaw) {
             civilDusk: "--",
             nauticalDusk: "--",
             astronomicalDusk: "--",
+            blueMorningStart: "--",
+            blueMorningEnd: "--",
+            goldenMorningStart: "--",
+            goldenMorningEnd: "--",
+            goldenEveningStart: "--",
+            goldenEveningEnd: "--",
+            blueEveningStart: "--",
+            blueEveningEnd: "--",
             calibrationOffsetMinutes: null
         };
     }
@@ -390,6 +398,14 @@ function summary(dateRaw, latitudeRaw, longitudeRaw, providerSunriseRaw) {
             civilDusk: "--",
             nauticalDusk: "--",
             astronomicalDusk: "--",
+            blueMorningStart: "--",
+            blueMorningEnd: "--",
+            goldenMorningStart: "--",
+            goldenMorningEnd: "--",
+            goldenEveningStart: "--",
+            goldenEveningEnd: "--",
+            blueEveningStart: "--",
+            blueEveningEnd: "--",
             calibrationOffsetMinutes: null
         };
     }
@@ -408,6 +424,24 @@ function summary(dateRaw, latitudeRaw, longitudeRaw, providerSunriseRaw) {
     const astronomicalDuskUtc =
         eventUtcMinutes(date, latitude, longitude, 108, false);
 
+    // Post-Apollo photographic-light convention. These are solar-center
+    // altitude crossings, not official astronomical twilight categories.
+    // BLUE: -6° to -4°. GOLDEN: -4° to +6°.
+    const blueMorningStartUtc =
+        eventUtcMinutes(date, latitude, longitude, 96, true);
+    const blueMorningEndUtc =
+        eventUtcMinutes(date, latitude, longitude, 94, true);
+    const goldenMorningStartUtc = blueMorningEndUtc;
+    const goldenMorningEndUtc =
+        eventUtcMinutes(date, latitude, longitude, 84, true);
+    const goldenEveningStartUtc =
+        eventUtcMinutes(date, latitude, longitude, 84, false);
+    const goldenEveningEndUtc =
+        eventUtcMinutes(date, latitude, longitude, 94, false);
+    const blueEveningStartUtc = goldenEveningEndUtc;
+    const blueEveningEndUtc =
+        eventUtcMinutes(date, latitude, longitude, 96, false);
+
     return {
         available: true,
         date: String(dateRaw),
@@ -418,6 +452,14 @@ function summary(dateRaw, latitudeRaw, longitudeRaw, providerSunriseRaw) {
         civilDusk: localLabel(civilDuskUtc, offset),
         nauticalDusk: localLabel(nauticalDuskUtc, offset),
         astronomicalDusk: localLabel(astronomicalDuskUtc, offset),
+        blueMorningStart: localLabel(blueMorningStartUtc, offset),
+        blueMorningEnd: localLabel(blueMorningEndUtc, offset),
+        goldenMorningStart: localLabel(goldenMorningStartUtc, offset),
+        goldenMorningEnd: localLabel(goldenMorningEndUtc, offset),
+        goldenEveningStart: localLabel(goldenEveningStartUtc, offset),
+        goldenEveningEnd: localLabel(goldenEveningEndUtc, offset),
+        blueEveningStart: localLabel(blueEveningStartUtc, offset),
+        blueEveningEnd: localLabel(blueEveningEndUtc, offset),
         calibrationOffsetMinutes: offset,
         sunriseAnchor: clockLabelFromMinute(providerSunriseMinute)
     };

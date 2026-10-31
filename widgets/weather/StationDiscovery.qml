@@ -9,6 +9,7 @@ import "StationNaturalEarthContext110.js" as NaturalEarthContext
 import "../../services/weather/FirmsHotspotPolicy.js" as FirmsAreaPolicy
 import "StationRadarPolicy.js" as RadarPolicy
 import "../../services/weather/HmsSmokePolicy.js" as SmokePolicy
+import "../../services/weather/SeismicPolicy.js" as SeismicPolicy
 
 // Source-first stage. All records shown come from a backend, never examples.
 // MAP owns a local Natural Earth geographic basemap plus source-driven data
@@ -22,6 +23,7 @@ Rectangle {
     property bool viewerOpen: false
     property var selectedNews: null
     property var newsMentionOverlay: null
+    property var seismicSource: null
     signal newsMapRequested(var payload)
     signal newsMapClearRequested()
     readonly property bool newsLocationMatchesSelection:
@@ -107,6 +109,8 @@ Rectangle {
     property var selectedMapEvent: null
     property var selectedMapHotspot: null
     property var selectedMapNewsMention: null
+    property var selectedMapEarthquake: null
+    property bool mapShowEarthquakes: true
     property bool mapShowCountryBorders: true
     property bool mapShowAdmin1: false
     property bool mapShowPlaces: true
@@ -122,6 +126,12 @@ Rectangle {
             && Array.isArray(newsMentionOverlay.locations)
             ? newsMentionOverlay.locations : []
         )
+    readonly property var mapEarthquakeRows:
+        mapShowEarthquakes
+        && seismicSource
+        && seismicSource.ready
+        ? MapProjection.plottable(seismicSource.events)
+        : []
     readonly property var mapPlaceRows:
         mapShowPlaces
         ? NaturalEarthContext.placesForZoom(mapZoom)
@@ -152,6 +162,8 @@ Rectangle {
         domain === "map" && selectedMapHotspot !== null
     readonly property bool newsMentionInspectorOpen:
         domain === "map" && selectedMapNewsMention !== null
+    readonly property bool earthquakeInspectorOpen:
+        domain === "map" && selectedMapEarthquake !== null
 
     readonly property var mapFilterOptions: [
         { "id": "all", "label": "ALL EVENTS", "category": "" },
@@ -236,6 +248,7 @@ Rectangle {
         selectedMapEvent = null;
         selectedMapHotspot = null;
         selectedMapNewsMention = null;
+        selectedMapEarthquake = null;
         mapFilter = id;
         resetMapView();
         discoveryScroll.contentY = 0;
@@ -352,6 +365,20 @@ Rectangle {
         }
     }
 
+    function earthquakeDepthColor(depthKm) {
+        const band = SeismicPolicy.depthBand(depthKm);
+        switch (String(band.token || "")) {
+        case "orange": return Colors.orange;
+        case "cyan": return Colors.cyan;
+        case "blue": return Colors.blue;
+        default: return Colors.white;
+        }
+    }
+
+    function closeEarthquakeInspector() {
+        selectedMapEarthquake = null;
+    }
+
     // Live MM:SS display, keeping even long provider cooldowns readable.
     function retryClock(value) {
         const seconds = Math.max(0, Math.ceil(Number(value) || 0));
@@ -400,6 +427,7 @@ Rectangle {
             if (row) {
                 selectedMapHotspot = null;
                 selectedMapNewsMention = null;
+                selectedMapEarthquake = null;
                 selectedMapEvent = row;
             }
             return;
@@ -420,6 +448,7 @@ Rectangle {
         selectedMapEvent = null;
         selectedMapHotspot = null;
         selectedMapNewsMention = null;
+        selectedMapEarthquake = null;
     }
     onNewsMentionOverlayChanged: {
         selectedMapNewsMention = null;
@@ -437,7 +466,7 @@ Rectangle {
         : domain === "news" ? "GDELT DOC // WORLD EVENT HEADLINES"
         : "RADIO BROWSER // TOP VOTED STREAMS"
     readonly property string sourceCaution:
-        domain === "map" ? "NATURAL EARTH BASEMAP + GEOGRAPHIC CONTEXT + EONET + FIRMS + MRMS + HMS SMOKE"
+        domain === "map" ? "NATURAL EARTH + EONET + USGS EARTHQUAKES + FIRMS + MRMS + HMS SMOKE"
         : domain === "news" ? "ARTICLE DISCOVERY // LOCAL FILTERS // EXACT-HEADLINE SOURCE GROUPS // NOT FUZZY STORY CLUSTERING"
         : "STATION DIRECTORY // PERSISTENT PLAYBACK NOT YET WIRED"
     readonly property var plannedSources: {
@@ -464,7 +493,17 @@ Rectangle {
                            ? "LOADED " + mapNewsMentionRows.length
                            : "READY FROM NEWS"
                 },
-                {name:"USGS // EARTHQUAKES", state:"GROUND FEED EXISTS"},
+                {
+                    name:"USGS // M2.5+ EARTHQUAKES // 24H",
+                    state: seismicSource
+                           ? (seismicSource.ready
+                              ? "LOADED " + seismicSource.events.length
+                              : seismicSource.loading
+                                ? "RECEIVING"
+                                : seismicSource.failed
+                                  ? "ERROR" : "WAITING")
+                           : "UNAVAILABLE"
+                },
                 {
                     name:"NOAA/NWS MRMS // BASE REFLECTIVITY",
                     state: radarImage.status === Image.Ready
@@ -666,7 +705,7 @@ Rectangle {
 
                 StationSectionDivider {
                     width: parent.width
-                    title: "SPATIAL PLOT // EONET + FIRMS + NEWS MENTIONS"
+                    title: "SPATIAL PLOT // USGS QUAKES + EONET + FIRMS + NEWS"
                 }
 
                 QuietText {
@@ -729,6 +768,45 @@ Rectangle {
                         text: "REFERENCE CARTOGRAPHY // DISPUTED / CLAIM LINES ARE DISTINCT // NOT A LEGAL POSITION"
                         elide: Text.ElideRight
                         font.pixelSize: 8
+                        color: Colors.orange
+                    }
+                }
+
+                Row {
+                    width: parent.width
+                    height: 30
+                    spacing: 10
+
+                    ActionButton {
+                        width: 152
+                        height: 28
+                        label: "EARTHQUAKES: "
+                               + (stationDiscovery.mapShowEarthquakes
+                                  ? "ON" : "OFF")
+                        labelPixelSize: 9
+                        accentColor: Colors.orange
+                        selected: stationDiscovery.mapShowEarthquakes
+                        onClicked:
+                            stationDiscovery.mapShowEarthquakes =
+                                !stationDiscovery.mapShowEarthquakes
+                    }
+
+                    QuietText {
+                        anchors.verticalCenter: parent.verticalCenter
+                        width: Math.max(0, parent.width - 162)
+                        text: stationDiscovery.seismicSource
+                              ? (stationDiscovery.seismicSource.ready
+                                 ? "USGS M2.5+ // "
+                                   + stationDiscovery.mapEarthquakeRows.length
+                                   + " PLOTTABLE // SIZE=MAGNITUDE // COLOR=DEPTH"
+                                 : stationDiscovery.seismicSource.loading
+                                   ? "USGS // RECEIVING"
+                                   : stationDiscovery.seismicSource.failed
+                                     ? stationDiscovery.seismicSource.errorText
+                                     : "USGS // WAITING")
+                              : "USGS // SHARED SOURCE UNAVAILABLE"
+                        elide: Text.ElideRight
+                        font.pixelSize: 9
                         color: Colors.orange
                     }
                 }
@@ -1622,6 +1700,65 @@ Rectangle {
                     }
 
                     Repeater {
+                        model: stationDiscovery.mapEarthquakeRows
+
+                        delegate: Item {
+                            required property var modelData
+                            readonly property var projected:
+                                MapProjection.project(
+                                    modelData.longitude,
+                                    modelData.latitude,
+                                    mapPlot.width,
+                                    mapPlot.height,
+                                    stationDiscovery.mapZoom,
+                                    stationDiscovery.mapCenterLon,
+                                    stationDiscovery.mapCenterLat
+                                )
+                            readonly property real quakeRadius:
+                                SeismicPolicy.magnitudeRadius(
+                                    modelData.magnitude
+                                )
+
+                            width: quakeRadius * 2 + 8
+                            height: quakeRadius * 2 + 8
+                            x: projected.x - width / 2
+                            y: projected.y - height / 2
+                            visible: projected.visible
+                            z: 2.15
+
+                            Rectangle {
+                                anchors.centerIn: parent
+                                width: parent.quakeRadius * 2
+                                height: parent.quakeRadius * 2
+                                radius: width / 2
+                                color: stationDiscovery.earthquakeDepthColor(
+                                    modelData.depthKm
+                                )
+                                opacity: 0.82
+                                border.width:
+                                    stationDiscovery.selectedMapEarthquake
+                                       === modelData ? 2 : 1
+                                border.color:
+                                    stationDiscovery.selectedMapEarthquake
+                                       === modelData
+                                    ? Colors.yellow : Colors.white
+                            }
+
+                            MouseArea {
+                                anchors.fill: parent
+                                hoverEnabled: true
+                                cursorShape: Qt.PointingHandCursor
+                                onClicked: {
+                                    stationDiscovery.selectedMapEvent = null;
+                                    stationDiscovery.selectedMapHotspot = null;
+                                    stationDiscovery.selectedMapNewsMention = null;
+                                    stationDiscovery.selectedMapEarthquake = modelData;
+                                }
+                            }
+                        }
+                    }
+
+                    Repeater {
                         model: stationDiscovery.mapPointRows
 
                         delegate: Item {
@@ -1665,8 +1802,12 @@ Rectangle {
                                 anchors.fill: parent
                                 hoverEnabled: true
                                 cursorShape: Qt.PointingHandCursor
-                                onClicked:
-                                    stationDiscovery.selectedMapEvent = modelData
+                                onClicked: {
+                                    stationDiscovery.selectedMapHotspot = null;
+                                    stationDiscovery.selectedMapNewsMention = null;
+                                    stationDiscovery.selectedMapEarthquake = null;
+                                    stationDiscovery.selectedMapEvent = modelData;
+                                }
                             }
                         }
                     }
@@ -1714,6 +1855,7 @@ Rectangle {
                                 onClicked: {
                                     stationDiscovery.selectedMapEvent = null;
                                     stationDiscovery.selectedMapHotspot = null;
+                                    stationDiscovery.selectedMapEarthquake = null;
                                     stationDiscovery.selectedMapNewsMention = modelData;
                                 }
                             }
@@ -1768,6 +1910,7 @@ Rectangle {
                                 onClicked: {
                                     stationDiscovery.selectedMapEvent = null;
                                     stationDiscovery.selectedMapNewsMention = null;
+                                    stationDiscovery.selectedMapEarthquake = null;
                                     stationDiscovery.selectedMapHotspot = modelData;
                                 }
                             }
@@ -1804,7 +1947,7 @@ Rectangle {
                         anchors.bottom: parent.bottom
                         anchors.margins: 7
                         z: 3
-                        text: "BASEMAP LOCAL // EONET DIAMONDS // FIRMS ORANGE // NEWS MAGENTA"
+                        text: "QUAKES CIRCLES // EONET DIAMONDS // FIRMS ORANGE // NEWS MAGENTA"
                         font.pixelSize: 9
                     }
                 }
@@ -2369,6 +2512,153 @@ Rectangle {
                 width: parent.width
                 text: stationDiscovery.sourceCaution
                 font.pixelSize: 11
+            }
+
+            Column {
+                width: parent.width
+                spacing: 7
+                visible: stationDiscovery.earthquakeInspectorOpen
+
+                StationSectionDivider {
+                    width: parent.width
+                    title: "EARTHQUAKE INSPECTOR // USGS"
+                }
+
+                Rectangle {
+                    width: parent.width
+                    height: 170
+                    color: Colors.dark
+                    border.width: 1
+                    border.color: stationDiscovery.selectedMapEarthquake
+                                  ? stationDiscovery.earthquakeDepthColor(
+                                        stationDiscovery.selectedMapEarthquake
+                                            .depthKm
+                                    )
+                                  : Colors.orange
+
+                    Column {
+                        anchors.fill: parent
+                        anchors.margins: 10
+                        spacing: 5
+
+                        Row {
+                            width: parent.width
+                            spacing: 10
+
+                            GohuText {
+                                width: Math.max(0, parent.width - 96)
+                                text: stationDiscovery.selectedMapEarthquake
+                                      ? "M "
+                                        + stationDiscovery.selectedMapEarthquake
+                                          .magnitude.toFixed(1)
+                                        + " // "
+                                        + stationDiscovery.selectedMapEarthquake
+                                          .place
+                                      : ""
+                                color: Colors.white
+                                elide: Text.ElideRight
+                                font.pixelSize: 15
+                            }
+
+                            ActionButton {
+                                width: 86
+                                height: 26
+                                label: "CLOSE"
+                                labelPixelSize: 10
+                                accentColor: Colors.red
+                                destructive: true
+                                onClicked:
+                                    stationDiscovery.closeEarthquakeInspector()
+                            }
+                        }
+
+                        SecondaryText {
+                            width: parent.width
+                            text: stationDiscovery.selectedMapEarthquake
+                                  ? SeismicPolicy.depthBand(
+                                        stationDiscovery.selectedMapEarthquake
+                                            .depthKm
+                                    ).label
+                                    + " // DEPTH "
+                                    + (stationDiscovery.selectedMapEarthquake
+                                       .depthKm >= 0
+                                       ? stationDiscovery.selectedMapEarthquake
+                                         .depthKm.toFixed(1) + " KM"
+                                       : "--")
+                                  : ""
+                            elide: Text.ElideRight
+                            font.pixelSize: 11
+                        }
+
+                        QuietText {
+                            width: parent.width
+                            text: stationDiscovery.selectedMapEarthquake
+                                  ? stationDiscovery.selectedMapEarthquake.utc
+                                    + " // "
+                                    + stationDiscovery.selectedMapEarthquake
+                                      .latitude.toFixed(3)
+                                    + ", "
+                                    + stationDiscovery.selectedMapEarthquake
+                                      .longitude.toFixed(3)
+                                  : ""
+                            elide: Text.ElideRight
+                            font.pixelSize: 9
+                        }
+
+                        QuietText {
+                            width: parent.width
+                            text: stationDiscovery.selectedMapEarthquake
+                                  ? "SIG "
+                                    + stationDiscovery.selectedMapEarthquake
+                                      .significance
+                                    + " // "
+                                    + (stationDiscovery.selectedMapEarthquake
+                                       .magType !== ""
+                                       ? stationDiscovery.selectedMapEarthquake
+                                         .magType.toUpperCase()
+                                       : "MAG TYPE --")
+                                    + " // STATUS "
+                                    + (stationDiscovery.selectedMapEarthquake
+                                       .status !== ""
+                                       ? stationDiscovery.selectedMapEarthquake
+                                         .status.toUpperCase()
+                                       : "--")
+                                  : ""
+                            elide: Text.ElideRight
+                            font.pixelSize: 9
+                        }
+
+                        QuietText {
+                            width: parent.width
+                            text: stationDiscovery.selectedMapEarthquake
+                                  ? "TSUNAMI FLAG // "
+                                    + (stationDiscovery.selectedMapEarthquake
+                                       .tsunami ? "YES" : "NO")
+                                    + (stationDiscovery.selectedMapEarthquake
+                                       .alert !== ""
+                                       ? " // ALERT "
+                                         + stationDiscovery
+                                           .selectedMapEarthquake.alert
+                                           .toUpperCase()
+                                       : "")
+                                  : ""
+                            elide: Text.ElideRight
+                            font.pixelSize: 9
+                            color: stationDiscovery.selectedMapEarthquake
+                                   && stationDiscovery.selectedMapEarthquake
+                                      .tsunami
+                                   ? Colors.orange : Colors.cyan
+                        }
+
+                        QuietText {
+                            width: parent.width
+                            text: "USGS OBSERVED EVENT // M2.5+ PAST DAY FEED // NOT AN EARTHQUAKE PREDICTION"
+                            elide: Text.ElideRight
+                            font.pixelSize: 9
+                            color: Colors.orange
+                        }
+                    }
+                }
             }
 
             Column {

@@ -27,6 +27,13 @@ PanelWindow {
                         : ""
     }
 
+    WeatherServices.SeismicService {
+        id: seismicService
+        active: weatherStation.menuOpen
+                && (weatherStation.currentView === "ground"
+                    || weatherStation.currentView === "map")
+    }
+
     // Shared keyboard-ownership contract. Weather stays usable with the
     // existing shell even before shell-level ownership wiring lands because
     // keyboardActive defaults true and OnDemand never traps desktop typing.
@@ -980,6 +987,7 @@ PanelWindow {
             StationGround {
                 weatherService: weatherStation.weatherService
                 nwsAlertSource: weatherStation.nwsAlertSource
+                seismicSource: seismicService
             }
         }
 
@@ -1006,6 +1014,7 @@ PanelWindow {
             StationDiscovery {
                 stationOpen: weatherStation.menuOpen
                 domain: "map"
+                seismicSource: seismicService
                 newsMentionOverlay: weatherStation.newsMapOverlay
                 onNewsMapClearRequested: {
                     weatherStation.newsMapOverlay = null;

@@ -13,6 +13,7 @@ Rectangle {
 
     property var weatherService: null
     property var nwsAlertSource: null
+    property var seismicSource: null
 
     readonly property bool nwsConfigured:
         nwsAlertSource && nwsAlertSource.configured
@@ -25,12 +26,10 @@ Rectangle {
     readonly property var officialAlerts:
         nwsAlertSource && Array.isArray(nwsAlertSource.alertList)
         ? nwsAlertSource.alertList : []
-
-    // View-scoped service: no USGS polling while GROUND is unmounted.
-    WeatherServices.SeismicService {
-        id: quakeService
-        active: ground.visible
-    }
+    readonly property var recentSeismicEvents:
+        seismicSource && seismicSource.ready
+        ? SeismicPolicy.recentRows(seismicSource.events, 3)
+        : []
 
     WeatherServices.NwpsRiverService {
         id: riverService
@@ -2972,12 +2971,16 @@ Rectangle {
                 }
 
                 QuietText {
-                    text: quakeService.failed
-                          ? "FEED ERROR // PREVIOUS EVENTS MAY BE STALE"
-                          : quakeService.loading && !quakeService.ready
-                            ? "RECEIVING"
-                            : quakeService.ready ? "LATEST PUBLISHED EVENTS"
-                              : "OFFLINE"
+                    text: !ground.seismicSource
+                          ? "OFFLINE"
+                          : ground.seismicSource.failed
+                            ? "FEED ERROR // PREVIOUS EVENTS MAY BE STALE"
+                            : ground.seismicSource.loading
+                              && !ground.seismicSource.ready
+                              ? "RECEIVING"
+                              : ground.seismicSource.ready
+                                ? "LATEST PUBLISHED EVENTS"
+                                : "OFFLINE"
                     font.pixelSize: 10
                 }
             }
@@ -2988,7 +2991,7 @@ Rectangle {
                 spacing: 10
 
                 Repeater {
-                    model: quakeService.ready ? quakeService.events : []
+                    model: ground.recentSeismicEvents
 
                     delegate: Rectangle {
                         required property var modelData
@@ -3047,11 +3050,18 @@ Rectangle {
             }
 
             QuietText {
-                visible: !quakeService.ready || quakeService.events.length === 0
-                text: quakeService.failed ? quakeService.errorText
-                      : quakeService.loading ? "LOADING USGS EVENTS"
-                      : quakeService.ready ? "NO M2.5+ EVENTS IN FEED"
-                        : "USGS DATA UNAVAILABLE"
+                visible: !ground.seismicSource
+                         || !ground.seismicSource.ready
+                         || ground.recentSeismicEvents.length === 0
+                text: !ground.seismicSource
+                      ? "USGS DATA UNAVAILABLE"
+                      : ground.seismicSource.failed
+                        ? ground.seismicSource.errorText
+                        : ground.seismicSource.loading
+                          ? "LOADING USGS EVENTS"
+                          : ground.seismicSource.ready
+                            ? "NO M2.5+ EVENTS IN FEED"
+                            : "USGS DATA UNAVAILABLE"
                 font.pixelSize: 11
             }
 

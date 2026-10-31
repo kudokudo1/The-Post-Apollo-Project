@@ -43,7 +43,7 @@ function parseFeed(root, limit) {
 
     const requested = Number(limit);
     const size = isFinite(requested) && requested > 0
-               ? Math.min(5, Math.floor(requested)) : 3;
+               ? Math.min(100, Math.floor(requested)) : 3;
     const result = [];
 
     for (let i = 0; i < root.features.length; ++i) {
@@ -66,17 +66,53 @@ function parseFeed(root, limit) {
             || Math.abs(lat) > 90 || Math.abs(lon) > 180)
             continue;
 
+        const significance = validNumber(p.sig);
+        const updated = validNumber(p.updated);
         result.push({
             id: String(feature.id || ""),
             magnitude: magnitude,
             place: String(p.place || "LOCATION UNAVAILABLE"),
             time: time,
+            updated: updated === null ? -1 : updated,
             utc: formatUtc(time),
             depthKm: depth === null ? -1 : depth,
             latitude: lat,
-            longitude: lon
+            longitude: lon,
+            significance: significance === null ? -1 : significance,
+            tsunami: Number(p.tsunami) === 1,
+            status: String(p.status || ""),
+            alert: String(p.alert || ""),
+            magType: String(p.magType || "")
         });
     }
     result.sort(function (a, b) { return b.time - a.time; });
     return result.slice(0, size);
+}
+
+
+function depthBand(depthKm) {
+    const depth = validNumber(depthKm);
+    if (depth === null || depth < 0)
+        return { id: "unknown", label: "DEPTH UNKNOWN", token: "white" };
+    if (depth < 70)
+        return { id: "shallow", label: "SHALLOW <70 KM", token: "orange" };
+    if (depth < 300)
+        return { id: "intermediate", label: "INTERMEDIATE 70–299 KM", token: "cyan" };
+    return { id: "deep", label: "DEEP ≥300 KM", token: "blue" };
+}
+
+function magnitudeRadius(magnitude) {
+    const value = validNumber(magnitude);
+    if (value === null)
+        return 4;
+    return Math.max(4, Math.min(10, 4 + (value - 2.5) * 1.45));
+}
+
+function recentRows(rows, limit) {
+    if (!Array.isArray(rows))
+        return [];
+    const requested = Number(limit);
+    const size = isFinite(requested) && requested > 0
+               ? Math.min(100, Math.floor(requested)) : 3;
+    return rows.slice(0, size);
 }

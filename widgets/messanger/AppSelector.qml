@@ -1598,49 +1598,6 @@ Rectangle {
                             appSelector.accountSelectedEntryId);
                     }
                 }
-                Text {
-                    width: parent.width
-                    text: "BROWSER SESSIONS"
-                    color: Colors.cyan
-                    font.bold: true
-                    font.pixelSize: 10
-                    wrapMode: Text.WordWrap
-                }
-                Text {
-                    width: parent.width
-                    text: appSelector.isolatedBrowserModeActive
-                          ? "ISOLATED // EACH IDENTITY HAS NEW, SEPARATE BROWSER SIGN-IN"
-                          : "LEGACY // CURRENT BROWSER ACCOUNTS ARE SHARED"
-                    color: Colors.white
-                    font.pixelSize: 9
-                    wrapMode: Text.WordWrap
-                }
-                Text {
-                    width: parent.width
-                    text: "This session only. Existing profiles stay untouched. New profiles start signed out."
-                    color: Colors.orange
-                    font.pixelSize: 9
-                    wrapMode: Text.WordWrap
-                }
-                ActionButton {
-                    width: parent.width
-                    height: 36
-                    label: appSelector.isolatedBrowserModeActive
-                           ? "USE LEGACY BROWSERS" : "USE ISOLATED BROWSERS"
-                    labelPixelSize: 9
-                    labelMinimumPixelSize: 8
-                    contentPadding: 3
-                    interactive: appSelector.isolatedBrowserToggleAllowed
-                                 && appSelector.identitySnapshot.writable
-                    onTriggered: appSelector.isolatedBrowserModeToggleRequested()
-                }
-                Text {
-                    width: parent.width
-                    text: "SETUP NOTES ONLY. A label does not connect or sign in."
-                    color: Colors.white
-                    font.pixelSize: 9
-                    wrapMode: Text.WordWrap
-                }
                 Rectangle {
                     width: parent.width
                     height: 1
@@ -1963,6 +1920,7 @@ Rectangle {
                         width: parent.width
                         height: 32
                         label: "FAMILY UP"
+                        accentColor: Colors.orange
                         labelPixelSize: 9
                         contentPadding: 3
                         interactive: appSelector.identitySnapshot.writable
@@ -1974,6 +1932,7 @@ Rectangle {
                         width: parent.width
                         height: 32
                         label: "FAMILY DOWN"
+                        accentColor: Colors.orange
                         labelPixelSize: 9
                         contentPadding: 3
                         interactive: appSelector.identitySnapshot.writable
@@ -2039,6 +1998,7 @@ Rectangle {
                         width: parent.width
                         height: 34
                         label: "RENAME"
+                        accentColor: Colors.orange
                         labelPixelSize: 9
                         contentPadding: 3
                         interactive: appSelector.identitySnapshot.writable
@@ -2126,6 +2086,10 @@ Rectangle {
                         height: 36
                         label: appSelector.familyRemovalConfirmationMatches()
                                ? "CONFIRM REMOVE" : "REMOVE FAMILY"
+                        // Destructive action remains two-step confirmed; only
+                        // the button's red identity/pressed styling changes.
+                        destructive: true
+                        accentColor: Colors.red
                         labelPixelSize: 9
                         labelMinimumPixelSize: 8
                         contentPadding: 3
@@ -2165,7 +2129,60 @@ Rectangle {
                         height: 1
                         color: Colors.cyan
                     }
-                                }
+                                } // end family editing actions
+
+                // Browser session mode is a global session setting, not an
+                // account nickname. Keep it independently accessible below
+                // the family operations in the middle settings column.
+                Rectangle {
+                    width: parent.width
+                    height: 1
+                    color: Colors.cyan
+                }
+                Text {
+                    width: parent.width
+                    text: "BROWSER SESSIONS"
+                    color: Colors.cyan
+                    font.bold: true
+                    font.pixelSize: 10
+                    wrapMode: Text.WordWrap
+                }
+                Text {
+                    width: parent.width
+                    text: appSelector.isolatedBrowserModeActive
+                          ? "ISOLATED // EACH IDENTITY HAS NEW, SEPARATE BROWSER SIGN-IN"
+                          : "LEGACY // CURRENT BROWSER ACCOUNTS ARE SHARED"
+                    color: Colors.white
+                    font.pixelSize: 9
+                    wrapMode: Text.WordWrap
+                }
+                Text {
+                    width: parent.width
+                    text: "This session only. Existing profiles stay untouched. New profiles start signed out."
+                    color: Colors.orange
+                    font.pixelSize: 9
+                    wrapMode: Text.WordWrap
+                }
+                ActionButton {
+                    width: parent.width
+                    height: 36
+                    label: appSelector.isolatedBrowserModeActive
+                           ? "USE LEGACY BROWSERS" : "USE ISOLATED BROWSERS"
+                    labelPixelSize: 9
+                    labelMinimumPixelSize: 8
+                    contentPadding: 3
+                    interactive: appSelector.isolatedBrowserToggleAllowed
+                                 && appSelector.identitySnapshot.writable
+                    onTriggered: appSelector.isolatedBrowserModeToggleRequested()
+                }
+                Text {
+                    width: parent.width
+                    text: "SETUP NOTES ONLY. A label does not connect or sign in."
+                    color: Colors.white
+                    font.pixelSize: 9
+                    wrapMode: Text.WordWrap
+                }
+
                             }
                         }
                     }
@@ -2301,6 +2318,7 @@ Rectangle {
                         width: parent.width
                         height: 32
                         label: "APP UP"
+                        accentColor: Colors.orange
                         labelPixelSize: 9
                         contentPadding: 3
                         interactive: appSelector.identitySnapshot.writable
@@ -2312,6 +2330,7 @@ Rectangle {
                         width: parent.width
                         height: 32
                         label: "APP DOWN"
+                        accentColor: Colors.orange
                         labelPixelSize: 9
                         contentPadding: 3
                         interactive: appSelector.identitySnapshot.writable

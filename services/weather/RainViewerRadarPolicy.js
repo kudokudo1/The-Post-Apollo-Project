@@ -22,7 +22,7 @@ function normalizeHistoryMinutes(value) {
 
 function safeHost(value) {
     const host = String(value || "").replace(/\/+$/, "");
-    return /^https:\/\/[a-z0-9.-]*rainviewer\.com(?::\d+)?$/i.test(host)
+    return /^https:\/\/(?:[a-z0-9-]+\.)*rainviewer\.com(?::\d+)?$/i.test(host)
            ? host : "";
 }
 

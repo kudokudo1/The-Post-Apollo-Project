@@ -918,6 +918,18 @@ Rectangle {
         }
     }
 
+    // One cursor recipe for all editable settings fields. Text color and
+    // insertion point are separate semantic channels from the orange borders.
+    // Qt Quick positions and shows this delegate only while the input owns
+    // its editing cursor.
+    Component {
+        id: settingsOrangeCaret
+        Rectangle {
+            width: 2
+            color: Colors.orange
+        }
+    }
+
     // The app rail remains an active, non-launching preview while settings
     // occupies the EXISTING contact-list and chat-feed areas of Social.
     // No second FloatingWindow or Sway geometry owner is introduced here.
@@ -1064,7 +1076,8 @@ Rectangle {
                             id: newIdentityName
                             anchors.fill: parent
                             anchors.margins: 5
-                            color: Colors.white
+                            color: Colors.magenta
+                            cursorDelegate: settingsOrangeCaret
                             font.family: "GohuFont 11 Nerd Font Mono"
                             font.pixelSize: 11
                             clip: true
@@ -1186,7 +1199,8 @@ Rectangle {
                         anchors.margins: 5
                         clip: true
                         selectByMouse: true
-                        color: Colors.white
+                        color: Colors.magenta
+                        cursorDelegate: settingsOrangeCaret
                         font.pixelSize: 11
                         maximumLength: 254
                         inputMethodHints: Qt.ImhEmailCharactersOnly
@@ -1209,7 +1223,8 @@ Rectangle {
                         anchors.margins: 5
                         clip: true
                         selectByMouse: true
-                        color: Colors.white
+                        color: Colors.magenta
+                        cursorDelegate: settingsOrangeCaret
                         font.pixelSize: 11
                         maximumLength: 24
                         inputMethodHints: Qt.ImhDialableCharactersOnly
@@ -1318,7 +1333,8 @@ Rectangle {
                             id: accountServiceSearchInput
                             anchors.fill: parent
                             anchors.margins: 5
-                            color: Colors.white
+                            color: Colors.magenta
+                            cursorDelegate: settingsOrangeCaret
                             clip: true
                             selectByMouse: true
                             font.pixelSize: 11
@@ -1326,6 +1342,7 @@ Rectangle {
                         }
                     }
                     Rectangle {
+                        id: accountAppPickerViewport
                         width: parent.width
                         height: Math.min(234, appSelector.matchingAccountServices(
                             accountServiceSearchInput.text).length * 31 + 6)
@@ -1333,7 +1350,11 @@ Rectangle {
                         border.color: Colors.cyan
 
                         Flickable {
+                            id: accountAppFlickable
                             anchors.fill: parent
+                            // Reserve a real lane for the star track so the
+                            // faded app labels cannot sit underneath it.
+                            anchors.rightMargin: 22
                             contentWidth: width
                             contentHeight: accountAppList.height + 8
                             flickableDirection: Flickable.VerticalFlick
@@ -1375,6 +1396,23 @@ Rectangle {
                                     }
                                 }
                             }
+                        }
+
+                        // The existing shared component owns pointer, wheel,
+                        // drag and keyboard navigation. It attaches to this
+                        // viewport, NOT the outer identity-pane Flickable.
+                        NeonScrollBar {
+                            flickable: accountAppFlickable
+                            geometryHost: accountAppPickerViewport
+                            geometryMode: "box"
+                            handleStyle: "star"
+                            starSceneGraphRenderer: true
+                            railColor: Colors.cyan
+                            handleColor: Colors.magenta
+                            reserveSpace: false
+                            rightInset: 2
+                            nestedScrollMode: "contain"
+                            visibilityMode: "auto"
                         }
                     }
                     Text {
@@ -1459,7 +1497,8 @@ Rectangle {
                         id: accountLabelInput
                         anchors.fill: parent
                         anchors.margins: 5
-                        color: Colors.white
+                        color: Colors.magenta
+                        cursorDelegate: settingsOrangeCaret
                         clip: true
                         selectByMouse: true
                         font.pixelSize: 11
@@ -1967,7 +2006,8 @@ Rectangle {
                             anchors.margins: 5
                             font.family: "GohuFont 11 Nerd Font Mono"
                             font.pixelSize: 11
-                            color: Colors.white
+                            color: Colors.magenta
+                            cursorDelegate: settingsOrangeCaret
                             clip: true
                             selectByMouse: true
                             maximumLength: 32
@@ -2198,7 +2238,8 @@ Rectangle {
                             anchors.margins: 5
                             font.family: "GohuFont 11 Nerd Font Mono"
                             font.pixelSize: 11
-                            color: Colors.white
+                            color: Colors.magenta
+                            cursorDelegate: settingsOrangeCaret
                             clip: true
                             selectByMouse: true
                             maximumLength: 40

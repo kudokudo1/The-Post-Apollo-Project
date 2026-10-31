@@ -139,6 +139,71 @@ class SocialAccountDetailsUiContracts(unittest.TestCase):
             self.assertNotIn(banned,QMLSTORE)
         self.assertNotIn('SocialAccountDetailsStore',HOST)
 
+    def test_marked_settings_fields_use_magenta_text_and_orange_caret(self):
+        # One cursor delegate, no duplicated cursor animation or shared
+        # TextInput replacement. The original orange input borders remain.
+        self.assertIn("id: settingsOrangeCaret", SELECTOR)
+        cursor = SELECTOR.split("id: settingsOrangeCaret", 1)[1].split(
+            "// The app rail remains", 1
+        )[0]
+        self.assertIn("Rectangle {", cursor)
+        self.assertIn("width: 2", cursor)
+        self.assertIn("color: Colors.orange", cursor)
+        fields = (
+            "newIdentityName", "accountEmailInput", "accountPhoneInput",
+            "accountServiceSearchInput", "accountLabelInput",
+            "familyNameInput", "familySearchInput",
+        )
+        for field in fields:
+            with self.subTest(field=field):
+                self.assertEqual(SELECTOR.count("id: " + field), 1)
+                body = SELECTOR.split("id: " + field, 1)[1].split("}", 1)[0]
+                self.assertIn("color: Colors.magenta", body)
+                self.assertIn("cursorDelegate: settingsOrangeCaret", body)
+                self.assertNotIn("color: Colors.white", body)
+        self.assertEqual(
+            SELECTOR.count("cursorDelegate: settingsOrangeCaret"),
+            len(fields),
+        )
+        # Existing field borders and writable form flows are unchanged.
+        self.assertIn("SocialAccountDetailsStore.saveContact(", SELECTOR)
+        self.assertIn("SocialAccountDetailsStore.addAccountName(", SELECTOR)
+
+    def test_account_picker_has_cyan_star_scrollbar_with_reserved_label_lane(self):
+        viewport = SELECTOR.split("id: accountAppPickerViewport", 1)[1].split(
+            'text: "FADED = NO NAME SAVED HERE.', 1
+        )[0]
+        self.assertIn("id: accountAppFlickable", viewport)
+        self.assertIn("anchors.rightMargin: 22", viewport)
+        self.assertIn("contentHeight: accountAppList.height + 8", viewport)
+        self.assertIn("NeonScrollBar {", viewport)
+        self.assertIn("flickable: accountAppFlickable", viewport)
+        self.assertIn("geometryHost: accountAppPickerViewport", viewport)
+        self.assertIn('geometryMode: "box"', viewport)
+        self.assertIn('handleStyle: "star"', viewport)
+        self.assertIn("starSceneGraphRenderer: true", viewport)
+        self.assertIn("railColor: Colors.cyan", viewport)
+        self.assertIn("handleColor: Colors.magenta", viewport)
+        self.assertIn('nestedScrollMode: "contain"', viewport)
+        self.assertIn('visibilityMode: "auto"', viewport)
+        self.assertIn("reserveSpace: false", viewport)
+        # Only the inner, overflowing app list gains a scroll handle. The
+        # outer identity pane's regular scrolling and app selection remain.
+        self.assertIn("contentHeight: settingsIdentityColumn.height + 24", SELECTOR)
+        self.assertIn("appSelector.selectAccountService(", viewport)
+
+    def test_browser_sign_in_section_remains_separate_and_unchanged(self):
+        settings = SELECTOR.split('text: "BROWSER SIGN-IN // MANUAL"', 1)[1]
+        for part in (
+            "appSelector.browserWindowStatusText()",
+            'label: "CHECK WINDOW"',
+            'label: "OPEN SIGN-IN WINDOW"',
+            "appSelector.browserWindowCheckRequested(",
+            "appSelector.browserOpenSignInRequested(",
+            "The provider website owns sign-in and reconnection.",
+        ):
+            self.assertIn(part, settings)
+
     def test_existing_launchers_browser_telegram_and_families_unchanged(self):
         names=re.findall(r'\bname:\s*"([^"]+)"',SELECTOR)
         self.assertEqual(len(names),32)

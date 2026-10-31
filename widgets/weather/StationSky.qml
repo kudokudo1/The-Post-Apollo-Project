@@ -120,6 +120,13 @@ Rectangle {
         longitude: sky.weatherService ? sky.weatherService.longitude : ""
     }
 
+    WeatherServices.IssPassService {
+        id: issPassService
+        active: sky.visible
+        latitude: sky.weatherService ? sky.weatherService.latitude : ""
+        longitude: sky.weatherService ? sky.weatherService.longitude : ""
+    }
+
     WeatherServices.UsnoPlanetRiseSetService {
         id: planetRiseSetService
         active: sky.visible
@@ -150,6 +157,39 @@ Rectangle {
     function skyAngleText(value) {
         const number = Number(value);
         return isFinite(number) ? number.toFixed(1) + "°" : "--";
+    }
+
+    function issUtcLabel(value) {
+        const text = String(value || "");
+        return /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/.test(text)
+            ? text.slice(5, 10) + " " + text.slice(11, 16) + "Z"
+            : "--";
+    }
+
+    function issCountdownLabel(value) {
+        const minutes = Number(value);
+        if (!isFinite(minutes) || minutes < 0)
+            return "--";
+        if (minutes < 1)
+            return "<1m";
+        if (minutes < 60)
+            return Math.round(minutes) + "m";
+        const hours = Math.floor(minutes / 60);
+        const remainder = Math.round(minutes % 60);
+        return hours + "h " + remainder + "m";
+    }
+
+    function issElevationColor(value) {
+        const degrees = Number(value);
+        if (!isFinite(degrees))
+            return Colors.white;
+        if (degrees >= 60)
+            return Colors.magenta;
+        if (degrees >= 30)
+            return Colors.orange;
+        if (degrees >= 10)
+            return Colors.cyan;
+        return Colors.blue;
     }
 
     function moonInputIssue() {
@@ -796,6 +836,209 @@ Rectangle {
             visible: sky.astronomySummary.available
             text: "WTTR.IN DAILY ASTRONOMY // DAYLIGHT DERIVED FROM PROVIDER SUNRISE + SUNSET"
             font.pixelSize: 9
+        }
+
+
+        StationSectionDivider {
+            width: parent.width
+            title: "ISS PASSES // SKYFIELD + SGP4"
+        }
+
+        Column {
+            width: parent.width
+            spacing: 7
+
+            Row {
+                width: parent.width
+                spacing: 12
+
+                GohuText {
+                    text: !issPassService.configured
+                          ? "LOCATION UNAVAILABLE"
+                          : issPassService.loading
+                            ? "PREDICTING"
+                            : issPassService.failed
+                              ? (issPassService.ready
+                                 ? "DEGRADED" : "OFFLINE")
+                              : issPassService.ready
+                                ? "RECEIVED" : "WAITING"
+                    font.pixelSize: 10
+                    color: issPassService.failed
+                           ? Colors.yellow
+                           : issPassService.ready
+                             ? Colors.cyan : Colors.orange
+                }
+
+                QuietText {
+                    width: Math.max(0, parent.width - 150)
+                    text: issPassService.ready
+                          ? issPassService.sourceName
+                            + " // ORBIT "
+                            + issPassService.orbitalSource
+                            + " // "
+                            + issPassService.passCount
+                            + " UPCOMING GEOMETRIC PASSES"
+                          : "ISS NORAD 25544 // LOCATION-SCOPED PASS PREDICTION"
+                    elide: Text.ElideRight
+                    font.pixelSize: 9
+                }
+            }
+
+            QuietText {
+                visible: issPassService.failed
+                width: parent.width
+                text: issPassService.errorText
+                font.pixelSize: 9
+                color: Colors.yellow
+            }
+
+            Row {
+                width: parent.width
+                spacing: 12
+                visible: issPassService.ready && !!issPassService.orbit
+
+                QuietText {
+                    width: 260
+                    text: issPassService.orbit
+                          ? "OBJECT // "
+                            + String(issPassService.orbit.objectName || "ISS")
+                            + " // NORAD "
+                            + String(issPassService.orbit.noradId || "25544")
+                          : "OBJECT // ISS"
+                    elide: Text.ElideRight
+                    font.pixelSize: 9
+                }
+
+                QuietText {
+                    width: 300
+                    text: issPassService.orbit
+                          ? "ELEMENT EPOCH // "
+                            + String(
+                                  issPassService.orbit.elementEpochUtc || "--"
+                              )
+                          : "ELEMENT EPOCH // --"
+                    elide: Text.ElideRight
+                    font.pixelSize: 9
+                }
+
+                QuietText {
+                    width: Math.max(0, parent.width - 584)
+                    text: issPassService.predictionModel
+                    horizontalAlignment: Text.AlignRight
+                    elide: Text.ElideRight
+                    font.pixelSize: 9
+                }
+            }
+
+            Row {
+                id: issPassRow
+                width: parent.width
+                spacing: 7
+                visible: issPassService.ready
+
+                Repeater {
+                    model: issPassService.passes.slice(0, 4)
+
+                    delegate: Rectangle {
+                        required property var modelData
+                        width: Math.max(
+                            0,
+                            (issPassRow.width - 3 * issPassRow.spacing) / 4
+                        )
+                        height: 132
+                        color: Colors.dark
+                        border.width: 1
+                        border.color: sky.issElevationColor(
+                            modelData.culminate.degrees
+                        )
+
+                        Column {
+                            anchors.fill: parent
+                            anchors.margins: 7
+                            spacing: 4
+
+                            GohuText {
+                                width: parent.width
+                                text: "IN "
+                                      + sky.issCountdownLabel(
+                                            modelData.minutesUntilRise
+                                        )
+                                font.pixelSize: 11
+                                color: sky.issElevationColor(
+                                    modelData.culminate.degrees
+                                )
+                            }
+
+                            QuietText {
+                                width: parent.width
+                                text: "RISE // "
+                                      + sky.issUtcLabel(
+                                            modelData.rise.time
+                                        )
+                                      + " // "
+                                      + modelData.rise.direction
+                                elide: Text.ElideRight
+                                font.pixelSize: 8
+                            }
+
+                            QuietText {
+                                width: parent.width
+                                text: "PEAK // "
+                                      + sky.issUtcLabel(
+                                            modelData.culminate.time
+                                        )
+                                elide: Text.ElideRight
+                                font.pixelSize: 8
+                            }
+
+                            GohuText {
+                                width: parent.width
+                                text: Number(
+                                          modelData.culminate.degrees
+                                      ).toFixed(0)
+                                      + "° // "
+                                      + modelData.culminate.direction
+                                font.pixelSize: 10
+                                color: sky.issElevationColor(
+                                    modelData.culminate.degrees
+                                )
+                            }
+
+                            QuietText {
+                                width: parent.width
+                                text: "SET // "
+                                      + sky.issUtcLabel(
+                                            modelData.set.time
+                                        )
+                                      + " // "
+                                      + modelData.set.direction
+                                elide: Text.ElideRight
+                                font.pixelSize: 8
+                            }
+
+                            QuietText {
+                                width: parent.width
+                                text: "DURATION // "
+                                      + modelData.durationLabel
+                                font.pixelSize: 8
+                            }
+                        }
+                    }
+                }
+            }
+
+            QuietText {
+                width: parent.width
+                text: "GEOMETRIC HORIZON PASSES ONLY // PEAK ELEVATION + AZIMUTH COME FROM THE PASS PREDICTOR // CELESTRAK ELEMENT EPOCH SHOWN FOR PROVENANCE"
+                font.pixelSize: 9
+            }
+
+            QuietText {
+                width: parent.width
+                text: "OPTICAL VISIBILITY NOT EVALUATED // SUNLIGHT, EARTH SHADOW, CLOUDS, SKY BRIGHTNESS + LOCAL OBSTRUCTIONS CAN MAKE A GEOMETRIC PASS INVISIBLE"
+                font.pixelSize: 9
+                color: Colors.orange
+            }
         }
 
         StationSectionDivider {

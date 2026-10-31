@@ -225,10 +225,11 @@ class SettingsContactChatWorkspaceContracts(unittest.TestCase):
             'label: appSelector.editingFamilies ? "CLOSE EDIT" : "EDIT FAMILIES"',
             1,
         )[1].split("onTriggered:", 1)[0]
-        self.assertIn(
-            "accentColor: appSelector.editingFamilies ? Colors.red : Colors.cyan",
-            edit,
-        )
+        # An open family editor uses ActionButton's normal selected
+        # appearance, not a warning/destructive red state.
+        self.assertIn("accentColor: Colors.cyan", edit)
+        self.assertIn("selected: appSelector.editingFamilies", edit)
+        self.assertNotIn("Colors.red", edit)
         self.assertNotIn("destructive: true", edit)
 
         browser = family.split(
@@ -250,7 +251,8 @@ class SettingsContactChatWorkspaceContracts(unittest.TestCase):
         )[0]
         self.assertIn("? \"SHOW APP\" : \"HIDE APP\"", hide)
         self.assertIn("!appSelector.selectedAppOption().hidden", hide)
-        self.assertIn("? Colors.red : Colors.cyan", hide)
+        self.assertIn("? Colors.white : Colors.cyan", hide)
+        self.assertNotIn("Colors.red", hide)
         self.assertNotIn("destructive: true", hide)
         self.assertIn("appSelector.selectedAppOption().familyId", hide)
 
@@ -316,6 +318,40 @@ class SettingsContactChatWorkspaceContracts(unittest.TestCase):
         self.assertIn("appSelector.browserWindowActionAllowed", signin)
         self.assertIn("appSelector.browserAccountServiceSupported(", signin)
         self.assertIn("appSelector.browserOpenSignInRequested(", identity)
+
+    def test_close_edit_uses_shared_open_state_and_hide_app_uses_white(self):
+        family = SELECTOR.split("id: settingsFamilyPane", 1)[1].split(
+            "id: settingsAppPane", 1
+        )[0]
+        app = SELECTOR.split("id: settingsAppPane", 1)[1].split(
+            "// This entry point is always visible", 1
+        )[0]
+        edit = family.split(
+            'label: appSelector.editingFamilies ? "CLOSE EDIT" : "EDIT FAMILIES"',
+            1
+        )[1].split("onTriggered:", 1)[0]
+        self.assertIn("selected: appSelector.editingFamilies", edit)
+        self.assertIn("accentColor: Colors.cyan", edit)
+        self.assertIn("interactive: appSelector.identitySnapshot.writable", edit)
+        self.assertNotIn("destructive: true", edit)
+        self.assertIn("appSelector.editingFamilies = !appSelector.editingFamilies;", family)
+        # ActionButton owns the selected yellow fill / magenta label + glow
+        # palette, so no custom local hover/press behavior is necessary.
+        action = (ROOT / "components/ActionButton.qml").read_text()
+        self.assertIn("property color selectedFillColor: Colors.yellow", action)
+        self.assertIn("property color selectedForegroundColor: Colors.magenta", action)
+        self.assertIn("property color selectedBorderColor: Colors.magenta", action)
+        self.assertIn("property color selectedContentGlowColor: Colors.magenta", action)
+
+        hide = app.split("label: appSelector.selectedAppOption()", 1)[1].split(
+            "onTriggered:", 1
+        )[0]
+        self.assertIn("? Colors.white : Colors.cyan", hide)
+        self.assertNotIn("Colors.red", hide)
+        self.assertNotIn("destructive: true", hide)
+        self.assertIn("appSelector.selectedAppOption().familyId", hide)
+        self.assertIn("SocialIdentityStore.setAppHidden(", app)
+        self.assertIn("app.id, !app.hidden", app)
 
     def test_input_mask_is_full_only_during_settings_and_restores(self):
         mask = HOST.split("id: socialWindow", 1)[1].split(

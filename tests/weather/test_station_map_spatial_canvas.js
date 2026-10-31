@@ -16,7 +16,7 @@ vm.runInNewContext(
     ctx
 );
 
-for (const fn of ["clampView","project","unproject","visibleBounds","pan","zoomAt","plottable"])
+for (const fn of ["clampView","project","unproject","visibleBounds","pan","zoomAt","fitRows","plottable"])
     assert.equal(typeof ctx[fn], "function", fn);
 
 let view = ctx.clampView(1, 90, 40);
@@ -84,13 +84,26 @@ const plotted = Array.from(ctx.plottable(rows));
 assert.deepEqual(plotted.map(x => x.id), ["a","d"]);
 assert.deepEqual(Array.from(ctx.plottable(null)), []);
 
+let fitted = ctx.fitRows([
+    {latitude:17.997, longitude:-76.793},
+    {latitude:18.25, longitude:-77.5}
+], 1.35);
+assert.ok(fitted.zoom > 1);
+assert.ok(fitted.centerLon < -76.7 && fitted.centerLon > -77.6);
+assert.ok(fitted.centerLat > 17.9 && fitted.centerLat < 18.3);
+
+fitted = ctx.fitRows([{latitude:38.9, longitude:-77.0}], 1.35);
+assert.equal(fitted.zoom, 4);
+assert.ok(Math.abs(fitted.centerLon + 77.0) < 1e-9);
+assert.ok(Math.abs(fitted.centerLat - 38.9) < 1e-9);
+
 const ui = read("widgets/weather/StationDiscovery.qml");
 assert.match(ui, /StationMapProjectionPolicy\.js" as MapProjection/);
 assert.match(ui, /property real mapZoom: 1/);
 assert.match(ui, /property real mapCenterLon: 0/);
 assert.match(ui, /property real mapCenterLat: 0/);
 assert.match(ui, /MapProjection\.plottable\(source \? source\.rows : \[\]\)/);
-assert.match(ui, /title: "SPATIAL PLOT \/\/ EONET \+ FIRMS POINTS"/);
+assert.match(ui, /title: "SPATIAL PLOT \/\/ EONET \+ FIRMS \+ NEWS MENTIONS"/);
 assert.match(ui, /id: mapPlot/);
 assert.match(ui, /height: 270/);
 assert.match(ui, /id: mapPanArea/);
@@ -103,8 +116,14 @@ assert.match(ui, /model: stationDiscovery\.mapPointRows/);
 assert.match(ui, /MapProjection\.project\(\s*modelData\.longitude,\s*modelData\.latitude/);
 assert.match(ui, /stationDiscovery\.selectedMapEvent = modelData/);
 assert.match(ui, /LAT\/LON GRID \/\/ RADAR \+ SMOKE ARE DATA LAYERS, NOT BASEMAP/);
-assert.match(ui, /EONET \+ FIRMS POINTS \/\/ POLYGONS LISTED BELOW/);
+assert.match(ui, /EONET DIAMONDS \/\/ FIRMS ORANGE \/\/ NEWS MAGENTA/);
 assert.match(ui, /EONET POINT CANVAS \/\/ PAN \+ ZOOM/);
+assert.match(ui, /GDELT NEWS MENTION POINTS/);
+assert.match(ui, /model: stationDiscovery\.mapNewsMentionRows/);
+assert.match(ui, /stationDiscovery\.selectedMapNewsMention = modelData/);
+assert.match(ui, /label: "FOCUS NEWS"/);
+assert.match(ui, /label: "CLEAR NEWS"/);
+assert.match(ui, /NEWS MENTION INSPECTOR \/\/ GDELT GKG/);
 assert.match(ui, /BASEMAP \/ OTHER POLYGON LAYERS", state:"NOT WIRED"/);
 
 const policySource = read("widgets/weather/StationMapProjectionPolicy.js");

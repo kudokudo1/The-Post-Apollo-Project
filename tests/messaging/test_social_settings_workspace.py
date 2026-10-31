@@ -139,6 +139,71 @@ class SettingsContactChatWorkspaceContracts(unittest.TestCase):
         self.assertIn("appSelector.selectedAppNeedsMove()", app)
         self.assertIn("SocialIdentityStore.reorderApp(", app)
 
+    def test_operator_marked_settings_button_accents(self):
+        # Only the seven screenshot-marked actions change. The existing
+        # ActionButton supplies matching idle text, border and glow from
+        # accentColor without altering handlers or storage permissions.
+        identity = SELECTOR.split("id: settingsIdentityPane", 1)[1].split(
+            "id: settingsEditorPane", 1
+        )[0]
+        family = SELECTOR.split("id: settingsFamilyPane", 1)[1].split(
+            "id: settingsAppPane", 1
+        )[0]
+        app = SELECTOR.split("id: settingsAppPane", 1)[1].split(
+            "// This entry point is always visible", 1
+        )[0]
+
+        for label, accent in (
+            ('appSelector.creatingIdentity ? "CANCEL NEW" : "+ NEW ID"',
+             "Colors.orange"),
+            ('"SAVE CONTACT"', "Colors.green"),
+            ('"RELOAD DETAILS"', "Colors.orange"),
+        ):
+            with self.subTest(label=label):
+                button = identity.split("label: " + label, 1)[1].split(
+                    "onTriggered:", 1
+                )[0]
+                self.assertIn("accentColor: " + accent, button)
+
+        edit = family.split(
+            'label: appSelector.editingFamilies ? "CLOSE EDIT" : "EDIT FAMILIES"',
+            1,
+        )[1].split("onTriggered:", 1)[0]
+        self.assertIn(
+            "accentColor: appSelector.editingFamilies ? Colors.red : Colors.cyan",
+            edit,
+        )
+        self.assertNotIn("destructive: true", edit)
+
+        browser = family.split(
+            '"USE LEGACY BROWSERS" : "USE ISOLATED BROWSERS"', 1
+        )[1].split("onTriggered:", 1)[0]
+        self.assertIn("accentColor: Colors.magenta", browser)
+        self.assertIn(
+            "appSelector.isolatedBrowserToggleAllowed", browser,
+        )
+
+        move = app.split('label: "MOVE HERE"', 1)[1].split(
+            "onTriggered:", 1
+        )[0]
+        self.assertIn("accentColor: Colors.orange", move)
+        self.assertIn("appSelector.selectedAppNeedsMove()", move)
+
+        hide = app.split('label: appSelector.selectedAppOption()', 1)[1].split(
+            "onTriggered:", 1
+        )[0]
+        self.assertIn("? \"SHOW APP\" : \"HIDE APP\"", hide)
+        self.assertIn("!appSelector.selectedAppOption().hidden", hide)
+        self.assertIn("? Colors.red : Colors.cyan", hide)
+        self.assertNotIn("destructive: true", hide)
+        self.assertIn("appSelector.selectedAppOption().familyId", hide)
+
+        # The actions still reach their original, guarded operations.
+        self.assertIn("SocialAccountDetailsStore.saveContact(", identity)
+        self.assertIn("SocialAccountDetailsStore.refresh()", identity)
+        self.assertIn("SocialIdentityStore.moveAppToFamily(", app)
+        self.assertIn("SocialIdentityStore.setAppHidden(", app)
+
     def test_input_mask_is_full_only_during_settings_and_restores(self):
         mask = HOST.split("id: socialWindow", 1)[1].split(
             "// GEOMETRY HELPERS", 1

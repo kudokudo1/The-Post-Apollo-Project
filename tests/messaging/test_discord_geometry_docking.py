@@ -55,8 +55,9 @@ class DiscordDockingTests(TestCase):
             'Quickshell.execDetached(["qs", "ipc", "call", "messaging", "openDiscordFromTray"])',
             tray,
         )
-        self.assertIn("trayDock.activateTrayItem(trayButton.modelData);", tray)
-        self.assertIn("item.activate();", tray)
+        self.assertIn("trayDock.isDiscordTrayItem(trayButton.modelData)", tray)
+        self.assertIn("trayDock.openDiscordFromTray();", tray)
+        self.assertIn("trayButton.modelData.activate();", tray)
         self.assertIn("function openDiscordFromTray(): void", social)
         self.assertIn("function openDiscordFromTray() {", social)
         self.assertIn("messagingWindow.activateApp(1);", social)

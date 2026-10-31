@@ -20,6 +20,7 @@ Rectangle {
     property string locationSemantics: ""
     signal backRequested()
     signal locateRequested()
+    signal showOnMapRequested()
 
     readonly property string articleUrl:
         selectedRecord ? ViewerPolicy.safeArticleUrl(selectedRecord.url) : ""
@@ -127,12 +128,26 @@ Rectangle {
                 onClicked: stationViewer.locateRequested()
             }
 
+            ActionButton {
+                width: 142
+                height: 34
+                label: "SHOW ON MAP"
+                labelPixelSize: 10
+                accentColor: Colors.magenta
+                available: stationViewer.locationReady
+                           && stationViewer.locationRows.length > 0
+                onClicked: stationViewer.showOnMapRequested()
+            }
+
             QuietText {
                 anchors.verticalCenter: parent.verticalCenter
-                width: Math.max(90, parent.width - 340)
+                width: Math.max(90, parent.width - 492)
                 font.pixelSize: 10
                 elide: Text.ElideRight
-                text: "GKG LOOKUP IS MANUAL // ARTICLE URL + SEENDATE JOIN"
+                text: stationViewer.locationReady
+                      && stationViewer.locationRows.length > 0
+                      ? "TRANSFER VERIFIED GKG MENTIONS TO MAP"
+                      : "GKG LOOKUP IS MANUAL // ARTICLE URL + SEENDATE JOIN"
             }
         }
 

@@ -18,7 +18,7 @@ vm.runInNewContext(
 
 for (const fn of [
     "distanceKm", "boundedBox", "categoryInfo",
-    "normalizeGauge", "nearestGauge", "readingText"
+    "normalizeGauge", "nearestGauges", "nearestGauge", "readingText"
 ])
     assert.equal(typeof ctx[fn], "function", fn);
 
@@ -114,6 +114,16 @@ const response = {
 gauge = ctx.nearestGauge(response, 38.9, -77.0);
 assert.equal(gauge.lid, "TEST1");
 
+const nearby = ctx.nearestGauges(response, 38.9, -77.0, 3);
+assert.equal(nearby.length, 3);
+assert.equal(nearby[0].lid, "TEST1");
+assert.equal(nearby[1].lid, "TEST2");
+assert.equal(nearby[2].lid, "FAR01");
+assert.ok(nearby[0].distanceKm <= nearby[1].distanceKm);
+assert.ok(nearby[1].distanceKm <= nearby[2].distanceKm);
+assert.equal(ctx.nearestGauges({gauges:[]}, 38.9, -77, 4).length, 0);
+assert.throws(() => ctx.nearestGauges({}, 38.9, -77, 4));
+
 assert.equal(
     ctx.nearestGauge({gauges:[]}, 38.9, -77.0),
     null
@@ -139,7 +149,9 @@ assert.match(service, /bbox\.xmax=/);
 assert.match(service, /bbox\.ymax=/);
 assert.match(service, /srid=EPSG_4326/);
 assert.match(service, /RiverPolicy\.boundedBox\(latitude, longitude, 0\.6\)/);
-assert.match(service, /RiverPolicy\.nearestGauge/);
+assert.match(service, /property var nearbyGauges: \[\]/);
+assert.match(service, /RiverPolicy\.nearestGauges/);
+assert.match(service, /nearbyGauges = rows/);
 assert.match(service, /interval: 900000/);
 assert.match(service, /running: river\.active && river\.configured/);
 assert.match(service, /Post-Apollo-WeatherStation\/0\.4/);
@@ -161,6 +173,10 @@ assert.match(ground, /FORECAST \/\/ PRIMARY/);
 assert.match(ground, /riverService\.gauge\s*\.observedCategory\.label/);
 assert.match(ground, /riverService\.gauge\s*\.forecastCategory\.label/);
 assert.match(ground, /KM FROM WEATHER FIX/);
+assert.match(ground, /title: "NEARBY COMPARE \/\/ SAME NWPS SNAPSHOT"/);
+assert.match(ground, /riverService\.nearbyGauges/);
+assert.match(ground, /PROXIMITY COMPARISON ONLY/);
+assert.match(ground, /DIFFERENT RIVERS \/ TRIBUTARIES MAY NOT BE HYDROLOGICALLY COMPARABLE/);
 assert.match(ground, /INFORMATIONAL ONLY/);
 assert.match(ground, /DOES NOT CHANGE THE EXPLICIT NWS ALERT TARGET/);
 assert.match(ground, /STAGE IS RELATIVE TO THE GAUGE DATUM/);

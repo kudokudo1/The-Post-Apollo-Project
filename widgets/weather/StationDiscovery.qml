@@ -1262,8 +1262,7 @@ Rectangle {
                                 border.width: 2
                                 border.color:
                                     stationDiscovery.selectedMapNewsMention
-                                    && stationDiscovery.selectedMapNewsMention.featureId
-                                       === modelData.featureId
+                                       === modelData
                                     ? Colors.yellow : Colors.white
                             }
 

@@ -1,0 +1,48 @@
+name: TASKS M11z synthetic source backup and code-only rollback
+
+on:
+  pull_request:
+    paths:
+      - 'tests/tasks/fixtures/TaskSyntheticBackupRollbackM11z.py'
+      - 'tests/tasks/test_task_synthetic_backup_rollback_m11z.py'
+      - 'docs/tasks-synthetic-backup-code-rollback-m11z.md'
+      - '.github/workflows/tasks-synthetic-backup-rollback-m11z.yml'
+      - 'services/projects/TaskJsonGateCandidateM11l.py'
+      - 'services/hub/ApolloHubTodoStore.qml'
+      - 'shell.qml'
+  push:
+    branches: [main]
+    paths:
+      - 'tests/tasks/fixtures/TaskSyntheticBackupRollbackM11z.py'
+      - 'tests/tasks/test_task_synthetic_backup_rollback_m11z.py'
+      - 'docs/tasks-synthetic-backup-code-rollback-m11z.md'
+      - '.github/workflows/tasks-synthetic-backup-rollback-m11z.yml'
+      - 'services/projects/TaskJsonGateCandidateM11l.py'
+      - 'services/hub/ApolloHubTodoStore.qml'
+      - 'shell.qml'
+
+permissions:
+  contents: read
+
+jobs:
+  synthetic-backup-code-rollback:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: M11z synthetic source, backup and code-only rollback regressions
+        run: python3 tests/tasks/test_task_synthetic_backup_rollback_m11z.py
+      - name: M11y signed synthetic release trust anchor
+        run: node --test tests/tasks/test_task_signed_release_verifier_m11y.cjs
+      - name: M11x production host architecture and UI boundaries
+        run: python3 tests/tasks/test_task_production_architecture_m11x.py
+      - name: M11t nine production gates remain open
+        run: python3 tests/tasks/test_task_production_trust_contract_m11t.py
+      - name: M11d sole production JSON writer inventory
+        run: python3 tests/tasks/test_task_writer_gate_inventory_m11d.py

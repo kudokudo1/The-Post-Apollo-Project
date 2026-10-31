@@ -22,6 +22,7 @@ Rectangle {
     property string newsTopic: "all"
     property string newsSourceQuery: ""
     property string newsLanguageQuery: ""
+    property string newsSourceRegion: ""
     property int newsMaxAgeHours: 0
     readonly property var newsTopicOptions: [
         { "id": "all", "label": "ALL" },
@@ -38,6 +39,37 @@ Rectangle {
         { "hours": 12, "label": "12H" },
         { "hours": 24, "label": "24H" }
     ]
+    readonly property var newsRegionBaseRows:
+        domain === "news"
+        ? DiscoveryPolicy.filterNewsRows(
+              source && Array.isArray(source.rows) ? source.rows : [],
+              newsTopic,
+              newsSourceQuery,
+              newsLanguageQuery,
+              newsMaxAgeHours,
+              source ? source.sourceClockMs : 0,
+              ""
+          ) : []
+    readonly property var newsSourceRegionGroups:
+        DiscoveryPolicy.newsSourceRegionGroups(newsRegionBaseRows)
+    readonly property var newsRegionOptions: {
+        const options = [{
+            "id": "",
+            "label": "ALL SOURCES",
+            "articles": newsRegionBaseRows.length,
+            "publishers": 0
+        }];
+        const groups = newsSourceRegionGroups.slice(0, 5);
+        for (let i = 0; i < groups.length; i++) {
+            options.push({
+                "id": groups[i].country,
+                "label": groups[i].country.toUpperCase(),
+                "articles": groups[i].articles,
+                "publishers": groups[i].publishers
+            });
+        }
+        return options;
+    }
     readonly property var visibleRows:
         domain === "news"
         ? DiscoveryPolicy.filterNewsRows(
@@ -46,7 +78,8 @@ Rectangle {
               newsSourceQuery,
               newsLanguageQuery,
               newsMaxAgeHours,
-              source ? source.sourceClockMs : 0
+              source ? source.sourceClockMs : 0,
+              newsSourceRegion
           )
         : (source && Array.isArray(source.rows) ? source.rows : [])
     readonly property var newsVisibleSummary:
@@ -130,6 +163,14 @@ Rectangle {
         if (domain !== "news" || newsMaxAgeHours === next)
             return;
         newsMaxAgeHours = next;
+        discoveryScroll.contentY = 0;
+    }
+
+    function selectNewsRegion(id) {
+        const next = String(id || "");
+        if (domain !== "news" || newsSourceRegion === next)
+            return;
+        newsSourceRegion = next;
         discoveryScroll.contentY = 0;
     }
 
@@ -329,7 +370,8 @@ Rectangle {
                 {name:"PUBLISHER / SOURCE COUNTRY FILTER", state:"CONNECTED"},
                 {name:"LANGUAGE + TIME WINDOW FILTERS", state:"CONNECTED"},
                 {name:"EXACT-HEADLINE SOURCE GROUPS", state:"CONNECTED"},
-                {name:"REGION GROUPING", state:"NOT WIRED"},
+                {name:"SOURCE-COUNTRY REGION GROUPS", state:"CONNECTED"},
+                {name:"EVENT / MENTIONED-LOCATION LINKING", state:"NOT WIRED"},
                 {name:"LIVE NEWS / VIDEO", state:"NOT WIRED"},
                 {name:"SEMANTIC STORY CLUSTERS / DOSSIERS", state:"NOT WIRED"}
             ];
@@ -1193,6 +1235,10 @@ Rectangle {
                             + " // LOCAL FILTER"
                             + (stationDiscovery.newsSourceQuery !== ""
                                ? " // SOURCE MATCH" : "")
+                            + (stationDiscovery.newsSourceRegion !== ""
+                               ? " // REGION "
+                                 + stationDiscovery.newsSourceRegion.toUpperCase()
+                               : "")
                           : "LOCAL FILTER // WAITING FOR HEADLINES"
                     elide: Text.ElideRight
                     font.pixelSize: 9
@@ -1389,6 +1435,57 @@ Rectangle {
                           + " COUNTRIES // "
                           + stationDiscovery.newsVisibleSummary.languages
                           + " LANGUAGES"
+                    elide: Text.ElideRight
+                    font.pixelSize: 9
+                }
+            }
+
+            Row {
+                id: newsRegionRail
+                width: parent.width
+                height: stationDiscovery.domain === "news" ? 42 : 0
+                visible: stationDiscovery.domain === "news"
+                spacing: 7
+
+                Repeater {
+                    model: stationDiscovery.newsRegionOptions
+
+                    delegate: ModeButton {
+                        required property var modelData
+                        width: modelData.id === "" ? 112 : 124
+                        height: 32
+                        textOnly: true
+                        horizontalContent: true
+                        bordered: false
+                        selected:
+                            stationDiscovery.newsSourceRegion
+                            === modelData.id
+                        labelText: modelData.label
+                        labelFontSize: 9
+                        idlePrimaryColor: Colors.cyan
+                        selectedPrimaryColor: Colors.magenta
+                        perimeterGlowColor: Colors.orange
+                        onTriggered:
+                            stationDiscovery.selectNewsRegion(
+                                modelData.id
+                            )
+                    }
+                }
+
+                QuietText {
+                    anchors.verticalCenter: parent.verticalCenter
+                    width: Math.max(
+                        0,
+                        parent.width
+                        - stationDiscovery.newsRegionOptions.length * 131
+                    )
+                    text: stationDiscovery.newsSourceRegion === ""
+                          ? "SOURCE COUNTRY GROUPS // TOP BATCH COUNTRIES"
+                          : "SOURCE REGION // "
+                            + stationDiscovery.newsSourceRegion.toUpperCase()
+                            + " // "
+                            + stationDiscovery.visibleRows.length
+                            + " ARTICLES"
                     elide: Text.ElideRight
                     font.pixelSize: 9
                 }

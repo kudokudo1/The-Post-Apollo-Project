@@ -140,7 +140,8 @@ assert module.clock_label("23:59") == "11:59 PM"
 assert module.clock_label("24:00") == "--"
 
 source = HELPER.read_text(encoding="utf-8")
-assert "https://" + module.HOST + "/calculated/mrst" in source
+assert 'HOST = "aa.usno.navy.mil"' in source
+assert '"/calculated/mrst"' in source
 assert "MAX_BYTES = 768 * 1024" in source
 assert "UsnoOnlyRedirects" in source
 assert "Post-Apollo-WeatherStation/0.9" in source

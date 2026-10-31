@@ -102,8 +102,8 @@ assert process_telemetry.count("SYNTAGMA_COMPLETION_PROBE // service=process-tel
 assert 'count >= 2048 || seq % 16 === 1' in process_telemetry
 assert 'trace.sampled || elapsedMs >= 25' in process_telemetry
 assert process_telemetry.count("onStreamFinished: {") == 6
-assert len(re.findall(r"(?m)^ {16}\\} finally \\{", process_telemetry)) == 6
-assert len(re.findall(r"(?m)^ {20}\\} finally \\{", process_telemetry)) == 3
+assert len(re.findall(r"(?m)^ {16}\} finally \{", process_telemetry)) == 6
+assert len(re.findall(r"(?m)^ {20}\} finally \{", process_telemetry)) == 3
 assert process_telemetry.count("                const completionTrace = processTelemetry.beginCompletionProbe(") == 6
 assert process_telemetry.count("                    processTelemetry.endCompletionProbe(") == 6
 assert "const lines = String(output || \"\").split(\"\\n\");" in process_telemetry

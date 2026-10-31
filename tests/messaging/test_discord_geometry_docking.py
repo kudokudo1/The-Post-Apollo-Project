@@ -42,25 +42,51 @@ class DiscordDockingTests(TestCase):
     def test_discord_tray_activation_routes_to_social_not_native_vesktop(self):
         tray = (ROOT / "modules/Tray.qml").read_text(encoding="utf-8")
         social = SOCIAL.read_text(encoding="utf-8")
+        bridge = (ROOT / "services/social/SocialTrayBridge.qml").read_text(
+            encoding="utf-8"
+        )
+        qmldir = (ROOT / "services/social/qmldir").read_text(encoding="utf-8")
 
-        # The freedesktop tray's native activation restores an independent
-        # Electron desktop window. Exact Vesktop/Discord identification enters
-        # the already-existing Social IPC target instead; other icons remain
-        # untouched. shell.qml is not part of this change.
+        # Tray and Social are already in one Quickshell instance. A detached
+        # "qs ipc call" may select the wrong instance or fail silently and
+        # must not be involved in handling the local icon click.
+        self.assertIn("pragma Singleton", bridge)
+        self.assertIn("Singleton {", bridge)
+        self.assertIn("signal discordActivationRequested()", bridge)
+        self.assertIn("function requestDiscordActivation()", bridge)
+        self.assertIn("discordActivationRequested();", bridge)
+        self.assertIn(
+            "singleton SocialTrayBridge 1.0 SocialTrayBridge.qml", qmldir
+        )
+        self.assertIn("import qs.services.social", tray)
+        self.assertIn("import qs.services.social", social)
         self.assertIn("function isDiscordTrayItem(item)", tray)
         self.assertIn('id === "dev.vencord.vesktop"', tray)
         self.assertIn('title === "vesktop"', tray)
         self.assertIn('title === "discord"', tray)
-        self.assertIn(
-            'Quickshell.execDetached(["qs", "ipc", "call", "messaging", "openDiscordFromTray"])',
-            tray,
-        )
+        self.assertIn('tooltip === "vesktop"', tray)
+        self.assertIn("SocialTrayBridge.requestDiscordActivation();", tray)
+        self.assertNotIn('["qs", "ipc", "call", "messaging"', tray)
         self.assertIn("trayDock.isDiscordTrayItem(trayButton.modelData)", tray)
         self.assertIn("trayDock.openDiscordFromTray();", tray)
+        # Unrelated applications keep their own native tray activation.
         self.assertIn("trayButton.modelData.activate();", tray)
-        self.assertIn("function openDiscordFromTray(): void", social)
-        self.assertIn("function openDiscordFromTray() {", social)
-        self.assertIn("messagingWindow.activateApp(1);", social)
+        self.assertIn("target: SocialTrayBridge", social)
+        self.assertIn("function onDiscordActivationRequested()", social)
+        self.assertIn("messagingWindow.openDiscordFromTray();", social)
+
+    def test_tray_open_uses_existing_social_menu_lifecycle(self):
+        src = SOCIAL.read_text(encoding="utf-8")
+        opening = src.split("    function openDiscordFromTray() {", 1)[1].split(
+            "    function showDiscord() {", 1
+        )[0]
+        # Opening a hidden menu must not invoke a native Vesktop tray action,
+        # and a visible menu switches to Discord without closing the widget.
+        self.assertIn("if (!menuOpen)", opening)
+        self.assertIn("menuOpen = true;", opening)
+        self.assertIn("Qt.callLater(function ()", opening)
+        self.assertIn("messagingWindow.activateApp(1);", opening)
+        self.assertIn("function openDiscordFromTray(): void", src)
 
     def test_discord_launch_waits_for_verified_social_mapping(self):
         src = SOCIAL.read_text(encoding="utf-8")

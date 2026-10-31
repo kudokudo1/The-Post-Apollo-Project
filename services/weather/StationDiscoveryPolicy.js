@@ -334,7 +334,9 @@ function parseNews(root) {
         const topics = newsTopics(title);
         rows.push({
             title: title,
-            detail: domain + (country ? " // " + country : ""),
+            detail: domain
+                + (country ? " // " + country : "")
+                + (language ? " // " + language.toUpperCase() : ""),
             domain: domain,
             country: country,
             language: language,

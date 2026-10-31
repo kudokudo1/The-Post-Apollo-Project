@@ -215,7 +215,7 @@ assert.match(sky, /celnavService\.snapshot\.constellations/);
 assert.match(sky, /modelData\.anchorStar/);
 assert.match(sky, /modelData\.anchorAltitude/);
 assert.match(sky, /modelData\.anchorDirection/);
-assert.match(sky, /modelData\.starNames\.join\("\ \/\ ")/);
+assert.match(sky, /modelData\.starNames\.join\(" \/ "\)/);
 assert.match(sky, /GROUP RETURNED NAVIGATION STARS ONLY/);
 assert.match(sky, /NOT FULL IAU CONSTELLATION BOUNDARIES OR ALL VISIBLE STARS/);
 assert.match(sky, /celnavService\.snapshot\.planets/);

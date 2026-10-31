@@ -1045,7 +1045,7 @@ Rectangle {
                     width: parent.width
                     height: 36
                     label: appSelector.creatingIdentity ? "CANCEL NEW" : "+ NEW ID"
-                    accentColor: Colors.orange
+                    accentColor: Colors.magenta
                     labelPixelSize: 9
                     contentPadding: 3
                     interactive: appSelector.identitySnapshot.writable
@@ -1260,7 +1260,7 @@ Rectangle {
                     width: parent.width
                     height: 33
                     label: "RELOAD DETAILS"
-                    accentColor: Colors.orange
+                    accentColor: Colors.yellow
                     labelPixelSize: 9
                     contentPadding: 3
                     interactive: SocialAccountDetailsStore.state === "error"
@@ -1316,6 +1316,11 @@ Rectangle {
                            : (appSelector.accountSelectedServiceId === ""
                               ? "▾ CHOOSE APP (32)"
                               : "▾ " + appSelector.accountSelectedServiceId.toUpperCase())
+                    // Yellow fill/magenta label when idle. When expanded,
+                    // reuse ActionButton's standard selected-state appearance.
+                    idleFillColor: Colors.yellow
+                    accentColor: Colors.magenta
+                    selected: appSelector.accountAppPickerOpen
                     labelPixelSize: 9
                     contentPadding: 3
                     interactive: appSelector.identitySnapshot.writable
@@ -1981,6 +1986,7 @@ Rectangle {
                         width: parent.width
                         height: 34
                         label: "+ FAMILY"
+                        accentColor: Colors.magenta
                         labelPixelSize: 9
                         contentPadding: 3
                         interactive: appSelector.identitySnapshot.writable

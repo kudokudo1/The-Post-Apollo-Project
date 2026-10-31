@@ -140,7 +140,7 @@ class SettingsContactChatWorkspaceContracts(unittest.TestCase):
         self.assertIn("SocialIdentityStore.reorderApp(", app)
 
     def test_operator_marked_settings_button_accents(self):
-        # Only the seven screenshot-marked actions change. The existing
+        # The marked actions use shared semantic states. The existing
         # ActionButton supplies matching idle text, border and glow from
         # accentColor without altering handlers or storage permissions.
         identity = SELECTOR.split("id: settingsIdentityPane", 1)[1].split(
@@ -155,15 +155,37 @@ class SettingsContactChatWorkspaceContracts(unittest.TestCase):
 
         for label, accent in (
             ('appSelector.creatingIdentity ? "CANCEL NEW" : "+ NEW ID"',
-             "Colors.orange"),
+             "Colors.magenta"),
             ('"SAVE CONTACT"', "Colors.green"),
-            ('"RELOAD DETAILS"', "Colors.orange"),
+            ('"RELOAD DETAILS"', "Colors.yellow"),
         ):
             with self.subTest(label=label):
                 button = identity.split("label: " + label, 1)[1].split(
                     "onTriggered:", 1
                 )[0]
                 self.assertIn("accentColor: " + accent, button)
+
+        # The family-create action follows the same magenta new-item
+        # identity while existing family reorder/rename stays orange.
+        add_family = family.split('label: "+ FAMILY"', 1)[1].split(
+            "onTriggered:", 1
+        )[0]
+        self.assertIn("accentColor: Colors.magenta", add_family)
+        self.assertIn("familyNameInput.text.trim().length > 0", add_family)
+
+        # The account picker is yellow/magenta at rest, then follows the
+        # shared ActionButton selected-state rules when its list is expanded.
+        picker = identity.split('label: appSelector.accountAppPickerOpen', 1)[1].split(
+            "onTriggered:", 1
+        )[0]
+        self.assertIn('"▾ CHOOSE APP (32)"', picker)
+        self.assertIn("idleFillColor: Colors.yellow", picker)
+        self.assertIn("accentColor: Colors.magenta", picker)
+        self.assertIn("selected: appSelector.accountAppPickerOpen", picker)
+        self.assertIn("interactive: appSelector.identitySnapshot.writable", picker)
+        self.assertIn("labelPixelSize: 9", picker)
+        self.assertIn("!appSelector.accountAppPickerOpen", identity)
+        self.assertIn("visible: appSelector.accountAppPickerOpen", identity)
 
         edit = family.split(
             'label: appSelector.editingFamilies ? "CLOSE EDIT" : "EDIT FAMILIES"',

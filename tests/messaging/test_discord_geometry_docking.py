@@ -88,7 +88,7 @@ class DiscordDockingTests(TestCase):
             "social": {"target": "social", "width": 441},
             "x": {"target": "x", "width": 1000},
         }
-        with patch.object(geometry.sys, "stdin", io.StringIO('{"op":"hideDiscord"}\\n')):
+        with patch.object(geometry.sys, "stdin", io.StringIO('{"op":"hideDiscord"}\n')):
             with patch.object(bridge, "queue_command") as send:
                 bridge.stdin_loop()
                 send.assert_called_once_with('[con_id="4242"] move scratchpad')

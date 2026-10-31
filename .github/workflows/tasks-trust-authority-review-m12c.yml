@@ -1,0 +1,50 @@
+name: TASKS M12c synthetic trust authority and release governance review
+
+on:
+  pull_request:
+    paths:
+      - 'docs/tasks-trust-authority-review-m12c.md'
+      - 'tests/tasks/fixtures/task_trust_authority_review_m12c.json'
+      - 'tests/tasks/fixtures/TaskTrustAuthorityPolicyM12c.py'
+      - 'tests/tasks/test_task_trust_authority_review_m12c.py'
+      - '.github/workflows/tasks-trust-authority-review-m12c.yml'
+      - 'services/hub/ApolloHubTodoStore.qml'
+      - 'shell.qml'
+  push:
+    branches: [main]
+    paths:
+      - 'docs/tasks-trust-authority-review-m12c.md'
+      - 'tests/tasks/fixtures/task_trust_authority_review_m12c.json'
+      - 'tests/tasks/fixtures/TaskTrustAuthorityPolicyM12c.py'
+      - 'tests/tasks/test_task_trust_authority_review_m12c.py'
+      - '.github/workflows/tasks-trust-authority-review-m12c.yml'
+      - 'services/hub/ApolloHubTodoStore.qml'
+      - 'shell.qml'
+
+permissions:
+  contents: read
+
+jobs:
+  synthetic-governance-review:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: M12c synthetic release custody, authorization and rotation matrix
+        run: python3 tests/tasks/test_task_trust_authority_review_m12c.py
+      - name: M12b disabled-only production integration preflight
+        run: python3 tests/tasks/test_task_disabled_integration_preflight_m12b.py
+      - name: M11y signed-release content verifier tests
+        run: node --test tests/tasks/test_task_signed_release_verifier_m11y.cjs
+      - name: M12a guarded completion model
+        run: node --test tests/tasks/test_task_guarded_completion_model_m12a.cjs
+      - name: M11t nine production acceptance gates open
+        run: python3 tests/tasks/test_task_production_trust_contract_m11t.py
+      - name: M11d original single TASKS writer
+        run: python3 tests/tasks/test_task_writer_gate_inventory_m11d.py

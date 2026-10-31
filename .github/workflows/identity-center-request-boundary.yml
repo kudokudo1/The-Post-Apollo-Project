@@ -28,6 +28,8 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
+      - name: Install offline identity test verification dependency
+        run: python3 -m pip install -r services/identity/requirements-jwks-verifier-v0.txt
       - name: Compile code and tests without contacting providers
         run: |
           python3 -m py_compile services/identity/synthetic_policy_v0.py

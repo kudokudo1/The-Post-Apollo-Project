@@ -17,6 +17,7 @@ Scope {
     property bool failed: false
     property string errorText: ""
     property var gauge: null
+    property var nearbyGauges: []
     property date lastUpdated
 
     property bool stageflowReady: false
@@ -111,13 +112,16 @@ Scope {
 
     function accept(raw) {
         try {
-            const parsed = RiverPolicy.nearestGauge(
+            const rows = RiverPolicy.nearestGauges(
                 JSON.parse(String(raw || "")),
                 latitude,
-                longitude
+                longitude,
+                4
             );
+            const parsed = rows.length > 0 ? rows[0] : null;
             const nextId = parsed ? String(parsed.lid || "") : "";
             const previousId = gauge ? String(gauge.lid || "") : "";
+            nearbyGauges = rows;
             gauge = parsed;
             ready = true;
             failed = false;

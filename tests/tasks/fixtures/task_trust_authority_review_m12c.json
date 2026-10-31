@@ -1,0 +1,163 @@
+{
+  "schemaVersion": 1,
+  "milestone": "M12c",
+  "classification": "PROPOSED_TRUST_AUTHORITY_DECISION_ONLY",
+  "patient": "kudokudo1/The-Post-Apollo-Project",
+  "inspectedMain": "126dfbfb7cf86eca420e66c618b8266775dfd552",
+  "staffRole": "EXTERNAL_HOSPITAL_COMPATIBLE_NO_LIVE_REGISTRATION",
+  "openDecisions": {
+    "TRUST_ROOT_CUSTODIAN": {
+      "status": "OPEN",
+      "question": "Who may create, hold, enroll, revoke and recover an independent verification trust root?",
+      "options": [
+        "Operator-controlled offline trust root with separately verified public fingerprint",
+        "Administratively managed OS-owned trust store with operator approval"
+      ],
+      "never": "An automatically adopted public key carried inside the candidate release"
+    },
+    "SIGNER_AND_RELEASE_REVIEWER": {
+      "status": "OPEN",
+      "question": "Who signs the host release and who independently reviews its source, dependencies and signing evidence?",
+      "options": [
+        "Separate release signer, reviewer, key custodian and final operator",
+        "Equivalent auditable separation of duties explicitly approved by operator"
+      ],
+      "never": "Self-approving release signer or this browser session claiming staff authority"
+    },
+    "APPROVED_RELEASE_CHANNEL": {
+      "status": "OPEN",
+      "question": "How are host/interpreter/owner-module artifacts and signed manifests delivered and pinned independently of mutable source trees?",
+      "options": [
+        "Signed immutable release artifact, independently provisioned verifier trust root and content pins",
+        "Operator-approved administrator-controlled artifact distribution with equivalent provenance checks"
+      ],
+      "never": "Import and execute from a mutable unreviewed checkout or same-user writable trust folder"
+    },
+    "ROLLBACK_RESISTANT_GENERATION": {
+      "status": "OPEN",
+      "question": "Where is the last accepted generation and exact release digest persisted to reject downgrade and same-generation replay?",
+      "options": [
+        "Operator/admin-protected monotonic state and exact release digest",
+        "Equivalent independently authenticated version floor and release identity with rollback-resistant recovery"
+      ],
+      "never": "Release directory containing its own editable minimum generation"
+    },
+    "KEY_ROTATION_AND_REVOCATION": {
+      "status": "OPEN",
+      "question": "What evidence authorizes replacing or revoking the signing root, and how can a lost root be recovered without silent self-enrollment?",
+      "options": [
+        "Old+new-root transition proof, independent custodian/reviewer and operator approval",
+        "Offline recovery ceremony using an operator-approved independent recovery anchor"
+      ],
+      "never": "Unknown replacement key accepted because it signs itself"
+    },
+    "HOST_EXECUTABLE_THREAT_MODEL": {
+      "status": "OPEN",
+      "question": "Which attackers must be resisted: supply-chain substitution, same-user code changes, privileged root compromise, and noncooperating writers?",
+      "options": [
+        "Define same-user adversary limits and root-controlled deployment boundary",
+        "Stronger isolated/sandboxed host identity and OS policy after independent security review"
+      ],
+      "never": "Treat Ed25519, PIDFD, advisory flock or nonce as complete runtime attestation"
+    }
+  },
+  "noncanonicalSuggestedRoles": [
+    "trust_custodian",
+    "release_signer",
+    "independent_reviewer",
+    "operator"
+  ],
+  "mustRemainSeparateActions": [
+    "TRUST_ROOT_ENROLLMENT",
+    "RELEASE_REVIEW",
+    "CODE_INSTALLATION",
+    "GUARDED_WRITER_ACTIVATION",
+    "TASK_DATA_RESTORATION"
+  ],
+  "threatModelNotProven": [
+    "privileged_root_compromise",
+    "compromised_parent_python_runtime",
+    "arbitrary_same_user_writer",
+    "rollback_of_independent_generation_floor",
+    "host_native_callback_misattribution",
+    "physical_power_loss_ordering"
+  ],
+  "policyModel": {
+    "file": "tests/tasks/fixtures/TaskTrustAuthorityPolicyM12c.py",
+    "evidenceClassification": "SYNTHETIC_ARGUMENTS_ONLY",
+    "actuallyVerifiesEd25519": false,
+    "actuallyPersistsGeneration": false,
+    "actuallyInstallsKeys": false,
+    "actuallyLaunchesProcess": false,
+    "eligibleState": "SYNTHETIC_REVIEW_ELIGIBLE",
+    "productionAuthorizedStateAlways": false,
+    "priorCryptoTest": "tests/tasks/fixtures/TaskSignedReleaseVerifierM11y.cjs"
+  },
+  "m12bProductionChecks": [
+    {
+      "id": "RELEASE_TRUST",
+      "status": "OPEN"
+    },
+    {
+      "id": "OS_HOST_OWNER",
+      "status": "OPEN"
+    },
+    {
+      "id": "REAL_SOURCE_AUTHORIZATION",
+      "status": "OPEN"
+    },
+    {
+      "id": "INDEPENDENT_BACKUP",
+      "status": "OPEN"
+    },
+    {
+      "id": "NATIVE_STAGE_ATTRIBUTION",
+      "status": "OPEN"
+    },
+    {
+      "id": "ASYNC_UI_ACCEPTANCE",
+      "status": "OPEN"
+    },
+    {
+      "id": "RESTART_AND_FREEZE",
+      "status": "OPEN"
+    },
+    {
+      "id": "CODE_ONLY_ROLLBACK",
+      "status": "OPEN"
+    },
+    {
+      "id": "NATIVE_RUNTIME_ACCEPTANCE",
+      "status": "OPEN"
+    },
+    {
+      "id": "ACTIVATION_DECISION",
+      "status": "OPEN"
+    }
+  ],
+  "authority": {
+    "userTrustRootSelectionApproved": false,
+    "realSigningKeyGenerated": false,
+    "releaseSignedForProduction": false,
+    "trustStoreInstalled": false,
+    "productionHostApproved": false,
+    "userTaskDataAccessApproved": false,
+    "productionStoreModified": false,
+    "localMachineModified": false,
+    "mergeAuthorized": false,
+    "guardedWriterActivated": false,
+    "sqliteTaskMigrationApproved": false,
+    "operatorAcceptanceRecorded": false,
+    "liveHospitalRegistrationVerified": false
+  },
+  "preservedSource": {
+    "store": "services/hub/ApolloHubTodoStore.qml",
+    "guardedFlag": "readonly property bool guardedWriterEnabled: false",
+    "sourceName": "apollo-hub-todo-v1.json",
+    "fileViewCount": 1,
+    "mutations": 9,
+    "m11lFixtureRestrictionUnchanged": true,
+    "m11yEphemeralKeysAreNotProductionTrust": true,
+    "noRealTaskReads": true
+  }
+}

@@ -805,6 +805,14 @@ class Bridge:
             if op == "hideDiscord":
                 self.discord_show_requested = False
                 self.discord_reveal_attempted_con_id = None
+                # Hide is a geometry-authority boundary, not just a visual
+                # scratchpad move. Flush the prior guest/follower commands so
+                # a queued resize cannot shrink Social after close/reopen.
+                self.discord_ready = False
+                self.discord_docked = False
+                with self.command_lock:
+                    self.pending_sync.pop("discord", None)
+                    self.pending_sync.pop("social", None)
                 if not self.discord_con_id:
                     self.sample_event.set()
                     continue

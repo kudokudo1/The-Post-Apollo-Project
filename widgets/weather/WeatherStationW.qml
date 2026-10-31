@@ -39,6 +39,7 @@ PanelWindow {
     property bool relationshipFocused: false
 
     property string currentView: "home"
+    property var newsMapOverlay: null
     property bool contextTerminalRequested: false
 
     // The SAME geometry drives the layer-shell input mask and the actual
@@ -1005,6 +1006,10 @@ PanelWindow {
             StationDiscovery {
                 stationOpen: weatherStation.menuOpen
                 domain: "map"
+                newsMentionOverlay: weatherStation.newsMapOverlay
+                onNewsMapClearRequested: {
+                    weatherStation.newsMapOverlay = null;
+                }
             }
         }
 
@@ -1013,6 +1018,19 @@ PanelWindow {
 
             StationNewsHub {
                 stationOpen: weatherStation.menuOpen
+                onNewsMapRequested: function(payload) {
+                    if (!payload
+                            || !Array.isArray(payload.locations)
+                            || payload.locations.length === 0)
+                        return;
+                    weatherStation.newsMapOverlay =
+                        JSON.parse(JSON.stringify(payload));
+                    weatherStation.currentView = "map";
+                    weatherStation.navigationIndex =
+                        weatherStation.mainModes.findIndex(function(mode) {
+                            return mode.id === "map";
+                        });
+                }
             }
         }
 

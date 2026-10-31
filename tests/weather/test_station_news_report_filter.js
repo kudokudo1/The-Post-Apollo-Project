@@ -182,7 +182,7 @@ assert.match(ui, /PUBLISHER \/ SOURCE COUNTRY FILTER", state:"CONNECTED"/);
 assert.match(ui, /LANGUAGE \+ TIME WINDOW FILTERS", state:"CONNECTED"/);
 assert.match(ui, /SOURCE-COUNTRY REGION GROUPS", state:"CONNECTED"/);
 assert.match(ui, /ARTICLE → GKG MENTIONED LOCATIONS", state:"CONNECTED"/);
-assert.match(ui, /NEWS → MAP LOCATION HANDOFF", state:"NOT WIRED"/);
+assert.match(ui, /NEWS → MAP LOCATION HANDOFF", state:"CONNECTED"/);
 
 const selectStart = ui.indexOf("function selectNewsTopic(id)");
 const selectEnd = ui.indexOf("function selectMapFilter(id)", selectStart);

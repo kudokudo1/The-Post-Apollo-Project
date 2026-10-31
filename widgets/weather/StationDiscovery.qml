@@ -19,6 +19,9 @@ Rectangle {
     property bool stationOpen: true
     property bool viewerOpen: false
     property var selectedNews: null
+    property var newsMentionOverlay: null
+    signal newsMapRequested(var payload)
+    signal newsMapClearRequested()
     readonly property bool newsLocationMatchesSelection:
         selectedNews
         && articleLocationService.requestedUrl !== ""
@@ -101,12 +104,19 @@ Rectangle {
     property string mapFilter: "all"
     property var selectedMapEvent: null
     property var selectedMapHotspot: null
+    property var selectedMapNewsMention: null
     property real mapZoom: 1
     property real mapCenterLon: 0
     property real mapCenterLat: 0
 
     readonly property var mapPointRows:
         MapProjection.plottable(source ? source.rows : [])
+    readonly property var mapNewsMentionRows:
+        MapProjection.plottable(
+            newsMentionOverlay
+            && Array.isArray(newsMentionOverlay.locations)
+            ? newsMentionOverlay.locations : []
+        )
     readonly property var mapVisibleBounds:
         MapProjection.visibleBounds(
             mapPlot ? mapPlot.width : 0,
@@ -131,6 +141,8 @@ Rectangle {
                         : { "count": 0, "light": 0, "medium": 0, "heavy": 0 }
     readonly property bool hotspotInspectorOpen:
         domain === "map" && selectedMapHotspot !== null
+    readonly property bool newsMentionInspectorOpen:
+        domain === "map" && selectedMapNewsMention !== null
 
     readonly property var mapFilterOptions: [
         { "id": "all", "label": "ALL EVENTS", "category": "" },
@@ -214,6 +226,7 @@ Rectangle {
             return;
         selectedMapEvent = null;
         selectedMapHotspot = null;
+        selectedMapNewsMention = null;
         mapFilter = id;
         resetMapView();
         discoveryScroll.contentY = 0;
@@ -225,6 +238,43 @@ Rectangle {
 
     function closeHotspotInspector() {
         selectedMapHotspot = null;
+    }
+
+    function closeNewsMentionInspector() {
+        selectedMapNewsMention = null;
+    }
+
+    function requestNewsMapHandoff() {
+        if (domain !== "news"
+                || !selectedNews
+                || !articleLocationService.ready
+                || articleLocationService.rows.length === 0)
+            return false;
+
+        const copiedRows = JSON.parse(
+            JSON.stringify(articleLocationService.rows)
+        );
+        newsMapRequested({
+            "articleTitle": String(selectedNews.title || ""),
+            "articleUrl": String(selectedNews.url || ""),
+            "articleSource": String(selectedNews.source || ""),
+            "articleTime": String(selectedNews.time || ""),
+            "gkgSliceUtc": String(articleLocationService.sliceUtc || ""),
+            "matchMethod": String(articleLocationService.matchMethod || ""),
+            "semantics": String(
+                articleLocationService.semantics
+                || "MENTIONED LOCATIONS, NOT VERIFIED EVENT LOCATIONS"
+            ),
+            "locations": copiedRows
+        });
+        return true;
+    }
+
+    function focusNewsMentions() {
+        if (domain !== "map" || mapNewsMentionRows.length === 0)
+            return false;
+        applyMapView(MapProjection.fitRows(mapNewsMentionRows, 1.35));
+        return true;
     }
 
     function fetchVisibleHotspots() {
@@ -340,6 +390,7 @@ Rectangle {
         if (domain === "map") {
             if (row) {
                 selectedMapHotspot = null;
+                selectedMapNewsMention = null;
                 selectedMapEvent = row;
             }
             return;
@@ -359,6 +410,12 @@ Rectangle {
         closeViewer();
         selectedMapEvent = null;
         selectedMapHotspot = null;
+        selectedMapNewsMention = null;
+    }
+    onNewsMentionOverlayChanged: {
+        selectedMapNewsMention = null;
+        if (domain === "map" && mapNewsMentionRows.length > 0)
+            focusNewsMentions();
     }
     onStationOpenChanged: { if (!stationOpen) closeViewer(); }
 
@@ -379,6 +436,12 @@ Rectangle {
             return [
                 {name:"NASA EONET // FILTERED EVENTS + INSPECTOR", state:"SOURCE CONNECTED"},
                 {name:"EONET POINT CANVAS // PAN + ZOOM", state:"CONNECTED"},
+                {
+                    name:"GDELT NEWS MENTION POINTS",
+                    state: mapNewsMentionRows.length > 0
+                           ? "LOADED " + mapNewsMentionRows.length
+                           : "READY FROM NEWS"
+                },
                 {name:"USGS // EARTHQUAKES", state:"GROUND FEED EXISTS"},
                 {
                     name:"NOAA/NWS MRMS // BASE REFLECTIVITY",
@@ -413,7 +476,7 @@ Rectangle {
                 {name:"REPORTING TREND / SOURCE COUNT", state:"CONNECTED"},
                 {name:"CONSERVATIVE STORY FAMILIES", state:"CONNECTED"},
                 {name:"ARTICLE → GKG MENTIONED LOCATIONS", state:"CONNECTED"},
-                {name:"NEWS → MAP LOCATION HANDOFF", state:"NOT WIRED"},
+                {name:"NEWS → MAP LOCATION HANDOFF", state:"CONNECTED"},
                 {name:"LIVE NEWS / VIDEO", state:"NOT WIRED"},
                 {name:"SEMANTIC / EMBEDDING DOSSIERS", state:"NOT WIRED"}
             ];
@@ -580,7 +643,7 @@ Rectangle {
 
                 StationSectionDivider {
                     width: parent.width
-                    title: "SPATIAL PLOT // EONET + FIRMS POINTS"
+                    title: "SPATIAL PLOT // EONET + FIRMS + NEWS MENTIONS"
                 }
 
                 Row {
@@ -607,6 +670,45 @@ Rectangle {
                                    || Math.abs(stationDiscovery.mapCenterLon) > 0.001
                                    || Math.abs(stationDiscovery.mapCenterLat) > 0.001
                         onClicked: stationDiscovery.resetMapView()
+                    }
+                }
+
+                Row {
+                    width: parent.width
+                    height: stationDiscovery.mapNewsMentionRows.length > 0 ? 30 : 0
+                    visible: stationDiscovery.mapNewsMentionRows.length > 0
+                    spacing: 10
+
+                    ActionButton {
+                        width: 132
+                        height: 28
+                        label: "FOCUS NEWS"
+                        labelPixelSize: 10
+                        accentColor: Colors.magenta
+                        onClicked: stationDiscovery.focusNewsMentions()
+                    }
+
+                    ActionButton {
+                        width: 118
+                        height: 28
+                        label: "CLEAR NEWS"
+                        labelPixelSize: 10
+                        accentColor: Colors.orange
+                        onClicked: stationDiscovery.newsMapClearRequested()
+                    }
+
+                    QuietText {
+                        anchors.verticalCenter: parent.verticalCenter
+                        width: Math.max(0, parent.width - 270)
+                        text: "NEWS MENTIONS // "
+                              + stationDiscovery.mapNewsMentionRows.length
+                              + " // "
+                              + (stationDiscovery.newsMentionOverlay
+                                 ? stationDiscovery.newsMentionOverlay.articleTitle
+                                 : "")
+                        elide: Text.ElideRight
+                        font.pixelSize: 9
+                        color: Colors.magenta
                     }
                 }
 
@@ -1129,6 +1231,55 @@ Rectangle {
                     }
 
                     Repeater {
+                        model: stationDiscovery.mapNewsMentionRows
+
+                        delegate: Item {
+                            required property var modelData
+                            readonly property var projected:
+                                MapProjection.project(
+                                    modelData.longitude,
+                                    modelData.latitude,
+                                    mapPlot.width,
+                                    mapPlot.height,
+                                    stationDiscovery.mapZoom,
+                                    stationDiscovery.mapCenterLon,
+                                    stationDiscovery.mapCenterLat
+                                )
+
+                            width: 18
+                            height: 18
+                            x: projected.x - width / 2
+                            y: projected.y - height / 2
+                            visible: projected.visible
+                            z: 2.2
+
+                            Rectangle {
+                                anchors.centerIn: parent
+                                width: 10
+                                height: 10
+                                radius: 5
+                                color: Colors.magenta
+                                border.width: 2
+                                border.color:
+                                    stationDiscovery.selectedMapNewsMention
+                                       === modelData
+                                    ? Colors.yellow : Colors.white
+                            }
+
+                            MouseArea {
+                                anchors.fill: parent
+                                hoverEnabled: true
+                                cursorShape: Qt.PointingHandCursor
+                                onClicked: {
+                                    stationDiscovery.selectedMapEvent = null;
+                                    stationDiscovery.selectedMapHotspot = null;
+                                    stationDiscovery.selectedMapNewsMention = modelData;
+                                }
+                            }
+                        }
+                    }
+
+                    Repeater {
                         model: firmsService.ready ? firmsService.hotspots : []
 
                         delegate: Item {
@@ -1175,6 +1326,7 @@ Rectangle {
                                 cursorShape: Qt.PointingHandCursor
                                 onClicked: {
                                     stationDiscovery.selectedMapEvent = null;
+                                    stationDiscovery.selectedMapNewsMention = null;
                                     stationDiscovery.selectedMapHotspot = modelData;
                                 }
                             }
@@ -1211,7 +1363,7 @@ Rectangle {
                         anchors.bottom: parent.bottom
                         anchors.margins: 7
                         z: 3
-                        text: "EONET + FIRMS POINTS // POLYGONS LISTED BELOW"
+                        text: "EONET DIAMONDS // FIRMS ORANGE // NEWS MAGENTA"
                         font.pixelSize: 9
                     }
                 }
@@ -1781,6 +1933,109 @@ Rectangle {
             Column {
                 width: parent.width
                 spacing: 7
+                visible: stationDiscovery.newsMentionInspectorOpen
+
+                StationSectionDivider {
+                    width: parent.width
+                    title: "NEWS MENTION INSPECTOR // GDELT GKG"
+                }
+
+                Rectangle {
+                    width: parent.width
+                    height: 150
+                    color: Colors.dark
+                    border.width: 1
+                    border.color: Colors.magenta
+
+                    Column {
+                        anchors.fill: parent
+                        anchors.margins: 10
+                        spacing: 5
+
+                        Row {
+                            width: parent.width
+                            spacing: 10
+
+                            GohuText {
+                                width: Math.max(0, parent.width - 96)
+                                text: stationDiscovery.selectedMapNewsMention
+                                      ? stationDiscovery.selectedMapNewsMention.name
+                                      : ""
+                                color: Colors.magenta
+                                elide: Text.ElideRight
+                                font.pixelSize: 15
+                            }
+
+                            ActionButton {
+                                width: 86
+                                height: 26
+                                label: "CLOSE"
+                                labelPixelSize: 10
+                                accentColor: Colors.red
+                                destructive: true
+                                onClicked:
+                                    stationDiscovery.closeNewsMentionInspector()
+                            }
+                        }
+
+                        SecondaryText {
+                            width: parent.width
+                            text: stationDiscovery.selectedMapNewsMention
+                                  ? stationDiscovery.selectedMapNewsMention.typeLabel
+                                    + " // "
+                                    + Number(
+                                        stationDiscovery.selectedMapNewsMention.latitude
+                                      ).toFixed(3)
+                                    + ", "
+                                    + Number(
+                                        stationDiscovery.selectedMapNewsMention.longitude
+                                      ).toFixed(3)
+                                  : ""
+                            elide: Text.ElideRight
+                            font.pixelSize: 11
+                        }
+
+                        QuietText {
+                            width: parent.width
+                            text: stationDiscovery.selectedMapNewsMention
+                                  ? "MENTIONS // "
+                                    + stationDiscovery.selectedMapNewsMention.mentionCount
+                                    + " // FIRST OFFSET // "
+                                    + stationDiscovery.selectedMapNewsMention.firstOffset
+                                    + " // FEATURE // "
+                                    + (stationDiscovery.selectedMapNewsMention.featureId || "--")
+                                  : ""
+                            elide: Text.ElideRight
+                            font.pixelSize: 9
+                        }
+
+                        QuietText {
+                            width: parent.width
+                            text: stationDiscovery.newsMentionOverlay
+                                  ? "ARTICLE // "
+                                    + stationDiscovery.newsMentionOverlay.articleTitle
+                                  : ""
+                            elide: Text.ElideRight
+                            font.pixelSize: 9
+                            color: Colors.white
+                        }
+
+                        QuietText {
+                            width: parent.width
+                            text: stationDiscovery.newsMentionOverlay
+                                  ? stationDiscovery.newsMentionOverlay.semantics
+                                  : "MENTIONED LOCATION // NOT VERIFIED EVENT LOCATION"
+                            elide: Text.ElideRight
+                            font.pixelSize: 9
+                            color: Colors.orange
+                        }
+                    }
+                }
+            }
+
+            Column {
+                width: parent.width
+                spacing: 7
                 visible: stationDiscovery.mapInspectorOpen
 
                 StationSectionDivider {
@@ -2153,6 +2408,8 @@ Rectangle {
                 articleLocationService.request(
                     stationDiscovery.selectedNews
                 )
+            onShowOnMapRequested:
+                stationDiscovery.requestNewsMapHandoff()
             onBackRequested: stationDiscovery.closeViewer()
         }
     }

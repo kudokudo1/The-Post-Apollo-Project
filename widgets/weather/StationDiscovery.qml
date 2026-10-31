@@ -382,6 +382,8 @@ Rectangle {
     }
 
     function loadRainViewerFallback() {
+        if (domain !== "map" || !stationOpen)
+            return false;
         return rainViewerRadarService.request(
             radarHistoryMinutes,
             mapVisibleBounds
@@ -587,7 +589,7 @@ Rectangle {
                 {
                     name:"RAINVIEWER // PAST RADAR FALLBACK // 2H",
                     state: rainViewerRadarService.ready
-                           ? "LOADED " + rainViewerRadarService.tileCount
+                           ? "READY " + rainViewerRadarService.tileCount
                              + " TILES"
                            : rainViewerRadarService.loading
                              ? "RECEIVING"
@@ -736,6 +738,7 @@ Rectangle {
                                    || modelData.state === "VISIBLE"
                                    || String(modelData.state).indexOf("FETCHED ") === 0
                                    || String(modelData.state).indexOf("LOADED ") === 0
+                                   || String(modelData.state).indexOf("READY ") === 0
                                    ? Colors.cyan : Colors.orange
                             font.pixelSize: 11
                         }
@@ -1199,7 +1202,7 @@ Rectangle {
                                 : rainViewerRadarService.failed
                                   ? rainViewerRadarService.errorText
                                   : rainViewerRadarService.ready
-                                    ? "FALLBACK LOADED"
+                                    ? "FALLBACK PLANNED"
                                     : "MANUAL READY"
                         elide: Text.ElideRight
                         font.pixelSize: 9

@@ -705,7 +705,7 @@ Rectangle {
 
                 StationSectionDivider {
                     width: parent.width
-                    title: "SPATIAL PLOT // EONET + FIRMS + NEWS MENTIONS"
+                    title: "SPATIAL PLOT // USGS QUAKES + EONET + FIRMS + NEWS"
                 }
 
                 QuietText {

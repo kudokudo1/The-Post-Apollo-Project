@@ -1907,8 +1907,11 @@ Rectangle {
                     width: parent.width
                     height: 36
                     label: appSelector.editingFamilies ? "CLOSE EDIT" : "EDIT FAMILIES"
-                    // Closing is red; opening retains the normal cyan accent.
-                    accentColor: appSelector.editingFamilies ? Colors.red : Colors.cyan
+                    // Editing is an open/active mode, not a destructive action.
+                    // Reuse shared selected styling: yellow fill and magenta
+                    // text, border and glow; closed edit stays cyan on dark.
+                    accentColor: Colors.cyan
+                    selected: appSelector.editingFamilies
                     labelPixelSize: 9
                     contentPadding: 3
                     interactive: appSelector.identitySnapshot.writable
@@ -2425,11 +2428,12 @@ Rectangle {
                         label: appSelector.selectedAppOption()
                                && appSelector.selectedAppOption().hidden
                                ? "SHOW APP" : "HIDE APP"
-                        // Hiding uses red, but the reversible SHOW action
-                        // remains cyan and no destructive action is introduced.
+                        // White identifies the HIDE action; the inverse SHOW
+                        // remains cyan. Both use their existing reversible
+                        // visibility handler, not destructive removal.
                         accentColor: appSelector.selectedAppOption()
                                      && !appSelector.selectedAppOption().hidden
-                                     ? Colors.red : Colors.cyan
+                                     ? Colors.white : Colors.cyan
                         labelPixelSize: 9
                         contentPadding: 3
                         interactive: appSelector.identitySnapshot.writable

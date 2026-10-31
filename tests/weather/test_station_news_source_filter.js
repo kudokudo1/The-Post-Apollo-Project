@@ -63,6 +63,40 @@ assert.deepEqual(titles("earth", "news.example"), ["Earthquake report"]);
 assert.deepEqual(titles("all", "  Canada  "), ["Aurora activity increases"]);
 assert.deepEqual(titles("all", "does-not-exist"), []);
 
+const grouped = Array.from(ctx.newsSourceRegionGroups(rows));
+assert.equal(grouped.length, 3);
+assert.equal(grouped[0].country, "United States");
+assert.equal(grouped[0].articles, 2);
+assert.equal(grouped[0].publishers, 2);
+assert.deepEqual(
+    Array.from(grouped[0].topics).sort(),
+    ["fire", "weather"]
+);
+assert.equal(grouped[1].articles, 1);
+assert.equal(grouped[2].articles, 1);
+
+const usOnly = Array.from(
+    ctx.filterNewsRows(
+        rows, "all", "", "", 0, 0, "United States"
+    )
+);
+assert.deepEqual(
+    usOnly.map(row => row.title),
+    ["Rain forecast for Maryland", "Wildfire smoke update"]
+);
+assert.equal(
+    ctx.filterNewsRows(
+        rows, "all", "", "", 0, 0, "Canada"
+    ).length,
+    1
+);
+assert.equal(
+    ctx.filterNewsRows(
+        rows, "all", "", "", 0, 0, "Japan"
+    )[0].title,
+    "Earthquake report"
+);
+
 // Filtering returns a new list and never mutates cached source rows.
 const copy = ctx.filterNewsRows(rows, "all", "");
 copy.pop();
@@ -86,7 +120,14 @@ assert.match(ui, /LOCAL \/\/ MATCHES GDELT DOMAIN OR SOURCE COUNTRY/);
 assert.match(ui, /SOURCE MATCH/);
 assert.match(ui, /PUBLISHER \/ SOURCE COUNTRY FILTER", state:"CONNECTED"/);
 assert.match(ui, /LANGUAGE \+ TIME WINDOW FILTERS", state:"CONNECTED"/);
-assert.match(ui, /REGION GROUPING", state:"NOT WIRED"/);
+assert.match(ui, /SOURCE-COUNTRY REGION GROUPS", state:"CONNECTED"/);
+assert.match(ui, /EVENT \/ MENTIONED-LOCATION LINKING", state:"NOT WIRED"/);
+assert.match(ui, /property string newsSourceRegion: ""/);
+assert.match(ui, /DiscoveryPolicy\.newsSourceRegionGroups/);
+assert.match(ui, /id: newsRegionRail/);
+assert.match(ui, /function selectNewsRegion\(id\)/);
+assert.match(ui, /SOURCE COUNTRY GROUPS \/\/ TOP BATCH COUNTRIES/);
+assert.match(ui, /SOURCE REGION \/\/ /);
 assert.match(ui, /FILTER IS LOCAL \/\/ SOURCE NOT REFETCHED/);
 
 const inputStart = ui.indexOf("id: newsSourceInput");

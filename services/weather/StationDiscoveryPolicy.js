@@ -306,6 +306,277 @@ function newsSourceRegionGroups(rows) {
     return output;
 }
 
+
+function newsStoryTokens(value) {
+    const stop = {
+        "the":true, "and":true, "for":true, "from":true, "with":true,
+        "that":true, "this":true, "into":true, "over":true, "after":true,
+        "before":true, "about":true, "amid":true, "near":true, "across":true,
+        "new":true, "latest":true, "update":true, "updates":true,
+        "report":true, "reports":true, "live":true, "watch":true,
+        "says":true, "say":true, "news":true
+    };
+    const parts = newsTitleKey(value).split(" ");
+    const out = [];
+    for (let i = 0; i < parts.length; i++) {
+        const token = String(parts[i] || "").trim();
+        if (!token || stop[token])
+            continue;
+        if (token.length < 3 && !/^\d{2,}$/.test(token))
+            continue;
+        if (out.indexOf(token) < 0)
+            out.push(token);
+    }
+    return out;
+}
+
+function newsStoryScore(left, right) {
+    const a = newsStoryTokens(left && left.title);
+    const b = newsStoryTokens(right && right.title);
+    if (a.length < 3 || b.length < 3)
+        return {match:false, common:0, overlap:0, jaccard:0};
+
+    const topicsA = left && Array.isArray(left.topics) ? left.topics : [];
+    const topicsB = right && Array.isArray(right.topics) ? right.topics : [];
+    if (topicsA.length > 0 && topicsB.length > 0) {
+        let sharedTopic = false;
+        for (let i = 0; i < topicsA.length; i++) {
+            if (topicsB.indexOf(topicsA[i]) >= 0) {
+                sharedTopic = true;
+                break;
+            }
+        }
+        if (!sharedTopic)
+            return {match:false, common:0, overlap:0, jaccard:0};
+    }
+
+    let common = 0;
+    for (let i = 0; i < a.length; i++) {
+        if (b.indexOf(a[i]) >= 0)
+            common++;
+    }
+    const minimum = Math.min(a.length, b.length);
+    const union = a.length + b.length - common;
+    const overlap = minimum > 0 ? common / minimum : 0;
+    const jaccard = union > 0 ? common / union : 0;
+
+    // Conservative by design. Three generic shared words are not enough.
+    // Require strong set agreement so nearby-but-different events stay apart.
+    const match = common >= 3 && overlap >= 0.75 && jaccard >= 0.62;
+    return {
+        match:match,
+        common:common,
+        overlap:overlap,
+        jaccard:jaccard
+    };
+}
+
+function newsStoryFamilies(rows) {
+    const source = Array.isArray(rows) ? rows : [];
+    const groups = [];
+
+    function addUnique(list, value, limit) {
+        const text = shortText(value, limit);
+        if (text && list.indexOf(text) < 0)
+            list.push(text);
+    }
+
+    function addRow(group, row, score) {
+        group.rows.push(row);
+        addUnique(group.titleVariants, row.title, 180);
+        group.variantCount = group.rows.length;
+        const sourceGroup = row.sourceGroup || {};
+        const records = Number(sourceGroup.articleCount);
+        group.articleRecords += isFinite(records) && records > 0 ? records : 1;
+
+        const domains = Array.isArray(sourceGroup.domains)
+            ? sourceGroup.domains : [row.domain];
+        const countries = Array.isArray(sourceGroup.countries)
+            ? sourceGroup.countries : [row.country];
+        const languages = Array.isArray(sourceGroup.languages)
+            ? sourceGroup.languages : [row.language];
+        const topics = Array.isArray(row.topics) ? row.topics : [];
+
+        for (let i = 0; i < domains.length; i++)
+            addUnique(group.domains, domains[i], 80);
+        for (let i = 0; i < countries.length; i++)
+            addUnique(group.countries, countries[i], 48);
+        for (let i = 0; i < languages.length; i++)
+            addUnique(group.languages, languages[i], 48);
+        for (let i = 0; i < topics.length; i++)
+            addUnique(group.topics, topics[i], 24);
+
+        const seen = Number(row.seenMillis);
+        if (isFinite(seen) && seen > group.latestSeenMillis)
+            group.latestSeenMillis = seen;
+        if (score && score.jaccard > group.strongestJaccard)
+            group.strongestJaccard = score.jaccard;
+    }
+
+    for (let i = 0; i < source.length; i++) {
+        const row = source[i];
+        if (!row || !row.title)
+            continue;
+
+        let bestIndex = -1;
+        let bestScore = null;
+        for (let j = 0; j < groups.length; j++) {
+            const score = newsStoryScore(groups[j].representative, row);
+            if (!score.match)
+                continue;
+            if (!bestScore
+                    || score.jaccard > bestScore.jaccard
+                    || (score.jaccard === bestScore.jaccard
+                        && score.overlap > bestScore.overlap)) {
+                bestIndex = j;
+                bestScore = score;
+            }
+        }
+
+        if (bestIndex < 0) {
+            const group = {
+                representative:row,
+                title:shortText(row.title, 180),
+                rows:[],
+                titleVariants:[],
+                variantCount:0,
+                articleRecords:0,
+                domains:[],
+                countries:[],
+                languages:[],
+                topics:[],
+                latestSeenMillis:-1,
+                strongestJaccard:1,
+                sourceCount:0
+            };
+            addRow(group, row, {jaccard:1});
+            groups.push(group);
+        } else {
+            addRow(groups[bestIndex], row, bestScore);
+        }
+    }
+
+    const families = [];
+    for (let i = 0; i < groups.length; i++) {
+        const group = groups[i];
+        group.sourceCount = group.domains.length;
+        if (group.variantCount >= 2)
+            families.push(group);
+    }
+
+    families.sort(function(a, b) {
+        if (a.variantCount !== b.variantCount)
+            return b.variantCount - a.variantCount;
+        if (a.sourceCount !== b.sourceCount)
+            return b.sourceCount - a.sourceCount;
+        if (a.articleRecords !== b.articleRecords)
+            return b.articleRecords - a.articleRecords;
+        return b.latestSeenMillis - a.latestSeenMillis;
+    });
+    return families;
+}
+
+function newsReportingTrend(rows, nowMs, bucketHours, bucketCount) {
+    const source = Array.isArray(rows) ? rows : [];
+    const hours = Math.max(1, Math.min(12, Math.floor(Number(bucketHours) || 4)));
+    const count = Math.max(3, Math.min(12, Math.floor(Number(bucketCount) || 6)));
+    let now = Number(nowMs);
+
+    if (!isFinite(now) || now <= 0) {
+        now = -1;
+        for (let i = 0; i < source.length; i++) {
+            const seen = Number(source[i] ? source[i].seenMillis : -1);
+            if (isFinite(seen) && seen > now)
+                now = seen;
+        }
+        if (now <= 0)
+            return {
+                buckets:[], timedRows:0, maxArticles:0, maxSources:0,
+                direction:"NO TIME DATA", recentArticles:0, previousArticles:0
+            };
+    }
+
+    const bucketMs = hours * 3600000;
+    const buckets = [];
+    for (let i = 0; i < count; i++) {
+        const older = (count - i) * hours;
+        const newer = (count - i - 1) * hours;
+        buckets.push({
+            label: newer === 0
+                ? "0-" + older + "H"
+                : newer + "-" + older + "H",
+            articles:0,
+            domains:[],
+            sources:0
+        });
+    }
+
+    let timedRows = 0;
+    for (let i = 0; i < source.length; i++) {
+        const row = source[i];
+        const seen = Number(row ? row.seenMillis : -1);
+        if (!isFinite(seen) || seen <= 0 || seen > now)
+            continue;
+        const age = now - seen;
+        if (age < 0 || age >= bucketMs * count)
+            continue;
+
+        const recentIndex = Math.floor(age / bucketMs);
+        const index = count - 1 - recentIndex;
+        if (index < 0 || index >= count)
+            continue;
+
+        const bucket = buckets[index];
+        bucket.articles++;
+        timedRows++;
+        const domain = shortText(row.domain, 80);
+        if (domain && bucket.domains.indexOf(domain) < 0)
+            bucket.domains.push(domain);
+    }
+
+    let maxArticles = 0;
+    let maxSources = 0;
+    for (let i = 0; i < buckets.length; i++) {
+        buckets[i].sources = buckets[i].domains.length;
+        maxArticles = Math.max(maxArticles, buckets[i].articles);
+        maxSources = Math.max(maxSources, buckets[i].sources);
+    }
+
+    const recentStart = Math.max(0, count - 2);
+    const previousStart = Math.max(0, count - 4);
+    let recentArticles = 0;
+    let previousArticles = 0;
+    for (let i = recentStart; i < count; i++)
+        recentArticles += buckets[i].articles;
+    for (let i = previousStart; i < recentStart; i++)
+        previousArticles += buckets[i].articles;
+
+    let direction = "STEADY";
+    if (timedRows < 3) {
+        direction = "SPARSE";
+    } else if (recentArticles >= previousArticles + 2
+            && (previousArticles === 0
+                || recentArticles >= previousArticles * 1.35)) {
+        direction = "RISING";
+    } else if (previousArticles >= recentArticles + 2
+            && (recentArticles === 0
+                || previousArticles >= recentArticles * 1.35)) {
+        direction = "FALLING";
+    }
+
+    return {
+        buckets:buckets,
+        timedRows:timedRows,
+        maxArticles:maxArticles,
+        maxSources:maxSources,
+        direction:direction,
+        recentArticles:recentArticles,
+        previousArticles:previousArticles,
+        bucketHours:hours,
+        bucketCount:count
+    };
+}
+
 function filterNewsRows(rows, topic, sourceQuery, languageQuery, maxAgeHours, nowMs, sourceRegion) {
     if (!Array.isArray(rows))
         return [];

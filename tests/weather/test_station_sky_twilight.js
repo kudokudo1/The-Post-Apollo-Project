@@ -50,6 +50,14 @@ assert.equal(dc.solarNoon, "12:51 PM");
 assert.equal(dc.civilDusk, "6:40 PM");
 assert.equal(dc.nauticalDusk, "7:11 PM");
 assert.equal(dc.astronomicalDusk, "7:42 PM");
+assert.equal(dc.blueMorningStart, "7:02 AM");
+assert.equal(dc.blueMorningEnd, "7:12 AM");
+assert.equal(dc.goldenMorningStart, "7:12 AM");
+assert.equal(dc.goldenMorningEnd, "8:06 AM");
+assert.equal(dc.goldenEveningStart, "5:35 PM");
+assert.equal(dc.goldenEveningEnd, "6:29 PM");
+assert.equal(dc.blueEveningStart, "6:29 PM");
+assert.equal(dc.blueEveningEnd, "6:40 PM");
 
 const ordered = [
     dc.astronomicalDawn, dc.nauticalDawn, dc.civilDawn,
@@ -58,6 +66,22 @@ const ordered = [
 ].map(ctx.clockMinute);
 for (let i = 1; i < ordered.length; i++)
     assert.ok(ordered[i] > ordered[i - 1], "solar windows must be chronological");
+
+const photoMorning = [
+    dc.blueMorningStart,
+    dc.blueMorningEnd,
+    dc.goldenMorningEnd
+].map(ctx.clockMinute);
+assert.ok(photoMorning[0] < photoMorning[1]);
+assert.ok(photoMorning[1] < photoMorning[2]);
+
+const photoEvening = [
+    dc.goldenEveningStart,
+    dc.goldenEveningEnd,
+    dc.blueEveningEnd
+].map(ctx.clockMinute);
+assert.ok(photoEvening[0] < photoEvening[1]);
+assert.ok(photoEvening[1] < photoEvening[2]);
 
 // No valid provider sunrise means there is no honest way to convert the
 // UTC solar calculation into the provider location's civil clock.
@@ -70,7 +94,7 @@ assert.equal(ctx.summary("bad-date", 38.9, -77, "07:29 AM").available, false);
 assert.equal(ctx.summary("2026-06-21", 89, 0, "12:00 AM").available, false);
 
 const policySource = read("widgets/weather/StationSkyTwilightPolicy.js");
-for (const zenith of ["90.833", "96", "102", "108"])
+for (const zenith of ["84", "90.833", "94", "96", "102", "108"])
     assert.ok(policySource.includes(zenith), "missing solar zenith " + zenith);
 assert.doesNotMatch(
     policySource,
@@ -93,7 +117,17 @@ for (const token of [
 assert.match(sky, /CLOCK CALIBRATED TO PROVIDER SUNRISE/);
 assert.match(sky, /NOT OBSERVED/);
 assert.match(sky, /TWILIGHT WINDOWS UNAVAILABLE/);
-assert.doesNotMatch(sky, /GOLDEN HOUR|BLUE HOUR/);
+assert.match(sky, /title: "PHOTO LIGHT \/\/ STATION CONVENTION"/);
+for (const token of [
+    "blueMorningStart", "blueMorningEnd",
+    "goldenMorningStart", "goldenMorningEnd",
+    "goldenEveningStart", "goldenEveningEnd",
+    "blueEveningStart", "blueEveningEnd"
+])
+    assert.ok(sky.includes("sky.twilightSummary." + token), token);
+assert.match(sky, /BLUE -6°\.\.-4°/);
+assert.match(sky, /GOLDEN -4°\.\.\+6°/);
+assert.match(sky, /CALCULATED, NOT OBSERVED/);
 
 const twilightStart = sky.indexOf('title: "TWILIGHT // SOLAR WINDOWS"');
 const forecastStart = sky.indexOf('title: "FORECAST // NEXT HOURS"', twilightStart);

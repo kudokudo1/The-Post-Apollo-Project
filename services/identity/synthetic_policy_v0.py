@@ -154,6 +154,9 @@ class SyntheticPolicyStore:
         """
         if type(now) is not int or now < 0:
             return False
+        if any(type(value) is not str or not value
+               for value in (principal_id, org_id, record_id, action)):
+            return False
         if action not in ("records.read", "records.write"):
             return False
         row = self._db.execute(
@@ -185,6 +188,9 @@ class SyntheticPolicyStore:
         This restrictive prototype shows only orgs with active independent
         memberships. Real dashboards may later require explicit summary grants.
         """
+        if any(type(value) is not str or not value
+               for value in (principal_id, portfolio_id)):
+            return ()
         rows = self._db.execute(
             """
             SELECT po.org_id

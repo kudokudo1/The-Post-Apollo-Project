@@ -121,6 +121,8 @@ jobs:
         run: python3 tests/weather/test_station_firms_fetch_helper.py
       - name: Validate NOAA MRMS current and four-hour radar history
         run: node tests/weather/test_station_map_noaa_radar.js
+      - name: Validate manual RainViewer radar fallback
+        run: node tests/weather/test_station_map_rainviewer_fallback.js
       - name: Validate NOAA HMS smoke polygon overlay
         run: node tests/weather/test_station_map_hms_smoke.js
       - name: Validate NOAA HMS latest KML fetch helper

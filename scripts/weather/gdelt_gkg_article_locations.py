@@ -54,7 +54,11 @@ def safe_article_url(value):
     host = parts.hostname.lower()
     if host == "localhost" or host.endswith(".local"):
         return ""
-    if parts.username or parts.password or parts.port:
+    try:
+        port = parts.port
+    except ValueError:
+        return ""
+    if parts.username or parts.password or port:
         return ""
     if re.fullmatch(r"\d+(?:\.\d+){3}", host):
         return ""
@@ -285,7 +289,9 @@ def lookup(article_url, seen_raw, language):
         attempted.append(stamp.strftime("%Y-%m-%d %H:%MZ"))
         try:
             match = find_article_in_zip(fetch_slice(url), safe)
-        except (HTTPError, URLError, OSError, zipfile.BadZipFile):
+        except (
+            HTTPError, URLError, OSError, ValueError, zipfile.BadZipFile
+        ):
             continue
         if match is None:
             continue

@@ -155,7 +155,8 @@ assert.match(ui, /modelData\.sourceGroup\.sourceCount/);
 assert.match(ui, /modelData\.sourceGroup\.domains\.join\("\ \/ "\)/);
 assert.match(ui, /modelData\.sourceGroup\.countries\.join\("\ \/ "\)/);
 assert.match(ui, /EXACT-HEADLINE SOURCE GROUPS", state:"CONNECTED"/);
-assert.match(ui, /SEMANTIC STORY CLUSTERS \/ DOSSIERS", state:"NOT WIRED"/);
+assert.match(ui, /CONSERVATIVE STORY FAMILIES", state:"CONNECTED"/);
+assert.match(ui, /SEMANTIC \/ EMBEDDING DOSSIERS", state:"NOT WIRED"/);
 assert.match(ui, /NOT FUZZY STORY CLUSTERING/);
 
 const source = read("services/weather/StationDiscoveryPolicy.js");

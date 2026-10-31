@@ -247,13 +247,73 @@ function newsBatchSummary(rows) {
     };
 }
 
-function filterNewsRows(rows, topic, sourceQuery, languageQuery, maxAgeHours, nowMs) {
+function newsSourceRegionGroups(rows) {
+    const source = Array.isArray(rows) ? rows : [];
+    const groups = {};
+
+    function addUnique(list, value, limit) {
+        const text = shortText(value, limit);
+        if (text && list.indexOf(text) < 0)
+            list.push(text);
+    }
+
+    for (let i = 0; i < source.length; i++) {
+        const row = source[i];
+        if (!row)
+            continue;
+
+        const country = shortText(row.country, 48) || "UNLISTED";
+        const key = country.toLowerCase();
+        if (!groups[key]) {
+            groups[key] = {
+                id:country,
+                country:country,
+                articles:0,
+                domains:[],
+                languages:[],
+                topics:[],
+                latestSeenMillis:-1
+            };
+        }
+
+        const group = groups[key];
+        group.articles++;
+        addUnique(group.domains, row.domain, 80);
+        addUnique(group.languages, row.language, 48);
+
+        const topics = Array.isArray(row.topics) ? row.topics : [];
+        for (let j = 0; j < topics.length; j++)
+            addUnique(group.topics, topics[j], 24);
+
+        const seen = Number(row.seenMillis);
+        if (isFinite(seen) && seen > group.latestSeenMillis)
+            group.latestSeenMillis = seen;
+    }
+
+    const output = Object.keys(groups).map(function(key) {
+        const group = groups[key];
+        group.publishers = group.domains.length;
+        return group;
+    });
+
+    output.sort(function(a, b) {
+        if (a.articles !== b.articles)
+            return b.articles - a.articles;
+        if (a.publishers !== b.publishers)
+            return b.publishers - a.publishers;
+        return a.country.localeCompare(b.country);
+    });
+    return output;
+}
+
+function filterNewsRows(rows, topic, sourceQuery, languageQuery, maxAgeHours, nowMs, sourceRegion) {
     if (!Array.isArray(rows))
         return [];
 
     const wanted = String(topic || "all").toLowerCase();
     const query = shortText(sourceQuery, 80).toLowerCase();
     const language = shortText(languageQuery, 48).toLowerCase();
+    const region = shortText(sourceRegion, 48).toLowerCase();
     const hours = Number(maxAgeHours);
     const timeLimited = isFinite(hours) && hours > 0;
     const now = Number(nowMs);
@@ -280,6 +340,13 @@ function filterNewsRows(rows, topic, sourceQuery, languageQuery, maxAgeHours, no
         if (language) {
             const rowLanguage = String(row.language || "").toLowerCase();
             if (rowLanguage.indexOf(language) < 0)
+                continue;
+        }
+
+        if (region) {
+            const rowCountry = String(row.country || "UNLISTED")
+                .trim().toLowerCase();
+            if (rowCountry !== region)
                 continue;
         }
 

@@ -225,6 +225,13 @@ def snapshot_from_tree(
     social: dict[str, Any] | None = None
     discord_candidates: list[dict[str, Any]] = []
     browser_candidates: dict[str, list[dict[str, Any]]] = {site: [] for site in BROWSER_SITES}
+    # Passive UI-only presence reporting. Unlike the existing geometry
+    # candidates, this includes exact managed Chromium classes in scratchpad
+    # and never grants focus/move/resize authority.
+    observed_browser_sites: set[str] = set()
+    expected_browser_classes = {
+        browser_window_class(site, scoped_identity): site for site in BROWSER_SITES
+    }
 
     for node in walk_tree(tree):
         rect = compact_rect(node.get("rect"))
@@ -266,12 +273,20 @@ def snapshot_from_tree(
         if visible and social is None and node.get("name") == "QS_SOCIAL_MENU":
             social = entry
 
-        # Legacy browser discovery stays visible-only. In the scoped mode,
-        # hidden scratchpad windows are discovered with their exact con_id so
-        # they cannot be mistaken for a different identity's visible window.
+        # Mark a provider as open only for an existing, exact-class Sway
+        # container in the current browser scope. Hidden scratchpad windows
+        # count as background-open; another identity's window never does.
+        window_class = (node.get("window_properties") or {}).get("class")
+        if isinstance(window_class, str) and type(node.get("id")) is int:
+            if node["id"] > 0:
+                open_site = expected_browser_classes.get(window_class)
+                if open_site is not None:
+                    observed_browser_sites.add(open_site)
+
+        # Legacy browser geometry discovery stays visible-only. The UI
+        # presence signal above does NOT broaden geometry/focus authority.
         if not visible and scoped_identity is None:
             continue
-        window_class = (node.get("window_properties") or {}).get("class")
         for site in BROWSER_SITES:
             if window_class != browser_window_class(site, scoped_identity):
                 continue
@@ -317,6 +332,9 @@ def snapshot_from_tree(
     return {
         "social": social,
         "discord": discord,
+        # UI status only: exact live Sway containers, including scratchpad.
+        # This list never participates in geometry command selection.
+        "openBrowserSites": sorted(observed_browser_sites),
         **browser_windows,
     }
 

@@ -8,7 +8,7 @@ not an independently authenticated callback trace or stage attestation.
 from __future__ import annotations
 
 import argparse
-import hashlib
+import fcntl
 import json
 import os
 from pathlib import Path
@@ -99,6 +99,36 @@ def private_file(file: Path, maximum: int):
         raise
     except OSError:
         raise EvidenceRefusal("PRIVATE_FIXTURE_FILE_REQUIRED") from None
+
+
+
+def acquire_disposable_lock(folder: Path):
+    # Hold the same existing M10p lifetime lock while inspecting. This only
+    # fences cooperating M11g owners, not arbitrary noncooperating writers.
+    lockfile = folder / "handoff-test.lock"
+    try:
+        meta = lockfile.lstat()
+        require(stat.S_ISREG(meta.st_mode) and not lockfile.is_symlink() and
+                meta.st_uid == os.geteuid() and meta.st_nlink == 1 and
+                stat.S_IMODE(meta.st_mode) == 0o600,
+                "PRIVATE_FIXTURE_LOCK_REQUIRED")
+        fd = os.open(lockfile, os.O_RDONLY | os.O_NOFOLLOW)
+        try:
+            observed = os.fstat(fd)
+            require((observed.st_dev,observed.st_ino) ==
+                    (meta.st_dev,meta.st_ino),
+                    "PRIVATE_FIXTURE_LOCK_REQUIRED")
+            fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except BaseException:
+            os.close(fd)
+            raise
+        return fd
+    except BlockingIOError:
+        raise EvidenceRefusal("NATIVE_HOST_STILL_OWNS_FIXTURE") from None
+    except EvidenceRefusal:
+        raise
+    except OSError:
+        raise EvidenceRefusal("PRIVATE_FIXTURE_LOCK_REQUIRED") from None
 
 
 def fixture_snapshot(file: Path):
@@ -199,8 +229,13 @@ def inspect(fixture_file: Path, expected_counter: int, expected_phase: str,
     require(expected_phase in ALLOWED_PHASES,
             "EXPECTED_PHASE_REQUIRED")
     folder = private_folder(fixture_file)
-    raw, document = fixture_snapshot(fixture_file)
-    journal = journal_snapshot(folder)
+    lock_fd = acquire_disposable_lock(folder)
+    try:
+        raw, document = fixture_snapshot(fixture_file)
+        journal = journal_snapshot(folder)
+    finally:
+        fcntl.flock(lock_fd, fcntl.LOCK_UN)
+        os.close(lock_fd)
     obs = trace_observation([] if tags is None else tags)
     passed = (document["counter"] == expected_counter and
               journal["phase"] == expected_phase)

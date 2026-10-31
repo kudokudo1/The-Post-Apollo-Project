@@ -854,6 +854,248 @@ Rectangle {
 
                 StationSectionDivider {
                     width: parent.width
+                    title: "FLOOD CONTEXT // IMPACTS + CRESTS"
+                }
+
+                Row {
+                    width: parent.width
+                    spacing: 12
+
+                    GohuText {
+                        text: riverService.contextLoading
+                              ? "RECEIVING"
+                              : riverService.contextFailed
+                                ? (riverService.contextReady
+                                   ? "DEGRADED" : "UNAVAILABLE")
+                                : riverService.contextReady
+                                  ? "RECEIVED"
+                                  : "WAITING"
+                        font.pixelSize: 10
+                        color: riverService.contextFailed
+                               ? Colors.yellow
+                               : riverService.contextReady
+                                 ? Colors.cyan : Colors.orange
+                    }
+
+                    QuietText {
+                        width: Math.max(0, parent.width - 110)
+                        text: riverService.contextReady
+                              ? "LID " + riverService.contextGaugeId
+                                + " // COUNTY "
+                                + (riverService.gaugeContext.county || "--")
+                                + (riverService.gaugeContext.usgsId
+                                   ? " // USGS "
+                                     + riverService.gaugeContext.usgsId
+                                   : "")
+                              : "NWPS /GAUGES/{LID} METADATA"
+                        elide: Text.ElideRight
+                        font.pixelSize: 9
+                    }
+                }
+
+                QuietText {
+                    visible: riverService.contextFailed
+                    width: parent.width
+                    text: riverService.contextErrorText
+                          + (riverService.contextReady
+                             ? " // LAST-GOOD CONTEXT RETAINED" : "")
+                    font.pixelSize: 9
+                    color: Colors.yellow
+                }
+
+                Row {
+                    width: parent.width
+                    spacing: 8
+                    visible: riverService.contextReady
+                             && riverService.gaugeContext.thresholds.length > 0
+
+                    Repeater {
+                        model: riverService.gaugeContext.thresholds
+
+                        delegate: Rectangle {
+                            required property var modelData
+                            width: 155
+                            height: 54
+                            color: Colors.dark
+                            border.width: 1
+                            border.color: ground.riverCategoryColor(
+                                {"id": modelData.id}
+                            )
+
+                            Column {
+                                anchors.fill: parent
+                                anchors.margins: 6
+                                spacing: 3
+
+                                SecondaryText {
+                                    text: modelData.label + " THRESHOLD"
+                                    font.pixelSize: 8
+                                }
+
+                                GohuText {
+                                    text: modelData.stage !== null
+                                          ? RiverPolicy.readingText(
+                                                modelData.stage,
+                                                riverService.gaugeContext
+                                                    .stageUnits
+                                            )
+                                          : RiverPolicy.readingText(
+                                                modelData.flow,
+                                                riverService.gaugeContext
+                                                    .flowUnits
+                                            )
+                                    font.pixelSize: 12
+                                    color: ground.riverCategoryColor(
+                                        {"id": modelData.id}
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+
+                Column {
+                    width: parent.width
+                    spacing: 5
+                    visible: riverService.contextReady
+                             && riverService.gaugeContext.impacts.length > 0
+
+                    GohuText {
+                        text: "OFFICIAL FLOOD IMPACT STATEMENTS // "
+                              + riverService.gaugeContext.impacts.length
+                        font.pixelSize: 10
+                        color: Colors.orange
+                    }
+
+                    Repeater {
+                        model: riverService.gaugeContext.impacts.slice(0, 4)
+
+                        delegate: Rectangle {
+                            required property var modelData
+                            width: parent.width
+                            height: 52
+                            color: Colors.dark
+                            border.width: 1
+                            border.color: Colors.orange
+
+                            Row {
+                                anchors.fill: parent
+                                anchors.margins: 7
+                                spacing: 10
+
+                                GohuText {
+                                    width: 105
+                                    text: RiverPolicy.readingText(
+                                        modelData.stage,
+                                        riverService.gaugeContext.stageUnits
+                                    )
+                                    font.pixelSize: 11
+                                    color: Colors.orange
+                                }
+
+                                QuietText {
+                                    width: Math.max(0, parent.width - 115)
+                                    text: modelData.statement
+                                    wrapMode: Text.WordWrap
+                                    maximumLineCount: 2
+                                    elide: Text.ElideRight
+                                    font.pixelSize: 9
+                                }
+                            }
+                        }
+                    }
+                }
+
+                Row {
+                    width: parent.width
+                    spacing: 12
+                    visible: riverService.contextReady
+                             && (riverService.gaugeContext.recentCrests.length > 0
+                                 || riverService.gaugeContext.historicCrests.length > 0)
+
+                    Column {
+                        width: (parent.width - 12) / 2
+                        spacing: 4
+
+                        GohuText {
+                            text: "RECENT CRESTS"
+                            font.pixelSize: 10
+                            color: Colors.cyan
+                        }
+
+                        Repeater {
+                            model: riverService.gaugeContext.recentCrests.slice(0, 4)
+
+                            delegate: QuietText {
+                                required property var modelData
+                                width: parent.width
+                                text: modelData.occurredLabel
+                                      + " // "
+                                      + RiverPolicy.crestReading(
+                                            modelData,
+                                            riverService.gaugeContext.stageUnits,
+                                            riverService.gaugeContext.flowUnits
+                                        )
+                                      + (modelData.preliminary
+                                         ? " // " + modelData.preliminary
+                                         : "")
+                                elide: Text.ElideRight
+                                font.pixelSize: 9
+                            }
+                        }
+                    }
+
+                    Column {
+                        width: (parent.width - 12) / 2
+                        spacing: 4
+
+                        GohuText {
+                            text: "HISTORIC CRESTS"
+                            font.pixelSize: 10
+                            color: Colors.magenta
+                        }
+
+                        Repeater {
+                            model: riverService.gaugeContext.historicCrests.slice(0, 4)
+
+                            delegate: QuietText {
+                                required property var modelData
+                                width: parent.width
+                                text: modelData.occurredLabel
+                                      + " // "
+                                      + RiverPolicy.crestReading(
+                                            modelData,
+                                            riverService.gaugeContext.stageUnits,
+                                            riverService.gaugeContext.flowUnits
+                                        )
+                                      + (modelData.oldDatum
+                                         ? " // OLD DATUM" : "")
+                                elide: Text.ElideRight
+                                font.pixelSize: 9
+                            }
+                        }
+                    }
+                }
+
+                QuietText {
+                    visible: riverService.contextReady
+                    width: parent.width
+                    text: "NWPS OFFICIAL GAUGE METADATA // IMPACT STATEMENTS + CREST RECORDS ARE LOCATION-SPECIFIC"
+                          + (riverService.gaugeContext.inundationAvailable
+                             ? " // INUNDATION PRODUCT AVAILABLE"
+                             : "")
+                    font.pixelSize: 9
+                    color: Colors.orange
+                }
+            }
+
+            Column {
+                width: parent.width
+                spacing: 7
+                visible: riverService.ready && !!riverService.gauge
+
+                StationSectionDivider {
+                    width: parent.width
                     title: "STAGEFLOW // OBSERVED + OFFICIAL FORECAST"
                 }
 

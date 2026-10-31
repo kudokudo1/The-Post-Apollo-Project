@@ -124,6 +124,10 @@ Rectangle {
     // local file distinct from the existing organization layout document.
     property string accountEditorIdentityId: ""
     property string accountSelectedServiceId: ""
+    property string accountSelectedEntryId: ""
+    property string pendingAccountRemovalId: ""
+    property bool accountManagerOpen: false
+    property bool accountAppPickerOpen: false
     readonly property var accountDetails:
         SocialAccountDetailsStore.recordFor(identitySnapshot.activeId)
 
@@ -133,7 +137,31 @@ Rectangle {
             var a = messagingApps[c.serviceIndex];
             return a && (!term || a.name.toLowerCase().indexOf(term) !== -1
                          || c.id.indexOf(term) !== -1);
-        }).slice(0, 8);
+        });
+    }
+
+    function accountNamesFor(serviceId) {
+        if (!serviceId || !identitySnapshot.activeId)
+            return [];
+        return SocialAccountDetailsStore.accountNamesFor(
+            identitySnapshot.activeId, serviceId);
+    }
+
+    function selectAccountService(serviceId) {
+        accountSelectedServiceId = serviceId;
+        accountSelectedEntryId = "";
+        pendingAccountRemovalId = "";
+        accountLabelInput.text = "";
+        accountAppPickerOpen = false;
+        accountServiceSearchInput.text = "";
+    }
+
+    function selectAccountEntry(entry) {
+        if (!entry || !entry.id)
+            return;
+        accountSelectedEntryId = entry.id;
+        pendingAccountRemovalId = "";
+        accountLabelInput.text = entry.label;
     }
 
     function refreshAccountForm() {
@@ -142,9 +170,15 @@ Rectangle {
         var entry = SocialAccountDetailsStore.recordFor(id);
         accountEmailInput.text = entry.email || "";
         accountPhoneInput.text = entry.phone || "";
-        if (accountSelectedServiceId)
-            accountLabelInput.text =
-                entry.accounts[accountSelectedServiceId] || "";
+        var entries = accountNamesFor(accountSelectedServiceId);
+        var selected = entries.find(function(a) {
+            return a.id === accountSelectedEntryId;
+        });
+        if (!selected)
+            accountSelectedEntryId = "";
+        accountLabelInput.text = selected ? selected.label : "";
+        if (pendingAccountRemovalId !== "" && !selected)
+            pendingAccountRemovalId = "";
     }
 
     // Family editing only touches metadata for the identity active when its
@@ -282,6 +316,9 @@ Rectangle {
         appSelector.resetFamilyRemovalConfirmation();
         if (appSelector.accountEditorIdentityId !== appSelector.identitySnapshot.activeId) {
             appSelector.accountSelectedServiceId = "";
+            appSelector.accountSelectedEntryId = "";
+            appSelector.pendingAccountRemovalId = "";
+            appSelector.accountAppPickerOpen = false;
             accountServiceSearchInput.text = "";
             accountLabelInput.text = "";
             appSelector.refreshAccountForm();

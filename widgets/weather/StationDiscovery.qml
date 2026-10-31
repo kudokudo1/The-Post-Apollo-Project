@@ -158,6 +158,7 @@ Rectangle {
     property int radarLoadedHistoryMinutes: 0
     property double radarRequestedTimeMs: 0
     property date radarRequestedAt
+    property string radarDisplaySource: "noaa"
     readonly property var radarHistoryOptions:
         RadarPolicy.historyOptions()
     readonly property var smokeSummary:
@@ -358,6 +359,7 @@ Rectangle {
 
         radarSnapshotBounds = snapshot;
         radarRequestedAt = new Date(requestNow);
+        radarDisplaySource = "noaa";
         radarLoadedHistoryMinutes = radarHistoryMinutes;
         radarRequestedTimeMs = historicalTime;
         // Explicit empty -> next URL guarantees a manual same-viewport refresh
@@ -374,6 +376,35 @@ Rectangle {
         radarSnapshotBounds = null;
         radarLoadedHistoryMinutes = 0;
         radarRequestedTimeMs = 0;
+        if (radarDisplaySource === "noaa"
+                && rainViewerRadarService.ready)
+            radarDisplaySource = "rainviewer";
+    }
+
+    function loadRainViewerFallback() {
+        return rainViewerRadarService.request(
+            radarHistoryMinutes,
+            mapVisibleBounds
+        );
+    }
+
+    function clearRainViewerFallback() {
+        rainViewerRadarService.clear();
+        if (radarDisplaySource === "rainviewer")
+            radarDisplaySource = radarImageUrl !== "" ? "noaa" : "noaa";
+    }
+
+    function showRadarSource(sourceId) {
+        const next = String(sourceId || "");
+        if (next === "noaa" && radarImageUrl !== "") {
+            radarDisplaySource = "noaa";
+            return true;
+        }
+        if (next === "rainviewer" && rainViewerRadarService.ready) {
+            radarDisplaySource = "rainviewer";
+            return true;
+        }
+        return false;
     }
 
     function loadSmokePolygons() {
@@ -508,7 +539,7 @@ Rectangle {
         : domain === "news" ? "GDELT DOC // WORLD EVENT HEADLINES"
         : "RADIO BROWSER // TOP VOTED STREAMS"
     readonly property string sourceCaution:
-        domain === "map" ? "NATURAL EARTH + EONET + USGS EARTHQUAKES + FIRMS + MRMS + HMS SMOKE"
+        domain === "map" ? "NATURAL EARTH + EONET + USGS EARTHQUAKES + FIRMS + MRMS + RAINVIEWER FALLBACK + HMS SMOKE"
         : domain === "news" ? "ARTICLE DISCOVERY // LOCAL FILTERS // EXACT-HEADLINE SOURCE GROUPS // NOT FUZZY STORY CLUSTERING"
         : "STATION DIRECTORY // PERSISTENT PLAYBACK NOT YET WIRED"
     readonly property var plannedSources: {
@@ -553,7 +584,16 @@ Rectangle {
                              + radarHistoryLabel(radarLoadedHistoryMinutes)
                            : "MANUAL READY"
                 },
-                {name:"RAINVIEWER // RADAR FALLBACK", state:"NOT WIRED"},
+                {
+                    name:"RAINVIEWER // PAST RADAR FALLBACK // 2H",
+                    state: rainViewerRadarService.ready
+                           ? "LOADED " + rainViewerRadarService.tileCount
+                             + " TILES"
+                           : rainViewerRadarService.loading
+                             ? "RECEIVING"
+                             : rainViewerRadarService.failed
+                               ? "ERROR" : "MANUAL READY"
+                },
                 {
                     name:"NOAA HMS // SMOKE PLUME POLYGONS",
                     state: hmsSmokeService.ready
@@ -609,6 +649,12 @@ Rectangle {
 
     WeatherServices.HmsSmokeService {
         id: hmsSmokeService
+    }
+
+    WeatherServices.RainViewerRadarService {
+        id: rainViewerRadarService
+        onOverlayReady:
+            stationDiscovery.radarDisplaySource = "rainviewer"
     }
 
     WeatherServices.GdeltArticleLocationService {
@@ -1110,6 +1156,133 @@ Rectangle {
 
                 StationSectionDivider {
                     width: parent.width
+                    title: "RADAR FALLBACK // RAINVIEWER PAST RADAR"
+                }
+
+                Row {
+                    width: parent.width
+                    height: 32
+                    spacing: 10
+
+                    ActionButton {
+                        width: 142
+                        height: 30
+                        label: rainViewerRadarService.ready
+                               ? "REFRESH FALLBACK"
+                               : "LOAD FALLBACK"
+                        labelPixelSize: 9
+                        accentColor: Colors.blue
+                        available: !rainViewerRadarService.loading
+                                   && stationDiscovery.radarHistoryMinutes <= 120
+                        onClicked:
+                            stationDiscovery.loadRainViewerFallback()
+                    }
+
+                    ActionButton {
+                        width: 92
+                        height: 30
+                        label: "CLEAR RV"
+                        labelPixelSize: 9
+                        available: rainViewerRadarService.ready
+                                   || rainViewerRadarService.strips.length > 0
+                        onClicked:
+                            stationDiscovery.clearRainViewerFallback()
+                    }
+
+                    GohuText {
+                        anchors.verticalCenter: parent.verticalCenter
+                        width: 180
+                        text: stationDiscovery.radarHistoryMinutes > 120
+                              ? "MAX HISTORY // 2H"
+                              : rainViewerRadarService.loading
+                                ? "READING METADATA"
+                                : rainViewerRadarService.failed
+                                  ? rainViewerRadarService.errorText
+                                  : rainViewerRadarService.ready
+                                    ? "FALLBACK LOADED"
+                                    : "MANUAL READY"
+                        elide: Text.ElideRight
+                        font.pixelSize: 9
+                        color: rainViewerRadarService.failed
+                               ? Colors.yellow
+                               : rainViewerRadarService.ready
+                                 ? Colors.blue : Colors.white
+                    }
+
+                    QuietText {
+                        anchors.verticalCenter: parent.verticalCenter
+                        width: Math.max(0, parent.width - 434)
+                        text: rainViewerRadarService.ready
+                              ? "FRAME "
+                                + stationDiscovery.radarUtcLabel(
+                                      rainViewerRadarService
+                                      .selectedFrameTime * 1000
+                                  )
+                                + " // "
+                                + rainViewerRadarService.tileCount
+                                + " TILES // Z"
+                                + rainViewerRadarService.tileZoom
+                              : "PAST 2H // 10-MIN FRAMES // MANUAL // NO AUTO-FETCH"
+                        elide: Text.ElideRight
+                        font.pixelSize: 9
+                    }
+                }
+
+                Row {
+                    width: parent.width
+                    height: 30
+                    spacing: 10
+
+                    ActionButton {
+                        width: 108
+                        height: 28
+                        label: "SHOW NOAA"
+                        labelPixelSize: 9
+                        selected: stationDiscovery.radarDisplaySource === "noaa"
+                        available: stationDiscovery.radarImageUrl !== ""
+                        accentColor: Colors.cyan
+                        onClicked:
+                            stationDiscovery.showRadarSource("noaa")
+                    }
+
+                    ActionButton {
+                        width: 132
+                        height: 28
+                        label: "SHOW FALLBACK"
+                        labelPixelSize: 9
+                        selected:
+                            stationDiscovery.radarDisplaySource === "rainviewer"
+                        available: rainViewerRadarService.ready
+                        accentColor: Colors.blue
+                        onClicked:
+                            stationDiscovery.showRadarSource("rainviewer")
+                    }
+
+                    QuietText {
+                        anchors.verticalCenter: parent.verticalCenter
+                        width: Math.max(0, parent.width - 250)
+                        text: "DISPLAY // "
+                              + (stationDiscovery.radarDisplaySource
+                                 === "rainviewer"
+                                 ? "RAINVIEWER" : "NOAA MRMS")
+                              + " // WEATHER DATA BY RAINVIEWER WHEN FALLBACK IS SHOWN"
+                        elide: Text.ElideRight
+                        font.pixelSize: 9
+                        color: stationDiscovery.radarDisplaySource
+                               === "rainviewer"
+                               ? Colors.blue : Colors.cyan
+                    }
+                }
+
+                QuietText {
+                    width: parent.width
+                    text: "RAINVIEWER API // SOURCE CREDIT REQUIRED // GLOBAL COVERAGE VARIES // PUBLIC FALLBACK HAS PAST RADAR ONLY"
+                    font.pixelSize: 9
+                    color: Colors.orange
+                }
+
+                StationSectionDivider {
+                    width: parent.width
                     title: "SMOKE PLUMES // NOAA HMS"
                 }
 
@@ -1501,9 +1674,72 @@ Rectangle {
                                ? Math.max(0, southEast.x - northWest.x) : 0
                         height: northWest.valid && southEast.valid
                                 ? Math.max(0, southEast.y - northWest.y) : 0
-                        visible: source !== ""
+                        visible: stationDiscovery.radarDisplaySource === "noaa"
+                                 && source !== ""
                                  && northWest.valid && southEast.valid
                                  && width > 0 && height > 0
+                    }
+
+                    Repeater {
+                        model: stationDiscovery.radarDisplaySource
+                               === "rainviewer"
+                               && rainViewerRadarService.ready
+                               ? rainViewerRadarService.strips : []
+
+                        delegate: Image {
+                            required property var modelData
+                            readonly property var northWest:
+                                MapProjection.project(
+                                    modelData.west,
+                                    modelData.north,
+                                    mapPlot.width,
+                                    mapPlot.height,
+                                    stationDiscovery.mapZoom,
+                                    stationDiscovery.mapCenterLon,
+                                    stationDiscovery.mapCenterLat
+                                )
+                            readonly property var southEast:
+                                MapProjection.project(
+                                    modelData.east,
+                                    modelData.south,
+                                    mapPlot.width,
+                                    mapPlot.height,
+                                    stationDiscovery.mapZoom,
+                                    stationDiscovery.mapCenterLon,
+                                    stationDiscovery.mapCenterLat
+                                )
+
+                            source: modelData.url
+                            sourceSize.width: modelData.sourceSize
+                            sourceSize.height: modelData.sourceSize
+                            sourceClipRect: Qt.rect(
+                                0,
+                                modelData.sourceY,
+                                modelData.sourceSize,
+                                modelData.sourceHeight
+                            )
+                            cache: true
+                            asynchronous: true
+                            fillMode: Image.Stretch
+                            smooth: true
+                            opacity: 0.68
+                            z: 0.12
+
+                            x: northWest.valid ? northWest.x : 0
+                            y: northWest.valid ? northWest.y : 0
+                            width: northWest.valid && southEast.valid
+                                   ? Math.max(
+                                         0,
+                                         southEast.x - northWest.x
+                                     ) : 0
+                            height: northWest.valid && southEast.valid
+                                    ? Math.max(
+                                          0,
+                                          southEast.y - northWest.y
+                                      ) : 0
+                            visible: northWest.valid && southEast.valid
+                                     && width > 0 && height > 0
+                        }
                     }
 
                     Canvas {

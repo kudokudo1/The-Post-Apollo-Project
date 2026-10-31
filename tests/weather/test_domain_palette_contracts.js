@@ -192,7 +192,7 @@ assert.match(windowSource, /weatherStation\.currentView === "news"[\s\S]*?\? new
 assert.match(windowSource, /weatherStation\.currentView === "radio"[\s\S]*?\? radioViewComponent/);
 assert.match(discoveryViewSource, /SOURCE RACK \/\/ WHAT IS CONNECTED/);
 assert.match(discoveryViewSource, /STATION DIRECTORY \/\/ PERSISTENT PLAYBACK NOT YET WIRED/);
-assert.match(discoveryViewSource, /SPATIAL PLOT \/\/ EONET \+ FIRMS POINTS/);
+assert.match(discoveryViewSource, /SPATIAL PLOT \/\/ EONET \+ FIRMS \+ NEWS MENTIONS/);
 assert.match(discoveryViewSource, /LAT\/LON GRID \/\/ RADAR \+ SMOKE ARE DATA LAYERS, NOT BASEMAP/);
 assert.match(discoveryViewSource, /BASEMAP \/ OTHER POLYGON LAYERS", state:"NOT WIRED"/);
 assert.match(discoveryViewSource, /WeatherServices\.StationDiscoveryService/);

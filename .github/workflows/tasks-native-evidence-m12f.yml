@@ -1,0 +1,55 @@
+name: TASKS M12f isolated native acceptance preparation and private journal evidence
+
+on:
+  pull_request:
+    paths:
+      - 'TaskNativeCallbackHarnessM12f.qml'
+      - 'tests/tasks/fixtures/TaskNativeEvidenceInspectorM12f.py'
+      - 'tests/tasks/test_task_native_evidence_inspector_m12f.py'
+      - 'docs/tasks-native-acceptance-evidence-m12f.md'
+      - '.github/workflows/tasks-native-evidence-m12f.yml'
+      - 'tests/tasks/fixtures/TaskNativeCallbackLabM12e.qml'
+      - 'tests/tasks/fixtures/TaskSqliteWriterAuthorityFixture.py'
+      - 'services/projects/TaskFileViewHostBridgeM11g.qml'
+      - 'services/hub/ApolloHubTodoStore.qml'
+      - 'shell.qml'
+  push:
+    branches: [main]
+    paths:
+      - 'TaskNativeCallbackHarnessM12f.qml'
+      - 'tests/tasks/fixtures/TaskNativeEvidenceInspectorM12f.py'
+      - 'tests/tasks/test_task_native_evidence_inspector_m12f.py'
+      - 'docs/tasks-native-acceptance-evidence-m12f.md'
+      - '.github/workflows/tasks-native-evidence-m12f.yml'
+      - 'services/hub/ApolloHubTodoStore.qml'
+      - 'shell.qml'
+
+permissions:
+  contents: read
+
+jobs:
+  disposable-native-evidence-source:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: M12f private synthetic source journal inspection and refused states
+        run: python3 tests/tasks/test_task_native_evidence_inspector_m12f.py
+      - name: M11g original isolated FileView owner host and SQLite tests
+        run: python3 tests/tasks/test_task_fileview_owner_host_m11g.py
+      - name: M12e native callback attribution ambiguity and QML source
+        run: node --test tests/tasks/test_task_native_callback_attribution_m12e.cjs
+      - name: M11q exact synthetic callback policy and evidence
+        run: node tests/tasks/test_task_native_callback_guard_m11q.cjs
+      - name: M11 deferred readback callbacks not immediate reload
+        run: python3 tests/tasks/test_fileview_deferred_readback_m11.py
+      - name: M11t nine production gates remain open
+        run: python3 tests/tasks/test_task_production_trust_contract_m11t.py
+      - name: M11d one live TASKS FileView owner
+        run: python3 tests/tasks/test_task_writer_gate_inventory_m11d.py

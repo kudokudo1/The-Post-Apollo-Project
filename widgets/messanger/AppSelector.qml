@@ -1476,17 +1476,65 @@ Rectangle {
                         appSelector.accountSelectedServiceId)
                     clip: true
                     spacing: 2
-                    delegate: ActionButton {
+                    delegate: Row {
+                        id: accountNameRow
                         required property var modelData
+                        required property int index
                         width: ListView.view.width
                         height: 31
-                        label: modelData.label
-                        labelPixelSize: 9
-                        contentPadding: 4
-                        selected: appSelector.accountSelectedEntryId ===
-                                  modelData.id
-                        interactive: appSelector.identitySnapshot.writable
-                        onTriggered: appSelector.selectAccountEntry(modelData)
+                        spacing: 3
+
+                        // Row-level actions target the entry at its persisted
+                        // position, not the previously selected account name.
+                        ActionButton {
+                            width: 28
+                            height: parent.height
+                            label: "↑"
+                            accentColor: Colors.orange
+                            labelPixelSize: 13
+                            contentPadding: 1
+                            interactive: appSelector.identitySnapshot.writable
+                                         && SocialAccountDetailsStore.state === "ready"
+                                         && appSelector.accountEditorIdentityId ===
+                                            appSelector.identitySnapshot.activeId
+                                         && accountNameRow.index > 0
+                            onTriggered: SocialAccountDetailsStore.moveAccountName(
+                                appSelector.identitySnapshot.activeId,
+                                appSelector.accountSelectedServiceId,
+                                accountNameRow.modelData.id, -1)
+                        }
+                        ActionButton {
+                            width: Math.max(1, accountNameRow.width - 62)
+                            height: parent.height
+                            label: accountNameRow.modelData.label
+                            labelPixelSize: 9
+                            labelMinimumPixelSize: 8
+                            contentPadding: 2
+                            selected: appSelector.accountSelectedEntryId ===
+                                      accountNameRow.modelData.id
+                            interactive: appSelector.identitySnapshot.writable
+                            onTriggered: appSelector.selectAccountEntry(
+                                accountNameRow.modelData)
+                        }
+                        ActionButton {
+                            width: 28
+                            height: parent.height
+                            label: "↓"
+                            accentColor: Colors.orange
+                            labelPixelSize: 13
+                            contentPadding: 1
+                            interactive: appSelector.identitySnapshot.writable
+                                         && SocialAccountDetailsStore.state === "ready"
+                                         && appSelector.accountEditorIdentityId ===
+                                            appSelector.identitySnapshot.activeId
+                                         && accountNameRow.index <
+                                            appSelector.accountNamesFor(
+                                                appSelector.accountSelectedServiceId).length - 1
+                            onTriggered: SocialAccountDetailsStore.moveAccountName(
+                                appSelector.identitySnapshot.activeId,
+                                appSelector.accountSelectedServiceId,
+                                accountNameRow.modelData.id, 1)
+                        }
                     }
                 }
                 ActionButton {
@@ -1560,44 +1608,6 @@ Rectangle {
                                 appSelector.accountSelectedServiceId,
                                 appSelector.accountSelectedEntryId,
                                 accountLabelInput.text);
-                    }
-                }
-                Row {
-                    width: parent.width
-                    height: 33
-                    spacing: 5
-                    visible: appSelector.accountSelectedServiceId !== ""
-                             && appSelector.accountSelectedEntryId !== ""
-                    ActionButton {
-                        width: (parent.width - 5) / 2
-                        height: parent.height
-                        label: "MOVE UP"
-                        labelPixelSize: 9
-                        contentPadding: 3
-                        interactive: appSelector.identitySnapshot.writable
-                                     && SocialAccountDetailsStore.state === "ready"
-                                     && appSelector.selectedAccountPosition() > 0
-                        onTriggered: SocialAccountDetailsStore.moveAccountName(
-                            appSelector.identitySnapshot.activeId,
-                            appSelector.accountSelectedServiceId,
-                            appSelector.accountSelectedEntryId, -1)
-                    }
-                    ActionButton {
-                        width: (parent.width - 5) / 2
-                        height: parent.height
-                        label: "MOVE DOWN"
-                        labelPixelSize: 9
-                        contentPadding: 3
-                        interactive: appSelector.identitySnapshot.writable
-                                     && SocialAccountDetailsStore.state === "ready"
-                                     && appSelector.selectedAccountPosition() >= 0
-                                     && appSelector.selectedAccountPosition() <
-                                        appSelector.accountNamesFor(
-                                            appSelector.accountSelectedServiceId).length - 1
-                        onTriggered: SocialAccountDetailsStore.moveAccountName(
-                            appSelector.identitySnapshot.activeId,
-                            appSelector.accountSelectedServiceId,
-                            appSelector.accountSelectedEntryId, 1)
                     }
                 }
                 ActionButton {
@@ -1927,49 +1937,64 @@ Rectangle {
                     }
                     Repeater {
                         model: appSelector.identitySnapshot.familyOptions || []
-                        delegate: ActionButton {
+                        delegate: Row {
+                            id: familyOptionRow
                             required property var modelData
                             width: settingsColumn.width
                             height: 33
-                            label: modelData.title
-                            labelPixelSize: 9
-                            labelMinimumPixelSize: 8
-                            contentPadding: 3
-                            selected: appSelector.editedFamilyId === modelData.id
-                            interactive: appSelector.identitySnapshot.writable
-                                         && appSelector.familyEditorIdentityId ===
-                                            appSelector.identitySnapshot.activeId
-                            onTriggered: {
-                                appSelector.editedFamilyId = modelData.id;
-                                appSelector.removalTargetFamilyId = "";
-                                appSelector.resetFamilyRemovalConfirmation();
-                                familyNameInput.text = modelData.title;
+                            spacing: 3
+
+                            ActionButton {
+                                width: 28
+                                height: parent.height
+                                label: "↑"
+                                accentColor: Colors.orange
+                                labelPixelSize: 13
+                                contentPadding: 1
+                                interactive: appSelector.identitySnapshot.writable
+                                             && appSelector.familyEditorIdentityId ===
+                                                appSelector.identitySnapshot.activeId
+                                             && !appSelector.familyCreatePending
+                                             && familyOptionRow.modelData.orderIndex > 0
+                                onTriggered: SocialIdentityStore.reorderFamily(
+                                    familyOptionRow.modelData.id, -1)
+                            }
+                            ActionButton {
+                                width: Math.max(1, familyOptionRow.width - 62)
+                                height: parent.height
+                                label: familyOptionRow.modelData.title
+                                labelPixelSize: 9
+                                labelMinimumPixelSize: 8
+                                contentPadding: 2
+                                selected: appSelector.editedFamilyId ===
+                                          familyOptionRow.modelData.id
+                                interactive: appSelector.identitySnapshot.writable
+                                             && appSelector.familyEditorIdentityId ===
+                                                appSelector.identitySnapshot.activeId
+                                onTriggered: {
+                                    appSelector.editedFamilyId = familyOptionRow.modelData.id;
+                                    appSelector.removalTargetFamilyId = "";
+                                    appSelector.resetFamilyRemovalConfirmation();
+                                    familyNameInput.text = familyOptionRow.modelData.title;
+                                }
+                            }
+                            ActionButton {
+                                width: 28
+                                height: parent.height
+                                label: "↓"
+                                accentColor: Colors.orange
+                                labelPixelSize: 13
+                                contentPadding: 1
+                                interactive: appSelector.identitySnapshot.writable
+                                             && appSelector.familyEditorIdentityId ===
+                                                appSelector.identitySnapshot.activeId
+                                             && !appSelector.familyCreatePending
+                                             && familyOptionRow.modelData.orderIndex <
+                                                familyOptionRow.modelData.familyCount - 1
+                                onTriggered: SocialIdentityStore.reorderFamily(
+                                    familyOptionRow.modelData.id, 1)
                             }
                         }
-                    }
-                    ActionButton {
-                        width: parent.width
-                        height: 32
-                        label: "FAMILY UP"
-                        accentColor: Colors.orange
-                        labelPixelSize: 9
-                        contentPadding: 3
-                        interactive: appSelector.identitySnapshot.writable
-                                     && appSelector.familyCanStep(-1)
-                        onTriggered: SocialIdentityStore.reorderFamily(
-                            appSelector.editedFamilyId, -1)
-                    }
-                    ActionButton {
-                        width: parent.width
-                        height: 32
-                        label: "FAMILY DOWN"
-                        accentColor: Colors.orange
-                        labelPixelSize: 9
-                        contentPadding: 3
-                        interactive: appSelector.identitySnapshot.writable
-                                     && appSelector.familyCanStep(1)
-                        onTriggered: SocialIdentityStore.reorderFamily(
-                            appSelector.editedFamilyId, 1)
                     }
                     Text {
                         width: parent.width
@@ -2303,19 +2328,65 @@ Rectangle {
                     }
                     Repeater {
                         model: appSelector.matchingFamilyApps(familySearchInput.text)
-                        delegate: ActionButton {
+                        delegate: Row {
+                            id: organizationAppRow
                             required property var modelData
                             width: settingsAppsColumn.width
                             height: 32
-                            label: appSelector.messagingApps[modelData.serviceIndex].name
-                            labelPixelSize: 9
-                            labelMinimumPixelSize: 8
-                            contentPadding: 3
-                            selected: appSelector.editedAppId === modelData.id
-                            interactive: appSelector.identitySnapshot.writable
-                                         && appSelector.familyEditorIdentityId ===
-                                            appSelector.identitySnapshot.activeId
-                            onTriggered: appSelector.editedAppId = modelData.id
+                            spacing: 3
+
+                            // Apps outside the selected family can still be
+                            // selected and moved, but only apps IN this
+                            // family can be reordered here.
+                            ActionButton {
+                                width: 28
+                                height: parent.height
+                                label: "↑"
+                                accentColor: Colors.orange
+                                labelPixelSize: 13
+                                contentPadding: 1
+                                interactive: appSelector.identitySnapshot.writable
+                                             && appSelector.familyIsSelected()
+                                             && organizationAppRow.modelData.familyId ===
+                                                appSelector.editedFamilyId
+                                             && organizationAppRow.modelData.orderIndex > 0
+                                onTriggered: SocialIdentityStore.reorderApp(
+                                    organizationAppRow.modelData.familyId,
+                                    organizationAppRow.modelData.id, -1)
+                            }
+                            ActionButton {
+                                width: Math.max(1, organizationAppRow.width - 62)
+                                height: parent.height
+                                label: appSelector.messagingApps[
+                                    organizationAppRow.modelData.serviceIndex].name
+                                labelPixelSize: 9
+                                labelMinimumPixelSize: 8
+                                contentPadding: 2
+                                selected: appSelector.editedAppId ===
+                                          organizationAppRow.modelData.id
+                                interactive: appSelector.identitySnapshot.writable
+                                             && appSelector.familyEditorIdentityId ===
+                                                appSelector.identitySnapshot.activeId
+                                onTriggered: appSelector.editedAppId =
+                                    organizationAppRow.modelData.id
+                            }
+                            ActionButton {
+                                width: 28
+                                height: parent.height
+                                label: "↓"
+                                accentColor: Colors.orange
+                                labelPixelSize: 13
+                                contentPadding: 1
+                                interactive: appSelector.identitySnapshot.writable
+                                             && appSelector.familyIsSelected()
+                                             && organizationAppRow.modelData.familyId ===
+                                                appSelector.editedFamilyId
+                                             && organizationAppRow.modelData.orderIndex <
+                                                organizationAppRow.modelData.siblingCount - 1
+                                onTriggered: SocialIdentityStore.reorderApp(
+                                    organizationAppRow.modelData.familyId,
+                                    organizationAppRow.modelData.id, 1)
+                            }
                         }
                     }
                     Text {
@@ -2347,30 +2418,6 @@ Rectangle {
                         color: Colors.white
                         font.pixelSize: 9
                         wrapMode: Text.WrapAnywhere
-                    }
-                    ActionButton {
-                        width: parent.width
-                        height: 32
-                        label: "APP UP"
-                        accentColor: Colors.orange
-                        labelPixelSize: 9
-                        contentPadding: 3
-                        interactive: appSelector.identitySnapshot.writable
-                                     && appSelector.appCanStep(-1)
-                        onTriggered: SocialIdentityStore.reorderApp(
-                            appSelector.editedFamilyId, appSelector.editedAppId, -1)
-                    }
-                    ActionButton {
-                        width: parent.width
-                        height: 32
-                        label: "APP DOWN"
-                        accentColor: Colors.orange
-                        labelPixelSize: 9
-                        contentPadding: 3
-                        interactive: appSelector.identitySnapshot.writable
-                                     && appSelector.appCanStep(1)
-                        onTriggered: SocialIdentityStore.reorderApp(
-                            appSelector.editedFamilyId, appSelector.editedAppId, 1)
                     }
                     ActionButton {
                         width: parent.width

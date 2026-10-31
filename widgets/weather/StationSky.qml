@@ -141,6 +141,13 @@ Rectangle {
         offsetMinutes: sky.moonCivilOffsetMinutes
     }
 
+    WeatherServices.IauMeteorShowerService {
+        id: meteorService
+        active: sky.visible
+        latitude: sky.weatherService ? sky.weatherService.latitude : ""
+        longitude: sky.weatherService ? sky.weatherService.longitude : ""
+    }
+
     readonly property string currentCelestialMode:
         weatherReady
         ? WeatherCyclePolicy.artworkFor(conditionState, skyCycle) : "weather"
@@ -252,6 +259,30 @@ Rectangle {
         const number = Number(value);
         return isFinite(number)
             ? Math.round(number) + String(suffix || "°")
+            : "--";
+    }
+
+    function meteorUtcLabel(value) {
+        const text = String(value || "");
+        return /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/.test(text)
+            ? text.slice(5, 10) + " " + text.slice(11, 16) + "Z"
+            : "--";
+    }
+
+    function meteorDaysLabel(value) {
+        const days = Number(value);
+        if (!isFinite(days))
+            return "--";
+        if (days < 0.05)
+            return "<0.1d";
+        return days < 10 ? days.toFixed(1) + "d"
+                         : Math.round(days) + "d";
+    }
+
+    function meteorAltitudeLabel(value) {
+        const altitude = Number(value);
+        return isFinite(altitude)
+            ? altitude.toFixed(0) + "°"
             : "--";
     }
 
@@ -2004,6 +2035,296 @@ Rectangle {
             QuietText {
                 width: parent.width
                 text: "CURRENT POSITION ABOVE USES CELNAV // THIS TABLE IS THE LOCAL-DATE EVENT CLOCK // BOTH USE THE SAME WEATHER COORDINATE FIX"
+                font.pixelSize: 9
+                color: Colors.orange
+            }
+        }
+
+
+        StationSectionDivider {
+            width: parent.width
+            title: "METEOR SHOWERS // IAU MDC"
+        }
+
+        Column {
+            width: parent.width
+            spacing: 7
+
+            Row {
+                width: parent.width
+                spacing: 12
+
+                GohuText {
+                    text: !meteorService.configured
+                          ? "LOCATION UNAVAILABLE"
+                          : meteorService.loading
+                            ? "READING CATALOG"
+                            : meteorService.failed
+                              ? (meteorService.ready
+                                 ? "DEGRADED" : "OFFLINE")
+                              : meteorService.ready
+                                ? "RECEIVED" : "WAITING"
+                    font.pixelSize: 10
+                    color: meteorService.failed
+                           ? Colors.yellow
+                           : meteorService.ready
+                             ? Colors.cyan : Colors.orange
+                }
+
+                QuietText {
+                    width: Math.max(0, parent.width - 160)
+                    text: meteorService.ready
+                          ? meteorService.sourceName
+                            + " // VERSION "
+                            + (meteorService.sourceVersion !== ""
+                               ? meteorService.sourceVersion : "--")
+                            + " // "
+                            + meteorService.catalogCount
+                            + " ESTABLISHED ANNUAL SHOWERS"
+                          : "IAU ESTABLISHED-SHOWER CATALOG // SOLAR-LONGITUDE MODEL"
+                    elide: Text.ElideRight
+                    font.pixelSize: 9
+                }
+            }
+
+            QuietText {
+                visible: meteorService.failed
+                width: parent.width
+                text: meteorService.errorText
+                font.pixelSize: 9
+                color: Colors.yellow
+            }
+
+            Row {
+                width: parent.width
+                spacing: 12
+                visible: meteorService.ready
+
+                GohuText {
+                    width: 260
+                    text: "ACTIVE NOW // "
+                          + meteorService.activeCount
+                    font.pixelSize: 11
+                    color: meteorService.activeCount > 0
+                           ? Colors.magenta : Colors.cyan
+                }
+
+                QuietText {
+                    width: 220
+                    text: meteorService.solarLongitude >= 0
+                          ? "SUN λ☉ // "
+                            + meteorService.solarLongitude.toFixed(2)
+                            + "°"
+                          : "SUN λ☉ // --"
+                    font.pixelSize: 9
+                }
+
+                QuietText {
+                    width: Math.max(0, parent.width - 504)
+                    text: "RADIANT ALTITUDE USES CURRENT WEATHER FIX + UTC"
+                    horizontalAlignment: Text.AlignRight
+                    font.pixelSize: 9
+                }
+            }
+
+            Column {
+                width: parent.width
+                spacing: 5
+                visible: meteorService.ready
+                         && meteorService.activeShowers.length > 0
+
+                Repeater {
+                    model: meteorService.activeShowers.slice(0, 6)
+
+                    delegate: Rectangle {
+                        required property var modelData
+                        width: parent.width
+                        height: 64
+                        color: Colors.dark
+                        border.width: 1
+                        border.color: modelData.radiantAboveHorizon
+                                      ? Colors.magenta : Colors.blue
+
+                        Row {
+                            anchors.fill: parent
+                            anchors.margins: 8
+                            spacing: 12
+
+                            Column {
+                                width: 210
+                                spacing: 4
+
+                                GohuText {
+                                    width: parent.width
+                                    text: modelData.name
+                                    elide: Text.ElideRight
+                                    font.pixelSize: 11
+                                    color: modelData.radiantAboveHorizon
+                                           ? Colors.magenta : Colors.white
+                                }
+
+                                QuietText {
+                                    width: parent.width
+                                    text: String(modelData.code || "")
+                                          + (modelData.parentBody
+                                             ? " // " + modelData.parentBody
+                                             : "")
+                                    elide: Text.ElideRight
+                                    font.pixelSize: 8
+                                }
+                            }
+
+                            Column {
+                                width: 170
+                                spacing: 4
+
+                                SecondaryText {
+                                    text: "RADIANT NOW"
+                                    font.pixelSize: 8
+                                }
+
+                                GohuText {
+                                    text: sky.meteorAltitudeLabel(
+                                              modelData.radiantAltitude
+                                          )
+                                          + (modelData.radiantAboveHorizon
+                                             ? " // ABOVE"
+                                             : " // BELOW")
+                                    font.pixelSize: 10
+                                    color: modelData.radiantAboveHorizon
+                                           ? Colors.cyan : Colors.blue
+                                }
+                            }
+
+                            Column {
+                                width: 180
+                                spacing: 4
+
+                                SecondaryText {
+                                    text: "PEAK"
+                                    font.pixelSize: 8
+                                }
+
+                                GohuText {
+                                    text: sky.meteorUtcLabel(
+                                        modelData.peakUtc
+                                    )
+                                    font.pixelSize: 10
+                                    color: Colors.orange
+                                }
+                            }
+
+                            QuietText {
+                                width: Math.max(0, parent.width - 596)
+                                text: "λ☉ "
+                                      + Number(modelData.solarPeak).toFixed(1)
+                                      + "° // "
+                                      + (modelData.speedKmS !== null
+                                         && modelData.speedKmS !== undefined
+                                         ? Number(modelData.speedKmS).toFixed(0)
+                                           + " km/s"
+                                         : "SPEED --")
+                                elide: Text.ElideRight
+                                font.pixelSize: 8
+                            }
+                        }
+                    }
+                }
+            }
+
+            QuietText {
+                visible: meteorService.ready
+                         && meteorService.activeShowers.length === 0
+                width: parent.width
+                text: "NO ESTABLISHED ANNUAL SHOWER WITH PUBLISHED ACTIVITY BOUNDS IS ACTIVE AT THE CURRENT SOLAR LONGITUDE"
+                font.pixelSize: 9
+            }
+
+            GohuText {
+                visible: meteorService.ready
+                text: "NEXT PEAKS"
+                font.pixelSize: 10
+                color: Colors.orange
+            }
+
+            Row {
+                id: meteorUpcomingRow
+                width: parent.width
+                spacing: 7
+                visible: meteorService.ready
+
+                Repeater {
+                    model: meteorService.upcomingShowers.slice(0, 5)
+
+                    delegate: Rectangle {
+                        required property var modelData
+                        width: Math.max(
+                            0,
+                            (meteorUpcomingRow.width
+                             - 4 * meteorUpcomingRow.spacing) / 5
+                        )
+                        height: 94
+                        color: Colors.dark
+                        border.width: 1
+                        border.color: modelData.active
+                                      ? Colors.magenta : Colors.cyan
+
+                        Column {
+                            anchors.fill: parent
+                            anchors.margins: 6
+                            spacing: 4
+
+                            GohuText {
+                                width: parent.width
+                                text: modelData.name
+                                elide: Text.ElideRight
+                                font.pixelSize: 9
+                                color: modelData.active
+                                       ? Colors.magenta : Colors.white
+                            }
+
+                            QuietText {
+                                width: parent.width
+                                text: sky.meteorUtcLabel(
+                                    modelData.peakUtc
+                                )
+                                font.pixelSize: 8
+                                color: Colors.orange
+                            }
+
+                            QuietText {
+                                width: parent.width
+                                text: "IN "
+                                      + sky.meteorDaysLabel(
+                                            modelData.daysToPeak
+                                        )
+                                font.pixelSize: 8
+                            }
+
+                            QuietText {
+                                width: parent.width
+                                text: "RA "
+                                      + Number(modelData.ra).toFixed(0)
+                                      + "° // DEC "
+                                      + Number(modelData.dec).toFixed(0)
+                                      + "°"
+                                font.pixelSize: 8
+                            }
+                        }
+                    }
+                }
+            }
+
+            QuietText {
+                width: parent.width
+                text: "IAU MDC ACTIVITY IS CATALOG/STREAM CONTEXT // NOT A LOCAL OBSERVED RATE OR ZHR CLAIM // PEAK UTC IS DERIVED LOCALLY FROM PROVIDER SOLAR LONGITUDE"
+                font.pixelSize: 9
+                color: Colors.orange
+            }
+
+            QuietText {
+                width: parent.width
+                text: "RADIANT ABOVE HORIZON ≠ GOOD VIEWING // CLOUDS, SKY BRIGHTNESS, MOONLIGHT + ACTUAL SHOWER STRENGTH ARE SEPARATE CONDITIONS"
                 font.pixelSize: 9
                 color: Colors.orange
             }

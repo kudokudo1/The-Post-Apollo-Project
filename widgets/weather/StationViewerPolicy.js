@@ -39,6 +39,9 @@ function normalizeNews(row) {
         title: title,
         source: shortText(row.detail, 110) || "SOURCE NOT PROVIDED",
         time: shortText(row.time, 60) || "TIME NOT PROVIDED",
+        rawTime: shortText(row.rawTime, 40),
+        language: shortText(row.language, 48),
+        domain: shortText(row.domain, 100),
         url: safeArticleUrl(row.url)
     };
 }

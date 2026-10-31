@@ -372,6 +372,9 @@ Rectangle {
             editingFamilies = true;
             familyEditorIdentityId = identitySnapshot.activeId;
         } else {
+            accountManagerOpen = false;
+            accountAppPickerOpen = false;
+            pendingAccountRemovalId = "";
             appSelector.resetFamilyRemovalConfirmation();
         }
     }
@@ -1243,9 +1246,34 @@ Rectangle {
                     height: 1
                     color: Colors.cyan
                 }
+                // Keep account name management at the BOTTOM of the identity
+                // column. Collapsed by default so contact and identity
+                // controls stay visible without scrolling through services.
+                ActionButton {
+                    width: parent.width
+                    height: 36
+                    label: appSelector.accountManagerOpen
+                           ? "▾ CLOSE ACCOUNT NAMES"
+                           : "▸ ACCOUNT NAMES"
+                    labelPixelSize: 9
+                    contentPadding: 3
+                    accentColor: Colors.orange
+                    onTriggered: {
+                        appSelector.accountManagerOpen =
+                            !appSelector.accountManagerOpen;
+                        if (!appSelector.accountManagerOpen)
+                            appSelector.accountAppPickerOpen = false;
+                    }
+                }
+                Column {
+                    id: accountNameManager
+                    width: parent.width
+                    spacing: 12
+                    visible: appSelector.accountManagerOpen
+
                 Text {
                     width: parent.width
-                    text: "LINKED ACCOUNTS"
+                    text: "ACCOUNT NAMES"
                     color: Colors.orange
                     font.bold: true
                     font.pixelSize: 11
@@ -1776,6 +1804,7 @@ Rectangle {
                     font.pixelSize: 9
                     wrapMode: Text.WordWrap
                 }
+                } // accountNameManager (collapsed dropdown)
                     }
                 }
             }

@@ -115,7 +115,7 @@ assert.match(ui, /onDoubleClicked:\s*stationDiscovery\.resetMapView\(\)/);
 assert.match(ui, /model: stationDiscovery\.mapPointRows/);
 assert.match(ui, /MapProjection\.project\(\s*modelData\.longitude,\s*modelData\.latitude/);
 assert.match(ui, /stationDiscovery\.selectedMapEvent = modelData/);
-assert.match(ui, /LAT\/LON GRID \/\/ RADAR \+ SMOKE ARE DATA LAYERS, NOT BASEMAP/);
+assert.match(ui, /NATURAL EARTH LAND \/\/ LAT\/LON GRID \/\/ RADAR \+ SMOKE OVERLAYS/);
 assert.match(ui, /EONET DIAMONDS \/\/ FIRMS ORANGE \/\/ NEWS MAGENTA/);
 assert.match(ui, /EONET POINT CANVAS \/\/ PAN \+ ZOOM/);
 assert.match(ui, /GDELT NEWS MENTION POINTS/);
@@ -124,7 +124,8 @@ assert.match(ui, /stationDiscovery\.selectedMapNewsMention = modelData/);
 assert.match(ui, /label: "FOCUS NEWS"/);
 assert.match(ui, /label: "CLEAR NEWS"/);
 assert.match(ui, /NEWS MENTION INSPECTOR \/\/ GDELT GKG/);
-assert.match(ui, /BASEMAP \/ OTHER POLYGON LAYERS", state:"NOT WIRED"/);
+assert.match(ui, /NATURAL EARTH 1:110m LAND BASEMAP", state:"CONNECTED"/);
+assert.match(ui, /OTHER POLYGON LAYERS", state:"NOT WIRED"/);
 
 const policySource = read("widgets/weather/StationMapProjectionPolicy.js");
 assert.doesNotMatch(policySource, /Process\s*\{|Timer\s*\{|curl|XMLHttpRequest|Qt\.openUrlExternally/);

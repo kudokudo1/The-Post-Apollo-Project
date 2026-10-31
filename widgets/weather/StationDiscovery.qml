@@ -4,13 +4,14 @@ import "../../services/weather" as WeatherServices
 import "StationViewerPolicy.js" as ViewerPolicy
 import "../../services/weather/StationDiscoveryPolicy.js" as DiscoveryPolicy
 import "StationMapProjectionPolicy.js" as MapProjection
+import "StationNaturalEarthLand110.js" as NaturalEarthLand
 import "../../services/weather/FirmsHotspotPolicy.js" as FirmsAreaPolicy
 import "StationRadarPolicy.js" as RadarPolicy
 import "../../services/weather/HmsSmokePolicy.js" as SmokePolicy
 
 // Source-first stage. All records shown come from a backend, never examples.
-// MAP now owns a source-driven geographic point canvas plus its event list.
-// No basemap or polygon renderer is implied; RADIO remains a stream directory
+// MAP owns a local Natural Earth geographic basemap plus source-driven data
+// overlays and its event list. RADIO remains a stream directory
 // before MediaDeck's persistent transport is connected.
 Rectangle {
     id: stationDiscovery
@@ -428,13 +429,14 @@ Rectangle {
         : domain === "news" ? "GDELT DOC // WORLD EVENT HEADLINES"
         : "RADIO BROWSER // TOP VOTED STREAMS"
     readonly property string sourceCaution:
-        domain === "map" ? "EONET + FIRMS + MRMS + HMS SMOKE CONNECTED // BASEMAP NOT WIRED"
+        domain === "map" ? "NATURAL EARTH BASEMAP + EONET + FIRMS + MRMS + HMS SMOKE CONNECTED"
         : domain === "news" ? "ARTICLE DISCOVERY // LOCAL FILTERS // EXACT-HEADLINE SOURCE GROUPS // NOT FUZZY STORY CLUSTERING"
         : "STATION DIRECTORY // PERSISTENT PLAYBACK NOT YET WIRED"
     readonly property var plannedSources: {
         if (domain === "map")
             return [
                 {name:"NASA EONET // FILTERED EVENTS + INSPECTOR", state:"SOURCE CONNECTED"},
+                {name:"NATURAL EARTH 1:110m LAND BASEMAP", state:"CONNECTED"},
                 {name:"EONET POINT CANVAS // PAN + ZOOM", state:"CONNECTED"},
                 {
                     name:"GDELT NEWS MENTION POINTS",
@@ -463,7 +465,7 @@ Rectangle {
                               : "MANUAL READY")
                            : "KEY REQUIRED"
                 },
-                {name:"BASEMAP / OTHER POLYGON LAYERS", state:"NOT WIRED"}
+                {name:"OTHER POLYGON LAYERS", state:"NOT WIRED"}
             ];
         if (domain === "news")
             return [
@@ -644,6 +646,13 @@ Rectangle {
                 StationSectionDivider {
                     width: parent.width
                     title: "SPATIAL PLOT // EONET + FIRMS + NEWS MENTIONS"
+                }
+
+                QuietText {
+                    width: parent.width
+                    text: "BASEMAP // NATURAL EARTH 1:110m LAND // PUBLIC DOMAIN // LOCAL ASSET // NO TILE NETWORK"
+                    font.pixelSize: 9
+                    color: Colors.cyan
                 }
 
                 Row {
@@ -941,6 +950,118 @@ Rectangle {
                         [-180, -120, -60, 0, 60, 120, 180]
                     readonly property var latitudeGrid:
                         [-90, -60, -30, 0, 30, 60, 90]
+
+                    Canvas {
+                        id: basemapCanvas
+                        anchors.fill: parent
+                        z: 0.05
+
+                        property var landPolygons: NaturalEarthLand.polygons
+                        property real viewZoom: stationDiscovery.mapZoom
+                        property real viewCenterLon: stationDiscovery.mapCenterLon
+                        property real viewCenterLat: stationDiscovery.mapCenterLat
+
+                        onLandPolygonsChanged: requestPaint()
+                        onViewZoomChanged: requestPaint()
+                        onViewCenterLonChanged: requestPaint()
+                        onViewCenterLatChanged: requestPaint()
+                        onWidthChanged: requestPaint()
+                        onHeightChanged: requestPaint()
+
+                        function projectedRing(rawRing, offset) {
+                            const ring = SmokePolicy.unwrapRing(rawRing);
+                            if (ring.length < 4)
+                                return [];
+
+                            const points = [];
+                            let minX = Infinity;
+                            let maxX = -Infinity;
+                            let minY = Infinity;
+                            let maxY = -Infinity;
+
+                            for (let i = 0; i < ring.length; i++) {
+                                const point = MapProjection.projectUnwrapped(
+                                    ring[i][0] + offset,
+                                    ring[i][1],
+                                    width,
+                                    height,
+                                    viewZoom,
+                                    viewCenterLon,
+                                    viewCenterLat
+                                );
+                                if (!point.valid)
+                                    return [];
+                                points.push(point);
+                                minX = Math.min(minX, point.x);
+                                maxX = Math.max(maxX, point.x);
+                                minY = Math.min(minY, point.y);
+                                maxY = Math.max(maxY, point.y);
+                            }
+
+                            if (maxX < 0 || minX > width
+                                    || maxY < 0 || minY > height)
+                                return [];
+                            return points;
+                        }
+
+                        function drawRing(ctx, points) {
+                            if (!points || points.length < 4)
+                                return false;
+                            ctx.beginPath();
+                            ctx.moveTo(points[0].x, points[0].y);
+                            for (let i = 1; i < points.length; i++)
+                                ctx.lineTo(points[i].x, points[i].y);
+                            ctx.closePath();
+                            return true;
+                        }
+
+                        onPaint: {
+                            const ctx = getContext("2d");
+                            ctx.clearRect(0, 0, width, height);
+                            const offsets = [-360, 0, 360];
+
+                            for (let polygonIndex = 0;
+                                 polygonIndex < landPolygons.length;
+                                 polygonIndex++) {
+                                const polygon = landPolygons[polygonIndex];
+                                if (!Array.isArray(polygon)
+                                        || polygon.length === 0)
+                                    continue;
+
+                                for (let copy = 0;
+                                     copy < offsets.length;
+                                     copy++) {
+                                    const offset = offsets[copy];
+                                    const outer = projectedRing(
+                                        polygon[0], offset
+                                    );
+                                    if (!drawRing(ctx, outer))
+                                        continue;
+
+                                    ctx.fillStyle = "rgba(22,5,31,0.96)";
+                                    ctx.strokeStyle = "rgba(85,207,202,0.58)";
+                                    ctx.lineWidth = 1;
+                                    ctx.fill();
+                                    ctx.stroke();
+
+                                    // Natural Earth land contains rare interior
+                                    // holes. Paint those back to Station ocean
+                                    // rather than claiming they are land.
+                                    for (let ringIndex = 1;
+                                         ringIndex < polygon.length;
+                                         ringIndex++) {
+                                        const hole = projectedRing(
+                                            polygon[ringIndex], offset
+                                        );
+                                        if (!drawRing(ctx, hole))
+                                            continue;
+                                        ctx.fillStyle = "#1B0623";
+                                        ctx.fill();
+                                    }
+                                }
+                            }
+                        }
+                    }
 
                     Image {
                         id: radarImage
@@ -1338,7 +1459,7 @@ Rectangle {
                         anchors.top: parent.top
                         anchors.margins: 7
                         z: 3
-                        text: "LAT/LON GRID // RADAR + SMOKE ARE DATA LAYERS, NOT BASEMAP"
+                        text: "NATURAL EARTH LAND // LAT/LON GRID // RADAR + SMOKE OVERLAYS"
                         color: Colors.orange
                         font.pixelSize: 9
                     }
@@ -1363,7 +1484,7 @@ Rectangle {
                         anchors.bottom: parent.bottom
                         anchors.margins: 7
                         z: 3
-                        text: "EONET DIAMONDS // FIRMS ORANGE // NEWS MAGENTA"
+                        text: "BASEMAP LOCAL // EONET DIAMONDS // FIRMS ORANGE // NEWS MAGENTA"
                         font.pixelSize: 9
                     }
                 }

@@ -1,0 +1,198 @@
+{
+  "schemaVersion": 1,
+  "milestone": "M12b",
+  "classification": "PROPOSED_DISABLED_ONLY_PRODUCTION_INTEGRATION_PREFLIGHT",
+  "reviewedMain": "b81c52d7e30a2ab9a3c03ce621cdff2d52838814",
+  "patient": "kudokudo1/The-Post-Apollo-Project",
+  "entrypoints": {
+    "singleton": "services/hub/ApolloHubTodoStore.qml",
+    "policy": "services/hub/ApolloHubTodoPolicy.js",
+    "oneFileView": true,
+    "nineMutationRoutes": true,
+    "oneStageFunction": "stage(result)",
+    "legacyGuardConstant": "readonly property bool guardedWriterEnabled: false",
+    "actualSourceSuffix": "/apollo-hub-todo-v1.json",
+    "existingNativeOnSavedPublishesPending": true,
+    "hostActuallyConnected": false
+  },
+  "preflight": {
+    "testOnly": true,
+    "productionAuthorized": false,
+    "sourceDataAccessAuthorized": false,
+    "localInstallationAuthorized": false,
+    "quickshellReloadAuthorized": false,
+    "sqliteTaskMigrationAuthorized": false,
+    "dataRestoreAuthorized": false,
+    "approvalToMerge": false,
+    "hostPreflightPassed": false,
+    "readyForGuardedActivation": false,
+    "runtimeEvidenceProvided": false,
+    "liveHospitalRegistrationVerified": false
+  },
+  "independentChecks": [
+    {
+      "id": "RELEASE_TRUST",
+      "status": "OPEN",
+      "evidence": "Operator-approved independent release verification key, signer authorization, interpreter and module provenance, approved generation plus rollback-resistant floor",
+      "testLineage": "M11y signed synthetic release"
+    },
+    {
+      "id": "OS_HOST_OWNER",
+      "status": "OPEN",
+      "evidence": "Authenticated process executable and observed pidfd, lifetime lock, owner session and durable journal owner epoch binding",
+      "testLineage": "M11u/M11v/M11w synthetic process owner"
+    },
+    {
+      "id": "REAL_SOURCE_AUTHORIZATION",
+      "status": "OPEN",
+      "evidence": "Explicit separate operator permission to inspect exact live file, owner/mode/path/identity validation, schema readback, no missing-file empty promotion",
+      "testLineage": "M11l and M11z disposable source"
+    },
+    {
+      "id": "INDEPENDENT_BACKUP",
+      "status": "OPEN",
+      "evidence": "Privately retained byte-exact independently re-read backup, source hash and journal baseline; external changes refuse",
+      "testLineage": "M11z synthetic backup"
+    },
+    {
+      "id": "NATIVE_STAGE_ATTRIBUTION",
+      "status": "OPEN",
+      "evidence": "Exact stage admission before sole FileView write; callback reorder/duplicates cannot commit wrong stage; OS readback and durable settlement required",
+      "testLineage": "M11r/M11s native synthetic; M12a pure model"
+    },
+    {
+      "id": "ASYNC_UI_ACCEPTANCE",
+      "status": "OPEN",
+      "evidence": "Chosen public API semantics, four caller reconciliation tests, last-confirmed read-only review and retained draft, no optimistic success",
+      "testLineage": "M11x/M12a pure model"
+    },
+    {
+      "id": "RESTART_AND_FREEZE",
+      "status": "OPEN",
+      "evidence": "Crash/freeze after each native boundary, fresh-owner recovery and no auto-replay of settled but unacknowledged stage",
+      "testLineage": "M11p/M11s/M11w disposable"
+    },
+    {
+      "id": "CODE_ONLY_ROLLBACK",
+      "status": "OPEN",
+      "evidence": "Trusted separate code rollback and authentic quiescence, preserve live JSON, backup, journal; data restore separate approval",
+      "testLineage": "M11z synthetic code-marker rollback"
+    },
+    {
+      "id": "NATIVE_RUNTIME_ACCEPTANCE",
+      "status": "OPEN",
+      "evidence": "Separately operator-authorized isolated native Quickshell, real OS host with redacted reproducible evidence and full failure matrix",
+      "testLineage": "Not observed in production"
+    },
+    {
+      "id": "ACTIVATION_DECISION",
+      "status": "OPEN",
+      "evidence": "Independent operator authorization after the above gates; no default activation",
+      "testLineage": "No production approval"
+    }
+  ],
+  "bindingOrder": [
+    "TRUSTED_RELEASE",
+    "AUTHENTICATED_OS_HOST",
+    "EXACT_SOURCE_PERMISSION",
+    "SOURCE_AND_SCHEMA_PREFLIGHT",
+    "BYTE_EXACT_BACKUP_READBACK",
+    "JOURNAL_OWNER_ATTACH",
+    "CANDIDATE_VALIDATE",
+    "DURABLE_STAGE_RESERVE",
+    "SINGLE_FILEVIEW_WRITE",
+    "NATIVE_DEFERRED_READBACK",
+    "DURABLE_OS_SETTLE",
+    "CONFIRMED_UI_PUBLISH",
+    "FREEZE_OR_RECOVERY_REVIEW",
+    "CODE_ONLY_ROLLBACK"
+  ],
+  "currentUI": {
+    "mutationReturn": "SYNCHRONOUS_BOOLEAN",
+    "meaningOfTrue": "LEGACY_FILEVIEW_WRITE_STARTED_NOT_DURABLE",
+    "proposedChoices": [
+      "BOOLEAN_MEANS_QUEUED_ONLY",
+      "TICKET_PLUS_EXPLICIT_COMPLETION"
+    ],
+    "choiceAccepted": false,
+    "knownStates": [
+      "loading",
+      "saving",
+      "ready",
+      "empty",
+      "error",
+      "unsupported"
+    ],
+    "lastConfirmedOverlayImplemented": false,
+    "errorViewMayHideConfirmed": true,
+    "requestCompletionMustBeTiedToDurableStage": true,
+    "consumers": [
+      "widgets/hub/ApolloHubTodoMini.qml",
+      "widgets/tasks/TaskDetailsPane.qml",
+      "widgets/tasks/TaskPlannerSchedulePane.qml",
+      "widgets/tasks/TaskProjectsPane.qml"
+    ]
+  },
+  "syntheticOnlyCannotAuthorize": [
+    "boolean:testTrustCheck",
+    "boolean:testBackupReadback",
+    "boolean:journalSettled",
+    "nonce:sessionId",
+    "hash:selfReportedDigest",
+    "sqlite:disposableJournal",
+    "signed:CIOnlyEphemeralKey",
+    "status:GitHubCIPassed",
+    "pidfd:untrustedLauncher"
+  ],
+  "failClosedCases": [
+    "MISSING_TRUST_ANCHOR",
+    "WRONG_SIGNER",
+    "ROLLBACK_FLOOR_RESET",
+    "UNAUTHORIZED_LIVE_SOURCE",
+    "MISSING_REAL_SOURCE",
+    "UNSUPPORTED_JSON_SCHEMA",
+    "CHANGED_SOURCE_DURING_BACKUP",
+    "BACKUP_READBACK_MISMATCH",
+    "UNCOOPERATIVE_EXTERNAL_WRITER",
+    "NO_DURABLE_RESERVATION",
+    "LATE_ONSAVED",
+    "REORDERED_ONLOADED",
+    "ON_SAVE_FAILED",
+    "HOST_EXIT_BEFORE_SETTLEMENT",
+    "SETTLED_WITHOUT_UI_ACK",
+    "SYNTHETIC_OWNER_AS_REAL",
+    "WRONG_SOURCE_IDENTITY",
+    "AMBIGUOUS_CALLBACK",
+    "MUTATION_UI_FALSE_SUCCESS",
+    "REVIEW_ERASES_CONFIRMED",
+    "UNQUIESCED_CODE_ROLLBACK",
+    "AUTO_DATA_RESTORE"
+  ],
+  "futurePatchSequence": [
+    {
+      "name": "M12c",
+      "state": "PROPOSED",
+      "scope": "Independent authorization and deployment trust-root decision; no code activation"
+    },
+    {
+      "name": "M12d",
+      "state": "PROPOSED",
+      "scope": "Synthetic source/host boundary integration with real-deployment-shape and explicit denied live-source route"
+    },
+    {
+      "name": "M12e",
+      "state": "PROPOSED",
+      "scope": "Scoped disabled-only QML adapter after trust and API decisions, exact native stage/readback proof"
+    }
+  ],
+  "forbiddenByM12bChanges": [
+    "services/hub/ApolloHubTodoStore.qml",
+    "services/hub/ApolloHubTodoPolicy.js",
+    "shell.qml",
+    "services/projects/TaskJsonGateCandidateM11l.py",
+    "widgets/tasks",
+    "widgets/hub",
+    "operator_machine",
+    "real_TASKS_data"
+  ]
+}

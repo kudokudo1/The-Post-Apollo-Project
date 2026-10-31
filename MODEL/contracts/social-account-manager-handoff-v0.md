@@ -6,6 +6,8 @@
 > **SOURCE //** Operator direction, 2026-10-24: use the planned account manager to coordinate Social connections and avoid repeated individual setup  
 > **RELATION //** Does not replace [native messaging adapter contract v1.0](../../services/messaging/ADAPTER-CONTRACT.md) or the [proposed schema v1.1](./social-messaging-schema-v1.1-proposal.md).
 
+> **CURRENT UPGRADE DIRECTION // 2026-10-31:** This v0 document is a **historical read-only Social-to-Account-Manager contract**. For future work, first read [Post-Apollo Identity Center multi-organization and portfolio upgrade plan v0.1](./post-apollo-identity-center-upgrade-plan-v0.md). The operator requires independent LLC/nonprofit/family venture/customer tenants; portfolio-level consolidated management; overlapping functional and geographic scopes; multiple roles per person; and personal/company/branch/team/partner account delegation. Those are product requirements, **not currently implemented by this catalog**. Preserve the v0 `PLAN_ONLY` boundary until a separately reviewed versioned broker contract replaces it. Do not infer company ownership or worker authority from local Social identities, family relationships or account nicknames.
+
 ## Actual assets inspected
 
 The current Social selector has **32 entries**. The `XBrowser.py` launcher defines

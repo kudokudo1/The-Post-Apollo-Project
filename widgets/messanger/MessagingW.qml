@@ -357,6 +357,41 @@ PanelWindow {
     // activeAppIndex is the app that is actually open.
     property int activeAppIndex: 0
 
+    // Passive Sway evidence for app windows that still exist behind Social.
+    // It is UI status only: no provider launches, focus changes or geometry
+    // commands are permitted based on these IDs. No guessed login status.
+    property var openProviderServiceIds: []
+
+    function updateOpenProviderServiceIds(payload) {
+        var present = [];
+        var discord = payload.discord;
+        if (discord && discord.kind === "main"
+                && (discord.visible || discord.scratchpadState === "fresh"))
+            present.push("discord");
+
+        var sites = Array.isArray(payload.openBrowserSites)
+                    ? payload.openBrowserSites : [];
+        for (var i = 0; i < sites.length; ++i) {
+            // The three opt-in browser fallbacks keep the canonical rail IDs.
+            var serviceId = sites[i] === "whatsappweb" ? "whatsapp"
+                          : sites[i] === "messengerweb" ? "messenger"
+                          : sites[i] === "linechrome" ? "line"
+                          : sites[i];
+            if (typeof serviceId === "string"
+                    && present.indexOf(serviceId) === -1)
+                present.push(serviceId);
+        }
+        present.sort();
+        // The helper samples every 8ms while Social is open. Do not redraw
+        // the rail when the same set of observed windows is reported again.
+        if (present.length === openProviderServiceIds.length
+                && present.every(function(id, i) {
+                    return id === openProviderServiceIds[i];
+                }))
+            return;
+        openProviderServiceIds = present;
+    }
+
     // Private Telegram sessions are opt-in for this Quickshell run. Never
     // migrate, copy or assign the existing shared personal.session to an ID.
     property bool telegramIsolationEnabled: false
@@ -1094,6 +1129,10 @@ PanelWindow {
         if (!menuOpen || !payload)
             return;
 
+        // Observe real existing background windows, independent of selector
+        // cursor movement or active-app docking/focus decisions below.
+        updateOpenProviderServiceIds(payload);
+
         var now = Date.now();
         var socialNode = payload.social;
         var discordNode = payload.discord;
@@ -1812,6 +1851,8 @@ PanelWindow {
 
         AppSelector {
             id: appSelector
+            activeAppIndex: messagingWindow.activeAppIndex
+            backgroundOpenServiceIds: messagingWindow.openProviderServiceIds
             sharedTelegramActive: messageRouter.telegramBackend.active
             telegramIdentityModeActive: messagingWindow.telegramIsolationEnabled
             telegramIdentityScopeId: messagingWindow.telegramActiveIdentityId
@@ -2168,6 +2209,9 @@ PanelWindow {
             socialFocusDelay.restart();
         } else {
             messagingWindow.setGeometryWatch(false);
+            // Do not carry old presence indicators across a closed menu;
+            // the helper will reconstruct live providers on the next open.
+            openProviderServiceIds = [];
 
             messagingWindow.hideDiscord();
             messagingWindow.hideX();

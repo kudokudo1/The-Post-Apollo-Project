@@ -106,6 +106,39 @@ class SettingsContactChatWorkspaceContracts(unittest.TestCase):
         self.assertIn("visible: appSelector.editingFamilies", app)
         self.assertIn("editingFamilies = true;", SELECTOR)
 
+    def test_marked_family_and_app_actions_use_orange_and_remove_uses_red(self):
+        family = SELECTOR.split("id: settingsFamilyPane", 1)[1].split(
+            "id: settingsAppPane", 1
+        )[0]
+        app = SELECTOR.split("id: settingsAppPane", 1)[1].split(
+            "// This entry point is always visible", 1
+        )[0]
+        for label in ("FAMILY UP", "FAMILY DOWN", "RENAME"):
+            with self.subTest(label=label):
+                button = family.split('label: "' + label + '"', 1)[1].split(
+                    "onTriggered:", 1
+                )[0]
+                self.assertIn("accentColor: Colors.orange", button)
+
+        for label in ("APP UP", "APP DOWN"):
+            with self.subTest(label=label):
+                button = app.split('label: "' + label + '"', 1)[1].split(
+                    "onTriggered:", 1
+                )[0]
+                self.assertIn("accentColor: Colors.orange", button)
+
+        removal = family.split(
+            'label: appSelector.familyRemovalConfirmationMatches()', 1
+        )[1].split("onTriggered:", 1)[0]
+        self.assertIn('CONFIRM REMOVE" : "REMOVE FAMILY"', removal)
+        self.assertIn('destructive: true', removal)
+        self.assertIn('accentColor: Colors.red', removal)
+        # The new semantic color must not replace the two-step guard.
+        self.assertIn("familyRemovalConfirmationMatches()", family)
+        self.assertIn("SocialIdentityStore.removeFamily(", family)
+        self.assertIn("appSelector.selectedAppNeedsMove()", app)
+        self.assertIn("SocialIdentityStore.reorderApp(", app)
+
     def test_input_mask_is_full_only_during_settings_and_restores(self):
         mask = HOST.split("id: socialWindow", 1)[1].split(
             "// GEOMETRY HELPERS", 1

@@ -53,6 +53,13 @@ Rectangle {
         longitude: weatherService ? weatherService.longitude : ""
     }
 
+    WeatherServices.NowcoastLightningService {
+        id: lightningService
+        active: ground.visible
+        latitude: weatherService ? weatherService.latitude : ""
+        longitude: weatherService ? weatherService.longitude : ""
+    }
+
     function distanceLabel(latitude, longitude) {
         const km = SeismicPolicy.distanceKm(
             weatherService ? weatherService.latitude : "",
@@ -149,6 +156,17 @@ Rectangle {
         if (high === false)
             return Colors.cyan;
         return Colors.white;
+    }
+
+    function lightningReceiveAge() {
+        if (!lightningService.lastUpdated
+                || typeof lightningService.lastUpdated.getTime !== "function")
+            return "--";
+        const millis = lightningService.lastUpdated.getTime();
+        if (!isFinite(millis) || millis <= 0)
+            return "--";
+        const age = Math.max(0, Math.floor((Date.now() - millis) / 60000));
+        return age === 0 ? "<1m" : age + "m";
     }
 
     function riverReceiveAge() {
@@ -2116,6 +2134,170 @@ Rectangle {
             QuietText {
                 width: parent.width
                 text: "NEAREST CO-OPS STATION ≠ LOCAL COAST // HEIGHT IS STATION-REFERENCED // NOT A STORM-SURGE OR FLOOD-IMPACT CLAIM"
+                font.pixelSize: 9
+                color: Colors.orange
+            }
+        }
+
+
+        StationSectionDivider {
+            width: parent.width
+            title: "LIGHTNING // NOAA NOWCOAST"
+        }
+
+        Column {
+            width: parent.width
+            spacing: 7
+
+            Row {
+                width: parent.width
+                spacing: 12
+
+                GohuText {
+                    text: !lightningService.configured
+                          ? "LOCATION UNAVAILABLE"
+                          : lightningService.loading
+                            && !lightningService.ready
+                            ? "DISCOVERING WMS"
+                            : lightningService.failed
+                              ? (lightningService.ready
+                                 ? "DEGRADED" : "OFFLINE")
+                              : lightningImage.status === Image.Loading
+                                ? "IMAGE LOADING"
+                                : lightningImage.status === Image.Ready
+                                  ? "RECEIVED"
+                                  : lightningService.ready
+                                    ? "WMS READY" : "WAITING"
+                    font.pixelSize: 10
+                    color: lightningService.failed
+                           || lightningImage.status === Image.Error
+                           ? Colors.yellow
+                           : lightningImage.status === Image.Ready
+                             ? Colors.magenta : Colors.orange
+                }
+
+                QuietText {
+                    width: Math.max(0, parent.width - 170)
+                    text: lightningService.ready
+                          ? "15-MIN STRIKE DENSITY // "
+                            + lightningService.resolutionKm
+                            + " KM GRID // ~"
+                            + Math.round(lightningService.radiusKm)
+                            + " KM RADIUS // RECEIVED "
+                            + ground.lightningReceiveAge()
+                          : "PUBLIC NOAA NOWCOAST LIGHTNING-DENSITY WMS"
+                    elide: Text.ElideRight
+                    font.pixelSize: 9
+                }
+            }
+
+            QuietText {
+                visible: lightningService.failed
+                         || lightningImage.status === Image.Error
+                width: parent.width
+                text: lightningService.failed
+                      ? lightningService.errorText
+                      : "NOWCOAST LIGHTNING IMAGE UNAVAILABLE"
+                font.pixelSize: 9
+                color: Colors.yellow
+            }
+
+            Rectangle {
+                width: parent.width
+                height: 232
+                color: Colors.dark
+                border.width: 1
+                border.color: lightningImage.status === Image.Ready
+                              ? Colors.magenta : Colors.cyan
+                clip: true
+
+                Image {
+                    id: lightningImage
+                    anchors.fill: parent
+                    anchors.margins: 1
+                    source: lightningService.ready
+                            ? lightningService.imageUrl : ""
+                    asynchronous: true
+                    cache: false
+                    fillMode: Image.Stretch
+                }
+
+                Rectangle {
+                    anchors.horizontalCenter: parent.horizontalCenter
+                    anchors.verticalCenter: parent.verticalCenter
+                    width: 1
+                    height: 24
+                    color: Colors.white
+                    opacity: 0.8
+                }
+
+                Rectangle {
+                    anchors.horizontalCenter: parent.horizontalCenter
+                    anchors.verticalCenter: parent.verticalCenter
+                    width: 24
+                    height: 1
+                    color: Colors.white
+                    opacity: 0.8
+                }
+
+                Rectangle {
+                    anchors.horizontalCenter: parent.horizontalCenter
+                    anchors.verticalCenter: parent.verticalCenter
+                    width: 5
+                    height: 5
+                    radius: 2.5
+                    color: Colors.orange
+                }
+
+                Rectangle {
+                    anchors.left: parent.left
+                    anchors.right: parent.right
+                    anchors.bottom: parent.bottom
+                    height: 28
+                    color: Colors.black
+                    opacity: 0.78
+                }
+
+                QuietText {
+                    anchors.left: parent.left
+                    anchors.right: parent.right
+                    anchors.bottom: parent.bottom
+                    anchors.leftMargin: 9
+                    anchors.rightMargin: 9
+                    anchors.bottomMargin: 7
+                    text: lightningService.ready
+                          ? "WEATHER FIX = CENTER CROSSHAIR // WMS TIME "
+                            + lightningService.latestTime
+                            + " // "
+                            + lightningService.layerTitle
+                          : "WAITING FOR NOAA WMS LAYER DISCOVERY"
+                    elide: Text.ElideRight
+                    font.pixelSize: 9
+                    color: Colors.white
+                }
+
+                QuietText {
+                    visible: lightningService.ready
+                             && lightningImage.status !== Image.Ready
+                    anchors.centerIn: parent
+                    text: lightningImage.status === Image.Loading
+                          ? "LOADING LIGHTNING DENSITY SNAPSHOT"
+                          : "NO SNAPSHOT RENDERED"
+                    font.pixelSize: 11
+                    color: Colors.orange
+                }
+            }
+
+            QuietText {
+                width: parent.width
+                text: "DERIVED NLDN / GLD360 PRODUCT // 15-MINUTE DENSITY ON ~8 × 8 KM CELLS // NOT RAW STRIKE LOCATIONS"
+                font.pixelSize: 9
+                color: Colors.orange
+            }
+
+            QuietText {
+                width: parent.width
+                text: "BLANK CELLS CAN MEAN ZERO LIGHTNING DENSITY OR NO RENDERED DATA // USE OFFICIAL NWS ALERTS FOR WARNING DECISIONS"
                 font.pixelSize: 9
                 color: Colors.orange
             }

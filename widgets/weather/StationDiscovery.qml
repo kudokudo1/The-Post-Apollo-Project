@@ -325,6 +325,19 @@ Rectangle {
         return "-" + Math.round(value / 60) + "H";
     }
 
+    function radarUtcLabel(timeMs) {
+        const value = Number(timeMs);
+        if (!isFinite(value) || value <= 0)
+            return "-- UTC";
+        const date = new Date(value);
+        if (isNaN(date.getTime()))
+            return "-- UTC";
+        const hh = date.getUTCHours();
+        const mm = date.getUTCMinutes();
+        return (hh < 10 ? "0" : "") + hh + ":"
+               + (mm < 10 ? "0" : "") + mm + " UTC";
+    }
+
     function loadRadarSnapshot() {
         if (!radarAreaReady || radarImage.status === Image.Loading)
             return false;
@@ -1075,14 +1088,11 @@ Rectangle {
                                 + (stationDiscovery
                                    .radarRequestedTimeMs > 0
                                    ? " // "
-                                     + Qt.formatDateTime(
-                                           new Date(
-                                               stationDiscovery
-                                               .radarRequestedTimeMs
-                                           ),
-                                           "hh:mm"
+                                     + stationDiscovery.radarUtcLabel(
+                                           stationDiscovery
+                                           .radarRequestedTimeMs
                                        )
-                                     + " UTC TARGET"
+                                     + " TARGET"
                                    : " // LATEST AVAILABLE")
                                 + " // SNAPSHOT TRACKS MAP"
                               : "MAX 90° × 50° VIEW // MANUAL LOAD // NO PAN AUTO-FETCH"

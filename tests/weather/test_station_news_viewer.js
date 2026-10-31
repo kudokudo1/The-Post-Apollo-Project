@@ -19,11 +19,17 @@ const article = policy.normalizeNews({
     title: "  Example \n weather report   ",
     detail: "example.org // US",
     time: "10-24 19:12 UTC",
+    rawTime: "20261024T191200Z",
+    language: "English",
+    domain: "example.org",
     url: "https://www.example.org/weather/2026"
 });
 assert.equal(article.title, "Example weather report");
 assert.equal(article.source, "example.org // US");
 assert.equal(article.time, "10-24 19:12 UTC");
+assert.equal(article.rawTime, "20261024T191200Z");
+assert.equal(article.language, "English");
+assert.equal(article.domain, "example.org");
 assert.equal(article.kind, "news");
 assert.equal(article.url, "https://www.example.org/weather/2026");
 assert.equal(policy.articleHost(article.url), "example.org");
@@ -67,11 +73,17 @@ assert.match(discovery, /if \(domain === "news"\)[\s\S]*?ViewerPolicy\.normalize
 assert.match(discovery, /onClicked: stationDiscovery\.openRow\(modelData\)/);
 assert.match(discovery, /active: stationDiscovery\.viewerOpen/);
 assert.match(discovery, /onBackRequested: stationDiscovery\.closeViewer\(\)/);
+assert.match(discovery, /WeatherServices\.GdeltArticleLocationService\s*\{/);
+assert.match(discovery, /onLocateRequested:[\s\S]*?articleLocationService\.request/);
 assert.match(discovery, /onStationOpenChanged: \{ if \(!stationOpen\) closeViewer\(\); \}/);
 assert.doesNotMatch(discovery, /onClicked:\s*\{\s*if \(modelData\.url/);
 assert.match(discovery, /visible: !stationDiscovery\.viewerOpen/);
 assert.match(viewer, /signal backRequested\(\)/);
+assert.match(viewer, /signal locateRequested\(\)/);
 assert.match(viewer, /label: "◂  BACK"/);
+assert.match(viewer, /"LOCATE MENTIONS"/);
+assert.match(viewer, /MENTIONED LOCATIONS \/\/ /);
+assert.match(viewer, /MENTIONED PLACES ONLY \/\/ NOT VERIFIED EVENT LOCATION/);
 assert.match(viewer, /label: "READER DISABLED"/);
 assert.match(viewer, /available: false/);
 assert.match(viewer, /INTERNAL ARTICLE RENDERER \/\/ SAFE MODE/);

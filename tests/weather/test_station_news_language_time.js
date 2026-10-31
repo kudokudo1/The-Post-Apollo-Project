@@ -182,7 +182,8 @@ assert.match(ui, /COUNTRIES \/\/ /);
 assert.match(ui, /LANGUAGES/);
 assert.match(ui, /LANGUAGE \+ TIME WINDOW FILTERS", state:"CONNECTED"/);
 assert.match(ui, /SOURCE-COUNTRY REGION GROUPS", state:"CONNECTED"/);
-assert.match(ui, /EVENT \/ MENTIONED-LOCATION LINKING", state:"NOT WIRED"/);
+assert.match(ui, /ARTICLE → GKG MENTIONED LOCATIONS", state:"CONNECTED"/);
+assert.match(ui, /NEWS → MAP LOCATION HANDOFF", state:"NOT WIRED"/);
 
 // Reuse the existing NEWS source clock; this feature adds no timer/fetch.
 const service = read("services/weather/StationDiscoveryService.qml");

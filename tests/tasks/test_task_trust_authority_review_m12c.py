@@ -148,11 +148,16 @@ class TrustAuthorityReviewTests(unittest.TestCase):
                              "EXTERNAL_RELEASE_EVIDENCE_REQUIRED")
 
     def test_boolean_string_and_malformed_identifiers_refuse(self):
-        for value in (True, -1, "8", 0):
+        for value in (True, -1, "8"):
             a = anchor()
             a["generationFloor"] = value
             self.assertEqual(policy.assess_release(a, release(), proof())["status"],
                              "REFUSED")
+        # Zero means no release accepted yet; bootstrap floor is valid.
+        fresh = anchor()
+        fresh["generationFloor"] = 0
+        self.assertEqual(policy.assess_release(fresh, release(), proof())["status"],
+                         "SYNTHETIC_REVIEW_ELIGIBLE")
         r = release()
         r["generation"] = True
         self.assertEqual(policy.assess_release(anchor(), r, proof())["reason"],

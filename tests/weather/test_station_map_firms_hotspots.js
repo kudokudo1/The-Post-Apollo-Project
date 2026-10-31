@@ -98,7 +98,7 @@ assert.match(ui, /model: firmsService\.ready \? firmsService\.hotspots : \[\]/);
 assert.match(ui, /title: "HOTSPOT INSPECTOR \/\/ NASA FIRMS"/);
 assert.match(ui, /SATELLITE HOTSPOT, NOT FIRE PERIMETER/);
 assert.match(ui, /selectedMapHotspot = modelData/);
-assert.match(ui, /SPATIAL PLOT \/\/ EONET \+ FIRMS POINTS/);
+assert.match(ui, /SPATIAL PLOT \/\/ EONET \+ FIRMS \+ NEWS MENTIONS/);
 assert.match(ui, /NASA FIRMS \/\/ VIIRS NOAA-21 HOTSPOTS/);
 assert.doesNotMatch(ui, /firmsService\.mapKey/);
 

@@ -87,6 +87,8 @@ jobs:
         run: node tests/weather/test_station_news_source_filter.js
       - name: Validate NEWS language time-window and source stats
         run: node tests/weather/test_station_news_language_time.js
+      - name: Validate NEWS exact-headline source comparison
+        run: node tests/weather/test_station_news_source_groups.js
       - name: Validate MAP EONET hazard filters cache and inspector
         run: node tests/weather/test_station_map_hazard_intelligence.js
       - name: Validate MAP spatial projection zoom pan and point canvas

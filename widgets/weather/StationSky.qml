@@ -120,6 +120,15 @@ Rectangle {
         longitude: sky.weatherService ? sky.weatherService.longitude : ""
     }
 
+    WeatherServices.UsnoPlanetRiseSetService {
+        id: planetRiseSetService
+        active: sky.visible
+        date: sky.astronomySummary.date
+        latitude: sky.weatherService ? sky.weatherService.latitude : ""
+        longitude: sky.weatherService ? sky.weatherService.longitude : ""
+        offsetMinutes: sky.moonCivilOffsetMinutes
+    }
+
     readonly property string currentCelestialMode:
         weatherReady
         ? WeatherCyclePolicy.artworkFor(conditionState, skyCycle) : "weather"
@@ -155,6 +164,23 @@ Rectangle {
         return missing.length > 0
             ? "INVALID/MISSING " + missing.join(" + ")
             : "INPUTS WAITING";
+    }
+
+    function planetStatusColor(status) {
+        switch (String(status || "")) {
+        case "NORMAL": return Colors.cyan;
+        case "CONTINUOUSLY ABOVE HORIZON": return Colors.green;
+        case "CONTINUOUSLY BELOW HORIZON": return Colors.blue;
+        case "INDETERMINATE": return Colors.yellow;
+        default: return Colors.orange;
+        }
+    }
+
+    function planetAngleLabel(value, suffix) {
+        const number = Number(value);
+        return isFinite(number)
+            ? Math.round(number) + String(suffix || "°")
+            : "--";
     }
 
     // Normalized live telemetry scales preserved from the original page.
@@ -1183,6 +1209,187 @@ Rectangle {
             QuietText {
                 width: parent.width
                 text: "ABOVE-HORIZON CATALOG ≠ NAKED-EYE VISIBILITY // DAYLIGHT, SUN GLARE, CLOUDS + TERRAIN ARE NOT MODELED // UTC MINUTE USED FOR USNO UT1 INPUT"
+                font.pixelSize: 9
+                color: Colors.orange
+            }
+        }
+
+
+        StationSectionDivider {
+            width: parent.width
+            title: "PLANET CLOCK // USNO RISE + TRANSIT + SET"
+        }
+
+        Column {
+            width: parent.width
+            spacing: 7
+
+            Row {
+                width: parent.width
+                spacing: 12
+
+                GohuText {
+                    text: !planetRiseSetService.configured
+                          ? "INPUTS UNAVAILABLE"
+                          : planetRiseSetService.loading
+                            ? "CALCULATING"
+                            : planetRiseSetService.failed
+                              ? (planetRiseSetService.ready
+                                 ? "DEGRADED" : "OFFLINE")
+                              : planetRiseSetService.ready
+                                ? "RECEIVED" : "WAITING"
+                    font.pixelSize: 10
+                    color: planetRiseSetService.failed
+                           ? Colors.yellow
+                           : planetRiseSetService.ready
+                             ? Colors.cyan : Colors.orange
+                }
+
+                QuietText {
+                    width: Math.max(0, parent.width - 150)
+                    text: planetRiseSetService.ready
+                          ? "LOCAL CIVIL DATE "
+                            + sky.astronomySummary.date
+                            + " // "
+                            + planetRiseSetService.rows.length
+                            + " PLANETS // "
+                            + planetRiseSetService.precision
+                          : "USNO MAJOR SOLAR SYSTEM BODIES // DATE-SCOPED CALCULATOR"
+                    elide: Text.ElideRight
+                    font.pixelSize: 9
+                }
+            }
+
+            QuietText {
+                visible: planetRiseSetService.failed
+                width: parent.width
+                text: planetRiseSetService.errorText
+                font.pixelSize: 9
+                color: Colors.yellow
+            }
+
+            Row {
+                id: planetClockRow
+                width: parent.width
+                spacing: 7
+                visible: planetRiseSetService.ready
+
+                Repeater {
+                    model: planetRiseSetService.rows
+
+                    delegate: Rectangle {
+                        required property var modelData
+                        width: Math.max(
+                            0,
+                            (planetClockRow.width
+                             - 4 * planetClockRow.spacing) / 5
+                        )
+                        height: 126
+                        color: Colors.dark
+                        border.width: 1
+                        border.color:
+                            sky.planetStatusColor(modelData.status)
+
+                        Column {
+                            anchors.fill: parent
+                            anchors.margins: 7
+                            spacing: 4
+
+                            GohuText {
+                                width: parent.width
+                                text: modelData.name
+                                elide: Text.ElideRight
+                                font.pixelSize: 11
+                                color:
+                                    sky.planetStatusColor(modelData.status)
+                            }
+
+                            QuietText {
+                                visible: modelData.status === "NORMAL"
+                                width: parent.width
+                                text: "RISE // "
+                                      + modelData.riseLabel
+                                elide: Text.ElideRight
+                                font.pixelSize: 8
+                            }
+
+                            QuietText {
+                                visible: modelData.status === "NORMAL"
+                                width: parent.width
+                                text: "AZ // "
+                                      + sky.planetAngleLabel(
+                                            modelData.riseAzimuth, "°T"
+                                        )
+                                font.pixelSize: 8
+                                color: Colors.cyan
+                            }
+
+                            QuietText {
+                                visible: modelData.status === "NORMAL"
+                                width: parent.width
+                                text: "TRANSIT // "
+                                      + modelData.transitLabel
+                                elide: Text.ElideRight
+                                font.pixelSize: 8
+                            }
+
+                            QuietText {
+                                visible: modelData.status === "NORMAL"
+                                width: parent.width
+                                text: "ALT // "
+                                      + sky.planetAngleLabel(
+                                            modelData.transitAltitude, "°"
+                                        )
+                                      + String(
+                                            modelData.transitHemisphere || ""
+                                        )
+                                font.pixelSize: 8
+                                color: Colors.orange
+                            }
+
+                            QuietText {
+                                visible: modelData.status === "NORMAL"
+                                width: parent.width
+                                text: "SET // "
+                                      + modelData.setLabel
+                                      + " // "
+                                      + sky.planetAngleLabel(
+                                            modelData.setAzimuth, "°T"
+                                        )
+                                elide: Text.ElideRight
+                                font.pixelSize: 8
+                            }
+
+                            GohuText {
+                                visible: modelData.status !== "NORMAL"
+                                width: parent.width
+                                text: modelData.status
+                                wrapMode: Text.WordWrap
+                                font.pixelSize: 9
+                                color:
+                                    sky.planetStatusColor(modelData.status)
+                            }
+                        }
+                    }
+                }
+            }
+
+            QuietText {
+                width: parent.width
+                text: "MERCURY + VENUS + MARS + JUPITER + SATURN // RISE/SET TO ONE-MINUTE PROVIDER PRECISION // AZIMUTH TRUE NORTH"
+                font.pixelSize: 9
+            }
+
+            QuietText {
+                width: parent.width
+                text: "USNO MODELS ATMOSPHERIC REFRACTION WITH A FLAT UNOBSTRUCTED HORIZON // TERRAIN, BUILDINGS, CLOUDS + DAYLIGHT ARE NOT VISIBILITY CLAIMS"
+                font.pixelSize: 9
+                color: Colors.orange
+            }
+
+            QuietText {
+                width: parent.width
+                text: "CURRENT POSITION ABOVE USES CELNAV // THIS TABLE IS THE LOCAL-DATE EVENT CLOCK // BOTH USE THE SAME WEATHER COORDINATE FIX"
                 font.pixelSize: 9
                 color: Colors.orange
             }

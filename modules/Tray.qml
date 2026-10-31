@@ -17,6 +17,22 @@ Rectangle {
     property bool trayButtonPressed: false
     property bool trayButtonHovered: false
 
+    // Exact application identity, never a substring match on a random tray
+    // tooltip. Other applications retain their own native tray activation.
+    function isDiscordTrayItem(item) {
+        const id = String(item.id || "").trim().toLowerCase().replace(/\.desktop$/, "");
+        const title = String(item.title || "").trim().toLowerCase();
+        return id === "vesktop" || id === "dev.vencord.vesktop"
+               || id === "discord" || title === "vesktop" || title === "discord";
+    }
+
+    function openDiscordFromTray() {
+        // MessagingW already exposes a dedicated Quickshell IPC target.
+        // Reuse it rather than editing the concurrently-owned shell.qml
+        // or calling Vesktop's desktop-window restore action.
+        Quickshell.execDetached(["qs", "ipc", "call", "messaging", "openDiscordFromTray"]);
+    }
+
     // ===== DOCK GLOW ============================================
 
     RectangularShadow {
@@ -154,7 +170,10 @@ Rectangle {
                         if (mouse.button === Qt.LeftButton) {
                             // Activate the actual tray item; no undeclared
                             // local test-state assignment may intercept this.
-                            trayButton.modelData.activate();
+                            if (trayDock.isDiscordTrayItem(trayButton.modelData))
+                                trayDock.openDiscordFromTray();
+                            else
+                                trayButton.modelData.activate();
                         }
 
                         if (mouse.button === Qt.RightButton) {

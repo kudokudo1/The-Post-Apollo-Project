@@ -39,6 +39,66 @@ def sample(*, focus="discord", discord_x=211, discord_y=51,
 
 
 class DiscordDockingTests(TestCase):
+    def test_discord_tray_activation_routes_to_social_not_native_vesktop(self):
+        tray = (ROOT / "modules/Tray.qml").read_text(encoding="utf-8")
+        social = SOCIAL.read_text(encoding="utf-8")
+
+        # The freedesktop tray's native activation restores an independent
+        # Electron desktop window. Exact Vesktop/Discord identification enters
+        # the already-existing Social IPC target instead; other icons remain
+        # untouched. shell.qml is not part of this change.
+        self.assertIn("function isDiscordTrayItem(item)", tray)
+        self.assertIn('id === "dev.vencord.vesktop"', tray)
+        self.assertIn('title === "vesktop"', tray)
+        self.assertIn('title === "discord"', tray)
+        self.assertIn(
+            'Quickshell.execDetached(["qs", "ipc", "call", "messaging", "openDiscordFromTray"])',
+            tray,
+        )
+        self.assertIn("trayDock.isDiscordTrayItem(trayButton.modelData)", tray)
+        self.assertIn("trayDock.openDiscordFromTray();", tray)
+        self.assertIn("trayButton.modelData.activate();", tray)
+        self.assertIn("function openDiscordFromTray(): void", social)
+        self.assertIn("function openDiscordFromTray() {", social)
+        self.assertIn("messagingWindow.activateApp(1);", social)
+
+    def test_discord_launch_waits_for_verified_social_mapping(self):
+        src = SOCIAL.read_text(encoding="utf-8")
+        show = src.split("    function showDiscord() {", 1)[1].split(
+            "    function hideDiscord()", 1
+        )[0]
+        self.assertIn("onSocialReadyChanged: {", src)
+        self.assertIn(
+            "if (socialReady && menuOpen && discordSelected && !discordReady)", src
+        )
+        self.assertLess(
+            show.index("if (!socialReady)"), show.index("discordLaunchProcess.exec(")
+        )
+        self.assertLess(
+            show.index("helperShowDiscord("), show.index("discordLaunchProcess.exec(")
+        )
+
+    def test_hiding_discord_disarms_stale_follow_before_scratchpad(self):
+        bridge = geometry.Bridge(0.1)
+        bridge.discord_ready = True
+        bridge.discord_docked = True
+        bridge.discord_con_id = 4242
+        bridge.discord_visible = True
+        bridge.pending_sync = {
+            "discord": {"target": "discord", "width": 330},
+            "social": {"target": "social", "width": 441},
+            "x": {"target": "x", "width": 1000},
+        }
+        with patch.object(geometry.sys, "stdin", io.StringIO('{"op":"hideDiscord"}\n')):
+            with patch.object(bridge, "queue_command") as send:
+                bridge.stdin_loop()
+                send.assert_called_once_with('[con_id="4242"] move scratchpad')
+
+        self.assertFalse(bridge.discord_show_requested)
+        self.assertFalse(bridge.discord_ready)
+        self.assertFalse(bridge.discord_docked)
+        self.assertEqual(bridge.pending_sync, {"x": {"target": "x", "width": 1000}})
+
     def bridge(self, docked=False):
         bridge = geometry.Bridge(0.1)
         bridge.discord_selected = True

@@ -292,7 +292,7 @@ Rectangle {
         : "RADIO BROWSER // TOP VOTED STREAMS"
     readonly property string sourceCaution:
         domain === "map" ? "EONET + FIRMS + MRMS + HMS SMOKE CONNECTED // BASEMAP NOT WIRED"
-        : domain === "news" ? "ARTICLE DISCOVERY // LOCAL TOPIC + SOURCE + LANGUAGE + TIME FILTERS // CONSERVATIVE DEDUPE // NOT STORY CLUSTERING"
+        : domain === "news" ? "ARTICLE DISCOVERY // LOCAL FILTERS // EXACT-HEADLINE SOURCE GROUPS // NOT FUZZY STORY CLUSTERING"
         : "STATION DIRECTORY // PERSISTENT PLAYBACK NOT YET WIRED"
     readonly property var plannedSources: {
         if (domain === "map")
@@ -328,9 +328,10 @@ Rectangle {
                 {name:"LOCAL TOPIC FILTER + URL/TITLE DEDUPE", state:"CONNECTED"},
                 {name:"PUBLISHER / SOURCE COUNTRY FILTER", state:"CONNECTED"},
                 {name:"LANGUAGE + TIME WINDOW FILTERS", state:"CONNECTED"},
+                {name:"EXACT-HEADLINE SOURCE GROUPS", state:"CONNECTED"},
                 {name:"REGION GROUPING", state:"NOT WIRED"},
                 {name:"LIVE NEWS / VIDEO", state:"NOT WIRED"},
-                {name:"STORY CLUSTERS / DOSSIERS", state:"NOT WIRED"}
+                {name:"SEMANTIC STORY CLUSTERS / DOSSIERS", state:"NOT WIRED"}
             ];
         return [
             {name:"RADIO BROWSER // STATION LIST", state:"SOURCE CONNECTED"},
@@ -1637,7 +1638,9 @@ Rectangle {
                 delegate: Rectangle {
                     required property var modelData
                     width: content.width
-                    height: 88
+                    height: modelData.sourceGroup
+                            && modelData.sourceGroup.multiSource
+                            ? 108 : 88
                     color: Colors.dark
                     border.width: 1
                     border.color: entryMouse.containsMouse ? Colors.yellow
@@ -1678,6 +1681,24 @@ Rectangle {
                             text: modelData.time
                             elide: Text.ElideRight
                             font.pixelSize: 10
+                        }
+                        QuietText {
+                            visible: modelData.sourceGroup
+                                     && modelData.sourceGroup.multiSource
+                            width: parent.width
+                            text: modelData.sourceGroup
+                                  ? "EXACT HEADLINE GROUP // "
+                                    + modelData.sourceGroup.sourceCount
+                                    + " PUBLISHERS // "
+                                    + modelData.sourceGroup.domains.join(" / ")
+                                    + (modelData.sourceGroup.countries.length > 0
+                                       ? " // COUNTRIES "
+                                         + modelData.sourceGroup.countries.join(" / ")
+                                       : "")
+                                  : ""
+                            elide: Text.ElideRight
+                            font.pixelSize: 9
+                            color: Colors.magenta
                         }
                     }
 

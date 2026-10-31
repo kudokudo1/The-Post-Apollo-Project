@@ -51,6 +51,13 @@ assert.throws(
 );
 assert.throws(
     () => rv.parseMetadata({
+        host: "https://evilrainviewer.com",
+        radar: {past: frames}
+    }),
+    /Unsafe RainViewer tile host/
+);
+assert.throws(
+    () => rv.parseMetadata({
         host: "https://tilecache.rainviewer.com",
         radar: {past: []}
     }),
@@ -137,6 +144,10 @@ assert.match(ui, /property string radarDisplaySource: "noaa"/);
 assert.match(ui, /function loadRainViewerFallback\(\)/);
 assert.match(
     ui,
+    /if \(domain !== "map" \|\| !stationOpen\)[\s\S]*?return false/
+);
+assert.match(
+    ui,
     /rainViewerRadarService\.request\([\s\S]*?radarHistoryMinutes[\s\S]*?mapVisibleBounds/
 );
 assert.match(ui, /function clearRainViewerFallback\(\)/);
@@ -154,6 +165,7 @@ assert.match(ui, /title: "RADAR FALLBACK \/\/ RAINVIEWER PAST RADAR"/);
 assert.match(ui, /"LOAD FALLBACK"/);
 assert.match(ui, /"SHOW NOAA"/);
 assert.match(ui, /"SHOW FALLBACK"/);
+assert.match(ui, /"FALLBACK PLANNED"/);
 assert.match(
     ui,
     /WEATHER DATA BY RAINVIEWER WHEN FALLBACK IS SHOWN/

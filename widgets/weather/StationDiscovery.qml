@@ -5,6 +5,7 @@ import "StationViewerPolicy.js" as ViewerPolicy
 import "../../services/weather/StationDiscoveryPolicy.js" as DiscoveryPolicy
 import "StationMapProjectionPolicy.js" as MapProjection
 import "StationNaturalEarthLand110.js" as NaturalEarthLand
+import "StationNaturalEarthContext110.js" as NaturalEarthContext
 import "../../services/weather/FirmsHotspotPolicy.js" as FirmsAreaPolicy
 import "StationRadarPolicy.js" as RadarPolicy
 import "../../services/weather/HmsSmokePolicy.js" as SmokePolicy
@@ -106,6 +107,9 @@ Rectangle {
     property var selectedMapEvent: null
     property var selectedMapHotspot: null
     property var selectedMapNewsMention: null
+    property bool mapShowCountryBorders: true
+    property bool mapShowAdmin1: false
+    property bool mapShowPlaces: true
     property real mapZoom: 1
     property real mapCenterLon: 0
     property real mapCenterLat: 0
@@ -118,6 +122,10 @@ Rectangle {
             && Array.isArray(newsMentionOverlay.locations)
             ? newsMentionOverlay.locations : []
         )
+    readonly property var mapPlaceRows:
+        mapShowPlaces
+        ? NaturalEarthContext.placesForZoom(mapZoom)
+        : []
     readonly property var mapVisibleBounds:
         MapProjection.visibleBounds(
             mapPlot ? mapPlot.width : 0,
@@ -429,7 +437,7 @@ Rectangle {
         : domain === "news" ? "GDELT DOC // WORLD EVENT HEADLINES"
         : "RADIO BROWSER // TOP VOTED STREAMS"
     readonly property string sourceCaution:
-        domain === "map" ? "NATURAL EARTH BASEMAP + EONET + FIRMS + MRMS + HMS SMOKE CONNECTED"
+        domain === "map" ? "NATURAL EARTH BASEMAP + GEOGRAPHIC CONTEXT + EONET + FIRMS + MRMS + HMS SMOKE"
         : domain === "news" ? "ARTICLE DISCOVERY // LOCAL FILTERS // EXACT-HEADLINE SOURCE GROUPS // NOT FUZZY STORY CLUSTERING"
         : "STATION DIRECTORY // PERSISTENT PLAYBACK NOT YET WIRED"
     readonly property var plannedSources: {
@@ -437,6 +445,18 @@ Rectangle {
             return [
                 {name:"NASA EONET // FILTERED EVENTS + INSPECTOR", state:"SOURCE CONNECTED"},
                 {name:"NATURAL EARTH 1:110m LAND BASEMAP", state:"CONNECTED"},
+                {
+                    name:"NATURAL EARTH ADMIN-0 REFERENCE BOUNDARIES",
+                    state: mapShowCountryBorders ? "VISIBLE" : "HIDDEN"
+                },
+                {
+                    name:"NATURAL EARTH ADMIN-1 STATE/PROVINCE LINES",
+                    state: mapShowAdmin1 ? "VISIBLE" : "HIDDEN"
+                },
+                {
+                    name:"NATURAL EARTH POPULATED PLACES",
+                    state: mapShowPlaces ? "VISIBLE" : "HIDDEN"
+                },
                 {name:"EONET POINT CANVAS // PAN + ZOOM", state:"CONNECTED"},
                 {
                     name:"GDELT NEWS MENTION POINTS",
@@ -584,6 +604,7 @@ Rectangle {
                                    || modelData.state === "GROUND FEED EXISTS"
                                    || modelData.state === "MANUAL READY"
                                    || modelData.state === "SNAPSHOT LOADED"
+                                   || modelData.state === "VISIBLE"
                                    || String(modelData.state).indexOf("FETCHED ") === 0
                                    || String(modelData.state).indexOf("LOADED ") === 0
                                    ? Colors.cyan : Colors.orange
@@ -653,6 +674,63 @@ Rectangle {
                     text: "BASEMAP // NATURAL EARTH 1:110m LAND // PUBLIC DOMAIN // LOCAL ASSET // NO TILE NETWORK"
                     font.pixelSize: 9
                     color: Colors.cyan
+                }
+
+                Row {
+                    width: parent.width
+                    height: 30
+                    spacing: 8
+
+                    ActionButton {
+                        width: 126
+                        height: 28
+                        label: "BORDERS: "
+                               + (stationDiscovery.mapShowCountryBorders
+                                  ? "ON" : "OFF")
+                        labelPixelSize: 9
+                        accentColor: Colors.cyan
+                        selected: stationDiscovery.mapShowCountryBorders
+                        onClicked:
+                            stationDiscovery.mapShowCountryBorders =
+                                !stationDiscovery.mapShowCountryBorders
+                    }
+
+                    ActionButton {
+                        width: 116
+                        height: 28
+                        label: "STATES: "
+                               + (stationDiscovery.mapShowAdmin1
+                                  ? "ON" : "OFF")
+                        labelPixelSize: 9
+                        accentColor: Colors.blue
+                        selected: stationDiscovery.mapShowAdmin1
+                        onClicked:
+                            stationDiscovery.mapShowAdmin1 =
+                                !stationDiscovery.mapShowAdmin1
+                    }
+
+                    ActionButton {
+                        width: 116
+                        height: 28
+                        label: "PLACES: "
+                               + (stationDiscovery.mapShowPlaces
+                                  ? "ON" : "OFF")
+                        labelPixelSize: 9
+                        accentColor: Colors.magenta
+                        selected: stationDiscovery.mapShowPlaces
+                        onClicked:
+                            stationDiscovery.mapShowPlaces =
+                                !stationDiscovery.mapShowPlaces
+                    }
+
+                    QuietText {
+                        anchors.verticalCenter: parent.verticalCenter
+                        width: Math.max(0, parent.width - 382)
+                        text: "REFERENCE CARTOGRAPHY // DISPUTED / CLAIM LINES ARE DISTINCT // NOT A LEGAL POSITION"
+                        elide: Text.ElideRight
+                        font.pixelSize: 8
+                        color: Colors.orange
+                    }
                 }
 
                 Row {
@@ -1063,6 +1141,150 @@ Rectangle {
                         }
                     }
 
+                    Canvas {
+                        id: mapContextLineCanvas
+                        anchors.fill: parent
+                        z: 0.08
+                        visible: stationDiscovery.mapShowCountryBorders
+                                 || stationDiscovery.mapShowAdmin1
+
+                        property var countryLines:
+                            NaturalEarthContext.admin0Lines
+                        property var admin1Lines:
+                            NaturalEarthContext.admin1Lines
+                        property bool showCountry:
+                            stationDiscovery.mapShowCountryBorders
+                        property bool showAdmin1:
+                            stationDiscovery.mapShowAdmin1
+                        property real viewZoom: stationDiscovery.mapZoom
+                        property real viewCenterLon: stationDiscovery.mapCenterLon
+                        property real viewCenterLat: stationDiscovery.mapCenterLat
+
+                        onCountryLinesChanged: requestPaint()
+                        onAdmin1LinesChanged: requestPaint()
+                        onShowCountryChanged: requestPaint()
+                        onShowAdmin1Changed: requestPaint()
+                        onViewZoomChanged: requestPaint()
+                        onViewCenterLonChanged: requestPaint()
+                        onViewCenterLatChanged: requestPaint()
+                        onWidthChanged: requestPaint()
+                        onHeightChanged: requestPaint()
+
+                        function projectedLine(rawLine, offset) {
+                            if (!Array.isArray(rawLine)
+                                    || rawLine.length < 2)
+                                return [];
+                            const points = [];
+                            let minX = Infinity;
+                            let maxX = -Infinity;
+                            let minY = Infinity;
+                            let maxY = -Infinity;
+
+                            for (let i = 0; i < rawLine.length; i++) {
+                                const point = rawLine[i];
+                                if (!Array.isArray(point)
+                                        || point.length < 2)
+                                    return [];
+                                const projected =
+                                    MapProjection.projectUnwrapped(
+                                        Number(point[0]) + offset,
+                                        Number(point[1]),
+                                        width,
+                                        height,
+                                        viewZoom,
+                                        viewCenterLon,
+                                        viewCenterLat
+                                    );
+                                if (!projected.valid)
+                                    return [];
+                                points.push(projected);
+                                minX = Math.min(minX, projected.x);
+                                maxX = Math.max(maxX, projected.x);
+                                minY = Math.min(minY, projected.y);
+                                maxY = Math.max(maxY, projected.y);
+                            }
+
+                            if (maxX < 0 || minX > width
+                                    || maxY < 0 || minY > height)
+                                return [];
+                            return points;
+                        }
+
+                        function strokeLine(ctx, points, color, lineWidth) {
+                            if (!points || points.length < 2)
+                                return;
+                            ctx.beginPath();
+                            ctx.moveTo(points[0].x, points[0].y);
+                            for (let i = 1; i < points.length; i++)
+                                ctx.lineTo(points[i].x, points[i].y);
+                            ctx.strokeStyle = color;
+                            ctx.lineWidth = lineWidth;
+                            ctx.stroke();
+                        }
+
+                        function disputedClass(value) {
+                            const text = String(value || "").toLowerCase();
+                            return text.indexOf("disputed") >= 0
+                                || text.indexOf("claim") >= 0
+                                || text.indexOf("line of control") >= 0
+                                || text.indexOf("indefinite") >= 0
+                                || text.indexOf("indeterminant") >= 0;
+                        }
+
+                        onPaint: {
+                            const ctx = getContext("2d");
+                            ctx.clearRect(0, 0, width, height);
+                            const offsets = [-360, 0, 360];
+
+                            if (showCountry) {
+                                for (let rowIndex = 0;
+                                     rowIndex < countryLines.length;
+                                     rowIndex++) {
+                                    const row = countryLines[rowIndex];
+                                    const disputed = disputedClass(
+                                        row.className
+                                    );
+                                    for (let copy = 0;
+                                         copy < offsets.length;
+                                         copy++) {
+                                        strokeLine(
+                                            ctx,
+                                            projectedLine(
+                                                row.line,
+                                                offsets[copy]
+                                            ),
+                                            disputed
+                                            ? "rgba(242,190,78,0.74)"
+                                            : "rgba(220,243,250,0.34)",
+                                            disputed ? 1.25 : 0.8
+                                        );
+                                    }
+                                }
+                            }
+
+                            if (showAdmin1 && viewZoom >= 1.6) {
+                                for (let rowIndex = 0;
+                                     rowIndex < admin1Lines.length;
+                                     rowIndex++) {
+                                    const row = admin1Lines[rowIndex];
+                                    for (let copy = 0;
+                                         copy < offsets.length;
+                                         copy++) {
+                                        strokeLine(
+                                            ctx,
+                                            projectedLine(
+                                                row.line,
+                                                offsets[copy]
+                                            ),
+                                            "rgba(91,95,212,0.30)",
+                                            0.7
+                                        );
+                                    }
+                                }
+                            }
+                        }
+                    }
+
                     Image {
                         id: radarImage
                         readonly property var northWest:
@@ -1241,6 +1463,104 @@ Rectangle {
                                    ? Colors.cyan : Colors.white
                             opacity: Number(modelData) === 0 ? 0.42 : 0.14
                             z: 0.3
+                        }
+                    }
+
+                    Canvas {
+                        id: mapPlaceLabelCanvas
+                        anchors.fill: parent
+                        z: 0.45
+                        visible: stationDiscovery.mapShowPlaces
+
+                        property var placeRows:
+                            stationDiscovery.mapPlaceRows
+                        property real viewZoom: stationDiscovery.mapZoom
+                        property real viewCenterLon: stationDiscovery.mapCenterLon
+                        property real viewCenterLat: stationDiscovery.mapCenterLat
+
+                        onPlaceRowsChanged: requestPaint()
+                        onViewZoomChanged: requestPaint()
+                        onViewCenterLonChanged: requestPaint()
+                        onViewCenterLatChanged: requestPaint()
+                        onWidthChanged: requestPaint()
+                        onHeightChanged: requestPaint()
+
+                        function collides(box, used) {
+                            for (let i = 0; i < used.length; i++) {
+                                const other = used[i];
+                                if (box.x < other.x + other.w + 3
+                                        && box.x + box.w + 3 > other.x
+                                        && box.y < other.y + other.h + 2
+                                        && box.y + box.h + 2 > other.y)
+                                    return true;
+                            }
+                            return false;
+                        }
+
+                        onPaint: {
+                            const ctx = getContext("2d");
+                            ctx.clearRect(0, 0, width, height);
+                            const used = [];
+                            ctx.font =
+                                "9px 'GohuFont 11 Nerd Font Mono'";
+                            ctx.textBaseline = "alphabetic";
+
+                            for (let i = 0; i < placeRows.length; i++) {
+                                const row = placeRows[i];
+                                const point = MapProjection.project(
+                                    row.longitude,
+                                    row.latitude,
+                                    width,
+                                    height,
+                                    viewZoom,
+                                    viewCenterLon,
+                                    viewCenterLat
+                                );
+                                if (!point.visible)
+                                    continue;
+
+                                const labelWidth = Math.min(
+                                    118,
+                                    Math.max(24, row.name.length * 5.4)
+                                );
+                                let labelX = point.x + 5;
+                                let labelY = point.y - 3;
+                                if (labelX + labelWidth + 3 > width)
+                                    labelX = point.x - labelWidth - 5;
+                                if (labelY - 9 < 0)
+                                    labelY = point.y + 11;
+
+                                const box = {
+                                    "x": labelX - 2,
+                                    "y": labelY - 9,
+                                    "w": labelWidth + 4,
+                                    "h": 12
+                                };
+                                if (collides(box, used))
+                                    continue;
+                                used.push(box);
+
+                                const accent =
+                                    row.adm0cap ? "#C74EC7"
+                                    : (row.worldcity || row.megacity)
+                                      ? "#55CFCA" : "#DCF3FA";
+                                ctx.fillStyle = "rgba(27,6,35,0.82)";
+                                ctx.fillRect(
+                                    box.x, box.y, box.w, box.h
+                                );
+                                ctx.fillStyle = accent;
+                                ctx.fillRect(
+                                    point.x - 1.5,
+                                    point.y - 1.5,
+                                    3,
+                                    3
+                                );
+                                ctx.fillText(
+                                    row.name,
+                                    labelX,
+                                    labelY
+                                );
+                            }
                         }
                     }
 
@@ -1459,7 +1779,7 @@ Rectangle {
                         anchors.top: parent.top
                         anchors.margins: 7
                         z: 3
-                        text: "NATURAL EARTH LAND // LAT/LON GRID // RADAR + SMOKE OVERLAYS"
+                        text: "NATURAL EARTH LAND + CONTEXT // LAT/LON GRID // RADAR + SMOKE OVERLAYS"
                         color: Colors.orange
                         font.pixelSize: 9
                     }

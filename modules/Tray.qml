@@ -26,15 +26,11 @@ Rectangle {
                || id === "discord" || title === "vesktop" || title === "discord";
     }
 
-    function activateTrayItem(item) {
-        if (isDiscordTrayItem(item)) {
-            // MessagingW already exposes a dedicated Quickshell IPC target.
-            // Reuse it rather than editing the concurrently-owned shell.qml
-            // or calling Vesktop's desktop-window restore action.
-            Quickshell.execDetached(["qs", "ipc", "call", "messaging", "openDiscordFromTray"]);
-            return;
-        }
-        item.activate();
+    function openDiscordFromTray() {
+        // MessagingW already exposes a dedicated Quickshell IPC target.
+        // Reuse it rather than editing the concurrently-owned shell.qml
+        // or calling Vesktop's desktop-window restore action.
+        Quickshell.execDetached(["qs", "ipc", "call", "messaging", "openDiscordFromTray"]);
     }
 
     // ===== DOCK GLOW ============================================
@@ -174,7 +170,10 @@ Rectangle {
                         if (mouse.button === Qt.LeftButton) {
                             // Activate the actual tray item; no undeclared
                             // local test-state assignment may intercept this.
-                            trayDock.activateTrayItem(trayButton.modelData);
+                            if (trayDock.isDiscordTrayItem(trayButton.modelData))
+                                trayDock.openDiscordFromTray();
+                            else
+                                trayButton.modelData.activate();
                         }
 
                         if (mouse.button === Qt.RightButton) {

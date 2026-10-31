@@ -111,6 +111,8 @@ jobs:
         run: node tests/weather/test_station_ground_nwps_river.js
       - name: Verify GROUND separate NWPS observed and forecast stageflow
         run: node tests/weather/test_station_ground_nwps_stageflow.js
+      - name: Verify GROUND nearest NOAA NDBC marine observations
+        run: node tests/weather/test_station_ground_ndbc_marine.js
       - name: Verify GROUND NWPS flood impacts and crest context
         run: node tests/weather/test_station_ground_nwps_context.js
       - name: Verify official NWS alert hierarchy across HOME and header

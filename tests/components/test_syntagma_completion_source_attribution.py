@@ -98,11 +98,12 @@ assert process_telemetry.count("    Process {") == 3
 assert 'Quickshell.env("POST_APOLLO_SUBPROCESS_LAG_PROBE")' in process_telemetry
 assert 'readonly property bool processCompletionProbeEnabled:' in process_telemetry
 assert 'if (!processCompletionProbeEnabled)\n            return null;' in process_telemetry
-assert process_telemetry.count("SYNTAGMA_COMPLETION_PROBE // service=process-telemetry") == 2
+assert process_telemetry.count("SYNTAGMA_COMPLETION_PROBE // service=process-telemetry") == 4
 assert 'count >= 2048 || seq % 16 === 1' in process_telemetry
 assert 'trace.sampled || elapsedMs >= 25' in process_telemetry
 assert process_telemetry.count("onStreamFinished: {") == 6
-assert process_telemetry.count("                } finally {") == 6
+assert len(re.findall(r"(?m)^ {16}\\} finally \\{", process_telemetry)) == 6
+assert len(re.findall(r"(?m)^ {20}\\} finally \\{", process_telemetry)) == 3
 assert process_telemetry.count("                const completionTrace = processTelemetry.beginCompletionProbe(") == 6
 assert process_telemetry.count("                    processTelemetry.endCompletionProbe(") == 6
 assert "const lines = String(output || \"\").split(\"\\n\");" in process_telemetry
@@ -115,4 +116,25 @@ probe_helpers = process_telemetry.split("function beginCompletionProbe(stage, ch
 for forbidden in ("this.text", "command:", "payload", "args", ".exec(", "processId"):
     assert forbidden not in probe_helpers, forbidden
 
-print("SYNTAGMA V5 + PROCESS TELEMETRY COMPLETION ATTRIBUTION // SOURCE GUARDS PASS; RUNTIME UNTESTED")
+
+# Snapshot identity phases reuse the outer completion sequence and report
+# only bounded static labels and times, not process rows/argv/stdout contents.
+for stage in ("parse", "publish", "settle"):
+    assert process_telemetry.count(f'beginSnapshotPhase("{stage}", completionTrace)') == 1, stage
+    assert process_telemetry.count(f'endSnapshotPhase("{stage}", {stage}Trace)') == 1, stage
+assert 'function beginSnapshotPhase(stage, completionTrace)' in process_telemetry
+assert 'function endSnapshotPhase(stage, trace)' in process_telemetry
+assert 'completionTrace.sampled' in process_telemetry
+assert 'trace.sampled || elapsedMs >= 25' in process_telemetry
+callback = process_telemetry.split('id: snapshotProcess', 1)[1].split('stderr: StdioCollector {', 1)[0]
+assert callback.index('beginSnapshotPhase("parse"') < callback.index('parseSnapshot(text)')
+assert callback.index('endSnapshotPhase("parse"') < callback.index('beginSnapshotPhase("publish"')
+assert callback.index('beginSnapshotPhase("publish"') < callback.index('snapshotReady(parsed)')
+assert callback.index('endSnapshotPhase("publish"') < callback.index('beginSnapshotPhase("settle"')
+assert callback.index('beginSnapshotPhase("settle"') < callback.index('processCount = parsed.length')
+assert callback.index('endSnapshotPhase("settle"') < callback.index('endCompletionProbe("snapshot-stdout"')
+phase_helpers = process_telemetry.split('function beginSnapshotPhase(stage, completionTrace)', 1)[1].split('    // Read-only process telemetry.', 1)[0]
+for forbidden in ('this.text', '.exec(', 'command:', 'payload', 'argv', 'processId'):
+    assert forbidden not in phase_helpers, forbidden
+
+print("SYNTAGMA V5 + PROCESS TELEMETRY SNAPSHOT STAGE ATTRIBUTION // SOURCE GUARDS PASS; RUNTIME UNTESTED")

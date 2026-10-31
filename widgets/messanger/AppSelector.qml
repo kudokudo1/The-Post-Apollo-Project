@@ -164,6 +164,13 @@ Rectangle {
         accountLabelInput.text = entry.label;
     }
 
+    function selectedAccountPosition() {
+        var entries = accountNamesFor(accountSelectedServiceId);
+        return entries.findIndex(function(item) {
+            return item.id === accountSelectedEntryId;
+        });
+    }
+
     function refreshAccountForm() {
         var id = identitySnapshot.activeId;
         accountEditorIdentityId = id;
@@ -1388,7 +1395,63 @@ Rectangle {
                 Text {
                     width: parent.width
                     visible: appSelector.accountSelectedServiceId !== ""
-                    text: "ACCOUNT NICKNAME // NO SECRETS"
+                    text: "ACCOUNT NAMES // LOCAL ONLY"
+                    color: Colors.cyan
+                    font.pixelSize: 9
+                    wrapMode: Text.WordWrap
+                }
+                Text {
+                    width: parent.width
+                    visible: appSelector.accountSelectedServiceId !== ""
+                    text: "Names belong to this Post-Apollo identity. They are not sign-ins."
+                    color: Colors.white
+                    font.pixelSize: 9
+                    wrapMode: Text.WordWrap
+                }
+                ListView {
+                    width: parent.width
+                    height: Math.min(180, appSelector.accountNamesFor(
+                        appSelector.accountSelectedServiceId).length * 33)
+                    visible: appSelector.accountSelectedServiceId !== ""
+                             && appSelector.accountNamesFor(
+                                 appSelector.accountSelectedServiceId).length > 0
+                    model: appSelector.accountNamesFor(
+                        appSelector.accountSelectedServiceId)
+                    clip: true
+                    spacing: 2
+                    delegate: ActionButton {
+                        required property var modelData
+                        width: ListView.view.width
+                        height: 31
+                        label: modelData.label
+                        labelPixelSize: 9
+                        contentPadding: 4
+                        selected: appSelector.accountSelectedEntryId ===
+                                  modelData.id
+                        interactive: appSelector.identitySnapshot.writable
+                        onTriggered: appSelector.selectAccountEntry(modelData)
+                    }
+                }
+                ActionButton {
+                    width: parent.width
+                    height: 32
+                    visible: appSelector.accountSelectedServiceId !== ""
+                    label: "+ NEW ACCOUNT NAME"
+                    labelPixelSize: 9
+                    contentPadding: 3
+                    interactive: appSelector.identitySnapshot.writable
+                    onTriggered: {
+                        appSelector.accountSelectedEntryId = "";
+                        appSelector.pendingAccountRemovalId = "";
+                        accountLabelInput.text = "";
+                    }
+                }
+                Text {
+                    width: parent.width
+                    visible: appSelector.accountSelectedServiceId !== ""
+                    text: appSelector.accountSelectedEntryId === ""
+                          ? "NEW NAME // NO PASSWORDS"
+                          : "EDIT SELECTED NAME"
                     color: Colors.cyan
                     font.pixelSize: 9
                     wrapMode: Text.WordWrap
@@ -1413,7 +1476,8 @@ Rectangle {
                 ActionButton {
                     width: parent.width
                     height: 36
-                    label: "SAVE ACCOUNT NOTE"
+                    label: appSelector.accountSelectedEntryId === ""
+                           ? "ADD ACCOUNT NAME" : "SAVE ACCOUNT NAME"
                     labelPixelSize: 9
                     labelMinimumPixelSize: 8
                     contentPadding: 3
@@ -1423,25 +1487,84 @@ Rectangle {
                                  && accountLabelInput.text.trim() !== ""
                                  && appSelector.accountEditorIdentityId ===
                                     appSelector.identitySnapshot.activeId
-                    onTriggered: SocialAccountDetailsStore.setAccountLabel(
-                        appSelector.identitySnapshot.activeId,
-                        appSelector.accountSelectedServiceId,
-                        accountLabelInput.text)
+                    onTriggered: {
+                        appSelector.pendingAccountRemovalId = "";
+                        if (appSelector.accountSelectedEntryId === "")
+                            SocialAccountDetailsStore.addAccountName(
+                                appSelector.identitySnapshot.activeId,
+                                appSelector.accountSelectedServiceId,
+                                accountLabelInput.text);
+                        else
+                            SocialAccountDetailsStore.renameAccountName(
+                                appSelector.identitySnapshot.activeId,
+                                appSelector.accountSelectedServiceId,
+                                appSelector.accountSelectedEntryId,
+                                accountLabelInput.text);
+                    }
+                }
+                Row {
+                    width: parent.width
+                    height: 33
+                    spacing: 5
+                    visible: appSelector.accountSelectedServiceId !== ""
+                             && appSelector.accountSelectedEntryId !== ""
+                    ActionButton {
+                        width: (parent.width - 5) / 2
+                        height: parent.height
+                        label: "MOVE UP"
+                        labelPixelSize: 9
+                        contentPadding: 3
+                        interactive: appSelector.identitySnapshot.writable
+                                     && SocialAccountDetailsStore.state === "ready"
+                                     && appSelector.selectedAccountPosition() > 0
+                        onTriggered: SocialAccountDetailsStore.moveAccountName(
+                            appSelector.identitySnapshot.activeId,
+                            appSelector.accountSelectedServiceId,
+                            appSelector.accountSelectedEntryId, -1)
+                    }
+                    ActionButton {
+                        width: (parent.width - 5) / 2
+                        height: parent.height
+                        label: "MOVE DOWN"
+                        labelPixelSize: 9
+                        contentPadding: 3
+                        interactive: appSelector.identitySnapshot.writable
+                                     && SocialAccountDetailsStore.state === "ready"
+                                     && appSelector.selectedAccountPosition() >= 0
+                                     && appSelector.selectedAccountPosition() <
+                                        appSelector.accountNamesFor(
+                                            appSelector.accountSelectedServiceId).length - 1
+                        onTriggered: SocialAccountDetailsStore.moveAccountName(
+                            appSelector.identitySnapshot.activeId,
+                            appSelector.accountSelectedServiceId,
+                            appSelector.accountSelectedEntryId, 1)
+                    }
                 }
                 ActionButton {
                     width: parent.width
                     height: 33
-                    label: "CLEAR NOTE"
+                    visible: appSelector.accountSelectedServiceId !== ""
+                             && appSelector.accountSelectedEntryId !== ""
+                    label: appSelector.pendingAccountRemovalId ===
+                           appSelector.accountSelectedEntryId
+                           ? "CONFIRM REMOVE NAME" : "REMOVE ACCOUNT NAME"
                     labelPixelSize: 9
                     contentPadding: 3
                     interactive: appSelector.identitySnapshot.writable
                                  && SocialAccountDetailsStore.state === "ready"
-                                 && appSelector.accountSelectedServiceId !== ""
-                                 && appSelector.accountDetails.accounts[
-                                       appSelector.accountSelectedServiceId] !== undefined
-                    onTriggered: SocialAccountDetailsStore.setAccountLabel(
-                        appSelector.identitySnapshot.activeId,
-                        appSelector.accountSelectedServiceId, "")
+                    onTriggered: {
+                        if (appSelector.pendingAccountRemovalId !==
+                                appSelector.accountSelectedEntryId) {
+                            appSelector.pendingAccountRemovalId =
+                                appSelector.accountSelectedEntryId;
+                            return;
+                        }
+                        appSelector.pendingAccountRemovalId = "";
+                        SocialAccountDetailsStore.removeAccountName(
+                            appSelector.identitySnapshot.activeId,
+                            appSelector.accountSelectedServiceId,
+                            appSelector.accountSelectedEntryId);
+                    }
                 }
                 Rectangle {
                     width: parent.width

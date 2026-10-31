@@ -529,6 +529,90 @@ class DiscordDockingTests(TestCase):
         self.assertFalse(bridge.discord_ready)
         self.assertFalse(bridge.discord_docked)
 
+    def test_restarted_helper_restores_hidden_sway_scratchpad_main(self):
+        # Quickshell restarts, but Vesktop remains hidden in Sway scratchpad.
+        # The fresh helper has never seen this main window visible.
+        bridge = geometry.Bridge(0.1)
+        bridge.discord_show_requested = True
+        bridge.discord_show_focus = True
+        self.assertEqual(bridge.discord_main_seen_visible, set())
+        tree = {
+            "id": 1, "visible": True,
+            "rect": {"x": 0, "y": 0, "width": 1920, "height": 1080},
+            "nodes": [
+                {
+                    "id": 99, "name": "QS_SOCIAL_MENU", "visible": True,
+                    "focused": False,
+                    "rect": {"x": 100, "y": 50, "width": 1210, "height": 700},
+                    "nodes": [], "floating_nodes": [],
+                },
+                {
+                    "id": 7001, "name": "Friends",
+                    "app_id": "dev.vencord.vesktop",
+                    "scratchpad_state": "fresh", "visible": False,
+                    "focused": False,
+                    "rect": {"x": 480, "y": 240, "width": 900, "height": 600},
+                    "nodes": [], "floating_nodes": [],
+                },
+            ],
+            "floating_nodes": [],
+        }
+        snap = geometry.snapshot_from_tree(tree)
+        self.assertEqual(snap["discord"]["kind"], "main")
+        self.assertEqual(snap["discord"]["scratchpadState"], "fresh")
+        bridge.poll_ipc.request = Mock(return_value=tree)
+        commands, dock_commands = [], []
+        bridge.queue_command = commands.append
+        bridge.queue_sync = dock_commands.append
+        bridge.emit_snapshot(force=True)
+        bridge.emit_snapshot(force=True)
+        self.assertEqual(commands, ['[con_id="7001"] scratchpad show'])
+        self.assertEqual(dock_commands, [])
+        self.assertTrue(bridge.discord_show_requested)
+        self.assertNotIn(7001, bridge.discord_main_seen_visible)
+        self.assertFalse(bridge.discord_docked)
+
+        # Only once Sway sees that same main as visible may the helper dock
+        # into the known Social rectangle and consume the open request.
+        tree["nodes"][1]["visible"] = True
+        bridge.emit_snapshot(force=True)
+        self.assertEqual(dock_commands, [{
+            "op": "sync", "target": "discord", "x": 211, "y": 51,
+            "width": 1098, "height": 698, "focus": True, "setup": True,
+        }])
+        self.assertFalse(bridge.discord_show_requested)
+        self.assertIn(7001, bridge.discord_main_seen_visible)
+        self.assertEqual(commands, ['[con_id="7001"] scratchpad show'])
+
+    def test_restart_never_forces_cold_main_or_splash_visible(self):
+        for title, width, height, state in (
+            ("Friends", 1280, 720, "none"),
+            ("Vesktop", 300, 350, "fresh"),
+            ("Friends", 1280, 720, "unknown"),
+        ):
+            with self.subTest(title=title, state=state):
+                bridge = geometry.Bridge(0.1)
+                bridge.discord_show_requested = True
+                bridge.poll_ipc.request = Mock(return_value={
+                    "id": 1, "visible": True,
+                    "rect": {"x": 0, "y": 0, "width": 1920, "height": 1080},
+                    "nodes": [{
+                        "id": 7101, "name": title,
+                        "app_id": "dev.vencord.vesktop",
+                        "scratchpad_state": state, "visible": False,
+                        "focused": False,
+                        "rect": {"x": 0, "y": 0, "width": width, "height": height},
+                        "nodes": [], "floating_nodes": [],
+                    }],
+                    "floating_nodes": [],
+                })
+                bridge.queue_command = Mock()
+                bridge.queue_sync = Mock()
+                bridge.emit_snapshot(force=True)
+                bridge.queue_command.assert_not_called()
+                bridge.queue_sync.assert_not_called()
+                self.assertTrue(bridge.discord_show_requested)
+
     def test_previously_visible_hidden_main_reveals_once_and_waits_for_visibility(self):
         bridge = geometry.Bridge(0.1)
         bridge.discord_show_requested = True

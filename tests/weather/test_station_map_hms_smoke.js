@@ -76,8 +76,8 @@ assert.match(ui, /MapProjection\.projectUnwrapped\(/);
 assert.match(ui, /const offsets = \[-360, 0, 360\]/);
 assert.match(ui, /SmokePolicy\.fillStyle\(row\.density\)/);
 assert.match(ui, /SmokePolicy\.strokeStyle\(row\.density\)/);
-assert.match(ui, /RADAR \+ SMOKE ARE DATA LAYERS, NOT BASEMAP/);
+assert.match(ui, /NATURAL EARTH LAND \/\/ LAT\/LON GRID \/\/ RADAR \+ SMOKE OVERLAYS/);
 assert.match(ui, /NOAA HMS \/\/ SMOKE PLUME POLYGONS/);
-assert.match(ui, /BASEMAP \/ OTHER POLYGON LAYERS", state:"NOT WIRED"/);
+assert.match(ui, /NATURAL EARTH 1:110m LAND BASEMAP", state:"CONNECTED"/);\nassert.match(ui, /OTHER POLYGON LAYERS", state:"NOT WIRED"/);
 
 console.log("Weather MAP NOAA HMS smoke polygon overlay: PASS");

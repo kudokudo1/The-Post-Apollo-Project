@@ -1,8 +1,8 @@
-# Post-Apollo Identity Center // Multi-Organization & Portfolio Upgrade Plan v0.1
+# Post-Apollo Identity Center // Multi-Organization & Portfolio Upgrade Plan v0.2
 
 > **STATUS:** OPERATOR-DIRECTED REQUIREMENTS + PROPOSED TECHNICAL ARCHITECTURE + WORKER HANDOFF. Multi-organization/portfolio scope is operator direction; implementation, vendor, schema, access policy, merge and deployment still require separate approval.
 >
-> **DATE:** 2026-10-31.
+> **DATE:** 2026-10-31. Build-sequence planning update recorded 2026-10-31.
 >
 > **PATIENT:** `kudokudo1/The-Post-Apollo-Project`.
 >
@@ -14,7 +14,7 @@
 >
 > **RELATION:** Extends [Social Account Manager handoff v0](./social-account-manager-handoff-v0.md). It does **not** silently replace its catalog contract, the approved [Social adapter contract](../../services/messaging/ADAPTER-CONTRACT.md), Syntagma policy, or provider authentication rules.
 >
-> **VERIFY LEVEL:** GitHub architecture and existing Social contract inspected on 2026-10-31. This revision documents requirements, not deployed tenants, real legal ownership records, working permissions, enterprise authorization or runtime acceptance.
+> **VERIFY LEVEL:** GitHub architecture and existing Social contract inspected on 2026-10-31. v0.2 also records a proposed first implementation sequence and a synthetic acceptance milestone. This revision documents requirements and planning, not deployed tenants, real legal ownership records, working permissions, enterprise authorization or runtime acceptance.
 
 ## 1 // Executive direction
 
@@ -265,6 +265,35 @@ These are **proposed lanes, not assignments**. Confirm actual Hospital Room, Sta
 | **H. Workforce, partner and portfolio admin UX** | Multi-org switcher, people/role/program/branch directory, invitations, staff and contractor lifecycle, partner agreements | C+D+E | Audited tenant switching, scoped view and cross-org revocation |
 | **I. Production reliability and acceptance** | Tenant provisioning, backups, localization plan, security/ops monitoring, pilot and disaster recovery | All, staged | Security assessment, controlled multi-org pilot, operator sign-off |
 
+### First-build foundation // immediate worker plan (operator requested planning)
+
+**Priority decision for the next design work:** define the **organization/portfolio data model and server-enforced permission engine first**, including tenant isolation, overlapping function/location scopes and grant ownership. In parallel, evaluate a standards-based authentication provider. **Do not** begin by building a password manager, redesigning all Social controls, or purchasing production infrastructure. This is a sequencing proposal, not permission to implement.
+
+| Build order | System / deliverable | Reuse and boundary | Proof before advancing |
+| --- | --- | --- | --- |
+| **0. Reconnaissance and contracts** | Confirm GitHub/Hospital owners, existing services, IdP candidates, tenant and secret custody, data model and threat model. Define one versioned API surface and feature flags. | Source of truth: this plan, Syntagma protocols, the Social v0 Account Manager catalog and current Social code. | Approved authority graph and design contract; no owner collisions. |
+| **1. Individual sign-in foundation** | Disposable test IdP, one authenticated `principalId` per person, session validation/revocation, passkey/MFA and recovery model. | Reuse a mature identity service; Post-Apollo does not write custom password cryptography or store workforce passwords in Social. | Signed and validated session, revocation and rejected token tests; no organization privileges inferred from login. |
+| **2. Multi-organization database** | Durable `Person`, `Organization/Tenant`, `Portfolio`, `PortfolioParticipation`, `Membership`, `Division/Program`, `GeographicUnit`, `Role/Grant`, `AuditEvent` records. | Candidate relational database (for example PostgreSQL) requires a separate decision; use synthetic records only. A portfolio is a view, not a legal parent or permission inheritance root. | Four independent test tenants, two portfolios, cross-org person and overlapping location/function relationships created without mixing records. |
+| **3. Permission engine + trusted API** | Server-side resource/action/tenant/scope checks with default deny, role expiry, delegated administrative scope, cross-tenant sharing by explicit agreement. | The backend, not QML, decides. The grant engine combines functional and geographic scopes as applicable; never infer rights from family ties, company names or portfolio listing. | Negative tests prove that a branch worker, national division director and portfolio viewer cannot read or mutate any ungranted tenant/division/location records. |
+| **4. First management screen** | Simple Post-Apollo **Sign in → My Portfolios → Organizations → Active Role/Scope** screen, authorized member listing and membership administration. | Reuse existing Post-Apollo UI patterns. Social remains a client and local `identity-N` remains local until reviewed mapping. | A test user can switch between two authorized companies; another person's tenant stays invisible. Expired grants disappear on refresh. |
+| **5. Vault + Account Broker** | Secure key/reference boundary, provider capability matrix, `Connect / Reconnect / Disconnect`, request correlation, truthful auth statuses and partial `Connect All`. | Keep Telegram native session semantics and Social profile isolation; never extract cookies, clone sessions or claim a launched browser means authenticated. | Synthetic credential-free fixtures first, then one approved provider end-to-end with correct ownership, expiry, revocation and failed-login display. |
+| **6. Social and workforce expansion** | Connect existing Linked Accounts to the broker and add provider-supported account delegation. Extend workers/branches/programs and eventual business apps through the same trusted APIs. | No wholesale Social rewrite; individual provider limitations, compliance and account ownership controls remain in force. | Cross-person, personal/business, branch and provider account separation verified in controlled runtime; operator accepts each release gate. |
+
+**Safe smallest working demonstration:** In a disposable environment, a test user signs in and sees **two authorized organization contexts** plus a portfolio overview. The fixture also includes **two LLC-style organizations, one nonprofit-style organization, and an unrelated customer organization**. They can switch roles and inspect only explicitly granted data; a second user cannot read those tenants. A **national function** and **single-branch** permission must yield different results. Demonstrate invitation/revocation and an audit entry. No real employees, provider passwords, real company data or production access.
+
+**Acceptance gates for this first milestone:**
+1. The same authenticated person can belong to multiple independent tenants without a shared root account; an unrelated customer is isolated.
+2. Portfolio membership alone gives no access to tenant-private records; nonprofit and LLC governance remain separate.
+3. National function and branch/location scopes are tested independently and in combination, including an explicit **deny** path.
+4. Server-side API authorization rejects forged client-supplied `orgId`/`portfolioId`/`branchId`, expired grants and revoked sessions even if the interface still displays an old selection.
+5. One worker can be offboarded from a single tenant without deleting personal Social identity, login or other memberships.
+6. A simple UI shows which organization, role, function and location are active; no business account secrets or personal messages cross contexts.
+7. All checks use synthetic data, versioned contracts and a reversible test environment, with security review and explicit operator acceptance before connecting real organizations.
+
+**Technology evaluation, not a selection:** compare established IdPs (such as Keycloak or ZITADEL), a relational database (such as PostgreSQL), a reviewed secret manager and a protected backend/API. Decide hosting topology, tenant isolation mode, backup/restore, network trust, cost, developer ownership, and global/data-residency implications based on evidence. The user has *not* selected a vendor or approved a server deployment.
+
+**Explicit sequencing rule:** design organization and permission contracts **before** exposing company features; implement minimal verified authentication **before** privileged API actions; connect Social provider credentials **after** tenant/account ownership and vault rules are verified. The UI can be prototyped against fixtures without being mistaken for a functioning production authorization layer.
+
 ### Release sequence with explicit multi-company gates
 
 **Phase 0 — Contracts and ownership:** commit operator requirements (multiple companies, nonprofit, independent ventures, eventual external customers, two-dimensional access). Evaluate IdP/secret custody/tenancy, legal governance authority and portfolio-vs-tenant contracts. Confirm worker seams in GitHub/Hospital; no bulk migration.
@@ -366,7 +395,7 @@ These decisions **supersede the old plan's unanswered question** of one company 
 Documentation-only revised proposal for a multi-legal-entity, portfolio-aware, international-ready Identity Center with separate nonprofit, family-venture, partner and customer tenants. Social's current ownership remains intact; no actual backend, workforce tenant, credential store or provider login is implemented by this document.
 
 ### HOW TO USE
-Workers should read the operator-confirmed scope in sections 1 and 11 first, then review the portfolio/tenant/trust model in sections 3–4. Select a bounded lane in section 8 **only after formal assignment**. Treat personal authentication, legal-entity governance, portfolio aggregation, branch/functional rights and provider-account ownership as separate.
+Workers should read the operator-confirmed scope in sections 1 and 11 first, then the portfolio/tenant/trust model in sections 3–4. **Begin planning from `8: First-build foundation`**, its six-system build order and synthetic demonstration; select a bounded lane **only after formal assignment**. Treat personal authentication, legal-entity governance, portfolio aggregation, branch/functional rights and provider-account ownership as separate.
 
 ### VERIFY
 GitHub source, current Model index, Account Manager handoff and Syntagma rules were inspected on 2026-10-31. External authentication standards are linked above. **Only documentation is changed in this scope; no live Quickshell, backend, enterprise authorization or legal-governance verification.**
@@ -378,6 +407,7 @@ Do not equate Social local identity with a person, a portfolio with legal owners
 - [x] Operator goal translated into cross-product architectural work plan
 - [x] Current Social account-manager boundary preserved
 - [x] Proposed multi-org/portfolio domain model, independent governance, functional/geographic grants, cross-provider ownership, worker lanes and expanded test gates documented
+- [x] First-build plan recorded: six components plus reconnaissance, initial organization/permissions design priority, minimum synthetic multi-tenant demonstration and verification gates
 - [x] Operator confirmed the multiple-entity/portfolio/overlapping-division requirements in section 11
 - [ ] Operator and authorized entity stakeholders resolve remaining governance/engineering decisions in section 11
 - [ ] Hospital ownership/Rooms/Assignments confirmed
@@ -386,7 +416,7 @@ Do not equate Social local identity with a person, a portfolio with legal owners
 - [ ] Explicit operator approval for rollout and final acceptance
 
 ### NEXT
-Operator reviews this scope clarification → confirm governance and identity authority → assign workers to synthetic three-entity plus unrelated-customer tenant model → write threat model and approved API contracts → build bounded, separately reviewed implementation PRs.
+Operator reviews the **section 8 first-build sequence** → confirm organization schema, IdP and server permission model → assign Hospital-owned architecture/authentication/authorization lanes → run disposable four-tenant proof → connect a minimal management UI and then one approved provider through the Broker. No live company onboarding without explicit acceptance.
 
 ### DECISIONS
-**Operator-directed product requirements:** multiple distinct entities, portfolio overview, overlapping functional/geographic structures, several roles per person, delegated business/social account access and eventual outside customers. **Technical proposals pending review:** shared Identity Center, standards-based IdP, separately enforceable tenant grants, protected Account Broker/Vault and provider-compliant authorization. No implementation, assignment, merge or production acceptance is granted by this text.
+**Operator-directed product requirements:** multiple distinct entities, portfolio overview, overlapping functional/geographic structures, several roles per person, delegated business/social account access and eventual outside customers. **Now documented as the proposed next build sequence:** organization/permission contracts and minimal authentication, then isolated tenant database/trusted API, management UI, protected Broker/Vault and Social integration with a synthetic pilot first. **Technical choices pending review:** IdP, database, hosting, key custody and API schema. No implementation, assignment, merge or production acceptance is granted by this text.

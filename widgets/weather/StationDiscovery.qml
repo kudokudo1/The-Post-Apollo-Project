@@ -21,6 +21,8 @@ Rectangle {
     property var selectedNews: null
     property string newsTopic: "all"
     property string newsSourceQuery: ""
+    property string newsLanguageQuery: ""
+    property int newsMaxAgeHours: 0
     readonly property var newsTopicOptions: [
         { "id": "all", "label": "ALL" },
         { "id": "weather", "label": "WEATHER" },
@@ -28,14 +30,27 @@ Rectangle {
         { "id": "fire", "label": "FIRE" },
         { "id": "space", "label": "SPACE" }
     ]
+    readonly property var newsTimeOptions: [
+        { "hours": 0, "label": "ALL 24H" },
+        { "hours": 1, "label": "1H" },
+        { "hours": 3, "label": "3H" },
+        { "hours": 6, "label": "6H" },
+        { "hours": 12, "label": "12H" },
+        { "hours": 24, "label": "24H" }
+    ]
     readonly property var visibleRows:
         domain === "news"
         ? DiscoveryPolicy.filterNewsRows(
               source && Array.isArray(source.rows) ? source.rows : [],
               newsTopic,
-              newsSourceQuery
+              newsSourceQuery,
+              newsLanguageQuery,
+              newsMaxAgeHours,
+              source ? source.sourceClockMs : 0
           )
         : (source && Array.isArray(source.rows) ? source.rows : [])
+    readonly property var newsVisibleSummary:
+        DiscoveryPolicy.newsBatchSummary(visibleRows)
 
     property string mapFilter: "all"
     property var selectedMapEvent: null
@@ -107,6 +122,14 @@ Rectangle {
         if (domain !== "news" || newsTopic === id)
             return;
         newsTopic = id;
+        discoveryScroll.contentY = 0;
+    }
+
+    function selectNewsTime(hours) {
+        const next = Number(hours);
+        if (domain !== "news" || newsMaxAgeHours === next)
+            return;
+        newsMaxAgeHours = next;
         discoveryScroll.contentY = 0;
     }
 
@@ -269,7 +292,7 @@ Rectangle {
         : "RADIO BROWSER // TOP VOTED STREAMS"
     readonly property string sourceCaution:
         domain === "map" ? "EONET + FIRMS + MRMS + HMS SMOKE CONNECTED // BASEMAP NOT WIRED"
-        : domain === "news" ? "ARTICLE DISCOVERY // LOCAL TOPIC + PUBLISHER/COUNTRY FILTERS // CONSERVATIVE DEDUPE // NOT STORY CLUSTERING"
+        : domain === "news" ? "ARTICLE DISCOVERY // LOCAL FILTERS // EXACT-HEADLINE SOURCE GROUPS // NOT FUZZY STORY CLUSTERING"
         : "STATION DIRECTORY // PERSISTENT PLAYBACK NOT YET WIRED"
     readonly property var plannedSources: {
         if (domain === "map")
@@ -304,9 +327,11 @@ Rectangle {
                 {name:"GDELT DOC // ARTICLE LIST", state:"ENDPOINT CONFIGURED"},
                 {name:"LOCAL TOPIC FILTER + URL/TITLE DEDUPE", state:"CONNECTED"},
                 {name:"PUBLISHER / SOURCE COUNTRY FILTER", state:"CONNECTED"},
-                {name:"REGION / LANGUAGE FILTERS", state:"NOT WIRED"},
+                {name:"LANGUAGE + TIME WINDOW FILTERS", state:"CONNECTED"},
+                {name:"EXACT-HEADLINE SOURCE GROUPS", state:"CONNECTED"},
+                {name:"REGION GROUPING", state:"NOT WIRED"},
                 {name:"LIVE NEWS / VIDEO", state:"NOT WIRED"},
-                {name:"STORY CLUSTERS / DOSSIERS", state:"NOT WIRED"}
+                {name:"SEMANTIC STORY CLUSTERS / DOSSIERS", state:"NOT WIRED"}
             ];
         return [
             {name:"RADIO BROWSER // STATION LIST", state:"SOURCE CONNECTED"},
@@ -1248,6 +1273,127 @@ Rectangle {
                 }
             }
 
+            Row {
+                id: newsTimeRail
+                width: parent.width
+                height: stationDiscovery.domain === "news" ? 34 : 0
+                visible: stationDiscovery.domain === "news"
+                spacing: 7
+
+                Repeater {
+                    model: stationDiscovery.newsTimeOptions
+
+                    delegate: ModeButton {
+                        required property var modelData
+                        width: modelData.hours === 0 ? 102 : 68
+                        height: 32
+                        textOnly: true
+                        horizontalContent: true
+                        bordered: false
+                        selected:
+                            stationDiscovery.newsMaxAgeHours
+                            === modelData.hours
+                        labelText: modelData.label
+                        labelFontSize: 10
+                        idlePrimaryColor: Colors.cyan
+                        selectedPrimaryColor: Colors.magenta
+                        perimeterGlowColor: Colors.orange
+                        onTriggered:
+                            stationDiscovery.selectNewsTime(
+                                modelData.hours
+                            )
+                    }
+                }
+
+                QuietText {
+                    anchors.verticalCenter: parent.verticalCenter
+                    width: Math.max(0, parent.width - 478)
+                    text: stationDiscovery.newsMaxAgeHours > 0
+                          ? "AGE ≤ "
+                            + stationDiscovery.newsMaxAgeHours
+                            + "H // LOCAL SEENDATE FILTER"
+                          : "FULL GDELT 24H BATCH"
+                    elide: Text.ElideRight
+                    font.pixelSize: 9
+                }
+            }
+
+            Row {
+                id: newsLanguageFilter
+                width: parent.width
+                height: stationDiscovery.domain === "news" ? 34 : 0
+                visible: stationDiscovery.domain === "news"
+                spacing: 8
+
+                Rectangle {
+                    width: 250
+                    height: 30
+                    color: Colors.dark
+                    border.width: 1
+                    border.color: newsLanguageInput.activeFocus
+                                  ? Colors.magenta : Colors.cyan
+
+                    QuietText {
+                        anchors.left: parent.left
+                        anchors.verticalCenter: parent.verticalCenter
+                        anchors.leftMargin: 10
+                        visible: newsLanguageInput.text.length === 0
+                                 && !newsLanguageInput.activeFocus
+                        text: "LANGUAGE / CODE"
+                        font.pixelSize: 10
+                    }
+
+                    TextInput {
+                        id: newsLanguageInput
+                        anchors.fill: parent
+                        anchors.leftMargin: 10
+                        anchors.rightMargin: 10
+                        verticalAlignment: TextInput.AlignVCenter
+                        color: Colors.white
+                        selectionColor: Colors.magenta
+                        selectedTextColor: Colors.black
+                        font.family: "GohuFont 11 Nerd Font Mono"
+                        font.pixelSize: 11
+                        clip: true
+                        text: stationDiscovery.newsLanguageQuery
+                        onTextEdited:
+                            stationDiscovery.newsLanguageQuery = text
+                        Keys.onEscapePressed: {
+                            stationDiscovery.newsLanguageQuery = "";
+                            text = "";
+                            event.accepted = true;
+                        }
+                    }
+                }
+
+                ActionButton {
+                    width: 72
+                    height: 30
+                    label: "CLEAR"
+                    labelPixelSize: 10
+                    available:
+                        stationDiscovery.newsLanguageQuery !== ""
+                    onClicked: {
+                        stationDiscovery.newsLanguageQuery = "";
+                        newsLanguageInput.text = "";
+                    }
+                }
+
+                QuietText {
+                    anchors.verticalCenter: parent.verticalCenter
+                    width: Math.max(0, parent.width - 338)
+                    text: "BATCH // "
+                          + stationDiscovery.newsVisibleSummary.publishers
+                          + " PUBLISHERS // "
+                          + stationDiscovery.newsVisibleSummary.countries
+                          + " COUNTRIES // "
+                          + stationDiscovery.newsVisibleSummary.languages
+                          + " LANGUAGES"
+                    elide: Text.ElideRight
+                    font.pixelSize: 9
+                }
+            }
+
             QuietText {
                 width: parent.width
                 text: stationDiscovery.sourceCaution
@@ -1461,6 +1607,13 @@ Rectangle {
                          ? " // SOURCE "
                            + stationDiscovery.newsSourceQuery.toUpperCase()
                          : "")
+                      + (stationDiscovery.newsLanguageQuery !== ""
+                         ? " // LANGUAGE "
+                           + stationDiscovery.newsLanguageQuery.toUpperCase()
+                         : "")
+                      + (stationDiscovery.newsMaxAgeHours > 0
+                         ? " // " + stationDiscovery.newsMaxAgeHours + "H"
+                         : "")
                       + " // FILTER IS LOCAL // SOURCE NOT REFETCHED"
                 font.pixelSize: 11
                 color: Colors.orange
@@ -1485,7 +1638,9 @@ Rectangle {
                 delegate: Rectangle {
                     required property var modelData
                     width: content.width
-                    height: 88
+                    height: modelData.sourceGroup
+                            && modelData.sourceGroup.multiSource
+                            ? 108 : 88
                     color: Colors.dark
                     border.width: 1
                     border.color: entryMouse.containsMouse ? Colors.yellow
@@ -1526,6 +1681,24 @@ Rectangle {
                             text: modelData.time
                             elide: Text.ElideRight
                             font.pixelSize: 10
+                        }
+                        QuietText {
+                            visible: modelData.sourceGroup
+                                     && modelData.sourceGroup.multiSource
+                            width: parent.width
+                            text: modelData.sourceGroup
+                                  ? "EXACT HEADLINE GROUP // "
+                                    + modelData.sourceGroup.sourceCount
+                                    + " PUBLISHERS // "
+                                    + modelData.sourceGroup.domains.join(" / ")
+                                    + (modelData.sourceGroup.countries.length > 0
+                                       ? " // COUNTRIES "
+                                         + modelData.sourceGroup.countries.join(" / ")
+                                       : "")
+                                  : ""
+                            elide: Text.ElideRight
+                            font.pixelSize: 9
+                            color: Colors.magenta
                         }
                     }
 

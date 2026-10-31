@@ -113,6 +113,13 @@ Rectangle {
         offsetMinutes: sky.moonCivilOffsetMinutes
     }
 
+    WeatherServices.UsnoCelnavService {
+        id: celnavService
+        active: sky.visible
+        latitude: sky.weatherService ? sky.weatherService.latitude : ""
+        longitude: sky.weatherService ? sky.weatherService.longitude : ""
+    }
+
     readonly property string currentCelestialMode:
         weatherReady
         ? WeatherCyclePolicy.artworkFor(conditionState, skyCycle) : "weather"
@@ -129,6 +136,11 @@ Rectangle {
             return "UTC --";
         const number = Number(text);
         return "UTC" + (isFinite(number) && number >= 0 ? "+" : "") + text;
+    }
+
+    function skyAngleText(value) {
+        const number = Number(value);
+        return isFinite(number) ? number.toFixed(1) + "°" : "--";
     }
 
     function moonInputIssue() {
@@ -908,6 +920,271 @@ Rectangle {
                 width: parent.width
                 text: "USNO ONE-DAY RISE/SET/TRANSIT // OPEN-METEO RESOLVED CIVIL OFFSET // SUNRISE CALIBRATION FALLBACK // DATE-SCOPED REQUEST"
                 font.pixelSize: 9
+            }
+        }
+
+        StationSectionDivider {
+            width: parent.width
+            title: "SKY NOW // USNO CELESTIAL FIX"
+        }
+
+        Column {
+            width: parent.width
+            spacing: 7
+
+            Row {
+                width: parent.width
+                spacing: 12
+
+                GohuText {
+                    text: !celnavService.configured
+                          ? "LOCATION UNAVAILABLE"
+                          : celnavService.loading
+                            ? "RECEIVING"
+                            : celnavService.failed
+                              ? (celnavService.ready
+                                 ? "DEGRADED" : "OFFLINE")
+                              : celnavService.ready
+                                ? "RECEIVED"
+                                : "WAITING"
+                    font.pixelSize: 10
+                    color: celnavService.failed
+                           ? Colors.yellow
+                           : celnavService.ready
+                             ? Colors.cyan : Colors.orange
+                }
+
+                QuietText {
+                    width: Math.max(0, parent.width - 150)
+                    text: celnavService.ready
+                          ? "U.S. NAVAL OBSERVATORY // "
+                            + celnavService.snapshot.date
+                            + " " + celnavService.snapshot.time
+                            + " UTC"
+                          : "USNO CELESTIAL NAVIGATION // CURRENT POSITION"
+                    elide: Text.ElideRight
+                    font.pixelSize: 9
+                }
+            }
+
+            QuietText {
+                visible: celnavService.failed
+                width: parent.width
+                text: celnavService.errorText
+                      + (celnavService.ready
+                         ? " // LAST-GOOD SKY FIX RETAINED" : "")
+                font.pixelSize: 9
+                color: Colors.yellow
+            }
+
+            Rectangle {
+                visible: celnavService.ready
+                width: parent.width
+                height: 66
+                color: Colors.dark
+                border.width: 1
+                border.color: celnavService.snapshot.moon
+                              ? Colors.magenta : Colors.white
+
+                Row {
+                    anchors.fill: parent
+                    anchors.margins: 8
+                    spacing: 14
+
+                    Column {
+                        width: 210
+                        spacing: 4
+
+                        SecondaryText {
+                            text: "MOON // CURRENT POSITION"
+                            font.pixelSize: 9
+                        }
+
+                        GohuText {
+                            text: celnavService.snapshot.moon
+                                  ? "ABOVE USNO DISPLAY LIMIT"
+                                  : "NOT IN CURRENT USNO LIST"
+                            font.pixelSize: 11
+                            color: celnavService.snapshot.moon
+                                   ? Colors.magenta : Colors.white
+                        }
+                    }
+
+                    Column {
+                        width: 150
+                        spacing: 4
+
+                        SecondaryText {
+                            text: "ALTITUDE // HC"
+                            font.pixelSize: 9
+                        }
+
+                        GohuText {
+                            text: celnavService.snapshot.moon
+                                  ? sky.skyAngleText(
+                                        celnavService.snapshot.moon.altitude
+                                    )
+                                  : "--"
+                            font.pixelSize: 16
+                            color: Colors.white
+                        }
+                    }
+
+                    Column {
+                        width: 190
+                        spacing: 4
+
+                        SecondaryText {
+                            text: "AZIMUTH // ZN"
+                            font.pixelSize: 9
+                        }
+
+                        GohuText {
+                            text: celnavService.snapshot.moon
+                                  ? sky.skyAngleText(
+                                        celnavService.snapshot.moon.azimuth
+                                    )
+                                    + " // "
+                                    + celnavService.snapshot.moon.direction
+                                  : "--"
+                            font.pixelSize: 16
+                            color: Colors.cyan
+                        }
+                    }
+
+                    QuietText {
+                        width: Math.max(0, parent.width - 590)
+                        text: celnavService.snapshot.moon
+                              ? "GEOCENTRIC ALTITUDE + COMPUTED AZIMUTH"
+                              : "USNO ONLY LISTS MOON WHEN HC > -3°"
+                        wrapMode: Text.WordWrap
+                        font.pixelSize: 9
+                    }
+                }
+            }
+
+            Column {
+                width: parent.width
+                spacing: 5
+                visible: celnavService.ready
+
+                Row {
+                    width: parent.width
+                    spacing: 12
+
+                    GohuText {
+                        width: 220
+                        text: "PLANETS ABOVE HORIZON // "
+                              + celnavService.snapshot.planets.length
+                        font.pixelSize: 10
+                        color: Colors.orange
+                    }
+
+                    QuietText {
+                        width: Math.max(0, parent.width - 232)
+                        text: "USNO CATALOG DISPLAY THRESHOLD // PRACTICAL VISIBILITY NOT GUARANTEED"
+                        font.pixelSize: 9
+                    }
+                }
+
+                Repeater {
+                    model: celnavService.snapshot.planets
+
+                    delegate: Row {
+                        required property var modelData
+                        width: parent.width
+                        spacing: 12
+
+                        GohuText {
+                            width: 160
+                            text: modelData.name
+                            font.pixelSize: 11
+                            color: Colors.orange
+                        }
+
+                        QuietText {
+                            width: 170
+                            text: "ALT "
+                                  + sky.skyAngleText(modelData.altitude)
+                            font.pixelSize: 9
+                        }
+
+                        QuietText {
+                            width: 210
+                            text: "AZ "
+                                  + sky.skyAngleText(modelData.azimuth)
+                                  + " // " + modelData.direction
+                            font.pixelSize: 9
+                        }
+                    }
+                }
+
+                QuietText {
+                    visible: celnavService.snapshot.planets.length === 0
+                    text: "NO NAVIGATIONAL PLANETS RETURNED ABOVE THE USNO DISPLAY THRESHOLD"
+                    font.pixelSize: 9
+                }
+            }
+
+            Column {
+                width: parent.width
+                spacing: 5
+                visible: celnavService.ready
+
+                GohuText {
+                    text: "NAVIGATION STARS // CONSTELLATION CONTEXT // "
+                          + celnavService.snapshot.stars.length
+                    font.pixelSize: 10
+                    color: Colors.cyan
+                }
+
+                Repeater {
+                    model: celnavService.snapshot.stars.slice(0, 6)
+
+                    delegate: Row {
+                        required property var modelData
+                        width: parent.width
+                        spacing: 12
+
+                        GohuText {
+                            width: 160
+                            text: modelData.name
+                            font.pixelSize: 10
+                            color: Colors.white
+                        }
+
+                        QuietText {
+                            width: 190
+                            text: modelData.constellation !== ""
+                                  ? modelData.constellation
+                                  : "CONSTELLATION --"
+                            elide: Text.ElideRight
+                            font.pixelSize: 9
+                        }
+
+                        QuietText {
+                            width: 170
+                            text: "ALT "
+                                  + sky.skyAngleText(modelData.altitude)
+                            font.pixelSize: 9
+                        }
+
+                        QuietText {
+                            width: 180
+                            text: "AZ "
+                                  + sky.skyAngleText(modelData.azimuth)
+                                  + " // " + modelData.direction
+                            font.pixelSize: 9
+                        }
+                    }
+                }
+            }
+
+            QuietText {
+                width: parent.width
+                text: "ABOVE-HORIZON CATALOG ≠ NAKED-EYE VISIBILITY // DAYLIGHT, SUN GLARE, CLOUDS + TERRAIN ARE NOT MODELED // UTC MINUTE USED FOR USNO UT1 INPUT"
+                font.pixelSize: 9
+                color: Colors.orange
             }
         }
 

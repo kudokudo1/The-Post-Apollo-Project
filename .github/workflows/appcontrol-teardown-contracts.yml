@@ -25,3 +25,5 @@ jobs:
         uses: actions/checkout@v4
       - name: Validate AppControl teardown contracts
         run: python3 tests/appcontrol/test_icon_grab_teardown_contracts.py
+      - name: Verify snapshot history compatibility and stage markers
+        run: node --test tests/appcontrol/test_snapshot_history_performance.cjs

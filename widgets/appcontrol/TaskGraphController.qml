@@ -390,8 +390,22 @@ QtObject {
     function updateMiniHunterMetricHistories(rows) {
         const sourceRows = Array.isArray(rows) ? rows : [];
         const previous = presentationState.taskMiniHunterMetricHistories;
-        const next = Object.assign({}, previous);
-        const livePids = ({});
+        const next = ({});
+
+        // Build only retained non-process metadata and the exact selected
+        // task's history. Live PIDs are appended below from this snapshot.
+        // Avoid cloning a large stale map and splitting every key afterward.
+        const selectedPid = Number(presentationState.taskHistoryPid || 0);
+        const keys = Object.keys(previous);
+        for (let i = 0; i < keys.length; i++) {
+            const key = String(keys[i]);
+            const at = key.indexOf(":pid:");
+            const isProcessKey =
+                at >= 0 && key.indexOf(":pid:", at + 5) === -1;
+            if (!isProcessKey
+                    || Number(key.slice(at + 5) || 0) === selectedPid)
+                next[key] = previous[key];
+        }
 
         function append(metric, pid, value) {
             const key = metric + ":pid:" + String(pid);
@@ -408,8 +422,6 @@ QtObject {
             const pid = Number(entry && entry.pid || 0);
             if (pid <= 0)
                 continue;
-
-            livePids[String(pid)] = true;
 
             const cpu = Math.max(
                 0,
@@ -441,20 +453,6 @@ QtObject {
             append("io", pid, ioMiB);
             append("age", pid, ageMinutes);
             append("combined", pid, combined);
-        }
-
-        const keys = Object.keys(next);
-        for (let i = 0; i < keys.length; i++) {
-            const key = String(keys[i]);
-            const pieces = key.split(":pid:");
-            if (pieces.length !== 2)
-                continue;
-
-            const pidText = pieces[1];
-            if (!livePids[pidText]
-                    && Number(pidText || 0)
-                       !== presentationState.taskHistoryPid)
-                delete next[key];
         }
 
         presentationState.taskMiniHunterMetricHistories = next;

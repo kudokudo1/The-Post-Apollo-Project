@@ -1606,8 +1606,31 @@ PanelWindow {
         processTelemetry.refreshSnapshot();
     }
 
+
+    // Opt-in timing for AppControl's synchronous snapshotReady consumer.
+    // Only fixed stage labels, row counts and durations are logged.
+    readonly property bool appControlSnapshotTraceEnabled:
+        String(Quickshell.env("POST_APOLLO_SUBPROCESS_LAG_PROBE") || "").trim() === "1"
+    property int appControlSnapshotTraceSequence: 0
+
+    function traceTaskSnapshotDuration(stage, sequence, startMs, rowCount) {
+        if (sequence <= 0)
+            return;
+        const now = Date.now();
+        const elapsedMs = now - startMs;
+        if (elapsedMs < 25 && sequence % 16 !== 1)
+            return;
+        console.warn("SYNTAGMA_COMPLETION_PROBE // service=appcontrol"
+                     + " stage=consumer:" + stage + ":end"
+                     + " seq=" + sequence + " rows=" + rowCount
+                     + " elapsedMs=" + elapsedMs + " tsMs=" + now);
+    }
+
     function applyTaskSnapshot(rows) {
         const snapshotRows = Array.isArray(rows) ? rows : [];
+        const traceSequence = appControlSnapshotTraceEnabled
+            ? ++appControlSnapshotTraceSequence : 0;
+        const traceRowCount = snapshotRows.length;
 
         let preservedPid = 0;
 
@@ -1617,14 +1640,27 @@ PanelWindow {
         }
 
         if (!taskMiniProbeNeeded()) {
+            let stageStart = traceSequence ? Date.now() : 0;
             updateTaskMiniCpuHistories(snapshotRows);
+            traceTaskSnapshotDuration("cpu-history", traceSequence, stageStart, traceRowCount);
+
+            stageStart = traceSequence ? Date.now() : 0;
             updateTaskMiniHunterMetricHistories(snapshotRows);
+            traceTaskSnapshotDuration("hunter-history", traceSequence, stageStart, traceRowCount);
+
+            stageStart = traceSequence ? Date.now() : 0;
             taskMiniHistoryRevision += 1;
             taskMiniDisplayRevision += 1;
+            traceTaskSnapshotDuration("history-revisions", traceSequence, stageStart, traceRowCount);
         }
 
+        let stageStart = traceSequence ? Date.now() : 0;
         appendNewKillTaskOrderIds(snapshotRows);
+        traceTaskSnapshotDuration("task-order", traceSequence, stageStart, traceRowCount);
+
+        stageStart = traceSequence ? Date.now() : 0;
         taskRows = snapshotRows;
+        traceTaskSnapshotDuration("task-rows", traceSequence, stageStart, traceRowCount);
 
         if (menuOpen
                 && (selectedResultIsApplication()
@@ -1640,7 +1676,9 @@ PanelWindow {
             taskMiniPreloadSnapshots + 1
         );
 
+        stageStart = traceSequence ? Date.now() : 0;
         checkTaskMetricAlerts(snapshotRows);
+        traceTaskSnapshotDuration("metric-alerts", traceSequence, stageStart, traceRowCount);
 
         Qt.callLater(function() {
             if (selectedModeIndex !== killModeIndex

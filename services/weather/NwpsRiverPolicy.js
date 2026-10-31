@@ -214,7 +214,7 @@ function gaugeArray(root) {
     throw new Error("Invalid NWPS gauge response");
 }
 
-function nearestGauge(root, originLat, originLon) {
+function nearestGauges(root, originLat, originLon, limit) {
     const originLatitude = validNumber(originLat);
     const originLongitude = validNumber(originLon);
     if (originLatitude === null || originLongitude === null
@@ -222,18 +222,29 @@ function nearestGauge(root, originLat, originLon) {
             || Math.abs(originLongitude) > 180)
         throw new Error("Invalid NWPS origin");
 
+    const requested = Math.max(
+        1, Math.min(8, Math.floor(Number(limit) || 4))
+    );
     const gauges = gaugeArray(root);
-    let nearest = null;
+    const rows = [];
     for (let i = 0; i < gauges.length; i++) {
         const row = normalizeGauge(
             gauges[i], originLatitude, originLongitude
         );
-        if (!row)
-            continue;
-        if (!nearest || row.distanceKm < nearest.distanceKm)
-            nearest = row;
+        if (row)
+            rows.push(row);
     }
-    return nearest;
+    rows.sort(function(a, b) {
+        if (a.distanceKm !== b.distanceKm)
+            return a.distanceKm - b.distanceKm;
+        return a.lid.localeCompare(b.lid);
+    });
+    return rows.slice(0, requested);
+}
+
+function nearestGauge(root, originLat, originLon) {
+    const rows = nearestGauges(root, originLat, originLon, 1);
+    return rows.length > 0 ? rows[0] : null;
 }
 
 function readingText(value, units) {
@@ -381,3 +392,100 @@ function pointReading(product, point) {
          + product.secondaryName + " "
          + readingText(secondary, product.secondaryUnits);
 }
+
+function seriesWindow(product, count) {
+    if (!product || !Array.isArray(product.data))
+        return [];
+    const size = Math.max(0, Math.min(24, Math.floor(Number(count) || 0)));
+    return product.data.slice(Math.max(0, product.data.length - size));
+}
+
+function seriesStats(product, count) {
+    const rows = seriesWindow(product, count);
+    if (rows.length === 0) {
+        return {
+            available:false,
+            points:0,
+            first:null,
+            latest:null,
+            minimum:null,
+            maximum:null,
+            delta:null,
+            direction:"UNAVAILABLE",
+            spanHours:-1
+        };
+    }
+
+    let minimum = null;
+    let maximum = null;
+    for (let i = 0; i < rows.length; i++) {
+        const value = validNumber(rows[i].primary);
+        if (value === null)
+            continue;
+        if (minimum === null || value < minimum)
+            minimum = value;
+        if (maximum === null || value > maximum)
+            maximum = value;
+    }
+
+    const first = validNumber(rows[0].primary);
+    const latest = validNumber(rows[rows.length - 1].primary);
+    const delta = first !== null && latest !== null ? latest - first : null;
+    let direction = "STEADY";
+    if (delta === null)
+        direction = "UNAVAILABLE";
+    else if (delta > 0.01)
+        direction = "RISING";
+    else if (delta < -0.01)
+        direction = "FALLING";
+
+    const firstTime = validNumber(rows[0].validMillis);
+    const lastTime = validNumber(rows[rows.length - 1].validMillis);
+    const spanHours = firstTime !== null && lastTime !== null
+        && lastTime >= firstTime
+        ? (lastTime - firstTime) / 3600000 : -1;
+
+    return {
+        available:first !== null || latest !== null,
+        points:rows.length,
+        first:first,
+        latest:latest,
+        minimum:minimum,
+        maximum:maximum,
+        delta:delta,
+        direction:direction,
+        spanHours:spanHours
+    };
+}
+
+function normalizedSeriesBars(product, count) {
+    const rows = seriesWindow(product, count);
+    const values = [];
+    let minimum = null;
+    let maximum = null;
+    for (let i = 0; i < rows.length; i++) {
+        const value = validNumber(rows[i].primary);
+        if (value === null)
+            continue;
+        values.push(value);
+        if (minimum === null || value < minimum)
+            minimum = value;
+        if (maximum === null || value > maximum)
+            maximum = value;
+    }
+    if (values.length === 0)
+        return [];
+
+    const spread = maximum - minimum;
+    const output = [];
+    for (let i = 0; i < values.length; i++) {
+        output.push({
+            value:values[i],
+            fraction:spread > 0
+                ? (values[i] - minimum) / spread
+                : 0.5
+        });
+    }
+    return output;
+}
+

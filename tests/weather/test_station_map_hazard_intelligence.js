@@ -144,7 +144,7 @@ assert.match(ui, /NATURAL EARTH \+ EONET \+ USGS EARTHQUAKES \+ FIRMS \+ MRMS \+
 assert.match(ui, /NASA FIRMS \/\/ VIIRS NOAA-21 HOTSPOTS/);
 assert.match(ui, /KEY REQUIRED/);
 assert.match(ui, /NOAA\/NWS MRMS \/\/ BASE REFLECTIVITY/);
-assert.match(ui, /RAINVIEWER \/\/ RADAR FALLBACK", state:"NOT WIRED"/);
+assert.match(ui, /RAINVIEWER \/\/ PAST RADAR FALLBACK \/\/ 2H/);
 assert.match(ui, /NOAA HMS \/\/ SMOKE PLUME POLYGONS/);
 
 console.log("Weather MAP EONET hazard filters, cache and inspector: PASS");

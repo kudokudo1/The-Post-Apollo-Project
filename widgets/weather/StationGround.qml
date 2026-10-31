@@ -3,6 +3,7 @@ import "../../components"
 import "../../services/weather" as WeatherServices
 import "../../services/weather/SeismicPolicy.js" as SeismicPolicy
 import "../../services/weather/NwpsRiverPolicy.js" as RiverPolicy
+import "../../services/weather/NdbcMarinePolicy.js" as MarinePolicy
 import "StationGroundPollenPolicy.js" as PollenDetails
 
 Rectangle {
@@ -36,6 +37,13 @@ Rectangle {
         longitude: weatherService ? weatherService.longitude : ""
     }
 
+    WeatherServices.NdbcMarineService {
+        id: marineService
+        active: ground.visible
+        latitude: weatherService ? weatherService.latitude : ""
+        longitude: weatherService ? weatherService.longitude : ""
+    }
+
     function distanceLabel(latitude, longitude) {
         const km = SeismicPolicy.distanceKm(
             weatherService ? weatherService.latitude : "",
@@ -64,6 +72,44 @@ Rectangle {
         case "STEADY": return Colors.green;
         default: return Colors.white;
         }
+    }
+
+    function marineSampleAge() {
+        if (!marineService.station)
+            return "--";
+        const millis = Number(marineService.station.sampleMillis);
+        if (!isFinite(millis) || millis <= 0)
+            return "--";
+        const age = Math.max(0, Math.floor((Date.now() - millis) / 60000));
+        return age < 60 ? age + "m"
+            : Math.floor(age / 60) + "h " + (age % 60) + "m";
+    }
+
+    function marineTempLabel(value) {
+        const celsius = Number(value);
+        if (!isFinite(celsius))
+            return "--";
+        const fahrenheit = MarinePolicy.celsiusToF(celsius);
+        return celsius.toFixed(1) + "°C // "
+            + fahrenheit.toFixed(1) + "°F";
+    }
+
+    function marineWindLabel(value) {
+        const speed = Number(value);
+        if (!isFinite(speed))
+            return "--";
+        const mph = MarinePolicy.metersPerSecondToMph(speed);
+        return speed.toFixed(1) + " m/s // "
+            + mph.toFixed(1) + " mph";
+    }
+
+    function marineWaveLabel(value) {
+        const meters = Number(value);
+        if (!isFinite(meters))
+            return "--";
+        const feet = MarinePolicy.metersToFeet(meters);
+        return meters.toFixed(1) + " m // "
+            + feet.toFixed(1) + " ft";
     }
 
     function riverReceiveAge() {
@@ -1469,6 +1515,271 @@ Rectangle {
             QuietText {
                 width: parent.width
                 text: "STAGE IS RELATIVE TO THE GAUGE DATUM // NEARBY GAUGE ≠ YOUR PROPERTY // NOT A FLOOD WARNING"
+                font.pixelSize: 9
+                color: Colors.orange
+            }
+        }
+
+        StationSectionDivider {
+            width: parent.width
+            title: "MARINE // NOAA NDBC"
+        }
+
+        Column {
+            width: parent.width
+            spacing: 7
+
+            Row {
+                width: parent.width
+                spacing: 12
+
+                GohuText {
+                    text: !marineService.configured
+                          ? "LOCATION UNAVAILABLE"
+                          : marineService.loading && !marineService.ready
+                            ? "RECEIVING"
+                            : marineService.failed
+                              ? (marineService.ready
+                                 ? "DEGRADED" : "OFFLINE")
+                              : marineService.ready && marineService.station
+                                ? "RECEIVED"
+                                : marineService.ready
+                                  ? "NO REPORTING STATION"
+                                  : "WAITING"
+                    font.pixelSize: 10
+                    color: marineService.failed
+                           ? Colors.yellow
+                           : marineService.ready && marineService.station
+                             ? Colors.cyan : Colors.orange
+                }
+
+                QuietText {
+                    width: Math.max(0, parent.width - 150)
+                    text: marineService.station
+                          ? "STATION "
+                            + marineService.station.stationId
+                            + " // "
+                            + Math.round(
+                                  marineService.station.distanceKm
+                              )
+                            + " KM FROM WEATHER FIX"
+                            + " // SAMPLE "
+                            + marineService.station.sampleUtc
+                          : "NDBC LATEST OBSERVATIONS // ALL REPORTING STATIONS"
+                    elide: Text.ElideRight
+                    font.pixelSize: 9
+                }
+            }
+
+            QuietText {
+                visible: marineService.failed
+                width: parent.width
+                text: marineService.errorText
+                      + (marineService.ready
+                         ? " // LAST-GOOD MARINE STATE RETAINED" : "")
+                font.pixelSize: 9
+                color: Colors.yellow
+            }
+
+            Rectangle {
+                visible: marineService.ready && !!marineService.station
+                width: parent.width
+                height: 164
+                color: Colors.dark
+                border.width: 1
+                border.color: Colors.cyan
+
+                Column {
+                    anchors.fill: parent
+                    anchors.margins: 9
+                    spacing: 7
+
+                    Row {
+                        width: parent.width
+                        spacing: 12
+
+                        GohuText {
+                            width: 180
+                            text: marineService.station
+                                  ? "NDBC "
+                                    + marineService.station.stationId
+                                  : "NDBC --"
+                            font.pixelSize: 13
+                            color: Colors.cyan
+                        }
+
+                        QuietText {
+                            width: 190
+                            text: "AGE // " + ground.marineSampleAge()
+                            font.pixelSize: 9
+                        }
+
+                        QuietText {
+                            width: Math.max(0, parent.width - 394)
+                            horizontalAlignment: Text.AlignRight
+                            text: "REPORTING STATIONS // "
+                                  + marineService.reportingStations
+                            font.pixelSize: 9
+                        }
+                    }
+
+                    Row {
+                        width: parent.width
+                        spacing: 12
+
+                        Column {
+                            width: 180
+                            spacing: 4
+                            SecondaryText {
+                                text: "WAVES // SIGNIFICANT"
+                                font.pixelSize: 8
+                            }
+                            GohuText {
+                                text: ground.marineWaveLabel(
+                                    marineService.station.waveHeightM
+                                )
+                                font.pixelSize: 11
+                                color: Colors.cyan
+                            }
+                            QuietText {
+                                text: "DPD "
+                                      + MarinePolicy.numericLabel(
+                                            marineService.station
+                                                .dominantPeriodS,
+                                            1, " s"
+                                        )
+                                      + " // APD "
+                                      + MarinePolicy.numericLabel(
+                                            marineService.station
+                                                .averagePeriodS,
+                                            1, " s"
+                                        )
+                                font.pixelSize: 8
+                            }
+                        }
+
+                        Column {
+                            width: 220
+                            spacing: 4
+                            SecondaryText {
+                                text: "WIND"
+                                font.pixelSize: 8
+                            }
+                            GohuText {
+                                text: ground.marineWindLabel(
+                                    marineService.station.windSpeedMs
+                                )
+                                font.pixelSize: 11
+                                color: Colors.white
+                            }
+                            QuietText {
+                                text: "DIR "
+                                      + MarinePolicy.numericLabel(
+                                            marineService.station
+                                                .windDirection,
+                                            0, "°T"
+                                        )
+                                      + " // GUST "
+                                      + ground.marineWindLabel(
+                                            marineService.station.gustMs
+                                        )
+                                elide: Text.ElideRight
+                                font.pixelSize: 8
+                            }
+                        }
+
+                        Column {
+                            width: 210
+                            spacing: 4
+                            SecondaryText {
+                                text: "WATER"
+                                font.pixelSize: 8
+                            }
+                            GohuText {
+                                text: ground.marineTempLabel(
+                                    marineService.station.waterTempC
+                                )
+                                font.pixelSize: 11
+                                color: Colors.blue
+                            }
+                            QuietText {
+                                text: "TIDE "
+                                      + MarinePolicy.numericLabel(
+                                            marineService.station.tideFt,
+                                            2, " ft"
+                                        )
+                                font.pixelSize: 8
+                            }
+                        }
+
+                        Column {
+                            width: 210
+                            spacing: 4
+                            SecondaryText {
+                                text: "AIR"
+                                font.pixelSize: 8
+                            }
+                            GohuText {
+                                text: ground.marineTempLabel(
+                                    marineService.station.airTempC
+                                )
+                                font.pixelSize: 11
+                                color: Colors.orange
+                            }
+                            QuietText {
+                                text: "PRES "
+                                      + MarinePolicy.numericLabel(
+                                            marineService.station.pressureHpa,
+                                            1, " hPa"
+                                        )
+                                      + " // DEW "
+                                      + ground.marineTempLabel(
+                                            marineService.station.dewpointC
+                                        )
+                                elide: Text.ElideRight
+                                font.pixelSize: 8
+                            }
+                        }
+                    }
+
+                    Row {
+                        width: parent.width
+                        spacing: 12
+
+                        QuietText {
+                            width: 250
+                            text: "MEAN WAVE DIR // "
+                                  + MarinePolicy.numericLabel(
+                                        marineService.station
+                                            .meanWaveDirection,
+                                        0, "°T"
+                                    )
+                            font.pixelSize: 8
+                        }
+
+                        QuietText {
+                            width: 200
+                            text: "VIS // "
+                                  + MarinePolicy.numericLabel(
+                                        marineService.station.visibilityNm,
+                                        1, " nmi"
+                                    )
+                            font.pixelSize: 8
+                        }
+
+                        QuietText {
+                            width: Math.max(0, parent.width - 474)
+                            text: "SOURCE METRIC // CONVERSIONS SHOWN FOR DISPLAY"
+                            horizontalAlignment: Text.AlignRight
+                            font.pixelSize: 8
+                        }
+                    }
+                }
+            }
+
+            QuietText {
+                width: parent.width
+                text: "NEAREST REPORTING NDBC-HOSTED STATION // DISTANCE IS GEOGRAPHIC, NOT COASTAL RELEVANCE // MISSING SENSOR FIELDS STAY UNAVAILABLE"
                 font.pixelSize: 9
                 color: Colors.orange
             }

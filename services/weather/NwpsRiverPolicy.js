@@ -269,6 +269,141 @@ function utcLabel(value) {
     return iso.slice(0, 10) + " " + iso.slice(11, 16) + "Z";
 }
 
+function normalizeFloodImpact(row) {
+    if (!row || typeof row !== "object")
+        return null;
+    const stage = validNumber(row.stage);
+    const statement = shortText(row.statement, 420);
+    if (stage === null || !statement)
+        return null;
+    return {stage:stage, statement:statement};
+}
+
+function normalizeFloodCrest(row) {
+    if (!row || typeof row !== "object")
+        return null;
+    const occurredTime = shortText(row.occurredTime, 40);
+    const occurredMillis = isoMillis(occurredTime);
+    const stage = validNumber(row.stage);
+    const flow = validNumber(row.flow);
+    if (occurredMillis < 0 || (stage === null && flow === null))
+        return null;
+    return {
+        occurredTime:occurredTime,
+        occurredLabel:utcLabel(occurredTime),
+        occurredMillis:occurredMillis,
+        stage:stage,
+        flow:flow,
+        preliminary:shortText(row.preliminary, 12),
+        oldDatum:row.olddatum === true
+    };
+}
+
+function normalizeFloodCategoryThresholds(categories) {
+    const source = categories && typeof categories === "object"
+        ? categories : {};
+    const ids = ["action", "minor", "moderate", "major"];
+    const rows = [];
+    for (let i = 0; i < ids.length; i++) {
+        const id = ids[i];
+        const row = source[id] && typeof source[id] === "object"
+            ? source[id] : {};
+        const stage = validNumber(row.stage);
+        const flow = validNumber(row.flow);
+        if (stage === null && flow === null)
+            continue;
+        rows.push({
+            id:id,
+            label:id.toUpperCase(),
+            stage:stage,
+            flow:flow
+        });
+    }
+    return rows;
+}
+
+function parseGaugeContext(root) {
+    if (!root || typeof root !== "object" || Array.isArray(root))
+        throw new Error("Invalid NWPS gauge metadata response");
+
+    const flood = root.flood && typeof root.flood === "object"
+        ? root.flood : {};
+    const rawImpacts = Array.isArray(flood.impacts) ? flood.impacts : [];
+    const impacts = [];
+    for (let i = 0; i < rawImpacts.length; i++) {
+        const item = normalizeFloodImpact(rawImpacts[i]);
+        if (item)
+            impacts.push(item);
+    }
+    impacts.sort(function(a, b) { return a.stage - b.stage; });
+
+    const crests = flood.crests && typeof flood.crests === "object"
+        ? flood.crests : {};
+    function crestList(value, limit) {
+        const source = Array.isArray(value) ? value : [];
+        const out = [];
+        for (let i = 0; i < source.length && out.length < limit; i++) {
+            const item = normalizeFloodCrest(source[i]);
+            if (item)
+                out.push(item);
+        }
+        return out;
+    }
+
+    const thresholds = normalizeFloodCategoryThresholds(flood.categories);
+    const inundation = root.inundation && typeof root.inundation === "object"
+        ? root.inundation : {};
+    const notes = [];
+    const rawNotes = Array.isArray(root.hydronotes) ? root.hydronotes : [];
+    for (let i = 0; i < rawNotes.length && notes.length < 4; i++) {
+        const row = rawNotes[i] || {};
+        const statement = shortText(row.statement, 320);
+        if (!statement)
+            continue;
+        notes.push({
+            statement:statement,
+            effective:shortText(row.effective, 40),
+            expiration:shortText(row.expiration, 40)
+        });
+    }
+
+    const result = {
+        lid:shortText(root.lid, 40),
+        usgsId:shortText(root.usgsId, 40),
+        description:shortText(root.description, 180),
+        county:shortText(root.county, 80),
+        timeZone:shortText(root.timeZone, 40),
+        stageUnits:shortText(flood.stageUnits, 24),
+        flowUnits:shortText(flood.flowUnits, 24),
+        thresholds:thresholds,
+        impacts:impacts.slice(0, 20),
+        recentCrests:crestList(crests.recent, 10),
+        historicCrests:crestList(crests.historic, 10),
+        inundationAvailable:inundation.enabled === true,
+        notes:notes
+    };
+    result.available = result.thresholds.length > 0
+        || result.impacts.length > 0
+        || result.recentCrests.length > 0
+        || result.historicCrests.length > 0
+        || result.inundationAvailable
+        || result.notes.length > 0
+        || result.usgsId !== ""
+        || result.county !== "";
+    return result;
+}
+
+function crestReading(crest, stageUnits, flowUnits) {
+    if (!crest)
+        return "--";
+    const parts = [];
+    if (validNumber(crest.stage) !== null)
+        parts.push(readingText(crest.stage, stageUnits));
+    if (validNumber(crest.flow) !== null)
+        parts.push(readingText(crest.flow, flowUnits));
+    return parts.length > 0 ? parts.join(" // ") : "--";
+}
+
 function normalizeStageflowProduct(product) {
     if (!product || typeof product !== "object")
         return {

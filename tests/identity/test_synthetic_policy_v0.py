@@ -132,6 +132,18 @@ class SyntheticIdentityGateTests(unittest.TestCase):
         self.assertFalse(self.can("operator", "llc_a", "unknown_record"))
         self.assertFalse(self.can("operator", "llc_a", "' OR 1=1 --"))
 
+    def test_malformed_values_fail_closed_without_sqlite_exception(self):
+        self.assertFalse(self.db.allowed([], "llc_a", "health_maryland",
+                                         "records.read", now=100))
+        self.assertFalse(self.db.allowed("operator", {}, "health_maryland",
+                                         "records.read", now=100))
+        self.assertFalse(self.db.allowed("operator", "llc_a", None,
+                                         "records.read", now=100))
+        self.assertFalse(self.db.allowed("operator", "llc_a", "health_maryland",
+                                         [], now=100))
+        self.assertEqual(self.db.visible_portfolio_orgs([], "family"), ())
+        self.assertEqual(self.db.visible_portfolio_orgs("operator", {}), ())
+
     def test_client_selected_org_cannot_redirect_to_another_tenant(self):
         self.assertFalse(self.can("operator", "customer", "health_maryland"))
         self.assertFalse(self.can("customer_user", "llc_b", "sales_maryland"))

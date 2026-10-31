@@ -164,28 +164,23 @@ class StageReceiptTests(unittest.TestCase):
             self.assertFalse(x["settled"])
             self.assertEqual(owner.snapshot()["phase"],"RECOVERY_REVIEW")
 
-    def test_missing_or_invalid_json_during_readback_never_settles(self):
-        for choice in ("missing","invalid"):
-            with self.subTest(choice=choice):
-                # Each subcase gets its own disposable fixture.
-                if choice=="invalid":
-                    with self.new() as owner:
-                        r=owner.reserve("m12h-stage-000001")
-                        self.simulated_external_fileview_write(b"{invalid}\n")
-                        response=owner.settle_after_independent_readback(
-                            r["stageId"],r["epoch"])
-                        self.assertFalse(response["settled"])
-                        self.assertEqual(owner.snapshot()["phase"],
-                                         "RECOVERY_REVIEW")
-                else:
-                    with self.new() as owner:
-                        r=owner.reserve("m12h-stage-000001")
-                        self.file.unlink()
-                        response=owner.settle_after_independent_readback(
-                            r["stageId"],r["epoch"])
-                        self.assertFalse(response["settled"])
-                        self.assertEqual(owner.snapshot()["phase"],
-                                         "RECOVERY_REVIEW")
+    def test_invalid_json_during_readback_never_settles(self):
+        with self.new() as owner:
+            r=owner.reserve("m12h-stage-000001")
+            self.simulated_external_fileview_write(b"{invalid}\n")
+            response=owner.settle_after_independent_readback(
+                r["stageId"],r["epoch"])
+            self.assertFalse(response["settled"])
+            self.assertEqual(owner.snapshot()["phase"],"RECOVERY_REVIEW")
+
+    def test_missing_json_during_readback_never_settles(self):
+        with self.new() as owner:
+            r=owner.reserve("m12h-stage-000001")
+            self.file.unlink()
+            response=owner.settle_after_independent_readback(
+                r["stageId"],r["epoch"])
+            self.assertFalse(response["settled"])
+            self.assertEqual(owner.snapshot()["phase"],"RECOVERY_REVIEW")
 
     def test_stale_stage_or_epoch_not_rebound_to_active_receipt(self):
         with self.new() as owner:

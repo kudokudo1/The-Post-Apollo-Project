@@ -18,7 +18,8 @@ vm.runInNewContext(
 
 for (const fn of [
     "normalizeStageflowProduct", "parseStageflow",
-    "seriesTail", "seriesHead", "pointReading", "utcLabel"
+    "seriesTail", "seriesHead", "seriesWindow", "seriesStats",
+    "normalizedSeriesBars", "pointReading", "utcLabel"
 ])
     assert.equal(typeof ctx[fn], "function", fn);
 
@@ -112,6 +113,25 @@ assert.equal(
     ctx.pointReading(parsed.observed, parsed.observed.data[2]),
     "4.10 ft // FLOW 0.82 kcfs"
 );
+
+const windowRows = ctx.seriesWindow(parsed.observed, 12);
+assert.equal(windowRows.length, 3);
+const stats = ctx.seriesStats(parsed.observed, 12);
+assert.equal(stats.available, true);
+assert.equal(stats.points, 3);
+assert.equal(stats.minimum, 3.8);
+assert.equal(stats.maximum, 4.1);
+assert.ok(Math.abs(stats.delta - 0.3) < 0.000001);
+assert.equal(stats.direction, "RISING");
+assert.equal(stats.spanHours, 2);
+
+const bars = ctx.normalizedSeriesBars(parsed.observed, 12);
+assert.equal(bars.length, 3);
+assert.equal(bars[0].fraction, 0);
+assert.equal(bars[2].fraction, 1);
+assert.equal(ctx.seriesStats(null, 12).available, false);
+assert.equal(ctx.normalizedSeriesBars(null, 12).length, 0);
+
 assert.equal(
     ctx.pointReading(
         {primaryUnits:"ft", secondaryName:"", secondaryUnits:""},
@@ -150,7 +170,11 @@ assert.match(
     service,
     /currentId !== river\.inflightStageflowGaugeId[\s\S]*?river\.refreshStageflow\(\)/
 );
-assert.equal((service.match(/\bProcess\s*\{/g) || []).length, 2);
+assert.equal(
+    (service.match(/\bProcess\s*\{/g) || []).length,
+    3,
+    "NWPS stack owns bbox + stageflow + selected-gauge metadata processes"
+);
 assert.equal((service.match(/interval: 900000/g) || []).length, 1);
 assert.doesNotMatch(service, /National Water Model|\/reaches\/|streamflow\?series=/i);
 
@@ -163,6 +187,13 @@ assert.match(ground, /RiverPolicy\.seriesHead/);
 assert.match(ground, /OBS ISSUED \/\/ /);
 assert.match(ground, /FORECAST ISSUED \/\/ /);
 assert.match(ground, /NO OFFICIAL FORECAST SERIES RETURNED/);
+assert.match(ground, /OBSERVED HYDROGRAPH \/\/ /);
+assert.match(ground, /RiverPolicy\.seriesWindow/);
+assert.match(ground, /RiverPolicy\.seriesStats/);
+assert.match(ground, /RiverPolicy\.normalizedSeriesBars/);
+assert.match(ground, /MIN \/\/ /);
+assert.match(ground, /MAX \/\/ /);
+assert.match(ground, /DELTA \/\/ /);
 assert.match(
     ground,
     /OBSERVED AND FORECAST SERIES ARE SEPARATE NWPS PRODUCTS \/\/ FORECAST VALUES ARE PREDICTIONS, NOT MEASUREMENTS/

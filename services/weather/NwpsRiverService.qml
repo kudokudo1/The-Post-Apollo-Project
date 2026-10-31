@@ -17,6 +17,7 @@ Scope {
     property bool failed: false
     property string errorText: ""
     property var gauge: null
+    property var nearbyGauges: []
     property date lastUpdated
 
     property bool stageflowReady: false
@@ -30,11 +31,27 @@ Scope {
     property string stageflowGaugeId: ""
     property string inflightStageflowGaugeId: ""
 
+    property bool contextReady: false
+    property bool contextFailed: false
+    property string contextErrorText: ""
+    property var gaugeContext: ({
+        "available": false,
+        "thresholds": [],
+        "impacts": [],
+        "recentCrests": [],
+        "historicCrests": [],
+        "notes": []
+    })
+    property date contextLastUpdated
+    property string contextGaugeId: ""
+    property string inflightContextGaugeId: ""
+
     readonly property var requestBox:
         RiverPolicy.boundedBox(latitude, longitude, 0.6)
     readonly property bool configured: requestBox !== null
     readonly property bool loading: riverFetch.running
     readonly property bool stageflowLoading: stageflowFetch.running
+    readonly property bool contextLoading: contextFetch.running
     readonly property string endpoint: {
         if (!requestBox)
             return "";
@@ -57,6 +74,56 @@ Scope {
             return false;
         riverFetch.running = true;
         return true;
+    }
+
+    function clearContext() {
+        contextReady = false;
+        contextFailed = false;
+        contextErrorText = "";
+        gaugeContext = {
+            "available": false,
+            "thresholds": [],
+            "impacts": [],
+            "recentCrests": [],
+            "historicCrests": [],
+            "notes": []
+        };
+        contextGaugeId = "";
+    }
+
+    function refreshContext() {
+        if (!active || !gauge || !gauge.lid || contextFetch.running)
+            return false;
+        inflightContextGaugeId = String(gauge.lid);
+        contextFetch.command = [
+            "curl", "-fsSL", "--max-time", "12",
+            "-H", "Accept: application/json",
+            "-A", "Post-Apollo-WeatherStation/0.5",
+            "https://api.water.noaa.gov/nwps/v1/gauges/"
+              + encodeURIComponent(inflightContextGaugeId)
+        ];
+        contextFetch.running = true;
+        return true;
+    }
+
+    function acceptContext(raw) {
+        if (!gauge
+                || String(gauge.lid || "") !== inflightContextGaugeId)
+            return;
+        try {
+            gaugeContext = RiverPolicy.parseGaugeContext(
+                JSON.parse(String(raw || ""))
+            );
+            contextGaugeId = inflightContextGaugeId;
+            contextLastUpdated = new Date();
+            contextReady = true;
+            contextFailed = false;
+            contextErrorText = "";
+        } catch (error) {
+            contextFailed = true;
+            contextErrorText = "NWPS GAUGE CONTEXT UNAVAILABLE";
+            console.log("NwpsRiverService context parse error:", error);
+        }
     }
 
     function clearStageflow() {
@@ -111,25 +178,35 @@ Scope {
 
     function accept(raw) {
         try {
-            const parsed = RiverPolicy.nearestGauge(
+            const rows = RiverPolicy.nearestGauges(
                 JSON.parse(String(raw || "")),
                 latitude,
-                longitude
+                longitude,
+                4
             );
+            const parsed = rows.length > 0 ? rows[0] : null;
             const nextId = parsed ? String(parsed.lid || "") : "";
             const previousId = gauge ? String(gauge.lid || "") : "";
+            nearbyGauges = rows;
             gauge = parsed;
             ready = true;
             failed = false;
             errorText = "";
             lastUpdated = new Date();
 
-            if (nextId !== previousId)
+            if (nextId !== previousId) {
                 clearStageflow();
-            if (nextId !== "")
-                Qt.callLater(function() { river.refreshStageflow(); });
-            else
+                clearContext();
+            }
+            if (nextId !== "") {
+                Qt.callLater(function() {
+                    river.refreshStageflow();
+                    river.refreshContext();
+                });
+            } else {
                 clearStageflow();
+                clearContext();
+            }
         } catch (error) {
             failed = true;
             errorText = "NWPS GAUGE FEED UNAVAILABLE";
@@ -175,6 +252,29 @@ Scope {
                     && currentId !== river.inflightStageflowGaugeId)
                 Qt.callLater(function() {
                     river.refreshStageflow();
+                });
+        }
+    }
+
+    Process {
+        id: contextFetch
+        command: []
+        stdout: StdioCollector {
+            onStreamFinished: river.acceptContext(text)
+        }
+        onExited: function(exitCode, exitStatus) {
+            const currentId = river.gauge
+                ? String(river.gauge.lid || "") : "";
+            if (exitCode !== 0
+                    && currentId === river.inflightContextGaugeId) {
+                river.contextFailed = true;
+                river.contextErrorText =
+                    "NWPS GAUGE CONTEXT REQUEST FAILED";
+            }
+            if (river.active && currentId !== ""
+                    && currentId !== river.inflightContextGaugeId)
+                Qt.callLater(function() {
+                    river.refreshContext();
                 });
         }
     }

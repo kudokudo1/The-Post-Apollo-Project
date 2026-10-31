@@ -214,7 +214,7 @@ function gaugeArray(root) {
     throw new Error("Invalid NWPS gauge response");
 }
 
-function nearestGauge(root, originLat, originLon) {
+function nearestGauges(root, originLat, originLon, limit) {
     const originLatitude = validNumber(originLat);
     const originLongitude = validNumber(originLon);
     if (originLatitude === null || originLongitude === null
@@ -222,18 +222,29 @@ function nearestGauge(root, originLat, originLon) {
             || Math.abs(originLongitude) > 180)
         throw new Error("Invalid NWPS origin");
 
+    const requested = Math.max(
+        1, Math.min(8, Math.floor(Number(limit) || 4))
+    );
     const gauges = gaugeArray(root);
-    let nearest = null;
+    const rows = [];
     for (let i = 0; i < gauges.length; i++) {
         const row = normalizeGauge(
             gauges[i], originLatitude, originLongitude
         );
-        if (!row)
-            continue;
-        if (!nearest || row.distanceKm < nearest.distanceKm)
-            nearest = row;
+        if (row)
+            rows.push(row);
     }
-    return nearest;
+    rows.sort(function(a, b) {
+        if (a.distanceKm !== b.distanceKm)
+            return a.distanceKm - b.distanceKm;
+        return a.lid.localeCompare(b.lid);
+    });
+    return rows.slice(0, requested);
+}
+
+function nearestGauge(root, originLat, originLon) {
+    const rows = nearestGauges(root, originLat, originLon, 1);
+    return rows.length > 0 ? rows[0] : null;
 }
 
 function readingText(value, units) {
@@ -256,6 +267,141 @@ function utcLabel(value) {
         return "--";
     const iso = new Date(millis).toISOString();
     return iso.slice(0, 10) + " " + iso.slice(11, 16) + "Z";
+}
+
+function normalizeFloodImpact(row) {
+    if (!row || typeof row !== "object")
+        return null;
+    const stage = validNumber(row.stage);
+    const statement = shortText(row.statement, 420);
+    if (stage === null || !statement)
+        return null;
+    return {stage:stage, statement:statement};
+}
+
+function normalizeFloodCrest(row) {
+    if (!row || typeof row !== "object")
+        return null;
+    const occurredTime = shortText(row.occurredTime, 40);
+    const occurredMillis = isoMillis(occurredTime);
+    const stage = validNumber(row.stage);
+    const flow = validNumber(row.flow);
+    if (occurredMillis < 0 || (stage === null && flow === null))
+        return null;
+    return {
+        occurredTime:occurredTime,
+        occurredLabel:utcLabel(occurredTime),
+        occurredMillis:occurredMillis,
+        stage:stage,
+        flow:flow,
+        preliminary:shortText(row.preliminary, 12),
+        oldDatum:row.olddatum === true
+    };
+}
+
+function normalizeFloodCategoryThresholds(categories) {
+    const source = categories && typeof categories === "object"
+        ? categories : {};
+    const ids = ["action", "minor", "moderate", "major"];
+    const rows = [];
+    for (let i = 0; i < ids.length; i++) {
+        const id = ids[i];
+        const row = source[id] && typeof source[id] === "object"
+            ? source[id] : {};
+        const stage = validNumber(row.stage);
+        const flow = validNumber(row.flow);
+        if (stage === null && flow === null)
+            continue;
+        rows.push({
+            id:id,
+            label:id.toUpperCase(),
+            stage:stage,
+            flow:flow
+        });
+    }
+    return rows;
+}
+
+function parseGaugeContext(root) {
+    if (!root || typeof root !== "object" || Array.isArray(root))
+        throw new Error("Invalid NWPS gauge metadata response");
+
+    const flood = root.flood && typeof root.flood === "object"
+        ? root.flood : {};
+    const rawImpacts = Array.isArray(flood.impacts) ? flood.impacts : [];
+    const impacts = [];
+    for (let i = 0; i < rawImpacts.length; i++) {
+        const item = normalizeFloodImpact(rawImpacts[i]);
+        if (item)
+            impacts.push(item);
+    }
+    impacts.sort(function(a, b) { return a.stage - b.stage; });
+
+    const crests = flood.crests && typeof flood.crests === "object"
+        ? flood.crests : {};
+    function crestList(value, limit) {
+        const source = Array.isArray(value) ? value : [];
+        const out = [];
+        for (let i = 0; i < source.length && out.length < limit; i++) {
+            const item = normalizeFloodCrest(source[i]);
+            if (item)
+                out.push(item);
+        }
+        return out;
+    }
+
+    const thresholds = normalizeFloodCategoryThresholds(flood.categories);
+    const inundation = root.inundation && typeof root.inundation === "object"
+        ? root.inundation : {};
+    const notes = [];
+    const rawNotes = Array.isArray(root.hydronotes) ? root.hydronotes : [];
+    for (let i = 0; i < rawNotes.length && notes.length < 4; i++) {
+        const row = rawNotes[i] || {};
+        const statement = shortText(row.statement, 320);
+        if (!statement)
+            continue;
+        notes.push({
+            statement:statement,
+            effective:shortText(row.effective, 40),
+            expiration:shortText(row.expiration, 40)
+        });
+    }
+
+    const result = {
+        lid:shortText(root.lid, 40),
+        usgsId:shortText(root.usgsId, 40),
+        description:shortText(root.description, 180),
+        county:shortText(root.county, 80),
+        timeZone:shortText(root.timeZone, 40),
+        stageUnits:shortText(flood.stageUnits, 24),
+        flowUnits:shortText(flood.flowUnits, 24),
+        thresholds:thresholds,
+        impacts:impacts.slice(0, 20),
+        recentCrests:crestList(crests.recent, 10),
+        historicCrests:crestList(crests.historic, 10),
+        inundationAvailable:inundation.enabled === true,
+        notes:notes
+    };
+    result.available = result.thresholds.length > 0
+        || result.impacts.length > 0
+        || result.recentCrests.length > 0
+        || result.historicCrests.length > 0
+        || result.inundationAvailable
+        || result.notes.length > 0
+        || result.usgsId !== ""
+        || result.county !== "";
+    return result;
+}
+
+function crestReading(crest, stageUnits, flowUnits) {
+    if (!crest)
+        return "--";
+    const parts = [];
+    if (validNumber(crest.stage) !== null)
+        parts.push(readingText(crest.stage, stageUnits));
+    if (validNumber(crest.flow) !== null)
+        parts.push(readingText(crest.flow, flowUnits));
+    return parts.length > 0 ? parts.join(" // ") : "--";
 }
 
 function normalizeStageflowProduct(product) {
@@ -381,3 +527,100 @@ function pointReading(product, point) {
          + product.secondaryName + " "
          + readingText(secondary, product.secondaryUnits);
 }
+
+function seriesWindow(product, count) {
+    if (!product || !Array.isArray(product.data))
+        return [];
+    const size = Math.max(0, Math.min(24, Math.floor(Number(count) || 0)));
+    return product.data.slice(Math.max(0, product.data.length - size));
+}
+
+function seriesStats(product, count) {
+    const rows = seriesWindow(product, count);
+    if (rows.length === 0) {
+        return {
+            available:false,
+            points:0,
+            first:null,
+            latest:null,
+            minimum:null,
+            maximum:null,
+            delta:null,
+            direction:"UNAVAILABLE",
+            spanHours:-1
+        };
+    }
+
+    let minimum = null;
+    let maximum = null;
+    for (let i = 0; i < rows.length; i++) {
+        const value = validNumber(rows[i].primary);
+        if (value === null)
+            continue;
+        if (minimum === null || value < minimum)
+            minimum = value;
+        if (maximum === null || value > maximum)
+            maximum = value;
+    }
+
+    const first = validNumber(rows[0].primary);
+    const latest = validNumber(rows[rows.length - 1].primary);
+    const delta = first !== null && latest !== null ? latest - first : null;
+    let direction = "STEADY";
+    if (delta === null)
+        direction = "UNAVAILABLE";
+    else if (delta > 0.01)
+        direction = "RISING";
+    else if (delta < -0.01)
+        direction = "FALLING";
+
+    const firstTime = validNumber(rows[0].validMillis);
+    const lastTime = validNumber(rows[rows.length - 1].validMillis);
+    const spanHours = firstTime !== null && lastTime !== null
+        && lastTime >= firstTime
+        ? (lastTime - firstTime) / 3600000 : -1;
+
+    return {
+        available:first !== null || latest !== null,
+        points:rows.length,
+        first:first,
+        latest:latest,
+        minimum:minimum,
+        maximum:maximum,
+        delta:delta,
+        direction:direction,
+        spanHours:spanHours
+    };
+}
+
+function normalizedSeriesBars(product, count) {
+    const rows = seriesWindow(product, count);
+    const values = [];
+    let minimum = null;
+    let maximum = null;
+    for (let i = 0; i < rows.length; i++) {
+        const value = validNumber(rows[i].primary);
+        if (value === null)
+            continue;
+        values.push(value);
+        if (minimum === null || value < minimum)
+            minimum = value;
+        if (maximum === null || value > maximum)
+            maximum = value;
+    }
+    if (values.length === 0)
+        return [];
+
+    const spread = maximum - minimum;
+    const output = [];
+    for (let i = 0; i < values.length; i++) {
+        output.push({
+            value:values[i],
+            fraction:spread > 0
+                ? (values[i] - minimum) / spread
+                : 0.5
+        });
+    }
+    return output;
+}
+

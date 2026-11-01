@@ -133,4 +133,32 @@ assert.doesNotMatch(
     /\bProcess\s*\{|\bTimer\s*\{|FileView|curl|XMLHttpRequest/
 );
 
+const ui = read("widgets/weather/StationDiscovery.qml");
+assert.match(
+    ui,
+    /import "\.\.\/\.\.\/services\/weather\/WeatherEventEvolutionPolicy\.js" as EvolutionPolicy/
+);
+assert.match(ui, /readonly property var eventEvolution:/);
+assert.match(ui, /EvolutionPolicy\.analyze\(eventTimeline\)/);
+assert.match(ui, /visibleEvolutionProviders/);
+assert.match(ui, /visibleEvolutionRecords/);
+assert.match(ui, /name:"EVIDENCE EVOLUTION \/\/ ARCHIVED PRESENCE"/);
+assert.match(ui, /title: "EVIDENCE EVOLUTION \/\/ ARCHIVED SNAPSHOTS"/);
+assert.match(
+    ui,
+    /FIRST \/ LAST = FIRST \/ LAST PRESENCE IN SAVED WEATHER SNAPSHOTS \/\/ NOT PROVIDER DETECTION, RETRACTION, OR EVENT ONSET/
+);
+assert.match(ui, /NEED AT LEAST 2 SAVED SNAPSHOTS TO INTERPRET EVOLUTION/);
+assert.match(ui, /RELATED PROVIDERS \/\/ FIRST ARCHIVED PRESENCE ORDER/);
+assert.match(ui, /RELATED RECORD LIFECYCLES \/\/ SAVED CONTEXT ONLY/);
+assert.match(ui, /modelData\.lifecycle/);
+assert.match(ui, /stationDiscovery\.evolutionPresence\(/);
+assert.match(ui, /MENTION ONLY/);
+
+const timelinePolicyText = read("services/weather/WeatherEventTimelinePolicy.js");
+assert.match(
+    timelinePolicyText,
+    /relations: Array\.isArray\(dossier\.relations\)[\s\S]*dossier\.relations\.slice\(0\)/
+);
+
 console.log("Weather MAP archived evidence evolution analysis: PASS");

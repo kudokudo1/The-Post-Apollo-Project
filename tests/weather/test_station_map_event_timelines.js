@@ -189,4 +189,35 @@ assert.doesNotMatch(policyText, /\bProcess\s*\{|\bTimer\s*\{|FileView|curl|XMLHt
 assert.match(policyText, /source \+ "\|" \+ id/);
 assert.match(policyText, /Cross-provider relationships remain context/);
 
+const ui = read("widgets/weather/StationDiscovery.qml");
+assert.match(
+    ui,
+    /import "\.\.\/\.\.\/services\/weather\/WeatherEventTimelinePolicy\.js" as TimelinePolicy/
+);
+assert.match(ui, /property var dossierTimelineAnchor: null/);
+assert.match(ui, /readonly property var timelineAnchor:/);
+assert.match(ui, /TimelinePolicy\.timelineForAnchor\([\s\S]*dossierStore\.document[\s\S]*timelineAnchor[\s\S]*24/);
+assert.match(ui, /rows\.slice\(rows\.length - 8\)/);
+assert.match(ui, /function focusDossierTimeline\(dossier\)/);
+for (const selected of [
+    "selectedMapEvent", "selectedMapHotspot", "selectedMapNewsMention",
+    "selectedMapEarthquake", "selectedMapGdacsEvent"
+])
+    assert.match(ui, new RegExp(selected + " = null;"));
+assert.match(ui, /name:"EVENT TIMELINE \/\/ EXACT SOURCE ID"/);
+assert.match(ui, /CLICK A SAVED DOSSIER TO FOCUS ITS EXACT-SOURCE TIMELINE/);
+assert.match(ui, /onClicked:\s*stationDiscovery\.focusDossierTimeline\(modelData\)/);
+assert.match(ui, /title: "EVENT TIMELINE \/\/ EXACT SOURCE EVENT"/);
+assert.match(ui, /label: "CLEAR FOCUS"/);
+assert.match(
+    ui,
+    /EXACT SOURCE \+ SOURCE EVENT ID ONLY \/\/ CROSS-PROVIDER RECORDS REMAIN CONTEXT, NOT SHARED IDENTITY/
+);
+assert.match(ui, /model: stationDiscovery\.visibleTimelineSnapshots/);
+assert.match(ui, /stationDiscovery\.timelineRecordTransition\(/);
+assert.match(ui, /stationDiscovery\.timelineSourceTransition\(/);
+assert.match(ui, /TIME\+SPACE/);
+assert.match(ui, /SPACE ONLY/);
+assert.match(ui, /MENTIONS/);
+
 console.log("Weather MAP exact-source event dossier timelines: PASS");

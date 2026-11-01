@@ -107,7 +107,8 @@ test('history update is single-pass and preserves selected and non-process state
     assert.ok(functionText.includes('const selectedPid = Number(presentationState.taskHistoryPid || 0);'));
     assert.ok(!functionText.includes('Object.assign({}, previous)'));
     assert.ok(!functionText.includes('const pieces = key.split(":pid:")'));
-    assert.ok(!functionText.includes('const livePids ='));
+    assert.ok(functionText.includes('const livePids = immutable ? null : ({});'),
+        'PID membership allocated only for hidden in-place cleanup');
     const stateObj = state();
     makeUpdater(stateObj)([{pid: 101, cpu: 12, mem: 1, rss: 1024, ioRate: 0, ageSeconds: 70}]);
     assert.deepStrictEqual(stateObj.taskMiniHunterMetricHistories['cpu:pid:202'], [3, 4]);

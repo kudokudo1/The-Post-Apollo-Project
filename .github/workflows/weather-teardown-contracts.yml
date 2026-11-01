@@ -107,6 +107,8 @@ jobs:
         run: node tests/weather/test_station_news_map_handoff.js
       - name: Validate MAP EONET hazard filters cache and inspector
         run: node tests/weather/test_station_map_hazard_intelligence.js
+      - name: Validate MAP GDACS multi-hazard disaster intelligence
+        run: node tests/weather/test_station_map_gdacs_disasters.js
       - name: Validate MAP spatial projection zoom pan and point canvas
         run: node tests/weather/test_station_map_spatial_canvas.js
       - name: Validate local Natural Earth MAP basemap

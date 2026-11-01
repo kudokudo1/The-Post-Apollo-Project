@@ -10,6 +10,7 @@ import "../../services/weather/FirmsHotspotPolicy.js" as FirmsAreaPolicy
 import "StationRadarPolicy.js" as RadarPolicy
 import "../../services/weather/HmsSmokePolicy.js" as SmokePolicy
 import "../../services/weather/SeismicPolicy.js" as SeismicPolicy
+import "../../services/weather/GdacsPolicy.js" as GdacsPolicy
 
 // Source-first stage. All records shown come from a backend, never examples.
 // MAP owns a local Natural Earth geographic basemap plus source-driven data
@@ -110,7 +111,9 @@ Rectangle {
     property var selectedMapHotspot: null
     property var selectedMapNewsMention: null
     property var selectedMapEarthquake: null
+    property var selectedMapGdacsEvent: null
     property bool mapShowEarthquakes: true
+    property bool mapShowGdacs: true
     property bool mapShowCountryBorders: true
     property bool mapShowAdmin1: false
     property bool mapShowPlaces: true
@@ -132,6 +135,12 @@ Rectangle {
         && seismicSource.ready
         ? MapProjection.plottable(seismicSource.events)
         : []
+    readonly property var mapGdacsRows:
+        mapShowGdacs && gdacsService.ready
+        ? MapProjection.plottable(gdacsService.events)
+        : []
+    readonly property var gdacsSummary:
+        GdacsPolicy.summary(gdacsService.events)
     readonly property var mapPlaceRows:
         mapShowPlaces
         ? NaturalEarthContext.placesForZoom(mapZoom)
@@ -170,6 +179,8 @@ Rectangle {
         domain === "map" && selectedMapNewsMention !== null
     readonly property bool earthquakeInspectorOpen:
         domain === "map" && selectedMapEarthquake !== null
+    readonly property bool gdacsInspectorOpen:
+        domain === "map" && selectedMapGdacsEvent !== null
 
     readonly property var mapFilterOptions: [
         { "id": "all", "label": "ALL EVENTS", "category": "" },
@@ -255,6 +266,7 @@ Rectangle {
         selectedMapHotspot = null;
         selectedMapNewsMention = null;
         selectedMapEarthquake = null;
+        selectedMapGdacsEvent = null;
         mapFilter = id;
         resetMapView();
         discoveryScroll.contentY = 0;
@@ -454,6 +466,19 @@ Rectangle {
         selectedMapEarthquake = null;
     }
 
+    function closeGdacsInspector() {
+        selectedMapGdacsEvent = null;
+    }
+
+    function gdacsAlertColor(level) {
+        switch (GdacsPolicy.alertToken(level)) {
+        case "red": return Colors.red;
+        case "orange": return Colors.orange;
+        case "cyan": return Colors.cyan;
+        default: return Colors.white;
+        }
+    }
+
     // Live MM:SS display, keeping even long provider cooldowns readable.
     function retryClock(value) {
         const seconds = Math.max(0, Math.ceil(Number(value) || 0));
@@ -503,6 +528,7 @@ Rectangle {
                 selectedMapHotspot = null;
                 selectedMapNewsMention = null;
                 selectedMapEarthquake = null;
+                selectedMapGdacsEvent = null;
                 selectedMapEvent = row;
             }
             return;
@@ -524,6 +550,7 @@ Rectangle {
         selectedMapHotspot = null;
         selectedMapNewsMention = null;
         selectedMapEarthquake = null;
+        selectedMapGdacsEvent = null;
     }
     onNewsMentionOverlayChanged: {
         selectedMapNewsMention = null;
@@ -537,17 +564,26 @@ Rectangle {
         : domain === "news" ? "▤  NEWS // HEADLINES"
         : "◉  RADIO // STATIONS"
     readonly property string providerTitle:
-        domain === "map" ? "NASA EONET // " + mapFilterLabel(mapFilter)
+        domain === "map" ? "WORLD EVENTS // NASA EONET + GDACS"
         : domain === "news" ? "GDELT DOC // WORLD EVENT HEADLINES"
         : "RADIO BROWSER // TOP VOTED STREAMS"
     readonly property string sourceCaution:
-        domain === "map" ? "NATURAL EARTH + EONET + USGS EARTHQUAKES + FIRMS + MRMS + RAINVIEWER FALLBACK + HMS SMOKE"
+        domain === "map" ? "NATURAL EARTH + EONET + GDACS + USGS EARTHQUAKES + FIRMS + MRMS + RAINVIEWER FALLBACK + HMS SMOKE"
         : domain === "news" ? "ARTICLE DISCOVERY // LOCAL FILTERS // EXACT-HEADLINE SOURCE GROUPS // NOT FUZZY STORY CLUSTERING"
         : "STATION DIRECTORY // PERSISTENT PLAYBACK NOT YET WIRED"
     readonly property var plannedSources: {
         if (domain === "map")
             return [
                 {name:"NASA EONET // FILTERED EVENTS + INSPECTOR", state:"SOURCE CONNECTED"},
+                {
+                    name:"GDACS // GLOBAL MULTI-HAZARD EARLY WARNING",
+                    state: gdacsService.ready
+                           ? "LOADED " + gdacsService.events.length
+                           : gdacsService.loading
+                             ? "RECEIVING"
+                             : gdacsService.failed
+                               ? "ERROR" : "WAITING"
+                },
                 {name:"NATURAL EARTH 1:110m LAND BASEMAP", state:"CONNECTED"},
                 {
                     name:"NATURAL EARTH ADMIN-0 REFERENCE BOUNDARIES",
@@ -643,6 +679,13 @@ Rectangle {
             stationDiscovery.mapFilter
         )
         active: stationDiscovery.stationOpen && stationDiscovery.visible
+    }
+
+    WeatherServices.GdacsService {
+        id: gdacsService
+        active: stationDiscovery.domain === "map"
+                && stationDiscovery.stationOpen
+                && stationDiscovery.visible
     }
 
     WeatherServices.FirmsHotspotService {
@@ -798,7 +841,7 @@ Rectangle {
 
                 StationSectionDivider {
                     width: parent.width
-                    title: "SPATIAL PLOT // USGS QUAKES + EONET + FIRMS + NEWS"
+                    title: "SPATIAL PLOT // GDACS + USGS QUAKES + EONET + FIRMS + NEWS"
                 }
 
                 QuietText {
@@ -901,6 +944,45 @@ Rectangle {
                         elide: Text.ElideRight
                         font.pixelSize: 9
                         color: Colors.orange
+                    }
+                }
+
+                Row {
+                    width: parent.width
+                    height: 30
+                    spacing: 10
+
+                    ActionButton {
+                        width: 152
+                        height: 28
+                        label: "GDACS: "
+                               + (stationDiscovery.mapShowGdacs
+                                  ? "ON" : "OFF")
+                        labelPixelSize: 9
+                        accentColor: Colors.magenta
+                        selected: stationDiscovery.mapShowGdacs
+                        onClicked:
+                            stationDiscovery.mapShowGdacs =
+                                !stationDiscovery.mapShowGdacs
+                    }
+
+                    QuietText {
+                        anchors.verticalCenter: parent.verticalCenter
+                        width: Math.max(0, parent.width - 162)
+                        text: gdacsService.ready
+                              ? "GDACS // " + stationDiscovery.mapGdacsRows.length
+                                + " PLOTTABLE // CURRENT "
+                                + stationDiscovery.gdacsSummary.current
+                                + " // RED " + stationDiscovery.gdacsSummary.red
+                                + " // ORANGE " + stationDiscovery.gdacsSummary.orange
+                              : gdacsService.loading
+                                ? "GDACS // RECEIVING"
+                                : gdacsService.failed
+                                  ? gdacsService.errorText
+                                  : "GDACS // WAITING"
+                        elide: Text.ElideRight
+                        font.pixelSize: 9
+                        color: Colors.magenta
                     }
                 }
 
@@ -2088,7 +2170,65 @@ Rectangle {
                                     stationDiscovery.selectedMapEvent = null;
                                     stationDiscovery.selectedMapHotspot = null;
                                     stationDiscovery.selectedMapNewsMention = null;
+                                    stationDiscovery.selectedMapGdacsEvent = null;
                                     stationDiscovery.selectedMapEarthquake = modelData;
+                                }
+                            }
+                        }
+                    }
+
+                    Repeater {
+                        model: stationDiscovery.mapGdacsRows
+
+                        delegate: Item {
+                            required property var modelData
+                            readonly property var projected:
+                                MapProjection.project(
+                                    modelData.longitude,
+                                    modelData.latitude,
+                                    mapPlot.width,
+                                    mapPlot.height,
+                                    stationDiscovery.mapZoom,
+                                    stationDiscovery.mapCenterLon,
+                                    stationDiscovery.mapCenterLat
+                                )
+                            readonly property real alertRadius:
+                                GdacsPolicy.alertRadius(modelData.alertLevel)
+
+                            width: alertRadius * 2 + 8
+                            height: alertRadius * 2 + 8
+                            x: projected.x - width / 2
+                            y: projected.y - height / 2
+                            visible: projected.visible
+                            z: 2.12
+
+                            Rectangle {
+                                anchors.centerIn: parent
+                                width: parent.alertRadius * 2
+                                height: parent.alertRadius * 2
+                                color: stationDiscovery.gdacsAlertColor(
+                                    modelData.alertLevel
+                                )
+                                opacity: 0.88
+                                border.width:
+                                    stationDiscovery.selectedMapGdacsEvent
+                                       === modelData ? 2 : 1
+                                border.color:
+                                    stationDiscovery.selectedMapGdacsEvent
+                                       === modelData
+                                    ? Colors.yellow : Colors.white
+                            }
+
+                            MouseArea {
+                                anchors.fill: parent
+                                hoverEnabled: true
+                                cursorShape: Qt.PointingHandCursor
+                                onClicked: {
+                                    stationDiscovery.selectedMapEvent = null;
+                                    stationDiscovery.selectedMapHotspot = null;
+                                    stationDiscovery.selectedMapNewsMention = null;
+                                    stationDiscovery.selectedMapEarthquake = null;
+                                    stationDiscovery.selectedMapGdacsEvent = modelData;
                                 }
                             }
                         }
@@ -2142,6 +2282,7 @@ Rectangle {
                                     stationDiscovery.selectedMapHotspot = null;
                                     stationDiscovery.selectedMapNewsMention = null;
                                     stationDiscovery.selectedMapEarthquake = null;
+                                    stationDiscovery.selectedMapGdacsEvent = null;
                                     stationDiscovery.selectedMapEvent = modelData;
                                 }
                             }
@@ -2192,6 +2333,7 @@ Rectangle {
                                     stationDiscovery.selectedMapEvent = null;
                                     stationDiscovery.selectedMapHotspot = null;
                                     stationDiscovery.selectedMapEarthquake = null;
+                                    stationDiscovery.selectedMapGdacsEvent = null;
                                     stationDiscovery.selectedMapNewsMention = modelData;
                                 }
                             }
@@ -2247,6 +2389,7 @@ Rectangle {
                                     stationDiscovery.selectedMapEvent = null;
                                     stationDiscovery.selectedMapNewsMention = null;
                                     stationDiscovery.selectedMapEarthquake = null;
+                                    stationDiscovery.selectedMapGdacsEvent = null;
                                     stationDiscovery.selectedMapHotspot = modelData;
                                 }
                             }
@@ -2283,7 +2426,7 @@ Rectangle {
                         anchors.bottom: parent.bottom
                         anchors.margins: 7
                         z: 3
-                        text: "QUAKES CIRCLES // EONET DIAMONDS // FIRMS ORANGE // NEWS MAGENTA"
+                        text: "GDACS ALERT SQUARES // QUAKES CIRCLES // EONET DIAMONDS // FIRMS ORANGE // NEWS MAGENTA"
                         font.pixelSize: 9
                     }
                 }
@@ -2848,6 +2991,124 @@ Rectangle {
                 width: parent.width
                 text: stationDiscovery.sourceCaution
                 font.pixelSize: 11
+            }
+
+            Column {
+                width: parent.width
+                spacing: 7
+                visible: stationDiscovery.gdacsInspectorOpen
+
+                StationSectionDivider {
+                    width: parent.width
+                    title: "DISASTER INSPECTOR // GDACS"
+                }
+
+                Rectangle {
+                    width: parent.width
+                    height: 188
+                    color: Colors.dark
+                    border.width: 1
+                    border.color: stationDiscovery.selectedMapGdacsEvent
+                                  ? stationDiscovery.gdacsAlertColor(
+                                        stationDiscovery.selectedMapGdacsEvent.alertLevel
+                                    )
+                                  : Colors.magenta
+
+                    Column {
+                        anchors.fill: parent
+                        anchors.margins: 10
+                        spacing: 5
+
+                        Row {
+                            width: parent.width
+                            spacing: 10
+
+                            GohuText {
+                                width: Math.max(0, parent.width - 96)
+                                text: stationDiscovery.selectedMapGdacsEvent
+                                      ? stationDiscovery.selectedMapGdacsEvent.name
+                                      : ""
+                                color: stationDiscovery.selectedMapGdacsEvent
+                                       ? stationDiscovery.gdacsAlertColor(
+                                             stationDiscovery.selectedMapGdacsEvent.alertLevel
+                                         )
+                                       : Colors.white
+                                elide: Text.ElideRight
+                                font.pixelSize: 15
+                            }
+
+                            ActionButton {
+                                width: 86
+                                height: 26
+                                label: "CLOSE"
+                                labelPixelSize: 10
+                                accentColor: Colors.red
+                                destructive: true
+                                onClicked:
+                                    stationDiscovery.closeGdacsInspector()
+                            }
+                        }
+
+                        SecondaryText {
+                            width: parent.width
+                            text: stationDiscovery.selectedMapGdacsEvent
+                                  ? stationDiscovery.selectedMapGdacsEvent.eventTypeLabel
+                                    + " // ALERT "
+                                    + stationDiscovery.selectedMapGdacsEvent.alertLevel
+                                    + " // "
+                                    + (stationDiscovery.selectedMapGdacsEvent.country !== ""
+                                       ? stationDiscovery.selectedMapGdacsEvent.country
+                                       : "COUNTRY --")
+                                  : ""
+                            elide: Text.ElideRight
+                            font.pixelSize: 11
+                        }
+
+                        QuietText {
+                            width: parent.width
+                            text: stationDiscovery.selectedMapGdacsEvent
+                                  ? stationDiscovery.selectedMapGdacsEvent.coordinates
+                                    + " // "
+                                    + (stationDiscovery.selectedMapGdacsEvent.isCurrent
+                                       ? "CURRENT EVENT" : "RECENT EVENT")
+                                    + " // ID "
+                                    + stationDiscovery.selectedMapGdacsEvent.eventId
+                                  : ""
+                            elide: Text.ElideRight
+                            font.pixelSize: 9
+                        }
+
+                        QuietText {
+                            width: parent.width
+                            text: stationDiscovery.selectedMapGdacsEvent
+                                  ? "SEVERITY // "
+                                    + stationDiscovery.selectedMapGdacsEvent.severityText
+                                  : ""
+                            elide: Text.ElideRight
+                            font.pixelSize: 9
+                        }
+
+                        QuietText {
+                            width: parent.width
+                            text: stationDiscovery.selectedMapGdacsEvent
+                                  ? "WINDOW // "
+                                    + stationDiscovery.selectedMapGdacsEvent.fromUtc
+                                    + " → "
+                                    + stationDiscovery.selectedMapGdacsEvent.toUtc
+                                  : ""
+                            elide: Text.ElideRight
+                            font.pixelSize: 9
+                        }
+
+                        QuietText {
+                            width: parent.width
+                            text: "GLOBAL DISASTER AWARENESS AND COORDINATION SYSTEM, GDACS // EARLY-WARNING CONTEXT // VERIFY LOCAL/NATIONAL WARNINGS"
+                            elide: Text.ElideRight
+                            font.pixelSize: 9
+                            color: Colors.orange
+                        }
+                    }
+                }
             }
 
             Column {

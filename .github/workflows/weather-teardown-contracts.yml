@@ -115,6 +115,8 @@ jobs:
         run: node tests/weather/test_station_map_event_dossiers.js
       - name: Validate MAP exact-source event dossier timelines
         run: node tests/weather/test_station_map_event_timelines.js
+      - name: Validate MAP archived evidence evolution
+        run: node tests/weather/test_station_map_evidence_evolution.js
       - name: Validate MAP spatial projection zoom pan and point canvas
         run: node tests/weather/test_station_map_spatial_canvas.js
       - name: Validate local Natural Earth MAP basemap

@@ -14,6 +14,7 @@ import "../../services/weather/GdacsPolicy.js" as GdacsPolicy
 import "../../services/weather/WeatherEventRelationPolicy.js" as EventRelationPolicy
 import "../../services/weather/WeatherEventDossierPolicy.js" as DossierPolicy
 import "../../services/weather/WeatherEventTimelinePolicy.js" as TimelinePolicy
+import "../../services/weather/WeatherEventEvolutionPolicy.js" as EvolutionPolicy
 
 // Source-first stage. All records shown come from a backend, never examples.
 // MAP owns a local Natural Earth geographic basemap plus source-driven data
@@ -185,6 +186,18 @@ Rectangle {
         const rows = eventTimeline && Array.isArray(eventTimeline.snapshots)
                    ? eventTimeline.snapshots : [];
         return rows.length <= 8 ? rows : rows.slice(rows.length - 8);
+    }
+    readonly property var eventEvolution:
+        EvolutionPolicy.analyze(eventTimeline)
+    readonly property var visibleEvolutionProviders: {
+        const rows = eventEvolution && Array.isArray(eventEvolution.providers)
+                   ? eventEvolution.providers : [];
+        return rows.slice(0, 8);
+    }
+    readonly property var visibleEvolutionRecords: {
+        const rows = eventEvolution && Array.isArray(eventEvolution.records)
+                   ? eventEvolution.records : [];
+        return rows.slice(0, 6);
     }
     readonly property var mapPlaceRows:
         mapShowPlaces
@@ -575,6 +588,13 @@ Rectangle {
         return TimelinePolicy.recordTransitionLabel(snapshot);
     }
 
+    function evolutionPresence(row) {
+        return EvolutionPolicy.presenceLabel(
+            row,
+            eventEvolution.summary.snapshotCount
+        );
+    }
+
     // Live MM:SS display, keeping even long provider cooldowns readable.
     function retryClock(value) {
         const seconds = Math.max(0, Math.ceil(Number(value) || 0));
@@ -700,6 +720,13 @@ Rectangle {
                            ? "SNAPSHOTS "
                              + eventTimeline.summary.snapshotCount
                            : "READY // SELECT LIVE OR SAVED EVENT"
+                },
+                {
+                    name:"EVIDENCE EVOLUTION // ARCHIVED PRESENCE",
+                    state: eventEvolution.summary.snapshotCount >= 2
+                           ? "CHURN "
+                             + eventEvolution.summary.totalChurn
+                           : "NEEDS 2+ SNAPSHOTS"
                 },
                 {name:"NATURAL EARTH 1:110m LAND BASEMAP", state:"CONNECTED"},
                 {
@@ -4050,6 +4077,159 @@ Rectangle {
                                 elide: Text.ElideRight
                                 font.pixelSize: 8
                                 color: Colors.yellow
+                            }
+                        }
+                    }
+                }
+            }
+
+            Column {
+                width: parent.width
+                spacing: 7
+                visible: stationDiscovery.domain === "map"
+                         && stationDiscovery.timelineAnchor !== null
+
+                StationSectionDivider {
+                    width: parent.width
+                    title: "EVIDENCE EVOLUTION // ARCHIVED SNAPSHOTS"
+                }
+
+                QuietText {
+                    width: parent.width
+                    text: "FIRST / LAST = FIRST / LAST PRESENCE IN SAVED WEATHER SNAPSHOTS // NOT PROVIDER DETECTION, RETRACTION, OR EVENT ONSET"
+                    font.pixelSize: 8
+                    color: Colors.orange
+                }
+
+                QuietText {
+                    width: parent.width
+                    text: stationDiscovery.eventEvolution.summary.snapshotCount >= 2
+                          ? "PROVIDERS "
+                            + stationDiscovery.eventEvolution.summary.providerCount
+                            + " // RECORDS "
+                            + stationDiscovery.eventEvolution.summary.recordCount
+                            + " // CURRENT "
+                            + stationDiscovery.eventEvolution.summary.currentRecords
+                            + " // PERSISTENT "
+                            + stationDiscovery.eventEvolution.summary.persistentRecords
+                            + " // INTERMITTENT "
+                            + stationDiscovery.eventEvolution.summary.intermittentRecords
+                            + " // CHURN +"
+                            + stationDiscovery.eventEvolution.summary.additions
+                            + " / -"
+                            + stationDiscovery.eventEvolution.summary.removals
+                          : "NEED AT LEAST 2 SAVED SNAPSHOTS TO INTERPRET EVOLUTION"
+                    font.pixelSize: 9
+                    color: stationDiscovery.eventEvolution.summary.snapshotCount >= 2
+                           ? Colors.white : Colors.orange
+                }
+
+                Column {
+                    width: parent.width
+                    spacing: 4
+                    visible: stationDiscovery.eventEvolution.summary.snapshotCount >= 2
+                             && stationDiscovery.visibleEvolutionProviders.length > 0
+
+                    QuietText {
+                        width: parent.width
+                        text: "RELATED PROVIDERS // FIRST ARCHIVED PRESENCE ORDER"
+                        font.pixelSize: 8
+                        color: Colors.cyan
+                    }
+
+                    Repeater {
+                        model: stationDiscovery.visibleEvolutionProviders
+
+                        delegate: Rectangle {
+                            required property var modelData
+                            width: content.width
+                            height: 48
+                            color: Colors.dark
+                            border.width: 1
+                            border.color: modelData.current
+                                          ? Colors.cyan : Colors.orange
+
+                            Column {
+                                anchors.fill: parent
+                                anchors.margins: 7
+                                spacing: 3
+
+                                GohuText {
+                                    width: parent.width
+                                    text: modelData.source
+                                          + " // " + modelData.lifecycle
+                                    color: modelData.current
+                                           ? Colors.cyan : Colors.orange
+                                    font.pixelSize: 9
+                                    elide: Text.ElideRight
+                                }
+
+                                SecondaryText {
+                                    width: parent.width
+                                    text: stationDiscovery.evolutionPresence(
+                                              modelData
+                                          )
+                                    font.pixelSize: 8
+                                    elide: Text.ElideRight
+                                }
+                            }
+                        }
+                    }
+                }
+
+                Column {
+                    width: parent.width
+                    spacing: 4
+                    visible: stationDiscovery.eventEvolution.summary.snapshotCount >= 2
+                             && stationDiscovery.visibleEvolutionRecords.length > 0
+
+                    QuietText {
+                        width: parent.width
+                        text: "RELATED RECORD LIFECYCLES // SAVED CONTEXT ONLY"
+                        font.pixelSize: 8
+                        color: Colors.magenta
+                    }
+
+                    Repeater {
+                        model: stationDiscovery.visibleEvolutionRecords
+
+                        delegate: Rectangle {
+                            required property var modelData
+                            width: content.width
+                            height: 56
+                            color: Colors.dark
+                            border.width: 1
+                            border.color: modelData.mentionOnly
+                                          ? Colors.magenta
+                                          : modelData.current
+                                            ? Colors.cyan : Colors.orange
+
+                            Column {
+                                anchors.fill: parent
+                                anchors.margins: 7
+                                spacing: 3
+
+                                GohuText {
+                                    width: parent.width
+                                    text: modelData.source
+                                          + " // "
+                                          + modelData.title
+                                    color: modelData.mentionOnly
+                                           ? Colors.magenta : Colors.white
+                                    font.pixelSize: 9
+                                    elide: Text.ElideRight
+                                }
+
+                                SecondaryText {
+                                    width: parent.width
+                                    text: stationDiscovery.evolutionPresence(
+                                              modelData
+                                          )
+                                          + (modelData.mentionOnly
+                                             ? " // MENTION ONLY" : "")
+                                    font.pixelSize: 8
+                                    elide: Text.ElideRight
+                                }
                             }
                         }
                     }

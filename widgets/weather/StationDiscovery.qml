@@ -12,6 +12,7 @@ import "../../services/weather/HmsSmokePolicy.js" as SmokePolicy
 import "../../services/weather/SeismicPolicy.js" as SeismicPolicy
 import "../../services/weather/GdacsPolicy.js" as GdacsPolicy
 import "../../services/weather/WeatherEventRelationPolicy.js" as EventRelationPolicy
+import "../../services/weather/WeatherEventDossierPolicy.js" as DossierPolicy
 
 // Source-first stage. All records shown come from a backend, never examples.
 // MAP owns a local Natural Earth geographic basemap plus source-driven data
@@ -115,6 +116,7 @@ Rectangle {
     property var selectedMapGdacsEvent: null
     property bool mapShowEarthquakes: true
     property bool mapShowGdacs: true
+    property bool dossierClearArmed: false
     property bool mapShowCountryBorders: true
     property bool mapShowAdmin1: false
     property bool mapShowPlaces: true
@@ -507,6 +509,33 @@ Rectangle {
         }
     }
 
+    function saveCurrentDossier() {
+        dossierClearArmed = false;
+        if (!relationAnchor)
+            return false;
+        return dossierStore.saveDossier(
+            relationAnchor,
+            relatedSourceRows
+        );
+    }
+
+    function clearDossierArchive() {
+        if (dossierStore.summary.count <= 0) {
+            dossierClearArmed = false;
+            return false;
+        }
+        if (!dossierClearArmed) {
+            dossierClearArmed = true;
+            return false;
+        }
+        dossierClearArmed = false;
+        return dossierStore.clearArchive();
+    }
+
+    function dossierSavedAtLabel(value) {
+        return DossierPolicy.formatSavedAt(value);
+    }
+
     // Live MM:SS display, keeping even long provider cooldowns readable.
     function retryClock(value) {
         const seconds = Math.max(0, Math.ceil(Number(value) || 0));
@@ -618,6 +647,14 @@ Rectangle {
                            ? "RELATED " + relatedSourceRows.length
                            : "READY // SELECT EVENT"
                 },
+                {
+                    name:"EVENT DOSSIER ARCHIVE // LOCAL",
+                    state: dossierStore.storageState === "saving"
+                           ? "SAVING"
+                           : dossierStore.storageState === "error"
+                             ? "ERROR"
+                             : "SAVED " + dossierStore.summary.count
+                },
                 {name:"NATURAL EARTH 1:110m LAND BASEMAP", state:"CONNECTED"},
                 {
                     name:"NATURAL EARTH ADMIN-0 REFERENCE BOUNDARIES",
@@ -720,6 +757,10 @@ Rectangle {
         active: stationDiscovery.domain === "map"
                 && stationDiscovery.stationOpen
                 && stationDiscovery.visible
+    }
+
+    WeatherServices.WeatherEventDossierStore {
+        id: dossierStore
     }
 
     WeatherServices.FirmsHotspotService {
@@ -3686,6 +3727,120 @@ Rectangle {
                     text: "NO RECORD CLEARS THIS HAZARD'S BOUNDED SPACE/TIME RULES // ABSENCE IS NOT PROOF OF NO RELATIONSHIP"
                     font.pixelSize: 9
                     color: Colors.orange
+                }
+            }
+
+            Column {
+                width: parent.width
+                spacing: 7
+                visible: stationDiscovery.domain === "map"
+
+                StationSectionDivider {
+                    width: parent.width
+                    title: "EVENT DOSSIERS // LOCAL HISTORY"
+                }
+
+                Row {
+                    width: parent.width
+                    height: 30
+                    spacing: 8
+
+                    ActionButton {
+                        width: 130
+                        height: 28
+                        label: "SAVE DOSSIER"
+                        labelPixelSize: 9
+                        accentColor: Colors.yellow
+                        available: stationDiscovery.relationAnchor !== null
+                                   && (dossierStore.storageState === "ready"
+                                       || dossierStore.storageState === "empty")
+                        onClicked: stationDiscovery.saveCurrentDossier()
+                    }
+
+                    ActionButton {
+                        width: 130
+                        height: 28
+                        label: stationDiscovery.dossierClearArmed
+                               ? "CONFIRM CLEAR" : "ARM CLEAR"
+                        labelPixelSize: 9
+                        accentColor: Colors.red
+                        destructive: stationDiscovery.dossierClearArmed
+                        available: dossierStore.summary.count > 0
+                                   && dossierStore.storageState !== "saving"
+                        onClicked: stationDiscovery.clearDossierArchive()
+                    }
+
+                    QuietText {
+                        anchors.verticalCenter: parent.verticalCenter
+                        width: Math.max(0, parent.width - 276)
+                        text: dossierStore.storageState === "saving"
+                              ? "ATOMIC LOCAL SAVE // WRITING"
+                              : dossierStore.storageState === "error"
+                                ? "ARCHIVE ERROR // " + dossierStore.errorCode
+                                : "ARCHIVED " + dossierStore.summary.count
+                                  + " // REV " + dossierStore.summary.revision
+                                  + " // "
+                                  + dossierStore.storagePath
+                        elide: Text.ElideMiddle
+                        font.pixelSize: 8
+                        color: dossierStore.storageState === "error"
+                               ? Colors.orange : Colors.cyan
+                    }
+                }
+
+                QuietText {
+                    width: parent.width
+                    text: "MANUAL SNAPSHOTS ONLY // PUBLIC EVENT METADATA + CURRENT RELATIONSHIPS // MAX 128 DOSSIERS // ATOMIC VERSIONED JSON"
+                    font.pixelSize: 8
+                    color: Colors.orange
+                }
+
+                Repeater {
+                    model: dossierStore.recentDossiers
+
+                    delegate: Rectangle {
+                        required property var modelData
+                        width: content.width
+                        height: 56
+                        color: Colors.dark
+                        border.width: 1
+                        border.color: Colors.blue
+
+                        Column {
+                            anchors.fill: parent
+                            anchors.margins: 7
+                            spacing: 3
+
+                            GohuText {
+                                width: parent.width
+                                text: modelData.anchor.source
+                                      + " // " + modelData.anchor.title
+                                color: Colors.white
+                                elide: Text.ElideRight
+                                font.pixelSize: 10
+                            }
+
+                            SecondaryText {
+                                width: parent.width
+                                text: stationDiscovery.dossierSavedAtLabel(
+                                          modelData.savedAtMs
+                                      )
+                                      + " // "
+                                      + modelData.relations.length
+                                      + " RELATED RECORDS"
+                                elide: Text.ElideRight
+                                font.pixelSize: 9
+                            }
+                        }
+                    }
+                }
+
+                QuietText {
+                    visible: dossierStore.summary.count === 0
+                             && dossierStore.storageState !== "error"
+                    width: parent.width
+                    text: "NO SAVED EVENT DOSSIERS // SELECT AN EVENT ANCHOR, REVIEW CONTEXT, THEN SAVE"
+                    font.pixelSize: 9
                 }
             }
 

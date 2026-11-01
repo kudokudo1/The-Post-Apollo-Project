@@ -109,6 +109,12 @@ jobs:
         run: node tests/weather/test_station_map_hazard_intelligence.js
       - name: Validate MAP GDACS multi-hazard disaster intelligence
         run: node tests/weather/test_station_map_gdacs_disasters.js
+      - name: Validate MAP conservative cross-source event relations
+        run: node tests/weather/test_station_map_cross_source_relations.js
+      - name: Validate MAP operator-saved event dossier archive
+        run: node tests/weather/test_station_map_event_dossiers.js
+      - name: Validate MAP exact-source event dossier timelines
+        run: node tests/weather/test_station_map_event_timelines.js
       - name: Validate MAP spatial projection zoom pan and point canvas
         run: node tests/weather/test_station_map_spatial_canvas.js
       - name: Validate local Natural Earth MAP basemap

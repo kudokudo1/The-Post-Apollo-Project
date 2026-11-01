@@ -11,6 +11,9 @@ import "StationRadarPolicy.js" as RadarPolicy
 import "../../services/weather/HmsSmokePolicy.js" as SmokePolicy
 import "../../services/weather/SeismicPolicy.js" as SeismicPolicy
 import "../../services/weather/GdacsPolicy.js" as GdacsPolicy
+import "../../services/weather/WeatherEventRelationPolicy.js" as EventRelationPolicy
+import "../../services/weather/WeatherEventDossierPolicy.js" as DossierPolicy
+import "../../services/weather/WeatherEventTimelinePolicy.js" as TimelinePolicy
 
 // Source-first stage. All records shown come from a backend, never examples.
 // MAP owns a local Natural Earth geographic basemap plus source-driven data
@@ -114,6 +117,8 @@ Rectangle {
     property var selectedMapGdacsEvent: null
     property bool mapShowEarthquakes: true
     property bool mapShowGdacs: true
+    property bool dossierClearArmed: false
+    property var dossierTimelineAnchor: null
     property bool mapShowCountryBorders: true
     property bool mapShowAdmin1: false
     property bool mapShowPlaces: true
@@ -141,6 +146,46 @@ Rectangle {
         : []
     readonly property var gdacsSummary:
         GdacsPolicy.summary(gdacsService.events)
+    readonly property var relationAnchor:
+        selectedMapGdacsEvent
+        ? EventRelationPolicy.anchorFromGdacs(selectedMapGdacsEvent)
+        : selectedMapEvent
+          ? EventRelationPolicy.anchorFromEonet(selectedMapEvent)
+          : selectedMapEarthquake
+            ? EventRelationPolicy.anchorFromEarthquake(selectedMapEarthquake)
+            : selectedMapHotspot
+              ? EventRelationPolicy.anchorFromHotspot(selectedMapHotspot)
+              : null
+    readonly property var relatedSourceRows:
+        relationAnchor
+        ? EventRelationPolicy.relationsForAnchor(
+              relationAnchor,
+              {
+                  "eonet": source && source.ready ? source.rows : [],
+                  "gdacs": gdacsService.ready ? gdacsService.events : [],
+                  "earthquakes": seismicSource && seismicSource.ready
+                                 ? seismicSource.events : [],
+                  "hotspots": firmsService.ready ? firmsService.hotspots : [],
+                  "newsMentions": newsMentionOverlay
+                                  && Array.isArray(newsMentionOverlay.locations)
+                                  ? newsMentionOverlay.locations : []
+              },
+              8
+          )
+        : []
+    readonly property var timelineAnchor:
+        relationAnchor !== null ? relationAnchor : dossierTimelineAnchor
+    readonly property var eventTimeline:
+        TimelinePolicy.timelineForAnchor(
+            dossierStore.document,
+            timelineAnchor,
+            24
+        )
+    readonly property var visibleTimelineSnapshots: {
+        const rows = eventTimeline && Array.isArray(eventTimeline.snapshots)
+                   ? eventTimeline.snapshots : [];
+        return rows.length <= 8 ? rows : rows.slice(rows.length - 8);
+    }
     readonly property var mapPlaceRows:
         mapShowPlaces
         ? NaturalEarthContext.placesForZoom(mapZoom)
@@ -479,6 +524,57 @@ Rectangle {
         }
     }
 
+    function saveCurrentDossier() {
+        dossierClearArmed = false;
+        if (!relationAnchor)
+            return false;
+        return dossierStore.saveDossier(
+            relationAnchor,
+            relatedSourceRows
+        );
+    }
+
+    function clearDossierArchive() {
+        if (dossierStore.summary.count <= 0) {
+            dossierClearArmed = false;
+            return false;
+        }
+        if (!dossierClearArmed) {
+            dossierClearArmed = true;
+            return false;
+        }
+        dossierClearArmed = false;
+        return dossierStore.clearArchive();
+    }
+
+    function dossierSavedAtLabel(value) {
+        return DossierPolicy.formatSavedAt(value);
+    }
+
+    function focusDossierTimeline(dossier) {
+        if (!dossier || !dossier.anchor)
+            return false;
+        selectedMapEvent = null;
+        selectedMapHotspot = null;
+        selectedMapNewsMention = null;
+        selectedMapEarthquake = null;
+        selectedMapGdacsEvent = null;
+        dossierTimelineAnchor = dossier.anchor;
+        return true;
+    }
+
+    function clearDossierTimelineFocus() {
+        dossierTimelineAnchor = null;
+    }
+
+    function timelineSourceTransition(snapshot) {
+        return TimelinePolicy.sourceTransitionLabel(snapshot);
+    }
+
+    function timelineRecordTransition(snapshot) {
+        return TimelinePolicy.recordTransitionLabel(snapshot);
+    }
+
     // Live MM:SS display, keeping even long provider cooldowns readable.
     function retryClock(value) {
         const seconds = Math.max(0, Math.ceil(Number(value) || 0));
@@ -584,6 +680,27 @@ Rectangle {
                              : gdacsService.failed
                                ? "ERROR" : "WAITING"
                 },
+                {
+                    name:"CROSS-SOURCE EVENT CONTEXT",
+                    state: relationAnchor
+                           ? "RELATED " + relatedSourceRows.length
+                           : "READY // SELECT EVENT"
+                },
+                {
+                    name:"EVENT DOSSIER ARCHIVE // LOCAL",
+                    state: dossierStore.storageState === "saving"
+                           ? "SAVING"
+                           : dossierStore.storageState === "error"
+                             ? "ERROR"
+                             : "SAVED " + dossierStore.summary.count
+                },
+                {
+                    name:"EVENT TIMELINE // EXACT SOURCE ID",
+                    state: timelineAnchor
+                           ? "SNAPSHOTS "
+                             + eventTimeline.summary.snapshotCount
+                           : "READY // SELECT LIVE OR SAVED EVENT"
+                },
                 {name:"NATURAL EARTH 1:110m LAND BASEMAP", state:"CONNECTED"},
                 {
                     name:"NATURAL EARTH ADMIN-0 REFERENCE BOUNDARIES",
@@ -686,6 +803,11 @@ Rectangle {
         active: stationDiscovery.domain === "map"
                 && stationDiscovery.stationOpen
                 && stationDiscovery.visible
+    }
+
+    WeatherServices.WeatherEventDossierStore {
+        id: dossierStore
+        onArchiveCleared: stationDiscovery.dossierTimelineAnchor = null
     }
 
     WeatherServices.FirmsHotspotService {
@@ -3549,6 +3671,386 @@ Rectangle {
                                   : ""
                             elide: Text.ElideRight
                             font.pixelSize: 9
+                        }
+                    }
+                }
+            }
+
+            Column {
+                width: parent.width
+                spacing: 7
+                visible: stationDiscovery.domain === "map"
+                         && stationDiscovery.relationAnchor !== null
+
+                StationSectionDivider {
+                    width: parent.width
+                    title: "CROSS-SOURCE CONTEXT // RELATED, NOT IDENTICAL"
+                }
+
+                QuietText {
+                    width: parent.width
+                    text: stationDiscovery.relationAnchor
+                          ? "ANCHOR // "
+                            + stationDiscovery.relationAnchor.source
+                            + " // "
+                            + stationDiscovery.relationAnchor.title
+                            + " // "
+                            + stationDiscovery.relatedSourceRows.length
+                            + " RELATED RECORDS"
+                          : ""
+                    elide: Text.ElideRight
+                    font.pixelSize: 9
+                    color: Colors.cyan
+                }
+
+                Repeater {
+                    model: stationDiscovery.relatedSourceRows
+
+                    delegate: Rectangle {
+                        required property var modelData
+                        width: content.width
+                        height: 68
+                        color: Colors.dark
+                        border.width: 1
+                        border.color: modelData.mentionOnly
+                                      ? Colors.magenta : Colors.cyan
+
+                        Column {
+                            anchors.fill: parent
+                            anchors.margins: 8
+                            spacing: 3
+
+                            Row {
+                                width: parent.width
+                                spacing: 10
+
+                                GohuText {
+                                    width: 170
+                                    text: modelData.source
+                                    color: modelData.mentionOnly
+                                           ? Colors.magenta : Colors.cyan
+                                    font.pixelSize: 10
+                                    elide: Text.ElideRight
+                                }
+
+                                GohuText {
+                                    width: Math.max(0, parent.width - 180)
+                                    text: modelData.relationKind
+                                    color: Colors.yellow
+                                    font.pixelSize: 10
+                                    elide: Text.ElideRight
+                                }
+                            }
+
+                            SecondaryText {
+                                width: parent.width
+                                text: modelData.title
+                                      + " // "
+                                      + modelData.distanceKm.toFixed(1)
+                                      + " KM"
+                                      + (modelData.deltaHours >= 0
+                                         ? " // ΔT "
+                                           + modelData.deltaHours.toFixed(1)
+                                           + "H"
+                                         : "")
+                                elide: Text.ElideRight
+                                font.pixelSize: 9
+                            }
+
+                            QuietText {
+                                width: parent.width
+                                text: modelData.semantics
+                                elide: Text.ElideRight
+                                font.pixelSize: 8
+                                color: Colors.orange
+                            }
+                        }
+                    }
+                }
+
+                QuietText {
+                    visible: stationDiscovery.relatedSourceRows.length === 0
+                    width: parent.width
+                    text: "NO RECORD CLEARS THIS HAZARD'S BOUNDED SPACE/TIME RULES // ABSENCE IS NOT PROOF OF NO RELATIONSHIP"
+                    font.pixelSize: 9
+                    color: Colors.orange
+                }
+            }
+
+            Column {
+                width: parent.width
+                spacing: 7
+                visible: stationDiscovery.domain === "map"
+
+                StationSectionDivider {
+                    width: parent.width
+                    title: "EVENT DOSSIERS // LOCAL HISTORY"
+                }
+
+                Row {
+                    width: parent.width
+                    height: 30
+                    spacing: 8
+
+                    ActionButton {
+                        width: 130
+                        height: 28
+                        label: "SAVE DOSSIER"
+                        labelPixelSize: 9
+                        accentColor: Colors.yellow
+                        available: stationDiscovery.relationAnchor !== null
+                                   && (dossierStore.storageState === "ready"
+                                       || dossierStore.storageState === "empty")
+                        onClicked: stationDiscovery.saveCurrentDossier()
+                    }
+
+                    ActionButton {
+                        width: 130
+                        height: 28
+                        label: stationDiscovery.dossierClearArmed
+                               ? "CONFIRM CLEAR" : "ARM CLEAR"
+                        labelPixelSize: 9
+                        accentColor: Colors.red
+                        destructive: stationDiscovery.dossierClearArmed
+                        available: dossierStore.summary.count > 0
+                                   && dossierStore.storageState !== "saving"
+                        onClicked: stationDiscovery.clearDossierArchive()
+                    }
+
+                    QuietText {
+                        anchors.verticalCenter: parent.verticalCenter
+                        width: Math.max(0, parent.width - 276)
+                        text: dossierStore.storageState === "saving"
+                              ? "ATOMIC LOCAL SAVE // WRITING"
+                              : dossierStore.storageState === "error"
+                                ? "ARCHIVE ERROR // " + dossierStore.errorCode
+                                : "ARCHIVED " + dossierStore.summary.count
+                                  + " // REV " + dossierStore.summary.revision
+                                  + " // "
+                                  + dossierStore.storagePath
+                        elide: Text.ElideMiddle
+                        font.pixelSize: 8
+                        color: dossierStore.storageState === "error"
+                               ? Colors.orange : Colors.cyan
+                    }
+                }
+
+                QuietText {
+                    width: parent.width
+                    text: "MANUAL SNAPSHOTS ONLY // PUBLIC EVENT METADATA + CURRENT RELATIONSHIPS // MAX 128 DOSSIERS // ATOMIC VERSIONED JSON"
+                    font.pixelSize: 8
+                    color: Colors.orange
+                }
+
+                QuietText {
+                    visible: dossierStore.summary.count > 0
+                    width: parent.width
+                    text: "CLICK A SAVED DOSSIER TO FOCUS ITS EXACT-SOURCE TIMELINE"
+                    font.pixelSize: 8
+                    color: Colors.blue
+                }
+
+                Repeater {
+                    model: dossierStore.recentDossiers
+
+                    delegate: Rectangle {
+                        required property var modelData
+                        width: content.width
+                        height: 56
+                        color: Colors.dark
+                        border.width: 1
+                        border.color:
+                            stationDiscovery.dossierTimelineAnchor
+                            && TimelinePolicy.anchorKey(
+                                   stationDiscovery.dossierTimelineAnchor
+                               ) === TimelinePolicy.anchorKey(modelData.anchor)
+                            ? Colors.yellow : Colors.blue
+
+                        Column {
+                            anchors.fill: parent
+                            anchors.margins: 7
+                            spacing: 3
+
+                            GohuText {
+                                width: parent.width
+                                text: modelData.anchor.source
+                                      + " // " + modelData.anchor.title
+                                color: Colors.white
+                                elide: Text.ElideRight
+                                font.pixelSize: 10
+                            }
+
+                            SecondaryText {
+                                width: parent.width
+                                text: stationDiscovery.dossierSavedAtLabel(
+                                          modelData.savedAtMs
+                                      )
+                                      + " // "
+                                      + modelData.relations.length
+                                      + " RELATED RECORDS"
+                                elide: Text.ElideRight
+                                font.pixelSize: 9
+                            }
+                        }
+
+                        MouseArea {
+                            anchors.fill: parent
+                            hoverEnabled: true
+                            cursorShape: Qt.PointingHandCursor
+                            onClicked:
+                                stationDiscovery.focusDossierTimeline(modelData)
+                        }
+                    }
+                }
+
+                QuietText {
+                    visible: dossierStore.summary.count === 0
+                             && dossierStore.storageState !== "error"
+                    width: parent.width
+                    text: "NO SAVED EVENT DOSSIERS // SELECT AN EVENT ANCHOR, REVIEW CONTEXT, THEN SAVE"
+                    font.pixelSize: 9
+                }
+            }
+
+            Column {
+                width: parent.width
+                spacing: 7
+                visible: stationDiscovery.domain === "map"
+                         && stationDiscovery.timelineAnchor !== null
+
+                StationSectionDivider {
+                    width: parent.width
+                    title: "EVENT TIMELINE // EXACT SOURCE EVENT"
+                }
+
+                Row {
+                    width: parent.width
+                    height: 30
+                    spacing: 8
+
+                    QuietText {
+                        anchors.verticalCenter: parent.verticalCenter
+                        width: Math.max(0, parent.width - 126)
+                        text: stationDiscovery.timelineAnchor
+                              ? stationDiscovery.timelineAnchor.source
+                                + " // "
+                                + stationDiscovery.timelineAnchor.title
+                                + " // EXACT ID "
+                                + stationDiscovery.timelineAnchor.id
+                              : ""
+                        elide: Text.ElideRight
+                        font.pixelSize: 9
+                        color: Colors.cyan
+                    }
+
+                    ActionButton {
+                        width: 118
+                        height: 28
+                        visible: stationDiscovery.relationAnchor === null
+                                 && stationDiscovery.dossierTimelineAnchor !== null
+                        label: "CLEAR FOCUS"
+                        labelPixelSize: 9
+                        accentColor: Colors.orange
+                        onClicked:
+                            stationDiscovery.clearDossierTimelineFocus()
+                    }
+                }
+
+                QuietText {
+                    width: parent.width
+                    text: "EXACT SOURCE + SOURCE EVENT ID ONLY // CROSS-PROVIDER RECORDS REMAIN CONTEXT, NOT SHARED IDENTITY"
+                    font.pixelSize: 8
+                    color: Colors.orange
+                }
+
+                QuietText {
+                    width: parent.width
+                    text: stationDiscovery.eventTimeline.summary.snapshotCount > 0
+                          ? "SNAPSHOTS "
+                            + stationDiscovery.eventTimeline.summary.snapshotCount
+                            + " // SPAN "
+                            + stationDiscovery.eventTimeline.summary.spanHours.toFixed(1)
+                            + "H // UNIQUE RELATED SOURCES "
+                            + stationDiscovery.eventTimeline.summary.uniqueSources
+                            + " // MAX RELATED RECORDS "
+                            + stationDiscovery.eventTimeline.summary.maxRelations
+                            + (stationDiscovery.eventTimeline.snapshots.length > 8
+                               ? " // SHOWING LATEST 8"
+                               : "")
+                          : "NO SAVED SNAPSHOT FOR THIS EXACT SOURCE EVENT"
+                    font.pixelSize: 9
+                    color: stationDiscovery.eventTimeline.summary.snapshotCount > 0
+                           ? Colors.white : Colors.orange
+                }
+
+                Repeater {
+                    model: stationDiscovery.visibleTimelineSnapshots
+
+                    delegate: Rectangle {
+                        required property var modelData
+                        width: content.width
+                        height: 78
+                        color: Colors.dark
+                        border.width: 1
+                        border.color: modelData.baseline
+                                      ? Colors.blue : Colors.cyan
+
+                        Column {
+                            anchors.fill: parent
+                            anchors.margins: 8
+                            spacing: 3
+
+                            Row {
+                                width: parent.width
+                                spacing: 10
+
+                                GohuText {
+                                    width: 176
+                                    text: stationDiscovery.dossierSavedAtLabel(
+                                              modelData.savedAtMs
+                                          )
+                                    color: Colors.white
+                                    font.pixelSize: 9
+                                    elide: Text.ElideRight
+                                }
+
+                                GohuText {
+                                    width: Math.max(0, parent.width - 186)
+                                    text: stationDiscovery.timelineRecordTransition(
+                                              modelData
+                                          )
+                                    color: modelData.relationDelta > 0
+                                           ? Colors.magenta
+                                           : modelData.relationDelta < 0
+                                             ? Colors.orange : Colors.cyan
+                                    font.pixelSize: 9
+                                    elide: Text.ElideRight
+                                }
+                            }
+
+                            SecondaryText {
+                                width: parent.width
+                                text: "SOURCES "
+                                      + modelData.sourceCount
+                                      + " // TIME+SPACE "
+                                      + modelData.timeSpaceCount
+                                      + " // SPACE ONLY "
+                                      + modelData.spaceOnlyCount
+                                      + " // MENTIONS "
+                                      + modelData.mentionCount
+                                elide: Text.ElideRight
+                                font.pixelSize: 8
+                            }
+
+                            QuietText {
+                                width: parent.width
+                                text: stationDiscovery.timelineSourceTransition(
+                                          modelData
+                                      )
+                                elide: Text.ElideRight
+                                font.pixelSize: 8
+                                color: Colors.yellow
+                            }
                         }
                     }
                 }

@@ -134,10 +134,14 @@ test('hidden HUNTER sampling reuses bounded arrays while matching legacy snapsho
             expected.taskMiniHunterMetricHistories, 'hidden round ' + round);
         assert.equal(actual.taskMiniHunterMetricHistories, map,
             'hidden map remains stable');
+        if (round === 2)
+            assert.equal(actual.taskMiniHunterMetricHistories[key], existing,
+                'live PID array reused in hidden mode');
     }
-    assert.equal(actual.taskMiniHunterMetricHistories[key], existing,
-        'live PID array reused in hidden mode');
     assert.ok(existing.length <= 48);
+    assert.deepStrictEqual(actual.taskMiniHunterMetricHistories['cpu:pid:202'],
+        expected.taskMiniHunterMetricHistories['cpu:pid:202'],
+        'selected PID remains retained after process churn');
 });
 
 test('hidden CPU sampling preserves PID and FAVORITES identity histories', () => {
@@ -145,7 +149,7 @@ test('hidden CPU sampling preserves PID and FAVORITES identity histories', () =>
     const cpuEnd = graph.indexOf('    function updateMiniHunterMetricHistories(', cpuStart);
     const cpuText = graph.slice(cpuStart, cpuEnd);
     const run = new Function('presentationState', 'persistentIdentity',
-        cpuText + '\\nreturn updateMiniCpuHistories;');
+        cpuText + '\nreturn updateMiniCpuHistories;');
     const stateObj = {
         taskMiniHistoryLimit: 3,
         taskMiniHistoryKeepImmutable: false,
@@ -180,7 +184,7 @@ test('hidden CPU sampling preserves PID and FAVORITES identity histories', () =>
 });
 
 test('menu visibility binds immutable graph presentation policy', () => {
-    assert.match(app, /taskMiniHistoryKeepImmutable:\\s*appControlWindow\\.menuOpen/);
+    assert.match(app, /taskMiniHistoryKeepImmutable:\s*appControlWindow\.menuOpen/);
     assert.match(graph, /if \(immutable\) \{/);
 });
 

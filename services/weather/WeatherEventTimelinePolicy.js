@@ -171,6 +171,8 @@ function timelineForAnchor(document, anchor, limit) {
             id: text(dossier.id, 220),
             savedAtMs: Math.floor(finite(dossier.savedAtMs, -1)),
             anchor: dossier.anchor,
+            relations: Array.isArray(dossier.relations)
+                       ? dossier.relations.slice(0) : [],
             relationCount: state.relationCount,
             sources: state.sources,
             sourceCount: state.sources.length,

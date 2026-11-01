@@ -103,7 +103,7 @@ test('compacted history update matches legacy outputs through churn and cap', ()
 });
 
 test('history update is single-pass and preserves selected and non-process state', () => {
-    assert.ok(functionText.includes('const next = ({});'));
+    assert.ok(functionText.includes('const next = immutable ? ({}) : previous;'));
     assert.ok(functionText.includes('const selectedPid = Number(presentationState.taskHistoryPid || 0);'));
     assert.ok(!functionText.includes('Object.assign({}, previous)'));
     assert.ok(!functionText.includes('const pieces = key.split(":pid:")'));
@@ -113,6 +113,75 @@ test('history update is single-pass and preserves selected and non-process state
     assert.deepStrictEqual(stateObj.taskMiniHunterMetricHistories['cpu:pid:202'], [3, 4]);
     assert.equal(stateObj.taskMiniHunterMetricHistories['cpu:pid:404'], undefined);
     assert.deepStrictEqual(stateObj.taskMiniHunterMetricHistories['legacy-extra'], [11]);
+});
+
+test('hidden HUNTER sampling reuses bounded arrays while matching legacy snapshots', () => {
+    const actual = state();
+    actual.taskMiniHistoryKeepImmutable = false;
+    const expected = state();
+    const run = makeUpdater(actual);
+    const first = entries(1);
+    run(first);
+    legacyUpdate(first, expected);
+    const key = 'cpu:pid:11';
+    const existing = actual.taskMiniHunterMetricHistories[key];
+    const map = actual.taskMiniHunterMetricHistories;
+    for (let round = 2; round < 62; ++round) {
+        const sample = entries(round);
+        run(sample);
+        legacyUpdate(sample, expected);
+        assert.deepStrictEqual(actual.taskMiniHunterMetricHistories,
+            expected.taskMiniHunterMetricHistories, 'hidden round ' + round);
+        assert.equal(actual.taskMiniHunterMetricHistories, map,
+            'hidden map remains stable');
+    }
+    assert.equal(actual.taskMiniHunterMetricHistories[key], existing,
+        'live PID array reused in hidden mode');
+    assert.ok(existing.length <= 48);
+});
+
+test('hidden CPU sampling preserves PID and FAVORITES identity histories', () => {
+    const cpuStart = graph.indexOf('    function updateMiniCpuHistories(rows) {');
+    const cpuEnd = graph.indexOf('    function updateMiniHunterMetricHistories(', cpuStart);
+    const cpuText = graph.slice(cpuStart, cpuEnd);
+    const run = new Function('presentationState', 'persistentIdentity',
+        cpuText + '\\nreturn updateMiniCpuHistories;');
+    const stateObj = {
+        taskMiniHistoryLimit: 3,
+        taskMiniHistoryKeepImmutable: false,
+        taskMiniCpuHistories: ({}),
+        taskMiniCpuIdentityHistories: ({})
+    };
+    const update = run(stateObj, entry => String(entry.comm || '').toLowerCase());
+    const map = stateObj.taskMiniCpuHistories;
+    const ids = stateObj.taskMiniCpuIdentityHistories;
+    for (const cpu of [1, 2, 3, 4]) {
+        update([{pid: 10, comm: 'Brave', cpuInstant: cpu},
+                {pid: 20, comm: 'Brave', cpuInstant: cpu + 1}]);
+    }
+    assert.deepStrictEqual(map['pid:10'], [2, 3, 4]);
+    assert.deepStrictEqual(ids['identity:brave'], [3, 4, 5]);
+    const history = map['pid:10'];
+    update([{pid: 10, comm: 'Brave', cpuInstant: 5}]);
+    assert.equal(map['pid:10'], history, 'in-place hidden CPU history');
+    assert.equal(stateObj.taskMiniCpuHistories, map, 'stable hidden PID map');
+    assert.equal(stateObj.taskMiniCpuIdentityHistories, ids, 'stable identity map');
+    assert.equal(map['pid:20'], undefined, 'dead PIDs pruned');
+    assert.deepStrictEqual(ids['identity:brave'], [4, 5, 5]);
+
+    stateObj.taskMiniHistoryKeepImmutable = true;
+    const before = stateObj.taskMiniCpuHistories['pid:10'];
+    update([{pid: 10, comm: 'Brave', cpuInstant: 6}]);
+    assert.notEqual(stateObj.taskMiniCpuHistories, map, 'visible map replaced');
+    assert.notEqual(stateObj.taskMiniCpuHistories['pid:10'], before,
+        'visible array copy-on-write');
+    assert.deepStrictEqual(before, [3, 4, 5],
+        'previous visible snapshot remains immutable');
+});
+
+test('menu visibility binds immutable graph presentation policy', () => {
+    assert.match(app, /taskMiniHistoryKeepImmutable:\\s*appControlWindow\\.menuOpen/);
+    assert.match(graph, /if \(immutable\) \{/);
 });
 
 test('AppControl six stage markers remain opt-in and preserve model assignment', () => {

@@ -2206,7 +2206,6 @@ Rectangle {
                                 anchors.centerIn: parent
                                 width: parent.alertRadius * 2
                                 height: parent.alertRadius * 2
-                                rotation: 45
                                 color: stationDiscovery.gdacsAlertColor(
                                     modelData.alertLevel
                                 )
@@ -2427,7 +2426,7 @@ Rectangle {
                         anchors.bottom: parent.bottom
                         anchors.margins: 7
                         z: 3
-                        text: "QUAKES CIRCLES // EONET DIAMONDS // FIRMS ORANGE // NEWS MAGENTA"
+                        text: "GDACS ALERT SQUARES // QUAKES CIRCLES // EONET DIAMONDS // FIRMS ORANGE // NEWS MAGENTA"
                         font.pixelSize: 9
                     }
                 }

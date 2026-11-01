@@ -183,4 +183,28 @@ assert.equal(quakeRelations.length, 1);
 assert.equal(quakeRelations[0].source, "GDACS");
 assert.equal(quakeRelations[0].relationKind, "TIME + SPACE");
 
+const ui = read("widgets/weather/StationDiscovery.qml");
+assert.match(
+    ui,
+    /import "\.\.\/\.\.\/services\/weather\/WeatherEventRelationPolicy\.js" as EventRelationPolicy/
+);
+assert.match(ui, /readonly property var relationAnchor:/);
+assert.match(ui, /EventRelationPolicy\.anchorFromGdacs\(selectedMapGdacsEvent\)/);
+assert.match(ui, /EventRelationPolicy\.anchorFromEonet\(selectedMapEvent\)/);
+assert.match(ui, /EventRelationPolicy\.anchorFromEarthquake\(selectedMapEarthquake\)/);
+assert.match(ui, /EventRelationPolicy\.anchorFromHotspot\(selectedMapHotspot\)/);
+assert.match(ui, /EventRelationPolicy\.relationsForAnchor\(/);
+assert.match(ui, /"newsMentions": newsMentionOverlay/);
+assert.match(ui, /name:"CROSS-SOURCE EVENT CONTEXT"/);
+assert.match(ui, /title: "CROSS-SOURCE CONTEXT \/\/ RELATED, NOT IDENTICAL"/);
+assert.match(ui, /model: stationDiscovery\.relatedSourceRows/);
+assert.match(ui, /modelData\.relationKind/);
+assert.match(ui, /modelData\.distanceKm\.toFixed\(1\)/);
+assert.match(ui, /modelData\.deltaHours\.toFixed\(1\)/);
+assert.match(ui, /modelData\.semantics/);
+assert.match(
+    ui,
+    /NO RECORD CLEARS THIS HAZARD'S BOUNDED SPACE\/TIME RULES \/\/ ABSENCE IS NOT PROOF OF NO RELATIONSHIP/
+);
+
 console.log("Weather MAP conservative cross-source relations: PASS");

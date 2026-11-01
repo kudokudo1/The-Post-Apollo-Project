@@ -11,6 +11,7 @@ import "StationRadarPolicy.js" as RadarPolicy
 import "../../services/weather/HmsSmokePolicy.js" as SmokePolicy
 import "../../services/weather/SeismicPolicy.js" as SeismicPolicy
 import "../../services/weather/GdacsPolicy.js" as GdacsPolicy
+import "../../services/weather/WeatherEventRelationPolicy.js" as EventRelationPolicy
 
 // Source-first stage. All records shown come from a backend, never examples.
 // MAP owns a local Natural Earth geographic basemap plus source-driven data
@@ -141,6 +142,33 @@ Rectangle {
         : []
     readonly property var gdacsSummary:
         GdacsPolicy.summary(gdacsService.events)
+    readonly property var relationAnchor:
+        selectedMapGdacsEvent
+        ? EventRelationPolicy.anchorFromGdacs(selectedMapGdacsEvent)
+        : selectedMapEvent
+          ? EventRelationPolicy.anchorFromEonet(selectedMapEvent)
+          : selectedMapEarthquake
+            ? EventRelationPolicy.anchorFromEarthquake(selectedMapEarthquake)
+            : selectedMapHotspot
+              ? EventRelationPolicy.anchorFromHotspot(selectedMapHotspot)
+              : null
+    readonly property var relatedSourceRows:
+        relationAnchor
+        ? EventRelationPolicy.relationsForAnchor(
+              relationAnchor,
+              {
+                  "eonet": source && source.ready ? source.rows : [],
+                  "gdacs": gdacsService.ready ? gdacsService.events : [],
+                  "earthquakes": seismicSource && seismicSource.ready
+                                 ? seismicSource.events : [],
+                  "hotspots": firmsService.ready ? firmsService.hotspots : [],
+                  "newsMentions": newsMentionOverlay
+                                  && Array.isArray(newsMentionOverlay.locations)
+                                  ? newsMentionOverlay.locations : []
+              },
+              8
+          )
+        : []
     readonly property var mapPlaceRows:
         mapShowPlaces
         ? NaturalEarthContext.placesForZoom(mapZoom)
@@ -583,6 +611,12 @@ Rectangle {
                              ? "RECEIVING"
                              : gdacsService.failed
                                ? "ERROR" : "WAITING"
+                },
+                {
+                    name:"CROSS-SOURCE EVENT CONTEXT",
+                    state: relationAnchor
+                           ? "RELATED " + relatedSourceRows.length
+                           : "READY // SELECT EVENT"
                 },
                 {name:"NATURAL EARTH 1:110m LAND BASEMAP", state:"CONNECTED"},
                 {
@@ -3551,6 +3585,107 @@ Rectangle {
                             font.pixelSize: 9
                         }
                     }
+                }
+            }
+
+            Column {
+                width: parent.width
+                spacing: 7
+                visible: stationDiscovery.domain === "map"
+                         && stationDiscovery.relationAnchor !== null
+
+                StationSectionDivider {
+                    width: parent.width
+                    title: "CROSS-SOURCE CONTEXT // RELATED, NOT IDENTICAL"
+                }
+
+                QuietText {
+                    width: parent.width
+                    text: stationDiscovery.relationAnchor
+                          ? "ANCHOR // "
+                            + stationDiscovery.relationAnchor.source
+                            + " // "
+                            + stationDiscovery.relationAnchor.title
+                            + " // "
+                            + stationDiscovery.relatedSourceRows.length
+                            + " RELATED RECORDS"
+                          : ""
+                    elide: Text.ElideRight
+                    font.pixelSize: 9
+                    color: Colors.cyan
+                }
+
+                Repeater {
+                    model: stationDiscovery.relatedSourceRows
+
+                    delegate: Rectangle {
+                        required property var modelData
+                        width: content.width
+                        height: 68
+                        color: Colors.dark
+                        border.width: 1
+                        border.color: modelData.mentionOnly
+                                      ? Colors.magenta : Colors.cyan
+
+                        Column {
+                            anchors.fill: parent
+                            anchors.margins: 8
+                            spacing: 3
+
+                            Row {
+                                width: parent.width
+                                spacing: 10
+
+                                GohuText {
+                                    width: 170
+                                    text: modelData.source
+                                    color: modelData.mentionOnly
+                                           ? Colors.magenta : Colors.cyan
+                                    font.pixelSize: 10
+                                    elide: Text.ElideRight
+                                }
+
+                                GohuText {
+                                    width: Math.max(0, parent.width - 180)
+                                    text: modelData.relationKind
+                                    color: Colors.yellow
+                                    font.pixelSize: 10
+                                    elide: Text.ElideRight
+                                }
+                            }
+
+                            SecondaryText {
+                                width: parent.width
+                                text: modelData.title
+                                      + " // "
+                                      + modelData.distanceKm.toFixed(1)
+                                      + " KM"
+                                      + (modelData.deltaHours >= 0
+                                         ? " // ΔT "
+                                           + modelData.deltaHours.toFixed(1)
+                                           + "H"
+                                         : "")
+                                elide: Text.ElideRight
+                                font.pixelSize: 9
+                            }
+
+                            QuietText {
+                                width: parent.width
+                                text: modelData.semantics
+                                elide: Text.ElideRight
+                                font.pixelSize: 8
+                                color: Colors.orange
+                            }
+                        }
+                    }
+                }
+
+                QuietText {
+                    visible: stationDiscovery.relatedSourceRows.length === 0
+                    width: parent.width
+                    text: "NO RECORD CLEARS THIS HAZARD'S BOUNDED SPACE/TIME RULES // ABSENCE IS NOT PROOF OF NO RELATIONSHIP"
+                    font.pixelSize: 9
+                    color: Colors.orange
                 }
             }
 

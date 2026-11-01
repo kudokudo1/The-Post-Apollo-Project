@@ -1,0 +1,38 @@
+name: Identity Center Trusted Discovery and Key Rotation
+
+on:
+  pull_request:
+    paths:
+      - 'services/identity/trusted_oidc_discovery_v0.py'
+      - 'tests/identity/test_trusted_oidc_discovery_v0.py'
+      - 'services/identity/requirements-jwks-verifier-v0.txt'
+      - 'MODEL/contracts/identity-center-discovery-rotation-v0.md'
+      - '.github/workflows/identity-center-discovery-rotation.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'services/identity/trusted_oidc_discovery_v0.py'
+      - 'tests/identity/test_trusted_oidc_discovery_v0.py'
+      - 'services/identity/requirements-jwks-verifier-v0.txt'
+      - 'MODEL/contracts/identity-center-discovery-rotation-v0.md'
+      - '.github/workflows/identity-center-discovery-rotation.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  trusted-discovery:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install isolated JWT test dependency
+        run: python3 -m pip install -r services/identity/requirements-jwks-verifier-v0.txt
+      - name: Compile all identity source and tests
+        run: |
+          python3 -m compileall -q services/identity tests/identity
+      - name: Verify offline discovery, pinned keys and cross-company isolation
+        run: python3 -m unittest discover -s tests/identity -p 'test_*.py' -v

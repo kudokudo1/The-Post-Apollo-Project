@@ -328,14 +328,20 @@ QtObject {
         return source;
     }
 
+    // Hidden state is the owned history store. Update arrays and map keys in
+    // place while the menu is closed, without emitting per-snapshot QML map
+    // changes. On visible views, preserve the existing copy-on-write contract
+    // so active graph readers never observe a previously returned array mutate.
+    // Both paths record every sample and keep the same 48-sample cap.
     function updateMiniCpuHistories(rows) {
         const sourceRows = Array.isArray(rows) ? rows : [];
         const previous = presentationState.taskMiniCpuHistories;
-        const next = ({});
-        const previousIdentity =
-            presentationState.taskMiniCpuIdentityHistories;
-        const nextIdentity = ({});
+        const previousIdentity = presentationState.taskMiniCpuIdentityHistories;
+        const immutable = presentationState.taskMiniHistoryKeepImmutable !== false;
+        const next = immutable ? ({}) : previous;
+        const nextIdentity = immutable ? ({}) : previousIdentity;
         const identitySamples = ({});
+        const livePids = immutable ? null : ({});
 
         for (let i = 0; i < sourceRows.length; i++) {
             const entry = sourceRows[i];
@@ -343,74 +349,82 @@ QtObject {
             if (pid <= 0)
                 continue;
 
-            const cpu = Math.max(
-                0,
-                Math.min(
-                    100,
-                    Number(
-                        entry.cpuInstant !== undefined
-                        ? entry.cpuInstant
-                        : entry.cpu || 0
-                    )
-                )
-            );
-
+            const cpu = Math.max(0, Math.min(100, Number(
+                entry.cpuInstant !== undefined
+                ? entry.cpuInstant : entry.cpu || 0
+            )));
             const key = "pid:" + String(pid);
-            const history = Array.isArray(previous[key])
-                            ? previous[key].slice() : [];
+            const prior = previous[key];
+            const history = Array.isArray(prior)
+                            ? (immutable ? prior.slice() : prior) : [];
             history.push(cpu);
             while (history.length > presentationState.taskMiniHistoryLimit)
                 history.shift();
             next[key] = history;
+            if (!immutable)
+                livePids[key] = true;
 
             const identity = persistentIdentity(entry);
             if (identity
-                    && (
-                        identitySamples[identity] === undefined
-                        || cpu > identitySamples[identity]
-                    ))
+                    && (identitySamples[identity] === undefined
+                        || cpu > identitySamples[identity]))
                 identitySamples[identity] = cpu;
         }
 
         for (const identity in identitySamples) {
             const key = "identity:" + identity;
-            const history =
-                Array.isArray(previousIdentity[key])
-                ? previousIdentity[key].slice() : [];
+            const prior = previousIdentity[key];
+            const history = Array.isArray(prior)
+                            ? (immutable ? prior.slice() : prior) : [];
             history.push(identitySamples[identity]);
             while (history.length > presentationState.taskMiniHistoryLimit)
                 history.shift();
             nextIdentity[key] = history;
         }
 
-        presentationState.taskMiniCpuHistories = next;
-        presentationState.taskMiniCpuIdentityHistories = nextIdentity;
+        if (immutable) {
+            presentationState.taskMiniCpuHistories = next;
+            presentationState.taskMiniCpuIdentityHistories = nextIdentity;
+        } else {
+            // Reproduce the old next-map semantics without allocating a new
+            // public object or leaving dead PIDs/identities behind.
+            for (const key of Object.keys(previous)) {
+                if (!livePids[key])
+                    delete previous[key];
+            }
+            for (const key of Object.keys(previousIdentity)) {
+                if (identitySamples[key.slice(9)] === undefined)
+                    delete previousIdentity[key];
+            }
+        }
     }
 
     function updateMiniHunterMetricHistories(rows) {
         const sourceRows = Array.isArray(rows) ? rows : [];
         const previous = presentationState.taskMiniHunterMetricHistories;
-        const next = ({});
-
-        // Build only retained non-process metadata and the exact selected
-        // task's history. Live PIDs are appended below from this snapshot.
-        // Avoid cloning a large stale map and splitting every key afterward.
+        const immutable = presentationState.taskMiniHistoryKeepImmutable !== false;
+        const next = immutable ? ({}) : previous;
         const selectedPid = Number(presentationState.taskHistoryPid || 0);
-        const keys = Object.keys(previous);
-        for (let i = 0; i < keys.length; i++) {
-            const key = String(keys[i]);
-            const at = key.indexOf(":pid:");
-            const isProcessKey =
-                at >= 0 && key.indexOf(":pid:", at + 5) === -1;
-            if (!isProcessKey
-                    || Number(key.slice(at + 5) || 0) === selectedPid)
-                next[key] = previous[key];
+        const livePids = immutable ? null : ({});
+
+        if (immutable) {
+            // Preserve non-process extensions and the selected PID even when
+            // its process has exited. Other PIDs are rebuilt from live rows.
+            for (const key of Object.keys(previous)) {
+                const at = key.indexOf(":pid:");
+                const isProcessKey =
+                    at >= 0 && key.indexOf(":pid:", at + 5) === -1;
+                if (!isProcessKey
+                        || Number(key.slice(at + 5) || 0) === selectedPid)
+                    next[key] = previous[key];
+            }
         }
 
         function append(metric, pid, value) {
             const key = metric + ":pid:" + String(pid);
-            const history = Array.isArray(previous[key])
-                            ? previous[key].slice() : [];
+            const prior = previous[key];
+            const history = Array.isArray(prior)
+                            ? (immutable ? prior.slice() : prior) : [];
             history.push(Math.max(0, Number(value || 0)));
             while (history.length > presentationState.taskMiniHistoryLimit)
                 history.shift();
@@ -422,29 +436,22 @@ QtObject {
             const pid = Number(entry && entry.pid || 0);
             if (pid <= 0)
                 continue;
+            if (!immutable)
+                livePids[String(pid)] = true;
 
-            const cpu = Math.max(
-                0,
-                Number(
-                    entry.cpuInstant !== undefined
-                    ? entry.cpuInstant
-                    : entry.cpu || 0
-                )
-            );
-            const memMiB =
-                Math.max(0, Number(entry.rss || 0)) / 1024.0;
-            const ioMiB =
-                Math.max(0, Number(entry.ioRate || 0))
-                / (1024.0 * 1024.0);
-            const ageMinutes =
-                Math.max(
-                    0,
-                    entry.ageSeconds !== undefined
-                    ? Number(entry.ageSeconds || 0)
-                    : hunterPresentation.elapsedSeconds(entry.elapsed)
-                ) / 60.0;
-            const combined =
-                cpu
+            const cpu = Math.max(0, Number(
+                entry.cpuInstant !== undefined
+                ? entry.cpuInstant : entry.cpu || 0
+            ));
+            const memMiB = Math.max(0, Number(entry.rss || 0)) / 1024.0;
+            const ioMiB = Math.max(0, Number(entry.ioRate || 0))
+                          / (1024.0 * 1024.0);
+            const ageMinutes = Math.max(0,
+                entry.ageSeconds !== undefined
+                ? Number(entry.ageSeconds || 0)
+                : hunterPresentation.elapsedSeconds(entry.elapsed)
+            ) / 60.0;
+            const combined = cpu
                 + Math.max(0, Number(entry.mem || 0)) * 0.35
                 + Math.log(1 + ioMiB) * 3.0;
 
@@ -455,7 +462,19 @@ QtObject {
             append("combined", pid, combined);
         }
 
-        presentationState.taskMiniHunterMetricHistories = next;
+        if (immutable) {
+            presentationState.taskMiniHunterMetricHistories = next;
+        } else {
+            for (const key of Object.keys(previous)) {
+                const at = key.indexOf(":pid:");
+                const isProcessKey =
+                    at >= 0 && key.indexOf(":pid:", at + 5) === -1;
+                if (isProcessKey
+                        && Number(key.slice(at + 5) || 0) !== selectedPid
+                        && !livePids[key.slice(at + 5)])
+                    delete previous[key];
+            }
+        }
     }
 
     function miniCpuHistoryByIdentity(identity, liveEntry) {

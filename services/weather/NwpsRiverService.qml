@@ -3,9 +3,10 @@ import Quickshell
 import Quickshell.Io
 import "NwpsRiverPolicy.js" as RiverPolicy
 
-// GROUND-only informational nearby river gauge lookup. The Weather location is
-// used only to find nearby NWPS gauges; this service is not an emergency alert
-// target and never replaces the explicitly pinned NWS alert point.
+// Weather-fix informational nearby river gauge lookup shared by GROUND and
+// MAP. The Weather location is used only to find nearby NWPS gauges; this
+// service is not an emergency alert target and never replaces the explicitly
+// pinned NWS alert point.
 Scope {
     id: river
 

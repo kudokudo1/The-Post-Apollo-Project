@@ -28,6 +28,7 @@ Rectangle {
     property var newsMentionOverlay: null
     property var seismicSource: null
     property var lightningSource: null
+    property var riverSource: null
     property var weatherService: null
     property var persistentCacheStore: null
     property real runtimeNowMs: Date.now()
@@ -144,6 +145,23 @@ Rectangle {
                     "usingCache": lightningSource
                                   ? lightningSource.usingFrameCache : false,
                     "detail": "WEATHER-FIX 15M DENSITY"
+                },
+                runtimeNowMs
+            ),
+            RuntimePolicy.displayRow(
+                "river",
+                {
+                    "active": !!riverSource
+                              && riverSource.active !== false,
+                    "ready": !!riverSource && riverSource.ready,
+                    "loading": !!riverSource && riverSource.loading,
+                    "errorText": riverSource
+                                 ? riverSource.errorText : "",
+                    "receivedAt": riverSource
+                                  ? riverSource.lastUpdated : null,
+                    "usingCache": riverSource
+                                  ? riverSource.usingPersistentCache : false,
+                    "detail": "WEATHER-FIX NEAREST GAUGE"
                 },
                 runtimeNowMs
             ),
@@ -409,6 +427,28 @@ Rectangle {
             ],
             250,
             6
+        )
+
+    readonly property var selectedFloodContext:
+        EventContextPolicy.floodGaugeContext(
+            selectedEventContext,
+            riverSource && riverSource.ready
+                ? riverSource.gauge : null,
+            riverSource && riverSource.contextReady
+                ? riverSource.gaugeContext : null,
+            riverSource && riverSource.stageflowReady
+                ? riverSource.stageflow : null,
+            100
+        )
+
+    readonly property var selectedEvidenceTimeline:
+        EventContextPolicy.evidenceTimeline(
+            selectedEventContext,
+            selectedContextCompanions,
+            selectedRadarContext,
+            selectedLightningContext,
+            selectedFloodContext,
+            8
         )
 
     readonly property bool eventContextInspectorOpen:
@@ -3298,6 +3338,10 @@ Rectangle {
                         stationDiscovery.selectedRadarContext
                     lightningContext:
                         stationDiscovery.selectedLightningContext
+                    floodContext:
+                        stationDiscovery.selectedFloodContext
+                    timelineRows:
+                        stationDiscovery.selectedEvidenceTimeline
                     companions:
                         stationDiscovery.selectedContextCompanions
                     accentColor:

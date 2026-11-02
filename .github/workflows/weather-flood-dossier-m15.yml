@@ -1,0 +1,36 @@
+name: Weather M15 flood dossier
+
+on:
+  pull_request:
+    paths:
+      - "services/weather/NwpsRiverService.qml"
+      - "widgets/weather/WeatherStationW.qml"
+      - "widgets/weather/StationGround.qml"
+      - "widgets/weather/StationDiscovery.qml"
+      - "widgets/weather/StationEventContextPolicy.js"
+      - "widgets/weather/StationEventContextCard.qml"
+      - "tests/weather/test_weather_flood_dossier_m15.js"
+      - "tests/weather/test_station_ground_nwps_river.js"
+      - ".github/workflows/weather-flood-dossier-m15.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  dossier:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: M15 flood dossier and evidence timeline
+        run: node tests/weather/test_weather_flood_dossier_m15.js
+      - name: NWPS base regression
+        run: node tests/weather/test_station_ground_nwps_river.js
+      - name: NWPS stageflow regression
+        run: node tests/weather/test_station_ground_nwps_stageflow.js
+      - name: NWPS flood-context regression
+        run: node tests/weather/test_station_ground_nwps_context.js
+      - name: M14 shared-lightning regression
+        run: node tests/weather/test_weather_shared_lightning_m14.js
+      - name: M13 event-context regression
+        run: node tests/weather/test_station_map_event_context_m13.js

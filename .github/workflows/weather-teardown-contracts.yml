@@ -57,6 +57,8 @@ jobs:
         run: node tests/weather/test_station_map_event_context_m13.js
       - name: Validate Weather M14 shared lightning ownership
         run: node tests/weather/test_weather_shared_lightning_m14.js
+      - name: Validate Weather M15 flood dossier and evidence timeline
+        run: node tests/weather/test_weather_flood_dossier_m15.js
       - name: Validate Weather persistent last-known cache M4
         run: node tests/weather/test_weather_persistent_cache_m4.js
       - name: Validate Weather persistent cache M5 global events

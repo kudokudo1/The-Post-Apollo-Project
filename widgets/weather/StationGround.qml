@@ -18,6 +18,8 @@ Rectangle {
     property var seismicSource: null
     property var lightningSource: null
     readonly property var lightningService: lightningSource
+    property var riverSource: null
+    readonly property var riverService: riverSource
     property var persistentCacheStore: null
     property var liveHistoryStore: null
     property real runtimeNowMs: Date.now()
@@ -346,14 +348,6 @@ Rectangle {
         seismicSource && seismicSource.ready
         ? SeismicPolicy.recentRows(seismicSource.events, 3)
         : []
-
-    WeatherServices.NwpsRiverService {
-        id: riverService
-        cacheStore: ground.persistentCacheStore
-        active: ground.visible
-        latitude: weatherService ? weatherService.latitude : ""
-        longitude: weatherService ? weatherService.longitude : ""
-    }
 
     WeatherServices.NdbcMarineService {
         id: marineService

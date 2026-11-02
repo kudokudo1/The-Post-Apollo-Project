@@ -123,6 +123,15 @@ test("search is in the control bay and display results remain read-only", () => 
     assert.doesNotMatch(deck, /WlrKeyboardFocus\.Exclusive/);
 });
 
+test("Escape closes only the focused Hi-Fi deck in MPD and MPRIS modes", () => {
+    assert.match(deck, /Shortcut\s*\{\s*sequence:\s*"Esc"\s*context:\s*Qt\.WindowShortcut\s*enabled:\s*deck\.menuOpen\s*onActivated:\s*deck\.menuOpen\s*=\s*false/);
+    assert.match(deck, /if\s*\(event\.key\s*===\s*Qt\.Key_Escape\)\s*\{\s*deck\.menuOpen\s*=\s*false;\s*event\.accepted\s*=\s*true;\s*return;/);
+    assert.match(deck, /if\s*\(deck\.transportMode\s*!==\s*"mpd"\)\s*return;/);
+    assert.match(deck, /WlrLayershell\.keyboardFocus:\s*menuOpen\s*\?\s*WlrKeyboardFocus\.OnDemand\s*:\s*WlrKeyboardFocus\.None/);
+    assert.doesNotMatch(deck, /WlrKeyboardFocus\.Exclusive/);
+    assert.doesNotMatch(deck, /sequence:\s*"Esc"[\s\S]{0,150}runTransport/);
+});
+
 test("Shift selection remains fail-closed; bare grave is reserved", () => {
     assert.match(deck, /standaloneShiftVerified:\s*false/);
     assert.match(deck, /shiftCandidate = standaloneShiftVerified/);

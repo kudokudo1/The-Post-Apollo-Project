@@ -74,6 +74,17 @@ PanelWindow {
         menuOpen = !menuOpen;
     }
 
+    // Tasks owns only its local Qt focus. Keep the existing mapped-window
+    // close behavior; never register an application-wide Escape shortcut.
+    onMenuOpenChanged: {
+        if (menuOpen) {
+            Qt.callLater(function() {
+                if (root.menuOpen)
+                    tasksFrame.forceActiveFocus();
+            });
+        }
+    }
+
     implicitWidth: frameWidth + glowGutter * 2
     implicitHeight: frameHeight + frameTopInset + glowGutter
 
@@ -95,16 +106,11 @@ PanelWindow {
 
     exclusiveZone: 0
     WlrLayershell.layer: WlrLayer.Overlay
-    // TextInput needs keyboard focus, but only while the TASKS page is open.
-    // OnDemand does not request an indefinite exclusive keyboard lock.
+    // Escape must reach the same Tasks surface in all five modes, including
+    // TODAY and SYNC. OnDemand does not request exclusive keyboard ownership.
     WlrLayershell.keyboardFocus:
-        root.menuOpen && (root.activeMode.id === "tasks"
-                          || root.activeMode.id === "projects"
-                          || root.activeMode.id === "planner")
-        ? WlrKeyboardFocus.OnDemand : WlrKeyboardFocus.None
-    focusable: root.menuOpen && (root.activeMode.id === "tasks"
-                                 || root.activeMode.id === "projects"
-                                 || root.activeMode.id === "planner")
+        root.menuOpen ? WlrKeyboardFocus.OnDemand : WlrKeyboardFocus.None
+    focusable: root.menuOpen
 
     color: "transparent"
     surfaceFormat.opaque: false
@@ -122,6 +128,16 @@ PanelWindow {
         anchors.margins: root.glowGutter
         anchors.topMargin: root.frameTopInset
         visible: root.menuOpen
+        focus: root.menuOpen
+
+        // Child text editors may consume Escape first (for example, BACK
+        // from renaming a task). Otherwise close only this Tasks window.
+        Keys.onEscapePressed: function(event) {
+            if (!root.menuOpen)
+                return;
+            root.menuOpen = false;
+            event.accepted = true;
+        }
 
         fillColor: Colors.black
         fillOpacity: 0.95

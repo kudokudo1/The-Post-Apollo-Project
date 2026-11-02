@@ -1,0 +1,46 @@
+name: Weather persistent cache M7 NWS restart
+
+on:
+  pull_request:
+    paths:
+      - "services/notifications/NwsOfficialAlertNotificationProducer.qml"
+      - "services/notifications/NwsOfficialAlertPolicy.js"
+      - "services/weather/WeatherPersistentCachePolicy.js"
+      - "services/weather/WeatherPersistentCacheStore.qml"
+      - "services/weather/WeatherRuntimePolicy.js"
+      - "widgets/weather/StationHome.qml"
+      - "widgets/weather/StationGround.qml"
+      - "widgets/weather/WeatherStationW.qml"
+      - "shell.qml"
+      - "tests/notifications/test_nws_official_alert_producer.py"
+      - "tests/weather/test_station_ground_nws_alerts.js"
+      - "tests/weather/test_station_official_alert_hierarchy.js"
+      - "tests/weather/test_weather_persistent_cache_m4.js"
+      - "tests/weather/test_weather_persistent_cache_m5.js"
+      - "tests/weather/test_weather_persistent_cache_m6.js"
+      - "tests/weather/test_weather_persistent_cache_m7_nws.js"
+      - ".github/workflows/weather-persistent-cache-m7-nws.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  nws-restart-cache:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: M4 persistent cache regression
+        run: node tests/weather/test_weather_persistent_cache_m4.js
+      - name: M5 global event cache regression
+        run: node tests/weather/test_weather_persistent_cache_m5.js
+      - name: M6 keyed GROUND cache regression
+        run: node tests/weather/test_weather_persistent_cache_m6.js
+      - name: M7 NWS restart lifecycle contract
+        run: node tests/weather/test_weather_persistent_cache_m7_nws.js
+      - name: Shared NWS GROUND contract
+        run: node tests/weather/test_station_ground_nws_alerts.js
+      - name: Official alert hierarchy regression
+        run: node tests/weather/test_station_official_alert_hierarchy.js
+      - name: NWS notification producer contract
+        run: python3 tests/notifications/test_nws_official_alert_producer.py

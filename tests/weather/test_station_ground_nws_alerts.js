@@ -93,7 +93,7 @@ assert.match(producer, /producer\.lastUpdated = new Date\(\)/);
 assert.match(producer, /producer\.errorText = "NWS REQUEST FAILED"/);
 assert.doesNotMatch(producer, /weatherService|wttr\.in/);
 
-assert.match(shell, /NwsOfficialAlertNotificationProducer \{ id: nwsOfficialAlerts \}/);
+assert.match(shell, /NwsOfficialAlertNotificationProducer \{[\s\S]*?id: nwsOfficialAlerts[\s\S]*?cacheStore: weatherPersistentCache/);
 assert.match(shell, /nwsAlertSource: nwsOfficialAlerts/);
 assert.match(station, /property var nwsAlertSource: null/);
 assert.match(station, /StationGround \{[\s\S]*?nwsAlertSource: weatherStation\.nwsAlertSource/);

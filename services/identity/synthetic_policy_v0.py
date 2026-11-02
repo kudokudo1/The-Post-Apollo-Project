@@ -181,6 +181,78 @@ class SyntheticPolicyStore:
         ).fetchone()
         return row is not None
 
+    def context_summary(self, principal_id: str, *, now: int) -> dict[str, list]:
+        """TEST-ONLY authorized membership/scope preview for a verified principal.
+
+        Membership existence is not a grant to read any tenant resource.
+        Portfolios only show organization IDs for active independent memberships.
+        Caller MUST validate the identity and use trusted server time; do not
+        accept a principal supplied by the GUI or use this response as an ACL.
+        """
+        result: dict[str, list] = {"organizations": [], "portfolios": []}
+        if (type(principal_id) is not str or not principal_id
+                or type(now) is not int or now < 0):
+            return result
+
+        memberships = self._db.execute(
+            """
+            SELECT o.org_id, o.kind
+            FROM memberships AS m
+            JOIN organizations AS o ON o.org_id = m.org_id
+            WHERE m.principal_id = ? AND m.state = 'active'
+            ORDER BY o.org_id
+            """,
+            (principal_id,),
+        ).fetchall()
+
+        for org_id, kind in memberships:
+            grants = self._db.execute(
+                """
+                SELECT DISTINCT g.action, g.division_id, g.unit_id, g.expires_at
+                FROM grants AS g
+                WHERE g.principal_id = ? AND g.org_id = ?
+                  AND (g.expires_at IS NULL OR g.expires_at > ?)
+                ORDER BY g.action, g.division_id, g.unit_id, g.expires_at
+                """,
+                (principal_id, org_id, now),
+            ).fetchall()
+            result["organizations"].append({
+                "organizationId": org_id,
+                "kind": kind,
+                # UI hints only: every real request must be re-authorized.
+                "scopeGrants": [
+                    {"action": action, "divisionId": division,
+                     "unitId": unit, "expiresAt": expires_at}
+                    for action, division, unit, expires_at in grants
+                ],
+            })
+
+        # A portfolio join alone must not reveal any unjoined company, even
+        # where the caller has a portfolio-membership row.
+        visible = self._db.execute(
+            """
+            SELECT pm.portfolio_id, po.org_id
+            FROM portfolio_members AS pm
+            JOIN portfolio_organizations AS po
+                ON po.portfolio_id = pm.portfolio_id
+            JOIN memberships AS m
+                ON m.org_id = po.org_id
+                AND m.principal_id = pm.principal_id
+                AND m.state = 'active'
+            WHERE pm.principal_id = ?
+            ORDER BY pm.portfolio_id, po.org_id
+            """,
+            (principal_id,),
+        ).fetchall()
+        for portfolio_id, org_id in visible:
+            if (not result["portfolios"]
+                    or result["portfolios"][-1]["portfolioId"] != portfolio_id):
+                result["portfolios"].append({
+                    "portfolioId": portfolio_id, "organizationIds": [],
+                })
+            result["portfolios"][-1]["organizationIds"].append(org_id)
+        return result
+
     def visible_portfolio_orgs(self, principal_id: str,
                                portfolio_id: str) -> tuple[str, ...]:
         """Portfolio association does not grant tenant-private visibility.

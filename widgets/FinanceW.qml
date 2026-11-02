@@ -519,7 +519,10 @@ PanelWindow {
     Shortcut {
         sequence: "Esc"
         context: Qt.WindowShortcut
-        enabled: root.standardKeysAvailable
+        // Escape follows the same close path as the X button even when a
+        // transaction draft editor is open. Other mode/navigation keys keep
+        // their stricter standardKeysAvailable editing guard.
+        enabled: root.menuOpen && root.keyboardActive
         onActivated: root.menuOpen = false
     }
 

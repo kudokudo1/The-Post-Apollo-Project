@@ -434,7 +434,7 @@ var _cacheProfiles = {
         freshMs:1800000, staleMs:10800000, expireMs:43200000
     },
     "nws-alerts": {
-        retention:RETENTION_MEMORY_LAST_GOOD,
+        retention:RETENTION_PERSISTENT_LAST_GOOD,
         freshMs:1800000, staleMs:3600000, expireMs:21600000
     },
     "home-history": {
@@ -446,15 +446,15 @@ var _cacheProfiles = {
         freshMs:1800000, staleMs:7200000, expireMs:86400000
     },
     "river": {
-        retention:RETENTION_MEMORY_LAST_GOOD,
+        retention:RETENTION_PERSISTENT_LAST_GOOD,
         freshMs:1800000, staleMs:7200000, expireMs:43200000
     },
     "marine": {
-        retention:RETENTION_MEMORY_LAST_GOOD,
+        retention:RETENTION_PERSISTENT_LAST_GOOD,
         freshMs:1200000, staleMs:3600000, expireMs:21600000
     },
     "coastal": {
-        retention:RETENTION_MEMORY_LAST_GOOD,
+        retention:RETENTION_PERSISTENT_LAST_GOOD,
         freshMs:1800000, staleMs:7200000, expireMs:86400000
     },
     "lightning": {

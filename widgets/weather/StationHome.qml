@@ -95,6 +95,8 @@ Rectangle {
                              ? nwsAlertSource.errorText : "",
                 "receivedAt": nwsAlertSource
                               ? nwsAlertSource.lastUpdated : null,
+                "usingCache": nwsAlertSource
+                              ? nwsAlertSource.usingPersistentCache : false,
                 "detail": nwsAlertSource && nwsAlertSource.configured
                           ? "PINNED POINT" : "NOT CONFIGURED"
             },

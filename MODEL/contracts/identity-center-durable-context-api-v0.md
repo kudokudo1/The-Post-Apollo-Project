@@ -4,7 +4,7 @@
 >
 > **PATIENT:** `kudokudo1/The-Post-Apollo-Project`
 >
-> **SOURCE:** Operator requested continuation after UI navigation #981 merged. Read-only synthetic membership response PR #986 is **open and unmerged** at creation. This separate main-based PR is an independent candidate, not a silent merge or replacement for #986.
+> **SOURCE:** Operator requested continuation after UI navigation #981 merged. Read-only synthetic membership response PR #986 has **merged into main** since this separate candidate began. This proposal complements its in-memory `readMyContexts` contract; it does not replace the merged implementation.
 >
 > **OWNING SEAM:** `services/identity/durable_context_schema_v0.sql`, `services/identity/durable_context_store_v0.py`, `services/identity/read_only_context_wsgi_v0.py`, `tests/identity/test_durable_context_service_v0.py`, CI and Model contract/index. Social QML, existing synthetic IdP verifiers, real account stores and Hospital code remain untouched.
 >
@@ -130,7 +130,7 @@ Tests verify:
 
 The PR adds isolated modules, SQL fixture, tests, workflow, contract/index. It does not change any existing API, Social QML, real provider account, machine service, or durable user DB. Revert the files or leave PR unmerged to roll back. All test DB files are deleted by CI temporary-directory cleanup.
 
-**NEXT:** reconcile this durable candidate with PR #986's in-memory readMyContexts contract; security review and production IdP/DB/host selection; implement protected API with real signed provider sessions, TLS and audit; only then connect Social USER // SETTINGS Organizations to a read-only verified result. Keep organization switching unavailable until server-side selection validation exists.
+**NEXT:** reconcile this durable candidate with merged PR #986's in-memory readMyContexts contract; security review and production IdP/DB/host selection; implement protected API with real signed provider sessions, TLS and audit; only then connect Social USER // SETTINGS Organizations to a read-only verified result. Keep organization switching unavailable until server-side selection validation exists.
 
 ## HOSPITAL REPORT
 
@@ -156,7 +156,7 @@ This is a candidate transport/schema, not an approved backend; the authenticatio
 - [ ] Durable production administration, IdP, audit and hosting decisions
 
 ### NEXT
-Review and reconcile with #986; then protected real provider service integration and read-only Social consumer.
+Review and reconcile with merged #986; then protected real provider service integration and read-only Social consumer.
 
 ### DECISIONS
 Experimental SQLite persistence and WSGI transport **only in tests**. No production DB, IdP, hosting, role admin, company data, real account enrollment or local machine changes.

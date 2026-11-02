@@ -221,7 +221,7 @@ assert.match(store, /function flushQueued\(\)/);
 assert.match(store, /age <= expireMs \? saved : null/);
 assert.doesNotMatch(store, /\bProcess\s*\{|\bTimer\s*\{|curl|XMLHttpRequest/);
 
-// One shell owner feeds both global services.
+// One shell owner feeds Weather, Space and the later additive NWS lifecycle consumer.
 const shell = read("shell.qml");
 assert.equal(
     (shell.match(/WeatherPersistentCacheStore\s*\{/g) || []).length,
@@ -230,7 +230,7 @@ assert.equal(
 assert.match(shell, /id:\s*weatherPersistentCache/);
 assert.equal(
     (shell.match(/cacheStore:\s*weatherPersistentCache/g) || []).length,
-    2
+    3
 );
 
 // Weather hydration: cache first when available, live fetch still starts.

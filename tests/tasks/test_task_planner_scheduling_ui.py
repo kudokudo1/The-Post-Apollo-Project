@@ -13,12 +13,20 @@ assert host.count("todoStore: ApolloHubTodoStore")==4
 mount=host.split("            TaskPlannerPane {",1)[1].split("\n            }",1)[0]
 assert "todoStore: ApolloHubTodoStore" in mount
 assert "todoSnapshot: ApolloHubTodoStore.snapshot" in mount
-assert '|| root.activeMode.id === "planner")' in host
+# Planner remains mounted in its own mode. The Tasks panel now accepts
+# window-local Escape in all five modes, rather than limiting focus to
+# the three modes that contain text editors.
+assert 'root.menuOpen && root.activeMode.id === "planner"' in host
+assert "focusable: root.menuOpen" in host
+assert "WlrKeyboardFocus.OnDemand : WlrKeyboardFocus.None" in host
+assert "Keys.onEscapePressed: function(event)" in host
 assert "property var todoStore: null" in planner
 assert "property bool scheduleMode: false" in planner
 assert 'label: "SCHEDULE"' in planner
 assert "TaskPlannerSchedulePane {" in planner
-assert "todoStore: planner.todoStore" in planner
+# Planner's existing writer is deliberately disabled outside the
+# approved scheduling mode. Preserve the conditional binding contract.
+assert "todoStore: planner.schedulingAllowed ? planner.todoStore : null" in planner
 assert "visible: !planner.scheduleMode" in planner
 assert "visible: planner.scheduleMode" in planner
 

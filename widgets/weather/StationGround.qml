@@ -15,6 +15,7 @@ Rectangle {
     property var weatherService: null
     property var nwsAlertSource: null
     property var seismicSource: null
+    property var persistentCacheStore: null
     property real runtimeNowMs: Date.now()
 
     readonly property var runtimeRows: [
@@ -67,6 +68,7 @@ Rectangle {
                 "errorText": nwsErrorText,
                 "receivedAt": nwsAlertSource
                               ? nwsAlertSource.lastUpdated : null,
+                "usingCache": nwsUsingPersistentCache,
                 "detail": nwsConfigured ? "PINNED POINT" : "NOT CONFIGURED"
             },
             runtimeNowMs
@@ -90,7 +92,8 @@ Rectangle {
                 "ready": riverService.ready,
                 "loading": riverService.loading,
                 "errorText": riverService.errorText,
-                "receivedAt": riverService.lastUpdated
+                "receivedAt": riverService.lastUpdated,
+                "usingCache": riverService.usingPersistentCache
             },
             runtimeNowMs
         ),
@@ -103,7 +106,8 @@ Rectangle {
                 "errorText": marineService.errorText,
                 "receivedAt": marineService.lastUpdated,
                 "observedAt": marineService.station
-                              ? marineService.station.sampleMillis : -1
+                              ? marineService.station.sampleMillis : -1,
+                "usingCache": marineService.usingPersistentCache
             },
             runtimeNowMs
         ),
@@ -116,7 +120,8 @@ Rectangle {
                 "errorText": coastalService.errorText,
                 "receivedAt": coastalService.lastUpdated,
                 "observedAt": coastalService.waterLevel
-                              ? coastalService.waterLevel.sampleMillis : -1
+                              ? coastalService.waterLevel.sampleMillis : -1,
+                "usingCache": coastalService.usingPersistentCache
             },
             runtimeNowMs
         ),
@@ -140,6 +145,8 @@ Rectangle {
         nwsAlertSource && nwsAlertSource.ready
     readonly property bool nwsLoading:
         nwsAlertSource && nwsAlertSource.loading
+    readonly property bool nwsUsingPersistentCache:
+        nwsAlertSource && nwsAlertSource.usingPersistentCache === true
     readonly property string nwsErrorText:
         nwsAlertSource ? String(nwsAlertSource.errorText || "") : ""
     readonly property var officialAlerts:
@@ -152,6 +159,7 @@ Rectangle {
 
     WeatherServices.NwpsRiverService {
         id: riverService
+        cacheStore: ground.persistentCacheStore
         active: ground.visible
         latitude: weatherService ? weatherService.latitude : ""
         longitude: weatherService ? weatherService.longitude : ""
@@ -159,6 +167,7 @@ Rectangle {
 
     WeatherServices.NdbcMarineService {
         id: marineService
+        cacheStore: ground.persistentCacheStore
         active: ground.visible
         latitude: weatherService ? weatherService.latitude : ""
         longitude: weatherService ? weatherService.longitude : ""
@@ -166,6 +175,7 @@ Rectangle {
 
     WeatherServices.CoopsCoastalService {
         id: coastalService
+        cacheStore: ground.persistentCacheStore
         active: ground.visible
         latitude: weatherService ? weatherService.latitude : ""
         longitude: weatherService ? weatherService.longitude : ""
@@ -587,7 +597,9 @@ Rectangle {
                             : ground.nwsErrorText.length > 0
                               ? (ground.nwsReady ? "DEGRADED" : "OFFLINE")
                               : ground.nwsReady
-                                ? "RECEIVED " + ground.officialAlerts.length
+                                ? (ground.nwsUsingPersistentCache
+                                   ? "CACHE " + ground.officialAlerts.length
+                                   : "RECEIVED " + ground.officialAlerts.length)
                                 : "WAITING"
                     font.pixelSize: 11
                     color: !ground.nwsConfigured ? Colors.orange
@@ -625,7 +637,9 @@ Rectangle {
                          && ground.nwsReady
                          && ground.officialAlerts.length === 0
                 width: parent.width
-                text: "NO ACTIVE NWS ALERTS LISTED FOR THE PINNED POINT"
+                text: ground.nwsUsingPersistentCache
+                      ? "LAST SUCCESSFUL NWS CHECK LISTED NO ACTIVE ALERTS // CACHE"
+                      : "NO ACTIVE NWS ALERTS LISTED FOR THE PINNED POINT"
                 font.pixelSize: 11
             }
 

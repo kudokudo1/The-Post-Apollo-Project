@@ -27,17 +27,16 @@ const hour = 3600000;
 const now = Date.parse("2026-11-02T12:00:00Z");
 
 const ids = policy.knownSourceIds().slice().sort();
-assert.equal(ids.length, 9);
-for (const id of ["seismic","gdacs"])
+const m5SourceIds = [
+    "weather-current","weather-forecast","air-quality",
+    "space-kp","space-wind","space-imf","space-flux",
+    "seismic","gdacs"
+];
+for (const id of m5SourceIds)
     assert.ok(ids.includes(id), id);
 
-// M5 deliberately admits global event collections only. These remain outside
-// persistent storage until their own key/volatility semantics are reviewed.
+// M5's still-deferred categories remain excluded until their own milestone.
 for (const id of [
-    "nws-alerts",
-    "river",
-    "marine",
-    "coastal",
     "lightning",
     "moon",
     "planet-rise-set",
@@ -150,8 +149,8 @@ for (const id of ["seismic","gdacs"]) {
     assert.equal(runtime.retentionLabel(spec), "PERSIST≤1d");
 }
 
-// Location-bound and volatile sources deliberately remain non-persistent.
-for (const id of ["nws-alerts","river","marine","coastal","lightning"]) {
+// Categories still deferred after later additive milestones remain non-persistent.
+for (const id of ["lightning"]) {
     const spec = runtime.sourceSpec(id);
     assert.notEqual(spec.retention, "PERSISTENT_LAST_GOOD", id);
 }
@@ -238,13 +237,9 @@ assert.match(
     /"usingCache": seismicSource[\s\S]{0,100}usingPersistentCache/
 );
 
-// Guard the deferred categories from accidental M5 wiring.
+// Guard categories that remain deferred after the additive M7 milestone.
 for (const file of [
-    "services/weather/NwpsRiverService.qml",
-    "services/weather/NdbcMarineService.qml",
-    "services/weather/CoopsCoastalService.qml",
-    "services/weather/NowcoastLightningService.qml",
-    "services/notifications/NwsOfficialAlertNotificationProducer.qml"
+    "services/weather/NowcoastLightningService.qml"
 ]) {
     const src = read(file);
     assert.doesNotMatch(src, /WeatherPersistentCache|persistentCacheStore/);

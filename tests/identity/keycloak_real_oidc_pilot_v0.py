@@ -117,10 +117,27 @@ def open_provider(discovery: dict, username: str, password: str):
             "Expected actual Keycloak authorization-code login form")
     login_url = urljoin(login_page.url, form.form_action)
     verify_loopback_url(login_url)
+    # Requests rebuilds its cookie jar while preparing each request and thus
+    # loses any injected Secure-cookie policy. Keycloak 26 requires the Secure
+    # AUTH_SESSION_ID on localhost; a normal browser supports that exception.
+    # For this disposable test only, send existing session cookies explicitly
+    # to the ONE verified 127.0.0.1:8080 login-form origin. No cookie reaches a
+    # remote host, user-facing log, token endpoint or production integration.
+    login_path = urlparse(login_url).path
+    valid_cookies = [
+        c for c in session.cookies
+        if c.domain == "127.0.0.1"
+        and login_path.startswith(c.path)
+        and c.name in {"AUTH_SESSION_ID", "KC_RESTART", "KEYCLOAK_IDENTITY",
+                       "KEYCLOAK_SESSION", "AUTH_SESSION_ID_LEGACY"}
+    ]
+    require(valid_cookies, "Keycloak provided no session cookies to the CI login")
+    cookie_header = "; ".join(c.name + "=" + c.value for c in valid_cookies)
     response = session.post(login_url, data={
         **form.hidden, "username": username, "password": password,
         "credentialId": "",
-    }, timeout=15, allow_redirects=False)
+    }, headers={"Cookie": cookie_header},
+        timeout=15, allow_redirects=False)
     require(response.status_code in (302, 303),
             "Keycloak did not issue an authorization-code redirect")
     target = urljoin(response.url, response.headers.get("Location", ""))

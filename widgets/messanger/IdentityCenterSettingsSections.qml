@@ -14,6 +14,8 @@ Item {
     property bool settingsOpen: false
     // Injected by Social; null in synthetic Qt tests.
     property var localDirectoryStore: null
+    // Local portfolio groupings are display metadata, never verified rights.
+    property var localPortfoliosStore: null
     // Manual Social label associations only, not Identity Center grants.
     property var localLinksStore: null
     property var socialIdentitiesSnapshot: null
@@ -190,6 +192,12 @@ Item {
                     IdentityCenterLocalOrganizationEditor {
                         width: parent.width
                         directoryStore: sections.localDirectoryStore
+                    }
+
+                    IdentityCenterLocalPortfolioEditor {
+                        width: parent.width
+                        directoryStore: sections.localDirectoryStore
+                        portfolioStore: sections.localPortfoliosStore
                     }
 
                     IdentityCenterLocalSocialLinksEditor {

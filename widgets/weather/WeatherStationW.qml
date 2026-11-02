@@ -14,6 +14,7 @@ PanelWindow {
     property var weatherService: null
     property var spaceService: null
     property var nwsAlertSource: null
+    property var persistentCacheStore: null
 
     WeatherServices.WeatherHistoryService {
         id: weatherHistoryService
@@ -30,6 +31,7 @@ PanelWindow {
 
     WeatherServices.SeismicService {
         id: seismicService
+        cacheStore: weatherStation.persistentCacheStore
         active: weatherStation.menuOpen
                 && (weatherStation.currentView === "ground"
                     || weatherStation.currentView === "map")
@@ -1129,6 +1131,7 @@ PanelWindow {
                 stationOpen: weatherStation.menuOpen
                 domain: "map"
                 seismicSource: seismicService
+                persistentCacheStore: weatherStation.persistentCacheStore
                 newsMentionOverlay: weatherStation.newsMapOverlay
                 runtimeNowMs: weatherStation.runtimeNowMs
                 onNewsMapClearRequested: {

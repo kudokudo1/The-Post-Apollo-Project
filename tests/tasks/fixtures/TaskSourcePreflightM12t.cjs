@@ -112,4 +112,58 @@ function inspect({folder,backupId,expectedSourceSha,plan,policy}) {
         ].includes(code)?code:"PREFLIGHT_UNAVAILABLE");
     }
 }
-module.exports={inspect,SOURCE};
+// M12y: missing-source review is NOT a bootstrap authorization.
+// A caller's "fresh install" declaration cannot prove absence of history.
+function classifyAbsent({folder,declaredFreshInstall,policy}={}) {
+    const deny=(classification,reason)=>({
+        ok:false,classification,reason,writeAuthorized:false,
+        bootstrapAuthorized:false,restoreAuthorized:false
+    });
+    if(typeof folder!=="string" || !path.isAbsolute(folder)
+            || path.normalize(folder)!==folder
+            || path.basename(folder)!=="m12t-disposable")
+        return deny("REFUSE","SYNTHETIC_DIRECTORY_REQUIRED");
+    if(typeof declaredFreshInstall!=="boolean")
+        return deny("REFUSE","EXPLICIT_INSTALL_DECLARATION_REQUIRED");
+    if(!policy || typeof policy.emptyDocument!=="function"
+            || typeof policy.validate!=="function")
+        return deny("REFUSE","TASKS_POLICY_REQUIRED");
+    try {
+        const empty=policy.emptyDocument();
+        if(!policy.validate(empty).ok || empty.tasks.length!==0
+                || empty.projects.length!==0)
+            return deny("REFUSE","INVALID_EMPTY_POLICY");
+        const safeDir=(dir)=>{
+            const st=fs.lstatSync(dir);
+            return st.isDirectory() && !st.isSymbolicLink()
+                && (st.mode & 0o077)===0
+                && (typeof process.getuid!=="function"
+                    || st.uid===process.getuid());
+        };
+        if(!safeDir(folder)) return deny("REFUSE","UNSAFE_SYNTHETIC_DIRECTORY");
+        const backupDir=path.join(folder,"backups");
+        if(!safeDir(backupDir)) return deny("REFUSE","UNSAFE_BACKUP_ROOT");
+        const source=path.join(folder,SOURCE);
+        const sourceStatus=()=>{
+            try {fs.lstatSync(source); return "EXISTS";}
+            catch(e) {return e && e.code==="ENOENT"?"ABSENT":"UNKNOWN";}
+        };
+        const first=sourceStatus();
+        if(first==="EXISTS")
+            return deny("EXISTING_SOURCE","SOURCE_EXISTS_USE_EXISTING_PREFLIGHT");
+        if(first!=="ABSENT")
+            return deny("REFUSE","SOURCE_STATUS_UNAVAILABLE");
+        if(fs.readdirSync(backupDir).length!==0)
+            return deny("MISSING_SOURCE_REVIEW","BACKUP_OR_PENDING_HISTORY_PRESENT");
+        const second=sourceStatus();
+        if(second==="EXISTS")
+            return deny("EXISTING_SOURCE","SOURCE_APPEARED_DURING_REVIEW");
+        if(second!=="ABSENT")
+            return deny("REFUSE","SOURCE_STATUS_UNAVAILABLE");
+        if(!declaredFreshInstall)
+            return deny("MISSING_SOURCE_REVIEW","FRESH_INSTALL_NOT_DECLARED");
+        return deny("POSSIBLE_FRESH_INSTALL",
+                    "INDEPENDENT_INSTALL_PROVENANCE_REQUIRED");
+    } catch(e) {return deny("REFUSE","ABSENCE_REVIEW_UNAVAILABLE");}
+}
+module.exports={inspect,classifyAbsent,SOURCE};

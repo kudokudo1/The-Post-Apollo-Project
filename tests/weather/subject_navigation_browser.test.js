@@ -10,6 +10,7 @@ const root = path.resolve(__dirname, "../..");
 const navSource = fs.readFileSync(path.join(root, "widgets/weather/StationSubjectNavigationPolicy.js"), "utf8");
 const previewSource = fs.readFileSync(path.join(root, "widgets/weather/StationSubjectNavigationPreviewPolicy.js"), "utf8");
 const uiSource = fs.readFileSync(path.join(root, "widgets/weather/StationSubjectNavigator.qml"), "utf8");
+const railSource = fs.readFileSync(path.join(root, "widgets/weather/StationSubjectRail.qml"), "utf8");
 const stationSource = fs.readFileSync(path.join(root, "widgets/weather/WeatherStationW.qml"), "utf8");
 
 const env = vm.createContext({});
@@ -73,6 +74,9 @@ test("browser is opt-in, names preview status, and explicitly links CLASSIC", ()
   assert.match(stationSource,/subjectNavigator\.moveCursor\(direction\)/);
   assert.match(stationSource,/subjectNavigator\.activateCursor\(\)/);
   assert.match(stationSource,/return "INDEX \/\/ PREVIEW"/);
+  assert.ok(stationSource.includes("StationSubjectRail {"));
+  assert.equal(stationSource.split("ModeButton {").length - 1, 1);
+  assert.equal(railSource.split("ModeButton {").length - 1, 1);
   assert.match(uiSource,/SPEC-ONLY SUBJECTS/);
   assert.match(uiSource,/CLASSIC PAGES REMAIN CANONICAL/);
 });

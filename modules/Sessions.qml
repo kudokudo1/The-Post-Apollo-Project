@@ -51,10 +51,10 @@ DockButton {
 
         GohuText {
             id: sessionsLeftOrnaments
-            // Original left-only offset was +3px. Shift by another +7px.
-            // Right-side ornaments retain the original shaping position.
+            // Move both left ornaments 3px left from the approved +10px
+            // position; the phone and right-side stars remain stationary.
             anchors.left: parent.left
-            anchors.leftMargin: 10
+            anchors.leftMargin: 7
             anchors.baseline: parent.baseline
             font.pixelSize: sessionsIcon.font.pixelSize
             textFormat: Text.PlainText

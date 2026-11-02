@@ -6,7 +6,6 @@ import Qt5Compat.GraphicalEffects
 import "../../components"
 import "../../services/weather" as WeatherServices
 import "StationOfficialAlertPolicy.js" as OfficialAlertPolicy
-import "StationSubjectNavigationPolicy.js" as SubjectRoutes
 import "../../services/weather/WeatherRuntimePolicy.js" as RuntimePolicy
 
 PanelWindow {

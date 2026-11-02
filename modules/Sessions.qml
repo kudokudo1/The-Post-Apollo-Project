@@ -80,7 +80,7 @@ DockButton {
             x: sessionsLeftOrnaments.implicitWidth
                + (sessionsPhoneAdvance.implicitWidth - implicitWidth) / 2
             anchors.baseline: parent.baseline
-            font.pixelSize: 28
+            font.pixelSize: 24
             textFormat: Text.PlainText
             text: "☎︎"
             color: sessionsDock.foregroundColor

@@ -1,0 +1,43 @@
+name: Weather M24 dossier serialization probe
+
+on:
+  pull_request:
+    paths:
+      - "widgets/weather/StationDossierSerializationPolicy.js"
+      - "tests/weather/test_weather_dossier_serialization_m24.js"
+      - ".github/workflows/weather-dossier-serialization-m24.yml"
+      - ".github/workflows/weather-teardown-contracts.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  serialization:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: M24 strict dossier transport and recovery refusal
+        run: node tests/weather/test_weather_dossier_serialization_m24.js
+      - name: M23 admission regression
+        run: node tests/weather/test_weather_dossier_capture_m23.js
+      - name: M22 volatile preview regression
+        run: node tests/weather/test_weather_dossier_preview_m22.js
+      - name: M21 archive pair regression
+        run: node tests/weather/test_weather_archive_pair_compare_m21.js
+      - name: M20 archive revisions regression
+        run: node tests/weather/test_weather_archive_revisions_m20.js
+      - name: M19 existing archive regression
+        run: node tests/weather/test_weather_event_archive_m19.js
+      - name: M18 provider freshness regression
+        run: node tests/weather/test_weather_provider_freshness_m18.js
+      - name: M17 relationships regression
+        run: node tests/weather/test_weather_evidence_relationships_m17.js
+      - name: M16 evidence quality regression
+        run: node tests/weather/test_weather_evidence_quality_m16.js
+      - name: M15 flood dossier regression
+        run: node tests/weather/test_weather_flood_dossier_m15.js
+      - name: M14 lightning regression
+        run: node tests/weather/test_weather_shared_lightning_m14.js
+      - name: M13 event context regression
+        run: node tests/weather/test_station_map_event_context_m13.js

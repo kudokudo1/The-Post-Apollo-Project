@@ -75,6 +75,8 @@ jobs:
         run: node tests/weather/test_weather_dossier_preview_m22.js
       - name: Validate Weather M23 dossier admission and no-write contract
         run: node tests/weather/test_weather_dossier_capture_m23.js
+      - name: Validate Weather M24 read-only serialization contract
+        run: node tests/weather/test_weather_dossier_serialization_m24.js
       - name: Validate Weather persistent last-known cache M4
         run: node tests/weather/test_weather_persistent_cache_m4.js
       - name: Validate Weather persistent cache M5 global events

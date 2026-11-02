@@ -1,0 +1,53 @@
+name: Identity structure / genuine disposable Quickshell restart
+
+on:
+  pull_request:
+    paths:
+      - 'LocalOrganizationStructureNativeSmokeV1.qml'
+      - 'tests/identity/native_local_organization_structure_smoke_v1.py'
+      - 'tests/identity/test_native_local_org_structure_guard_v1.py'
+      - '.github/workflows/identity-org-structure-native-smoke-v1.yml'
+      - 'MODEL/contracts/identity-local-structure-native-verification-v1.md'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  genuine-native-restart:
+    name: Native Quickshell 0.3.2 / 3 synthetic orgs / save and reload
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    container:
+      image: debian:unstable-slim
+    steps:
+      - name: Install existing pinned disposable Quickshell runtime
+        run: |
+          apt-get update -qq
+          DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+            git ca-certificates python3 quickshell=0.3.2-1 \
+            qt6-qpa-plugins qml6-module-qtquick \
+            qml6-module-qtquick-layouts qml6-module-qtquick-effects \
+            qml6-module-qt5compat-graphicaleffects qml6-module-qtqml
+      - uses: actions/checkout@v4
+      - name: Run genuine isolated native Quickshell save and new-process reload
+        run: |
+          python3 -m py_compile tests/identity/native_local_organization_structure_smoke_v1.py
+          python3 tests/identity/native_local_organization_structure_smoke_v1.py
+
+  source-guards:
+    name: No live shell mounting and private-store regressions
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Validate synthetic-only isolation
+        run: python3 -m unittest discover -s tests/identity -p 'test_native_local_org_structure_guard_v1.py' -v
+      - name: Preserve organization structure and portfolio contracts
+        run: |
+          python3 -m unittest discover -s tests/messaging -p 'test_social_local_org_structure_v1.py' -v
+          python3 -m unittest discover -s tests/messaging -p 'test_social_local_portfolios_v1.py' -v
+          python3 -m unittest discover -s tests/messaging -p 'test_social_local_organizations.py' -v

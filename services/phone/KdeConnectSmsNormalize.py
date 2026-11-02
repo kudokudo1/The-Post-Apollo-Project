@@ -80,9 +80,9 @@ def normalize_message(packet: object, *,
     kind = _integer(packet["type"], bits=32)
     if kind not in NATIVE_STATES:
         raise ValueError("unsupported native SMS message type")
-    timestamp = _integer(packet["date"], positive=True, bits=64)
-    thread = _integer(packet["thread_id"], positive=True, bits=64)
-    message_id = _integer(packet["_id"], positive=True, bits=32)
+    timestamp = _integer(packet["date"], positive=True, signed=True, bits=64)
+    thread = _integer(packet["thread_id"], positive=True, signed=True, bits=64)
+    message_id = _integer(packet["_id"], positive=True, signed=True, bits=32)
     read = packet["read"]
     if type(read) is bool:
         read = bool(read)

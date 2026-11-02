@@ -147,9 +147,28 @@ for path in files:
     matches = Counter(pattern.findall(text))
     if matches:
         actual[name] = dict(matches)
-assert actual == data["callers"], (
+# M12s is deliberately unmounted, unlike the four production consumers.
+# Explicitly account for its two mock-fixture-only user-triggered routes;
+# do not hide them from the writer inventory or silently expand live callers.
+disposable = data.get("disposableNativeCallers", {})
+assert disposable == {
+    "TaskNativeStoreSmokeM12s.qml": {"addTask": 1, "reloadFromDisk": 1}
+}
+fixture = (ROOT/"TaskNativeStoreSmokeM12s.qml").read_text()
+assert '//@ pragma DataDir $BASE/post-apollo-m12s-fixture' in fixture
+assert 'POST_APOLLO_M12S_DISPOSABLE' in fixture
+assert 'Quickshell.dataDir.endsWith(exactExpectedSuffix)' in fixture
+assert 'storePath === Quickshell.dataDir + "/apollo-hub-todo-v1.json"' in fixture
+assert "guardedPath && flagsSafe" in fixture
+assert "readonly property bool ticketProducerEnabled: false" in store
+assert "TaskNativeStoreSmokeM12s" not in (ROOT/"shell.qml").read_text()
+assert not re.search(r"\b(?:FileView|Process)\s*\{", fixture)
+expected_callers = dict(data["callers"])
+assert not (set(expected_callers) & set(disposable))
+expected_callers.update(disposable)
+assert actual == expected_callers, (
     "TASKS writer route drift: actual="+repr(actual)+
-    " expected="+repr(data["callers"]))
+    " expected="+repr(expected_callers))
 
 # No task UI should hold a second FileView, write to a task path, or call
 # stage directly. These are targeted checks, not a general filesystem audit.

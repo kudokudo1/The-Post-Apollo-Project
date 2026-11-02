@@ -1,0 +1,42 @@
+name: TASKS M12s isolated real store native smoke source guard
+
+on:
+  pull_request:
+    paths:
+      - 'TaskNativeStoreSmokeM12s.qml'
+      - 'tests/tasks/test_task_real_store_native_smoke_m12s.cjs'
+      - 'docs/tasks-real-store-native-smoke-m12s.md'
+      - '.github/workflows/tasks-real-store-native-smoke-m12s.yml'
+      - 'services/hub/ApolloHubTodoStore.qml'
+  push:
+    branches: [main]
+    paths:
+      - 'TaskNativeStoreSmokeM12s.qml'
+      - 'tests/tasks/test_task_real_store_native_smoke_m12s.cjs'
+      - '.github/workflows/tasks-real-store-native-smoke-m12s.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  m12s-source-only:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: M12s real-store native harness source and mock-only UI actions
+        run: node --test tests/tasks/test_task_real_store_native_smoke_m12s.cjs
+      - name: M12r disabled ticket admission regression
+        run: node --test tests/tasks/test_task_disabled_admission_m12r.cjs
+      - name: M12q nine-mutation ticket plan regression
+        run: node --test tests/tasks/test_task_local_ticket_producer_m12q.cjs
+      - name: M11d sole production FileView audit
+        run: python3 tests/tasks/test_task_writer_gate_inventory_m11d.py
+      - name: M11t trust gate remains closed
+        run: python3 tests/tasks/test_task_production_trust_contract_m11t.py

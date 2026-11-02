@@ -115,5 +115,11 @@
     }
   ],
   "productionChangesAuthorized": false,
-  "sqliteActivationAuthorized": false
+  "sqliteActivationAuthorized": false,
+  "disposableNativeCallers": {
+    "TaskNativeStoreSmokeM12s.qml": {
+      "addTask": 1,
+      "reloadFromDisk": 1
+    }
+  }
 }

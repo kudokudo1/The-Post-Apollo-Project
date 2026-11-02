@@ -123,6 +123,15 @@ class LoopbackReceiverTests(unittest.TestCase):
         with self.assertRaises(RuntimeError):
             candidate.start()
 
+    def test_explicit_port_configuration_is_bounded_and_bool_rejected(self):
+        for invalid in (-1, 80, 1023, 65536, True, False, "8765", None):
+            with self.subTest(value=invalid):
+                with self.assertRaises(ValueError):
+                    LoopbackCallbackReceiver(
+                        callback=lambda _: {"status": "SIGNED_OUT"},
+                        port=invalid,
+                    )
+
     def test_exclusive_numeric_ipv4_loopback_and_host_config_alignment(self):
         self.assertEqual(self.receiver._server.server_address[0], "127.0.0.1")
         self.assertEqual(self.redirect, self.config.redirect_uri)

@@ -3342,6 +3342,8 @@ Rectangle {
                         stationDiscovery.selectedFloodContext
                     timelineRows:
                         stationDiscovery.selectedEvidenceTimeline
+                    runtimeNowMs:
+                        stationDiscovery.runtimeNowMs
                     companions:
                         stationDiscovery.selectedContextCompanions
                     accentColor:

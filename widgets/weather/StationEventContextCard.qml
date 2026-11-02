@@ -1,5 +1,6 @@
 import QtQuick
 import "../../components"
+import "../../services/weather/WeatherRuntimePolicy.js" as RuntimePolicy
 
 Rectangle {
     id: card
@@ -11,6 +12,7 @@ Rectangle {
     property var floodContext: null
     property var timelineRows: []
     property var companions: []
+    property real runtimeNowMs: Date.now()
     property color accentColor: Colors.magenta
 
     readonly property int companionCount:
@@ -21,14 +23,41 @@ Rectangle {
         !!floodContext && floodContext.relevant === true
     readonly property int floodHeight:
         !floodRelevant ? 0
-        : floodContext.available ? 150 : 64
+        : floodContext.available ? 198 : 64
+
+    function timelineAgeMinutes(row) {
+        return RuntimePolicy.ageMinutes(
+            row ? row.timeMs : null,
+            runtimeNowMs
+        );
+    }
+
+    function timelineAgeLabel(row) {
+        const minutes = timelineAgeMinutes(row);
+        return minutes < 0
+            ? "AGE --"
+            : "AGE " + RuntimePolicy.compactAgeMinutes(minutes);
+    }
+
+    function timelineRecencyBand(row) {
+        const minutes = timelineAgeMinutes(row);
+        if (minutes < 0)
+            return "UNKNOWN";
+        if (minutes <= 15)
+            return "FRESH";
+        if (minutes <= 60)
+            return "RECENT";
+        if (minutes <= 360)
+            return "AGING";
+        return "OLDER";
+    }
 
     visible: eventContext !== null
     width: parent ? parent.width : 0
     height: visible
         ? 260
           + Math.min(4, companionCount) * 42
-          + Math.min(6, timelineCount) * 36
+          + Math.min(6, timelineCount) * 48
           + floodHeight
         : 0
 
@@ -213,6 +242,56 @@ Rectangle {
             QuietText {
                 visible: card.floodContext
                          && card.floodContext.available
+                         && card.floodContext.contextAvailable
+                width: parent.width
+                text: {
+                    const state = card.floodContext
+                        ? card.floodContext.thresholdContext : null;
+                    if (!state)
+                        return "OBSERVED THRESHOLD // UNAVAILABLE";
+                    if (!state.available)
+                        return "OBSERVED THRESHOLD // "
+                            + state.reason;
+                    if (!state.supported)
+                        return "OBSERVED THRESHOLD // CLAIM WITHHELD // "
+                            + state.reason;
+                    if (!state.thresholdId)
+                        return "OBSERVED THRESHOLD // BELOW ACTION // "
+                            + state.categoryLabel;
+                    let value = "OBSERVED THRESHOLD // "
+                        + state.thresholdLabel
+                        + " MET @ "
+                        + Number(state.thresholdValue).toFixed(2)
+                        + " " + state.units
+                        + " // OBS "
+                        + Number(state.observedValue).toFixed(2)
+                        + " " + state.units;
+                    if (state.crossedInSeries)
+                        value += " // CROSSING OBSERVED "
+                            + state.crossingFromTimeLabel
+                            + " → " + state.crossingToTimeLabel;
+                    else
+                        value += " // CATEGORY ALIGNED";
+                    if (state.nextThresholdLabel
+                            && state.nextGap !== null)
+                        value += " // NEXT "
+                            + state.nextThresholdLabel
+                            + " +"
+                            + Number(state.nextGap).toFixed(2)
+                            + " " + state.units;
+                    return value;
+                }
+                font.pixelSize: 8
+                color: card.floodContext
+                       && card.floodContext.thresholdContext
+                       && card.floodContext.thresholdContext.supported
+                       ? Colors.green : Colors.orange
+                elide: Text.ElideRight
+            }
+
+            QuietText {
+                visible: card.floodContext
+                         && card.floodContext.available
                          && card.floodContext.thresholds.length > 0
                 width: parent.width
                 text: card.floodContext
@@ -330,36 +409,66 @@ Rectangle {
                 delegate: Rectangle {
                     required property var modelData
                     width: card.width - 20
-                    height: 31
+                    height: 43
                     color: Colors.black
                     border.width: 1
                     border.color: Colors.cyan
 
-                    Row {
+                    Column {
                         anchors.fill: parent
-                        anchors.margins: 5
-                        spacing: 7
+                        anchors.margins: 4
+                        spacing: 2
 
-                        GohuText {
-                            width: 92
-                            text: modelData.timeLabel
-                            font.pixelSize: 8
-                            color: Colors.cyan
-                            elide: Text.ElideRight
-                        }
+                        Row {
+                            width: parent.width
+                            spacing: 7
 
-                        GohuText {
-                            width: 88
-                            text: modelData.sourceLabel
-                            font.pixelSize: 8
-                            color: Colors.magenta
-                            elide: Text.ElideRight
+                            GohuText {
+                                width: 92
+                                text: modelData.timeLabel
+                                font.pixelSize: 8
+                                color: Colors.cyan
+                                elide: Text.ElideRight
+                            }
+
+                            GohuText {
+                                width: 98
+                                text: card.timelineAgeLabel(modelData)
+                                    + " // "
+                                    + card.timelineRecencyBand(modelData)
+                                font.pixelSize: 8
+                                color: card.timelineRecencyBand(modelData)
+                                       === "FRESH"
+                                       ? Colors.green
+                                       : card.timelineRecencyBand(modelData)
+                                         === "RECENT"
+                                         ? Colors.cyan
+                                         : Colors.orange
+                                elide: Text.ElideRight
+                            }
+
+                            GohuText {
+                                width: 112
+                                text: modelData.provenanceGroup
+                                font.pixelSize: 8
+                                color: Colors.blue
+                                elide: Text.ElideRight
+                            }
+
+                            GohuText {
+                                width: Math.max(0, parent.width - 323)
+                                text: modelData.sourceLabel
+                                font.pixelSize: 8
+                                color: Colors.magenta
+                                elide: Text.ElideRight
+                            }
                         }
 
                         QuietText {
-                            width: Math.max(0, parent.width - 194)
+                            width: parent.width
                             text: modelData.kind + " // "
                                 + modelData.label
+                                + " // " + modelData.provenance
                             font.pixelSize: 8
                             elide: Text.ElideRight
                         }
@@ -369,7 +478,7 @@ Rectangle {
 
             QuietText {
                 width: parent.width
-                text: "CHRONOLOGY ONLY // ROWS RETAIN SOURCE PROVENANCE // NOT ONE MERGED INCIDENT HISTORY"
+                text: "CHRONOLOGY ONLY // RECENCY = CLOCK AGE, NOT PROVIDER VALIDITY // ROWS RETAIN SOURCE + GROUP PROVENANCE // NOT ONE MERGED INCIDENT HISTORY"
                 font.pixelSize: 8
                 color: Colors.orange
                 elide: Text.ElideRight

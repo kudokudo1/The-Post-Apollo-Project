@@ -1,0 +1,57 @@
+name: Identity Center Social Read-Only IPC Viewer
+
+on:
+  pull_request:
+    paths:
+      - 'services/identity/identity_display_reader_cli_v0.py'
+      - 'tests/identity/test_identity_display_reader_cli_v0.py'
+      - 'widgets/messanger/IdentityCenterOrganizationDisplayReader.qml'
+      - 'widgets/messanger/IdentityCenterSettingsSections.qml'
+      - 'widgets/messanger/AppSelector.qml'
+      - 'tests/messaging/test_identity_center_ipc_viewer_v0.cjs'
+      - 'MODEL/contracts/identity-center-social-ipc-viewer-v0.md'
+      - '.github/workflows/identity-center-social-ipc-viewer.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'services/identity/identity_display_reader_cli_v0.py'
+      - 'tests/identity/test_identity_display_reader_cli_v0.py'
+      - 'widgets/messanger/IdentityCenterOrganizationDisplayReader.qml'
+      - 'widgets/messanger/IdentityCenterSettingsSections.qml'
+      - 'widgets/messanger/AppSelector.qml'
+      - 'tests/messaging/test_identity_center_ipc_viewer_v0.cjs'
+      - 'MODEL/contracts/identity-center-social-ipc-viewer-v0.md'
+      - '.github/workflows/identity-center-social-ipc-viewer.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  viewer:
+    name: Private socket CLI, QML JS lifecycle and existing Social settings
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Compile the fixed tokenless desktop read command
+        run: |
+          python3 -m py_compile services/identity/identity_display_reader_cli_v0.py
+          python3 -m py_compile tests/identity/test_identity_display_reader_cli_v0.py
+      - name: Execute actual private socket to CLI read in separate process
+        run: |
+          python3 -m unittest discover -s tests/identity \
+            -p 'test_identity_display_reader_cli_v0.py' -v
+      - name: Execute extracted QML JS display policy in Node
+        run: node tests/messaging/test_identity_center_ipc_viewer_v0.cjs
+      - name: Preserve original Social settings and tokenless display contracts
+        run: |
+          python3 -m unittest discover -s tests/messaging \
+            -p 'test_identity_center_settings_sections.py' -v
+          python3 -m unittest discover -s tests/messaging \
+            -p 'test_identity_center_desktop_display_v0.py' -v
+          python3 -m unittest discover -s tests/identity \
+            -p 'test_desktop_context_projection_v0.py' -v

@@ -48,6 +48,15 @@ Scope {
                && s.items[0].done === false;
     }
 
+    // Queue observations after the FileView event which changed the store
+    // state unwinds. Calling addTask() synchronously from the initial
+    // onLoadFailed transition, or reloadFromDisk() synchronously from
+    // onSaved, is a test-harness reentrancy risk, not a requirement of the
+    // live writer. Qt.callLater coalesces calls to the same named function.
+    function scheduleAdvance() {
+        if (!finished) Qt.callLater(smoke.advance);
+    }
+
     function advance() {
         if (finished) return;
         if (!isolatedPath) {
@@ -127,12 +136,12 @@ Scope {
         // Delayed, so FileView's initial ready/empty state can arrive first.
         // Launch is the operator's single deliberate disposable test action.
         console.warn("M12U_BOOT|CONFIG_LOADED|PASS");
-        Qt.callLater(function() { smoke.advance(); });
+        smoke.scheduleAdvance();
     }
 
     Connections {
         target: ApolloHubTodoStore
-        function onStorageStateChanged() { smoke.advance(); }
+        function onStorageStateChanged() { smoke.scheduleAdvance(); }
     }
 
     Timer {

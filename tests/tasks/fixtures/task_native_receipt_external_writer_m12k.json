@@ -1,0 +1,84 @@
+{
+  "schemaVersion": 1,
+  "milestone": "M12k",
+  "patient": "kudokudo1/The-Post-Apollo-Project",
+  "room": "TASKS JSON writer continuity",
+  "provider": "OPEN AI // CHATGPT",
+  "connection": "EXTERNAL_HOSPITAL_COMPATIBLE_NOT_LIVE_REGISTERED",
+  "inspectedGitHubHead": "8ec95a9ffeec8a57c6018e36d43d4ff5f958b152",
+  "nativeCheckpoint": {
+    "milestone": "M12j",
+    "classification": "OPERATOR_OBSERVED_NATIVE_AND_READ_ONLY_DISPOSABLE_JOURNAL",
+    "source": "operator-supplied screenshots and terminal outputs in preceding conversation",
+    "fixtureClassification": "M11E_SYNTHETIC_ONLY",
+    "privateFixturePathIncluded": false,
+    "rawScreenshotsIncluded": false,
+    "nativeHostAttached": true,
+    "observedNativeSaveCount": 2,
+    "observedSettledReceiptCount": 2,
+    "nativeFreezeObserved": true,
+    "sqliteReadOnlyInspectionReported": true,
+    "sqliteChecks": {
+      "sourceCounterEquals2": true,
+      "freezePhaseObserved": true,
+      "pendingStageCleared": true,
+      "receiptCountExactly2": true,
+      "bothReceiptsSettledUnacknowledged": true,
+      "expectedActualDigestsMatched": true,
+      "secondStageBaselineMatchedFirstStageExpected": true,
+      "finalExpectedDigestMatchedSource": true
+    },
+    "recovery": {
+      "firstWildcardPathAttempt": "INVALID_PATH_AND_EVIDENCE_REFUSED",
+      "correctedExactFixture": "REPORTED_SYNTHETIC_JOURNAL_MATCH",
+      "phaseExpected": "RECOVERY_REVIEW",
+      "counterPreserved": 2,
+      "independentNativeCallbackOriginProven": false,
+      "explicitOperatorFinalAcceptanceRecorded": false
+    },
+    "provenanceLimits": [
+      "Earlier chat screenshots and copied inspector output, not GitHub CI execution of native Quickshell",
+      "Inspector explicitly reports independentNativeAcceptance false",
+      "No sanitized per-callback authenticated stage/provenance transcript",
+      "No live TASKS source access or production approval"
+    ]
+  },
+  "newTests": {
+    "classification": "SAME_UID_EXTERNAL_WRITER_DISPOSABLE_PROCESS_ONLY",
+    "operatesOnlyIn": "/tmp/m12k-*/m11e-fileview-test/fixture-only.json",
+    "protectsProduction": false,
+    "exercises": [
+      "UNCOOPERATIVE_WRITER_IGNORES_FLOCK",
+      "EXTERNAL_SOURCE_CHANGED_BEFORE_RESERVATION",
+      "UNEXPECTED_BYTES_BEFORE_READBACK_REVIEW",
+      "EXPECTED_BYTES_WRITTEN_BY_OUTSIDER_SETTLE_BUT_ORIGIN_UNKNOWN",
+      "POST_SETTLEMENT_EXTERNAL_REPLACEMENT_DETECTED_AT_NEXT_RESERVATION",
+      "SECOND_READBACK_TO_COMMIT_RACE_CAN_SETTLE_STALE_BYTES"
+    ],
+    "allAreSourceOrSyntheticLinuxEvidence": true,
+    "productionWriterModification": false,
+    "nativeQuickshellExecution": false
+  },
+  "decisionsStillOpen": {
+    "signerAndTrustAnchorAuthority": "OPEN",
+    "authenticatedHostAndLaunchBoundary": "OPEN",
+    "externalWriterThreatModelAndPermissions": "OPEN",
+    "productionSourceAuthority": "OPEN",
+    "nativeCallbackOrigin": "OPEN",
+    "asynchronousUiConfirmationApi": "OPEN",
+    "dataRecoveryAndRollback": "OPEN",
+    "operatorActivationApproval": "OPEN"
+  },
+  "authority": {
+    "localChangesAuthorized": false,
+    "productionSourceAccessAuthorized": false,
+    "liveQuickshellRestartAuthorized": false,
+    "hostTrustRootInstallationAuthorized": false,
+    "realDataRestorationAuthorized": false,
+    "sqliteTaskMigrationAuthorized": false,
+    "productionGuardedWriterAuthorized": false,
+    "pullRequestMergeAuthorized": false,
+    "finalOperatorAcceptanceRecorded": false,
+    "liveHospitalRegistrationVerified": false
+  }
+}

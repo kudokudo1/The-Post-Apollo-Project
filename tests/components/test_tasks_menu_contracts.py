@@ -26,7 +26,7 @@ assert "root.screen ? root.screen.width - root.implicitWidth : 0" in MENU
 # Leave the Wayland surface mapped and empty its pointer mask when closed.
 assert "WlrLayershell.layer: WlrLayer.Overlay" in MENU
 assert "WlrKeyboardFocus.OnDemand : WlrKeyboardFocus.None" in MENU
-assert 'focusable: root.menuOpen && (root.activeMode.id === "tasks"' in MENU
+assert "focusable: root.menuOpen" in MENU
 assert "visible: true" in MENU
 assert "mask: Region {" in MENU
 assert "width: root.menuOpen ? root.frameWidth : 0" in MENU
@@ -34,6 +34,14 @@ assert "height: root.menuOpen ? root.frameHeight : 0" in MENU
 assert "visible: root.menuOpen" in MENU
 assert "menuOpen = !menuOpen;" in MENU
 assert "onLeftClicked: root.menuOpen = false" in MENU
+assert "onMenuOpenChanged: {" in MENU
+assert "tasksFrame.forceActiveFocus();" in MENU
+assert "focus: root.menuOpen" in MENU
+assert "Keys.onEscapePressed: function(event)" in MENU
+assert "root.menuOpen = false;" in MENU
+assert "event.accepted = true;" in MENU
+assert "Qt.WindowShortcut" not in MENU  # Preserve child text-input Escape handling.
+
 
 # Standard chrome and truthful empty state; avoid invented task data.
 assert "WindowPanelFrame {" in MENU
@@ -73,7 +81,7 @@ assert "text: root.activeMode.emptyTitle" in MENU
 assert "text: root.activeMode.emptyDetail" in MENU
 assert "anchors.left: mainModeRail.right" in MENU
 assert "WlrKeyboardFocus.OnDemand : WlrKeyboardFocus.None" in MENU
-assert 'focusable: root.menuOpen && (root.activeMode.id === "tasks"' in MENU
+assert "focusable: root.menuOpen" in MENU
 
 for forbidden in (
     "Process {", "FileView {", "JsonAdapter {", "Timer {",

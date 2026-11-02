@@ -79,6 +79,25 @@ Scope {
         );
     }
 
+    function revisionRows(sourceId, eventId, nowMs, maximum) {
+        return ArchivePolicy.revisionRows(
+            workingDocument(),
+            sourceId,
+            eventId,
+            Number(nowMs) > 0 ? Number(nowMs) : Date.now(),
+            maximum
+        );
+    }
+
+    function latestDiff(sourceId, eventId, nowMs) {
+        return ArchivePolicy.latestDiff(
+            workingDocument(),
+            sourceId,
+            eventId,
+            Number(nowMs) > 0 ? Number(nowMs) : Date.now()
+        );
+    }
+
     function deferRequest(sourceId, row, capturedAtMs) {
         const next = deferredRequests.slice();
         next.push({

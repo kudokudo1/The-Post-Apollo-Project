@@ -482,6 +482,29 @@ Rectangle {
         );
     }
 
+    readonly property var selectedArchiveRows: {
+        const revision = selectedArchiveRevision;
+        if (!eventArchiveStore || !selectedEventContext)
+            return [];
+        return eventArchiveStore.revisionRows(
+            selectedContextSourceId,
+            selectedEventContext.id,
+            runtimeNowMs,
+            5
+        );
+    }
+
+    readonly property var selectedArchiveDiff: {
+        const revision = selectedArchiveRevision;
+        if (!eventArchiveStore || !selectedEventContext)
+            return null;
+        return eventArchiveStore.latestDiff(
+            selectedContextSourceId,
+            selectedEventContext.id,
+            runtimeNowMs
+        );
+    }
+
     readonly property bool selectedArchiveAvailable:
         !!eventArchiveStore
         && selectedEventContext !== null
@@ -3419,6 +3442,10 @@ Rectangle {
                         stationDiscovery.selectedArchiveCount
                     archiveStatusText:
                         stationDiscovery.selectedArchiveStatus
+                    archiveRows:
+                        stationDiscovery.selectedArchiveRows
+                    archiveDiff:
+                        stationDiscovery.selectedArchiveDiff
                     accentColor:
                         stationDiscovery.eventContextAccentColor()
                     onArchiveRequested:

@@ -67,6 +67,8 @@ jobs:
         run: node tests/weather/test_weather_provider_freshness_m18.js
       - name: Validate Weather M19 operator event archive
         run: node tests/weather/test_weather_event_archive_m19.js
+      - name: Validate Weather M20 archive revision history and diff
+        run: node tests/weather/test_weather_archive_revisions_m20.js
       - name: Validate Weather persistent last-known cache M4
         run: node tests/weather/test_weather_persistent_cache_m4.js
       - name: Validate Weather persistent cache M5 global events

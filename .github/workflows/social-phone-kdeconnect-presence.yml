@@ -1,0 +1,31 @@
+name: Social Phone KDE Connect Presence P1
+
+on:
+  pull_request:
+    paths:
+      - 'services/phone/KdeConnectPresence.py'
+      - 'tests/phone/test_kdeconnect_presence.py'
+      - 'MODEL/contracts/social-phone-kdeconnect-presence-p1-v0.md'
+      - '.github/workflows/social-phone-kdeconnect-presence.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'services/phone/KdeConnectPresence.py'
+      - 'tests/phone/test_kdeconnect_presence.py'
+      - 'MODEL/contracts/social-phone-kdeconnect-presence-p1-v0.md'
+      - '.github/workflows/social-phone-kdeconnect-presence.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  presence-contract:
+    name: Synthetic KDE Connect device presence, no CLI execution
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Compile probe and tests
+        run: python3 -m py_compile services/phone/KdeConnectPresence.py tests/phone/test_kdeconnect_presence.py
+      - name: Run offline no-device tests
+        run: python3 -m unittest discover -s tests/phone -p 'test_kdeconnect_presence.py' -v

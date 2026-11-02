@@ -146,7 +146,7 @@ function normalizeSelected(sourceId, row) {
 
 function pointInBounds(latitude, longitude, bounds) {
     if (!validPoint(latitude, longitude)
-            || !bounds || bounds.valid !== true)
+            || !plainBoundsAvailable(bounds))
         return false;
     const west = finite(bounds.west, null);
     const south = finite(bounds.south, null);
@@ -190,6 +190,56 @@ function radarCoverage(
               : covered
                 ? "FRAME COVERS EVENT COORDINATE"
                 : "EVENT OUTSIDE LOADED FRAME"
+    };
+}
+
+function plainBoundsAvailable(bounds) {
+    if (!bounds || typeof bounds !== "object" || bounds.valid === false)
+        return false;
+    const west = finite(bounds.west, null);
+    const south = finite(bounds.south, null);
+    const east = finite(bounds.east, null);
+    const north = finite(bounds.north, null);
+    return west !== null && south !== null
+        && east !== null && north !== null
+        && west < east && south < north;
+}
+
+function lightningCoverage(
+    selected, bounds, ready, latestTime,
+    windowMinutes, resolutionKm, radiusKm, usingCache
+) {
+    const hasFrame = ready === true && plainBoundsAvailable(bounds);
+    const hasPoint = !!selected && selected.hasPoint === true;
+    const covered = hasFrame && hasPoint
+        && pointInBounds(selected.latitude, selected.longitude, bounds);
+    const window = Math.max(
+        0,
+        Math.round(Number(windowMinutes) || 0)
+    );
+    const resolution = Math.max(
+        0,
+        Math.round(Number(resolutionKm) || 0)
+    );
+    const radius = Math.max(
+        0,
+        Math.round(Number(radiusKm) || 0)
+    );
+    return {
+        available: hasFrame,
+        covered: covered,
+        timeLabel: safeText(latestTime, 48) || "LATEST",
+        windowMinutes: window,
+        resolutionKm: resolution,
+        radiusKm: radius,
+        usingCache: usingCache === true,
+        status: !hasFrame
+            ? "NO LOADED LIGHTNING FRAME"
+            : !hasPoint
+              ? "EVENT HAS NO POINT COORDINATE"
+              : covered
+                ? "FRAME COVERS EVENT COORDINATE"
+                : "EVENT OUTSIDE LIGHTNING FRAME"
     };
 }
 

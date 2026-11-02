@@ -16,6 +16,8 @@ Rectangle {
     property var weatherService: null
     property var nwsAlertSource: null
     property var seismicSource: null
+    property var lightningSource: null
+    readonly property var lightningService: lightningSource
     property var persistentCacheStore: null
     property var liveHistoryStore: null
     property real runtimeNowMs: Date.now()
@@ -366,13 +368,6 @@ Rectangle {
         id: coastalService
         cacheStore: ground.persistentCacheStore
         historyStore: ground.liveHistoryStore
-        active: ground.visible
-        latitude: weatherService ? weatherService.latitude : ""
-        longitude: weatherService ? weatherService.longitude : ""
-    }
-
-    WeatherServices.NowcoastLightningService {
-        id: lightningService
         active: ground.visible
         latitude: weatherService ? weatherService.latitude : ""
         longitude: weatherService ? weatherService.longitude : ""

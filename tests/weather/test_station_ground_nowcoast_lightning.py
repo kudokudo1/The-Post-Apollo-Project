@@ -148,10 +148,27 @@ assert service.count("Process {") == 1
 assert service.count("Timer {") == 2
 assert "Qt.openUrlExternally" not in service
 
+station = (
+    ROOT / "widgets/weather/WeatherStationW.qml"
+).read_text(encoding="utf-8")
 ground = (
     ROOT / "widgets/weather/StationGround.qml"
 ).read_text(encoding="utf-8")
-assert "WeatherServices.NowcoastLightningService {" in ground
+map_ui = (
+    ROOT / "widgets/weather/StationDiscovery.qml"
+).read_text(encoding="utf-8")
+
+assert station.count("WeatherServices.NowcoastLightningService {") == 1
+assert "id: lightningService" in station
+assert 'weatherStation.currentView === "ground"' in station
+assert 'weatherStation.currentView === "map"' in station
+assert "lightningSource: lightningService" in station
+assert "WeatherServices.NowcoastLightningService {" not in ground
+assert "property var lightningSource: null" in ground
+assert "readonly property var lightningService: lightningSource" in ground
+assert "WeatherServices.NowcoastLightningService {" not in map_ui
+assert "property var lightningSource: null" in map_ui
+
 assert 'title: "LIGHTNING // NOAA NOWCOAST"' in ground
 assert "15-MIN STRIKE DENSITY" in ground
 assert "WEATHER FIX = CENTER CROSSHAIR" in ground

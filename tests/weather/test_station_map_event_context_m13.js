@@ -224,11 +224,20 @@ assert.match(
     /StationDiscovery\s*\{[\s\S]*?domain: "map"[\s\S]*?weatherService: weatherStation\.weatherService/
 );
 
-// Existing GROUND nowCOAST ownership remains unchanged.
+// M14 promotes nowCOAST to one WeatherStation-level owner. M13 continues
+// to reject a MAP-local duplicate and consumes the shared source only.
 const ground = read("widgets/weather/StationGround.qml");
 assert.equal(
     (ground.match(/WeatherServices\.NowcoastLightningService\s*\{/g) || []).length,
+    0
+);
+assert.equal(
+    (station.match(/WeatherServices\.NowcoastLightningService\s*\{/g) || []).length,
     1
+);
+assert.match(
+    station,
+    /StationDiscovery\s*\{[\s\S]*?domain: "map"[\s\S]*?lightningSource: lightningService/
 );
 
 console.log("Weather M13 cross-domain selected-event context: PASS");

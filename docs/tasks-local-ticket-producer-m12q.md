@@ -18,6 +18,7 @@ M12q puts a **new disabled-only ticket-producing path within the already-existin
 - `services/hub/TaskLocalTicketProducerM12q.js`: pure QML-compatible planner and verifier, using the **actual TASKS v3 policy** for all nine mutation methods. Requires a recognized Hub/Details/Planner/Projects surface, exact argument shape, permitted method, valid document, nonempty change, bounded UTF-8 JSON length, and a session-qualified ticket ID compatible with the M12o/M12p presenter contract. Does **not** write files or authenticate native callbacks.
 - `services/hub/ApolloHubTodoStore.qml`: keeps **one FileView**, `guardedWriterEnabled: false`, and the **same nine legacy `stage(TodoPolicy.*)` methods**. Adds `readonly property bool ticketProducerEnabled: false` and a `submit(surface,method,payload)` method that **always refuses writes** in current production. Its inactive code path would stage a planned mutation through the **same existing FileView**, treat `onSaved` as a hint, defer `reload()` until after the native callback unwinds, compare the exact returned JSON to the expected bytes and validated full task view, and emit a single ticket-specific result. A failed/ambiguous write keeps the last-confirmed in-memory document and reports `REVIEW_REQUIRED` rather than replaying automatically. The old FileView handlers still run when the literal flag is false.
 - `tests/tasks/test_task_local_ticket_producer_m12q.cjs`: pure policy regression vectors for all nine operations across eleven consumer/method combinations, refusal paths, exact/incorrect/early readback, compatibility with M12p first-consumer presentation, no second writer, and permanently disabled source flags.
+- `tests/tasks/test_task_writer_gate_inventory_m11d.py`: explicitly inventories the three new source-only public methods (`submit`, `ticketReview`, `ticketReadback`), verifies the compile-time disabled gate, and still requires exactly one executable `todoFile.setText(...)` call inside the original `stage()` seam. This is **not** a waiver of any production acceptance gate.
 - A scoped CI workflow.
 
 ### Mechanics and what `CONFIRMED` would mean
@@ -53,6 +54,12 @@ node --test tests/tasks/test_task_local_ticket_producer_m12q.cjs
 The preceding M12m real disposable-filesystem suite, M12n native-ticket model, M12o consumer contract, M12p Hub presenter and M12k outside-writer threat tests also run in CI.
 
 ## VERIFY
+
+### CI evidence and corrective iteration (2026-11-02)
+
+The first CI run found a **genuine writer-seam violation**: the inactive ticket path included a second `todoFile.setText(...)` call inside the same FileView. This was corrected by invoking the original `todo.stage({ok:true,document:stage.expectedDocument})` after ticket planning. Therefore the final source again has **exactly one FileView and one `setText` call**. The follow-up inventory failures exposed M11d's deliberately closed public-method list; its test now recognizes only the three audited, hard-disabled M12q ticket methods, checks their source guard and absence of direct writes, and retains every original nine mutation-route requirement. Its executable-write assertion ignores mere comments mentioning `setText`, while requiring the true write call still occur solely within `stage()`.
+
+**Final verified head `238fb6580b1da8272bed2f4b6fe690b9569606a3`: 27/27 GitHub Actions workflows passed,** including M12q's own nine-operation producer suite, M12p/M12o/M12n/M12m, M12i/M12k, M11t/M11d and all other triggered source checks. This is **source/fixture CI**, not native Quickshell acceptance or real data authorization.
 
 **Expected evidence from this PR:**
 

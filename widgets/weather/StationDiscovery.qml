@@ -1801,6 +1801,7 @@ Rectangle {
 
                 Row {
                     visible: (!stationDiscovery.weatherMapOnly || stationDiscovery.weatherLayerEnabled("radar") || stationDiscovery.weatherLayerEnabled("radar-fallback"))
+                             && !stationDiscovery.earthMapOnly
                     width: parent.width
                     height: 30
                     spacing: 7
@@ -1841,6 +1842,7 @@ Rectangle {
 
                 Row {
                     visible: (!stationDiscovery.weatherMapOnly || stationDiscovery.weatherLayerEnabled("radar"))
+                             && !stationDiscovery.earthMapOnly
                     width: parent.width
                     height: 32
                     spacing: 10
@@ -1920,6 +1922,7 @@ Rectangle {
 
                 QuietText {
                     visible: (!stationDiscovery.weatherMapOnly || stationDiscovery.weatherLayerEnabled("radar"))
+                             && !stationDiscovery.earthMapOnly
                     width: parent.width
                     text: "NOAA / NWS / MRMS // OFFICIAL BASE REFLECTIVITY // 4H MOVING HISTORY // COVERAGE IS NOT GLOBAL"
                     font.pixelSize: 9
@@ -1934,6 +1937,7 @@ Rectangle {
 
                 Row {
                     visible: (!stationDiscovery.weatherMapOnly || stationDiscovery.weatherLayerEnabled("radar-fallback"))
+                             && !stationDiscovery.earthMapOnly
                     width: parent.width
                     height: 32
                     spacing: 10
@@ -2010,6 +2014,7 @@ Rectangle {
 
                 Row {
                     visible: (!stationDiscovery.weatherMapOnly || stationDiscovery.weatherLayerEnabled("radar-fallback"))
+                             && !stationDiscovery.earthMapOnly
                     width: parent.width
                     height: 30
                     spacing: 10
@@ -2057,6 +2062,7 @@ Rectangle {
 
                 QuietText {
                     visible: (!stationDiscovery.weatherMapOnly || stationDiscovery.weatherLayerEnabled("radar-fallback"))
+                             && !stationDiscovery.earthMapOnly
                     width: parent.width
                     text: "RAINVIEWER API // SOURCE CREDIT REQUIRED // GLOBAL COVERAGE VARIES // PUBLIC FALLBACK HAS PAST RADAR ONLY"
                     font.pixelSize: 9
@@ -2071,6 +2077,7 @@ Rectangle {
 
                 Row {
                     visible: (!stationDiscovery.weatherMapOnly || stationDiscovery.weatherLayerEnabled("smoke"))
+                             && stationDiscovery.earthLayerEnabled("smoke")
                     width: parent.width
                     height: 32
                     spacing: 10
@@ -2127,6 +2134,7 @@ Rectangle {
 
                 Row {
                     visible: (!stationDiscovery.weatherMapOnly || stationDiscovery.weatherLayerEnabled("smoke"))
+                             && stationDiscovery.earthLayerEnabled("smoke")
                     width: parent.width
                     spacing: 16
 
@@ -2460,6 +2468,7 @@ Rectangle {
                         height: northWest.valid && southEast.valid
                                 ? Math.max(0, southEast.y - northWest.y) : 0
                         visible: stationDiscovery.radarDisplaySource === "noaa"
+                                 && !stationDiscovery.earthMapOnly
                                  && stationDiscovery.weatherLayerEnabled("radar")
                                  && source !== ""
                                  && northWest.valid && southEast.valid
@@ -2471,6 +2480,7 @@ Rectangle {
                                === "rainviewer"
                                && rainViewerRadarService.ready
                                && stationDiscovery.weatherLayerEnabled("radar-fallback")
+                               && !stationDiscovery.earthMapOnly
                                ? rainViewerRadarService.strips : []
 
                         delegate: Image {
@@ -2535,6 +2545,7 @@ Rectangle {
                         z: 0.2
 
                         property var smokeRows: stationDiscovery.weatherLayerEnabled("smoke")
+                                                && stationDiscovery.earthLayerEnabled("smoke")
                                                 ? hmsSmokeService.polygons : []
                         property real viewZoom: stationDiscovery.mapZoom
                         property real viewCenterLon: stationDiscovery.mapCenterLon
@@ -3046,6 +3057,7 @@ Rectangle {
                     Repeater {
                         model: firmsService.ready ? firmsService.hotspots : []
                         visible: !stationDiscovery.weatherMapOnly
+                                 && stationDiscovery.earthLayerEnabled("firms")
 
                         delegate: Item {
                             required property var modelData
@@ -4036,6 +4048,7 @@ Rectangle {
                 width: parent.width
                 spacing: 7
                 visible: stationDiscovery.newsMentionInspectorOpen
+                         && !stationDiscovery.earthMapOnly
 
                 StationSectionDivider {
                     width: parent.width
@@ -4356,6 +4369,7 @@ Rectangle {
 
             QuietText {
                 visible: !stationDiscovery.weatherMapOnly
+                         && stationDiscovery.earthLayerEnabled("eonet")
                          && (source.failed || !source.ready || source.rows.length === 0)
                 width: parent.width
                 text: source.failed
@@ -4371,6 +4385,7 @@ Rectangle {
             Repeater {
                 model: source.ready ? stationDiscovery.visibleRows : []
                 visible: !stationDiscovery.weatherMapOnly
+                         && stationDiscovery.earthLayerEnabled("eonet")
 
                 delegate: Rectangle {
                     required property var modelData
@@ -4466,8 +4481,11 @@ Rectangle {
 
             QuietText {
                 width: parent.width
-                text: stationDiscovery.weatherMapOnly
-                      ? "RADAR + SMOKE // MANUAL SOURCE REQUESTS"
+                text: stationDiscovery.earthMapOnly
+                      ? EarthPanelPolicy.routeLabel(stationDiscovery.earthMapRoute)
+                        + " // NATIVE SOURCE RECORDS // SELECT TO INSPECT"
+                      : stationDiscovery.weatherMapOnly
+                        ? "RADAR + SMOKE // MANUAL SOURCE REQUESTS"
                       : source.ready
                       ? "LAST RECEIVED // "
                         + Qt.formatDateTime(source.lastUpdated, "hh:mm") + " LOCAL"

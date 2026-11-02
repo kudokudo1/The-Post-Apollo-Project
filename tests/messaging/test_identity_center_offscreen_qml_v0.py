@@ -17,6 +17,7 @@ os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 from PySide6.QtCore import QObject, QUrl
 from PySide6.QtGui import QGuiApplication
 from PySide6.QtQml import QQmlComponent, QQmlEngine
+from PySide6.QtQuick import QQuickItem
 
 ROOT = Path(__file__).resolve().parents[2]
 QML = ROOT / "widgets/messanger/IdentityCenterOrganizationDisplayReader.qml"
@@ -237,7 +238,24 @@ class RealQtOrganizationsSettingsPaneSmoke(unittest.TestCase):
         return _value(self.sections.property("organizationDisplaySnapshot"))
 
     def _objects(self):
-        return self.sections.findChildren(QObject)
+        # A Repeater's delegates may have a visual parent without being
+        # QObject children of the enclosing QML Item. Traverse BOTH trees.
+        found = []
+        visited = set()
+        queue = [self.sections]
+        while queue:
+            item = queue.pop(0)
+            if item is None:
+                continue
+            identity = id(item)
+            if identity in visited:
+                continue
+            visited.add(identity)
+            found.append(item)
+            queue.extend(item.children())
+            if isinstance(item, QQuickItem):
+                queue.extend(item.childItems())
+        return found
 
     def _text(self, contains):
         return [
@@ -280,7 +298,12 @@ class RealQtOrganizationsSettingsPaneSmoke(unittest.TestCase):
         current = self._display()
         self.assertEqual([x["organizationId"] for x in current["organizations"]],
                          ["synthetic_llc", "synthetic_nonprofit"])
-        self.assertTrue(self._text("synthetic_llc // LLC // 1 SCOPE PREVIEWS"))
+        self.assertTrue(
+            self._text("synthetic_llc // LLC // 1 SCOPE PREVIEWS"),
+            "Missing dynamic LLC repeater row; visible Qt texts: " +
+            repr([x.property("text") for x in self._objects()
+                  if isinstance(x.property("text"), str)])[:1600],
+        )
         self.assertTrue(self._text("synthetic_nonprofit // NONPROFIT // 0 SCOPE PREVIEWS"))
         self.assertTrue(self._text("PORTFOLIOS // 1"))
         labels = [node for node in self._objects()

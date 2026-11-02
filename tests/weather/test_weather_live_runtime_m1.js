@@ -48,7 +48,8 @@ assert.equal(weather.mode, "NORMAL_POLL");
 assert.equal(weather.cadenceMs, 900000);
 assert.equal(weather.lifetime, "SESSION_BACKGROUND");
 assert.equal(weather.freshMs, 1200000);
-assert.equal(weather.staleMs, 21600000);
+assert.equal(weather.staleMs, 5400000);
+assert.equal(weather.expireMs, 21600000);
 
 const space = ctx.sourceSpec("space-core");
 assert.equal(space.mode, "FAST_POLL");

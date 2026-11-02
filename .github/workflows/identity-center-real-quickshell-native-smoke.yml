@@ -50,6 +50,10 @@ jobs:
         run: python3 tests/identity/native_quickshell_display_smoke_v0.py --scenario missing
       - name: Native Quickshell refresh clears revoked synthetic memberships
         run: python3 tests/identity/native_quickshell_display_smoke_v0.py --scenario revoke
+      - name: Native Quickshell refresh clears data after actual host socket shutdown
+        run: python3 tests/identity/native_quickshell_display_smoke_v0.py --scenario host-stop
+      - name: Native Quickshell clears and refetches on settings tab change
+        run: python3 tests/identity/native_quickshell_display_smoke_v0.py --scenario tab-change
 
   source-guard:
     name: Unmounted smoke root and no production host or shell mutations

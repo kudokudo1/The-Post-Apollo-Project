@@ -18,13 +18,16 @@ ShellRoot {
     readonly property string scenario:
         String(Quickshell.env("POST_APOLLO_IDENTITY_NATIVE_SCENARIO") || "")
     property bool observedReady: false
+    property int tabStep: 0
+    property bool testSettingsOpen: smoke.armed
+    property string testSection: smoke.armed ? "ORGANIZATIONS" : "SOCIAL LAYOUT"
 
     IdentityCenterSettingsSections {
         id: sections
         width: 820
         height: 560
-        settingsOpen: smoke.armed
-        activeSection: smoke.armed ? "ORGANIZATIONS" : "SOCIAL LAYOUT"
+        settingsOpen: smoke.testSettingsOpen
+        activeSection: smoke.testSection
     }
 
     Timer {
@@ -33,6 +36,36 @@ ShellRoot {
         running: smoke.armed
         onTriggered: {
             const view = sections.organizationDisplaySnapshot;
+            // Exercise the real settings-reader active binding, rather than
+            // injecting data directly into any QML display property.
+            if (smoke.scenario === "tab-change") {
+                if (smoke.tabStep === 0 && view
+                    && view.status === "READY"
+                    && sections.organizationDisplayReady
+                    && view.organizations.length === 2) {
+                    smoke.tabStep = 1;
+                    smoke.testSection = "SECURITY";
+                    return;
+                }
+                if (smoke.tabStep === 1
+                    && sections.activeSection === "SECURITY"
+                    && sections.organizationDisplaySnapshot === null
+                    && !sections.organizationDisplayReady) {
+                    smoke.tabStep = 2;
+                    smoke.testSection = "ORGANIZATIONS";
+                    return;
+                }
+                if (smoke.tabStep === 2 && view
+                    && view.status === "READY"
+                    && sections.organizationDisplayReady
+                    && view.organizations.length === 2
+                    && view.portfolios.length === 1
+                    && view.canSwitchOrganization === false) {
+                    console.log("IDENTITY_NATIVE_SMOKE_PASS_TAB_CHANGE");
+                    Qt.quit();
+                }
+                return;
+            }
             if (view === null || !view)
                 return;
             if (view.schema !== "post-apollo.identity.desktop-context-display.v0"
@@ -61,6 +94,18 @@ ShellRoot {
                 && view.organizations.length === 0) {
                 console.log("IDENTITY_NATIVE_SMOKE_PASS_MISSING");
                 Qt.quit();
+            }
+            if (smoke.scenario === "host-stop") {
+                if (view.status === "READY" && view.organizations.length === 2
+                    && sections.organizationDisplayReady)
+                    smoke.observedReady = true;
+                else if (smoke.observedReady && view.status === "UNAVAILABLE"
+                         && view.organizations.length === 0
+                         && view.portfolios.length === 0
+                         && !sections.organizationDisplayReady) {
+                    console.log("IDENTITY_NATIVE_SMOKE_PASS_HOST_STOP");
+                    Qt.quit();
+                }
             }
             if (smoke.scenario === "revoke") {
                 if (view.status === "READY" && view.organizations.length === 2)

@@ -20,6 +20,7 @@ from PySide6.QtQml import QQmlComponent, QQmlEngine
 
 ROOT = Path(__file__).resolve().parents[2]
 QML = ROOT / "widgets/messanger/IdentityCenterOrganizationDisplayReader.qml"
+SECTIONS_QML = ROOT / "widgets/messanger/IdentityCenterSettingsSections.qml"
 STUBS = ROOT / "tests/messaging/fixtures/identity_qml_stubs"
 SCHEMA = "post-apollo.identity.desktop-context-display.v0"
 APP = QGuiApplication.instance() or QGuiApplication([])
@@ -192,6 +193,140 @@ class RealQtOrganizationsReaderSmoke(unittest.TestCase):
         self.process.finishWith("null", 0)
         APP.processEvents()
         self.assertIsNone(self._snapshot())
+
+
+class RealQtOrganizationsSettingsPaneSmoke(unittest.TestCase):
+    """Load the REAL embedded Organizations section, not just its IPC reader.
+
+    Quickshell-only APIs are inert test stubs. The existing ActionButton,
+    Colors, QtQuick Repeater/Flickable, section visibility and QML bindings
+    are the actual repository components executed by the Qt 6 engine.
+    """
+
+    def setUp(self):
+        self.engine = QQmlEngine()
+        self.engine.addImportPath(str(STUBS))
+        self.component = QQmlComponent(
+            self.engine, QUrl.fromLocalFile(str(SECTIONS_QML))
+        )
+        self.assertTrue(
+            self.component.isReady(),
+            "Full settings QML failed native Qt loading:\n" +
+            "\n".join(str(e) for e in self.component.errors()),
+        )
+        self.sections = self.component.create()
+        self.assertIsNotNone(
+            self.sections,
+            "Full settings QML failed native Qt construction:\n" +
+            "\n".join(str(e) for e in self.component.errors()),
+        )
+        self.sections.setProperty("width", 820)
+        self.sections.setProperty("height", 560)
+        self.process = self.sections.findChild(QObject, "ciSnapshotProcess")
+        self.assertIsNotNone(self.process, "Embedded reader not instantiated")
+        APP.processEvents()
+
+    def tearDown(self):
+        self.sections.setProperty("settingsOpen", False)
+        APP.processEvents()
+        self.sections.deleteLater()
+        self.engine.deleteLater()
+        APP.processEvents()
+
+    def _display(self):
+        return _value(self.sections.property("organizationDisplaySnapshot"))
+
+    def _objects(self):
+        return self.sections.findChildren(QObject)
+
+    def _text(self, contains):
+        return [
+            node for node in self._objects()
+            if isinstance(node.property("text"), str)
+            and contains in node.property("text")
+        ]
+
+    def _open_organizations(self):
+        self.sections.setProperty("activeSection", "ORGANIZATIONS")
+        self.sections.setProperty("settingsOpen", True)
+        APP.processEvents()
+        self.assertTrue(self.process.property("running"))
+        self.assertEqual(list(_value(self.process.property("command"))), [
+            "/usr/bin/python3",
+            "/ci-fake-shell/services/identity/identity_display_reader_cli_v0.py",
+            "--json",
+        ])
+
+    def _finish(self, payload, status=0):
+        self.process.finishWith(json.dumps(payload), status)
+        APP.processEvents()
+
+    def test_real_navigation_keeps_reader_dormant_until_orgs_are_open(self):
+        self.assertEqual(self.sections.property("activeSection"), "SOCIAL LAYOUT")
+        self.assertFalse(self.sections.property("settingsOpen"))
+        self.assertFalse(self.process.property("running"))
+        self.sections.setProperty("settingsOpen", True)
+        APP.processEvents()
+        self.assertFalse(self.process.property("running"))
+        self.sections.setProperty("activeSection", "PROFILE")
+        APP.processEvents()
+        self.assertFalse(self.process.property("running"))
+        self.assertIsNone(self._display())
+
+    def test_real_organizations_panel_renders_only_synthetic_memberships(self):
+        self._open_organizations()
+        self._finish(_body())
+        self.assertTrue(self.sections.property("organizationDisplayReady"))
+        current = self._display()
+        self.assertEqual([x["organizationId"] for x in current["organizations"]],
+                         ["synthetic_llc", "synthetic_nonprofit"])
+        self.assertTrue(self._text("synthetic_llc // LLC // 1 SCOPE PREVIEWS"))
+        self.assertTrue(self._text("synthetic_nonprofit // NONPROFIT // 0 SCOPE PREVIEWS"))
+        self.assertTrue(self._text("PORTFOLIOS // 1"))
+        labels = [node for node in self._objects()
+                  if node.property("label") == "SWITCH ORGANIZATION // UNAVAILABLE"]
+        self.assertEqual(len(labels), 1)
+        self.assertIs(labels[0].property("interactive"), False)
+        self.assertTrue(self._text("ACTIVE ORGANIZATION // NONE VERIFIED"))
+        self.assertNotIn("accessToken", repr(current))
+
+    def test_tab_change_clears_rendered_organizations_and_ignores_late_reply(self):
+        self._open_organizations()
+        self._finish(_body())
+        self.assertTrue(self.sections.property("organizationDisplayReady"))
+        self.sections.setProperty("activeSection", "SECURITY")
+        APP.processEvents()
+        self.assertIsNone(self._display())
+        self.assertFalse(self.sections.property("organizationDisplayReady"))
+        self.sections.setProperty("activeSection", "ORGANIZATIONS")
+        APP.processEvents()
+        self.assertTrue(self.process.property("running"))
+        self.sections.setProperty("settingsOpen", False)
+        APP.processEvents()
+        self.assertIsNone(self._display())
+        self._finish(_body())
+        self.assertIsNone(self._display())
+
+    def test_host_logout_and_failure_are_reflected_in_real_panel(self):
+        self._open_organizations()
+        self._finish(_body())
+        self.assertTrue(self.sections.property("organizationDisplayReady"))
+        self.sections.setProperty("settingsOpen", False)
+        APP.processEvents()
+        self.sections.setProperty("settingsOpen", True)
+        APP.processEvents()
+        self._finish(_body(status="SIGNED_OUT"))
+        self.assertFalse(self.sections.property("organizationDisplayReady"))
+        self.assertEqual(self._display()["status"], "SIGNED_OUT")
+        self.assertEqual(self._display()["organizations"], [])
+        self.assertTrue(self._text("NOT CONNECTED // TRUSTED BACKEND REQUIRED"))
+        self.sections.setProperty("settingsOpen", False)
+        APP.processEvents()
+        self.sections.setProperty("settingsOpen", True)
+        APP.processEvents()
+        self.process.finishWith("not-json", 1)
+        APP.processEvents()
+        self.assertIsNone(self._display())
 
 
 if __name__ == "__main__":

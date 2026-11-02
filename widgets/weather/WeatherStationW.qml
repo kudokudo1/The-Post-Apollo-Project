@@ -74,6 +74,8 @@ PanelWindow {
     property bool relationshipFocused: false
 
     property string currentView: "home"
+    // M1 opt-in browser: the existing eight-mode UI remains canonical.
+    property bool subjectNavigationOpen: false
     property var newsMapOverlay: null
     property bool contextTerminalRequested: false
 
@@ -123,7 +125,8 @@ PanelWindow {
         return "UNKNOWN";
     }
 
-    readonly property string currentContext: currentViewName
+    readonly property string currentContext:
+        subjectNavigationOpen ? "SUBJECT INDEX" : currentViewName
 
     readonly property var officialAlertSummary:
         OfficialAlertPolicy.summary(
@@ -342,6 +345,9 @@ PanelWindow {
             return officialAlertSummary.headerText
                    + (officialAlertUsingPersistentCache ? " // CACHE" : "");
 
+        if (subjectNavigationOpen)
+            return "NAV PREVIEW";
+
         if (usesHomeSources) {
             if (homeWeatherUsable && homeSpaceUsable) {
                 if (runtimeCached(weatherRuntimeState)
@@ -401,6 +407,9 @@ PanelWindow {
             return officialAlertSummary.headerText
                    + (officialAlertUsingPersistentCache ? " // CACHE" : "");
 
+        if (subjectNavigationOpen)
+            return "INDEX // PREVIEW";
+
         if (usesHomeSources) {
             if (homeWeatherUsable && homeSpaceUsable)
                 return sourceStatusText + " // 2 FEEDS";
@@ -452,6 +461,9 @@ PanelWindow {
     readonly property color sourceStatusColor: {
         if (officialAlertSummary.available)
             return officialAlertColor(officialAlertSummary.colorToken);
+
+        if (subjectNavigationOpen)
+            return Colors.cyan;
 
         if (usesHomeSources) {
             if (homeWeatherUsable && homeSpaceUsable) {
@@ -610,7 +622,10 @@ PanelWindow {
                 return;
 
             if (event.key === Qt.Key_Escape) {
-                weatherStation.close();
+                if (weatherStation.subjectNavigationOpen)
+                    weatherStation.subjectNavigationOpen = false;
+                else
+                    weatherStation.close();
             } else if (event.key === Qt.Key_Tab
                        || event.key === Qt.Key_Backtab) {
                 const reverse =
@@ -654,6 +669,10 @@ PanelWindow {
     // Every visible rail page is a Main Mode. Tab/Shift+Tab cycles them
     // in rail order; Up/Down previews the same list and Enter activates it.
     function cycleMainMode(direction) {
+        if (subjectNavigationOpen) {
+            subjectNavigator.cycleSubjects(direction);
+            return;
+        }
         const current = Math.max(0, mainModes.findIndex(function(mode) {
             return mode.id === currentView;
         }));
@@ -664,12 +683,20 @@ PanelWindow {
     }
 
     function moveNavigationCursor(direction) {
+        if (subjectNavigationOpen) {
+            subjectNavigator.moveCursor(direction);
+            return;
+        }
         const step = Number(direction) < 0 ? -1 : 1;
         navigationIndex =
             (navigationIndex + step + mainModes.length) % mainModes.length;
     }
 
     function activateNavigationCursor() {
+        if (subjectNavigationOpen) {
+            subjectNavigator.activateCursor();
+            return;
+        }
         if (navigationIndex < 0 || navigationIndex >= mainModes.length)
             return;
         currentView = mainModes[navigationIndex].id;
@@ -712,6 +739,30 @@ PanelWindow {
         onActivated: weatherStation.activateNavigationCursor()
     }
 
+    function openSubjectNavigation() {
+        // The M1 browser is intentionally passive; never obscure a live
+        // terminal actor or reinterpret its exact legacy session identity.
+        if (!menuOpen || contextTerminalRequested
+                || terminalView.terminalState !== "IDLE")
+            return;
+        if (currentView === "terminal") {
+            currentView = "home";
+            navigationIndex = 0;
+        }
+        subjectNavigationOpen = true;
+    }
+
+    function openLegacyFromSubject(pageId) {
+        const index = mainModes.findIndex(function(mode) {
+            return mode.id === pageId;
+        });
+        if (index < 0)
+            return;
+        subjectNavigationOpen = false;
+        navigationIndex = index;
+        currentView = pageId;
+    }
+
     function open() {
         weatherStation.keyboardOwnershipRequested();
         menuOpen = true;
@@ -719,7 +770,8 @@ PanelWindow {
     }
 
     function launchContextTerminal() {
-        if (!menuOpen || terminalView.terminalState !== "IDLE")
+        if (!menuOpen || subjectNavigationOpen
+                || terminalView.terminalState !== "IDLE")
             return;
         contextTerminalRequested = true;
         // Wait for the host to become visible before requesting Kitty.
@@ -738,6 +790,7 @@ PanelWindow {
     }
 
     onCurrentViewChanged: {
+        subjectNavigationOpen = false;
         // One compositor-backed session at a time. Each new mode has a
         // different app ID; never direct Sway to close the wrong actor.
         closeContextTerminal();
@@ -745,6 +798,7 @@ PanelWindow {
 
     function close() {
         closeContextTerminal();
+        subjectNavigationOpen = false;
         menuOpen = false;
     }
 
@@ -844,11 +898,13 @@ PanelWindow {
                     id: contextTerminalLaunch
                     width: 106
                     height: 32
-                    label: weatherStation.currentView === "terminal"
+                    label: weatherStation.subjectNavigationOpen
+                           ? "INDEX" : weatherStation.currentView === "terminal"
                            ? "STAR MAP" : weatherStation.currentViewName
                     labelPixelSize: 11
                     contentPadding: 4
                     available: weatherStation.menuOpen
+                               && !weatherStation.subjectNavigationOpen
                                && terminalView.terminalState === "IDLE"
                     accentColor: Colors.cyan
                     onLeftClicked: weatherStation.launchContextTerminal()
@@ -1006,6 +1062,7 @@ PanelWindow {
 
             Column {
                 id: railColumn
+                visible: !weatherStation.subjectNavigationOpen
 
                 anchors.top: parent.top
                 anchors.left: parent.left
@@ -1049,6 +1106,44 @@ PanelWindow {
                     }
                 }
             }
+
+            // The new subject rail lives in its own QML component so this
+            // file keeps its one canonical existing Main Mode delegate.
+            StationSubjectRail {
+                id: subjectRailColumn
+                visible: weatherStation.subjectNavigationOpen
+                anchors.top: parent.top
+                anchors.left: parent.left
+                anchors.right: parent.right
+                anchors.topMargin: 14
+                navigator: subjectNavigator
+            }
+
+            // Explicit CLASSIC return. This is an index preview, not a
+            // premature activation of migrated source panels.
+            ActionButton {
+                id: subjectBrowserToggle
+                anchors.left: parent.left
+                anchors.right: parent.right
+                anchors.bottom: parent.bottom
+                anchors.leftMargin: 9
+                anchors.rightMargin: 9
+                anchors.bottomMargin: 12
+                height: 36
+                label: weatherStation.subjectNavigationOpen
+                       ? "CLASSIC" : "SUBJECTS"
+                labelPixelSize: 12
+                selected: weatherStation.subjectNavigationOpen
+                available: weatherStation.menuOpen
+                           && terminalView.terminalState === "IDLE"
+                           && !weatherStation.contextTerminalRequested
+                onClicked: {
+                    if (weatherStation.subjectNavigationOpen)
+                        weatherStation.subjectNavigationOpen = false;
+                    else
+                        weatherStation.openSubjectNavigation();
+                }
+            }
         }
 
         // ─────────────────────────────────────────
@@ -1074,6 +1169,7 @@ PanelWindow {
                 anchors.fill: parent
                 visible: weatherStation.currentView !== "terminal"
                          && !weatherStation.contextTerminalRequested
+                         && !weatherStation.subjectNavigationOpen
 
                 sourceComponent:
                     weatherStation.currentView === "home"
@@ -1091,6 +1187,17 @@ PanelWindow {
                     : weatherStation.currentView === "radio"
                     ? radioViewComponent
                     : placeholderViewComponent
+            }
+
+            StationSubjectNavigator {
+                id: subjectNavigator
+                anchors.fill: parent
+                visible: weatherStation.subjectNavigationOpen
+                         && !weatherStation.contextTerminalRequested
+                enabled: visible
+                onLegacyPageRequested: function(pageId) {
+                    weatherStation.openLegacyFromSubject(pageId);
+                }
             }
 
             StationTerminal {
@@ -1310,7 +1417,8 @@ PanelWindow {
 
                 anchors.rightMargin: 20
 
-                text: weatherStation.currentViewName
+                text: weatherStation.subjectNavigationOpen
+                      ? "SUBJECTS" : weatherStation.currentViewName
 
                 font.family: "GohuFont 11 Nerd Font Mono"
 
@@ -1327,7 +1435,10 @@ PanelWindow {
         enabled: weatherStation.menuOpen
 
         onActivated: {
-            weatherStation.close();
+            if (weatherStation.subjectNavigationOpen)
+                weatherStation.subjectNavigationOpen = false;
+            else
+                weatherStation.close();
         }
     }
 

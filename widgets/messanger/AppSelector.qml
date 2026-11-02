@@ -22,6 +22,8 @@ Rectangle {
     // Entry-point shell only. Identity storage, credentials and family layouts
     // are deliberately reserved for subsequent operator-reviewed slices.
     property bool settingsOpen: false
+    // Local UI selection only. Not a sign-in state or authorized organization.
+    property string settingsSection: "SOCIAL LAYOUT"
     // Browser identity sessions are explicitly opt-in and live in MessagingW.
     // The launcher rail, family metadata, and credential notes stay separate.
     property bool isolatedBrowserModeActive: false
@@ -374,6 +376,8 @@ Rectangle {
 
     onSettingsOpenChanged: {
         if (settingsOpen) {
+            // Preserve the established editor as the default settings screen.
+            settingsSection = "SOCIAL LAYOUT";
             appSelector.refreshAccountForm();
             // The broader editor opens ready to organize, without requiring
             // a second click through the old narrow "EDIT FAMILIES" control.
@@ -976,13 +980,32 @@ Rectangle {
             }
         }
 
+        // This navigation is embedded in the existing workspace, not a new
+        // Social window or a local authority for organization membership.
+        IdentityCenterSettingsSections {
+            id: identityCenterSettingsSections
+            anchors.top: settingsHeader.bottom
+            anchors.left: parent.left
+            anchors.right: parent.right
+            anchors.bottom: parent.bottom
+            activeSection: appSelector.settingsSection
+            onSectionRequested: function(section) {
+                appSelector.settingsSection = section;
+            }
+        }
+
+        // Keep the original editors alive and completely unchanged. Only
+        // their visibility changes when visiting the read-only pilot sections.
         Row {
+            id: settingsLegacyLayoutRow
+            visible: appSelector.settingsSection === "SOCIAL LAYOUT"
             anchors {
                 top: settingsHeader.bottom
                 left: parent.left
                 right: parent.right
                 bottom: parent.bottom
             }
+            anchors.topMargin: identityCenterSettingsSections.navigationHeight
             spacing: 0
 
             // Contact-list-sized identity and account setup column.

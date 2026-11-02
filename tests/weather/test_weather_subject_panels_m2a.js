@@ -88,6 +88,7 @@ test("provider activation matches only relevant routes and preserves old collect
   for (const s of ["river","lightning"])
     assert.ok(station.includes('subjectNavigator.currentPath, "'+s+'"'));
   assert.match(station,/!weatherStation\.subjectNavigationOpen\s*&& \(weatherStation\.currentView === "ground"/);
+  assert.match(station,/active: weatherStation\.menuOpen\s*&& !weatherStation\.subjectNavigationOpen\s*&& weatherStation\.currentView === "home"/);
   assert.ok(!pane.includes("WeatherServices."));
 });
 

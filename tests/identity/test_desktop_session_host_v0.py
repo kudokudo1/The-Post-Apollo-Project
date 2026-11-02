@@ -279,6 +279,17 @@ class HostTests(unittest.TestCase):
         self.assertEqual(self.host.snapshot()["status"], "NOT_CONNECTED")
         self.assertEqual(self.host.refresh_context()["organizations"], [])
 
+    def test_clock_rollback_during_refresh_revokes_host_bearer_too(self):
+        self.login()
+        self.assertEqual(self.host.refresh_context()["status"], "READY")
+        self.now = 999
+        view = self.host.refresh_context()
+        self.assertEqual(view["status"], "SIGNED_OUT")
+        self.assertEqual(view["organizations"], [])
+        self.now = 1000
+        self.assertEqual(self.host.refresh_context()["status"], "SIGNED_OUT")
+        self.assertEqual(len(self.api_received), 1)
+
     def test_api_401_clears_display_and_does_not_authorize_switch(self):
         self.login()
         self.host.refresh_context()

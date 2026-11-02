@@ -14,6 +14,9 @@ PanelWindow {
     id: deck
 
     property bool menuOpen: false
+    // The dock module owns the open state. Writing menuOpen from inside
+    // this panel would replace the parent's declarative QML binding.
+    signal closeRequested()
 
     // Keep the first pass easy to resize/reposition during the design phase.
     property int panelWidth: 520
@@ -433,13 +436,13 @@ PanelWindow {
     WlrLayershell.keyboardFocus: menuOpen
         ? WlrKeyboardFocus.OnDemand : WlrKeyboardFocus.None
 
-    // Close only this Hi-Fi panel when its own window receives Escape.
-    // Never stop playback or close another keyboard-owned widget.
+    // Ask the owning dock to close. Never assign to the bound menuOpen
+    // property here: that severs the binding and breaks subsequent opens.
     Shortcut {
         sequence: "Esc"
         context: Qt.WindowShortcut
         enabled: deck.menuOpen
-        onActivated: deck.menuOpen = false
+        onActivated: deck.closeRequested()
     }
 
     anchors {
@@ -760,7 +763,7 @@ PanelWindow {
                         // Esc works in MPD and MPRIS. Only navigation below
                         // remains MPD-specific and search-edit guarded.
                         if (event.key === Qt.Key_Escape) {
-                            deck.menuOpen = false;
+                            deck.closeRequested();
                             event.accepted = true;
                             return;
                         }

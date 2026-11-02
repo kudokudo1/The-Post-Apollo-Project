@@ -729,6 +729,9 @@ Item {
 
     MediaDeckW {
         id: deckPanel
+        // Keep the dock button and panel synchronized through this single
+        // owner. Escape must not write into the bound child menuOpen property.
         menuOpen: mediaRoot.deckOpen
+        onCloseRequested: mediaRoot.deckOpen = false
     }
 }

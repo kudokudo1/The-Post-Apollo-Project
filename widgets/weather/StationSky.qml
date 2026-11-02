@@ -22,6 +22,9 @@ Rectangle {
                 "loading": !!weatherService && weatherService.loading,
                 "errorText": weatherService ? weatherService.errorText : "",
                 "receivedAt": weatherService ? weatherService.lastUpdated : null,
+                "usingCache": weatherService
+                              ? weatherService.usingPersistentCurrentCache
+                              : false,
                 "detail": weatherService
                           && String(weatherService.observationTime || "") !== ""
                           ? "PROVIDER OBS CLOCK "
@@ -39,6 +42,9 @@ Rectangle {
                 "errorText": weatherService ? weatherService.errorText : "",
                 "receivedAt": weatherService
                               ? weatherService.forecastLastUpdated : null,
+                "usingCache": weatherService
+                              ? weatherService.usingPersistentForecastCache
+                              : false,
                 "detail": "FETCH TIME // PROVIDER ISSUE TIME NOT EXPOSED"
             },
             runtimeNowMs
@@ -53,6 +59,9 @@ Rectangle {
                              ? weatherService.aqiErrorText : "",
                 "receivedAt": weatherService
                               ? weatherService.aqiLastUpdated : null,
+                "usingCache": weatherService
+                              ? weatherService.usingPersistentAqiCache
+                              : false,
                 "detail": weatherService
                           && String(weatherService.airQualitySourceTime || "") !== ""
                           ? "SOURCE CLOCK "

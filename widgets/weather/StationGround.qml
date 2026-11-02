@@ -26,6 +26,9 @@ Rectangle {
                 "loading": !!weatherService && weatherService.loading,
                 "errorText": weatherService ? weatherService.errorText : "",
                 "receivedAt": weatherService ? weatherService.lastUpdated : null,
+                "usingCache": weatherService
+                              ? weatherService.usingPersistentCurrentCache
+                              : false,
                 "detail": weatherService
                           && String(weatherService.observationTime || "") !== ""
                           ? "PROVIDER OBS CLOCK "
@@ -44,6 +47,9 @@ Rectangle {
                              ? weatherService.aqiErrorText : "",
                 "receivedAt": weatherService
                               ? weatherService.aqiLastUpdated : null,
+                "usingCache": weatherService
+                              ? weatherService.usingPersistentAqiCache
+                              : false,
                 "detail": weatherService
                           && String(weatherService.airQualitySourceTime || "") !== ""
                           ? "SOURCE CLOCK "

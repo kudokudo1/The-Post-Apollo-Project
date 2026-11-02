@@ -6,6 +6,17 @@ import "SpaceHistoryPolicy.js" as SpaceHistoryPolicy
 Scope {
     id: spaceService
 
+    property var cacheStore: null
+    property bool usingPersistentKpCache: false
+    property bool usingPersistentSolarWindCache: false
+    property bool usingPersistentMagneticFieldCache: false
+    property bool usingPersistentSolarFluxCache: false
+    readonly property bool usingPersistentCache:
+        usingPersistentKpCache
+        || usingPersistentSolarWindCache
+        || usingPersistentMagneticFieldCache
+        || usingPersistentSolarFluxCache
+
     // ─────────────────────────────────────────────
     // PUBLIC STATE
     // ─────────────────────────────────────────────
@@ -253,6 +264,149 @@ Scope {
         }
     }
 
+    function updateAggregateLastUpdated() {
+        const stamps = [
+            kpLastUpdated,
+            solarWindLastUpdated,
+            magneticFieldLastUpdated,
+            solarFluxLastUpdated
+        ];
+        let newest = 0;
+        for (let i = 0; i < stamps.length; i++) {
+            const value = stamps[i];
+            if (!value || typeof value.getTime !== "function")
+                continue;
+            const millis = value.getTime();
+            if (isFinite(millis))
+                newest = Math.max(newest, millis);
+        }
+        if (newest > 0)
+            lastUpdated = new Date(newest);
+    }
+
+    function hydratePersistentCache() {
+        if (!cacheStore)
+            return false;
+
+        const now = Date.now();
+        let hydrated = false;
+
+        if (!kpReady) {
+            const saved = cacheStore.record("space-kp", now);
+            if (saved && saved.payload) {
+                const p = saved.payload;
+                kp = Number(p.kp);
+                kpTime = String(p.kpTime || "");
+                kpHistory = Array.isArray(p.kpHistory)
+                            ? p.kpHistory.slice() : [];
+                kpHistorySummary =
+                    p.kpHistorySummary && typeof p.kpHistorySummary === "object"
+                    ? p.kpHistorySummary : kpHistorySummary;
+                kpLastUpdated = new Date(saved.receivedAtMs);
+                kpErrorText = "";
+                kpReady = true;
+                usingPersistentKpCache = true;
+                hydrated = true;
+            }
+        }
+
+        if (!solarWindReady) {
+            const saved = cacheStore.record("space-wind", now);
+            if (saved && saved.payload) {
+                solarWindSpeed = Number(saved.payload.solarWindSpeed);
+                solarWindTime = String(saved.payload.solarWindTime || "");
+                solarWindLastUpdated = new Date(saved.receivedAtMs);
+                solarWindErrorText = "";
+                solarWindReady = true;
+                usingPersistentSolarWindCache = true;
+                hydrated = true;
+            }
+        }
+
+        if (!magneticFieldReady) {
+            const saved = cacheStore.record("space-imf", now);
+            if (saved && saved.payload) {
+                magneticFieldBt = Number(saved.payload.magneticFieldBt);
+                magneticFieldBz = Number(saved.payload.magneticFieldBz);
+                magneticFieldTime =
+                    String(saved.payload.magneticFieldTime || "");
+                magneticFieldLastUpdated = new Date(saved.receivedAtMs);
+                magneticFieldErrorText = "";
+                magneticFieldReady = true;
+                usingPersistentMagneticFieldCache = true;
+                hydrated = true;
+            }
+        }
+
+        if (!solarFluxReady) {
+            const saved = cacheStore.record("space-flux", now);
+            if (saved && saved.payload) {
+                solarFlux = Number(saved.payload.solarFlux);
+                solarFluxTime = String(saved.payload.solarFluxTime || "");
+                solarFluxLastUpdated = new Date(saved.receivedAtMs);
+                solarFluxErrorText = "";
+                solarFluxReady = true;
+                usingPersistentSolarFluxCache = true;
+                hydrated = true;
+            }
+        }
+
+        if (hydrated)
+            updateAggregateLastUpdated();
+        return hydrated;
+    }
+
+    function persistKp(receivedAtMs) {
+        if (!cacheStore || !kpReady)
+            return false;
+        return cacheStore.put("space-kp", receivedAtMs, {
+            "kp": kp,
+            "kpTime": kpTime,
+            "kpHistory": kpHistory,
+            "kpHistorySummary": kpHistorySummary
+        });
+    }
+
+    function persistSolarWind(receivedAtMs) {
+        if (!cacheStore || !solarWindReady)
+            return false;
+        return cacheStore.put("space-wind", receivedAtMs, {
+            "solarWindSpeed": solarWindSpeed,
+            "solarWindTime": solarWindTime
+        });
+    }
+
+    function persistMagneticField(receivedAtMs) {
+        if (!cacheStore || !magneticFieldReady)
+            return false;
+        return cacheStore.put("space-imf", receivedAtMs, {
+            "magneticFieldBt": magneticFieldBt,
+            "magneticFieldBz": magneticFieldBz,
+            "magneticFieldTime": magneticFieldTime
+        });
+    }
+
+    function persistSolarFlux(receivedAtMs) {
+        if (!cacheStore || !solarFluxReady)
+            return false;
+        return cacheStore.put("space-flux", receivedAtMs, {
+            "solarFlux": solarFlux,
+            "solarFluxTime": solarFluxTime
+        });
+    }
+
+    Connections {
+        target: spaceService.cacheStore
+        enabled: !!spaceService.cacheStore
+        function onStorageStateChanged() {
+            if (!spaceService.cacheStore)
+                return;
+            const state = String(spaceService.cacheStore.storageState || "");
+            if (state === "ready" || state === "empty")
+                spaceService.hydratePersistentCache();
+        }
+    }
+
     // ─────────────────────────────────────────────
     // Kp PARSER
     // ─────────────────────────────────────────────
@@ -273,6 +427,8 @@ Scope {
             kpErrorText = "";
             kpLastUpdated = receivedAt;
             lastUpdated = receivedAt;
+            usingPersistentKpCache = false;
+            persistKp(receivedAt.getTime());
         } catch (error) {
             console.log("SpaceService Kp parse error:", error);
 
@@ -303,6 +459,8 @@ Scope {
             solarWindErrorText = "";
             solarWindLastUpdated = receivedAt;
             lastUpdated = receivedAt;
+            usingPersistentSolarWindCache = false;
+            persistSolarWind(receivedAt.getTime());
         } catch (error) {
             console.log("SpaceService solar wind parse error:", error);
 
@@ -335,6 +493,8 @@ Scope {
             magneticFieldErrorText = "";
             magneticFieldLastUpdated = receivedAt;
             lastUpdated = receivedAt;
+            usingPersistentMagneticFieldCache = false;
+            persistMagneticField(receivedAt.getTime());
         } catch (error) {
             console.log("SpaceService magnetic field parse error:", error);
 
@@ -365,6 +525,8 @@ Scope {
             solarFluxErrorText = "";
             solarFluxLastUpdated = receivedAt;
             lastUpdated = receivedAt;
+            usingPersistentSolarFluxCache = false;
+            persistSolarFlux(receivedAt.getTime());
         } catch (error) {
             console.log("SpaceService solar flux parse error:", error);
 
@@ -407,6 +569,7 @@ Scope {
     // ─────────────────────────────────────────────
 
     Component.onCompleted: {
+        hydratePersistentCache();
         refresh();
     }
 }

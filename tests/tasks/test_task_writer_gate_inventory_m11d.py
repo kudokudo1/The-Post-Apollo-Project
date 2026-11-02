@@ -162,7 +162,7 @@ assert 'storePath === Quickshell.dataDir + "/apollo-hub-todo-v1.json"' in fixtur
 assert "guardedPath && flagsSafe" in fixture
 assert "readonly property bool ticketProducerEnabled: false" in store
 assert "TaskNativeStoreSmokeM12s" not in (ROOT/"shell.qml").read_text()
-assert not re.search(r"\\b(?:FileView|Process)\\s*\\{", fixture)
+assert not re.search(r"\b(?:FileView|Process)\s*\{", fixture)
 expected_callers = dict(data["callers"])
 assert not (set(expected_callers) & set(disposable))
 expected_callers.update(disposable)

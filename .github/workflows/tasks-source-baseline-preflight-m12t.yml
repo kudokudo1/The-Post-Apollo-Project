@@ -1,0 +1,49 @@
+name: TASKS M12t disposable source-baseline and backup preflight
+
+on:
+  pull_request:
+    paths:
+      - 'tests/tasks/fixtures/TaskSourcePreflightM12t.cjs'
+      - 'tests/tasks/test_task_source_preflight_m12t.cjs'
+      - 'docs/tasks-source-baseline-preflight-m12t.md'
+      - '.github/workflows/tasks-source-baseline-preflight-m12t.yml'
+      - 'tests/tasks/fixtures/verified_backup_restore_fixture.cjs'
+      - 'services/hub/ApolloHubTodoPolicy.js'
+      - 'services/hub/TaskLocalTicketProducerM12q.js'
+      - 'services/hub/ApolloHubTodoStore.qml'
+  push:
+    branches: [main]
+    paths:
+      - 'tests/tasks/fixtures/TaskSourcePreflightM12t.cjs'
+      - 'tests/tasks/test_task_source_preflight_m12t.cjs'
+      - '.github/workflows/tasks-source-baseline-preflight-m12t.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  disposable-source-preflight:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: M12t source/backup/ticket read-only observation
+        run: node --test tests/tasks/test_task_source_preflight_m12t.cjs
+      - name: M10e existing backup/restore fixture
+        run: node tests/tasks/test_verified_backup_restore.cjs
+      - name: M11z synthetic backup and code-only rollback
+        run: python3 tests/tasks/test_task_synthetic_backup_rollback_m11z.py
+      - name: M12q nine-mutation ticket planning
+        run: node --test tests/tasks/test_task_local_ticket_producer_m12q.cjs
+      - name: M12r dormant admission tests
+        run: node --test tests/tasks/test_task_disabled_admission_m12r.cjs
+      - name: M11d single production writer inventory
+        run: python3 tests/tasks/test_task_writer_gate_inventory_m11d.py
+      - name: M11t trust gate remains closed
+        run: python3 tests/tasks/test_task_production_trust_contract_m11t.py

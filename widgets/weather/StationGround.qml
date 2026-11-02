@@ -88,6 +88,107 @@ Rectangle {
             + " // CO-OPS OBSERVED WATER LEVEL // ASSOCIATION ONLY";
     }
 
+    readonly property var marineHistory: {
+        liveHistoryRevision;
+        const scope = marineService.currentKey;
+        return liveHistoryStore && scope !== ""
+            ? liveHistoryStore.samples(
+                "marine", scope, runtimeNowMs
+              )
+            : [];
+    }
+
+    readonly property var marineWindWaveRelation:
+        RelationshipPolicy.relationship(
+            marineHistory, "windSpeedMs",
+            marineHistory, "waveHeightM",
+            0,
+            48
+        )
+
+    readonly property var marinePressureWaveRelation:
+        RelationshipPolicy.relationship(
+            marineHistory, "pressureHpa",
+            marineHistory, "waveHeightM",
+            0,
+            48
+        )
+
+    readonly property var riverObservedSamples: {
+        if (!riverService.stageflowReady
+                || !riverService.stageflow
+                || !riverService.stageflow.observed
+                || !Array.isArray(
+                    riverService.stageflow.observed.data
+                ))
+            return [];
+
+        return riverService.stageflow.observed.data.map(
+            function(row) {
+                return {
+                    "observedAtMs": Number(row.validMillis),
+                    "receivedAtMs": Number(row.validMillis),
+                    "payload": {
+                        "stage": row.primary
+                    }
+                };
+            }
+        );
+    }
+
+    readonly property var riverPrecipRelation:
+        RelationshipPolicy.relationship(
+            pressureHistory, "precipMm",
+            riverObservedSamples, "stage",
+            90 * 60000,
+            48
+        )
+
+    function marineRelationSummary(relation) {
+        return "R "
+            + RelationshipPolicy.formatCorrelation(
+                relation ? relation.correlation : null
+              )
+            + " // "
+            + (relation ? relation.correlationLabel : "NEED ≥4 PAIRS");
+    }
+
+    function marineRelationFooter(relation) {
+        const count = relation ? Number(relation.count || 0) : 0;
+        const span = relation
+            ? RelationshipPolicy.spanLabel(relation.spanMs)
+            : "0m";
+        return "SAME NDBC OBS // " + count
+            + " PAIRS // SPAN " + span
+            + " // LINEAR ASSOCIATION ONLY, NOT CAUSATION";
+    }
+
+    function riverPrecipSummary() {
+        const units = riverService.stageflow
+            && riverService.stageflow.observed
+            ? String(
+                riverService.stageflow.observed.primaryUnits || ""
+              )
+            : "";
+        return "SYNC " + riverPrecipRelation.count
+            + " // Δ STAGE "
+            + RelationshipPolicy.formatDelta(
+                riverPrecipRelation.rightTrend.delta, 2
+              )
+            + (units !== "" ? " " + units : "");
+    }
+
+    function riverPrecipFooter() {
+        const distance = riverService.gauge
+            && isFinite(Number(riverService.gauge.distanceKm))
+            ? Math.round(Number(riverService.gauge.distanceKm))
+                + " KM GAUGE DISTANCE"
+            : "GAUGE DISTANCE --";
+        return "ALIGN ≤90m // " + distance
+            + " // WEATHER-FIX PRECIP ≠ BASIN RAINFALL"
+            + " // HYDROLOGIC LAG NOT MODELED // CONTEXT ONLY";
+    }
+
     readonly property var runtimeRows: [
         RuntimePolicy.displayRow(
             "weather-current",
@@ -839,6 +940,50 @@ Rectangle {
 
         StationSectionDivider {
             width: parent.width
+            title: "LIVE HISTORY // MARINE RELATIONSHIPS"
+        }
+
+        Row {
+            width: parent.width
+            spacing: 12
+
+            WeatherTrendInspector {
+                width: (parent.width - 12) / 2
+                title: "NDBC WIND ↔ WAVE HEIGHT"
+                leftLabel: "WIND m/s"
+                rightLabel: "WAVE m"
+                leftValues: ground.marineWindWaveRelation.leftValues
+                rightValues: ground.marineWindWaveRelation.rightValues
+                summaryText: ground.marineRelationSummary(
+                    ground.marineWindWaveRelation
+                )
+                footerText: ground.marineRelationFooter(
+                    ground.marineWindWaveRelation
+                )
+                leftColor: Colors.cyan
+                rightColor: Colors.orange
+            }
+
+            WeatherTrendInspector {
+                width: (parent.width - 12) / 2
+                title: "NDBC PRESSURE ↔ WAVE HEIGHT"
+                leftLabel: "PRESSURE hPa"
+                rightLabel: "WAVE m"
+                leftValues: ground.marinePressureWaveRelation.leftValues
+                rightValues: ground.marinePressureWaveRelation.rightValues
+                summaryText: ground.marineRelationSummary(
+                    ground.marinePressureWaveRelation
+                )
+                footerText: ground.marineRelationFooter(
+                    ground.marinePressureWaveRelation
+                )
+                leftColor: Colors.magenta
+                rightColor: Colors.orange
+            }
+        }
+
+        StationSectionDivider {
+            width: parent.width
             title: "RIVER // NOAA NWPS"
         }
 
@@ -1071,6 +1216,29 @@ Rectangle {
                         }
                     }
                 }
+            }
+
+            WeatherTrendInspector {
+                width: parent.width
+                visible: riverService.ready && !!riverService.gauge
+                title: "LOCAL PRECIP ↔ NWPS OBSERVED STAGE"
+                leftLabel: "PRECIP mm"
+                rightLabel: "STAGE "
+                    + (
+                        riverService.stageflow
+                        && riverService.stageflow.observed
+                        ? String(
+                            riverService.stageflow.observed.primaryUnits
+                            || ""
+                          )
+                        : ""
+                      )
+                leftValues: ground.riverPrecipRelation.leftValues
+                rightValues: ground.riverPrecipRelation.rightValues
+                summaryText: ground.riverPrecipSummary()
+                footerText: ground.riverPrecipFooter()
+                leftColor: Colors.cyan
+                rightColor: Colors.green
             }
 
             Column {

@@ -6,6 +6,7 @@ import Qt5Compat.GraphicalEffects
 import "../../components"
 import "../../services/weather" as WeatherServices
 import "StationOfficialAlertPolicy.js" as OfficialAlertPolicy
+import "../../services/weather/WeatherRuntimePolicy.js" as RuntimePolicy
 
 PanelWindow {
     id: weatherStation
@@ -155,52 +156,64 @@ PanelWindow {
         && newsViewerViewportRect.x + newsViewerViewportRect.width <= stationBackground.width
         && newsViewerViewportRect.y + newsViewerViewportRect.height <= stationBackground.height
 
-    readonly property int weatherAgeMinutes: {
+    readonly property var weatherRuntimeSpec:
+        RuntimePolicy.sourceSpec("weather")
+    readonly property var spaceRuntimeSpec:
+        RuntimePolicy.sourceSpec("space-core")
+
+    readonly property var weatherRuntimeState: {
         sourceStatusClock;
-
-        if (!weatherService || !weatherService.ready)
-            return -1;
-
-        const stamp = weatherService.lastUpdated;
-        if (!stamp || typeof stamp.getTime !== "function")
-            return -1;
-
-        const millis = stamp.getTime();
-        if (!isFinite(millis) || millis <= 0)
-            return -1;
-
-        return Math.max(
-            0,
-            Math.floor((Date.now() - millis) / 60000)
+        return RuntimePolicy.runtimeState(
+            weatherRuntimeSpec,
+            {
+                "active": true,
+                "ready": !!weatherService && weatherService.ready,
+                "loading": !!weatherService && weatherService.loading,
+                "errorText": weatherService
+                             ? weatherService.errorText : "",
+                "receivedAt": weatherService
+                              ? weatherService.lastUpdated : null,
+                "observedAt": weatherService
+                              ? weatherService.localObservationAnchorMs : -1
+            },
+            Date.now()
         );
     }
 
-    readonly property int spaceAgeMinutes: {
+    readonly property var spaceRuntimeState: {
         sourceStatusClock;
-
-        if (!spaceService)
-            return -1;
-
-        const stamp = spaceService.lastUpdated;
-        if (!stamp || typeof stamp.getTime !== "function")
-            return -1;
-
-        const millis = stamp.getTime();
-        if (!isFinite(millis) || millis <= 0)
-            return -1;
-
-        return Math.max(
-            0,
-            Math.floor((Date.now() - millis) / 60000)
+        return RuntimePolicy.runtimeState(
+            spaceRuntimeSpec,
+            {
+                "active": true,
+                "ready": !!spaceService && spaceService.ready,
+                "loading": !!spaceService && spaceService.loading,
+                "errorText": spaceService
+                             ? spaceService.errorText : "",
+                "receivedAt": spaceService
+                              ? spaceService.lastUpdated : null
+            },
+            Date.now()
         );
     }
+
+    readonly property int weatherAgeMinutes:
+        weatherRuntimeState.receivedAgeMs < 0
+        ? -1
+        : Math.floor(weatherRuntimeState.receivedAgeMs / 60000)
+
+    readonly property int weatherObservationAgeMinutes:
+        weatherRuntimeState.observationAgeMs < 0
+        ? -1
+        : Math.floor(weatherRuntimeState.observationAgeMs / 60000)
+
+    readonly property int spaceAgeMinutes:
+        spaceRuntimeState.receivedAgeMs < 0
+        ? -1
+        : Math.floor(spaceRuntimeState.receivedAgeMs / 60000)
 
     function compactAge(ageMinutes) {
-        if (ageMinutes < 0)
-            return "--";
-        if (ageMinutes === 0)
-            return "<1m";
-        return ageMinutes + "m";
+        return RuntimePolicy.compactAgeMinutes(ageMinutes);
     }
 
     readonly property string footerSourceStatus:
@@ -212,7 +225,8 @@ PanelWindow {
         && weatherService.ready
         && (
             String(weatherService.errorText || "").length > 0
-            || weatherAgeMinutes >= 20
+            || weatherRuntimeState.freshness === "AGING"
+            || weatherRuntimeState.freshness === "STALE"
         )
 
     readonly property bool homeWeatherUsable:

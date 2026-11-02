@@ -63,14 +63,65 @@ class SelfReportEvidence(unittest.TestCase):
             self.assertEqual(self.check(reduced)["status"], "FAIL")
 
     def test_native_failure_and_duplicate_terminal_reports_fail(self):
-        self.assertEqual(self.check(self.events[:-1]+[
+        outcome=self.check(self.events[:-1]+[
             "WARN: M12U_RESULT|FAIL|NATIVE_CALLBACK_TIMEOUT\n"
-        ])["reason"], "NATIVE_RESULT_NOT_CONFIRMED")
+        ])
+        self.assertEqual(outcome["reason"], "NATIVE_CALLBACK_TIMEOUT")
+        self.assertEqual(outcome["terminal"],
+                         [("FAIL", "NATIVE_CALLBACK_TIMEOUT")])
         self.assertEqual(self.check(self.events+self.events[-1:])["status"],
                          "FAIL")
         swapped = self.events[:]
         swapped[0], swapped[1] = swapped[1], swapped[0]
         self.assertEqual(self.check(swapped)["status"], "FAIL")
+
+
+    def test_explicit_native_failure_takes_priority_over_missing_stages(self):
+        outcome = self.check([
+            "WARN: M12U_BOOT|CONFIG_LOADED|PASS\n",
+            "WARN: M12U_RESULT|FAIL|FIXTURE_PATH_MISMATCH\n",
+        ])
+        self.assertEqual(outcome["status"], "FAIL")
+        self.assertEqual(outcome["reason"], "FIXTURE_PATH_MISMATCH")
+        self.assertEqual(outcome["stages"], [])
+        self.assertEqual(outcome["expectedNext"], "INITIAL_EMPTY")
+
+    def test_partial_native_failure_reports_observed_stage(self):
+        outcome = self.check([
+            "WARN: M12U_STAGE|INITIAL_EMPTY|PASS\n",
+            "WARN: M12U_STAGE|TICKET_DISABLED|PASS\n",
+            "WARN: M12U_RESULT|FAIL|SAVE_CALLBACK_INVALID\n",
+        ])
+        self.assertEqual(outcome["reason"], "SAVE_CALLBACK_INVALID")
+        self.assertEqual(outcome["stages"],
+                         ["INITIAL_EMPTY", "TICKET_DISABLED"])
+        self.assertEqual(outcome["expectedNext"], "NATIVE_SAVE")
+
+    def test_no_native_stages_reports_first_expected_stage(self):
+        outcome = self.check(["INFO: Configuration Loaded\n"])
+        self.assertEqual(outcome["status"], "FAIL")
+        self.assertEqual(outcome["reason"], "NATIVE_STAGE_SEQUENCE_MISSING")
+        self.assertEqual(outcome["expectedNext"], "INITIAL_EMPTY")
+
+    def test_ansi_wrapped_markers_keep_original_result(self):
+        colored = [
+            "\x1b[33mM12U_STAGE|INITIAL_EMPTY|PASS\x1b[0m\n",
+            "\x1b[33mM12U_RESULT|FAIL|PRODUCTION_GATES_UNSAFE\x1b[0m\n",
+        ]
+        outcome = self.check(colored)
+        self.assertEqual(outcome["reason"], "PRODUCTION_GATES_UNSAFE")
+
+    def test_source_guard_diagnostics_are_explicit_and_no_live_changes(self):
+        root_qml = (ROOT / "TaskNativeSelfReportM12u.qml").read_text()
+        runner = (ROOT / "tests/tasks/fixtures/TaskNativeSelfReportRunnerM12u.py").read_text()
+        self.assertIn('endTest(false, "FIXTURE_PATH_MISMATCH")', root_qml)
+        self.assertIn('endTest(false, "DISPOSABLE_ENV_MISSING")', root_qml)
+        self.assertIn('endTest(false, "PRODUCTION_GATES_UNSAFE")', root_qml)
+        self.assertIn("M12U_BOOT|CONFIG_LOADED|PASS", root_qml)
+        self.assertIn('env["NO_COLOR"] = "1"', runner)
+        self.assertIn('[qs, "--no-color", "-p", str(QML)]', runner)
+        self.assertNotIn("pkill", runner)
+        self.assertIn("stop_child(proc)", runner)
 
     def test_disk_changed_after_native_report_cannot_pass(self):
         self.data["tasks"][0]["title"] = "external-edit"

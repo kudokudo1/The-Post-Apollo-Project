@@ -12,6 +12,7 @@ import "../../services/weather/HmsSmokePolicy.js" as SmokePolicy
 import "../../services/weather/SeismicPolicy.js" as SeismicPolicy
 import "../../services/weather/GdacsPolicy.js" as GdacsPolicy
 import "../../services/weather/WeatherRuntimePolicy.js" as RuntimePolicy
+import "StationEventContextPolicy.js" as EventContextPolicy
 
 // Source-first stage. All records shown come from a backend, never examples.
 // MAP owns a local Natural Earth geographic basemap plus source-driven data
@@ -26,6 +27,7 @@ Rectangle {
     property var selectedNews: null
     property var newsMentionOverlay: null
     property var seismicSource: null
+    property var weatherService: null
     property var persistentCacheStore: null
     property real runtimeNowMs: Date.now()
     signal newsMapRequested(var payload)
@@ -308,6 +310,78 @@ Rectangle {
     readonly property bool gdacsInspectorOpen:
         domain === "map" && selectedMapGdacsEvent !== null
 
+    readonly property string selectedContextSourceId:
+        selectedMapGdacsEvent !== null ? "gdacs"
+        : selectedMapEarthquake !== null ? "usgs"
+        : selectedMapEvent !== null ? "eonet"
+        : selectedMapHotspot !== null ? "firms"
+        : ""
+
+    readonly property var selectedContextRow:
+        selectedContextSourceId === "gdacs" ? selectedMapGdacsEvent
+        : selectedContextSourceId === "usgs" ? selectedMapEarthquake
+        : selectedContextSourceId === "eonet" ? selectedMapEvent
+        : selectedContextSourceId === "firms" ? selectedMapHotspot
+        : null
+
+    readonly property var selectedEventContext:
+        EventContextPolicy.normalizeSelected(
+            selectedContextSourceId,
+            selectedContextRow
+        )
+
+    readonly property real selectedWeatherFixDistanceKm:
+        EventContextPolicy.weatherFixDistance(
+            selectedEventContext,
+            weatherService ? weatherService.latitude : null,
+            weatherService ? weatherService.longitude : null
+        )
+
+    readonly property var selectedRadarContext:
+        EventContextPolicy.radarCoverage(
+            selectedEventContext,
+            radarSnapshotBounds,
+            radarLoadedHistoryMinutes,
+            radarRequestedTimeMs,
+            mrmsRadarService.usingFrameCache
+        )
+
+    readonly property var selectedContextCompanions:
+        EventContextPolicy.nearbyEvidence(
+            selectedEventContext,
+            [
+                {
+                    "sourceId": "gdacs",
+                    "rows": mapShowGdacs && gdacsService.ready
+                        ? gdacsService.events : []
+                },
+                {
+                    "sourceId": "usgs",
+                    "rows": mapShowEarthquakes
+                        && seismicSource
+                        && seismicSource.ready
+                        ? seismicSource.events : []
+                },
+                {
+                    "sourceId": "eonet",
+                    "rows": source && Array.isArray(source.rows)
+                        ? source.rows : []
+                },
+                {
+                    "sourceId": "firms",
+                    "rows": firmsService.ready
+                        ? firmsService.hotspots : []
+                }
+            ],
+            250,
+            6
+        )
+
+    readonly property bool eventContextInspectorOpen:
+        domain === "map"
+        && selectedContextSourceId !== ""
+        && selectedEventContext !== null
+
     readonly property var mapFilterOptions: [
         { "id": "all", "label": "ALL EVENTS", "category": "" },
         { "id": "wildfires", "label": "WILDFIRE", "category": "wildfires" },
@@ -579,6 +653,27 @@ Rectangle {
         case "cyan": return Colors.cyan;
         case "blue": return Colors.blue;
         default: return Colors.white;
+        }
+    }
+
+    function eventContextAccentColor() {
+        switch (selectedContextSourceId) {
+        case "gdacs":
+            return selectedMapGdacsEvent
+                ? gdacsAlertColor(selectedMapGdacsEvent.alertLevel)
+                : Colors.magenta;
+        case "usgs":
+            return selectedMapEarthquake
+                ? earthquakeDepthColor(selectedMapEarthquake.depthKm)
+                : Colors.cyan;
+        case "eonet":
+            return selectedMapEvent
+                ? mapPointColor(selectedMapEvent.categoryId)
+                : Colors.cyan;
+        case "firms":
+            return Colors.orange;
+        default:
+            return Colors.white;
         }
     }
 
@@ -3148,6 +3243,30 @@ Rectangle {
                 width: parent.width
                 text: stationDiscovery.sourceCaution
                 font.pixelSize: 11
+            }
+
+            Column {
+                width: parent.width
+                spacing: 7
+                visible: stationDiscovery.eventContextInspectorOpen
+
+                StationSectionDivider {
+                    width: parent.width
+                    title: "EVENT CONTEXT // CROSS-DOMAIN"
+                }
+
+                StationEventContextCard {
+                    width: parent.width
+                    eventContext: stationDiscovery.selectedEventContext
+                    weatherFixDistanceKm:
+                        stationDiscovery.selectedWeatherFixDistanceKm
+                    radarContext:
+                        stationDiscovery.selectedRadarContext
+                    companions:
+                        stationDiscovery.selectedContextCompanions
+                    accentColor:
+                        stationDiscovery.eventContextAccentColor()
+                }
             }
 
             Column {

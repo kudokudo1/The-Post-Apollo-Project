@@ -53,6 +53,8 @@ jobs:
         run: node tests/weather/test_weather_history_inspectors_m11.js
       - name: Validate Weather M12 marine and hydrology context
         run: node tests/weather/test_weather_marine_hydrology_m12.js
+      - name: Validate Weather M13 cross-domain event context
+        run: node tests/weather/test_station_map_event_context_m13.js
       - name: Validate Weather persistent last-known cache M4
         run: node tests/weather/test_weather_persistent_cache_m4.js
       - name: Validate Weather persistent cache M5 global events

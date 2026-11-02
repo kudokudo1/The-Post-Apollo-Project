@@ -52,7 +52,7 @@ DockButton {
 
         GohuText {
             id: sessionsLeftOrnaments
-            // Move ONLY the left white marks 3px right. The phone and the
+            // Move ONLY the left ornaments 3px right. The phone and the
             // entire right-side sequence remain at the original text positions.
             anchors.left: parent.left
             anchors.leftMargin: 3

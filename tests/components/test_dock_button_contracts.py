@@ -202,7 +202,7 @@ for needle in (
     "visible: false",
     "x: sessionsLeftOrnaments.implicitWidth",
     "+ (sessionsPhoneAdvance.implicitWidth - implicitWidth) / 2",
-    "font.pixelSize: 28",
+    "font.pixelSize: 24",
     "anchors.baseline: parent.baseline",
     'text: "☎︎"',
     "anchors.baseline: parent.baseline",
@@ -245,7 +245,7 @@ assert "Math.max(65, Math.ceil(sessionsIcon.implicitWidth) + 16)" not in social_
 assert "implicitHeight: 50" in social_module
 assert "implicitWidth: Math.max(63, Math.ceil(sessionsIcon.implicitWidth) + 14)" in social_module
 assert "font.pixelSize: 21" in social_module
-assert "font.pixelSize: 28" in social_module
+assert "font.pixelSize: 24" in social_module
 assert "text: \"<font color='transparent'>࣪˖☎︎</font>๋࣭✧\"" in social_module
 assert social_module.count("contentGlowSource: sessionsIcon") == 1
 # 10px is exactly 7px farther right than the 3px accepted prior overlay.

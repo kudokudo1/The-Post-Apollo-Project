@@ -1,0 +1,49 @@
+name: TASKS M12k external-writer threat boundary and M12j evidence provenance
+
+on:
+  pull_request:
+    paths:
+      - 'tests/tasks/fixtures/task_native_receipt_external_writer_m12k.json'
+      - 'tests/tasks/test_task_uncooperative_writer_m12k.py'
+      - 'docs/tasks-m12j-checkpoint-and-external-writer-boundary-m12k.md'
+      - '.github/workflows/tasks-uncooperative-writer-m12k.yml'
+      - 'tests/tasks/fixtures/TaskStageSourceReceiptM12h.py'
+      - 'services/hub/ApolloHubTodoStore.qml'
+      - 'shell.qml'
+  push:
+    branches: [main]
+    paths:
+      - 'tests/tasks/fixtures/task_native_receipt_external_writer_m12k.json'
+      - 'tests/tasks/test_task_uncooperative_writer_m12k.py'
+      - 'docs/tasks-m12j-checkpoint-and-external-writer-boundary-m12k.md'
+      - '.github/workflows/tasks-uncooperative-writer-m12k.yml'
+      - 'services/hub/ApolloHubTodoStore.qml'
+      - 'shell.qml'
+
+permissions:
+  contents: read
+
+jobs:
+  m12k-disposable-external-writer:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: M12k second same-UID process and outside-writer limitations
+        run: python3 tests/tasks/test_task_uncooperative_writer_m12k.py
+      - name: M12h stage receipt and independent exact source readback regressions
+        run: python3 tests/tasks/test_task_stage_source_receipt_m12h.py
+      - name: M12i standalone host process and protocol regression
+        run: python3 tests/tasks/test_task_native_receipt_host_m12i.py
+      - name: M12f disposable source/journal evidence read-only regression
+        run: python3 tests/tasks/test_task_native_evidence_inspector_m12f.py
+      - name: M11t original production trust gates remain open
+        run: python3 tests/tasks/test_task_production_trust_contract_m11t.py
+      - name: M11d one live legacy TASKS FileView owner
+        run: python3 tests/tasks/test_task_writer_gate_inventory_m11d.py

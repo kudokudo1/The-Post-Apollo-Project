@@ -21,7 +21,7 @@ permissions:
 
 jobs:
   synthetic-plugin-evidence:
-    name: KDE Connect D-Bus metadata: no live access
+    name: "KDE Connect D-Bus metadata: no live access"
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4

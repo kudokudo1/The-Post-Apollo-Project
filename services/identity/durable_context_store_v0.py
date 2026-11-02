@@ -11,6 +11,7 @@ until its schema, owner, storage security, migration and auditing are reviewed.
 """
 from __future__ import annotations
 
+from contextlib import closing
 from pathlib import Path
 import sqlite3
 from urllib.parse import quote
@@ -27,7 +28,7 @@ class DurableContextStore:
             raise ValueError("An existing absolute SQLite database is required")
         self._uri = "file:" + quote(str(database_path.resolve(strict=True)),
                                     safe="/") + "?mode=ro"
-        with self._connect() as db:
+        with closing(self._connect()) as db:
             if db.execute("PRAGMA user_version").fetchone()[0] != 1:
                 raise ValueError("Unsupported synthetic context schema")
 
@@ -51,7 +52,7 @@ class DurableContextStore:
                 or type(provider_subject) is not str or not provider_subject
                 or type(now) is not int or now < 0):
             return None
-        with self._connect() as db:
+        with closing(self._connect()) as db:
             if db.execute("PRAGMA user_version").fetchone()[0] != 1:
                 return None
             match = db.execute(

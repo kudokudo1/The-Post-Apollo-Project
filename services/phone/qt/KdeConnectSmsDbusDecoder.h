@@ -2,6 +2,7 @@
 // Isolated, in-memory KDE Connect SMS D-Bus data decoding. No bus access.
 #pragma once
 
+#include <QDBusArgument>
 #include <QDBusVariant>
 #include <QJsonObject>
 #include <QList>

@@ -127,6 +127,10 @@ function rejected(change, reason) {
 }
 rejected(d => { d.format = "unknown"; }, "PREVIEW_FORMAT_UNSUPPORTED");
 rejected(d => { d.semantics.incidentMerge = true; }, "PREVIEW_SEMANTICS_UNTRUSTED");
+rejected(d => { d.semantics.relationshipMeaning = "SAME_INCIDENT"; },
+    "PREVIEW_SEMANTICS_UNTRUSTED");
+rejected(d => { d.semantics.rawFrameBytes = "INCLUDED"; },
+    "PREVIEW_SEMANTICS_UNTRUSTED");
 rejected(d => { d.selectedEvent.eventId = ""; }, "INVALID_PROVIDER_NATIVE_IDENTITY");
 rejected(d => { d.selectedEvent.sourceId = "unknown"; }, "INVALID_PROVIDER_NATIVE_IDENTITY");
 rejected(d => { d.selectedEvent.point.longitude = -200; }, "INVALID_PROVIDER_NATIVE_IDENTITY");
@@ -137,6 +141,10 @@ rejected(d => { d.nearbyEvents[0].distanceKm = 400; }, "NEARBY_PROVENANCE_INVALI
 rejected(d => { d.nearbyEvents.push(d.nearbyEvents[0]); d.counts.nearby=2; },
     "NEARBY_IDENTITY_DUPLICATED");
 rejected(d => { d.operationalEvidence[0].sameIncidentClaim=true; },
+    "OPERATIONAL_PROVENANCE_INVALID");
+rejected(d => { d.operationalEvidence[0].interpretation="RADAR PROVED INCIDENT"; },
+    "OPERATIONAL_PROVENANCE_INVALID");
+rejected(d => { d.operationalEvidence[1].limitation="NO LIMITATION"; },
     "OPERATIONAL_PROVENANCE_INVALID");
 rejected(d => { d.operationalEvidence[0].receivedAtMs=-999; },
     "OPERATIONAL_PROVENANCE_INVALID");

@@ -1,0 +1,41 @@
+name: Identity Center Native Session Host Contract
+
+on:
+  pull_request:
+    paths:
+      - 'services/identity/desktop_session_host_v0.py'
+      - 'tests/identity/test_desktop_session_host_v0.py'
+      - 'MODEL/contracts/identity-center-desktop-session-host-v0.md'
+      - '.github/workflows/identity-center-desktop-session-host.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'services/identity/desktop_session_host_v0.py'
+      - 'tests/identity/test_desktop_session_host_v0.py'
+      - 'MODEL/contracts/identity-center-desktop-session-host-v0.md'
+      - '.github/workflows/identity-center-desktop-session-host.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  native-host:
+    name: Host PKCE state, callback replay and tokenless UI contract
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Compile host and tests
+        run: |
+          python3 -m py_compile services/identity/desktop_session_host_v0.py
+          python3 -m py_compile tests/identity/test_desktop_session_host_v0.py
+      - name: Test native host state machine and token custody boundaries
+        run: python3 -m unittest discover -s tests/identity -p 'test_desktop_session_host_v0.py' -v
+      - name: Verify preexisting read-only desktop projection
+        run: python3 -m unittest discover -s tests/identity -p 'test_desktop_context_projection_v0.py' -v
+      - name: Verify existing Social Organizations UI remains disconnected
+        run: python3 -m unittest discover -s tests/messaging -p 'test_identity_center_desktop_display_v0.py' -v

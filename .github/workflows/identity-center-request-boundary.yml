@@ -38,3 +38,5 @@ jobs:
           python3 -m py_compile tests/identity/test_synthetic_request_boundary_v0.py
       - name: Execute all offline tenant, portfolio and identity-binding tests
         run: python3 -m unittest discover -s tests/identity -p 'test_*.py' -v
+      - name: Verify durable current-user loopback contract explicitly
+        run: python3 -m unittest discover -s tests/identity -p 'test_durable_context_service_v0.py' -v

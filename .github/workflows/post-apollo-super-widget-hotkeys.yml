@@ -1,0 +1,24 @@
+name: Post-Apollo Super Widget Hotkey Contracts
+
+on:
+  pull_request:
+    paths:
+      - "shell.qml"
+      - "modules/Mediaplayer.qml"
+      - "config/sway/post-apollo-widget-hotkeys.conf"
+      - "tests/navigation/test_super_widget_hotkeys.py"
+      - ".github/workflows/post-apollo-super-widget-hotkeys.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  source-contracts:
+    name: Super widget hotkey source contracts
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Assert global chord map and existing owner IPC toggles
+        run: python3 tests/navigation/test_super_widget_hotkeys.py

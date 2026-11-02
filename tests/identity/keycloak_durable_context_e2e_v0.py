@@ -25,6 +25,7 @@ sys.path.insert(0, str(ROOT / "services" / "identity"))
 sys.path.insert(0, str(ROOT / "tests" / "identity"))
 
 from durable_context_store_v0 import DurableContextStore, CONTEXT_SCHEMA
+from desktop_context_projection_v0 import DesktopContextProjection, HostContextReply
 from keycloak_loopback_pilot_verifier_v0 import LoopbackKeycloakPilotVerifier
 from read_only_context_wsgi_v0 import ReadOnlyContextApp
 from keycloak_real_oidc_pilot_v0 import (
@@ -182,11 +183,26 @@ def main(fixture_dir: Path) -> None:
         task.start()
         try:
             port = server.server_port
+            # Fake privileged DESKTOP host owns this callback; the bearer
+            # never enters DesktopContextProjection or Social QML.
+            def host_owned_context_fetch() -> HostContextReply:
+                status, payload = _request(port, access)
+                return HostContextReply(
+                    status, "application/json",
+                    json.dumps(payload, separators=(",", ":")).encode("utf-8"),
+                )
+
+            display = DesktopContextProjection(
+                host_fetch=host_owned_context_fetch,
+                clock=lambda: int(time.time()),
+            )
             # Valid signed token is NOT enough without a trusted explicit
             # issuer+subject -> internal principal enrollment.
             code, body = _request(port, access)
             require(code == 401 and body == {"status": "DENIED"},
                     "Unmapped real Keycloak subject was accepted")
+            require(display.refresh()["status"] == "SIGNED_OUT",
+                    "Desktop projection accepted unmapped provider subject")
 
             _update_fixture(
                 path,
@@ -196,6 +212,14 @@ def main(fixture_dir: Path) -> None:
             code, body = _request(port, access)
             require(code == 200 and body.get("schema") == CONTEXT_SCHEMA,
                     "Mapped signed Keycloak token did not reach durable API")
+            desktop = display.refresh()
+            require(desktop["status"] == "READY"
+                    and [x["organizationId"] for x in desktop["organizations"]]
+                        == ["llc_a", "llc_b"]
+                    and desktop["canSwitchOrganization"] is False
+                    and "access_token" not in repr(desktop)
+                    and access not in repr(desktop),
+                    "Tokenless desktop projection lost API authorization boundary")
             require([org["organizationId"] for org in body["organizations"]]
                     == ["llc_a", "llc_b"],
                     "Verified user has incorrect company membership summary")
@@ -245,6 +269,11 @@ def main(fixture_dir: Path) -> None:
             require(body["portfolios"] == [{
                 "portfolioId": "family", "organizationIds": ["llc_b"],
             }], "Revoked organization remains visible through portfolio")
+            desktop = display.refresh()
+            require(desktop["status"] == "READY"
+                    and [x["organizationId"] for x in desktop["organizations"]]
+                        == ["llc_b"],
+                    "Tokenless desktop display retained revoked company")
 
             # Keycloak logout must invalidate the ORIGINAL still-signed access
             # token at the HTTP layer via live server introspection.
@@ -259,6 +288,9 @@ def main(fixture_dir: Path) -> None:
             status, output = _request(port, access)
             require(status == 401 and output == {"status": "DENIED"},
                     "Revoked IdP session accessed the persisted organizations")
+            require(display.refresh()["status"] == "SIGNED_OUT"
+                    and display.snapshot()["organizations"] == [],
+                    "Tokenless projection retained companies after real logout")
         finally:
             server.shutdown()
             server.server_close()
@@ -268,6 +300,7 @@ def main(fixture_dir: Path) -> None:
     print("PASS: genuine Keycloak S256 PKCE -> signed JWT -> issuer+subject mapping")
     print("PASS: real authenticated GET /v0/me/contexts and per-tenant grant isolation")
     print("PASS: durable membership revocation and post-logout token denial")
+    print("PASS: real Keycloak bearer never enters tokenless desktop display")
 
 
 if __name__ == "__main__":

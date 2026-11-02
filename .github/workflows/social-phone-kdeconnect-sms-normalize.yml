@@ -1,0 +1,31 @@
+name: Social Phone KDE Connect SMS Normalization P1
+
+on:
+  pull_request:
+    paths:
+      - 'services/phone/KdeConnectSmsNormalize.py'
+      - 'tests/phone/test_kdeconnect_sms_normalize.py'
+      - 'MODEL/contracts/social-phone-kdeconnect-sms-normalize-p1-v0.md'
+      - '.github/workflows/social-phone-kdeconnect-sms-normalize.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'services/phone/KdeConnectSmsNormalize.py'
+      - 'tests/phone/test_kdeconnect_sms_normalize.py'
+      - 'MODEL/contracts/social-phone-kdeconnect-sms-normalize-p1-v0.md'
+      - '.github/workflows/social-phone-kdeconnect-sms-normalize.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  offline-sms-normalization:
+    name: "KDE Connect SMS: synthetic normalization only"
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Compile normalizer and tests
+        run: python3 -m py_compile services/phone/KdeConnectSmsNormalize.py tests/phone/test_kdeconnect_sms_normalize.py
+      - name: Run synthetic normalization and privacy fixtures
+        run: python3 -m unittest discover -s tests/phone -p 'test_kdeconnect_sms_normalize.py' -v

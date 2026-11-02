@@ -70,6 +70,11 @@ This doesn't import a native FileView, start Quickshell, access real tasks, requ
 - Single production `FileView`, all nine mutation paths and `guardedWriterEnabled: false` remain unchanged.
 - **No native QML runtime test of M12p** is included. GitHub CI is a source/test-model boundary, not proof of a live ticket UI.
 
+
+### CI caveat on this branch (verified November 2, 2026)
+
+GitHub Actions showed **M12p, M12o, M11d, M11x, Apollo Hub foundation and Meta Apollo Grammar successful** after the M12o historical assertion was updated to recognize the literal-disabled Hub seam. The separate `TASKS dock contracts` workflow still fails at `tests/tasks/test_task_details_ui_contracts.py:81` because that test expects the historical substring `focusable: root.menuOpen && (root.activeMode.id === "tasks"`, whereas current `widgets/TasksW.qml` contains `focusable: root.menuOpen` with focus behavior handled separately. **Neither `widgets/TasksW.qml` nor this dock test is changed in M12p; this failure is not evidence M12p ticket logic is broken.** The owning dock/UI worker should reconcile that assertion and actual focus semantics independently; do not silently patch it in this TASKS storage assignment. The PR is not fully green while that check remains failed.
+
 ## WATCH OUT FOR
 
 - No actual production ticket producer exists. The new branch does **not** create one and does not enable ticket mode. `ticketProducer` is an optional future injected dependency currently always null, and the connection signal is detached while disabled.
@@ -86,7 +91,9 @@ This doesn't import a native FileView, start Quickshell, access real tasks, requ
 - [x] Add M12p pure presenter for the four Hub methods
 - [x] Add disabled-only QML seam without touching storage or existing methods
 - [x] Add policy-driven draft and late-receipt regression tests
-- [ ] CI green and final diff audit
+- [x] M12p and M12o CI pass, including all persistence guard regressions
+- [ ] Unrelated pre-existing TASKS dock check remains red (see VERIFY/WATCH OUT FOR); separately owned
+- [x] Scoped diff audited; no production storage writer changes
 - [ ] Operator review and merge
 - [ ] Native no-regression UI verification on the actual device, separately approved
 - [ ] Future approved trusted ticket producer, then gradual activation of Hub consumer

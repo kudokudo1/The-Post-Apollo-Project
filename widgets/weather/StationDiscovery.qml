@@ -1433,8 +1433,10 @@ Rectangle {
             Row {
                 id: mapFilterRail
                 width: parent.width
-                height: stationDiscovery.domain === "map" && !stationDiscovery.weatherMapOnly ? 34 : 0
+                height: stationDiscovery.domain === "map" && !stationDiscovery.weatherMapOnly
+                        && stationDiscovery.earthLayerEnabled("eonet") ? 34 : 0
                 visible: stationDiscovery.domain === "map" && !stationDiscovery.weatherMapOnly
+                         && stationDiscovery.earthLayerEnabled("eonet")
                 spacing: 8
 
                 Repeater {
@@ -1482,7 +1484,25 @@ Rectangle {
                 }
 
                 StationSectionDivider {
-                    visible: (!stationDiscovery.weatherMapOnly)
+                    visible: stationDiscovery.earthMapOnly
+                    width: parent.width
+                    title: EarthPanelPolicy.routeLabel(
+                        stationDiscovery.earthMapRoute)
+                }
+
+                QuietText {
+                    visible: stationDiscovery.earthInvestigationRoute
+                    width: parent.width
+                    wrapMode: Text.WordWrap
+                    font.pixelSize: 10
+                    color: Colors.yellow
+                    text: EarthPanelPolicy.selectionHint(
+                        stationDiscovery.earthMapRoute)
+                          + " // SELECT A MAP MARKER, THEN SCROLL TO EVENT CONTEXT BELOW."
+                }
+
+                StationSectionDivider {
+                    visible: (!stationDiscovery.weatherMapOnly) && !stationDiscovery.earthMapOnly
                     width: parent.width
                     title: "SPATIAL PLOT // GDACS + USGS QUAKES + EONET + FIRMS + NEWS"
                 }
@@ -1553,6 +1573,7 @@ Rectangle {
 
                 Row {
                     visible: (!stationDiscovery.weatherMapOnly)
+                             && stationDiscovery.earthLayerEnabled("quakes")
                     width: parent.width
                     height: 30
                     spacing: 10
@@ -1593,6 +1614,7 @@ Rectangle {
 
                 Row {
                     visible: (!stationDiscovery.weatherMapOnly)
+                             && stationDiscovery.earthLayerEnabled("gdacs")
                     width: parent.width
                     height: 30
                     spacing: 10
@@ -1639,8 +1661,10 @@ Rectangle {
                     QuietText {
                         anchors.verticalCenter: parent.verticalCenter
                         width: Math.max(0, parent.width - 120)
-                        text: stationDiscovery.weatherMapOnly
-                              ? "WHEEL ZOOM // DRAG PAN // MANUAL RADAR + SMOKE"
+                        text: stationDiscovery.earthMapOnly
+                              ? "WHEEL ZOOM // DRAG PAN // EVENT SELECTION PRESERVED"
+                              : stationDiscovery.weatherMapOnly
+                                ? "WHEEL ZOOM // DRAG PAN // MANUAL RADAR + SMOKE"
                               : "PLOTTABLE "
                               + stationDiscovery.mapPointRows.length
                               + " / " + source.rows.length
@@ -1663,7 +1687,9 @@ Rectangle {
                 Row {
                     width: parent.width
                     height: stationDiscovery.mapNewsMentionRows.length > 0 ? 30 : 0
-                    visible: (!stationDiscovery.weatherMapOnly) && (stationDiscovery.mapNewsMentionRows.length > 0)
+                    visible: (!stationDiscovery.weatherMapOnly)
+                             && !stationDiscovery.earthMapOnly
+                             && (stationDiscovery.mapNewsMentionRows.length > 0)
                     spacing: 10
 
                     ActionButton {
@@ -1700,13 +1726,14 @@ Rectangle {
                 }
 
                 StationSectionDivider {
-                    visible: (!stationDiscovery.weatherMapOnly)
+                    visible: (!stationDiscovery.weatherMapOnly) && stationDiscovery.earthLayerEnabled("firms")
                     width: parent.width
                     title: "FIRE HOTSPOTS // NASA FIRMS"
                 }
 
                 Row {
                     visible: (!stationDiscovery.weatherMapOnly)
+                             && stationDiscovery.earthLayerEnabled("firms")
                     width: parent.width
                     height: 32
                     spacing: 10
@@ -1759,6 +1786,7 @@ Rectangle {
 
                 QuietText {
                     visible: (!stationDiscovery.weatherMapOnly)
+                             && stationDiscovery.earthLayerEnabled("firms")
                     width: parent.width
                     text: "POST_APOLLO_FIRMS_MAP_KEY // OPTIONAL // KEY NEVER SHOWN OR PASSED IN PROCESS ARGV"
                     font.pixelSize: 9
@@ -1766,7 +1794,7 @@ Rectangle {
                 }
 
                 StationSectionDivider {
-                    visible: (!stationDiscovery.weatherMapOnly || stationDiscovery.weatherLayerEnabled("radar"))
+                    visible: (!stationDiscovery.weatherMapOnly || stationDiscovery.weatherLayerEnabled("radar")) && !stationDiscovery.earthMapOnly
                     width: parent.width
                     title: "RADAR // NOAA/NWS MRMS BASE REFLECTIVITY + 4H HISTORY"
                 }
@@ -1899,7 +1927,7 @@ Rectangle {
                 }
 
                 StationSectionDivider {
-                    visible: (!stationDiscovery.weatherMapOnly || stationDiscovery.weatherLayerEnabled("radar-fallback"))
+                    visible: (!stationDiscovery.weatherMapOnly || stationDiscovery.weatherLayerEnabled("radar-fallback")) && !stationDiscovery.earthMapOnly
                     width: parent.width
                     title: "RADAR FALLBACK // RAINVIEWER PAST RADAR"
                 }
@@ -2036,7 +2064,7 @@ Rectangle {
                 }
 
                 StationSectionDivider {
-                    visible: (!stationDiscovery.weatherMapOnly || stationDiscovery.weatherLayerEnabled("smoke"))
+                    visible: (!stationDiscovery.weatherMapOnly || stationDiscovery.weatherLayerEnabled("smoke")) && stationDiscovery.earthLayerEnabled("smoke")
                     width: parent.width
                     title: "SMOKE PLUMES // NOAA HMS"
                 }

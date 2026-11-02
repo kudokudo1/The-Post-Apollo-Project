@@ -1307,16 +1307,19 @@ Rectangle {
             }
 
             StationRuntimeRack {
+                visible: !stationDiscovery.weatherMapOnly
                 width: parent.width
                 rows: stationDiscovery.runtimeRows
             }
 
             StationSectionDivider {
+                visible: !stationDiscovery.weatherMapOnly
                 width: parent.width
                 title: "SOURCE RACK // WHAT IS CONNECTED"
             }
 
             Column {
+                visible: !stationDiscovery.weatherMapOnly
                 width: parent.width
                 spacing: 5
 
@@ -1354,6 +1357,7 @@ Rectangle {
             }
 
             StationSectionDivider {
+                visible: !stationDiscovery.weatherMapOnly
                 width: parent.width
                 title: stationDiscovery.providerTitle
             }
@@ -1361,8 +1365,8 @@ Rectangle {
             Row {
                 id: mapFilterRail
                 width: parent.width
-                height: stationDiscovery.domain === "map" ? 34 : 0
-                visible: stationDiscovery.domain === "map"
+                height: stationDiscovery.domain === "map" && !stationDiscovery.weatherMapOnly ? 34 : 0
+                visible: stationDiscovery.domain === "map" && !stationDiscovery.weatherMapOnly
                 spacing: 8
 
                 Repeater {
@@ -1402,6 +1406,12 @@ Rectangle {
                 width: parent.width
                 spacing: 7
                 visible: stationDiscovery.domain === "map"
+
+                StationSectionDivider {
+                    visible: stationDiscovery.weatherMapOnly
+                    width: parent.width
+                    title: "WEATHER // RADAR + SMOKE GEOGRAPHY"
+                }
 
                 StationSectionDivider {
                     width: parent.width
@@ -1558,7 +1568,9 @@ Rectangle {
                     QuietText {
                         anchors.verticalCenter: parent.verticalCenter
                         width: Math.max(0, parent.width - 120)
-                        text: "PLOTTABLE "
+                        text: stationDiscovery.weatherMapOnly
+                              ? "WHEEL ZOOM // DRAG PAN // MANUAL RADAR + SMOKE"
+                              : "PLOTTABLE "
                               + stationDiscovery.mapPointRows.length
                               + " / " + source.rows.length
                               + " // WHEEL ZOOM // DRAG PAN"
@@ -2334,14 +2346,16 @@ Rectangle {
                                ? Math.max(0, southEast.x - northWest.x) : 0
                         height: northWest.valid && southEast.valid
                                 ? Math.max(0, southEast.y - northWest.y) : 0
-                        visible: stationDiscovery.radarDisplaySource === "noaa"
+                        visible: stationDiscovery.weatherLayerEnabled("radar")
+                                 && stationDiscovery.radarDisplaySource === "noaa"
                                  && source !== ""
                                  && northWest.valid && southEast.valid
                                  && width > 0 && height > 0
                     }
 
                     Repeater {
-                        model: stationDiscovery.radarDisplaySource
+                        model: stationDiscovery.weatherLayerEnabled("radar-fallback")
+                               && stationDiscovery.radarDisplaySource
                                === "rainviewer"
                                && rainViewerRadarService.ready
                                ? rainViewerRadarService.strips : []
@@ -2407,7 +2421,8 @@ Rectangle {
                         anchors.fill: parent
                         z: 0.2
 
-                        property var smokeRows: hmsSmokeService.polygons
+                        property var smokeRows: stationDiscovery.weatherLayerEnabled("smoke")
+                                                ? hmsSmokeService.polygons : []
                         property real viewZoom: stationDiscovery.mapZoom
                         property real viewCenterLon: stationDiscovery.mapCenterLon
                         property real viewCenterLat: stationDiscovery.mapCenterLat
@@ -2916,7 +2931,8 @@ Rectangle {
                     }
 
                     Repeater {
-                        model: firmsService.ready ? firmsService.hotspots : []
+                        model: stationDiscovery.weatherMapOnly ? []
+                               : firmsService.ready ? firmsService.hotspots : []
 
                         delegate: Item {
                             required property var modelData
@@ -3001,7 +3017,9 @@ Rectangle {
                         anchors.bottom: parent.bottom
                         anchors.margins: 7
                         z: 3
-                        text: "GDACS ALERT SQUARES // QUAKES CIRCLES // EONET DIAMONDS // FIRMS ORANGE // NEWS MAGENTA"
+                        text: stationDiscovery.weatherMapOnly
+                              ? "NOAA RADAR + HMS SMOKE // MANUAL REQUESTS"
+                              : "GDACS ALERT SQUARES // QUAKES CIRCLES // EONET DIAMONDS // FIRMS ORANGE // NEWS MAGENTA"
                         font.pixelSize: 9
                     }
                 }
@@ -4224,7 +4242,8 @@ Rectangle {
             }
 
             QuietText {
-                visible: source.failed || !source.ready || source.rows.length === 0
+                visible: !stationDiscovery.weatherMapOnly
+                         && (source.failed || !source.ready || source.rows.length === 0)
                 width: parent.width
                 text: source.failed
                       ? source.errorText + " // PRIOR DATA MAY BE STALE"
@@ -4237,7 +4256,8 @@ Rectangle {
             }
 
             Repeater {
-                model: source.ready ? stationDiscovery.visibleRows : []
+                model: stationDiscovery.weatherMapOnly ? []
+                       : source.ready ? stationDiscovery.visibleRows : []
 
                 delegate: Rectangle {
                     required property var modelData
@@ -4333,7 +4353,9 @@ Rectangle {
 
             QuietText {
                 width: parent.width
-                text: source.ready
+                text: stationDiscovery.weatherMapOnly
+                      ? "RADAR + SMOKE // MANUAL SOURCE REQUESTS"
+                      : source.ready
                       ? "LAST RECEIVED // "
                         + Qt.formatDateTime(source.lastUpdated, "hh:mm") + " LOCAL"
                       : "LAST RECEIVED // --"

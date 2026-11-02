@@ -1,0 +1,24 @@
+name: Weather Station subject navigation contract
+
+on:
+  pull_request:
+    paths:
+      - 'widgets/weather/StationSubjectNavigationPolicy.js'
+      - 'tests/weather/subject_navigation_contract.test.js'
+      - '.github/workflows/weather-subject-navigation-contract.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  subject-navigation:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Verify pure subject navigation policy
+        run: node --test tests/weather/subject_navigation_contract.test.js

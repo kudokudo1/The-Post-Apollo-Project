@@ -1,0 +1,52 @@
+name: TASKS M12n isolated native ticket observer source and reducer
+
+on:
+  pull_request:
+    paths:
+      - 'TaskNativeTicketHarnessM12n.qml'
+      - 'tests/tasks/fixtures/TaskNativeTicketAdapterM12n.qml'
+      - 'tests/tasks/fixtures/TaskNativeTicketLogicM12n.js'
+      - 'tests/tasks/test_task_native_ticket_bridge_m12n.cjs'
+      - 'docs/tasks-native-ticket-observer-m12n.md'
+      - '.github/workflows/tasks-native-ticket-observer-m12n.yml'
+      - 'tests/tasks/fixtures/TaskNativeReceiptLabM12i.qml'
+      - 'services/hub/ApolloHubTodoStore.qml'
+  push:
+    branches: [main]
+    paths:
+      - 'TaskNativeTicketHarnessM12n.qml'
+      - 'tests/tasks/fixtures/TaskNativeTicketAdapterM12n.qml'
+      - 'tests/tasks/fixtures/TaskNativeTicketLogicM12n.js'
+      - 'tests/tasks/test_task_native_ticket_bridge_m12n.cjs'
+      - 'docs/tasks-native-ticket-observer-m12n.md'
+      - '.github/workflows/tasks-native-ticket-observer-m12n.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  m12n-ticket-bridge-synthetic:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: M12n pure reducer and native QML source boundary
+        run: node --test tests/tasks/test_task_native_ticket_bridge_m12n.cjs
+      - name: M12m real disposable FIFO ticket coordinator regression
+        run: node --test tests/tasks/test_task_local_coordinator_m12m.cjs
+      - name: M12i native receipt host process regression, no QML execution
+        run: python3 tests/tasks/test_task_native_receipt_host_m12i.py
+      - name: M12h independently persisted fixture stage receipts
+        run: python3 tests/tasks/test_task_stage_source_receipt_m12h.py
+      - name: M12k outside-writer limitations remain visible
+        run: python3 tests/tasks/test_task_uncooperative_writer_m12k.py
+      - name: M11t existing production gates remain open
+        run: python3 tests/tasks/test_task_production_trust_contract_m11t.py
+      - name: M11d production still has only one native FileView
+        run: python3 tests/tasks/test_task_writer_gate_inventory_m11d.py

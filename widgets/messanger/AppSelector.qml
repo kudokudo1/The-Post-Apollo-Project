@@ -991,6 +991,7 @@ Rectangle {
             activeSection: appSelector.settingsSection
             settingsOpen: appSelector.settingsOpen
             localDirectoryStore: SocialOrganizationDirectoryStore
+            localPortfoliosStore: SocialLocalPortfoliosStore
             localLinksStore: SocialOrganizationLinksStore
             socialIdentitiesSnapshot: appSelector.identitySnapshot
             socialAccountDetailsStore: SocialAccountDetailsStore

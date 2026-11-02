@@ -24,6 +24,25 @@ Rectangle {
     id: stationDiscovery
 
     property string domain: "map"
+    // M2b weather-only view of the existing CLASSIC map renderer.
+    property bool weatherMapOnly: false
+    property string weatherMapRoute: ""
+
+    function weatherLayerEnabled(layer) {
+        if (!weatherMapOnly || weatherMapRoute === "weather/maps")
+            return true;
+        return weatherMapRoute === "weather/maps/" + layer;
+    }
+
+    onWeatherMapRouteChanged: {
+        if (!weatherMapOnly)
+            return;
+        if (weatherMapRoute === "weather/maps/radar")
+            radarDisplaySource = "noaa";
+        else if (weatherMapRoute === "weather/maps/radar-fallback")
+            radarDisplaySource = "rainviewer";
+        discoveryScroll.contentY = 0;
+    }
     property bool stationOpen: true
     property bool viewerOpen: false
     property var selectedNews: null
@@ -291,21 +310,21 @@ Rectangle {
     property real mapCenterLat: 0
 
     readonly property var mapPointRows:
-        MapProjection.plottable(source ? source.rows : [])
+        weatherMapOnly ? [] : MapProjection.plottable(source ? source.rows : [])
     readonly property var mapNewsMentionRows:
-        MapProjection.plottable(
+        weatherMapOnly ? [] : MapProjection.plottable(
             newsMentionOverlay
             && Array.isArray(newsMentionOverlay.locations)
             ? newsMentionOverlay.locations : []
         )
     readonly property var mapEarthquakeRows:
-        mapShowEarthquakes
+        !weatherMapOnly && mapShowEarthquakes
         && seismicSource
         && seismicSource.ready
         ? MapProjection.plottable(seismicSource.events)
         : []
     readonly property var mapGdacsRows:
-        mapShowGdacs && gdacsService.ready
+        !weatherMapOnly && mapShowGdacs && gdacsService.ready
         ? MapProjection.plottable(gdacsService.events)
         : []
     readonly property var gdacsSummary:
@@ -1060,18 +1079,34 @@ Rectangle {
     onStationOpenChanged: { if (!stationOpen) closeViewer(); }
 
     readonly property string modeTitle:
+        weatherMapOnly ? "☁  WEATHER // MAP" :
         domain === "map" ? "⌖  MAP // EVENT SOURCES"
         : domain === "news" ? "▤  NEWS // HEADLINES"
         : "◉  RADIO // STATIONS"
     readonly property string providerTitle:
+        weatherMapOnly ? "WEATHER OVERLAYS // MANUAL LOAD" :
         domain === "map" ? "WORLD EVENTS // NASA EONET + GDACS"
         : domain === "news" ? "GDELT DOC // WORLD EVENT HEADLINES"
         : "RADIO BROWSER // TOP VOTED STREAMS"
     readonly property string sourceCaution:
+        weatherMapOnly ? "NOAA MRMS + RAINVIEWER + NOAA HMS // NOT A DISASTER FEED" :
         domain === "map" ? "NATURAL EARTH + EONET + GDACS + USGS EARTHQUAKES + FIRMS + MRMS + RAINVIEWER FALLBACK + HMS SMOKE"
         : domain === "news" ? "ARTICLE DISCOVERY // LOCAL FILTERS // EXACT-HEADLINE SOURCE GROUPS // NOT FUZZY STORY CLUSTERING"
         : "STATION DIRECTORY // PERSISTENT PLAYBACK NOT YET WIRED"
     readonly property var plannedSources: {
+        if (weatherMapOnly)
+            return [
+                {name:"NATURAL EARTH // LOCAL BASEMAP", state:"CONNECTED"},
+                {name:"NOAA MRMS // MANUAL RADAR", state:mrmsRadarService.ready
+                      ? "FRAME READY" : mrmsRadarService.loading
+                        ? "RECEIVING" : "MANUAL READY"},
+                {name:"RAINVIEWER // PAST RADAR FALLBACK", state:rainViewerRadarService.ready
+                      ? "FRAME READY" : rainViewerRadarService.loading
+                        ? "RECEIVING" : "MANUAL READY"},
+                {name:"NOAA HMS // SMOKE PLUMES", state:hmsSmokeService.ready
+                      ? "PLUMES " + hmsSmokeService.polygons.length
+                      : hmsSmokeService.loading ? "RECEIVING" : "MANUAL READY"}
+            ];
         if (domain === "map")
             return [
                 {name:"NASA EONET // FILTERED EVENTS + INSPECTOR", state:"SOURCE CONNECTED"},
@@ -1185,12 +1220,14 @@ Rectangle {
             stationDiscovery.mapFilter
         )
         active: stationDiscovery.stationOpen && stationDiscovery.visible
+                && !stationDiscovery.weatherMapOnly
     }
 
     WeatherServices.GdacsService {
         id: gdacsService
         cacheStore: stationDiscovery.persistentCacheStore
         active: stationDiscovery.domain === "map"
+                && !stationDiscovery.weatherMapOnly
                 && stationDiscovery.stationOpen
                 && stationDiscovery.visible
     }
@@ -1256,7 +1293,8 @@ Rectangle {
                 }
 
                 GohuText {
-                    text: source.failed ? source.errorText
+                    text: stationDiscovery.weatherMapOnly ? "RADAR + SMOKE // MANUAL" :
+                          source.failed ? source.errorText
                           : source.loading ? "RECEIVING"
                           : source.ready
                             ? (source.usingCache ? "CACHED " : "RECEIVED ")

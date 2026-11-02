@@ -141,7 +141,24 @@ def open_provider(discovery: dict, username: str, password: str):
     require(response.status_code in (302, 303),
             "Keycloak did not issue an authorization-code redirect")
     target = urljoin(response.url, response.headers.get("Location", ""))
-    require(target.startswith(CALLBACK + "?"), "Redirect is not the registered callback")
+    # Keycloak can use intermediate same-origin redirects before the callback.
+    # Follow a small fixed number, never follow the callback (no listener).
+    for _ in range(8):
+        if target.startswith(CALLBACK + "?"):
+            break
+        parts = urlparse(target)
+        require(parts.scheme == "http" and parts.hostname == "127.0.0.1"
+                and parts.port == 8080
+                and parts.path.startswith("/realms/post-apollo-disposable/"),
+                "Unexpected login redirect origin/path")
+        response = session.get(target, timeout=15, allow_redirects=False)
+        require(response.status_code in (302, 303),
+                "Keycloak returned a non-redirect login intermediary: "
+                + str(response.status_code) + " path=" + parts.path)
+        target = urljoin(response.url, response.headers.get("Location", ""))
+    require(target.startswith(CALLBACK + "?"),
+            "Redirect did not reach registered callback; final path="
+            + urlparse(target).path)
     returned = parse_qs(urlparse(target).query)
     require(returned.get("state") == [state], "OAuth state did not match request")
     require("error" not in returned, "Keycloak returned an OAuth error")

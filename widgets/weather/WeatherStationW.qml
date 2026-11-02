@@ -1133,8 +1133,6 @@ PanelWindow {
                         selected: subjectNavigator.currentRoute
                                   && subjectNavigator.currentRoute.subject
                                      === modelData.id
-                        selectedPrimaryColor: modelData.id === "magick"
-                                              ? Colors.magenta : Colors.cyan
                         labelText: modelData.label
                         onTriggered: subjectNavigator.selectSubject(modelData.id)
                     }

@@ -195,5 +195,24 @@ assert.equal((policy.match(/\bFileView\s*\{/g)||[]).length,0);
 assert.equal((policy.match(/\bTimer\s*\{/g)||[]).length,0);
 assert.equal((policy.match(/\bProcess\s*\{/g)||[]).length,0);
 assert.equal(policy.includes("Quickshell.dataDir"),false);
-assert.equal((map.match(/DossierCapturePolicy\.stage\(/g)||[]).length,0);
+// M23 alone is a no-write preview. M25 can add exactly one explicit
+// user-action stage call, but never a background/on-selection stage.
+const stageCalls = (map.match(/DossierCapturePolicy\.stage\(/g) || []).length;
+const saveStart = map.indexOf("    function saveSelectedDossier() {");
+if (saveStart < 0) {
+    assert.equal(stageCalls, 0);
+} else {
+    const saveEnd = map.indexOf(
+        "\n    readonly property bool eventContextInspectorOpen:", saveStart
+    );
+    assert.ok(saveEnd > saveStart);
+    const saveAction = map.slice(saveStart, saveEnd);
+    assert.equal((saveAction.match(/DossierCapturePolicy\.stage\(/g)||[]).length, 1);
+    assert.ok(saveAction.includes("selectedDossierPreview, now, true"));
+    assert.ok(saveAction.includes("dossierArchiveStore.capture(staged, now)"));
+    assert.equal((map.slice(0,saveStart) + map.slice(saveEnd))
+        .match(/DossierCapturePolicy\.stage\(/g), null);
+    assert.ok(card.includes("signal dossierSaveRequested()"));
+    assert.ok(card.includes("onClicked: card.dossierSaveRequested()"));
+}
 console.log("Weather M23 no-write dossier admission contract: PASS");

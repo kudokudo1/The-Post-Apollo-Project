@@ -379,10 +379,13 @@ function effectiveStaleMs(spec) {
 function freshness(spec, receivedAt, nowValue) {
     if (!spec)
         return "UNKNOWN";
+    // runtimeState() calls freshness only after the source is ready.
+    // Manual/keyed readiness is therefore meaningful even when an older
+    // service does not yet expose a dedicated receive timestamp.
     if (spec.mode === MODE_MANUAL)
-        return timestampMs(receivedAt) > 0 ? "SNAPSHOT" : "WAITING";
+        return "SNAPSHOT";
     if (spec.mode === MODE_KEYED_FETCH)
-        return timestampMs(receivedAt) > 0 ? "KEYED" : "WAITING";
+        return "KEYED";
     if (spec.mode === MODE_LOCAL_CALC)
         return "LOCAL";
 

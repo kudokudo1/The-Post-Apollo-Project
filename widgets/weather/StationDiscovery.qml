@@ -44,6 +44,7 @@ Rectangle {
                     "loading": source.loading,
                     "errorText": source.errorText,
                     "receivedAt": source.lastUpdated,
+                    "usingCache": source.usingCache,
                     "detail": domain === "map" ? "EONET" : "GDELT DOC"
                 },
                 runtimeNowMs

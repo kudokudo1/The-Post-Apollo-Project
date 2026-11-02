@@ -273,9 +273,12 @@ assert.match(homePolicySource, /SUNSET/);
 // HOME consumes both source families, so the header badge must describe the
 // aggregate rather than pretending HOME is Weather-only.
 assert.match(windowSource, /readonly property bool usesHomeSources:/);
-assert.match(windowSource, /HOME LIVE \/\/ 2 FEEDS/);
-assert.match(windowSource, /PARTIAL \/\/ WEATHER/);
-assert.match(windowSource, /PARTIAL \/\/ SPACE/);
+assert.match(windowSource, /return "HOME LIVE";/);
+assert.match(windowSource, /return "HOME MIXED";/);
+assert.match(windowSource, /return "HOME CACHE";/);
+assert.match(windowSource, /return sourceStatusText \+ " \/\/ 2 FEEDS";/);
+assert.match(windowSource, /return sourceStatusText \+ " \/\/ WEATHER";/);
+assert.match(windowSource, /return sourceStatusText \+ " \/\/ SPACE";/);
 
 // Footer is source-level freshness, not a duplicate of the aggregate HOME badge.
 assert.match(windowSource, /readonly property int spaceAgeMinutes:/);

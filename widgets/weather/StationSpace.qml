@@ -14,13 +14,57 @@ Rectangle {
 
     readonly property var runtimeRows: [
         RuntimePolicy.displayRow(
-            "space-core",
+            "space-kp",
             {
                 "active": true,
-                "ready": !!spaceService && spaceService.ready,
-                "loading": !!spaceService && spaceService.loading,
-                "errorText": spaceService ? spaceService.errorText : "",
-                "receivedAt": spaceService ? spaceService.lastUpdated : null
+                "ready": !!spaceService && spaceService.kpReady,
+                "loading": !!spaceService && spaceService.kpLoading,
+                "errorText": spaceService ? spaceService.kpErrorText : "",
+                "receivedAt": spaceService ? spaceService.kpLastUpdated : null,
+                "observedAt": spaceService ? spaceService.kpTime : null
+            },
+            runtimeNowMs
+        ),
+        RuntimePolicy.displayRow(
+            "space-wind",
+            {
+                "active": true,
+                "ready": !!spaceService && spaceService.solarWindReady,
+                "loading": !!spaceService && spaceService.solarWindLoading,
+                "errorText": spaceService
+                             ? spaceService.solarWindErrorText : "",
+                "receivedAt": spaceService
+                              ? spaceService.solarWindLastUpdated : null,
+                "observedAt": spaceService ? spaceService.solarWindTime : null
+            },
+            runtimeNowMs
+        ),
+        RuntimePolicy.displayRow(
+            "space-imf",
+            {
+                "active": true,
+                "ready": !!spaceService && spaceService.magneticFieldReady,
+                "loading": !!spaceService && spaceService.magneticFieldLoading,
+                "errorText": spaceService
+                             ? spaceService.magneticFieldErrorText : "",
+                "receivedAt": spaceService
+                              ? spaceService.magneticFieldLastUpdated : null,
+                "observedAt": spaceService
+                              ? spaceService.magneticFieldTime : null
+            },
+            runtimeNowMs
+        ),
+        RuntimePolicy.displayRow(
+            "space-flux",
+            {
+                "active": true,
+                "ready": !!spaceService && spaceService.solarFluxReady,
+                "loading": !!spaceService && spaceService.solarFluxLoading,
+                "errorText": spaceService
+                             ? spaceService.solarFluxErrorText : "",
+                "receivedAt": spaceService
+                              ? spaceService.solarFluxLastUpdated : null,
+                "observedAt": spaceService ? spaceService.solarFluxTime : null
             },
             runtimeNowMs
         ),

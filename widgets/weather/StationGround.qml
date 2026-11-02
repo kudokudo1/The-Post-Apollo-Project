@@ -19,15 +19,36 @@ Rectangle {
 
     readonly property var runtimeRows: [
         RuntimePolicy.displayRow(
-            "weather",
+            "weather-current",
             {
                 "active": true,
                 "ready": !!weatherService && weatherService.ready,
                 "loading": !!weatherService && weatherService.loading,
                 "errorText": weatherService ? weatherService.errorText : "",
                 "receivedAt": weatherService ? weatherService.lastUpdated : null,
-                "observedAt": weatherService
-                              ? weatherService.localObservationAnchorMs : -1
+                "detail": weatherService
+                          && String(weatherService.observationTime || "") !== ""
+                          ? "PROVIDER OBS CLOCK "
+                            + weatherService.observationTime
+                          : "CURRENT CONDITIONS"
+            },
+            runtimeNowMs
+        ),
+        RuntimePolicy.displayRow(
+            "air-quality",
+            {
+                "active": true,
+                "ready": !!weatherService && weatherService.aqiReady,
+                "loading": !!weatherService && weatherService.aqiLoading,
+                "errorText": weatherService
+                             ? weatherService.aqiErrorText : "",
+                "receivedAt": weatherService
+                              ? weatherService.aqiLastUpdated : null,
+                "detail": weatherService
+                          && String(weatherService.airQualitySourceTime || "") !== ""
+                          ? "SOURCE CLOCK "
+                            + weatherService.airQualitySourceTime
+                          : "AQI + POLLEN"
             },
             runtimeNowMs
         ),

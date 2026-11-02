@@ -170,7 +170,7 @@ PanelWindow {
         && newsViewerViewportRect.y + newsViewerViewportRect.height <= stationBackground.height
 
     readonly property var weatherRuntimeSpec:
-        RuntimePolicy.sourceSpec("weather")
+        RuntimePolicy.sourceSpec("weather-current")
     readonly property var spaceRuntimeSpec:
         RuntimePolicy.sourceSpec("space-core")
 
@@ -185,9 +185,7 @@ PanelWindow {
                 "errorText": weatherService
                              ? weatherService.errorText : "",
                 "receivedAt": weatherService
-                              ? weatherService.lastUpdated : null,
-                "observedAt": weatherService
-                              ? weatherService.localObservationAnchorMs : -1
+                              ? weatherService.lastUpdated : null
             },
             Date.now()
         );
@@ -240,12 +238,62 @@ PanelWindow {
             String(weatherService.errorText || "").length > 0
             || weatherRuntimeState.freshness === "AGING"
             || weatherRuntimeState.freshness === "STALE"
+            || weatherRuntimeState.freshness === "EXPIRED"
         )
 
+    function runtimeExpired(state) {
+        if (!state)
+            return true;
+        const value = String(state.availability || "");
+        return value === "OFFLINE"
+            || value === "EXPIRED"
+            || value === "CACHE_EXPIRED";
+    }
+
+    function runtimeCached(state) {
+        return state
+            && String(state.availability || "").indexOf("CACHE_") === 0;
+    }
+
+    function runtimeHeaderText(state, liveLabel) {
+        if (!state)
+            return "OFFLINE";
+        switch (String(state.availability || "")) {
+        case "LIVE": return liveLabel;
+        case "LIVE_AGING": return "AGING";
+        case "LIVE_STALE": return "STALE";
+        case "EXPIRED": return "EXPIRED";
+        case "CACHE_FRESH": return "CACHE FRESH";
+        case "CACHE_AGING": return "CACHE AGING";
+        case "CACHE_STALE": return "CACHE STALE";
+        case "CACHE_EXPIRED": return "CACHE EXPIRED";
+        case "READING": return "READING";
+        case "OFFLINE": return "OFFLINE";
+        case "WAITING": return "CONNECTING";
+        case "INACTIVE": return "INACTIVE";
+        default: return liveLabel;
+        }
+    }
+
+    function runtimeHeaderColor(state, liveColor) {
+        switch (RuntimePolicy.statusToken(state)) {
+        case "red": return Colors.red;
+        case "yellow": return Colors.yellow;
+        case "orange": return Colors.orange;
+        case "blue": return Colors.blue;
+        case "green": return Colors.green;
+        case "cyan": return Colors.cyan;
+        case "magenta": return Colors.magenta;
+        default: return liveColor;
+        }
+    }
+
     readonly property bool homeWeatherUsable:
-        weatherService && weatherService.ready && !weatherStale
+        weatherService && weatherService.ready
+        && !runtimeExpired(weatherRuntimeState)
     readonly property bool homeSpaceUsable:
         spaceService && spaceService.ready
+        && !runtimeExpired(spaceRuntimeState)
     readonly property bool homeSourceLoading:
         (weatherService && weatherService.loading)
         || (spaceService && spaceService.loading)
@@ -260,10 +308,19 @@ PanelWindow {
             return officialAlertSummary.headerText;
 
         if (usesHomeSources) {
-            if (homeWeatherUsable && homeSpaceUsable)
+            if (homeWeatherUsable && homeSpaceUsable) {
+                if (runtimeCached(weatherRuntimeState)
+                        && runtimeCached(spaceRuntimeState))
+                    return "HOME CACHE";
+                if (runtimeCached(weatherRuntimeState)
+                        || runtimeCached(spaceRuntimeState))
+                    return "HOME MIXED";
                 return "HOME LIVE";
+            }
             if (homeWeatherUsable || homeSpaceUsable)
-                return "PARTIAL";
+                return runtimeCached(weatherRuntimeState)
+                       || runtimeCached(spaceRuntimeState)
+                       ? "PARTIAL CACHE" : "PARTIAL";
             if (homeSourceLoading)
                 return "READING";
             if (homeSourceError)
@@ -271,38 +328,26 @@ PanelWindow {
             return "CONNECTING";
         }
 
-        if (usesWeatherSource) {
-            if (!weatherService)
-                return "OFFLINE";
-            if (weatherService.loading)
-                return "READING";
-            if (!weatherService.ready)
-                return String(weatherService.errorText || "").length > 0
-                       ? "OFFLINE" : "CONNECTING";
-            if (weatherStale)
-                return "STALE";
-            return "WEATHER LIVE";
-        }
+        if (usesWeatherSource)
+            return runtimeHeaderText(weatherRuntimeState, "WEATHER LIVE");
 
-        if (usesSpaceSource) {
-            if (!spaceService)
-                return "OFFLINE";
-            if (spaceService.loading)
-                return "READING";
-            if (spaceService.ready)
-                return "SPACE LIVE";
-            if (String(spaceService.errorText || "").length > 0)
-                return "OFFLINE";
-            return "PARTIAL";
-        }
+        if (usesSpaceSource)
+            return runtimeHeaderText(spaceRuntimeState, "SPACE LIVE");
 
         if (usesMapRuntime) {
-            if (currentPageRuntimeSummary.problem > 0
+            if (currentPageRuntimeSummary.expired > 0
+                    && currentPageRuntimeSummary.expired
+                       >= currentPageRuntimeSummary.ready)
+                return "MAP EXPIRED";
+            if ((currentPageRuntimeSummary.problem > 0
+                    || currentPageRuntimeSummary.offline > 0)
                     && currentPageRuntimeSummary.ready === 0)
                 return "OFFLINE";
             if (currentPageRuntimeSummary.loading > 0
                     && currentPageRuntimeSummary.ready === 0)
                 return "READING";
+            if (currentPageRuntimeSummary.cached > 0)
+                return "MAP CACHE";
             if (currentPageRuntimeSummary.stale > 0)
                 return "STALE";
             if (currentPageRuntimeSummary.ready > 0)
@@ -322,11 +367,11 @@ PanelWindow {
 
         if (usesHomeSources) {
             if (homeWeatherUsable && homeSpaceUsable)
-                return "HOME LIVE // 2 FEEDS";
+                return sourceStatusText + " // 2 FEEDS";
             if (homeWeatherUsable)
-                return "PARTIAL // WEATHER";
+                return sourceStatusText + " // WEATHER";
             if (homeSpaceUsable)
-                return "PARTIAL // SPACE";
+                return sourceStatusText + " // SPACE";
             if (homeSourceLoading)
                 return "READING // SOURCES";
             if (homeSourceError)
@@ -373,8 +418,12 @@ PanelWindow {
             return officialAlertColor(officialAlertSummary.colorToken);
 
         if (usesHomeSources) {
-            if (homeWeatherUsable && homeSpaceUsable)
+            if (homeWeatherUsable && homeSpaceUsable) {
+                if (runtimeCached(weatherRuntimeState)
+                        || runtimeCached(spaceRuntimeState))
+                    return Colors.blue;
                 return Colors.magenta;
+            }
             if (homeWeatherUsable || homeSpaceUsable)
                 return Colors.yellow;
             if (homeSourceLoading)
@@ -384,35 +433,23 @@ PanelWindow {
             return Colors.orange;
         }
 
-        if (usesWeatherSource) {
-            if (!weatherService)
-                return Colors.red;
-            if (weatherService.loading)
-                return Colors.orange;
-            if (!weatherService.ready)
-                return String(weatherService.errorText || "").length > 0
-                       ? Colors.red : Colors.orange;
-            if (weatherStale)
-                return Colors.yellow;
-            return Colors.magenta;
-        }
+        if (usesWeatherSource)
+            return runtimeHeaderColor(weatherRuntimeState, Colors.magenta);
 
-        if (usesSpaceSource) {
-            if (!spaceService)
-                return Colors.red;
-            if (spaceService.loading)
-                return Colors.orange;
-            if (spaceService.ready)
-                return Colors.magenta;
-            if (String(spaceService.errorText || "").length > 0)
-                return Colors.red;
-            return Colors.yellow;
-        }
+        if (usesSpaceSource)
+            return runtimeHeaderColor(spaceRuntimeState, Colors.magenta);
 
         if (usesMapRuntime) {
-            if (currentPageRuntimeSummary.problem > 0
+            if (currentPageRuntimeSummary.expired > 0
+                    && currentPageRuntimeSummary.expired
+                       >= currentPageRuntimeSummary.ready)
+                return Colors.red;
+            if ((currentPageRuntimeSummary.problem > 0
+                    || currentPageRuntimeSummary.offline > 0)
                     && currentPageRuntimeSummary.ready === 0)
                 return Colors.red;
+            if (currentPageRuntimeSummary.cached > 0)
+                return Colors.blue;
             if (currentPageRuntimeSummary.stale > 0
                     || currentPageRuntimeSummary.problem > 0)
                 return Colors.yellow;

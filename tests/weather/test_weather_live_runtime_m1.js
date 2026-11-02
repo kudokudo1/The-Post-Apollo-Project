@@ -18,7 +18,7 @@ vm.runInNewContext(source.replace(/^\.pragma library\s*/m, ""), ctx);
 
 for (const fn of [
     "sourceCatalog", "sourceSpec", "timestampMs", "ageMs", "ageMinutes",
-    "effectiveFreshMs", "effectiveStaleMs", "freshness",
+    "effectiveFreshMs", "effectiveStaleMs", "effectiveExpireMs", "freshness",
     "runtimeState", "compactAgeMinutes"
 ])
     assert.equal(typeof ctx[fn], "function", fn);
@@ -48,7 +48,8 @@ assert.equal(weather.mode, "NORMAL_POLL");
 assert.equal(weather.cadenceMs, 900000);
 assert.equal(weather.lifetime, "SESSION_BACKGROUND");
 assert.equal(weather.freshMs, 1200000);
-assert.equal(weather.staleMs, 21600000);
+assert.equal(weather.staleMs, 5400000);
+assert.equal(weather.expireMs, 21600000);
 
 const space = ctx.sourceSpec("space-core");
 assert.equal(space.mode, "FAST_POLL");
@@ -92,10 +93,17 @@ assert.equal(state.freshness, "AGING");
 
 state = ctx.runtimeState(
     weather,
-    {active:true, ready:true, receivedAt:now - 7 * 3600000},
+    {active:true, ready:true, receivedAt:now - 2 * 3600000},
     now
 );
 assert.equal(state.freshness, "STALE");
+
+state = ctx.runtimeState(
+    weather,
+    {active:true, ready:true, receivedAt:now - 7 * 3600000},
+    now
+);
+assert.equal(state.freshness, "EXPIRED");
 
 state = ctx.runtimeState(
     space,
@@ -208,12 +216,13 @@ assert.match(
     ui,
     /import "\.\.\/\.\.\/services\/weather\/WeatherRuntimePolicy\.js" as RuntimePolicy/
 );
-assert.match(ui, /RuntimePolicy\.sourceSpec\("weather"\)/);
+assert.match(ui, /RuntimePolicy\.sourceSpec\("weather-current"\)/);
 assert.match(ui, /RuntimePolicy\.sourceSpec\("space-core"\)/);
 assert.match(ui, /RuntimePolicy\.runtimeState\(/);
 assert.match(ui, /weatherObservationAgeMinutes/);
 assert.match(ui, /weatherRuntimeState\.freshness === "AGING"/);
 assert.match(ui, /weatherRuntimeState\.freshness === "STALE"/);
+assert.match(ui, /weatherRuntimeState\.freshness === "EXPIRED"/);
 assert.doesNotMatch(ui, /weatherAgeMinutes >= 20/);
 
 console.log("Weather live runtime M1 inventory and freshness contract: PASS");

@@ -38,8 +38,14 @@ Column {
                  ? " // READING " + rack.summary.loading : "")
               + (rack.summary.problem > 0
                  ? " // ERROR " + rack.summary.problem : "")
+              + (rack.summary.cached > 0
+                 ? " // CACHE " + rack.summary.cached : "")
               + (rack.summary.stale > 0
                  ? " // STALE " + rack.summary.stale : "")
+              + (rack.summary.expired > 0
+                 ? " // EXPIRED " + rack.summary.expired : "")
+              + (rack.summary.offline > 0
+                 ? " // OFFLINE " + rack.summary.offline : "")
               + (rack.summary.manual > 0
                  ? " // ON REQUEST " + rack.summary.manual : "")
               + (rack.summary.keyed > 0
@@ -90,6 +96,7 @@ Column {
                 width: Math.max(0, parent.width - 585)
                 anchors.verticalCenter: parent.verticalCenter
                 text: RuntimePolicy.cadenceLabel(modelData)
+                      + " // " + RuntimePolicy.retentionLabel(modelData)
                       + (modelData.detail !== ""
                          ? " // " + modelData.detail : "")
                 color: Colors.cyan

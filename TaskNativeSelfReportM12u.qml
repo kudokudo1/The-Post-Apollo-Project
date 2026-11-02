@@ -50,8 +50,16 @@ Scope {
 
     function advance() {
         if (finished) return;
+        if (!isolatedPath) {
+            endTest(false, "FIXTURE_PATH_MISMATCH");
+            return;
+        }
+        if (Quickshell.env("POST_APOLLO_M12U_DISPOSABLE") !== "1") {
+            endTest(false, "DISPOSABLE_ENV_MISSING");
+            return;
+        }
         if (!safe) {
-            endTest(false, "ISOLATION_OR_GATES_UNSAFE");
+            endTest(false, "PRODUCTION_GATES_UNSAFE");
             return;
         }
         var state = ApolloHubTodoStore.storageState;
@@ -118,6 +126,7 @@ Scope {
     Component.onCompleted: {
         // Delayed, so FileView's initial ready/empty state can arrive first.
         // Launch is the operator's single deliberate disposable test action.
+        console.warn("M12U_BOOT|CONFIG_LOADED|PASS");
         Qt.callLater(function() { smoke.advance(); });
     }
 

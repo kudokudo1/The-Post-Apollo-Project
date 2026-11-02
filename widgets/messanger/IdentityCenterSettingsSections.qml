@@ -286,7 +286,7 @@ Item {
 
                 Text {
                     width: parent.width
-                    text: "This is navigation only. No enterprise data, " +
+                    text: "Local organization edits save labels only. No verified " +
                           "company access, sign-in state or account connection " +
                           "is changed by selecting a section."
                     color: Colors.orange

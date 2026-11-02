@@ -1,0 +1,46 @@
+name: TASKS M13a synthetic restart review and draft retention
+
+on:
+  pull_request:
+    paths:
+      - 'tests/tasks/fixtures/TaskRestartReviewM13a.cjs'
+      - 'tests/tasks/test_task_restart_review_m13a.cjs'
+      - 'docs/tasks-durable-stage-restart-review-m13a.md'
+      - '.github/workflows/tasks-restart-review-m13a.yml'
+      - 'services/hub/ApolloHubTodoStore.qml'
+  push:
+    branches: [main]
+    paths:
+      - 'tests/tasks/fixtures/TaskRestartReviewM13a.cjs'
+      - 'tests/tasks/test_task_restart_review_m13a.cjs'
+      - '.github/workflows/tasks-restart-review-m13a.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  synthetic-restart-review:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: M13a independent fresh-process checkpoint and draft recovery
+        run: node --test tests/tasks/test_task_restart_review_m13a.cjs
+      - name: M12a last-confirmed in-memory recovery contract
+        run: node --test tests/tasks/test_task_guarded_completion_model_m12a.cjs
+      - name: M12o four-consumer draft reconciliation
+        run: node --test tests/tasks/test_task_disabled_ticket_api_m12o.cjs
+      - name: M12p inert Hub draft presenter
+        run: node --test tests/tasks/test_task_hub_ticket_presenter_m12p.cjs
+      - name: M12z first-create and lost acknowledgment
+        run: node --test tests/tasks/test_task_first_create_contract_m12z.cjs
+      - name: M12y missing-source review
+        run: node --test tests/tasks/test_task_absent_source_review_m12y.cjs
+      - name: M11d single-writer and disabled mode
+        run: python3 tests/tasks/test_task_writer_gate_inventory_m11d.py

@@ -89,7 +89,7 @@ def _clean(display: object, now: int) -> dict[str, object]:
 
 
 def _private_directory(path: Path) -> Path:
-    if type(path) is not Path or not path.is_absolute():
+    if not isinstance(path, Path) or not path.is_absolute():
         raise ValueError("A host-owned absolute runtime directory is required")
     info = path.lstat()  # never resolve a symlink into another user's directory
     if (not stat.S_ISDIR(info.st_mode)
@@ -225,7 +225,7 @@ def read_private_display(socket_path: Path, *,
     from QML, a web page or another untrusted request.
     """
     try:
-        if (type(socket_path) is not Path
+        if (not isinstance(socket_path, Path)
                 or socket_path.name != SOCKET_NAME
                 or not socket_path.is_absolute()):
             return empty_display()

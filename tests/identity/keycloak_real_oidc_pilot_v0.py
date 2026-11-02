@@ -17,6 +17,7 @@ from pathlib import Path
 import secrets
 import sys
 import time
+from collections.abc import Callable
 from urllib.parse import parse_qs, urljoin, urlparse
 
 import jwt
@@ -104,8 +105,14 @@ def loopback_cookie_header(session: requests.Session, url: str) -> str:
     return "; ".join(c.name + "=" + c.value for c in cookies)
 
 
-def open_provider(discovery: dict, username: str, password: str):
-    """Perform real interactive auth-code flow with a new cookie jar."""
+def open_provider(discovery: dict, username: str, password: str, *,
+                  on_redirect: Callable[[str, str, str, str], None] | None = None):
+    """Real auth-code flow. Optional CI handler delivers actual IdP redirect.
+
+    on_redirect is invoked with (actual redirect URL, PKCE verifier, nonce,
+    expected state). It MUST stay inside test code and must never be wired
+    to Social QML or used with real credentials.
+    """
     session = requests.Session()
     session.cookies.set_policy(LoopbackOnlySecureCookiePolicy())
     verifier = secrets.token_urlsafe(64)
@@ -175,6 +182,8 @@ def open_provider(discovery: dict, username: str, password: str):
     require("error" not in returned, "Keycloak returned an OAuth error")
     code = returned.get("code", [None])[0]
     require(type(code) is str and code, "Authorization code missing")
+    if on_redirect is not None:
+        on_redirect(target, verifier, nonce, state)
     return code, verifier, nonce
 
 

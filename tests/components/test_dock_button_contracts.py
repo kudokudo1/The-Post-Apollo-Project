@@ -182,12 +182,9 @@ for path, needles in DOCK_MODULES.items():
     for needle in needles:
         require(source, needle, f"DockButton migration contract for {path}")
 
-# Preserve the operator's Gohu icon and state colors, but shift the LEFT
-# ornaments alone. The full original shaping string stays in the source so
-# the central phone and RIGHT ornaments retain their natural advances.
-# Keep the original text advances but make the phone +7px larger in a
-# foreground-colored overlay. The independent left ornament moves from
-# +3px to +10px. The right ornament and dock geometry do not move.
+# Preserve the operator's Gohu icon, source-shaped advances, and state
+# colors. Draw the larger phone as an overlay without resizing the button;
+# move only the left ornaments an additional 7px right (+3px -> +10px).
 social_module = (ROOT / "modules/Sessions.qml").read_text(encoding="utf-8")
 for needle in (
     "GohuText {",
@@ -230,7 +227,7 @@ assert social_module.count("contentGlowSource: sessionsIcon") == 1
 assert social_module.count(
     "color: sessionsDock.open ? sessionsDock.openForegroundColor : Colors.white"
 ) == 2
-assert 'text: "<font color=\'transparent\'>࣪˖</font>' in social_module
+assert 'text: "<font color=\'transparent\'>࣪˖☎︎</font>๋࣭✧"' in social_module
 assert 'text: "࣪˖"' in social_module
 assert "open: menuOpen" in social_module
 assert "property color openForegroundColor: Colors.magenta" in COMPONENT

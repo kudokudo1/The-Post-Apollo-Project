@@ -6,6 +6,7 @@ import Qt5Compat.GraphicalEffects
 import "../../components"
 import "../../services/weather" as WeatherServices
 import "StationOfficialAlertPolicy.js" as OfficialAlertPolicy
+import "StationWeatherSubjectPanelPolicy.js" as SubjectPanelPolicy
 import "../../services/weather/WeatherRuntimePolicy.js" as RuntimePolicy
 
 PanelWindow {
@@ -36,6 +37,7 @@ PanelWindow {
         id: seismicService
         cacheStore: weatherStation.persistentCacheStore
         active: weatherStation.menuOpen
+                && !weatherStation.subjectNavigationOpen
                 && (weatherStation.currentView === "ground"
                     || weatherStation.currentView === "map")
     }
@@ -43,8 +45,12 @@ PanelWindow {
     WeatherServices.NowcoastLightningService {
         id: lightningService
         active: weatherStation.menuOpen
-                && (weatherStation.currentView === "ground"
-                    || weatherStation.currentView === "map")
+                && ((!weatherStation.subjectNavigationOpen
+                     && (weatherStation.currentView === "ground"
+                         || weatherStation.currentView === "map"))
+                    || (weatherStation.subjectNavigationOpen
+                        && SubjectPanelPolicy.needsSource(
+                               subjectNavigator.currentPath, "lightning")))
         latitude: weatherStation.weatherService
                   ? weatherStation.weatherService.latitude : ""
         longitude: weatherStation.weatherService
@@ -55,8 +61,12 @@ PanelWindow {
         id: riverService
         cacheStore: weatherStation.persistentCacheStore
         active: weatherStation.menuOpen
-                && (weatherStation.currentView === "ground"
-                    || weatherStation.currentView === "map")
+                && ((!weatherStation.subjectNavigationOpen
+                     && (weatherStation.currentView === "ground"
+                         || weatherStation.currentView === "map"))
+                    || (weatherStation.subjectNavigationOpen
+                        && SubjectPanelPolicy.needsSource(
+                               subjectNavigator.currentPath, "river")))
         latitude: weatherStation.weatherService
                   ? weatherStation.weatherService.latitude : ""
         longitude: weatherStation.weatherService
@@ -127,7 +137,9 @@ PanelWindow {
     }
 
     readonly property string currentContext:
-        subjectNavigationOpen ? "SUBJECT INDEX" : currentViewName
+        subjectNavigationOpen
+        ? (subjectNavigator.liveWeatherKind !== ""
+           ? "WEATHER" : "SUBJECT INDEX") : currentViewName
 
     readonly property var officialAlertSummary:
         OfficialAlertPolicy.summary(
@@ -347,7 +359,8 @@ PanelWindow {
                    + (officialAlertUsingPersistentCache ? " // CACHE" : "");
 
         if (subjectNavigationOpen)
-            return "NAV PREVIEW";
+            return subjectNavigator.liveWeatherKind !== ""
+                   ? "WEATHER PANEL" : "NAV PREVIEW";
 
         if (usesHomeSources) {
             if (homeWeatherUsable && homeSpaceUsable) {
@@ -408,8 +421,11 @@ PanelWindow {
             return officialAlertSummary.headerText
                    + (officialAlertUsingPersistentCache ? " // CACHE" : "");
 
-        if (subjectNavigationOpen)
+        if (subjectNavigationOpen) {
+            if (subjectNavigator.liveWeatherKind !== "")
+                return "WEATHER // PANEL";
             return "INDEX // PREVIEW";
+        }
 
         if (usesHomeSources) {
             if (homeWeatherUsable && homeSpaceUsable)
@@ -1196,6 +1212,14 @@ PanelWindow {
                 visible: weatherStation.subjectNavigationOpen
                          && !weatherStation.contextTerminalRequested
                 enabled: visible
+                weatherService: weatherStation.weatherService
+                nwsAlertSource: weatherStation.nwsAlertSource
+                seismicSource: seismicService
+                lightningSource: lightningService
+                riverSource: riverService
+                persistentCacheStore: weatherStation.persistentCacheStore
+                liveHistoryStore: weatherStation.liveHistoryStore
+                runtimeNowMs: weatherStation.runtimeNowMs
                 onLegacyPageRequested: function(pageId) {
                     weatherStation.openLegacyFromSubject(pageId);
                 }

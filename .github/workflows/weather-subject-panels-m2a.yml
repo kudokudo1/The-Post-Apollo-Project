@@ -1,0 +1,32 @@
+name: Weather Station M2a live WEATHER subject panels
+
+on:
+  pull_request:
+    paths:
+      - 'widgets/weather/WeatherStationW.qml'
+      - 'widgets/weather/StationSubjectNavigator.qml'
+      - 'widgets/weather/StationGround.qml'
+      - 'widgets/weather/StationSky.qml'
+      - 'widgets/weather/StationWeatherSubjectPane.qml'
+      - 'widgets/weather/StationWeatherSubjectPanelPolicy.js'
+      - 'tests/weather/test_weather_subject_panels_m2a.js'
+      - '.github/workflows/weather-subject-panels-m2a.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  subject-panels:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Verify M0/M1 subject routes and M2a real WEATHER panels
+        run: |
+          node --test tests/weather/subject_navigation_contract.test.js
+          node --test tests/weather/subject_navigation_browser.test.js
+          node --test tests/weather/test_weather_subject_panels_m2a.js

@@ -1,5 +1,6 @@
 import QtQuick
 import "../../components"
+import "StationWeatherSubjectPanelPolicy.js" as SubjectPanelPolicy
 import "../../services/weather" as WeatherServices
 import "../../services/weather/SeismicPolicy.js" as SeismicPolicy
 import "../../services/weather/NwpsRiverPolicy.js" as RiverPolicy
@@ -12,6 +13,17 @@ import "WeatherRelationshipPolicy.js" as RelationshipPolicy
 
 Rectangle {
     id: ground
+
+    // Optional WEATHER subject route. Empty keeps the exact CLASSIC page.
+    property string subjectRoute: ""
+    function sectionVisible(section) {
+        return SubjectPanelPolicy.visibleFor("ground",subjectRoute,section);
+    }
+    // Changing live submodes must not inherit the previous panel's scroll offset.
+    onSubjectRouteChanged: {
+        if (groundScroll)
+            groundScroll.contentY = 0;
+    }
 
     property var weatherService: null
     property var nwsAlertSource: null
@@ -354,6 +366,7 @@ Rectangle {
         cacheStore: ground.persistentCacheStore
         historyStore: ground.liveHistoryStore
         active: ground.visible
+                && SubjectPanelPolicy.needsSource(ground.subjectRoute,"marine")
         latitude: weatherService ? weatherService.latitude : ""
         longitude: weatherService ? weatherService.longitude : ""
     }
@@ -363,6 +376,7 @@ Rectangle {
         cacheStore: ground.persistentCacheStore
         historyStore: ground.liveHistoryStore
         active: ground.visible
+                && SubjectPanelPolicy.needsSource(ground.subjectRoute,"coastal")
         latitude: weatherService ? weatherService.latitude : ""
         longitude: weatherService ? weatherService.longitude : ""
     }
@@ -720,10 +734,12 @@ Rectangle {
             spacing: 10
 
             Row {
+            visible: ground.sectionVisible("header")
             width: parent.width
 
             GohuText {
-                text: "⌁  GROUND"
+                text: ground.subjectRoute === "" ? "⌁  GROUND"
+                      : "⌁  WEATHER"
                 font.pixelSize: 24
                 color: Colors.green
             }
@@ -745,16 +761,19 @@ Rectangle {
         }
 
         StationRuntimeRack {
+            visible: ground.sectionVisible("runtime")
             width: parent.width
             rows: ground.runtimeRows
         }
 
         StationSectionDivider {
+            visible: ground.sectionVisible("alerts")
             width: parent.width
             title: "OFFICIAL ALERTS // NWS"
         }
 
         Column {
+            visible: ground.sectionVisible("alerts")
             width: parent.width
             spacing: 8
 
@@ -910,11 +929,13 @@ Rectangle {
         }
 
         StationSectionDivider {
+            visible: ground.sectionVisible("coastal-rel")
             width: parent.width
             title: "LIVE HISTORY // COASTAL RELATIONSHIP"
         }
 
         WeatherTrendInspector {
+            visible: ground.sectionVisible("coastal-rel")
             width: parent.width
             title: "PRESSURE ↔ COASTAL WATER LEVEL"
             leftLabel: "PRESSURE hPa"
@@ -928,11 +949,13 @@ Rectangle {
         }
 
         StationSectionDivider {
+            visible: ground.sectionVisible("marine-rel")
             width: parent.width
             title: "LIVE HISTORY // MARINE RELATIONSHIPS"
         }
 
         Row {
+            visible: ground.sectionVisible("marine-rel")
             width: parent.width
             spacing: 12
 
@@ -972,11 +995,13 @@ Rectangle {
         }
 
         StationSectionDivider {
+            visible: ground.sectionVisible("rivers")
             width: parent.width
             title: "RIVER // NOAA NWPS"
         }
 
         Column {
+            visible: ground.sectionVisible("rivers")
             width: parent.width
             spacing: 7
 
@@ -1987,11 +2012,13 @@ Rectangle {
         }
 
         StationSectionDivider {
+            visible: ground.sectionVisible("marine")
             width: parent.width
             title: "MARINE // NOAA NDBC"
         }
 
         Column {
+            visible: ground.sectionVisible("marine")
             width: parent.width
             spacing: 7
 
@@ -2253,11 +2280,13 @@ Rectangle {
 
 
         StationSectionDivider {
+            visible: ground.sectionVisible("coast")
             width: parent.width
             title: "COAST // NOAA CO-OPS"
         }
 
         Column {
+            visible: ground.sectionVisible("coast")
             width: parent.width
             spacing: 7
 
@@ -2542,11 +2571,13 @@ Rectangle {
 
 
         StationSectionDivider {
+            visible: ground.sectionVisible("lightning")
             width: parent.width
             title: "LIGHTNING // NOAA NOWCOAST"
         }
 
         Column {
+            visible: ground.sectionVisible("lightning")
             width: parent.width
             spacing: 7
 
@@ -2708,11 +2739,13 @@ Rectangle {
         }
 
         StationSectionDivider {
+            visible: ground.sectionVisible("heat-fire")
             width: parent.width
             title: "HEAT + FIRE WEATHER // NWS CONTEXT"
         }
 
         Row {
+            visible: ground.sectionVisible("heat-fire")
             width: parent.width
             spacing: 12
 
@@ -2844,7 +2877,7 @@ Rectangle {
         Column {
             width: parent.width
             spacing: 5
-            visible: ground.fireWeatherAlertRows.length > 0
+            visible: ground.sectionVisible("heat-fire") && (ground.fireWeatherAlertRows.length > 0)
 
             Repeater {
                 model: ground.fireWeatherAlertRows.slice(0, 3)
@@ -2893,6 +2926,7 @@ Rectangle {
         }
 
         StationSectionDivider {
+            visible: ground.sectionVisible("air-pm")
             width: parent.width
             title: "AIR // PARTICULATES"
         }
@@ -2900,6 +2934,7 @@ Rectangle {
         // One large instrument, two particulate measurements and the
         // highest available gas AQI component. No invented measurement.
         Row {
+            visible: ground.sectionVisible("air-pm")
             width: parent.width
             spacing: 14
 
@@ -3079,11 +3114,13 @@ Rectangle {
         }
 
         StationSectionDivider {
+            visible: ground.sectionVisible("air-gases")
             width: parent.width
             title: "GASES // POLLEN"
         }
 
         Row {
+            visible: ground.sectionVisible("air-gases")
             spacing: 14
 
             Column {
@@ -3234,6 +3271,7 @@ Rectangle {
         // The peak is only a summary. Show the six already-received
         // per-species readings without requesting a second pollen source.
         StationSectionDivider {
+            visible: ground.sectionVisible("pollen")
             width: parent.width
             title: "POLLEN // SPECIES"
         }
@@ -3241,7 +3279,7 @@ Rectangle {
         Row {
             width: parent.width
             spacing: 8
-            visible: ground.pollenSpecies.length > 0
+            visible: ground.sectionVisible("pollen") && (ground.pollenSpecies.length > 0)
 
             Repeater {
                 model: ground.pollenSpecies
@@ -3268,6 +3306,7 @@ Rectangle {
         }
 
         QuietText {
+            visible: ground.sectionVisible("pollen")
             width: parent.width
             font.pixelSize: 10
             text: ground.pollenSpecies.length > 0
@@ -3276,11 +3315,13 @@ Rectangle {
         }
 
         StationSectionDivider {
+            visible: ground.sectionVisible("air-forecast")
             width: parent.width
             title: "AIR // NEXT 12 HOURS"
         }
 
         Column {
+            visible: ground.sectionVisible("air-forecast")
             width: parent.width
             spacing: 4
 
@@ -3358,11 +3399,13 @@ Rectangle {
         }
 
         StationSectionDivider {
+            visible: ground.sectionVisible("seismic")
             width: parent.width
             title: "SEISMIC // WORLDWIDE 24H"
         }
 
         Column {
+            visible: ground.sectionVisible("seismic")
             width: parent.width
             spacing: 5
 
@@ -3477,11 +3520,13 @@ Rectangle {
         }
 
         StationSectionDivider {
+            visible: ground.sectionVisible("source")
             width: parent.width
             title: "ENVIRONMENT // SOURCE"
         }
 
         Row {
+            visible: ground.sectionVisible("source")
             width: parent.width
             spacing: 22
 

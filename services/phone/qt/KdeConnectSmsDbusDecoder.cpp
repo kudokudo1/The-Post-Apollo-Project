@@ -27,6 +27,7 @@ void registerNestedTypes()
         qDBusRegisterMetaType<QList<SmsAddress>>();
         qDBusRegisterMetaType<SmsAttachment>();
         qDBusRegisterMetaType<QList<SmsAttachment>>();
+        qDBusRegisterMetaType<SmsFields>();
         return true;
     }();
     Q_UNUSED(registered);
@@ -62,6 +63,24 @@ const QDBusArgument &operator>>(const QDBusArgument &arg, SmsAttachment &v)
 {
     arg.beginStructure();
     arg >> v.partId >> v.mimeType >> v.encodedFile >> v.identifier;
+    arg.endStructure();
+    return arg;
+}
+
+QDBusArgument &operator<<(QDBusArgument &arg, const SmsFields &v)
+{
+    arg.beginStructure();
+    arg << v.event << v.body << v.addresses << v.date << v.type << v.read
+        << v.threadId << v.messageId << v.subId << v.attachments;
+    arg.endStructure();
+    return arg;
+}
+
+const QDBusArgument &operator>>(const QDBusArgument &arg, SmsFields &v)
+{
+    arg.beginStructure();
+    arg >> v.event >> v.body >> v.addresses >> v.date >> v.type >> v.read
+        >> v.threadId >> v.messageId >> v.subId >> v.attachments;
     arg.endStructure();
     return arg;
 }
@@ -130,11 +149,7 @@ SmsDecodeResult decodeVariant(const QDBusVariant &variant)
         return failure(QStringLiteral("UNEXPECTED_DBUS_SIGNATURE"));
 
     SmsFields fields;
-    argument.beginStructure();
-    argument >> fields.event >> fields.body >> fields.addresses >> fields.date
-             >> fields.type >> fields.read >> fields.threadId >> fields.messageId
-             >> fields.subId >> fields.attachments;
-    argument.endStructure();
+    argument >> fields;
     return decodeFields(fields);
 }
 

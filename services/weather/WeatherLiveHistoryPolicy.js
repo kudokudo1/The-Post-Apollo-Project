@@ -319,8 +319,8 @@ function append(
     const observed = positiveMillis(observedAtMs, false);
     const received = positiveMillis(receivedAtMs, false);
     const saved = positiveMillis(savedAtMs, false);
-    const normalizedPayload = normalizedPayload(id, payload);
-    if (observed <= 0 || received <= 0 || saved <= 0 || !normalizedPayload)
+    const payloadValue = normalizedPayload(id, payload);
+    if (observed <= 0 || received <= 0 || saved <= 0 || !payloadValue)
         return {ok:false, document:copyDocument(document), reason:"INVALID_SAMPLE"};
 
     const next = copyDocument(document, saved);
@@ -332,7 +332,7 @@ function append(
     samples.push({
         observedAtMs: observed,
         receivedAtMs: received,
-        payload: normalizedPayload
+        payload: payloadValue
     });
     samples = dedupeAndBound(id, samples, saved);
 

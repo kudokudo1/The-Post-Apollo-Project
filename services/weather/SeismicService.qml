@@ -96,10 +96,11 @@ Scope {
         }
     }
 
-    // USGS publishes frequent updates; Weather Station intentionally polls at
-    // a slower 15-minute cadence only while GROUND or MAP owns seismic use.
+    // USGS GeoJSON summary feeds update every minute. Weather Station uses a
+    // five-minute view-scoped cadence to reduce delay without mirroring the
+    // provider's full one-minute publication rate.
     Timer {
-        interval: 900000
+        interval: 300000
         repeat: true
         running: seismic.active
         onTriggered: seismic.refresh()

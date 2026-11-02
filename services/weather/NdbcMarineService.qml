@@ -154,8 +154,11 @@ Scope {
         }
     }
 
+    // NDBC asks clients to minimize retrievals; most stations report hourly.
+    // Location changes still fetch immediately, while steady-state refreshes
+    // use a thirty-minute cadence.
     Timer {
-        interval: 600000
+        interval: 1800000
         repeat: true
         running: marine.active && marine.configured
         onTriggered: marine.refresh()

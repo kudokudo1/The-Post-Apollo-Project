@@ -146,7 +146,7 @@ assert.match(
     /gdacs\.org\/gdacsapi\/api\/events\/geteventlist\/events4app/
 );
 assert.match(service, /GdacsPolicy\.parseEventList\(JSON\.parse\(raw\), 100\)/);
-assert.match(service, /property int cacheMs: 900000/);
+assert.match(service, /property int cacheMs: 360000/);
 assert.match(service, /now - lastFetchMs < cacheMs/);
 assert.equal((service.match(/\bProcess\s*\{/g) || []).length, 1);
 assert.equal((service.match(/\bTimer\s*\{/g) || []).length, 1);

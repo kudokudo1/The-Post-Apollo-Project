@@ -141,7 +141,14 @@ Scope {
 
     Connections {
         target: ApolloHubTodoStore
-        function onStorageStateChanged() { smoke.scheduleAdvance(); }
+        function onStorageStateChanged() {
+            // Fixed-vocabulary state trace from the real singleton only.
+            // No task title, document bytes or filesystem paths in logs.
+            var state=String(ApolloHubTodoStore.storageState).toUpperCase();
+            if (["LOADING","EMPTY","SAVING","READY","ERROR","UNSUPPORTED"].indexOf(state) >= 0)
+                console.warn("M12U_STATE|" + state + "|OBSERVED");
+            smoke.scheduleAdvance();
+        }
     }
 
     Timer {

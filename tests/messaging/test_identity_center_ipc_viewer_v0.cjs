@@ -37,6 +37,7 @@ function qmlFunction(name) {
 const sandbox = {
     active: true,
     snapshot: null,
+    acceptResponse: false,
     displaySchema: "post-apollo.identity.desktop-context-display.v0",
     pythonPath: "/usr/bin/python3",
     readerPath: "/fake-code/identity_display_reader_cli_v0.py",
@@ -111,23 +112,40 @@ for (const status of ["SIGNED_OUT", "NOT_CONNECTED", "UNAVAILABLE", "NO_MEMBERSH
         organizations: [], portfolios: [], canSwitchOrganization: false,
     };
     assert.equal(accepted(empty), true, status + " empty view rejected");
+    sandbox.acceptResponse = true;
     sandbox.receive(JSON.stringify(empty));
     assert.equal(sandbox.snapshot.status, status);
 }
+sandbox.acceptResponse = true;
 sandbox.receive(JSON.stringify(display()));
 assert.equal(sandbox.snapshot.status, "READY");
+sandbox.acceptResponse = true;
 sandbox.receive("{not valid json");
 assert.equal(sandbox.snapshot, null, "Malformed output retained old data");
+sandbox.acceptResponse = true;
 sandbox.receive(JSON.stringify(display()));
 sandbox.active = false;
+sandbox.acceptResponse = false;
 sandbox.receive(JSON.stringify(display()));
 assert.equal(sandbox.snapshot, null, "Late response after close retained data");
 sandbox.active = true;
+sandbox.snapshotProcess.running = true;
+sandbox.refresh();
+assert.equal(sandbox.acceptResponse, false,
+             "Reopening during old command cannot accept its result");
 sandbox.receive(JSON.stringify(display()));
+assert.equal(sandbox.snapshot, null,
+             "Late previous-session stdout restored a company");
 sandbox.snapshotProcess.running = false;
 sandbox.refresh();
 assert.equal(sandbox.snapshot, null, "Refresh must clear stale snapshot first");
 assert.equal(sandbox.snapshotProcess.running, true);
+assert.equal(sandbox.acceptResponse, true,
+             "Only a newly started process may deliver a response");
+sandbox.receive(JSON.stringify(display()));
+assert.equal(sandbox.snapshot.status, "READY");
+assert.equal(sandbox.acceptResponse, false,
+             "Only one response per poll may update display");
 assert.equal(sandbox.snapshotProcess.command.join(" "), [
     "/usr/bin/python3",
     "/fake-code/identity_display_reader_cli_v0.py",

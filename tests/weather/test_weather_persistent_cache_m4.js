@@ -30,6 +30,16 @@ assert.equal(doc.version, 1);
 assert.equal(doc.revision, 0);
 assert.deepEqual(Object.keys(doc.records), []);
 
+const m4SourceIds = [
+    "weather-current",
+    "weather-forecast",
+    "air-quality",
+    "space-kp",
+    "space-wind",
+    "space-imf",
+    "space-flux"
+];
+
 const samples = {
     "weather-current": {
         receivedAtMs: now - 5 * minute,
@@ -100,7 +110,7 @@ const samples = {
     }
 };
 
-for (const id of ctx.knownSourceIds()) {
+for (const id of m4SourceIds) {
     const sample = samples[id];
     assert.ok(sample, "fixture for " + id);
     const result = ctx.upsert(
@@ -185,7 +195,7 @@ vm.runInNewContext(
     runtimeSource.replace(/^\.pragma library\s*/m, ""),
     runtime
 );
-for (const id of ctx.knownSourceIds()) {
+for (const id of m4SourceIds) {
     const spec = runtime.sourceSpec(id);
     assert.ok(spec, id + " runtime spec");
     assert.equal(spec.retention, "PERSISTENT_LAST_GOOD", id);

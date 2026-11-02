@@ -442,7 +442,7 @@ var _cacheProfiles = {
         freshMs:43200000, staleMs:86400000, expireMs:604800000
     },
     "seismic": {
-        retention:RETENTION_MEMORY_LAST_GOOD,
+        retention:RETENTION_PERSISTENT_LAST_GOOD,
         freshMs:1800000, staleMs:7200000, expireMs:86400000
     },
     "river": {
@@ -509,7 +509,7 @@ var _cacheProfiles = {
         freshMs:1800000, staleMs:7200000, expireMs:86400000
     },
     "gdacs": {
-        retention:RETENTION_MEMORY_LAST_GOOD,
+        retention:RETENTION_PERSISTENT_LAST_GOOD,
         freshMs:1800000, staleMs:7200000, expireMs:86400000
     },
     "firms": {

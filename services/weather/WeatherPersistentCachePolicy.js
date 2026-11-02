@@ -2,7 +2,7 @@
 
 var SCHEMA = "post-apollo.weather-last-known.v1";
 var VERSION = 1;
-var MAX_RECORDS = 7;
+var MAX_RECORDS = 9;
 var MAX_TEXT = 160;
 var MAX_ARRAY_JSON = 65536;
 
@@ -13,7 +13,9 @@ var _known = {
     "space-kp": true,
     "space-wind": true,
     "space-imf": true,
-    "space-flux": true
+    "space-flux": true,
+    "seismic": true,
+    "gdacs": true
 };
 
 function initialDocument() {
@@ -71,6 +73,89 @@ function boundedObject(value) {
     const copy = boundedJson(value, null, 16384);
     return copy && typeof copy === "object" && !Array.isArray(copy)
         ? copy : ({});
+}
+
+function normalizeSeismicEvents(value) {
+    if (!Array.isArray(value))
+        return [];
+
+    const out = [];
+    for (let i = 0; i < value.length && out.length < 50; i++) {
+        const row = value[i] || {};
+        const magnitude = finiteNumber(row.magnitude, null);
+        const time = positiveMillis(row.time);
+        const latitude = finiteNumber(row.latitude, null);
+        const longitude = finiteNumber(row.longitude, null);
+        if (magnitude === null || magnitude < 2.5
+                || time <= 0 || latitude === null || longitude === null
+                || Math.abs(latitude) > 90 || Math.abs(longitude) > 180)
+            continue;
+
+        out.push({
+            id: safeText(row.id, 128),
+            magnitude: magnitude,
+            place: safeText(row.place, 180),
+            time: time,
+            updated: positiveMillis(row.updated),
+            utc: safeText(row.utc, 32),
+            depthKm: finiteNumber(row.depthKm, -1),
+            latitude: latitude,
+            longitude: longitude,
+            significance: finiteNumber(row.significance, -1),
+            tsunami: row.tsunami === true,
+            status: safeText(row.status, 32),
+            alert: safeText(row.alert, 24),
+            magType: safeText(row.magType, 24)
+        });
+    }
+    return out;
+}
+
+function normalizeGdacsEvents(value) {
+    if (!Array.isArray(value))
+        return [];
+
+    const out = [];
+    for (let i = 0; i < value.length && out.length < 50; i++) {
+        const row = value[i] || {};
+        const latitude = finiteNumber(row.latitude, null);
+        const longitude = finiteNumber(row.longitude, null);
+        const timeMs = positiveMillis(row.timeMs);
+        if (latitude === null || longitude === null || timeMs <= 0
+                || Math.abs(latitude) > 90 || Math.abs(longitude) > 180)
+            continue;
+
+        const alert = safeText(row.alertLevel, 16).toUpperCase();
+        out.push({
+            id: safeText(row.id, 160),
+            eventId: safeText(row.eventId, 80),
+            episodeId: safeText(row.episodeId, 80),
+            eventType: safeText(row.eventType, 16),
+            eventTypeLabel: safeText(row.eventTypeLabel, 64),
+            name: safeText(row.name, 180),
+            alertLevel: alert === "RED" || alert === "ORANGE"
+                        || alert === "GREEN" ? alert : "UNKNOWN",
+            alertScore: finiteNumber(row.alertScore, -1),
+            alertToken: safeText(row.alertToken, 16),
+            isCurrent: row.isCurrent === true,
+            country: safeText(row.country, 120),
+            iso3: safeText(row.iso3, 8),
+            source: safeText(row.source, 64),
+            latitude: latitude,
+            longitude: longitude,
+            coordinates: safeText(row.coordinates, 48),
+            geometryType: "Point",
+            fromUtc: safeText(row.fromUtc, 40),
+            toUtc: safeText(row.toUtc, 40),
+            timeMs: timeMs,
+            severity: finiteNumber(row.severity, -1),
+            severityText: safeText(row.severityText, 160),
+            severityUnit: safeText(row.severityUnit, 40),
+            reportUrl: safeText(row.reportUrl, 512),
+            detailsUrl: safeText(row.detailsUrl, 512)
+        });
+    }
+    return out;
 }
 
 function normalizePayload(sourceId, payload) {
@@ -193,6 +278,16 @@ function normalizePayload(sourceId, payload) {
             solarFlux: flux,
             solarFluxTime: safeText(source.solarFluxTime, 64)
         };
+    }
+
+    if (sourceId === "seismic") {
+        const events = normalizeSeismicEvents(source.events);
+        return events.length > 0 ? {events:events} : null;
+    }
+
+    if (sourceId === "gdacs") {
+        const events = normalizeGdacsEvents(source.events);
+        return events.length > 0 ? {events:events} : null;
     }
 
     return null;

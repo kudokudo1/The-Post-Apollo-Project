@@ -956,6 +956,7 @@ PanelWindow {
                 weatherService: weatherService
                 spaceService: spaceService
                 nwsAlertSource: nwsOfficialAlerts
+                persistentCacheStore: weatherPersistentCache
                 relationshipFocusModeActive: relationshipFocus.active
                 relationshipFocused: relationshipFocus.owner === "weather"
             }

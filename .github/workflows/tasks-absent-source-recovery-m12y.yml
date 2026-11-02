@@ -1,0 +1,45 @@
+name: TASKS M12y absent-source recovery triage
+
+on:
+  pull_request:
+    paths:
+      - 'tests/tasks/fixtures/TaskSourcePreflightM12t.cjs'
+      - 'tests/tasks/test_task_source_preflight_m12t.cjs'
+      - 'tests/tasks/test_task_absent_source_review_m12y.cjs'
+      - 'docs/tasks-absent-source-recovery-m12y.md'
+      - '.github/workflows/tasks-absent-source-recovery-m12y.yml'
+      - 'services/hub/ApolloHubTodoStore.qml'
+  push:
+    branches: [main]
+    paths:
+      - 'tests/tasks/fixtures/TaskSourcePreflightM12t.cjs'
+      - 'tests/tasks/test_task_absent_source_review_m12y.cjs'
+      - '.github/workflows/tasks-absent-source-recovery-m12y.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  fixture-readonly:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: New missing-source recovery classification, always denies write
+        run: node --test tests/tasks/test_task_absent_source_review_m12y.cjs
+      - name: Existing M12t source/backup/ticket preflight regression
+        run: node --test tests/tasks/test_task_source_preflight_m12t.cjs
+      - name: M12q producer policy regression
+        run: node --test tests/tasks/test_task_local_ticket_producer_m12q.cjs
+      - name: M12r disabled admission regression
+        run: node --test tests/tasks/test_task_disabled_admission_m12r.cjs
+      - name: M11d authoritative single writer
+        run: python3 tests/tasks/test_task_writer_gate_inventory_m11d.py
+      - name: M12u and M12x native-smoke source contracts
+        run: python3 tests/tasks/test_task_native_self_report_m12u.py

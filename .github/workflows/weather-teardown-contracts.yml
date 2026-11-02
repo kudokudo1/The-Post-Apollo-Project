@@ -45,6 +45,8 @@ jobs:
         run: node tests/weather/test_weather_live_runtime_m3.js
       - name: Validate Weather persistent last-known cache M4
         run: node tests/weather/test_weather_persistent_cache_m4.js
+      - name: Validate Weather persistent cache M5 global events
+        run: node tests/weather/test_weather_persistent_cache_m5.js
       - name: Validate Weather data parsing and forecast contracts
         run: node tests/weather/test_weather_data_policy.js
       - name: Verify SKY hourly detail inspection of existing forecast data

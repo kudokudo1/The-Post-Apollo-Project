@@ -26,7 +26,7 @@ KDE Connect emits `conversationCreated` / `conversationUpdated` D-Bus signals ca
 - [KDE incoming Android message-map key names](https://github.com/KDE/kdeconnect-kde/blob/master/models/conversationmessage.cpp).
 - [KDE SMS conversation D-Bus signals](https://github.com/KDE/kdeconnect-kde/blob/master/plugins/sms/conversationsdbusinterface.h).
 
-This is real Qt typed decoding code, **not** a KDE Connect signal subscription or a live read. The independent native CI test constructs synthetic Qt structures only. It does not prove that an installed user's KDE Connect daemon exports the exact same runtime type/variant shape; that requires a separately authorized disposable-device test.
+This is real Qt typed decoding code, **not** a KDE Connect signal subscription or a live read. The independent native CI test constructs synthetic Qt structures and sends one invented fixture through a **disposable GitHub Actions D-Bus session** so the decoder receives a genuinely read-only/deserialized Qt argument. It never connects to the operator's user bus or KDE Connect. Compatibility with an installed KDE Connect daemon and phone still requires separately approved verification.
 
 ## 2 // Security and ownership boundaries
 
@@ -40,22 +40,24 @@ The existing Social integration owner retains ownership of `MessagingW.qml`, `Ap
 
 ## 3 // Test / run instructions
 
-Tests run only inside ephemeral GitHub Actions runner using `qt6-base-dev` and `pkg-config`. They compile with C++17, `-Wall -Wextra -Werror` and Qt6 Core/DBus, then execute the local in-process fixture:
+Tests run only inside an ephemeral GitHub Actions runner using `qt6-base-dev`, `dbus` and `pkg-config`. They compile with C++17, `-Wall -Wextra -Werror` and Qt6 Core/DBus, generate the synthetic receiver's Qt meta-object code, then run on an isolated `dbus-run-session` test bus:
 
 ```bash
-g++ -std=c++17 -fPIC -Wall -Wextra -Werror \
+/usr/lib/qt6/libexec/moc tests/phone/qt/test_kdeconnect_sms_dbus_decoder.cpp -o /tmp/test_kdeconnect_sms_dbus_decoder.moc
+
+g++ -std=c++17 -fPIC -Wall -Wextra -Werror -I/tmp \
   $(pkg-config --cflags Qt6Core Qt6DBus) \
   services/phone/qt/KdeConnectSmsDbusDecoder.cpp \
   tests/phone/qt/test_kdeconnect_sms_dbus_decoder.cpp \
   $(pkg-config --libs Qt6Core Qt6DBus) -o /tmp/post-apollo-kde-sms-decode-test
 
-/tmp/post-apollo-kde-sms-decode-test
+dbus-run-session -- /tmp/post-apollo-kde-sms-decode-test
 python3 -m unittest discover -s tests/phone -p 'test_*.py' -q
 ```
 
 These commands are **developer-only** on a machine already provisioned with Qt6. Running tests doesn't activate KDE Connect, but do not install Qt packages or modify the operator's live desktop without explicit approval. The PR CI installs dependencies **only on its disposable GitHub runner**.
 
-Tests verify timestamp/ID precision, native state values, group flags, read flags, content limits, attachment thumbnail suppression and the Qt D-Bus variant gate. All fixtures are invented.
+Tests verify timestamp/ID precision, native state values, group flags, read flags, content limits, attachment thumbnail suppression and a synthetic Qt signal round-trip on a private bus. All fixtures are invented; no user's KDE Connect process, messages or phone is accessed.
 
 ## 4 // What remains unverified
 
@@ -77,7 +79,7 @@ Review the new C++ source and isolated GitHub Action; no Post-Apollo button or r
 Check PR exact-head CI results, confirm structural signature against installed KDE version during a later explicitly permitted hardware test, and distinguish local synthetic checks from genuine phone data.
 
 ### WATCH OUT FOR
-The Qt output includes private decoded message content in memory; it must never be sent to GitHub Actions logs or developer traces. Header/source must compile with the selected Qt6 version. QDBusVariant marshalling may vary across runtime versions, so do not claim actual device support from fixture tests.
+The Qt output includes private decoded message content in memory; it must never be sent to GitHub Actions logs or developer traces. Header/source must compile with the selected Qt6 version. The isolated fixture's successful QDBusVariant decoding does not certify the operator's installed KDE Connect version or Android permissions.
 
 ### CHECKLIST
 - [x] Confirm #1028 merged, no active Phone Bridge PRs, Syntagma and source contracts.

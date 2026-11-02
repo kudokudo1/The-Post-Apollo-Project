@@ -9,6 +9,17 @@ Item {
     id: sections
 
     property string activeSection: "SOCIAL LAYOUT"
+    // Display-only input for a FUTURE approved privileged host.
+    // No current host feeds this value; never treat it as authorization.
+    // Tokens, provider subjects and credentials must never enter QML.
+    property var organizationDisplaySnapshot: null
+    readonly property bool organizationDisplayReady:
+        organizationDisplaySnapshot !== null
+        && organizationDisplaySnapshot.schema === "post-apollo.identity.desktop-context-display.v0"
+        && organizationDisplaySnapshot.status === "READY"
+        && organizationDisplaySnapshot.canSwitchOrganization === false
+        && Array.isArray(organizationDisplaySnapshot.organizations)
+        && Array.isArray(organizationDisplaySnapshot.portfolios)
     readonly property int navigationHeight: 42
     signal sectionRequested(string section)
 
@@ -145,12 +156,66 @@ Item {
 
                     Text {
                         width: parent.width
+                        visible: !sections.organizationDisplayReady
                         text: "No authorized organizations or portfolios have " +
                               "been loaded. The future selector will show only " +
                               "memberships verified by the Identity Center API."
                         color: Colors.white
                         font.pixelSize: 11
                         wrapMode: Text.WordWrap
+                    }
+
+                    Column {
+                        width: parent.width
+                        spacing: 7
+                        visible: sections.organizationDisplayReady
+
+                        Text {
+                            width: parent.width
+                            text: "MEMBERSHIPS // READ-ONLY DISPLAY"
+                            font.pixelSize: 11
+                            font.bold: true
+                            color: Colors.cyan
+                            wrapMode: Text.WordWrap
+                        }
+
+                        Repeater {
+                            model: sections.organizationDisplayReady
+                                   ? sections.organizationDisplaySnapshot.organizations
+                                   : []
+                            delegate: Text {
+                                required property var modelData
+                                width: parent.width
+                                // IDs/kinds/summary counts only. Never render
+                                // tokens, subjects or a client-managed role.
+                                text: modelData.organizationId + " // " +
+                                      modelData.kind.toUpperCase() + " // " +
+                                      modelData.scopeGrants.length + " SCOPE PREVIEWS"
+                                color: Colors.white
+                                font.pixelSize: 10
+                                wrapMode: Text.WordWrap
+                            }
+                        }
+
+                        Text {
+                            width: parent.width
+                            text: "PORTFOLIOS // " +
+                                  (sections.organizationDisplayReady
+                                   ? sections.organizationDisplaySnapshot.portfolios.length
+                                   : 0)
+                            font.pixelSize: 10
+                            color: Colors.cyan
+                            wrapMode: Text.WordWrap
+                        }
+
+                        Text {
+                            width: parent.width
+                            text: "Display data is not proof of permission. " +
+                                  "Actions always require fresh server authorization."
+                            font.pixelSize: 9
+                            color: Colors.orange
+                            wrapMode: Text.WordWrap
+                        }
                     }
 
                     ActionButton {

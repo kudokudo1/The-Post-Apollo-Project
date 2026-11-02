@@ -23,6 +23,7 @@ PanelWindow {
     WeatherServices.WeatherHistoryService {
         id: weatherHistoryService
         active: weatherStation.menuOpen
+                && !weatherStation.subjectNavigationOpen
                 && weatherStation.currentView === "home"
         latitude: weatherStation.weatherService
                   ? weatherStation.weatherService.latitude : ""

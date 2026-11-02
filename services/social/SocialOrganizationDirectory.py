@@ -16,7 +16,7 @@ import sys
 import tempfile
 from typing import Any
 
-from SocialAccountDetails import _assert_secure_dir, _assert_secure_file, root_path
+from SocialAccountDetails import StoreError as SocialStorageError, _assert_secure_dir, _assert_secure_file, root_path
 
 SCHEMA = "post-apollo.social-local-organizations.v1"
 FILE_NAME = "local-organizations-v1.json"
@@ -308,8 +308,8 @@ def main(argv: list[str] | None = None) -> int:
             raise DirectoryError("INVALID_REQUEST")
         result = run(action[0])
         code = 0
-    except (DirectoryError, OSError) as error:
-        result = {"ok": False, "error": error.code if isinstance(error, DirectoryError)
+    except (DirectoryError, SocialStorageError, OSError) as error:
+        result = {"ok": False, "error": error.code if isinstance(error, (DirectoryError, SocialStorageError))
                   else "STORAGE_UNAVAILABLE"}
         code = 2
     print(json.dumps(result, separators=(",", ":")))

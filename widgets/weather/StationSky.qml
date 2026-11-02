@@ -1,5 +1,6 @@
 import QtQuick
 import "../../components"
+import "StationWeatherSubjectPanelPolicy.js" as SubjectPanelPolicy
 import "../../services/weather" as WeatherServices
 import "../../services/weather/WeatherDockPolicy.js" as WeatherDockPolicy
 import "../../services/weather/WeatherCyclePolicy.js" as WeatherCyclePolicy
@@ -9,6 +10,12 @@ import "../../services/weather/WeatherRuntimePolicy.js" as RuntimePolicy
 
 Rectangle {
     id: sky
+
+    // Optional WEATHER subject route. Empty keeps the exact CLASSIC page.
+    property string subjectRoute: ""
+    function sectionVisible(section) {
+        return SubjectPanelPolicy.visibleFor("sky",subjectRoute,section);
+    }
 
     property var weatherService: null
     property real runtimeNowMs: Date.now()
@@ -243,6 +250,7 @@ Rectangle {
     WeatherServices.UsnoMoonService {
         id: moonService
         active: sky.visible
+                && SubjectPanelPolicy.needsSource(sky.subjectRoute,"astronomy")
         // Use the same provider forecast date shown by ASTRONOMY.
         // skyCycle.date intentionally clears when the observation anchor is
         // stale, while astronomySummary safely falls back to dailyForecast[0].
@@ -255,11 +263,13 @@ Rectangle {
     WeatherServices.NasaEclipseService {
         id: eclipseService
         active: sky.visible
+                && SubjectPanelPolicy.needsSource(sky.subjectRoute,"astronomy")
     }
 
     WeatherServices.UsnoCelnavService {
         id: celnavService
         active: sky.visible
+                && SubjectPanelPolicy.needsSource(sky.subjectRoute,"astronomy")
         latitude: sky.weatherService ? sky.weatherService.latitude : ""
         longitude: sky.weatherService ? sky.weatherService.longitude : ""
     }
@@ -267,6 +277,7 @@ Rectangle {
     WeatherServices.IssPassService {
         id: issPassService
         active: sky.visible
+                && SubjectPanelPolicy.needsSource(sky.subjectRoute,"astronomy")
         latitude: sky.weatherService ? sky.weatherService.latitude : ""
         longitude: sky.weatherService ? sky.weatherService.longitude : ""
     }
@@ -274,6 +285,7 @@ Rectangle {
     WeatherServices.UsnoPlanetRiseSetService {
         id: planetRiseSetService
         active: sky.visible
+                && SubjectPanelPolicy.needsSource(sky.subjectRoute,"astronomy")
         date: sky.astronomySummary.date
         latitude: sky.weatherService ? sky.weatherService.latitude : ""
         longitude: sky.weatherService ? sky.weatherService.longitude : ""
@@ -283,6 +295,7 @@ Rectangle {
     WeatherServices.IauMeteorShowerService {
         id: meteorService
         active: sky.visible
+                && SubjectPanelPolicy.needsSource(sky.subjectRoute,"astronomy")
         latitude: sky.weatherService ? sky.weatherService.latitude : ""
         longitude: sky.weatherService ? sky.weatherService.longitude : ""
     }
@@ -515,10 +528,12 @@ Rectangle {
             spacing: 6
 
             Row {
+            visible: sky.sectionVisible("header")
             width: parent.width
 
             GohuText {
-                text: "☁  SKY"
+                text: sky.subjectRoute === "" ? "☁  SKY"
+                      : "☁  " + SubjectPanelPolicy.titleFor(sky.subjectRoute)
                 font.pixelSize: 24
                 color: Colors.cyan
             }
@@ -540,16 +555,19 @@ Rectangle {
         }
 
         StationRuntimeRack {
+            visible: sky.sectionVisible("runtime")
             width: parent.width
             rows: sky.runtimeRows
         }
 
         StationSectionDivider {
+            visible: sky.sectionVisible("current")
             width: parent.width
             title: "CURRENT // CONDITIONS"
         }
 
         Row {
+            visible: sky.sectionVisible("current")
             spacing: 13
 
             Column {
@@ -799,11 +817,13 @@ Rectangle {
         }
 
         StationSectionDivider {
+            visible: sky.sectionVisible("atmosphere")
             width: parent.width
             title: "ATMOSPHERE // OBSERVATION"
         }
 
         Row {
+            visible: sky.sectionVisible("atmosphere")
             spacing: 18
 
             Column {
@@ -935,13 +955,14 @@ Rectangle {
         }
 
         StationSectionDivider {
+            visible: sky.sectionVisible("astronomy")
             width: parent.width
             title: "ASTRONOMY // SUN + MOON"
         }
 
         Row {
             spacing: 12
-            visible: sky.astronomySummary.available
+            visible: sky.sectionVisible("astronomy") && (sky.astronomySummary.available)
 
             Column {
                 width: 118
@@ -1034,24 +1055,26 @@ Rectangle {
         }
 
         QuietText {
-            visible: !sky.astronomySummary.available
+            visible: sky.sectionVisible("astronomy") && (!sky.astronomySummary.available)
             text: "ASTRONOMY DATA UNAVAILABLE IN CURRENT DAILY PROVIDER PAYLOAD"
             font.pixelSize: 9
         }
 
         QuietText {
-            visible: sky.astronomySummary.available
+            visible: sky.sectionVisible("astronomy") && (sky.astronomySummary.available)
             text: "WTTR.IN DAILY ASTRONOMY // DAYLIGHT DERIVED FROM PROVIDER SUNRISE + SUNSET"
             font.pixelSize: 9
         }
 
 
         StationSectionDivider {
+            visible: sky.sectionVisible("iss")
             width: parent.width
             title: "ISS PASSES // SKYFIELD + SGP4"
         }
 
         Column {
+            visible: sky.sectionVisible("iss")
             width: parent.width
             spacing: 7
 
@@ -1249,11 +1272,13 @@ Rectangle {
         }
 
         StationSectionDivider {
+            visible: sky.sectionVisible("moon")
             width: parent.width
             title: "MOON // USNO EPHEMERIS"
         }
 
         Column {
+            visible: sky.sectionVisible("moon")
             width: parent.width
             spacing: 7
 
@@ -1401,11 +1426,13 @@ Rectangle {
 
 
         StationSectionDivider {
+            visible: sky.sectionVisible("eclipses")
             width: parent.width
             title: "ECLIPSES // NASA GSFC"
         }
 
         Column {
+            visible: sky.sectionVisible("eclipses")
             width: parent.width
             spacing: 7
 
@@ -1634,11 +1661,13 @@ Rectangle {
         }
 
         StationSectionDivider {
+            visible: sky.sectionVisible("celestial-fix")
             width: parent.width
             title: "SKY NOW // USNO CELESTIAL FIX"
         }
 
         Column {
+            visible: sky.sectionVisible("celestial-fix")
             width: parent.width
             spacing: 7
 
@@ -2005,11 +2034,13 @@ Rectangle {
 
 
         StationSectionDivider {
+            visible: sky.sectionVisible("planet-clock")
             width: parent.width
             title: "PLANET CLOCK // USNO RISE + TRANSIT + SET"
         }
 
         Column {
+            visible: sky.sectionVisible("planet-clock")
             width: parent.width
             spacing: 7
 
@@ -2186,11 +2217,13 @@ Rectangle {
 
 
         StationSectionDivider {
+            visible: sky.sectionVisible("meteor")
             width: parent.width
             title: "METEOR SHOWERS // IAU MDC"
         }
 
         Column {
+            visible: sky.sectionVisible("meteor")
             width: parent.width
             spacing: 7
 
@@ -2475,6 +2508,7 @@ Rectangle {
         }
 
         StationSectionDivider {
+            visible: sky.sectionVisible("twilight")
             width: parent.width
             title: "TWILIGHT // SOLAR WINDOWS"
         }
@@ -2482,7 +2516,7 @@ Rectangle {
         Column {
             width: parent.width
             spacing: 7
-            visible: sky.twilightSummary.available
+            visible: sky.sectionVisible("twilight") && (sky.twilightSummary.available)
 
             Row {
                 width: parent.width
@@ -2776,7 +2810,7 @@ Rectangle {
         }
 
         QuietText {
-            visible: sky.astronomySummary.available
+            visible: sky.sectionVisible("twilight") && (sky.astronomySummary.available)
                      && !sky.twilightSummary.available
             width: parent.width
             text: "TWILIGHT WINDOWS UNAVAILABLE // REQUIRES VALID DATE, COORDINATES, PROVIDER SUNRISE, AND A DAILY SUNRISE SOLUTION"
@@ -2785,6 +2819,7 @@ Rectangle {
         }
 
         Column {
+            visible: sky.sectionVisible("hourly")
             spacing: 4
 
             StationSectionDivider {
@@ -3039,6 +3074,7 @@ Rectangle {
         }
 
         Column {
+            visible: sky.sectionVisible("daily")
             spacing: 4
 
             StationSectionDivider {

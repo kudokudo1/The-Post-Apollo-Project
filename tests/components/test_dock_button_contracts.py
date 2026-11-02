@@ -184,7 +184,8 @@ for path, needles in DOCK_MODULES.items():
 
 # Preserve the operator's Gohu icon, source-shaped advances, and state
 # colors. Draw the larger phone as an overlay without resizing the button;
-# move only the left ornaments an additional 7px right (+3px -> +10px).
+# move both left ornaments 3px left (+10px -> +7px), independently
+# of the phone and right-side shaping.
 social_module = (ROOT / "modules/Sessions.qml").read_text(encoding="utf-8")
 for needle in (
     "GohuText {",
@@ -196,7 +197,7 @@ for needle in (
     'text: "<font color=\'transparent\'>࣪˖☎︎</font>๋࣭✧"',
     "id: sessionsLeftOrnaments",
     "anchors.left: parent.left",
-    "anchors.leftMargin: 10",
+    "anchors.leftMargin: 7",
     "id: sessionsPhoneAdvance",
     "id: sessionsPhoneFace",
     "visible: false",
@@ -239,7 +240,7 @@ assert social_module.count("NotoText {") == 0
 # Original glyph advances remain unchanged, so the actual dock size is not
 # coupled to the larger overlaid handset. No global letter-spacing changes.
 assert "font.letterSpacing:" not in social_module
-assert social_module.count("anchors.leftMargin: 10") == 1
+assert social_module.count("anchors.leftMargin: 7") == 1
 assert "font.pixelSize: 22" not in social_module
 assert "Math.max(65, Math.ceil(sessionsIcon.implicitWidth) + 16)" not in social_module
 assert "implicitHeight: 50" in social_module
@@ -248,9 +249,10 @@ assert "font.pixelSize: 21" in social_module
 assert "font.pixelSize: 24" in social_module
 assert "text: \"<font color='transparent'>࣪˖☎︎</font>๋࣭✧\"" in social_module
 assert social_module.count("contentGlowSource: sessionsIcon") == 1
-# 10px is exactly 7px farther right than the 3px accepted prior overlay.
+# The two left ornaments move exactly 3px left; phone and right side
+# remain in the same shaped parent run, with no dock size change.
 for original_left_x in (0, 7, 42):
-    assert (original_left_x + 10) - (original_left_x + 3) == 7
+    assert (original_left_x + 7) - (original_left_x + 10) == -3
 
 LEGACY_ROOT_MOUSE_IDS = (
     "appmenuMouse",

@@ -291,7 +291,7 @@ Rectangle {
         anchors.topMargin: liveChildren.visible ? 6 : 14
         anchors.bottom: previewNote.top
         anchors.bottomMargin: 6
-        visible: browser.liveWeatherKind !== ""
+        visible: browser.visible && browser.liveWeatherKind !== ""
         subjectRoute: browser.currentPath
         weatherService: browser.weatherService
         nwsAlertSource: browser.nwsAlertSource

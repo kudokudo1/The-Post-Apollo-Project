@@ -1414,6 +1414,7 @@ Rectangle {
                 }
 
                 StationSectionDivider {
+                    visible: (!stationDiscovery.weatherMapOnly)
                     width: parent.width
                     title: "SPATIAL PLOT // GDACS + USGS QUAKES + EONET + FIRMS + NEWS"
                 }
@@ -1483,6 +1484,7 @@ Rectangle {
                 }
 
                 Row {
+                    visible: (!stationDiscovery.weatherMapOnly)
                     width: parent.width
                     height: 30
                     spacing: 10
@@ -1522,6 +1524,7 @@ Rectangle {
                 }
 
                 Row {
+                    visible: (!stationDiscovery.weatherMapOnly)
                     width: parent.width
                     height: 30
                     spacing: 10
@@ -1592,7 +1595,7 @@ Rectangle {
                 Row {
                     width: parent.width
                     height: stationDiscovery.mapNewsMentionRows.length > 0 ? 30 : 0
-                    visible: stationDiscovery.mapNewsMentionRows.length > 0
+                    visible: (!stationDiscovery.weatherMapOnly) && (stationDiscovery.mapNewsMentionRows.length > 0)
                     spacing: 10
 
                     ActionButton {
@@ -1629,11 +1632,13 @@ Rectangle {
                 }
 
                 StationSectionDivider {
+                    visible: (!stationDiscovery.weatherMapOnly)
                     width: parent.width
                     title: "FIRE HOTSPOTS // NASA FIRMS"
                 }
 
                 Row {
+                    visible: (!stationDiscovery.weatherMapOnly)
                     width: parent.width
                     height: 32
                     spacing: 10
@@ -1685,6 +1690,7 @@ Rectangle {
                 }
 
                 QuietText {
+                    visible: (!stationDiscovery.weatherMapOnly)
                     width: parent.width
                     text: "POST_APOLLO_FIRMS_MAP_KEY // OPTIONAL // KEY NEVER SHOWN OR PASSED IN PROCESS ARGV"
                     font.pixelSize: 9
@@ -1692,11 +1698,13 @@ Rectangle {
                 }
 
                 StationSectionDivider {
+                    visible: (!stationDiscovery.weatherMapOnly || stationDiscovery.weatherLayerEnabled("radar"))
                     width: parent.width
                     title: "RADAR // NOAA/NWS MRMS BASE REFLECTIVITY + 4H HISTORY"
                 }
 
                 Row {
+                    visible: (!stationDiscovery.weatherMapOnly || stationDiscovery.weatherLayerEnabled("radar") || stationDiscovery.weatherLayerEnabled("radar-fallback"))
                     width: parent.width
                     height: 30
                     spacing: 7
@@ -1736,6 +1744,7 @@ Rectangle {
                 }
 
                 Row {
+                    visible: (!stationDiscovery.weatherMapOnly || stationDiscovery.weatherLayerEnabled("radar"))
                     width: parent.width
                     height: 32
                     spacing: 10
@@ -1814,6 +1823,7 @@ Rectangle {
                 }
 
                 QuietText {
+                    visible: (!stationDiscovery.weatherMapOnly || stationDiscovery.weatherLayerEnabled("radar"))
                     width: parent.width
                     text: "NOAA / NWS / MRMS // OFFICIAL BASE REFLECTIVITY // 4H MOVING HISTORY // COVERAGE IS NOT GLOBAL"
                     font.pixelSize: 9
@@ -1821,11 +1831,13 @@ Rectangle {
                 }
 
                 StationSectionDivider {
+                    visible: (!stationDiscovery.weatherMapOnly || stationDiscovery.weatherLayerEnabled("radar-fallback"))
                     width: parent.width
                     title: "RADAR FALLBACK // RAINVIEWER PAST RADAR"
                 }
 
                 Row {
+                    visible: (!stationDiscovery.weatherMapOnly || stationDiscovery.weatherLayerEnabled("radar-fallback"))
                     width: parent.width
                     height: 32
                     spacing: 10
@@ -1901,6 +1913,7 @@ Rectangle {
                 }
 
                 Row {
+                    visible: (!stationDiscovery.weatherMapOnly || stationDiscovery.weatherLayerEnabled("radar-fallback"))
                     width: parent.width
                     height: 30
                     spacing: 10
@@ -1947,6 +1960,7 @@ Rectangle {
                 }
 
                 QuietText {
+                    visible: (!stationDiscovery.weatherMapOnly || stationDiscovery.weatherLayerEnabled("radar-fallback"))
                     width: parent.width
                     text: "RAINVIEWER API // SOURCE CREDIT REQUIRED // GLOBAL COVERAGE VARIES // PUBLIC FALLBACK HAS PAST RADAR ONLY"
                     font.pixelSize: 9
@@ -1954,11 +1968,13 @@ Rectangle {
                 }
 
                 StationSectionDivider {
+                    visible: (!stationDiscovery.weatherMapOnly || stationDiscovery.weatherLayerEnabled("smoke"))
                     width: parent.width
                     title: "SMOKE PLUMES // NOAA HMS"
                 }
 
                 Row {
+                    visible: (!stationDiscovery.weatherMapOnly || stationDiscovery.weatherLayerEnabled("smoke"))
                     width: parent.width
                     height: 32
                     spacing: 10
@@ -2014,6 +2030,7 @@ Rectangle {
                 }
 
                 Row {
+                    visible: (!stationDiscovery.weatherMapOnly || stationDiscovery.weatherLayerEnabled("smoke"))
                     width: parent.width
                     spacing: 16
 

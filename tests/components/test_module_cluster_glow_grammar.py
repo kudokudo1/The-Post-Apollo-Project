@@ -93,7 +93,12 @@ assert "normalContentGlowColor: Colors.omnitrix" in social
 assert "normalDockGlowColor: Colors.omnitrix" in social
 assert "property color openForegroundColor: Colors.magenta" in dock
 assert "property color openGlowColor: Colors.magenta" in dock
-assert social.count("GohuText {") == 2
+assert social.count("GohuText {") == 4
+assert "id: sessionsPhoneFace" in social
+assert "color: sessionsDock.foregroundColor" in social
+assert "font.pixelSize: 28" in social
+assert 'text: "<font color=\'transparent\'>࣪˖☎︎</font>๋࣭✧"' in social
+assert "anchors.leftMargin: 10" in social
 
 
 volume = module("Volumebar")

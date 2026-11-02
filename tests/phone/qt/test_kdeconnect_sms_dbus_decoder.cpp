@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-// Synthetic native Qt D-Bus message decoder tests. Never connect to a bus.
+// Synthetic Qt D-Bus tests; connect only to a disposable CI test bus.
 #include "../../../services/phone/qt/KdeConnectSmsDbusDecoder.h"
 
 #include <QCoreApplication>

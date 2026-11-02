@@ -372,6 +372,10 @@ PanelWindow {
         id: weatherEventArchive
     }
 
+    WeatherDossierArchiveStore {
+        id: weatherDossierArchive
+    }
+
     WeatherService {
         id: weatherService
         cacheStore: weatherPersistentCache
@@ -1011,6 +1015,7 @@ PanelWindow {
                 persistentCacheStore: weatherPersistentCache
                 liveHistoryStore: weatherLiveHistory
                 eventArchiveStore: weatherEventArchive
+                dossierArchiveStore: weatherDossierArchive
                 relationshipFocusModeActive: relationshipFocus.active
                 relationshipFocused: relationshipFocus.owner === "weather"
             }

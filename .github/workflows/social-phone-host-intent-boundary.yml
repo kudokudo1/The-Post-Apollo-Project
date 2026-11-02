@@ -1,0 +1,34 @@
+name: Social Phone Host Intent Boundary P1
+
+on:
+  pull_request:
+    paths:
+      - 'services/phone/PhoneHostIntentBoundary.py'
+      - 'tests/phone/test_phone_host_intent_boundary.py'
+      - 'MODEL/contracts/social-phone-host-intent-boundary-p1-v0.md'
+      - '.github/workflows/social-phone-host-intent-boundary.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'services/phone/PhoneHostIntentBoundary.py'
+      - 'tests/phone/test_phone_host_intent_boundary.py'
+      - 'MODEL/contracts/social-phone-host-intent-boundary-p1-v0.md'
+      - '.github/workflows/social-phone-host-intent-boundary.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  receive-intent-only:
+    name: "Untrusted phone selection: reject privilege claims"
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Compile untrusted intent boundary and tests
+        run: python3 -m py_compile services/phone/PhoneHostIntentBoundary.py tests/phone/test_phone_host_intent_boundary.py
+      - name: Check strict intent shape and privacy
+        run: python3 -m unittest discover -s tests/phone -p 'test_phone_host_intent_boundary.py' -v
+      - name: Regress all offline Phone Bridge Python tests
+        run: python3 -m unittest discover -s tests/phone -p 'test_*.py' -q

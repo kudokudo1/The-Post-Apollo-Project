@@ -41,7 +41,8 @@ Rectangle {
             radarDisplaySource = "noaa";
         else if (weatherMapRoute === "weather/maps/radar-fallback")
             radarDisplaySource = "rainviewer";
-        discoveryScroll.contentY = 0;
+        if (discoveryScroll)
+            discoveryScroll.contentY = 0;
     }
     property bool stationOpen: true
     property bool viewerOpen: false

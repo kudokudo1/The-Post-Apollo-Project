@@ -14,6 +14,7 @@ on:
       - "shell.qml"
       - "tests/notifications/test_nws_official_alert_producer.py"
       - "tests/weather/test_station_ground_nws_alerts.js"
+      - "tests/weather/test_station_official_alert_hierarchy.js"
       - "tests/weather/test_weather_persistent_cache_m4.js"
       - "tests/weather/test_weather_persistent_cache_m5.js"
       - "tests/weather/test_weather_persistent_cache_m6.js"
@@ -39,5 +40,7 @@ jobs:
         run: node tests/weather/test_weather_persistent_cache_m7_nws.js
       - name: Shared NWS GROUND contract
         run: node tests/weather/test_station_ground_nws_alerts.js
+      - name: Official alert hierarchy regression
+        run: node tests/weather/test_station_official_alert_hierarchy.js
       - name: NWS notification producer contract
         run: python3 tests/notifications/test_nws_official_alert_producer.py

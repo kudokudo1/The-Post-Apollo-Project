@@ -28,7 +28,7 @@ assert "Quickshell.env(" in qml
 assert "api.weather.gov/alerts/active?point=" in qml
 assert '"Accept: application/geo+json"' in qml
 assert "Post-Apollo-WeatherStation" in qml
-assert "interval: 900000" in qml
+assert "interval: 300000" in qml
 assert 'producer.alertPoint !== ""' in qml
 assert "NotificationsService.historyReady" in qml
 assert "property var cacheStore: null" in qml

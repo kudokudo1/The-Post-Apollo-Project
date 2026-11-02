@@ -1,0 +1,42 @@
+name: Weather M9 source cadence tuning
+
+on:
+  pull_request:
+    paths:
+      - "services/notifications/NwsOfficialAlertNotificationProducer.qml"
+      - "services/weather/SeismicService.qml"
+      - "services/weather/NdbcMarineService.qml"
+      - "services/weather/GdacsService.qml"
+      - "services/weather/WeatherRuntimePolicy.js"
+      - "tests/notifications/test_nws_official_alert_producer.py"
+      - "tests/weather/test_weather_persistent_cache_m7_nws.js"
+      - "tests/weather/test_station_map_usgs_earthquakes.js"
+      - "tests/weather/test_station_ground_ndbc_marine.js"
+      - "tests/weather/test_station_map_gdacs_disasters.js"
+      - "tests/weather/test_weather_live_runtime_m1.js"
+      - "tests/weather/test_weather_cadence_m9.js"
+      - ".github/workflows/weather-cadence-m9.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  cadence:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: M9 cadence policy
+        run: node tests/weather/test_weather_cadence_m9.js
+      - name: Runtime M1 inventory regression
+        run: node tests/weather/test_weather_live_runtime_m1.js
+      - name: NWS producer regression
+        run: python3 tests/notifications/test_nws_official_alert_producer.py
+      - name: NWS persistent lifecycle regression
+        run: node tests/weather/test_weather_persistent_cache_m7_nws.js
+      - name: USGS earthquake regression
+        run: node tests/weather/test_station_map_usgs_earthquakes.js
+      - name: NDBC marine regression
+        run: node tests/weather/test_station_ground_ndbc_marine.js
+      - name: GDACS disaster regression
+        run: node tests/weather/test_station_map_gdacs_disasters.js

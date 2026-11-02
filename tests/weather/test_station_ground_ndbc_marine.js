@@ -98,7 +98,7 @@ assert.match(service, /property string inflightKey: ""/);
 assert.match(service, /currentKey !== inflightKey/);
 assert.equal((service.match(/\bProcess\s*\{/g) || []).length, 1);
 assert.equal((service.match(/\bTimer\s*\{/g) || []).length, 2);
-assert.match(service, /interval: 600000/);
+assert.match(service, /interval: 1800000/);
 assert.match(service, /interval: 250/);
 assert.match(service, /running: marine\.active && marine\.configured/);
 assert.match(service, /--proto", "=https"/);

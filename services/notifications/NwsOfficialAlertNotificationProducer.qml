@@ -217,8 +217,11 @@ Scope {
             nwsFetch.running = true;
     }
 
+    // NWS permits alert-service clients to request no more often than every
+    // 30 seconds. Weather Station uses a conservative five-minute cadence:
+    // timely enough for warnings without turning one pinned point into noise.
     Timer {
-        interval: 900000
+        interval: 300000
         repeat: true
         running: producer.alertPoint !== ""
         onTriggered: producer.refresh()

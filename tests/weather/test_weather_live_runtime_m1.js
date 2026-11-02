@@ -208,7 +208,7 @@ assert.match(spaceService, /interval:\s*300000/);
 assert.match(spaceService, /running:\s*true/);
 
 const nws = read("services/notifications/NwsOfficialAlertNotificationProducer.qml");
-assert.match(nws, /interval:\s*900000/);
+assert.match(nws, /interval:\s*300000/);
 assert.match(nws, /running:\s*producer\.alertPoint !== ""/);
 
 const ui = read("widgets/weather/WeatherStationW.qml");

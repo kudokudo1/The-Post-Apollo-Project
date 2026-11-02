@@ -100,7 +100,7 @@ assert.match(
 assert.match(service, /SeismicPolicy\.parseFeed\(JSON\.parse\(raw\), 100\)/);
 assert.equal((service.match(/\bProcess\s*\{/g) || []).length, 1);
 assert.equal((service.match(/\bTimer\s*\{/g) || []).length, 1);
-assert.match(service, /interval:\s*900000/);
+assert.match(service, /interval:\s*300000/);
 
 const station = read("widgets/weather/WeatherStationW.qml");
 assert.equal(

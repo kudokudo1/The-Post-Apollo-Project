@@ -129,13 +129,13 @@ var _catalog = [
         id:"nws-alerts",
         label:"NWS OFFICIAL ALERTS",
         owner:"services/notifications/NwsOfficialAlertNotificationProducer.qml",
-        mode:MODE_NORMAL_POLL,
-        cadenceMs:900000,
+        mode:MODE_FAST_POLL,
+        cadenceMs:300000,
         lifetime:LIFETIME_SESSION_BACKGROUND,
         view:"GLOBAL",
-        freshMs:1800000,
-        staleMs:3600000,
-        note:"conditional on operator-pinned NWS alert point"
+        freshMs:600000,
+        staleMs:1800000,
+        note:"5m pinned-point poll; NWS alert service recommends no faster than 30s"
     },
     {
         id:"home-history",
@@ -153,11 +153,11 @@ var _catalog = [
         id:"seismic",
         label:"USGS EARTHQUAKES",
         owner:"SeismicService.qml",
-        mode:MODE_NORMAL_POLL,
-        cadenceMs:900000,
+        mode:MODE_FAST_POLL,
+        cadenceMs:300000,
         lifetime:LIFETIME_VIEW_SCOPED,
         view:"GROUND/MAP",
-        note:"one retained set shared by GROUND and MAP while either view owns it"
+        note:"5m shared poll against USGS summary feed, which publishes every minute"
     },
     {
         id:"river",
@@ -172,10 +172,11 @@ var _catalog = [
         id:"marine",
         label:"NOAA NDBC MARINE",
         owner:"NdbcMarineService.qml",
-        mode:MODE_NORMAL_POLL,
-        cadenceMs:600000,
+        mode:MODE_SLOW_POLL,
+        cadenceMs:1800000,
         lifetime:LIFETIME_VIEW_SCOPED,
-        view:"GROUND"
+        view:"GROUND",
+        note:"30m steady-state poll; NDBC says most stations report hourly"
     },
     {
         id:"coastal",
@@ -194,7 +195,7 @@ var _catalog = [
         cadenceMs:900000,
         lifetime:LIFETIME_VIEW_SCOPED,
         view:"GROUND",
-        note:"current code polls 15m; faster live cadence is a later provider-policy decision"
+        note:"15m strike-density product retained at matching 15m poll cadence"
     },
     {
         id:"moon",
@@ -330,9 +331,10 @@ var _catalog = [
         label:"GDACS GLOBAL DISASTERS",
         owner:"GdacsService.qml",
         mode:MODE_NORMAL_POLL,
-        cadenceMs:900000,
+        cadenceMs:360000,
         lifetime:LIFETIME_VIEW_SCOPED,
-        view:"MAP"
+        view:"MAP",
+        note:"matches GDACS documented six-minute principal-feed update cadence"
     },
     {
         id:"firms",
@@ -436,7 +438,7 @@ var _cacheProfiles = {
     },
     "nws-alerts": {
         retention:RETENTION_PERSISTENT_LAST_GOOD,
-        freshMs:1800000, staleMs:3600000, expireMs:21600000
+        freshMs:600000, staleMs:1800000, expireMs:21600000
     },
     "home-history": {
         retention:RETENTION_MEMORY_LAST_GOOD,
@@ -444,7 +446,7 @@ var _cacheProfiles = {
     },
     "seismic": {
         retention:RETENTION_PERSISTENT_LAST_GOOD,
-        freshMs:1800000, staleMs:7200000, expireMs:86400000
+        freshMs:600000, staleMs:1800000, expireMs:86400000
     },
     "river": {
         retention:RETENTION_PERSISTENT_LAST_GOOD,
@@ -452,7 +454,7 @@ var _cacheProfiles = {
     },
     "marine": {
         retention:RETENTION_PERSISTENT_LAST_GOOD,
-        freshMs:1200000, staleMs:3600000, expireMs:21600000
+        freshMs:2700000, staleMs:7200000, expireMs:21600000
     },
     "coastal": {
         retention:RETENTION_PERSISTENT_LAST_GOOD,
@@ -511,7 +513,7 @@ var _cacheProfiles = {
     },
     "gdacs": {
         retention:RETENTION_PERSISTENT_LAST_GOOD,
-        freshMs:1800000, staleMs:7200000, expireMs:86400000
+        freshMs:900000, staleMs:3600000, expireMs:86400000
     },
     "firms": {
         retention:RETENTION_OPERATOR_SNAPSHOT,

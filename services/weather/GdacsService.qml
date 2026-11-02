@@ -19,7 +19,7 @@ Scope {
     property date lastUpdated
     property double lastFetchMs: 0
 
-    readonly property int cacheMs: 900000
+    readonly property int cacheMs: 360000
     readonly property string endpoint:
         "https://www.gdacs.org/gdacsapi/api/events/geteventlist/events4app"
     readonly property bool loading: fetchProcess.running
@@ -111,8 +111,9 @@ Scope {
         }
     }
 
-    // GDACS recommends caching collection responses. Weather Station refreshes
-    // at a deliberately modest 15-minute cadence only while MAP owns this feed.
+    // GDACS documents its principal feeds as updated every six minutes.
+    // Match that cadence only while MAP owns this feed; cached restart state
+    // still prevents unnecessary fetches on a quick remount.
     Timer {
         interval: gdacs.cacheMs
         repeat: true

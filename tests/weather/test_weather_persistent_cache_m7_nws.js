@@ -150,7 +150,7 @@ assert.equal(result.document.records["nws-alerts"].payload.entries.length, 0);
 
 const spec = runtime.sourceSpec("nws-alerts");
 assert.equal(spec.retention, "PERSISTENT_LAST_GOOD");
-assert.equal(spec.cadenceMs, 900000);
+assert.equal(spec.cadenceMs, 300000);
 assert.equal(spec.expireMs, 6 * 3600000);
 assert.match(runtime.retentionLabel(spec), /^PERSIST≤/);
 
@@ -177,7 +177,7 @@ assert.match(producer, /fetchSucceeded \|\| usingPersistentCache/);
 assert.match(producer, /producer\.usingPersistentCache = false/);
 assert.equal((producer.match(/\bProcess\s*\{/g) || []).length, 1);
 assert.equal((producer.match(/\bTimer\s*\{/g) || []).length, 1);
-assert.match(producer, /interval: 900000/);
+assert.match(producer, /interval: 300000/);
 assert.doesNotMatch(producer, /weatherService|wttr\.in/);
 
 assert.match(

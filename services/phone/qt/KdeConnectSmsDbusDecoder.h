@@ -45,6 +45,8 @@ struct SmsDecodeResult {
 // Qt D-Bus stream operators for KDE's two nested structure shapes.
 QDBusArgument &operator<<(QDBusArgument &arg, const SmsAddress &v);
 const QDBusArgument &operator>>(const QDBusArgument &arg, SmsAddress &v);
+QDBusArgument &operator<<(QDBusArgument &arg, const SmsFields &v);
+const QDBusArgument &operator>>(const QDBusArgument &arg, SmsFields &v);
 QDBusArgument &operator<<(QDBusArgument &arg, const SmsAttachment &v);
 const QDBusArgument &operator>>(const QDBusArgument &arg, SmsAttachment &v);
 
@@ -55,5 +57,6 @@ SmsDecodeResult decodeVariant(const QDBusVariant &variant);
 
 Q_DECLARE_METATYPE(PostApolloPhone::SmsAddress)
 Q_DECLARE_METATYPE(PostApolloPhone::SmsAttachment)
+Q_DECLARE_METATYPE(PostApolloPhone::SmsFields)
 Q_DECLARE_METATYPE(QList<PostApolloPhone::SmsAddress>)
 Q_DECLARE_METATYPE(QList<PostApolloPhone::SmsAttachment>)

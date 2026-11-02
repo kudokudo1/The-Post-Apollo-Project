@@ -269,13 +269,202 @@ function latestObservedStage(stageflow) {
     if (!observed || observed.data.length === 0)
         return null;
     const row = observed.data[observed.data.length - 1];
+    const previous = observed.data.length > 1
+        ? observed.data[observed.data.length - 2] : null;
     const timeMs = finite(row.validMillis, -1);
+    const previousTimeMs = previous
+        ? finite(previous.validMillis, -1) : -1;
     return {
         value: finite(row.primary, null),
         units: safeText(observed.primaryUnits, 24),
+        measurementName: safeText(observed.primaryName, 36),
         timeMs: timeMs,
-        timeLabel: safeText(row.validLabel, 48) || utcLabel(timeMs)
+        timeLabel: safeText(row.validLabel, 48) || utcLabel(timeMs),
+        previousValue: previous ? finite(previous.primary, null) : null,
+        previousTimeMs: previousTimeMs,
+        previousTimeLabel: previous
+            ? (safeText(previous.validLabel, 48)
+               || utcLabel(previousTimeMs))
+            : "--"
     };
+}
+
+function thresholdMeasurementKind(name) {
+    const compact = safeText(name, 36).toUpperCase();
+    if (compact.indexOf("STAGE") >= 0 || compact.indexOf("HEIGHT") >= 0)
+        return "stage";
+    if (compact.indexOf("FLOW") >= 0
+            || compact.indexOf("DISCHARGE") >= 0)
+        return "flow";
+    return "";
+}
+
+function normalizedUnit(value) {
+    return safeText(value, 24).toLowerCase();
+}
+
+function categoryRank(id) {
+    switch (safeText(id, 24).toLowerCase()) {
+    case "major": return 4;
+    case "moderate": return 3;
+    case "minor": return 2;
+    case "action": return 1;
+    case "none": return 0;
+    default: return -1;
+    }
+}
+
+function observedThresholdContext(gauge, gaugeContext, stageflow) {
+    const unavailable = {
+        available: false,
+        supported: false,
+        crossedInSeries: false,
+        reason: "THRESHOLD CONTEXT UNAVAILABLE",
+        measurementKind: "",
+        measurementName: "",
+        units: "",
+        observedValue: null,
+        categoryId: "",
+        categoryLabel: "NOT DEFINED",
+        categoryRank: -1,
+        thresholdId: "",
+        thresholdLabel: "",
+        thresholdValue: null,
+        aboveBy: null,
+        nextThresholdLabel: "",
+        nextThresholdValue: null,
+        nextGap: null,
+        crossingFromTimeMs: -1,
+        crossingFromTimeLabel: "--",
+        crossingToTimeMs: -1,
+        crossingToTimeLabel: "--"
+    };
+    if (!gauge || !gaugeContext || gaugeContext.available !== true)
+        return unavailable;
+
+    const latest = latestObservedStage(stageflow);
+    if (!latest || latest.value === null) {
+        unavailable.reason = "NO OBSERVED NWPS READING";
+        return unavailable;
+    }
+
+    const kind = thresholdMeasurementKind(latest.measurementName);
+    if (!kind) {
+        unavailable.reason = "OBSERVED MEASUREMENT TYPE NOT IDENTIFIED";
+        return unavailable;
+    }
+
+    const expectedUnits = kind === "stage"
+        ? safeText(gaugeContext.stageUnits, 24)
+        : safeText(gaugeContext.flowUnits, 24);
+    if (!expectedUnits
+            || normalizedUnit(expectedUnits)
+               !== normalizedUnit(latest.units)) {
+        unavailable.reason = "OBSERVED UNITS DO NOT MATCH THRESHOLD UNITS";
+        return unavailable;
+    }
+
+    const rawThresholds = Array.isArray(gaugeContext.thresholds)
+        ? gaugeContext.thresholds : [];
+    const thresholds = [];
+    for (let i = 0; i < rawThresholds.length; i++) {
+        const row = rawThresholds[i] || {};
+        const value = finite(
+            kind === "stage" ? row.stage : row.flow,
+            null
+        );
+        if (value === null)
+            continue;
+        thresholds.push({
+            id: safeText(row.id, 24).toLowerCase(),
+            label: safeText(row.label, 36),
+            value: value,
+            rank: categoryRank(row.id)
+        });
+    }
+    thresholds.sort(function(a, b) {
+        if (a.value !== b.value)
+            return a.value - b.value;
+        return a.rank - b.rank;
+    });
+    if (thresholds.length === 0) {
+        unavailable.reason = "NO MATCHING OFFICIAL THRESHOLDS";
+        return unavailable;
+    }
+
+    const category = gauge.observedCategory || {};
+    const observedCategoryId = safeText(category.id, 24).toLowerCase();
+    const observedCategoryLabel = safeText(category.label, 40)
+        || "NOT DEFINED";
+    const observedCategoryRank = finite(
+        category.rank,
+        categoryRank(observedCategoryId)
+    );
+
+    let met = null;
+    let next = null;
+    for (let i = 0; i < thresholds.length; i++) {
+        if (latest.value >= thresholds[i].value)
+            met = thresholds[i];
+        else {
+            next = thresholds[i];
+            break;
+        }
+    }
+
+    const result = {
+        available: true,
+        supported: false,
+        crossedInSeries: false,
+        reason: "",
+        measurementKind: kind,
+        measurementName: latest.measurementName,
+        units: latest.units,
+        observedValue: latest.value,
+        categoryId: observedCategoryId,
+        categoryLabel: observedCategoryLabel,
+        categoryRank: observedCategoryRank,
+        thresholdId: met ? met.id : "",
+        thresholdLabel: met ? met.label : "",
+        thresholdValue: met ? met.value : null,
+        aboveBy: met ? latest.value - met.value : null,
+        nextThresholdLabel: next ? next.label : "",
+        nextThresholdValue: next ? next.value : null,
+        nextGap: next ? next.value - latest.value : null,
+        crossingFromTimeMs: -1,
+        crossingFromTimeLabel: "--",
+        crossingToTimeMs: latest.timeMs,
+        crossingToTimeLabel: latest.timeLabel
+    };
+
+    if (!met) {
+        result.supported = observedCategoryRank === 0;
+        result.reason = result.supported
+            ? "BELOW ACTION // OBSERVED CATEGORY ALIGNED"
+            : "CATEGORY/READING NOT ALIGNED // CLAIM WITHHELD";
+        return result;
+    }
+
+    result.supported = observedCategoryId === met.id
+        && observedCategoryRank === met.rank;
+    if (!result.supported) {
+        result.reason =
+            "CATEGORY/READING NOT ALIGNED // CLAIM WITHHELD";
+        return result;
+    }
+
+    const previousValue = finite(latest.previousValue, null);
+    if (previousValue !== null
+            && previousValue < met.value
+            && latest.value >= met.value) {
+        result.crossedInSeries = true;
+        result.crossingFromTimeMs = latest.previousTimeMs;
+        result.crossingFromTimeLabel = latest.previousTimeLabel;
+        result.reason = "THRESHOLD CROSSED IN LOADED OBSERVED SERIES";
+    } else {
+        result.reason = "THRESHOLD MET // CATEGORY ALIGNED";
+    }
+    return result;
 }
 
 function floodGaugeContext(
@@ -299,6 +488,12 @@ function floodGaugeContext(
         forecastCategory: "NOT DEFINED",
         observedReading: "--",
         latestObserved: null,
+        thresholdContext: {
+            available: false,
+            supported: false,
+            crossedInSeries: false,
+            reason: "THRESHOLD CONTEXT UNAVAILABLE"
+        },
         thresholds: [],
         impacts: [],
         contextAvailable: false
@@ -347,6 +542,11 @@ function floodGaugeContext(
             ? context.thresholds.slice(0, 4) : [];
         base.impacts = Array.isArray(context.impacts)
             ? context.impacts.slice(0, 2) : [];
+        base.thresholdContext = observedThresholdContext(
+            gauge,
+            context,
+            stageflow
+        );
     }
 
     if (distance < 0 || distance > limit) {
@@ -362,12 +562,16 @@ function floodGaugeContext(
     return base;
 }
 
-function timelineRow(sourceLabel, kind, label, timeMs, provenance) {
+function timelineRow(
+    sourceLabel, provenanceGroup, kind,
+    label, timeMs, provenance
+) {
     const time = finite(timeMs, -1);
     if (time <= 0)
         return null;
     return {
         sourceLabel: safeText(sourceLabel, 40),
+        provenanceGroup: safeText(provenanceGroup, 40),
         kind: safeText(kind, 40),
         label: safeText(label, 180),
         timeMs: time,
@@ -389,6 +593,7 @@ function evidenceTimeline(
     if (selected) {
         add(timelineRow(
             selected.sourceLabel,
+            "EVENT RECORD",
             "SELECTED EVENT",
             selected.typeLabel + " // " + selected.title,
             selected.timeMs,
@@ -401,6 +606,7 @@ function evidenceTimeline(
         const row = nearby[i] || {};
         add(timelineRow(
             row.sourceLabel,
+            "EVENT RECORD",
             "NEARBY RECORD",
             row.typeLabel + " // " + row.title,
             row.timeMs,
@@ -411,6 +617,7 @@ function evidenceTimeline(
     if (radarContext && radarContext.available) {
         add(timelineRow(
             "NOAA MRMS",
+            "REMOTE SENSING",
             "RADAR FRAME",
             radarContext.frameLabel || "FRAME",
             radarContext.timeMs,
@@ -421,6 +628,7 @@ function evidenceTimeline(
     if (lightningContext && lightningContext.available) {
         add(timelineRow(
             "NOAA NOWCOAST",
+            "REMOTE SENSING",
             "LIGHTNING FRAME",
             String(lightningContext.windowMinutes || 15)
                 + "M DENSITY",
@@ -433,6 +641,7 @@ function evidenceTimeline(
             && floodContext.latestObserved) {
         add(timelineRow(
             "NOAA NWPS",
+            "GAUGE OBSERVATION",
             "OBSERVED STAGE",
             floodContext.gaugeId + " // "
                 + compactReading(

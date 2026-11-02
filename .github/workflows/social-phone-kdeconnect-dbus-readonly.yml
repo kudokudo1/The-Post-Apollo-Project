@@ -1,0 +1,31 @@
+name: Social Phone KDE Connect Read-Only D-Bus Probe P1
+
+on:
+  pull_request:
+    paths:
+      - 'services/phone/KdeConnectDbusProbe.py'
+      - 'tests/phone/test_kdeconnect_dbus_probe.py'
+      - 'MODEL/contracts/social-phone-kdeconnect-dbus-readonly-probe-p1-v0.md'
+      - '.github/workflows/social-phone-kdeconnect-dbus-readonly.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'services/phone/KdeConnectDbusProbe.py'
+      - 'tests/phone/test_kdeconnect_dbus_probe.py'
+      - 'MODEL/contracts/social-phone-kdeconnect-dbus-readonly-probe-p1-v0.md'
+      - '.github/workflows/social-phone-kdeconnect-dbus-readonly.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  offline-no-autostart:
+    name: "KDE Connect D-Bus metadata: mock only"
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Compile probe and mocks
+        run: python3 -m py_compile services/phone/KdeConnectDbusProbe.py tests/phone/test_kdeconnect_dbus_probe.py
+      - name: Verify no auto-activation, no mutation and privacy
+        run: python3 -m unittest discover -s tests/phone -p 'test_kdeconnect_dbus_probe.py' -v

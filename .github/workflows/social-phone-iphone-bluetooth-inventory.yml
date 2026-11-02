@@ -1,0 +1,34 @@
+name: Social Phone iPhone Bluetooth Prerequisites P2
+
+on:
+  pull_request:
+    paths:
+      - 'services/phone/IphoneBluetoothInventory.py'
+      - 'tests/phone/test_iphone_bluetooth_inventory.py'
+      - 'MODEL/contracts/social-phone-iphone-bluetooth-inventory-p2-v0.md'
+      - '.github/workflows/social-phone-iphone-bluetooth-inventory.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'services/phone/IphoneBluetoothInventory.py'
+      - 'tests/phone/test_iphone_bluetooth_inventory.py'
+      - 'MODEL/contracts/social-phone-iphone-bluetooth-inventory-p2-v0.md'
+      - '.github/workflows/social-phone-iphone-bluetooth-inventory.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  no-device-inventory:
+    name: "No device, no Bluetooth access: synthetic inventory"
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Compile inventory and synthetic tests
+        run: python3 -m py_compile services/phone/IphoneBluetoothInventory.py tests/phone/test_iphone_bluetooth_inventory.py
+      - name: Run isolated inventory fixtures (no Bluetooth command execution)
+        run: python3 -m unittest discover -s tests/phone -p 'test_iphone_bluetooth_inventory.py' -v
+      - name: Regress all Phone Bridge offline Python tests
+        run: python3 -m unittest discover -s tests/phone -p 'test_*.py' -q

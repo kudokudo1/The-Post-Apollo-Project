@@ -13,6 +13,7 @@ import "../../services/weather/SeismicPolicy.js" as SeismicPolicy
 import "../../services/weather/GdacsPolicy.js" as GdacsPolicy
 import "../../services/weather/WeatherRuntimePolicy.js" as RuntimePolicy
 import "StationEventContextPolicy.js" as EventContextPolicy
+import "StationDossierPreviewPolicy.js" as DossierPreviewPolicy
 
 // Source-first stage. All records shown come from a backend, never examples.
 // MAP owns a local Natural Earth geographic basemap plus source-driven data
@@ -464,6 +465,20 @@ Rectangle {
             selectedLightningContext,
             selectedFloodContext,
             8
+        )
+
+    // M22-A read-only, volatile preview over already-derived event context.
+    // Not an archive writer, and never a merged incident identity.
+    readonly property var selectedDossierPreview:
+        DossierPreviewPolicy.preview(
+            selectedEventContext,
+            selectedContextCompanions,
+            selectedRadarContext,
+            selectedLightningContext,
+            selectedFloodContext,
+            selectedEvidenceTimeline,
+            selectedEvidenceRelationships,
+            runtimeNowMs
         )
 
     readonly property int selectedArchiveRevision: {
@@ -3494,6 +3509,8 @@ Rectangle {
                         stationDiscovery.selectedArchiveCount
                     archiveStatusText:
                         stationDiscovery.selectedArchiveStatus
+                    dossierPreview:
+                        stationDiscovery.selectedDossierPreview
                     archiveRows:
                         stationDiscovery.selectedArchiveRows
                     archiveDiff:

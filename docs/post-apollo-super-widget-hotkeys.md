@@ -46,8 +46,11 @@ Quickshell restarts, and Sway reloads require separate operator approval.
 2. Inspect the **running** Sway config and every imported include for existing
    Super shortcuts. For an initial inspection (requires `jq`):
    `swaymsg -t get_config | jq -r '.config' | grep -nE 'bindsym.*(Mod4|\\$mod)'`.
-   Check all eight exact chords, including shifted variants. Some may already
-   be bound to terminals, launchers, workspaces, or native actions.
+   Check all eight exact chords, including shifted variants. In common
+   Sway keymaps, Super+T may select tabbed layout and Super+R may enter
+   resize mode. Other systems may use them for terminals, launchers,
+   workspaces, or native actions. These bindings are NOT automatically safe
+   to activate just because repository CI passes.
 3. If there is a collision, decide deliberately which old shortcut to retain.
    Do not silently override it, and do not just append duplicates. The
    repository cannot verify the active user's separate Sway keymap.

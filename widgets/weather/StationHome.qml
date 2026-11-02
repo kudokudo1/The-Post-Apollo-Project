@@ -932,7 +932,8 @@ Rectangle {
         Column {
             width: parent.width
             spacing: 8
-            visible: home.sectionVisible("alerts") && (home.officialAlertSummary.available)
+            visible: home.officialAlertSummary.available
+                     && home.sectionVisible("alerts")
 
             StationSectionDivider {
                 width: parent.width

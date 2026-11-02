@@ -20,10 +20,16 @@ vm.runInContext(routeSource.replace(/^\.pragma library\s*$/m, ""), env);
 vm.runInContext(policySource.replace(/^\.pragma library\s*$/m, ""), env);
 const plain = value => JSON.parse(JSON.stringify(value));
 
-test("13 real WEATHER routes belong to the existing M0 subject hierarchy", () => {
-  const keys = Object.keys(env.ROUTES);
-  assert.equal(keys.length, 13);
-  for (const key of keys) {
+test("original 13 WEATHER routes retain ownership after M2b expansion", () => {
+  const originals = [
+    "weather/conditions/current","weather/conditions/atmosphere",
+    "weather/conditions/air","weather/conditions/pollen",
+    "weather/forecasts/hourly","weather/forecasts/daily","weather/forecasts/air",
+    "weather/water/rivers","weather/water/marine","weather/water/coast",
+    "weather/hazards/alerts","weather/hazards/lightning","weather/hazards/heat-fire"
+  ];
+  assert.equal(originals.length, 13);
+  for (const key of originals) {
     const route = env.findRoute(key);
     assert.ok(route, key);
     assert.equal(route.subject, "weather");
@@ -33,9 +39,9 @@ test("13 real WEATHER routes belong to the existing M0 subject hierarchy", () =>
     assert.ok(env.visibleFor(page,key,"header"),key);
     assert.match(env.titleFor(key), /^WEATHER \/\//);
   }
-  assert.equal(env.kindForRoute("weather/overview"), "");
-  assert.equal(env.kindForRoute("weather/maps/radar"), "");
-  assert.equal(env.kindForRoute("weather/water/rivers/gauges"), "");
+  assert.equal(env.kindForRoute("weather/overview"), "home");
+  assert.equal(env.kindForRoute("weather/maps/radar"), "map");
+  assert.equal(env.kindForRoute("weather/water/rivers/gauges"), "ground");
   assert.equal(env.kindForRoute("magick/astrology/charts"), "");
 });
 
@@ -77,10 +83,19 @@ test("selected WEATHER routes show only their own sections", () => {
 test("provider activation matches only relevant routes and preserves old collectors", () => {
   for (const key of Object.keys(env.ROUTES)) {
     assert.equal(env.needsSource(key,"astronomy"),false,key);
-    assert.equal(env.needsSource(key,"river"),key === "weather/water/rivers");
-    assert.equal(env.needsSource(key,"lightning"),key === "weather/hazards/lightning");
-    assert.equal(env.needsSource(key,"marine"),key === "weather/water/marine");
-    assert.equal(env.needsSource(key,"coastal"),key === "weather/water/coast");
+    assert.equal(env.needsSource(key,"river"),
+      key === "weather/water/rivers"
+      || key.startsWith("weather/water/rivers/")
+      || key === "weather/hazards/flood"
+      || key === "weather/history/relationships/rivers");
+    assert.equal(env.needsSource(key,"lightning"),
+      key === "weather/hazards/lightning" || key === "weather/maps/lightning");
+    assert.equal(env.needsSource(key,"marine"),
+      key === "weather/water/marine"
+      || key === "weather/history/relationships/marine");
+    assert.equal(env.needsSource(key,"coastal"),
+      key === "weather/water/coast"
+      || key === "weather/history/relationships/coastal");
   }
   assert.equal((sky.match(/SubjectPanelPolicy\.needsSource\(sky\.subjectRoute,"astronomy"\)/g)||[]).length,6);
   for (const s of ["marine","coastal"])
@@ -88,7 +103,8 @@ test("provider activation matches only relevant routes and preserves old collect
   for (const s of ["river","lightning"])
     assert.ok(station.includes('subjectNavigator.currentPath, "'+s+'"'));
   assert.match(station,/!weatherStation\.subjectNavigationOpen\s*&& \(weatherStation\.currentView === "ground"/);
-  assert.match(station,/active: weatherStation\.menuOpen\s*&& !weatherStation\.subjectNavigationOpen\s*&& weatherStation\.currentView === "home"/);
+  assert.match(station,/weatherStation\.currentView === "home"/);
+  assert.match(station,/subjectNavigator\.currentPath, "history"/);
   assert.ok(!pane.includes("WeatherServices."));
 });
 

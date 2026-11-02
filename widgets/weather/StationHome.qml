@@ -16,7 +16,10 @@ Rectangle {
     function sectionVisible(section) {
         return SubjectPanelPolicy.visibleFor("home", subjectRoute, section);
     }
-    onSubjectRouteChanged: homeScroll.contentY = 0
+    onSubjectRouteChanged: {
+        if (homeScroll)
+            homeScroll.contentY = 0;
+    }
 
     property var weatherService: null
     property var spaceService: null

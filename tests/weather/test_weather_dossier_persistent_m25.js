@@ -130,7 +130,9 @@ sample=JSON.parse(JSON.stringify(b.document));
 sample.entries[1].extra="unrecognized";
 rejectDocument(sample,"INVALID_ENTRY_OR_ORDER");
 assert.equal(archive.parse("{bad",codec).reason,"INVALID_JSON");
-assert.equal(archive.parse("",codec).count,0);
+assert.equal(archive.parse("",codec).reason,"EMPTY_FILE_CORRUPT");
+assert.equal(archive.parse(" \n  ",codec).reason,"EMPTY_FILE_CORRUPT");
+assert.equal(archive.parse(JSON.stringify(archive.empty()),codec).count,0);
 assert.equal(archive.parse("x".repeat(archive.MAX_DOCUMENT_CHARS+1),codec).reason,
     "INPUT_SIZE_OR_TYPE_INVALID");
 

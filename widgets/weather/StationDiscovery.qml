@@ -2372,10 +2372,10 @@ Rectangle {
                     }
 
                     Repeater {
-                        model: stationDiscovery.weatherLayerEnabled("radar-fallback")
-                               && stationDiscovery.radarDisplaySource
+                        model: stationDiscovery.radarDisplaySource
                                === "rainviewer"
                                && rainViewerRadarService.ready
+                               && stationDiscovery.weatherLayerEnabled("radar-fallback")
                                ? rainViewerRadarService.strips : []
 
                         delegate: Image {

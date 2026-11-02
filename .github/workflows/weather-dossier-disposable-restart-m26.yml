@@ -1,0 +1,30 @@
+name: Weather M26 disposable dossier restart simulation
+
+on:
+  pull_request:
+    paths:
+      - "services/weather/WeatherDossierArchivePolicy.js"
+      - "services/weather/WeatherDossierArchiveStore.qml"
+      - "widgets/weather/StationDossierCapturePolicy.js"
+      - "widgets/weather/StationDossierSerializationPolicy.js"
+      - "tests/weather/test_weather_dossier_disposable_restart_m26.js"
+      - ".github/workflows/weather-dossier-disposable-restart-m26.yml"
+      - ".github/workflows/weather-teardown-contracts.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  disposable:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: M26 disposable filesystem and exact QML callback tests
+        run: node tests/weather/test_weather_dossier_disposable_restart_m26.js
+      - name: M25 archive document regressions
+        run: node tests/weather/test_weather_dossier_persistent_m25.js
+      - name: M24 serializer regressions
+        run: node tests/weather/test_weather_dossier_serialization_m24.js
+      - name: M23 admission regressions
+        run: node tests/weather/test_weather_dossier_capture_m23.js

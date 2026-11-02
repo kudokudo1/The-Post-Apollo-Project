@@ -992,6 +992,7 @@ Rectangle {
             settingsOpen: appSelector.settingsOpen
             localDirectoryStore: SocialOrganizationDirectoryStore
             localPortfoliosStore: SocialLocalPortfoliosStore
+            localStructureStore: SocialLocalOrganizationStructureStore
             localLinksStore: SocialOrganizationLinksStore
             socialIdentitiesSnapshot: appSelector.identitySnapshot
             socialAccountDetailsStore: SocialAccountDetailsStore

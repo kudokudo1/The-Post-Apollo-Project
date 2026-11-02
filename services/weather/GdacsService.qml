@@ -9,6 +9,8 @@ import "GdacsPolicy.js" as GdacsPolicy
 Scope {
     id: gdacs
 
+    property var cacheStore: null
+    property bool usingPersistentCache: false
     property bool active: true
     property bool ready: false
     property bool failed: false
@@ -21,6 +23,46 @@ Scope {
     readonly property string endpoint:
         "https://www.gdacs.org/gdacsapi/api/events/geteventlist/events4app"
     readonly property bool loading: fetchProcess.running
+
+    function hydratePersistentCache() {
+        if (!cacheStore || ready)
+            return false;
+        const saved = cacheStore.record("gdacs", Date.now());
+        if (!saved || !saved.payload
+                || !Array.isArray(saved.payload.events)
+                || saved.payload.events.length === 0)
+            return false;
+
+        events = saved.payload.events.slice();
+        lastFetchMs = Number(saved.receivedAtMs);
+        lastUpdated = new Date(saved.receivedAtMs);
+        ready = true;
+        failed = false;
+        errorText = "";
+        usingPersistentCache = true;
+        return true;
+    }
+
+    function persistEvents(receivedAtMs) {
+        if (!cacheStore || !ready || !Array.isArray(events)
+                || events.length === 0)
+            return false;
+        return cacheStore.put("gdacs", receivedAtMs, {
+            "events": events
+        });
+    }
+
+    Connections {
+        target: gdacs.cacheStore
+        enabled: !!gdacs.cacheStore
+        function onStorageStateChanged() {
+            if (!gdacs.cacheStore)
+                return;
+            const state = String(gdacs.cacheStore.storageState || "");
+            if (state === "ready" || state === "empty")
+                gdacs.hydratePersistentCache();
+        }
+    }
 
     function refresh(force) {
         if (!active || fetchProcess.running)
@@ -42,6 +84,8 @@ Scope {
             ready = true;
             failed = false;
             errorText = "";
+            usingPersistentCache = false;
+            persistEvents(lastFetchMs);
         } catch (error) {
             failed = true;
             errorText = "GDACS FEED UNAVAILABLE";
@@ -82,6 +126,7 @@ Scope {
     }
 
     Component.onCompleted: {
+        hydratePersistentCache();
         if (active)
             refresh(false);
     }

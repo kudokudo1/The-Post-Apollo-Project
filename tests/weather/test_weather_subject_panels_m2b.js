@@ -127,7 +127,9 @@ test("WEATHER map does not fetch or plot non-weather events", () => {
   assert.match(discovery,/!weatherMapOnly && mapShowEarthquakes/);
   assert.match(discovery,/!weatherMapOnly && mapShowGdacs/);
   assert.match(discovery,/&& !stationDiscovery\.weatherMapOnly/);
-  assert.match(discovery,/stationDiscovery\.weatherMapOnly \? \[\]\s*: firmsService\.ready/);
+  assert.match(discovery,/model: firmsService\.ready \? firmsService\.hotspots : \[\]/);
+  assert.match(discovery,/visible: !stationDiscovery\.weatherMapOnly/);
+  assert.match(discovery,/model: source\.ready \? stationDiscovery\.visibleRows : \[\]/);
   assert.match(discovery,/weatherLayerEnabled\("smoke"\)/);
   assert.match(discovery,/weatherLayerEnabled\("radar"\)/);
   assert.match(discovery,/weatherLayerEnabled\("radar-fallback"\)/);

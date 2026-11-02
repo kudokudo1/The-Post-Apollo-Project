@@ -468,13 +468,21 @@ for (const service of ["riverService","marineService","coastalService"]) {
 }
 assert.equal(
     (ground.match(/cacheStore:\s*ground\.persistentCacheStore/g) || []).length,
-    3
+    2
 );
 
 const station = read("widgets/weather/WeatherStationW.qml");
 assert.match(
     station,
     /persistentCacheStore:\s*weatherStation\.persistentCacheStore/
+);
+assert.equal(
+    (station.match(/WeatherServices\.NwpsRiverService\s*\{/g) || []).length,
+    1
+);
+assert.match(
+    station,
+    /WeatherServices\.NwpsRiverService\s*\{[\s\S]*?cacheStore:\s*weatherStation\.persistentCacheStore/
 );
 
 // Volatile visual sources remain separate from the observation JSON cache.

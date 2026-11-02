@@ -52,8 +52,22 @@ assert 'todo.storageState = "error";' in store
 public_funcs = dict((name,body) for name,body in re.findall(
     r"\bfunction\s+(\w+)\s*\([^)]*\)\s*\{(.*?)\n\s*\}",
     store,re.DOTALL))
-expected_public = MUTATORS | READERS | {"stage","acceptLoaded"}
+# M12q: audit the disabled ticket API explicitly. This is a NEW
+# source-only method inventory, NOT an activation or trust-gate waiver.
+# These helpers may not write to FileView; only the original stage() may.
+ticket_api = {"submit","ticketReadback","ticketReview"}
+expected_public = MUTATORS | READERS | {"stage","acceptLoaded"} | ticket_api
 assert set(public_funcs) == expected_public, sorted(set(public_funcs)^expected_public)
+assert "readonly property bool ticketProducerEnabled: false" in store
+assert "readonly property bool independentlyAuthenticatedTicketReceipt: false" in store
+assert 'if (!ticketProducerEnabled || guardedWriterEnabled)' in public_funcs["submit"]
+assert "todo.stage({ok:true,document:stage.expectedDocument})" in store
+assert "ticketEvent({ticketId:stage.ticketId,state:\"CONFIRMED\"" in store
+for name in ticket_api:
+    # A comment mentioning FileView.setText() is not a native write call.
+    # Match executable receiver syntax, preserving the one-write invariant.
+    assert re.search(r"\btodoFile\.setText\s*\(",public_funcs[name]) is None,name
+    assert "exec(" not in public_funcs[name], name
 for method in sorted(MUTATORS):
     body = public_funcs[method]
     assert re.search(r"\breturn\s+stage\s*\(\s*TodoPolicy\.",body),method

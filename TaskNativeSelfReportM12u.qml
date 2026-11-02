@@ -27,6 +27,9 @@ Scope {
     property string resultLine: "PENDING"
     property bool finished: false
     property bool observedReadyByPoll: false
+    // Never start a FileView write or reload inside a FileView callback.
+    property bool writeDispatched: false
+    property bool reloadDispatched: false
 
     function stage(name) {
         console.warn("M12U_STAGE|" + name + "|PASS");
@@ -93,14 +96,25 @@ Scope {
             // This is the sole explicit test write. All checks above must
             // pass before invoking the original legacy mutation route.
             phase = "WAIT_SAVE";
-            if (!ApolloHubTodoStore.addTask("M12U_SYNTHETIC_TASK")) {
-                endTest(false, "LEGACY_STAGE_REFUSED");
-                return;
-            }
+            // onStorageStateChanged may be executing synchronously *inside*
+            // FileView.onLoadFailed. Dispatch after that callback unwinds.
+            Qt.callLater(function() {
+                if (smoke.finished || smoke.phase !== "WAIT_SAVE"
+                        || smoke.writeDispatched)
+                    return;
+                if (!smoke.safe) {
+                    smoke.endTest(false, "GUARD_CHANGED_BEFORE_WRITE");
+                    return;
+                }
+                smoke.writeDispatched = true;
+                console.warn("M12U_OBSERVATION|DEFERRED_WRITE|DISPATCHED");
+                if (!ApolloHubTodoStore.addTask("M12U_SYNTHETIC_TASK"))
+                    smoke.endTest(false, "LEGACY_STAGE_REFUSED");
+            });
             return;
         }
         if (phase === "WAIT_SAVE") {
-            if (state === "saving") return;
+            if (!writeDispatched || state === "saving") return;
             if (state !== "ready" || !validOneTask()) {
                 endTest(false, "SAVE_CALLBACK_INVALID");
                 return;
@@ -109,14 +123,24 @@ Scope {
             if (observedReadyByPoll)
                 console.warn("M12U_OBSERVATION|POLL_RECONCILED|PASS");
             phase = "WAIT_RELOAD";
-            if (!ApolloHubTodoStore.reloadFromDisk()) {
-                endTest(false, "NATIVE_RELOAD_REFUSED");
-                return;
-            }
+            // Likewise, defer reload beyond FileView.onSaved callback.
+            Qt.callLater(function() {
+                if (smoke.finished || smoke.phase !== "WAIT_RELOAD"
+                        || smoke.reloadDispatched)
+                    return;
+                if (!smoke.safe) {
+                    smoke.endTest(false, "GUARD_CHANGED_BEFORE_RELOAD");
+                    return;
+                }
+                smoke.reloadDispatched = true;
+                console.warn("M12U_OBSERVATION|DEFERRED_RELOAD|DISPATCHED");
+                if (!ApolloHubTodoStore.reloadFromDisk())
+                    smoke.endTest(false, "NATIVE_RELOAD_REFUSED");
+            });
             return;
         }
         if (phase === "WAIT_RELOAD") {
-            if (state === "loading") return;
+            if (!reloadDispatched || state === "loading") return;
             if (state !== "ready" || !validOneTask()) {
                 endTest(false, "RELOAD_CALLBACK_INVALID");
                 return;

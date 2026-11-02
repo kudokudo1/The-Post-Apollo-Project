@@ -7,6 +7,7 @@ import "../../components"
 import "../../services/weather" as WeatherServices
 import "StationOfficialAlertPolicy.js" as OfficialAlertPolicy
 import "StationWeatherSubjectPanelPolicy.js" as SubjectPanelPolicy
+import "StationEarthSubjectPanelPolicy.js" as EarthPanelPolicy
 import "../../services/weather/WeatherRuntimePolicy.js" as RuntimePolicy
 
 PanelWindow {
@@ -41,9 +42,12 @@ PanelWindow {
         id: seismicService
         cacheStore: weatherStation.persistentCacheStore
         active: weatherStation.menuOpen
-                && !weatherStation.subjectNavigationOpen
-                && (weatherStation.currentView === "ground"
-                    || weatherStation.currentView === "map")
+                && ((!weatherStation.subjectNavigationOpen
+                     && (weatherStation.currentView === "ground"
+                         || weatherStation.currentView === "map"))
+                    || (weatherStation.subjectNavigationOpen
+                        && EarthPanelPolicy.needsSource(
+                               subjectNavigator.currentPath, "seismic")))
     }
 
     WeatherServices.NowcoastLightningService {
@@ -144,7 +148,8 @@ PanelWindow {
         subjectNavigationOpen
         ? (subjectNavigator.liveWeatherKind !== ""
            ? "WEATHER" : subjectNavigator.liveCosmosKind !== ""
-             ? "COSMOS" : "SUBJECT INDEX") : currentViewName
+             ? "COSMOS" : subjectNavigator.liveEarthKind !== ""
+               ? "EARTH" : "SUBJECT INDEX") : currentViewName
 
     readonly property var officialAlertSummary:
         OfficialAlertPolicy.summary(
@@ -366,7 +371,8 @@ PanelWindow {
         if (subjectNavigationOpen)
             return subjectNavigator.liveWeatherKind !== ""
                    ? "WEATHER PANEL" : subjectNavigator.liveCosmosKind !== ""
-                     ? "COSMOS PANEL" : "NAV PREVIEW";
+                     ? "COSMOS PANEL" : subjectNavigator.liveEarthKind !== ""
+                       ? "EARTH PANEL" : "NAV PREVIEW";
 
         if (usesHomeSources) {
             if (homeWeatherUsable && homeSpaceUsable) {
@@ -432,6 +438,8 @@ PanelWindow {
                 return "WEATHER // PANEL";
             if (subjectNavigator.liveCosmosKind !== "")
                 return "COSMOS // PANEL";
+            if (subjectNavigator.liveEarthKind !== "")
+                return "EARTH // PANEL";
             return "INDEX // PREVIEW";
         }
 
@@ -1229,6 +1237,8 @@ PanelWindow {
                 riverSource: riverService
                 persistentCacheStore: weatherStation.persistentCacheStore
                 liveHistoryStore: weatherStation.liveHistoryStore
+                eventArchiveStore: weatherStation.eventArchiveStore
+                dossierArchiveStore: weatherStation.dossierArchiveStore
                 runtimeNowMs: weatherStation.runtimeNowMs
                 onLegacyPageRequested: function(pageId) {
                     weatherStation.openLegacyFromSubject(pageId);

@@ -111,6 +111,20 @@ class SelfReportEvidence(unittest.TestCase):
         outcome = self.check(colored)
         self.assertEqual(outcome["reason"], "PRODUCTION_GATES_UNSAFE")
 
+    def test_bounded_poll_observes_existing_state_without_retrying_write(self):
+        root_qml = (ROOT / "TaskNativeSelfReportM12u.qml").read_text()
+        self.assertIn("id: observationPoll", root_qml)
+        self.assertIn('interval: 100', root_qml)
+        self.assertIn('smoke.advance();', root_qml)
+        self.assertIn('smoke.observedReadyByPoll = true;', root_qml)
+        self.assertIn('endTest(false, "STORE_STUCK_SAVING")', root_qml)
+        self.assertIn('endTest(false, "SAVE_STATE_NOT_READY")', root_qml)
+        self.assertIn('endTest(false, "RELOAD_STUCK")', root_qml)
+        self.assertEqual(root_qml.count('ApolloHubTodoStore.addTask('), 1)
+        self.assertEqual(root_qml.count('ApolloHubTodoStore.reloadFromDisk('), 1)
+        self.assertNotIn('TaskNativeSelfReportM12u',
+                         (ROOT / "shell.qml").read_text())
+
     def test_source_guard_diagnostics_are_explicit_and_no_live_changes(self):
         root_qml = (ROOT / "TaskNativeSelfReportM12u.qml").read_text()
         runner = (ROOT / "tests/tasks/fixtures/TaskNativeSelfReportRunnerM12u.py").read_text()

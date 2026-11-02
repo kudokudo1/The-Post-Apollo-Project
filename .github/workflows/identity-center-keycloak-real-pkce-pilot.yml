@@ -67,6 +67,12 @@ jobs:
       - name: Verify existing offline organization boundaries
         run: python3 -m unittest discover -s tests/identity -p 'test_*.py' -v
 
+      - name: Diagnose disposable Keycloak startup failure
+        if: failure()
+        run: |
+          docker inspect --format 'state={{.State.Status}} exit={{.State.ExitCode}}' post-apollo-oidc-disposable || true
+          docker logs --tail 90 post-apollo-oidc-disposable || true
+
       - name: Stop and remove disposable identity provider
         if: always()
         run: docker rm --force post-apollo-oidc-disposable 2>/dev/null || true

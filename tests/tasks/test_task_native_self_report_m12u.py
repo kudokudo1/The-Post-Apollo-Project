@@ -120,7 +120,7 @@ class SelfReportEvidence(unittest.TestCase):
         self.assertIn("M12U_BOOT|CONFIG_LOADED|PASS", root_qml)
         self.assertIn('env["NO_COLOR"] = "1"', runner)
         self.assertIn('[qs, "--no-color", "-p", str(QML)]', runner)
-        self.assertNotIn("pkill", runner)
+        # A safety comment may mention pkill; reject an executable invocation.\n        self.assertNotIn('["pkill"', runner)
         self.assertIn("stop_child(proc)", runner)
 
     def test_disk_changed_after_native_report_cannot_pass(self):

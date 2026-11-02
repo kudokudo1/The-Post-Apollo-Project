@@ -152,7 +152,8 @@ for path in files:
 # do not hide them from the writer inventory or silently expand live callers.
 disposable = data.get("disposableNativeCallers", {})
 assert disposable == {
-    "TaskNativeStoreSmokeM12s.qml": {"addTask": 1, "reloadFromDisk": 1}
+    "TaskNativeStoreSmokeM12s.qml": {"addTask": 1, "reloadFromDisk": 1},
+    "TaskNativeSelfReportM12u.qml": {"addTask": 1, "reloadFromDisk": 1},
 }
 fixture = (ROOT/"TaskNativeStoreSmokeM12s.qml").read_text()
 assert '//@ pragma DataDir $BASE/post-apollo-m12s-fixture' in fixture
@@ -163,6 +164,17 @@ assert "guardedPath && flagsSafe" in fixture
 assert "readonly property bool ticketProducerEnabled: false" in store
 assert "TaskNativeStoreSmokeM12s" not in (ROOT/"shell.qml").read_text()
 assert not re.search(r"\b(?:FileView|Process)\s*\{", fixture)
+auto_fixture = (ROOT/"TaskNativeSelfReportM12u.qml").read_text()
+assert '//@ pragma DataDir $BASE/post-apollo-m12u-fixture' in auto_fixture
+assert '//@ pragma StateDir $BASE/post-apollo-m12u-state' in auto_fixture
+assert 'POST_APOLLO_M12U_DISPOSABLE' in auto_fixture
+assert 'Quickshell.dataDir.endsWith(expectedSuffix)' in auto_fixture
+assert '=== Quickshell.dataDir + "/apollo-hub-todo-v1.json"' in auto_fixture
+assert '&& !ApolloHubTodoStore.ticketProducerEnabled' in auto_fixture
+assert '&& !ApolloHubTodoStore.guardedWriterEnabled' in auto_fixture
+assert 'M12U_RESULT|' in auto_fixture
+assert 'TaskNativeSelfReportM12u' not in (ROOT/"shell.qml").read_text()
+assert not re.search(r"\b(?:FileView|Process)\s*\{", auto_fixture)
 expected_callers = dict(data["callers"])
 assert not (set(expected_callers) & set(disposable))
 expected_callers.update(disposable)

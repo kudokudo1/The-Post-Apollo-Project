@@ -58,11 +58,16 @@ assert '&& taskListRail.scrollable' in EDITOR
 assert 'taskListRail.reservedExtent : 0' in EDITOR
 assert 'taskScrollbarEnabled: true' not in HUB
 
-# Only the TASKS editor page can receive on-demand typing; closing it
-# clears pointer capture and disables keyboard capture.
+# The standalone TASKS panel can receive window-local Escape in all
+# five modes. Only the editor pages create text inputs, and closing still
+# empties pointer/keyboard capture without a permanent exclusive lock.
 assert 'root.menuOpen && root.activeMode.id === "tasks"' in MENU
 assert "WlrKeyboardFocus.OnDemand : WlrKeyboardFocus.None" in MENU
-assert 'focusable: root.menuOpen && (root.activeMode.id === "tasks"' in MENU
+assert "focusable: root.menuOpen" in MENU
+assert "Keys.onEscapePressed: function(event)" in MENU
+assert "tasksFrame.forceActiveFocus();" in MENU
+assert "Qt.WindowShortcut" not in MENU
+assert "Keys.onEscapePressed: function(event)" in EDITOR
 assert "width: root.menuOpen ? root.frameWidth : 0" in MENU
 assert "height: root.menuOpen ? root.frameHeight : 0" in MENU
 assert "onLeftClicked: root.menuOpen = false" in MENU

@@ -1,0 +1,49 @@
+name: Identity Center Offscreen Qt Organizations Smoke
+
+on:
+  pull_request:
+    paths:
+      - 'widgets/messanger/IdentityCenterOrganizationDisplayReader.qml'
+      - 'tests/messaging/test_identity_center_offscreen_qml_v0.py'
+      - 'tests/messaging/fixtures/identity_qml_stubs/**'
+      - 'MODEL/contracts/identity-center-offscreen-qml-smoke-v0.md'
+      - '.github/workflows/identity-center-offscreen-qml-smoke.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'widgets/messanger/IdentityCenterOrganizationDisplayReader.qml'
+      - 'tests/messaging/test_identity_center_offscreen_qml_v0.py'
+      - 'tests/messaging/fixtures/identity_qml_stubs/**'
+      - 'MODEL/contracts/identity-center-offscreen-qml-smoke-v0.md'
+      - '.github/workflows/identity-center-offscreen-qml-smoke.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  qt-offscreen:
+    name: Real Qt 6 QML reader + fake Quickshell process
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    env:
+      QT_QPA_PLATFORM: offscreen
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install disposable Linux Qt offscreen shared libraries
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends \
+            libegl1 libopengl0 libgl1 libxkbcommon0
+      - name: Install pinned offscreen Qt 6 QML engine
+        run: python3 -m pip install --disable-pip-version-check 'PySide6==6.9.3'
+      - name: Instantiate actual QML reader and exercise native Qt bindings
+        run: python3 -m unittest discover -s tests/messaging -p 'test_identity_center_offscreen_qml_v0.py' -v
+      - name: Preserve real Unix-socket CLI and embedded Social display contracts
+        run: |
+          python3 -m unittest discover -s tests/identity -p 'test_identity_display_reader_cli_v0.py' -v
+          python3 -m unittest discover -s tests/messaging -p 'test_identity_center_settings_sections.py' -v
+          node tests/messaging/test_identity_center_ipc_viewer_v0.cjs

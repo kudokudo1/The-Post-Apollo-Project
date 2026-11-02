@@ -1,0 +1,44 @@
+name: TASKS M13c pinned recovery evidence and draft review age
+
+on:
+  pull_request:
+    paths:
+      - 'tests/tasks/fixtures/TaskRecoveryEvidenceM13c.cjs'
+      - 'tests/tasks/test_task_recovery_evidence_m13c.cjs'
+      - 'docs/tasks-recovery-evidence-and-draft-retention-m13c.md'
+      - '.github/workflows/tasks-recovery-evidence-m13c.yml'
+      - 'services/hub/ApolloHubTodoStore.qml'
+  push:
+    branches: [main]
+    paths:
+      - 'tests/tasks/fixtures/TaskRecoveryEvidenceM13c.cjs'
+      - 'tests/tasks/test_task_recovery_evidence_m13c.cjs'
+      - '.github/workflows/tasks-recovery-evidence-m13c.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  synthetic-evidence:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: M13c fake independent pin and nondeleting draft-age review
+        run: node --test tests/tasks/test_task_recovery_evidence_m13c.cjs
+      - name: M13b read-only recovery display contracts
+        run: node --test tests/tasks/test_task_recovery_display_m13b.cjs
+      - name: M13a fresh-owner checkpoint and restart
+        run: node --test tests/tasks/test_task_restart_review_m13a.cjs
+      - name: M12o four-consumer draft reconciliation
+        run: node --test tests/tasks/test_task_disabled_ticket_api_m12o.cjs
+      - name: M12p Hub ticket presenter
+        run: node --test tests/tasks/test_task_hub_ticket_presenter_m12p.cjs
+      - name: M11d single production writer and disabled flags
+        run: python3 tests/tasks/test_task_writer_gate_inventory_m11d.py

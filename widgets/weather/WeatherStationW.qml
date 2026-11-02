@@ -143,7 +143,8 @@ PanelWindow {
     readonly property string currentContext:
         subjectNavigationOpen
         ? (subjectNavigator.liveWeatherKind !== ""
-           ? "WEATHER" : "SUBJECT INDEX") : currentViewName
+           ? "WEATHER" : subjectNavigator.liveCosmosKind !== ""
+             ? "COSMOS" : "SUBJECT INDEX") : currentViewName
 
     readonly property var officialAlertSummary:
         OfficialAlertPolicy.summary(
@@ -364,7 +365,8 @@ PanelWindow {
 
         if (subjectNavigationOpen)
             return subjectNavigator.liveWeatherKind !== ""
-                   ? "WEATHER PANEL" : "NAV PREVIEW";
+                   ? "WEATHER PANEL" : subjectNavigator.liveCosmosKind !== ""
+                     ? "COSMOS PANEL" : "NAV PREVIEW";
 
         if (usesHomeSources) {
             if (homeWeatherUsable && homeSpaceUsable) {
@@ -428,6 +430,8 @@ PanelWindow {
         if (subjectNavigationOpen) {
             if (subjectNavigator.liveWeatherKind !== "")
                 return "WEATHER // PANEL";
+            if (subjectNavigator.liveCosmosKind !== "")
+                return "COSMOS // PANEL";
             return "INDEX // PREVIEW";
         }
 
@@ -1217,6 +1221,7 @@ PanelWindow {
                          && !weatherStation.contextTerminalRequested
                 enabled: visible
                 weatherService: weatherStation.weatherService
+                spaceService: weatherStation.spaceService
                 nwsAlertSource: weatherStation.nwsAlertSource
                 historyService: weatherHistoryService
                 seismicSource: seismicService

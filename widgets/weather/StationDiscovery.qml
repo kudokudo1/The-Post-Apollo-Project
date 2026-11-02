@@ -14,6 +14,7 @@ import "../../services/weather/GdacsPolicy.js" as GdacsPolicy
 import "../../services/weather/WeatherRuntimePolicy.js" as RuntimePolicy
 import "StationEventContextPolicy.js" as EventContextPolicy
 import "StationDossierPreviewPolicy.js" as DossierPreviewPolicy
+import "StationDossierCapturePolicy.js" as DossierCapturePolicy
 
 // Source-first stage. All records shown come from a backend, never examples.
 // MAP owns a local Natural Earth geographic basemap plus source-driven data
@@ -478,6 +479,13 @@ Rectangle {
             selectedFloodContext,
             selectedEvidenceTimeline,
             selectedEvidenceRelationships,
+            runtimeNowMs
+        )
+
+    // Admission review is volatile. It never stages or saves a dossier.
+    readonly property var selectedDossierCaptureReview:
+        DossierCapturePolicy.review(
+            selectedDossierPreview,
             runtimeNowMs
         )
 
@@ -3511,6 +3519,8 @@ Rectangle {
                         stationDiscovery.selectedArchiveStatus
                     dossierPreview:
                         stationDiscovery.selectedDossierPreview
+                    dossierCaptureReview:
+                        stationDiscovery.selectedDossierCaptureReview
                     archiveRows:
                         stationDiscovery.selectedArchiveRows
                     archiveDiff:

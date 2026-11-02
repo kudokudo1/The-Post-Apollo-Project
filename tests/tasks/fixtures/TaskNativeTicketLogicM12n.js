@@ -73,8 +73,18 @@ function observe(ticket, n) {
                          n.receipts === ticket.baselineReceipts + 1);
     const unadvanced = (n.counter === ticket.baselineCounter &&
                         n.receipts === ticket.baselineReceipts);
-    if (!incremented && !unadvanced)
-        return _transition(ticket,"REVIEW_REQUIRED","INCONSISTENT_COUNTER_AND_RECEIPTS");
+    // M12i increments counter then receipt count on separate QML property
+    // notifications. A counter-only advance while SETTLING is a normal
+    // transient. Receipt-only advance is not part of that known order.
+    if (!incremented && !unadvanced) {
+        if (n.counter === ticket.baselineCounter + 1 &&
+                n.receipts === ticket.baselineReceipts &&
+                n.fileState === "SETTLING" &&
+                n.pendingStage === ticket.stageId)
+            return _transition(ticket,"SETTLING","");
+        return _transition(ticket,"REVIEW_REQUIRED",
+                           "INCONSISTENT_COUNTER_AND_RECEIPTS");
+    }
 
     const settled = n.status === "TEST_RECEIPT_SETTLED_UI_UNACKNOWLEDGED";
     if (incremented) {

@@ -5,6 +5,7 @@ import "StationSourceHealthPolicy.js" as SourceHealth
 import "StationOfficialAlertPolicy.js" as OfficialAlertPolicy
 import "../../services/weather/WeatherHistoryPolicy.js" as HistoryPolicy
 import "../../services/weather/WeatherRuntimePolicy.js" as RuntimePolicy
+import "WeatherRelationshipPolicy.js" as RelationshipPolicy
 
 Rectangle {
     id: home
@@ -35,6 +36,60 @@ Rectangle {
         const count = scope === "" ? 0
             : liveHistoryStore.count(sourceId, scope, runtimeNowMs);
         return " // HISTORY " + count + "/48H";
+    }
+
+    readonly property var liveWeatherHistory: {
+        liveHistoryRevision;
+        const scope = liveHistoryScopeKey();
+        return liveHistoryStore && scope !== ""
+            ? liveHistoryStore.samples(
+                "weather-current", scope, runtimeNowMs
+              )
+            : [];
+    }
+
+    readonly property var liveAqiHistory: {
+        liveHistoryRevision;
+        const scope = liveHistoryScopeKey();
+        return liveHistoryStore && scope !== ""
+            ? liveHistoryStore.samples(
+                "air-quality", scope, runtimeNowMs
+              )
+            : [];
+    }
+
+    readonly property var aqiHumidityRelation:
+        RelationshipPolicy.relationship(
+            liveAqiHistory, "aqi",
+            liveWeatherHistory, "humidity",
+            20 * 60000,
+            48
+        )
+
+    readonly property var aqiWindRelation:
+        RelationshipPolicy.relationship(
+            liveAqiHistory, "aqi",
+            liveWeatherHistory, "windMph",
+            20 * 60000,
+            48
+        )
+
+    function relationSummary(relation) {
+        return "R "
+            + RelationshipPolicy.formatCorrelation(
+                relation ? relation.correlation : null
+              )
+            + " // "
+            + (relation ? relation.correlationLabel : "NEED ≥4 PAIRS");
+    }
+
+    function relationFooter(relation) {
+        const count = relation ? Number(relation.count || 0) : 0;
+        const span = relation
+            ? RelationshipPolicy.spanLabel(relation.spanMs)
+            : "0m";
+        return "ALIGN ≤20m // " + count + " PAIRS // SPAN " + span
+            + " // LINEAR ASSOCIATION ONLY, NOT CAUSATION";
     }
 
     readonly property var runtimeRows: [
@@ -953,6 +1008,50 @@ Rectangle {
                         font.pixelSize: 9
                     }
                 }
+            }
+        }
+
+        StationSectionDivider {
+            width: parent.width
+            title: "LIVE HISTORY // AQI RELATIONSHIPS"
+        }
+
+        Row {
+            width: parent.width
+            spacing: 12
+
+            WeatherTrendInspector {
+                width: (parent.width - 12) / 2
+                title: "AQI ↔ HUMIDITY"
+                leftLabel: "AQI"
+                rightLabel: "HUMIDITY %"
+                leftValues: home.aqiHumidityRelation.leftValues
+                rightValues: home.aqiHumidityRelation.rightValues
+                summaryText: home.relationSummary(
+                    home.aqiHumidityRelation
+                )
+                footerText: home.relationFooter(
+                    home.aqiHumidityRelation
+                )
+                leftColor: Colors.magenta
+                rightColor: Colors.cyan
+            }
+
+            WeatherTrendInspector {
+                width: (parent.width - 12) / 2
+                title: "AQI ↔ WIND"
+                leftLabel: "AQI"
+                rightLabel: "WIND MPH"
+                leftValues: home.aqiWindRelation.leftValues
+                rightValues: home.aqiWindRelation.rightValues
+                summaryText: home.relationSummary(
+                    home.aqiWindRelation
+                )
+                footerText: home.relationFooter(
+                    home.aqiWindRelation
+                )
+                leftColor: Colors.magenta
+                rightColor: Colors.orange
             }
         }
 

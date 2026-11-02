@@ -8,6 +8,7 @@ import "../../services/weather/CoopsCoastalPolicy.js" as CoastalPolicy
 import "StationGroundPollenPolicy.js" as PollenDetails
 import "StationGroundEnvironmentPolicy.js" as EnvironmentPolicy
 import "../../services/weather/WeatherRuntimePolicy.js" as RuntimePolicy
+import "WeatherRelationshipPolicy.js" as RelationshipPolicy
 
 Rectangle {
     id: ground
@@ -38,6 +39,53 @@ Rectangle {
         const count = scope === "" ? 0
             : liveHistoryStore.count(sourceId, scope, runtimeNowMs);
         return " // HISTORY " + count + "/48H";
+    }
+
+    readonly property var pressureHistory: {
+        liveHistoryRevision;
+        const scope = weatherHistoryScopeKey();
+        return liveHistoryStore && scope !== ""
+            ? liveHistoryStore.samples(
+                "weather-current", scope, runtimeNowMs
+              )
+            : [];
+    }
+
+    readonly property var coastalWaterHistory: {
+        liveHistoryRevision;
+        const scope = coastalService.currentKey;
+        return liveHistoryStore && scope !== ""
+            ? liveHistoryStore.samples(
+                "coastal-water", scope, runtimeNowMs
+              )
+            : [];
+    }
+
+    readonly property var pressureCoastalRelation:
+        RelationshipPolicy.relationship(
+            pressureHistory, "pressureHpa",
+            coastalWaterHistory, "waterLevel",
+            45 * 60000,
+            48
+        )
+
+    function pressureCoastalSummary() {
+        return "R "
+            + RelationshipPolicy.formatCorrelation(
+                pressureCoastalRelation.correlation
+              )
+            + " // "
+            + pressureCoastalRelation.correlationLabel;
+    }
+
+    function pressureCoastalFooter() {
+        return "ALIGN ≤45m // "
+            + pressureCoastalRelation.count
+            + " PAIRS // SPAN "
+            + RelationshipPolicy.spanLabel(
+                pressureCoastalRelation.spanMs
+              )
+            + " // CO-OPS OBSERVED WATER LEVEL // ASSOCIATION ONLY";
     }
 
     readonly property var runtimeRows: [
@@ -769,6 +817,24 @@ Rectangle {
                     }
                 }
             }
+        }
+
+        StationSectionDivider {
+            width: parent.width
+            title: "LIVE HISTORY // COASTAL RELATIONSHIP"
+        }
+
+        WeatherTrendInspector {
+            width: parent.width
+            title: "PRESSURE ↔ COASTAL WATER LEVEL"
+            leftLabel: "PRESSURE hPa"
+            rightLabel: "WATER LEVEL ft"
+            leftValues: ground.pressureCoastalRelation.leftValues
+            rightValues: ground.pressureCoastalRelation.rightValues
+            summaryText: ground.pressureCoastalSummary()
+            footerText: ground.pressureCoastalFooter()
+            leftColor: Colors.cyan
+            rightColor: Colors.orange
         }
 
         StationSectionDivider {

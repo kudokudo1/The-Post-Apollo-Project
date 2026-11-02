@@ -4,6 +4,7 @@ import "../../services/weather" as WeatherServices
 import "../../services/weather/SolarCyclePolicy.js" as SolarCyclePolicy
 import "StationSolarImagePolicy.js" as SolarImagePolicy
 import "../../services/weather/WeatherRuntimePolicy.js" as RuntimePolicy
+import "WeatherRelationshipPolicy.js" as RelationshipPolicy
 
 Rectangle {
     id: space
@@ -25,6 +26,60 @@ Rectangle {
                 sourceId, "global", runtimeNowMs
             )
             + "/48H";
+    }
+
+    readonly property var windHistory: {
+        liveHistoryRevision;
+        return liveHistoryStore
+            ? liveHistoryStore.samples(
+                "space-wind", "global", runtimeNowMs
+              )
+            : [];
+    }
+
+    readonly property var imfHistory: {
+        liveHistoryRevision;
+        return liveHistoryStore
+            ? liveHistoryStore.samples(
+                "space-imf", "global", runtimeNowMs
+              )
+            : [];
+    }
+
+    readonly property var windBzRelation:
+        RelationshipPolicy.relationship(
+            windHistory, "solarWindSpeed",
+            imfHistory, "bz",
+            10 * 60000,
+            48
+        )
+
+    function windBzSummary() {
+        const windDelta = RelationshipPolicy.formatDelta(
+            windBzRelation.leftTrend.delta, 0
+        );
+        const bzDelta = RelationshipPolicy.formatDelta(
+            windBzRelation.rightTrend.delta, 1
+        );
+        return "Δ WIND " + windDelta
+            + " // Δ BZ " + bzDelta;
+    }
+
+    function windBzFooter() {
+        const kp = spaceService && spaceService.kpReady
+            ? Number(spaceService.kp).toFixed(1) : "--";
+        const aurora = auroraService.localReady
+            ? Math.round(auroraService.localIntensity) + "/100"
+            : "--/100";
+        return "ALIGN ≤10m // "
+            + windBzRelation.count
+            + " PAIRS // SPAN "
+            + RelationshipPolicy.spanLabel(
+                windBzRelation.spanMs
+              )
+            + " // CURRENT KP " + kp
+            + " // OVATION LOCAL " + aurora
+            + " // CONTEXT ONLY, NO CAUSAL MODEL";
     }
 
     readonly property var runtimeRows: [
@@ -693,6 +748,24 @@ Rectangle {
                     }
                 }
             }
+        }
+
+        StationSectionDivider {
+            width: parent.width
+            title: "LIVE HISTORY // SOLAR CONTEXT"
+        }
+
+        WeatherTrendInspector {
+            width: parent.width
+            title: "SOLAR WIND ↔ IMF BZ"
+            leftLabel: "WIND KM/S"
+            rightLabel: "BZ nT"
+            leftValues: space.windBzRelation.leftValues
+            rightValues: space.windBzRelation.rightValues
+            summaryText: space.windBzSummary()
+            footerText: space.windBzFooter()
+            leftColor: Colors.orange
+            rightColor: Colors.magenta
         }
 
         StationSectionDivider {

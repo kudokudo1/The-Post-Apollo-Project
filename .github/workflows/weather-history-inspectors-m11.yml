@@ -1,0 +1,34 @@
+name: Weather M11 history inspectors
+
+on:
+  pull_request:
+    paths:
+      - "widgets/weather/WeatherRelationshipPolicy.js"
+      - "widgets/weather/WeatherTrendInspector.qml"
+      - "widgets/weather/StationHome.qml"
+      - "widgets/weather/StationGround.qml"
+      - "widgets/weather/StationSpace.qml"
+      - "tests/weather/test_weather_history_inspectors_m11.js"
+      - ".github/workflows/weather-history-inspectors-m11.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  inspectors:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: M11 relationship policy and page wiring
+        run: node tests/weather/test_weather_history_inspectors_m11.js
+      - name: M10 live-history storage regression
+        run: node tests/weather/test_weather_live_history_m10.js
+      - name: Runtime M2 page rack regression
+        run: node tests/weather/test_weather_live_runtime_m2.js
+      - name: HOME recent-history regression
+        run: node tests/weather/test_station_home_recent_history.js
+      - name: GROUND CO-OPS regression
+        run: node tests/weather/test_station_ground_coops_coastal.js
+      - name: SPACE Kp history regression
+        run: node tests/weather/test_station_space_kp_history.js

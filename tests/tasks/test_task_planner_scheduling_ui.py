@@ -24,7 +24,9 @@ assert "property var todoStore: null" in planner
 assert "property bool scheduleMode: false" in planner
 assert 'label: "SCHEDULE"' in planner
 assert "TaskPlannerSchedulePane {" in planner
-assert "todoStore: planner.todoStore" in planner
+# Planner's write capability is already conditional on schedulingAllowed.
+# Verify its actual guard rather than demanding the older unconditional form.
+assert "todoStore: planner.schedulingAllowed ? planner.todoStore : null" in planner
 assert "visible: !planner.scheduleMode" in planner
 assert "visible: planner.scheduleMode" in planner
 

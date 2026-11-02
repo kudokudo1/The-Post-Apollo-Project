@@ -19,6 +19,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import threading
 import time
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -32,6 +33,8 @@ EXPECTED = {
     "signed-out": "IDENTITY_NATIVE_SMOKE_PASS_SIGNED_OUT",
     "missing": "IDENTITY_NATIVE_SMOKE_PASS_MISSING",
     "revoke": "IDENTITY_NATIVE_SMOKE_PASS_REVOKE",
+    "host-stop": "IDENTITY_NATIVE_SMOKE_PASS_HOST_STOP",
+    "tab-change": "IDENTITY_NATIVE_SMOKE_PASS_TAB_CHANGE",
 }
 
 
@@ -140,11 +143,29 @@ def run(scenario: str) -> None:
         if scenario == "missing":
             execute_qs()
         else:
-            with PrivateContextSocket(
+            server = PrivateContextSocket(
                 runtime_directory=directory,
                 snapshot_provider=provider,
                 clock=lambda: int(time.time()),
-            ):
+            )
+            # Host-loss is a REAL socket disappearance after the first
+            # successful snapshot, not a fabricated UNAVAILABLE reply.
+            # Only the disposable test thread may close this fixture.
+            if scenario == "host-stop":
+                base_provider = provider
+                stopped = [False]
+
+                def host_stop_after_first_read() -> dict[str, object]:
+                    response = base_provider()
+                    if not stopped[0]:
+                        stopped[0] = True
+                        task = threading.Timer(1.0, server.close)
+                        task.daemon = True
+                        task.start()
+                    return response
+
+                server._provider = host_stop_after_first_read
+            with server:
                 execute_qs()
 
 

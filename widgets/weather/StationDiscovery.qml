@@ -15,6 +15,7 @@ import "../../services/weather/WeatherRuntimePolicy.js" as RuntimePolicy
 import "StationEventContextPolicy.js" as EventContextPolicy
 import "StationDossierPreviewPolicy.js" as DossierPreviewPolicy
 import "StationDossierCapturePolicy.js" as DossierCapturePolicy
+import "StationEarthSubjectPanelPolicy.js" as EarthPanelPolicy
 
 // Source-first stage. All records shown come from a backend, never examples.
 // MAP owns a local Natural Earth geographic basemap plus source-driven data
@@ -27,6 +28,28 @@ Rectangle {
     // M2b weather-only view of the existing CLASSIC map renderer.
     property bool weatherMapOnly: false
     property string weatherMapRoute: ""
+
+    // EARTH shares the real CLASSIC MAP and its manual dossier controls.
+    // Never clear selected event or geographic viewport during EARTH routing.
+    property bool earthMapOnly: false
+    property string earthMapRoute: ""
+    function earthLayerEnabled(layer) {
+        return !earthMapOnly
+            || EarthPanelPolicy.showsLayer(earthMapRoute,layer);
+    }
+    readonly property bool earthInvestigationRoute:
+        earthMapOnly && EarthPanelPolicy.investigationRoute(earthMapRoute)
+    onEarthMapRouteChanged: {
+        if (!earthMapOnly)
+            return;
+        // A dedicated source route must not be blanked by an earlier toggle.
+        if (earthMapRoute === "earth/geology/earthquakes")
+            mapShowEarthquakes = true;
+        else if (earthMapRoute === "earth/events/gdacs")
+            mapShowGdacs = true;
+        if (discoveryScroll)
+            discoveryScroll.contentY = 0;
+    }
 
     function weatherLayerEnabled(layer) {
         if (!weatherMapOnly || weatherMapRoute === "weather/maps")
@@ -312,20 +335,25 @@ Rectangle {
 
     readonly property var mapPointRows:
         weatherMapOnly ? [] : MapProjection.plottable(source ? source.rows : [])
+            .filter(function() {
+                return stationDiscovery.earthLayerEnabled("eonet");
+            })
     readonly property var mapNewsMentionRows:
         weatherMapOnly ? [] : MapProjection.plottable(
             newsMentionOverlay
             && Array.isArray(newsMentionOverlay.locations)
             ? newsMentionOverlay.locations : []
-        )
+        ).filter(function() {return !stationDiscovery.earthMapOnly;})
     readonly property var mapEarthquakeRows:
         !weatherMapOnly && mapShowEarthquakes
+        && earthLayerEnabled("quakes")
         && seismicSource
         && seismicSource.ready
         ? MapProjection.plottable(seismicSource.events)
         : []
     readonly property var mapGdacsRows:
         !weatherMapOnly && mapShowGdacs && gdacsService.ready
+        && earthLayerEnabled("gdacs")
         ? MapProjection.plottable(gdacsService.events)
         : []
     readonly property var gdacsSummary:
@@ -1080,21 +1108,51 @@ Rectangle {
     onStationOpenChanged: { if (!stationOpen) closeViewer(); }
 
     readonly property string modeTitle:
+        earthMapOnly ? "⌖  EARTH // MAP" :
         weatherMapOnly ? "☁  WEATHER // MAP" :
         domain === "map" ? "⌖  MAP // EVENT SOURCES"
         : domain === "news" ? "▤  NEWS // HEADLINES"
         : "◉  RADIO // STATIONS"
     readonly property string providerTitle:
+        earthMapOnly ? EarthPanelPolicy.routeLabel(earthMapRoute) :
         weatherMapOnly ? "WEATHER OVERLAYS // MANUAL LOAD" :
         domain === "map" ? "WORLD EVENTS // NASA EONET + GDACS"
         : domain === "news" ? "GDELT DOC // WORLD EVENT HEADLINES"
         : "RADIO BROWSER // TOP VOTED STREAMS"
     readonly property string sourceCaution:
+        earthMapOnly ? "NATURAL EARTH + USGS + NASA EONET + GDACS + NASA FIRMS // MANUAL HOTSPOT & SMOKE LOAD // PROVIDER-NATIVE EVENTS" :
         weatherMapOnly ? "NOAA MRMS + RAINVIEWER + NOAA HMS // NOT A DISASTER FEED" :
         domain === "map" ? "NATURAL EARTH + EONET + GDACS + USGS EARTHQUAKES + FIRMS + MRMS + RAINVIEWER FALLBACK + HMS SMOKE"
         : domain === "news" ? "ARTICLE DISCOVERY // LOCAL FILTERS // EXACT-HEADLINE SOURCE GROUPS // NOT FUZZY STORY CLUSTERING"
         : "STATION DIRECTORY // PERSISTENT PLAYBACK NOT YET WIRED"
     readonly property var plannedSources: {
+        if (earthMapOnly)
+            return [
+                {name:"NATURAL EARTH // SHARED LOCAL CARTOGRAPHY",
+                 state:"CONNECTED"},
+                {name:"USGS // OBSERVED EARTHQUAKES M2.5+",
+                 state: seismicSource && seismicSource.ready
+                      ? "EVENTS " + seismicSource.events.length
+                      : seismicSource && seismicSource.loading
+                        ? "RECEIVING" : "INACTIVE / WAITING"},
+                {name:"NASA EONET // NATURAL EVENTS",
+                 state: source.ready ? "EVENTS " + source.rows.length
+                       : source.loading ? "RECEIVING" : "INACTIVE / WAITING"},
+                {name:"GDACS // DISASTER EARLY WARNING",
+                 state: gdacsService.ready
+                        ? "EVENTS " + gdacsService.events.length
+                        : gdacsService.loading ? "RECEIVING"
+                          : "INACTIVE / WAITING"},
+                {name:"NASA FIRMS // VIIRS HOTSPOTS",
+                 state: !firmsService.configured ? "KEY REQUIRED"
+                      : firmsService.ready
+                        ? "HOTSPOTS " + firmsService.hotspots.length
+                        : "MANUAL READY"},
+                {name:"NOAA HMS // SMOKE PLUMES",
+                 state: hmsSmokeService.ready
+                      ? "PLUMES " + hmsSmokeService.polygons.length
+                      : "MANUAL READY"}
+            ];
         if (weatherMapOnly)
             return [
                 {name:"NATURAL EARTH // LOCAL BASEMAP", state:"CONNECTED"},
@@ -1222,6 +1280,9 @@ Rectangle {
         )
         active: stationDiscovery.stationOpen && stationDiscovery.visible
                 && !stationDiscovery.weatherMapOnly
+                && (!stationDiscovery.earthMapOnly
+                    || EarthPanelPolicy.needsSource(
+                           stationDiscovery.earthMapRoute,"eonet"))
     }
 
     WeatherServices.GdacsService {
@@ -1229,6 +1290,9 @@ Rectangle {
         cacheStore: stationDiscovery.persistentCacheStore
         active: stationDiscovery.domain === "map"
                 && !stationDiscovery.weatherMapOnly
+                && (!stationDiscovery.earthMapOnly
+                    || EarthPanelPolicy.needsSource(
+                           stationDiscovery.earthMapRoute,"gdacs"))
                 && stationDiscovery.stationOpen
                 && stationDiscovery.visible
     }
@@ -1245,6 +1309,7 @@ Rectangle {
         id: mrmsRadarService
         active: stationDiscovery.domain === "map"
                 && stationDiscovery.stationOpen
+                && !stationDiscovery.earthMapOnly
         onFrameReady: {
             if (!stationDiscovery.pendingRainViewerDisplay)
                 stationDiscovery.radarDisplaySource = "noaa";
@@ -1294,7 +1359,9 @@ Rectangle {
                 }
 
                 GohuText {
-                    text: stationDiscovery.weatherMapOnly ? "RADAR + SMOKE // MANUAL" :
+                    text: stationDiscovery.earthMapOnly
+                          ? "EARTH // SOURCE-SCOPED MAP" :
+                          stationDiscovery.weatherMapOnly ? "RADAR + SMOKE // MANUAL" :
                           source.failed ? source.errorText
                           : source.loading ? "RECEIVING"
                           : source.ready

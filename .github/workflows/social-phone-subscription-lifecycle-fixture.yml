@@ -1,0 +1,33 @@
+name: Social Phone Subscription Lifecycle Fixture P1
+
+on:
+  pull_request:
+    paths:
+      - 'services/phone/PhoneSubscriptionLifecycleFixture.py'
+      - 'tests/phone/test_phone_subscription_lifecycle_fixture.py'
+      - 'MODEL/contracts/social-phone-subscription-lifecycle-fixture-p1-v0.md'
+      - '.github/workflows/social-phone-subscription-lifecycle-fixture.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'services/phone/PhoneSubscriptionLifecycleFixture.py'
+      - 'tests/phone/test_phone_subscription_lifecycle_fixture.py'
+      - 'MODEL/contracts/social-phone-subscription-lifecycle-fixture-p1-v0.md'
+      - '.github/workflows/social-phone-subscription-lifecycle-fixture.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  fixture-cancellation:
+    name: "Phone receive lifecycle: synthetic cancellation only"
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Compile in-memory lifecycle and test files
+        run: python3 -m py_compile services/phone/PhoneSubscriptionLifecycleFixture.py tests/phone/test_phone_subscription_lifecycle_fixture.py
+      - name: Test synthetic grant recheck and cancellation
+        run: python3 -m unittest discover -s tests/phone -p 'test_phone_subscription_lifecycle_fixture.py' -v
+      - name: Run all offline Phone Bridge Python regression tests
+        run: python3 -m unittest discover -s tests/phone -p 'test_*.py' -q

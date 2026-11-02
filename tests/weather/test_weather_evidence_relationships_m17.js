@@ -32,6 +32,14 @@ for (const fn of [
 
 const base = Date.UTC(2026, 10, 2, 16, 30, 0);
 
+assert.equal(ctx.parseMillis(-1), -1);
+assert.equal(ctx.parseMillis(0), -1);
+assert.equal(ctx.parseMillis("-1"), -1);
+assert.equal(
+    ctx.parseMillis("2026-11-02T16:30:00Z"),
+    base
+);
+
 assert.equal(ctx.compactOffsetMinutes(0.25), "<1M");
 assert.equal(ctx.compactOffsetMinutes(10), "10M");
 assert.equal(ctx.compactOffsetMinutes(90), "1.5H");

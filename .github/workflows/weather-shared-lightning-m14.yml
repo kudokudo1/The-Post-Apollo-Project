@@ -1,0 +1,34 @@
+name: Weather M14 shared lightning
+
+on:
+  pull_request:
+    paths:
+      - "widgets/weather/WeatherStationW.qml"
+      - "widgets/weather/StationGround.qml"
+      - "widgets/weather/StationDiscovery.qml"
+      - "widgets/weather/StationEventContextPolicy.js"
+      - "widgets/weather/StationEventContextCard.qml"
+      - "tests/weather/test_weather_shared_lightning_m14.js"
+      - "tests/weather/test_station_ground_nowcoast_lightning.py"
+      - "tests/weather/test_station_map_event_context_m13.js"
+      - ".github/workflows/weather-shared-lightning-m14.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  shared-lightning:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: M14 shared lightning ownership
+        run: node tests/weather/test_weather_shared_lightning_m14.js
+      - name: nowCOAST provider and GROUND regression
+        run: python3 tests/weather/test_station_ground_nowcoast_lightning.py
+      - name: M13 event-context regression
+        run: node tests/weather/test_station_map_event_context_m13.js
+      - name: M8 frame-cache regression
+        run: python3 tests/weather/test_weather_frame_cache_m8.py
+      - name: MAP MRMS regression
+        run: node tests/weather/test_station_map_noaa_radar.js

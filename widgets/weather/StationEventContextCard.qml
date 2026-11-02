@@ -7,6 +7,7 @@ Rectangle {
     property var eventContext: null
     property real weatherFixDistanceKm: -1
     property var radarContext: null
+    property var lightningContext: null
     property var companions: []
     property color accentColor: Colors.magenta
 
@@ -15,7 +16,7 @@ Rectangle {
 
     visible: eventContext !== null
     width: parent ? parent.width : 0
-    height: visible ? 176 + Math.min(4, companionCount) * 42 : 0
+    height: visible ? 218 + Math.min(4, companionCount) * 42 : 0
 
     color: Colors.dark
     border.width: 1
@@ -101,6 +102,33 @@ Rectangle {
         QuietText {
             width: parent.width
             text: "RADAR CONTEXT = GEOMETRIC FRAME COVERAGE ONLY // IMAGE PIXELS ARE NOT INTERPRETED"
+            font.pixelSize: 8
+            color: Colors.orange
+            elide: Text.ElideRight
+        }
+
+        GohuText {
+            width: parent.width
+            text: card.lightningContext
+                ? "LIGHTNING // " + card.lightningContext.status
+                    + (card.lightningContext.available
+                       ? " // " + card.lightningContext.windowMinutes
+                         + "M DENSITY // "
+                         + card.lightningContext.timeLabel
+                         + (card.lightningContext.usingCache
+                            ? " // CACHE" : "")
+                       : "")
+                : "LIGHTNING // NO LOADED LIGHTNING FRAME"
+            font.pixelSize: 9
+            color: card.lightningContext
+                   && card.lightningContext.covered
+                   ? Colors.magenta : Colors.orange
+            elide: Text.ElideRight
+        }
+
+        QuietText {
+            width: parent.width
+            text: "LIGHTNING CONTEXT = GEOMETRIC FRAME COVERAGE ONLY // DENSITY PIXELS ARE NOT INTERPRETED"
             font.pixelSize: 8
             color: Colors.orange
             elide: Text.ElideRight

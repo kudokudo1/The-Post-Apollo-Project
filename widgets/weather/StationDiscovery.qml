@@ -27,6 +27,7 @@ Rectangle {
     property var selectedNews: null
     property var newsMentionOverlay: null
     property var seismicSource: null
+    property var lightningSource: null
     property var weatherService: null
     property var persistentCacheStore: null
     property real runtimeNowMs: Date.now()
@@ -122,6 +123,27 @@ Rectangle {
                     "observedAt": mrmsRadarService.requestedTimeMs,
                     "usingCache": mrmsRadarService.usingFrameCache,
                     "detail": "VIEWPORT IMAGE"
+                },
+                runtimeNowMs
+            ),
+            RuntimePolicy.displayRow(
+                "lightning",
+                {
+                    "active": !!lightningSource
+                              && lightningSource.active !== false,
+                    "ready": !!lightningSource
+                             && lightningSource.ready,
+                    "loading": !!lightningSource
+                               && lightningSource.loading,
+                    "errorText": lightningSource
+                                 ? lightningSource.errorText : "",
+                    "receivedAt": lightningSource
+                                  ? lightningSource.lastUpdated : null,
+                    "observedAt": lightningSource
+                                  ? lightningSource.latestTime : null,
+                    "usingCache": lightningSource
+                                  ? lightningSource.usingFrameCache : false,
+                    "detail": "WEATHER-FIX 15M DENSITY"
                 },
                 runtimeNowMs
             ),
@@ -344,6 +366,18 @@ Rectangle {
             radarLoadedHistoryMinutes,
             radarRequestedTimeMs,
             mrmsRadarService.usingFrameCache
+        )
+
+    readonly property var selectedLightningContext:
+        EventContextPolicy.lightningCoverage(
+            selectedEventContext,
+            lightningSource ? lightningSource.bbox : null,
+            lightningSource ? lightningSource.ready : false,
+            lightningSource ? lightningSource.latestTime : "",
+            lightningSource ? lightningSource.windowMinutes : 0,
+            lightningSource ? lightningSource.resolutionKm : 0,
+            lightningSource ? lightningSource.radiusKm : 0,
+            lightningSource ? lightningSource.usingFrameCache : false
         )
 
     readonly property var selectedContextCompanions:
@@ -3262,6 +3296,8 @@ Rectangle {
                         stationDiscovery.selectedWeatherFixDistanceKm
                     radarContext:
                         stationDiscovery.selectedRadarContext
+                    lightningContext:
+                        stationDiscovery.selectedLightningContext
                     companions:
                         stationDiscovery.selectedContextCompanions
                     accentColor:

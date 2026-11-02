@@ -38,6 +38,17 @@ PanelWindow {
                     || weatherStation.currentView === "map")
     }
 
+    WeatherServices.NowcoastLightningService {
+        id: lightningService
+        active: weatherStation.menuOpen
+                && (weatherStation.currentView === "ground"
+                    || weatherStation.currentView === "map")
+        latitude: weatherStation.weatherService
+                  ? weatherStation.weatherService.latitude : ""
+        longitude: weatherStation.weatherService
+                   ? weatherStation.weatherService.longitude : ""
+    }
+
     // Shared keyboard-ownership contract. Weather stays usable with the
     // existing shell even before shell-level ownership wiring lands because
     // keyboardActive defaults true and OnDemand never traps desktop typing.
@@ -1107,6 +1118,7 @@ PanelWindow {
                 weatherService: weatherStation.weatherService
                 nwsAlertSource: weatherStation.nwsAlertSource
                 seismicSource: seismicService
+                lightningSource: lightningService
                 persistentCacheStore: weatherStation.persistentCacheStore
                 liveHistoryStore: weatherStation.liveHistoryStore
                 runtimeNowMs: weatherStation.runtimeNowMs
@@ -1140,6 +1152,7 @@ PanelWindow {
                 stationOpen: weatherStation.menuOpen
                 domain: "map"
                 seismicSource: seismicService
+                lightningSource: lightningService
                 weatherService: weatherStation.weatherService
                 persistentCacheStore: weatherStation.persistentCacheStore
                 newsMentionOverlay: weatherStation.newsMapOverlay

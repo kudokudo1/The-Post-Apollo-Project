@@ -1,0 +1,41 @@
+name: Social local organization identity and account label links
+
+on:
+  pull_request:
+    paths:
+      - 'services/social/SocialOrganizationLinks*'
+      - 'services/social/qmldir'
+      - 'widgets/messanger/IdentityCenterLocalSocialLinksEditor.qml'
+      - 'widgets/messanger/IdentityCenterSettingsSections.qml'
+      - 'widgets/messanger/AppSelector.qml'
+      - 'tests/messaging/test_social_org_links_v1.py'
+      - '.github/workflows/social-local-org-links-v1.yml'
+      - 'MODEL/contracts/social-local-organization-label-links-v1.md'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  local-links:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    env:
+      QT_QPA_PLATFORM: offscreen
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Private link store and original Settings regression
+        run: |
+          python3 -m unittest discover -s tests/messaging -p 'test_social_org_links_v1.py' -v
+          python3 -m unittest discover -s tests/messaging -p 'test_social_local_organizations.py' -v
+          python3 -m unittest discover -s tests/messaging -p 'test_identity_center_settings_sections.py' -v
+      - name: Install disposable Qt engine
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends libegl1 libopengl0 libgl1 libxkbcommon0
+          python3 -m pip install --disable-pip-version-check 'PySide6==6.9.3'
+      - name: Instantiate Organizations QML in real offscreen Qt
+        run: python3 -m unittest discover -s tests/messaging -p 'test_identity_center_offscreen_qml_v0.py' -v

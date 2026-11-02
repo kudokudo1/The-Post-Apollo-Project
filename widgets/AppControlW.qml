@@ -780,6 +780,9 @@ PanelWindow {
 
     ProcessPresentationState {
         id: processPresentationState
+        // Hidden history sampling must remain continuous for FAVORITES/preload,
+        // but visible history arrays remain snapshot-immutable.
+        taskMiniHistoryKeepImmutable: appControlWindow.menuOpen
     }
 
     HunterPresentation {

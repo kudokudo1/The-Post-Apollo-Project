@@ -18,6 +18,12 @@ QtObject {
     readonly property int taskMiniGraphScrollDuration: 1080
     readonly property int taskCombiRenderPointLimit: taskHistoryLimit
 
+    // Hidden AppControl graphs retain samples without thousands of per-snapshot
+    // JS-array copies or map-property notifications. The visible view keeps
+    // immutable snapshots for active graph bindings. Default is conservative
+    // for standalone ProcessPresentationState consumers.
+    property bool taskMiniHistoryKeepImmutable: true
+
     property var taskMiniCpuHistories: ({})
     property var taskMiniHunterMetricHistories: ({})
 

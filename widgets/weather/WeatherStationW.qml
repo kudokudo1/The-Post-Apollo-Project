@@ -1108,35 +1108,16 @@ PanelWindow {
                 }
             }
 
-            // M1 subject index: the six approved subject roots replace the
-            // visible classic rail only while preview browsing is active.
-            Column {
+            // The new subject rail lives in its own QML component so this
+            // file keeps its one canonical existing Main Mode delegate.
+            StationSubjectRail {
                 id: subjectRailColumn
                 visible: weatherStation.subjectNavigationOpen
                 anchors.top: parent.top
                 anchors.left: parent.left
                 anchors.right: parent.right
                 anchors.topMargin: 14
-                spacing: 6
-
-                Repeater {
-                    model: SubjectRoutes.SUBJECTS
-                    delegate: ModeButton {
-                        required property int index
-                        required property var modelData
-                        width: subjectRailColumn.width
-                        height: 48
-                        textOnly: true
-                        horizontalContent: true
-                        labelFontSize: 17
-                        bordered: false
-                        selected: subjectNavigator.currentRoute
-                                  && subjectNavigator.currentRoute.subject
-                                     === modelData.id
-                        labelText: modelData.label
-                        onTriggered: subjectNavigator.selectSubject(modelData.id)
-                    }
-                }
+                navigator: subjectNavigator
             }
 
             // Explicit CLASSIC return. This is an index preview, not a

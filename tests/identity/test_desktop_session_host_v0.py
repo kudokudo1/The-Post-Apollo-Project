@@ -303,15 +303,19 @@ class HostTests(unittest.TestCase):
         self.assertNotIn("authorization", repr(self.host.snapshot()))
 
     def test_https_issuer_and_exact_loopback_redirect_required(self):
-        bad = [
-            replace(self.config, issuer="http://idp.synthetic.invalid/realms/test"),
-            replace(self.config, authorization_endpoint="https://evil.invalid/auth"),
-            replace(self.config, redirect_uri="http://0.0.0.0:8765/callback"),
-            replace(self.config, redirect_uri="http://127.0.0.1:80/callback"),
-            replace(self.config, redirect_uri="http://127.0.0.1:8765/callback?x=y"),
-            replace(self.config, redirect_uri="http://127.0.0.1:8765/evil"),
+        invalid_config = [
+            {"issuer": "http://idp.synthetic.invalid/realms/test"},
+            {"authorization_endpoint": "https://evil.invalid/auth"},
+            {"redirect_uri": "http://0.0.0.0:8765/callback"},
+            {"redirect_uri": "http://127.0.0.1:80/callback"},
+            {"redirect_uri": "http://127.0.0.1:8765/callback?x=y"},
+            {"redirect_uri": "http://127.0.0.1:8765/evil"},
+            {"client_id": "evil client"},
         ]
-        # Constructors above must be individually evaluated to test rejection.
+        for change in invalid_config:
+            with self.subTest(change=change):
+                with self.assertRaises(ValueError):
+                    replace(self.config, **change)
 
     def test_host_is_not_a_production_listener_or_token_file(self):
         source = (ROOT / "services/identity/desktop_session_host_v0.py").read_text()

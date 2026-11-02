@@ -317,6 +317,45 @@ PanelWindow {
         function hospital(): void {
             hospitalWindow.toggle();
         }
+
+        // Sway Super-key widget chords call only the existing owner windows.
+        // Do not create a duplicate window, shortcut controller or auth state.
+        function todo(): void {
+            tasksWindow.toggle();
+        }
+
+        function social(): void {
+            // Match Sessions' deferred change; DockButton may be sampling
+            // its shader-backed artwork while the click/key is delivered.
+            Qt.callLater(function() {
+                messagingWindow.menuOpen = !messagingWindow.menuOpen;
+            });
+        }
+
+        function finance(): void {
+            financeWindow.toggle();
+        }
+
+        function notifications(): void {
+            notificationsHubWindow.toggle();
+        }
+
+        function apolloHub(): void {
+            apolloHubWindow.toggle();
+        }
+
+        function clock(): void {
+            timewWindow.toggle();
+        }
+
+        function weatherStation(): void {
+            weatherStationWindow.toggle();
+        }
+
+        function media(): void {
+            // Same placement-aware toggle as the MP3 dock click.
+            sharedMediaDock.toggleDeck();
+        }
     }
 
     // ===== SERVICES =============================================

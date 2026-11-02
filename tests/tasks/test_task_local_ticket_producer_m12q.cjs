@@ -137,7 +137,8 @@ test("live singleton remains exactly one FileView and ticket path compile-time d
     assert.match(facade,/readonly property bool enabled:\s*false/);
     assert.equal((store.match(/\bFileView\s*\{/g)||[]).length,1);
     assert.equal((store.match(/return stage\(TodoPolicy\./g)||[]).length,9);
-    assert.match(store,/todoFile\.setText\(stage\.expectedRaw\)/);
+    assert.match(store,/todo\.stage\(\{ok:true,document:stage\.expectedDocument\}\)/);
+    assert.equal((store.match(/todoFile\.setText\(/g)||[]).length,1);
     assert.match(store,/todoFile\.reload\(\)/);
     assert.match(store,/TicketProducer\.verify\(TodoPolicy,stage,raw\)/);
     assert.match(store,/if \(ticketProducerEnabled && storageState === "saving"\)/);

@@ -308,10 +308,19 @@ PanelWindow {
             return officialAlertSummary.headerText;
 
         if (usesHomeSources) {
-            if (homeWeatherUsable && homeSpaceUsable)
+            if (homeWeatherUsable && homeSpaceUsable) {
+                if (runtimeCached(weatherRuntimeState)
+                        && runtimeCached(spaceRuntimeState))
+                    return "HOME CACHE";
+                if (runtimeCached(weatherRuntimeState)
+                        || runtimeCached(spaceRuntimeState))
+                    return "HOME MIXED";
                 return "HOME LIVE";
+            }
             if (homeWeatherUsable || homeSpaceUsable)
-                return "PARTIAL";
+                return runtimeCached(weatherRuntimeState)
+                       || runtimeCached(spaceRuntimeState)
+                       ? "PARTIAL CACHE" : "PARTIAL";
             if (homeSourceLoading)
                 return "READING";
             if (homeSourceError)
@@ -319,38 +328,26 @@ PanelWindow {
             return "CONNECTING";
         }
 
-        if (usesWeatherSource) {
-            if (!weatherService)
-                return "OFFLINE";
-            if (weatherService.loading)
-                return "READING";
-            if (!weatherService.ready)
-                return String(weatherService.errorText || "").length > 0
-                       ? "OFFLINE" : "CONNECTING";
-            if (weatherStale)
-                return "STALE";
-            return "WEATHER LIVE";
-        }
+        if (usesWeatherSource)
+            return runtimeHeaderText(weatherRuntimeState, "WEATHER LIVE");
 
-        if (usesSpaceSource) {
-            if (!spaceService)
-                return "OFFLINE";
-            if (spaceService.loading)
-                return "READING";
-            if (spaceService.ready)
-                return "SPACE LIVE";
-            if (String(spaceService.errorText || "").length > 0)
-                return "OFFLINE";
-            return "PARTIAL";
-        }
+        if (usesSpaceSource)
+            return runtimeHeaderText(spaceRuntimeState, "SPACE LIVE");
 
         if (usesMapRuntime) {
-            if (currentPageRuntimeSummary.problem > 0
+            if (currentPageRuntimeSummary.expired > 0
+                    && currentPageRuntimeSummary.expired
+                       >= currentPageRuntimeSummary.ready)
+                return "MAP EXPIRED";
+            if ((currentPageRuntimeSummary.problem > 0
+                    || currentPageRuntimeSummary.offline > 0)
                     && currentPageRuntimeSummary.ready === 0)
                 return "OFFLINE";
             if (currentPageRuntimeSummary.loading > 0
                     && currentPageRuntimeSummary.ready === 0)
                 return "READING";
+            if (currentPageRuntimeSummary.cached > 0)
+                return "MAP CACHE";
             if (currentPageRuntimeSummary.stale > 0)
                 return "STALE";
             if (currentPageRuntimeSummary.ready > 0)
@@ -370,11 +367,11 @@ PanelWindow {
 
         if (usesHomeSources) {
             if (homeWeatherUsable && homeSpaceUsable)
-                return "HOME LIVE // 2 FEEDS";
+                return sourceStatusText + " // 2 FEEDS";
             if (homeWeatherUsable)
-                return "PARTIAL // WEATHER";
+                return sourceStatusText + " // WEATHER";
             if (homeSpaceUsable)
-                return "PARTIAL // SPACE";
+                return sourceStatusText + " // SPACE";
             if (homeSourceLoading)
                 return "READING // SOURCES";
             if (homeSourceError)
@@ -421,8 +418,12 @@ PanelWindow {
             return officialAlertColor(officialAlertSummary.colorToken);
 
         if (usesHomeSources) {
-            if (homeWeatherUsable && homeSpaceUsable)
+            if (homeWeatherUsable && homeSpaceUsable) {
+                if (runtimeCached(weatherRuntimeState)
+                        || runtimeCached(spaceRuntimeState))
+                    return Colors.blue;
                 return Colors.magenta;
+            }
             if (homeWeatherUsable || homeSpaceUsable)
                 return Colors.yellow;
             if (homeSourceLoading)
@@ -432,35 +433,23 @@ PanelWindow {
             return Colors.orange;
         }
 
-        if (usesWeatherSource) {
-            if (!weatherService)
-                return Colors.red;
-            if (weatherService.loading)
-                return Colors.orange;
-            if (!weatherService.ready)
-                return String(weatherService.errorText || "").length > 0
-                       ? Colors.red : Colors.orange;
-            if (weatherStale)
-                return Colors.yellow;
-            return Colors.magenta;
-        }
+        if (usesWeatherSource)
+            return runtimeHeaderColor(weatherRuntimeState, Colors.magenta);
 
-        if (usesSpaceSource) {
-            if (!spaceService)
-                return Colors.red;
-            if (spaceService.loading)
-                return Colors.orange;
-            if (spaceService.ready)
-                return Colors.magenta;
-            if (String(spaceService.errorText || "").length > 0)
-                return Colors.red;
-            return Colors.yellow;
-        }
+        if (usesSpaceSource)
+            return runtimeHeaderColor(spaceRuntimeState, Colors.magenta);
 
         if (usesMapRuntime) {
-            if (currentPageRuntimeSummary.problem > 0
+            if (currentPageRuntimeSummary.expired > 0
+                    && currentPageRuntimeSummary.expired
+                       >= currentPageRuntimeSummary.ready)
+                return Colors.red;
+            if ((currentPageRuntimeSummary.problem > 0
+                    || currentPageRuntimeSummary.offline > 0)
                     && currentPageRuntimeSummary.ready === 0)
                 return Colors.red;
+            if (currentPageRuntimeSummary.cached > 0)
+                return Colors.blue;
             if (currentPageRuntimeSummary.stale > 0
                     || currentPageRuntimeSummary.problem > 0)
                 return Colors.yellow;

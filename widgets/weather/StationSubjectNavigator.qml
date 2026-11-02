@@ -234,6 +234,15 @@ Rectangle {
         }
     }
 
+    // Post-Apollo shared star indicator; no new scroll behavior is invented.
+    NeonScrollBar {
+        flickable: routeScroll
+        geometryMode: "viewport"
+        handleStyle: "star"
+        visible: browser.visible
+                 && routeScroll.contentHeight > routeScroll.height + 1
+    }
+
     QuietText {
         id: previewNote
         anchors.left: parent.left

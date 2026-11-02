@@ -1,0 +1,44 @@
+name: Weather M10 selective live history
+
+on:
+  pull_request:
+    paths:
+      - "services/weather/WeatherLiveHistoryPolicy.js"
+      - "services/weather/WeatherLiveHistoryStore.qml"
+      - "services/weather/WeatherService.qml"
+      - "services/weather/SpaceService.qml"
+      - "services/weather/NdbcMarineService.qml"
+      - "services/weather/CoopsCoastalService.qml"
+      - "widgets/weather/WeatherStationW.qml"
+      - "widgets/weather/StationHome.qml"
+      - "widgets/weather/StationGround.qml"
+      - "widgets/weather/StationSpace.qml"
+      - "shell.qml"
+      - "tests/weather/test_weather_live_history_m10.js"
+      - ".github/workflows/weather-live-history-m10.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  live-history:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: M10 live-history policy and wiring
+        run: node tests/weather/test_weather_live_history_m10.js
+      - name: Runtime M1 inventory regression
+        run: node tests/weather/test_weather_live_runtime_m1.js
+      - name: Runtime M2 page rack regression
+        run: node tests/weather/test_weather_live_runtime_m2.js
+      - name: Runtime M3 cache semantics regression
+        run: node tests/weather/test_weather_live_runtime_m3.js
+      - name: M9 cadence regression
+        run: node tests/weather/test_weather_cadence_m9.js
+      - name: NDBC marine regression
+        run: node tests/weather/test_station_ground_ndbc_marine.js
+      - name: CO-OPS coastal regression
+        run: node tests/weather/test_station_ground_coops_coastal.js
+      - name: SPACE Kp history regression
+        run: node tests/weather/test_station_space_kp_history.js

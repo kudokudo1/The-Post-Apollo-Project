@@ -15,6 +15,7 @@ PanelWindow {
     property var spaceService: null
     property var nwsAlertSource: null
     property var persistentCacheStore: null
+    property var liveHistoryStore: null
 
     WeatherServices.WeatherHistoryService {
         id: weatherHistoryService
@@ -1094,6 +1095,7 @@ PanelWindow {
                 spaceService: weatherStation.spaceService
                 nwsAlertSource: weatherStation.nwsAlertSource
                 historyService: weatherHistoryService
+                liveHistoryStore: weatherStation.liveHistoryStore
                 runtimeNowMs: weatherStation.runtimeNowMs
             }
         }
@@ -1106,6 +1108,7 @@ PanelWindow {
                 nwsAlertSource: weatherStation.nwsAlertSource
                 seismicSource: seismicService
                 persistentCacheStore: weatherStation.persistentCacheStore
+                liveHistoryStore: weatherStation.liveHistoryStore
                 runtimeNowMs: weatherStation.runtimeNowMs
             }
         }
@@ -1125,6 +1128,7 @@ PanelWindow {
             StationSpace {
                 spaceService: weatherStation.spaceService
                 weatherService: weatherStation.weatherService
+                liveHistoryStore: weatherStation.liveHistoryStore
                 runtimeNowMs: weatherStation.runtimeNowMs
             }
         }

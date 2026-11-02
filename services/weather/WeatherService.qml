@@ -7,6 +7,7 @@ Scope {
     id: weatherService
 
     property var cacheStore: null
+    property var historyStore: null
     property bool usingPersistentCurrentCache: false
     property bool usingPersistentForecastCache: false
     property bool usingPersistentAqiCache: false
@@ -49,6 +50,15 @@ Scope {
 
     property string latitude: ""
     property string longitude: ""
+
+    readonly property string historyScopeKey: {
+        const lat = Number(latitude);
+        const lon = Number(longitude);
+        if (!isFinite(lat) || !isFinite(lon)
+                || lat < -90 || lat > 90 || lon < -180 || lon > 180)
+            return "";
+        return lat.toFixed(3) + "|" + lon.toFixed(3);
+    }
 
     property string errorText: ""
 
@@ -304,6 +314,52 @@ Scope {
         });
     }
 
+    function captureCurrentHistory(receivedAtMs) {
+        if (!historyStore || historyScopeKey === "" || !ready)
+            return false;
+        return historyStore.append(
+            "weather-current",
+            historyScopeKey,
+            receivedAtMs,
+            receivedAtMs,
+            {
+                "tempF": tempF,
+                "feelsLikeF": feelsLikeF,
+                "humidity": humidity,
+                "windMph": windMph,
+                "pressureHpa": pressureHpa,
+                "visibilityMiles": visibilityMiles,
+                "cloudCover": cloudCover,
+                "precipMm": precipMm,
+                "uvIndex": uvIndex,
+                "condition": condition
+            }
+        );
+    }
+
+    function captureAirQualityHistory(receivedAtMs) {
+        if (!historyStore || historyScopeKey === "" || !aqiReady)
+            return false;
+        return historyStore.append(
+            "air-quality",
+            historyScopeKey,
+            receivedAtMs,
+            receivedAtMs,
+            {
+                "aqi": aqi,
+                "pm25": pm25,
+                "pm10": pm10,
+                "ozoneAqi": ozoneAqi,
+                "nitrogenDioxideAqi": nitrogenDioxideAqi,
+                "carbonMonoxideAqi": carbonMonoxideAqi,
+                "ozone": ozone,
+                "nitrogenDioxide": nitrogenDioxide,
+                "carbonMonoxide": carbonMonoxide,
+                "dust": dust
+            }
+        );
+    }
+
     function persistForecast(receivedAtMs) {
         if (!cacheStore || !forecastReady)
             return false;
@@ -483,6 +539,7 @@ Scope {
 
             persistCurrentWeather(receivedAt.getTime());
             persistForecast(receivedAt.getTime());
+            captureCurrentHistory(receivedAt.getTime());
 
             // Once weather gives us coordinates,
             // fetch matching AQI.
@@ -546,6 +603,7 @@ Scope {
             aqiReady = true;
             usingPersistentAqiCache = false;
             persistAirQuality(aqiLastUpdated.getTime());
+            captureAirQualityHistory(aqiLastUpdated.getTime());
         } catch (error) {
             console.log("WeatherService AQI parse error:", error);
 

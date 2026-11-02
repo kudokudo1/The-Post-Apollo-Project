@@ -13,7 +13,29 @@ Rectangle {
     property var spaceService: null
     property var nwsAlertSource: null
     property var historyService: null
+    property var liveHistoryStore: null
     property real runtimeNowMs: Date.now()
+
+    readonly property int liveHistoryRevision:
+        liveHistoryStore ? Number(liveHistoryStore.revision) || 0 : 0
+
+    function liveHistoryScopeKey() {
+        const lat = weatherService ? Number(weatherService.latitude) : NaN;
+        const lon = weatherService ? Number(weatherService.longitude) : NaN;
+        if (!isFinite(lat) || !isFinite(lon))
+            return "";
+        return lat.toFixed(3) + "|" + lon.toFixed(3);
+    }
+
+    function historySuffix(sourceId) {
+        liveHistoryRevision;
+        if (!liveHistoryStore)
+            return " // HISTORY --";
+        const scope = liveHistoryScopeKey();
+        const count = scope === "" ? 0
+            : liveHistoryStore.count(sourceId, scope, runtimeNowMs);
+        return " // HISTORY " + count + "/48H";
+    }
 
     readonly property var runtimeRows: [
         RuntimePolicy.displayRow(
@@ -27,11 +49,13 @@ Rectangle {
                 "usingCache": weatherService
                               ? weatherService.usingPersistentCurrentCache
                               : false,
-                "detail": weatherService
-                          && String(weatherService.observationTime || "") !== ""
-                          ? "PROVIDER OBS CLOCK "
-                            + weatherService.observationTime
-                          : "CURRENT CONDITIONS"
+                "detail": (
+                    weatherService
+                    && String(weatherService.observationTime || "") !== ""
+                    ? "PROVIDER OBS CLOCK "
+                      + weatherService.observationTime
+                    : "CURRENT CONDITIONS"
+                ) + home.historySuffix("weather-current")
             },
             runtimeNowMs
         ),
@@ -64,11 +88,13 @@ Rectangle {
                 "usingCache": weatherService
                               ? weatherService.usingPersistentAqiCache
                               : false,
-                "detail": weatherService
-                          && String(weatherService.airQualitySourceTime || "") !== ""
-                          ? "SOURCE CLOCK "
-                            + weatherService.airQualitySourceTime
-                          : "AQI + POLLEN"
+                "detail": (
+                    weatherService
+                    && String(weatherService.airQualitySourceTime || "") !== ""
+                    ? "SOURCE CLOCK "
+                      + weatherService.airQualitySourceTime
+                    : "AQI + POLLEN"
+                ) + home.historySuffix("air-quality")
             },
             runtimeNowMs
         ),

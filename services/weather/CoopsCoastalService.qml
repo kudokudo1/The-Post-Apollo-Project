@@ -10,6 +10,7 @@ Scope {
     id: coastal
 
     property var cacheStore: null
+    property var historyStore: null
     property bool waterUsingPersistentCache: false
     property bool tideUsingPersistentCache: false
     readonly property bool usingPersistentCache:
@@ -321,6 +322,24 @@ Scope {
         return selectStationsAndRefresh();
     }
 
+    function captureWaterHistory(receivedAtMs) {
+        if (!historyStore || !configured || !waterStation || !waterLevel)
+            return false;
+        return historyStore.append(
+            "coastal-water",
+            currentKey,
+            Number(waterLevel.sampleMillis),
+            receivedAtMs,
+            {
+                "stationId": String(waterStation.id || ""),
+                "sampleMillis": Number(waterLevel.sampleMillis),
+                "waterLevel": Number(waterLevel.value),
+                "sigma": waterLevel.sigma,
+                "quality": String(waterLevel.quality || "")
+            }
+        );
+    }
+
     function acceptWater(raw) {
         if (!configured || !waterStation
                 || inflightWaterKey !== currentKey + "|" + waterStation.id)
@@ -340,6 +359,7 @@ Scope {
             loadedKey = currentKey;
             waterUsingPersistentCache = false;
             persistProducts();
+            captureWaterHistory(waterLastUpdated.getTime());
         } catch (error) {
             waterFailed = true;
             waterErrorText = "CO-OPS WATER LEVEL UNAVAILABLE";

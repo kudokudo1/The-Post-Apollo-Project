@@ -1,0 +1,46 @@
+name: TASKS M12u native self-report source and evaluator tests
+
+on:
+  pull_request:
+    paths:
+      - 'TaskNativeSelfReportM12u.qml'
+      - 'tests/tasks/fixtures/TaskNativeSelfReportRunnerM12u.py'
+      - 'tests/tasks/test_task_native_self_report_m12u.py'
+      - 'tests/tasks/fixtures/task_writer_gate_inventory_m11d.json'
+      - 'tests/tasks/test_task_writer_gate_inventory_m11d.py'
+      - 'docs/tasks-native-self-report-m12u.md'
+      - '.github/workflows/tasks-native-self-report-m12u.yml'
+      - 'services/hub/ApolloHubTodoStore.qml'
+  push:
+    branches: [main]
+    paths:
+      - 'TaskNativeSelfReportM12u.qml'
+      - 'tests/tasks/fixtures/TaskNativeSelfReportRunnerM12u.py'
+      - 'tests/tasks/test_task_native_self_report_m12u.py'
+      - '.github/workflows/tasks-native-self-report-m12u.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  source-and-evaluator:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: M12u private native marker/disk self-report evaluator
+        run: python3 tests/tasks/test_task_native_self_report_m12u.py
+      - name: M11d live and test-only caller inventory
+        run: python3 tests/tasks/test_task_writer_gate_inventory_m11d.py
+      - name: M12s previous disposable native smoke source
+        run: node --test tests/tasks/test_task_real_store_native_smoke_m12s.cjs
+      - name: M12r ticket admission still disabled
+        run: node --test tests/tasks/test_task_disabled_admission_m12r.cjs
+      - name: M11t production trust still not accepted
+        run: python3 tests/tasks/test_task_production_trust_contract_m11t.py

@@ -4,6 +4,11 @@
 
 #include <QCoreApplication>
 #include <QDBusArgument>
+#include <QDBusConnection>
+#include <QDBusMessage>
+#include <QDBusMetaType>
+#include <QEventLoop>
+#include <QTimer>
 #include <QJsonArray>
 #include <QJsonDocument>
 #include <QVariant>
@@ -141,24 +146,71 @@ void testDbusVariantTypeGate()
     check(r.packet.isEmpty(), "no data on type error");
 }
 
+class SmsReceiver : public QObject {
+    Q_OBJECT
+public:
+    SmsDecodeResult received;
+    bool arrived = false;
+
+public Q_SLOTS:
+    void onMessage(const QDBusVariant &value)
+    {
+        arrived = true;
+        received = decodeVariant(value);
+        Q_EMIT complete();
+    }
+
+Q_SIGNALS:
+    void complete();
+};
+
 void testExactDbusStructureRoundTrip()
 {
-    // Build the identical 10-field structure described by KDE Connect.
-    // This is a local Qt marshalling fixture, not a D-Bus connection.
+    // Sender and receiver use only a disposable dbus-run-session bus on CI.
+    // No KDE Connect service/device is present. This gives the decoder a
+    // genuine *readable* QDBusArgument, not a local write-only marshaller.
+    qDBusRegisterMetaType<SmsAddress>();
+    qDBusRegisterMetaType<QList<SmsAddress>>();
+    qDBusRegisterMetaType<SmsAttachment>();
+    qDBusRegisterMetaType<QList<SmsAttachment>>();
+
+    SmsReceiver receiver;
+    QDBusConnection bus = QDBusConnection::sessionBus();
+    check(bus.isConnected(), "isolated test D-Bus session connected");
+    const QString path = QStringLiteral("/postapollo/test/sms");
+    const QString iface = QStringLiteral("org.postapollo.test.sms");
+    check(bus.connect(QString(), path, iface,
+                      QStringLiteral("conversationUpdated"),
+                      &receiver, SLOT(onMessage(QDBusVariant))),
+          "subscribe to only synthetic fixture signal");
+
     auto f = sample();
     QDBusArgument arg;
     arg.beginStructure();
     arg << f.event << f.body << f.addresses << f.date << f.type << f.read
         << f.threadId << f.messageId << f.subId << f.attachments;
     arg.endStructure();
-    const auto r = decodeVariant(QDBusVariant(QVariant::fromValue(arg)));
-    check(r.ok, "QDBusArgument structure successfully decoded");
-    check(r.packet.value(QStringLiteral("body")).toString() == f.body,
-          "QDBusVariant text survived native structure");
-    check(r.packet.value(QStringLiteral("thread_id")).toString()
+    QDBusMessage message = QDBusMessage::createSignal(
+        path, iface, QStringLiteral("conversationUpdated"));
+    message.setArguments({QVariant::fromValue(QDBusVariant(QVariant::fromValue(arg)))});
+
+    QEventLoop loop;
+    QObject::connect(&receiver, &SmsReceiver::complete, &loop, &QEventLoop::quit);
+    check(bus.send(message), "send in-memory synthetic fixture through test bus");
+    QTimer::singleShot(2000, &loop, &QEventLoop::quit);
+    loop.exec();
+
+    check(receiver.arrived, "receive synthetic message from disposable D-Bus");
+    check(receiver.received.ok, "decode genuine readable QDBusArgument");
+    check(receiver.received.packet.value(QStringLiteral("body")).toString() == f.body,
+          "D-Bus text survived native structure");
+    check(receiver.received.packet.value(QStringLiteral("thread_id")).toString()
           == QStringLiteral("9007199254740993"),
-          "native Qt D-Bus qint64 exactness");
+          "D-Bus qint64 exactness");
+    bus.disconnect(QString(), path, iface, QStringLiteral("conversationUpdated"),
+                   &receiver, SLOT(onMessage(QDBusVariant)));
 }
+
 } // namespace
 
 int main(int argc, char **argv)
@@ -174,3 +226,5 @@ int main(int argc, char **argv)
     std::printf("PASS: %d synthetic Qt decoder assertions\n", checks);
     return 0;
 }
+
+#include "test_kdeconnect_sms_dbus_decoder.moc"

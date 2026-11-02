@@ -130,7 +130,7 @@ class DbusProbeTests(unittest.TestCase):
     def test_device_path_is_lowercase_devices_as_in_source(self):
         bus = FakeBus()
         run(bus)
-        paths = [a[0][2 + len(probe.BASE)] for a in bus.calls[2:]]
+        paths = [a[0][3 + len(probe.BASE)] for a in bus.calls[2:]]
         self.assertTrue(all(p == f"/modules/kdeconnect/devices/{DEVICE}"
                             for p in paths))
 

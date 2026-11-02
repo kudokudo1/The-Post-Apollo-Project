@@ -11,11 +11,17 @@ from __future__ import annotations
 from datetime import datetime, timezone
 import json
 import math
+from pathlib import Path
 import sys
 import xml.etree.ElementTree as ET
 from urllib.error import HTTPError, URLError
 from urllib.parse import urlencode, urlsplit
 from urllib.request import HTTPRedirectHandler, Request, build_opener
+
+SCRIPT_DIR = Path(__file__).resolve().parent
+if str(SCRIPT_DIR) not in sys.path:
+    sys.path.insert(0, str(SCRIPT_DIR))
+import weather_frame_cache as FrameCache
 
 HOST = "nowcoast.noaa.gov"
 SERVICE = (
@@ -229,7 +235,7 @@ def build_snapshot(capabilities: bytes, latitude: float, longitude: float,
 
 def main(argv=None) -> int:
     args = list(sys.argv[1:] if argv is None else argv)
-    if len(args) != 2:
+    if len(args) not in {2, 3}:
         sys.stdout.write('{"error":"NOWCOAST LIGHTNING LOCATION REQUIRED"}')
         return 2
 
@@ -239,6 +245,41 @@ def main(argv=None) -> int:
         snapshot = build_snapshot(
             fetch_capabilities(), latitude, longitude
         )
+
+        if len(args) == 3:
+            scope_key = f"{latitude:.3f}|{longitude:.3f}"
+            observed_ms = 0
+            if snapshot["latestTime"] != "LATEST":
+                try:
+                    observed_ms = int(
+                        datetime.fromisoformat(
+                            snapshot["latestTime"].replace("Z", "+00:00")
+                        ).timestamp() * 1000
+                    )
+                except ValueError:
+                    observed_ms = 0
+
+            cached = FrameCache.store_single_frame(
+                "lightning",
+                args[2],
+                scope_key,
+                snapshot["imageUrl"],
+                observed_ms,
+                {
+                    "bbox": snapshot["bbox"],
+                    "layer": snapshot["layer"],
+                    "layerTitle": snapshot["layerTitle"],
+                    "latestTime": snapshot["latestTime"],
+                    "windowMinutes": snapshot["windowMinutes"],
+                    "resolutionKm": snapshot["resolutionKm"],
+                    "radiusKm": snapshot["radiusKm"],
+                },
+            )
+            snapshot["imageUrl"] = cached["fileUrl"]
+            snapshot["receivedAtMs"] = cached["receivedAtMs"]
+            snapshot["observedAtMs"] = cached["observedAtMs"]
+            snapshot["frameCached"] = True
+
         sys.stdout.write(json.dumps(snapshot, separators=(",", ":")))
         return 0
     except (ValueError, ET.ParseError, HTTPError, URLError, OSError):

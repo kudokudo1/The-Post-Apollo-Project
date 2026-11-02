@@ -161,8 +161,9 @@ assert.match(space, /auroraService\.observationTimeMs/);
 assert.match(space, /xrayService\.sampleTimeMs/);
 
 const discovery = read("widgets/weather/StationDiscovery.qml");
-assert.match(discovery, /radarImage\.status === Image\.Ready/);
-assert.match(discovery, /"observedAt": radarRequestedTimeMs/);
+assert.match(discovery, /"ready": mrmsRadarService\.ready/);
+assert.match(discovery, /"observedAt": mrmsRadarService\.requestedTimeMs/);
+assert.match(discovery, /"usingCache": mrmsRadarService\.usingFrameCache/);
 assert.match(discovery, /domain === "news"/);
 assert.match(discovery, /"usingCache": source\.usingCache/);
 

@@ -113,11 +113,12 @@ Rectangle {
                 "mrms-radar",
                 {
                     "active": stationOpen,
-                    "ready": radarImage.status === Image.Ready,
-                    "loading": radarImage.status === Image.Loading,
-                    "failed": radarImage.status === Image.Error,
-                    "receivedAt": radarRequestedAt,
-                    "observedAt": radarRequestedTimeMs,
+                    "ready": mrmsRadarService.ready,
+                    "loading": mrmsRadarService.loading,
+                    "errorText": mrmsRadarService.errorText,
+                    "receivedAt": mrmsRadarService.lastUpdated,
+                    "observedAt": mrmsRadarService.requestedTimeMs,
+                    "usingCache": mrmsRadarService.usingFrameCache,
                     "detail": "VIEWPORT IMAGE"
                 },
                 runtimeNowMs
@@ -130,6 +131,10 @@ Rectangle {
                     "loading": rainViewerRadarService.loading,
                     "errorText": rainViewerRadarService.errorText,
                     "receivedAt": rainViewerRadarService.lastUpdated,
+                    "observedAt":
+                        rainViewerRadarService.selectedFrameTime > 0
+                        ? rainViewerRadarService.selectedFrameTime * 1000 : 0,
+                    "usingCache": rainViewerRadarService.usingFrameCache,
                     "detail": "FALLBACK FRAME"
                 },
                 runtimeNowMs
@@ -279,13 +284,16 @@ Rectangle {
         firmsArea && firmsArea.valid
     readonly property bool radarAreaReady:
         radarArea && radarArea.valid
-    property string radarImageUrl: ""
-    property var radarSnapshotBounds: null
+    readonly property string radarImageUrl: mrmsRadarService.imageUrl
+    readonly property var radarSnapshotBounds: mrmsRadarService.snapshotBounds
     property int radarHistoryMinutes: 0
-    property int radarLoadedHistoryMinutes: 0
-    property double radarRequestedTimeMs: 0
-    property date radarRequestedAt
+    readonly property int radarLoadedHistoryMinutes:
+        mrmsRadarService.loadedHistoryMinutes
+    readonly property double radarRequestedTimeMs:
+        mrmsRadarService.requestedTimeMs
+    readonly property date radarRequestedAt: mrmsRadarService.lastUpdated
     property string radarDisplaySource: "noaa"
+    property bool pendingRainViewerDisplay: false
     readonly property var radarHistoryOptions:
         RadarPolicy.historyOptions()
     readonly property var smokeSummary:
@@ -487,25 +495,16 @@ Rectangle {
         if (!snapshot || nextUrl === "")
             return false;
 
-        radarSnapshotBounds = snapshot;
-        radarRequestedAt = new Date(requestNow);
-        radarDisplaySource = "noaa";
-        radarLoadedHistoryMinutes = radarHistoryMinutes;
-        radarRequestedTimeMs = historicalTime;
-        // Explicit empty -> next URL guarantees a manual same-viewport refresh
-        // even with the Image cache disabled.
-        radarImageUrl = "";
-        Qt.callLater(function() {
-            stationDiscovery.radarImageUrl = nextUrl;
-        });
-        return true;
+        return mrmsRadarService.request(
+            nextUrl,
+            snapshot,
+            radarHistoryMinutes,
+            historicalTime
+        );
     }
 
     function clearRadarSnapshot() {
-        radarImageUrl = "";
-        radarSnapshotBounds = null;
-        radarLoadedHistoryMinutes = 0;
-        radarRequestedTimeMs = 0;
+        mrmsRadarService.clear();
         if (radarDisplaySource === "noaa"
                 && rainViewerRadarService.ready)
             radarDisplaySource = "rainviewer";
@@ -514,10 +513,13 @@ Rectangle {
     function loadRainViewerFallback() {
         if (domain !== "map" || !stationOpen)
             return false;
-        return rainViewerRadarService.request(
+        const accepted = rainViewerRadarService.request(
             radarHistoryMinutes,
             mapVisibleBounds
         );
+        if (accepted)
+            pendingRainViewerDisplay = true;
+        return accepted;
     }
 
     function clearRainViewerFallback() {
@@ -735,15 +737,21 @@ Rectangle {
                 },
                 {
                     name:"NOAA/NWS MRMS // BASE REFLECTIVITY + 4H HISTORY",
-                    state: radarImage.status === Image.Ready
-                           ? "FRAME "
+                    state: mrmsRadarService.ready
+                           ? (mrmsRadarService.usingFrameCache
+                              ? "CACHE " : "FRAME ")
                              + radarHistoryLabel(radarLoadedHistoryMinutes)
-                           : "MANUAL READY"
+                           : mrmsRadarService.loading
+                             ? "RECEIVING"
+                             : mrmsRadarService.failed
+                               ? "ERROR" : "MANUAL READY"
                 },
                 {
                     name:"RAINVIEWER // PAST RADAR FALLBACK // 2H",
                     state: rainViewerRadarService.ready
-                           ? "READY " + rainViewerRadarService.tileCount
+                           ? (rainViewerRadarService.usingFrameCache
+                              ? "CACHE " : "READY ")
+                             + rainViewerRadarService.tileCount
                              + " TILES"
                            : rainViewerRadarService.loading
                              ? "RECEIVING"
@@ -815,10 +823,24 @@ Rectangle {
         id: hmsSmokeService
     }
 
+    WeatherServices.MrmsRadarService {
+        id: mrmsRadarService
+        active: stationDiscovery.domain === "map"
+                && stationDiscovery.stationOpen
+        onFrameReady: {
+            if (!stationDiscovery.pendingRainViewerDisplay)
+                stationDiscovery.radarDisplaySource = "noaa";
+        }
+    }
+
     WeatherServices.RainViewerRadarService {
         id: rainViewerRadarService
-        onOverlayReady:
-            stationDiscovery.radarDisplaySource = "rainviewer"
+        onOverlayReady: {
+            if (stationDiscovery.pendingRainViewerDisplay
+                    || !mrmsRadarService.ready)
+                stationDiscovery.radarDisplaySource = "rainviewer";
+            stationDiscovery.pendingRainViewerDisplay = false;
+        }
     }
 
     WeatherServices.GdeltArticleLocationService {
@@ -1295,7 +1317,7 @@ Rectangle {
                                ? "REFRESH RADAR" : "LOAD RADAR"
                         labelPixelSize: 10
                         available: stationDiscovery.radarAreaReady
-                                   && radarImage.status !== Image.Loading
+                                   && !mrmsRadarService.loading
                         accentColor: Colors.cyan
                         onClicked:
                             stationDiscovery.loadRadarSnapshot()
@@ -1317,13 +1339,16 @@ Rectangle {
                         width: 170
                         text: !stationDiscovery.radarAreaReady
                               ? stationDiscovery.radarArea.reason
-                              : radarImage.status === Image.Loading
-                                ? "LOADING"
-                                : radarImage.status === Image.Error
-                                  ? "IMAGE ERROR"
-                                  : radarImage.status === Image.Ready
-                                    ? "RADAR LOADED"
-                                    : "MANUAL READY"
+                              : mrmsRadarService.loading
+                                ? "CACHING FRAME"
+                                : mrmsRadarService.failed
+                                  ? mrmsRadarService.errorText
+                                  : radarImage.status === Image.Error
+                                    ? "IMAGE ERROR"
+                                    : radarImage.status === Image.Ready
+                                      ? (mrmsRadarService.usingFrameCache
+                                         ? "FRAME CACHE" : "RADAR LOADED")
+                                      : "MANUAL READY"
                         elide: Text.ElideRight
                         font.pixelSize: 10
                         color: radarImage.status === Image.Error ? Colors.yellow
@@ -1349,7 +1374,9 @@ Rectangle {
                                        )
                                      + " TARGET"
                                    : " // LATEST AVAILABLE")
-                                + " // SNAPSHOT TRACKS MAP"
+                                + (mrmsRadarService.usingFrameCache
+                                   ? " // FRAME CACHE"
+                                   : " // SNAPSHOT TRACKS MAP")
                               : "MAX 90° × 50° VIEW // MANUAL LOAD // NO PAN AUTO-FETCH"
                         elide: Text.ElideRight
                         font.pixelSize: 9
@@ -1408,7 +1435,11 @@ Rectangle {
                                 : rainViewerRadarService.failed
                                   ? rainViewerRadarService.errorText
                                   : rainViewerRadarService.ready
-                                    ? "FALLBACK PLANNED"
+                                    ? (rainViewerRadarService.usingFrameCache
+                                       ? "FRAME CACHE"
+                                       : rainViewerRadarService.frameCacheMode === "fetch"
+                                         ? "CACHING TILES"
+                                         : "FALLBACK PLANNED")
                                     : "MANUAL READY"
                         elide: Text.ElideRight
                         font.pixelSize: 9
@@ -1431,6 +1462,8 @@ Rectangle {
                                 + rainViewerRadarService.tileCount
                                 + " TILES // Z"
                                 + rainViewerRadarService.tileZoom
+                                + (rainViewerRadarService.usingFrameCache
+                                   ? " // CACHE" : "")
                               : "PAST 2H // 10-MIN FRAMES // MANUAL // NO AUTO-FETCH"
                         elide: Text.ElideRight
                         font.pixelSize: 9

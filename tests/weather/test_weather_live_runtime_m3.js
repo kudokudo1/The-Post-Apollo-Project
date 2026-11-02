@@ -128,7 +128,7 @@ assert.equal(ctx.retentionLabel(row), "SESSION≤1d");
 
 // Manual radar snapshots age independently of polling.
 const radar = ctx.sourceSpec("mrms-radar");
-assert.equal(radar.retention, "OPERATOR_SNAPSHOT");
+assert.equal(radar.retention, "FRAME_CACHE");
 assert.equal(radar.freshMs, 10 * minute);
 assert.equal(radar.staleMs, 30 * minute);
 assert.equal(radar.expireMs, 2 * hour);
@@ -142,7 +142,7 @@ assert.equal(row.freshness, "SNAPSHOT");
 assert.equal(row.ageBand, "FRESH");
 assert.equal(row.availability, "SNAPSHOT");
 assert.equal(ctx.rowStateLabel(row), "SNAPSHOT // FRESH");
-assert.equal(ctx.retentionLabel(row), "SNAPSHOT≤2h");
+assert.equal(ctx.retentionLabel(row), "FRAME≤2h");
 
 row = ctx.displayRow(
     "mrms-radar",
@@ -150,6 +150,18 @@ row = ctx.displayRow(
     now
 );
 assert.equal(row.availability, "SNAPSHOT_AGING");
+
+row = ctx.displayRow(
+    "mrms-radar",
+    {
+        active:true, ready:true, usingCache:true,
+        receivedAt:now - 20 * minute
+    },
+    now
+);
+assert.equal(row.availability, "FRAME_CACHE_AGING");
+assert.equal(ctx.rowStateLabel(row), "FRAME CACHE // AGING");
+assert.equal(ctx.statusToken(row), "yellow");
 
 row = ctx.displayRow(
     "mrms-radar",
@@ -187,6 +199,8 @@ assert.equal(ctx.retentionLabel(row), "LOCAL");
 
 // Provider-specific cache profiles cover high-volatility and slower products.
 assert.equal(ctx.sourceSpec("lightning").expireMs, 2 * hour);
+assert.equal(ctx.sourceSpec("lightning").retention, "FRAME_CACHE");
+assert.equal(ctx.sourceSpec("rainviewer").retention, "FRAME_CACHE");
 assert.equal(ctx.sourceSpec("river").expireMs, 12 * hour);
 assert.equal(ctx.sourceSpec("coastal").expireMs, 24 * hour);
 assert.equal(ctx.sourceSpec("aurora").expireMs, 2 * hour);

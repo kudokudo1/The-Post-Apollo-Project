@@ -133,7 +133,8 @@ Rectangle {
                 "loading": lightningService.loading,
                 "errorText": lightningService.errorText,
                 "receivedAt": lightningService.lastUpdated,
-                "observedAt": lightningService.latestTime
+                "observedAt": lightningService.latestTime,
+                "usingCache": lightningService.usingFrameCache
             },
             runtimeNowMs
         )
@@ -2302,7 +2303,8 @@ Rectangle {
                               : lightningImage.status === Image.Loading
                                 ? "IMAGE LOADING"
                                 : lightningImage.status === Image.Ready
-                                  ? "RECEIVED"
+                                  ? (lightningService.usingFrameCache
+                                     ? "FRAME CACHE" : "RECEIVED")
                                   : lightningService.ready
                                     ? "WMS READY" : "WAITING"
                     font.pixelSize: 10
@@ -2320,7 +2322,9 @@ Rectangle {
                             + lightningService.resolutionKm
                             + " KM GRID // ~"
                             + Math.round(lightningService.radiusKm)
-                            + " KM RADIUS // RECEIVED "
+                            + " KM RADIUS // "
+                            + (lightningService.usingFrameCache
+                               ? "CACHE " : "RECEIVED ")
                             + ground.lightningReceiveAge()
                           : "PUBLIC NOAA NOWCOAST LIGHTNING-DENSITY WMS"
                     elide: Text.ElideRight

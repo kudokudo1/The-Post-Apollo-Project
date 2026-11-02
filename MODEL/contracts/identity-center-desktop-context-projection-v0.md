@@ -92,7 +92,7 @@ python3 -m unittest discover -s tests/identity -p 'test_desktop_context_projecti
 python3 -m unittest discover -s tests/messaging -p 'test_identity_center_desktop_display_v0.py' -v
 ```
 
-**These are not live Quickshell UI tests, browser PKCE tests or production security certification.** The existing real-Keycloak integration CI remains the separate authenticated API evidence.
+**These are not live Quickshell UI tests or production security certification.** In addition, the existing disposable real-Keycloak integration now exercises the tokenless projection across signed JWT authentication, persisted membership revocation and server logout. That is a real provider test only inside GitHub CI, not a production desktop session host.
 
 ## Recovery, implementation handoff and future security gates
 
@@ -117,6 +117,7 @@ No actual desktop privileged host, bearer custody, native login, TLS client, acc
 - [x] Tokenless projection, strict bounds and staleness invalidation
 - [x] Read-only QML display slot, default null and disabled switcher
 - [x] Focused Python and Social source-contract tests
+- [x] Extend disposable real-Keycloak end-to-end CI to validate tokenless projection
 - [ ] Exact-head CI green
 - [ ] Independent security/architecture review
 - [ ] Operator acceptance and live Quickshell UI verification

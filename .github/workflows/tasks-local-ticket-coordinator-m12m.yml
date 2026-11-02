@@ -1,0 +1,48 @@
+name: TASKS M12m isolated local ticket coordinator
+
+on:
+  pull_request:
+    paths:
+      - 'tests/tasks/fixtures/TaskLocalTicketCoordinatorM12m.cjs'
+      - 'tests/tasks/fixtures/TaskPrivateFixtureAdapterM12m.cjs'
+      - 'tests/tasks/test_task_local_coordinator_m12m.cjs'
+      - 'docs/tasks-local-ticket-coordinator-m12m.md'
+      - '.github/workflows/tasks-local-ticket-coordinator-m12m.yml'
+      - 'services/hub/ApolloHubTodoStore.qml'
+      - 'services/hub/ApolloHubTodoPolicy.js'
+  push:
+    branches: [main]
+    paths:
+      - 'tests/tasks/fixtures/TaskLocalTicketCoordinatorM12m.cjs'
+      - 'tests/tasks/fixtures/TaskPrivateFixtureAdapterM12m.cjs'
+      - 'tests/tasks/test_task_local_coordinator_m12m.cjs'
+      - 'docs/tasks-local-ticket-coordinator-m12m.md'
+      - '.github/workflows/tasks-local-ticket-coordinator-m12m.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  m12m-local-disposable:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: M12m real synthetic filesystem and explicit ticket lifecycle
+        run: node --test tests/tasks/test_task_local_coordinator_m12m.cjs
+      - name: M12k external same-UID writer limitations still evidenced
+        run: python3 tests/tasks/test_task_uncooperative_writer_m12k.py
+      - name: M12h durable disposable stage receipts remain correct
+        run: python3 tests/tasks/test_task_stage_source_receipt_m12h.py
+      - name: M12i native bridge process regression
+        run: python3 tests/tasks/test_task_native_receipt_host_m12i.py
+      - name: M11t production gating remains refused
+        run: python3 tests/tasks/test_task_production_trust_contract_m11t.py
+      - name: M11d one live legacy FileView remains
+        run: python3 tests/tasks/test_task_writer_gate_inventory_m11d.py

@@ -362,8 +362,8 @@ for (const id of ["river","marine","coastal"]) {
     );
 }
 
-// M6 expands the additive envelope to twelve known records.
-assert.equal(policy.knownSourceIds().length, 12);
+// M7 later expands the additive envelope to thirteen known records.
+assert.equal(policy.knownSourceIds().length, 13);
 for (const id of ["river","marine","coastal"])
     assert.ok(policy.knownSourceIds().includes(id));
 
@@ -477,21 +477,22 @@ assert.match(
     /persistentCacheStore:\s*weatherStation\.persistentCacheStore/
 );
 
-// Deferred categories stay deferred.
+// Volatile lightning remains deferred after NWS lifecycle persistence lands.
 for (const file of [
-    "services/weather/NowcoastLightningService.qml",
-    "services/notifications/NwsOfficialAlertNotificationProducer.qml"
+    "services/weather/NowcoastLightningService.qml"
 ]) {
     const src = read(file);
     assert.doesNotMatch(src, /cacheStore\.put\(/);
     assert.doesNotMatch(src, /usingPersistentCache/);
 }
-for (const id of ["lightning","nws-alerts"]) {
-    assert.notEqual(
-        runtime.sourceSpec(id).retention,
-        "PERSISTENT_LAST_GOOD"
-    );
-}
+assert.notEqual(
+    runtime.sourceSpec("lightning").retention,
+    "PERSISTENT_LAST_GOOD"
+);
+assert.equal(
+    runtime.sourceSpec("nws-alerts").retention,
+    "PERSISTENT_LAST_GOOD"
+);
 for (const id of ["mrms-radar","rainviewer","firms","hms-smoke"])
     assert.equal(runtime.sourceSpec(id).retention, "OPERATOR_SNAPSHOT");
 assert.equal(runtime.sourceSpec("moon").retention, "KEY_BOUND");

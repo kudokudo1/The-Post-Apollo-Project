@@ -37,7 +37,6 @@ for (const id of m5SourceIds)
 
 // M5's still-deferred categories remain excluded until their own milestone.
 for (const id of [
-    "nws-alerts",
     "lightning",
     "moon",
     "planet-rise-set",
@@ -150,8 +149,8 @@ for (const id of ["seismic","gdacs"]) {
     assert.equal(runtime.retentionLabel(spec), "PERSIST≤1d");
 }
 
-// Categories still deferred after M5 remain non-persistent here.
-for (const id of ["nws-alerts","lightning"]) {
+// Categories still deferred after later additive milestones remain non-persistent.
+for (const id of ["lightning"]) {
     const spec = runtime.sourceSpec(id);
     assert.notEqual(spec.retention, "PERSISTENT_LAST_GOOD", id);
 }
@@ -238,10 +237,9 @@ assert.match(
     /"usingCache": seismicSource[\s\S]{0,100}usingPersistentCache/
 );
 
-// Guard categories that remain deferred after the additive M6 milestone.
+// Guard categories that remain deferred after the additive M7 milestone.
 for (const file of [
-    "services/weather/NowcoastLightningService.qml",
-    "services/notifications/NwsOfficialAlertNotificationProducer.qml"
+    "services/weather/NowcoastLightningService.qml"
 ]) {
     const src = read(file);
     assert.doesNotMatch(src, /WeatherPersistentCache|persistentCacheStore/);

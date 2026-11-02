@@ -31,6 +31,10 @@ assert "Post-Apollo-WeatherStation" in qml
 assert "interval: 900000" in qml
 assert 'producer.alertPoint !== ""' in qml
 assert "NotificationsService.historyReady" in qml
+assert "property var cacheStore: null" in qml
+assert "property bool usingPersistentCache: false" in qml
+assert 'cacheStore.record(' in qml and '"nws-alerts"' in qml
+assert "persistAlertState()" in qml
 assert "NwsPolicy.parseActive(text, Date.now())" in qml
 assert "function historyContains(alertId, revision, kind)" in qml
 assert 'vanished ? "normal" : alert.displaySeverity' in qml
@@ -149,7 +153,11 @@ const runtime={
   historyReady:true, notifications:{get count(){return entries.length;},get:i=>entries[i]},
   pushRich:item=>{entries.push(item);}
  },
- producer:{activeAlerts:{}}
+ producer:{
+  activeAlerts:{},
+  usingPersistentCache:false,
+  persistAlertState:()=>true
+ }
 };
 vm.runInNewContext(
  ['historyContains','publish','acceptResponse'].map(method).join('\n'),runtime);

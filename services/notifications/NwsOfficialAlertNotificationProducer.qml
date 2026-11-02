@@ -10,6 +10,9 @@ import "NwsOfficialAlertPolicy.js" as NwsPolicy
 Scope {
     id: producer
 
+    property var cacheStore: null
+    property bool usingPersistentCache: false
+
     readonly property string alertPoint:
         NwsPolicy.configuredPoint(Quickshell.env("POST_APOLLO_NWS_ALERT_POINT"))
     readonly property string endpoint: alertPoint === "" ? ""
@@ -24,9 +27,99 @@ Scope {
     // remains the ONE owner of the NWS request and pinned-point lifecycle.
     readonly property bool configured: alertPoint !== ""
     readonly property bool loading: nwsFetch.running
-    readonly property bool ready: fetchSucceeded
+    readonly property bool ready: fetchSucceeded || usingPersistentCache
+    readonly property string cacheRequestKey:
+        alertPoint === "" ? "" : "nws|" + alertPoint
     readonly property var alertList: NwsPolicy.visibleAlerts(activeAlerts)
     readonly property int activeCount: alertList.length
+
+
+    function persistentEntries() {
+        const rows = [];
+        const ids = Object.keys(producer.activeAlerts || {}).sort();
+        for (let i = 0; i < ids.length; i++) {
+            const entry = producer.activeAlerts[ids[i]] || {};
+            const alert = entry.alert;
+            if (!alert)
+                continue;
+            rows.push({
+                "id": ids[i],
+                "revision": String(entry.revision || alert.revision || ""),
+                "absent": Math.min(
+                    1,
+                    Math.max(0, Math.floor(Number(entry.absent || 0)))
+                ),
+                "alert": alert
+            });
+        }
+        return rows;
+    }
+
+    function stateFromPersistentEntries(entries) {
+        const state = ({});
+        const rows = Array.isArray(entries) ? entries : [];
+        for (let i = 0; i < rows.length; i++) {
+            const row = rows[i] || {};
+            const alert = row.alert;
+            const id = String(row.id || (alert ? alert.id : "") || "");
+            const revision = String(
+                row.revision || (alert ? alert.revision : "") || ""
+            );
+            if (!id || !revision || !alert || String(alert.id || "") !== id)
+                continue;
+            state[id] = {
+                "revision": revision,
+                "absent": Math.min(
+                    1,
+                    Math.max(0, Math.floor(Number(row.absent || 0)))
+                ),
+                "alert": alert
+            };
+        }
+        return state;
+    }
+
+    function hydratePersistentCache() {
+        if (!producer.cacheStore || producer.alertPoint === ""
+                || producer.fetchSucceeded)
+            return false;
+
+        const saved = producer.cacheStore.record(
+            "nws-alerts", Date.now(), producer.alertPoint
+        );
+        if (!saved || !saved.payload
+                || String(saved.payload.point || "") !== producer.alertPoint
+                || String(saved.requestKey || "") !== producer.cacheRequestKey)
+            return false;
+
+        producer.activeAlerts = producer.stateFromPersistentEntries(
+            saved.payload.entries
+        );
+        producer.lastUpdated = new Date(saved.receivedAtMs);
+        producer.usingPersistentCache = true;
+        producer.errorText = "";
+        return true;
+    }
+
+    function persistAlertState() {
+        if (!producer.cacheStore || producer.alertPoint === ""
+                || !producer.lastUpdated)
+            return false;
+        const receivedAtMs = producer.lastUpdated.getTime();
+        if (!isFinite(receivedAtMs) || receivedAtMs <= 0)
+            return false;
+
+        return producer.cacheStore.put(
+            "nws-alerts",
+            receivedAtMs,
+            {
+                "point": producer.alertPoint,
+                "entries": producer.persistentEntries()
+            },
+            producer.alertPoint,
+            producer.cacheRequestKey
+        );
+    }
 
     function historyContains(alertId, revision, kind) {
         const model = NotificationsService.notifications;
@@ -95,6 +188,8 @@ Scope {
         producer.fetchSucceeded = true;
         producer.lastUpdated = new Date();
         producer.errorText = "";
+        producer.usingPersistentCache = false;
+        producer.persistAlertState();
         for (const change of outcome.changes)
             producer.publish(change);
     }
@@ -129,8 +224,22 @@ Scope {
         onTriggered: producer.refresh()
     }
     Connections {
+        target: producer.cacheStore
+        enabled: !!producer.cacheStore
+        function onStorageStateChanged() {
+            if (!producer.cacheStore)
+                return;
+            const state = String(producer.cacheStore.storageState || "");
+            if (state === "ready" || state === "empty")
+                producer.hydratePersistentCache();
+        }
+    }
+    Connections {
         target: NotificationsService
         function onHistoryReadyChanged() { producer.refresh(); }
     }
-    Component.onCompleted: producer.refresh()
+    Component.onCompleted: {
+        producer.hydratePersistentCache();
+        producer.refresh();
+    }
 }

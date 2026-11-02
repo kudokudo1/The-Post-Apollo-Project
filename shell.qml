@@ -360,7 +360,10 @@ PanelWindow {
     }
 
     // Official NWS alerts only when an operator-pinned geographic point exists.
-    NwsOfficialAlertNotificationProducer { id: nwsOfficialAlerts }
+    NwsOfficialAlertNotificationProducer {
+        id: nwsOfficialAlerts
+        cacheStore: weatherPersistentCache
+    }
 
     // Observe existing AQI readings without touching Weather Station fetching.
     WeatherAqiNotificationProducer {

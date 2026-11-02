@@ -2,7 +2,7 @@
 
 var SCHEMA = "post-apollo.weather-last-known.v1";
 var VERSION = 1;
-var MAX_RECORDS = 12;
+var MAX_RECORDS = 13;
 var MAX_TEXT = 160;
 var MAX_ARRAY_JSON = 65536;
 
@@ -16,6 +16,7 @@ var _known = {
     "space-flux": true,
     "seismic": true,
     "gdacs": true,
+    "nws-alerts": true,
     "river": true,
     "marine": true,
     "coastal": true
@@ -24,7 +25,8 @@ var _known = {
 var _scoped = {
     "river": true,
     "marine": true,
-    "coastal": true
+    "coastal": true,
+    "nws-alerts": true
 };
 
 function initialDocument() {
@@ -82,6 +84,98 @@ function boundedObject(value) {
     const copy = boundedJson(value, null, 16384);
     return copy && typeof copy === "object" && !Array.isArray(copy)
         ? copy : ({});
+}
+
+
+function normalizeNwsPointKey(value) {
+    const text = safeText(value, 64).trim();
+    if (!/^-?\d{1,2}(?:\.\d{1,4})?\s*,\s*-?\d{1,3}(?:\.\d{1,4})?$/.test(text))
+        return "";
+    const values = text.split(",").map(function(v) {
+        return Number(v.trim());
+    });
+    if (!isFinite(values[0]) || !isFinite(values[1])
+            || Math.abs(values[0]) > 90 || Math.abs(values[1]) > 180)
+        return "";
+    return String(values[0]) + "," + String(values[1]);
+}
+
+function nwsDisplaySeverity(raw) {
+    const severity = String(raw || "").toLowerCase();
+    return severity === "extreme" || severity === "severe" ? "critical"
+        : severity === "moderate" ? "warning" : "normal";
+}
+
+function normalizeNwsAlert(value) {
+    if (!value || typeof value !== "object" || Array.isArray(value))
+        return null;
+
+    const id = safeText(value.id, 512);
+    const event = safeText(value.event, 128);
+    const revision = safeText(value.revision, 1024);
+    const status = safeText(value.status, 24);
+    if (!id || !event || !revision || status !== "Actual")
+        return null;
+
+    const severity = safeText(value.severity, 24);
+    return {
+        id:id,
+        event:event,
+        headline:safeText(value.headline, 300),
+        area:safeText(value.area, 240),
+        issuer:safeText(value.issuer, 120),
+        severity:severity,
+        urgency:safeText(value.urgency, 24),
+        certainty:safeText(value.certainty, 24),
+        status:status,
+        messageType:safeText(value.messageType, 24),
+        category:safeText(value.category, 48),
+        response:safeText(value.response, 48),
+        displaySeverity:nwsDisplaySeverity(severity),
+        description:safeText(value.description, 640),
+        instruction:safeText(value.instruction, 320),
+        sent:safeText(value.sent, 45),
+        updated:safeText(value.updated, 45),
+        effective:safeText(value.effective, 45),
+        onset:safeText(value.onset, 45),
+        expires:safeText(value.expires, 45),
+        ends:safeText(value.ends, 45),
+        revision:revision
+    };
+}
+
+function normalizeNwsEntries(value) {
+    const source = Array.isArray(value) ? value : [];
+    const out = [];
+    const seen = ({});
+
+    for (let i = 0; i < source.length && out.length < 64; i++) {
+        const row = source[i] || {};
+        const alert = normalizeNwsAlert(row.alert);
+        if (!alert || seen[alert.id])
+            continue;
+
+        const id = safeText(row.id, 512);
+        const revision = safeText(row.revision, 1024);
+        if (id !== alert.id || revision !== alert.revision)
+            continue;
+
+        seen[id] = true;
+        out.push({
+            id:id,
+            revision:revision,
+            absent:Math.min(
+                1,
+                Math.max(0, Math.floor(finiteNumber(row.absent, 0)))
+            ),
+            alert:alert
+        });
+    }
+
+    out.sort(function(a, b) {
+        return String(a.id).localeCompare(String(b.id));
+    });
+    return out;
 }
 
 function normalizeSeismicEvents(value) {
@@ -563,6 +657,16 @@ function normalizePayload(sourceId, payload) {
         };
     }
 
+    if (sourceId === "nws-alerts") {
+        const point = normalizeNwsPointKey(source.point);
+        if (!point)
+            return null;
+        return {
+            point:point,
+            entries:normalizeNwsEntries(source.entries)
+        };
+    }
+
     if (sourceId === "seismic") {
         const events = normalizeSeismicEvents(source.events);
         return events.length > 0 ? {events:events} : null;
@@ -649,22 +753,31 @@ function normalizeRecord(sourceId, record) {
     const requestKey = safeText(record.requestKey, 192);
 
     if (_scoped[sourceId]) {
-        if (!scopeKey || !requestKey
-                || normalizeLocationKey(scopeKey) !== scopeKey
-                || payload.locationKey !== scopeKey)
+        if (!scopeKey || !requestKey)
             return null;
 
-        let expected = "";
-        if (sourceId === "river")
-            expected = scopeKey + "|" + payload.gauge.lid;
-        else if (sourceId === "marine")
-            expected = scopeKey + "|" + payload.station.stationId;
-        else if (sourceId === "coastal")
-            expected = scopeKey + "|" + payload.waterStation.id
-                     + "|" + payload.tideStation.id;
+        if (sourceId === "nws-alerts") {
+            if (normalizeNwsPointKey(scopeKey) !== scopeKey
+                    || payload.point !== scopeKey
+                    || requestKey !== "nws|" + scopeKey)
+                return null;
+        } else {
+            if (normalizeLocationKey(scopeKey) !== scopeKey
+                    || payload.locationKey !== scopeKey)
+                return null;
 
-        if (!expected || requestKey !== expected)
-            return null;
+            let expected = "";
+            if (sourceId === "river")
+                expected = scopeKey + "|" + payload.gauge.lid;
+            else if (sourceId === "marine")
+                expected = scopeKey + "|" + payload.station.stationId;
+            else if (sourceId === "coastal")
+                expected = scopeKey + "|" + payload.waterStation.id
+                         + "|" + payload.tideStation.id;
+
+            if (!expected || requestKey !== expected)
+                return null;
+        }
     }
 
     return {

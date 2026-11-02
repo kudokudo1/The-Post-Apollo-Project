@@ -95,7 +95,9 @@ Rectangle {
             id: headingText
             anchors.top: parent.top
             anchors.left: parent.left
-            text: "SUBJECTS // NAVIGATION PREVIEW"
+            text: browser.liveWeatherKind !== ""
+                  ? "WEATHER // SUBJECT VIEW"
+                  : "SUBJECTS // NAVIGATION PREVIEW"
             color: Colors.magenta
             font.pixelSize: 17
         }

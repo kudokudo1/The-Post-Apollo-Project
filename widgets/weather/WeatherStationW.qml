@@ -419,9 +419,11 @@ PanelWindow {
             return officialAlertSummary.headerText
                    + (officialAlertUsingPersistentCache ? " // CACHE" : "");
 
-        if (subjectNavigationOpen)
-            return subjectNavigator.liveWeatherKind !== ""
-                   ? "WEATHER // PANEL" : "INDEX // PREVIEW";
+        if (subjectNavigationOpen) {
+            if (subjectNavigator.liveWeatherKind !== "")
+                return "WEATHER // PANEL";
+            return "INDEX // PREVIEW";
+        }
 
         if (usesHomeSources) {
             if (homeWeatherUsable && homeSpaceUsable)

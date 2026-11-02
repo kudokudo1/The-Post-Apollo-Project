@@ -22,8 +22,8 @@ def _private_json(path: Path, data: object) -> None:
 
 def prepare(root: Path) -> None:
     root = root.resolve()
-    root.mkdir(mode=0o700, parents=True, exist_ok=False)
-    (root / "import").mkdir(mode=0o700)
+    root.mkdir(mode=0o755, parents=True, exist_ok=False)
+    (root / "import").mkdir(mode=0o755)
     worker_password = secrets.token_urlsafe(32)
     introspection_secret = secrets.token_urlsafe(40)
     admin_password = secrets.token_urlsafe(40)
@@ -92,6 +92,10 @@ def prepare(root: Path) -> None:
         ],
     }
     _private_json(root / "import" / "post-apollo-disposable-realm.json", realm)
+    # Keycloak's container UID differs from the CI runner. Only the throwaway
+    # import is world-readable so the container can read it; random admin and
+    # runner test credentials outside /import stay mode 0600.
+    (root / "import" / "post-apollo-disposable-realm.json").chmod(0o644)
     _private_json(root / "runtime.json", {
         "username": "pilot-worker",
         "password": worker_password,

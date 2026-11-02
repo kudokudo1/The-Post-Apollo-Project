@@ -1,0 +1,52 @@
+name: Identity local directory / genuine disposable Quickshell persistence
+
+on:
+  pull_request:
+    paths:
+      - 'LocalOrganizationNativeSmokeV0.qml'
+      - 'tests/identity/native_local_organization_smoke_v0.py'
+      - 'tests/identity/test_native_local_organization_guard_v0.py'
+      - 'MODEL/contracts/identity-local-organization-native-persistence-v0.md'
+      - '.github/workflows/identity-local-organization-native-smoke.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  native-local-directory:
+    name: Real Quickshell 0.3.2 / synthetic save and new-process reload
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    container:
+      image: debian:unstable-slim
+    steps:
+      - name: Install existing pinned disposable Quickshell runtime
+        run: |
+          apt-get update -qq
+          DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+            git ca-certificates python3 quickshell=0.3.2-1 \
+            qt6-qpa-plugins qml6-module-qtquick \
+            qml6-module-qtquick-layouts qml6-module-qtquick-effects \
+            qml6-module-qt5compat-graphicaleffects qml6-module-qtqml
+      - uses: actions/checkout@v4
+      - name: Compile synthetic runner and exercise real isolated Quickshell
+        run: |
+          python3 -m py_compile tests/identity/native_local_organization_smoke_v0.py
+          python3 tests/identity/native_local_organization_smoke_v0.py
+
+  source-guards:
+    name: Unmounted synthetic QML and Social settings regressions
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Check disposable root and no live desktop mutation
+        run: python3 -m unittest discover -s tests/identity -p 'test_native_local_organization_guard_v0.py' -v
+      - name: Recheck private directory and original Settings contracts
+        run: |
+          python3 -m unittest discover -s tests/messaging -p 'test_social_local_organizations.py' -v
+          python3 -m unittest discover -s tests/messaging -p 'test_identity_center_settings_sections.py' -v

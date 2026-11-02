@@ -120,6 +120,10 @@
     "TaskNativeStoreSmokeM12s.qml": {
       "addTask": 1,
       "reloadFromDisk": 1
+    },
+    "TaskNativeSelfReportM12u.qml": {
+      "addTask": 1,
+      "reloadFromDisk": 1
     }
   }
 }

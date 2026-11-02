@@ -27,7 +27,11 @@ var SUBJECTS = [
       {id:"smoke",label:"SMOKE"}, {id:"lightning",label:"LIGHTNING"}]},
     {id:"history",label:"HISTORY AND ANALYSIS", children:[
       {id:"historical-forecast",label:"HISTORICAL FORECAST"},
-      {id:"relationships",label:"RELATIONSHIPS"}]}
+      {id:"relationships",label:"RELATIONSHIPS", children:[
+      {id:"aqi",label:"AQI + WEATHER"},
+      {id:"marine",label:"MARINE + WAVES"},
+      {id:"coastal",label:"PRESSURE + WATER LEVEL"},
+      {id:"rivers",label:"PRECIP + RIVER STAGE"}]}]}
   ]},
   {id:"cosmos",label:"COSMOS",sections:[
     {id:"overview",label:"OVERVIEW"},

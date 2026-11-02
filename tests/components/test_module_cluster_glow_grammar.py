@@ -93,7 +93,12 @@ assert "normalContentGlowColor: Colors.omnitrix" in social
 assert "normalDockGlowColor: Colors.omnitrix" in social
 assert "property color openForegroundColor: Colors.magenta" in dock
 assert "property color openGlowColor: Colors.magenta" in dock
-assert social.count("GohuText {") == 2
+assert social.count("GohuText {") == 4
+assert "id: sessionsPhoneFace" in social
+assert "color: sessionsDock.foregroundColor" in social
+assert "font.pixelSize: 28" in social
+assert 'text: "<font color=\'transparent\'>࣪˖☎︎</font>๋࣭✧"' in social
+assert "anchors.leftMargin: 10" in social
 
 
 volume = module("Volumebar")
@@ -175,6 +180,12 @@ assert "readonly property int contentGlowSamples:" in dock_source
 
 # Preserve separately approved specialty behavior pending runtime review.
 assert "softGlowSpread: 1" in module("Power")
-assert "contentGlowSource: mediaArtwork" in module("Mediaplayer")
+# Media's newer per-glyph shadows intentionally replaced its old combined
+# source. This contract must verify the current exception, not the stale form.
+media = module("Mediaplayer")
+assert "contentGlowEnabled: false" in media
+assert "contentGlowSource: null" in media
+for glyph in ("leadingStars", "trebleClef", "trailingStar"):
+    assert f"safeSource: {glyph}" in media
 
 print("Dock cluster and structural-white contracts: PASS")

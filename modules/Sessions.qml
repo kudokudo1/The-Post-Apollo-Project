@@ -44,24 +44,46 @@ DockButton {
         // Right-side unstyled stars use this default; phone stays styled
         // separately via DockButton.foregroundColor.
         color: sessionsDock.open ? sessionsDock.openForegroundColor : Colors.white
-        // Preserve the ORIGINAL glyph advances for the phone and right star.
-        // The left marks retain their original place in the shaping run but
-        // are transparent there; only their visible overlay moves right.
-        text: "<font color='transparent'>࣪˖</font><font color='" + sessionsDock.foregroundColor
-              + "'>☎︎</font>๋࣭✧"
+        // Preserve original text advances: neither the larger phone nor the
+        // independently positioned left ornament can resize the DockButton.
+        // The invisible original phone keeps the right stars exactly in place.
+        text: "<font color='transparent'>࣪˖☎︎</font>๋࣭✧"
 
         GohuText {
             id: sessionsLeftOrnaments
-            // Move ONLY the left ornaments 3px right. The phone and the
-            // entire right-side sequence remain at the original text positions.
+            // Original left-only offset was +3px. Shift by another +7px.
+            // Right-side ornaments retain the original shaping position.
             anchors.left: parent.left
-            anchors.leftMargin: 3
+            anchors.leftMargin: 10
             anchors.baseline: parent.baseline
             font.pixelSize: sessionsIcon.font.pixelSize
             textFormat: Text.PlainText
             // Left overlay must match the right stars when Social is open.
             color: sessionsDock.open ? sessionsDock.openForegroundColor : Colors.white
             text: "࣪˖"
+        }
+
+        // Measure the original phone width without changing the shaping run.
+        // Invisible; the same 21px Gohu glyph remains the width reference.
+        GohuText {
+            id: sessionsPhoneAdvance
+            visible: false
+            font.pixelSize: sessionsIcon.font.pixelSize
+            textFormat: Text.PlainText
+            text: "☎︎"
+        }
+
+        GohuText {
+            id: sessionsPhoneFace
+            // Enlarge ONLY the phone artwork. The parent styled text retains
+            // its previous implicitWidth and the dock keeps its existing size.
+            x: sessionsLeftOrnaments.implicitWidth
+               + (sessionsPhoneAdvance.implicitWidth - implicitWidth) / 2
+            anchors.baseline: parent.baseline
+            font.pixelSize: 28
+            textFormat: Text.PlainText
+            text: "☎︎"
+            color: sessionsDock.foregroundColor
         }
     }
 

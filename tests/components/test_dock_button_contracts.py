@@ -182,11 +182,9 @@ for path, needles in DOCK_MODULES.items():
     for needle in needles:
         require(source, needle, f"DockButton migration contract for {path}")
 
-# Preserve the operator's Gohu icon and state colors, but shift the LEFT
-# ornaments alone. The full original shaping string stays in the source so
-# the central phone and RIGHT ornaments retain their natural advances.
-# Make the source's left glyphs transparent, then draw the left pair at +3px.
-# Both ornament runs become magenta with their shared glow while Social is open.
+# Preserve the operator's Gohu icon, source-shaped advances, and state
+# colors. Draw the larger phone as an overlay without resizing the button;
+# move only the left ornaments an additional 7px right (+3px -> +10px).
 social_module = (ROOT / "modules/Sessions.qml").read_text(encoding="utf-8")
 for needle in (
     "GohuText {",
@@ -195,11 +193,18 @@ for needle in (
     "font.pixelSize: 21",
     "textFormat: Text.StyledText",
     "color: sessionsDock.open ? sessionsDock.openForegroundColor : Colors.white",
-    "text: \"<font color='transparent'>࣪˖</font><font color='\" + sessionsDock.foregroundColor",
-    "              + \"'>☎︎</font>๋࣭✧\"",
+    'text: "<font color=\'transparent\'>࣪˖☎︎</font>๋࣭✧"',
     "id: sessionsLeftOrnaments",
     "anchors.left: parent.left",
-    "anchors.leftMargin: 3",
+    "anchors.leftMargin: 10",
+    "id: sessionsPhoneAdvance",
+    "id: sessionsPhoneFace",
+    "visible: false",
+    "x: sessionsLeftOrnaments.implicitWidth",
+    "+ (sessionsPhoneAdvance.implicitWidth - implicitWidth) / 2",
+    "font.pixelSize: 28",
+    "anchors.baseline: parent.baseline",
+    'text: "☎︎"',
     "anchors.baseline: parent.baseline",
     "font.pixelSize: sessionsIcon.font.pixelSize",
     "textFormat: Text.PlainText",
@@ -222,26 +227,30 @@ assert social_module.count("contentGlowSource: sessionsIcon") == 1
 assert social_module.count(
     "color: sessionsDock.open ? sessionsDock.openForegroundColor : Colors.white"
 ) == 2
-assert 'text: "<font color=\'transparent\'>࣪˖</font>' in social_module
+assert 'text: "<font color=\'transparent\'>࣪˖☎︎</font>๋࣭✧"' in social_module
 assert 'text: "࣪˖"' in social_module
 assert "open: menuOpen" in social_module
 assert "property color openForegroundColor: Colors.magenta" in COMPONENT
 assert "property color openGlowColor: Colors.magenta" in COMPONENT
 assert "readonly property color contentGlowColor: open" in COMPONENT
 
-assert social_module.count("GohuText {") == 2
+assert social_module.count("GohuText {") == 4
 assert social_module.count("NotoText {") == 0
-# Previous global tracking tightened the right side and shifted the phone.
-# The left-only overlay moves +3px; no character spacing may touch phone/right.
+# Original glyph advances remain unchanged, so the actual dock size is not
+# coupled to the larger overlaid handset. No global letter-spacing changes.
 assert "font.letterSpacing:" not in social_module
-assert social_module.count("anchors.leftMargin: 3") == 1
+assert social_module.count("anchors.leftMargin: 10") == 1
 assert "font.pixelSize: 22" not in social_module
 assert "Math.max(65, Math.ceil(sessionsIcon.implicitWidth) + 16)" not in social_module
 assert "implicitHeight: 50" in social_module
 assert "implicitWidth: Math.max(63, Math.ceil(sessionsIcon.implicitWidth) + 14)" in social_module
-# Left-star x moves by exactly +3; core and right-side run stay stationary.
+assert "font.pixelSize: 21" in social_module
+assert "font.pixelSize: 28" in social_module
+assert "text: \"<font color='transparent'>࣪˖☎︎</font>๋࣭✧\"" in social_module
+assert social_module.count("contentGlowSource: sessionsIcon") == 1
+# 10px is exactly 7px farther right than the 3px accepted prior overlay.
 for original_left_x in (0, 7, 42):
-    assert (original_left_x + 3) - original_left_x == 3
+    assert (original_left_x + 10) - (original_left_x + 3) == 7
 
 LEGACY_ROOT_MOUSE_IDS = (
     "appmenuMouse",

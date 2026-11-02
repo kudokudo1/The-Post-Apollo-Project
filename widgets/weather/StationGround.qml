@@ -734,7 +734,7 @@ Rectangle {
 
             GohuText {
                 text: ground.subjectRoute === "" ? "⌁  GROUND"
-                      : "⌁  " + SubjectPanelPolicy.titleFor(ground.subjectRoute)
+                      : "⌁  WEATHER"
                 font.pixelSize: 24
                 color: Colors.green
             }

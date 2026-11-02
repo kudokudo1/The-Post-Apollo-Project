@@ -14,7 +14,7 @@ const ctx = {
 };
 vm.runInNewContext(
     read("services/weather/WeatherEventArchivePolicy.js")
-        .replace(/^\\.pragma library\\s*/m, ""),
+        .replace(/^\.pragma library\s*/m, ""),
     ctx,
     {filename:"services/weather/WeatherEventArchivePolicy.js"}
 );
@@ -95,22 +95,22 @@ assert.equal(ctx.pairDiff(doc, "usgs", id, checkTime, 1, 7).available, false);
 assert.equal(ctx.pairDiff(doc, "gdacs", "FL:999:1", checkTime, 1, 7).available, false);
 
 const store = read("services/weather/WeatherEventArchiveStore.qml");
-assert.match(store, /function pairDiff\\(sourceId, eventId, nowMs, earlierPosition, laterPosition\\)/);
-assert.match(store, /ArchivePolicy\\.pairDiff\\(/);
-assert.equal((store.match(/\\bFileView\\s*\\{/g) || []).length, 1);
-assert.equal((store.match(/function archiveEvent\\(/g) || []).length, 1);
-assert.equal((store.match(/\\bTimer\\s*\\{/g) || []).length, 0);
-assert.equal((store.match(/\\bProcess\\s*\\{/g) || []).length, 0);
+assert.match(store, /function pairDiff\(sourceId, eventId, nowMs, earlierPosition, laterPosition\)/);
+assert.match(store, /ArchivePolicy\.pairDiff\(/);
+assert.equal((store.match(/\bFileView\s*\{/g) || []).length, 1);
+assert.equal((store.match(/function archiveEvent\(/g) || []).length, 1);
+assert.equal((store.match(/\bTimer\s*\{/g) || []).length, 0);
+assert.equal((store.match(/\bProcess\s*\{/g) || []).length, 0);
 
 const map = read("widgets/weather/StationDiscovery.qml");
 assert.match(map, /readonly property string archivePairIdentity:/);
 assert.match(map, /onArchivePairIdentityChanged:/);
 assert.match(map, /onSelectedArchiveRevisionChanged:/);
-assert.match(map, /function selectArchivePair\\(earlierPosition, laterPosition\\)/);
-assert.match(map, /eventArchiveStore\\.pairDiff\\(/);
-assert.match(map, /archivePairDiff:\\s*stationDiscovery\\.selectedArchivePairDiff/);
+assert.match(map, /function selectArchivePair\(earlierPosition, laterPosition\)/);
+assert.match(map, /eventArchiveStore\.pairDiff\(/);
+assert.match(map, /archivePairDiff:\s*stationDiscovery\.selectedArchivePairDiff/);
 assert.match(map, /onArchivePairRequested:/);
-assert.equal((map.match(/eventArchiveStore\\.archiveEvent\\(/g) || []).length, 1);
+assert.equal((map.match(/eventArchiveStore\.archiveEvent\(/g) || []).length, 1);
 
 const card = read("widgets/weather/StationEventContextCard.qml");
 for (const text of [
@@ -123,12 +123,12 @@ for (const text of [
 ]) {
     assert.ok(card.includes(text), text);
 }
-assert.match(card, /signal archivePairRequested\\(int earlier, int later\\)/);
+assert.match(card, /signal archivePairRequested\(int earlier, int later\)/);
 assert.match(card, /readonly property var displayedArchiveDiff:/);
-assert.match(card, /available: card\\.archiveEarlierPosition > 1/);
-assert.match(card, /available: card\\.archiveLaterPosition[\\s\\S]*?< card\\.archiveSnapshotCount/);
-assert.equal((card.match(/\\bTimer\\s*\\{/g) || []).length, 0);
-assert.equal((card.match(/\\bProcess\\s*\\{/g) || []).length, 0);
-assert.equal((card.match(/\\bFileView\\s*\\{/g) || []).length, 0);
+assert.match(card, /available: card\.archiveEarlierPosition > 1/);
+assert.match(card, /available: card\.archiveLaterPosition[\s\S]*?< card\.archiveSnapshotCount/);
+assert.equal((card.match(/\bTimer\s*\{/g) || []).length, 0);
+assert.equal((card.match(/\bProcess\s*\{/g) || []).length, 0);
+assert.equal((card.match(/\bFileView\s*\{/g) || []).length, 0);
 
 console.log("Weather M21 arbitrary retained snapshot pair comparison: PASS");

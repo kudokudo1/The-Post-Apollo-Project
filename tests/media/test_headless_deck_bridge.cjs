@@ -7,6 +7,7 @@ const fs = require("node:fs");
 const path = require("node:path");
 const base = path.resolve(__dirname, "../..");
 const deck = fs.readFileSync(path.join(base, "widgets/MediaDeckW.qml"), "utf8");
+const mediaDock = fs.readFileSync(path.join(base, "modules/Mediaplayer.qml"), "utf8");
 const bridge = fs.readFileSync(path.join(base, "services/media/HeadlessMediaController.qml"), "utf8");
 
 test("deck uses persistent CLI bridge, never detached mpc for MPD", () => {
@@ -123,9 +124,19 @@ test("search is in the control bay and display results remain read-only", () => 
     assert.doesNotMatch(deck, /WlrKeyboardFocus\.Exclusive/);
 });
 
-test("Escape closes only the focused Hi-Fi deck in MPD and MPRIS modes", () => {
-    assert.match(deck, /Shortcut\s*\{\s*sequence:\s*"Esc"\s*context:\s*Qt\.WindowShortcut\s*enabled:\s*deck\.menuOpen\s*onActivated:\s*deck\.menuOpen\s*=\s*false/);
-    assert.match(deck, /if\s*\(event\.key\s*===\s*Qt\.Key_Escape\)\s*\{\s*deck\.menuOpen\s*=\s*false;\s*event\.accepted\s*=\s*true;\s*return;/);
+test("Escape notifies the owning dock without severing the panel's binding", () => {
+    // The dock must remain the sole writer of deckOpen; the panel is a
+    // bound consumer. Direct deck.menuOpen assignment broke re-opening.
+    assert.match(mediaDock, /property bool deckOpen:\s*false/);
+    assert.match(mediaDock, /open:\s*mediaRoot\.deckOpen/);
+    assert.match(mediaDock, /mediaRoot\.deckOpen\s*=\s*!mediaRoot\.deckOpen/);
+    assert.match(mediaDock, /MediaDeckW\s*\{\s*id:\s*deckPanel\b[\s\S]*?menuOpen:\s*mediaRoot\.deckOpen\s*onCloseRequested:\s*mediaRoot\.deckOpen\s*=\s*false/);
+    assert.match(deck, /signal closeRequested\(\)/);
+    assert.match(deck, /Shortcut\s*\{\s*sequence:\s*"Esc"\s*context:\s*Qt\.WindowShortcut\s*enabled:\s*deck\.menuOpen\s*onActivated:\s*deck\.closeRequested\(\)/);
+    assert.match(deck, /if\s*\(event\.key\s*===\s*Qt\.Key_Escape\)\s*\{\s*deck\.closeRequested\(\);\s*event\.accepted\s*=\s*true;\s*return;/);
+    assert.doesNotMatch(deck, /\bdeck\.menuOpen\s*=/,
+        "a direct write to the bound child would break dock-to-panel sync");
+    assert.match(deck, /visible:\s*menuOpen/);
     assert.match(deck, /if\s*\(deck\.transportMode\s*!==\s*"mpd"\)\s*return;/);
     assert.match(deck, /WlrLayershell\.keyboardFocus:\s*menuOpen\s*\?\s*WlrKeyboardFocus\.OnDemand\s*:\s*WlrKeyboardFocus\.None/);
     assert.doesNotMatch(deck, /WlrKeyboardFocus\.Exclusive/);

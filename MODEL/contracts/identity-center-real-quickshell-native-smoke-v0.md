@@ -57,7 +57,7 @@ python3 tests/identity/native_quickshell_display_smoke_v0.py --scenario revoke
 
 Each case must emit an exact `IDENTITY_NATIVE_SMOKE_PASS_*` marker from actual Quickshell QML, return process exit status zero, and never print a timeout marker. A separate CI source guard ensures no production root import, no unsafe process controls, no tokens, and an exact dummy-only activation gate. On failure the runner emits only a bounded error-category summary, never any stdout payload from the test child.
 
-**Verification status: pending exact-head CI.** Quickshell native process semantics and Linux environment dependencies must not be claimed until the Debian job passes. Even a green result is *not* the operator's Sway session. Backend authorization and real desktop/lock/suspend lifecycle remain separate.
+**Verification:** [real Quickshell container run](https://github.com/kudokudo1/The-Post-Apollo-Project/actions/runs/41490131413) passed all four native cases with Quickshell 0.3.2 and the source guard passed, on commit `3a49849`. The first CI attempt failed because the minimal Debian container omitted `Qt5Compat.GraphicalEffects`, required by the production `ActionButton`; the workflow now installs Debian's `qml6-module-qt5compat-graphicaleffects`. This establishes genuine Quickshell.Process execution in the disposable offscreen runner, not the operator's Sway session. Backend authorization and real desktop/lock/suspend lifecycle remain separate. Even a green result is *not* the operator's Sway session. Backend authorization and real desktop/lock/suspend lifecycle remain separate.
 
 ## Recovery and decision boundaries
 
@@ -80,12 +80,12 @@ Real Quickshell in offscreen CI does not equal visual verification on Sway/Wayla
 - [x] Unmounted genuine native ShellRoot and isolated Python fixture
 - [x] No tokens/real company records and no production setting modification
 - [x] Four smoke cases, guard tests and isolated container workflow created
-- [ ] Native Quickshell exact-head CI success
+- [x] All four native Quickshell scenarios and source guards passed on `3a49849` (recheck exact head after handoff edit)
 - [ ] Security review and operator final acceptance
 - [ ] Separate approved live desktop test and real host deployment
 
 ### NEXT
-Verify native GitHub CI and refine only test harness failures. If successful, the next stage is an operator-approved observation of the real Quickshell pane with synthetic credentials, while leaving organization switching disabled.
+With container CI green, the next stage is an operator-approved observation of the real Quickshell pane with synthetic records, while leaving organization switching disabled. Check lock/suspend and compositor behavior separately; the container does not prove those.
 
 ### DECISIONS
 No production process/root modification, merge, device installation, local service mutation or real account sign-in. Test-only Debian 0.3.2 native Quickshell does not select a production runtime version.

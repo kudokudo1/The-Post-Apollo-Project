@@ -373,8 +373,12 @@ PanelWindow {
                     mainModeContent.height * 0.55)
                 visible: root.menuOpen && root.activeMode.id === "tasks"
                 taskScrollbarEnabled: true
-                closeOnEscape: true
-                onCloseRequested: root.menuOpen = false
+                // First Escape exits the prompt; the next reaches tasksFrame
+                // and closes this window. Never discard the unsaved add draft.
+                onEntryEscapeReleased: {
+                    if (root.menuOpen)
+                        tasksFrame.forceActiveFocus();
+                }
                 todoStore: ApolloHubTodoStore
                 todoSnapshot: ApolloHubTodoStore.snapshot
                 onTaskSelected: function(taskId) {

@@ -68,17 +68,33 @@ assert "Keys.onEscapePressed: function(event)" in MENU
 assert "tasksFrame.forceActiveFocus();" in MENU
 assert "Qt.WindowShortcut" not in MENU
 assert "Keys.onEscapePressed: function(event)" in EDITOR
-# Escape from NEW TASK closes only standalone TASKS, not the shared Hub tile.
-assert "closeOnEscape: true" in MENU
-assert "onCloseRequested: root.menuOpen = false" in MENU
-assert "property bool closeOnEscape: false" in EDITOR
-assert "signal closeRequested()" in EDITOR
-assert "if (todoMini.editingTitle)" in EDITOR
-assert "todoMini.cancelRename();" in EDITOR
-assert "else if (todoMini.closeOnEscape)" in EDITOR
-assert "todoMini.closeRequested();" in EDITOR
-assert "entryInput.focus = false;" in EDITOR
-assert "closeOnEscape: true" not in HUB
+# Escape is a two-step local focus transition: prompt blur, then panel close.
+# Hub's shared editor retains its normal focus release; no close signal exists.
+assert "signal entryEscapeReleased()" in EDITOR
+assert "onEntryEscapeReleased: {" in MENU
+assert "tasksFrame.forceActiveFocus();" in MENU
+assert "closeOnEscape" not in EDITOR
+assert "closeOnEscape" not in MENU
+assert "closeRequested" not in EDITOR
+assert "onEntryEscapeReleased:" not in HUB
+escape = EDITOR.split("Keys.onEscapePressed: function(event) {", 1)[1].split(
+    "\n                    }", 1)[0]
+assert "event.accepted = true;" in escape
+assert "if (todoMini.editingTitle)" in escape
+assert "todoMini.cancelRename();" in escape
+assert "entryInput.focus = false;" in escape
+assert "todoMini.entryEscapeReleased();" in escape
+assert "menuOpen" not in escape
+assert "entryInput.text =" not in escape  # Keep typed, unsaved add draft.
+assert escape.index("event.accepted = true;") < escape.index(
+    "entryInput.focus = false;")
+assert escape.index("entryInput.focus = false;") < escape.index(
+    "todoMini.entryEscapeReleased();")
+handoff = MENU.split("onEntryEscapeReleased: {", 1)[1].split("}", 1)[0]
+assert "if (root.menuOpen)" in handoff
+assert "tasksFrame.forceActiveFocus();" in handoff
+assert "root.menuOpen = false" not in handoff
+
 assert "width: root.menuOpen ? root.frameWidth : 0" in MENU
 assert "height: root.menuOpen ? root.frameHeight : 0" in MENU
 assert "onLeftClicked: root.menuOpen = false" in MENU

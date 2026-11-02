@@ -14,8 +14,6 @@ Item {
     // Enabled only by the standalone TASKS page; ApolloHub's mini tile
     // keeps its existing wheel-scrolling layout and no additional rail.
     property bool taskScrollbarEnabled: false
-    // The standalone TASKS host closes on Escape; Hub's tile keeps blur behavior.
-    property bool closeOnEscape: false
     property string editingTaskId: ""
     property string savedAddDraft: ""
     property string confirmDeleteId: ""
@@ -29,7 +27,9 @@ Item {
     property var activeSaveTicket: null
 
     signal textFocusChanged(bool focused)
-    signal closeRequested()
+    // Only emitted on an explicit Escape from the NEW TASK / rename input.
+    // A standalone host may reclaim panel focus for a second Escape.
+    signal entryEscapeReleased()
     // Optional host navigation into richer task details. Hub remains unchanged.
     signal taskSelected(string taskId)
 
@@ -343,13 +343,14 @@ Item {
                     onAccepted: todoMini.commitText()
                     onActiveFocusChanged: todoMini.textFocusChanged(activeFocus)
                     Keys.onEscapePressed: function(event) {
+                        // Consume this press before moving focus: one Escape
+                        // exits the input without closing its parent window.
+                        event.accepted = true;
                         if (todoMini.editingTitle)
                             todoMini.cancelRename();
-                        else if (todoMini.closeOnEscape)
-                            todoMini.closeRequested();
                         else
                             entryInput.focus = false;
-                        event.accepted = true;
+                        todoMini.entryEscapeReleased();
                     }
                 }
                 GohuText {

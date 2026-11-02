@@ -88,6 +88,22 @@ def verify_loopback_url(url: str) -> None:
             "Unexpected non-loopback URL; refusing request or redirect")
 
 
+def loopback_cookie_header(session: requests.Session, url: str) -> str:
+    """Return existing Keycloak session cookies only to fixed CI loopback."""
+    verify_loopback_url(url)
+    endpoint = urlparse(url)
+    require(endpoint.hostname == "127.0.0.1" and endpoint.port == 8080,
+            "Refusing to send test session cookie outside Keycloak loopback")
+    cookies = [
+        c for c in session.cookies
+        if c.domain.lstrip(".") == "127.0.0.1"
+        and endpoint.path.startswith(c.path)
+        and c.name in {"AUTH_SESSION_ID", "KC_RESTART", "KEYCLOAK_IDENTITY",
+                       "KEYCLOAK_SESSION", "AUTH_SESSION_ID_LEGACY"}
+    ]
+    return "; ".join(c.name + "=" + c.value for c in cookies)
+
+
 def open_provider(discovery: dict, username: str, password: str):
     """Perform real interactive auth-code flow with a new cookie jar."""
     session = requests.Session()
@@ -123,16 +139,8 @@ def open_provider(discovery: dict, username: str, password: str):
     # For this disposable test only, send existing session cookies explicitly
     # to the ONE verified 127.0.0.1:8080 login-form origin. No cookie reaches a
     # remote host, user-facing log, token endpoint or production integration.
-    login_path = urlparse(login_url).path
-    valid_cookies = [
-        c for c in session.cookies
-        if c.domain == "127.0.0.1"
-        and login_path.startswith(c.path)
-        and c.name in {"AUTH_SESSION_ID", "KC_RESTART", "KEYCLOAK_IDENTITY",
-                       "KEYCLOAK_SESSION", "AUTH_SESSION_ID_LEGACY"}
-    ]
-    require(valid_cookies, "Keycloak provided no session cookies to the CI login")
-    cookie_header = "; ".join(c.name + "=" + c.value for c in valid_cookies)
+    cookie_header = loopback_cookie_header(session, login_url)
+    require(cookie_header, "Keycloak provided no session cookies to the CI login")
     response = session.post(login_url, data={
         **form.hidden, "username": username, "password": password,
         "credentialId": "",
@@ -151,7 +159,10 @@ def open_provider(discovery: dict, username: str, password: str):
                 and parts.port == 8080
                 and parts.path.startswith("/realms/post-apollo-disposable/"),
                 "Unexpected login redirect origin/path")
-        response = session.get(target, timeout=15, allow_redirects=False)
+        response = session.get(
+            target, headers={"Cookie": loopback_cookie_header(session, target)},
+            timeout=15, allow_redirects=False,
+        )
         require(response.status_code in (302, 303),
                 "Keycloak returned a non-redirect login intermediary: "
                 + str(response.status_code) + " path=" + parts.path)

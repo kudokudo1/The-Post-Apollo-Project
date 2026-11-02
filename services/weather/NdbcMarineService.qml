@@ -9,6 +9,9 @@ import "NdbcMarinePolicy.js" as MarinePolicy
 Scope {
     id: marine
 
+    property var cacheStore: null
+    property bool usingPersistentCache: false
+    property string loadedKey: ""
     property bool active: true
     property var latitude: ""
     property var longitude: ""
@@ -27,6 +30,78 @@ Scope {
     readonly property bool loading: marineFetch.running
     readonly property string endpoint:
         "https://www.ndbc.noaa.gov/data/latest_obs/latest_obs.txt"
+
+    function clearLoadedState() {
+        ready = false;
+        failed = false;
+        errorText = "";
+        station = null;
+        reportingStations = 0;
+        loadedKey = "";
+        usingPersistentCache = false;
+    }
+
+    function hydratePersistentCache() {
+        if (!cacheStore || !configured || ready)
+            return false;
+        const saved = cacheStore.record("marine", Date.now(), currentKey);
+        if (!saved || !saved.payload || !saved.payload.station)
+            return false;
+        const expected = currentKey + "|"
+            + String(saved.payload.station.stationId || "");
+        if (String(saved.requestKey || "") !== expected)
+            return false;
+
+        station = saved.payload.station;
+        reportingStations = Number(saved.payload.reportingStations || 0);
+        lastUpdated = new Date(saved.receivedAtMs);
+        ready = true;
+        failed = false;
+        errorText = "";
+        loadedKey = currentKey;
+        usingPersistentCache = true;
+        return true;
+    }
+
+    function persistStation(receivedAtMs) {
+        if (!cacheStore || !ready || !station || !configured)
+            return false;
+        const requestKey = currentKey + "|"
+            + String(station.stationId || "");
+        return cacheStore.put(
+            "marine",
+            receivedAtMs,
+            {
+                "locationKey": currentKey,
+                "station": station,
+                "reportingStations": reportingStations
+            },
+            currentKey,
+            requestKey
+        );
+    }
+
+    function reconcileLocationKey() {
+        if (loadedKey !== "" && loadedKey !== currentKey)
+            clearLoadedState();
+        if (configured)
+            hydratePersistentCache();
+        if (active && configured)
+            locationDebounce.restart();
+    }
+
+    Connections {
+        target: marine.cacheStore
+        enabled: !!marine.cacheStore
+        function onStorageStateChanged() {
+            if (!marine.cacheStore)
+                return;
+            const state = String(marine.cacheStore.storageState || "");
+            if ((state === "ready" || state === "empty")
+                    && marine.configured)
+                marine.hydratePersistentCache();
+        }
+    }
 
     function refresh() {
         if (!active || !configured || marineFetch.running)
@@ -47,6 +122,9 @@ Scope {
             failed = false;
             errorText = "";
             lastUpdated = new Date();
+            loadedKey = inflightKey;
+            usingPersistentCache = false;
+            persistStation(lastUpdated.getTime());
         } catch (error) {
             failed = true;
             errorText = "NDBC MARINE OBSERVATIONS UNAVAILABLE";
@@ -91,18 +169,14 @@ Scope {
     }
 
     onActiveChanged: {
-        if (active && configured)
+        if (active && configured) {
+            hydratePersistentCache();
             locationDebounce.restart();
+        }
     }
-    onLatitudeChanged: {
-        if (active && configured)
-            locationDebounce.restart();
-    }
-    onLongitudeChanged: {
-        if (active && configured)
-            locationDebounce.restart();
-    }
+    onCurrentKeyChanged: reconcileLocationKey()
     Component.onCompleted: {
+        hydratePersistentCache();
         if (active && configured)
             locationDebounce.restart();
     }

@@ -1101,6 +1101,7 @@ PanelWindow {
                 weatherService: weatherStation.weatherService
                 nwsAlertSource: weatherStation.nwsAlertSource
                 seismicSource: seismicService
+                persistentCacheStore: weatherStation.persistentCacheStore
                 runtimeNowMs: weatherStation.runtimeNowMs
             }
         }

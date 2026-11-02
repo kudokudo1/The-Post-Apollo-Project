@@ -26,6 +26,7 @@ Scope {
     property string phase: "WAIT_INITIAL"
     property string resultLine: "PENDING"
     property bool finished: false
+    property bool observedReadyByPoll: false
 
     function stage(name) {
         console.warn("M12U_STAGE|" + name + "|PASS");
@@ -105,6 +106,8 @@ Scope {
                 return;
             }
             stage("NATIVE_SAVE");
+            if (observedReadyByPoll)
+                console.warn("M12U_OBSERVATION|POLL_RECONCILED|PASS");
             phase = "WAIT_RELOAD";
             if (!ApolloHubTodoStore.reloadFromDisk()) {
                 endTest(false, "NATIVE_RELOAD_REFUSED");
@@ -135,12 +138,38 @@ Scope {
         function onStorageStateChanged() { smoke.advance(); }
     }
 
+    // A missed change notification must not be confused with a missing save.
+    // Poll the existing store state only; this never retries or writes.
+    Timer {
+        id: observationPoll
+        interval: 100
+        repeat: true
+        running: !smoke.finished
+        onTriggered: {
+            if (smoke.phase === "WAIT_SAVE"
+                    && ApolloHubTodoStore.storageState === "ready")
+                smoke.observedReadyByPoll = true;
+            smoke.advance();
+        }
+    }
+
     Timer {
         id: deadline
         interval: 20000
         repeat: false
         running: true
-        onTriggered: smoke.endTest(false, "NATIVE_CALLBACK_TIMEOUT")
+        onTriggered: {
+            if (smoke.phase === "WAIT_SAVE") {
+                var state = ApolloHubTodoStore.storageState;
+                if (state === "saving")
+                    smoke.endTest(false, "STORE_STUCK_SAVING");
+                else
+                    smoke.endTest(false, "SAVE_STATE_NOT_READY");
+            } else if (smoke.phase === "WAIT_RELOAD")
+                smoke.endTest(false, "RELOAD_STUCK");
+            else
+                smoke.endTest(false, "NATIVE_CALLBACK_TIMEOUT");
+        }
     }
 
     PanelWindow {

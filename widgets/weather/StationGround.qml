@@ -7,6 +7,7 @@ import "../../services/weather/NdbcMarinePolicy.js" as MarinePolicy
 import "../../services/weather/CoopsCoastalPolicy.js" as CoastalPolicy
 import "StationGroundPollenPolicy.js" as PollenDetails
 import "StationGroundEnvironmentPolicy.js" as EnvironmentPolicy
+import "../../services/weather/WeatherRuntimePolicy.js" as RuntimePolicy
 
 Rectangle {
     id: ground
@@ -14,6 +15,97 @@ Rectangle {
     property var weatherService: null
     property var nwsAlertSource: null
     property var seismicSource: null
+    property real runtimeNowMs: Date.now()
+
+    readonly property var runtimeRows: [
+        RuntimePolicy.displayRow(
+            "weather",
+            {
+                "active": true,
+                "ready": !!weatherService && weatherService.ready,
+                "loading": !!weatherService && weatherService.loading,
+                "errorText": weatherService ? weatherService.errorText : "",
+                "receivedAt": weatherService ? weatherService.lastUpdated : null,
+                "observedAt": weatherService
+                              ? weatherService.localObservationAnchorMs : -1
+            },
+            runtimeNowMs
+        ),
+        RuntimePolicy.displayRow(
+            "nws-alerts",
+            {
+                "active": nwsConfigured,
+                "ready": nwsReady,
+                "loading": nwsLoading,
+                "errorText": nwsErrorText,
+                "receivedAt": nwsAlertSource
+                              ? nwsAlertSource.lastUpdated : null,
+                "detail": nwsConfigured ? "PINNED POINT" : "NOT CONFIGURED"
+            },
+            runtimeNowMs
+        ),
+        RuntimePolicy.displayRow(
+            "seismic",
+            {
+                "active": !!seismicSource && seismicSource.active !== false,
+                "ready": !!seismicSource && seismicSource.ready,
+                "loading": !!seismicSource && seismicSource.loading,
+                "errorText": seismicSource ? seismicSource.errorText : "",
+                "receivedAt": seismicSource
+                              ? seismicSource.lastUpdated : null
+            },
+            runtimeNowMs
+        ),
+        RuntimePolicy.displayRow(
+            "river",
+            {
+                "active": riverService.active,
+                "ready": riverService.ready,
+                "loading": riverService.loading,
+                "errorText": riverService.errorText,
+                "receivedAt": riverService.lastUpdated
+            },
+            runtimeNowMs
+        ),
+        RuntimePolicy.displayRow(
+            "marine",
+            {
+                "active": marineService.active,
+                "ready": marineService.ready,
+                "loading": marineService.loading,
+                "errorText": marineService.errorText,
+                "receivedAt": marineService.lastUpdated,
+                "observedAt": marineService.station
+                              ? marineService.station.sampleMillis : -1
+            },
+            runtimeNowMs
+        ),
+        RuntimePolicy.displayRow(
+            "coastal",
+            {
+                "active": coastalService.active,
+                "ready": coastalService.ready,
+                "loading": coastalService.loading,
+                "errorText": coastalService.errorText,
+                "receivedAt": coastalService.lastUpdated,
+                "observedAt": coastalService.waterLevel
+                              ? coastalService.waterLevel.sampleMillis : -1
+            },
+            runtimeNowMs
+        ),
+        RuntimePolicy.displayRow(
+            "lightning",
+            {
+                "active": lightningService.active,
+                "ready": lightningService.ready,
+                "loading": lightningService.loading,
+                "errorText": lightningService.errorText,
+                "receivedAt": lightningService.lastUpdated,
+                "observedAt": lightningService.latestTime
+            },
+            runtimeNowMs
+        )
+    ]
 
     readonly property bool nwsConfigured:
         nwsAlertSource && nwsAlertSource.configured
@@ -434,6 +526,11 @@ Rectangle {
                 font.pixelSize: 12
                 color: ground.aqiReady ? Colors.cyan : Colors.orange
             }
+        }
+
+        StationRuntimeRack {
+            width: parent.width
+            rows: ground.runtimeRows
         }
 
         StationSectionDivider {

@@ -3,12 +3,107 @@ import "../../components"
 import "../../services/weather" as WeatherServices
 import "../../services/weather/SolarCyclePolicy.js" as SolarCyclePolicy
 import "StationSolarImagePolicy.js" as SolarImagePolicy
+import "../../services/weather/WeatherRuntimePolicy.js" as RuntimePolicy
 
 Rectangle {
     id: space
 
     property var spaceService: null
     property var weatherService: null
+    property real runtimeNowMs: Date.now()
+
+    readonly property var runtimeRows: [
+        RuntimePolicy.displayRow(
+            "space-core",
+            {
+                "active": true,
+                "ready": !!spaceService && spaceService.ready,
+                "loading": !!spaceService && spaceService.loading,
+                "errorText": spaceService ? spaceService.errorText : "",
+                "receivedAt": spaceService ? spaceService.lastUpdated : null
+            },
+            runtimeNowMs
+        ),
+        RuntimePolicy.displayRow(
+            "aurora",
+            {
+                "active": auroraService.active,
+                "ready": auroraService.ready,
+                "loading": auroraService.loading,
+                "errorText": auroraService.errorText,
+                "receivedAt": auroraService.lastUpdated,
+                "observedAt": auroraService.observationTimeMs
+            },
+            runtimeNowMs
+        ),
+        RuntimePolicy.displayRow(
+            "solar-flares",
+            {
+                "active": flareService.active,
+                "ready": flareService.ready,
+                "loading": flareService.loading,
+                "errorText": flareService.errorText,
+                "receivedAt": flareService.lastUpdated
+            },
+            runtimeNowMs
+        ),
+        RuntimePolicy.displayRow(
+            "xray-flux",
+            {
+                "active": xrayService.active,
+                "ready": xrayService.ready,
+                "loading": xrayService.loading,
+                "errorText": xrayService.errorText,
+                "receivedAt": xrayService.lastUpdated,
+                "observedAt": xrayService.sampleTimeMs
+            },
+            runtimeNowMs
+        ),
+        RuntimePolicy.displayRow(
+            "swpc-alerts",
+            {
+                "active": alertService.active,
+                "ready": alertService.ready,
+                "loading": alertService.loading,
+                "errorText": alertService.errorText,
+                "receivedAt": alertService.lastUpdated
+            },
+            runtimeNowMs
+        ),
+        RuntimePolicy.displayRow(
+            "solar-cycle",
+            {
+                "active": solarCycleService.active,
+                "ready": solarCycleService.ready,
+                "loading": solarCycleService.loading,
+                "errorText": solarCycleService.errorText,
+                "receivedAt": solarCycleService.lastUpdated
+            },
+            runtimeNowMs
+        ),
+        RuntimePolicy.displayRow(
+            "noaa-scales",
+            {
+                "active": scalesService.active,
+                "ready": scalesService.ready,
+                "loading": scalesService.loading,
+                "errorText": scalesService.errorText,
+                "receivedAt": scalesService.lastUpdated
+            },
+            runtimeNowMs
+        ),
+        RuntimePolicy.displayRow(
+            "kp-forecast",
+            {
+                "active": kpForecastService.active,
+                "ready": kpForecastService.ready,
+                "loading": kpForecastService.loading,
+                "errorText": kpForecastService.errorText,
+                "receivedAt": kpForecastService.lastUpdated
+            },
+            runtimeNowMs
+        )
+    ]
 
     property string solarImageMode: "195"
     property string solarImageUrl: ""
@@ -320,6 +415,11 @@ Rectangle {
                 font.pixelSize: 12
                 color: space.spaceReady ? Colors.cyan : Colors.orange
             }
+        }
+
+        StationRuntimeRack {
+            width: parent.width
+            rows: space.runtimeRows
         }
 
         StationSectionDivider {

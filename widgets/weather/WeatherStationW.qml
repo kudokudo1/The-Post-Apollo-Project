@@ -118,6 +118,10 @@ PanelWindow {
     // HOME is an aggregate surface now, so its badge represents both the
     // weather/air-quality stack and the independent NOAA space-weather stack.
     property int sourceStatusClock: 0
+    readonly property real runtimeNowMs: {
+        sourceStatusClock;
+        return Date.now();
+    }
 
     readonly property bool usesHomeSources:
         currentView === "home"
@@ -135,6 +139,15 @@ PanelWindow {
     readonly property var newsSourceItem:
         usesNewsSource && weatherContentLoader.item
         ? weatherContentLoader.item : null
+
+    readonly property var currentPageRuntimeRows:
+        weatherContentLoader.item
+        && Array.isArray(weatherContentLoader.item.runtimeRows)
+        ? weatherContentLoader.item.runtimeRows : []
+    readonly property var currentPageRuntimeSummary:
+        RuntimePolicy.summarizeRows(currentPageRuntimeRows)
+    readonly property bool usesMapRuntime:
+        currentView === "map"
 
     // NEWS player viewport in the 1000x700 Station chassis's local logical
     // coordinate system. The Station window's *global* coordinates remain
@@ -282,6 +295,21 @@ PanelWindow {
                 return "OFFLINE";
             return "PARTIAL";
         }
+
+        if (usesMapRuntime) {
+            if (currentPageRuntimeSummary.problem > 0
+                    && currentPageRuntimeSummary.ready === 0)
+                return "OFFLINE";
+            if (currentPageRuntimeSummary.loading > 0
+                    && currentPageRuntimeSummary.ready === 0)
+                return "READING";
+            if (currentPageRuntimeSummary.stale > 0)
+                return "STALE";
+            if (currentPageRuntimeSummary.ready > 0)
+                return "MAP LIVE";
+            return "CONNECTING";
+        }
+
         if (usesNewsSource)
             return newsSourceItem ? newsSourceItem.feedBadge : "CONNECTING // NEWS";
 
@@ -322,6 +350,16 @@ PanelWindow {
                             ? "<1m"
                             : weatherAgeMinutes + "m";
             return sourceStatusText + " // " + ageText;
+        }
+
+        if (usesMapRuntime) {
+            if (currentPageRuntimeSummary.ready > 0)
+                return sourceStatusText + " // "
+                       + currentPageRuntimeSummary.ready + " READY";
+            if (currentPageRuntimeSummary.loading > 0)
+                return sourceStatusText + " // "
+                       + currentPageRuntimeSummary.loading + " READING";
+            return sourceStatusText + " // SOURCES";
         }
 
         if (usesSpaceSource || usesNewsSource)
@@ -370,6 +408,22 @@ PanelWindow {
                 return Colors.red;
             return Colors.yellow;
         }
+
+        if (usesMapRuntime) {
+            if (currentPageRuntimeSummary.problem > 0
+                    && currentPageRuntimeSummary.ready === 0)
+                return Colors.red;
+            if (currentPageRuntimeSummary.stale > 0
+                    || currentPageRuntimeSummary.problem > 0)
+                return Colors.yellow;
+            if (currentPageRuntimeSummary.loading > 0
+                    && currentPageRuntimeSummary.ready === 0)
+                return Colors.orange;
+            if (currentPageRuntimeSummary.ready > 0)
+                return Colors.magenta;
+            return Colors.orange;
+        }
+
         if (usesNewsSource)
             return newsSourceItem ? newsSourceItem.feedBadgeColor : Colors.orange;
 
@@ -992,6 +1046,7 @@ PanelWindow {
                 spaceService: weatherStation.spaceService
                 nwsAlertSource: weatherStation.nwsAlertSource
                 historyService: weatherHistoryService
+                runtimeNowMs: weatherStation.runtimeNowMs
             }
         }
 
@@ -1002,6 +1057,7 @@ PanelWindow {
                 weatherService: weatherStation.weatherService
                 nwsAlertSource: weatherStation.nwsAlertSource
                 seismicSource: seismicService
+                runtimeNowMs: weatherStation.runtimeNowMs
             }
         }
 
@@ -1010,6 +1066,7 @@ PanelWindow {
 
             StationSky {
                 weatherService: weatherStation.weatherService
+                runtimeNowMs: weatherStation.runtimeNowMs
             }
         }
 
@@ -1019,6 +1076,7 @@ PanelWindow {
             StationSpace {
                 spaceService: weatherStation.spaceService
                 weatherService: weatherStation.weatherService
+                runtimeNowMs: weatherStation.runtimeNowMs
             }
         }
 
@@ -1030,6 +1088,7 @@ PanelWindow {
                 domain: "map"
                 seismicSource: seismicService
                 newsMentionOverlay: weatherStation.newsMapOverlay
+                runtimeNowMs: weatherStation.runtimeNowMs
                 onNewsMapClearRequested: {
                     weatherStation.newsMapOverlay = null;
                 }
@@ -1041,6 +1100,7 @@ PanelWindow {
 
             StationNewsHub {
                 stationOpen: weatherStation.menuOpen
+                runtimeNowMs: weatherStation.runtimeNowMs
                 onNewsMapRequested: function(payload) {
                     if (!payload
                             || !Array.isArray(payload.locations)

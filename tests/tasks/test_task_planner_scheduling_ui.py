@@ -24,7 +24,9 @@ assert "property var todoStore: null" in planner
 assert "property bool scheduleMode: false" in planner
 assert 'label: "SCHEDULE"' in planner
 assert "TaskPlannerSchedulePane {" in planner
-assert "todoStore: planner.todoStore" in planner
+# Planner's existing writer is deliberately disabled outside the
+# approved scheduling mode. Preserve the conditional binding contract.
+assert "todoStore: planner.schedulingAllowed ? planner.todoStore : null" in planner
 assert "visible: !planner.scheduleMode" in planner
 assert "visible: planner.scheduleMode" in planner
 

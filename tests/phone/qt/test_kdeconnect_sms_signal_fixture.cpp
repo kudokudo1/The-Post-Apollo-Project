@@ -91,18 +91,18 @@ void registerTypes()
 void testFixtureSourceAndDeviceIsolation(QDBusConnection bus)
 {
     KdeConnectSmsSignalFixture stream;
-    require(!stream.start(bus, QStringLiteral(kDeviceA)),
+    require(!stream.start(bus, QString::fromLatin1(kDeviceA)),
             "cannot attach without fixture service owned by test process");
     require(!stream.start(bus, QStringLiteral("../bad")),
             "invalid device ID rejected");
-    require(bus.registerService(QStringLiteral(kService)),
+    require(bus.registerService(QString::fromLatin1(kService)),
             "register isolated fixture service");
     require(!stream.start(bus, QStringLiteral("short")),
             "invalid short device ID rejected");
-    require(stream.start(bus, QStringLiteral(kDeviceA)),
+    require(stream.start(bus, QString::fromLatin1(kDeviceA)),
             "valid fixture source and device accepted");
     require(stream.active(), "stream started");
-    require(!stream.start(bus, QStringLiteral(kDeviceB)),
+    require(!stream.start(bus, QString::fromLatin1(kDeviceB)),
             "cannot silently change device while already active");
 
     int decoded = 0;
@@ -121,17 +121,17 @@ void testFixtureSourceAndDeviceIsolation(QDBusConnection bus)
                      });
 
     const QDBusVariant good(QVariant::fromValue(syntheticFields()));
-    sendSignal(bus, QStringLiteral(kDeviceB), QStringLiteral(kInterface),
+    sendSignal(bus, QString::fromLatin1(kDeviceB), QString::fromLatin1(kInterface),
                QStringLiteral("conversationUpdated"), good);
-    sendSignal(bus, QStringLiteral(kDeviceA), QStringLiteral("org.example.unrelated"),
+    sendSignal(bus, QString::fromLatin1(kDeviceA), QStringLiteral("org.example.unrelated"),
                QStringLiteral("conversationUpdated"), good);
-    sendSignal(bus, QStringLiteral(kDeviceA), QStringLiteral(kInterface),
+    sendSignal(bus, QString::fromLatin1(kDeviceA), QString::fromLatin1(kInterface),
                QStringLiteral("unrelatedEvent"), good);
     pump();
     require(decoded == 0 && rejected == 0,
             "device/interface/signal mismatch ignored");
 
-    sendSignal(bus, QStringLiteral(kDeviceA), QStringLiteral(kInterface),
+    sendSignal(bus, QString::fromLatin1(kDeviceA), QString::fromLatin1(kInterface),
                QStringLiteral("conversationCreated"), good);
     require(until([&]{ return decoded == 1; }),
             "accepted synthetic conversationCreated signal");
@@ -140,13 +140,13 @@ void testFixtureSourceAndDeviceIsolation(QDBusConnection bus)
     require(last.value(QStringLiteral("thread_id")).toString() ==
             QStringLiteral("9007199254740993"), "64-bit precision retained");
 
-    sendSignal(bus, QStringLiteral(kDeviceA), QStringLiteral(kInterface),
+    sendSignal(bus, QString::fromLatin1(kDeviceA), QString::fromLatin1(kInterface),
                QStringLiteral("conversationUpdated"), good);
     require(until([&]{ return decoded == 2; }),
             "accepted synthetic conversationUpdated signal");
 
     const QDBusVariant invalid(QVariant::fromValue(QStringLiteral("bad-fixture-data")));
-    sendSignal(bus, QStringLiteral(kDeviceA), QStringLiteral(kInterface),
+    sendSignal(bus, QString::fromLatin1(kDeviceA), QString::fromLatin1(kInterface),
                QStringLiteral("conversationUpdated"), invalid);
     require(until([&]{ return rejected == 1; }),
             "invalid variant rejected and not forwarded");
@@ -155,23 +155,23 @@ void testFixtureSourceAndDeviceIsolation(QDBusConnection bus)
 
     stream.stop();
     require(!stream.active(), "explicit stop deactivates stream");
-    sendSignal(bus, QStringLiteral(kDeviceA), QStringLiteral(kInterface),
+    sendSignal(bus, QString::fromLatin1(kDeviceA), QString::fromLatin1(kInterface),
                QStringLiteral("conversationUpdated"), good);
     pump();
     require(decoded == 2, "stopped stream cannot emit further records");
-    require(stream.start(bus, QStringLiteral(kDeviceB)),
+    require(stream.start(bus, QString::fromLatin1(kDeviceB)),
             "explicit restart may select a different fixture device");
-    sendSignal(bus, QStringLiteral(kDeviceA), QStringLiteral(kInterface),
+    sendSignal(bus, QString::fromLatin1(kDeviceA), QString::fromLatin1(kInterface),
                QStringLiteral("conversationUpdated"), good);
     pump();
     require(decoded == 2, "old device ignored following device switch");
-    sendSignal(bus, QStringLiteral(kDeviceB), QStringLiteral(kInterface),
+    sendSignal(bus, QString::fromLatin1(kDeviceB), QString::fromLatin1(kInterface),
                QStringLiteral("conversationUpdated"), good);
     require(until([&]{ return decoded == 3; }),
             "new device works only after explicit reconnect");
 
     stream.stop();
-    require(bus.unregisterService(QStringLiteral(kService)),
+    require(bus.unregisterService(QString::fromLatin1(kService)),
             "unregister test-only fixture service");
 }
 

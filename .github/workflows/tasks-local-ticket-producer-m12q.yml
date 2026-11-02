@@ -1,0 +1,53 @@
+name: TASKS M12q disabled single-writer ticket producer
+
+on:
+  pull_request:
+    paths:
+      - 'services/hub/TaskLocalTicketProducerM12q.js'
+      - 'services/hub/ApolloHubTodoStore.qml'
+      - 'tests/tasks/test_task_local_ticket_producer_m12q.cjs'
+      - 'docs/tasks-local-ticket-producer-m12q.md'
+      - '.github/workflows/tasks-local-ticket-producer-m12q.yml'
+      - 'services/hub/ApolloHubTodoPolicy.js'
+  push:
+    branches: [main]
+    paths:
+      - 'services/hub/TaskLocalTicketProducerM12q.js'
+      - 'services/hub/ApolloHubTodoStore.qml'
+      - 'tests/tasks/test_task_local_ticket_producer_m12q.cjs'
+      - 'docs/tasks-local-ticket-producer-m12q.md'
+      - '.github/workflows/tasks-local-ticket-producer-m12q.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  m12q-disabled-producer:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: M12q nine-mutation ticket producer plan and readback
+        run: node --test tests/tasks/test_task_local_ticket_producer_m12q.cjs
+      - name: M12p Hub first-consumer disabled presenter
+        run: node --test tests/tasks/test_task_hub_ticket_presenter_m12p.cjs
+      - name: M12o all four consumer contract
+        run: node --test tests/tasks/test_task_disabled_ticket_api_m12o.cjs
+      - name: M12n native ticket observer regression
+        run: node --test tests/tasks/test_task_native_ticket_bridge_m12n.cjs
+      - name: M12m FIFO disposable filesystem test
+        run: node --test tests/tasks/test_task_local_coordinator_m12m.cjs
+      - name: M12i native receipt host regression
+        run: python3 tests/tasks/test_task_native_receipt_host_m12i.py
+      - name: M12k same-user external writer threat
+        run: python3 tests/tasks/test_task_uncooperative_writer_m12k.py
+      - name: M11t production trust gate remains locked
+        run: python3 tests/tasks/test_task_production_trust_contract_m11t.py
+      - name: M11d exactly one production FileView
+        run: python3 tests/tasks/test_task_writer_gate_inventory_m11d.py

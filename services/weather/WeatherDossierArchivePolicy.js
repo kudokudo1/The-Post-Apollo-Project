@@ -95,8 +95,10 @@ function validateDocument(value, codec) {
 function parse(raw, codec) {
     if (typeof raw !== "string" || raw.length > MAX_DOCUMENT_CHARS)
         return fail("INPUT_SIZE_OR_TYPE_INVALID");
+    // Missing file is handled by FileView.FileNotFound. A present but empty
+    // file is corruption and must never be silently overwritten as new.
     if (!raw.trim())
-        return {ok:true,reason:"EMPTY",document:empty(),count:0};
+        return fail("EMPTY_FILE_CORRUPT");
     let value;
     try { value=JSON.parse(raw); }
     catch (error) { return fail("INVALID_JSON"); }

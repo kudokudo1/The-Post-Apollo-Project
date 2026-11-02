@@ -320,6 +320,8 @@ PanelWindow {
                 height: Math.min(350, mainModeContent.height * 0.53)
                 visible: root.menuOpen && root.activeMode.id === "tasks"
                 taskScrollbarEnabled: true
+                closeOnEscape: true
+                onCloseRequested: root.menuOpen = false
                 todoStore: ApolloHubTodoStore
                 todoSnapshot: ApolloHubTodoStore.snapshot
                 onTaskSelected: function(taskId) {

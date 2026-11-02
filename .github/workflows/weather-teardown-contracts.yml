@@ -71,6 +71,8 @@ jobs:
         run: node tests/weather/test_weather_archive_revisions_m20.js
       - name: Validate Weather M21 retained archive pair comparison
         run: node tests/weather/test_weather_archive_pair_compare_m21.js
+      - name: Validate Weather M22 volatile dossier preview
+        run: node tests/weather/test_weather_dossier_preview_m22.js
       - name: Validate Weather persistent last-known cache M4
         run: node tests/weather/test_weather_persistent_cache_m4.js
       - name: Validate Weather persistent cache M5 global events

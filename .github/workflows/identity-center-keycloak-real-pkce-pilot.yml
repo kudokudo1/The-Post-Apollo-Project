@@ -1,0 +1,72 @@
+name: Identity Center Real Disposable Keycloak PKCE Pilot
+
+on:
+  pull_request:
+    paths:
+      - 'services/identity/keycloak_loopback_pilot_verifier_v0.py'
+      - 'tests/identity/keycloak_pilot_fixture_v0.py'
+      - 'tests/identity/keycloak_real_oidc_pilot_v0.py'
+      - 'MODEL/contracts/identity-center-real-keycloak-pkce-pilot-v0.md'
+      - '.github/workflows/identity-center-keycloak-real-pkce-pilot.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'services/identity/keycloak_loopback_pilot_verifier_v0.py'
+      - 'tests/identity/keycloak_pilot_fixture_v0.py'
+      - 'tests/identity/keycloak_real_oidc_pilot_v0.py'
+      - 'MODEL/contracts/identity-center-real-keycloak-pkce-pilot-v0.md'
+      - '.github/workflows/identity-center-keycloak-real-pkce-pilot.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  keycloak-pkce:
+    name: Real Keycloak CI-only OAuth code + PKCE
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install test-only verifier and HTTP client
+        run: |
+          python3 -m pip install -r services/identity/requirements-jwks-verifier-v0.txt
+          python3 -m pip install 'requests==2.32.5'
+
+      - name: Generate isolated realm and random test credentials
+        run: |
+          python3 tests/identity/keycloak_pilot_fixture_v0.py \
+            --directory "${RUNNER_TEMP}/post-apollo-keycloak-v0"
+
+      - name: Run real disposable Keycloak on loopback only
+        run: |
+          docker run --detach --name post-apollo-oidc-disposable \
+            --memory=1g --publish 127.0.0.1:8080:8080 \
+            --volume "${RUNNER_TEMP}/post-apollo-keycloak-v0/import:/opt/keycloak/data/import:ro" \
+            --env KC_BOOTSTRAP_ADMIN_USERNAME=ci-disposable \
+            --env KC_BOOTSTRAP_ADMIN_PASSWORD="$(cat "${RUNNER_TEMP}/post-apollo-keycloak-v0/admin-password")" \
+            --env KC_HOSTNAME=http://127.0.0.1:8080 \
+            quay.io/keycloak/keycloak:26.8.1 \
+            start-dev --import-realm
+
+      - name: Compile isolated client and provider adapter
+        run: |
+          python3 -m py_compile services/identity/keycloak_loopback_pilot_verifier_v0.py
+          python3 -m py_compile tests/identity/keycloak_pilot_fixture_v0.py
+          python3 -m py_compile tests/identity/keycloak_real_oidc_pilot_v0.py
+
+      - name: Test real authorization code, PKCE, signed tokens and logout
+        run: |
+          python3 tests/identity/keycloak_real_oidc_pilot_v0.py \
+            --fixture-dir "${RUNNER_TEMP}/post-apollo-keycloak-v0"
+
+      - name: Verify existing offline organization boundaries
+        run: python3 -m unittest discover -s tests/identity -p 'test_*.py' -v
+
+      - name: Stop and remove disposable identity provider
+        if: always()
+        run: docker rm --force post-apollo-oidc-disposable 2>/dev/null || true

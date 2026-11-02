@@ -1,0 +1,48 @@
+name: Identity Center Tokenless Desktop Context Projection
+
+on:
+  pull_request:
+    paths:
+      - 'services/identity/desktop_context_projection_v0.py'
+      - 'tests/identity/test_desktop_context_projection_v0.py'
+      - 'widgets/messanger/IdentityCenterSettingsSections.qml'
+      - 'tests/messaging/test_identity_center_desktop_display_v0.py'
+      - 'MODEL/contracts/identity-center-desktop-context-projection-v0.md'
+      - '.github/workflows/identity-center-desktop-context-projection.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'services/identity/desktop_context_projection_v0.py'
+      - 'tests/identity/test_desktop_context_projection_v0.py'
+      - 'widgets/messanger/IdentityCenterSettingsSections.qml'
+      - 'tests/messaging/test_identity_center_desktop_display_v0.py'
+      - 'MODEL/contracts/identity-center-desktop-context-projection-v0.md'
+      - '.github/workflows/identity-center-desktop-context-projection.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  projection:
+    name: Tokenless adapter + read-only Social display contracts
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Compile identity projection and test
+        run: |
+          python3 -m py_compile services/identity/desktop_context_projection_v0.py
+          python3 -m py_compile tests/identity/test_desktop_context_projection_v0.py
+      - name: Test verified API to tokenless desktop display projection
+        run: |
+          python3 -m unittest discover -s tests/identity \
+            -p 'test_desktop_context_projection_v0.py' -v
+      - name: Preserve existing Social settings and display-only behavior
+        run: |
+          python3 -m unittest discover -s tests/messaging \
+            -p 'test_identity_center_settings_sections.py' -v
+          python3 -m unittest discover -s tests/messaging \
+            -p 'test_identity_center_desktop_display_v0.py' -v

@@ -1,0 +1,49 @@
+name: Social Phone KDE Connect SMS Signal Fixture P1
+
+on:
+  pull_request:
+    paths:
+      - 'services/phone/qt/KdeConnectSmsSignalFixture.h'
+      - 'services/phone/qt/KdeConnectSmsSignalFixture.cpp'
+      - 'tests/phone/qt/test_kdeconnect_sms_signal_fixture.cpp'
+      - 'MODEL/contracts/social-phone-kdeconnect-sms-signal-fixture-p1-v0.md'
+      - '.github/workflows/social-phone-kdeconnect-sms-signal-fixture.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'services/phone/qt/KdeConnectSmsSignalFixture.h'
+      - 'services/phone/qt/KdeConnectSmsSignalFixture.cpp'
+      - 'tests/phone/qt/test_kdeconnect_sms_signal_fixture.cpp'
+      - 'MODEL/contracts/social-phone-kdeconnect-sms-signal-fixture-p1-v0.md'
+      - '.github/workflows/social-phone-kdeconnect-sms-signal-fixture.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  isolated-signal-fixture:
+    name: "Qt SMS read-only stream: test-owned D-Bus only"
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Qt6 and D-Bus only on the disposable runner
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends qt6-base-dev pkg-config dbus
+      - name: Generate moc for the isolated receiver
+        run: /usr/lib/qt6/libexec/moc services/phone/qt/KdeConnectSmsSignalFixture.h -o /tmp/moc_kde_sms_signal_fixture.cpp
+      - name: Compile isolated Qt signal receiver and synthetic tests
+        run: |
+          g++ -std=c++17 -fPIC -Wall -Wextra -Werror \
+            $(pkg-config --cflags Qt6Core Qt6DBus) \
+            services/phone/qt/KdeConnectSmsDbusDecoder.cpp \
+            services/phone/qt/KdeConnectSmsSignalFixture.cpp \
+            tests/phone/qt/test_kdeconnect_sms_signal_fixture.cpp \
+            /tmp/moc_kde_sms_signal_fixture.cpp \
+            $(pkg-config --libs Qt6Core Qt6DBus) \
+            -o /tmp/post-apollo-sms-signal-fixture-test
+      - name: Run on disposable D-Bus session with no KDE Connect
+        run: dbus-run-session -- /tmp/post-apollo-sms-signal-fixture-test
+      - name: Regress all pure-Python Phone Bridge tests
+        run: python3 -m unittest discover -s tests/phone -p 'test_*.py' -q

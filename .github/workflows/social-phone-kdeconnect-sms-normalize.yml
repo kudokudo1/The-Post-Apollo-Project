@@ -29,3 +29,5 @@ jobs:
         run: python3 -m py_compile services/phone/KdeConnectSmsNormalize.py tests/phone/test_kdeconnect_sms_normalize.py
       - name: Run synthetic normalization and privacy fixtures
         run: python3 -m unittest discover -s tests/phone -p 'test_kdeconnect_sms_normalize.py' -v
+      - name: Run entire offline Phone Bridge regression suite
+        run: python3 -m unittest discover -s tests/phone -p 'test_*.py' -v

@@ -46,7 +46,7 @@ QT_QPA_PLATFORM=offscreen python3 -m unittest discover \
     -s tests/messaging -p 'test_identity_center_offscreen_qml_v0.py' -v
 ```
 
-Followed by the merged Python socket/CLI and Social Settings/Node contract suites. No private organization records appear; test data are clearly synthetic IDs. Review the exact-head GitHub Actions results before calling the slice verified.
+Followed by the merged Python socket/CLI and Social Settings/Node contract suites. No private organization records appear; test data are clearly synthetic IDs. The first real Qt run needed the disposable runner's missing libEGL runtime dependency. After installing it in the workflow, the [offscreen Qt test run](https://github.com/kudokudo1/The-Post-Apollo-Project/actions/runs/41482400276) passed all seven native QML tests and its IPC/CLI and Social regression steps on commit `eac1718`. Recheck the exact PR head before accepting or merging.
 
 ## Local/live verification gate, not authorized by this PR
 
@@ -75,7 +75,7 @@ The Quickshell imports are fake *only in CI*; the test does not prove Quickshell
 - [x] Actual source QML loaded in offscreen Qt 6 engine through isolated stubs
 - [x] Synthetic READY, deny, expiry and close/reopen edge cases
 - [x] Existing IPC/CLI and Social regression checks included
-- [ ] Exact-head CI success
+- [x] Native Qt/IPC/Social CI successful on `eac1718` (reverify after this handoff commit)
 - [ ] Approved live Quickshell visual/suspension and host-death evidence
 - [ ] Host sandbox, OS token custody, security review and operator acceptance
 

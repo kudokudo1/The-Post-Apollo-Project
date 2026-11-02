@@ -25,6 +25,8 @@ MODEL describes architecture, ownership, contracts, services, and subsystem rela
 
 **Navigation / classification only.** These links identify contracts in their *current* paths; they do not rename, certify, relocate or supersede the originals.
 
+- **TASKS / storage ownership architectural decision (operator-selected direction; design only):** [M12l local-first coordinator, separate GitHub/format adapters, and deferral of a privileged broker](./contracts/tasks-storage-ownership-adr-m12l.md). Evidence includes M12j's isolated native receipts, M12k's independently tested same-UID writer limitations, and official local-first/synchronization references. No production writer approval or activation.
+
 - **Weather Station / Observatory worker recovery (proposed plan):** [Backend-first master roadmap](../docs/weather-station-backend-first-roadmap.md) covers connected sources, shared Hi-Fi radio, terminal/viewer architecture, remaining domains and acceptance gates. It is a proposed staged plan, not a live Hospital Assignment or implementation certification. The [Syntagma rules entry](https://github.com/kudokudo1/Meta-Apollo-Logos-How-I-Think/blob/main/AGENTS.md) owns shared operator/semantic guidance; this repository owns QML implementation and local technical contracts.
 
 - **P // Weather Station / Stage Director virtual viewport:** [Real Kitty scene clipping, mouse pan/zoom and CRT shader preservation (strong proposal)](./weather-station-virtual-viewport-proposal-20261024.md). Mirrored with SwayPX; documentation only and no compositor implementation authorization.

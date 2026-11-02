@@ -14,6 +14,10 @@ Item {
     property bool settingsOpen: false
     // Injected by Social; null in synthetic Qt tests.
     property var localDirectoryStore: null
+    // Manual Social label associations only, not Identity Center grants.
+    property var localLinksStore: null
+    property var socialIdentitiesSnapshot: null
+    property var socialAccountDetailsStore: null
     // Display-only input for a FUTURE approved privileged host.
     // No current host feeds this value; never treat it as authorization.
     // Tokens, provider subjects and credentials must never enter QML.
@@ -186,6 +190,14 @@ Item {
                     IdentityCenterLocalOrganizationEditor {
                         width: parent.width
                         directoryStore: sections.localDirectoryStore
+                    }
+
+                    IdentityCenterLocalSocialLinksEditor {
+                        width: parent.width
+                        directoryStore: sections.localDirectoryStore
+                        linksStore: sections.localLinksStore
+                        identitiesSnapshot: sections.socialIdentitiesSnapshot
+                        accountDetailsStore: sections.socialAccountDetailsStore
                     }
 
                     Column {

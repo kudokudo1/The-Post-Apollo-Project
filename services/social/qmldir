@@ -5,3 +5,4 @@ singleton SocialAccountDetailsStore 1.0 SocialAccountDetailsStore.qml
 singleton SocialAccountDetailsStore 1.0 SocialAccountDetailsStore.qml
 singleton SocialTrayBridge 1.0 SocialTrayBridge.qml
 singleton SocialOrganizationDirectoryStore 1.0 SocialOrganizationDirectoryStore.qml
+singleton SocialOrganizationLinksStore 1.0 SocialOrganizationLinksStore.qml

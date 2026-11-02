@@ -991,6 +991,9 @@ Rectangle {
             activeSection: appSelector.settingsSection
             settingsOpen: appSelector.settingsOpen
             localDirectoryStore: SocialOrganizationDirectoryStore
+            localLinksStore: SocialOrganizationLinksStore
+            socialIdentitiesSnapshot: appSelector.identitySnapshot
+            socialAccountDetailsStore: SocialAccountDetailsStore
             onSectionRequested: function(section) {
                 appSelector.settingsSection = section;
             }

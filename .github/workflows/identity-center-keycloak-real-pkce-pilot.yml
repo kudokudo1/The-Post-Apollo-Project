@@ -6,6 +6,7 @@ on:
       - 'services/identity/keycloak_loopback_pilot_verifier_v0.py'
       - 'tests/identity/keycloak_pilot_fixture_v0.py'
       - 'tests/identity/keycloak_real_oidc_pilot_v0.py'
+      - 'tests/identity/keycloak_durable_context_e2e_v0.py'
       - 'MODEL/contracts/identity-center-real-keycloak-pkce-pilot-v0.md'
       - '.github/workflows/identity-center-keycloak-real-pkce-pilot.yml'
   push:
@@ -14,6 +15,7 @@ on:
       - 'services/identity/keycloak_loopback_pilot_verifier_v0.py'
       - 'tests/identity/keycloak_pilot_fixture_v0.py'
       - 'tests/identity/keycloak_real_oidc_pilot_v0.py'
+      - 'tests/identity/keycloak_durable_context_e2e_v0.py'
       - 'MODEL/contracts/identity-center-real-keycloak-pkce-pilot-v0.md'
       - '.github/workflows/identity-center-keycloak-real-pkce-pilot.yml'
   workflow_dispatch:
@@ -58,10 +60,18 @@ jobs:
           python3 -m py_compile services/identity/keycloak_loopback_pilot_verifier_v0.py
           python3 -m py_compile tests/identity/keycloak_pilot_fixture_v0.py
           python3 -m py_compile tests/identity/keycloak_real_oidc_pilot_v0.py
+          python3 -m py_compile tests/identity/keycloak_durable_context_e2e_v0.py
+          python3 -m py_compile services/identity/durable_context_store_v0.py
+          python3 -m py_compile services/identity/read_only_context_wsgi_v0.py
 
       - name: Test real authorization code, PKCE, signed tokens and logout
         run: |
           python3 tests/identity/keycloak_real_oidc_pilot_v0.py \
+            --fixture-dir "${RUNNER_TEMP}/post-apollo-keycloak-v0"
+
+      - name: Verify real Keycloak JWT with file-backed organization API
+        run: |
+          python3 tests/identity/keycloak_durable_context_e2e_v0.py \
             --fixture-dir "${RUNNER_TEMP}/post-apollo-keycloak-v0"
 
       - name: Verify existing offline organization boundaries

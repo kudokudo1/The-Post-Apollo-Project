@@ -118,6 +118,10 @@ PanelWindow {
     // HOME is an aggregate surface now, so its badge represents both the
     // weather/air-quality stack and the independent NOAA space-weather stack.
     property int sourceStatusClock: 0
+    readonly property real runtimeNowMs: {
+        sourceStatusClock;
+        return Date.now();
+    }
 
     readonly property bool usesHomeSources:
         currentView === "home"
@@ -992,6 +996,7 @@ PanelWindow {
                 spaceService: weatherStation.spaceService
                 nwsAlertSource: weatherStation.nwsAlertSource
                 historyService: weatherHistoryService
+                runtimeNowMs: weatherStation.runtimeNowMs
             }
         }
 
@@ -1002,6 +1007,7 @@ PanelWindow {
                 weatherService: weatherStation.weatherService
                 nwsAlertSource: weatherStation.nwsAlertSource
                 seismicSource: seismicService
+                runtimeNowMs: weatherStation.runtimeNowMs
             }
         }
 
@@ -1010,6 +1016,7 @@ PanelWindow {
 
             StationSky {
                 weatherService: weatherStation.weatherService
+                runtimeNowMs: weatherStation.runtimeNowMs
             }
         }
 
@@ -1019,6 +1026,7 @@ PanelWindow {
             StationSpace {
                 spaceService: weatherStation.spaceService
                 weatherService: weatherStation.weatherService
+                runtimeNowMs: weatherStation.runtimeNowMs
             }
         }
 
@@ -1030,6 +1038,7 @@ PanelWindow {
                 domain: "map"
                 seismicSource: seismicService
                 newsMentionOverlay: weatherStation.newsMapOverlay
+                runtimeNowMs: weatherStation.runtimeNowMs
                 onNewsMapClearRequested: {
                     weatherStation.newsMapOverlay = null;
                 }
@@ -1041,6 +1050,7 @@ PanelWindow {
 
             StationNewsHub {
                 stationOpen: weatherStation.menuOpen
+                runtimeNowMs: weatherStation.runtimeNowMs
                 onNewsMapRequested: function(payload) {
                     if (!payload
                             || !Array.isArray(payload.locations)

@@ -11,7 +11,7 @@ STATUS // Draft, no local activation or operator acceptance
 - `WeatherStationW.qml` now has a default-off `subjectNavigationOpen` flag and a SUB-JECTS/
   CLASSIC rail action. When enabled by the user, six approved subject roots appear in the
   existing 160px rail.
-- `StationSubjectNavigator.qml` shows nested paths, breadcrumbs, submode entry, and
+- `StationSubjectRail.qml` owns the six new subject buttons; WeatherStationW keeps its one canonical main-mode delegate.\n- `StationSubjectNavigator.qml` shows nested paths, breadcrumbs, submode entry, and
   explicit **OPEN [CLASSIC PAGE]** handoffs to existing screens. Navigation uses
   `StationSubjectNavigationPolicy.js` from M0 rather than a second route registry.
 - `StationSubjectNavigationPreviewPolicy.js` enumerates which classic pages currently

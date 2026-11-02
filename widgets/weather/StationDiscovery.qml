@@ -34,6 +34,7 @@ Rectangle {
     property var weatherService: null
     property var persistentCacheStore: null
     property var eventArchiveStore: null
+    property var dossierArchiveStore: null
     property real runtimeNowMs: Date.now()
     signal newsMapRequested(var payload)
     signal newsMapClearRequested()
@@ -612,6 +613,53 @@ Rectangle {
             selectedContextSourceId,
             selectedContextRow
         );
+    }
+
+    // M25 is an independent store. No write on selection or data refresh.
+    readonly property bool dossierSaveAvailable:
+        !!dossierArchiveStore
+        && !!selectedDossierCaptureReview
+        && selectedDossierCaptureReview.ready === true
+        && (dossierArchiveStore.storageState === "ready"
+            || dossierArchiveStore.storageState === "empty")
+
+    readonly property int selectedDossierCount:
+        dossierArchiveStore && selectedEventContext
+        ? dossierArchiveStore.eventCount(
+            selectedContextSourceId, selectedEventContext.id
+        ) : 0
+
+    readonly property string selectedDossierSaveStatus: {
+        if (!dossierArchiveStore)
+            return "DOSSIER STORE UNAVAILABLE";
+        const state = dossierArchiveStore.storageState;
+        if (state === "error")
+            return "DOSSIER ERROR // " + dossierArchiveStore.errorCode;
+        if (state === "unsupported")
+            return "DOSSIER SCHEMA UNSUPPORTED";
+        if (state === "loading")
+            return "DOSSIER LOADING";
+        if (state === "saving")
+            return "DOSSIER SAVING";
+        if (dossierArchiveStore.lastResultCode
+                && dossierArchiveStore.lastResultCode !== "SAVED")
+            return "DOSSIER // " + dossierArchiveStore.lastResultCode;
+        return selectedDossierCount > 0
+            ? "SAVED // " + selectedDossierCount + " DOSSIER"
+                + (selectedDossierCount === 1 ? "" : "S")
+            : "NOT SAVED";
+    }
+
+    function saveSelectedDossier() {
+        if (!dossierSaveAvailable)
+            return false;
+        const now = Date.now();
+        const staged = DossierCapturePolicy.stage(
+            selectedDossierPreview, now, true
+        );
+        if (!staged.ok)
+            return false;
+        return dossierArchiveStore.capture(staged, now);
     }
 
     readonly property bool eventContextInspectorOpen:
@@ -3521,6 +3569,14 @@ Rectangle {
                         stationDiscovery.selectedDossierPreview
                     dossierCaptureReview:
                         stationDiscovery.selectedDossierCaptureReview
+                    dossierSaveAvailable:
+                        stationDiscovery.dossierSaveAvailable
+                    dossierSaveStatus:
+                        stationDiscovery.selectedDossierSaveStatus
+                    dossierSavedCount:
+                        stationDiscovery.selectedDossierCount
+                    onDossierSaveRequested:
+                        stationDiscovery.saveSelectedDossier()
                     archiveRows:
                         stationDiscovery.selectedArchiveRows
                     archiveDiff:

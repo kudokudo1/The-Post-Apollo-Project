@@ -1,0 +1,42 @@
+name: Identity Center Private Desktop Display IPC
+
+on:
+  pull_request:
+    paths:
+      - 'services/identity/private_context_ipc_v0.py'
+      - 'tests/identity/test_private_context_ipc_v0.py'
+      - 'MODEL/contracts/identity-center-private-desktop-ipc-v0.md'
+      - '.github/workflows/identity-center-private-desktop-ipc.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'services/identity/private_context_ipc_v0.py'
+      - 'tests/identity/test_private_context_ipc_v0.py'
+      - 'MODEL/contracts/identity-center-private-desktop-ipc-v0.md'
+      - '.github/workflows/identity-center-private-desktop-ipc.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  private-ipc:
+    name: Linux separate-process host and read-only snapshot Unix socket
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Compile isolated identity display IPC
+        run: |
+          python3 -m py_compile services/identity/private_context_ipc_v0.py
+          python3 -m py_compile tests/identity/test_private_context_ipc_v0.py
+      - name: Test tokenless Unix socket and real isolated host process
+        run: python3 -m unittest discover -s tests/identity -p 'test_private_context_ipc_v0.py' -v
+      - name: Preserve trusted host, tokenless projection and Social read-only UI
+        run: |
+          python3 -m unittest discover -s tests/identity -p 'test_desktop_session_host_v0.py' -v
+          python3 -m unittest discover -s tests/identity -p 'test_desktop_context_projection_v0.py' -v
+          python3 -m unittest discover -s tests/messaging -p 'test_identity_center_desktop_display_v0.py' -v

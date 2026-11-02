@@ -989,6 +989,7 @@ Rectangle {
             anchors.right: parent.right
             anchors.bottom: parent.bottom
             activeSection: appSelector.settingsSection
+            settingsOpen: appSelector.settingsOpen
             onSectionRequested: function(section) {
                 appSelector.settingsSection = section;
             }

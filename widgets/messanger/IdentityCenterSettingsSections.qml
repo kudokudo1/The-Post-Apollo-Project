@@ -9,6 +9,9 @@ Item {
     id: sections
 
     property string activeSection: "SOCIAL LAYOUT"
+    // Parent settings visibility gates the display-only IPC reader.
+    // This is NOT a login, account selection or authorization state.
+    property bool settingsOpen: false
     // Display-only input for a FUTURE approved privileged host.
     // No current host feeds this value; never treat it as authorization.
     // Tokens, provider subjects and credentials must never enter QML.
@@ -20,6 +23,17 @@ Item {
         && organizationDisplaySnapshot.canSwitchOrganization === false
         && Array.isArray(organizationDisplaySnapshot.organizations)
         && Array.isArray(organizationDisplaySnapshot.portfolios)
+    // The reader uses only a fixed JSON snapshot operation. The actual
+    // identity host is separate; no bearer, code or callback enters Social.
+    IdentityCenterOrganizationDisplayReader {
+        id: identityDisplayReader
+        active: sections.settingsOpen
+                && sections.activeSection === "ORGANIZATIONS"
+        onSnapshotChanged: {
+            sections.organizationDisplaySnapshot = snapshot;
+        }
+    }
+
     readonly property int navigationHeight: 42
     signal sectionRequested(string section)
 
@@ -123,6 +137,8 @@ Item {
                 Text {
                     width: parent.width
                     text: "NOT CONNECTED // TRUSTED BACKEND REQUIRED"
+                    visible: sections.activeSection !== "ORGANIZATIONS"
+                             || !sections.organizationDisplayReady
                     color: Colors.orange
                     font.pixelSize: 10
                     font.bold: true

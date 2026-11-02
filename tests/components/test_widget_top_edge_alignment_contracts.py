@@ -29,11 +29,11 @@ assert git.count("anchors.topMargin: root.topGlowGutter") >= 2
 
 assert "readonly property int glowGutter: 12" in tasks
 assert "readonly property int frameTopInset: 9" in tasks
-assert "root.chassisTopY - root.glowGutter" in tasks
+assert "TasksChassisPolicy.topMargin(" in tasks
 assert "y: root.frameTopInset" in tasks
 assert "anchors.topMargin: root.frameTopInset" in tasks
-assert "implicitHeight: frameHeight + frameTopInset + glowGutter" in tasks
-assert "frameHeight: 790" in tasks
+assert "implicitHeight: frameHeight + frameTopInset + bottomScreenGap" in tasks
+assert "readonly property int frameHeight: chassisFrame.height" in tasks
 
 assert "readonly property int glowGutter: 12" in time
 assert "readonly property int frameTopInset: 9" in time
@@ -57,10 +57,13 @@ assert "    margins {\n        top: 9\n        bottom: 0\n        right: 20\n   
 assert "width: weatherStation.menuOpen ? 1000 : 0" in weather
 assert "height: weatherStation.menuOpen ? 700 : 0" in weather
 
-# All three portrait widgets use a visible height of 790px on large outputs.
+# Compact retains the 790px TASKS and TimeW visible heights on large outputs.
+# Expanded/Large grow without losing the common 9px visible top inset.
 policy = source("widgets/FinanceChassisPolicy.js")
+tasks_policy = source("widgets/TasksChassisPolicy.js")
 assert 'mode === "expanded" ? 900 : 790' in policy
-assert 'readonly property int frameHeight: 790' in tasks
+assert 'mode === "large" ? 1345 : mode === "expanded" ? 1020 : 790' in tasks_policy
+assert 'var position = Number(chassisTopY) - Number(gutter);' in tasks_policy
 assert 'readonly property int frameHeight: 790' in time
 
 # Finance uses one 9px visible top line in Compact, Expanded and Fullscreen.

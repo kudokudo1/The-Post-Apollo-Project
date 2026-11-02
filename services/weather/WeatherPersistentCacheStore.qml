@@ -26,12 +26,17 @@ Scope {
 
     signal recordSaved(string sourceId)
 
-    function record(sourceId, nowMs) {
+    function record(sourceId, nowMs, scopeKey) {
         if (storageState !== "ready" && storageState !== "empty")
             return null;
 
         const saved = CachePolicy.record(document, sourceId);
         if (!saved)
+            return null;
+
+        const expectedScope = String(scopeKey || "");
+        if (expectedScope !== ""
+                && String(saved.scopeKey || "") !== expectedScope)
             return null;
 
         const spec = RuntimePolicy.sourceSpec(sourceId);
@@ -67,10 +72,15 @@ Scope {
         Qt.callLater(cache.applyDeferredUpdates);
     }
 
-    function deferRecord(sourceId, receivedAtMs, payload, savedAtMs) {
+    function deferRecord(
+        sourceId, receivedAtMs, payload, savedAtMs,
+        scopeKey, requestKey
+    ) {
         const record = CachePolicy.normalizeRecord(sourceId, {
             "receivedAtMs": receivedAtMs,
             "savedAtMs": savedAtMs,
+            "scopeKey": scopeKey,
+            "requestKey": requestKey,
             "payload": payload
         });
         if (!record)
@@ -93,11 +103,17 @@ Scope {
         return document;
     }
 
-    function put(sourceId, receivedAtMs, payload) {
+    function put(
+        sourceId, receivedAtMs, payload,
+        scopeKey, requestKey
+    ) {
         const now = Date.now();
 
         if (storageState === "loading")
-            return deferRecord(sourceId, receivedAtMs, payload, now);
+            return deferRecord(
+                sourceId, receivedAtMs, payload, now,
+                scopeKey, requestKey
+            );
 
         if (storageState !== "ready"
                 && storageState !== "empty"
@@ -109,7 +125,9 @@ Scope {
             sourceId,
             receivedAtMs,
             payload,
-            now
+            now,
+            scopeKey,
+            requestKey
         );
         if (!result.ok)
             return false;
@@ -137,7 +155,9 @@ Scope {
                 ids[i],
                 record.receivedAtMs,
                 record.payload,
-                record.savedAtMs
+                record.savedAtMs,
+                record.scopeKey,
+                record.requestKey
             );
             if (!result.ok) {
                 storageState = "error";

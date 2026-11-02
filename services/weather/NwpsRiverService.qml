@@ -9,6 +9,15 @@ import "NwpsRiverPolicy.js" as RiverPolicy
 Scope {
     id: river
 
+    property var cacheStore: null
+    property bool baseUsingPersistentCache: false
+    property bool stageflowUsingPersistentCache: false
+    property bool contextUsingPersistentCache: false
+    readonly property bool usingPersistentCache:
+        baseUsingPersistentCache
+        || stageflowUsingPersistentCache
+        || contextUsingPersistentCache
+    property string loadedKey: ""
     property bool active: true
     property var latitude: ""
     property var longitude: ""
@@ -46,9 +55,12 @@ Scope {
     property string contextGaugeId: ""
     property string inflightContextGaugeId: ""
 
+    readonly property string currentKey:
+        RiverPolicy.requestKey(latitude, longitude)
     readonly property var requestBox:
         RiverPolicy.boundedBox(latitude, longitude, 0.6)
-    readonly property bool configured: requestBox !== null
+    readonly property bool configured:
+        currentKey !== "" && requestBox !== null
     readonly property bool loading: riverFetch.running
     readonly property bool stageflowLoading: stageflowFetch.running
     readonly property bool contextLoading: contextFetch.running
@@ -69,6 +81,123 @@ Scope {
         : ""
 
 
+    function clearLoadedState() {
+        ready = false;
+        failed = false;
+        errorText = "";
+        gauge = null;
+        nearbyGauges = [];
+        loadedKey = "";
+        baseUsingPersistentCache = false;
+        clearStageflow();
+        clearContext();
+    }
+
+    function hydratePersistentCache() {
+        if (!cacheStore || !configured || ready)
+            return false;
+        const saved = cacheStore.record("river", Date.now(), currentKey);
+        if (!saved || !saved.payload || !saved.payload.gauge)
+            return false;
+
+        const expected = currentKey + "|"
+            + String(saved.payload.gauge.lid || "");
+        if (String(saved.requestKey || "") !== expected)
+            return false;
+
+        gauge = saved.payload.gauge;
+        nearbyGauges = Array.isArray(saved.payload.nearbyGauges)
+            ? saved.payload.nearbyGauges.slice() : [];
+        stageflow = saved.payload.stageflow || {
+            "observed": RiverPolicy.normalizeStageflowProduct(null),
+            "forecast": RiverPolicy.normalizeStageflowProduct(null)
+        };
+        stageflowGaugeId = String(saved.payload.stageflowGaugeId || "");
+        gaugeContext = saved.payload.gaugeContext || {
+            "available": false,
+            "thresholds": [],
+            "impacts": [],
+            "recentCrests": [],
+            "historicCrests": [],
+            "notes": []
+        };
+        contextGaugeId = String(saved.payload.contextGaugeId || "");
+
+        lastUpdated = new Date(saved.receivedAtMs);
+        ready = true;
+        failed = false;
+        errorText = "";
+        loadedKey = currentKey;
+        baseUsingPersistentCache = true;
+
+        stageflowReady = stageflowGaugeId === String(gauge.lid || "")
+            && ((stageflow.observed && stageflow.observed.available)
+                || (stageflow.forecast && stageflow.forecast.available));
+        if (stageflowReady) {
+            stageflowLastUpdated = new Date(saved.receivedAtMs);
+            stageflowUsingPersistentCache = true;
+        }
+
+        contextReady = contextGaugeId === String(gauge.lid || "")
+            && gaugeContext && gaugeContext.available === true;
+        if (contextReady) {
+            contextLastUpdated = new Date(saved.receivedAtMs);
+            contextUsingPersistentCache = true;
+        }
+        return true;
+    }
+
+    function persistRiver() {
+        if (!cacheStore || !configured || !ready || !gauge
+                || !lastUpdated)
+            return false;
+        const receivedAtMs = lastUpdated.getTime();
+        if (!isFinite(receivedAtMs) || receivedAtMs <= 0)
+            return false;
+        const requestKey = currentKey + "|" + String(gauge.lid || "");
+        return cacheStore.put(
+            "river",
+            receivedAtMs,
+            {
+                "locationKey": currentKey,
+                "gauge": gauge,
+                "nearbyGauges": nearbyGauges,
+                "stageflow": stageflowUsingPersistentCache
+                             ? null : stageflow,
+                "stageflowGaugeId": stageflowUsingPersistentCache
+                                    ? "" : stageflowGaugeId,
+                "gaugeContext": contextUsingPersistentCache
+                                ? null : gaugeContext,
+                "contextGaugeId": contextUsingPersistentCache
+                                  ? "" : contextGaugeId
+            },
+            currentKey,
+            requestKey
+        );
+    }
+
+    function reconcileLocationKey() {
+        if (loadedKey !== "" && loadedKey !== currentKey)
+            clearLoadedState();
+        if (configured)
+            hydratePersistentCache();
+        if (active && configured)
+            locationDebounce.restart();
+    }
+
+    Connections {
+        target: river.cacheStore
+        enabled: !!river.cacheStore
+        function onStorageStateChanged() {
+            if (!river.cacheStore)
+                return;
+            const state = String(river.cacheStore.storageState || "");
+            if ((state === "ready" || state === "empty")
+                    && river.configured)
+                river.hydratePersistentCache();
+        }
+    }
+
     function refresh() {
         if (!active || !configured || riverFetch.running)
             return false;
@@ -80,6 +209,7 @@ Scope {
         contextReady = false;
         contextFailed = false;
         contextErrorText = "";
+        contextUsingPersistentCache = false;
         gaugeContext = {
             "available": false,
             "thresholds": [],
@@ -119,6 +249,8 @@ Scope {
             contextReady = true;
             contextFailed = false;
             contextErrorText = "";
+            contextUsingPersistentCache = false;
+            persistRiver();
         } catch (error) {
             contextFailed = true;
             contextErrorText = "NWPS GAUGE CONTEXT UNAVAILABLE";
@@ -130,6 +262,7 @@ Scope {
         stageflowReady = false;
         stageflowFailed = false;
         stageflowErrorText = "";
+        stageflowUsingPersistentCache = false;
         stageflow = {
             "observed": RiverPolicy.normalizeStageflowProduct(null),
             "forecast": RiverPolicy.normalizeStageflowProduct(null)
@@ -169,6 +302,8 @@ Scope {
             stageflowReady = true;
             stageflowFailed = false;
             stageflowErrorText = "";
+            stageflowUsingPersistentCache = false;
+            persistRiver();
         } catch (error) {
             stageflowFailed = true;
             stageflowErrorText = "NWPS STAGEFLOW UNAVAILABLE";
@@ -193,6 +328,8 @@ Scope {
             failed = false;
             errorText = "";
             lastUpdated = new Date();
+            loadedKey = currentKey;
+            baseUsingPersistentCache = false;
 
             if (nextId !== previousId) {
                 clearStageflow();
@@ -207,6 +344,7 @@ Scope {
                 clearStageflow();
                 clearContext();
             }
+            persistRiver();
         } catch (error) {
             failed = true;
             errorText = "NWPS GAUGE FEED UNAVAILABLE";
@@ -295,18 +433,14 @@ Scope {
     }
 
     onActiveChanged: {
-        if (active && configured)
+        if (active && configured) {
+            hydratePersistentCache();
             locationDebounce.restart();
+        }
     }
-    onLatitudeChanged: {
-        if (active && configured)
-            locationDebounce.restart();
-    }
-    onLongitudeChanged: {
-        if (active && configured)
-            locationDebounce.restart();
-    }
+    onCurrentKeyChanged: reconcileLocationKey()
     Component.onCompleted: {
+        hydratePersistentCache();
         if (active && configured)
             locationDebounce.restart();
     }

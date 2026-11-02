@@ -37,6 +37,15 @@ function distanceKm(latA, lonA, latB, lonB) {
     );
 }
 
+function requestKey(latitudeRaw, longitudeRaw) {
+    const latitude = validNumber(latitudeRaw);
+    const longitude = validNumber(longitudeRaw);
+    if (latitude === null || longitude === null
+            || Math.abs(latitude) > 90 || Math.abs(longitude) > 180)
+        return "";
+    return latitude.toFixed(3) + "|" + longitude.toFixed(3);
+}
+
 function boundedBox(latitudeRaw, longitudeRaw, radiusDegrees) {
     const latitude = validNumber(latitudeRaw);
     const longitude = validNumber(longitudeRaw);

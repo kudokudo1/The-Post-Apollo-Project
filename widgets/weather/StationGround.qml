@@ -15,6 +15,7 @@ Rectangle {
     property var weatherService: null
     property var nwsAlertSource: null
     property var seismicSource: null
+    property var persistentCacheStore: null
     property real runtimeNowMs: Date.now()
 
     readonly property var runtimeRows: [
@@ -90,7 +91,8 @@ Rectangle {
                 "ready": riverService.ready,
                 "loading": riverService.loading,
                 "errorText": riverService.errorText,
-                "receivedAt": riverService.lastUpdated
+                "receivedAt": riverService.lastUpdated,
+                "usingCache": riverService.usingPersistentCache
             },
             runtimeNowMs
         ),
@@ -103,7 +105,8 @@ Rectangle {
                 "errorText": marineService.errorText,
                 "receivedAt": marineService.lastUpdated,
                 "observedAt": marineService.station
-                              ? marineService.station.sampleMillis : -1
+                              ? marineService.station.sampleMillis : -1,
+                "usingCache": marineService.usingPersistentCache
             },
             runtimeNowMs
         ),
@@ -116,7 +119,8 @@ Rectangle {
                 "errorText": coastalService.errorText,
                 "receivedAt": coastalService.lastUpdated,
                 "observedAt": coastalService.waterLevel
-                              ? coastalService.waterLevel.sampleMillis : -1
+                              ? coastalService.waterLevel.sampleMillis : -1,
+                "usingCache": coastalService.usingPersistentCache
             },
             runtimeNowMs
         ),
@@ -152,6 +156,7 @@ Rectangle {
 
     WeatherServices.NwpsRiverService {
         id: riverService
+        cacheStore: ground.persistentCacheStore
         active: ground.visible
         latitude: weatherService ? weatherService.latitude : ""
         longitude: weatherService ? weatherService.longitude : ""
@@ -159,6 +164,7 @@ Rectangle {
 
     WeatherServices.NdbcMarineService {
         id: marineService
+        cacheStore: ground.persistentCacheStore
         active: ground.visible
         latitude: weatherService ? weatherService.latitude : ""
         longitude: weatherService ? weatherService.longitude : ""
@@ -166,6 +172,7 @@ Rectangle {
 
     WeatherServices.CoopsCoastalService {
         id: coastalService
+        cacheStore: ground.persistentCacheStore
         active: ground.visible
         latitude: weatherService ? weatherService.latitude : ""
         longitude: weatherService ? weatherService.longitude : ""

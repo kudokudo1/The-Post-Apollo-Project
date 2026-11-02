@@ -9,6 +9,12 @@ import "CoopsCoastalPolicy.js" as CoastalPolicy
 Scope {
     id: coastal
 
+    property var cacheStore: null
+    property bool waterUsingPersistentCache: false
+    property bool tideUsingPersistentCache: false
+    readonly property bool usingPersistentCache:
+        waterUsingPersistentCache || tideUsingPersistentCache
+    property string loadedKey: ""
     property bool active: true
     property var latitude: ""
     property var longitude: ""
@@ -30,6 +36,8 @@ Scope {
     property string waterErrorText: ""
     property string tideErrorText: ""
     property date lastUpdated
+    property date waterLastUpdated
+    property date tideLastUpdated
 
     property var waterCatalog: []
     property var tideCatalog: []
@@ -44,6 +52,119 @@ Scope {
     readonly property bool loading:
         catalogFetch.running || waterFetch.running || tideFetch.running
     readonly property int catalogTtlMs: 86400000
+
+    function clearLoadedState() {
+        ready = false;
+        failed = false;
+        errorText = "";
+        waterReady = false;
+        tideReady = false;
+        waterFailed = false;
+        tideFailed = false;
+        waterErrorText = "";
+        tideErrorText = "";
+        waterStation = null;
+        tideStation = null;
+        waterLevel = null;
+        tidePredictions = [];
+        loadedKey = "";
+        waterUsingPersistentCache = false;
+        tideUsingPersistentCache = false;
+    }
+
+    function hydratePersistentCache() {
+        if (!cacheStore || !configured || ready)
+            return false;
+        const saved = cacheStore.record("coastal", Date.now(), currentKey);
+        if (!saved || !saved.payload
+                || !saved.payload.waterStation
+                || !saved.payload.tideStation)
+            return false;
+
+        const expected = currentKey + "|"
+            + String(saved.payload.waterStation.id || "") + "|"
+            + String(saved.payload.tideStation.id || "");
+        if (String(saved.requestKey || "") !== expected)
+            return false;
+
+        waterStation = saved.payload.waterStation;
+        tideStation = saved.payload.tideStation;
+        waterLevel = saved.payload.waterLevel || null;
+        tidePredictions = Array.isArray(saved.payload.tidePredictions)
+            ? saved.payload.tidePredictions.slice() : [];
+        waterReady = !!waterLevel;
+        tideReady = tidePredictions.length > 0;
+        if (!waterReady && !tideReady)
+            return false;
+
+        waterLastUpdated = waterReady
+            ? new Date(saved.receivedAtMs) : waterLastUpdated;
+        tideLastUpdated = tideReady
+            ? new Date(saved.receivedAtMs) : tideLastUpdated;
+        lastUpdated = new Date(saved.receivedAtMs);
+        ready = true;
+        failed = false;
+        errorText = "";
+        loadedKey = currentKey;
+        waterUsingPersistentCache = waterReady;
+        tideUsingPersistentCache = tideReady;
+        return true;
+    }
+
+    function persistProducts() {
+        if (!cacheStore || !configured || !ready
+                || !waterStation || !tideStation)
+            return false;
+
+        const waterMs = waterReady && waterLastUpdated
+            ? waterLastUpdated.getTime() : -1;
+        const tideMs = tideReady && tideLastUpdated
+            ? tideLastUpdated.getTime() : -1;
+        let receivedAtMs = Math.max(waterMs, tideMs);
+        if (waterMs > 0 && tideMs > 0)
+            receivedAtMs = Math.min(waterMs, tideMs);
+        if (!isFinite(receivedAtMs) || receivedAtMs <= 0)
+            return false;
+
+        const requestKey = currentKey + "|"
+            + String(waterStation.id || "") + "|"
+            + String(tideStation.id || "");
+        return cacheStore.put(
+            "coastal",
+            receivedAtMs,
+            {
+                "locationKey": currentKey,
+                "waterStation": waterStation,
+                "tideStation": tideStation,
+                "waterLevel": waterLevel,
+                "tidePredictions": tidePredictions
+            },
+            currentKey,
+            requestKey
+        );
+    }
+
+    function reconcileLocationKey() {
+        if (loadedKey !== "" && loadedKey !== currentKey)
+            clearLoadedState();
+        if (configured)
+            hydratePersistentCache();
+        if (active && configured)
+            locationDebounce.restart();
+    }
+
+    Connections {
+        target: coastal.cacheStore
+        enabled: !!coastal.cacheStore
+        function onStorageStateChanged() {
+            if (!coastal.cacheStore)
+                return;
+            const state = String(coastal.cacheStore.storageState || "");
+            if ((state === "ready" || state === "empty")
+                    && coastal.configured)
+                coastal.hydratePersistentCache();
+        }
+    }
 
     function catalogEndpoint(kind) {
         return "https://api.tidesandcurrents.noaa.gov/mdapi/prod/"
@@ -211,10 +332,14 @@ Scope {
             waterReady = true;
             waterFailed = false;
             waterErrorText = "";
-            lastUpdated = new Date();
+            waterLastUpdated = new Date();
+            lastUpdated = waterLastUpdated;
             ready = waterReady || tideReady;
             failed = false;
             errorText = "";
+            loadedKey = currentKey;
+            waterUsingPersistentCache = false;
+            persistProducts();
         } catch (error) {
             waterFailed = true;
             waterErrorText = "CO-OPS WATER LEVEL UNAVAILABLE";
@@ -233,10 +358,14 @@ Scope {
             tideReady = true;
             tideFailed = false;
             tideErrorText = "";
-            lastUpdated = new Date();
+            tideLastUpdated = new Date();
+            lastUpdated = tideLastUpdated;
             ready = waterReady || tideReady;
             failed = false;
             errorText = "";
+            loadedKey = currentKey;
+            tideUsingPersistentCache = false;
+            persistProducts();
         } catch (error) {
             tideFailed = true;
             tideErrorText = "CO-OPS TIDE PREDICTIONS UNAVAILABLE";
@@ -313,18 +442,14 @@ Scope {
     }
 
     onActiveChanged: {
-        if (active && configured)
+        if (active && configured) {
+            hydratePersistentCache();
             locationDebounce.restart();
+        }
     }
-    onLatitudeChanged: {
-        if (active && configured)
-            locationDebounce.restart();
-    }
-    onLongitudeChanged: {
-        if (active && configured)
-            locationDebounce.restart();
-    }
+    onCurrentKeyChanged: reconcileLocationKey()
     Component.onCompleted: {
+        hydratePersistentCache();
         if (active && configured)
             locationDebounce.restart();
     }

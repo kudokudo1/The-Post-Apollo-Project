@@ -18,8 +18,13 @@ Rectangle {
     property string archiveStatusText: "NOT ARCHIVED"
     property var archiveRows: []
     property var archiveDiff: null
+    property var archivePairDiff: null
+    property bool archivePairCustom: false
+    property int archiveEarlierPosition: 0
+    property int archiveLaterPosition: 0
     property real runtimeNowMs: Date.now()
     signal archiveRequested()
+    signal archivePairRequested(int earlier, int later)
     property color accentColor: Colors.magenta
 
     readonly property int companionCount:
@@ -30,9 +35,11 @@ Rectangle {
         Array.isArray(relationshipRows) ? relationshipRows.length : 0
     readonly property int archiveRowCount:
         Array.isArray(archiveRows) ? archiveRows.length : 0
+    readonly property var displayedArchiveDiff:
+        archivePairCustom ? archivePairDiff : archiveDiff
     readonly property int archiveDiffCount:
-        archiveDiff && Array.isArray(archiveDiff.changes)
-        ? archiveDiff.changes.length : 0
+        displayedArchiveDiff && Array.isArray(displayedArchiveDiff.changes)
+        ? displayedArchiveDiff.changes.length : 0
     readonly property bool floodRelevant:
         !!floodContext && floodContext.relevant === true
     readonly property int floodHeight:
@@ -113,7 +120,7 @@ Rectangle {
           + Math.min(5, archiveRowCount) * 42
           + (archiveSnapshotCount > 0 ? 30 : 0)
           + (archiveSnapshotCount === 1 ? 32 : 0)
-          + (archiveSnapshotCount >= 2 ? 30 : 0)
+          + (archiveSnapshotCount >= 2 ? 110 : 0)
           + Math.min(8, archiveDiffCount) * 40
           + Math.min(4, companionCount) * 42
           + Math.min(6, timelineCount) * 48
@@ -277,9 +284,114 @@ Rectangle {
             spacing: 4
             visible: card.archiveSnapshotCount > 0
 
+            Column {
+                width: parent.width
+                spacing: 4
+                visible: card.archiveSnapshotCount >= 2
+
+                Row {
+                    width: parent.width
+                    height: 27
+                    spacing: 6
+
+                    GohuText {
+                        width: Math.max(90, parent.width - 156)
+                        anchors.verticalCenter: parent.verticalCenter
+                        text: "EARLIER // SNAP " + card.archiveEarlierPosition
+                            + "/" + card.archiveSnapshotCount
+                        font.pixelSize: 9
+                        color: Colors.magenta
+                        elide: Text.ElideRight
+                    }
+
+                    ActionButton {
+                        width: 70
+                        height: 26
+                        label: "OLDER"
+                        labelPixelSize: 8
+                        accentColor: Colors.magenta
+                        available: card.archiveEarlierPosition > 1
+                        onClicked: card.archivePairRequested(
+                            card.archiveEarlierPosition - 1,
+                            card.archiveLaterPosition
+                        )
+                    }
+
+                    ActionButton {
+                        width: 70
+                        height: 26
+                        label: "NEWER"
+                        labelPixelSize: 8
+                        accentColor: Colors.magenta
+                        available: card.archiveEarlierPosition + 1
+                            < card.archiveLaterPosition
+                        onClicked: card.archivePairRequested(
+                            card.archiveEarlierPosition + 1,
+                            card.archiveLaterPosition
+                        )
+                    }
+                }
+
+                Row {
+                    width: parent.width
+                    height: 27
+                    spacing: 6
+
+                    GohuText {
+                        width: Math.max(90, parent.width - 156)
+                        anchors.verticalCenter: parent.verticalCenter
+                        text: "LATER // SNAP " + card.archiveLaterPosition
+                            + "/" + card.archiveSnapshotCount
+                        font.pixelSize: 9
+                        color: Colors.cyan
+                        elide: Text.ElideRight
+                    }
+
+                    ActionButton {
+                        width: 70
+                        height: 26
+                        label: "OLDER"
+                        labelPixelSize: 8
+                        accentColor: Colors.cyan
+                        available: card.archiveLaterPosition >
+                            card.archiveEarlierPosition + 1
+                        onClicked: card.archivePairRequested(
+                            card.archiveEarlierPosition,
+                            card.archiveLaterPosition - 1
+                        )
+                    }
+
+                    ActionButton {
+                        width: 70
+                        height: 26
+                        label: "NEWER"
+                        labelPixelSize: 8
+                        accentColor: Colors.cyan
+                        available: card.archiveLaterPosition
+                            < card.archiveSnapshotCount
+                        onClicked: card.archivePairRequested(
+                            card.archiveEarlierPosition,
+                            card.archiveLaterPosition + 1
+                        )
+                    }
+                }
+
+                QuietText {
+                    width: parent.width
+                    text: "SELECT ANY RETAINED PAIR // EARLIER MUST PRECEDE LATER"
+                    font.pixelSize: 8
+                    color: Colors.orange
+                    elide: Text.ElideRight
+                }
+            }
+
             GohuText {
                 width: parent.width
-                text: "LATEST ARCHIVE DIFF // NEWEST VS PREVIOUS"
+                text: card.archivePairCustom
+                    ? "SELECTED ARCHIVE DIFF // SNAP "
+                        + card.archiveEarlierPosition + " → "
+                        + card.archiveLaterPosition
+                    : "LATEST ARCHIVE DIFF // NEWEST VS PREVIOUS"
                 font.pixelSize: 10
                 color: Colors.cyan
             }
@@ -295,8 +407,8 @@ Rectangle {
 
             QuietText {
                 visible: card.archiveSnapshotCount >= 2
-                         && card.archiveDiff
-                         && card.archiveDiff.available
+                         && card.displayedArchiveDiff
+                         && card.displayedArchiveDiff.available
                          && card.archiveDiffCount === 0
                 width: parent.width
                 text: "NO EVIDENCE-FIELD DIFFERENCE // CAPTURE TIME IS NOT COUNTED AS A PROVIDER CHANGE"
@@ -306,9 +418,9 @@ Rectangle {
             }
 
             Repeater {
-                model: card.archiveDiff
-                       && Array.isArray(card.archiveDiff.changes)
-                    ? card.archiveDiff.changes.slice(0, 8)
+                model: card.displayedArchiveDiff
+                       && Array.isArray(card.displayedArchiveDiff.changes)
+                    ? card.displayedArchiveDiff.changes.slice(0, 8)
                     : []
 
                 delegate: Rectangle {

@@ -704,3 +704,16 @@ function latestDiff(document, sourceId, eventId, nowMs) {
     );
 }
 
+// Retained positions are one-based, oldest-first and never permanent IDs.
+// Invalid, reversed or missing selections fail closed without fallback.
+function pairDiff(document, sourceId, eventId, nowMs, earlierPosition, laterPosition) {
+    const rows = snapshots(document, sourceId, eventId, nowMs);
+    const earlier = Number(earlierPosition);
+    const later = Number(laterPosition);
+    if (rows.length < 2
+            || !Number.isInteger(earlier) || !Number.isInteger(later)
+            || earlier < 1 || later > rows.length || earlier >= later)
+        return snapshotDiff(null, null);
+    return snapshotDiff(rows[earlier - 1], rows[later - 1]);
+}
+

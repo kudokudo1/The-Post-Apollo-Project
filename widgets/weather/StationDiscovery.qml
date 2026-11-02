@@ -471,6 +471,22 @@ Rectangle {
             ? Number(eventArchiveStore.revision || 0) : 0;
     }
 
+    // Pair selections belong to the currently inspected provider-native event.
+    // Clear positional choices after event switches or archive retention changes.
+    property int archiveEarlierPosition: 0
+    property int archiveLaterPosition: 0
+    readonly property string archivePairIdentity:
+        selectedContextSourceId + "|" + (selectedEventContext
+            ? String(selectedEventContext.id || "") : "")
+    onArchivePairIdentityChanged: {
+        archiveEarlierPosition = 0;
+        archiveLaterPosition = 0;
+    }
+    onSelectedArchiveRevisionChanged: {
+        archiveEarlierPosition = 0;
+        archiveLaterPosition = 0;
+    }
+
     readonly property int selectedArchiveCount: {
         const revision = selectedArchiveRevision;
         if (!eventArchiveStore || !selectedEventContext)
@@ -503,6 +519,42 @@ Rectangle {
             selectedEventContext.id,
             runtimeNowMs
         );
+    }
+
+    readonly property int resolvedArchiveEarlierPosition:
+        archiveEarlierPosition > 0 ? archiveEarlierPosition
+            : Math.max(1, selectedArchiveCount - 1)
+    readonly property int resolvedArchiveLaterPosition:
+        archiveLaterPosition > 0 ? archiveLaterPosition
+            : selectedArchiveCount
+    readonly property bool archivePairCustom:
+        archiveEarlierPosition > 0 && archiveLaterPosition > 0
+
+    readonly property var selectedArchivePairDiff: {
+        const revision = selectedArchiveRevision;
+        if (!eventArchiveStore || !selectedEventContext
+                || selectedArchiveCount < 2)
+            return null;
+        return eventArchiveStore.pairDiff(
+            selectedContextSourceId,
+            selectedEventContext.id,
+            runtimeNowMs,
+            resolvedArchiveEarlierPosition,
+            resolvedArchiveLaterPosition
+        );
+    }
+
+    function selectArchivePair(earlierPosition, laterPosition) {
+        const earlier = Number(earlierPosition);
+        const later = Number(laterPosition);
+        if (selectedArchiveCount < 2
+                || !Number.isInteger(earlier) || !Number.isInteger(later)
+                || earlier < 1 || later > selectedArchiveCount
+                || earlier >= later)
+            return false;
+        archiveEarlierPosition = earlier;
+        archiveLaterPosition = later;
+        return true;
     }
 
     readonly property bool selectedArchiveAvailable:
@@ -3446,10 +3498,20 @@ Rectangle {
                         stationDiscovery.selectedArchiveRows
                     archiveDiff:
                         stationDiscovery.selectedArchiveDiff
+                    archivePairDiff:
+                        stationDiscovery.selectedArchivePairDiff
+                    archivePairCustom:
+                        stationDiscovery.archivePairCustom
+                    archiveEarlierPosition:
+                        stationDiscovery.resolvedArchiveEarlierPosition
+                    archiveLaterPosition:
+                        stationDiscovery.resolvedArchiveLaterPosition
                     accentColor:
                         stationDiscovery.eventContextAccentColor()
                     onArchiveRequested:
                         stationDiscovery.archiveSelectedEvent()
+                    onArchivePairRequested: (earlier, later) =>
+                        stationDiscovery.selectArchivePair(earlier, later)
                 }
             }
 

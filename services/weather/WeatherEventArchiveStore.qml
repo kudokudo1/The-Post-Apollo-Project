@@ -98,6 +98,17 @@ Scope {
         );
     }
 
+    function pairDiff(sourceId, eventId, nowMs, earlierPosition, laterPosition) {
+        return ArchivePolicy.pairDiff(
+            workingDocument(),
+            sourceId,
+            eventId,
+            Number(nowMs) > 0 ? Number(nowMs) : Date.now(),
+            earlierPosition,
+            laterPosition
+        );
+    }
+
     function deferRequest(sourceId, row, capturedAtMs) {
         const next = deferredRequests.slice();
         next.push({

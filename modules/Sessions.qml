@@ -17,8 +17,9 @@ DockButton {
 
     open: menuOpen
 
-    // Keep Social's existing green identity while closed and the standard
-    // magenta foreground while open. Decorations stay white in both states.
+    // Keep Social's existing green identity while closed. In the open
+    // state, both ornament runs join the telephone's magenta foreground
+    // and the DockButton's existing magenta composite artwork glow.
     normalForegroundColor: Colors.omnitrix
     hoverForegroundColor: Colors.omnitrix
     pressedForegroundColor: Colors.omnitrix
@@ -40,7 +41,9 @@ DockButton {
         anchors.centerIn: parent
         font.pixelSize: 21
         textFormat: Text.StyledText
-        color: Colors.white
+        // Right-side unstyled stars use this default; phone stays styled
+        // separately via DockButton.foregroundColor.
+        color: sessionsDock.open ? sessionsDock.openForegroundColor : Colors.white
         // Preserve the ORIGINAL glyph advances for the phone and right star.
         // The left marks retain their original place in the shaping run but
         // are transparent there; only their visible overlay moves right.
@@ -56,7 +59,8 @@ DockButton {
             anchors.baseline: parent.baseline
             font.pixelSize: sessionsIcon.font.pixelSize
             textFormat: Text.PlainText
-            color: Colors.white
+            // Left overlay must match the right stars when Social is open.
+            color: sessionsDock.open ? sessionsDock.openForegroundColor : Colors.white
             text: "࣪˖"
         }
     }

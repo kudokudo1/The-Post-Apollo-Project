@@ -16,6 +16,8 @@ Item {
     property var localDirectoryStore: null
     // Local portfolio groupings are display metadata, never verified rights.
     property var localPortfoliosStore: null
+    // Local division/department/location/team labels, never verified grants.
+    property var localStructureStore: null
     // Manual Social label associations only, not Identity Center grants.
     property var localLinksStore: null
     property var socialIdentitiesSnapshot: null
@@ -198,6 +200,12 @@ Item {
                         width: parent.width
                         directoryStore: sections.localDirectoryStore
                         portfolioStore: sections.localPortfoliosStore
+                    }
+
+                    IdentityCenterLocalStructureEditor {
+                        width: parent.width
+                        directoryStore: sections.localDirectoryStore
+                        structureStore: sections.localStructureStore
                     }
 
                     IdentityCenterLocalSocialLinksEditor {

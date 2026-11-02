@@ -1,0 +1,329 @@
+import QtQuick
+import "../../components"
+
+// Local structural labels, never verified company scopes or staff permissions.
+// Functional units and geographic locations are separate categories.
+Column {
+    id: editor
+    property var directoryStore: null
+    property var structureStore: null
+    property string selectedOrgId: ""
+    property string selectedKind: "division"
+    property bool showArchivedUnits: false
+    property bool showArchivedOrganizations: false
+    property string confirmationKey: ""
+
+    readonly property bool ready: structureStore !== null
+                                  && structureStore.state === "ready"
+    readonly property var organizations:
+        directoryStore && directoryStore.state === "ready"
+        ? directoryStore.saved.organizations : []
+    readonly property var selectedOrganization:
+        organizations.find(function(org) {
+            return org.id === editor.selectedOrgId;
+        }) || null
+    readonly property bool activeOrganization:
+        selectedOrganization !== null && !selectedOrganization.archived
+    readonly property var visibleOrganizations:
+        organizations.filter(function(org) {
+            return !org.archived || editor.showArchivedOrganizations;
+        })
+    readonly property var visibleUnits: structureStore && structureStore.saved
+        ? structureStore.saved.units.filter(function(unit) {
+            return unit.orgId === editor.selectedOrgId
+                && unit.kind === editor.selectedKind
+                && (!unit.archived || editor.showArchivedUnits);
+        }) : []
+    readonly property var allUnits: structureStore && structureStore.saved
+        ? structureStore.saved.units : []
+    readonly property bool canEdit: ready && activeOrganization
+    width: parent ? parent.width : 400
+    spacing: 9
+
+    Rectangle {
+        width: parent.width
+        height: 1
+        color: Colors.cyan
+        opacity: 0.45
+    }
+    Text {
+        width: parent.width
+        text: "MY STRUCTURE // LOCAL ORGANIZATION UNITS"
+        color: Colors.cyan
+        font.bold: true
+        font.pixelSize: 12
+        wrapMode: Text.WordWrap
+    }
+    Text {
+        width: parent.width
+        text: "Create divisions, departments, locations and teams for each " +
+              "organization. Functional groups and places remain separate. " +
+              "These are labels only, not reporting lines, staffing or permissions."
+        color: Colors.orange
+        font.pixelSize: 10
+        wrapMode: Text.WordWrap
+    }
+    Text {
+        width: parent.width
+        visible: !editor.ready
+        text: !structureStore ? "STRUCTURE STORAGE // UNAVAILABLE"
+              : structureStore.state === "error"
+              ? "STRUCTURE STORAGE ERROR // " + structureStore.errorCode
+              : "STRUCTURE STORAGE // " + structureStore.state.toUpperCase()
+        color: Colors.orange
+        font.pixelSize: 10
+        wrapMode: Text.WordWrap
+    }
+    ActionButton {
+        width: 149
+        height: 28
+        label: "RELOAD STRUCTURE"
+        labelPixelSize: 9
+        interactive: structureStore !== null && structureStore.state !== "saving"
+        onTriggered: structureStore.refresh()
+    }
+    Text {
+        width: parent.width
+        text: "1 // ORGANIZATION"
+        color: Colors.cyan
+        font.bold: true
+        font.pixelSize: 10
+    }
+    Flow {
+        width: parent.width
+        spacing: 5
+        height: childrenRect.height
+        Repeater {
+            model: editor.visibleOrganizations
+            delegate: ActionButton {
+                required property var modelData
+                width: Math.min(190, Math.max(110, editor.width - 12))
+                height: 29
+                label: modelData.name + (modelData.archived ? " [ARCHIVED]" : "")
+                labelPixelSize: 9
+                selected: editor.selectedOrgId === modelData.id
+                onTriggered: {
+                    editor.selectedOrgId = modelData.id;
+                    editor.confirmationKey = "";
+                }
+            }
+        }
+    }
+    ActionButton {
+        width: 170
+        height: 27
+        label: editor.showArchivedOrganizations
+               ? "HIDE ARCHIVED ORGS" : "SHOW ARCHIVED ORGS"
+        labelPixelSize: 9
+        onTriggered: editor.showArchivedOrganizations = !editor.showArchivedOrganizations
+    }
+    Text {
+        width: parent.width
+        visible: editor.organizations.length === 0
+        text: "Add an organization in MY ORGANIZATIONS above first."
+        color: Colors.orange
+        font.pixelSize: 10
+        wrapMode: Text.WordWrap
+    }
+    Text {
+        width: parent.width
+        visible: editor.selectedOrganization !== null
+                 && editor.selectedOrganization.archived
+        text: "This organization is archived. Its units remain visible, " +
+              "but editing and restoration require restoring the organization first."
+        color: Colors.orange
+        font.pixelSize: 10
+        wrapMode: Text.WordWrap
+    }
+
+    Text {
+        width: parent.width
+        text: "2 // UNIT CATEGORY"
+        color: Colors.cyan
+        font.bold: true
+        font.pixelSize: 10
+    }
+    Flow {
+        width: parent.width
+        spacing: 5
+        height: childrenRect.height
+        Repeater {
+            model: [
+                {id:"division", label:"DIVISIONS"},
+                {id:"department", label:"DEPARTMENTS"},
+                {id:"location", label:"LOCATIONS"},
+                {id:"team", label:"TEAMS"}
+            ]
+            delegate: ActionButton {
+                required property var modelData
+                width: 113
+                height: 29
+                label: modelData.label
+                labelPixelSize: 9
+                selected: editor.selectedKind === modelData.id
+                onTriggered: {
+                    editor.selectedKind = modelData.id;
+                    editor.confirmationKey = "";
+                }
+            }
+        }
+    }
+    Text {
+        width: parent.width
+        text: editor.selectedKind === "location"
+              ? "Locations are geographic labels. Existing branches remain " +
+                "separate records; no branch is automatically moved or copied."
+              : "Functional units can operate across different locations. " +
+                "No automatic parent, manager or staffing relationship is created."
+        font.pixelSize: 10
+        color: Colors.white
+        wrapMode: Text.WordWrap
+    }
+    Row {
+        width: parent.width
+        spacing: 6
+        Rectangle {
+            width: Math.max(100, parent.width - 148)
+            height: 30
+            color: Colors.black
+            border.color: Colors.cyan
+            TextInput {
+                id: newUnitName
+                anchors.fill: parent
+                anchors.margins: 6
+                color: Colors.white
+                font.pixelSize: 11
+                maximumLength: 80
+                clip: true
+                enabled: editor.canEdit
+                verticalAlignment: TextInput.AlignVCenter
+            }
+            Text {
+                anchors.verticalCenter: parent.verticalCenter
+                anchors.left: parent.left
+                anchors.leftMargin: 6
+                text: "New " + editor.selectedKind
+                color: Colors.cyan
+                opacity: 0.65
+                font.pixelSize: 10
+                visible: newUnitName.text.length === 0
+            }
+        }
+        ActionButton {
+            width: 136
+            height: 30
+            label: "+ ADD UNIT"
+            labelPixelSize: 9
+            interactive: editor.canEdit && newUnitName.text.trim().length > 0
+            onTriggered: {
+                if (structureStore.createUnit(editor.selectedOrgId,
+                                              editor.selectedKind, newUnitName.text))
+                    newUnitName.text = "";
+            }
+        }
+    }
+    Row {
+        spacing: 6
+        ActionButton {
+            width: 174
+            height: 28
+            label: editor.showArchivedUnits ? "HIDE ARCHIVED UNITS"
+                                           : "SHOW ARCHIVED UNITS"
+            labelPixelSize: 9
+            onTriggered: {
+                editor.showArchivedUnits = !editor.showArchivedUnits;
+                editor.confirmationKey = "";
+            }
+        }
+    }
+    Text {
+        width: parent.width
+        visible: editor.selectedOrganization === null
+        text: "Select an organization to view its structure."
+        color: Colors.white
+        font.pixelSize: 10
+    }
+    Text {
+        width: parent.width
+        visible: editor.selectedOrganization !== null
+                 && editor.ready && editor.visibleUnits.length === 0
+        text: "No " + editor.selectedKind + " records in this view."
+        color: Colors.white
+        font.pixelSize: 10
+    }
+    Repeater {
+        model: editor.visibleUnits
+        delegate: Column {
+            id: unitRow
+            required property var modelData
+            width: editor.width
+            spacing: 5
+            Rectangle {
+                width: parent.width
+                height: 1
+                color: Colors.cyan
+                opacity: 0.28
+            }
+            Text {
+                width: parent.width
+                text: modelData.kind.toUpperCase() + " // " + modelData.id
+                      + (modelData.archived ? " // ARCHIVED" : " // LOCAL ONLY")
+                color: modelData.archived ? Colors.orange : Colors.cyan
+                font.pixelSize: 10
+                font.bold: true
+                wrapMode: Text.WordWrap
+            }
+            Row {
+                width: parent.width
+                spacing: 6
+                Rectangle {
+                    width: Math.max(100, parent.width - 202)
+                    height: 30
+                    color: Colors.black
+                    border.color: Colors.cyan
+                    TextInput {
+                        id: unitName
+                        anchors.fill: parent
+                        anchors.margins: 6
+                        text: unitRow.modelData.name
+                        color: Colors.white
+                        font.pixelSize: 10
+                        maximumLength: 80
+                        clip: true
+                        readOnly: !editor.canEdit || unitRow.modelData.archived
+                        verticalAlignment: TextInput.AlignVCenter
+                    }
+                }
+                ActionButton {
+                    width: 62
+                    height: 30
+                    label: "SAVE"
+                    labelPixelSize: 9
+                    interactive: editor.canEdit && !unitRow.modelData.archived
+                    onTriggered: structureStore.renameUnit(
+                        unitRow.modelData.id, unitName.text)
+                }
+                ActionButton {
+                    width: 128
+                    height: 30
+                    label: unitRow.modelData.archived ? "RESTORE"
+                           : editor.confirmationKey === "unit:" + unitRow.modelData.id
+                           ? "CONFIRM ARCHIVE" : "ARCHIVE"
+                    labelPixelSize: 8
+                    accentColor: Colors.orange
+                    interactive: editor.canEdit
+                    onTriggered: {
+                        if (unitRow.modelData.archived)
+                            structureStore.restoreUnit(unitRow.modelData.id);
+                        else if (editor.confirmationKey ===
+                                 "unit:" + unitRow.modelData.id) {
+                            structureStore.archiveUnit(unitRow.modelData.id);
+                            editor.confirmationKey = "";
+                        } else
+                            editor.confirmationKey = "unit:" + unitRow.modelData.id;
+                    }
+                }
+            }
+        }
+    }
+}

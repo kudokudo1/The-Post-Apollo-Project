@@ -7,3 +7,4 @@ singleton SocialTrayBridge 1.0 SocialTrayBridge.qml
 singleton SocialOrganizationDirectoryStore 1.0 SocialOrganizationDirectoryStore.qml
 singleton SocialOrganizationLinksStore 1.0 SocialOrganizationLinksStore.qml
 singleton SocialLocalPortfoliosStore 1.0 SocialLocalPortfoliosStore.qml
+singleton SocialLocalOrganizationStructureStore 1.0 SocialLocalOrganizationStructureStore.qml

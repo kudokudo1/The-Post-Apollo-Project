@@ -86,7 +86,7 @@ assert.match(producer, /POST_APOLLO_NWS_ALERT_POINT/);
 assert.match(producer, /api\.weather\.gov\/alerts\/active\?point=/);
 assert.match(producer, /Accept: application\/geo\+json/);
 assert.match(producer, /Post-Apollo-WeatherStation/);
-assert.match(producer, /interval: 900000/);
+assert.match(producer, /interval: 300000/);
 assert.match(producer, /readonly property var alertList: NwsPolicy\.visibleAlerts\(activeAlerts\)/);
 assert.match(producer, /readonly property bool configured: alertPoint !== ""/);
 assert.match(producer, /producer\.lastUpdated = new Date\(\)/);

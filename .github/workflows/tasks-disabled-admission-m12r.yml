@@ -1,0 +1,47 @@
+name: TASKS M12r disabled admission and recovery preflight
+
+on:
+  pull_request:
+    paths:
+      - 'services/hub/ApolloHubTodoStore.qml'
+      - 'services/hub/TaskLocalTicketProducerM12q.js'
+      - 'services/hub/ApolloHubTodoPolicy.js'
+      - 'tests/tasks/test_task_disabled_admission_m12r.cjs'
+      - 'docs/tasks-disabled-ticket-admission-m12r.md'
+      - '.github/workflows/tasks-disabled-admission-m12r.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'services/hub/ApolloHubTodoStore.qml'
+      - 'services/hub/TaskLocalTicketProducerM12q.js'
+      - 'services/hub/ApolloHubTodoPolicy.js'
+      - 'tests/tasks/test_task_disabled_admission_m12r.cjs'
+      - '.github/workflows/tasks-disabled-admission-m12r.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  disabled-ticket-admission:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Actual dormant QML functions with mock FileView
+        run: node --test tests/tasks/test_task_disabled_admission_m12r.cjs
+      - name: M12q ticket planning and readback policy
+        run: node --test tests/tasks/test_task_local_ticket_producer_m12q.cjs
+      - name: M12p Hub draft-preservation regression
+        run: node --test tests/tasks/test_task_hub_ticket_presenter_m12p.cjs
+      - name: M12o four-consumer contract
+        run: node --test tests/tasks/test_task_disabled_ticket_api_m12o.cjs
+      - name: M11d one FileView and nine mutations
+        run: python3 tests/tasks/test_task_writer_gate_inventory_m11d.py
+      - name: M11t production trust gates remain open
+        run: python3 tests/tasks/test_task_production_trust_contract_m11t.py

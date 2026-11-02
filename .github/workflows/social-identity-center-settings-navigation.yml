@@ -1,0 +1,32 @@
+name: Social Identity Center Settings Navigation
+
+on:
+  pull_request:
+    paths:
+      - 'widgets/messanger/AppSelector.qml'
+      - 'widgets/messanger/IdentityCenterSettingsSections.qml'
+      - 'tests/messaging/test_identity_center_settings_sections.py'
+      - '.github/workflows/social-identity-center-settings-navigation.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'widgets/messanger/AppSelector.qml'
+      - 'widgets/messanger/IdentityCenterSettingsSections.qml'
+      - 'tests/messaging/test_identity_center_settings_sections.py'
+      - '.github/workflows/social-identity-center-settings-navigation.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  settings-seam:
+    name: Existing Social settings + new Identity Center tabs
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify preserved app rail, editors and read-only sections
+        run: |
+          python3 -m unittest discover -s tests/messaging -p 'test_social_user_settings_rail.py' -v
+          python3 -m unittest discover -s tests/messaging -p 'test_social_settings_workspace.py' -v
+          python3 -m unittest discover -s tests/messaging -p 'test_identity_center_settings_sections.py' -v

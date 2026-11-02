@@ -68,6 +68,7 @@ Rectangle {
                 "errorText": nwsErrorText,
                 "receivedAt": nwsAlertSource
                               ? nwsAlertSource.lastUpdated : null,
+                "usingCache": nwsUsingPersistentCache,
                 "detail": nwsConfigured ? "PINNED POINT" : "NOT CONFIGURED"
             },
             runtimeNowMs
@@ -144,6 +145,8 @@ Rectangle {
         nwsAlertSource && nwsAlertSource.ready
     readonly property bool nwsLoading:
         nwsAlertSource && nwsAlertSource.loading
+    readonly property bool nwsUsingPersistentCache:
+        nwsAlertSource && nwsAlertSource.usingPersistentCache === true
     readonly property string nwsErrorText:
         nwsAlertSource ? String(nwsAlertSource.errorText || "") : ""
     readonly property var officialAlerts:
@@ -594,7 +597,9 @@ Rectangle {
                             : ground.nwsErrorText.length > 0
                               ? (ground.nwsReady ? "DEGRADED" : "OFFLINE")
                               : ground.nwsReady
-                                ? "RECEIVED " + ground.officialAlerts.length
+                                ? (ground.nwsUsingPersistentCache
+                                   ? "CACHE " + ground.officialAlerts.length
+                                   : "RECEIVED " + ground.officialAlerts.length)
                                 : "WAITING"
                     font.pixelSize: 11
                     color: !ground.nwsConfigured ? Colors.orange
@@ -632,7 +637,9 @@ Rectangle {
                          && ground.nwsReady
                          && ground.officialAlerts.length === 0
                 width: parent.width
-                text: "NO ACTIVE NWS ALERTS LISTED FOR THE PINNED POINT"
+                text: ground.nwsUsingPersistentCache
+                      ? "LAST SUCCESSFUL NWS CHECK LISTED NO ACTIVE ALERTS // CACHE"
+                      : "NO ACTIVE NWS ALERTS LISTED FOR THE PINNED POINT"
                 font.pixelSize: 11
             }
 

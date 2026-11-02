@@ -105,6 +105,8 @@ PanelWindow {
             nwsAlertSource && Array.isArray(nwsAlertSource.alertList)
             ? nwsAlertSource.alertList : []
         )
+    readonly property bool officialAlertUsingPersistentCache:
+        nwsAlertSource && nwsAlertSource.usingPersistentCache === true
 
     function officialAlertColor(token) {
         switch (String(token || "")) {
@@ -312,7 +314,8 @@ PanelWindow {
 
     readonly property string sourceStatusText: {
         if (officialAlertSummary.available)
-            return officialAlertSummary.headerText;
+            return officialAlertSummary.headerText
+                   + (officialAlertUsingPersistentCache ? " // CACHE" : "");
 
         if (usesHomeSources) {
             if (homeWeatherUsable && homeSpaceUsable) {
@@ -370,7 +373,8 @@ PanelWindow {
 
     readonly property string sourceStatusDisplay: {
         if (officialAlertSummary.available)
-            return officialAlertSummary.headerText;
+            return officialAlertSummary.headerText
+                   + (officialAlertUsingPersistentCache ? " // CACHE" : "");
 
         if (usesHomeSources) {
             if (homeWeatherUsable && homeSpaceUsable)

@@ -196,6 +196,7 @@ def main() -> int:
             return 1
         try:
             lines = collect(proc)
+            exited_before_stop = proc.poll() is not None
         except KeyboardInterrupt:
             print("M12u // FAIL // TEST_INTERRUPTED")
             return 130
@@ -213,13 +214,15 @@ def main() -> int:
                    if result["terminal"] else "NONE"))
             # Fixed-vocabulary diagnostics only. Never emit arbitrary
             # Quickshell lines, real home paths, or raw task contents.
-            if any("Configuration Loaded" in line for line in lines):
-                print("Quickshell: CONFIGURATION_LOADED")
+            if any("M12U_BOOT|CONFIG_LOADED|PASS" in line for line in lines):
+                print("Quickshell: M12U_QML_OBJECT_STARTED")
             elif any(re.search(r"failed to load|error loading|module .* not installed",
                                line, re.IGNORECASE) for line in lines):
                 print("Quickshell: CONFIGURATION_LOAD_ERROR")
-            elif proc.returncode is not None:
-                print("Quickshell: TEST_PROCESS_EXITED")
+            elif any("Configuration Loaded" in line for line in lines):
+                print("Quickshell: CONFIGURATION_LOADED_NO_M12U_BOOT")
+            elif exited_before_stop:
+                print("Quickshell: TEST_PROCESS_EXITED_EARLY")
             else:
                 print("Quickshell: NO_CONFIG_LOADED_MARKER")
             if any("OUTPUT_LIMIT_EXCEEDED" in line for line in lines):

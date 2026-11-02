@@ -84,6 +84,46 @@ var _catalog = [
         note:"Kp, solar wind, magnetic field and solar flux share one 5m owner"
     },
     {
+        id:"space-kp",
+        label:"NOAA PLANETARY KP",
+        owner:"SpaceService.qml",
+        mode:MODE_FAST_POLL,
+        cadenceMs:300000,
+        lifetime:LIFETIME_SESSION_BACKGROUND,
+        view:"SPACE",
+        note:"Kp product from the shared SpaceService owner"
+    },
+    {
+        id:"space-wind",
+        label:"NOAA SOLAR WIND",
+        owner:"SpaceService.qml",
+        mode:MODE_FAST_POLL,
+        cadenceMs:300000,
+        lifetime:LIFETIME_SESSION_BACKGROUND,
+        view:"SPACE",
+        note:"solar-wind product from the shared SpaceService owner"
+    },
+    {
+        id:"space-imf",
+        label:"NOAA IMF BT/BZ",
+        owner:"SpaceService.qml",
+        mode:MODE_FAST_POLL,
+        cadenceMs:300000,
+        lifetime:LIFETIME_SESSION_BACKGROUND,
+        view:"SPACE",
+        note:"magnetic-field product from the shared SpaceService owner"
+    },
+    {
+        id:"space-flux",
+        label:"NOAA F10.7 FLUX",
+        owner:"SpaceService.qml",
+        mode:MODE_FAST_POLL,
+        cadenceMs:300000,
+        lifetime:LIFETIME_SESSION_BACKGROUND,
+        view:"SPACE",
+        note:"10.7cm flux product from the shared SpaceService owner"
+    },
+    {
         id:"nws-alerts",
         label:"NWS OFFICIAL ALERTS",
         owner:"services/notifications/NwsOfficialAlertNotificationProducer.qml",
@@ -375,6 +415,22 @@ var _cacheProfiles = {
     "space-core": {
         retention:RETENTION_MEMORY_LAST_GOOD,
         freshMs:600000, staleMs:1800000, expireMs:7200000
+    },
+    "space-kp": {
+        retention:RETENTION_MEMORY_LAST_GOOD,
+        freshMs:600000, staleMs:1800000, expireMs:7200000
+    },
+    "space-wind": {
+        retention:RETENTION_MEMORY_LAST_GOOD,
+        freshMs:600000, staleMs:1800000, expireMs:7200000
+    },
+    "space-imf": {
+        retention:RETENTION_MEMORY_LAST_GOOD,
+        freshMs:600000, staleMs:1800000, expireMs:7200000
+    },
+    "space-flux": {
+        retention:RETENTION_MEMORY_LAST_GOOD,
+        freshMs:1800000, staleMs:10800000, expireMs:43200000
     },
     "nws-alerts": {
         retention:RETENTION_MEMORY_LAST_GOOD,

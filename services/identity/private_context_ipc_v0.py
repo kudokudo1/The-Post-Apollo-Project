@@ -23,7 +23,7 @@ import struct
 import threading
 from collections.abc import Callable
 
-from desktop_context_projection_v0 import _context
+from desktop_context_projection_v0 import _context, _pairs_unique
 
 DISPLAY_SCHEMA = "post-apollo.identity.desktop-context-display.v0"
 SOCKET_NAME = "identity-display-v0.sock"
@@ -148,10 +148,10 @@ class PrivateContextSocket:
         class _Handler(socketserver.BaseRequestHandler):
             def handle(self) -> None:
                 conn = self.request
-                conn.settimeout(1.5)
-                if _peer_uid(conn) != os.geteuid():
-                    return
                 try:
+                    conn.settimeout(1.5)
+                    if _peer_uid(conn) != os.geteuid():
+                        return
                     request = conn.recv(32)
                     if request != _REQUEST:
                         payload = empty_display()
@@ -197,7 +197,8 @@ class PrivateContextSocket:
         self._server = None
         self._worker = None
         if server is not None:
-            server.shutdown() if worker is not None and worker.is_alive() else None
+            if worker is not None and worker.is_alive():
+                server.shutdown()
             server.server_close()
         # Never unlink a path changed by another process.
         try:
@@ -250,7 +251,13 @@ def read_private_display(socket_path: Path, *,
                     break
         if len(reply) > _MAX_WIRE or not reply.endswith(b"\n"):
             return empty_display()
-        result = json.loads(bytes(reply[:-1]).decode("utf-8"))
+        result = json.loads(
+            bytes(reply[:-1]).decode("utf-8"),
+            object_pairs_hook=_pairs_unique,
+            parse_constant=lambda _: (_ for _ in ()).throw(
+                ValueError("Invalid nonfinite IPC response")
+            ),
+        )
         return _clean(result, _now(clock))
     except Exception:
         return empty_display()

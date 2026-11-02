@@ -38,16 +38,21 @@ The new tests/tasks/test_task_real_store_native_smoke_m12s.cjs checks the root p
 2. In a terminal inside the updated repository, prepare a fresh private disposable root. These commands create files only in a new temporary directory:
 
 ~~~sh
-cd "$HOME/.config/quickshell"
-test -f TaskNativeStoreSmokeM12s.qml || { echo "M12s harness not installed"; exit 1; }
-m12s_tmp="$(mktemp -d -t post-apollo-tasks-m12s-XXXXXXXX)" || exit 1
-chmod 700 "$m12s_tmp"
-mkdir -m 700 "$m12s_tmp/share" "$m12s_tmp/state"
-printf 'TEST ROOT // %s\n' "$m12s_tmp"
-env XDG_DATA_HOME="$m12s_tmp/share" \
-    XDG_STATE_HOME="$m12s_tmp/state" \
-    POST_APOLLO_M12S_DISPOSABLE=1 \
-    qs -p "$PWD/TaskNativeStoreSmokeM12s.qml"
+m12s_native() {
+    local repo="$HOME/.config/quickshell"
+    test -f "$repo/TaskNativeStoreSmokeM12s.qml" || {
+        echo "M12s harness not installed"; return 1
+    }
+    m12s_tmp="$(mktemp -d -t post-apollo-tasks-m12s-XXXXXXXX)" || return 1
+    chmod 700 "$m12s_tmp" || return 1
+    mkdir -m 700 "$m12s_tmp/share" "$m12s_tmp/state" || return 1
+    printf 'TEST ROOT // %s\n' "$m12s_tmp"
+    env XDG_DATA_HOME="$m12s_tmp/share" \
+        XDG_STATE_HOME="$m12s_tmp/state" \
+        POST_APOLLO_M12S_DISPOSABLE=1 \
+        qs -p "$repo/TaskNativeStoreSmokeM12s.qml"
+}
+m12s_native
 ~~~
 
 The $HOME/.config/quickshell checkout is an expected installation example, **not a verified location**; use the actual installed repository directory if different. Do not paste the commands into the same shell that launches the live Quickshell. The environment variables are scoped to the isolated qs process. This should create a distinct process and data path; its actual resolved path must be inspected on the M12s panel before any mutating button is clicked.

@@ -11,6 +11,7 @@ Rectangle {
     property var lightningContext: null
     property var floodContext: null
     property var timelineRows: []
+    property var relationshipRows: []
     property var companions: []
     property real runtimeNowMs: Date.now()
     property color accentColor: Colors.magenta
@@ -19,6 +20,8 @@ Rectangle {
         Array.isArray(companions) ? companions.length : 0
     readonly property int timelineCount:
         Array.isArray(timelineRows) ? timelineRows.length : 0
+    readonly property int relationshipCount:
+        Array.isArray(relationshipRows) ? relationshipRows.length : 0
     readonly property bool floodRelevant:
         !!floodContext && floodContext.relevant === true
     readonly property int floodHeight:
@@ -58,6 +61,8 @@ Rectangle {
         ? 260
           + Math.min(4, companionCount) * 42
           + Math.min(6, timelineCount) * 48
+          + (relationshipCount > 0 ? 30 : 0)
+          + Math.min(8, relationshipCount) * 58
           + floodHeight
         : 0
 
@@ -387,6 +392,94 @@ Rectangle {
                         elide: Text.ElideRight
                     }
                 }
+            }
+        }
+
+        Column {
+            width: parent.width
+            spacing: 4
+            visible: card.relationshipCount > 0
+
+            GohuText {
+                width: parent.width
+                text: "RELATIONSHIP BASIS // WHY THIS EVIDENCE IS SHOWN"
+                font.pixelSize: 10
+                color: Colors.cyan
+            }
+
+            Repeater {
+                model: Array.isArray(card.relationshipRows)
+                    ? card.relationshipRows.slice(0, 8) : []
+
+                delegate: Rectangle {
+                    required property var modelData
+                    width: card.width - 20
+                    height: 53
+                    color: Colors.black
+                    border.width: 1
+                    border.color: Colors.blue
+
+                    Column {
+                        anchors.fill: parent
+                        anchors.margins: 5
+                        spacing: 2
+
+                        Row {
+                            width: parent.width
+                            spacing: 7
+
+                            GohuText {
+                                width: 116
+                                text: modelData.evidenceClass
+                                font.pixelSize: 8
+                                color: Colors.blue
+                                elide: Text.ElideRight
+                            }
+
+                            GohuText {
+                                width: 116
+                                text: modelData.sourceLabel
+                                font.pixelSize: 8
+                                color: Colors.magenta
+                                elide: Text.ElideRight
+                            }
+
+                            GohuText {
+                                width: Math.max(0, parent.width - 246)
+                                text: modelData.relationClass
+                                font.pixelSize: 8
+                                color: Colors.cyan
+                                elide: Text.ElideRight
+                            }
+                        }
+
+                        QuietText {
+                            width: parent.width
+                            text: "SPACE // " + modelData.spatialLabel
+                                + " // TIME // " + modelData.temporalLabel
+                            font.pixelSize: 8
+                            elide: Text.ElideRight
+                        }
+
+                        QuietText {
+                            width: parent.width
+                            text: modelData.reason
+                                + " // LIMIT // "
+                                + modelData.limitation
+                            font.pixelSize: 8
+                            color: Colors.orange
+                            elide: Text.ElideRight
+                        }
+                    }
+                }
+            }
+
+            QuietText {
+                width: parent.width
+                text: "RELATIONSHIP BASIS EXPLAINS INCLUSION ONLY // NO SCORE // NO CAUSAL CLAIM // NO INCIDENT MERGE"
+                font.pixelSize: 8
+                color: Colors.orange
+                elide: Text.ElideRight
             }
         }
 

@@ -666,6 +666,186 @@ function evidenceTimeline(
     return rows.slice(0, limit);
 }
 
+function compactOffsetMinutes(minutes) {
+    const value = Math.abs(Number(minutes));
+    if (!isFinite(value))
+        return "--";
+    if (value < 1)
+        return "<1M";
+    if (value < 60)
+        return Math.round(value) + "M";
+    const hours = value / 60;
+    if (hours < 24)
+        return hours.toFixed(hours < 10 ? 1 : 0) + "H";
+    return Math.round(hours / 24) + "D";
+}
+
+function timeRelationship(anchorTimeMs, evidenceTimeMs) {
+    const anchor = parseMillis(anchorTimeMs);
+    const evidence = parseMillis(evidenceTimeMs);
+    if (anchor <= 0 || evidence <= 0) {
+        return {
+            available: false,
+            deltaMinutes: -1,
+            direction: "UNKNOWN",
+            band: "UNKNOWN",
+            label: "TIME OFFSET UNAVAILABLE"
+        };
+    }
+
+    const signedMinutes = (evidence - anchor) / 60000;
+    const absoluteMinutes = Math.abs(signedMinutes);
+    const direction = absoluteMinutes < 0.5
+        ? "SAME SELECTED SOURCE TIME"
+        : signedMinutes < 0
+          ? "BEFORE SELECTED SOURCE TIME"
+          : "AFTER SELECTED SOURCE TIME";
+    const band = absoluteMinutes <= 15
+        ? "WITHIN 15M"
+        : absoluteMinutes <= 60
+          ? "WITHIN 1H"
+          : absoluteMinutes <= 360
+            ? "WITHIN 6H"
+            : absoluteMinutes <= 1440
+              ? "WITHIN 24H"
+              : "OVER 24H";
+
+    return {
+        available: true,
+        deltaMinutes: absoluteMinutes,
+        direction: direction,
+        band: band,
+        label: compactOffsetMinutes(absoluteMinutes)
+            + " " + direction + " // " + band
+    };
+}
+
+function spatialRelationship(distance) {
+    const km = finite(distance, -1);
+    if (km < 0) {
+        return {
+            available: false,
+            distanceKm: -1,
+            band: "UNKNOWN",
+            label: "DISTANCE UNAVAILABLE"
+        };
+    }
+    const band = km <= 25
+        ? "LOCAL"
+        : km <= 100
+          ? "NEAR"
+          : km <= 250
+            ? "REGIONAL"
+            : "DISTANT";
+    return {
+        available: true,
+        distanceKm: km,
+        band: band,
+        label: Math.round(km) + " KM // " + band
+    };
+}
+
+function relationshipRow(
+    sourceLabelValue, evidenceClass, relationClass,
+    spatialLabel, temporal, reason, limitation, distanceKm
+) {
+    return {
+        sourceLabel: safeText(sourceLabelValue, 48),
+        evidenceClass: safeText(evidenceClass, 48),
+        relationClass: safeText(relationClass, 48),
+        spatialLabel: safeText(spatialLabel, 120),
+        temporalLabel: temporal && temporal.label
+            ? safeText(temporal.label, 120)
+            : "TIME OFFSET UNAVAILABLE",
+        timeBand: temporal && temporal.band
+            ? safeText(temporal.band, 40) : "UNKNOWN",
+        timeDeltaMinutes: temporal && temporal.available
+            ? finite(temporal.deltaMinutes, -1) : -1,
+        reason: safeText(reason, 180),
+        limitation: safeText(limitation, 180),
+        distanceKm: finite(distanceKm, -1)
+    };
+}
+
+function evidenceRelationships(
+    selected, companions, radarContext,
+    lightningContext, floodContext, maximum
+) {
+    if (!selected)
+        return [];
+
+    const rows = [];
+    const nearby = Array.isArray(companions) ? companions : [];
+
+    for (let i = 0; i < nearby.length && i < 4; i++) {
+        const row = nearby[i] || {};
+        const spatial = spatialRelationship(row.distanceKm);
+        rows.push(relationshipRow(
+            row.sourceLabel,
+            "EVENT RECORD",
+            "CROSS-SOURCE PROXIMITY",
+            spatial.label,
+            timeRelationship(selected.timeMs, row.timeMs),
+            "CROSS-SOURCE RECORD ADMITTED BY 250 KM PROXIMITY RULE",
+            "PROXIMITY + TIME OFFSET DO NOT ESTABLISH SAME INCIDENT",
+            spatial.distanceKm
+        ));
+    }
+
+    if (radarContext && radarContext.available
+            && radarContext.covered === true) {
+        rows.push(relationshipRow(
+            "NOAA MRMS",
+            "REMOTE SENSING",
+            "FRAME COVERAGE",
+            "EVENT POINT INSIDE LOADED MRMS FRAME",
+            timeRelationship(selected.timeMs, radarContext.timeMs),
+            "LOADED MRMS FRAME COVERS SELECTED EVENT POINT",
+            "FRAME COVERAGE + TIME OFFSET DO NOT INTERPRET RADAR PIXELS",
+            -1
+        ));
+    }
+
+    if (lightningContext && lightningContext.available
+            && lightningContext.covered === true) {
+        rows.push(relationshipRow(
+            "NOAA NOWCOAST",
+            "REMOTE SENSING",
+            "FRAME COVERAGE",
+            "EVENT POINT INSIDE LOADED LIGHTNING FRAME",
+            timeRelationship(selected.timeMs, lightningContext.timeMs),
+            "LOADED LIGHTNING FRAME COVERS SELECTED EVENT POINT",
+            "FRAME COVERAGE + TIME OFFSET DO NOT PROVE LIGHTNING AT EVENT",
+            -1
+        ));
+    }
+
+    if (floodContext && floodContext.available === true
+            && floodContext.relevant === true) {
+        const spatial = spatialRelationship(
+            floodContext.eventGaugeDistanceKm
+        );
+        const observationTime = floodContext.latestObserved
+            ? floodContext.latestObserved.timeMs : -1;
+        rows.push(relationshipRow(
+            "NOAA NWPS",
+            "GAUGE OBSERVATION",
+            "FLOOD-GATED PROXIMITY",
+            spatial.label + " // EVENT TO GAUGE",
+            timeRelationship(selected.timeMs, observationTime),
+            "EXPLICIT FLOOD SELECTION + NWPS GAUGE WITHIN 100 KM EVENT GATE",
+            "NEARBY GAUGE ≠ EVENT CATCHMENT OR INCIDENT IDENTITY",
+            spatial.distanceKm
+        ));
+    }
+
+    const limit = Math.max(
+        1,
+        Math.min(10, Math.floor(Number(maximum) || 8))
+    );
+    return rows.slice(0, limit);
+}
+
 function weatherFixDistance(selected, latitude, longitude) {
     if (!selected || selected.hasPoint !== true
             || !validPoint(latitude, longitude))

@@ -1,0 +1,36 @@
+name: Weather M17 evidence relationships
+
+on:
+  pull_request:
+    paths:
+      - "widgets/weather/StationEventContextPolicy.js"
+      - "widgets/weather/StationEventContextCard.qml"
+      - "widgets/weather/StationDiscovery.qml"
+      - "tests/weather/test_weather_evidence_relationships_m17.js"
+      - ".github/workflows/weather-evidence-relationships-m17.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  relationships:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: M17 evidence relationship basis
+        run: node tests/weather/test_weather_evidence_relationships_m17.js
+      - name: M16 evidence quality regression
+        run: node tests/weather/test_weather_evidence_quality_m16.js
+      - name: M15 flood dossier regression
+        run: node tests/weather/test_weather_flood_dossier_m15.js
+      - name: M14 shared-lightning regression
+        run: node tests/weather/test_weather_shared_lightning_m14.js
+      - name: M13 event-context regression
+        run: node tests/weather/test_station_map_event_context_m13.js
+      - name: NWPS base regression
+        run: node tests/weather/test_station_ground_nwps_river.js
+      - name: NWPS stageflow regression
+        run: node tests/weather/test_station_ground_nwps_stageflow.js
+      - name: NWPS flood-context regression
+        run: node tests/weather/test_station_ground_nwps_context.js

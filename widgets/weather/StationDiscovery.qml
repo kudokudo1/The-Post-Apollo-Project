@@ -451,6 +451,16 @@ Rectangle {
             8
         )
 
+    readonly property var selectedEvidenceRelationships:
+        EventContextPolicy.evidenceRelationships(
+            selectedEventContext,
+            selectedContextCompanions,
+            selectedRadarContext,
+            selectedLightningContext,
+            selectedFloodContext,
+            8
+        )
+
     readonly property bool eventContextInspectorOpen:
         domain === "map"
         && selectedContextSourceId !== ""
@@ -3342,6 +3352,8 @@ Rectangle {
                         stationDiscovery.selectedFloodContext
                     timelineRows:
                         stationDiscovery.selectedEvidenceTimeline
+                    relationshipRows:
+                        stationDiscovery.selectedEvidenceRelationships
                     runtimeNowMs:
                         stationDiscovery.runtimeNowMs
                     companions:

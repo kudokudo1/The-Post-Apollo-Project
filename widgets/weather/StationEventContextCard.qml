@@ -55,6 +55,32 @@ Rectangle {
         return "OLDER";
     }
 
+    function timelineFreshnessLabel(row) {
+        const mode = String(
+            row && row.freshnessMode
+            ? row.freshnessMode : "AGE_ONLY"
+        );
+        if (mode === "AGE_ONLY")
+            return "AGE ONLY";
+        if (mode === "SNAPSHOT")
+            return "SNAPSHOT";
+        if (mode !== "PROVIDER_CONTRACT")
+            return "UNKNOWN";
+
+        const sourceId = row
+            ? String(row.runtimeSourceId || "") : "";
+        const spec = RuntimePolicy.sourceSpec(sourceId);
+        if (!spec)
+            return "UNKNOWN";
+
+        const band = RuntimePolicy.temporalBand(
+            spec,
+            row ? row.receivedAtMs : null,
+            runtimeNowMs
+        );
+        return "CONTRACT " + band;
+    }
+
     visible: eventContext !== null
     width: parent ? parent.width : 0
     height: visible
@@ -562,6 +588,8 @@ Rectangle {
                             text: modelData.kind + " // "
                                 + modelData.label
                                 + " // " + modelData.provenance
+                                + " // FRESHNESS "
+                                + card.timelineFreshnessLabel(modelData)
                             font.pixelSize: 8
                             elide: Text.ElideRight
                         }
@@ -571,7 +599,7 @@ Rectangle {
 
             QuietText {
                 width: parent.width
-                text: "CHRONOLOGY ONLY // RECENCY = CLOCK AGE, NOT PROVIDER VALIDITY // ROWS RETAIN SOURCE + GROUP PROVENANCE // NOT ONE MERGED INCIDENT HISTORY"
+                text: "CHRONOLOGY ONLY // RECENCY = CLOCK AGE, NOT PROVIDER VALIDITY // PROVIDER FRESHNESS = RECEIVE-TIME CONTRACT ONLY FOR OPERATIONAL EVIDENCE // EVENT RECORDS = AGE ONLY // ROWS RETAIN SOURCE + GROUP PROVENANCE // NOT ONE MERGED INCIDENT HISTORY"
                 font.pixelSize: 8
                 color: Colors.orange
                 elide: Text.ElideRight

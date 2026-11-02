@@ -383,7 +383,8 @@ Rectangle {
             radarSnapshotBounds,
             radarLoadedHistoryMinutes,
             radarRequestedTimeMs,
-            mrmsRadarService.usingFrameCache
+            mrmsRadarService.usingFrameCache,
+            mrmsRadarService.lastUpdated
         )
 
     readonly property var selectedLightningContext:
@@ -395,7 +396,8 @@ Rectangle {
             lightningSource ? lightningSource.windowMinutes : 0,
             lightningSource ? lightningSource.resolutionKm : 0,
             lightningSource ? lightningSource.radiusKm : 0,
-            lightningSource ? lightningSource.usingFrameCache : false
+            lightningSource ? lightningSource.usingFrameCache : false,
+            lightningSource ? lightningSource.lastUpdated : null
         )
 
     readonly property var selectedContextCompanions:
@@ -438,7 +440,9 @@ Rectangle {
                 ? riverSource.gaugeContext : null,
             riverSource && riverSource.stageflowReady
                 ? riverSource.stageflow : null,
-            100
+            100,
+            riverSource && riverSource.stageflowReady
+                ? riverSource.stageflowLastUpdated : null
         )
 
     readonly property var selectedEvidenceTimeline:

@@ -63,6 +63,8 @@ jobs:
         run: node tests/weather/test_weather_evidence_quality_m16.js
       - name: Validate Weather M17 evidence relationship basis
         run: node tests/weather/test_weather_evidence_relationships_m17.js
+      - name: Validate Weather M18 provider-aware evidence freshness
+        run: node tests/weather/test_weather_provider_freshness_m18.js
       - name: Validate Weather persistent last-known cache M4
         run: node tests/weather/test_weather_persistent_cache_m4.js
       - name: Validate Weather persistent cache M5 global events

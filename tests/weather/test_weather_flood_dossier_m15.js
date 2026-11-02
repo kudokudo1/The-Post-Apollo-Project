@@ -272,7 +272,11 @@ assert.match(map, /EventContextPolicy\.floodGaugeContext\(/);
 assert.match(map, /selectedFloodContext,\s*8/);
 assert.match(map, /riverSource && riverSource\.contextReady/);
 assert.match(map, /riverSource && riverSource\.stageflowReady/);
-assert.match(map, /\n\s*100\s*\n\s*\)/);
+assert.match(
+    map,
+    /\n\s*100,?\s*\n/,
+    "M15 flood dossier keeps the 100 km event-to-gauge gate even when later milestones append optional context arguments"
+);
 assert.match(map, /readonly property var selectedEvidenceTimeline:/);
 assert.match(map, /EventContextPolicy\.evidenceTimeline\(/);
 assert.match(

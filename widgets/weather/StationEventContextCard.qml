@@ -8,6 +8,10 @@ Rectangle {
     property var eventContext: null
     property var dossierPreview: null
     property var dossierCaptureReview: null
+    property bool dossierSaveAvailable: false
+    property string dossierSaveStatus: "NOT SAVED"
+    property int dossierSavedCount: 0
+    signal dossierSaveRequested()
     property real weatherFixDistanceKm: -1
     property var radarContext: null
     property var lightningContext: null
@@ -121,7 +125,7 @@ Rectangle {
     width: parent ? parent.width : 0
     height: visible
         ? 292
-          + (dossierPreviewReady ? 71 : 0)
+          + (dossierPreviewReady ? 106 : 0)
           + (archiveRowCount > 0 ? 30 : 0)
           + Math.min(5, archiveRowCount) * 42
           + (archiveSnapshotCount > 0 ? 30 : 0)
@@ -259,6 +263,34 @@ Rectangle {
                 font.pixelSize: 8
                 color: card.dossierCaptureReview
                     && card.dossierCaptureReview.ready
+                    ? Colors.cyan : Colors.orange
+                elide: Text.ElideRight
+            }
+        }
+
+        Row {
+            width: parent.width
+            height: 27
+            spacing: 8
+            visible: card.dossierPreviewReady
+
+            ActionButton {
+                width: 116
+                height: 26
+                label: "SAVE DOSSIER"
+                labelPixelSize: 9
+                accentColor: Colors.magenta
+                available: card.dossierSaveAvailable
+                onClicked: card.dossierSaveRequested()
+            }
+
+            QuietText {
+                anchors.verticalCenter: parent.verticalCenter
+                width: Math.max(0, parent.width - 124)
+                text: card.dossierSaveStatus
+                    + " // INDEPENDENT CROSS-DOMAIN ARCHIVE"
+                font.pixelSize: 8
+                color: card.dossierSavedCount > 0
                     ? Colors.cyan : Colors.orange
                 elide: Text.ElideRight
             }

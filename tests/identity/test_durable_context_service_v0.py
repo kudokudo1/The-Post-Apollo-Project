@@ -243,8 +243,8 @@ class DurableContextEndpointTests(unittest.TestCase):
     def test_active_membership_without_grant_is_visible_but_not_authorization(self):
         self.write("INSERT INTO memberships VALUES (?, ?, 'active')",
                    "internal-operator", "external")
-        org = self.invoke()["body"]["organizations"][-1]
-        self.assertEqual(org["organizationId"], "external")
+        orgs = self.invoke()["body"]["organizations"]
+        org = next(item for item in orgs if item["organizationId"] == "external")
         self.assertEqual(org["scopeGrants"], [])
 
     def test_revoked_session_fails_closed(self):

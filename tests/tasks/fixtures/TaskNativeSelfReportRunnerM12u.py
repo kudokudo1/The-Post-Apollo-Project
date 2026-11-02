@@ -111,6 +111,51 @@ def no_duplicates(pairs):
     return obj
 
 
+
+def failed_fixture_observation(source: Path) -> str:
+    """Observe synthetic source after child exit, never promote this to PASS.
+
+    Returns a fixed code. The private temp directory and task bytes are not
+    included in console output. No file is created, repaired or retried.
+    """
+    try:
+        parent = source.parent.lstat()
+    except FileNotFoundError:
+        return "DATA_DIRECTORY_MISSING"
+    except OSError:
+        return "DATA_DIRECTORY_UNAVAILABLE"
+    if not stat.S_ISDIR(parent.st_mode) or stat.S_ISLNK(parent.st_mode):
+        return "DATA_DIRECTORY_UNSAFE"
+    try:
+        st = source.lstat()
+    except FileNotFoundError:
+        return "SOURCE_MISSING"
+    except OSError:
+        return "SOURCE_UNAVAILABLE"
+    if not stat.S_ISREG(st.st_mode) or st.st_nlink != 1 or (
+        hasattr(os, "geteuid") and st.st_uid != os.geteuid()
+    ):
+        return "SOURCE_UNSAFE"
+    if st.st_size < 1 or st.st_size > 1048576:
+        return "SOURCE_INVALID_SIZE"
+    try:
+        raw = source.read_bytes()
+        doc = json.loads(raw.decode("utf-8"), object_pairs_hook=no_duplicates)
+    except (OSError, ValueError, UnicodeError):
+        return "SOURCE_PRESENT_INVALID_JSON"
+    if not isinstance(doc, dict) or doc.get("version") != 3:
+        return "SOURCE_PRESENT_INVALID_SCHEMA"
+    tasks = doc.get("tasks")
+    if not isinstance(tasks, list) or len(tasks) != 1:
+        return "SOURCE_PRESENT_WRONG_TASK_COUNT"
+    task = tasks[0]
+    if not isinstance(task, dict) or task.get("title") != TITLE or task.get("done") is not False:
+        return "SOURCE_PRESENT_WRONG_TASK"
+    if doc.get("projects") != []:
+        return "SOURCE_PRESENT_UNEXPECTED_PROJECTS"
+    return "SOURCE_PRESENT_EXPECTED_SYNTHETIC_V3"
+
+
 def collect(proc: subprocess.Popen, seconds: float = 35.0) -> list[str]:
     """Read only the launched child's log until its terminal test marker."""
     lines: list[str] = []
@@ -236,6 +281,8 @@ def main() -> int:
             return 0
         # No raw task content or local full path in test output. The private
         # test root is discarded on process exit, including on failure.
+        print("Fixture after test: " + failed_fixture_observation(source))
+        print("Fixture observation is diagnostic only; it cannot override FAIL")
         print("Native or disk evidence was incomplete; no success assumed")
         return 1
 

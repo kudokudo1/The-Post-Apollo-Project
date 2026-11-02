@@ -137,6 +137,63 @@ class SelfReportEvidence(unittest.TestCase):
         # A safety comment may mention pkill; reject an executable invocation.\n        self.assertNotIn('["pkill"', runner)
         self.assertIn("stop_child(proc)", runner)
 
+    def test_qml_defers_mutating_calls_out_of_native_fileview_callbacks(self):
+        root_qml = (ROOT / "TaskNativeSelfReportM12u.qml").read_text()
+        self.assertEqual(root_qml.count("ApolloHubTodoStore.addTask("), 1)
+        self.assertEqual(root_qml.count("ApolloHubTodoStore.reloadFromDisk("), 1)
+        self.assertIn("property bool writeDispatched: false", root_qml)
+        self.assertIn("property bool reloadDispatched: false", root_qml)
+        self.assertIn("if (!writeDispatched || state === \"saving\") return;", root_qml)
+        self.assertIn("if (!reloadDispatched || state === \"loading\") return;", root_qml)
+        self.assertIn("Qt.callLater(function() {", root_qml)
+        self.assertIn("M12U_OBSERVATION|DEFERRED_WRITE|DISPATCHED", root_qml)
+        self.assertIn("M12U_OBSERVATION|DEFERRED_RELOAD|DISPATCHED", root_qml)
+        self.assertNotIn("TaskNativeSelfReportM12u",
+                         (ROOT / "shell.qml").read_text())
+        store = (ROOT / "services/hub/ApolloHubTodoStore.qml").read_text()
+        self.assertEqual(store.count("FileView {"), 1)
+        self.assertIn("readonly property bool ticketProducerEnabled: false", store)
+        self.assertIn("readonly property bool guardedWriterEnabled: false", store)
+
+    def test_failure_disk_probe_can_distinguish_no_dir_no_file_and_valid_bytes(self):
+        source = Path(self.tmp.name) / "fresh" / report.SOURCE
+        self.assertEqual(report.failed_fixture_observation(source),
+                         "DATA_DIRECTORY_MISSING")
+        source.parent.mkdir()
+        self.assertEqual(report.failed_fixture_observation(source),
+                         "SOURCE_MISSING")
+        source.write_text(json.dumps(self.data), encoding="utf-8")
+        self.assertEqual(report.failed_fixture_observation(source),
+                         "SOURCE_PRESENT_EXPECTED_SYNTHETIC_V3")
+        self.assertEqual(report.evidence([], source)["status"], "FAIL")
+
+    def test_failure_disk_probe_rejects_corrupt_or_unexpected_source(self):
+        self.assertEqual(report.failed_fixture_observation(self.path),
+                         "SOURCE_PRESENT_EXPECTED_SYNTHETIC_V3")
+        self.path.write_text("not json", encoding="utf-8")
+        self.assertEqual(report.failed_fixture_observation(self.path),
+                         "SOURCE_PRESENT_INVALID_JSON")
+        self.data["version"] = 99
+        self.write()
+        self.assertEqual(report.failed_fixture_observation(self.path),
+                         "SOURCE_PRESENT_INVALID_SCHEMA")
+        self.data["version"] = 3
+        self.data["tasks"][0]["title"] = "M12X_CHANGED"
+        self.write()
+        self.assertEqual(report.failed_fixture_observation(self.path),
+                         "SOURCE_PRESENT_WRONG_TASK")
+
+    def test_failure_disk_probe_rejects_symlink_and_never_promotes_to_pass(self):
+        copy = Path(self.tmp.name) / "source-copy.json"
+        copy.write_text(json.dumps(self.data), encoding="utf-8")
+        self.path.unlink()
+        self.path.symlink_to(copy)
+        self.assertEqual(report.failed_fixture_observation(self.path),
+                         "SOURCE_UNSAFE")
+        result = report.evidence(["M12U_RESULT|FAIL|STORE_STUCK_SAVING"], self.path)
+        self.assertEqual(result["status"], "FAIL")
+        self.assertEqual(result["reason"], "STORE_STUCK_SAVING")
+
     def test_disk_changed_after_native_report_cannot_pass(self):
         self.data["tasks"][0]["title"] = "external-edit"
         self.write()

@@ -15,15 +15,49 @@ Rectangle {
 
     readonly property var runtimeRows: [
         RuntimePolicy.displayRow(
-            "weather",
+            "weather-current",
             {
                 "active": true,
                 "ready": !!weatherService && weatherService.ready,
                 "loading": !!weatherService && weatherService.loading,
                 "errorText": weatherService ? weatherService.errorText : "",
                 "receivedAt": weatherService ? weatherService.lastUpdated : null,
-                "observedAt": weatherService
-                              ? weatherService.localObservationAnchorMs : -1
+                "detail": weatherService
+                          && String(weatherService.observationTime || "") !== ""
+                          ? "PROVIDER OBS CLOCK "
+                            + weatherService.observationTime
+                          : "CURRENT CONDITIONS"
+            },
+            runtimeNowMs
+        ),
+        RuntimePolicy.displayRow(
+            "weather-forecast",
+            {
+                "active": true,
+                "ready": !!weatherService && weatherService.forecastReady,
+                "loading": !!weatherService && weatherService.loading,
+                "errorText": weatherService ? weatherService.errorText : "",
+                "receivedAt": weatherService
+                              ? weatherService.forecastLastUpdated : null,
+                "detail": "FETCH TIME // PROVIDER ISSUE TIME NOT EXPOSED"
+            },
+            runtimeNowMs
+        ),
+        RuntimePolicy.displayRow(
+            "air-quality",
+            {
+                "active": true,
+                "ready": !!weatherService && weatherService.aqiReady,
+                "loading": !!weatherService && weatherService.aqiLoading,
+                "errorText": weatherService
+                             ? weatherService.aqiErrorText : "",
+                "receivedAt": weatherService
+                              ? weatherService.aqiLastUpdated : null,
+                "detail": weatherService
+                          && String(weatherService.airQualitySourceTime || "") !== ""
+                          ? "SOURCE CLOCK "
+                            + weatherService.airQualitySourceTime
+                          : "AQI + POLLEN"
             },
             runtimeNowMs
         ),

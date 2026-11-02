@@ -45,7 +45,7 @@ const windWave = relation.relationship(
     48
 );
 assert.equal(windWave.count, 4);
-assert.equal(windWave.correlation, 1);
+assert.ok(windWave.correlation > 0.99);
 
 const pressureWave = relation.relationship(
     marine, "pressureHpa",

@@ -41,6 +41,8 @@ jobs:
         run: node tests/weather/test_weather_live_runtime_m1.js
       - name: Validate Weather live runtime M2 page status rack
         run: node tests/weather/test_weather_live_runtime_m2.js
+      - name: Validate Weather live runtime M3 cache and offline validity
+        run: node tests/weather/test_weather_live_runtime_m3.js
       - name: Validate Weather data parsing and forecast contracts
         run: node tests/weather/test_weather_data_policy.js
       - name: Verify SKY hourly detail inspection of existing forecast data

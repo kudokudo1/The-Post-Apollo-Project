@@ -2364,8 +2364,8 @@ Rectangle {
                                ? Math.max(0, southEast.x - northWest.x) : 0
                         height: northWest.valid && southEast.valid
                                 ? Math.max(0, southEast.y - northWest.y) : 0
-                        visible: stationDiscovery.weatherLayerEnabled("radar")
-                                 && stationDiscovery.radarDisplaySource === "noaa"
+                        visible: stationDiscovery.radarDisplaySource === "noaa"
+                                 && stationDiscovery.weatherLayerEnabled("radar")
                                  && source !== ""
                                  && northWest.valid && southEast.valid
                                  && width > 0 && height > 0
@@ -2949,8 +2949,8 @@ Rectangle {
                     }
 
                     Repeater {
-                        model: stationDiscovery.weatherMapOnly ? []
-                               : firmsService.ready ? firmsService.hotspots : []
+                        model: firmsService.ready ? firmsService.hotspots : []
+                        visible: !stationDiscovery.weatherMapOnly
 
                         delegate: Item {
                             required property var modelData
@@ -4274,8 +4274,8 @@ Rectangle {
             }
 
             Repeater {
-                model: stationDiscovery.weatherMapOnly ? []
-                       : source.ready ? stationDiscovery.visibleRows : []
+                model: source.ready ? stationDiscovery.visibleRows : []
+                visible: !stationDiscovery.weatherMapOnly
 
                 delegate: Rectangle {
                     required property var modelData

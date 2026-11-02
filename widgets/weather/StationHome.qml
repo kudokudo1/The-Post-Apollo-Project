@@ -4,6 +4,7 @@ import "StationHomePolicy.js" as StationHomePolicy
 import "StationSourceHealthPolicy.js" as SourceHealth
 import "StationOfficialAlertPolicy.js" as OfficialAlertPolicy
 import "../../services/weather/WeatherHistoryPolicy.js" as HistoryPolicy
+import "../../services/weather/WeatherRuntimePolicy.js" as RuntimePolicy
 
 Rectangle {
     id: home
@@ -12,6 +13,63 @@ Rectangle {
     property var spaceService: null
     property var nwsAlertSource: null
     property var historyService: null
+    property real runtimeNowMs: Date.now()
+
+    readonly property var runtimeRows: [
+        RuntimePolicy.displayRow(
+            "weather",
+            {
+                "active": true,
+                "ready": !!weatherService && weatherService.ready,
+                "loading": !!weatherService && weatherService.loading,
+                "errorText": weatherService ? weatherService.errorText : "",
+                "receivedAt": weatherService ? weatherService.lastUpdated : null,
+                "observedAt": weatherService
+                              ? weatherService.localObservationAnchorMs : -1
+            },
+            runtimeNowMs
+        ),
+        RuntimePolicy.displayRow(
+            "space-core",
+            {
+                "active": true,
+                "ready": !!spaceService && spaceService.ready,
+                "loading": !!spaceService && spaceService.loading,
+                "errorText": spaceService ? spaceService.errorText : "",
+                "receivedAt": spaceService ? spaceService.lastUpdated : null
+            },
+            runtimeNowMs
+        ),
+        RuntimePolicy.displayRow(
+            "nws-alerts",
+            {
+                "active": !!nwsAlertSource && nwsAlertSource.configured,
+                "ready": !!nwsAlertSource && nwsAlertSource.ready,
+                "loading": !!nwsAlertSource && nwsAlertSource.loading,
+                "errorText": nwsAlertSource
+                             ? nwsAlertSource.errorText : "",
+                "receivedAt": nwsAlertSource
+                              ? nwsAlertSource.lastUpdated : null,
+                "detail": nwsAlertSource && nwsAlertSource.configured
+                          ? "PINNED POINT" : "NOT CONFIGURED"
+            },
+            runtimeNowMs
+        ),
+        RuntimePolicy.displayRow(
+            "home-history",
+            {
+                "active": !!historyService && historyService.active,
+                "ready": !!historyService && historyService.ready,
+                "loading": !!historyService && historyService.loading,
+                "errorText": historyService
+                             ? historyService.errorText : "",
+                "receivedAt": historyService
+                              ? historyService.lastUpdated : null,
+                "detail": "HISTORICAL FORECAST"
+            },
+            runtimeNowMs
+        )
+    ]
 
     readonly property bool historyReady:
         historyService && historyService.ready
@@ -716,6 +774,11 @@ Rectangle {
                 font.pixelSize: 12
                 color: Colors.orange
             }
+        }
+
+        StationRuntimeRack {
+            width: parent.width
+            rows: home.runtimeRows
         }
 
         Column {

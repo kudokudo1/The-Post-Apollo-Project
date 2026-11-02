@@ -11,6 +11,7 @@ import "StationRadarPolicy.js" as RadarPolicy
 import "../../services/weather/HmsSmokePolicy.js" as SmokePolicy
 import "../../services/weather/SeismicPolicy.js" as SeismicPolicy
 import "../../services/weather/GdacsPolicy.js" as GdacsPolicy
+import "../../services/weather/WeatherRuntimePolicy.js" as RuntimePolicy
 
 // Source-first stage. All records shown come from a backend, never examples.
 // MAP owns a local Natural Earth geographic basemap plus source-driven data
@@ -25,12 +26,124 @@ Rectangle {
     property var selectedNews: null
     property var newsMentionOverlay: null
     property var seismicSource: null
+    property real runtimeNowMs: Date.now()
     signal newsMapRequested(var payload)
     signal newsMapClearRequested()
     readonly property bool newsLocationMatchesSelection:
         selectedNews
         && articleLocationService.requestedUrl !== ""
         && articleLocationService.requestedUrl === selectedNews.url
+
+    readonly property var runtimeRows: {
+        const base = [
+            RuntimePolicy.displayRow(
+                "discovery",
+                {
+                    "active": source.active,
+                    "ready": source.ready,
+                    "loading": source.loading,
+                    "errorText": source.errorText,
+                    "receivedAt": source.lastUpdated,
+                    "detail": domain === "map" ? "EONET" : "GDELT DOC"
+                },
+                runtimeNowMs
+            )
+        ];
+
+        if (domain === "news") {
+            base.push(RuntimePolicy.displayRow(
+                "gdelt-article-location",
+                {
+                    "active": stationOpen,
+                    "ready": articleLocationService.ready,
+                    "loading": articleLocationService.loading,
+                    "errorText": articleLocationService.errorText,
+                    "detail": "ARTICLE LOCATION LOOKUP"
+                },
+                runtimeNowMs
+            ));
+            return base;
+        }
+
+        if (domain !== "map")
+            return base;
+
+        base.push(
+            RuntimePolicy.displayRow(
+                "gdacs",
+                {
+                    "active": gdacsService.active,
+                    "ready": gdacsService.ready,
+                    "loading": gdacsService.loading,
+                    "errorText": gdacsService.errorText,
+                    "receivedAt": gdacsService.lastUpdated
+                },
+                runtimeNowMs
+            ),
+            RuntimePolicy.displayRow(
+                "seismic",
+                {
+                    "active": !!seismicSource && seismicSource.active !== false,
+                    "ready": !!seismicSource && seismicSource.ready,
+                    "loading": !!seismicSource && seismicSource.loading,
+                    "errorText": seismicSource ? seismicSource.errorText : "",
+                    "receivedAt": seismicSource
+                                  ? seismicSource.lastUpdated : null
+                },
+                runtimeNowMs
+            ),
+            RuntimePolicy.displayRow(
+                "firms",
+                {
+                    "active": stationOpen,
+                    "ready": firmsService.ready,
+                    "loading": firmsService.loading,
+                    "errorText": firmsService.errorText,
+                    "receivedAt": firmsService.lastUpdated,
+                    "detail": "VIEWPORT REQUEST"
+                },
+                runtimeNowMs
+            ),
+            RuntimePolicy.displayRow(
+                "mrms-radar",
+                {
+                    "active": stationOpen,
+                    "ready": radarImage.status === Image.Ready,
+                    "loading": radarImage.status === Image.Loading,
+                    "failed": radarImage.status === Image.Error,
+                    "receivedAt": radarRequestedAt,
+                    "observedAt": radarRequestedTimeMs,
+                    "detail": "VIEWPORT IMAGE"
+                },
+                runtimeNowMs
+            ),
+            RuntimePolicy.displayRow(
+                "rainviewer",
+                {
+                    "active": stationOpen,
+                    "ready": rainViewerRadarService.ready,
+                    "loading": rainViewerRadarService.loading,
+                    "errorText": rainViewerRadarService.errorText,
+                    "receivedAt": rainViewerRadarService.lastUpdated,
+                    "detail": "FALLBACK FRAME"
+                },
+                runtimeNowMs
+            ),
+            RuntimePolicy.displayRow(
+                "hms-smoke",
+                {
+                    "active": stationOpen,
+                    "ready": hmsSmokeService.ready,
+                    "loading": hmsSmokeService.loading,
+                    "errorText": hmsSmokeService.errorText,
+                    "receivedAt": hmsSmokeService.lastUpdated,
+                    "detail": "ANALYST POLYGONS"
+                },
+                runtimeNowMs
+            )
+        );
+        return base;
+    }
     property string newsTopic: "all"
     property string newsSourceQuery: ""
     property string newsLanguageQuery: ""
@@ -745,6 +858,11 @@ Rectangle {
                     color: source.failed ? Colors.orange
                            : source.ready ? Colors.cyan : Colors.white
                 }
+            }
+
+            StationRuntimeRack {
+                width: parent.width
+                rows: stationDiscovery.runtimeRows
             }
 
             StationSectionDivider {

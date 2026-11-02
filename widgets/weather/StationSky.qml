@@ -5,11 +5,107 @@ import "../../services/weather/WeatherDockPolicy.js" as WeatherDockPolicy
 import "../../services/weather/WeatherCyclePolicy.js" as WeatherCyclePolicy
 import "StationSkyHourlyPolicy.js" as HourlyDetails
 import "StationSkyTwilightPolicy.js" as TwilightPolicy
+import "../../services/weather/WeatherRuntimePolicy.js" as RuntimePolicy
 
 Rectangle {
     id: sky
 
     property var weatherService: null
+    property real runtimeNowMs: Date.now()
+
+    readonly property var runtimeRows: [
+        RuntimePolicy.displayRow(
+            "weather",
+            {
+                "active": true,
+                "ready": !!weatherService && weatherService.ready,
+                "loading": !!weatherService && weatherService.loading,
+                "errorText": weatherService ? weatherService.errorText : "",
+                "receivedAt": weatherService ? weatherService.lastUpdated : null,
+                "observedAt": weatherService
+                              ? weatherService.localObservationAnchorMs : -1
+            },
+            runtimeNowMs
+        ),
+        RuntimePolicy.displayRow(
+            "moon",
+            {
+                "active": moonService.active,
+                "ready": moonService.ready,
+                "loading": moonService.loading,
+                "errorText": moonService.errorText,
+                "receivedAt": moonService.lastUpdated
+            },
+            runtimeNowMs
+        ),
+        RuntimePolicy.displayRow(
+            "eclipses",
+            {
+                "active": eclipseService.active,
+                "ready": eclipseService.ready,
+                "loading": eclipseService.loading,
+                "errorText": eclipseService.errorText,
+                "receivedAt": eclipseService.lastUpdated
+            },
+            runtimeNowMs
+        ),
+        RuntimePolicy.displayRow(
+            "celnav",
+            {
+                "active": celnavService.active,
+                "ready": celnavService.ready,
+                "loading": celnavService.loading,
+                "errorText": celnavService.errorText,
+                "receivedAt": celnavService.lastUpdated
+            },
+            runtimeNowMs
+        ),
+        RuntimePolicy.displayRow(
+            "iss-passes",
+            {
+                "active": issPassService.active,
+                "ready": issPassService.ready,
+                "loading": issPassService.loading,
+                "errorText": issPassService.errorText,
+                "receivedAt": issPassService.lastUpdated
+            },
+            runtimeNowMs
+        ),
+        RuntimePolicy.displayRow(
+            "planet-rise-set",
+            {
+                "active": planetRiseSetService.active,
+                "ready": planetRiseSetService.ready,
+                "loading": planetRiseSetService.loading,
+                "errorText": planetRiseSetService.errorText,
+                "receivedAt": planetRiseSetService.lastUpdated
+            },
+            runtimeNowMs
+        ),
+        RuntimePolicy.displayRow(
+            "meteor-showers",
+            {
+                "active": meteorService.active,
+                "ready": meteorService.ready,
+                "loading": meteorService.loading,
+                "errorText": meteorService.errorText,
+                "receivedAt": meteorService.lastUpdated
+            },
+            runtimeNowMs
+        ),
+        RuntimePolicy.displayRow(
+            "sky-local",
+            {
+                "active": true,
+                "ready": astronomySummary.available,
+                "loading": false,
+                "errorText": "",
+                "observedAt": runtimeNowMs,
+                "detail": "SOLAR POSITION + TWILIGHT"
+            },
+            runtimeNowMs
+        )
+    ]
 
     readonly property bool weatherReady: weatherService && weatherService.ready
     readonly property bool weatherLoading: weatherService && weatherService.loading
@@ -398,6 +494,11 @@ Rectangle {
                 font.pixelSize: 12
                 color: sky.weatherReady ? Colors.cyan : Colors.orange
             }
+        }
+
+        StationRuntimeRack {
+            width: parent.width
+            rows: sky.runtimeRows
         }
 
         StationSectionDivider {

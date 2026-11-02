@@ -11,6 +11,7 @@ import "StationNewsCatalogPolicy.js" as Catalog
 Rectangle {
     id: stationNewsHub
     property bool stationOpen: true
+    property real runtimeNowMs: Date.now()
     property string section: "LIVE"
     property bool viewerOpen: false
     property var chosenRecord: null
@@ -38,6 +39,10 @@ Rectangle {
     property string selectedCreatorId: ""
     property string inflightCreatorId: ""
     readonly property bool isReports: section === "REPORTS"
+    readonly property var runtimeRows:
+        isReports && reportsLoader.item
+        && Array.isArray(reportsLoader.item.runtimeRows)
+        ? reportsLoader.item.runtimeRows : []
     readonly property string feedBadge: isReports
         ? (reportsLoader.item ? reportsLoader.item.feedBadge : "NEWS // CONNECTING")
         : "NEWS // " + section + " CATALOG"
@@ -209,6 +214,7 @@ Rectangle {
             StationDiscovery {
                 domain: "news"
                 stationOpen: stationNewsHub.stationOpen
+                runtimeNowMs: stationNewsHub.runtimeNowMs
                 onNewsMapRequested: function(payload) {
                     stationNewsHub.newsMapRequested(payload);
                 }

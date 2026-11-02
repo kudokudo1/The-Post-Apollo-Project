@@ -200,7 +200,9 @@ Item {
                         Text {
                             width: parent.width
                             text: "PORTFOLIOS // " +
-                                  sections.organizationDisplaySnapshot.portfolios.length
+                                  (sections.organizationDisplayReady
+                                   ? sections.organizationDisplaySnapshot.portfolios.length
+                                   : 0)
                             font.pixelSize: 10
                             color: Colors.cyan
                             wrapMode: Text.WordWrap

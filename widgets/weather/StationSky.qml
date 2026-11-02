@@ -537,8 +537,15 @@ Rectangle {
             width: parent.width
 
             GohuText {
-                text: sky.subjectRoute === "" ? "☁  SKY"
-                      : "☁  WEATHER"
+                visible: sky.subjectRoute === ""
+                text: "☁  SKY"
+                font.pixelSize: 24
+                color: Colors.cyan
+            }
+
+            GohuText {
+                visible: sky.subjectRoute !== ""
+                text: "☁  WEATHER"
                 font.pixelSize: 24
                 color: Colors.cyan
             }

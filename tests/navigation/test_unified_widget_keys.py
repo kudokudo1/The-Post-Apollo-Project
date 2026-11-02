@@ -149,10 +149,12 @@ def test_weather_keyboard_live_indicator_and_close_follow_shared_contract():
     assert "borderColor: Colors.cyan" in src
 
     assert "id: sourceStatusIndicator" in src
-    assert 'return "WEATHER LIVE";' in src
+    assert 'runtimeHeaderText(weatherRuntimeState, "WEATHER LIVE")' in src
     assert 'return "READING";' in src
     assert 'return "STALE";' in src
     assert 'return "OFFLINE";' in src
+    assert 'case "CACHE_FRESH": return "CACHE FRESH";' in src
+    assert 'case "CACHE_EXPIRED": return "CACHE EXPIRED";' in src
     assert "return Colors.magenta;" in src
     runtime = read("services/weather/WeatherRuntimePolicy.js")
     assert 'RuntimePolicy.sourceSpec("weather-current")' in src

@@ -123,6 +123,14 @@ class SmsNormalizationTests(unittest.TestCase):
                     with self.assertRaises(ValueError):
                         sms.normalize_message(packet(**{key: bad}), **SCOPE)
 
+    def test_native_signed_integer_widths(self):
+        for field, value in [
+            ("date", 2 ** 63), ("thread_id", 2 ** 63), ("_id", 2 ** 31),
+        ]:
+            with self.subTest(field=field):
+                with self.assertRaises(ValueError):
+                    sms.normalize_message(packet(**{field: value}), **SCOPE)
+
     def test_invalid_type_does_not_claim_incoming_or_outgoing(self):
         for bad in [0, 7, True, "sent", None]:
             with self.subTest(bad=bad):

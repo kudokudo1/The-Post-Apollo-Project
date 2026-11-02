@@ -1140,6 +1140,7 @@ PanelWindow {
                 stationOpen: weatherStation.menuOpen
                 domain: "map"
                 seismicSource: seismicService
+                weatherService: weatherStation.weatherService
                 persistentCacheStore: weatherStation.persistentCacheStore
                 newsMentionOverlay: weatherStation.newsMapOverlay
                 runtimeNowMs: weatherStation.runtimeNowMs

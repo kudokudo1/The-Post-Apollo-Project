@@ -1,0 +1,35 @@
+name: Weather M13 event context
+
+on:
+  pull_request:
+    paths:
+      - "widgets/weather/StationEventContextPolicy.js"
+      - "widgets/weather/StationEventContextCard.qml"
+      - "widgets/weather/StationDiscovery.qml"
+      - "widgets/weather/WeatherStationW.qml"
+      - "tests/weather/test_station_map_event_context_m13.js"
+      - ".github/workflows/weather-event-context-m13.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  context:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: M13 selected-event context
+        run: node tests/weather/test_station_map_event_context_m13.js
+      - name: MAP hazard inspector regression
+        run: node tests/weather/test_station_map_hazard_intelligence.js
+      - name: MAP GDACS regression
+        run: node tests/weather/test_station_map_gdacs_disasters.js
+      - name: MAP USGS regression
+        run: node tests/weather/test_station_map_usgs_earthquakes.js
+      - name: MAP FIRMS regression
+        run: node tests/weather/test_station_map_firms_hotspots.js
+      - name: MAP MRMS regression
+        run: node tests/weather/test_station_map_noaa_radar.js
+      - name: GROUND lightning ownership regression
+        run: python3 tests/weather/test_station_ground_nowcoast_lightning.py

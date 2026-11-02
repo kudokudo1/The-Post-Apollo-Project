@@ -1,0 +1,31 @@
+name: Social Phone Capability Policy P0
+
+on:
+  pull_request:
+    paths:
+      - 'services/phone/CapabilityPolicy.py'
+      - 'tests/phone/test_capability_policy.py'
+      - 'MODEL/contracts/social-phone-capability-policy-v0.md'
+      - '.github/workflows/social-phone-capability-policy.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'services/phone/CapabilityPolicy.py'
+      - 'tests/phone/test_capability_policy.py'
+      - 'MODEL/contracts/social-phone-capability-policy-v0.md'
+      - '.github/workflows/social-phone-capability-policy.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  offline-route-contract:
+    name: Fail-closed Phone Bridge route planner fixtures
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Compile offline-only policy and tests
+        run: python3 -m py_compile services/phone/CapabilityPolicy.py tests/phone/test_capability_policy.py
+      - name: Run synthetic route-policy tests (no hardware or credentials)
+        run: python3 -m unittest discover -s tests/phone -p 'test_capability_policy.py' -v

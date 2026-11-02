@@ -16,6 +16,11 @@ Rectangle {
     function sectionVisible(section) {
         return SubjectPanelPolicy.visibleFor("sky",subjectRoute,section);
     }
+    // Changing live submodes must not inherit the previous panel's scroll offset.
+    onSubjectRouteChanged: {
+        if (skyScroll)
+            skyScroll.contentY = 0;
+    }
 
     property var weatherService: null
     property real runtimeNowMs: Date.now()

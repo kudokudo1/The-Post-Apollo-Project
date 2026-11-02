@@ -17,6 +17,7 @@ from synthetic_policy_v0 import SyntheticPolicyStore
 
 
 SCHEMA = "post-apollo.identity.synthetic-request.v0"
+CONTEXT_SCHEMA = "post-apollo.identity.context-summary.v0"
 
 
 @dataclass(frozen=True, slots=True)
@@ -96,6 +97,7 @@ class SyntheticRequestBoundary:
                            recordId, action
           listPortfolioOrganizations: schema, operation, accessToken,
                                       portfolioId
+          readMyContexts: schema, operation, accessToken
         Claims like principalId, role or org membership are NOT accepted.
         """
         denied = {"status": "DENIED"}
@@ -106,7 +108,9 @@ class SyntheticRequestBoundary:
             {"schema", "operation", "accessToken", "organizationId", "recordId", "action"}
             if operation == "authorizeRecord" else
             {"schema", "operation", "accessToken", "portfolioId"}
-            if operation == "listPortfolioOrganizations" else None
+            if operation == "listPortfolioOrganizations" else
+            {"schema", "operation", "accessToken"}
+            if operation == "readMyContexts" else None
         )
         if (expected is None or set(request) != expected
                 or request.get("schema") != SCHEMA):
@@ -128,6 +132,9 @@ class SyntheticRequestBoundary:
                     request["action"], now=now,
                 )
                 return {"status": "ALLOWED"} if ok else denied
+            if operation == "readMyContexts":
+                summary = self._policy.context_summary(principal, now=now)
+                return {"status": "OK", "schema": CONTEXT_SCHEMA, **summary}
             orgs = self._policy.visible_portfolio_orgs(
                 principal, request["portfolioId"]
             )

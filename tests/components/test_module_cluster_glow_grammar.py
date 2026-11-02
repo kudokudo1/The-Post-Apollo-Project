@@ -80,6 +80,22 @@ for name in ("Applauncher", "NotificationsHub", "Git"):
 # existing composite source and shared open-first glow priority.
 assert "contentGlowSource: hospitalMark" in hospital
 
+# Social's decorative left and right marks are white at rest, but use the
+# shared magenta open foreground and single composite magenta icon glow.
+social = module("Sessions")
+assert "open: menuOpen" in social
+assert social.count(
+    "color: sessionsDock.open ? sessionsDock.openForegroundColor : Colors.white"
+) == 2
+assert "contentGlowSource: sessionsIcon" in social
+assert "normalForegroundColor: Colors.omnitrix" in social
+assert "normalContentGlowColor: Colors.omnitrix" in social
+assert "normalDockGlowColor: Colors.omnitrix" in social
+assert "property color openForegroundColor: Colors.magenta" in dock
+assert "property color openGlowColor: Colors.magenta" in dock
+assert social.count("GohuText {") == 2
+
+
 volume = module("Volumebar")
 assert "contentGlowEnabled: false" in volume
 assert volume.count("textFormat: Text.StyledText") == 2

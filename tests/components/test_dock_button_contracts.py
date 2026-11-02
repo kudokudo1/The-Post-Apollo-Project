@@ -185,7 +185,8 @@ for path, needles in DOCK_MODULES.items():
 # Preserve the operator's Gohu icon and state colors, but shift the LEFT
 # ornaments alone. The full original shaping string stays in the source so
 # the central phone and RIGHT ornaments retain their natural advances.
-# Make the source's left glyphs transparent, then draw the white pair at +3px.
+# Make the source's left glyphs transparent, then draw the left pair at +3px.
+# Both ornament runs become magenta with their shared glow while Social is open.
 social_module = (ROOT / "modules/Sessions.qml").read_text(encoding="utf-8")
 for needle in (
     "GohuText {",
@@ -193,7 +194,7 @@ for needle in (
     "anchors.centerIn: parent",
     "font.pixelSize: 21",
     "textFormat: Text.StyledText",
-    "color: Colors.white",
+    "color: sessionsDock.open ? sessionsDock.openForegroundColor : Colors.white",
     "text: \"<font color='transparent'>࣪˖</font><font color='\" + sessionsDock.foregroundColor",
     "              + \"'>☎︎</font>๋࣭✧\"",
     "id: sessionsLeftOrnaments",
@@ -216,6 +217,18 @@ assert "Sessions.png" not in social_module
 assert "ColorOverlay {" not in social_module
 assert "SafeDropShadow {" not in social_module
 assert social_module.count("contentGlowSource: sessionsIcon") == 1
+# The phone is already state-styled; the left and right stars now use
+# open foreground magenta and leave the closed ornament white.
+assert social_module.count(
+    "color: sessionsDock.open ? sessionsDock.openForegroundColor : Colors.white"
+) == 2
+assert 'text: "<font color=\'transparent\'>࣪˖</font>' in social_module
+assert 'text: "࣪˖"' in social_module
+assert "open: menuOpen" in social_module
+assert "property color openForegroundColor: Colors.magenta" in COMPONENT
+assert "property color openGlowColor: Colors.magenta" in COMPONENT
+assert "readonly property color contentGlowColor: open" in COMPONENT
+
 assert social_module.count("GohuText {") == 2
 assert social_module.count("NotoText {") == 0
 # Previous global tracking tightened the right side and shifted the phone.

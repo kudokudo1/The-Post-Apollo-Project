@@ -239,7 +239,7 @@ def store_single_frame(source_id, root, scope_key, remote_url, observed_at_ms, c
 
 def load_single_frame(source_id, root, scope_key, max_age_ms):
     spec = SOURCES.get(source_id)
-    if not spec or spec.kind != "single":
+    if not spec or spec["kind"] != "single":
         raise ValueError("SINGLE_SOURCE_REQUIRED")
     scope = safe_text(scope_key, 256)
     directory = source_dir(root, source_id)

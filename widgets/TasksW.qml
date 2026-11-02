@@ -1,6 +1,7 @@
 import QtQuick
 import Quickshell
 import Quickshell.Wayland
+import "TasksChassisPolicy.js" as TasksChassisPolicy
 import "../components"
 import "hub"
 import "tasks"
@@ -17,11 +18,20 @@ PanelWindow {
     property real chassisTopY: 0
     signal openGithubProjectsRequested()
 
-    // Match FinanceW Compact's 790px visible height; width remains 432px.
-    readonly property int frameWidth: 432
-    readonly property int frameHeight: 790
+    // FinanceW-style arrows, but three portrait TASKS sizes. This property
+    // changes only mapped-panel geometry, never store/editor lifecycle.
+    property string chassisLevel: "compact"
     readonly property int glowGutter: 12
     readonly property int frameTopInset: 9 // shared visible top line
+    readonly property int bottomScreenGap: 12 // retain TASKS compact gutter
+    readonly property var chassisFrame: TasksChassisPolicy.frame(
+        chassisLevel,
+        root.screen ? root.screen.width : 456,
+        root.screen ? root.screen.height : 768,
+        glowGutter, frameTopInset, bottomScreenGap
+    )
+    readonly property int frameWidth: chassisFrame.width
+    readonly property int frameHeight: chassisFrame.height
 
     // M2: five main modes share one window and one truthful empty-state view.
     // Text-only labels are provisional until the user approves mode artwork.
@@ -70,6 +80,14 @@ PanelWindow {
             selectedMainModeIndex = index;
     }
 
+    function expandChassis() {
+        chassisLevel = TasksChassisPolicy.step(chassisLevel, 1);
+    }
+
+    function collapseChassis() {
+        chassisLevel = TasksChassisPolicy.step(chassisLevel, -1);
+    }
+
     function toggle() {
         menuOpen = !menuOpen;
     }
@@ -86,7 +104,7 @@ PanelWindow {
     }
 
     implicitWidth: frameWidth + glowGutter * 2
-    implicitHeight: frameHeight + frameTopInset + glowGutter
+    implicitHeight: frameHeight + frameTopInset + bottomScreenGap
 
     anchors {
         top: true
@@ -95,13 +113,16 @@ PanelWindow {
         right: false
     }
 
-    // Align with the Git/Hospital panel top, and clamp to the screen.
+    // Dock-centered, viewport-clamped at every size, including short screens.
     margins {
-        top: Math.max(0, Math.round(root.chassisTopY - root.glowGutter))
-        left: Math.max(0, Math.min(
-            Math.max(0, root.screen ? root.screen.width - root.implicitWidth : 0),
-            Math.round(root.dockCenterX - root.implicitWidth / 2)
-        ))
+        top: TasksChassisPolicy.topMargin(
+            root.chassisTopY,
+            root.screen ? root.screen.height : root.implicitHeight,
+            root.implicitHeight, root.glowGutter)
+        left: TasksChassisPolicy.leftMargin(
+            root.dockCenterX,
+            root.screen ? root.screen.width : root.implicitWidth,
+            root.implicitWidth)
     }
 
     exclusiveZone: 0
@@ -159,7 +180,7 @@ PanelWindow {
             GohuText {
                 anchors.left: parent.left
                 anchors.leftMargin: 14
-                anchors.right: feedBadge.left
+                anchors.right: collapseChassisButton.left
                 anchors.rightMargin: 8
                 anchors.verticalCenter: parent.verticalCenter
                 text: "TASKS // " + root.activeMode.label
@@ -167,6 +188,35 @@ PanelWindow {
                 font.bold: true
                 color: Colors.magenta
                 elide: Text.ElideRight
+            }
+
+            // FinanceW's up/down ActionButtons, scoped to this one TASKS window.
+            ActionButton {
+                id: collapseChassisButton
+                anchors.right: expandChassisButton.left
+                anchors.rightMargin: 4
+                anchors.verticalCenter: parent.verticalCenter
+                width: 30
+                height: 30
+                label: "↓"
+                labelPixelSize: 17
+                accentColor: Colors.cyan
+                available: root.chassisLevel !== "compact"
+                onLeftClicked: root.collapseChassis()
+            }
+
+            ActionButton {
+                id: expandChassisButton
+                anchors.right: feedBadge.left
+                anchors.rightMargin: 7
+                anchors.verticalCenter: parent.verticalCenter
+                width: 30
+                height: 30
+                label: "↑"
+                labelPixelSize: 17
+                accentColor: Colors.magenta
+                available: root.chassisLevel !== "large"
+                onLeftClicked: root.expandChassis()
             }
 
             // Local store health for TASKS; reserved pages have no feed.
@@ -317,7 +367,10 @@ PanelWindow {
                 anchors.top: parent.top
                 anchors.left: parent.left
                 anchors.right: parent.right
-                height: Math.min(350, mainModeContent.height * 0.53)
+                height: Math.min(
+                    root.chassisLevel === "compact" ? 350
+                    : root.chassisLevel === "expanded" ? 480 : 640,
+                    mainModeContent.height * 0.55)
                 visible: root.menuOpen && root.activeMode.id === "tasks"
                 taskScrollbarEnabled: true
                 closeOnEscape: true

@@ -11,17 +11,46 @@ SHELL = (ROOT / "shell.qml").read_text(encoding="utf-8")
 assert "PanelWindow {" in MENU
 assert 'import "Quickshell"' not in MENU  # built-in imports, not string imports
 assert 'import "../components"' in MENU
-assert "readonly property int frameWidth: 432" in MENU
-assert "readonly property int frameHeight: 790" in MENU
+assert 'import "TasksChassisPolicy.js" as TasksChassisPolicy' in MENU
+assert 'property string chassisLevel: "compact"' in MENU
+assert "readonly property var chassisFrame: TasksChassisPolicy.frame(" in MENU
+assert "readonly property int frameWidth: chassisFrame.width" in MENU
+assert "readonly property int frameHeight: chassisFrame.height" in MENU
 assert "readonly property int glowGutter: 12" in MENU
 assert "readonly property int frameTopInset: 9" in MENU
+assert "readonly property int bottomScreenGap: 12" in MENU
 assert "implicitWidth: frameWidth + glowGutter * 2" in MENU
-assert "implicitHeight: frameHeight + frameTopInset + glowGutter" in MENU
+assert "implicitHeight: frameHeight + frameTopInset + bottomScreenGap" in MENU
 assert "y: root.frameTopInset" in MENU
 assert "anchors.topMargin: root.frameTopInset" in MENU
-assert "dockCenterX - root.implicitWidth / 2" in MENU
-assert "root.chassisTopY - root.glowGutter" in MENU
-assert "root.screen ? root.screen.width - root.implicitWidth : 0" in MENU
+assert "TasksChassisPolicy.leftMargin(" in MENU
+assert "TasksChassisPolicy.topMargin(" in MENU
+assert "root.implicitWidth)" in MENU
+assert "root.implicitHeight, root.glowGutter)" in MENU
+assert "function expandChassis()" in MENU
+assert "function collapseChassis()" in MENU
+assert "chassisLevel = TasksChassisPolicy.step(chassisLevel, 1);" in MENU
+assert "chassisLevel = TasksChassisPolicy.step(chassisLevel, -1);" in MENU
+assert "id: collapseChassisButton" in MENU
+assert "id: expandChassisButton" in MENU
+assert 'label: "↓"' in MENU and 'label: "↑"' in MENU
+assert 'available: root.chassisLevel !== "compact"' in MENU
+assert 'available: root.chassisLevel !== "large"' in MENU
+assert "onLeftClicked: root.collapseChassis()" in MENU
+assert "onLeftClicked: root.expandChassis()" in MENU
+assert "anchors.right: collapseChassisButton.left" in MENU
+assert "anchors.right: expandChassisButton.left" in MENU
+assert "anchors.right: feedBadge.left" in MENU
+assert 'root.chassisLevel === "compact" ? 350' in MENU
+assert 'root.chassisLevel === "expanded" ? 480 : 640' in MENU
+assert "mainModeContent.height * 0.55" in MENU
+# The size changes must not reconstruct the Tasks page or shared store.
+assert MENU.count("PanelWindow {") == 1
+assert MENU.count("ApolloHubTodoMini {") == 1
+assert MENU.count("TaskDetailsPane {") == 1
+resize_code = MENU[MENU.index("function expandChassis()"):MENU.index("function toggle()")]
+for forbidden in ("menuOpen =", "selectedMainModeIndex =", "refresh()", "addTask(", "saveDetails("):
+    assert forbidden not in resize_code, forbidden
 
 # Leave the Wayland surface mapped and empty its pointer mask when closed.
 assert "WlrLayershell.layer: WlrLayer.Overlay" in MENU

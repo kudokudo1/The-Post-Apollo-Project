@@ -6,6 +6,8 @@ on:
       - "shell.qml"
       - "modules/Tasks.qml"
       - "widgets/TasksW.qml"
+      - "widgets/TasksChassisPolicy.js"
+      - "tests/tasks/test_task_chassis_policy.cjs"
       - "tests/components/test_tasks_dock_contracts.py"
       - "tests/components/test_tasks_menu_contracts.py"
       - "tests/components/test_tasks_m3_shared_editor_contracts.py"
@@ -38,6 +40,8 @@ on:
       - "shell.qml"
       - "modules/Tasks.qml"
       - "widgets/TasksW.qml"
+      - "widgets/TasksChassisPolicy.js"
+      - "tests/tasks/test_task_chassis_policy.cjs"
       - "tests/components/test_tasks_dock_contracts.py"
       - "tests/components/test_tasks_menu_contracts.py"
       - "tests/components/test_tasks_m3_shared_editor_contracts.py"
@@ -76,6 +80,8 @@ jobs:
         run: python3 tests/components/test_tasks_dock_contracts.py
       - name: Validate TASKS basic menu source contracts
         run: python3 tests/components/test_tasks_menu_contracts.py
+      - name: Validate TASKS three-step portrait resize policy
+        run: node tests/tasks/test_task_chassis_policy.cjs
       - name: Validate TASKS shared editor/store source contracts
         run: python3 tests/components/test_tasks_m3_shared_editor_contracts.py
       - name: Validate TASKS v2 details UI and single-writer contracts

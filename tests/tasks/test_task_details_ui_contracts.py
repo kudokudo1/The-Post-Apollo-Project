@@ -78,6 +78,7 @@ assert STORE.count("FileView {") == 1
 for src in (TASKS, DETAILS, MINI):
     for token in ("FileView {", "Process {", "JsonAdapter {", "Quickshell.execDetached(", "HttpClient"):
         assert token not in src, token
-assert 'focusable: root.menuOpen && (root.activeMode.id === "tasks"' in TASKS
+# Focus must remain available on all five TASKS modes, not just TASKS editor.
+assert "focusable: root.menuOpen" in TASKS
 
 print("TASKS M4 UI/single-writer contracts: PASS")

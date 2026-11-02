@@ -13,7 +13,11 @@ Rectangle {
     property var timelineRows: []
     property var relationshipRows: []
     property var companions: []
+    property bool archiveAvailable: false
+    property int archiveSnapshotCount: 0
+    property string archiveStatusText: "NOT ARCHIVED"
     property real runtimeNowMs: Date.now()
+    signal archiveRequested()
     property color accentColor: Colors.magenta
 
     readonly property int companionCount:
@@ -84,7 +88,7 @@ Rectangle {
     visible: eventContext !== null
     width: parent ? parent.width : 0
     height: visible
-        ? 260
+        ? 292
           + Math.min(4, companionCount) * 42
           + Math.min(6, timelineCount) * 48
           + (relationshipCount > 0 ? 30 : 0)
@@ -142,6 +146,33 @@ Rectangle {
                 : ""
             font.pixelSize: 9
             elide: Text.ElideRight
+        }
+
+        Row {
+            width: parent.width
+            height: 27
+            spacing: 8
+
+            ActionButton {
+                width: 116
+                height: 26
+                label: "ARCHIVE"
+                labelPixelSize: 9
+                accentColor: Colors.magenta
+                available: card.archiveAvailable
+                onClicked: card.archiveRequested()
+            }
+
+            QuietText {
+                anchors.verticalCenter: parent.verticalCenter
+                width: Math.max(0, parent.width - 124)
+                text: card.archiveStatusText
+                    + " // OPERATOR SNAPSHOT // SOURCE IDENTITY PRESERVED"
+                font.pixelSize: 8
+                color: card.archiveSnapshotCount > 0
+                    ? Colors.cyan : Colors.orange
+                elide: Text.ElideRight
+            }
         }
 
         QuietText {

@@ -368,6 +368,10 @@ PanelWindow {
         id: weatherLiveHistory
     }
 
+    WeatherEventArchiveStore {
+        id: weatherEventArchive
+    }
+
     WeatherService {
         id: weatherService
         cacheStore: weatherPersistentCache
@@ -1006,6 +1010,7 @@ PanelWindow {
                 nwsAlertSource: nwsOfficialAlerts
                 persistentCacheStore: weatherPersistentCache
                 liveHistoryStore: weatherLiveHistory
+                eventArchiveStore: weatherEventArchive
                 relationshipFocusModeActive: relationshipFocus.active
                 relationshipFocused: relationshipFocus.owner === "weather"
             }

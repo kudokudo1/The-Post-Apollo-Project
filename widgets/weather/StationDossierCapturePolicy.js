@@ -63,7 +63,11 @@ function validate(preview, nowMs) {
     if (!d.semantics || d.semantics.persistence !== "NONE"
             || d.semantics.incidentMerge !== false
             || d.semantics.sourceEventIdentity
-               !== "EXACT_PROVIDER_AND_PROVIDER_NATIVE_ID")
+               !== "EXACT_PROVIDER_AND_PROVIDER_NATIVE_ID"
+            || d.semantics.relationshipMeaning !== "CONTEXT_NOT_CAUSALITY"
+            || d.semantics.radarMeaning !== "FRAME_COVERAGE_NOT_PIXEL_INTERPRETATION"
+            || d.semantics.gaugeMeaning !== "PROXIMITY_NOT_CATCHMENT"
+            || d.semantics.rawFrameBytes !== "NOT_INCLUDED")
         return fail("PREVIEW_SEMANTICS_UNTRUSTED");
     if (!validTime(nowMs, false) || !validTime(d.assembledAtMs, false)
             || nowMs < d.assembledAtMs
@@ -115,6 +119,16 @@ function validate(preview, nowMs) {
         LIGHTNING_FRAME_COVERAGE:"NOAA NOWCOAST",
         FLOOD_GATED_GAUGE_OBSERVATION:"NOAA NWPS"
     };
+    const expectedInterpretation = {
+        RADAR_FRAME_COVERAGE:"LOADED_FRAME_COVERS_EVENT_POINT",
+        LIGHTNING_FRAME_COVERAGE:"LOADED_FRAME_COVERS_EVENT_POINT",
+        FLOOD_GATED_GAUGE_OBSERVATION:"EXPLICIT_FLOOD_EVENT_AND_NEARBY_GAUGE"
+    };
+    const expectedLimitation = {
+        RADAR_FRAME_COVERAGE:"FRAME COVERAGE DOES NOT INTERPRET RADAR PIXELS",
+        LIGHTNING_FRAME_COVERAGE:"FRAME COVERAGE DOES NOT PROVE LIGHTNING AT EVENT",
+        FLOOD_GATED_GAUGE_OBSERVATION:"DISTANCE DOES NOT ESTABLISH SAME CATCHMENT OR INCIDENT"
+    };
     const operational = [];
     const seenKinds = [];
     for (let i = 0; i < d.operationalEvidence.length; i++) {
@@ -125,7 +139,8 @@ function validate(preview, nowMs) {
                 || r.sameIncidentClaim !== false
                 || !validTime(r.sourceTimeMs, true)
                 || !validTime(r.receivedAtMs, true)
-                || !string(r.limitation, 180))
+                || r.interpretation !== expectedInterpretation[r.kind]
+                || r.limitation !== expectedLimitation[r.kind])
             return fail("OPERATIONAL_PROVENANCE_INVALID");
         if (r.kind === "FLOOD_GATED_GAUGE_OBSERVATION"
                 && (!string(r.gaugeId, 40)

@@ -1,0 +1,53 @@
+name: TASKS M12p disabled Hub ticket presenter
+
+on:
+  pull_request:
+    paths:
+      - 'widgets/hub/ApolloHubTodoMini.qml'
+      - 'widgets/hub/TaskHubTicketPresenterM12p.js'
+      - 'tests/tasks/test_task_hub_ticket_presenter_m12p.cjs'
+      - 'docs/tasks-hub-ticket-presenter-m12p.md'
+      - '.github/workflows/tasks-hub-ticket-presenter-m12p.yml'
+      - 'services/hub/TaskSaveTicketContractM12o.js'
+      - 'services/hub/ApolloHubTodoStore.qml'
+      - 'services/hub/ApolloHubTodoPolicy.js'
+  push:
+    branches: [main]
+    paths:
+      - 'widgets/hub/ApolloHubTodoMini.qml'
+      - 'widgets/hub/TaskHubTicketPresenterM12p.js'
+      - 'tests/tasks/test_task_hub_ticket_presenter_m12p.cjs'
+      - 'docs/tasks-hub-ticket-presenter-m12p.md'
+      - '.github/workflows/tasks-hub-ticket-presenter-m12p.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  m12p-disabled-hub:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: M12p four Hub ticket states and hard-disabled legacy path
+        run: node --test tests/tasks/test_task_hub_ticket_presenter_m12p.cjs
+      - name: M12o all four consumer contract regression
+        run: node --test tests/tasks/test_task_disabled_ticket_api_m12o.cjs
+      - name: M12n native-ticket reducer and source boundary
+        run: node --test tests/tasks/test_task_native_ticket_bridge_m12n.cjs
+      - name: M12m local FIFO disposable file coordinator
+        run: node --test tests/tasks/test_task_local_coordinator_m12m.cjs
+      - name: M12i synthetic host receipt bridge
+        run: python3 tests/tasks/test_task_native_receipt_host_m12i.py
+      - name: M12k noncooperating same-user writer limitation
+        run: python3 tests/tasks/test_task_uncooperative_writer_m12k.py
+      - name: M11t production authorization remains gated
+        run: python3 tests/tasks/test_task_production_trust_contract_m11t.py
+      - name: M11d exactly one production FileView
+        run: python3 tests/tasks/test_task_writer_gate_inventory_m11d.py

@@ -23,7 +23,7 @@ public:
 
     // Requires a supplied test bus on which THIS process owns the isolated
     // synthetic service. Does not discover phones or connect to KDE Connect.
-    bool start(const QDBusConnection &bus, const QString &fixtureDeviceId);
+    bool start(QDBusConnection bus, const QString &fixtureDeviceId);
     void stop();
     bool active() const { return m_active; }
 

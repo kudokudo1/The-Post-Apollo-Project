@@ -6,6 +6,7 @@ Rectangle {
     id: card
 
     property var eventContext: null
+    property var dossierPreview: null
     property real weatherFixDistanceKm: -1
     property var radarContext: null
     property var lightningContext: null
@@ -35,6 +36,9 @@ Rectangle {
         Array.isArray(relationshipRows) ? relationshipRows.length : 0
     readonly property int archiveRowCount:
         Array.isArray(archiveRows) ? archiveRows.length : 0
+    readonly property bool dossierPreviewReady:
+        !!dossierPreview && dossierPreview.ok === true
+        && !!dossierPreview.dossier
     readonly property var displayedArchiveDiff:
         archivePairCustom ? archivePairDiff : archiveDiff
     readonly property int archiveDiffCount:
@@ -116,6 +120,7 @@ Rectangle {
     width: parent ? parent.width : 0
     height: visible
         ? 292
+          + (dossierPreviewReady ? 48 : 0)
           + (archiveRowCount > 0 ? 30 : 0)
           + Math.min(5, archiveRowCount) * 42
           + (archiveSnapshotCount > 0 ? 30 : 0)
@@ -204,6 +209,41 @@ Rectangle {
                 font.pixelSize: 8
                 color: card.archiveSnapshotCount > 0
                     ? Colors.cyan : Colors.orange
+                elide: Text.ElideRight
+            }
+        }
+
+        Column {
+            width: parent.width
+            spacing: 3
+            visible: card.dossierPreviewReady
+
+            GohuText {
+                width: parent.width
+                text: "DOSSIER PREVIEW // VOLATILE // NO DISK WRITE"
+                font.pixelSize: 10
+                color: Colors.magenta
+                elide: Text.ElideRight
+            }
+
+            QuietText {
+                width: parent.width
+                text: card.dossierPreviewReady
+                    ? "NEARBY " + card.dossierPreview.dossier.counts.nearby
+                        + " // OPERATIONAL " + card.dossierPreview.dossier.counts.operational
+                        + " // TIMELINE " + card.dossierPreview.dossier.counts.timeline
+                        + " // RELATIONS " + card.dossierPreview.dossier.counts.relationships
+                    : ""
+                font.pixelSize: 8
+                color: Colors.cyan
+                elide: Text.ElideRight
+            }
+
+            QuietText {
+                width: parent.width
+                text: "PROVIDER IDS KEPT SEPARATE // NO INCIDENT MERGE // NO CAUSAL CLAIM"
+                font.pixelSize: 8
+                color: Colors.orange
                 elide: Text.ElideRight
             }
         }

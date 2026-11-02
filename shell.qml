@@ -325,9 +325,14 @@ PanelWindow {
         id: weatherPersistentCache
     }
 
+    WeatherLiveHistoryStore {
+        id: weatherLiveHistory
+    }
+
     WeatherService {
         id: weatherService
         cacheStore: weatherPersistentCache
+        historyStore: weatherLiveHistory
     }
 
     // P3-B DRAFT INTEGRATION GATE: Team 6's one shared stream owner.
@@ -378,6 +383,7 @@ PanelWindow {
     SpaceService {
         id: spaceService
         cacheStore: weatherPersistentCache
+        historyStore: weatherLiveHistory
     }
 
     // Daily observational brief from the same Space data as Weather Station.
@@ -960,6 +966,7 @@ PanelWindow {
                 spaceService: spaceService
                 nwsAlertSource: nwsOfficialAlerts
                 persistentCacheStore: weatherPersistentCache
+                liveHistoryStore: weatherLiveHistory
                 relationshipFocusModeActive: relationshipFocus.active
                 relationshipFocused: relationshipFocus.owner === "weather"
             }

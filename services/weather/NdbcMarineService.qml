@@ -10,6 +10,7 @@ Scope {
     id: marine
 
     property var cacheStore: null
+    property var historyStore: null
     property bool usingPersistentCache: false
     property string loadedKey: ""
     property bool active: true
@@ -111,6 +112,18 @@ Scope {
         return true;
     }
 
+    function captureHistory(receivedAtMs) {
+        if (!historyStore || !configured || !station)
+            return false;
+        return historyStore.append(
+            "marine",
+            currentKey,
+            Number(station.sampleMillis),
+            receivedAtMs,
+            station
+        );
+    }
+
     function accept(raw) {
         if (!configured || currentKey !== inflightKey)
             return;
@@ -125,6 +138,7 @@ Scope {
             loadedKey = inflightKey;
             usingPersistentCache = false;
             persistStation(lastUpdated.getTime());
+            captureHistory(lastUpdated.getTime());
         } catch (error) {
             failed = true;
             errorText = "NDBC MARINE OBSERVATIONS UNAVAILABLE";

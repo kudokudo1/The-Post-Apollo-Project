@@ -7,6 +7,7 @@ Scope {
     id: spaceService
 
     property var cacheStore: null
+    property var historyStore: null
     property bool usingPersistentKpCache: false
     property bool usingPersistentSolarWindCache: false
     property bool usingPersistentMagneticFieldCache: false
@@ -386,6 +387,42 @@ Scope {
         });
     }
 
+    function sourceObservedMillis(value, fallbackMs) {
+        const parsed = Date.parse(String(value || ""));
+        return isFinite(parsed) && parsed > 0 ? parsed : Number(fallbackMs);
+    }
+
+    function captureSolarWindHistory(receivedAtMs) {
+        if (!historyStore || !solarWindReady)
+            return false;
+        return historyStore.append(
+            "space-wind",
+            "global",
+            sourceObservedMillis(solarWindTime, receivedAtMs),
+            receivedAtMs,
+            {
+                "solarWindSpeed": solarWindSpeed,
+                "sourceTime": solarWindTime
+            }
+        );
+    }
+
+    function captureMagneticFieldHistory(receivedAtMs) {
+        if (!historyStore || !magneticFieldReady)
+            return false;
+        return historyStore.append(
+            "space-imf",
+            "global",
+            sourceObservedMillis(magneticFieldTime, receivedAtMs),
+            receivedAtMs,
+            {
+                "bt": magneticFieldBt,
+                "bz": magneticFieldBz,
+                "sourceTime": magneticFieldTime
+            }
+        );
+    }
+
     function persistSolarFlux(receivedAtMs) {
         if (!cacheStore || !solarFluxReady)
             return false;
@@ -461,6 +498,7 @@ Scope {
             lastUpdated = receivedAt;
             usingPersistentSolarWindCache = false;
             persistSolarWind(receivedAt.getTime());
+            captureSolarWindHistory(receivedAt.getTime());
         } catch (error) {
             console.log("SpaceService solar wind parse error:", error);
 
@@ -495,6 +533,7 @@ Scope {
             lastUpdated = receivedAt;
             usingPersistentMagneticFieldCache = false;
             persistMagneticField(receivedAt.getTime());
+            captureMagneticFieldHistory(receivedAt.getTime());
         } catch (error) {
             console.log("SpaceService magnetic field parse error:", error);
 

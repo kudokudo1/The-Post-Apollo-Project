@@ -16,7 +16,29 @@ Rectangle {
     property var nwsAlertSource: null
     property var seismicSource: null
     property var persistentCacheStore: null
+    property var liveHistoryStore: null
     property real runtimeNowMs: Date.now()
+
+    readonly property int liveHistoryRevision:
+        liveHistoryStore ? Number(liveHistoryStore.revision) || 0 : 0
+
+    function weatherHistoryScopeKey() {
+        const lat = weatherService ? Number(weatherService.latitude) : NaN;
+        const lon = weatherService ? Number(weatherService.longitude) : NaN;
+        if (!isFinite(lat) || !isFinite(lon))
+            return "";
+        return lat.toFixed(3) + "|" + lon.toFixed(3);
+    }
+
+    function historySuffix(sourceId, scopeKey) {
+        liveHistoryRevision;
+        if (!liveHistoryStore)
+            return " // HISTORY --";
+        const scope = String(scopeKey || "");
+        const count = scope === "" ? 0
+            : liveHistoryStore.count(sourceId, scope, runtimeNowMs);
+        return " // HISTORY " + count + "/48H";
+    }
 
     readonly property var runtimeRows: [
         RuntimePolicy.displayRow(
@@ -30,11 +52,15 @@ Rectangle {
                 "usingCache": weatherService
                               ? weatherService.usingPersistentCurrentCache
                               : false,
-                "detail": weatherService
-                          && String(weatherService.observationTime || "") !== ""
-                          ? "PROVIDER OBS CLOCK "
-                            + weatherService.observationTime
-                          : "CURRENT CONDITIONS"
+                "detail": (
+                    weatherService
+                    && String(weatherService.observationTime || "") !== ""
+                    ? "PROVIDER OBS CLOCK "
+                      + weatherService.observationTime
+                    : "CURRENT CONDITIONS"
+                ) + ground.historySuffix(
+                    "weather-current", ground.weatherHistoryScopeKey()
+                )
             },
             runtimeNowMs
         ),
@@ -51,11 +77,15 @@ Rectangle {
                 "usingCache": weatherService
                               ? weatherService.usingPersistentAqiCache
                               : false,
-                "detail": weatherService
-                          && String(weatherService.airQualitySourceTime || "") !== ""
-                          ? "SOURCE CLOCK "
-                            + weatherService.airQualitySourceTime
-                          : "AQI + POLLEN"
+                "detail": (
+                    weatherService
+                    && String(weatherService.airQualitySourceTime || "") !== ""
+                    ? "SOURCE CLOCK "
+                      + weatherService.airQualitySourceTime
+                    : "AQI + POLLEN"
+                ) + ground.historySuffix(
+                    "air-quality", ground.weatherHistoryScopeKey()
+                )
             },
             runtimeNowMs
         ),
@@ -107,7 +137,11 @@ Rectangle {
                 "receivedAt": marineService.lastUpdated,
                 "observedAt": marineService.station
                               ? marineService.station.sampleMillis : -1,
-                "usingCache": marineService.usingPersistentCache
+                "usingCache": marineService.usingPersistentCache,
+                "detail": "NEAREST STATION"
+                          + ground.historySuffix(
+                                "marine", marineService.currentKey
+                            )
             },
             runtimeNowMs
         ),
@@ -121,7 +155,11 @@ Rectangle {
                 "receivedAt": coastalService.lastUpdated,
                 "observedAt": coastalService.waterLevel
                               ? coastalService.waterLevel.sampleMillis : -1,
-                "usingCache": coastalService.usingPersistentCache
+                "usingCache": coastalService.usingPersistentCache,
+                "detail": "WATER LEVEL + TIDES"
+                          + ground.historySuffix(
+                                "coastal-water", coastalService.currentKey
+                            )
             },
             runtimeNowMs
         ),
@@ -169,6 +207,7 @@ Rectangle {
     WeatherServices.NdbcMarineService {
         id: marineService
         cacheStore: ground.persistentCacheStore
+        historyStore: ground.liveHistoryStore
         active: ground.visible
         latitude: weatherService ? weatherService.latitude : ""
         longitude: weatherService ? weatherService.longitude : ""
@@ -177,6 +216,7 @@ Rectangle {
     WeatherServices.CoopsCoastalService {
         id: coastalService
         cacheStore: ground.persistentCacheStore
+        historyStore: ground.liveHistoryStore
         active: ground.visible
         latitude: weatherService ? weatherService.latitude : ""
         longitude: weatherService ? weatherService.longitude : ""

@@ -10,7 +10,22 @@ Rectangle {
 
     property var spaceService: null
     property var weatherService: null
+    property var liveHistoryStore: null
     property real runtimeNowMs: Date.now()
+
+    readonly property int liveHistoryRevision:
+        liveHistoryStore ? Number(liveHistoryStore.revision) || 0 : 0
+
+    function historySuffix(sourceId) {
+        liveHistoryRevision;
+        if (!liveHistoryStore)
+            return "HISTORY --";
+        return "HISTORY "
+            + liveHistoryStore.count(
+                sourceId, "global", runtimeNowMs
+            )
+            + "/48H";
+    }
 
     readonly property var runtimeRows: [
         RuntimePolicy.displayRow(
@@ -40,7 +55,8 @@ Rectangle {
                 "observedAt": spaceService ? spaceService.solarWindTime : null,
                 "usingCache": spaceService
                               ? spaceService.usingPersistentSolarWindCache
-                              : false
+                              : false,
+                "detail": space.historySuffix("space-wind")
             },
             runtimeNowMs
         ),
@@ -58,7 +74,8 @@ Rectangle {
                               ? spaceService.magneticFieldTime : null,
                 "usingCache": spaceService
                               ? spaceService.usingPersistentMagneticFieldCache
-                              : false
+                              : false,
+                "detail": space.historySuffix("space-imf")
             },
             runtimeNowMs
         ),

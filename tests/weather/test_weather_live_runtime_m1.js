@@ -175,10 +175,11 @@ for (const row of catalog) {
     const owner = read(ownerPath);
 
     if (row.cadenceMs > 0) {
-        const intervalPattern = new RegExp(
-            "interval\\s*:\\s*" + String(row.cadenceMs)
+        const cadencePattern = new RegExp(
+            "\\b" + String(row.cadenceMs) + "\\b"
         );
-        assert.match(owner, intervalPattern, row.id + " declared cadence");
+        assert.match(owner, /\\bTimer\\s*\\{/, row.id + " poll timer");
+        assert.match(owner, cadencePattern, row.id + " declared cadence");
     }
 
     if (row.lifetime === "VIEW_SCOPED") {

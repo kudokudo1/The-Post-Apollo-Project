@@ -5,6 +5,7 @@
 #include <QCoreApplication>
 #include <QDBusArgument>
 #include <QJsonArray>
+#include <QJsonDocument>
 #include <QVariant>
 
 #include <cstdio>

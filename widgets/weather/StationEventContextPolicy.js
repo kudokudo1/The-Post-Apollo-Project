@@ -61,6 +61,11 @@ function parseMillis(value) {
     if (typeof value === "number")
         return isFinite(value) && value > 0 ? value : -1;
 
+    if (typeof value.getTime === "function") {
+        const ms = value.getTime();
+        return isFinite(ms) && ms > 0 ? ms : -1;
+    }
+
     const raw = String(value).trim();
     if (!raw)
         return -1;
@@ -173,7 +178,7 @@ function pointInBounds(latitude, longitude, bounds) {
 
 function radarCoverage(
     selected, bounds, loadedHistoryMinutes,
-    requestedTimeMs, usingCache
+    requestedTimeMs, usingCache, receivedAt
 ) {
     const hasFrame = !!bounds && bounds.valid === true;
     const hasPoint = !!selected && selected.hasPoint === true;
@@ -193,6 +198,7 @@ function radarCoverage(
             ? utcLabel(requested) : "LATEST FRAME",
         usingCache: usingCache === true,
         timeMs: isFinite(requested) && requested > 0 ? requested : -1,
+        receivedAtMs: parseMillis(receivedAt),
         status: !hasFrame
             ? "NO LOADED MRMS FRAME"
             : !hasPoint
@@ -217,7 +223,7 @@ function plainBoundsAvailable(bounds) {
 
 function lightningCoverage(
     selected, bounds, ready, latestTime,
-    windowMinutes, resolutionKm, radiusKm, usingCache
+    windowMinutes, resolutionKm, radiusKm, usingCache, receivedAt
 ) {
     const hasFrame = ready === true && plainBoundsAvailable(bounds);
     const hasPoint = !!selected && selected.hasPoint === true;
@@ -244,6 +250,7 @@ function lightningCoverage(
         radiusKm: radius,
         usingCache: usingCache === true,
         timeMs: parseMillis(latestTime),
+        receivedAtMs: parseMillis(receivedAt),
         status: !hasFrame
             ? "NO LOADED LIGHTNING FRAME"
             : !hasPoint
@@ -477,7 +484,8 @@ function observedThresholdContext(gauge, gaugeContext, stageflow) {
 }
 
 function floodGaugeContext(
-    selected, gauge, gaugeContext, stageflow, maximumDistanceKm
+    selected, gauge, gaugeContext, stageflow,
+    maximumDistanceKm, receivedAt
 ) {
     const relevant = isFloodLike(selected);
     const limit = Math.max(
@@ -497,6 +505,7 @@ function floodGaugeContext(
         forecastCategory: "NOT DEFINED",
         observedReading: "--",
         latestObserved: null,
+        receivedAtMs: parseMillis(receivedAt),
         thresholdContext: {
             available: false,
             supported: false,
@@ -573,7 +582,8 @@ function floodGaugeContext(
 
 function timelineRow(
     sourceLabel, provenanceGroup, kind,
-    label, timeMs, provenance
+    label, timeMs, provenance,
+    freshnessMode, runtimeSourceId, receivedAtMs
 ) {
     const time = finite(timeMs, -1);
     if (time <= 0)
@@ -585,7 +595,12 @@ function timelineRow(
         label: safeText(label, 180),
         timeMs: time,
         timeLabel: utcLabel(time),
-        provenance: safeText(provenance, 80)
+        provenance: safeText(provenance, 80),
+        freshnessMode: safeText(
+            freshnessMode || "AGE_ONLY", 32
+        ),
+        runtimeSourceId: safeText(runtimeSourceId, 48),
+        receivedAtMs: parseMillis(receivedAtMs)
     };
 }
 
@@ -606,7 +621,10 @@ function evidenceTimeline(
             "SELECTED EVENT",
             selected.typeLabel + " // " + selected.title,
             selected.timeMs,
-            "SOURCE EVENT TIME"
+            "SOURCE EVENT TIME",
+            "AGE_ONLY",
+            "",
+            -1
         ));
     }
 
@@ -619,7 +637,10 @@ function evidenceTimeline(
             "NEARBY RECORD",
             row.typeLabel + " // " + row.title,
             row.timeMs,
-            "INDEPENDENT SOURCE RECORD"
+            "INDEPENDENT SOURCE RECORD",
+            "AGE_ONLY",
+            "",
+            -1
         ));
     }
 
@@ -630,7 +651,10 @@ function evidenceTimeline(
             "RADAR FRAME",
             radarContext.frameLabel || "FRAME",
             radarContext.timeMs,
-            "LOADED FRAME TIME"
+            "LOADED FRAME TIME",
+            "SNAPSHOT",
+            "mrms-radar",
+            radarContext.receivedAtMs
         ));
     }
 
@@ -642,7 +666,10 @@ function evidenceTimeline(
             String(lightningContext.windowMinutes || 15)
                 + "M DENSITY",
             lightningContext.timeMs,
-            "LOADED FRAME TIME"
+            "LOADED FRAME TIME",
+            "PROVIDER_CONTRACT",
+            "lightning",
+            lightningContext.receivedAtMs
         ));
     }
 
@@ -658,7 +685,10 @@ function evidenceTimeline(
                     floodContext.latestObserved.units
                   ),
             floodContext.latestObserved.timeMs,
-            "GAUGE OBSERVATION TIME"
+            "GAUGE OBSERVATION TIME",
+            "PROVIDER_CONTRACT",
+            "river",
+            floodContext.receivedAtMs
         ));
     }
 

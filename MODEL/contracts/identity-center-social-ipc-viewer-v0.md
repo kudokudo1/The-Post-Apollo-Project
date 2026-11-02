@@ -51,7 +51,7 @@ This is a *viewer* of the existing display contract, not an authentication autho
 
 ## Critical lifecycle decisions
 
-1. The QML reader is active only while `appSelector.settingsOpen` and `sections.activeSection === "ORGANIZATIONS"`. Leaving settings or the Organizations section sets its snapshot to null and clears company data in the same QML component. A late process result is ignored if the reader is inactive.
+1. The QML reader is active only while `appSelector.settingsOpen` and `sections.activeSection === "ORGANIZATIONS"`. Leaving settings or the Organizations section sets its snapshot to null and clears company data in the same QML component. A late process result is ignored if the reader is inactive. An explicit in-flight response guard also refuses the *old* result if a user closes and immediately reopens the pane before the previous subprocess finishes.
 2. While active, the reader polls at five-second intervals, **clearing before each poll**. A hung command therefore cannot leave a prior READY list displayed indefinitely; if no host/socket exists the CLI returns UNAVAILABLE with empty memberships.
 3. The Python CLI returns exactly one JSON line, never a token, error trace or private path. Only `--json` is permitted; extra args including company/role/token selectors exit with no output. The QML reader never uses an external URL, JavaScript fetch, dynamic command arguments, credential storage or browser opener.
 4. Both the Python IPC client and the QML display validator reject malformed results. The QML validator checks exact top-level and nested keys, bounded org/grant/portfolio collections, known kind/action, duplicate org/portfolio IDs, invalid grant expiry, cross-portfolio tenant leakage and rejects any `canSwitchOrganization=true`.
@@ -96,7 +96,7 @@ Do not merge the dependent PR before accepting the IPC base, do not treat same-U
 - [x] No-credentials fixed CLI reader, private runtime path, read-only socket
 - [x] QML visibility/clear lifecycle, data-schema validation, disabled switcher
 - [x] Real subprocess IPC, QML JS logic and existing Social settings tests authored
-- [ ] Exact-head CI passing
+- [x] Exact-head CI passing (21/21 GitHub Actions runs on pre-handoff revision)
 - [ ] Independent security / UI lifecycle review
 - [ ] Operator acceptance and actual Quickshell visual proof
 - [ ] Approved real host, isolation, OS vault and server-side authorization

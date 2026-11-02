@@ -18,6 +18,26 @@ Item {
 
     property bool deckOpen: false
 
+    // This owner is the one writer of deckOpen (including Escape close).
+    // Reuse the dock's placement calculation for both mouse and Super+R.
+    function toggleDeck() {
+        if (!mediaRoot.deckOpen) {
+            // shell.qml currently starts 50px from the DP-5 screen edge.
+            // Follow the dock's current temporary placement without editing
+            // shared shell.qml geometry or inventing final taskbar placement.
+            var dockSceneX = mediaDock.mapToItem(null, 0, 0).x;
+            var screenWidth = deckPanel.screen
+                              ? deckPanel.screen.width : 2560;
+            var maxLeft = Math.max(
+                8, screenWidth - deckPanel.panelWidth - 8
+            );
+            deckPanel.panelLeftMargin = Math.max(
+                8, Math.min(maxLeft, Math.round(50 + dockSceneX))
+            );
+        }
+        mediaRoot.deckOpen = !mediaRoot.deckOpen;
+    }
+
     // Forward the same Hi-Fi controller and explicit MPRIS selection.
     // These are observations for the Hub, not second media instances.
     readonly property var hubMediaController: deckPanel.hubMediaController
@@ -705,26 +725,9 @@ Item {
         }
     }
 
-    // Left-click now opens/closes the deck. Playback controls will live in
-    // the future control section. Right-click remains free for the planned
-    // Desktop / Player CAVA source switch.
-    onLeftClicked: {
-        if (!mediaRoot.deckOpen) {
-            // shell.qml currently starts 50px from the DP-5 screen edge.
-            // Follow the dock's current temporary placement without editing
-            // shared shell.qml or inventing its final taskbar position.
-            var dockSceneX = mediaDock.mapToItem(null, 0, 0).x;
-            var screenWidth = deckPanel.screen
-                              ? deckPanel.screen.width : 2560;
-            var maxLeft = Math.max(
-                8, screenWidth - deckPanel.panelWidth - 8
-            );
-            deckPanel.panelLeftMargin = Math.max(
-                8, Math.min(maxLeft, Math.round(50 + dockSceneX))
-            );
-        }
-        mediaRoot.deckOpen = !mediaRoot.deckOpen;
-    }
+    // Left-click and the global Super+R IPC shortcut share the SAME
+    // placement-aware deck toggle; no duplicate state writer is introduced.
+    onLeftClicked: mediaRoot.toggleDeck()
     }
 
     MediaDeckW {

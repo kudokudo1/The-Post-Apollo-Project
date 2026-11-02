@@ -165,6 +165,17 @@ test("four live consumer files remain legacy boolean clients, not accidentally m
         const qml=fs.readFileSync(path.join(ROOT,file),"utf8");
         for(const method of methods)
             assert.match(qml,new RegExp("todoStore\\."+method+"\\("));
-        assert.doesNotMatch(qml,/TaskSaveTicketFacadeM12o|TaskSaveTicketContractM12o/);
+        if(file === "widgets/hub/ApolloHubTodoMini.qml") {
+            // M12p introduces an *inert* future UI seam only. It is not a
+            // migrated writer: this literal false guard cannot be toggled
+            // by the operator or by an injected provider at runtime.
+            assert.match(qml,/readonly property bool ticketUiEnabled: false/);
+            assert.match(qml,/property var ticketProducer: null/);
+            assert.match(qml,/TaskSaveTicketContractM12o\.js/);
+            assert.doesNotMatch(qml,/TaskSaveTicketFacadeM12o\.qml/);
+            assert.doesNotMatch(qml,/\bFileView\s*\{|\bProcess\s*\{/);
+        } else {
+            assert.doesNotMatch(qml,/TaskSaveTicketFacadeM12o|TaskSaveTicketContractM12o/);
+        }
     }
 });

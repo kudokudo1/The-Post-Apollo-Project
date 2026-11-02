@@ -17,6 +17,9 @@ Item {
         "post-apollo.identity.desktop-context-display.v0"
 
     property var snapshot: null
+    // Invalidated on close, section change and overlapping refresh attempts.
+    // Prevents an old in-flight stdout response from restoring an old user.
+    property bool acceptResponse: false
 
     function clear() {
         snapshot = null;
@@ -106,17 +109,21 @@ Item {
         // Revoke the previous display BEFORE attempting each read.
         // If Python or the host stalls, no stale company list remains.
         clear();
+        acceptResponse = false;
         if (!active || snapshotProcess.running)
             return;
         snapshotProcess.command = [pythonPath, readerPath, "--json"];
+        acceptResponse = true;
         snapshotProcess.running = true;
     }
 
     function receive(raw) {
-        if (!active || typeof raw !== "string" || raw.length > 65536) {
+        if (!active || !acceptResponse ||
+                typeof raw !== "string" || raw.length > 65536) {
             clear();
             return;
         }
+        acceptResponse = false;
         try {
             const next = JSON.parse(raw);
             if (validDisplay(next)) {
@@ -130,10 +137,12 @@ Item {
     }
 
     onActiveChanged: {
-        if (!active)
+        if (!active) {
+            acceptResponse = false;
             clear();
-        else
+        } else {
             refresh();
+        }
     }
 
     Timer {

@@ -22,6 +22,7 @@ var LIFETIME_OPERATOR_REQUEST = "OPERATOR_REQUEST";
 var LIFETIME_LOCAL = "LOCAL";
 
 var RETENTION_MEMORY_LAST_GOOD = "MEMORY_LAST_GOOD";
+var RETENTION_PERSISTENT_LAST_GOOD = "PERSISTENT_LAST_GOOD";
 var RETENTION_SESSION_CACHE = "SESSION_CACHE";
 var RETENTION_KEY_BOUND = "KEY_BOUND";
 var RETENTION_OPERATOR_SNAPSHOT = "OPERATOR_SNAPSHOT";
@@ -397,39 +398,39 @@ var _catalog = [
 // here: MEMORY_LAST_GOOD and SESSION_CACHE remain process/session state.
 var _cacheProfiles = {
     "weather": {
-        retention:RETENTION_MEMORY_LAST_GOOD,
+        retention:RETENTION_PERSISTENT_LAST_GOOD,
         freshMs:1200000, staleMs:5400000, expireMs:21600000
     },
     "weather-current": {
-        retention:RETENTION_MEMORY_LAST_GOOD,
+        retention:RETENTION_PERSISTENT_LAST_GOOD,
         freshMs:1200000, staleMs:5400000, expireMs:21600000
     },
     "weather-forecast": {
-        retention:RETENTION_MEMORY_LAST_GOOD,
+        retention:RETENTION_PERSISTENT_LAST_GOOD,
         freshMs:10800000, staleMs:86400000, expireMs:691200000
     },
     "air-quality": {
-        retention:RETENTION_MEMORY_LAST_GOOD,
+        retention:RETENTION_PERSISTENT_LAST_GOOD,
         freshMs:1800000, staleMs:10800000, expireMs:43200000
     },
     "space-core": {
-        retention:RETENTION_MEMORY_LAST_GOOD,
+        retention:RETENTION_PERSISTENT_LAST_GOOD,
         freshMs:600000, staleMs:1800000, expireMs:7200000
     },
     "space-kp": {
-        retention:RETENTION_MEMORY_LAST_GOOD,
+        retention:RETENTION_PERSISTENT_LAST_GOOD,
         freshMs:600000, staleMs:1800000, expireMs:7200000
     },
     "space-wind": {
-        retention:RETENTION_MEMORY_LAST_GOOD,
+        retention:RETENTION_PERSISTENT_LAST_GOOD,
         freshMs:600000, staleMs:1800000, expireMs:7200000
     },
     "space-imf": {
-        retention:RETENTION_MEMORY_LAST_GOOD,
+        retention:RETENTION_PERSISTENT_LAST_GOOD,
         freshMs:600000, staleMs:1800000, expireMs:7200000
     },
     "space-flux": {
-        retention:RETENTION_MEMORY_LAST_GOOD,
+        retention:RETENTION_PERSISTENT_LAST_GOOD,
         freshMs:1800000, staleMs:10800000, expireMs:43200000
     },
     "nws-alerts": {
@@ -679,6 +680,7 @@ function retainsLastGood(spec) {
     if (!spec)
         return false;
     return spec.retention === RETENTION_MEMORY_LAST_GOOD
+        || spec.retention === RETENTION_PERSISTENT_LAST_GOOD
         || spec.retention === RETENTION_SESSION_CACHE;
 }
 
@@ -988,6 +990,8 @@ function retentionLabel(row) {
         return "SNAPSHOT≤" + limit;
     if (row.retention === RETENTION_SESSION_CACHE)
         return "SESSION≤" + limit;
+    if (row.retention === RETENTION_PERSISTENT_LAST_GOOD)
+        return "PERSIST≤" + limit;
     if (row.retention === RETENTION_MEMORY_LAST_GOOD)
         return "MEMORY≤" + limit;
     return row.retention;

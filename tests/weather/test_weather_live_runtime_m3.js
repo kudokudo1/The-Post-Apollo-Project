@@ -46,7 +46,7 @@ assert.equal(aqi.staleMs, 3 * hour);
 assert.equal(aqi.expireMs, 12 * hour);
 
 for (const spec of [current, forecast, aqi])
-    assert.equal(spec.retention, "MEMORY_LAST_GOOD");
+    assert.equal(spec.retention, "PERSISTENT_LAST_GOOD");
 
 // Current weather transitions FRESH -> AGING -> STALE -> EXPIRED.
 assert.equal(ctx.temporalBand(current, now - 10 * minute, now), "FRESH");
@@ -67,7 +67,7 @@ assert.equal(row.transport, "DEGRADED");
 assert.equal(row.availability, "CACHE_FRESH");
 assert.equal(ctx.rowStateLabel(row), "CACHE // FRESH");
 assert.equal(ctx.statusToken(row), "blue");
-assert.equal(ctx.retentionLabel(row), "MEMORY≤6h");
+assert.equal(ctx.retentionLabel(row), "PERSIST≤6h");
 
 row = ctx.displayRow(
     "weather-current",
@@ -198,7 +198,7 @@ assert.equal(ctx.sourceSpec("firms").expireMs, 24 * hour);
 for (const id of ["space-kp","space-wind","space-imf","space-flux"]) {
     const spec = ctx.sourceSpec(id);
     assert.equal(spec.owner, "SpaceService.qml");
-    assert.equal(spec.retention, "MEMORY_LAST_GOOD");
+    assert.equal(spec.retention, "PERSISTENT_LAST_GOOD");
 }
 assert.equal(ctx.sourceSpec("space-kp").expireMs, 2 * hour);
 assert.equal(ctx.sourceSpec("space-flux").expireMs, 12 * hour);

@@ -21,7 +21,9 @@ Rectangle {
                 "loading": !!spaceService && spaceService.kpLoading,
                 "errorText": spaceService ? spaceService.kpErrorText : "",
                 "receivedAt": spaceService ? spaceService.kpLastUpdated : null,
-                "observedAt": spaceService ? spaceService.kpTime : null
+                "observedAt": spaceService ? spaceService.kpTime : null,
+                "usingCache": spaceService
+                              ? spaceService.usingPersistentKpCache : false
             },
             runtimeNowMs
         ),
@@ -35,7 +37,10 @@ Rectangle {
                              ? spaceService.solarWindErrorText : "",
                 "receivedAt": spaceService
                               ? spaceService.solarWindLastUpdated : null,
-                "observedAt": spaceService ? spaceService.solarWindTime : null
+                "observedAt": spaceService ? spaceService.solarWindTime : null,
+                "usingCache": spaceService
+                              ? spaceService.usingPersistentSolarWindCache
+                              : false
             },
             runtimeNowMs
         ),
@@ -50,7 +55,10 @@ Rectangle {
                 "receivedAt": spaceService
                               ? spaceService.magneticFieldLastUpdated : null,
                 "observedAt": spaceService
-                              ? spaceService.magneticFieldTime : null
+                              ? spaceService.magneticFieldTime : null,
+                "usingCache": spaceService
+                              ? spaceService.usingPersistentMagneticFieldCache
+                              : false
             },
             runtimeNowMs
         ),
@@ -64,7 +72,10 @@ Rectangle {
                              ? spaceService.solarFluxErrorText : "",
                 "receivedAt": spaceService
                               ? spaceService.solarFluxLastUpdated : null,
-                "observedAt": spaceService ? spaceService.solarFluxTime : null
+                "observedAt": spaceService ? spaceService.solarFluxTime : null,
+                "usingCache": spaceService
+                              ? spaceService.usingPersistentSolarFluxCache
+                              : false
             },
             runtimeNowMs
         ),

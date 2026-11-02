@@ -185,7 +185,10 @@ PanelWindow {
                 "errorText": weatherService
                              ? weatherService.errorText : "",
                 "receivedAt": weatherService
-                              ? weatherService.lastUpdated : null
+                              ? weatherService.lastUpdated : null,
+                "usingCache": weatherService
+                              ? weatherService.usingPersistentCurrentCache
+                              : false
             },
             Date.now()
         );
@@ -202,7 +205,9 @@ PanelWindow {
                 "errorText": spaceService
                              ? spaceService.errorText : "",
                 "receivedAt": spaceService
-                              ? spaceService.lastUpdated : null
+                              ? spaceService.lastUpdated : null,
+                "usingCache": spaceService
+                              ? spaceService.usingPersistentCache : false
             },
             Date.now()
         );

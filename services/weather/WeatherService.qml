@@ -6,6 +6,11 @@ import "WeatherDataPolicy.js" as WeatherDataPolicy
 Scope {
     id: weatherService
 
+    property var cacheStore: null
+    property bool usingPersistentCurrentCache: false
+    property bool usingPersistentForecastCache: false
+    property bool usingPersistentAqiCache: false
+
     // ─────────────────────────────────────────────
     // WEATHER DATA
     // ─────────────────────────────────────────────
@@ -175,6 +180,182 @@ Scope {
         }
     }
 
+    function hydratePersistentCache() {
+        if (!cacheStore)
+            return false;
+
+        const now = Date.now();
+        let hydrated = false;
+
+        if (!ready) {
+            const saved = cacheStore.record("weather-current", now);
+            if (saved && saved.payload) {
+                const p = saved.payload;
+                tempF = String(p.tempF || "--");
+                feelsLikeF = String(p.feelsLikeF || "--");
+                condition = String(p.condition || "UNKNOWN");
+                weatherCode = String(p.weatherCode || "");
+                uvIndex = Number(p.uvIndex);
+                humidity = String(p.humidity || "--");
+                windMph = String(p.windMph || "--");
+                windDirection = String(p.windDirection || "--");
+                pressureHpa = Number(p.pressureHpa);
+                visibilityMiles = Number(p.visibilityMiles);
+                cloudCover = Number(p.cloudCover);
+                precipMm = Number(p.precipMm);
+                observationTime = String(p.observationTime || "");
+                localObservationDateTime =
+                    String(p.localObservationDateTime || "");
+                localObservationAnchorMs = Number(saved.receivedAtMs);
+                latitude = String(p.latitude || "");
+                longitude = String(p.longitude || "");
+                lastUpdated = new Date(saved.receivedAtMs);
+                errorText = "";
+                ready = true;
+                usingPersistentCurrentCache = true;
+                hydrated = true;
+            }
+        }
+
+        if (!forecastReady) {
+            const saved = cacheStore.record("weather-forecast", now);
+            if (saved && saved.payload) {
+                hourlyForecast =
+                    Array.isArray(saved.payload.hourlyForecast)
+                    ? saved.payload.hourlyForecast.slice() : [];
+                dailyForecast =
+                    Array.isArray(saved.payload.dailyForecast)
+                    ? saved.payload.dailyForecast.slice() : [];
+                if (hourlyForecast.length > 0 || dailyForecast.length > 0) {
+                    forecastLastUpdated =
+                        new Date(saved.receivedAtMs);
+                    usingPersistentForecastCache = true;
+                    hydrated = true;
+                }
+            }
+        }
+
+        if (!aqiReady) {
+            const saved = cacheStore.record("air-quality", now);
+            if (saved && saved.payload) {
+                const p = saved.payload;
+                aqi = Number(p.aqi);
+                aqiLabel = String(p.aqiLabel || describeAqi(aqi));
+                ozoneAqi = Number(p.ozoneAqi);
+                nitrogenDioxideAqi = Number(p.nitrogenDioxideAqi);
+                carbonMonoxideAqi = Number(p.carbonMonoxideAqi);
+                pm25 = Number(p.pm25);
+                pm10 = Number(p.pm10);
+                carbonMonoxide = Number(p.carbonMonoxide);
+                nitrogenDioxide = Number(p.nitrogenDioxide);
+                ozone = Number(p.ozone);
+                dust = Number(p.dust);
+                alderPollen = Number(p.alderPollen);
+                birchPollen = Number(p.birchPollen);
+                grassPollen = Number(p.grassPollen);
+                mugwortPollen = Number(p.mugwortPollen);
+                olivePollen = Number(p.olivePollen);
+                ragweedPollen = Number(p.ragweedPollen);
+                pollenAvailable = p.pollenAvailable === true;
+                airQualitySourceTime =
+                    String(p.airQualitySourceTime || "");
+                airQualityUtcOffsetMinutes =
+                    p.airQualityUtcOffsetMinutes === null
+                    || p.airQualityUtcOffsetMinutes === undefined
+                    ? null : Number(p.airQualityUtcOffsetMinutes);
+                airQualityTimezone =
+                    String(p.airQualityTimezone || "");
+                airQualityTimezoneAbbreviation =
+                    String(p.airQualityTimezoneAbbreviation || "");
+                airQualityForecast =
+                    Array.isArray(p.airQualityForecast)
+                    ? p.airQualityForecast.slice() : [];
+                aqiLastUpdated = new Date(saved.receivedAtMs);
+                aqiErrorText = "";
+                aqiReady = true;
+                usingPersistentAqiCache = true;
+                hydrated = true;
+            }
+        }
+
+        return hydrated;
+    }
+
+    function persistCurrentWeather(receivedAtMs) {
+        if (!cacheStore)
+            return false;
+        return cacheStore.put("weather-current", receivedAtMs, {
+            "tempF": tempF,
+            "feelsLikeF": feelsLikeF,
+            "condition": condition,
+            "weatherCode": weatherCode,
+            "uvIndex": uvIndex,
+            "humidity": humidity,
+            "windMph": windMph,
+            "windDirection": windDirection,
+            "pressureHpa": pressureHpa,
+            "visibilityMiles": visibilityMiles,
+            "cloudCover": cloudCover,
+            "precipMm": precipMm,
+            "observationTime": observationTime,
+            "localObservationDateTime": localObservationDateTime,
+            "latitude": latitude,
+            "longitude": longitude
+        });
+    }
+
+    function persistForecast(receivedAtMs) {
+        if (!cacheStore || !forecastReady)
+            return false;
+        return cacheStore.put("weather-forecast", receivedAtMs, {
+            "hourlyForecast": hourlyForecast,
+            "dailyForecast": dailyForecast
+        });
+    }
+
+    function persistAirQuality(receivedAtMs) {
+        if (!cacheStore || !aqiReady)
+            return false;
+        return cacheStore.put("air-quality", receivedAtMs, {
+            "aqi": aqi,
+            "aqiLabel": aqiLabel,
+            "ozoneAqi": ozoneAqi,
+            "nitrogenDioxideAqi": nitrogenDioxideAqi,
+            "carbonMonoxideAqi": carbonMonoxideAqi,
+            "pm25": pm25,
+            "pm10": pm10,
+            "carbonMonoxide": carbonMonoxide,
+            "nitrogenDioxide": nitrogenDioxide,
+            "ozone": ozone,
+            "dust": dust,
+            "alderPollen": alderPollen,
+            "birchPollen": birchPollen,
+            "grassPollen": grassPollen,
+            "mugwortPollen": mugwortPollen,
+            "olivePollen": olivePollen,
+            "ragweedPollen": ragweedPollen,
+            "pollenAvailable": pollenAvailable,
+            "airQualitySourceTime": airQualitySourceTime,
+            "airQualityUtcOffsetMinutes": airQualityUtcOffsetMinutes,
+            "airQualityTimezone": airQualityTimezone,
+            "airQualityTimezoneAbbreviation":
+                airQualityTimezoneAbbreviation,
+            "airQualityForecast": airQualityForecast
+        });
+    }
+
+    Connections {
+        target: weatherService.cacheStore
+        enabled: !!weatherService.cacheStore
+        function onStorageStateChanged() {
+            if (!weatherService.cacheStore)
+                return;
+            const state = String(weatherService.cacheStore.storageState || "");
+            if (state === "ready" || state === "empty")
+                weatherService.hydratePersistentCache();
+        }
+    }
+
     // ─────────────────────────────────────────────
     // REFRESH TIMER
     // ─────────────────────────────────────────────
@@ -263,7 +444,8 @@ Scope {
                 WeatherDataPolicy.parseForecast(data, current, 6);
             hourlyForecast = forecast.hourly;
             dailyForecast = forecast.daily;
-            forecastLastUpdated = new Date();
+            const receivedAt = new Date();
+            forecastLastUpdated = receivedAt;
 
             // ─────────────────────────────────────
             // LOCATION FROM WTTR
@@ -292,10 +474,15 @@ Scope {
                 }
             }
 
-            lastUpdated = new Date();
+            lastUpdated = receivedAt;
 
             errorText = "";
             ready = true;
+            usingPersistentCurrentCache = false;
+            usingPersistentForecastCache = false;
+
+            persistCurrentWeather(receivedAt.getTime());
+            persistForecast(receivedAt.getTime());
 
             // Once weather gives us coordinates,
             // fetch matching AQI.
@@ -357,6 +544,8 @@ Scope {
             aqiErrorText = "";
             aqiLastUpdated = new Date();
             aqiReady = true;
+            usingPersistentAqiCache = false;
+            persistAirQuality(aqiLastUpdated.getTime());
         } catch (error) {
             console.log("WeatherService AQI parse error:", error);
 
@@ -395,6 +584,7 @@ Scope {
     // ─────────────────────────────────────────────
 
     Component.onCompleted: {
+        hydratePersistentCache();
         refresh();
     }
 }

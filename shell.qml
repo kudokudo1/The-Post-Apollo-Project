@@ -321,8 +321,13 @@ PanelWindow {
 
     // ===== SERVICES =============================================
 
+    WeatherPersistentCacheStore {
+        id: weatherPersistentCache
+    }
+
     WeatherService {
         id: weatherService
+        cacheStore: weatherPersistentCache
     }
 
     // P3-B DRAFT INTEGRATION GATE: Team 6's one shared stream owner.
@@ -369,6 +374,7 @@ PanelWindow {
 
     SpaceService {
         id: spaceService
+        cacheStore: weatherPersistentCache
     }
 
     // Daily observational brief from the same Space data as Weather Station.

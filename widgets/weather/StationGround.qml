@@ -19,6 +19,11 @@ Rectangle {
     function sectionVisible(section) {
         return SubjectPanelPolicy.visibleFor("ground",subjectRoute,section);
     }
+    // Changing live submodes must not inherit the previous panel's scroll offset.
+    onSubjectRouteChanged: {
+        if (groundScroll)
+            groundScroll.contentY = 0;
+    }
 
     property var weatherService: null
     property var nwsAlertSource: null

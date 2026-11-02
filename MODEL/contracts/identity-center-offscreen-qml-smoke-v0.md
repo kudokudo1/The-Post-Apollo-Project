@@ -19,7 +19,8 @@ The test **stubs only the Quickshell-specific APIs**, not Qt. Those small module
 ```text
 [ GitHub CI, disposable Ubuntu/PySide6 with QT_QPA_PLATFORM=offscreen ]
                      |
-[ real QQmlEngine loads widgets/messanger/IdentityCenterOrganizationDisplayReader.qml ]
+[ real QQmlEngine loads both IdentityCenterOrganizationDisplayReader.qml
+  and IdentityCenterSettingsSections.qml with actual QtQuick and ActionButton ]
                      |
 [ test-only stubbed Quickshell.shellPath + Process/StdioCollector ]
                      |
@@ -31,6 +32,9 @@ The test **stubs only the Quickshell-specific APIs**, not Qt. Those small module
    - malformed/failed Process: old companies erased
    - expired scope / forged external portfolio: fail closed
    - close/reopen while fake process pending: ignore old data
+   - real settings navigation and button state: switching stays disabled
+   - dynamic LLC/nonprofit membership rows and portfolio count
+   - tabs/settings closed, SIGNED_OUT and invalid responses remove rows
                      |
 [ tests finish; no system process, socket or account touched ]
 ```
@@ -46,7 +50,7 @@ QT_QPA_PLATFORM=offscreen python3 -m unittest discover \
     -s tests/messaging -p 'test_identity_center_offscreen_qml_v0.py' -v
 ```
 
-Followed by the merged Python socket/CLI and Social Settings/Node contract suites. No private organization records appear; test data are clearly synthetic IDs. The first real Qt run needed the disposable runner's missing libEGL runtime dependency. After installing it in the workflow, the [offscreen Qt test run](https://github.com/kudokudo1/The-Post-Apollo-Project/actions/runs/41482400276) passed all seven native QML tests and its IPC/CLI and Social regression steps on commit `eac1718`. Recheck the exact PR head before accepting or merging.
+Followed by the merged Python socket/CLI and Social Settings/Node contract suites. No private organization records appear; test data are clearly synthetic IDs. The first Qt run needed a disposable-runner libEGL dependency, installed by the workflow. The later [expanded offscreen Qt run](https://github.com/kudokudo1/The-Post-Apollo-Project/actions/runs/41486028629) passed **11 real Qt tests** on commit `cf909c7`: seven IPC-reader cases and four additional embedded-settings-pane cases. The new pane checks real QML navigation, dynamic Repeater rows, a disabled switcher, tab closure, logout and malformed data. QtQuick's visual child tree is traversed for dynamic delegates. This is still an offscreen test using fake Quickshell process APIs, **not** a screenshot or live UI integration.
 
 ## Local/live verification gate, not authorized by this PR
 
@@ -59,7 +63,7 @@ A later operator-approved Quickshell session test must inspect the already-runni
 Leave the draft PR unmerged, or revert only the offscreen fixture files, test, CI workflow and MODEL doc/index. No production file or runtime is changed and no socket/credential needs cleaning. The test's QGuiApplication/QQmlEngine are disposed after each test.
 
 ### IMPLEMENTATION
-Add an actual Qt 6 engine smoke for the existing QML Organizations IPC reader, using inert Quickshell test doubles.
+Add actual Qt 6 engine smoke for both the existing QML Organizations IPC reader and the embedded settings pane, using inert Quickshell test doubles and unmodified production QML.
 
 ### HOW TO USE
 Inspect PR/CI. No desktop action or installation necessary.
@@ -75,7 +79,7 @@ The Quickshell imports are fake *only in CI*; the test does not prove Quickshell
 - [x] Actual source QML loaded in offscreen Qt 6 engine through isolated stubs
 - [x] Synthetic READY, deny, expiry and close/reopen edge cases
 - [x] Existing IPC/CLI and Social regression checks included
-- [x] Native Qt/IPC/Social CI successful on `eac1718` (reverify after this handoff commit)
+- [x] Eleven native Qt cases, including real dynamic settings UI controls, passed on `cf909c7` (reverify after this handoff commit)
 - [ ] Approved live Quickshell visual/suspension and host-death evidence
 - [ ] Host sandbox, OS token custody, security review and operator acceptance
 

@@ -55,9 +55,9 @@ class LocalDirectoryModel(unittest.TestCase):
         doc = update(doc, "add_org", name="test corp", kind="llc")
         with self.assertRaisesRegex(directory.DirectoryError, "DUPLICATE_NAME"):
             update(doc, "restore_org", orgId="org-1")
-        doc = update(doc, "add_branch", orgId="org-3", name="Program")
+        doc = update(doc, "add_branch", orgId="org-2", name="Program")
         with self.assertRaisesRegex(directory.DirectoryError, "DUPLICATE_NAME"):
-            update(doc, "add_branch", orgId="org-3", name="program")
+            update(doc, "add_branch", orgId="org-2", name="program")
 
     def test_revision_lock_invalid_ids_and_validation(self):
         doc = directory.initial()

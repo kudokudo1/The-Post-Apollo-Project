@@ -128,8 +128,12 @@ assert.match(
     service,
     /https:\/\/api\.rainviewer\.com\/public\/weather-maps\.json/
 );
-assert.equal((service.match(/\bProcess\s*\{/g) || []).length, 1);
+assert.equal((service.match(/\bProcess\s*\{/g) || []).length, 2);
 assert.equal((service.match(/\bTimer\s*\{/g) || []).length, 0);
+assert.match(service, /weather_frame_cache\.py/);
+assert.match(service, /"load-tiles"/);
+assert.match(service, /"fetch-tiles"/);
+assert.match(service, /property bool usingFrameCache: false/);
 assert.match(service, /nowMs - lastMetadataMs < 10 \* 60 \* 1000/);
 assert.match(service, /now - lastRequestMs < 30000/);
 assert.match(
@@ -157,6 +161,8 @@ assert.match(
     ui,
     /onOverlayReady:[\s\S]*?radarDisplaySource = "rainviewer"/
 );
+assert.match(ui, /pendingRainViewerDisplay/);
+assert.match(ui, /usingCache": rainViewerRadarService\.usingFrameCache/);
 assert.match(
     ui,
     /RAINVIEWER \/\/ PAST RADAR FALLBACK \/\/ 2H/

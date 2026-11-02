@@ -109,8 +109,13 @@ assert.match(ui, /RadarPolicy\.exportImageUrl\(/);
 assert.match(ui, /radarHistoryOptions:\s*RadarPolicy\.historyOptions\(\)/);
 assert.match(ui, /model: stationDiscovery\.radarHistoryOptions/);
 assert.match(ui, /SELECT FRAME \/\/ THEN LOAD \/\/ NOAA TIME WINDOW \/\/ NO AUTO-FETCH/);
-assert.match(ui, /radarImageUrl = "";/);
-assert.match(ui, /Qt\.callLater\(function\(\)[\s\S]*stationDiscovery\.radarImageUrl = nextUrl/);
+assert.match(ui, /WeatherServices\.MrmsRadarService\s*\{/);
+assert.match(
+    ui,
+    /mrmsRadarService\.request\([\s\S]*?nextUrl[\s\S]*?snapshot[\s\S]*?radarHistoryMinutes[\s\S]*?historicalTime/
+);
+assert.match(ui, /readonly property string radarImageUrl: mrmsRadarService\.imageUrl/);
+assert.match(ui, /usingCache": mrmsRadarService\.usingFrameCache/);
 assert.match(ui, /title: "RADAR \/\/ NOAA\/NWS MRMS BASE REFLECTIVITY \+ 4H HISTORY"/);
 assert.match(ui, /"REFRESH RADAR" : "LOAD RADAR"/);
 assert.match(ui, /MAX 90° × 50° VIEW \/\/ MANUAL LOAD \/\/ NO PAN AUTO-FETCH/);
@@ -142,6 +147,16 @@ for (const forbidden of [
         assert.doesNotMatch(tail, /loadRadarSnapshot|radarImageUrl/);
     }
 }
+
+const mrms = read("services/weather/MrmsRadarService.qml");
+assert.equal((mrms.match(/\bProcess\s*\{/g) || []).length, 1);
+assert.equal((mrms.match(/\bTimer\s*\{/g) || []).length, 0);
+assert.match(mrms, /weather_frame_cache\.py/);
+assert.match(mrms, /"load-single"/);
+assert.match(mrms, /"fetch-single"/);
+assert.match(mrms, /"mrms-radar"/);
+assert.match(mrms, /property bool usingFrameCache: false/);
+assert.match(mrms, /signal frameReady\(\)/);
 
 const policySource = read("widgets/weather/StationRadarPolicy.js");
 assert.doesNotMatch(

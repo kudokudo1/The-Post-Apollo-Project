@@ -154,7 +154,11 @@ for (const id of ["lightning"]) {
     const spec = runtime.sourceSpec(id);
     assert.notEqual(spec.retention, "PERSISTENT_LAST_GOOD", id);
 }
-for (const id of ["mrms-radar","rainviewer","hms-smoke","firms"]) {
+for (const id of ["lightning","mrms-radar","rainviewer"]) {
+    const spec = runtime.sourceSpec(id);
+    assert.equal(spec.retention, "FRAME_CACHE", id);
+}
+for (const id of ["hms-smoke","firms"]) {
     const spec = runtime.sourceSpec(id);
     assert.equal(spec.retention, "OPERATOR_SNAPSHOT", id);
 }

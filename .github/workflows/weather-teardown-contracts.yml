@@ -8,6 +8,7 @@ on:
       - "components/WeatherCelestialGlyph.qml"
       - "components/qmldir"
       - "services/weather/**"
+      - "scripts/weather/**"
       - "shell.qml"
       - "tests/weather/**"
       - ".github/workflows/weather-teardown-contracts.yml"
@@ -20,6 +21,7 @@ on:
       - "components/WeatherCelestialGlyph.qml"
       - "components/qmldir"
       - "services/weather/**"
+      - "scripts/weather/**"
       - "shell.qml"
       - "tests/weather/**"
       - ".github/workflows/weather-teardown-contracts.yml"
@@ -133,6 +135,8 @@ jobs:
         run: node tests/weather/test_station_map_firms_hotspots.js
       - name: Validate secret-safe FIRMS fetch helper
         run: python3 tests/weather/test_station_firms_fetch_helper.py
+      - name: Validate Weather M8 short-lived frame cache
+        run: python3 tests/weather/test_weather_frame_cache_m8.py
       - name: Validate NOAA MRMS current and four-hour radar history
         run: node tests/weather/test_station_map_noaa_radar.js
       - name: Validate manual RainViewer radar fallback

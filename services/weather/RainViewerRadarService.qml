@@ -4,7 +4,9 @@ import Quickshell.Io
 import "RainViewerRadarPolicy.js" as RainViewerPolicy
 
 // Manual RainViewer fallback for MAP radar. Metadata and tile plans are only
-// refreshed on operator request. No timer, no pan/zoom auto-fetch.
+// refreshed on operator request. The latest selected tile set is cached as
+// short-lived local PNG bytes so a restart can restore it without pretending
+// the snapshot is live. No provider timer, no pan/zoom auto-fetch.
 Scope {
     id: rainViewer
 
@@ -12,12 +14,18 @@ Scope {
         "RAINVIEWER // PAST RADAR FALLBACK"
     readonly property string endpoint:
         "https://api.rainviewer.com/public/weather-maps.json"
-    readonly property bool loading: metadataFetch.running
+    readonly property string cacheRoot:
+        Quickshell.dataDir + "/weather-frame-cache-v1"
+    readonly property string cacheScopeKey: "manual-radar"
+    readonly property bool loading:
+        metadataFetch.running || frameCacheProcess.running
 
     property bool metadataReady: false
     property bool ready: false
     property bool failed: false
     property string errorText: ""
+    property bool usingFrameCache: false
+    property string frameCacheMode: ""
     property string host: ""
     property var frames: []
     property int generated: 0
@@ -36,6 +44,8 @@ Scope {
     property double lastRequestMs: 0
     property int pendingHistoryMinutes: 0
     property var pendingBounds: null
+    property var pendingLivePlan: null
+    property var pendingLiveFrame: null
 
     signal overlayReady()
 
@@ -57,6 +67,105 @@ Scope {
         ready = false;
         failed = false;
         errorText = "";
+        usingFrameCache = false;
+    }
+
+    function applyCachedOverlay(raw, fromCache) {
+        try {
+            const parsed = JSON.parse(String(raw || ""));
+            const context = parsed && parsed.context ? parsed.context : {};
+            const bounds = context.snapshotBounds;
+            if (!parsed || parsed.ok !== true
+                    || String(parsed.sourceId || "") !== "rainviewer"
+                    || !Array.isArray(parsed.strips)
+                    || parsed.strips.length === 0
+                    || !bounds)
+                throw new Error("invalid RainViewer frame cache");
+
+            strips = parsed.strips;
+            snapshotBounds = bounds;
+            tileZoom = Math.max(0, Math.round(Number(context.tileZoom) || 0));
+            tileCount = Math.max(0, Math.round(Number(context.tileCount) || 0));
+            stripCount = strips.length;
+            requestedHistoryMinutes =
+                Math.max(0, Math.round(Number(context.requestedHistoryMinutes) || 0));
+            actualHistoryMinutes =
+                Math.max(0, Math.round(Number(context.actualHistoryMinutes) || 0));
+            selectedFrameTime =
+                Math.max(0, Math.round(Number(context.selectedFrameTime) || 0));
+            lastUpdated = new Date(Number(parsed.receivedAtMs));
+            ready = true;
+            failed = false;
+            errorText = "";
+            usingFrameCache = fromCache === true;
+            pendingLivePlan = null;
+            pendingLiveFrame = null;
+            overlayReady();
+            return true;
+        } catch (error) {
+            return false;
+        }
+    }
+
+    function loadFrameCache() {
+        if (ready || frameCacheProcess.running)
+            return false;
+        frameCacheMode = "cache-load";
+        frameCacheProcess.command = [
+            "python3", "-B",
+            Quickshell.configDir + "/scripts/weather/weather_frame_cache.py",
+            "load-tiles",
+            "rainviewer",
+            cacheRoot,
+            "7200000"
+        ];
+        frameCacheProcess.running = true;
+        return true;
+    }
+
+    function cacheOverlay(plan, frame) {
+        if (!plan || !plan.valid || !frame || frameCacheProcess.running)
+            return false;
+        frameCacheMode = "fetch";
+        frameCacheProcess.command = [
+            "python3", "-B",
+            Quickshell.configDir + "/scripts/weather/weather_frame_cache.py",
+            "fetch-tiles",
+            "rainviewer",
+            cacheRoot,
+            cacheScopeKey,
+            String(Math.max(0, Number(frame.time) * 1000 || 0)),
+            JSON.stringify({
+                "snapshotBounds": pendingBounds,
+                "tileZoom": plan.zoom,
+                "tileCount": plan.tileCount,
+                "requestedHistoryMinutes": frame.requestedMinutes,
+                "actualHistoryMinutes": frame.actualMinutes,
+                "selectedFrameTime": frame.time
+            }),
+            JSON.stringify(plan.strips)
+        ];
+        frameCacheProcess.running = true;
+        return true;
+    }
+
+    function applyRemotePlan(plan, frame) {
+        if (!plan || !plan.valid || !frame)
+            return false;
+        snapshotBounds = JSON.parse(JSON.stringify(pendingBounds));
+        strips = plan.strips;
+        tileZoom = plan.zoom;
+        tileCount = plan.tileCount;
+        stripCount = plan.stripCount;
+        requestedHistoryMinutes = frame.requestedMinutes;
+        actualHistoryMinutes = frame.actualMinutes;
+        selectedFrameTime = frame.time;
+        ready = true;
+        failed = false;
+        errorText = "";
+        usingFrameCache = false;
+        overlayReady();
+        return true;
     }
 
     function finalizeOverlay() {
@@ -85,23 +194,18 @@ Scope {
             return false;
         }
 
-        snapshotBounds = JSON.parse(JSON.stringify(pendingBounds));
-        strips = plan.strips;
-        tileZoom = plan.zoom;
-        tileCount = plan.tileCount;
-        stripCount = plan.stripCount;
-        requestedHistoryMinutes = frame.requestedMinutes;
-        actualHistoryMinutes = frame.actualMinutes;
-        selectedFrameTime = frame.time;
-        ready = true;
-        failed = false;
-        errorText = "";
-        overlayReady();
+        pendingLivePlan = plan;
+        pendingLiveFrame = frame;
+        if (!cacheOverlay(plan, frame)) {
+            applyRemotePlan(plan, frame);
+            pendingLivePlan = null;
+            pendingLiveFrame = null;
+        }
         return true;
     }
 
     function request(minutesAgo, bounds) {
-        if (metadataFetch.running)
+        if (metadataFetch.running || frameCacheProcess.running)
             return false;
 
         const requested =
@@ -155,7 +259,8 @@ Scope {
             finalizeOverlay();
         } catch (error) {
             failed = true;
-            ready = false;
+            if (!ready)
+                ready = false;
             errorText = "RAINVIEWER METADATA UNAVAILABLE";
         }
     }
@@ -173,9 +278,47 @@ Scope {
         onExited: function(exitCode, exitStatus) {
             if (exitCode !== 0 && !rainViewer.failed) {
                 rainViewer.failed = true;
-                rainViewer.ready = false;
                 rainViewer.errorText = "RAINVIEWER REQUEST FAILED";
             }
         }
     }
+
+    Process {
+        id: frameCacheProcess
+        command: []
+        stdout: StdioCollector {
+            onStreamFinished: {
+                if (rainViewer.frameCacheMode === "cache-load") {
+                    rainViewer.applyCachedOverlay(text, true);
+                } else if (rainViewer.frameCacheMode === "fetch") {
+                    if (!rainViewer.applyCachedOverlay(text, false)
+                            && rainViewer.pendingLivePlan
+                            && rainViewer.pendingLiveFrame) {
+                        rainViewer.applyRemotePlan(
+                            rainViewer.pendingLivePlan,
+                            rainViewer.pendingLiveFrame
+                        );
+                        rainViewer.pendingLivePlan = null;
+                        rainViewer.pendingLiveFrame = null;
+                    }
+                }
+            }
+        }
+        onExited: function(exitCode, exitStatus) {
+            const mode = rainViewer.frameCacheMode;
+            rainViewer.frameCacheMode = "";
+            if (mode === "fetch" && exitCode !== 0
+                    && rainViewer.pendingLivePlan
+                    && rainViewer.pendingLiveFrame) {
+                rainViewer.applyRemotePlan(
+                    rainViewer.pendingLivePlan,
+                    rainViewer.pendingLiveFrame
+                );
+                rainViewer.pendingLivePlan = null;
+                rainViewer.pendingLiveFrame = null;
+            }
+        }
+    }
+
+    Component.onCompleted: loadFrameCache()
 }

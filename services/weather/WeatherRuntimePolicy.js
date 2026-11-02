@@ -26,6 +26,7 @@ var RETENTION_PERSISTENT_LAST_GOOD = "PERSISTENT_LAST_GOOD";
 var RETENTION_SESSION_CACHE = "SESSION_CACHE";
 var RETENTION_KEY_BOUND = "KEY_BOUND";
 var RETENTION_OPERATOR_SNAPSHOT = "OPERATOR_SNAPSHOT";
+var RETENTION_FRAME_CACHE = "FRAME_CACHE";
 var RETENTION_LOCAL = "LOCAL";
 var RETENTION_NONE = "NONE";
 
@@ -458,7 +459,7 @@ var _cacheProfiles = {
         freshMs:1800000, staleMs:7200000, expireMs:86400000
     },
     "lightning": {
-        retention:RETENTION_MEMORY_LAST_GOOD,
+        retention:RETENTION_FRAME_CACHE,
         freshMs:1200000, staleMs:2700000, expireMs:7200000
     },
     "moon": {retention:RETENTION_KEY_BOUND},
@@ -521,7 +522,7 @@ var _cacheProfiles = {
         freshMs:21600000, staleMs:43200000, expireMs:129600000
     },
     "rainviewer": {
-        retention:RETENTION_OPERATOR_SNAPSHOT,
+        retention:RETENTION_FRAME_CACHE,
         freshMs:600000, staleMs:1800000, expireMs:7200000
     },
     "gdelt-article-location": {
@@ -529,7 +530,7 @@ var _cacheProfiles = {
         freshMs:21600000, staleMs:86400000, expireMs:604800000
     },
     "mrms-radar": {
-        retention:RETENTION_OPERATOR_SNAPSHOT,
+        retention:RETENTION_FRAME_CACHE,
         freshMs:600000, staleMs:1800000, expireMs:7200000
     },
     "sky-local": {retention:RETENTION_LOCAL}
@@ -681,7 +682,8 @@ function retainsLastGood(spec) {
         return false;
     return spec.retention === RETENTION_MEMORY_LAST_GOOD
         || spec.retention === RETENTION_PERSISTENT_LAST_GOOD
-        || spec.retention === RETENTION_SESSION_CACHE;
+        || spec.retention === RETENTION_SESSION_CACHE
+        || spec.retention === RETENTION_FRAME_CACHE;
 }
 
 function availabilityState(spec, state, ageBand) {
@@ -705,6 +707,16 @@ function availabilityState(spec, state, ageBand) {
         if (ready)
             return failed ? "KEY_DEGRADED" : "KEY_VALID";
         return failed ? "OFFLINE" : "WAITING";
+    }
+
+    if (usingCache && spec && spec.retention === RETENTION_FRAME_CACHE) {
+        if (band === "EXPIRED")
+            return "FRAME_CACHE_EXPIRED";
+        if (band === "STALE")
+            return "FRAME_CACHE_STALE";
+        if (band === "AGING")
+            return "FRAME_CACHE_AGING";
+        return "FRAME_CACHE_FRESH";
     }
 
     if (spec && spec.mode === MODE_MANUAL) {
@@ -859,12 +871,15 @@ function statusToken(row) {
     if (state === "OFFLINE"
             || state === "EXPIRED"
             || state === "CACHE_EXPIRED"
+            || state === "FRAME_CACHE_EXPIRED"
             || state === "SNAPSHOT_EXPIRED")
         return "red";
 
     if (state === "LIVE_STALE"
             || state === "CACHE_STALE"
             || state === "CACHE_AGING"
+            || state === "FRAME_CACHE_STALE"
+            || state === "FRAME_CACHE_AGING"
             || state === "SNAPSHOT_STALE"
             || state === "SNAPSHOT_AGING"
             || state === "LIVE_AGING"
@@ -875,7 +890,9 @@ function statusToken(row) {
         return "orange";
     if (state === "INACTIVE")
         return "blue";
-    if (state === "CACHE_FRESH" || state === "KEY_VALID")
+    if (state === "CACHE_FRESH"
+            || state === "FRAME_CACHE_FRESH"
+            || state === "KEY_VALID")
         return "blue";
     if (state === "SNAPSHOT")
         return "magenta";
@@ -922,6 +939,10 @@ function availabilityLabel(row) {
     case "CACHE_AGING": return "CACHE // AGING";
     case "CACHE_STALE": return "CACHE // STALE";
     case "CACHE_EXPIRED": return "CACHE // EXPIRED";
+    case "FRAME_CACHE_FRESH": return "FRAME CACHE // FRESH";
+    case "FRAME_CACHE_AGING": return "FRAME CACHE // AGING";
+    case "FRAME_CACHE_STALE": return "FRAME CACHE // STALE";
+    case "FRAME_CACHE_EXPIRED": return "FRAME CACHE // EXPIRED";
     case "SNAPSHOT": return "SNAPSHOT // FRESH";
     case "SNAPSHOT_AGING": return "SNAPSHOT // AGING";
     case "SNAPSHOT_STALE": return "SNAPSHOT // STALE";
@@ -988,6 +1009,8 @@ function retentionLabel(row) {
 
     if (row.retention === RETENTION_OPERATOR_SNAPSHOT)
         return "SNAPSHOT≤" + limit;
+    if (row.retention === RETENTION_FRAME_CACHE)
+        return "FRAME≤" + limit;
     if (row.retention === RETENTION_SESSION_CACHE)
         return "SESSION≤" + limit;
     if (row.retention === RETENTION_PERSISTENT_LAST_GOOD)
@@ -1022,7 +1045,8 @@ function summarizeRows(rows) {
             problem++;
         if (row.ageBand === "STALE")
             stale++;
-        if (availability.indexOf("CACHE_") === 0)
+        if (availability.indexOf("CACHE_") === 0
+                || availability.indexOf("FRAME_CACHE_") === 0)
             cached++;
         if (availability.indexOf("EXPIRED") >= 0)
             expired++;

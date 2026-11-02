@@ -125,6 +125,9 @@ assert "NowcoastOnlyRedirects" in source
 assert "Post-Apollo-WeatherStation/0.8" in source
 assert '"TRANSPARENT": "true"' in source
 assert "urllib.request" in source
+assert "weather_frame_cache as FrameCache" in source
+assert 'FrameCache.store_single_frame(' in source
+assert '"lightning"' in source
 assert "requests" not in source
 
 service = (
@@ -133,6 +136,10 @@ service = (
 assert "Scope {" in service
 assert "property bool active: true" in service
 assert "property string inflightKey" in service
+assert "property bool usingFrameCache: false" in service
+assert 'Quickshell.dataDir + "/weather-frame-cache-v1"' in service
+assert '"load-single"' in service
+assert '"7200000"' in service
 assert "currentKey !== inflightKey" in service
 assert "nowcoast_lightning_snapshot.py" in service
 assert "interval: 900000" in service

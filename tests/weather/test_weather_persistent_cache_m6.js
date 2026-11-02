@@ -477,7 +477,7 @@ assert.match(
     /persistentCacheStore:\s*weatherStation\.persistentCacheStore/
 );
 
-// Volatile lightning remains deferred after NWS lifecycle persistence lands.
+// Volatile visual sources remain separate from the observation JSON cache.
 for (const file of [
     "services/weather/NowcoastLightningService.qml"
 ]) {
@@ -485,15 +485,17 @@ for (const file of [
     assert.doesNotMatch(src, /cacheStore\.put\(/);
     assert.doesNotMatch(src, /usingPersistentCache/);
 }
-assert.notEqual(
+assert.equal(
     runtime.sourceSpec("lightning").retention,
-    "PERSISTENT_LAST_GOOD"
+    "FRAME_CACHE"
 );
 assert.equal(
     runtime.sourceSpec("nws-alerts").retention,
     "PERSISTENT_LAST_GOOD"
 );
-for (const id of ["mrms-radar","rainviewer","firms","hms-smoke"])
+for (const id of ["mrms-radar","rainviewer"])
+    assert.equal(runtime.sourceSpec(id).retention, "FRAME_CACHE");
+for (const id of ["firms","hms-smoke"])
     assert.equal(runtime.sourceSpec(id).retention, "OPERATOR_SNAPSHOT");
 assert.equal(runtime.sourceSpec("moon").retention, "KEY_BOUND");
 assert.equal(runtime.sourceSpec("planet-rise-set").retention, "KEY_BOUND");

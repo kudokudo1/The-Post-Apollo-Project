@@ -1,0 +1,45 @@
+name: Weather M8 volatile frame cache
+
+on:
+  pull_request:
+    paths:
+      - "scripts/weather/weather_frame_cache.py"
+      - "scripts/weather/nowcoast_lightning_snapshot.py"
+      - "services/weather/NowcoastLightningService.qml"
+      - "services/weather/MrmsRadarService.qml"
+      - "services/weather/RainViewerRadarService.qml"
+      - "services/weather/WeatherRuntimePolicy.js"
+      - "widgets/weather/StationGround.qml"
+      - "widgets/weather/StationDiscovery.qml"
+      - "tests/weather/test_weather_frame_cache_m8.py"
+      - "tests/weather/test_weather_live_runtime_m3.js"
+      - "tests/weather/test_weather_persistent_cache_m5.js"
+      - "tests/weather/test_weather_persistent_cache_m6.js"
+      - "tests/weather/test_station_ground_nowcoast_lightning.py"
+      - "tests/weather/test_station_map_noaa_radar.js"
+      - "tests/weather/test_station_map_rainviewer_fallback.js"
+      - ".github/workflows/weather-frame-cache-m8.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  frame-cache:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: M8 volatile frame-cache contract
+        run: python3 tests/weather/test_weather_frame_cache_m8.py
+      - name: Runtime M3 regression
+        run: node tests/weather/test_weather_live_runtime_m3.js
+      - name: M5 persistence boundary regression
+        run: node tests/weather/test_weather_persistent_cache_m5.js
+      - name: M6 persistence boundary regression
+        run: node tests/weather/test_weather_persistent_cache_m6.js
+      - name: nowCOAST lightning regression
+        run: python3 tests/weather/test_station_ground_nowcoast_lightning.py
+      - name: NOAA MRMS regression
+        run: node tests/weather/test_station_map_noaa_radar.js
+      - name: RainViewer regression
+        run: node tests/weather/test_station_map_rainviewer_fallback.js

@@ -60,7 +60,13 @@ Scope {
         pendingDocument=stage.expectedDocument;
         storageState="saving";
         errorCode="";
-        todoFile.setText(stage.expectedRaw);
+        // Reuse the sole existing stage() gate and one FileView.setText().
+        // The ticket path must not become a second native write seam.
+        if (!todo.stage({ok:true,document:stage.expectedDocument})) {
+            pendingTicket=null;
+            pendingDocument=null;
+            return TicketProducer.refusal("LEGACY_STAGE_REFUSED");
+        }
         // No synchronous completion event before the consumer receives ID.
         return {admitted:true,ticketId:stage.ticketId,state:"QUEUED",
                 expected:stage.expected,baseline:stage.baseline};

@@ -31,6 +31,7 @@ Rectangle {
     property var riverSource: null
     property var weatherService: null
     property var persistentCacheStore: null
+    property var eventArchiveStore: null
     property real runtimeNowMs: Date.now()
     signal newsMapRequested(var payload)
     signal newsMapClearRequested()
@@ -464,6 +465,56 @@ Rectangle {
             selectedFloodContext,
             8
         )
+
+    readonly property int selectedArchiveRevision: {
+        return eventArchiveStore
+            ? Number(eventArchiveStore.revision || 0) : 0;
+    }
+
+    readonly property int selectedArchiveCount: {
+        const revision = selectedArchiveRevision;
+        if (!eventArchiveStore || !selectedEventContext)
+            return 0;
+        return eventArchiveStore.snapshotCount(
+            selectedContextSourceId,
+            selectedEventContext.id,
+            runtimeNowMs
+        );
+    }
+
+    readonly property bool selectedArchiveAvailable:
+        !!eventArchiveStore
+        && selectedEventContext !== null
+        && eventArchiveStore.storageState !== "error"
+        && eventArchiveStore.storageState !== "unsupported"
+
+    readonly property string selectedArchiveStatus: {
+        if (!eventArchiveStore)
+            return "ARCHIVE STORE UNAVAILABLE";
+        if (eventArchiveStore.storageState === "error")
+            return "ARCHIVE ERROR // " + eventArchiveStore.errorCode;
+        if (eventArchiveStore.storageState === "unsupported")
+            return "ARCHIVE SCHEMA UNSUPPORTED";
+        if (eventArchiveStore.storageState === "loading")
+            return "ARCHIVE LOADING";
+        if (eventArchiveStore.storageState === "saving")
+            return "ARCHIVE SAVING";
+        if (selectedArchiveCount > 0)
+            return "ARCHIVED // " + selectedArchiveCount + " SNAPSHOT"
+                + (selectedArchiveCount === 1 ? "" : "S");
+        return "NOT ARCHIVED";
+    }
+
+    function archiveSelectedEvent() {
+        if (!selectedArchiveAvailable
+                || !selectedContextSourceId
+                || !selectedContextRow)
+            return false;
+        return eventArchiveStore.archiveEvent(
+            selectedContextSourceId,
+            selectedContextRow
+        );
+    }
 
     readonly property bool eventContextInspectorOpen:
         domain === "map"
@@ -3362,8 +3413,16 @@ Rectangle {
                         stationDiscovery.runtimeNowMs
                     companions:
                         stationDiscovery.selectedContextCompanions
+                    archiveAvailable:
+                        stationDiscovery.selectedArchiveAvailable
+                    archiveSnapshotCount:
+                        stationDiscovery.selectedArchiveCount
+                    archiveStatusText:
+                        stationDiscovery.selectedArchiveStatus
                     accentColor:
                         stationDiscovery.eventContextAccentColor()
+                    onArchiveRequested:
+                        stationDiscovery.archiveSelectedEvent()
                 }
             }
 

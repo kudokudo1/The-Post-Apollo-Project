@@ -16,6 +16,7 @@ PanelWindow {
     property var nwsAlertSource: null
     property var persistentCacheStore: null
     property var liveHistoryStore: null
+    property var eventArchiveStore: null
 
     WeatherServices.WeatherHistoryService {
         id: weatherHistoryService
@@ -1169,6 +1170,7 @@ PanelWindow {
                 riverSource: riverService
                 weatherService: weatherStation.weatherService
                 persistentCacheStore: weatherStation.persistentCacheStore
+                eventArchiveStore: weatherStation.eventArchiveStore
                 newsMentionOverlay: weatherStation.newsMapOverlay
                 runtimeNowMs: weatherStation.runtimeNowMs
                 onNewsMapClearRequested: {

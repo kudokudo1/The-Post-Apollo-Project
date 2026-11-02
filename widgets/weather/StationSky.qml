@@ -1,6 +1,7 @@
 import QtQuick
 import "../../components"
 import "StationWeatherSubjectPanelPolicy.js" as SubjectPanelPolicy
+import "StationCosmosSubjectPanelPolicy.js" as CosmosPanelPolicy
 import "../../services/weather" as WeatherServices
 import "../../services/weather/WeatherDockPolicy.js" as WeatherDockPolicy
 import "../../services/weather/WeatherCyclePolicy.js" as WeatherCyclePolicy
@@ -14,7 +15,8 @@ Rectangle {
     // Optional WEATHER subject route. Empty keeps the exact CLASSIC page.
     property string subjectRoute: ""
     function sectionVisible(section) {
-        return SubjectPanelPolicy.visibleFor("sky",subjectRoute,section);
+        return SubjectPanelPolicy.visibleFor("sky",subjectRoute,section)
+            || CosmosPanelPolicy.visibleFor("sky",subjectRoute,section);
     }
     // Changing live submodes must not inherit the previous panel's scroll offset.
     onSubjectRouteChanged: {
@@ -255,7 +257,8 @@ Rectangle {
     WeatherServices.UsnoMoonService {
         id: moonService
         active: sky.visible
-                && SubjectPanelPolicy.needsSource(sky.subjectRoute,"astronomy")
+                && (SubjectPanelPolicy.needsSource(sky.subjectRoute,"astronomy")
+                    || CosmosPanelPolicy.needsSource(sky.subjectRoute,"moon"))
         // Use the same provider forecast date shown by ASTRONOMY.
         // skyCycle.date intentionally clears when the observation anchor is
         // stale, while astronomySummary safely falls back to dailyForecast[0].
@@ -268,13 +271,15 @@ Rectangle {
     WeatherServices.NasaEclipseService {
         id: eclipseService
         active: sky.visible
-                && SubjectPanelPolicy.needsSource(sky.subjectRoute,"astronomy")
+                && (SubjectPanelPolicy.needsSource(sky.subjectRoute,"astronomy")
+                    || CosmosPanelPolicy.needsSource(sky.subjectRoute,"eclipses"))
     }
 
     WeatherServices.UsnoCelnavService {
         id: celnavService
         active: sky.visible
-                && SubjectPanelPolicy.needsSource(sky.subjectRoute,"astronomy")
+                && (SubjectPanelPolicy.needsSource(sky.subjectRoute,"astronomy")
+                    || CosmosPanelPolicy.needsSource(sky.subjectRoute,"celnav"))
         latitude: sky.weatherService ? sky.weatherService.latitude : ""
         longitude: sky.weatherService ? sky.weatherService.longitude : ""
     }
@@ -282,7 +287,8 @@ Rectangle {
     WeatherServices.IssPassService {
         id: issPassService
         active: sky.visible
-                && SubjectPanelPolicy.needsSource(sky.subjectRoute,"astronomy")
+                && (SubjectPanelPolicy.needsSource(sky.subjectRoute,"astronomy")
+                    || CosmosPanelPolicy.needsSource(sky.subjectRoute,"iss"))
         latitude: sky.weatherService ? sky.weatherService.latitude : ""
         longitude: sky.weatherService ? sky.weatherService.longitude : ""
     }
@@ -290,7 +296,8 @@ Rectangle {
     WeatherServices.UsnoPlanetRiseSetService {
         id: planetRiseSetService
         active: sky.visible
-                && SubjectPanelPolicy.needsSource(sky.subjectRoute,"astronomy")
+                && (SubjectPanelPolicy.needsSource(sky.subjectRoute,"astronomy")
+                    || CosmosPanelPolicy.needsSource(sky.subjectRoute,"planets"))
         date: sky.astronomySummary.date
         latitude: sky.weatherService ? sky.weatherService.latitude : ""
         longitude: sky.weatherService ? sky.weatherService.longitude : ""
@@ -300,7 +307,8 @@ Rectangle {
     WeatherServices.IauMeteorShowerService {
         id: meteorService
         active: sky.visible
-                && SubjectPanelPolicy.needsSource(sky.subjectRoute,"astronomy")
+                && (SubjectPanelPolicy.needsSource(sky.subjectRoute,"astronomy")
+                    || CosmosPanelPolicy.needsSource(sky.subjectRoute,"meteor"))
         latitude: sky.weatherService ? sky.weatherService.latitude : ""
         longitude: sky.weatherService ? sky.weatherService.longitude : ""
     }
@@ -545,7 +553,15 @@ Rectangle {
 
             GohuText {
                 visible: sky.subjectRoute !== ""
+                         && sky.subjectRoute.indexOf("cosmos/") !== 0
                 text: "☁  WEATHER"
+                font.pixelSize: 24
+                color: Colors.cyan
+            }
+
+            GohuText {
+                visible: sky.subjectRoute.indexOf("cosmos/") === 0
+                text: "✦  COSMOS"
                 font.pixelSize: 24
                 color: Colors.cyan
             }

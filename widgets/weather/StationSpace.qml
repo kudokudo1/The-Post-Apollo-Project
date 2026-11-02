@@ -3,11 +3,22 @@ import "../../components"
 import "../../services/weather" as WeatherServices
 import "../../services/weather/SolarCyclePolicy.js" as SolarCyclePolicy
 import "StationSolarImagePolicy.js" as SolarImagePolicy
+import "StationCosmosSubjectPanelPolicy.js" as CosmosPanelPolicy
 import "../../services/weather/WeatherRuntimePolicy.js" as RuntimePolicy
 import "WeatherRelationshipPolicy.js" as RelationshipPolicy
 
 Rectangle {
     id: space
+
+    // Optional COSMOS detail route. Empty keeps CLASSIC SPACE fully intact.
+    property string subjectRoute: ""
+    function sectionVisible(section) {
+        return CosmosPanelPolicy.visibleFor("space", subjectRoute, section);
+    }
+    onSubjectRouteChanged: {
+        if (spaceScroll)
+            spaceScroll.contentY = 0;
+    }
 
     property var spaceService: null
     property var weatherService: null
@@ -247,6 +258,7 @@ Rectangle {
     WeatherServices.AuroraService {
         id: auroraService
         active: space.visible
+                && CosmosPanelPolicy.needsSource(space.subjectRoute,"aurora")
         targetLatitude: space.weatherService
                         ? space.weatherService.latitude : ""
         targetLongitude: space.weatherService
@@ -256,31 +268,37 @@ Rectangle {
     WeatherServices.SolarFlareService {
         id: flareService
         active: space.visible
+                && CosmosPanelPolicy.needsSource(space.subjectRoute,"flares")
     }
 
     WeatherServices.XrayFluxService {
         id: xrayService
         active: space.visible
+                && CosmosPanelPolicy.needsSource(space.subjectRoute,"xray")
     }
 
     WeatherServices.SwpcAlertService {
         id: alertService
         active: space.visible
+                && CosmosPanelPolicy.needsSource(space.subjectRoute,"alerts")
     }
 
     WeatherServices.SolarCycleService {
         id: solarCycleService
         active: space.visible
+                && CosmosPanelPolicy.needsSource(space.subjectRoute,"cycle")
     }
 
     WeatherServices.NoaaScalesService {
         id: scalesService
         active: space.visible
+                && CosmosPanelPolicy.needsSource(space.subjectRoute,"scales")
     }
 
     WeatherServices.KpForecastService {
         id: kpForecastService
         active: space.visible
+                && CosmosPanelPolicy.needsSource(space.subjectRoute,"kpForecast")
     }
 
     function bulletinColor(kind) {
@@ -520,10 +538,19 @@ Rectangle {
             spacing: 10
 
             Row {
+            visible: space.sectionVisible("header")
             width: parent.width
 
             GohuText {
+                visible: space.subjectRoute === ""
                 text: "✦  SPACE"
+                font.pixelSize: 24
+                color: Colors.magenta
+            }
+
+            GohuText {
+                visible: space.subjectRoute !== ""
+                text: "✦  COSMOS"
                 font.pixelSize: 24
                 color: Colors.magenta
             }
@@ -545,16 +572,19 @@ Rectangle {
         }
 
         StationRuntimeRack {
+            visible: space.sectionVisible("runtime")
             width: parent.width
             rows: space.runtimeRows
         }
 
         StationSectionDivider {
+            visible: space.sectionVisible("solar")
             width: parent.width
             title: "SOLAR // GEOMAGNETIC"
         }
 
         Row {
+            visible: space.sectionVisible("solar")
             width: parent.width
             spacing: 14
 
@@ -751,11 +781,13 @@ Rectangle {
         }
 
         StationSectionDivider {
+            visible: space.sectionVisible("relation")
             width: parent.width
             title: "LIVE HISTORY // SOLAR CONTEXT"
         }
 
         WeatherTrendInspector {
+            visible: space.sectionVisible("relation")
             width: parent.width
             title: "SOLAR WIND ↔ IMF BZ"
             leftLabel: "WIND KM/S"
@@ -769,11 +801,13 @@ Rectangle {
         }
 
         StationSectionDivider {
+            visible: space.sectionVisible("scales")
             width: parent.width
             title: "NOAA SCALES // CURRENT SNAPSHOT"
         }
 
         Column {
+            visible: space.sectionVisible("scales")
             width: parent.width
             spacing: 8
 
@@ -872,11 +906,13 @@ Rectangle {
         }
 
         StationSectionDivider {
+            visible: space.sectionVisible("cycle")
             width: parent.width
             title: "SOLAR CYCLE // NOAA MONTHLY PREDICTION"
         }
 
         Column {
+            visible: space.sectionVisible("cycle")
             width: parent.width
             spacing: 8
 
@@ -1071,11 +1107,13 @@ Rectangle {
         }
 
         StationSectionDivider {
+            visible: space.sectionVisible("kp-history")
             width: parent.width
             title: "GEOMAGNETIC // KP 72-HOUR HISTORY"
         }
 
         Column {
+            visible: space.sectionVisible("kp-history")
             width: parent.width
             spacing: 8
 
@@ -1212,11 +1250,13 @@ Rectangle {
         }
 
         StationSectionDivider {
+            visible: space.sectionVisible("kp-forecast")
             width: parent.width
             title: "GEOMAGNETIC // NOAA KP FORECAST"
         }
 
         Column {
+            visible: space.sectionVisible("kp-forecast")
             width: parent.width
             spacing: 8
 
@@ -1408,11 +1448,13 @@ Rectangle {
         }
 
         StationSectionDivider {
+            visible: space.sectionVisible("field")
             width: parent.width
             title: "FIELD // SOURCE TIMES"
         }
 
         Row {
+            visible: space.sectionVisible("field")
             width: parent.width
             spacing: 14
 
@@ -1536,11 +1578,13 @@ Rectangle {
         }
 
         StationSectionDivider {
+            visible: space.sectionVisible("suvi")
             width: parent.width
             title: "SOLAR IMAGER // NOAA SWPC SUVI"
         }
 
         Row {
+            visible: space.sectionVisible("suvi")
             width: parent.width
             height: 342
             spacing: 14
@@ -1732,11 +1776,13 @@ Rectangle {
         }
 
         StationSectionDivider {
+            visible: space.sectionVisible("aurora")
             width: parent.width
             title: "AURORA // 30-90 MIN FORECAST"
         }
 
         Column {
+            visible: space.sectionVisible("aurora")
             width: parent.width
             spacing: 7
 
@@ -1999,11 +2045,13 @@ Rectangle {
         }
 
         StationSectionDivider {
+            visible: space.sectionVisible("xray")
             width: parent.width
             title: "SOLAR // LIVE X-RAY FLUX"
         }
 
         Column {
+            visible: space.sectionVisible("xray")
             width: parent.width
             spacing: 7
 
@@ -2177,11 +2225,13 @@ Rectangle {
         }
 
         StationSectionDivider {
+            visible: space.sectionVisible("flares")
             width: parent.width
             title: "SOLAR // GOES X-RAY FLARES"
         }
 
         Column {
+            visible: space.sectionVisible("flares")
             width: parent.width
             spacing: 8
 
@@ -2395,11 +2445,13 @@ Rectangle {
         }
 
         StationSectionDivider {
+            visible: space.sectionVisible("watch")
             width: parent.width
             title: "GEOMAGNETIC // WATCH-DAY OUTLOOK"
         }
 
         Column {
+            visible: space.sectionVisible("watch")
             width: parent.width
             spacing: 8
 
@@ -2522,11 +2574,13 @@ Rectangle {
         }
 
         StationSectionDivider {
+            visible: space.sectionVisible("warnings")
             width: parent.width
             title: "NOAA // WARNING VALIDITY REVIEW"
         }
 
         Column {
+            visible: space.sectionVisible("warnings")
             width: parent.width
             spacing: 8
 
@@ -2631,11 +2685,13 @@ Rectangle {
         }
 
         StationSectionDivider {
+            visible: space.sectionVisible("bulletins")
             width: parent.width
             title: "SPACE WEATHER // NOAA BULLETINS"
         }
 
         Column {
+            visible: space.sectionVisible("bulletins")
             width: parent.width
             spacing: 8
 
@@ -2756,6 +2812,7 @@ Rectangle {
         }
 
         QuietText {
+            visible: space.sectionVisible("footer")
             text: "NOAA SWPC // FOUR LIVE PRODUCTS // INDEPENDENT SAMPLE TIMES"
             font.pixelSize: 11
         }

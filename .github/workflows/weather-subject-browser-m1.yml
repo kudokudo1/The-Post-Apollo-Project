@@ -1,0 +1,29 @@
+name: Weather Station subject browser M1
+
+on:
+  pull_request:
+    paths:
+      - 'widgets/weather/WeatherStationW.qml'
+      - 'widgets/weather/StationSubjectNavigator.qml'
+      - 'widgets/weather/StationSubjectNavigationPolicy.js'
+      - 'widgets/weather/StationSubjectNavigationPreviewPolicy.js'
+      - 'tests/weather/subject_navigation_browser.test.js'
+      - '.github/workflows/weather-subject-browser-m1.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  subject-browser:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Verify subject-first contract and browser bridge
+        run: |
+          node --test tests/weather/subject_navigation_contract.test.js
+          node --test tests/weather/subject_navigation_browser.test.js

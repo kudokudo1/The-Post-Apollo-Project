@@ -1,0 +1,46 @@
+name: TASKS M13b disabled recovery-display compatibility
+
+on:
+  pull_request:
+    paths:
+      - 'tests/tasks/fixtures/TaskRecoveryDisplayM13b.cjs'
+      - 'tests/tasks/test_task_recovery_display_m13b.cjs'
+      - 'docs/tasks-disabled-recovery-display-m13b.md'
+      - '.github/workflows/tasks-recovery-display-m13b.yml'
+      - 'services/hub/ApolloHubTodoStore.qml'
+      - 'services/hub/TaskSaveTicketContractM12o.js'
+      - 'widgets/hub/TaskHubTicketPresenterM12p.js'
+  push:
+    branches: [main]
+    paths:
+      - 'tests/tasks/fixtures/TaskRecoveryDisplayM13b.cjs'
+      - 'tests/tasks/test_task_recovery_display_m13b.cjs'
+      - '.github/workflows/tasks-recovery-display-m13b.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  synthetic-recovery-display:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: M13b four-consumer recovery display and owner-ticket binding
+        run: node --test tests/tasks/test_task_recovery_display_m13b.cjs
+      - name: M13a fresh-owner independent process regression
+        run: node --test tests/tasks/test_task_restart_review_m13a.cjs
+      - name: M12o four-consumer draft contract
+        run: node --test tests/tasks/test_task_disabled_ticket_api_m12o.cjs
+      - name: M12p Hub deferred receipt presenter
+        run: node --test tests/tasks/test_task_hub_ticket_presenter_m12p.cjs
+      - name: M12a last-confirmed state model
+        run: node --test tests/tasks/test_task_guarded_completion_model_m12a.cjs
+      - name: M11d single authoritative writer disabled flags
+        run: python3 tests/tasks/test_task_writer_gate_inventory_m11d.py

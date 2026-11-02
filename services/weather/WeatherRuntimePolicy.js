@@ -796,28 +796,37 @@ function displayRow(sourceId, input, nowValue) {
 function statusToken(row) {
     if (!row)
         return "orange";
-    if (row.transport === "ERROR")
+
+    const state = String(row.availability || "");
+    if (state === "OFFLINE"
+            || state === "EXPIRED"
+            || state === "CACHE_EXPIRED"
+            || state === "SNAPSHOT_EXPIRED")
         return "red";
-    if (row.transport === "DEGRADED"
-            || row.freshness === "STALE")
+
+    if (state === "LIVE_STALE"
+            || state === "CACHE_STALE"
+            || state === "CACHE_AGING"
+            || state === "SNAPSHOT_STALE"
+            || state === "SNAPSHOT_AGING"
+            || state === "LIVE_AGING"
+            || state === "KEY_DEGRADED")
         return "yellow";
-    if (row.transport === "LOADING")
+
+    if (state === "READING" || state === "WAITING")
         return "orange";
-    if (row.transport === "INACTIVE")
+    if (state === "INACTIVE")
         return "blue";
-    if (row.freshness === "AGING")
-        return "yellow";
-    if (row.freshness === "SNAPSHOT")
+    if (state === "CACHE_FRESH" || state === "KEY_VALID")
+        return "blue";
+    if (state === "SNAPSHOT")
         return "magenta";
-    if (row.freshness === "KEYED")
-        return "blue";
-    if (row.freshness === "LOCAL")
+    if (state === "LOCAL")
         return "green";
-    if (row.transport === "READY" && row.freshness === "FRESH")
+    if (state === "LIVE")
         return "cyan";
-    if (row.transport === "READY")
-        return "cyan";
-    return "orange";
+
+    return row.transport === "ERROR" ? "red" : "orange";
 }
 
 function cadenceLabel(row) {
@@ -843,13 +852,35 @@ function cadenceLabel(row) {
         : (hours / 24).toFixed((hours / 24) < 10 ? 1 : 0) + "d";
 }
 
-function rowStateLabel(row) {
+function availabilityLabel(row) {
     if (!row)
         return "UNKNOWN";
-    const parts = [row.transport];
-    if (row.freshness && row.freshness !== "UNKNOWN")
-        parts.push(row.freshness);
-    return parts.join(" // ");
+    switch (String(row.availability || "")) {
+    case "LIVE": return "LIVE // FRESH";
+    case "LIVE_AGING": return "LIVE // AGING";
+    case "LIVE_STALE": return "LIVE // STALE";
+    case "EXPIRED": return "LIVE // EXPIRED";
+    case "CACHE_FRESH": return "CACHE // FRESH";
+    case "CACHE_AGING": return "CACHE // AGING";
+    case "CACHE_STALE": return "CACHE // STALE";
+    case "CACHE_EXPIRED": return "CACHE // EXPIRED";
+    case "SNAPSHOT": return "SNAPSHOT // FRESH";
+    case "SNAPSHOT_AGING": return "SNAPSHOT // AGING";
+    case "SNAPSHOT_STALE": return "SNAPSHOT // STALE";
+    case "SNAPSHOT_EXPIRED": return "SNAPSHOT // EXPIRED";
+    case "KEY_VALID": return "KEYED // VALID";
+    case "KEY_DEGRADED": return "KEYED // DEGRADED";
+    case "LOCAL": return "LOCAL";
+    case "READING": return "READING";
+    case "OFFLINE": return "OFFLINE";
+    case "WAITING": return "WAITING";
+    case "INACTIVE": return "INACTIVE";
+    default: return "UNKNOWN";
+    }
+}
+
+function rowStateLabel(row) {
+    return availabilityLabel(row);
 }
 
 function rowAgeLabel(row) {
@@ -868,18 +899,60 @@ function rowAgeLabel(row) {
     return parts.join(" // ");
 }
 
+function compactDurationMs(ms) {
+    const value = Number(ms);
+    if (!isFinite(value) || value <= 0)
+        return "--";
+    const minutes = value / 60000;
+    if (minutes < 60)
+        return Math.round(minutes) + "m";
+    const hours = minutes / 60;
+    if (hours < 24)
+        return (hours < 10 && hours % 1 !== 0
+                ? hours.toFixed(1) : Math.round(hours)) + "h";
+    const days = hours / 24;
+    return (days < 10 && days % 1 !== 0
+            ? days.toFixed(1) : Math.round(days)) + "d";
+}
+
+function retentionLabel(row) {
+    if (!row)
+        return "--";
+    if (row.retention === RETENTION_KEY_BOUND)
+        return "KEY-BOUND";
+    if (row.retention === RETENTION_LOCAL)
+        return "LOCAL";
+    if (row.retention === RETENTION_NONE)
+        return "NO RETAIN";
+
+    const limit = Number(row.expireMs) > 0
+        ? compactDurationMs(row.expireMs) : "--";
+
+    if (row.retention === RETENTION_OPERATOR_SNAPSHOT)
+        return "SNAPSHOT≤" + limit;
+    if (row.retention === RETENTION_SESSION_CACHE)
+        return "SESSION≤" + limit;
+    if (row.retention === RETENTION_MEMORY_LAST_GOOD)
+        return "MEMORY≤" + limit;
+    return row.retention;
+}
+
 function summarizeRows(rows) {
     const list = Array.isArray(rows) ? rows : [];
     let ready = 0;
     let loading = 0;
     let problem = 0;
     let stale = 0;
+    let cached = 0;
+    let expired = 0;
+    let offline = 0;
     let manual = 0;
     let keyed = 0;
     let local = 0;
 
     for (let i = 0; i < list.length; i++) {
         const row = list[i] || {};
+        const availability = String(row.availability || "");
         if (row.transport === "READY"
                 || row.transport === "DEGRADED")
             ready++;
@@ -887,8 +960,14 @@ function summarizeRows(rows) {
             loading++;
         if (row.transport === "ERROR")
             problem++;
-        if (row.freshness === "STALE")
+        if (row.ageBand === "STALE")
             stale++;
+        if (availability.indexOf("CACHE_") === 0)
+            cached++;
+        if (availability.indexOf("EXPIRED") >= 0)
+            expired++;
+        if (availability === "OFFLINE")
+            offline++;
         if (row.mode === MODE_MANUAL)
             manual++;
         if (row.mode === MODE_KEYED_FETCH)
@@ -903,6 +982,9 @@ function summarizeRows(rows) {
         loading: loading,
         problem: problem,
         stale: stale,
+        cached: cached,
+        expired: expired,
+        offline: offline,
         manual: manual,
         keyed: keyed,
         local: local

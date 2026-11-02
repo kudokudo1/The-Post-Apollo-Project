@@ -7,6 +7,7 @@ Rectangle {
 
     property var eventContext: null
     property var dossierPreview: null
+    property var dossierCaptureReview: null
     property real weatherFixDistanceKm: -1
     property var radarContext: null
     property var lightningContext: null
@@ -120,7 +121,7 @@ Rectangle {
     width: parent ? parent.width : 0
     height: visible
         ? 292
-          + (dossierPreviewReady ? 48 : 0)
+          + (dossierPreviewReady ? 71 : 0)
           + (archiveRowCount > 0 ? 30 : 0)
           + Math.min(5, archiveRowCount) * 42
           + (archiveSnapshotCount > 0 ? 30 : 0)
@@ -244,6 +245,21 @@ Rectangle {
                 text: "PROVIDER IDS KEPT SEPARATE // NO INCIDENT MERGE // NO CAUSAL CLAIM"
                 font.pixelSize: 8
                 color: Colors.orange
+                elide: Text.ElideRight
+            }
+
+            QuietText {
+                width: parent.width
+                text: card.dossierCaptureReview
+                    ? "M23 DOSSIER ADMISSION // "
+                        + (card.dossierCaptureReview.ready
+                            ? "REVIEWABLE // NOT SAVED"
+                            : card.dossierCaptureReview.reason)
+                    : "M23 DOSSIER ADMISSION // UNAVAILABLE"
+                font.pixelSize: 8
+                color: card.dossierCaptureReview
+                    && card.dossierCaptureReview.ready
+                    ? Colors.cyan : Colors.orange
                 elide: Text.ElideRight
             }
         }

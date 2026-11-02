@@ -40,6 +40,7 @@ def prepare(root: Path) -> None:
         "users": [{
             "username": "pilot-worker",
             "enabled": True,
+            "email": "worker@ci.invalid",
             "emailVerified": True,
             "firstName": "Synthetic",
             "lastName": "Worker",

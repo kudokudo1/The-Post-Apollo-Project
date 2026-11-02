@@ -1,0 +1,32 @@
+name: Weather M12 marine hydrology context
+
+on:
+  pull_request:
+    paths:
+      - "widgets/weather/StationGround.qml"
+      - "tests/weather/test_weather_marine_hydrology_m12.js"
+      - ".github/workflows/weather-marine-hydrology-m12.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  context:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: M12 marine and hydrology context
+        run: node tests/weather/test_weather_marine_hydrology_m12.js
+      - name: M11 relationship regression
+        run: node tests/weather/test_weather_history_inspectors_m11.js
+      - name: M10 live-history regression
+        run: node tests/weather/test_weather_live_history_m10.js
+      - name: NDBC marine regression
+        run: node tests/weather/test_station_ground_ndbc_marine.js
+      - name: NWPS base regression
+        run: node tests/weather/test_station_ground_nwps_river.js
+      - name: NWPS stageflow regression
+        run: node tests/weather/test_station_ground_nwps_stageflow.js
+      - name: CO-OPS regression
+        run: node tests/weather/test_station_ground_coops_coastal.js

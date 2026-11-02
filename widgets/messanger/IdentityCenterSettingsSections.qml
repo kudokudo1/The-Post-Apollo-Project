@@ -12,6 +12,8 @@ Item {
     // Parent settings visibility gates the display-only IPC reader.
     // This is NOT a login, account selection or authorization state.
     property bool settingsOpen: false
+    // Injected by Social; null in synthetic Qt tests.
+    property var localDirectoryStore: null
     // Display-only input for a FUTURE approved privileged host.
     // No current host feeds this value; never treat it as authorization.
     // Tokens, provider subjects and credentials must never enter QML.
@@ -181,6 +183,11 @@ Item {
                         wrapMode: Text.WordWrap
                     }
 
+                    IdentityCenterLocalOrganizationEditor {
+                        width: parent.width
+                        directoryStore: sections.localDirectoryStore
+                    }
+
                     Column {
                         width: parent.width
                         spacing: 7
@@ -279,7 +286,7 @@ Item {
 
                 Text {
                     width: parent.width
-                    text: "This is navigation only. No enterprise data, " +
+                    text: "Local organization edits save labels only. No verified " +
                           "company access, sign-in state or account connection " +
                           "is changed by selecting a section."
                     color: Colors.orange

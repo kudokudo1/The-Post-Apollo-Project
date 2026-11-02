@@ -86,7 +86,7 @@ assert.match(windowSource, /StationOfficialAlertPolicy\.js" as OfficialAlertPoli
 assert.match(windowSource, /readonly property var officialAlertSummary:/);
 assert.match(
     windowSource,
-    /readonly property string sourceStatusDisplay:\s*\{\s*if \(officialAlertSummary\.available\)\s*return officialAlertSummary\.headerText;/
+    /readonly property string sourceStatusDisplay:\s*\{\s*if \(officialAlertSummary\.available\)\s*return officialAlertSummary\.headerText[\s\S]{0,160}officialAlertUsingPersistentCache/
 );
 assert.match(
     windowSource,

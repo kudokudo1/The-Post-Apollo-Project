@@ -39,6 +39,10 @@ Rectangle {
     property string selectedCreatorId: ""
     property string inflightCreatorId: ""
     readonly property bool isReports: section === "REPORTS"
+    readonly property var runtimeRows:
+        isReports && reportsLoader.item
+        && Array.isArray(reportsLoader.item.runtimeRows)
+        ? reportsLoader.item.runtimeRows : []
     readonly property string feedBadge: isReports
         ? (reportsLoader.item ? reportsLoader.item.feedBadge : "NEWS // CONNECTING")
         : "NEWS // " + section + " CATALOG"

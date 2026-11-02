@@ -31,7 +31,7 @@ class InventoryTests(unittest.TestCase):
         self.paths.append(name)
         return self.binaries.get(name)
 
-    def run(self, argv, **kwargs):
+    def fake_runner(self, argv, **kwargs):
         self.commands.append((argv, kwargs))
         return self.output
 
@@ -41,7 +41,7 @@ class InventoryTests(unittest.TestCase):
 
     def inspect(self, **kwargs):
         return inv.inspect(
-            which=self.which, runner=self.run, listdir=self.listdir,
+            which=self.which, runner=self.fake_runner, listdir=self.listdir,
             platform=kwargs.pop("platform", "linux"), **kwargs,
         )
 
@@ -143,7 +143,7 @@ class InventoryTests(unittest.TestCase):
     def test_sysfs_unavailable_still_returns_version(self):
         def failure(path):
             raise PermissionError("private system location")
-        x = inv.inspect(which=self.which, runner=self.run, listdir=failure)
+        x = inv.inspect(which=self.which, runner=self.fake_runner, listdir=failure)
         self.assertEqual(x["state"], "SYSFS_UNAVAILABLE")
         self.assertEqual(x["bluezVersion"], "5.86")
         self.assertRestricted(x)
@@ -214,7 +214,7 @@ class InventoryTests(unittest.TestCase):
     def test_failed_executable_lookup_fails_closed(self):
         def fail(name):
             raise OSError("private path")
-        x = inv.inspect(which=fail, runner=self.run, listdir=self.listdir)
+        x = inv.inspect(which=fail, runner=self.fake_runner, listdir=self.listdir)
         self.assertEqual(x["state"], "INVENTORY_UNAVAILABLE")
         self.assertRestricted(x)
         self.assertEqual(self.commands, [])

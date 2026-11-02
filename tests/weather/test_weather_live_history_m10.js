@@ -288,10 +288,11 @@ assert.match(
     station,
     /StationSpace\s*\{[\s\S]*?liveHistoryStore: weatherStation\.liveHistoryStore/
 );
-assert.doesNotMatch(
-    station,
-    /StationSky\s*\{[\s\S]*?liveHistoryStore:/
-);
+const skyStart = station.indexOf("StationSky {");
+const spaceComponentStart = station.indexOf("id: spaceViewComponent", skyStart);
+assert.ok(skyStart >= 0 && spaceComponentStart > skyStart);
+const skyArea = station.slice(skyStart, spaceComponentStart);
+assert.doesNotMatch(skyArea, /liveHistoryStore:/);
 
 const home = read("widgets/weather/StationHome.qml");
 const ground = read("widgets/weather/StationGround.qml");

@@ -290,6 +290,26 @@ var _catalog = [
         cadenceMs:0,
         lifetime:LIFETIME_OPERATOR_REQUEST,
         view:"NEWS/MAP"
+    },
+    {
+        id:"mrms-radar",
+        label:"NOAA/NWS MRMS RADAR",
+        owner:"widgets/weather/StationDiscovery.qml",
+        mode:MODE_MANUAL,
+        cadenceMs:0,
+        lifetime:LIFETIME_OPERATOR_REQUEST,
+        view:"MAP",
+        note:"operator-requested Image snapshot; no repeating provider timer"
+    },
+    {
+        id:"sky-local",
+        label:"SKY LOCAL CALCULATIONS",
+        owner:"widgets/weather/StationSky.qml",
+        mode:MODE_LOCAL_CALC,
+        cadenceMs:0,
+        lifetime:LIFETIME_LOCAL,
+        view:"SKY",
+        note:"solar position/twilight derived locally from retained provider data"
     }
 ];
 
@@ -430,3 +450,146 @@ function compactAgeMinutes(minutes) {
     return hours < 24 ? hours.toFixed(hours < 10 ? 1 : 0) + "h"
                       : Math.floor(hours / 24) + "d";
 }
+
+function displayRow(sourceId, input, nowValue) {
+    const spec = sourceSpec(sourceId);
+    const state = runtimeState(spec, input, nowValue);
+    const receivedMinutes = state.receivedAgeMs < 0
+        ? -1 : Math.floor(state.receivedAgeMs / 60000);
+    const observationMinutes = state.observationAgeMs < 0
+        ? -1 : Math.floor(state.observationAgeMs / 60000);
+
+    return {
+        id: state.id,
+        label: spec ? spec.label : String(sourceId || "").toUpperCase(),
+        mode: state.mode,
+        lifetime: state.lifetime,
+        cadenceMs: state.cadenceMs,
+        transport: state.transport,
+        freshness: state.freshness,
+        receivedAgeMinutes: receivedMinutes,
+        observationAgeMinutes: observationMinutes,
+        ready: state.ready,
+        loading: state.loading,
+        failed: state.failed,
+        active: state.active,
+        detail: input && input.detail ? String(input.detail) : ""
+    };
+}
+
+function statusToken(row) {
+    if (!row)
+        return "orange";
+    if (row.transport === "ERROR")
+        return "red";
+    if (row.transport === "DEGRADED"
+            || row.freshness === "STALE")
+        return "yellow";
+    if (row.transport === "LOADING")
+        return "orange";
+    if (row.transport === "INACTIVE")
+        return "blue";
+    if (row.freshness === "AGING")
+        return "yellow";
+    if (row.freshness === "SNAPSHOT")
+        return "magenta";
+    if (row.freshness === "KEYED")
+        return "blue";
+    if (row.freshness === "LOCAL")
+        return "green";
+    if (row.transport === "READY" && row.freshness === "FRESH")
+        return "cyan";
+    if (row.transport === "READY")
+        return "cyan";
+    return "orange";
+}
+
+function cadenceLabel(row) {
+    if (!row)
+        return "--";
+    if (row.mode === MODE_STREAM)
+        return "STREAM";
+    if (row.mode === MODE_MANUAL)
+        return "ON REQUEST";
+    if (row.mode === MODE_KEYED_FETCH)
+        return "ON KEY CHANGE";
+    if (row.mode === MODE_LOCAL_CALC)
+        return "LOCAL";
+    const ms = Number(row.cadenceMs) || 0;
+    if (ms <= 0)
+        return row.mode || "--";
+    const minutes = ms / 60000;
+    if (minutes < 60)
+        return minutes.toFixed(minutes < 10 && minutes % 1 !== 0 ? 1 : 0) + "m";
+    const hours = minutes / 60;
+    return hours < 24
+        ? hours.toFixed(hours < 10 && hours % 1 !== 0 ? 1 : 0) + "h"
+        : (hours / 24).toFixed((hours / 24) < 10 ? 1 : 0) + "d";
+}
+
+function rowStateLabel(row) {
+    if (!row)
+        return "UNKNOWN";
+    const parts = [row.transport];
+    if (row.freshness && row.freshness !== "UNKNOWN")
+        parts.push(row.freshness);
+    return parts.join(" // ");
+}
+
+function rowAgeLabel(row) {
+    if (!row)
+        return "RX --";
+    const parts = [];
+    if (row.receivedAgeMinutes >= 0)
+        parts.push("RX " + compactAgeMinutes(row.receivedAgeMinutes));
+    else if (row.freshness === "LOCAL")
+        parts.push("LOCAL NOW");
+    else
+        parts.push("RX --");
+
+    if (row.observationAgeMinutes >= 0)
+        parts.push("OBS " + compactAgeMinutes(row.observationAgeMinutes));
+    return parts.join(" // ");
+}
+
+function summarizeRows(rows) {
+    const list = Array.isArray(rows) ? rows : [];
+    let ready = 0;
+    let loading = 0;
+    let problem = 0;
+    let stale = 0;
+    let manual = 0;
+    let keyed = 0;
+    let local = 0;
+
+    for (let i = 0; i < list.length; i++) {
+        const row = list[i] || {};
+        if (row.transport === "READY"
+                || row.transport === "DEGRADED")
+            ready++;
+        if (row.transport === "LOADING")
+            loading++;
+        if (row.transport === "ERROR")
+            problem++;
+        if (row.freshness === "STALE")
+            stale++;
+        if (row.mode === MODE_MANUAL)
+            manual++;
+        if (row.mode === MODE_KEYED_FETCH)
+            keyed++;
+        if (row.mode === MODE_LOCAL_CALC)
+            local++;
+    }
+
+    return {
+        total: list.length,
+        ready: ready,
+        loading: loading,
+        problem: problem,
+        stale: stale,
+        manual: manual,
+        keyed: keyed,
+        local: local
+    };
+}
+

@@ -87,7 +87,8 @@ test("Sun, Moon, planets, stars and events reuse the actual SKY modules", () => 
   assert.match(sky,/SubjectPanelPolicy\.visibleFor\("sky",subjectRoute,section\)/);
   assert.match(sky,/CosmosPanelPolicy\.visibleFor\("sky",subjectRoute,section\)/);
   assert.match(sky,/text: "☁  SKY"/);
-  assert.match(sky,/text: sky\.subjectRoute\.indexOf\("cosmos\/"\)/);
+  assert.match(sky,/text: "✦  COSMOS"/);
+  assert.match(sky,/visible: sky\.subjectRoute\.indexOf\("cosmos\/"\) === 0/);
   assert.match(sky,/text: "☁  WEATHER"/);
 });
 

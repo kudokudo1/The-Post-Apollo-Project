@@ -31,7 +31,7 @@ KdeConnectSmsSignalFixture::~KdeConnectSmsSignalFixture()
     stop();
 }
 
-bool KdeConnectSmsSignalFixture::start(const QDBusConnection &bus,
+bool KdeConnectSmsSignalFixture::start(QDBusConnection bus,
                                        const QString &fixtureDeviceId)
 {
     // Fail closed on reactivation. Never silently change source/device.

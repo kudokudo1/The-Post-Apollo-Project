@@ -178,7 +178,7 @@ for (const row of catalog) {
         const cadencePattern = new RegExp(
             "\\b" + String(row.cadenceMs) + "\\b"
         );
-        assert.match(owner, /\\bTimer\\s*\\{/, row.id + " poll timer");
+        assert.ok(owner.includes("Timer {"), row.id + " poll timer");
         assert.match(owner, cadencePattern, row.id + " declared cadence");
     }
 

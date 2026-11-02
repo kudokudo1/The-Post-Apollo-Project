@@ -24,15 +24,15 @@ expected = {
     "Mod4+r": "media",
 }
 chords = re.findall(
-    r"^bindsym --no-repeat (Mod4(?:\\+Shift)?\\+[a-z])"
-    r"\\s+exec qs ipc call controlMenus (\\w+)\\s*$",
+    r"^bindsym --no-repeat (Mod4(?:\+Shift)?\+[a-z])"
+    r"\s+exec qs ipc call controlMenus (\w+)\s*$",
     SWAY, flags=re.MULTILINE,
 )
 assert len(chords) == len(expected), chords
 assert dict(chords) == expected, chords
 assert len({chord for chord, _ in chords}) == len(expected), "duplicate chord"
 assert "Mod4+grave" not in SWAY, "Koinoikos prefix must stay untouched"
-assert not re.search(r"^(include|mode|exec_always|bindcode)\\b", SWAY, re.M)
+assert not re.search(r"^(include|mode|exec_always|bindcode)\b", SWAY, re.M)
 assert "OPT-IN" in SWAY, "never install in a live Sway config silently"
 
 # Reuse the one existing controlMenus endpoint. No second widget instance.

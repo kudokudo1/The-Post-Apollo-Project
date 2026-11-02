@@ -138,6 +138,7 @@ test("no premature MAP or MAGICK activation and no new persistence writer", () =
 test("route header reveals correct scope without claiming live provider success", () => {
   assert.match(ground,/SubjectPanelPolicy\.titleFor\(ground\.subjectRoute\)/);
   assert.match(sky,/SubjectPanelPolicy\.titleFor\(sky\.subjectRoute\)/);
-  assert.match(station,/\? "WEATHER \/\/ PANEL" : "INDEX \/\/ PREVIEW"/);
+  assert.match(station,/return "WEATHER \/\/ PANEL"/);
+  assert.match(station,/return "INDEX \/\/ PREVIEW"/);
   assert.match(nav,/WEATHER \/\/ EXISTING SOURCE PANELS \/\/ SAME COLLECTORS/);
 });

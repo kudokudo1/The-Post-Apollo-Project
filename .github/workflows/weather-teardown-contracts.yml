@@ -79,6 +79,8 @@ jobs:
         run: node tests/weather/test_weather_dossier_serialization_m24.js
       - name: Validate Weather M25 independent dossier archive contract
         run: node tests/weather/test_weather_dossier_persistent_m25.js
+      - name: Validate Weather M26 disposable filesystem restart
+        run: node tests/weather/test_weather_dossier_disposable_restart_m26.js
       - name: Validate Weather persistent last-known cache M4
         run: node tests/weather/test_weather_persistent_cache_m4.js
       - name: Validate Weather persistent cache M5 global events

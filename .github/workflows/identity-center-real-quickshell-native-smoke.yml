@@ -1,0 +1,66 @@
+name: Identity Center Real Quickshell Synthetic Native Smoke
+
+on:
+  pull_request:
+    paths:
+      - 'IdentityNativeDisplaySmokeV0.qml'
+      - 'tests/identity/native_quickshell_display_smoke_v0.py'
+      - 'tests/identity/test_native_quickshell_smoke_guard_v0.py'
+      - 'MODEL/contracts/identity-center-real-quickshell-native-smoke-v0.md'
+      - '.github/workflows/identity-center-real-quickshell-native-smoke.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'IdentityNativeDisplaySmokeV0.qml'
+      - 'tests/identity/native_quickshell_display_smoke_v0.py'
+      - 'tests/identity/test_native_quickshell_smoke_guard_v0.py'
+      - 'MODEL/contracts/identity-center-real-quickshell-native-smoke-v0.md'
+      - '.github/workflows/identity-center-real-quickshell-native-smoke.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  native-real-qs:
+    name: Debian Quickshell 0.3.2, real Process + synthetic Organizations
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    container:
+      image: debian:unstable-slim
+    steps:
+      - name: Install Debian-packaged native Quickshell and Qt runtime
+        run: |
+          apt-get update -qq
+          DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+            git ca-certificates python3 quickshell=0.3.2-1 \
+            qt6-qpa-plugins qml6-module-qtquick \
+            qml6-module-qtquick-layouts qml6-module-qtquick-effects \
+            qml6-module-qtqml
+      - uses: actions/checkout@v4
+      - name: Verify actual binary and compile disposable runner
+        run: |
+          command -v qs
+          python3 -m py_compile tests/identity/native_quickshell_display_smoke_v0.py
+      - name: Native Quickshell receives READY via actual Process and private socket
+        run: python3 tests/identity/native_quickshell_display_smoke_v0.py --scenario ready
+      - name: Native Quickshell receives signed-out status without tenants
+        run: python3 tests/identity/native_quickshell_display_smoke_v0.py --scenario signed-out
+      - name: Native Quickshell denies missing host without stale membership
+        run: python3 tests/identity/native_quickshell_display_smoke_v0.py --scenario missing
+      - name: Native Quickshell refresh clears revoked synthetic memberships
+        run: python3 tests/identity/native_quickshell_display_smoke_v0.py --scenario revoke
+
+  source-guard:
+    name: Unmounted smoke root and no production host or shell mutations
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Check synthetic-only guard, disposable directories and unmounted QML
+        run: python3 -m unittest discover -s tests/identity -p 'test_native_quickshell_smoke_guard_v0.py' -v
+      - name: Preserve Social Organizations viewer contracts
+        run: node tests/messaging/test_identity_center_ipc_viewer_v0.cjs

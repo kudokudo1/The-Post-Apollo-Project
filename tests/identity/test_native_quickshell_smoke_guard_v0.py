@@ -33,8 +33,10 @@ class SyntheticNativeQuickshellGuard(unittest.TestCase):
         self.assertIn("ShellRoot {", root)
         self.assertIn("IdentityCenterSettingsSections {", root)
         self.assertIn('=== "CI_DISPOSABLE_ONLY"', root)
-        self.assertIn('settingsOpen: smoke.armed', root)
-        self.assertIn('activeSection: smoke.armed ? "ORGANIZATIONS" : "SOCIAL LAYOUT"', root)
+        self.assertIn('property bool testSettingsOpen: smoke.armed', root)
+        self.assertIn('property string testSection: smoke.armed ? "ORGANIZATIONS" : "SOCIAL LAYOUT"', root)
+        self.assertIn('settingsOpen: smoke.testSettingsOpen', root)
+        self.assertIn('activeSection: smoke.testSection', root)
         self.assertIn("Quickshell.watchFiles = false;", root)
         self.assertIn("if (!armed)", root)
         for invalid in ("PanelWindow {", "FloatingWindow {", "FileView {",
@@ -50,6 +52,8 @@ class SyntheticNativeQuickshellGuard(unittest.TestCase):
             "IDENTITY_NATIVE_SMOKE_PASS_SIGNED_OUT",
             "IDENTITY_NATIVE_SMOKE_PASS_MISSING",
             "IDENTITY_NATIVE_SMOKE_PASS_REVOKE",
+            "IDENTITY_NATIVE_SMOKE_PASS_HOST_STOP",
+            "IDENTITY_NATIVE_SMOKE_PASS_TAB_CHANGE",
         ):
             self.assertIn(expected, smoke)
         self.assertIn('label: "SWITCH ORGANIZATION // UNAVAILABLE"', sections)
@@ -84,6 +88,7 @@ class SyntheticNativeQuickshellGuard(unittest.TestCase):
         module = fixture()
         self.assertEqual(set(module.EXPECTED), {
             "ready", "signed-out", "missing", "revoke",
+            "host-stop", "tab-change",
         })
         for status in ("READY", "SIGNED_OUT", "UNAVAILABLE"):
             result = module.synthetic(status)
@@ -106,6 +111,19 @@ class SyntheticNativeQuickshellGuard(unittest.TestCase):
         self.assertTrue(all(not item["scopeGrants"]
                             for item in ready["organizations"]))
         self.assertEqual(module.synthetic("SIGNED_OUT")["organizations"], [])
+
+    def test_real_host_loss_is_an_actual_socket_close(self):
+        root = SMOKE.read_text()
+        runner = SCRIPT.read_text()
+        self.assertIn('smoke.scenario === "host-stop"', root)
+        self.assertIn('smoke.scenario === "tab-change"', root)
+        self.assertIn('smoke.testSection = "SECURITY"', root)
+        self.assertIn('smoke.testSection = "ORGANIZATIONS"', root)
+        self.assertIn('threading.Timer(1.0, server.close)', runner)
+        self.assertIn('if scenario == "host-stop":', runner)
+        self.assertIn('with server:', runner)
+        self.assertNotIn("socket_path.unlink(", runner)
+        self.assertNotIn("os.kill(", runner)
 
     def test_native_smoke_has_no_production_import_or_unsafe_switch(self):
         self.assertFalse(

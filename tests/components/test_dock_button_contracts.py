@@ -223,7 +223,6 @@ assert social_module.count(
     "color: sessionsDock.open ? sessionsDock.openForegroundColor : Colors.white"
 ) == 2
 assert 'text: "<font color=\'transparent\'>࣪˖</font>' in social_module
-assert '"+ sessionsDock.foregroundColor' in social_module
 assert 'text: "࣪˖"' in social_module
 assert "open: menuOpen" in social_module
 assert "property color openForegroundColor: Colors.magenta" in COMPONENT

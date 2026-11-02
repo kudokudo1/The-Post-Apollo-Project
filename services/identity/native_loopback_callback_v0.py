@@ -37,9 +37,16 @@ class LoopbackCallbackReceiver:
     internal success/fail indicator; sensitive results are not returned.
     """
 
-    def __init__(self, *, callback: Callable[[str], dict[str, object]]) -> None:
+    def __init__(self, *, callback: Callable[[str], dict[str, object]],
+                 port: int = 0) -> None:
         if not callable(callback):
             raise ValueError("A host-owned callback is required")
+        # Explicit nonzero port is ONLY for matching the existing disposable
+        # Keycloak CI realm's fixed registration. Normal native hosts use 0
+        # for an OS-selected ephemeral loopback port.
+        if type(port) is not int or (port != 0 and not 1024 <= port <= 65535):
+            raise ValueError("Invalid loopback callback port")
+        self._port = port
         self._callback = callback
         self._lock = threading.Lock()
         self._used = False
@@ -128,7 +135,7 @@ class LoopbackCallbackReceiver:
 
         # Server is only ever bound to numeric loopback, never localhost,
         # ::, 0.0.0.0 or a selected external address.
-        server = _PrivateServer(("127.0.0.1", 0), _Handler)
+        server = _PrivateServer(("127.0.0.1", self._port), _Handler)
         self._server = server
         worker = threading.Thread(
             target=server.serve_forever,

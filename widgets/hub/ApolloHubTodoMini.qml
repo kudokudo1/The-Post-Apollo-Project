@@ -1,5 +1,7 @@
 import QtQuick
 import "../../components"
+import "../../services/hub/TaskSaveTicketContractM12o.js" as TicketContract
+import "TaskHubTicketPresenterM12p.js" as TicketPresenter
 
 // B7 personal checklist UI. One injected ApolloHubTodoStore owns ALL data
 // and atomic writes. This component never creates files, timers, or services.
@@ -17,6 +19,12 @@ Item {
     property string confirmDeleteId: ""
     property string pendingWriteKind: ""
     property string feedback: ""
+
+    // M12p: disabled integration seam only. A production ticket producer has
+    // NOT been authorized. Nothing in the running UI can enable this switch.
+    readonly property bool ticketUiEnabled: false
+    property var ticketProducer: null
+    property var activeSaveTicket: null
 
     signal textFocusChanged(bool focused)
     // Optional host navigation into richer task details. Hub remains unchanged.
@@ -54,6 +62,10 @@ Item {
     }
 
     onTodoSnapshotChanged: {
+        if (ticketUiEnabled) {
+            processTicketEvent(null);
+            return;
+        }
         if (pendingWriteKind === "")
             return;
         // Only the store's completed onSaved transition confirms a write.
@@ -73,6 +85,56 @@ Item {
             // Keep unsaved input and any confirmation on disk failure.
             pendingWriteKind = "";
         }
+    }
+
+    // This is a future QML-consumer adapter, not the persistence authority.
+    // M12o's current disabled facade always refuses admission. An eventual
+    // approved producer must return the ticket ID and expected FULL view,
+    // and may not synchronously emit completion during submit().
+    function requestSaveTicket(kind, method, args, draft) {
+        if (!ticketUiEnabled || !ticketProducer || !writable)
+            return false;
+        var admission;
+        try {
+            admission = ticketProducer.submit("HUB", method,
+                                              {args:args, draft:draft});
+        } catch(e) { return false; }
+        var intent = TicketPresenter.begin(TicketContract, kind, method,
+                                           admission, todoSnapshot, draft);
+        if (!intent) return false;
+        activeSaveTicket = intent;
+        pendingWriteKind = kind;
+        feedback = "SAVING // TICKET PENDING";
+        return true;
+    }
+
+    function processTicketEvent(event) {
+        if (!ticketUiEnabled || !activeSaveTicket || pendingWriteKind === "")
+            return;
+        var result = TicketPresenter.advance(TicketContract, activeSaveTicket,
+                                              event, todoSnapshot);
+        activeSaveTicket = result.pending;
+        if (result.effect === "CLEAR_DRAFT") {
+            var kind = pendingWriteKind;
+            if (kind === "add") entryInput.text = "";
+            if (kind === "rename") {
+                editingTaskId = "";
+                entryInput.text = savedAddDraft;
+                savedAddDraft = "";
+            }
+            if (kind === "remove") confirmDeleteId = "";
+            pendingWriteKind = "";
+            feedback = "";
+        } else if (result.effect === "KEEP_DRAFT_FINAL") {
+            // Failed/uncertain result must never erase text or delete choice.
+            pendingWriteKind = "";
+            feedback = "SAVE NOT VERIFIED // DRAFT KEPT";
+        }
+    }
+
+    Connections {
+        target: todoMini.ticketUiEnabled ? todoMini.ticketProducer : null
+        function onTicketEvent(event) {todoMini.processTicketEvent(event);}
     }
 
     onVisibleChanged: {
@@ -110,6 +172,14 @@ Item {
         const value = entryInput.text;
         const kind = editingTitle ? "rename" : "add";
         const target = editingTaskId;
+        if (ticketUiEnabled) {
+            const method = kind === "rename" ? "renameTask" : "addTask";
+            if (!requestSaveTicket(kind, method,
+                    kind === "rename" ? {id:target,title:value} : {title:value},
+                    {input:value,target:target,previousAddText:savedAddDraft}))
+                feedback = "TICKET NOT ADMITTED // DRAFT KEPT";
+            return;
+        }
         pendingWriteKind = kind;
         const started = kind === "rename"
             ? todoStore.renameTask(target, value)
@@ -124,6 +194,13 @@ Item {
     function toggleDone(task) {
         if (!writable || !task)
             return;
+        if (ticketUiEnabled) {
+            if (!requestSaveTicket("done","setTaskDone",
+                    {id:task.id,done:task.done !== true},
+                    {taskId:task.id,wasDone:task.done}))
+                feedback = "TICKET NOT ADMITTED // DRAFT KEPT";
+            return;
+        }
         pendingWriteKind = "done";
         if (!todoStore.setTaskDone(task.id, task.done !== true)) {
             pendingWriteKind = "";
@@ -142,6 +219,13 @@ Item {
     function confirmDelete(task) {
         if (!writable || !task || confirmDeleteId !== task.id)
             return;
+        if (ticketUiEnabled) {
+            if (!requestSaveTicket("remove","removeTask",
+                    {id:task.id,confirmed:true},
+                    {taskId:task.id,deleteConfirmed:true}))
+                feedback = "TICKET NOT ADMITTED // DRAFT KEPT";
+            return;
+        }
         pendingWriteKind = "remove";
         // Backend refuses deletion without this explicit confirmed=true.
         if (!todoStore.removeTask(task.id, true)) {

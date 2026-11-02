@@ -8,6 +8,8 @@ import "SeismicPolicy.js" as SeismicPolicy
 Scope {
     id: seismic
 
+    property var cacheStore: null
+    property bool usingPersistentCache: false
     property bool active: true
     property bool ready: false
     property bool failed: false
@@ -18,6 +20,45 @@ Scope {
     readonly property string endpoint:
         "https://earthquake.usgs.gov/earthquakes/feed/v1.0/summary/2.5_day.geojson"
     readonly property bool loading: quakeFetch.running
+
+    function hydratePersistentCache() {
+        if (!cacheStore || ready)
+            return false;
+        const saved = cacheStore.record("seismic", Date.now());
+        if (!saved || !saved.payload
+                || !Array.isArray(saved.payload.events)
+                || saved.payload.events.length === 0)
+            return false;
+
+        events = saved.payload.events.slice();
+        lastUpdated = new Date(saved.receivedAtMs);
+        ready = true;
+        failed = false;
+        errorText = "";
+        usingPersistentCache = true;
+        return true;
+    }
+
+    function persistEvents(receivedAtMs) {
+        if (!cacheStore || !ready || !Array.isArray(events)
+                || events.length === 0)
+            return false;
+        return cacheStore.put("seismic", receivedAtMs, {
+            "events": events
+        });
+    }
+
+    Connections {
+        target: seismic.cacheStore
+        enabled: !!seismic.cacheStore
+        function onStorageStateChanged() {
+            if (!seismic.cacheStore)
+                return;
+            const state = String(seismic.cacheStore.storageState || "");
+            if (state === "ready" || state === "empty")
+                seismic.hydratePersistentCache();
+        }
+    }
 
     function refresh() {
         if (active && !quakeFetch.running)
@@ -32,6 +73,8 @@ Scope {
             ready = true;
             failed = false;
             errorText = "";
+            usingPersistentCache = false;
+            persistEvents(lastUpdated.getTime());
         } catch (error) {
             failed = true;
             errorText = "USGS FEED UNAVAILABLE";
@@ -67,6 +110,7 @@ Scope {
             refresh();
     }
     Component.onCompleted: {
+        hydratePersistentCache();
         if (active)
             refresh();
     }

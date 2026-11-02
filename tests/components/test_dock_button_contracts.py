@@ -182,10 +182,10 @@ for path, needles in DOCK_MODULES.items():
     for needle in needles:
         require(source, needle, f"DockButton migration contract for {path}")
 
-# Preserve the operator's Gohu icon, source-shaped advances, and state
-# colors. Draw the larger phone as an overlay without resizing the button;
-# move both left ornaments 3px left (+10px -> +7px), independently
-# of the phone and right-side shaping.
+# Preserve the operator's Gohu icon and original text advances so the
+# fixed dock and 24px phone do not shift. The previously shared +7px left
+# ornament position now holds a transparent reference; the first glyph moves
+# +1px and the second moves -1px horizontally and +1px vertically.
 social_module = (ROOT / "modules/Sessions.qml").read_text(encoding="utf-8")
 for needle in (
     "GohuText {",
@@ -198,6 +198,9 @@ for needle in (
     "id: sessionsLeftOrnaments",
     "anchors.left: parent.left",
     "anchors.leftMargin: 7",
+    "id: sessionsLeftOuterStar",
+    "id: sessionsLeftInnerStar",
+    "transform: Translate { y: 1 }",
     "id: sessionsPhoneAdvance",
     "id: sessionsPhoneFace",
     "visible: false",
@@ -223,19 +226,22 @@ assert "Sessions.png" not in social_module
 assert "ColorOverlay {" not in social_module
 assert "SafeDropShadow {" not in social_module
 assert social_module.count("contentGlowSource: sessionsIcon") == 1
-# The phone is already state-styled; the left and right stars now use
-# open foreground magenta and leave the closed ornament white.
+# The original ornament run remains invisible, while two separately
+# positioned copies retain the same white-closed/magenta-open colors.
 assert social_module.count(
     "color: sessionsDock.open ? sessionsDock.openForegroundColor : Colors.white"
-) == 2
+) == 3
 assert 'text: "<font color=\'transparent\'>࣪˖☎︎</font>๋࣭✧"' in social_module
 assert 'text: "࣪˖"' in social_module
+assert 'text: "࣪<font color=\'transparent\'>˖</font>"' in social_module
+assert 'text: "<font color=\'transparent\'>࣪</font>˖"' in social_module
+assert 'color: "transparent"' in social_module
 assert "open: menuOpen" in social_module
 assert "property color openForegroundColor: Colors.magenta" in COMPONENT
 assert "property color openGlowColor: Colors.magenta" in COMPONENT
 assert "readonly property color contentGlowColor: open" in COMPONENT
 
-assert social_module.count("GohuText {") == 4
+assert social_module.count("GohuText {") == 6
 assert social_module.count("NotoText {") == 0
 # Original glyph advances remain unchanged, so the actual dock size is not
 # coupled to the larger overlaid handset. No global letter-spacing changes.
@@ -249,10 +255,25 @@ assert "font.pixelSize: 21" in social_module
 assert "font.pixelSize: 24" in social_module
 assert "text: \"<font color='transparent'>࣪˖☎︎</font>๋࣭✧\"" in social_module
 assert social_module.count("contentGlowSource: sessionsIcon") == 1
-# The two left ornaments move exactly 3px left; phone and right side
-# remain in the same shaped parent run, with no dock size change.
-for original_left_x in (0, 7, 42):
-    assert (original_left_x + 7) - (original_left_x + 10) == -3
+# The two visible left ornament layers each retain the entire source
+# sequence with the opposite mark transparent to avoid reflow. Their parent
+# retains the same +7px baseline and implicit width for the phone overlay.
+original_run = social_module.split("id: sessionsLeftOrnaments", 1)[1].split(
+    "id: sessionsPhoneAdvance", 1)[0]
+outer_star = original_run.split("id: sessionsLeftOuterStar", 1)[1].split(
+    "id: sessionsLeftInnerStar", 1)[0]
+inner_star = original_run.split("id: sessionsLeftInnerStar", 1)[1]
+assert "anchors.leftMargin: 7" in original_run
+assert 'color: "transparent"' in original_run
+assert "x: 1" in outer_star
+assert "transform: Translate" not in outer_star
+assert 'text: "࣪<font color=\'transparent\'>˖</font>"' in outer_star
+assert "x: -1" in inner_star
+assert "transform: Translate { y: 1 }" in inner_star
+assert 'text: "<font color=\'transparent\'>࣪</font>˖"' in inner_star
+for x in (0, 7, 42):
+    assert (x + 7 + 1) - (x + 7) == 1  # leftmost right 1
+    assert (x + 7 - 1) - (x + 7) == -1  # inner left 1
 
 LEGACY_ROOT_MOUSE_IDS = (
     "appmenuMouse",

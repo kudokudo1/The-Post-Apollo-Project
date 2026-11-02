@@ -1,0 +1,38 @@
+name: Identity Center Verified Membership Context Summary
+
+on:
+  pull_request:
+    paths:
+      - 'services/identity/synthetic_policy_v0.py'
+      - 'services/identity/synthetic_request_boundary_v0.py'
+      - 'tests/identity/test_synthetic_context_summary_v0.py'
+      - 'MODEL/contracts/identity-center-context-summary-v0.md'
+      - '.github/workflows/identity-center-context-summary.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'services/identity/synthetic_policy_v0.py'
+      - 'services/identity/synthetic_request_boundary_v0.py'
+      - 'tests/identity/test_synthetic_context_summary_v0.py'
+      - 'MODEL/contracts/identity-center-context-summary-v0.md'
+      - '.github/workflows/identity-center-context-summary.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  membership-summary:
+    name: Verified-session organization/portfolio context (offline)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install existing isolated token-verification test dependency
+        run: python3 -m pip install -r services/identity/requirements-jwks-verifier-v0.txt
+      - name: Compile existing and new identity contracts
+        run: python3 -m compileall -q services/identity tests/identity
+      - name: Verify the entire offline Identity Center permission suite
+        run: python3 -m unittest discover -s tests/identity -p 'test_*.py' -v

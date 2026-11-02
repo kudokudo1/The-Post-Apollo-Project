@@ -1,0 +1,33 @@
+name: Social Phone Access Grant Fixture P1
+
+on:
+  pull_request:
+    paths:
+      - 'services/phone/TrustedPhoneGrantFixture.py'
+      - 'tests/phone/test_trusted_phone_grant_fixture.py'
+      - 'MODEL/contracts/social-phone-access-grant-fixture-p1-v0.md'
+      - '.github/workflows/social-phone-trusted-grant-fixture.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'services/phone/TrustedPhoneGrantFixture.py'
+      - 'tests/phone/test_trusted_phone_grant_fixture.py'
+      - 'MODEL/contracts/social-phone-access-grant-fixture-p1-v0.md'
+      - '.github/workflows/social-phone-trusted-grant-fixture.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  offline-grant-revocation:
+    name: "Phone grant fixture: host identity, line scope and revocation"
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Compile offline grant fixture and tests
+        run: python3 -m py_compile services/phone/TrustedPhoneGrantFixture.py tests/phone/test_trusted_phone_grant_fixture.py
+      - name: Run isolated grant fixture tests
+        run: python3 -m unittest discover -s tests/phone -p 'test_trusted_phone_grant_fixture.py' -v
+      - name: Regress all offline Python Phone Bridge tests
+        run: python3 -m unittest discover -s tests/phone -p 'test_*.py' -q

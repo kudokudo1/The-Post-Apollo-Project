@@ -204,7 +204,6 @@ const card = read("widgets/weather/StationEventContextCard.qml");
 for (const phrase of [
     "WEATHER FIX",
     "DISTANCE ONLY",
-    "FRAME COVERS EVENT COORDINATE",
     "RADAR CONTEXT = GEOMETRIC FRAME COVERAGE ONLY",
     "IMAGE PIXELS ARE NOT INTERPRETED",
     "NEARBY INDEPENDENT MAP RECORDS",
@@ -213,6 +212,7 @@ for (const phrase of [
 ]) {
     assert.ok(card.includes(phrase), phrase);
 }
+assert.match(card, /card\.radarContext\.status/);
 assert.equal((card.match(/\bProcess\s*\{/g) || []).length, 0);
 assert.equal((card.match(/\bTimer\s*\{/g) || []).length, 0);
 assert.equal((card.match(/\bFileView\s*\{/g) || []).length, 0);

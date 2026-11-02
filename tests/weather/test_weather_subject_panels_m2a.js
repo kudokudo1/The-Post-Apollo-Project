@@ -27,7 +27,7 @@ test("13 real WEATHER routes belong to the existing M0 subject hierarchy", () =>
     const route = env.findRoute(key);
     assert.ok(route, key);
     assert.equal(route.subject, "weather");
-    assert.equal(route.group, false, key);
+    assert.equal(route.group, key === "weather/water/rivers", key);
     const page = env.kindForRoute(key);
     assert.ok(page === "sky" || page === "ground", key);
     assert.ok(env.visibleFor(page,key,"header"),key);

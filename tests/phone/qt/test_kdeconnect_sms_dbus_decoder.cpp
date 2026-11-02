@@ -173,6 +173,7 @@ void testExactDbusStructureRoundTrip()
     qDBusRegisterMetaType<QList<SmsAddress>>();
     qDBusRegisterMetaType<SmsAttachment>();
     qDBusRegisterMetaType<QList<SmsAttachment>>();
+    qDBusRegisterMetaType<SmsFields>();
 
     SmsReceiver receiver;
     QDBusConnection bus = QDBusConnection::sessionBus();
@@ -185,14 +186,11 @@ void testExactDbusStructureRoundTrip()
           "subscribe to only synthetic fixture signal");
 
     auto f = sample();
-    QDBusArgument arg;
-    arg.beginStructure();
-    arg << f.event << f.body << f.addresses << f.date << f.type << f.read
-        << f.threadId << f.messageId << f.subId << f.attachments;
-    arg.endStructure();
     QDBusMessage message = QDBusMessage::createSignal(
         path, iface, QStringLiteral("conversationUpdated"));
-    message.setArguments({QVariant::fromValue(QDBusVariant(QVariant::fromValue(arg)))});
+    // Qt encodes the registered SmsFields type on the sender, then the
+    // private session bus delivers a read-only QDBusArgument to receiver.
+    message.setArguments({QVariant::fromValue(QDBusVariant(QVariant::fromValue(f)))});
 
     QEventLoop loop;
     QObject::connect(&receiver, &SmsReceiver::complete, &loop, &QEventLoop::quit);

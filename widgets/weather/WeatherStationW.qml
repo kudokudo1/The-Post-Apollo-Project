@@ -137,7 +137,9 @@ PanelWindow {
     }
 
     readonly property string currentContext:
-        subjectNavigationOpen ? "SUBJECT INDEX" : currentViewName
+        subjectNavigationOpen
+        ? (subjectNavigator.liveWeatherKind !== ""
+           ? "WEATHER" : "SUBJECT INDEX") : currentViewName
 
     readonly property var officialAlertSummary:
         OfficialAlertPolicy.summary(

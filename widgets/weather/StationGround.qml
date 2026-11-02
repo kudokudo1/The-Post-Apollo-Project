@@ -738,8 +738,15 @@ Rectangle {
             width: parent.width
 
             GohuText {
-                text: ground.subjectRoute === "" ? "⌁  GROUND"
-                      : "⌁  WEATHER"
+                visible: ground.subjectRoute === ""
+                text: "⌁  GROUND"
+                font.pixelSize: 24
+                color: Colors.green
+            }
+
+            GohuText {
+                visible: ground.subjectRoute !== ""
+                text: "⌁  WEATHER"
                 font.pixelSize: 24
                 color: Colors.green
             }

@@ -56,15 +56,14 @@ Scope {
                 payload.args,Date.now(),ticketSessionNonce,nextSequence);
         if (!stage.admitted) return stage;
         ticketSequence=nextSequence;
+        // Reserve the ticket before writing, but leave state admission and
+        // pendingDocument ownership to stage(). Setting "saving" here made
+        // stage() reject its own request (it only accepts ready/empty).
         pendingTicket=stage;
-        pendingDocument=stage.expectedDocument;
-        storageState="saving";
-        errorCode="";
         // Reuse the sole existing stage() gate and one FileView.setText().
         // The ticket path must not become a second native write seam.
         if (!todo.stage({ok:true,document:stage.expectedDocument})) {
             pendingTicket=null;
-            pendingDocument=null;
             return TicketProducer.refusal("LEGACY_STAGE_REFUSED");
         }
         // No synchronous completion event before the consumer receives ID.

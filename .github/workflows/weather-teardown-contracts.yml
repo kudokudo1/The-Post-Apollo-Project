@@ -49,6 +49,8 @@ jobs:
         run: node tests/weather/test_weather_cadence_m9.js
       - name: Validate Weather M10 selective live-history capture
         run: node tests/weather/test_weather_live_history_m10.js
+      - name: Validate Weather M11 history inspectors and relationships
+        run: node tests/weather/test_weather_history_inspectors_m11.js
       - name: Validate Weather persistent last-known cache M4
         run: node tests/weather/test_weather_persistent_cache_m4.js
       - name: Validate Weather persistent cache M5 global events

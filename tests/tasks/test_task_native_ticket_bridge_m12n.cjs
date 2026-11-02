@@ -66,6 +66,10 @@ test("confirmed only after matching increment and host status plus READY",()=>{
     let t=start();
     t=observe(t,native({fileState:"SAVING"}));
     t=observe(t,native({fileState:"VERIFYING"}));
+    // The real M12i QML executes counter++ then settledCount++ and these
+    // send separate property-change notifications.
+    t=observe(t,native({fileState:"SETTLING",counter:1,receipts:0}));
+    assert.equal(t.state,"SETTLING");
     t=observe(t,native({fileState:"SETTLING",counter:1,receipts:1,
         status:"TEST_RECEIPT_SETTLED_UI_UNACKNOWLEDGED"}));
     assert.equal(t.state,"SETTLING");

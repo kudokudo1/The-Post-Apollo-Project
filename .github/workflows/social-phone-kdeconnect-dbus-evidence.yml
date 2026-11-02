@@ -1,0 +1,31 @@
+name: Social Phone KDE Connect D-Bus Evidence P1
+
+on:
+  pull_request:
+    paths:
+      - 'services/phone/KdeConnectDbusEvidence.py'
+      - 'tests/phone/test_kdeconnect_dbus_evidence.py'
+      - 'MODEL/contracts/social-phone-kdeconnect-dbus-evidence-p1-v0.md'
+      - '.github/workflows/social-phone-kdeconnect-dbus-evidence.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'services/phone/KdeConnectDbusEvidence.py'
+      - 'tests/phone/test_kdeconnect_dbus_evidence.py'
+      - 'MODEL/contracts/social-phone-kdeconnect-dbus-evidence-p1-v0.md'
+      - '.github/workflows/social-phone-kdeconnect-dbus-evidence.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  synthetic-plugin-evidence:
+    name: "KDE Connect D-Bus metadata: no live access"
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Compile source and tests
+        run: python3 -m py_compile services/phone/KdeConnectDbusEvidence.py tests/phone/test_kdeconnect_dbus_evidence.py
+      - name: Test synthetic plugin metadata and negative evidence
+        run: python3 -m unittest discover -s tests/phone -p 'test_kdeconnect_dbus_evidence.py' -v

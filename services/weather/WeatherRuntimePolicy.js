@@ -21,6 +21,13 @@ var LIFETIME_KEYED_VIEW = "KEYED_VIEW";
 var LIFETIME_OPERATOR_REQUEST = "OPERATOR_REQUEST";
 var LIFETIME_LOCAL = "LOCAL";
 
+var RETENTION_MEMORY_LAST_GOOD = "MEMORY_LAST_GOOD";
+var RETENTION_SESSION_CACHE = "SESSION_CACHE";
+var RETENTION_KEY_BOUND = "KEY_BOUND";
+var RETENTION_OPERATOR_SNAPSHOT = "OPERATOR_SNAPSHOT";
+var RETENTION_LOCAL = "LOCAL";
+var RETENTION_NONE = "NONE";
+
 var _catalog = [
     {
         id:"weather",
@@ -33,6 +40,36 @@ var _catalog = [
         freshMs:1200000,
         staleMs:21600000,
         note:"15m session-wide weather fetch; AQI follows the weather response"
+    },
+    {
+        id:"weather-current",
+        label:"CURRENT WEATHER",
+        owner:"WeatherService.qml",
+        mode:MODE_NORMAL_POLL,
+        cadenceMs:900000,
+        lifetime:LIFETIME_SESSION_BACKGROUND,
+        view:"GLOBAL",
+        note:"current-condition view of the shared 15m WeatherService fetch"
+    },
+    {
+        id:"weather-forecast",
+        label:"WEATHER FORECAST",
+        owner:"WeatherService.qml",
+        mode:MODE_NORMAL_POLL,
+        cadenceMs:900000,
+        lifetime:LIFETIME_SESSION_BACKGROUND,
+        view:"GLOBAL",
+        note:"forecast view of the same WeatherService response; receive time is not provider issue time"
+    },
+    {
+        id:"air-quality",
+        label:"AIR QUALITY + POLLEN",
+        owner:"WeatherService.qml",
+        mode:MODE_NORMAL_POLL,
+        cadenceMs:900000,
+        lifetime:LIFETIME_SESSION_BACKGROUND,
+        view:"GLOBAL",
+        note:"Open-Meteo AQ request follows the shared weather location update"
     },
     {
         id:"space-core",
@@ -313,13 +350,167 @@ var _catalog = [
     }
 ];
 
+// M3 cache/offline policy. These are Post-Apollo presentation limits, not
+// claims that the upstream provider guarantees usefulness for this duration.
+// The limit describes how long a retained last-good payload may remain visible
+// before Weather Station marks it EXPIRED. Disk persistence is not introduced
+// here: MEMORY_LAST_GOOD and SESSION_CACHE remain process/session state.
+var _cacheProfiles = {
+    "weather": {
+        retention:RETENTION_MEMORY_LAST_GOOD,
+        freshMs:1200000, staleMs:5400000, expireMs:21600000
+    },
+    "weather-current": {
+        retention:RETENTION_MEMORY_LAST_GOOD,
+        freshMs:1200000, staleMs:5400000, expireMs:21600000
+    },
+    "weather-forecast": {
+        retention:RETENTION_MEMORY_LAST_GOOD,
+        freshMs:10800000, staleMs:86400000, expireMs:691200000
+    },
+    "air-quality": {
+        retention:RETENTION_MEMORY_LAST_GOOD,
+        freshMs:1800000, staleMs:10800000, expireMs:43200000
+    },
+    "space-core": {
+        retention:RETENTION_MEMORY_LAST_GOOD,
+        freshMs:600000, staleMs:1800000, expireMs:7200000
+    },
+    "nws-alerts": {
+        retention:RETENTION_MEMORY_LAST_GOOD,
+        freshMs:1800000, staleMs:3600000, expireMs:21600000
+    },
+    "home-history": {
+        retention:RETENTION_MEMORY_LAST_GOOD,
+        freshMs:43200000, staleMs:86400000, expireMs:604800000
+    },
+    "seismic": {
+        retention:RETENTION_MEMORY_LAST_GOOD,
+        freshMs:1800000, staleMs:7200000, expireMs:86400000
+    },
+    "river": {
+        retention:RETENTION_MEMORY_LAST_GOOD,
+        freshMs:1800000, staleMs:7200000, expireMs:43200000
+    },
+    "marine": {
+        retention:RETENTION_MEMORY_LAST_GOOD,
+        freshMs:1200000, staleMs:3600000, expireMs:21600000
+    },
+    "coastal": {
+        retention:RETENTION_MEMORY_LAST_GOOD,
+        freshMs:1800000, staleMs:7200000, expireMs:86400000
+    },
+    "lightning": {
+        retention:RETENTION_MEMORY_LAST_GOOD,
+        freshMs:1200000, staleMs:2700000, expireMs:7200000
+    },
+    "moon": {retention:RETENTION_KEY_BOUND},
+    "eclipses": {
+        retention:RETENTION_MEMORY_LAST_GOOD,
+        freshMs:86400000, staleMs:604800000, expireMs:2592000000
+    },
+    "celnav": {
+        retention:RETENTION_MEMORY_LAST_GOOD,
+        freshMs:600000, staleMs:1800000, expireMs:7200000
+    },
+    "iss-passes": {
+        retention:RETENTION_MEMORY_LAST_GOOD,
+        freshMs:7200000, staleMs:21600000, expireMs:86400000
+    },
+    "planet-rise-set": {retention:RETENTION_KEY_BOUND},
+    "meteor-showers": {
+        retention:RETENTION_MEMORY_LAST_GOOD,
+        freshMs:43200000, staleMs:86400000, expireMs:604800000
+    },
+    "aurora": {
+        retention:RETENTION_MEMORY_LAST_GOOD,
+        freshMs:1200000, staleMs:2700000, expireMs:7200000
+    },
+    "solar-flares": {
+        retention:RETENTION_MEMORY_LAST_GOOD,
+        freshMs:1800000, staleMs:7200000, expireMs:43200000
+    },
+    "xray-flux": {
+        retention:RETENTION_MEMORY_LAST_GOOD,
+        freshMs:600000, staleMs:1800000, expireMs:7200000
+    },
+    "swpc-alerts": {
+        retention:RETENTION_MEMORY_LAST_GOOD,
+        freshMs:1200000, staleMs:3600000, expireMs:21600000
+    },
+    "solar-cycle": {retention:RETENTION_KEY_BOUND},
+    "noaa-scales": {
+        retention:RETENTION_MEMORY_LAST_GOOD,
+        freshMs:600000, staleMs:1800000, expireMs:7200000
+    },
+    "kp-forecast": {
+        retention:RETENTION_MEMORY_LAST_GOOD,
+        freshMs:1800000, staleMs:10800000, expireMs:43200000
+    },
+    "discovery": {
+        retention:RETENTION_SESSION_CACHE,
+        freshMs:1800000, staleMs:7200000, expireMs:86400000
+    },
+    "gdacs": {
+        retention:RETENTION_MEMORY_LAST_GOOD,
+        freshMs:1800000, staleMs:7200000, expireMs:86400000
+    },
+    "firms": {
+        retention:RETENTION_OPERATOR_SNAPSHOT,
+        freshMs:7200000, staleMs:21600000, expireMs:86400000
+    },
+    "hms-smoke": {
+        retention:RETENTION_OPERATOR_SNAPSHOT,
+        freshMs:21600000, staleMs:43200000, expireMs:129600000
+    },
+    "rainviewer": {
+        retention:RETENTION_OPERATOR_SNAPSHOT,
+        freshMs:600000, staleMs:1800000, expireMs:7200000
+    },
+    "gdelt-article-location": {
+        retention:RETENTION_OPERATOR_SNAPSHOT,
+        freshMs:21600000, staleMs:86400000, expireMs:604800000
+    },
+    "mrms-radar": {
+        retention:RETENTION_OPERATOR_SNAPSHOT,
+        freshMs:600000, staleMs:1800000, expireMs:7200000
+    },
+    "sky-local": {retention:RETENTION_LOCAL}
+};
+
+function defaultRetention(spec) {
+    if (!spec)
+        return RETENTION_NONE;
+    if (spec.mode === MODE_KEYED_FETCH)
+        return RETENTION_KEY_BOUND;
+    if (spec.mode === MODE_MANUAL)
+        return RETENTION_OPERATOR_SNAPSHOT;
+    if (spec.mode === MODE_LOCAL_CALC)
+        return RETENTION_LOCAL;
+    return RETENTION_MEMORY_LAST_GOOD;
+}
+
+function withCacheProfile(row) {
+    if (!row)
+        return null;
+    const copy = {};
+    const keys = Object.keys(row);
+    for (let i = 0; i < keys.length; i++)
+        copy[keys[i]] = row[keys[i]];
+
+    const profile = _cacheProfiles[copy.id] || {};
+    const profileKeys = Object.keys(profile);
+    for (let i = 0; i < profileKeys.length; i++)
+        copy[profileKeys[i]] = profile[profileKeys[i]];
+
+    if (!copy.retention)
+        copy.retention = defaultRetention(copy);
+    return copy;
+}
+
 function sourceCatalog() {
     return _catalog.map(function(row) {
-        const copy = {};
-        const keys = Object.keys(row);
-        for (let i = 0; i < keys.length; i++)
-            copy[keys[i]] = row[keys[i]];
-        return copy;
+        return withCacheProfile(row);
     });
 }
 
@@ -327,7 +518,7 @@ function sourceSpec(id) {
     const key = String(id || "");
     for (let i = 0; i < _catalog.length; i++) {
         if (_catalog[i].id === key)
-            return sourceCatalog()[i];
+            return withCacheProfile(_catalog[i]);
     }
     return null;
 }

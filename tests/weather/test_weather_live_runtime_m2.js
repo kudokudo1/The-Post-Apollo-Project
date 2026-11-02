@@ -24,7 +24,7 @@ for (const fn of [
 
 const now = Date.parse("2026-11-02T08:30:00Z");
 let row = ctx.displayRow(
-    "weather",
+    "weather-current",
     {
         active:true, ready:true, loading:false, errorText:"",
         receivedAt:now - 5 * 60000,
@@ -38,7 +38,7 @@ assert.equal(row.receivedAgeMinutes, 5);
 assert.equal(row.observationAgeMinutes, 12);
 assert.equal(ctx.statusToken(row), "cyan");
 assert.equal(ctx.cadenceLabel(row), "15m");
-assert.equal(ctx.rowStateLabel(row), "READY // FRESH");
+assert.equal(ctx.rowStateLabel(row), "LIVE // FRESH");
 assert.equal(ctx.rowAgeLabel(row), "RX 5m // OBS 12m");
 
 row = ctx.displayRow(
@@ -108,21 +108,25 @@ assert.match(rack, /RuntimePolicy\.summarizeRows\(rows\)/);
 assert.match(rack, /RuntimePolicy\.rowStateLabel\(modelData\)/);
 assert.match(rack, /RuntimePolicy\.rowAgeLabel\(modelData\)/);
 assert.match(rack, /RuntimePolicy\.cadenceLabel\(modelData\)/);
+assert.match(rack, /RuntimePolicy\.retentionLabel\(modelData\)/);
 assert.match(rack, /RuntimePolicy\.statusToken\(row\)/);
 assert.doesNotMatch(rack, /\bTimer\s*\{/);
 assert.doesNotMatch(rack, /\bProcess\s*\{|curl|XMLHttpRequest|FileView/);
 
 const pageContracts = [
     ["widgets/weather/StationHome.qml",
-     ["weather","space-core","nws-alerts","home-history"]],
+     ["weather-current","weather-forecast","air-quality","space-core",
+      "nws-alerts","home-history"]],
     ["widgets/weather/StationGround.qml",
-     ["weather","nws-alerts","seismic","river","marine","coastal","lightning"]],
+     ["weather-current","air-quality","nws-alerts","seismic","river",
+      "marine","coastal","lightning"]],
     ["widgets/weather/StationSky.qml",
-     ["weather","moon","eclipses","celnav","iss-passes",
-      "planet-rise-set","meteor-showers","sky-local"]],
+     ["weather-current","weather-forecast","air-quality","moon","eclipses",
+      "celnav","iss-passes","planet-rise-set","meteor-showers","sky-local"]],
     ["widgets/weather/StationSpace.qml",
-     ["space-core","aurora","solar-flares","xray-flux","swpc-alerts",
-      "solar-cycle","noaa-scales","kp-forecast"]],
+     ["space-kp","space-wind","space-imf","space-flux","aurora",
+      "solar-flares","xray-flux","swpc-alerts","solar-cycle",
+      "noaa-scales","kp-forecast"]],
     ["widgets/weather/StationDiscovery.qml",
      ["discovery","gdacs","seismic","firms","mrms-radar",
       "rainviewer","hms-smoke","gdelt-article-location"]]
@@ -160,6 +164,7 @@ const discovery = read("widgets/weather/StationDiscovery.qml");
 assert.match(discovery, /radarImage\.status === Image\.Ready/);
 assert.match(discovery, /"observedAt": radarRequestedTimeMs/);
 assert.match(discovery, /domain === "news"/);
+assert.match(discovery, /"usingCache": source\.usingCache/);
 
 const news = read("widgets/weather/StationNewsHub.qml");
 assert.match(news, /property real runtimeNowMs:/);
@@ -171,6 +176,7 @@ assert.match(station, /readonly property real runtimeNowMs:/);
 assert.match(station, /RuntimePolicy\.summarizeRows\(currentPageRuntimeRows\)/);
 assert.match(station, /readonly property bool usesMapRuntime:/);
 assert.match(station, /return "MAP LIVE";/);
+assert.match(station, /return "MAP CACHE";/);
 assert.match(station, /currentPageRuntimeSummary\.ready \+ " READY"/);
 assert.match(station, /runtimeNowMs: weatherStation\.runtimeNowMs/);
 

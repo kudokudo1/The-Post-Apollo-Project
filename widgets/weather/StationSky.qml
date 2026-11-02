@@ -533,7 +533,7 @@ Rectangle {
 
             GohuText {
                 text: sky.subjectRoute === "" ? "☁  SKY"
-                      : "☁  " + SubjectPanelPolicy.titleFor(sky.subjectRoute)
+                      : "☁  WEATHER"
                 font.pixelSize: 24
                 color: Colors.cyan
             }

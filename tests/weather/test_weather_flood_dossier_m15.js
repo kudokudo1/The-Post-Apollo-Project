@@ -291,7 +291,7 @@ for (const phrase of [
     "EVENT POINT ≠ GAUGE CATCHMENT",
     "NOT A FLOOD WARNING",
     "EVIDENCE TIMELINE // SOURCE-NATIVE TIMES",
-    "ROWS RETAIN SOURCE PROVENANCE",
+    "ROWS RETAIN SOURCE + GROUP PROVENANCE",
     "NOT ONE MERGED INCIDENT HISTORY"
 ]) {
     assert.ok(card.includes(phrase), phrase);

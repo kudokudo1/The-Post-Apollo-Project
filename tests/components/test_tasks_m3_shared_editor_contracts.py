@@ -68,6 +68,17 @@ assert "Keys.onEscapePressed: function(event)" in MENU
 assert "tasksFrame.forceActiveFocus();" in MENU
 assert "Qt.WindowShortcut" not in MENU
 assert "Keys.onEscapePressed: function(event)" in EDITOR
+# Escape from NEW TASK closes only standalone TASKS, not the shared Hub tile.
+assert "closeOnEscape: true" in MENU
+assert "onCloseRequested: root.menuOpen = false" in MENU
+assert "property bool closeOnEscape: false" in EDITOR
+assert "signal closeRequested()" in EDITOR
+assert "if (todoMini.editingTitle)" in EDITOR
+assert "todoMini.cancelRename();" in EDITOR
+assert "else if (todoMini.closeOnEscape)" in EDITOR
+assert "todoMini.closeRequested();" in EDITOR
+assert "entryInput.focus = false;" in EDITOR
+assert "closeOnEscape: true" not in HUB
 assert "width: root.menuOpen ? root.frameWidth : 0" in MENU
 assert "height: root.menuOpen ? root.frameHeight : 0" in MENU
 assert "onLeftClicked: root.menuOpen = false" in MENU

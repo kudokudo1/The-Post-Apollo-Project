@@ -239,7 +239,15 @@ for sequence in ("Tab", "Shift+Tab", "Shift+Left", "Shift+Right",
     assert f'sequence: "{sequence}"' in menu, sequence
 assert "context: Qt.WindowShortcut" in menu
 assert "enabled: root.standardKeysAvailable" in menu
+# Escape is the existing X-style close, even while the transaction editor
+# is open. All non-Escape mode/navigation shortcuts retain their edit guard.
+esc = menu.split('sequence: "Esc"', 1)[1].split("onActivated:", 1)[0]
+assert "context: Qt.WindowShortcut" in esc
+assert "enabled: root.menuOpen && root.keyboardActive" in esc
 assert "root.menuOpen = false" in menu
+assert "!transactionDraftPane.open" in menu
+assert "transactionDraftPane.clear();" in menu
+assert "onLeftClicked: root.menuOpen = false" in menu
 assert "activeMainModes().length" in menu
 assert "return mainModes.filter(function(mode) { return !mode.future; });" in menu
 assert "root.moveNavigationZone(-1)" in menu

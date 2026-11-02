@@ -26,6 +26,7 @@ Rectangle {
     property var selectedNews: null
     property var newsMentionOverlay: null
     property var seismicSource: null
+    property var persistentCacheStore: null
     property real runtimeNowMs: Date.now()
     signal newsMapRequested(var payload)
     signal newsMapClearRequested()
@@ -77,7 +78,8 @@ Rectangle {
                     "ready": gdacsService.ready,
                     "loading": gdacsService.loading,
                     "errorText": gdacsService.errorText,
-                    "receivedAt": gdacsService.lastUpdated
+                    "receivedAt": gdacsService.lastUpdated,
+                    "usingCache": gdacsService.usingPersistentCache
                 },
                 runtimeNowMs
             ),
@@ -89,7 +91,9 @@ Rectangle {
                     "loading": !!seismicSource && seismicSource.loading,
                     "errorText": seismicSource ? seismicSource.errorText : "",
                     "receivedAt": seismicSource
-                                  ? seismicSource.lastUpdated : null
+                                  ? seismicSource.lastUpdated : null,
+                    "usingCache": seismicSource
+                                  ? seismicSource.usingPersistentCache : false
                 },
                 runtimeNowMs
             ),
@@ -797,6 +801,7 @@ Rectangle {
 
     WeatherServices.GdacsService {
         id: gdacsService
+        cacheStore: stationDiscovery.persistentCacheStore
         active: stationDiscovery.domain === "map"
                 && stationDiscovery.stationOpen
                 && stationDiscovery.visible

@@ -51,40 +51,17 @@ DockButton {
 
         GohuText {
             id: sessionsLeftOrnaments
-            // Keep the established +7px run and its original glyph advances.
-            // It measures the phone's x position; only the two visible copies
-            // below receive the independent one-pixel optical corrections.
+            // The leading U+08EA is a combining mark. It must stay in the
+            // SAME plain-text shaping run as U+02D6 to remain visible in Gohu.
+            // Last known-visible +7px placement. Do not split the glyphs
+            // into styled-color spans or independently rendered Text items.
             anchors.left: parent.left
             anchors.leftMargin: 7
             anchors.baseline: parent.baseline
             font.pixelSize: sessionsIcon.font.pixelSize
             textFormat: Text.PlainText
-            color: "transparent"
+            color: sessionsDock.open ? sessionsDock.openForegroundColor : Colors.white
             text: "࣪˖"
-
-            GohuText {
-                id: sessionsLeftOuterStar
-                // Leftmost mark 1px right, with the second mark masked.
-                x: 1
-                anchors.baseline: parent.baseline
-                font.pixelSize: parent.font.pixelSize
-                textFormat: Text.StyledText
-                color: sessionsDock.open ? sessionsDock.openForegroundColor : Colors.white
-                text: "࣪<font color='transparent'>˖</font>"
-            }
-
-            GohuText {
-                id: sessionsLeftInnerStar
-                // Inner mark 1px left and 1px down, relative to the same
-                // original shaped text; the first mark is masked.
-                x: -1
-                anchors.baseline: parent.baseline
-                transform: Translate { y: 1 }
-                font.pixelSize: parent.font.pixelSize
-                textFormat: Text.StyledText
-                color: sessionsDock.open ? sessionsDock.openForegroundColor : Colors.white
-                text: "<font color='transparent'>࣪</font>˖"
-            }
         }
 
         // Measure the original phone width without changing the shaping run.

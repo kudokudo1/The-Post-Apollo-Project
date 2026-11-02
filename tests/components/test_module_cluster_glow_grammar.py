@@ -86,23 +86,24 @@ social = module("Sessions")
 assert "open: menuOpen" in social
 assert social.count(
     "color: sessionsDock.open ? sessionsDock.openForegroundColor : Colors.white"
-) == 3
+) == 2
 assert "contentGlowSource: sessionsIcon" in social
 assert "normalForegroundColor: Colors.omnitrix" in social
 assert "normalContentGlowColor: Colors.omnitrix" in social
 assert "normalDockGlowColor: Colors.omnitrix" in social
 assert "property color openForegroundColor: Colors.magenta" in dock
 assert "property color openGlowColor: Colors.magenta" in dock
-assert social.count("GohuText {") == 6
+assert social.count("GohuText {") == 4
 assert "id: sessionsPhoneFace" in social
 assert "color: sessionsDock.foregroundColor" in social
 assert "font.pixelSize: 24" in social
 assert 'text: "<font color=\'transparent\'>࣪˖☎︎</font>๋࣭✧"' in social
 assert "anchors.leftMargin: 7" in social
-assert "id: sessionsLeftOuterStar" in social
-assert "id: sessionsLeftInnerStar" in social
-assert "transform: Translate { y: 1 }" in social
-assert social.count('color: "transparent"') == 1
+assert 'text: "࣪˖"' in social
+assert "id: sessionsLeftOuterStar" not in social
+assert "id: sessionsLeftInnerStar" not in social
+assert "transform: Translate" not in social
+assert social.count('color: "transparent"') == 0
 assert "contentGlowSource: sessionsIcon" in social
 
 

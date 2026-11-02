@@ -553,8 +553,15 @@ Rectangle {
 
             GohuText {
                 visible: sky.subjectRoute !== ""
-                text: sky.subjectRoute.indexOf("cosmos/") === 0
-                      ? "✦  COSMOS" : "☁  WEATHER"
+                         && sky.subjectRoute.indexOf("cosmos/") !== 0
+                text: "☁  WEATHER"
+                font.pixelSize: 24
+                color: Colors.cyan
+            }
+
+            GohuText {
+                visible: sky.subjectRoute.indexOf("cosmos/") === 0
+                text: "✦  COSMOS"
                 font.pixelSize: 24
                 color: Colors.cyan
             }

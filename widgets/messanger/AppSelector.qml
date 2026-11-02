@@ -990,6 +990,7 @@ Rectangle {
             anchors.bottom: parent.bottom
             activeSection: appSelector.settingsSection
             settingsOpen: appSelector.settingsOpen
+            localDirectoryStore: SocialOrganizationDirectoryStore
             onSectionRequested: function(section) {
                 appSelector.settingsSection = section;
             }

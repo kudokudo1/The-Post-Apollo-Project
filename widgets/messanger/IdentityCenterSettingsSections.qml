@@ -12,6 +12,8 @@ Item {
     // Parent settings visibility gates the display-only IPC reader.
     // This is NOT a login, account selection or authorization state.
     property bool settingsOpen: false
+    // Injected by Social; null in synthetic Qt tests.
+    property var localDirectoryStore: null
     // Display-only input for a FUTURE approved privileged host.
     // No current host feeds this value; never treat it as authorization.
     // Tokens, provider subjects and credentials must never enter QML.
@@ -179,6 +181,11 @@ Item {
                         color: Colors.white
                         font.pixelSize: 11
                         wrapMode: Text.WordWrap
+                    }
+
+                    IdentityCenterLocalOrganizationEditor {
+                        width: parent.width
+                        directoryStore: sections.localDirectoryStore
                     }
 
                     Column {

@@ -77,7 +77,7 @@ Rectangle {
         anchors.right: parent.right
         anchors.top: parent.top
         anchors.margins: 16
-        height: 123
+        height: 39
 
         GohuText {
             id: headingText
@@ -88,37 +88,6 @@ Rectangle {
             font.pixelSize: 17
         }
 
-        Grid {
-            id: subjectGrid
-            anchors.left: parent.left
-            anchors.right: parent.right
-            anchors.top: headingText.bottom
-            anchors.topMargin: 12
-            columns: 3
-            columnSpacing: 10
-            rowSpacing: 5
-
-            Repeater {
-                model: SubjectRoutes.SUBJECTS
-
-                delegate: ModeButton {
-                    required property int index
-                    required property var modelData
-                    width: Math.floor((subjectGrid.width - 20) / 3)
-                    height: 36
-                    textOnly: true
-                    horizontalContent: true
-                    bordered: false
-                    labelFontSize: 13
-                    selected: browser.currentRoute
-                              && browser.currentRoute.subject === modelData.id
-                    selectedPrimaryColor: modelData.id === "magick"
-                                          ? Colors.magenta : Colors.cyan
-                    labelText: modelData.label
-                    onTriggered: browser.selectSubject(modelData.id)
-                }
-            }
-        }
     }
 
     Row {

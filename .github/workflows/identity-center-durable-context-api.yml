@@ -1,0 +1,43 @@
+name: Identity Center Durable Read-Only Context API
+
+on:
+  pull_request:
+    paths:
+      - 'services/identity/durable_context_schema_v0.sql'
+      - 'services/identity/durable_context_store_v0.py'
+      - 'services/identity/read_only_context_wsgi_v0.py'
+      - 'tests/identity/test_durable_context_service_v0.py'
+      - 'MODEL/contracts/identity-center-durable-context-api-v0.md'
+      - '.github/workflows/identity-center-durable-context-api.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'services/identity/durable_context_schema_v0.sql'
+      - 'services/identity/durable_context_store_v0.py'
+      - 'services/identity/read_only_context_wsgi_v0.py'
+      - 'tests/identity/test_durable_context_service_v0.py'
+      - 'MODEL/contracts/identity-center-durable-context-api-v0.md'
+      - '.github/workflows/identity-center-durable-context-api.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  durable-context-api:
+    name: Persistent temporary DB, verified context and local-only HTTP
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Compile service modules and fixture contracts
+        run: |
+          python3 -m py_compile services/identity/durable_context_store_v0.py
+          python3 -m py_compile services/identity/read_only_context_wsgi_v0.py
+          python3 -m py_compile tests/identity/test_durable_context_service_v0.py
+      - name: Run ephemeral SQLite and loopback WSGI tests
+        run: |
+          python3 -m unittest discover -s tests/identity \
+            -p 'test_durable_context_service_v0.py' -v

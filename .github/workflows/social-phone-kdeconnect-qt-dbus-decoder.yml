@@ -30,16 +30,18 @@ jobs:
       - name: Install Qt6 developer headers on ephemeral CI runner
         run: |
           sudo apt-get update -qq
-          sudo apt-get install -y --no-install-recommends qt6-base-dev pkg-config
+          sudo apt-get install -y --no-install-recommends qt6-base-dev pkg-config dbus
+      - name: Generate Qt moc for temporary synthetic signal receiver
+        run: /usr/lib/qt6/libexec/moc tests/phone/qt/test_kdeconnect_sms_dbus_decoder.cpp -o /tmp/test_kdeconnect_sms_dbus_decoder.moc
       - name: Compile Qt6 Core + DBus decoder and native fixture
         run: |
-          g++ -std=c++17 -fPIC -Wall -Wextra -Werror \
+          g++ -std=c++17 -fPIC -Wall -Wextra -Werror -I/tmp \
             $(pkg-config --cflags Qt6Core Qt6DBus) \
             services/phone/qt/KdeConnectSmsDbusDecoder.cpp \
             tests/phone/qt/test_kdeconnect_sms_dbus_decoder.cpp \
             $(pkg-config --libs Qt6Core Qt6DBus) \
             -o /tmp/post-apollo-kde-sms-decode-test
       - name: Run native Qt decoder synthetic assertions
-        run: /tmp/post-apollo-kde-sms-decode-test
+        run: dbus-run-session -- /tmp/post-apollo-kde-sms-decode-test
       - name: Run previous offline Phone Bridge Python regressions
         run: python3 -m unittest discover -s tests/phone -p 'test_*.py' -q

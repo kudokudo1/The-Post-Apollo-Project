@@ -1,0 +1,34 @@
+name: Weather Station COSMOS C1 real SKY SPACE subject panels
+
+on:
+  pull_request:
+    paths:
+      - 'widgets/weather/StationSky.qml'
+      - 'widgets/weather/StationSpace.qml'
+      - 'widgets/weather/StationCosmosSubjectPanelPolicy.js'
+      - 'widgets/weather/StationCosmosSubjectPane.qml'
+      - 'widgets/weather/StationSubjectNavigator.qml'
+      - 'widgets/weather/WeatherStationW.qml'
+      - 'tests/weather/test_cosmos_subject_panels_c1.js'
+      - '.github/workflows/weather-cosmos-subject-panels-c1.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  cosmos-panels:
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Verify canonical subject tree, existing WEATHER, and COSMOS C1 panel reuse
+        run: |
+          node --test tests/weather/subject_navigation_contract.test.js
+          node --test tests/weather/subject_navigation_browser.test.js
+          node --test tests/weather/test_weather_subject_panels_m2a.js
+          node --test tests/weather/test_weather_subject_panels_m2b.js
+          node --test tests/weather/test_cosmos_subject_panels_c1.js

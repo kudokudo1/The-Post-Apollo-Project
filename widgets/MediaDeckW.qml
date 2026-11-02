@@ -433,6 +433,15 @@ PanelWindow {
     WlrLayershell.keyboardFocus: menuOpen
         ? WlrKeyboardFocus.OnDemand : WlrKeyboardFocus.None
 
+    // Close only this Hi-Fi panel when its own window receives Escape.
+    // Never stop playback or close another keyboard-owned widget.
+    Shortcut {
+        sequence: "Esc"
+        context: Qt.WindowShortcut
+        enabled: deck.menuOpen
+        onActivated: deck.menuOpen = false
+    }
+
     anchors {
         top: true
         left: true
@@ -746,7 +755,16 @@ PanelWindow {
                     property bool standaloneShiftVerified: false
                     Keys.priority: Keys.BeforeItem
                     Keys.onPressed: function(event) {
-                        if (!deck.menuOpen || deck.transportMode !== "mpd")
+                        if (!deck.menuOpen)
+                            return;
+                        // Esc works in MPD and MPRIS. Only navigation below
+                        // remains MPD-specific and search-edit guarded.
+                        if (event.key === Qt.Key_Escape) {
+                            deck.menuOpen = false;
+                            event.accepted = true;
+                            return;
+                        }
+                        if (deck.transportMode !== "mpd")
                             return;
                         if (event.key === Qt.Key_Shift) {
                             shiftCandidate = standaloneShiftVerified

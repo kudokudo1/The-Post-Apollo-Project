@@ -256,7 +256,7 @@ assert social_module.count("contentGlowSource: sessionsIcon") == 1
 # The visible cluster must use the exact source string with no span
 # boundaries, and keep the established position and original width reference.
 left_run = social_module.split("id: sessionsLeftOrnaments", 1)[1].split(
-    "id: sessionsPhoneAdvance", 1)[0]
+    "        }\n\n        // Measure the original phone width", 1)[0]
 assert "anchors.leftMargin: 7" in left_run
 assert "textFormat: Text.PlainText" in left_run
 assert 'text: "࣪˖"' in left_run

@@ -97,9 +97,10 @@ class LocalTicketCoordinatorM12m {
             ticket.finish = resolve;
         });
         this.tickets.push(ticket);
-        if (this.phase !== "READY" || typeof mutation !== "function") {
-            this._finish(ticket, this.phase === "READY" ? "REJECTED" : "BLOCKED",
-                         this.phase === "READY" ? "INVALID_MUTATION" : "WRITES_NOT_READY");
+        if ((this.phase !== "READY" && this.phase !== "WRITING") ||
+                typeof mutation !== "function") {
+            this._finish(ticket, typeof mutation === "function" ? "BLOCKED" : "REJECTED",
+                         typeof mutation === "function" ? "WRITES_NOT_READY" : "INVALID_MUTATION");
             return {ticketId: ticket.ticketId, completion};
         }
         this.queue.push({ticket, mutation});

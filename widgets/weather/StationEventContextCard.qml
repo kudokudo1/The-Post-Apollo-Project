@@ -16,6 +16,8 @@ Rectangle {
     property bool archiveAvailable: false
     property int archiveSnapshotCount: 0
     property string archiveStatusText: "NOT ARCHIVED"
+    property var archiveRows: []
+    property var archiveDiff: null
     property real runtimeNowMs: Date.now()
     signal archiveRequested()
     property color accentColor: Colors.magenta
@@ -26,6 +28,11 @@ Rectangle {
         Array.isArray(timelineRows) ? timelineRows.length : 0
     readonly property int relationshipCount:
         Array.isArray(relationshipRows) ? relationshipRows.length : 0
+    readonly property int archiveRowCount:
+        Array.isArray(archiveRows) ? archiveRows.length : 0
+    readonly property int archiveDiffCount:
+        archiveDiff && Array.isArray(archiveDiff.changes)
+        ? archiveDiff.changes.length : 0
     readonly property bool floodRelevant:
         !!floodContext && floodContext.relevant === true
     readonly property int floodHeight:
@@ -59,6 +66,19 @@ Rectangle {
         return "OLDER";
     }
 
+    function archiveTimeLabel(value) {
+        const ms = Number(value);
+        if (!isFinite(ms) || ms <= 0)
+            return "-- UTC";
+        const date = new Date(ms);
+        if (isNaN(date.getTime()))
+            return "-- UTC";
+        return date.toISOString()
+            .slice(0, 16)
+            .replace("T", " ")
+            + " UTC";
+    }
+
     function timelineFreshnessLabel(row) {
         const mode = String(
             row && row.freshnessMode
@@ -89,6 +109,12 @@ Rectangle {
     width: parent ? parent.width : 0
     height: visible
         ? 292
+          + (archiveRowCount > 0 ? 30 : 0)
+          + Math.min(5, archiveRowCount) * 42
+          + (archiveSnapshotCount > 0 ? 30 : 0)
+          + (archiveSnapshotCount === 1 ? 32 : 0)
+          + (archiveSnapshotCount >= 2 ? 30 : 0)
+          + Math.min(8, archiveDiffCount) * 40
           + Math.min(4, companionCount) * 42
           + Math.min(6, timelineCount) * 48
           + (relationshipCount > 0 ? 30 : 0)
@@ -171,6 +197,163 @@ Rectangle {
                 font.pixelSize: 8
                 color: card.archiveSnapshotCount > 0
                     ? Colors.cyan : Colors.orange
+                elide: Text.ElideRight
+            }
+        }
+
+        Column {
+            width: parent.width
+            spacing: 4
+            visible: card.archiveRowCount > 0
+
+            GohuText {
+                width: parent.width
+                text: "ARCHIVE HISTORY // SOURCE-NATIVE SNAPSHOTS"
+                font.pixelSize: 10
+                color: Colors.magenta
+            }
+
+            Repeater {
+                model: Array.isArray(card.archiveRows)
+                    ? card.archiveRows.slice(0, 5) : []
+
+                delegate: Rectangle {
+                    required property var modelData
+                    width: card.width - 20
+                    height: 37
+                    color: Colors.black
+                    border.width: 1
+                    border.color: Colors.magenta
+
+                    Row {
+                        anchors.fill: parent
+                        anchors.margins: 5
+                        spacing: 7
+
+                        GohuText {
+                            width: 86
+                            text: "SNAP "
+                                + modelData.position
+                                + "/" + modelData.total
+                            font.pixelSize: 8
+                            color: Colors.magenta
+                            elide: Text.ElideRight
+                        }
+
+                        GohuText {
+                            width: 156
+                            text: card.archiveTimeLabel(
+                                modelData.capturedAtMs
+                            )
+                            font.pixelSize: 8
+                            color: Colors.cyan
+                            elide: Text.ElideRight
+                        }
+
+                        QuietText {
+                            width: Math.max(0, parent.width - 256)
+                            text: "SOURCE TIME // "
+                                + card.archiveTimeLabel(
+                                    modelData.sourceTimeMs
+                                )
+                            font.pixelSize: 8
+                            elide: Text.ElideRight
+                        }
+                    }
+                }
+            }
+
+            QuietText {
+                width: parent.width
+                text: "BOUNDED SNAPSHOT HISTORY // POSITION IS WITHIN RETAINED ARCHIVE, NOT A PERMANENT REVISION NUMBER"
+                font.pixelSize: 8
+                color: Colors.orange
+                elide: Text.ElideRight
+            }
+        }
+
+        Column {
+            width: parent.width
+            spacing: 4
+            visible: card.archiveSnapshotCount > 0
+
+            GohuText {
+                width: parent.width
+                text: "LATEST ARCHIVE DIFF // NEWEST VS PREVIOUS"
+                font.pixelSize: 10
+                color: Colors.cyan
+            }
+
+            QuietText {
+                visible: card.archiveSnapshotCount === 1
+                width: parent.width
+                text: "BASELINE SNAPSHOT ONLY // NO PRIOR ARCHIVED PROVIDER STATE TO COMPARE"
+                font.pixelSize: 8
+                color: Colors.orange
+                elide: Text.ElideRight
+            }
+
+            QuietText {
+                visible: card.archiveSnapshotCount >= 2
+                         && card.archiveDiff
+                         && card.archiveDiff.available
+                         && card.archiveDiffCount === 0
+                width: parent.width
+                text: "NO EVIDENCE-FIELD DIFFERENCE // CAPTURE TIME IS NOT COUNTED AS A PROVIDER CHANGE"
+                font.pixelSize: 8
+                color: Colors.cyan
+                elide: Text.ElideRight
+            }
+
+            Repeater {
+                model: card.archiveDiff
+                       && Array.isArray(card.archiveDiff.changes)
+                    ? card.archiveDiff.changes.slice(0, 8)
+                    : []
+
+                delegate: Rectangle {
+                    required property var modelData
+                    width: card.width - 20
+                    height: 35
+                    color: Colors.black
+                    border.width: 1
+                    border.color: Colors.cyan
+
+                    Row {
+                        anchors.fill: parent
+                        anchors.margins: 5
+                        spacing: 7
+
+                        GohuText {
+                            width: 112
+                            text: modelData.label
+                            font.pixelSize: 8
+                            color: Colors.cyan
+                            elide: Text.ElideRight
+                        }
+
+                        QuietText {
+                            width: Math.max(0, parent.width - 126)
+                            text: modelData.beforeText
+                                + " → " + modelData.afterText
+                            font.pixelSize: 8
+                            color: Colors.white
+                            elide: Text.ElideRight
+                        }
+                    }
+                }
+            }
+
+            QuietText {
+                visible: card.archiveSnapshotCount >= 2
+                width: parent.width
+                text: card.archiveDiffCount > 8
+                    ? "SHOWING 8 OF "
+                      + card.archiveDiffCount
+                      + " CHANGED FIELDS // SOURCE IDENTITY UNCHANGED"
+                    : "EXACT ARCHIVED PROVIDER-FIELD CHANGES // SOURCE IDENTITY UNCHANGED"
+                font.pixelSize: 8
+                color: Colors.orange
                 elide: Text.ElideRight
             }
         }

@@ -498,3 +498,209 @@ function latest(document, sourceId, eventId, nowMs) {
 function eventCount(document, nowMs) {
     return Object.keys(copyDocument(document, nowMs).events).length;
 }
+
+function fieldLabel(key) {
+    const name = String(key || "");
+    const labels = {
+        sourceTimeMs:"SOURCE TIME",
+        title:"TITLE",
+        typeLabel:"TYPE",
+        latitude:"LATITUDE",
+        longitude:"LONGITUDE",
+        eventId:"EVENT ID",
+        episodeId:"EPISODE ID",
+        eventType:"EVENT TYPE",
+        alertLevel:"ALERT LEVEL",
+        alertScore:"ALERT SCORE",
+        isCurrent:"IS CURRENT",
+        country:"COUNTRY",
+        iso3:"ISO3",
+        severity:"SEVERITY",
+        severityText:"SEVERITY TEXT",
+        severityUnit:"SEVERITY UNIT",
+        fromUtc:"FROM UTC",
+        toUtc:"TO UTC",
+        reportUrl:"REPORT URL",
+        detailsUrl:"DETAILS URL",
+        magnitude:"MAGNITUDE",
+        place:"PLACE",
+        time:"EVENT TIME",
+        updated:"UPDATED TIME",
+        depthKm:"DEPTH KM",
+        significance:"SIGNIFICANCE",
+        tsunami:"TSUNAMI",
+        status:"STATUS",
+        alert:"ALERT",
+        magType:"MAG TYPE",
+        description:"DESCRIPTION",
+        category:"CATEGORY",
+        categoryId:"CATEGORY ID",
+        rawTime:"RAW TIME",
+        geometryType:"GEOMETRY TYPE",
+        sourceNames:"SOURCE NAMES",
+        url:"URL",
+        acquiredUtc:"ACQUIRED UTC",
+        brightnessK:"BRIGHTNESS K",
+        frpMw:"FRP MW",
+        confidenceCode:"CONFIDENCE CODE",
+        confidenceLabel:"CONFIDENCE",
+        satellite:"SATELLITE",
+        instrument:"INSTRUMENT",
+        dayNight:"DAY / NIGHT",
+        version:"VERSION"
+    };
+    if (labels[name])
+        return labels[name];
+    return name.replace(/([a-z0-9])([A-Z])/g, "$1 $2")
+        .replace(/_/g, " ")
+        .toUpperCase();
+}
+
+function comparableFields(snapshot) {
+    if (!snapshot || typeof snapshot !== "object")
+        return {};
+
+    const fields = {
+        sourceTimeMs: positiveMillis(snapshot.sourceTimeMs),
+        title: safeText(snapshot.title, 180),
+        typeLabel: safeText(snapshot.typeLabel, 80),
+        latitude: boundedLatitude(snapshot.latitude),
+        longitude: boundedLongitude(snapshot.longitude)
+    };
+
+    const payload = snapshot.payload
+        && typeof snapshot.payload === "object"
+        && !Array.isArray(snapshot.payload)
+        ? snapshot.payload : {};
+    const keys = Object.keys(payload).sort();
+    for (let i = 0; i < keys.length; i++)
+        fields[keys[i]] = payload[keys[i]];
+    return fields;
+}
+
+function valuesEqual(left, right) {
+    if (left === right)
+        return true;
+    if (left === null || left === undefined
+            || right === null || right === undefined)
+        return false;
+    if (typeof left === "number" && typeof right === "number")
+        return isFinite(left) && isFinite(right) && left === right;
+    return JSON.stringify(left) === JSON.stringify(right);
+}
+
+function displayFieldValue(key, value) {
+    if (value === null || value === undefined || value === "")
+        return "--";
+    if (typeof value === "boolean")
+        return value ? "TRUE" : "FALSE";
+    if (typeof value === "number") {
+        if (!isFinite(value))
+            return "--";
+        const signedCoordinate =
+            key === "latitude" || key === "longitude";
+        if (!signedCoordinate && value < 0)
+            return "--";
+        if (Math.floor(value) === value)
+            return String(value);
+        return Number(value).toFixed(3)
+            .replace(/0+$/, "")
+            .replace(/\.$/, "");
+    }
+    return safeText(value, 220) || "--";
+}
+
+function snapshotDiff(previous, current) {
+    const unavailable = {
+        available:false,
+        sameIdentity:false,
+        sourceId:"",
+        sourceLabel:"",
+        eventId:"",
+        previousCapturedAtMs:-1,
+        currentCapturedAtMs:-1,
+        changedCount:0,
+        changes:[]
+    };
+    if (!previous || !current)
+        return unavailable;
+
+    const previousSource = String(previous.sourceId || "");
+    const currentSource = String(current.sourceId || "");
+    const previousId = safeText(previous.eventId, 180);
+    const currentId = safeText(current.eventId, 180);
+    if (!previousSource || previousSource !== currentSource
+            || !previousId || previousId !== currentId)
+        return unavailable;
+
+    const left = comparableFields(previous);
+    const right = comparableFields(current);
+    const keys = {};
+    Object.keys(left).forEach(function(key) { keys[key] = true; });
+    Object.keys(right).forEach(function(key) { keys[key] = true; });
+
+    const changes = [];
+    const sorted = Object.keys(keys).sort();
+    for (let i = 0; i < sorted.length; i++) {
+        const key = sorted[i];
+        const before = left[key];
+        const after = right[key];
+        if (valuesEqual(before, after))
+            continue;
+        changes.push({
+            key:key,
+            label:fieldLabel(key),
+            beforeValue:before,
+            afterValue:after,
+            beforeText:displayFieldValue(key, before),
+            afterText:displayFieldValue(key, after)
+        });
+    }
+
+    return {
+        available:true,
+        sameIdentity:true,
+        sourceId:currentSource,
+        sourceLabel:sourceLabel(currentSource),
+        eventId:currentId,
+        previousCapturedAtMs:positiveMillis(previous.capturedAtMs),
+        currentCapturedAtMs:positiveMillis(current.capturedAtMs),
+        changedCount:changes.length,
+        changes:changes
+    };
+}
+
+function revisionRows(document, sourceId, eventId, nowMs, maximum) {
+    const rows = snapshots(document, sourceId, eventId, nowMs);
+    const requested = Math.floor(Number(maximum) || 5);
+    const limit = Math.max(1, Math.min(32, requested));
+    const total = rows.length;
+    const result = [];
+
+    for (let i = total - 1; i >= 0 && result.length < limit; i--) {
+        const row = rows[i];
+        result.push({
+            sourceId:row.sourceId,
+            sourceLabel:row.sourceLabel,
+            eventId:row.eventId,
+            capturedAtMs:row.capturedAtMs,
+            sourceTimeMs:row.sourceTimeMs,
+            title:row.title,
+            typeLabel:row.typeLabel,
+            position:i + 1,
+            total:total
+        });
+    }
+    return result;
+}
+
+function latestDiff(document, sourceId, eventId, nowMs) {
+    const rows = snapshots(document, sourceId, eventId, nowMs);
+    if (rows.length < 2)
+        return snapshotDiff(null, null);
+    return snapshotDiff(
+        rows[rows.length - 2],
+        rows[rows.length - 1]
+    );
+}
+

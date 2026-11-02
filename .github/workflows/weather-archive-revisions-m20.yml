@@ -1,0 +1,37 @@
+name: Weather M20 archive revisions
+
+on:
+  pull_request:
+    paths:
+      - "services/weather/WeatherEventArchivePolicy.js"
+      - "services/weather/WeatherEventArchiveStore.qml"
+      - "widgets/weather/StationEventContextCard.qml"
+      - "widgets/weather/StationDiscovery.qml"
+      - "tests/weather/test_weather_archive_revisions_m20.js"
+      - ".github/workflows/weather-archive-revisions-m20.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  revisions:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: M20 archive revision history and diff
+        run: node tests/weather/test_weather_archive_revisions_m20.js
+      - name: M19 event archive regression
+        run: node tests/weather/test_weather_event_archive_m19.js
+      - name: M18 provider freshness regression
+        run: node tests/weather/test_weather_provider_freshness_m18.js
+      - name: M17 relationship regression
+        run: node tests/weather/test_weather_evidence_relationships_m17.js
+      - name: M16 evidence quality regression
+        run: node tests/weather/test_weather_evidence_quality_m16.js
+      - name: M15 flood dossier regression
+        run: node tests/weather/test_weather_flood_dossier_m15.js
+      - name: M14 shared-lightning regression
+        run: node tests/weather/test_weather_shared_lightning_m14.js
+      - name: M13 event-context regression
+        run: node tests/weather/test_station_map_event_context_m13.js

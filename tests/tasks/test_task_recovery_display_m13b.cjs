@@ -97,7 +97,7 @@ for(const surface of ["HUB","DETAILS","PLANNER","PROJECTS"]) {
             assert.equal(result.ticket.state,"REVIEW_REQUIRED");
             assert.equal(result.ticket.disposition,"KEEP_DRAFT");
             assert.equal(result.ticket.ticketId,s.ticket.ticketId);
-            assert.deepEqual(result.draft,s.ticket.draft);
+            assert.deepEqual(copy(result.draft),copy(s.ticket.draft));
             assertSafe(result);
             assert.equal(result.productionActivation,false);
             assert.deepEqual(copy(s.ticket),beforeTicket);

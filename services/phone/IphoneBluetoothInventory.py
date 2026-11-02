@@ -45,12 +45,12 @@ def _snapshot(
         "adapterCount": adapter_count,
         "blueferryExecutableFound": blueferry_available,
         "mapPbapVersionMinimum": (
-            "DOCUMENTED_VERSION_MET" if version_tuple >= (5, 72)
+            "DOCUMENTED_VERSION_MET" if version_tuple is not None and version_tuple >= (5, 72)
             else "BELOW_DOCUMENTED_VERSION" if version_tuple is not None
             else "NOT_CHECKED"
         ),
         "ancsVersionMinimum": (
-            "DOCUMENTED_VERSION_MET" if version_tuple >= (5, 86)
+            "DOCUMENTED_VERSION_MET" if version_tuple is not None and version_tuple >= (5, 86)
             else "BELOW_DOCUMENTED_VERSION" if version_tuple is not None
             else "NOT_CHECKED"
         ),

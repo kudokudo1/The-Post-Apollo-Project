@@ -567,6 +567,42 @@ function effectiveStaleMs(spec) {
     return cadence > 0 ? cadence * 6 : 0;
 }
 
+function effectiveExpireMs(spec) {
+    if (!spec)
+        return 0;
+    if (Number(spec.expireMs) > 0)
+        return Number(spec.expireMs);
+    const staleMs = effectiveStaleMs(spec);
+    return staleMs > 0 ? staleMs * 4 : 0;
+}
+
+function temporalBand(spec, receivedAt, nowValue) {
+    if (!spec)
+        return "UNKNOWN";
+    if (spec.mode === MODE_KEYED_FETCH)
+        return "KEYED";
+    if (spec.mode === MODE_LOCAL_CALC)
+        return "LOCAL";
+
+    const age = ageMs(receivedAt, nowValue);
+    if (age < 0)
+        return "UNKNOWN";
+
+    const freshMs = effectiveFreshMs(spec);
+    const staleMs = effectiveStaleMs(spec);
+    const expireMs = effectiveExpireMs(spec);
+
+    if (freshMs > 0 && age <= freshMs)
+        return "FRESH";
+    if (staleMs > 0 && age <= staleMs)
+        return "AGING";
+    if (expireMs > 0 && age <= expireMs)
+        return "STALE";
+    if (expireMs > 0 && age > expireMs)
+        return "EXPIRED";
+    return "STALE";
+}
+
 function freshness(spec, receivedAt, nowValue) {
     if (!spec)
         return "UNKNOWN";
@@ -580,17 +616,80 @@ function freshness(spec, receivedAt, nowValue) {
     if (spec.mode === MODE_LOCAL_CALC)
         return "LOCAL";
 
-    const age = ageMs(receivedAt, nowValue);
-    if (age < 0)
-        return "UNKNOWN";
+    return temporalBand(spec, receivedAt, nowValue);
+}
 
-    const freshMs = effectiveFreshMs(spec);
-    const staleMs = effectiveStaleMs(spec);
-    if (freshMs > 0 && age <= freshMs)
-        return "FRESH";
-    if (staleMs > 0 && age <= staleMs)
-        return "AGING";
-    return "STALE";
+function retainsLastGood(spec) {
+    if (!spec)
+        return false;
+    return spec.retention === RETENTION_MEMORY_LAST_GOOD
+        || spec.retention === RETENTION_SESSION_CACHE;
+}
+
+function availabilityState(spec, state, ageBand) {
+    const value = state || {};
+    const active = value.active !== false;
+    const ready = value.ready === true;
+    const loading = value.loading === true;
+    const failed = value.failed === true;
+    const usingCache = value.usingCache === true;
+    const band = String(ageBand || "UNKNOWN");
+
+    if (!active)
+        return "INACTIVE";
+
+    if (spec && spec.mode === MODE_LOCAL_CALC)
+        return ready ? "LOCAL" : "WAITING";
+
+    if (spec && spec.mode === MODE_KEYED_FETCH) {
+        if (loading && !ready)
+            return "READING";
+        if (ready)
+            return failed ? "KEY_DEGRADED" : "KEY_VALID";
+        return failed ? "OFFLINE" : "WAITING";
+    }
+
+    if (spec && spec.mode === MODE_MANUAL) {
+        if (loading && !ready)
+            return "READING";
+        if (!ready)
+            return failed ? "OFFLINE" : "WAITING";
+        if (band === "EXPIRED")
+            return "SNAPSHOT_EXPIRED";
+        if (band === "STALE")
+            return "SNAPSHOT_STALE";
+        if (band === "AGING")
+            return "SNAPSHOT_AGING";
+        return "SNAPSHOT";
+    }
+
+    if (!ready) {
+        if (loading)
+            return "READING";
+        return failed ? "OFFLINE" : "WAITING";
+    }
+
+    const retained = failed || usingCache;
+    if (retained && retainsLastGood(spec)) {
+        if (band === "EXPIRED")
+            return "CACHE_EXPIRED";
+        if (band === "STALE")
+            return "CACHE_STALE";
+        if (band === "AGING")
+            return "CACHE_AGING";
+        return "CACHE_FRESH";
+    }
+
+    if (retained && !retainsLastGood(spec))
+        return "OFFLINE";
+
+    if (band === "EXPIRED")
+        return "EXPIRED";
+    if (band === "STALE")
+        return "LIVE_STALE";
+    if (band === "AGING")
+        return "LIVE_AGING";
+    return "LIVE";
 }
 
 function runtimeState(spec, input, nowValue) {
@@ -603,6 +702,9 @@ function runtimeState(spec, input, nowValue) {
     const receivedAtMs = timestampMs(state.receivedAt);
     const observedAtMs = timestampMs(state.observedAt);
     const nowMs = timestampMs(nowValue);
+    const ageBand = ready
+        ? temporalBand(spec, receivedAtMs, nowMs)
+        : "UNKNOWN";
 
     let transport = "WAITING";
     if (!active)
@@ -618,9 +720,24 @@ function runtimeState(spec, input, nowValue) {
         id: spec ? spec.id : "",
         mode: spec ? spec.mode : "",
         lifetime: spec ? spec.lifetime : "",
+        retention: spec ? spec.retention : RETENTION_NONE,
         cadenceMs: spec ? Number(spec.cadenceMs) || 0 : 0,
+        expireMs: effectiveExpireMs(spec),
         transport: transport,
         freshness: ready ? freshness(spec, receivedAtMs, nowMs) : "UNKNOWN",
+        ageBand: ageBand,
+        availability: availabilityState(
+            spec,
+            {
+                "active": active,
+                "ready": ready,
+                "loading": loading,
+                "failed": failed,
+                "usingCache": state.usingCache === true
+            },
+            ageBand
+        ),
+        usingCache: state.usingCache === true,
         receivedAtMs: receivedAtMs,
         observedAtMs: observedAtMs,
         receivedAgeMs: ageMs(receivedAtMs, nowMs),
@@ -658,9 +775,14 @@ function displayRow(sourceId, input, nowValue) {
         label: spec ? spec.label : String(sourceId || "").toUpperCase(),
         mode: state.mode,
         lifetime: state.lifetime,
+        retention: state.retention,
         cadenceMs: state.cadenceMs,
+        expireMs: state.expireMs,
         transport: state.transport,
         freshness: state.freshness,
+        ageBand: state.ageBand,
+        availability: state.availability,
+        usingCache: state.usingCache,
         receivedAgeMinutes: receivedMinutes,
         observationAgeMinutes: observationMinutes,
         ready: state.ready,

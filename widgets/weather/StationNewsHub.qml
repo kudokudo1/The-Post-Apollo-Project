@@ -11,6 +11,7 @@ import "StationNewsCatalogPolicy.js" as Catalog
 Rectangle {
     id: stationNewsHub
     property bool stationOpen: true
+    property real runtimeNowMs: Date.now()
     property string section: "LIVE"
     property bool viewerOpen: false
     property var chosenRecord: null
@@ -209,6 +210,7 @@ Rectangle {
             StationDiscovery {
                 domain: "news"
                 stationOpen: stationNewsHub.stationOpen
+                runtimeNowMs: stationNewsHub.runtimeNowMs
                 onNewsMapRequested: function(payload) {
                     stationNewsHub.newsMapRequested(payload);
                 }

@@ -2,6 +2,7 @@ import QtQuick
 import "../../components"
 import "StationSubjectNavigationPolicy.js" as SubjectRoutes
 import "StationSubjectNavigationPreviewPolicy.js" as PreviewRoutes
+import "StationWeatherSubjectPanelPolicy.js" as WeatherPanelPolicy
 
 // M1 bounded visual browser. Source panels remain in their original classic
 // QML pages; no new fetches, persistence, or fake submode content.
@@ -12,6 +13,17 @@ Rectangle {
     property string currentPath: "weather"
     property var lastSubjectPaths: ({})
     property int navigationCursor: 0
+    // Existing Weather Station sources supplied from the single owning root.
+    property var weatherService: null
+    property var nwsAlertSource: null
+    property var seismicSource: null
+    property var lightningSource: null
+    property var riverSource: null
+    property var persistentCacheStore: null
+    property var liveHistoryStore: null
+    property real runtimeNowMs: Date.now()
+    readonly property string liveWeatherKind:
+        WeatherPanelPolicy.kindForRoute(currentPath)
 
     readonly property var currentRoute: SubjectRoutes.findRoute(currentPath)
     readonly property var childrenRoutes: SubjectRoutes.childrenOf(currentPath)
@@ -145,6 +157,7 @@ Rectangle {
         anchors.leftMargin: 18
         anchors.rightMargin: 18
         clip: true
+        visible: browser.liveWeatherKind === ""
         boundsBehavior: Flickable.StopAtBounds
         contentWidth: width
         contentHeight: Math.max(height, contentColumn.implicitHeight + 12)
@@ -234,12 +247,68 @@ Rectangle {
         }
     }
 
+    // Selectors for deeper reserved river subroutes remain available even
+    // while the parent river instrument is displayed.
+    Flickable {
+        id: liveChildren
+        visible: browser.liveWeatherKind !== ""
+                 && browser.childrenRoutes.length > 0
+        anchors.left: parent.left
+        anchors.right: parent.right
+        anchors.top: breadcrumbRow.bottom
+        anchors.topMargin: 6
+        anchors.leftMargin: 18
+        anchors.rightMargin: 18
+        height: visible ? 34 : 0
+        contentHeight: height
+        contentWidth: Math.max(width, liveChildRow.implicitWidth)
+        clip: true
+        boundsBehavior: Flickable.StopAtBounds
+
+        Row {
+            id: liveChildRow
+            spacing: 7
+            Repeater {
+                model: browser.childrenRoutes
+                delegate: ModeButton {
+                    required property var modelData
+                    height: 31
+                    width: Math.max(100, modelData.label.length * 9 + 14)
+                    labelFontSize: 11
+                    textOnly: true
+                    onTriggered: browser.chooseRoute(modelData.path)
+                }
+            }
+        }
+    }
+
+    StationWeatherSubjectPane {
+        id: weatherLivePane
+        anchors.left: parent.left
+        anchors.right: parent.right
+        anchors.top: liveChildren.visible
+                     ? liveChildren.bottom : breadcrumbRow.bottom
+        anchors.topMargin: liveChildren.visible ? 6 : 14
+        anchors.bottom: previewNote.top
+        anchors.bottomMargin: 6
+        visible: browser.liveWeatherKind !== ""
+        subjectRoute: browser.currentPath
+        weatherService: browser.weatherService
+        nwsAlertSource: browser.nwsAlertSource
+        seismicSource: browser.seismicSource
+        lightningSource: browser.lightningSource
+        riverSource: browser.riverSource
+        persistentCacheStore: browser.persistentCacheStore
+        liveHistoryStore: browser.liveHistoryStore
+        runtimeNowMs: browser.runtimeNowMs
+    }
+
     // Post-Apollo shared star indicator; no new scroll behavior is invented.
     NeonScrollBar {
         flickable: routeScroll
         geometryMode: "viewport"
         handleStyle: "star"
-        visible: browser.visible
+        visible: browser.visible && browser.liveWeatherKind === ""
                  && routeScroll.contentHeight > routeScroll.height + 1
     }
 
@@ -254,6 +323,8 @@ Rectangle {
         height: 23
         font.pixelSize: 10
         color: Colors.yellow
-        text: "SPEC-ONLY SUBJECTS // CLASSIC PAGES REMAIN CANONICAL UNTIL PANEL MIGRATION"
+        text: browser.liveWeatherKind !== ""
+              ? "WEATHER // EXISTING SOURCE PANELS // SAME COLLECTORS"
+              : "SPEC-ONLY SUBJECTS // CLASSIC PAGES REMAIN CANONICAL UNTIL PANEL MIGRATION"
     }
 }

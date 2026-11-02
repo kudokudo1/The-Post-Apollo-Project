@@ -225,7 +225,14 @@ class DesktopSessionHost:
             return {"status": "SIGNED_OUT"}
 
     def _host_fetch(self) -> HostContextReply:
-        now = self._now()
+        try:
+            now = self._now()
+        except Exception:
+            # A backwards/missing clock invalidates the HOST bearer as well
+            # as the UI preview. Recovery cannot revive the old credential.
+            self._clear()
+            return HostContextReply(401, "application/json",
+                                    b'{"status":"DENIED"}')
         if (self._access_token is None or self._expires_at is None
                 or now >= self._expires_at):
             self._clear()

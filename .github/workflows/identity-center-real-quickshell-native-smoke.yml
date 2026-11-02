@@ -36,7 +36,7 @@ jobs:
             git ca-certificates python3 quickshell=0.3.2-1 \
             qt6-qpa-plugins qml6-module-qtquick \
             qml6-module-qtquick-layouts qml6-module-qtquick-effects \
-            qml6-module-qtqml
+            qml6-module-qt5compat-graphicaleffects qml6-module-qtqml
       - uses: actions/checkout@v4
       - name: Verify actual binary and compile disposable runner
         run: |

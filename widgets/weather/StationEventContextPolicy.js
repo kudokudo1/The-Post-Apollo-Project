@@ -57,10 +57,19 @@ function sourceLabel(sourceId) {
 function parseMillis(value) {
     if (value === undefined || value === null || value === "")
         return -1;
-    const direct = Number(value);
-    if (isFinite(direct) && direct > 0)
-        return direct;
-    const parsed = Date.parse(String(value));
+
+    if (typeof value === "number")
+        return isFinite(value) && value > 0 ? value : -1;
+
+    const raw = String(value).trim();
+    if (!raw)
+        return -1;
+
+    const direct = Number(raw);
+    if (isFinite(direct))
+        return direct > 0 ? direct : -1;
+
+    const parsed = Date.parse(raw);
     return isFinite(parsed) && parsed > 0 ? parsed : -1;
 }
 

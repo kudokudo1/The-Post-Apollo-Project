@@ -37,7 +37,8 @@ function make({policy,confirmed,candidate,draft,sessionId,ownerEpoch,generation,
             ||!keys(draft,["surface","method","value"])
             ||!["HUB","DETAILS","PLANNER","PROJECTS"].includes(draft.surface)
             ||typeof draft.method!=="string"
-            ||!draft.method || JSON.stringify(draft.value).length>32768)
+            ||!draft.method ||typeof JSON.stringify(draft.value)!=="string"
+            || JSON.stringify(draft.value).length>32768)
         return deny("INVALID_SYNTHETIC_IDENTITY_OR_DRAFT");
     try {
         if(!confirmed || !candidate || !policy
@@ -65,14 +66,6 @@ function make({policy,confirmed,candidate,draft,sessionId,ownerEpoch,generation,
             restoreAuthorized:false,replayAuthorized:false,
             clearDraftAuthorized:false};
     } catch(e) {return deny("CHECKPOINT_CANDIDATE_UNAVAILABLE");}
-}
-function duplicateKeys(pairs) {
-    const out={};
-    for(const [k,v] of pairs) {
-        if(Object.hasOwn(out,k)) throw Error("DUPLICATE_JSON_KEY");
-        out[k]=v;
-    }
-    return out;
 }
 function reopen({recordRaw,sourceRaw,policy,freshSessionId,freshEpoch}={}) {
     if(typeof recordRaw!=="string" || Buffer.byteLength(recordRaw,"utf8")>2097152)

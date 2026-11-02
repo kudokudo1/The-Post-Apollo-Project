@@ -37,6 +37,8 @@ jobs:
         run: python3 tests/weather/test_shader_teardown_contracts.py
       - name: Validate live Weather dock state classification
         run: node tests/weather/test_weather_dock_policy.js
+      - name: Validate Weather live runtime M1 inventory and freshness contract
+        run: node tests/weather/test_weather_live_runtime_m1.js
       - name: Validate Weather data parsing and forecast contracts
         run: node tests/weather/test_weather_data_policy.js
       - name: Verify SKY hourly detail inspection of existing forecast data

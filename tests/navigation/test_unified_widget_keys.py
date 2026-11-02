@@ -154,7 +154,11 @@ def test_weather_keyboard_live_indicator_and_close_follow_shared_contract():
     assert 'return "STALE";' in src
     assert 'return "OFFLINE";' in src
     assert "return Colors.magenta;" in src
-    assert "weatherAgeMinutes >= 20" in src
+    runtime = read("services/weather/WeatherRuntimePolicy.js")
+    assert 'RuntimePolicy.sourceSpec("weather")' in src
+    assert 'weatherRuntimeState.freshness === "AGING"' in src
+    assert 'weatherRuntimeState.freshness === "STALE"' in src
+    assert "freshMs:1200000" in runtime  # preserve the existing 20m threshold
     assert 'return sourceStatusText + " // " + ageText;' in src
     assert 'width: 150' in src
     assert 'font.pixelSize: 11' in src

@@ -98,7 +98,7 @@ assert "id: sessionsPhoneFace" in social
 assert "color: sessionsDock.foregroundColor" in social
 assert "font.pixelSize: 24" in social
 assert 'text: "<font color=\'transparent\'>࣪˖☎︎</font>๋࣭✧"' in social
-assert "anchors.leftMargin: 10" in social
+assert "anchors.leftMargin: 7" in social
 
 
 volume = module("Volumebar")

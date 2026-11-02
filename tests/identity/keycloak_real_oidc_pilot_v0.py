@@ -11,6 +11,7 @@ import argparse
 import base64
 from html.parser import HTMLParser
 import hashlib
+import http.cookiejar
 import json
 from pathlib import Path
 import secrets
@@ -38,6 +39,22 @@ CALLBACK = "http://127.0.0.1:8765/callback"
 def require(test: bool, description: str) -> None:
     if not test:
         raise AssertionError(description)
+
+
+class LoopbackOnlySecureCookiePolicy(http.cookiejar.DefaultCookiePolicy):
+    """Allow Secure login cookies ONLY on the disposable CI loopback HTTP host.
+
+    Real web browsers treat localhost as a secure context. Python's cookiejar
+    rejects Secure cookies on any HTTP URL; this narrow test shim preserves
+    the real Keycloak cookie exchange without weakening production transport.
+    """
+
+    def return_ok_secure(self, cookie, request):
+        parts = urlparse(request.get_full_url())
+        if (cookie.secure and parts.scheme == "http"
+                and parts.hostname == "127.0.0.1" and parts.port == 8080):
+            return True
+        return super().return_ok_secure(cookie, request)
 
 
 class LoginForm(HTMLParser):
@@ -74,6 +91,7 @@ def verify_loopback_url(url: str) -> None:
 def open_provider(discovery: dict, username: str, password: str):
     """Perform real interactive auth-code flow with a new cookie jar."""
     session = requests.Session()
+    session.cookies.set_policy(LoopbackOnlySecureCookiePolicy())
     verifier = secrets.token_urlsafe(64)
     challenge = base64.urlsafe_b64encode(
         hashlib.sha256(verifier.encode("ascii")).digest()

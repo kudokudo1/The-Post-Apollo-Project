@@ -16,6 +16,7 @@ Rectangle {
     // Existing Weather Station sources supplied from the single owning root.
     property var weatherService: null
     property var nwsAlertSource: null
+    property var historyService: null
     property var seismicSource: null
     property var lightningSource: null
     property var riverSource: null
@@ -297,6 +298,7 @@ Rectangle {
         subjectRoute: browser.currentPath
         weatherService: browser.weatherService
         nwsAlertSource: browser.nwsAlertSource
+        historyService: browser.historyService
         seismicSource: browser.seismicSource
         lightningSource: browser.lightningSource
         riverSource: browser.riverSource

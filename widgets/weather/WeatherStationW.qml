@@ -23,8 +23,11 @@ PanelWindow {
     WeatherServices.WeatherHistoryService {
         id: weatherHistoryService
         active: weatherStation.menuOpen
-                && !weatherStation.subjectNavigationOpen
-                && weatherStation.currentView === "home"
+                && ((!weatherStation.subjectNavigationOpen
+                     && weatherStation.currentView === "home")
+                    || (weatherStation.subjectNavigationOpen
+                        && SubjectPanelPolicy.needsSource(
+                               subjectNavigator.currentPath, "history")))
         latitude: weatherStation.weatherService
                   ? weatherStation.weatherService.latitude : ""
         longitude: weatherStation.weatherService
@@ -1215,6 +1218,7 @@ PanelWindow {
                 enabled: visible
                 weatherService: weatherStation.weatherService
                 nwsAlertSource: weatherStation.nwsAlertSource
+                historyService: weatherHistoryService
                 seismicSource: seismicService
                 lightningSource: lightningService
                 riverSource: riverService

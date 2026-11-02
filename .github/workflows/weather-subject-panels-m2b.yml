@@ -1,0 +1,35 @@
+name: Weather Station M2b WEATHER overview maps history
+
+on:
+  pull_request:
+    paths:
+      - 'widgets/weather/StationHome.qml'
+      - 'widgets/weather/StationDiscovery.qml'
+      - 'widgets/weather/StationSubjectNavigationPolicy.js'
+      - 'widgets/weather/StationWeatherSubjectPane.qml'
+      - 'widgets/weather/StationWeatherSubjectPanelPolicy.js'
+      - 'widgets/weather/StationSubjectNavigator.qml'
+      - 'widgets/weather/WeatherStationW.qml'
+      - 'tests/weather/test_weather_subject_panels_m2a.js'
+      - 'tests/weather/test_weather_subject_panels_m2b.js'
+      - '.github/workflows/weather-subject-panels-m2b.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  subject-panels:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Verify M0 and M1 baseline, M2a and M2b panels
+        run: |
+          node --test tests/weather/subject_navigation_contract.test.js
+          node --test tests/weather/subject_navigation_browser.test.js
+          node --test tests/weather/test_weather_subject_panels_m2a.js
+          node --test tests/weather/test_weather_subject_panels_m2b.js

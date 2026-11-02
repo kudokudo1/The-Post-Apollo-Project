@@ -1,6 +1,7 @@
 import QtQuick
 import "../../components"
 import "StationHomePolicy.js" as StationHomePolicy
+import "StationWeatherSubjectPanelPolicy.js" as SubjectPanelPolicy
 import "StationSourceHealthPolicy.js" as SourceHealth
 import "StationOfficialAlertPolicy.js" as OfficialAlertPolicy
 import "../../services/weather/WeatherHistoryPolicy.js" as HistoryPolicy
@@ -9,6 +10,16 @@ import "WeatherRelationshipPolicy.js" as RelationshipPolicy
 
 Rectangle {
     id: home
+
+    // Empty route preserves original CLASSIC HOME.
+    property string subjectRoute: ""
+    function sectionVisible(section) {
+        return SubjectPanelPolicy.visibleFor("home", subjectRoute, section);
+    }
+    onSubjectRouteChanged: {
+        if (homeScroll)
+            homeScroll.contentY = 0;
+    }
 
     property var weatherService: null
     property var spaceService: null
@@ -881,14 +892,24 @@ Rectangle {
             spacing: 14
 
         Row {
+            visible: home.sectionVisible("header")
             width: parent.width
             height: 28
 
             GohuText {
                 anchors.verticalCenter: parent.verticalCenter
+                visible: home.subjectRoute === ""
                 text: "⌂  HOME"
                 font.pixelSize: 24
                 color: Colors.magenta
+            }
+
+            GohuText {
+                anchors.verticalCenter: parent.verticalCenter
+                visible: home.subjectRoute !== ""
+                text: "⌂  WEATHER"
+                font.pixelSize: 24
+                color: Colors.cyan
             }
 
             Item {
@@ -898,13 +919,15 @@ Rectangle {
 
             GohuText {
                 anchors.verticalCenter: parent.verticalCenter
-                text: "AUTO SNAPSHOT"
+                text: home.subjectRoute.indexOf("weather/history/") === 0
+                      ? "WEATHER HISTORY" : "AUTO SNAPSHOT"
                 font.pixelSize: 12
                 color: Colors.orange
             }
         }
 
         StationRuntimeRack {
+            visible: home.sectionVisible("runtime")
             width: parent.width
             rows: home.runtimeRows
         }
@@ -913,6 +936,7 @@ Rectangle {
             width: parent.width
             spacing: 8
             visible: home.officialAlertSummary.available
+                     && home.sectionVisible("alerts")
 
             StationSectionDivider {
                 width: parent.width
@@ -1012,11 +1036,13 @@ Rectangle {
         }
 
         StationSectionDivider {
+            visible: home.sectionVisible("relations")
             width: parent.width
             title: "LIVE HISTORY // AQI RELATIONSHIPS"
         }
 
         Row {
+            visible: home.sectionVisible("relations")
             width: parent.width
             spacing: 12
 
@@ -1056,11 +1082,13 @@ Rectangle {
         }
 
         StationSectionDivider {
+            visible: home.sectionVisible("snapshot")
             width: parent.width
             title: "SNAPSHOT // NOW"
         }
 
         Row {
+            visible: home.sectionVisible("snapshot")
             width: parent.width
             height: 118
             spacing: 12
@@ -1159,11 +1187,13 @@ Rectangle {
         }
 
         StationSectionDivider {
+            visible: home.sectionVisible("history")
             width: parent.width
             title: "RECENT HISTORY // ARCHIVED MODEL"
         }
 
         Column {
+            visible: home.sectionVisible("history")
             width: parent.width
             spacing: 9
 
@@ -1349,11 +1379,13 @@ Rectangle {
         }
 
         StationSectionDivider {
+            visible: home.sectionVisible("quick")
             width: parent.width
             title: "QUICK // CONDITIONS"
         }
 
         Row {
+            visible: home.sectionVisible("quick")
             width: parent.width
             height: 106
             spacing: 12
@@ -1437,11 +1469,13 @@ Rectangle {
         }
 
         StationSectionDivider {
+            visible: home.sectionVisible("health")
             width: parent.width
             title: "CORE SOURCE HEALTH // LAST SUCCESS + FRESHNESS"
         }
 
         Grid {
+            visible: home.sectionVisible("health")
             id: sourceHealthGrid
             width: parent.width
             columns: 3
@@ -1468,11 +1502,13 @@ Rectangle {
         }
 
         StationSectionDivider {
+            visible: home.sectionVisible("relevant")
             width: parent.width
             title: "AUTO // RELEVANT"
         }
 
         Row {
+            visible: home.sectionVisible("relevant")
             width: parent.width
             height: 118
             spacing: 12

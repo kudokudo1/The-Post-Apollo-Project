@@ -24,6 +24,26 @@ Rectangle {
     id: stationDiscovery
 
     property string domain: "map"
+    // M2b weather-only view of the existing CLASSIC map renderer.
+    property bool weatherMapOnly: false
+    property string weatherMapRoute: ""
+
+    function weatherLayerEnabled(layer) {
+        if (!weatherMapOnly || weatherMapRoute === "weather/maps")
+            return true;
+        return weatherMapRoute === "weather/maps/" + layer;
+    }
+
+    onWeatherMapRouteChanged: {
+        if (!weatherMapOnly)
+            return;
+        if (weatherMapRoute === "weather/maps/radar")
+            radarDisplaySource = "noaa";
+        else if (weatherMapRoute === "weather/maps/radar-fallback")
+            radarDisplaySource = "rainviewer";
+        if (discoveryScroll)
+            discoveryScroll.contentY = 0;
+    }
     property bool stationOpen: true
     property bool viewerOpen: false
     property var selectedNews: null
@@ -291,21 +311,21 @@ Rectangle {
     property real mapCenterLat: 0
 
     readonly property var mapPointRows:
-        MapProjection.plottable(source ? source.rows : [])
+        weatherMapOnly ? [] : MapProjection.plottable(source ? source.rows : [])
     readonly property var mapNewsMentionRows:
-        MapProjection.plottable(
+        weatherMapOnly ? [] : MapProjection.plottable(
             newsMentionOverlay
             && Array.isArray(newsMentionOverlay.locations)
             ? newsMentionOverlay.locations : []
         )
     readonly property var mapEarthquakeRows:
-        mapShowEarthquakes
+        !weatherMapOnly && mapShowEarthquakes
         && seismicSource
         && seismicSource.ready
         ? MapProjection.plottable(seismicSource.events)
         : []
     readonly property var mapGdacsRows:
-        mapShowGdacs && gdacsService.ready
+        !weatherMapOnly && mapShowGdacs && gdacsService.ready
         ? MapProjection.plottable(gdacsService.events)
         : []
     readonly property var gdacsSummary:
@@ -1060,18 +1080,34 @@ Rectangle {
     onStationOpenChanged: { if (!stationOpen) closeViewer(); }
 
     readonly property string modeTitle:
+        weatherMapOnly ? "☁  WEATHER // MAP" :
         domain === "map" ? "⌖  MAP // EVENT SOURCES"
         : domain === "news" ? "▤  NEWS // HEADLINES"
         : "◉  RADIO // STATIONS"
     readonly property string providerTitle:
+        weatherMapOnly ? "WEATHER OVERLAYS // MANUAL LOAD" :
         domain === "map" ? "WORLD EVENTS // NASA EONET + GDACS"
         : domain === "news" ? "GDELT DOC // WORLD EVENT HEADLINES"
         : "RADIO BROWSER // TOP VOTED STREAMS"
     readonly property string sourceCaution:
+        weatherMapOnly ? "NOAA MRMS + RAINVIEWER + NOAA HMS // NOT A DISASTER FEED" :
         domain === "map" ? "NATURAL EARTH + EONET + GDACS + USGS EARTHQUAKES + FIRMS + MRMS + RAINVIEWER FALLBACK + HMS SMOKE"
         : domain === "news" ? "ARTICLE DISCOVERY // LOCAL FILTERS // EXACT-HEADLINE SOURCE GROUPS // NOT FUZZY STORY CLUSTERING"
         : "STATION DIRECTORY // PERSISTENT PLAYBACK NOT YET WIRED"
     readonly property var plannedSources: {
+        if (weatherMapOnly)
+            return [
+                {name:"NATURAL EARTH // LOCAL BASEMAP", state:"CONNECTED"},
+                {name:"NOAA MRMS // MANUAL RADAR", state:mrmsRadarService.ready
+                      ? "FRAME READY" : mrmsRadarService.loading
+                        ? "RECEIVING" : "MANUAL READY"},
+                {name:"RAINVIEWER // PAST RADAR FALLBACK", state:rainViewerRadarService.ready
+                      ? "FRAME READY" : rainViewerRadarService.loading
+                        ? "RECEIVING" : "MANUAL READY"},
+                {name:"NOAA HMS // SMOKE PLUMES", state:hmsSmokeService.ready
+                      ? "PLUMES " + hmsSmokeService.polygons.length
+                      : hmsSmokeService.loading ? "RECEIVING" : "MANUAL READY"}
+            ];
         if (domain === "map")
             return [
                 {name:"NASA EONET // FILTERED EVENTS + INSPECTOR", state:"SOURCE CONNECTED"},
@@ -1185,12 +1221,14 @@ Rectangle {
             stationDiscovery.mapFilter
         )
         active: stationDiscovery.stationOpen && stationDiscovery.visible
+                && !stationDiscovery.weatherMapOnly
     }
 
     WeatherServices.GdacsService {
         id: gdacsService
         cacheStore: stationDiscovery.persistentCacheStore
         active: stationDiscovery.domain === "map"
+                && !stationDiscovery.weatherMapOnly
                 && stationDiscovery.stationOpen
                 && stationDiscovery.visible
     }
@@ -1256,7 +1294,8 @@ Rectangle {
                 }
 
                 GohuText {
-                    text: source.failed ? source.errorText
+                    text: stationDiscovery.weatherMapOnly ? "RADAR + SMOKE // MANUAL" :
+                          source.failed ? source.errorText
                           : source.loading ? "RECEIVING"
                           : source.ready
                             ? (source.usingCache ? "CACHED " : "RECEIVED ")
@@ -1269,16 +1308,19 @@ Rectangle {
             }
 
             StationRuntimeRack {
+                visible: !stationDiscovery.weatherMapOnly
                 width: parent.width
                 rows: stationDiscovery.runtimeRows
             }
 
             StationSectionDivider {
+                visible: !stationDiscovery.weatherMapOnly
                 width: parent.width
                 title: "SOURCE RACK // WHAT IS CONNECTED"
             }
 
             Column {
+                visible: !stationDiscovery.weatherMapOnly
                 width: parent.width
                 spacing: 5
 
@@ -1316,6 +1358,7 @@ Rectangle {
             }
 
             StationSectionDivider {
+                visible: !stationDiscovery.weatherMapOnly
                 width: parent.width
                 title: stationDiscovery.providerTitle
             }
@@ -1323,8 +1366,8 @@ Rectangle {
             Row {
                 id: mapFilterRail
                 width: parent.width
-                height: stationDiscovery.domain === "map" ? 34 : 0
-                visible: stationDiscovery.domain === "map"
+                height: stationDiscovery.domain === "map" && !stationDiscovery.weatherMapOnly ? 34 : 0
+                visible: stationDiscovery.domain === "map" && !stationDiscovery.weatherMapOnly
                 spacing: 8
 
                 Repeater {
@@ -1366,6 +1409,13 @@ Rectangle {
                 visible: stationDiscovery.domain === "map"
 
                 StationSectionDivider {
+                    visible: stationDiscovery.weatherMapOnly
+                    width: parent.width
+                    title: "WEATHER // RADAR + SMOKE GEOGRAPHY"
+                }
+
+                StationSectionDivider {
+                    visible: (!stationDiscovery.weatherMapOnly)
                     width: parent.width
                     title: "SPATIAL PLOT // GDACS + USGS QUAKES + EONET + FIRMS + NEWS"
                 }
@@ -1435,6 +1485,7 @@ Rectangle {
                 }
 
                 Row {
+                    visible: (!stationDiscovery.weatherMapOnly)
                     width: parent.width
                     height: 30
                     spacing: 10
@@ -1474,6 +1525,7 @@ Rectangle {
                 }
 
                 Row {
+                    visible: (!stationDiscovery.weatherMapOnly)
                     width: parent.width
                     height: 30
                     spacing: 10
@@ -1520,7 +1572,9 @@ Rectangle {
                     QuietText {
                         anchors.verticalCenter: parent.verticalCenter
                         width: Math.max(0, parent.width - 120)
-                        text: "PLOTTABLE "
+                        text: stationDiscovery.weatherMapOnly
+                              ? "WHEEL ZOOM // DRAG PAN // MANUAL RADAR + SMOKE"
+                              : "PLOTTABLE "
                               + stationDiscovery.mapPointRows.length
                               + " / " + source.rows.length
                               + " // WHEEL ZOOM // DRAG PAN"
@@ -1542,7 +1596,7 @@ Rectangle {
                 Row {
                     width: parent.width
                     height: stationDiscovery.mapNewsMentionRows.length > 0 ? 30 : 0
-                    visible: stationDiscovery.mapNewsMentionRows.length > 0
+                    visible: (!stationDiscovery.weatherMapOnly) && (stationDiscovery.mapNewsMentionRows.length > 0)
                     spacing: 10
 
                     ActionButton {
@@ -1579,11 +1633,13 @@ Rectangle {
                 }
 
                 StationSectionDivider {
+                    visible: (!stationDiscovery.weatherMapOnly)
                     width: parent.width
                     title: "FIRE HOTSPOTS // NASA FIRMS"
                 }
 
                 Row {
+                    visible: (!stationDiscovery.weatherMapOnly)
                     width: parent.width
                     height: 32
                     spacing: 10
@@ -1635,6 +1691,7 @@ Rectangle {
                 }
 
                 QuietText {
+                    visible: (!stationDiscovery.weatherMapOnly)
                     width: parent.width
                     text: "POST_APOLLO_FIRMS_MAP_KEY // OPTIONAL // KEY NEVER SHOWN OR PASSED IN PROCESS ARGV"
                     font.pixelSize: 9
@@ -1642,11 +1699,13 @@ Rectangle {
                 }
 
                 StationSectionDivider {
+                    visible: (!stationDiscovery.weatherMapOnly || stationDiscovery.weatherLayerEnabled("radar"))
                     width: parent.width
                     title: "RADAR // NOAA/NWS MRMS BASE REFLECTIVITY + 4H HISTORY"
                 }
 
                 Row {
+                    visible: (!stationDiscovery.weatherMapOnly || stationDiscovery.weatherLayerEnabled("radar") || stationDiscovery.weatherLayerEnabled("radar-fallback"))
                     width: parent.width
                     height: 30
                     spacing: 7
@@ -1686,6 +1745,7 @@ Rectangle {
                 }
 
                 Row {
+                    visible: (!stationDiscovery.weatherMapOnly || stationDiscovery.weatherLayerEnabled("radar"))
                     width: parent.width
                     height: 32
                     spacing: 10
@@ -1764,6 +1824,7 @@ Rectangle {
                 }
 
                 QuietText {
+                    visible: (!stationDiscovery.weatherMapOnly || stationDiscovery.weatherLayerEnabled("radar"))
                     width: parent.width
                     text: "NOAA / NWS / MRMS // OFFICIAL BASE REFLECTIVITY // 4H MOVING HISTORY // COVERAGE IS NOT GLOBAL"
                     font.pixelSize: 9
@@ -1771,11 +1832,13 @@ Rectangle {
                 }
 
                 StationSectionDivider {
+                    visible: (!stationDiscovery.weatherMapOnly || stationDiscovery.weatherLayerEnabled("radar-fallback"))
                     width: parent.width
                     title: "RADAR FALLBACK // RAINVIEWER PAST RADAR"
                 }
 
                 Row {
+                    visible: (!stationDiscovery.weatherMapOnly || stationDiscovery.weatherLayerEnabled("radar-fallback"))
                     width: parent.width
                     height: 32
                     spacing: 10
@@ -1851,6 +1914,7 @@ Rectangle {
                 }
 
                 Row {
+                    visible: (!stationDiscovery.weatherMapOnly || stationDiscovery.weatherLayerEnabled("radar-fallback"))
                     width: parent.width
                     height: 30
                     spacing: 10
@@ -1897,6 +1961,7 @@ Rectangle {
                 }
 
                 QuietText {
+                    visible: (!stationDiscovery.weatherMapOnly || stationDiscovery.weatherLayerEnabled("radar-fallback"))
                     width: parent.width
                     text: "RAINVIEWER API // SOURCE CREDIT REQUIRED // GLOBAL COVERAGE VARIES // PUBLIC FALLBACK HAS PAST RADAR ONLY"
                     font.pixelSize: 9
@@ -1904,11 +1969,13 @@ Rectangle {
                 }
 
                 StationSectionDivider {
+                    visible: (!stationDiscovery.weatherMapOnly || stationDiscovery.weatherLayerEnabled("smoke"))
                     width: parent.width
                     title: "SMOKE PLUMES // NOAA HMS"
                 }
 
                 Row {
+                    visible: (!stationDiscovery.weatherMapOnly || stationDiscovery.weatherLayerEnabled("smoke"))
                     width: parent.width
                     height: 32
                     spacing: 10
@@ -1964,6 +2031,7 @@ Rectangle {
                 }
 
                 Row {
+                    visible: (!stationDiscovery.weatherMapOnly || stationDiscovery.weatherLayerEnabled("smoke"))
                     width: parent.width
                     spacing: 16
 
@@ -2297,6 +2365,7 @@ Rectangle {
                         height: northWest.valid && southEast.valid
                                 ? Math.max(0, southEast.y - northWest.y) : 0
                         visible: stationDiscovery.radarDisplaySource === "noaa"
+                                 && stationDiscovery.weatherLayerEnabled("radar")
                                  && source !== ""
                                  && northWest.valid && southEast.valid
                                  && width > 0 && height > 0
@@ -2306,6 +2375,7 @@ Rectangle {
                         model: stationDiscovery.radarDisplaySource
                                === "rainviewer"
                                && rainViewerRadarService.ready
+                               && stationDiscovery.weatherLayerEnabled("radar-fallback")
                                ? rainViewerRadarService.strips : []
 
                         delegate: Image {
@@ -2369,7 +2439,8 @@ Rectangle {
                         anchors.fill: parent
                         z: 0.2
 
-                        property var smokeRows: hmsSmokeService.polygons
+                        property var smokeRows: stationDiscovery.weatherLayerEnabled("smoke")
+                                                ? hmsSmokeService.polygons : []
                         property real viewZoom: stationDiscovery.mapZoom
                         property real viewCenterLon: stationDiscovery.mapCenterLon
                         property real viewCenterLat: stationDiscovery.mapCenterLat
@@ -2879,6 +2950,7 @@ Rectangle {
 
                     Repeater {
                         model: firmsService.ready ? firmsService.hotspots : []
+                        visible: !stationDiscovery.weatherMapOnly
 
                         delegate: Item {
                             required property var modelData
@@ -2963,7 +3035,9 @@ Rectangle {
                         anchors.bottom: parent.bottom
                         anchors.margins: 7
                         z: 3
-                        text: "GDACS ALERT SQUARES // QUAKES CIRCLES // EONET DIAMONDS // FIRMS ORANGE // NEWS MAGENTA"
+                        text: stationDiscovery.weatherMapOnly
+                              ? "NOAA RADAR + HMS SMOKE // MANUAL REQUESTS"
+                              : "GDACS ALERT SQUARES // QUAKES CIRCLES // EONET DIAMONDS // FIRMS ORANGE // NEWS MAGENTA"
                         font.pixelSize: 9
                     }
                 }
@@ -4186,7 +4260,8 @@ Rectangle {
             }
 
             QuietText {
-                visible: source.failed || !source.ready || source.rows.length === 0
+                visible: !stationDiscovery.weatherMapOnly
+                         && (source.failed || !source.ready || source.rows.length === 0)
                 width: parent.width
                 text: source.failed
                       ? source.errorText + " // PRIOR DATA MAY BE STALE"
@@ -4200,6 +4275,7 @@ Rectangle {
 
             Repeater {
                 model: source.ready ? stationDiscovery.visibleRows : []
+                visible: !stationDiscovery.weatherMapOnly
 
                 delegate: Rectangle {
                     required property var modelData
@@ -4295,7 +4371,9 @@ Rectangle {
 
             QuietText {
                 width: parent.width
-                text: source.ready
+                text: stationDiscovery.weatherMapOnly
+                      ? "RADAR + SMOKE // MANUAL SOURCE REQUESTS"
+                      : source.ready
                       ? "LAST RECEIVED // "
                         + Qt.formatDateTime(source.lastUpdated, "hh:mm") + " LOCAL"
                       : "LAST RECEIVED // --"

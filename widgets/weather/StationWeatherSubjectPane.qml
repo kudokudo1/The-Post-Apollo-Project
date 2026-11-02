@@ -9,6 +9,7 @@ Rectangle {
     property string subjectRoute: ""
     property var weatherService: null
     property var nwsAlertSource: null
+    property var historyService: null
     property var seismicSource: null
     property var lightningSource: null
     property var riverSource: null
@@ -24,7 +25,39 @@ Rectangle {
         anchors.fill: parent
         active: weatherPane.visible && weatherPane.kind !== ""
         sourceComponent: weatherPane.kind === "ground"
-                         ? groundPanel : skyPanel
+                         ? groundPanel : weatherPane.kind === "home"
+                         ? homePanel : weatherPane.kind === "map"
+                         ? mapPanel : skyPanel
+    }
+
+    Component {
+        id: homePanel
+        StationHome {
+            subjectRoute: weatherPane.subjectRoute
+            weatherService: weatherPane.weatherService
+            // No cross-domain solar/Kp data is presented as WEATHER.
+            spaceService: null
+            nwsAlertSource: weatherPane.nwsAlertSource
+            historyService: weatherPane.historyService
+            liveHistoryStore: weatherPane.liveHistoryStore
+            runtimeNowMs: weatherPane.runtimeNowMs
+        }
+    }
+
+    Component {
+        id: mapPanel
+        StationDiscovery {
+            domain: "map"
+            weatherMapOnly: true
+            weatherMapRoute: weatherPane.subjectRoute
+            stationOpen: weatherPane.visible
+            seismicSource: weatherPane.seismicSource
+            lightningSource: weatherPane.lightningSource
+            riverSource: weatherPane.riverSource
+            weatherService: weatherPane.weatherService
+            persistentCacheStore: weatherPane.persistentCacheStore
+            runtimeNowMs: weatherPane.runtimeNowMs
+        }
     }
 
     Component {

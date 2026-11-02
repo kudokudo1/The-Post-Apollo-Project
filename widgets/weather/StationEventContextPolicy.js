@@ -183,6 +183,7 @@ function radarCoverage(
         timeLabel: isFinite(requested) && requested > 0
             ? utcLabel(requested) : "LATEST FRAME",
         usingCache: usingCache === true,
+        timeMs: isFinite(requested) && requested > 0 ? requested : -1,
         status: !hasFrame
             ? "NO LOADED MRMS FRAME"
             : !hasPoint
@@ -233,6 +234,7 @@ function lightningCoverage(
         resolutionKm: resolution,
         radiusKm: radius,
         usingCache: usingCache === true,
+        timeMs: parseMillis(latestTime),
         status: !hasFrame
             ? "NO LOADED LIGHTNING FRAME"
             : !hasPoint
@@ -241,6 +243,218 @@ function lightningCoverage(
                 ? "FRAME COVERS EVENT COORDINATE"
                 : "EVENT OUTSIDE LIGHTNING FRAME"
     };
+}
+
+function isFloodLike(selected) {
+    if (!selected)
+        return false;
+    return safeText(selected.typeLabel, 80)
+        .toUpperCase().indexOf("FLOOD") >= 0;
+}
+
+function compactReading(value, units) {
+    const number = finite(value, null);
+    if (number === null)
+        return "--";
+    const suffix = safeText(units, 16);
+    return number.toFixed(2) + (suffix ? " " + suffix : "");
+}
+
+function latestObservedStage(stageflow) {
+    const observed = stageflow
+        && stageflow.observed
+        && stageflow.observed.available
+        && Array.isArray(stageflow.observed.data)
+        ? stageflow.observed : null;
+    if (!observed || observed.data.length === 0)
+        return null;
+    const row = observed.data[observed.data.length - 1];
+    const timeMs = finite(row.validMillis, -1);
+    return {
+        value: finite(row.primary, null),
+        units: safeText(observed.primaryUnits, 24),
+        timeMs: timeMs,
+        timeLabel: safeText(row.validLabel, 48) || utcLabel(timeMs)
+    };
+}
+
+function floodGaugeContext(
+    selected, gauge, gaugeContext, stageflow, maximumDistanceKm
+) {
+    const relevant = isFloodLike(selected);
+    const limit = Math.max(
+        10,
+        Math.min(250, Number(maximumDistanceKm) || 100)
+    );
+    const base = {
+        relevant: relevant,
+        available: false,
+        reason: "",
+        maximumDistanceKm: limit,
+        gaugeName: "",
+        gaugeId: "",
+        eventGaugeDistanceKm: -1,
+        weatherFixGaugeDistanceKm: -1,
+        observedCategory: "NOT DEFINED",
+        forecastCategory: "NOT DEFINED",
+        observedReading: "--",
+        latestObserved: null,
+        thresholds: [],
+        impacts: [],
+        contextAvailable: false
+    };
+
+    if (!relevant) {
+        base.reason = "SELECTED EVENT IS NOT AN EXPLICIT FLOOD";
+        return base;
+    }
+    if (!selected || selected.hasPoint !== true) {
+        base.reason = "FLOOD EVENT HAS NO POINT COORDINATE";
+        return base;
+    }
+    if (!gauge || !validPoint(gauge.latitude, gauge.longitude)) {
+        base.reason = "NWPS GAUGE CONTEXT UNAVAILABLE";
+        return base;
+    }
+
+    const distance = distanceKm(
+        selected.latitude, selected.longitude,
+        gauge.latitude, gauge.longitude
+    );
+    base.gaugeName = safeText(gauge.name, 160);
+    base.gaugeId = safeText(gauge.lid, 40);
+    base.eventGaugeDistanceKm = distance;
+    base.weatherFixGaugeDistanceKm = finite(gauge.distanceKm, -1);
+    base.observedCategory = gauge.observedCategory
+        ? safeText(gauge.observedCategory.label, 40) : "NOT DEFINED";
+    base.forecastCategory = gauge.forecastCategory
+        ? safeText(gauge.forecastCategory.label, 40) : "NOT DEFINED";
+    base.observedReading = compactReading(
+        gauge.observedPrimary,
+        gauge.primaryUnits
+    );
+
+    const latest = latestObservedStage(stageflow);
+    base.latestObserved = latest;
+
+    const context = gaugeContext
+        && typeof gaugeContext === "object"
+        && gaugeContext.available === true
+        ? gaugeContext : null;
+    if (context) {
+        base.contextAvailable = true;
+        base.thresholds = Array.isArray(context.thresholds)
+            ? context.thresholds.slice(0, 4) : [];
+        base.impacts = Array.isArray(context.impacts)
+            ? context.impacts.slice(0, 2) : [];
+    }
+
+    if (distance < 0 || distance > limit) {
+        base.reason = "NEAREST WEATHER-FIX GAUGE IS OUTSIDE "
+            + Math.round(limit) + " KM EVENT GATE";
+        return base;
+    }
+
+    base.available = true;
+    base.reason = context
+        ? "NEARBY NWPS GAUGE + OFFICIAL FLOOD METADATA"
+        : "NEARBY NWPS GAUGE // METADATA NOT LOADED";
+    return base;
+}
+
+function timelineRow(sourceLabel, kind, label, timeMs, provenance) {
+    const time = finite(timeMs, -1);
+    if (time <= 0)
+        return null;
+    return {
+        sourceLabel: safeText(sourceLabel, 40),
+        kind: safeText(kind, 40),
+        label: safeText(label, 180),
+        timeMs: time,
+        timeLabel: utcLabel(time),
+        provenance: safeText(provenance, 80)
+    };
+}
+
+function evidenceTimeline(
+    selected, companions, radarContext,
+    lightningContext, floodContext, maximum
+) {
+    const rows = [];
+    function add(row) {
+        if (row)
+            rows.push(row);
+    }
+
+    if (selected) {
+        add(timelineRow(
+            selected.sourceLabel,
+            "SELECTED EVENT",
+            selected.typeLabel + " // " + selected.title,
+            selected.timeMs,
+            "SOURCE EVENT TIME"
+        ));
+    }
+
+    const nearby = Array.isArray(companions) ? companions : [];
+    for (let i = 0; i < nearby.length; i++) {
+        const row = nearby[i] || {};
+        add(timelineRow(
+            row.sourceLabel,
+            "NEARBY RECORD",
+            row.typeLabel + " // " + row.title,
+            row.timeMs,
+            "INDEPENDENT SOURCE RECORD"
+        ));
+    }
+
+    if (radarContext && radarContext.available) {
+        add(timelineRow(
+            "NOAA MRMS",
+            "RADAR FRAME",
+            radarContext.frameLabel || "FRAME",
+            radarContext.timeMs,
+            "LOADED FRAME TIME"
+        ));
+    }
+
+    if (lightningContext && lightningContext.available) {
+        add(timelineRow(
+            "NOAA NOWCOAST",
+            "LIGHTNING FRAME",
+            String(lightningContext.windowMinutes || 15)
+                + "M DENSITY",
+            lightningContext.timeMs,
+            "LOADED FRAME TIME"
+        ));
+    }
+
+    if (floodContext && floodContext.available
+            && floodContext.latestObserved) {
+        add(timelineRow(
+            "NOAA NWPS",
+            "OBSERVED STAGE",
+            floodContext.gaugeId + " // "
+                + compactReading(
+                    floodContext.latestObserved.value,
+                    floodContext.latestObserved.units
+                  ),
+            floodContext.latestObserved.timeMs,
+            "GAUGE OBSERVATION TIME"
+        ));
+    }
+
+    rows.sort(function(a, b) {
+        if (a.timeMs !== b.timeMs)
+            return b.timeMs - a.timeMs;
+        return a.sourceLabel.localeCompare(b.sourceLabel);
+    });
+
+    const limit = Math.max(
+        1,
+        Math.min(12, Math.floor(Number(maximum) || 8))
+    );
+    return rows.slice(0, limit);
 }
 
 function weatherFixDistance(selected, latitude, longitude) {

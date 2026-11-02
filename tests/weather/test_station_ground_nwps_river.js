@@ -166,10 +166,35 @@ assert.match(
 );
 assert.doesNotMatch(service, /waterservices\.usgs\.gov|nwm|National Water Model/i);
 
+const station = read("widgets/weather/WeatherStationW.qml");
 const ground = read("widgets/weather/StationGround.qml");
-assert.match(ground, /WeatherServices\.NwpsRiverService\s*\{/);
-assert.match(ground, /latitude: weatherService \? weatherService\.latitude : ""/);
-assert.match(ground, /longitude: weatherService \? weatherService\.longitude : ""/);
+const mapUi = read("widgets/weather/StationDiscovery.qml");
+
+assert.equal(
+    (station.match(/WeatherServices\.NwpsRiverService\s*\{/g) || []).length,
+    1
+);
+assert.equal(
+    (ground.match(/WeatherServices\.NwpsRiverService\s*\{/g) || []).length,
+    0
+);
+assert.equal(
+    (mapUi.match(/WeatherServices\.NwpsRiverService\s*\{/g) || []).length,
+    0
+);
+assert.match(station, /id: riverService/);
+assert.match(station, /weatherStation\.currentView === "ground"/);
+assert.match(station, /weatherStation\.currentView === "map"/);
+assert.match(
+    station,
+    /StationGround\s*\{[\s\S]*?riverSource: riverService/
+);
+assert.match(
+    station,
+    /StationDiscovery\s*\{[\s\S]*?domain: "map"[\s\S]*?riverSource: riverService/
+);
+assert.match(ground, /property var riverSource: null/);
+assert.match(ground, /readonly property var riverService: riverSource/);
 assert.match(ground, /title: "RIVER \/\/ NOAA NWPS"/);
 assert.match(ground, /NEARBY GAUGE/);
 assert.match(ground, /OBSERVED \/\/ PRIMARY/);

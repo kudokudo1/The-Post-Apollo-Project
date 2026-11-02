@@ -8,15 +8,29 @@ Rectangle {
     property real weatherFixDistanceKm: -1
     property var radarContext: null
     property var lightningContext: null
+    property var floodContext: null
+    property var timelineRows: []
     property var companions: []
     property color accentColor: Colors.magenta
 
     readonly property int companionCount:
         Array.isArray(companions) ? companions.length : 0
+    readonly property int timelineCount:
+        Array.isArray(timelineRows) ? timelineRows.length : 0
+    readonly property bool floodRelevant:
+        !!floodContext && floodContext.relevant === true
+    readonly property int floodHeight:
+        !floodRelevant ? 0
+        : floodContext.available ? 150 : 64
 
     visible: eventContext !== null
     width: parent ? parent.width : 0
-    height: visible ? 218 + Math.min(4, companionCount) * 42 : 0
+    height: visible
+        ? 260
+          + Math.min(4, companionCount) * 42
+          + Math.min(6, timelineCount) * 36
+          + floodHeight
+        : 0
 
     color: Colors.dark
     border.width: 1
@@ -134,6 +148,117 @@ Rectangle {
             elide: Text.ElideRight
         }
 
+        Column {
+            width: parent.width
+            spacing: 4
+            visible: card.floodRelevant
+
+            GohuText {
+                width: parent.width
+                text: "FLOOD DOSSIER // NOAA NWPS"
+                font.pixelSize: 10
+                color: Colors.cyan
+            }
+
+            QuietText {
+                width: parent.width
+                text: card.floodContext
+                    ? card.floodContext.reason : ""
+                font.pixelSize: 8
+                color: card.floodContext
+                       && card.floodContext.available
+                       ? Colors.green : Colors.orange
+                elide: Text.ElideRight
+            }
+
+            GohuText {
+                visible: card.floodContext
+                         && card.floodContext.available
+                width: parent.width
+                text: card.floodContext
+                    ? card.floodContext.gaugeName
+                      + " // LID " + card.floodContext.gaugeId
+                      + " // EVENT "
+                      + Math.round(
+                          card.floodContext.eventGaugeDistanceKm
+                        )
+                      + " KM // FIX "
+                      + Math.round(
+                          card.floodContext.weatherFixGaugeDistanceKm
+                        )
+                      + " KM"
+                    : ""
+                font.pixelSize: 9
+                color: Colors.white
+                elide: Text.ElideRight
+            }
+
+            QuietText {
+                visible: card.floodContext
+                         && card.floodContext.available
+                width: parent.width
+                text: card.floodContext
+                    ? "OBSERVED "
+                      + card.floodContext.observedCategory
+                      + " // "
+                      + card.floodContext.observedReading
+                      + " // FORECAST "
+                      + card.floodContext.forecastCategory
+                    : ""
+                font.pixelSize: 8
+                color: Colors.cyan
+                elide: Text.ElideRight
+            }
+
+            QuietText {
+                visible: card.floodContext
+                         && card.floodContext.available
+                         && card.floodContext.thresholds.length > 0
+                width: parent.width
+                text: card.floodContext
+                    ? "OFFICIAL THRESHOLDS // "
+                      + card.floodContext.thresholds.map(
+                          function(row) {
+                              return row.label + " "
+                                  + (row.stage === null
+                                     ? "--"
+                                     : Number(row.stage).toFixed(2));
+                          }
+                        ).join(" // ")
+                    : ""
+                font.pixelSize: 8
+                color: Colors.magenta
+                elide: Text.ElideRight
+            }
+
+            QuietText {
+                visible: card.floodContext
+                         && card.floodContext.available
+                         && card.floodContext.impacts.length > 0
+                width: parent.width
+                text: card.floodContext
+                    ? "IMPACT CONTEXT // "
+                      + card.floodContext.impacts.map(
+                          function(row) {
+                              return Number(row.stage).toFixed(2)
+                                  + " // " + row.statement;
+                          }
+                        ).join(" | ")
+                    : ""
+                font.pixelSize: 8
+                color: Colors.orange
+                elide: Text.ElideRight
+            }
+
+            QuietText {
+                width: parent.width
+                text: "NEARBY GAUGE EVIDENCE ONLY // EVENT POINT ≠ GAUGE CATCHMENT // NOT A FLOOD WARNING"
+                font.pixelSize: 8
+                color: Colors.orange
+                elide: Text.ElideRight
+            }
+        }
+
         GohuText {
             width: parent.width
             text: "NEARBY INDEPENDENT MAP RECORDS // "
@@ -183,6 +308,71 @@ Rectangle {
                         elide: Text.ElideRight
                     }
                 }
+            }
+        }
+
+        Column {
+            width: parent.width
+            spacing: 4
+            visible: card.timelineCount > 0
+
+            GohuText {
+                width: parent.width
+                text: "EVIDENCE TIMELINE // SOURCE-NATIVE TIMES"
+                font.pixelSize: 10
+                color: Colors.magenta
+            }
+
+            Repeater {
+                model: Array.isArray(card.timelineRows)
+                    ? card.timelineRows.slice(0, 6) : []
+
+                delegate: Rectangle {
+                    required property var modelData
+                    width: card.width - 20
+                    height: 31
+                    color: Colors.black
+                    border.width: 1
+                    border.color: Colors.cyan
+
+                    Row {
+                        anchors.fill: parent
+                        anchors.margins: 5
+                        spacing: 7
+
+                        GohuText {
+                            width: 92
+                            text: modelData.timeLabel
+                            font.pixelSize: 8
+                            color: Colors.cyan
+                            elide: Text.ElideRight
+                        }
+
+                        GohuText {
+                            width: 88
+                            text: modelData.sourceLabel
+                            font.pixelSize: 8
+                            color: Colors.magenta
+                            elide: Text.ElideRight
+                        }
+
+                        QuietText {
+                            width: Math.max(0, parent.width - 194)
+                            text: modelData.kind + " // "
+                                + modelData.label
+                            font.pixelSize: 8
+                            elide: Text.ElideRight
+                        }
+                    }
+                }
+            }
+
+            QuietText {
+                width: parent.width
+                text: "CHRONOLOGY ONLY // ROWS RETAIN SOURCE PROVENANCE // NOT ONE MERGED INCIDENT HISTORY"
+                font.pixelSize: 8
+                color: Colors.orange
+                elide: Text.ElideRight
             }
         }
 

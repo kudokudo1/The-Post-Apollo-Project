@@ -33,6 +33,7 @@ Scope {
     property bool hostRefreshing: false
     property string hostError: ""
     property string resyncStatus: "idle"
+    property bool resyncConfirmRequired: false
     property string resyncMessage: "NOT REQUESTED"
 
     function adjustedEpochMs(epochMs) {
@@ -93,9 +94,26 @@ Scope {
         ]);
     }
 
-    function requestResync() {
+    function prepareResync() {
         if (resyncProcess.running)
             return;
+        resyncConfirmRequired = true;
+        resyncStatus = "confirm";
+        resyncMessage = "CONFIRM ONE-SHOT HOST TIME CORRECTION BELOW";
+    }
+
+    function cancelResync() {
+        if (!resyncConfirmRequired)
+            return;
+        resyncConfirmRequired = false;
+        resyncStatus = "idle";
+        resyncMessage = "RESYNC CANCELLED // CLOCK UNCHANGED";
+    }
+
+    function requestResync() {
+        if (!resyncConfirmRequired || resyncProcess.running)
+            return;
+        resyncConfirmRequired = false;
         resyncStatus = "working";
         resyncMessage = "REQUESTING FRESH TIME MEASUREMENTS...";
         resyncProcess.exec([

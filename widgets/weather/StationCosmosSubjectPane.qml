@@ -22,7 +22,10 @@ Rectangle {
         active: cosmosPane.visible && cosmosPane.kind !== ""
         sourceComponent: cosmosPane.kind === "overview"
                          ? overviewComponent : cosmosPane.kind === "sky"
-                         ? skyComponent : spaceComponent
+                         ? skyComponent
+                         : (cosmosPane.subjectRoute === "cosmos/space-weather/overview"
+                            || cosmosPane.subjectRoute === "cosmos/space-weather/history")
+                           ? spaceTimelineComponent : spaceComponent
     }
 
     Component {
@@ -37,6 +40,17 @@ Rectangle {
     Component {
         id: spaceComponent
         StationSpace {
+            subjectRoute: cosmosPane.subjectRoute
+            spaceService: cosmosPane.spaceService
+            weatherService: cosmosPane.weatherService
+            liveHistoryStore: cosmosPane.liveHistoryStore
+            runtimeNowMs: cosmosPane.runtimeNowMs
+        }
+    }
+
+    Component {
+        id: spaceTimelineComponent
+        StationSpaceWeatherTimelinePane {
             subjectRoute: cosmosPane.subjectRoute
             spaceService: cosmosPane.spaceService
             weatherService: cosmosPane.weatherService

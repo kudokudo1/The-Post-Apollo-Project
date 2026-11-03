@@ -11,6 +11,7 @@ on:
       - "widgets/weather/StationDiscovery.qml"
       - "services/weather/WeatherDossierArchiveStore.qml"
       - ".github/workflows/weather-dossier-multiprovider-m26e.yml"
+      - "docs/weather-dossier-m26e-multiprovider-identity-handoff.md"
   workflow_dispatch:
 
 permissions:
@@ -38,5 +39,5 @@ jobs:
         run: bash scripts/weather/verify_dossier_multiprovider_fedora_m26e.sh
       - name: M25 persistence and identity regression
         run: node tests/weather/test_weather_dossier_persistent_m25.js
-      - name: M26-D single-source MAP regression
+      - name: M26-A disposable FileView callback regression
         run: node tests/weather/test_weather_dossier_disposable_restart_m26.js

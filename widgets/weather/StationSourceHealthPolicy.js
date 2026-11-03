@@ -35,6 +35,7 @@ function accentFor(state) {
     case "DEGRADED":
     case "CACHE":
     case "FALLBACK": return "yellow";
+    case "FALLBACK STALE": return "orange";
     case "CACHE STALE": return "orange";
     case "OFFLINE": return "red";
     default: return "white";
@@ -59,7 +60,7 @@ function sourceRow(config, nowMs) {
     if (cached && ready)
         state = stale ? "CACHE STALE" : "CACHE";
     else if (fallback && ready)
-        state = "FALLBACK";
+        state = stale ? "FALLBACK STALE" : "FALLBACK";
     else if (loading && error)
         state = "RETRYING";
     else if (loading)
@@ -75,7 +76,9 @@ function sourceRow(config, nowMs) {
     if (cached && ready)
         detail = "LAST KNOWN // " + String(source.provider || "UNKNOWN");
     else if (fallback && ready)
-        detail = "FALLBACK // " + String(source.provider || "UNKNOWN");
+        detail = "FALLBACK // " + String(source.provider || "UNKNOWN")
+                 + (stale && freshnessAge >= 0
+                    ? " // SAMPLE " + compactAge(freshnessAge) + " OLD" : "");
     else if (error)
         detail = "LAST FAILURE // " + error.toUpperCase();
     else if (stale && freshnessAge >= 0)

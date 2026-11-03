@@ -110,6 +110,28 @@ test("six shared source-health rows reuse HOME's sample-age conventions", () => 
   const none=plain(health.buildCoreSources(tools.sourceInput(null,null,now)));
   assert.equal(none.length,6);
   assert.ok(none.every(x=>x.state==="OFFLINE"));
+  // M7: TOOLS must use the same truthful provenance as HOME and the header.
+  const fallbackWeather={
+    ...weather,activeWeatherProvider:"OPEN_METEO",
+    usingPersistentCurrentCache:false,usingPersistentAqiCache:false
+  };
+  const fallback=tools.sourceInput(fallbackWeather,space,now);
+  const fallbackRows=plain(health.buildCoreSources(fallback));
+  assert.equal(fallbackRows[0].provider,"OPEN-METEO");
+  assert.equal(fallbackRows[0].state,"FALLBACK");
+  assert.equal(fallbackRows[1].state,"LIVE");
+  const cachedWeather={
+    ...fallbackWeather,activeWeatherProvider:"CACHE",
+    usingPersistentCurrentCache:true,cachedWeatherProvider:"OPEN_METEO",
+    usingPersistentAqiCache:true
+  };
+  const cache=plain(health.buildCoreSources(
+      tools.sourceInput(cachedWeather,space,now)));
+  assert.equal(cache[0].state,"CACHE");
+  assert.equal(cache[0].provider,"CACHE // OPEN-METEO");
+  assert.equal(cache[0].footer,"LAST SUCCESS -- // SAMPLE 2m");
+  assert.equal(cache[1].state,"CACHE");
+  assert.equal(cache[1].footer,"LAST SUCCESS -- // SAMPLE 3m");
   assert.match(pane,/SourceHealth\.buildCoreSources\(/);
   assert.match(pane,/ToolsPolicy\.sourceInput\(weatherService,spaceService,runtimeNowMs\)/);
 });

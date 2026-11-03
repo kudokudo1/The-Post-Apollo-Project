@@ -92,6 +92,11 @@ current = row({fallback:true,provider:"OPEN-METEO"});
 assert.equal(current.state, "FALLBACK");
 assert.equal(current.accent, "yellow");
 assert.match(current.detail, /FALLBACK/);
+current = row({fallback:true,provider:"OPEN-METEO",
+               lastSuccessMs:now-21*60000});
+assert.equal(current.state, "FALLBACK STALE");
+assert.equal(current.accent, "orange");
+assert.match(current.detail, /SAMPLE 21m OLD/);
 current = row({cached:false,fallback:false});
 assert.equal(current.state, "LIVE");
 

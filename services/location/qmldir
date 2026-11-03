@@ -1,0 +1,3 @@
+module qs.services.location
+
+singleton PlaceRegistry 1.0 PlaceRegistry.qml

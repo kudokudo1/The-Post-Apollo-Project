@@ -85,9 +85,10 @@ test("EARTH MAPS is compact, EONET source route retains full event list",()=>{
   assert.match(qml,/import "StationMapCompanionPolicy.js" as MapCompanion/);
   assert.match(qml,/earthMapRoute === "earth\/events\/eonet"\s*\? visibleRows/);
   assert.match(qml,/MapCompanion\.previewEonet\(\s*mapPointRows, selectedMapEvent, mapVisibleBounds, 4/);
-  assert.match(qml,/model: stationDiscovery.earthLayerEnabled\("eonet"\)\s*&& source.ready\s*\? stationDiscovery.mapCompanionEonetRows/);
+  assert.match(qml,/model: stationDiscovery.domain === "map"\s*&& stationDiscovery.earthMapOnly\s*&& stationDiscovery.earthLayerEnabled\("eonet"\)\s*&& source.ready\s*\? stationDiscovery.mapCompanionEonetRows/);
   assert.match(qml,/EARTH MAP CONTEXT \/\/ EONET EVENTS IN VIEW/);
   assert.match(qml,/NASA EONET \/\/ FULL EVENT LIST/);
+  assert.ok(!qml.includes('model: stationDiscovery.earthLayerEnabled("eonet")\n                            && source.ready'),"avoid hidden event delegates under MEDIA NEWS");
   assert.match(qml,/COMPLETE LIST UNDER EARTH → EVENTS → EONET/);
   assert.match(earthPane,/domain: "map"/);
   assert.match(qml,/StationEventContextCard\s*\{/);

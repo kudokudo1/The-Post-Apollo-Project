@@ -3370,7 +3370,9 @@ Rectangle {
                     font.pixelSize: 9
                 }
                 Repeater {
-                    model: stationDiscovery.earthLayerEnabled("eonet")
+                    model: stationDiscovery.domain === "map"
+                            && stationDiscovery.earthMapOnly
+                            && stationDiscovery.earthLayerEnabled("eonet")
                             && source.ready
                         ? stationDiscovery.mapCompanionEonetRows : []
                     delegate: discoveryRecordCard

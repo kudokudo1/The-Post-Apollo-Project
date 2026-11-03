@@ -68,6 +68,20 @@ if [[ "$mode" == "--preflight" ]]; then
     exit 0
 fi
 
+# A dirty local checkout may have different QML/host behavior. Before
+# actually executing it, pin the THREE executable entrypoints to reviewed
+# GitHub main blobs. git hash-object READS bytes; it never stages or writes.
+if ! command -v git >/dev/null 2>&1; then
+    printf 'M13J_GIT_HASH_TOOL_MISSING\n'
+    exit 2
+fi
+if [[ "$(git hash-object -- "$component")" != "069a1be6fa9cc2b77d5e1701debf1b4c8b269ac2" ||
+      "$(git hash-object -- "$host")" != "6d49e3e2067b45b8ab243ed70461b4ea61689daf" ||
+      "$(git hash-object -- "$panel")" != "46dded5561e4c9b79ee2ef0820f838a9833d838e" ]]; then
+    printf 'M13J_SOURCE_NOT_REVIEWED\n'
+    exit 2
+fi
+
 # No writes or repair. This starts another, separately scoped Quickshell
 # instance; never quits, reloads or signals any running production instance.
 if command -v quickshell >/dev/null 2>&1; then

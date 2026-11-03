@@ -1,0 +1,23 @@
+name: MAGICK celestial contract M0
+on:
+  pull_request:
+    paths:
+      - 'scripts/weather/celestial_contract.py'
+      - 'tests/weather/test_celestial_contract_m0.py'
+      - '.github/workflows/weather-magick-celestial-contract-m0.yml'
+  push:
+    paths:
+      - 'scripts/weather/celestial_contract.py'
+      - 'tests/weather/test_celestial_contract_m0.py'
+      - '.github/workflows/weather-magick-celestial-contract-m0.yml'
+  workflow_dispatch:
+jobs:
+  contract:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Validate M0 celestial contract
+        run: python3 -m unittest discover -s tests/weather -p 'test_celestial_contract_m0.py' -v

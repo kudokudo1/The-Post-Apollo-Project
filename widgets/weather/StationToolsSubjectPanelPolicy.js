@@ -147,6 +147,30 @@ function sourceInput(weather,space,nowMs) {
 // M28-I: the original SPACE FIELD TIME values, not runtime catalogue specs.
 // Read the SAME four existing NOAA SpaceService sample clocks and receipt dates.
 // A fresh network receipt must never silently mean a fresh provider sample.
+// M28-L: exact GROUND SOURCE provenance from the existing WeatherService.
+// This is the weather response's fix, not the device GPS position or NWS point.
+// AQI provider clock is independent of the latest HTTP receipt.
+function groundSourceRows(weather) {
+    var w=weather||null;
+    var lat=w&&w.latitude!==undefined&&w.latitude!==null
+        ? String(w.latitude).trim():"";
+    var lon=w&&w.longitude!==undefined&&w.longitude!==null
+        ? String(w.longitude).trim():"";
+    var valid=lat!==""&&lon!==""&&isFinite(Number(lat))
+        &&isFinite(Number(lon))&&Math.abs(Number(lat))<=90
+        &&Math.abs(Number(lon))<=180;
+    var aqiTime=w&&w.aqiReady
+        ? String(w.airQualitySourceTime||"").trim():"";
+    return [
+        {id:"weather-fix",title:"POSITION // WEATHER FIX",
+         value:valid?"LAT "+lat+"   LON "+lon:"LAT --   LON --",
+         detail:"CURRENT PROVIDER WEATHER FIX // NOT DEVICE GPS"},
+        {id:"aqi-sample",title:"AIR QUALITY // SAMPLE",
+         value:aqiTime!==""?aqiTime:"--",
+         detail:"OPEN-METEO PROVIDER SAMPLE CLOCK // NOT NETWORK RECEIPT"}
+    ];
+}
+
 function fieldTimeRows(space,nowMs) {
     var s=space || null;
     var h=sourceInput(null,s,nowMs);

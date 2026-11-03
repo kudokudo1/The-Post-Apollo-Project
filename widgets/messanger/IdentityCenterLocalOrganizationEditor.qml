@@ -8,6 +8,23 @@ Column {
     // Optional focus supplied by the one-page editing selector.
     // Empty focus retains the accepted all-organizations editor.
     property string focusedOrganizationId: ""
+    property string searchQuery: ""
+    readonly property string normalizedSearch: searchQuery.trim().toLowerCase()
+    function matchesOrganization(org) {
+        if (normalizedSearch.length === 0) return true;
+        if ((String(org.name) + " " + String(org.kind) + " " + String(org.id))
+                .toLowerCase().indexOf(normalizedSearch) !== -1) return true;
+        return Array.isArray(org.branches) && org.branches.some(function(branch) {
+            return (String(branch.name) + " " + String(branch.id))
+                .toLowerCase().indexOf(editor.normalizedSearch) !== -1;
+        });
+    }
+    function matchesBranch(org, branch) {
+        if (normalizedSearch.length === 0) return true;
+        return (String(org.name) + " " + String(org.kind) + " "
+                + String(branch.name) + " " + String(branch.id))
+                .toLowerCase().indexOf(normalizedSearch) !== -1;
+    }
     property string newKind: "llc"
     property bool showArchived: false
     property string confirmationKey: ""
@@ -137,6 +154,7 @@ Column {
             visible: (!modelData.archived || editor.showArchived)
                      && (editor.focusedOrganizationId === ""
                          || editor.focusedOrganizationId === modelData.id)
+                     && editor.matchesOrganization(modelData)
             height: visible ? implicitHeight : 0
 
             Rectangle {
@@ -215,7 +233,8 @@ Column {
                         required property var modelData
                         width: parent.width
                         spacing: 6
-                        visible: !modelData.archived || editor.showArchived
+                        visible: (!modelData.archived || editor.showArchived)
+                                 && editor.matchesBranch(orgRow.modelData, modelData)
                         height: visible ? 28 : 0
                         Rectangle {
                             width: Math.max(90, parent.width - 194)

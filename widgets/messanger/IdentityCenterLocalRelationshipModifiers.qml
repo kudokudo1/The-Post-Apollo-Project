@@ -18,6 +18,8 @@ Column {
     property string selectedOrgId: ""
     // Parent page may supply the same local editing focus used by Structure.
     property bool useSharedContext: false
+    property string searchQuery: ""
+    readonly property string normalizedSearch: searchQuery.trim().toLowerCase()
     property string selectedSourceId: ""
     property string selectedSourceKind: ""
     property string modifier: "location"
@@ -115,6 +117,12 @@ Column {
         .concat(items(branchLocationStore, "branch-location"))
         .concat(items(reportingStore, "reporting"))
         .concat(items(socialLinksStore, "social"))
+    readonly property var visibleSavedEntries:
+        savedEntries.filter(function(link) {
+            return editor.normalizedSearch.length === 0 ||
+                (editor.describe(link) + " " + link.id)
+                    .toLowerCase().indexOf(editor.normalizedSearch) !== -1;
+        })
     readonly property bool validSelection:
         directoryReady && structureReady && selectedOrg !== null
         && selectedSource !== null
@@ -684,13 +692,13 @@ Column {
         wrapMode: Text.WordWrap
     }
     Repeater {
-        model: editor.savedEntries
+        model: editor.visibleSavedEntries
         delegate: Column {
             id: itemRow
             required property var modelData
             width: editor.width
             spacing: 5
-            visible: editor.showAll || (
+            visible: editor.showAll || editor.normalizedSearch.length > 0 || (
                 editor.selectedOrgId !== ""
                 && editor.selectedOrgId === modelData.orgId)
             height: visible ? implicitHeight : 0

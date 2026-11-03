@@ -7,6 +7,17 @@ Column {
     id: editor
     property var directoryStore: null
     property var structureStore: null
+    property string searchQuery: ""
+    readonly property string normalizedSearch: searchQuery.trim().toLowerCase()
+    function matchesUnit(unit) {
+        if (normalizedSearch.length === 0) return true;
+        const org = organizations.find(function(item) {
+            return item.id === unit.orgId;
+        });
+        return (String(unit.name) + " " + String(unit.kind) + " " + String(unit.id)
+                + " " + (org ? String(org.name) : ""))
+                .toLowerCase().indexOf(normalizedSearch) !== -1;
+    }
     property string selectedOrgId: ""
     property bool useSharedContext: false
     onSelectedOrgIdChanged: confirmationKey = ""
@@ -33,8 +44,10 @@ Column {
     readonly property var visibleUnits: structureStore && structureStore.saved
         ? structureStore.saved.units.filter(function(unit) {
             return unit.orgId === editor.selectedOrgId
-                && unit.kind === editor.selectedKind
-                && (!unit.archived || editor.showArchivedUnits);
+                && (editor.normalizedSearch.length > 0
+                    || unit.kind === editor.selectedKind)
+                && (!unit.archived || editor.showArchivedUnits)
+                && editor.matchesUnit(unit);
         }) : []
     readonly property var allUnits: structureStore && structureStore.saved
         ? structureStore.saved.units : []

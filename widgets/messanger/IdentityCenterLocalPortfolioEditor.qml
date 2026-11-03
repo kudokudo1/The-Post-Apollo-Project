@@ -7,6 +7,18 @@ Column {
     id: editor
     property var portfolioStore: null
     property var directoryStore: null
+    property string searchQuery: ""
+    readonly property string normalizedSearch: searchQuery.trim().toLowerCase()
+    function matchesPortfolio(portfolio) {
+        if (normalizedSearch.length === 0) return true;
+        let values = String(portfolio.name) + " " + String(portfolio.id);
+        for (const orgId of portfolio.orgIds) {
+            const org = organizationFor(orgId);
+            values += " " + (org ? String(org.name) + " " + String(org.kind)
+                                  : String(orgId));
+        }
+        return values.toLowerCase().indexOf(normalizedSearch) !== -1;
+    }
     property bool showArchived: false
     property string confirmationKey: ""
     readonly property bool editable: portfolioStore !== null
@@ -139,7 +151,8 @@ Column {
             required property var modelData
             width: editor.width
             spacing: 6
-            visible: !modelData.archived || editor.showArchived
+            visible: (!modelData.archived || editor.showArchived)
+                     && editor.matchesPortfolio(modelData)
             height: visible ? implicitHeight : 0
             Rectangle {
                 width: parent.width

@@ -407,6 +407,115 @@ class RealQtOrganizationsSettingsPaneSmoke(unittest.TestCase):
             self.assertEqual(modifier.property("selectedOrgId"), "")
             self.assertFalse(modifier.property("validSelection"))
 
+    def test_unified_local_search_finds_records_without_new_menus(self):
+        self._open_organizations()
+        search = self.sections.findChild(QObject, "orgLocalSearch")
+        self.assertIsNotNone(search)
+        self.assertEqual(search.property("searchText"), "")
+        self.assertEqual(search.property("matchCount"), 0)
+
+        # Genuine JS arrays, exactly as the JSON-backed local stores expose,
+        # but entirely synthetic and disconnected from user data.
+        fixtures = {
+            "localDirectoryStore": {"state": "ready", "saved": {
+                "organizations": [
+                    {"id": "org-1", "name": "Acme Learning", "kind": "llc",
+                     "archived": False, "branches": [
+                         {"id": "branch-4", "name": "Bethesda Office",
+                          "archived": False}]},
+                    {"id": "org-2", "name": "Bright Foundation",
+                     "kind": "nonprofit", "archived": False, "branches": []},
+                    {"id": "org-3", "name": "Archived Ventures",
+                     "kind": "llc", "archived": True, "branches": []},
+                ]}},
+            "localPortfoliosStore": {"state": "ready", "saved": {
+                "portfolios": [
+                    {"id": "portfolio-1", "name": "Development Partners",
+                     "orgIds": ["org-1", "org-2"], "archived": False}]}},
+            "localStructureStore": {"state": "ready", "saved": {
+                "units": [
+                    {"id": "unit-1", "orgId": "org-1", "kind": "division",
+                     "name": "Education", "archived": False},
+                    {"id": "unit-2", "orgId": "org-2", "kind": "team",
+                     "name": "Outreach", "archived": False},
+                    {"id": "unit-3", "orgId": "org-3", "kind": "department",
+                     "name": "Legacy Lab", "archived": True},
+                    {"id": "unit-4", "orgId": "org-1", "kind": "location",
+                     "name": "Washington", "archived": False},
+                ]}},
+            "localUnitLocationLinksStore": {"state": "ready", "saved": {
+                "links": [{"id": "unit-location-1", "orgId": "org-1",
+                           "functionId": "unit-1", "locationId": "unit-4"}]}},
+            "localBranchLocationLinksStore": {"state": "ready", "saved": {
+                "links": [{"id": "branch-location-1", "orgId": "org-1",
+                           "branchId": "branch-4", "locationId": "unit-4"}]}},
+            "localFunctionalReportingStore": {"state": "ready", "saved": {
+                "links": []}},
+            "localLinksStore": {"state": "ready", "saved": {
+                "links": [{"id": "social-link-1", "orgId": "org-2",
+                           "branchId": None, "identityId": "identity-1",
+                           "serviceId": None, "accountId": None}]}},
+            "socialIdentitiesSnapshot": {"writable": True, "identities": [
+                {"id": "identity-1", "name": "Public Outreach"}]},
+        }
+        for name, data in fixtures.items():
+            snapshot = self.engine.evaluate("(" + json.dumps(data) + ")")
+            self.assertFalse(snapshot.isError(), name)
+            self.assertTrue(self.sections.setProperty(name, snapshot), name)
+        APP.processEvents()
+
+        def results(term, scope="all", archived=False):
+            search.setProperty("scope", scope)
+            search.setProperty("includeArchived", archived)
+            search.setProperty("searchText", term)
+            APP.processEvents()
+            return _value(search.property("visibleMatches"))
+
+        branches = results("Bethesda", "organizations")
+        self.assertEqual(len(branches), 1, branches)
+        self.assertIn("Bethesda Office", branches[0]["label"])
+        self.assertEqual(branches[0]["orgId"], "org-1")
+        self.assertEqual(search.property("matchCount"), 1)
+
+        membership = results("Bright Foundation", "portfolios")
+        self.assertEqual(len(membership), 1, membership)
+        self.assertIn("Development Partners", membership[0]["label"])
+
+        units = results("Education", "units")
+        self.assertEqual(len(units), 1, units)
+        self.assertEqual(units[0]["kind"], "division")
+
+        self.assertEqual(results("Legacy Lab", "units"), [])
+        hidden = results("Legacy Lab", "units", archived=True)
+        self.assertEqual(len(hidden), 1)
+        self.assertTrue(hidden[0]["archived"])
+
+        saved = results("Washington", "links")
+        self.assertEqual(len(saved), 2, saved)
+        self.assertTrue(all("LOCATED AT" in x["label"] for x in saved))
+
+        social = results("Public Outreach", "links")
+        self.assertEqual(len(social), 1, social)
+        self.assertIn("SOCIAL LABEL", social[0]["label"])
+
+        self.sections.setProperty("localEditingOrganizationId", "org-1")
+        APP.processEvents()
+        structure = self.sections.findChild(QObject, "localStructureEditor")
+        self.assertIsNotNone(structure)
+        result = results("Washington", "units")
+        self.assertEqual(len(result), 1)
+        # Search crosses unit categories even when division remains selected.
+        self.assertEqual(structure.property("selectedKind"), "division")
+        visible_units = _value(structure.property("visibleUnits"))
+        self.assertEqual(len(visible_units), 1, visible_units)
+        self.assertEqual(visible_units[0]["kind"], "location")
+
+        search.setProperty("searchText", "")
+        APP.processEvents()
+        self.assertEqual(search.property("matchCount"), 0)
+        self.assertEqual(structure.property("searchQuery"), "")
+        self.assertFalse(self.sections.property("organizationDisplayReady"))
+
     def test_host_logout_and_failure_are_reflected_in_real_panel(self):
         self._open_organizations()
         self._finish(_body())

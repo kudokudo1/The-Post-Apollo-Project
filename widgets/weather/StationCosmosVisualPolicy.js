@@ -61,7 +61,7 @@ function moonDisplay(usnoReady,ephemeris,dailyFallback) {
         waxing:ready&&phase!==""?waxingDirection(phase):null,
         directionKnown:ready&&phase!=="",
         source:ready?(usno?"USNO ONE-DAY":"WTTR DAILY FORECAST"):"NO VERIFIED PHASE",
-        sourceDate:ready?String(usno?source.sourceDate:source.date||""):"",
+        sourceDate:ready?String((usno?source.sourceDate:source.date)||""):"",
         schematic:true
     };
 }

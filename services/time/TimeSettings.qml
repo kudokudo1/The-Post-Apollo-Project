@@ -35,6 +35,10 @@ Scope {
     property string resyncStatus: "idle"
     property bool resyncConfirmRequired: false
     property string resyncMessage: "NOT REQUESTED"
+    property string resyncErrorCode: ""
+    property bool diagnosticBusy: false
+    property string diagnosticMessage: "NOT CHECKED"
+    property string diagnosticDetail: ""
 
     function adjustedEpochMs(epochMs) {
         return Policy.adjustedEpochMs(epochMs, displayOffsetMs);
@@ -94,6 +98,18 @@ Scope {
         ]);
     }
 
+    function diagnoseResync() {
+        if (diagnosticBusy)
+            return;
+        diagnosticBusy = true;
+        diagnosticMessage = "CHECKING CHRONY PREREQUISITES...";
+        diagnosticDetail = "";
+        diagnosticsProcess.exec([
+            "python3", "-B", "-I",
+            Quickshell.shellPath("services/time/TimeHostControl.py"), "diagnose"
+        ]);
+    }
+
     function prepareResync() {
         if (resyncProcess.running)
             return;
@@ -115,6 +131,7 @@ Scope {
             return;
         resyncConfirmRequired = false;
         resyncStatus = "working";
+        resyncErrorCode = "";
         resyncMessage = "REQUESTING FRESH TIME MEASUREMENTS...";
         resyncProcess.exec([
             "python3", "-B", "-I",
@@ -183,6 +200,32 @@ Scope {
     }
 
     Process {
+        id: diagnosticsProcess
+        running: false
+        stdout: StdioCollector {
+            onStreamFinished: {
+                try {
+                    const output = JSON.parse(this.text);
+                    timeSettings.diagnosticMessage =
+                        String(output.message || "DIAGNOSTIC UNAVAILABLE");
+                    timeSettings.diagnosticDetail =
+                        String(output.detail || output.errorCode || "");
+                } catch (error) {
+                    timeSettings.diagnosticMessage = "DIAGNOSTIC RESPONSE INVALID";
+                    timeSettings.diagnosticDetail = "";
+                }
+            }
+        }
+        onExited: function(code, exitStatus) {
+            timeSettings.diagnosticBusy = false;
+            if (code !== 0) {
+                timeSettings.diagnosticMessage = "DIAGNOSTIC PROCESS FAILED";
+                timeSettings.diagnosticDetail = "";
+            }
+        }
+    }
+
+    Process {
         id: resyncProcess
         running: false
         stdout: StdioCollector {
@@ -192,6 +235,8 @@ Scope {
                     timeSettings.resyncStatus = String(value.status || "failed");
                     timeSettings.resyncMessage =
                         String(value.message || "NO RESYNC RESULT");
+                    timeSettings.resyncErrorCode =
+                        String(value.errorCode || "");
                 } catch (error) {
                     timeSettings.resyncStatus = "failed";
                     timeSettings.resyncMessage = "RESYNC RESULT UNAVAILABLE";

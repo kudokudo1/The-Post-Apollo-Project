@@ -1503,20 +1503,24 @@ Rectangle {
             }
 
             StationRuntimeRack {
-                // Both native map families expose their original providers.
-                visible: stationDiscovery.domain === "map"
+                // Preserve CLASSIC NEWS/RADIO runtime rack and add native
+                // WEATHER map; never suppress the original news scroll area.
+                visible: !stationDiscovery.weatherMapOnly
+                         || stationDiscovery.domain === "map"
                 width: parent.width
                 rows: stationDiscovery.runtimeRows
             }
 
             StationSectionDivider {
-                visible: stationDiscovery.domain === "map"
+                visible: !stationDiscovery.weatherMapOnly
+                         || stationDiscovery.domain === "map"
                 width: parent.width
                 title: "SOURCE RACK // WHAT IS CONNECTED"
             }
 
             Column {
-                visible: stationDiscovery.domain === "map"
+                visible: !stationDiscovery.weatherMapOnly
+                         || stationDiscovery.domain === "map"
                 width: parent.width
                 spacing: 5
 

@@ -28,7 +28,7 @@ test("real JPL 90-day M4 output matches M5c pair and M5 presentation",{
     assert.equal(payload.query.step_hours,12);
     assert.equal(payload.query.include_events,true);
     assert.equal(payload.sample_count,181);
-    assert.deepEqual(payload.query.bodies,req.bodies.slice().sort());
+    assert.deepEqual(payload.query.bodies,JSON.parse(JSON.stringify(req.bodies.slice().sort())));
     const visual=Visual.model(payload);
     assert.equal(visual.ready,true,visual.reason);
     assert.equal(visual.sampleCount,payload.sample_count);

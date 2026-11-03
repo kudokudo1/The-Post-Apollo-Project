@@ -8,6 +8,7 @@ import "../../services/weather" as WeatherServices
 import "StationOfficialAlertPolicy.js" as OfficialAlertPolicy
 import "StationWeatherSubjectPanelPolicy.js" as SubjectPanelPolicy
 import "StationSubjectSourceBadgePolicy.js" as SubjectSourceBadge
+import "StationSubjectDefaultPolicy.js" as SubjectDefaultPolicy
 import "StationProviderDiagnosticsPolicy.js" as ProviderDiagnostics
 import "StationMagickSubjectPanelPolicy.js" as MagickPanelPolicy
 import "StationEarthSubjectPanelPolicy.js" as EarthPanelPolicy
@@ -112,6 +113,9 @@ PanelWindow {
     signal keyboardOwnershipRequested()
 
     property bool menuOpen: false
+    // M28-N reversible source-controlled preference; CLASSIC remains a
+    // per-open rescue control. This is not a persistent user setting.
+    property bool subjectsFirstPilotEnabled: SubjectDefaultPolicy.SUBJECTS_FIRST_PILOT
     property bool providerDiagnosticsOpen: false
     onMenuOpenChanged: {
         if (!menuOpen)
@@ -121,7 +125,8 @@ PanelWindow {
     property bool relationshipFocused: false
 
     property string currentView: "home"
-    // M1 opt-in browser: the existing eight-mode UI remains canonical.
+    // Collapsed 0x0 PanelWindow must NEVER keep SUBJECTS workspace loaded.
+    // The M28-N pilot selects SUBJECTS only on explicit open(), not at init.
     property bool subjectNavigationOpen: false
     property var newsMapOverlay: null
     property bool contextTerminalRequested: false
@@ -739,10 +744,7 @@ PanelWindow {
                 return;
 
             if (event.key === Qt.Key_Escape) {
-                if (weatherStation.subjectNavigationOpen)
-                    weatherStation.subjectNavigationOpen = false;
-                else
-                    weatherStation.close();
+                weatherStation.handleEscape();
             } else if (event.key === Qt.Key_Tab
                        || event.key === Qt.Key_Backtab) {
                 const reverse =
@@ -762,6 +764,22 @@ PanelWindow {
 
             event.accepted = true;
         }
+    }
+
+    function handleEscape() {
+        // M6c diagnostics owns the first Escape when its read-only panel
+        // is visible. INDEX then returns to its real workspace; the active
+        // SUBJECTS workspace and CLASSIC both close the station normally.
+        if (providerDiagnosticsOpen) {
+            providerDiagnosticsOpen = false;
+            return;
+        }
+        const action = SubjectDefaultPolicy.escapeAction(
+            subjectNavigationOpen, subjectNavigator.indexOpen);
+        if (action === "workspace")
+            subjectNavigator.returnToWorkspace();
+        else
+            close();
     }
 
     function restoreWeatherKeyboardFocus() {
@@ -869,6 +887,18 @@ PanelWindow {
         subjectNavigationOpen = true;
     }
 
+    function switchToClassic() {
+        if (!SubjectDefaultPolicy.switchToClassic(
+                subjectNavigationOpen,
+                SubjectDefaultPolicy.canSwitch(
+                    menuOpen, contextTerminalRequested,
+                    terminalView.terminalState)))
+            return false;
+        providerDiagnosticsOpen = false;
+        subjectNavigationOpen = false;
+        return true;
+    }
+
     function openLegacyFromSubject(pageId) {
         const index = mainModes.findIndex(function(mode) {
             return mode.id === pageId;
@@ -882,6 +912,21 @@ PanelWindow {
 
     function open() {
         weatherStation.keyboardOwnershipRequested();
+        // A previously selected CLASSIC TERMINAL must not sit on top of
+        // SUBJECTS as an IDLE transparent overlay. Preserve legacy
+        // currentView for every other CLASSIC fallback page.
+        if (subjectsFirstPilotEnabled) {
+            if (currentView === "terminal") {
+                currentView = "home";
+                navigationIndex = 0;
+            }
+            if (subjectNavigator.indexOpen)
+                subjectNavigator.returnToWorkspace();
+        }
+        // The host is an always-visible 0x0 PanelWindow when closed.
+        // Choose a view before expanding it, but admit only an IDLE Kitty.
+        subjectNavigationOpen = SubjectDefaultPolicy.onOpen(subjectsFirstPilotEnabled)
+                                && terminalView.terminalState === "IDLE";
         menuOpen = true;
         Qt.callLater(weatherStation.restoreWeatherKeyboardFocus);
     }
@@ -950,7 +995,9 @@ PanelWindow {
 
     function close() {
         closeContextTerminal();
-        subjectNavigationOpen = false;
+        // Always unload SUBJECTS in the collapsed layer-shell surface.
+        // The preference is reapplied by the next explicit open().
+        subjectNavigationOpen = SubjectDefaultPolicy.onClose(subjectsFirstPilotEnabled);
         menuOpen = false;
     }
 
@@ -1336,7 +1383,7 @@ PanelWindow {
                            && !weatherStation.contextTerminalRequested
                 onClicked: {
                     if (weatherStation.subjectNavigationOpen)
-                        weatherStation.subjectNavigationOpen = false;
+                        weatherStation.switchToClassic();
                     else
                         weatherStation.openSubjectNavigation();
                 }
@@ -1394,6 +1441,7 @@ PanelWindow {
                 celestialSource: celestialVisualService
                 anchors.fill: parent
                 visible: weatherStation.subjectNavigationOpen
+                         && weatherStation.menuOpen
                          && !weatherStation.contextTerminalRequested
                 enabled: visible
                 weatherService: weatherStation.weatherService
@@ -1669,15 +1717,7 @@ PanelWindow {
         sequence: "Escape"
 
         enabled: weatherStation.menuOpen
-
-        onActivated: {
-            if (weatherStation.providerDiagnosticsOpen)
-                weatherStation.providerDiagnosticsOpen = false;
-            else if (weatherStation.subjectNavigationOpen)
-                weatherStation.subjectNavigationOpen = false;
-            else
-                weatherStation.close();
-        }
+        onActivated: weatherStation.handleEscape()
     }
 
     Shortcut {

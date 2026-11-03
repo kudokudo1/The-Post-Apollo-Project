@@ -56,7 +56,14 @@ assert "airQualityFetch.running = false" not in changed
 # Asynchronous old-location payloads must be rejected before parsing.
 assert 'weatherService.weatherRequestContextKey\n                        === weatherService.requestContextKey' in weather
 assert 'weatherService.aqiRequestContextKey\n                        === weatherService.requestContextKey' in weather
-assert weather.count("Qt.callLater(weatherService.refresh)") >= 1
+# M6 settles the primary provider in a deferred guarded callback so
+# fallback is not launched before StdioCollector finishes. On context change
+# this guarded callback still starts a new primary request.
+primary_exit = weather[weather.index("id: weatherFetch"):
+                       weather.index("id: fallbackWeatherFetch")]
+assert "Qt.callLater(function()" in primary_exit
+assert "weatherService.refresh();" in primary_exit
+assert "weatherService.weatherRequestContextKey" in primary_exit
 assert weather.count("Qt.callLater(weatherService.refreshAirQuality)") >= 1
 
 # Unscoped legacy cache must not be relabelled as manual Home or Explore.

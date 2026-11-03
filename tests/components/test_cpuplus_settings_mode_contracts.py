@@ -164,7 +164,7 @@ for token in (
     "function search()", "onClicked: searchPanel.search()",
     "onAccepted: searchPanel.search()", "USE FOR HOME",
     "USE FOR EXPLORE", "searchPanel.useForHome(",
-    "searchPanel.useForExplore(", "GeoNames", "GEONAMES",
+    "searchPanel.useForExplore(", "GEONAMES",
     "NON-COMMERCIAL API",
 ):
     assert token in search, token

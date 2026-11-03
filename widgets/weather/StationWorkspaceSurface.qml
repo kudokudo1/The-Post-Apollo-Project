@@ -1,6 +1,7 @@
 import QtQuick
 import "../../components"
 import "StationWorkspaceNavigationPolicy.js" as Workspace
+import "StationHomeDeckPolicy.js" as HomeDeck
 
 // W1r // Left family rail and bottom submodes, NOT a new source framework.
 // HOME is one persistent original StationHome instance across all tabs.
@@ -22,12 +23,38 @@ Rectangle {
     property var dossierArchiveStore: null
     property real runtimeNowMs: 0
 
+    // W2a preferences are owned by the persistent SubjectNavigator. The
+    // surface is only the control and timer, never a storage or source owner.
+    property bool deckEnabled: false
+    property bool deckHeld: false
+    property string deckMode: "mixed"
+    property var deckFavorites: []
+    property bool deckIndexOpen: false
+
     readonly property string activeFamily: Workspace.familyFor(currentPath)
     readonly property string homeSection: Workspace.homeSectionFor(currentPath)
     readonly property var activeTabs: Workspace.tabsFor(currentPath)
     signal routeRequested(string path)
     signal legacyPageRequested(string pageId)
     signal newsMapRequested(var payload)
+    signal deckEnabledRequested(bool enabled)
+    signal deckHeldRequested(bool held)
+    signal deckModeRequested(string mode)
+    signal deckFavoritesRequested(var paths)
+
+    function advanceDeck() {
+        const next = HomeDeck.nextRoute(
+            currentPath, deckFavorites, deckMode, Math.random()
+        );
+        if (next !== "")
+            routeRequested(next);
+    }
+
+    onCurrentPathChanged: {
+        // Manual tab changes get a full reading interval before another swap.
+        if (deckTimer.running)
+            deckTimer.restart();
+    }
 
     Item {
         id: workspaceContent
@@ -42,6 +69,7 @@ Rectangle {
         StationHome {
             id: originalHome
             anchors.fill: parent
+            anchors.bottomMargin: homeDeckBar.visible ? homeDeckBar.height : 0
             visible: surface.activeFamily === "home"
                      && surface.homeSection !== "magick"
             subjectRoute: ""
@@ -59,6 +87,7 @@ Rectangle {
         // clearly separated from unsupported spiritual calculations.
         StationMagickSubjectPane {
             anchors.fill: parent
+            anchors.bottomMargin: homeDeckBar.visible ? homeDeckBar.height : 0
             visible: surface.activeFamily === "home"
                      && surface.homeSection === "magick"
             subjectRoute: "magick/overview"
@@ -138,6 +167,98 @@ Rectangle {
                 surface.legacyPageRequested(pageId);
             }
         }
+
+        // W2a HOME deck controls use the original ActionButton language and
+        // reuse the existing HOME section routes. No extra panel instance.
+        Rectangle {
+            id: homeDeckBar
+            anchors.left: parent.left
+            anchors.right: parent.right
+            anchors.bottom: parent.bottom
+            visible: surface.activeFamily === "home"
+            height: visible ? 40 : 0
+            color: Colors.black
+
+            Rectangle {
+                anchors.top: parent.top
+                anchors.left: parent.left
+                anchors.right: parent.right
+                height: 1
+                color: Colors.cyan
+            }
+
+            Row {
+                anchors.left: parent.left
+                anchors.right: parent.right
+                anchors.verticalCenter: parent.verticalCenter
+                anchors.leftMargin: 10
+                anchors.rightMargin: 10
+                spacing: 6
+
+                ActionButton {
+                    width: Math.max(1,(parent.width - 24)/5)
+                    height: 29
+                    label: surface.deckEnabled ? "ROTATE // ON" : "ROTATE // OFF"
+                    labelPixelSize: 10
+                    selected: surface.deckEnabled
+                    onClicked: surface.deckEnabledRequested(!surface.deckEnabled)
+                }
+                ActionButton {
+                    width: Math.max(1,(parent.width - 24)/5)
+                    height: 29
+                    label: "MODE // " + surface.deckMode.toUpperCase()
+                    labelPixelSize: 10
+                    onClicked: surface.deckModeRequested(
+                        HomeDeck.nextMode(surface.deckMode)
+                    )
+                }
+                ActionButton {
+                    width: Math.max(1,(parent.width - 24)/5)
+                    height: 29
+                    label: surface.deckHeld ? "RESUME" : "HOLD"
+                    labelPixelSize: 10
+                    selected: surface.deckHeld
+                    onClicked: surface.deckHeldRequested(!surface.deckHeld)
+                }
+                ActionButton {
+                    width: Math.max(1,(parent.width - 24)/5)
+                    height: 29
+                    label: HomeDeck.favorite(surface.deckFavorites,surface.currentPath)
+                           ? "★ FAVORITE" : "☆ FAVORITE"
+                    labelPixelSize: 10
+                    selected: HomeDeck.favorite(surface.deckFavorites,surface.currentPath)
+                    available: HomeDeck.isRotatable(surface.currentPath)
+                    onClicked: surface.deckFavoritesRequested(
+                        HomeDeck.toggleFavorite(
+                            surface.deckFavorites, surface.currentPath
+                        )
+                    )
+                }
+                ActionButton {
+                    width: Math.max(1,(parent.width - 24)/5)
+                    height: 29
+                    label: "NEXT"
+                    labelPixelSize: 10
+                    available: HomeDeck.candidates(
+                        surface.currentPath,surface.deckFavorites,surface.deckMode
+                    ).length > 0
+                    onClicked: surface.advanceDeck()
+                }
+            }
+        }
+    }
+
+    Timer {
+        id: deckTimer
+        interval: 30000
+        repeat: true
+        running: HomeDeck.mayRotate(
+            surface.activeFamily, surface.visible, surface.deckEnabled,
+            surface.deckHeld, surface.deckIndexOpen
+        ) && HomeDeck.candidates(
+            surface.currentPath, surface.deckFavorites, surface.deckMode
+        ).length > 0
+        onTriggered: surface.advanceDeck()
     }
 
     Rectangle {

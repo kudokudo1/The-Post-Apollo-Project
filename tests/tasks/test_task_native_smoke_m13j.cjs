@@ -18,8 +18,9 @@ function fakeTree(t) {
     fs.mkdirSync(hub,{recursive:true});
     fs.writeFileSync(path.join(hub,"qmldir"),"module qs.services.hub\n"+entry+"\n");
     for(const name of ["TaskEncryptedRecoveryBridgeM13i.qml","TaskRecoveryProviderHostM13i.py"])
-        fs.writeFileSync(path.join(hub,name),"CI_FAKE_ONLY");
-    fs.writeFileSync(path.join(root,"TaskEncryptedRecoveryHarnessM13i.qml"),"CI_FAKE_ONLY");
+        fs.copyFileSync(path.join(ROOT,"services/hub",name),path.join(hub,name));
+    fs.copyFileSync(path.join(ROOT,"TaskEncryptedRecoveryHarnessM13i.qml"),
+        path.join(root,"TaskEncryptedRecoveryHarnessM13i.qml"));
     return {temp,root,hub};
 }
 function smoke(args,env) {
@@ -50,6 +51,14 @@ test("unregistered, duplicated and bad module refuse",t=>{
         assert.equal(result.status,2);
         assert.match(result.stdout,/M13J_(BRIDGE_UNREGISTERED|INVALID_HUB_MODULE)/);
     }
+});
+test("run refuses an unreviewed edited local QML file",t=>{
+    const {root,hub}=fakeTree(t);
+    fs.appendFileSync(path.join(hub,"TaskEncryptedRecoveryBridgeM13i.qml"),"\n// unreviewed local change\n");
+    const result=smoke(["--run",root]);
+    assert.equal(result.status,2);
+    assert.equal(result.stdout.trim(),
+        "M13J_LOCAL_MODULE_READY\nM13J_SOURCE_NOT_REVIEWED");
 });
 test("invalid modes refuse before loading any files",t=>{
     const {root}=fakeTree(t);

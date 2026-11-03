@@ -47,8 +47,10 @@ test("exact M28-J original WATCH catalogue and CREATORS controls have real MEDIA
     assert.ok(catalog.sections.includes(section),section);
   }
   assert.equal(Object.keys(env.PANELS).length,103);
-  assert.equal(Object.keys(env.WIRED_IN_SUBJECTS).length,96);
-  assert.equal(103-96,7);
+  assert.equal(Object.values(env.WIRED_IN_SUBJECTS).filter(m=>m==="M28-J").length,7,
+    "M28-J seven native media controls remain exact");
+  assert.ok(Object.keys(env.WIRED_IN_SUBJECTS).length>=96,
+    "later independently reviewed HOME controls may increase the total");
   assert.deepEqual(plain(env.remainingSourcePagesForPath("media",env.PANELS)),[]);
   assert.deepEqual(plain(env.sourcePagesForPath("media/watch",env.PANELS).map(x=>x.id)),["news"],
     "original M1 SOURCE lineage remains intact");

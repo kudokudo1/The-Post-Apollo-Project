@@ -173,7 +173,7 @@ test("CLASSIC, WEATHER, COSMOS, the terminal and data store ownership remain int
   assert.match(browser,/StationWeatherSubjectPane\s*\{/);
   assert.match(browser,/StationCosmosSubjectPane\s*\{/);
   assert.match(browser,/StationEarthSubjectPane\s*\{/);
-  assert.match(browser,/visible: browser\.visible && browser\.liveEarthKind !== ""/);
+  assert.match(browser,/visible: browser\.visible && browser\.indexOpen\s*&& browser\.liveEarthKind !== ""/);
   assert.match(station,/property bool subjectNavigationOpen: false/);
   assert.match(station,/eventArchiveStore: weatherStation\.eventArchiveStore/);
   assert.match(station,/dossierArchiveStore: weatherStation\.dossierArchiveStore/);

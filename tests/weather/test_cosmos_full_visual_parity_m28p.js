@@ -10,6 +10,7 @@ const read=p=>fs.readFileSync(path.join(root,p),"utf8");
 const policy=read("widgets/weather/StationCosmosSubjectPanelPolicy.js");
 const tree=read("widgets/weather/StationSubjectNavigationPolicy.js");
 const workspace=read("widgets/weather/StationWorkspaceNavigationPolicy.js");
+const terrestrialSource=read("widgets/weather/StationWeatherSubjectPanelPolicy.js");
 const pane=read("widgets/weather/StationCosmosSubjectPane.qml");
 const sky=read("widgets/weather/StationSky.qml");
 const space=read("widgets/weather/StationSpace.qml");
@@ -22,12 +23,14 @@ const contexts=[policy,tree,workspace].map(x=>{
   return c;
 });
 const [cosmos,nav,tabs]=contexts;
+const terrestrial=vm.createContext({});
+vm.runInContext(terrestrialSource.replace(/^\.pragma library\s*$/m,""),terrestrial);
 const plain=x=>JSON.parse(JSON.stringify(x));
 const SKY="cosmos/sky/full",SPACE="cosmos/space-weather/full";
 const sectionNames=src=>[...new Set([...src.matchAll(/sectionVisible\("([^"]+)"\)/g)]
   .map(x=>x[1]))].sort();
 
-test("COSMOS offers complete SKY and SPACE as real in-widget bottom modes, not hidden CLASSIC links",()=>{
+test("COSMOS offers an astronomy-only SKY and complete SPACE as native bottom modes",()=>{
   assert.equal(cosmos.kindForRoute(SKY),"sky");
   assert.equal(cosmos.kindForRoute(SPACE),"space");
   for(const route of [SKY,SPACE]){
@@ -40,7 +43,7 @@ test("COSMOS offers complete SKY and SPACE as real in-widget bottom modes, not h
   assert.equal(nav.findRoute("cosmos/sky").group,true);
   assert.equal(tabs.GROUPS.cosmos.length,6,"no extra cramped 8-column mode bar");
   const main=plain(tabs.tabsFor("cosmos/overview"));
-  assert.ok(main.some(x=>x.label==="SKY // ALL"&&x.path===SKY&&x.key==="sky"));
+  assert.ok(main.some(x=>x.label==="ASTRONOMY"&&x.path===SKY&&x.key==="sky"));
   assert.ok(main.some(x=>x.label==="SPACE // ALL"&&x.path===SPACE&&x.key==="space-weather"));
   assert.equal(tabs.selectedGroup(SKY),"sky");
   assert.equal(tabs.selectedGroup(SPACE),"space-weather");
@@ -52,16 +55,34 @@ test("COSMOS offers complete SKY and SPACE as real in-widget bottom modes, not h
   assert.match(navigator,/browser\.chooseRoute\(path\)/);
 });
 
-test("the original SKY's complete sections are visible through one full COSMOS instance",()=>{
+test("the mixed CLASSIC SKY sections are partitioned across COSMOS astronomy and WEATHER",()=>{
   const sections=sectionNames(sky);
   assert.deepEqual(sections,[
     "astronomy","atmosphere","celestial-fix","current","daily","eclipses",
     "header","hourly","iss","meteor","moon","planet-clock","runtime","twilight"
   ]);
+  const astronomy=new Set([
+    "header","astronomy","iss","moon","eclipses",
+    "celestial-fix","planet-clock","meteor"
+  ]);
+  const weatherRoutes={
+    current:"weather/conditions/current",
+    atmosphere:"weather/conditions/current",
+    hourly:"weather/forecasts/hourly",
+    daily:"weather/forecasts/hourly",
+    twilight:"weather/forecasts/hourly"
+  };
   for(const section of sections){
-    assert.equal(cosmos.visibleFor("sky",SKY,section),true,section);
+    assert.equal(cosmos.visibleFor("sky",SKY,section),astronomy.has(section),
+      "COSMOS must not display terrestrial "+section);
     assert.equal(cosmos.visibleFor("space",SKY,section),false,section);
   }
+  for(const [section,route] of Object.entries(weatherRoutes))
+    assert.ok(terrestrial.visibleFor("sky",route,section),route+" "+section);
+  assert.equal(cosmos.visibleFor("sky",SKY,"current"),false);
+  assert.equal(cosmos.visibleFor("sky",SKY,"hourly"),false);
+  assert.equal(cosmos.visibleFor("sky",SKY,"daily"),false);
+  assert.equal(cosmos.visibleFor("sky",SKY,"atmosphere"),false);
   for(const s of ["moon","eclipses","celnav","iss","planets","meteor"])
     assert.equal(cosmos.needsSource(SKY,s),true,s);
   assert.equal(cosmos.needsSource(SKY,"xray"),false);
@@ -74,6 +95,8 @@ test("the original SKY's complete sections are visible through one full COSMOS i
   assert.ok(sky.includes("StationCosmosVisualInstruments {"),
     "sun/moon visuals remain part of the full original SKY component");
   assert.match(sky,/visible: sky\.subjectRoute\.indexOf\("cosmos\/"\) === 0/);
+  assert.match(sky,/LOCAL REFERENCE READY/);
+  assert.equal(terrestrial.needsSource("weather/forecasts/hourly","astronomy"),false);
 });
 
 test("the original SPACE's NOAA solar image, model curves, history and bulletins all display",()=>{

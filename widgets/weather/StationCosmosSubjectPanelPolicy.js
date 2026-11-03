@@ -5,9 +5,9 @@
 // Neither navigation nor this policy owns fetchers, cache files or sessions.
 var FORMAT = "post-apollo.weather.cosmos-panels.c1.v1";
 var ROUTES = {
-  // M28-P: complete original SKY/SPACE instruments, including the artwork,
-  // long-form charts, forecasts and provider provenance hidden by partial
-  // overview routes. Only the selected full page is actually loaded.
+  // M28-R: original SKY mixed terrestrial WEATHER and astronomy.
+  // The comprehensive COSMOS page is astronomy-only. WEATHER owns
+  // conditions, atmosphere, photo light, hourly/daily forecasts.
   "cosmos/sky/full": {page:"sky",full:true},
   "cosmos/space-weather/full": {page:"space",full:true},
   "cosmos/overview": {page:"overview",
@@ -55,14 +55,22 @@ function kindForRoute(path) {
   return row ? row.page : "";
 }
 
+// A full astronomical page is NOT the original weather+sky page.
+var FULL_ASTRONOMY_SECTIONS = [
+  "header","astronomy","moon","iss","eclipses",
+  "celestial-fix","planet-clock","meteor"
+];
+
 function visibleFor(page,path,section) {
   if (path === "") return true;
   if (page !== "sky" && page !== "space") return false;
   var row = routeInfo(path);
   if (!row) return false;
-  // Full pages deliberately reproduce every section of the original
-  // CLASSIC instrument in a SINGLE existing SKY or SPACE instance.
-  if (row.full === true && row.page === page) return true;
+  // The full SPACE instrument is entirely COSMOS. Original SKY is not:
+  // prohibit terrestrial WEATHER widgets even on COSMOS/sky/full.
+  if (row.full === true && row.page === page)
+    return page === "space"
+      || FULL_ASTRONOMY_SECTIONS.indexOf(section) >= 0;
   var values = row[page];
   return Array.isArray(values) && values.indexOf(section) >= 0;
 }
@@ -84,8 +92,8 @@ function needsSource(path,source) {
   if (!routeInfo(path)) return false;
   if (typeof source !== "string") return false;
   var row = routeInfo(path);
-  // No new collectors: original panel-owned source services are active
-  // only in their matching full native view. Unknown source keys fail shut.
+  // No new collectors: original page-specific astronomy or space-weather
+  // services are activated only for their exact selected full route.
   if (row.full === true) {
     if (row.page === "sky")
       return Object.prototype.hasOwnProperty.call(SKY_SOURCE_SECTION,source);

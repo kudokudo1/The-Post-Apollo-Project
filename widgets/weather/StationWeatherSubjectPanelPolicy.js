@@ -6,11 +6,15 @@
 var FORMAT = "post-apollo.weather.subject-panels.m2a.v1";
 
 var ROUTES = {
-  "weather/conditions/current": {page:"sky", sections:["header","current"]},
+  // NOW + AIR aggregates original terrestrial readings in one scrollable
+  // StationSky view; detailed ground air/gas/pollen pages stay independent.
+  "weather/conditions/current": {page:"sky", sections:["header","runtime","current","atmosphere"]},
   "weather/conditions/atmosphere": {page:"sky", sections:["header","atmosphere"]},
   "weather/conditions/air": {page:"ground", sections:["header","air-pm","air-gases"]},
   "weather/conditions/pollen": {page:"ground", sections:["header","air-gases","pollen"]},
-  "weather/forecasts/hourly": {page:"sky", sections:["header","hourly"]},
+  // FORECAST restores both original hourly/daily artwork plus the local
+  // twilight/photo-light windows, without activating astronomy collectors.
+  "weather/forecasts/hourly": {page:"sky", sections:["header","hourly","daily","twilight"]},
   "weather/forecasts/daily": {page:"sky", sections:["header","daily"]},
   "weather/forecasts/air": {page:"ground", sections:["header","air-forecast"]},
   "weather/water/rivers": {page:"ground", sections:["header","rivers"]},

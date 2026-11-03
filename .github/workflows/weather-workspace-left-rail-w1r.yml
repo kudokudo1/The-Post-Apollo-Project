@@ -1,0 +1,32 @@
+name: Weather Station W1r classic left family rail and header INDEX
+
+on:
+  pull_request:
+    paths:
+      - 'widgets/weather/StationWorkspaceFamilyRail.qml'
+      - 'widgets/weather/StationWorkspaceSurface.qml'
+      - 'widgets/weather/WeatherStationW.qml'
+      - 'widgets/weather/StationSubjectNavigator.qml'
+      - 'tests/weather/test_workspace_landing_w1.js'
+      - 'tests/weather/test_workspace_left_rail_w1r.js'
+      - '.github/workflows/weather-workspace-left-rail-w1r.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  classic-rail:
+    runs-on: ubuntu-latest
+    timeout-minutes: 7
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Confirm W1/W1r workspace layout and detailed INDEX navigation
+        run: |
+          node --test tests/weather/test_workspace_landing_w1.js
+          node --test tests/weather/test_workspace_left_rail_w1r.js
+          node --test tests/weather/subject_navigation_contract.test.js
+          node --test tests/weather/subject_navigation_browser.test.js

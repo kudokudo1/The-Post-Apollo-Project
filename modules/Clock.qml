@@ -1,6 +1,7 @@
 import QtQuick
 import Quickshell
 import "../components"
+import qs.services.time
 import QtQuick.Effects
 import Qt5Compat.GraphicalEffects
 
@@ -11,6 +12,10 @@ Item {
     height: clockButton.height + 46
 
     property bool is24Hour: false
+    // Display-only adjustment from the shared persistent settings service.
+    // No system clock change; the real SystemClock still owns the tick.
+    readonly property date adjustedDate:
+        new Date(clock.date.getTime() + TimeSettings.displayOffsetMs)
     // Optional TimeW window reference. The shared shell will connect it in a
     // separate, ownership-cleared integration step.
     property var timeWindow: null
@@ -211,8 +216,8 @@ Item {
 
                         text:
                             clockArea.is24Hour
-                            ? Qt.formatDateTime(clock.date, "HH")
-                            : Qt.formatDateTime(clock.date, "hh AP").split(" ")[0]
+                            ? Qt.formatDateTime(clockArea.adjustedDate, "HH")
+                            : Qt.formatDateTime(clockArea.adjustedDate, "hh AP").split(" ")[0]
 
                         color: clockButton.foregroundColor
                         font.pixelSize: 20
@@ -282,7 +287,7 @@ Item {
                         id: clockMinute
                         anchors.centerIn: parent
 
-                        text: Qt.formatDateTime(clock.date, "mm")
+                        text: Qt.formatDateTime(clockArea.adjustedDate, "mm")
                         color: clockButton.foregroundColor
                         font.pixelSize: 20
                     }
@@ -353,7 +358,7 @@ Item {
                         id: clockPeriod
                         anchors.centerIn: parent
 
-                        text: Qt.formatDateTime(clock.date, "AP")
+                        text: Qt.formatDateTime(clockArea.adjustedDate, "AP")
                         color: clockButton.foregroundColor
                         font.pixelSize: 20
                     }

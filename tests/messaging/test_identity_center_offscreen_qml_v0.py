@@ -376,11 +376,20 @@ class RealQtOrganizationsSettingsPaneSmoke(unittest.TestCase):
                  "archived": True, "branches": []},
             ]},
         }
-        self.sections.setProperty("localDirectoryStore", sample)
+        # A QML var needs a JS object with real JavaScript arrays; passing
+        # a Python QVariantMap can lose Array.isArray and filter semantics.
+        js_sample = self.engine.evaluate("(" + json.dumps(sample) + ")")
+        self.assertFalse(js_sample.isError())
+        self.assertTrue(self.sections.setProperty("localDirectoryStore", js_sample))
         APP.processEvents()
         self.sections.setProperty("localEditingOrganizationId", "org-1")
         APP.processEvents()
-        self.assertEqual(self.sections.property("activeLocalEditingOrganizationId"), "org-1")
+        self.assertEqual(
+            self.sections.property("activeLocalEditingOrganizationId"), "org-1",
+            "QML source: " + repr(self.sections.property("localDirectoryStore")) +
+            " / choices: " + repr(_value(self.sections.property(
+                "localOrganizationsForEditing"))),
+        )
         self.assertEqual(structure.property("selectedOrgId"), "org-1")
         self.assertEqual(modifier.property("selectedOrgId"), "org-1")
 

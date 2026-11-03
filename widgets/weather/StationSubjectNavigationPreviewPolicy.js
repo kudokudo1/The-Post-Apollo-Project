@@ -149,7 +149,30 @@ var WIRED_IN_SUBJECTS = {
   "news-compare":"M28-J",
   "news-satire":"M28-J",
   "news-creators":"M28-J",
-  "news-uploads":"M28-J"
+  "news-uploads":"M28-J",
+  // M28-K: the exact original HOME widgets already run in HOME/QUICK
+  // or HOME/HISTORY. M0's historical source map stays immutable below.
+  "home-aqi-humidity":"M28-K",
+  "home-aqi-wind":"M28-K",
+  "home-quick-conditions":"M28-K",
+  "home-space-weather":"M28-K"
+};
+
+// M0 historical hints name pre-workspace WEATHER/COSMOS targets. Their actual
+// native UI is the original persistent StationHome workspace, not those
+// similarly named SKY CURRENT or COSMOS panels. Keep source hints untouched
+// for audit; resolve only these four explicitly reviewed controls to HOME.
+var HOME_SOURCE_HINTS = {
+  "home-aqi-humidity":"weather/history/relationships",
+  "home-aqi-wind":"weather/history/relationships",
+  "home-quick-conditions":"weather/conditions/current",
+  "home-space-weather":"cosmos/space-weather/overview"
+};
+var HOME_NATIVE_ROUTES = {
+  "home-aqi-humidity":"home/history",
+  "home-aqi-wind":"home/history",
+  "home-quick-conditions":"home/quick",
+  "home-space-weather":"home/quick"
 };
 
 function remainingSourcePagesForPath(path, panelRoutes) {
@@ -173,9 +196,14 @@ function nativeDestinationsForPath(path, panelRoutes) {
   Object.keys(panelRoutes).sort().forEach(function(panel) {
     if (!Object.prototype.hasOwnProperty.call(WIRED_IN_SUBJECTS, panel))
       return;
-    var target = panelRoutes[panel];
-    if (typeof target !== "string"
-        || (target !== path && target.indexOf(path + "/") !== 0))
+    var sourceHint = panelRoutes[panel];
+    if (typeof sourceHint !== "string") return;
+    var home = Object.prototype.hasOwnProperty.call(HOME_NATIVE_ROUTES,panel);
+    // Only the exact M0 original hint for this reviewed source ID qualifies.
+    // A mutated unknown route never silently promotes a HOME source control.
+    if (home && sourceHint !== HOME_SOURCE_HINTS[panel]) return;
+    var target = home ? HOME_NATIVE_ROUTES[panel] : sourceHint;
+    if (target !== path && target.indexOf(path + "/") !== 0)
       return;
     if (!Object.prototype.hasOwnProperty.call(destinations, target))
       destinations[target] = {path:target, panels:0, milestones:[]};

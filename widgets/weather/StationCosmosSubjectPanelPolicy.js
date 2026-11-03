@@ -5,6 +5,11 @@
 // Neither navigation nor this policy owns fetchers, cache files or sessions.
 var FORMAT = "post-apollo.weather.cosmos-panels.c1.v1";
 var ROUTES = {
+  // M28-P: complete original SKY/SPACE instruments, including the artwork,
+  // long-form charts, forecasts and provider provenance hidden by partial
+  // overview routes. Only the selected full page is actually loaded.
+  "cosmos/sky/full": {page:"sky",full:true},
+  "cosmos/space-weather/full": {page:"space",full:true},
   "cosmos/overview": {page:"overview",
     sky:["header","astronomy","moon","twilight"],
     space:["header","solar","scales","aurora"]},
@@ -55,6 +60,9 @@ function visibleFor(page,path,section) {
   if (page !== "sky" && page !== "space") return false;
   var row = routeInfo(path);
   if (!row) return false;
+  // Full pages deliberately reproduce every section of the original
+  // CLASSIC instrument in a SINGLE existing SKY or SPACE instance.
+  if (row.full === true && row.page === page) return true;
   var values = row[page];
   return Array.isArray(values) && values.indexOf(section) >= 0;
 }
@@ -75,6 +83,16 @@ function needsSource(path,source) {
   if (path === "") return true;
   if (!routeInfo(path)) return false;
   if (typeof source !== "string") return false;
+  var row = routeInfo(path);
+  // No new collectors: original panel-owned source services are active
+  // only in their matching full native view. Unknown source keys fail shut.
+  if (row.full === true) {
+    if (row.page === "sky")
+      return Object.prototype.hasOwnProperty.call(SKY_SOURCE_SECTION,source);
+    if (row.page === "space")
+      return Object.prototype.hasOwnProperty.call(SPACE_SOURCE_SECTION,source);
+    return false;
+  }
   var skySection = SKY_SOURCE_SECTION[source];
   if (skySection)
     return visibleFor("sky",path,skySection);

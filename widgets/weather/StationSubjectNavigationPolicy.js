@@ -35,6 +35,9 @@ var SUBJECTS = [
   ]},
   {id:"cosmos",label:"COSMOS",sections:[
     {id:"overview",label:"OVERVIEW"},
+    // M28-P full-page native renderers, not a second CLASSIC instance.
+    {id:"sky",label:"FULL SKY",children:[
+      {id:"full",label:"SKY // ALL ORIGINAL INSTRUMENTS"}]},
     {id:"sun",label:"SUN",children:[
       {id:"position",label:"POSITION"}, {id:"twilight",label:"TWILIGHT"},
       {id:"photo-light",label:"PHOTO LIGHT"}]},
@@ -49,7 +52,9 @@ var SUBJECTS = [
       {id:"eclipses",label:"ECLIPSES"}, {id:"meteors",label:"METEOR SHOWERS"},
       {id:"iss",label:"ISS PASSES"}]},
     {id:"space-weather",label:"SPACE WEATHER",children:[
-      {id:"overview",label:"OVERVIEW"}, {id:"solar-wind",label:"SOLAR WIND AND FIELD"},
+      {id:"overview",label:"OVERVIEW"},
+      {id:"full",label:"SPACE // ALL ORIGINAL INSTRUMENTS"},
+      {id:"solar-wind",label:"SOLAR WIND AND FIELD"},
       {id:"geomagnetic",label:"GEOMAGNETIC"}, {id:"aurora",label:"AURORA"},
       {id:"solar-activity",label:"SOLAR ACTIVITY"},
       {id:"forecasts",label:"FORECASTS"}, {id:"bulletins",label:"BULLETINS"},

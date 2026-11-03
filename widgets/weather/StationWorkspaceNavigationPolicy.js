@@ -36,9 +36,11 @@ var GROUPS = {
         {label:"OVERVIEW",path:"cosmos/overview",key:"overview"},
         {label:"SUN",path:"cosmos/sun/position",key:"sun"},
         {label:"MOON",path:"cosmos/moon/ephemeris",key:"moon"},
-        {label:"PLANETS + SKY",path:"cosmos/planets-stars/celestial-fix",key:"planets-stars"},
+        // Full-page access is intentionally a *main* swap. The original
+        // visual/forecast/ephemeris panels were hidden behind narrow filters.
+        {label:"SKY // ALL",path:"cosmos/sky/full",key:"sky"},
         {label:"EVENTS",path:"cosmos/events/iss",key:"events"},
-        {label:"SPACE WX",path:"cosmos/space-weather/overview",key:"space-weather"}
+        {label:"SPACE // ALL",path:"cosmos/space-weather/full",key:"space-weather"}
     ],
     earth:[
         {label:"OVERVIEW",path:"earth/overview",key:"overview"},
@@ -104,6 +106,9 @@ function selectedGroup(path) {
             if(groups[j].path===path) return groups[j].key;
     }
     var group=tokens[1]||"overview";
+    // Keep the PLANETS+STARS deep INDEX subtree associated with the full
+    // SKY bottom swap, while its detailed route stays available in INDEX.
+    if(family==="cosmos" && group==="planets-stars") return "sky";
     for(var k=0;k<groups.length;k++)
         if(groups[k].key===group) return group;
     return "overview";

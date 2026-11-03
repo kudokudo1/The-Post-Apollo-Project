@@ -82,8 +82,13 @@ feed. It does not bypass provider limits.
 Dedicated GitHub workflow
 `.github/workflows/weather-subjects-news-map-companion-m28b.yml`
 runs a pure M28-B policy/layout contract, existing MEDIA D1 and
-EARTH E1 contracts, M28-A source-native handoff regression, and the
-actual Fedora 44/Quickshell/Xvfb EARTH article-marker/clear test.
+EARTH E1 contracts, M28-A source-native handoff regression, and two
+disposable Fedora 44/Quickshell/Xvfb native tests:
+`verify_news_feed_first_fedora_m28b.sh` loads fake NEWS articles into
+the **real** StationDiscovery, confirms HEADLINES-before-analytics,
+clicks the real report card to open the article viewer, and verifies
+TRENDS/STORIES routes independently. The original M28-A test clicks
+an EARTH article-mention marker and CLEAR NEWS without CLASSIC.
 **CI is pending at handoff creation.** Inspect the exact final PR
 HEAD and any failures before reporting the milestone as verified.
 

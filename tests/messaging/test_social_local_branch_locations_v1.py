@@ -20,6 +20,8 @@ import SocialLocalUnitLocationLinks as functions  # noqa: E402
 import SocialLocalBranchLocationLinks as branches  # noqa: E402
 
 SETTINGS = (ROOT / "widgets/messanger/IdentityCenterSettingsSections.qml").read_text()
+# The original editors now live in the consolidated local workspace.
+SETTINGS += "\n" + (ROOT / "widgets/messanger/IdentityCenterLocalOrganizationsWorkspace.qml").read_text()
 SELECTOR = (ROOT / "widgets/messanger/AppSelector.qml").read_text()
 EDITOR = (ROOT / "widgets/messanger/IdentityCenterLocalBranchLocationsEditor.qml").read_text()
 STORE = (ROOT / "services/social/SocialLocalBranchLocationLinksStore.qml").read_text()

@@ -10,6 +10,13 @@ Column {
     property var identitiesSnapshot: null
     property var accountDetailsStore: null
     property string selectedOrgId: ""
+    property bool useSharedContext: false
+    onSelectedOrgIdChanged: {
+        selectedBranchId = "";
+        selectedServiceId = "";
+        selectedAccountId = "";
+        pendingUnlinkId = "";
+    }
     property string selectedBranchId: ""
     property string selectedIdentityId: ""
     property string selectedServiceId: ""
@@ -166,6 +173,7 @@ Column {
     }
     Text {
         width: parent.width
+        visible: !linksEditor.useSharedContext
         text: "1 // SELECT LOCAL ORGANIZATION"
         color: Colors.cyan
         font.pixelSize: 10
@@ -173,6 +181,7 @@ Column {
     }
     Flow {
         width: parent.width
+        visible: !linksEditor.useSharedContext
         spacing: 5
         height: childrenRect.height
         Repeater {

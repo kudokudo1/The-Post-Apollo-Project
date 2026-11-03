@@ -179,6 +179,7 @@ Item {
 
                     Text {
                         width: parent.width
+                        visible: localOrganizationsWorkspace.activeWorkspace === "overview"
                         text: "ACTIVE ORGANIZATION // NONE VERIFIED"
                         color: Colors.white
                         font.pixelSize: 11
@@ -189,6 +190,7 @@ Item {
                     Text {
                         width: parent.width
                         visible: !sections.organizationDisplayReady
+                                 && localOrganizationsWorkspace.activeWorkspace === "overview"
                         text: "No authorized organizations or portfolios have " +
                               "been loaded. The future selector will show only " +
                               "memberships verified by the Identity Center API."
@@ -197,48 +199,16 @@ Item {
                         wrapMode: Text.WordWrap
                     }
 
-                    IdentityCenterLocalOrganizationEditor {
-                        width: parent.width
-                        directoryStore: sections.localDirectoryStore
-                    }
-
-                    IdentityCenterLocalPortfolioEditor {
+                    IdentityCenterLocalOrganizationsWorkspace {
+                        id: localOrganizationsWorkspace
                         width: parent.width
                         directoryStore: sections.localDirectoryStore
                         portfolioStore: sections.localPortfoliosStore
-                    }
-
-                    IdentityCenterLocalStructureEditor {
-                        width: parent.width
-                        directoryStore: sections.localDirectoryStore
                         structureStore: sections.localStructureStore
-                    }
-
-                    IdentityCenterLocalUnitLocationsEditor {
-                        width: parent.width
-                        directoryStore: sections.localDirectoryStore
-                        structureStore: sections.localStructureStore
-                        linkStore: sections.localUnitLocationLinksStore
-                    }
-
-                    IdentityCenterLocalBranchLocationsEditor {
-                        width: parent.width
-                        directoryStore: sections.localDirectoryStore
-                        structureStore: sections.localStructureStore
-                        linkStore: sections.localBranchLocationLinksStore
-                    }
-
-                    IdentityCenterLocalFunctionalReportingEditor {
-                        width: parent.width
-                        directoryStore: sections.localDirectoryStore
-                        structureStore: sections.localStructureStore
+                        functionLocationStore: sections.localUnitLocationLinksStore
+                        branchLocationStore: sections.localBranchLocationLinksStore
                         reportingStore: sections.localFunctionalReportingStore
-                    }
-
-                    IdentityCenterLocalSocialLinksEditor {
-                        width: parent.width
-                        directoryStore: sections.localDirectoryStore
-                        linksStore: sections.localLinksStore
+                        socialLinksStore: sections.localLinksStore
                         identitiesSnapshot: sections.socialIdentitiesSnapshot
                         accountDetailsStore: sections.socialAccountDetailsStore
                     }
@@ -247,6 +217,7 @@ Item {
                         width: parent.width
                         spacing: 7
                         visible: sections.organizationDisplayReady
+                                 && localOrganizationsWorkspace.activeWorkspace === "overview"
 
                         Text {
                             width: parent.width
@@ -299,6 +270,7 @@ Item {
                     ActionButton {
                         width: Math.min(parent.width, 260)
                         height: 35
+                        visible: localOrganizationsWorkspace.activeWorkspace === "overview"
                         label: "SWITCH ORGANIZATION // UNAVAILABLE"
                         labelPixelSize: 9
                         labelMinimumPixelSize: 8
@@ -309,6 +281,7 @@ Item {
 
                     Text {
                         width: parent.width
+                        visible: localOrganizationsWorkspace.activeWorkspace === "overview"
                         text: "Portfolio views never grant rights to an LLC, " +
                               "nonprofit or customer account by themselves."
                         color: Colors.orange

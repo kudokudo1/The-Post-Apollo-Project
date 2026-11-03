@@ -9,6 +9,12 @@ Column {
     property var structureStore: null
     property var reportingStore: null
     property string selectedOrgId: ""
+    property bool useSharedContext: false
+    onSelectedOrgIdChanged: {
+        selectedParentId = "";
+        selectedChildId = "";
+        confirmRemovalId = "";
+    }
     property string selectedParentId: ""
     property string selectedChildId: ""
     property string confirmRemovalId: ""
@@ -147,6 +153,7 @@ Column {
 
     Text {
         width: parent.width
+        visible: !editor.useSharedContext
         text: "1 // ORGANIZATION"
         color: Colors.cyan
         font.bold: true
@@ -154,6 +161,7 @@ Column {
     }
     Flow {
         width: parent.width
+        visible: !editor.useSharedContext
         spacing: 5
         height: childrenRect.height
         Repeater {

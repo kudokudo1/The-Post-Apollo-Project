@@ -107,7 +107,8 @@ test("EARTH receives transient overlay, actual map marker and clear action",()=>
   assert.match(discovery,/onClicked: stationDiscovery\.newsMapClearRequested\(\)/);
   assert.match(discovery,/onClicked: stationDiscovery\.focusNewsMentions\(\)/);
   assert.match(discovery,/MEDIA → EARTH \/\/ GDELT ARTICLE MENTIONS \/\/ NOT VERIFIED EVENT LOCATIONS/);
-  assert.match(discovery,/selectedMapNewsMention = modelData/);
+  assert.match(discovery,/stationDiscovery\.inspectNewsMention\(modelData\)/);
+  assert.match(discovery,/function inspectNewsMention\(row\)/);
   assert.match(discovery,/stationDiscovery\.newsMentionOverlay\.semantics/);
 });
 

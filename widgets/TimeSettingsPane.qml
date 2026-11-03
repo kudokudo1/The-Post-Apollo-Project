@@ -179,9 +179,38 @@ Item {
             GohuText {
                 width: parent.width
                 wrapMode: Text.WordWrap
-                text: "Use the top-right ⟳ to ask active Chrony for fresh samples. An authorization prompt may appear. It never enables NTP, forces a time jump, or promises an instant correction."
+                text: "Top-right ⟳ opens this confirmation. Active Chrony gets fresh samples; if stopped, a one-shot Chrony process may jump system time. A Polkit prompt may appear. NTP is never permanently enabled."
                 font.pixelSize: 10
                 color: Colors.white
+            }
+            GohuText {
+                width: parent.width
+                wrapMode: Text.WordWrap
+                text: "CONFIRMING CONTACTS CONFIGURED TIME SERVERS. THEY CAN SEE YOUR IP; A CORRECTION CAN CHANGE LOG / FILE TIMES."
+                font.pixelSize: 9
+                color: Colors.orange
+            }
+            Row {
+                width: parent.width
+                height: TimeSettings.resyncConfirmRequired ? 34 : 0
+                visible: TimeSettings.resyncConfirmRequired
+                spacing: 6
+                ActionButton {
+                    width: (parent.width - parent.spacing) / 2
+                    height: 33
+                    label: "CONFIRM RESYNC"
+                    labelPixelSize: 10
+                    accentColor: Colors.orange
+                    onLeftClicked: TimeSettings.requestResync()
+                }
+                ActionButton {
+                    width: (parent.width - parent.spacing) / 2
+                    height: 33
+                    label: "CANCEL"
+                    labelPixelSize: 10
+                    accentColor: Colors.cyan
+                    onLeftClicked: TimeSettings.cancelResync()
+                }
             }
             GohuText {
                 width: parent.width

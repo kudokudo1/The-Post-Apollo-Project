@@ -16,6 +16,14 @@ Rectangle {
     property bool meterVisible: false
     property real meterValue: 0
 
+    // W2b optional per-card inspector and explicit pin control. Disabled
+    // by default for all existing HOME snapshots/health/quick cards.
+    property string provenanceText: ""
+    property bool pinEnabled: false
+    property bool pinned: false
+    property bool pinAvailable: false
+    signal pinRequested()
+
     color: Colors.black
     border.width: 1
     border.color: Colors.cyan
@@ -29,6 +37,8 @@ Rectangle {
             text: card.title
             font.pixelSize: 10
             color: card.accentColor
+            width: parent.width - (card.pinEnabled ? 32 : 0)
+            elide: Text.ElideRight
         }
 
         GohuText {
@@ -73,5 +83,28 @@ Rectangle {
             width: parent.width
             visible: text.length > 0
         }
+
+        QuietText {
+            text: card.provenanceText
+            font.pixelSize: 8
+            elide: Text.ElideRight
+            width: parent.width
+            visible: text.length > 0
+        }
+    }
+
+    ActionButton {
+        anchors.top: parent.top
+        anchors.right: parent.right
+        anchors.margins: 5
+        width: 26
+        height: 23
+        visible: card.pinEnabled
+        available: card.pinAvailable
+        selected: card.pinned
+        accentColor: Colors.yellow
+        label: card.pinned ? "★" : "☆"
+        labelPixelSize: 13
+        onClicked: card.pinRequested()
     }
 }

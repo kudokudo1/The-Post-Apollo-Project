@@ -141,10 +141,9 @@ test("M28-J seven catalog controls remain exact after HOME is separately reviewe
   assert.equal(Object.values(env.WIRED_IN_SUBJECTS)
     .filter(milestone=>milestone==="M28-J").length,7,
     "M28-J retains all five WATCH and two creator controls");
-  const expected=["ground-source","map-source-rack","station-source-badge"];
-  const pending=Object.keys(env.PANELS).filter(id=>!env.WIRED_IN_SUBJECTS[id]).sort();
-  assert.deepEqual(pending,expected.sort());
-  assert.ok(env.remainingSourcePagesForPath("tools/sources/health",env.PANELS).length>0);
+  assert.deepEqual(Object.keys(env.PANELS).filter(id=>!env.WIRED_IN_SUBJECTS[id]),[],
+    "M28-L later completes source wiring without certifying safe video");
+  assert.deepEqual(plain(env.remainingSourcePagesForPath("tools/sources/health",env.PANELS)),[]);
   assert.deepEqual(plain(env.remainingSourcePagesForPath("weather",env.PANELS)),[],
     "M28-K original HOME controls belong to the native HOME workspace");
   assert.deepEqual(plain(env.nativeDestinationsForPath("../media",env.PANELS)),[]);

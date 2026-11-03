@@ -180,7 +180,8 @@ test("CLASSIC, WEATHER, COSMOS, the terminal and data store ownership remain int
   assert.match(station,/dossierArchiveStore: weatherStation\.dossierArchiveStore/);
   assert.match(station,/StationTerminal\s*\{/);
   assert.match(station,/onNewsMapRequested: function\(payload\)/);
-  assert.match(station,/return "INDEX \/\/ PREVIEW"/);
+  assert.match(station,/SubjectSourceBadge\.badgeFor\(/);
+  assert.match(station,/subjectNavigator\.indexOpen/);
   assert.ok(!earthPane.includes("WeatherServices."));
   for(const forbidden of ["FileView {","Process {","XMLHttpRequest","swaymsg","curl ","save("])
     assert.ok(!policySource.includes(forbidden),"policy side effect "+forbidden);

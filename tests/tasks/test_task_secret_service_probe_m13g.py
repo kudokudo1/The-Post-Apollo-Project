@@ -38,7 +38,7 @@ class ProbeTests(unittest.TestCase):
         self.assertEqual(len(calls), 1)
         args, kwargs = calls[0]
         self.assertEqual(args, probe.QUERY)
-        self.assertEqual(args[4], "/org/freedesktop/DBus")
+        self.assertEqual(args[6], "/org/freedesktop/DBus")
         self.assertEqual(args[-2], "org.freedesktop.DBus.NameHasOwner")
         self.assertEqual(args[-1], "org.freedesktop.secrets")
         self.assertLessEqual(kwargs["timeout"], 4)

@@ -37,6 +37,10 @@ Scope {
     property int fallbackGeneration: 0
     property string fallbackRequestContextKey: ""
     property date fallbackLastUpdated
+    // Session-local successful provider calls, scoped to the current place.
+    // These do not imply success when hydrating a cached observation.
+    property var primaryLastSuccessAt: null
+    property var fallbackLastSuccessAt: null
 
     // ─────────────────────────────────────────────
     // WEATHER DATA
@@ -803,6 +807,8 @@ Scope {
         usingPersistentAqiCache = false;
         activeWeatherProvider = "NONE";
         cachedWeatherProvider = "";
+        primaryLastSuccessAt = null;
+        fallbackLastSuccessAt = null;
         primaryWeatherStatus = "IDLE";
         fallbackWeatherStatus = "IDLE";
         fallbackWeatherError = "";
@@ -920,6 +926,7 @@ Scope {
             primaryParseSucceeded = true;
             activeWeatherProvider = "WTTR";
             cachedWeatherProvider = "";
+            primaryLastSuccessAt = receivedAt;
             usingPersistentCurrentCache = false;
             usingPersistentForecastCache = false;
 
@@ -973,6 +980,7 @@ Scope {
         fallbackParseSucceeded = true;
         activeWeatherProvider = "OPEN_METEO";
         cachedWeatherProvider = "";
+        fallbackLastSuccessAt = receivedAt;
         errorText = "";
         usingPersistentCurrentCache = false;
         usingPersistentForecastCache = false;

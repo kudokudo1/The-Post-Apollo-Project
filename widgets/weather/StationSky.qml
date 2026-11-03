@@ -588,13 +588,13 @@ Rectangle {
         StationCosmosVisualInstruments {
             width: parent.width
             visible: sky.subjectRoute.indexOf("cosmos/") === 0
-                     && (sky.sectionVisible("moon")
-                         || sky.sectionVisible("astronomy")
-                         || sky.sectionVisible("twilight"))
+                     && (CosmosPanelPolicy.visibleFor("sky",sky.subjectRoute,"moon")
+                         || CosmosPanelPolicy.visibleFor("sky",sky.subjectRoute,"astronomy")
+                         || CosmosPanelPolicy.visibleFor("sky",sky.subjectRoute,"twilight"))
             height: visible ? 258 : 0
-            showMoon: sky.sectionVisible("moon")
-            showSun: sky.sectionVisible("astronomy")
-                     || sky.sectionVisible("twilight")
+            showMoon: CosmosPanelPolicy.visibleFor("sky",sky.subjectRoute,"moon")
+            showSun: CosmosPanelPolicy.visibleFor("sky",sky.subjectRoute,"astronomy")
+                     || CosmosPanelPolicy.visibleFor("sky",sky.subjectRoute,"twilight")
             moonReady: moonService.ready
             moonEphemeris: moonService.ephemeris
             astronomySummary: sky.astronomySummary

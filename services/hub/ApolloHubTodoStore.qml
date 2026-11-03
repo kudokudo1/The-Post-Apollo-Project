@@ -26,6 +26,20 @@ Scope {
     // existing FileView/boolean methods are still the running writer.
     readonly property bool ticketProducerEnabled: false
     readonly property bool independentlyAuthenticatedTicketReceipt: false
+
+    // M13i: one shared read-only discovery seam, DISABLED for recovery.
+    // Merely creating the component never starts a process or accesses keys.
+    readonly property bool encryptedRecoveryEnabled: false
+    readonly property bool encryptedRecoveryStorageAuthorized: false
+    readonly property bool encryptedRecoveryUnlockAuthorized: false
+    readonly property string encryptedRecoveryProviderStatus:
+        encryptedRecoveryBridge.providerStatus
+    readonly property bool encryptedRecoveryProviderPresent:
+        encryptedRecoveryBridge.providerPresent
+
+    TaskEncryptedRecoveryBridgeM13i {
+        id: encryptedRecoveryBridge
+    }
     property string ticketSessionNonce:
         String(Date.now()) + String(Math.floor(Math.random() * 1000000000))
     property int ticketSequence: 0

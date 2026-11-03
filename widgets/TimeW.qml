@@ -44,7 +44,11 @@ PanelWindow {
     // Presentation choice is local to TimeW; it does not change the Clock
     // dock or Hub preference. The Hub helper is pure and owns no clock tick.
     property bool use24Hour: true
+    // Keep raw system time unchanged for Hub / legacy TimeW contracts.
     readonly property var localTimeSnapshot:
+        LocalTimePolicy.snapshot(localClock.date.getTime(), use24Hour)
+    // Calibration affects presentation only, not actual time consumers.
+    readonly property var displayLocalTimeSnapshot:
         LocalTimePolicy.snapshot(
             TimeSettings.adjustedEpochMs(localClock.date.getTime()),
             use24Hour)
@@ -54,10 +58,10 @@ PanelWindow {
     readonly property color clockReadoutColor:
         use24Hour ? Colors.orange : Colors.cyan
     readonly property string clockReadoutText:
-        localTimeSnapshot.state === "ready"
-        ? (use24Hour ? localTimeSnapshot.time24
-                     : localTimeSnapshot.time12.slice(0, 8))
-          + "//" + localTimeSnapshot.meridiem
+        displayLocalTimeSnapshot.state === "ready"
+        ? (use24Hour ? displayLocalTimeSnapshot.time24
+                     : displayLocalTimeSnapshot.time12.slice(0, 8))
+          + "//" + displayLocalTimeSnapshot.meridiem
         : "--:--:--//--"
 
     // Two CALC views, with MATH split into duration shift vs. interval.
@@ -2149,21 +2153,23 @@ PanelWindow {
 
                         GohuText {
                             width: parent.width
-                            text: timew.localTimeSnapshot.dateLabel
+                            text: timew.displayLocalTimeSnapshot.dateLabel
                             color: Colors.white
                             font.pixelSize: 18
                         }
 
                         GohuText {
                             width: parent.width
-                            text: timew.localTimeSnapshot.utcOffsetLabel
+                            text: timew.displayLocalTimeSnapshot.utcOffsetLabel
                             color: Colors.orange
                             font.pixelSize: 11
                         }
 
                         GohuText {
-                            text: timew.localTimeSnapshot.state === "ready"
-                                  ? "LOCAL CLOCK // SYSTEM TIME"
+                            text: timew.displayLocalTimeSnapshot.state === "ready"
+                                  ? TimeSettings.displayOffsetMs === 0
+                                    ? "LOCAL CLOCK // SYSTEM TIME"
+                                    : "LOCAL CLOCK // CALIBRATED DISPLAY"
                                   : "LOCAL CLOCK // UNAVAILABLE"
                             color: Colors.orange
                             font.pixelSize: 11

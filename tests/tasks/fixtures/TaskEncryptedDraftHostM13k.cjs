@@ -56,7 +56,7 @@ function isolatedRoot(){
         path.dirname(home)!==os.tmpdir() ||
         !path.basename(home).startsWith(MARKER) ||
         typeof process.env.DBUS_SESSION_BUS_ADDRESS!=="string" ||
-        !process.env.DBUS_SESSION_BUS_ADDRESS.startsWith("unix:") ||
+        !/^unix:path=\/tmp\/dbus-[A-Za-z0-9_-]+(?:,.*)?$/.test(process.env.DBUS_SESSION_BUS_ADDRESS) ||
         process.env.XDG_DATA_HOME!==path.join(home,".local/share") ||
         process.env.XDG_CONFIG_HOME!==path.join(home,".config") ||
         process.env.XDG_CACHE_HOME!==path.join(home,".cache") ||

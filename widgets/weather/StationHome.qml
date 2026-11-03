@@ -13,8 +13,26 @@ Rectangle {
 
     // Empty route preserves original CLASSIC HOME.
     property string subjectRoute: ""
+    property string workspaceSection: ""
     function sectionVisible(section) {
+        if (subjectRoute === "" && workspaceSection !== "") {
+            if (section === "header") return true;
+            if (workspaceSection === "auto")
+                return section === "relevant" || section === "alerts";
+            if (workspaceSection === "quick")
+                return section === "quick" || section === "relations";
+            if (workspaceSection === "snapshot")
+                return section === "snapshot" || section === "alerts";
+            if (workspaceSection === "history")
+                return section === "history" || section === "relations";
+            if (workspaceSection === "runtime") return section === "runtime";
+            if (workspaceSection === "health") return section === "health";
+            return false;
+        }
         return SubjectPanelPolicy.visibleFor("home", subjectRoute, section);
+    }
+    onWorkspaceSectionChanged: {
+        if (homeScroll) homeScroll.contentY = 0;
     }
     onSubjectRouteChanged: {
         if (homeScroll)

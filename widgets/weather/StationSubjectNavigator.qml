@@ -80,8 +80,12 @@ Rectangle {
     readonly property var currentRoute: SubjectRoutes.findRoute(currentPath)
     readonly property var childrenRoutes: SubjectRoutes.childrenOf(currentPath)
     readonly property var pathCrumbs: SubjectRoutes.breadcrumbs(currentPath)
+    // Preserve historical source lineage but present only unresolved legacy
+    // shortcuts; exact M28-A/B/C routes are offered as native SUBJECTS links.
     readonly property var classicSources:
-        PreviewRoutes.sourcePagesForPath(currentPath, SubjectRoutes.PANELS)
+        PreviewRoutes.remainingSourcePagesForPath(currentPath, SubjectRoutes.PANELS)
+    readonly property var nativeDestinations:
+        PreviewRoutes.nativeDestinationsForPath(currentPath, SubjectRoutes.PANELS)
 
     // MEDIA owns article extraction. EARTH owns map plotting and inspection.
     // This is transient view context, never a source event or archive write.
@@ -434,7 +438,7 @@ Rectangle {
             }
 
             GohuText {
-                text: "CURRENT SOURCE PAGES // CLASSIC"
+                text: "SOURCE ROUTES // SUBJECTS + CLASSIC"
                 font.pixelSize: 13
                 color: Colors.cyan
             }
@@ -442,8 +446,34 @@ Rectangle {
             QuietText {
                 width: parent.width
                 wrapMode: Text.WordWrap
-                text: "OPEN A CLASSIC PAGE TO USE ITS EXISTING CONTROLS. THE NEW ROUTE TREE DOES NOT YET RELOCATE OR FILTER THAT PAGE."
+                text: "EXACT M28-A/B/C CONTROL CUTOVERS OPEN DIRECTLY IN SUBJECTS. ONLY UNRESOLVED MAPPED CONTROLS STILL OFFER THEIR ORIGINAL CLASSIC PAGE. THIS IS NOT FULL-PARITY ACCEPTANCE."
                 font.pixelSize: 10
+            }
+
+            GohuText {
+                visible: browser.nativeDestinations.length > 0
+                text: "ALREADY ROUTED // SUBJECTS"
+                font.pixelSize: 13
+                color: Colors.cyan
+            }
+
+            Repeater {
+                model: browser.nativeDestinations
+                delegate: ActionButton {
+                    required property var modelData
+                    width: contentColumn.width
+                    height: 32
+                    label: "OPEN SUBJECTS // " + modelData.path.toUpperCase()
+                    labelPixelSize: 10
+                    onClicked: browser.chooseRoute(modelData.path)
+                }
+            }
+
+            GohuText {
+                visible: browser.classicSources.length > 0
+                text: "STILL PENDING // CLASSIC"
+                font.pixelSize: 13
+                color: Colors.orange
             }
 
             Repeater {
@@ -466,7 +496,9 @@ Rectangle {
                 text: browser.currentRoute
                       && browser.currentRoute.subject === "magick"
                       ? "MAGICK IS A PLANNED INTERPRETIVE SUBJECT. NO ASTROLOGY OR MAGICK CONTENT IS BEING CLAIMED AS OPERATIONAL."
-                      : "NO CLASSIC PAGE IS DIRECTLY MAPPED TO THIS ROUTE YET."
+                      : browser.nativeDestinations.length > 0
+                        ? "NO REMAINING CLASSIC SHORTCUT FOR TRACKED CUTOVERS AT THIS ROUTE. OPEN THE SUBJECTS CONTROL ABOVE."
+                        : "NO CLASSIC PAGE IS DIRECTLY MAPPED TO THIS ROUTE YET."
             }
         }
     }

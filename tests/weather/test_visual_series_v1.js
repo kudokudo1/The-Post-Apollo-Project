@@ -72,7 +72,7 @@ test("duplicate observed timestamps choose latest receipt, maintain ascending ch
      sample(10,450,"solarWindSpeed",3000),sample(30,370)];
   const m=modeled(rows);
   assert.equal(m.count,3);
-  assert.deepEqual(plain(m.rows.map(x=>x.value)),[370,450,390].sort((a,b)=>0));
+  assert.deepEqual(plain(m.rows.map(x=>x.value)),[370,380,450]);
   assert.equal(m.rows[0].timeMs,NOW-30*minute);
   assert.equal(m.rows[2].timeMs,NOW-10*minute);
   assert.equal(m.rows[2].value,450);
@@ -129,6 +129,8 @@ test("point inspector picks a real timestamp with no generated midpoints",()=>{
   assert.equal(context.nearestValue(right,selected,10*minute).value,-5);
   assert.equal(context.nearestValue(right,selected,0),null);
   assert.equal(context.nearestTimestamp({rows:[]},{rows:[]},NOW),-1);
+  assert.equal(context.freshnessLabel(left.lastMs,NOW,45),"FRESH 20M");
+  assert.equal(context.freshnessLabel(-1,NOW,45),"NO SAMPLE");
   assert.equal(context.formatNumber(null,1),"--");
   assert.equal(context.formatNumber(-5.12,1),"-5.1");
   assert.equal(context.xPosition(left.startMs,left,360),0);

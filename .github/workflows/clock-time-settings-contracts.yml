@@ -1,0 +1,56 @@
+name: Clock time settings contracts
+
+on:
+  pull_request:
+    paths:
+      - "modules/Clock.qml"
+      - "widgets/TimeW.qml"
+      - "widgets/TimeSettingsPane.qml"
+      - "services/time/TimeSettings.qml"
+      - "services/time/TimeSettingsPolicy.js"
+      - "services/time/TimeHostControl.py"
+      - "services/time/qmldir"
+      - "tests/time/test_clock_settings_contract.py"
+      - ".github/workflows/clock-time-settings-contracts.yml"
+  push:
+    paths:
+      - "modules/Clock.qml"
+      - "widgets/TimeW.qml"
+      - "widgets/TimeSettingsPane.qml"
+      - "services/time/TimeSettings.qml"
+      - "services/time/TimeSettingsPolicy.js"
+      - "services/time/TimeHostControl.py"
+      - "services/time/qmldir"
+      - "tests/time/test_clock_settings_contract.py"
+      - ".github/workflows/clock-time-settings-contracts.yml"
+
+jobs:
+  contracts:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify Python time control and integration contracts
+        run: python3 -m unittest discover -s tests/time -p 'test_clock_settings_contract.py' -v
+      - name: Check bounded visual calibration policy
+        run: |
+          node <<'JS'
+          const fs = require('fs');
+          const vm = require('vm');
+          const assert = require('assert/strict');
+          const file = 'services/time/TimeSettingsPolicy.js';
+          const source = fs.readFileSync(file, 'utf8').replace(/^\.pragma library\s*/, '');
+          const policy = {};
+          vm.runInNewContext(source, policy);
+          assert.equal(policy.initialDocument().displayOffsetMs, 0);
+          assert.equal(policy.validOffset(300000), true);
+          assert.equal(policy.validOffset(-300000), true);
+          assert.equal(policy.validOffset(300001), false);
+          assert.equal(policy.validOffset(1.5), false);
+          assert.equal(policy.withOffset(policy.initialDocument(), 1500).ok, true);
+          assert.equal(policy.withOffset(policy.initialDocument(), 500000).ok, false);
+          assert.equal(policy.adjustedEpochMs(1000, 1500), 2500);
+          assert.equal(policy.formatOffset(-1250), '-1.250s');
+          assert.equal(policy.parse(JSON.stringify({version:1,displayOffsetMs:0})).ok,true);
+          assert.equal(policy.parse(JSON.stringify({version:2,displayOffsetMs:0})).ok,false);
+          assert.equal(policy.parse('not json').ok,false);
+          JS

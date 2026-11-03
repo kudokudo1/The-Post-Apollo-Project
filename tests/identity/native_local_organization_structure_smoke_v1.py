@@ -105,11 +105,13 @@ def main() -> None:
         with patch.dict(os.environ, env, clear=True):
             fixture()
             root = directory.root_path()
-            original = {
-                "organization": directory.location().read_bytes(),
-                "portfolio": portfolios.storage_path().read_bytes(),
-                "links": links.storage_path().read_bytes(),
+            fixture_paths = {
+                "organization": root / directory.FILE_NAME,
+                "portfolio": root / portfolios.FILE_NAME,
+                "links": root / links.FILE_NAME,
             }
+            original = {name: path.read_bytes()
+                        for name, path in fixture_paths.items()}
         path = root / "local-org-structure-v1.json"
         assert not path.exists(), "Absent file must not be initialized on read"
         previous = None
@@ -145,13 +147,13 @@ def main() -> None:
             assert_document(json.loads(data))
             for forbidden in (b"accessToken", b"scopeGrants", b"principalId"):
                 assert forbidden not in data, "Privileged field in local metadata"
-            assert directory.location().read_bytes() == original["organization"], (
+            assert fixture_paths["organization"].read_bytes() == original["organization"], (
                 "Native structure editor rewrote the original organization directory"
             )
-            assert portfolios.storage_path().read_bytes() == original["portfolio"], (
+            assert fixture_paths["portfolio"].read_bytes() == original["portfolio"], (
                 "Native structure editor rewrote the original portfolio directory"
             )
-            assert links.storage_path().read_bytes() == original["links"], (
+            assert fixture_paths["links"].read_bytes() == original["links"], (
                 "Native structure editor rewrote existing Social label links"
             )
             if previous is not None:

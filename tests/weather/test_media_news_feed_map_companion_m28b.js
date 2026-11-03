@@ -54,7 +54,7 @@ test("NEWS retains original full filtered article rows and click-to-inspect",()=
   assert.equal((qml.match(/id: discoveryRecordCard/g)||[]).length,1);
   const feedBlock=qml.split("NEWS HEADLINES // CURRENT FILTERED BATCH")[1]
                     ?.split("REPORTING TREND // CURRENT FILTERED BATCH")[0]||"";
-  assert.match(feedBlock,/model: source.ready \? stationDiscovery.visibleRows : \[\]/);
+  assert.match(feedBlock,/model: stationDiscovery.newsGroupVisible\("list"\)\s*&& source.ready\s*\? stationDiscovery.visibleRows : \[\]/);
   assert.match(feedBlock,/delegate: discoveryRecordCard/);
   assert.match(qml,/onClicked: stationDiscovery.openRow\(modelData\)/);
   assert.match(qml,/function openRow\(row\)/);

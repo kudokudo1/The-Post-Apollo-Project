@@ -18,6 +18,8 @@ Item {
     property var localPortfoliosStore: null
     // Local division/department/location/team labels, never verified grants.
     property var localStructureStore: null
+    // Local-only functional-unit to location planning labels.
+    property var localUnitLocationLinksStore: null
     // Manual Social label associations only, not Identity Center grants.
     property var localLinksStore: null
     property var socialIdentitiesSnapshot: null
@@ -206,6 +208,13 @@ Item {
                         width: parent.width
                         directoryStore: sections.localDirectoryStore
                         structureStore: sections.localStructureStore
+                    }
+
+                    IdentityCenterLocalUnitLocationsEditor {
+                        width: parent.width
+                        directoryStore: sections.localDirectoryStore
+                        structureStore: sections.localStructureStore
+                        linkStore: sections.localUnitLocationLinksStore
                     }
 
                     IdentityCenterLocalSocialLinksEditor {

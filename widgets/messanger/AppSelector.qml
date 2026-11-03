@@ -993,6 +993,7 @@ Rectangle {
             localDirectoryStore: SocialOrganizationDirectoryStore
             localPortfoliosStore: SocialLocalPortfoliosStore
             localStructureStore: SocialLocalOrganizationStructureStore
+            localUnitLocationLinksStore: SocialLocalUnitLocationLinksStore
             localLinksStore: SocialOrganizationLinksStore
             socialIdentitiesSnapshot: appSelector.identitySnapshot
             socialAccountDetailsStore: SocialAccountDetailsStore

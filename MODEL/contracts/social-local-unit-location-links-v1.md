@@ -26,7 +26,7 @@ After code review/merge and separately authorized local source update:
 
 ## VERIFY
 
-Synthetic tests in tests/messaging/test_social_local_unit_locations_v1.py exercise three fictional organizations, all functional categories, many-to-many reuse, strict cross-company rejection, missing/archived target checks, stale-link removal, revision and duplicate rejection, private file modes, corrupt/newer/unsafe file refusal, fixed CLI and **byte-for-byte original store preservation**. New CI also runs existing organization, portfolio, structure, Social-link, settings and actual offscreen Qt parser/instantiation regressions. This is not a native Quickshell restart or a running desktop click test for the new editor.
+Synthetic tests in tests/messaging/test_social_local_unit_locations_v1.py exercise three fictional organizations, all functional categories, many-to-many reuse, strict cross-company rejection, missing/archived target checks, stale-link removal, revision and duplicate rejection, private file modes, corrupt/newer/unsafe file refusal, fixed CLI and **byte-for-byte original store preservation**. New CI also runs existing organization, portfolio, structure, Social-link, settings and actual offscreen Qt parser/instantiation regressions. CI additionally runs a genuine pinned Quickshell 0.3.2 process twice against completely disposable XDG roots, creating and then reloading link records across three fictional organizations, while verifying byte-for-byte preservation of the source files and private modes. This is still not a live Sway desktop click test for the new editor.
 
 ## WATCH OUT FOR
 
@@ -39,7 +39,7 @@ These are **manual local planning links**, not tenant memberships, verified phys
 - [x] Independent private local unit-location association model
 - [x] Same-screen UI with many-to-many choices, stale status and confirmation unlink
 - [x] Synthetic tests, original regressions and Qt offscreen workflow
-- [ ] Exact-head CI green
+- [ ] Exact-head Python, Qt and genuine native Quickshell CI green
 - [ ] Independent review and operator merge
 - [ ] Operator live UI acceptance
 

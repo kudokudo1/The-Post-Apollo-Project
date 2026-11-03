@@ -27,11 +27,20 @@ Rectangle {
         return Colors.red;
     }
 
-    Column {
-        id: detailBody
+    Flickable {
+        id: diagnosticsScroll
         anchors.fill: parent
-        anchors.margins: 12
-        spacing: 11
+        clip: true
+        boundsBehavior: Flickable.StopAtBounds
+        contentWidth: width
+        contentHeight: Math.max(height, detailBody.y + detailBody.implicitHeight + 16)
+
+        Column {
+            id: detailBody
+            x: 12
+            y: 12
+            width: Math.max(0, diagnosticsScroll.width - 24)
+            spacing: 11
 
         Row {
             width: parent.width
@@ -170,5 +179,13 @@ Rectangle {
                   + "CACHE AGE COMES FROM THE SAVED SAMPLE. "
                   + "NO EXTRA FETCHES FROM THIS PANEL."
         }
+        }
+    }
+
+    NeonScrollBar {
+        flickable: diagnosticsScroll
+        handleStyle: "star"
+        geometryHost: diagnosticsPane
+        visible: scrollable
     }
 }

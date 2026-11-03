@@ -21,6 +21,7 @@ Rectangle {
     property var liveHistoryStore: null
     property var eventArchiveStore: null
     property var dossierArchiveStore: null
+    property var homeFavoritesStore: null
     property real runtimeNowMs: 0
 
     // W2a preferences are owned by the persistent SubjectNavigator. The
@@ -80,6 +81,7 @@ Rectangle {
             nwsAlertSource: surface.nwsAlertSource
             historyService: surface.historyService
             liveHistoryStore: surface.liveHistoryStore
+            homeFavoritesStore: surface.homeFavoritesStore
             runtimeNowMs: surface.runtimeNowMs
         }
 
@@ -107,6 +109,7 @@ Rectangle {
             riverSource: surface.riverSource
             persistentCacheStore: surface.persistentCacheStore
             liveHistoryStore: surface.liveHistoryStore
+            homeFavoritesStore: surface.homeFavoritesStore
             runtimeNowMs: surface.runtimeNowMs
         }
 
@@ -228,6 +231,8 @@ Rectangle {
                     labelPixelSize: 10
                     selected: HomeDeck.favorite(surface.deckFavorites,surface.currentPath)
                     available: HomeDeck.isRotatable(surface.currentPath)
+                               && surface.homeFavoritesStore
+                               && surface.homeFavoritesStore.writable
                     onClicked: surface.deckFavoritesRequested(
                         HomeDeck.toggleFavorite(
                             surface.deckFavorites, surface.currentPath

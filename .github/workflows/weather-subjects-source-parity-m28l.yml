@@ -18,6 +18,7 @@ on:
       - 'tests/weather/test_media_subject_panels_d1.js'
       - 'tests/weather/test_earth_subject_panels_e1.js'
       - 'tests/weather/test_tools_subject_panels_t1.js'
+      - 'tests/weather/test_weather_subject_panels_m2a.js'
       - 'tests/weather/test_magick_subject_panels_g1.js'
       - 'tests/weather/test_index_home_cutover_m28k.js'
       - 'tests/weather/test_index_media_catalog_cutover_m28j.js'

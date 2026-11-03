@@ -4,6 +4,7 @@ import "../../services/weather" as WeatherServices
 import "StationViewerPolicy.js" as ViewerPolicy
 import "../../services/weather/StationDiscoveryPolicy.js" as DiscoveryPolicy
 import "StationMapProjectionPolicy.js" as MapProjection
+import "StationMapCompanionPolicy.js" as MapCompanion
 import "StationNaturalEarthLand110.js" as NaturalEarthLand
 import "StationNaturalEarthContext110.js" as NaturalEarthContext
 import "../../services/weather/FirmsHotspotPolicy.js" as FirmsAreaPolicy
@@ -381,6 +382,14 @@ Rectangle {
             mapPlot ? mapPlot.height : 0,
             mapZoom, mapCenterLon, mapCenterLat
         )
+    // A small spatial companion, not a duplicated MEDIA news feed.
+    // EARTH → EVENTS → EONET keeps the complete original event list.
+    readonly property var mapCompanionEonetRows:
+        !earthMapOnly || earthMapRoute === "earth/events/eonet"
+        ? visibleRows
+        : MapCompanion.previewEonet(
+              mapPointRows, selectedMapEvent, mapVisibleBounds, 4
+          )
     readonly property var firmsArea:
         firmsService
         ? FirmsAreaPolicy.boundedArea(mapVisibleBounds, 60, 40)
@@ -828,6 +837,16 @@ Rectangle {
 
     function closeNewsMentionInspector() {
         selectedMapNewsMention = null;
+    }
+
+    function inspectNewsMention(row) {
+        if (domain !== "map" || !row) return false;
+        selectedMapEvent = null;
+        selectedMapHotspot = null;
+        selectedMapEarthquake = null;
+        selectedMapGdacsEvent = null;
+        selectedMapNewsMention = row;
+        return true;
     }
 
     function requestNewsMapHandoff() {
@@ -1344,6 +1363,102 @@ Rectangle {
     }
 
     color: Colors.black
+
+    // The original SOURCE ROW card is shared by the MEDIA feed and the
+    // EARTH event companion. Reuse the same click/inspector behavior.
+    Component {
+        id: discoveryRecordCard
+        Rectangle {
+                    required property var modelData
+                    width: content.width
+                    height: modelData.sourceGroup
+                            && modelData.sourceGroup.multiSource
+                            ? 108 : 88
+                    color: Colors.dark
+                    border.width: 1
+                    border.color: entryMouse.containsMouse ? Colors.yellow
+                                  : Colors.cyan
+
+                    Column {
+                        anchors.left: parent.left
+                        anchors.right: openLabel.left
+                        anchors.top: parent.top
+                        anchors.leftMargin: 12
+                        anchors.topMargin: 8
+                        anchors.rightMargin: 12
+                        spacing: 6
+
+                        GohuText {
+                            width: parent.width
+                            text: modelData.title
+                            color: Colors.white
+                            elide: Text.ElideRight
+                            font.pixelSize: 15
+                        }
+
+                        SecondaryText {
+                            width: parent.width
+                            text: stationDiscovery.domain === "news"
+                                  ? modelData.detail
+                                    + " // "
+                                    + String(
+                                          modelData.primaryTopic || "other"
+                                      ).toUpperCase()
+                                  : modelData.detail
+                            elide: Text.ElideRight
+                            font.pixelSize: 12
+                        }
+
+                        QuietText {
+                            width: parent.width
+                            text: modelData.time
+                            elide: Text.ElideRight
+                            font.pixelSize: 10
+                        }
+                        QuietText {
+                            visible: modelData.sourceGroup
+                                     && modelData.sourceGroup.multiSource
+                            width: parent.width
+                            text: modelData.sourceGroup
+                                  ? "EXACT HEADLINE GROUP // "
+                                    + modelData.sourceGroup.sourceCount
+                                    + " PUBLISHERS // "
+                                    + modelData.sourceGroup.domains.join(" / ")
+                                    + (modelData.sourceGroup.countries.length > 0
+                                       ? " // COUNTRIES "
+                                         + modelData.sourceGroup.countries.join(" / ")
+                                       : "")
+                                  : ""
+                            elide: Text.ElideRight
+                            font.pixelSize: 9
+                            color: Colors.magenta
+                        }
+                    }
+
+                    GohuText {
+                        id: openLabel
+                        anchors.right: parent.right
+                        anchors.verticalCenter: parent.verticalCenter
+                        anchors.rightMargin: 12
+                        text: stationDiscovery.domain === "news" ? "VIEW HERE"
+                              : stationDiscovery.domain === "map" ? "INSPECT HERE"
+                              : modelData.url !== "" ? modelData.action : "NO LINK"
+                        color: entryMouse.containsMouse ? Colors.yellow : Colors.cyan
+                        font.pixelSize: 11
+                    }
+
+                    MouseArea {
+                        id: entryMouse
+                        anchors.fill: parent
+                        hoverEnabled: true
+                        cursorShape: stationDiscovery.domain === "news"
+                                     || stationDiscovery.domain === "map"
+                                     || modelData.url !== ""
+                                     ? Qt.PointingHandCursor : Qt.ArrowCursor
+                        onClicked: stationDiscovery.openRow(modelData)
+                    }
+                }
+    }
 
     Flickable {
         id: discoveryScroll
@@ -3065,13 +3180,8 @@ Rectangle {
                                 anchors.fill: parent
                                 hoverEnabled: true
                                 cursorShape: Qt.PointingHandCursor
-                                onClicked: {
-                                    stationDiscovery.selectedMapEvent = null;
-                                    stationDiscovery.selectedMapHotspot = null;
-                                    stationDiscovery.selectedMapEarthquake = null;
-                                    stationDiscovery.selectedMapGdacsEvent = null;
-                                    stationDiscovery.selectedMapNewsMention = modelData;
-                                }
+                                onClicked:
+                                    stationDiscovery.inspectNewsMention(modelData)
                             }
                         }
                     }
@@ -3494,6 +3604,41 @@ Rectangle {
                             + " ARTICLES"
                     elide: Text.ElideRight
                     font.pixelSize: 9
+                }
+            }
+
+            // M28-B: MEDIA owns the full article feed. Keep its working
+            // filters together, then show headlines before optional analytics.
+            Column {
+                width: parent.width
+                spacing: 7
+                visible: stationDiscovery.domain === "news"
+                         && stationDiscovery.newsGroupVisible("list")
+
+                StationSectionDivider {
+                    width: parent.width
+                    title: "NEWS HEADLINES // CURRENT FILTERED BATCH // "
+                         + stationDiscovery.visibleRows.length
+                }
+
+                QuietText {
+                    width: parent.width
+                    visible: !source.ready || stationDiscovery.visibleRows.length === 0
+                    wrapMode: Text.WordWrap
+                    text: source.failed ? source.errorText
+                          : source.retryWaitSeconds > 0
+                            ? "REQUEST HELD // PROVIDER COOLDOWN // ARTICLES NOT LOADED"
+                          : source.loading ? "RECEIVING NEWS HEADLINES"
+                          : source.ready
+                            ? "NO HEADLINES MATCH THE ACTIVE FILTERS"
+                            : "NEWS SOURCE WAITING // REQUEST A FRESH BATCH"
+                    color: Colors.orange
+                    font.pixelSize: 10
+                }
+
+                Repeater {
+                    model: source.ready ? stationDiscovery.visibleRows : []
+                    delegate: discoveryRecordCard
                 }
             }
 
@@ -4413,7 +4558,8 @@ Rectangle {
             }
 
             QuietText {
-                visible: !stationDiscovery.weatherMapOnly
+                visible: stationDiscovery.domain === "map"
+                         && !stationDiscovery.weatherMapOnly
                          && stationDiscovery.earthLayerEnabled("eonet")
                          && (source.failed || !source.ready || source.rows.length === 0)
                 width: parent.width
@@ -4427,101 +4573,90 @@ Rectangle {
                 font.pixelSize: 12
             }
 
-            Repeater {
-                model: source.ready ? stationDiscovery.visibleRows : []
-                visible: !stationDiscovery.weatherMapOnly
+            // Nearby map-event companion. This is EONET data, NOT GDELT
+            // headlines. Event record clicks reuse the original inspector.
+            StationSectionDivider {
+                width: parent.width
+                visible: stationDiscovery.domain === "map"
+                         && stationDiscovery.earthMapOnly
                          && stationDiscovery.earthLayerEnabled("eonet")
+                title: stationDiscovery.earthMapRoute === "earth/events/eonet"
+                    ? "NASA EONET // FULL EVENT LIST"
+                    : "EARTH MAP CONTEXT // EONET EVENTS IN VIEW"
+            }
 
-                delegate: Rectangle {
-                    required property var modelData
-                    width: content.width
-                    height: modelData.sourceGroup
-                            && modelData.sourceGroup.multiSource
-                            ? 108 : 88
-                    color: Colors.dark
-                    border.width: 1
-                    border.color: entryMouse.containsMouse ? Colors.yellow
-                                  : Colors.cyan
+            QuietText {
+                width: parent.width
+                visible: stationDiscovery.domain === "map"
+                         && stationDiscovery.earthMapOnly
+                         && stationDiscovery.earthLayerEnabled("eonet")
+                text: stationDiscovery.earthMapRoute === "earth/events/eonet"
+                    ? "ALL SOURCE EVENTS // SELECT TO INSPECT"
+                    : "SHOWING " + stationDiscovery.mapCompanionEonetRows.length
+                      + " CONTEXT EVENTS // COMPLETE LIST UNDER EARTH → EVENTS → EONET"
+                color: Colors.cyan
+                font.pixelSize: 9
+            }
 
-                    Column {
-                        anchors.left: parent.left
-                        anchors.right: openLabel.left
-                        anchors.top: parent.top
-                        anchors.leftMargin: 12
-                        anchors.topMargin: 8
-                        anchors.rightMargin: 12
-                        spacing: 6
+            // No second news feed is created in EARTH. These are the
+            // mentioned locations already extracted for the selected MEDIA
+            // article. Each remains independently selectable on the map.
+            Column {
+                width: parent.width
+                spacing: 6
+                visible: stationDiscovery.domain === "map"
+                         && stationDiscovery.earthMapOnly
+                         && stationDiscovery.mapNewsMentionRows.length > 0
 
-                        GohuText {
-                            width: parent.width
-                            text: modelData.title
-                            color: Colors.white
-                            elide: Text.ElideRight
-                            font.pixelSize: 15
+                StationSectionDivider {
+                    width: parent.width
+                    title: "MAP COMPANION // ARTICLE MENTIONED PLACES"
+                }
+                QuietText {
+                    width: parent.width
+                    text: stationDiscovery.newsMentionOverlay
+                          ? stationDiscovery.newsMentionOverlay.articleTitle
+                          : ""
+                    elide: Text.ElideRight
+                    color: Colors.magenta
+                    font.pixelSize: 10
+                }
+                Repeater {
+                    model: stationDiscovery.mapNewsMentionRows.slice(0, 5)
+                    delegate: ActionButton {
+                        required property var modelData
+                        width: Math.min(parent.width, 360)
+                        height: 28
+                        label: "◉ " + modelData.name
+                        labelPixelSize: 10
+                        accentColor: Colors.magenta
+                        selected: stationDiscovery.selectedMapNewsMention
+                                  === modelData
+                        onClicked: {
+                            stationDiscovery.inspectNewsMention(modelData);
+                            stationDiscovery.applyMapView(
+                                MapProjection.fitRows([modelData], 1.35)
+                            );
                         }
-
-                        SecondaryText {
-                            width: parent.width
-                            text: stationDiscovery.domain === "news"
-                                  ? modelData.detail
-                                    + " // "
-                                    + String(
-                                          modelData.primaryTopic || "other"
-                                      ).toUpperCase()
-                                  : modelData.detail
-                            elide: Text.ElideRight
-                            font.pixelSize: 12
-                        }
-
-                        QuietText {
-                            width: parent.width
-                            text: modelData.time
-                            elide: Text.ElideRight
-                            font.pixelSize: 10
-                        }
-                        QuietText {
-                            visible: modelData.sourceGroup
-                                     && modelData.sourceGroup.multiSource
-                            width: parent.width
-                            text: modelData.sourceGroup
-                                  ? "EXACT HEADLINE GROUP // "
-                                    + modelData.sourceGroup.sourceCount
-                                    + " PUBLISHERS // "
-                                    + modelData.sourceGroup.domains.join(" / ")
-                                    + (modelData.sourceGroup.countries.length > 0
-                                       ? " // COUNTRIES "
-                                         + modelData.sourceGroup.countries.join(" / ")
-                                       : "")
-                                  : ""
-                            elide: Text.ElideRight
-                            font.pixelSize: 9
-                            color: Colors.magenta
-                        }
-                    }
-
-                    GohuText {
-                        id: openLabel
-                        anchors.right: parent.right
-                        anchors.verticalCenter: parent.verticalCenter
-                        anchors.rightMargin: 12
-                        text: stationDiscovery.domain === "news" ? "VIEW HERE"
-                              : stationDiscovery.domain === "map" ? "INSPECT HERE"
-                              : modelData.url !== "" ? modelData.action : "NO LINK"
-                        color: entryMouse.containsMouse ? Colors.yellow : Colors.cyan
-                        font.pixelSize: 11
-                    }
-
-                    MouseArea {
-                        id: entryMouse
-                        anchors.fill: parent
-                        hoverEnabled: true
-                        cursorShape: stationDiscovery.domain === "news"
-                                     || stationDiscovery.domain === "map"
-                                     || modelData.url !== ""
-                                     ? Qt.PointingHandCursor : Qt.ArrowCursor
-                        onClicked: stationDiscovery.openRow(modelData)
                     }
                 }
+                QuietText {
+                    width: parent.width
+                    text: "ARTICLE MENTIONS ONLY // NOT VERIFIED EVENT LOCATIONS"
+                    font.pixelSize: 9
+                    color: Colors.orange
+                }
+            }
+
+            Repeater {
+                // The complete EONET list lives at EARTH → EVENTS → EONET.
+                // MAPS/OVERVIEW shows a small in-view companion with the
+                // currently selected record prioritized, not an endless feed.
+                model: stationDiscovery.domain === "map" && source.ready
+                    ? stationDiscovery.mapCompanionEonetRows : []
+                visible: !stationDiscovery.weatherMapOnly
+                         && stationDiscovery.earthLayerEnabled("eonet")
+                delegate: discoveryRecordCard
             }
 
             QuietText {

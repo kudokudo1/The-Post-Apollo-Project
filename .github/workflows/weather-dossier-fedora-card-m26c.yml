@@ -24,11 +24,14 @@ jobs:
     steps:
       - name: Install Fedora Quickshell, Qt QML components and Node
         run: |
+          dnf install -y --setopt=install_weak_deps=False dnf5-plugins
+          dnf copr enable -y errornointernet/quickshell
           dnf install -y --setopt=install_weak_deps=False \
             quickshell qt6-qtdeclarative qt6-qt5compat \
             qt6-qtbase-gui qt6-qtsvg git nodejs coreutils findutils \
             xdotool xorg-x11-server-Xvfb
           quickshell --version
+          quickshell --version | grep '0.3.'
       - uses: actions/checkout@v4
       - name: M26-C actual Xvfb Event Context card native pointer smoke
         run: bash scripts/weather/verify_dossier_card_fedora_m26c.sh

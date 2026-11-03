@@ -1,0 +1,46 @@
+name: TASKS M13e draft privacy decision dossier
+
+on:
+  pull_request:
+    paths:
+      - 'tests/tasks/fixtures/TaskDraftPrivacyDecisionM13e.cjs'
+      - 'tests/tasks/test_task_draft_privacy_decision_m13e.cjs'
+      - 'docs/tasks-draft-storage-privacy-decision-m13e.md'
+      - '.github/workflows/tasks-draft-privacy-decision-m13e.yml'
+      - 'services/hub/ApolloHubTodoStore.qml'
+  push:
+    branches: [main]
+    paths:
+      - 'tests/tasks/fixtures/TaskDraftPrivacyDecisionM13e.cjs'
+      - 'tests/tasks/test_task_draft_privacy_decision_m13e.cjs'
+      - '.github/workflows/tasks-draft-privacy-decision-m13e.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  privacy-review-only:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: M13e privacy decision candidates never persist, export or delete
+        run: node --test tests/tasks/test_task_draft_privacy_decision_m13e.cjs
+      - name: M13d separate fake gesture and draft-only scope
+        run: node --test tests/tasks/test_task_operator_draft_choice_m13d.cjs
+      - name: M13c pinned synthetic evidence and review age
+        run: node --test tests/tasks/test_task_recovery_evidence_m13c.cjs
+      - name: M13b read-only four-consumer recovery display
+        run: node --test tests/tasks/test_task_recovery_display_m13b.cjs
+      - name: M13a fake restart preservation
+        run: node --test tests/tasks/test_task_restart_review_m13a.cjs
+      - name: M12o four consumer ticket draft contract
+        run: node --test tests/tasks/test_task_disabled_ticket_api_m12o.cjs
+      - name: M11d one writer and disabled ticket guards
+        run: python3 tests/tasks/test_task_writer_gate_inventory_m11d.py

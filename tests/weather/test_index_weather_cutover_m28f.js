@@ -148,10 +148,11 @@ test("INDEX offers concrete WEATHER routes, preserves unreviewed HOME and non-WE
     "weather/history/relationships/coastal",
     "weather/history/relationships/marine"
   ]);
-  assert.ok(context.remainingSourcePagesForPath("weather",context.PANELS)
-    .some(row=>row.id==="home"), "unreviewed HOME controls retain CLASSIC shortcut");
-  for (const id of ["home-quick-conditions","home-aqi-humidity","home-aqi-wind",
-                    "ground-source","map-source-rack","station-source-badge"]) {
+  assert.ok(context.sourcePagesForPath("weather",context.PANELS)
+    .some(row=>row.id==="home"), "M0 original HOME source identity remains");
+  assert.deepEqual(plain(context.remainingSourcePagesForPath("weather",context.PANELS)),[],
+    "M28-K reroutes original HOME controls to the actual workspace");
+  for (const id of ["ground-source","map-source-rack","station-source-badge"]) {
     assert.equal(context.WIRED_IN_SUBJECTS[id], undefined, id + " remains unreviewed");
   }
   assert.ok(context.sourcePagesForPath("media/watch",context.PANELS).length>0);

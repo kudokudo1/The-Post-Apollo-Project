@@ -45,8 +45,10 @@ test("the historical M1 source map stays intact, without mislabeling all control
     ["map","news"]);
   assert.deepEqual(plain(ctx.sourcePagesForPath("tools/terminal", ctx.PANELS).map(x => x.id)),
     ["terminal"]);
-  assert.ok(ctx.remainingSourcePagesForPath("weather", ctx.PANELS).length > 0,
-    "unreviewed HOME quick/relationship controls must still offer CLASSIC access");
+  assert.ok(ctx.sourcePagesForPath("weather", ctx.PANELS).some(x=>x.id==="home"),
+    "M0 historical HOME source provenance must remain intact");
+  assert.deepEqual(plain(ctx.remainingSourcePagesForPath("weather", ctx.PANELS)),[],
+    "M28-K corrects original HOME controls into their native workspace");
   assert.ok(ctx.sourcePagesForPath("weather", ctx.PANELS).length
     >= ctx.remainingSourcePagesForPath("weather", ctx.PANELS).length,
     "historical provenance cannot shrink with later reviewed cutovers");

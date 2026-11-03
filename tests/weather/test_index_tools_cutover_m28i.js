@@ -143,9 +143,7 @@ test("cache, history, event, dossier and FRAME CONTRACT stay read-only with orig
 
 test("still-pending source racks, HOME semantics and WATCH hosting remain visibly unresolved",()=>{
   for(const id of [
-    "home-quick-conditions","home-aqi-humidity","home-aqi-wind",
-    "home-space-weather","ground-source","map-source-rack",
-    "station-source-badge","home-aqi-humidity","home-aqi-wind"
+    "ground-source","map-source-rack","station-source-badge"
   ])assert.equal(env.WIRED_IN_SUBJECTS[id],undefined,id+" not silently accepted");
   assert.ok(env.sourcePagesForPath("media/watch",env.PANELS).length>0,
     "original NEWS catalog source provenance remains");

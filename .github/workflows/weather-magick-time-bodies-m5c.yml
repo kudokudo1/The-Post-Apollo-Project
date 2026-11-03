@@ -1,0 +1,77 @@
+name: MAGICK M5c date and planetary pair controls
+on:
+  pull_request:
+    paths:
+      - 'services/weather/CelestialVisualQueryPolicy.js'
+      - 'services/weather/CelestialVisualService.qml'
+      - 'widgets/weather/StationMagickSubjectPane.qml'
+      - 'tests/weather/test_magick_celestial_query_m5c.js'
+      - 'tests/weather/test_magick_celestial_query_m5c_jpl.js'
+      - '.github/workflows/weather-magick-time-bodies-m5c.yml'
+  push:
+    paths:
+      - 'services/weather/CelestialVisualQueryPolicy.js'
+      - 'services/weather/CelestialVisualService.qml'
+      - 'widgets/weather/StationMagickSubjectPane.qml'
+      - 'tests/weather/test_magick_celestial_query_m5c.js'
+      - 'tests/weather/test_magick_celestial_query_m5c_jpl.js'
+      - '.github/workflows/weather-magick-time-bodies-m5c.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  pure-controls:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Verify M5c date and body selection policy
+        run: node --test tests/weather/test_magick_celestial_query_m5c.js
+      - name: Verify existing M5a M5b MAGICK COSMOS HOME contracts
+        run: |
+          node --test tests/weather/test_magick_celestial_visual_m5.js
+          node --test tests/weather/test_magick_celestial_bridge_m5b.js
+          node --test tests/weather/test_magick_subject_panels_g1.js
+          node --test tests/weather/test_cosmos_visual_interactions_v2r.js
+          node --test tests/weather/test_home_deck_w2a.js
+          python3 -m unittest discover -s tests/weather -p 'test_celestial_visual_cli_m5b.py' -v
+  real-jpl-selected-pairs:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install Skyfield in the disposable runner
+        run: python3 -m pip install 'skyfield==1.55'
+      - name: Obtain official JPL DE440s in temporary CI storage
+        run: |
+          curl --fail --location --retry 3 --connect-timeout 15 --max-time 180 --silent --show-error \
+            'https://ssd.jpl.nasa.gov/ftp/eph/planets/bsp/de440s.bsp' \
+            --output "$RUNNER_TEMP/de440s.bsp"
+          test "$(stat -c %s "$RUNNER_TEMP/de440s.bsp")" -gt 30000000
+      - name: Verify VENUS/MARS system and JUPITER/SATURN system pairs
+        run: |
+          for item in venus-mars jupiter-saturn; do
+            case "$item" in
+              venus-mars) bodies='["venus","mars_barycenter"]' ;;
+              jupiter-saturn) bodies='["jupiter_barycenter","saturn_barycenter"]' ;;
+            esac
+            query="{\"format\":\"post-apollo.weather.celestial-visual-data.v1\",\"start_utc\":\"2026-09-19T00:00:00Z\",\"end_utc\":\"2026-12-18T00:00:00Z\",\"bodies\":$bodies,\"step_hours\":12,\"rate_window_hours\":6,\"orb_degrees\":6,\"include_events\":true}"
+            python3 scripts/weather/celestial_visual_data.py \
+              --kernel "$RUNNER_TEMP/de440s.bsp" --query-json "$query" \
+              > "$RUNNER_TEMP/m5c-$item.json"
+            MAGICK_M5C_PAIR="$item" \
+              MAGICK_M5C_JSON_FILE="$RUNNER_TEMP/m5c-$item.json" \
+              node --test tests/weather/test_magick_celestial_query_m5c_jpl.js
+          done

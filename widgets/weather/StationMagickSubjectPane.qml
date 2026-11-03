@@ -100,7 +100,7 @@ Rectangle {
                 anchors.fill: parent
                 clip: true
                 contentWidth: width
-                contentHeight: Math.max(height, 518)
+                contentHeight: Math.max(height, 582)
                 boundsBehavior: Flickable.StopAtBounds
                 Column {
                     width: parent.width
@@ -136,6 +136,105 @@ Rectangle {
                                        && magickPane.celestialSource.configured
                                        && !magickPane.celestialSource.loading
                             onClicked: magickPane.celestialSource.refresh()
+                        }
+                    }
+                    // M5c // Date and body controls work on the root-owned
+                    // service only; changing options invalidates data until
+                    // the user explicitly presses CALCULATE again.
+                    Row {
+                        width: parent.width
+                        height: 27
+                        spacing: 6
+                        ActionButton {
+                            width: 83
+                            height: 26
+                            label: "◀ 30D"
+                            labelPixelSize: 10
+                            accentColor: Colors.cyan
+                            available: !!magickPane.celestialSource
+                                       && !magickPane.celestialSource.loading
+                            onClicked: magickPane.celestialSource.shiftDate(-30)
+                        }
+                        QuietText {
+                            width: Math.max(20,parent.width-83-83-82-18)
+                            height: 27
+                            verticalAlignment: Text.AlignVCenter
+                            horizontalAlignment: Text.AlignHCenter
+                            elide: Text.ElideRight
+                            color: Colors.white
+                            font.pixelSize: 10
+                            text: magickPane.celestialSource
+                                  ? "UTC " + magickPane.celestialSource.targetDayUtc
+                                  : "UTC // SOURCE OFFLINE"
+                        }
+                        ActionButton {
+                            width: 82
+                            height: 26
+                            label: "TODAY"
+                            labelPixelSize: 10
+                            accentColor: Colors.orange
+                            available: !!magickPane.celestialSource
+                                       && !magickPane.celestialSource.loading
+                            onClicked: magickPane.celestialSource.returnToToday()
+                        }
+                        ActionButton {
+                            width: 83
+                            height: 26
+                            label: "30D ▶"
+                            labelPixelSize: 10
+                            accentColor: Colors.cyan
+                            available: !!magickPane.celestialSource
+                                       && !magickPane.celestialSource.loading
+                            onClicked: magickPane.celestialSource.shiftDate(30)
+                        }
+                    }
+                    Row {
+                        width: parent.width
+                        height: 27
+                        spacing: 6
+                        ActionButton {
+                            width: 81
+                            height: 26
+                            label: "◀ PAIR"
+                            labelPixelSize: 10
+                            accentColor: Colors.cyan
+                            available: !!magickPane.celestialSource
+                                       && !magickPane.celestialSource.loading
+                            onClicked: magickPane.celestialSource.cyclePair(-1)
+                        }
+                        QuietText {
+                            width: Math.max(20,parent.width-81-81-87-18)
+                            height: 27
+                            verticalAlignment: Text.AlignVCenter
+                            horizontalAlignment: Text.AlignHCenter
+                            elide: Text.ElideRight
+                            color: Colors.magenta
+                            font.pixelSize: 10
+                            text: magickPane.celestialSource
+                                  ? magickPane.celestialSource.pairLabel
+                                  : "NO PAIR"
+                        }
+                        ActionButton {
+                            width: 81
+                            height: 26
+                            label: "PAIR ▶"
+                            labelPixelSize: 10
+                            accentColor: Colors.cyan
+                            available: !!magickPane.celestialSource
+                                       && !magickPane.celestialSource.loading
+                            onClicked: magickPane.celestialSource.cyclePair(1)
+                        }
+                        ActionButton {
+                            width: 87
+                            height: 26
+                            label: magickPane.celestialSource
+                                   ? "SPAN " + magickPane.celestialSource.spanDays + "D"
+                                   : "SPAN --"
+                            labelPixelSize: 9
+                            accentColor: Colors.yellow
+                            available: !!magickPane.celestialSource
+                                       && !magickPane.celestialSource.loading
+                            onClicked: magickPane.celestialSource.cycleSpan()
                         }
                     }
                     StationMagickCelestialInstrument {

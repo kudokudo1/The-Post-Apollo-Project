@@ -19,8 +19,6 @@ import SocialLocalPortfolios as portfolios  # noqa: E402
 import SocialOrganizationLinks as social_links  # noqa: E402
 
 SECTIONS = (ROOT / "widgets/messanger/IdentityCenterSettingsSections.qml").read_text()
-# The original editors now live in the consolidated local workspace.
-SECTIONS += "\n" + (ROOT / "widgets/messanger/IdentityCenterLocalOrganizationsWorkspace.qml").read_text()
 SELECTOR = (ROOT / "widgets/messanger/AppSelector.qml").read_text()
 EDITOR = (ROOT / "widgets/messanger/IdentityCenterLocalUnitLocationsEditor.qml").read_text()
 STORE = (ROOT / "services/social/SocialLocalUnitLocationLinksStore.qml").read_text()
@@ -248,8 +246,8 @@ class PlacementUIContracts(unittest.TestCase):
         for name in ("IdentityCenterLocalOrganizationEditor {",
                      "IdentityCenterLocalPortfolioEditor {",
                      "IdentityCenterLocalStructureEditor {",
-                     "IdentityCenterLocalUnitLocationsEditor {",
-                     "IdentityCenterLocalSocialLinksEditor {"):
+                     "IdentityCenterLocalRelationshipModifiers {",
+                     "IdentityCenterLocalRelationshipModifiers {"):
             self.assertIn(name, SECTIONS)
         self.assertIn("localUnitLocationLinksStore: SocialLocalUnitLocationLinksStore", SELECTOR)
         self.assertIn("singleton SocialLocalUnitLocationLinksStore 1.0", QMLDIR)

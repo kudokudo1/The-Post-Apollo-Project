@@ -179,7 +179,6 @@ Item {
 
                     Text {
                         width: parent.width
-                        visible: localOrganizationsWorkspace.activeWorkspace === "overview"
                         text: "ACTIVE ORGANIZATION // NONE VERIFIED"
                         color: Colors.white
                         font.pixelSize: 11
@@ -190,7 +189,6 @@ Item {
                     Text {
                         width: parent.width
                         visible: !sections.organizationDisplayReady
-                                 && localOrganizationsWorkspace.activeWorkspace === "overview"
                         text: "No authorized organizations or portfolios have " +
                               "been loaded. The future selector will show only " +
                               "memberships verified by the Identity Center API."
@@ -199,12 +197,30 @@ Item {
                         wrapMode: Text.WordWrap
                     }
 
-                    IdentityCenterLocalOrganizationsWorkspace {
-                        id: localOrganizationsWorkspace
-                        objectName: "orgNavigationV2"
+                    IdentityCenterLocalOrganizationEditor {
+                        width: parent.width
+                        directoryStore: sections.localDirectoryStore
+                    }
+
+                    IdentityCenterLocalPortfolioEditor {
                         width: parent.width
                         directoryStore: sections.localDirectoryStore
                         portfolioStore: sections.localPortfoliosStore
+                    }
+
+                    IdentityCenterLocalStructureEditor {
+                        width: parent.width
+                        directoryStore: sections.localDirectoryStore
+                        structureStore: sections.localStructureStore
+                    }
+
+                    // One source/target form applies existing link modifiers across
+                    // organization, branch, division, department and team labels.
+                    IdentityCenterLocalRelationshipModifiers {
+                        id: organizationModifiers
+                        objectName: "orgModifierForm"
+                        width: parent.width
+                        directoryStore: sections.localDirectoryStore
                         structureStore: sections.localStructureStore
                         functionLocationStore: sections.localUnitLocationLinksStore
                         branchLocationStore: sections.localBranchLocationLinksStore
@@ -218,7 +234,6 @@ Item {
                         width: parent.width
                         spacing: 7
                         visible: sections.organizationDisplayReady
-                                 && localOrganizationsWorkspace.activeWorkspace === "overview"
 
                         Text {
                             width: parent.width
@@ -271,7 +286,6 @@ Item {
                     ActionButton {
                         width: Math.min(parent.width, 260)
                         height: 35
-                        visible: localOrganizationsWorkspace.activeWorkspace === "overview"
                         label: "SWITCH ORGANIZATION // UNAVAILABLE"
                         labelPixelSize: 9
                         labelMinimumPixelSize: 8
@@ -282,7 +296,6 @@ Item {
 
                     Text {
                         width: parent.width
-                        visible: localOrganizationsWorkspace.activeWorkspace === "overview"
                         text: "Portfolio views never grant rights to an LLC, " +
                               "nonprofit or customer account by themselves."
                         color: Colors.orange

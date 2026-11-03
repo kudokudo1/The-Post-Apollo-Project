@@ -60,7 +60,9 @@ timeout --signal=TERM --kill-after=3s 30s \
     XDG_DATA_HOME="$work/data" \
     XDG_CONFIG_HOME="$work/config-root" \
     XDG_CACHE_HOME="$work/cache" \
-    "$qs_bin" --no-color -p "$work/config/shell.qml" \
+    QT_LOGGING_RULES="qml.debug=true" \
+    "$qs_bin" --no-color --log-rules "qml.debug=true" \
+      -p "$work/config/shell.qml" \
     >"$log" 2>&1 &
 qs_pid="$!"
 

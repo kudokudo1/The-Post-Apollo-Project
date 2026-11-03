@@ -17,12 +17,15 @@ for token in (
     'onLeftClicked:', 'weatherStation.providerDiagnosticsOpen =',
     'StationWeatherProviderDiagnostics {', 'snapshot: weatherStation.weatherDiagnostics',
     'onCloseRequested: weatherStation.providerDiagnosticsOpen = false',
-    'if (weatherStation.providerDiagnosticsOpen)',
+    'if (providerDiagnosticsOpen)',
     'weatherDiagnostics.header',
 ):
     assert token in station, token
 assert station.count('StationWeatherProviderDiagnostics {') == 1
-assert station.index('if (weatherStation.providerDiagnosticsOpen)')        < station.rindex('weatherStation.close();')
+# The unified M28-N Escape handler preserves M6c overlay priority across
+# BOTH Qt Keys and the root WindowShortcut, before INDEX/close handling.
+assert station.index('if (providerDiagnosticsOpen)') < station.index('SubjectDefaultPolicy.escapeAction(')
+assert station.count('weatherStation.handleEscape()') == 2
 assert 'id: sourceStatusIndicator' in station
 assert station.index('if (officialAlertSummary.available)')        < station.index('if (usesWeatherSource)')
 assert 'id: sourceStatusIndicator' in station

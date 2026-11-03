@@ -113,7 +113,8 @@ test("one original data owner remains, no extra hidden CLASSIC workspace, no del
 test("the default is reversible but not a production enable switch or CLASSIC removal authorization",()=>{
   assert.match(station,/subjectsFirstPilotEnabled:\s*SubjectDefaultPolicy\.SUBJECTS_FIRST_PILOT/);
   assert.match(station,/visible: !weatherStation\.subjectNavigationOpen/);
-  assert.match(station,/weatherStation\.subjectNavigationOpen = false/);
+  assert.match(station,/function switchToClassic\(\)/);
+  assert.match(station,/subjectNavigationOpen = false;\s*return true;/);
   assert.match(station,/currentView === "terminal"/);
   assert.match(station,/WeatherServices\.WeatherHistoryService/);
   assert.match(station,/onNewsMapRequested: function\(payload\)/);

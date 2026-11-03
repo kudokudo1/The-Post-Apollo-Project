@@ -95,8 +95,8 @@ Scope {
 
         onSaveFailed: function(error) {
             registry.pendingDocument = null;
-            registry.storageState = "error";
             registry.errorCode = "FILE_SAVE_FAILED";
+            registry.storageState = "error";
         }
     }
 }

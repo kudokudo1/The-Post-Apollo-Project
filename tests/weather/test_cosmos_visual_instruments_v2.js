@@ -167,7 +167,7 @@ test("Canvas interactivity and source claims are explicit",()=>{
     assert.match(qml,/onPositionChanged: function\(mouse\)/);
     assert.match(qml,/visual\.lockedMinute=/);
     assert.match(qml,/onClicked: visual\.lockedMinute=-1/);
-    assert.match(qml,/SOLAR MODEL UNAVAILABLE/);
+    assert.match(qml,/VisualPolicy\\.solarUnavailableReason\\(/);
     assert.match(qml,/NOT MEASURED SKY PHOTO/);
     assert.match(qml,/CURRENT STAGE ONLY/);
     assert.match(qml,/NOAA|SOLAR CENTER/);

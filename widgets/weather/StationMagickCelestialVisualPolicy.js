@@ -267,3 +267,80 @@ function pairDetails(m,index) {
         "  SEPARATION "+sample.longitude_separation_deg.toFixed(3)+"°"+
         (aspects.length?"  "+aspects.join(", "):"  NO ASPECT IN ORB");
 }
+
+
+// M5f // Plot geometry is shared between Canvas painting and pointer mapping.
+// The margins reserve real space for labels instead of overwriting the curve.
+function chartLayout(width,height) {
+    var w=number(width),h=number(height);
+    if(w===null || h===null || w<=0 || h<=0)
+        return {left:0,top:0,width:1,height:1,right:1,bottom:1};
+    var left=Math.min(52,Math.max(36,Math.floor(w*0.14)));
+    var right=8,top=28,bottom=23;
+    return {
+        left:left,top:top,
+        width:Math.max(1,w-left-right),
+        height:Math.max(1,h-top-bottom),
+        right:Math.max(left+1,w-right),
+        bottom:Math.max(top+1,h-bottom)
+    };
+}
+function plotX(index,view,layout) {
+    return layout.left+chartX(index,view,layout.width);
+}
+function plotY(value,range,layout) {
+    return layout.top+chartY(value,range,layout.height);
+}
+function plotFraction(pixelX,width,height) {
+    var layout=chartLayout(width,height);
+    return clamp((pixelX-layout.left)/layout.width,0,1);
+}
+function shortBodyName(body) {
+    var names={
+        "sun":"SUN","moon":"MOON","mercury":"MERCURY",
+        "venus":"VENUS","mars_barycenter":"MARS SYS",
+        "jupiter_barycenter":"JUP SYS",
+        "saturn_barycenter":"SAT SYS",
+        "uranus_barycenter":"URA SYS",
+        "neptune_barycenter":"NEP SYS",
+        "pluto_barycenter":"PLU SYS"
+    };
+    return names[body] || String(body||"").toUpperCase().slice(0,12);
+}
+function legendRows(m,mode) {
+    if(!m || !m.ready)return [];
+    if(mode==="aspects")
+        return m.relationships.map(function(pair,i){
+            return {text:pair.bodies.map(shortBodyName).join("/"),
+                    color:BODY_COLORS[i%BODY_COLORS.length],index:i};
+        });
+    return m.series.map(function(entry,i){
+        return {text:shortBodyName(entry.body),
+                color:entry.color,index:i,body:entry.body};
+    });
+}
+function wheelLabels(m,index,width,height) {
+    if(!m || !m.ready)return [];
+    var pts=wheelPositions(m,index),radius=Math.max(30,Math.min(width,height)*0.36);
+    var cx=width/2,cy=height/2;
+    var labels=pts.map(function(p){
+        var theta=p.longitude_deg*Math.PI/180;
+        var x=cx+radius*Math.sin(theta),y=cy-radius*Math.cos(theta);
+        var label=shortBodyName(p.body);
+        var left=x+(x>cx?-1:1)*11;
+        left=x>cx?left:left-label.length*6;
+        return {body:p.body,color:p.color,pointX:x,pointY:y,
+                x:clamp(left,3,Math.max(3,width-label.length*6-3)),
+                y:clamp(y-8,11,Math.max(11,height-7)),
+                label:label};
+    });
+    // Keep the original angular markers intact; offset only colliding text.
+    for(var i=1;i<labels.length;i++) {
+        for(var j=0;j<i;j++) {
+            if(Math.abs(labels[i].x-labels[j].x)<70 &&
+               Math.abs(labels[i].y-labels[j].y)<12)
+                labels[i].y=clamp(labels[j].y+13,11,Math.max(11,height-7));
+        }
+    }
+    return labels;
+}

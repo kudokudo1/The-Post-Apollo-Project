@@ -157,7 +157,8 @@ test("one EARTH map instance persists event selection and zoom while navigating 
   for(const name of ["selectedMapEvent =","selectedMapEarthquake =","selectedMapHotspot =",
                      "selectedMapGdacsEvent =","mapCenterLon =","mapCenterLat =","mapZoom =","resetMapView()"])
     assert.ok(!changed.includes(name),"EARTH route wrongly resets "+name);
-  assert.match(earthPane,/newsMentionOverlay/);
+  assert.ok(!earthPane.includes("newsMentionOverlay:"),
+    "EARTH must not receive the MEDIA news overlay binding");
 });
 
 test("CLASSIC, WEATHER, COSMOS, the terminal and data store ownership remain intact", () => {

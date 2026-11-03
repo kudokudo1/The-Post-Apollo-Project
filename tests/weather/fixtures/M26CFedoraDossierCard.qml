@@ -1,18 +1,18 @@
 import QtQuick
 import Quickshell
-import QtTest
 import "services/weather"
 import "widgets/weather"
 import "widgets/weather/StationDossierPreviewPolicy.js" as DossierPreview
 import "widgets/weather/StationDossierCapturePolicy.js" as DossierCapture
 
-// M26-C: actual production EVENT CONTEXT card + ActionButton pointer path
-// in an isolated offscreen Qt window; no production shell or provider fetch.
+// M26-C: production Event Context card and real ActionButton MouseArea.
+// A disposable Xvfb runner sends actual native X11 pointer events.
 ShellRoot {
     id: root
 
     property var preview: null
     property bool armed: false
+    property bool readyLogged: false
     property int requestCount: 0
     property int savedCount: 0
     property bool complete: false
@@ -23,7 +23,11 @@ ShellRoot {
 
     Window {
         id: testWindow
+        title: "M26C-DOSSIER-TEST"
+        flags: Qt.FramelessWindowHint
         visible: true
+        x: 0
+        y: 0
         width: 720
         height: 900
         color: "#16051F"
@@ -60,6 +64,7 @@ ShellRoot {
             archiveStatusText: "SOURCE ARCHIVE UNCHANGED"
             onDossierSaveRequested: {
                 root.requestCount++;
+                console.log("M26C_UI_REQUEST // count=" + root.requestCount);
                 const now = Date.now();
                 const staged = DossierCapture.stage(
                     card.dossierPreview, now, true
@@ -75,22 +80,30 @@ ShellRoot {
         function onDossierSaved(sourceId, eventId, sequence) {
             if (sourceId !== "gdacs"
                     || eventId !== "GDACS-M26C-CLICK"
-                    || sequence !== 1)
+                    || sequence !== 1
+                    || root.requestCount !== 1
+                    || archive.eventCount("gdacs", eventId) !== 1) {
                 root.failure("NATIVE_CALLBACK_IDENTITY_MISMATCH");
+                return;
+            }
+            root.savedCount++;
+            const sourceButton = root.findAction(card, "ARCHIVE");
+            if (!sourceButton || sourceButton.available)
+                root.failure("SOURCE_ARCHIVE_ACTIVATED");
             else
-                root.savedCount++;
+                root.success();
         }
     }
 
-    function findAction(item, text) {
+    function findAction(item, wanted) {
         if (!item)
             return null;
-        if (item.label !== undefined && item.label === text)
+        if (item.label !== undefined && item.label === wanted)
             return item;
         if (!item.children)
             return null;
         for (let i = 0; i < item.children.length; ++i) {
-            const match = findAction(item.children[i], text);
+            const match = findAction(item.children[i], wanted);
             if (match)
                 return match;
         }
@@ -105,18 +118,14 @@ ShellRoot {
             + " // requests=" + requestCount
             + " // saved=" + savedCount
             + " // state=" + archive.storageState);
-        // Quitting synchronously in a QtTest/TestSchedule signal handler
-        // destroys the runner in-flight. A separate timer owns shutdown.
     }
 
     function success() {
         if (complete)
             return;
         complete = true;
-        console.log("M26C_UI_PASS // DISABLED_POINTER_IGNORED");
         console.log("M26C_UI_PASS // ENABLED_POINTER_SAVED");
         console.log("M26C_UI_PASS // SOURCE_ARCHIVE_SEPARATE");
-        // QtTest owns shutdown when the running test function returns.
     }
 
     Component.onCompleted: {
@@ -132,48 +141,58 @@ ShellRoot {
     }
 
     Timer {
-        interval: 18000
+        interval: 50
+        repeat: true
+        running: !root.complete
+        onTriggered: {
+            if (root.readyLogged || archive.storageState !== "empty"
+                    || !root.preview || !testWindow.visible)
+                return;
+            const save = root.findAction(card, "SAVE DOSSIER");
+            const source = root.findAction(card, "ARCHIVE");
+            if (!save || !source || source.available || save.available
+                    || !card.dossierPreviewReady
+                    || root.requestCount !== 0) {
+                root.failure("INITIAL_DISABLED_CARD_STATE_INVALID");
+                return;
+            }
+            const p = save.mapToItem(null, save.width / 2, save.height / 2);
+            root.readyLogged = true;
+            console.log("M26C_UI_READY // SAVE x=" + Math.round(p.x)
+                + " y=" + Math.round(p.y));
+        }
+    }
+
+    // Window for an actual disabled pointer click, then separately arm.
+    Timer {
+        interval: 1600
+        repeat: false
+        running: root.readyLogged && !root.armed && !root.complete
+        onTriggered: {
+            if (root.requestCount !== 0) {
+                root.failure("DISABLED_BUTTON_REQUESTED_WRITE");
+                return;
+            }
+            root.armed = true;
+            const save = root.findAction(card, "SAVE DOSSIER");
+            if (!save || !save.available)
+                root.failure("ENABLED_BUTTON_NOT_READY");
+            else
+                console.log("M26C_UI_ARMED // POINTER_CLICK_NOW");
+        }
+    }
+
+    Timer {
+        interval: 20000
         repeat: false
         running: !root.complete
         onTriggered: root.failure("TEST_TIMEOUT")
     }
 
-    TestCase {
-        name: "M26CFedoraDossierCard"
-        // QtQuick TestSchedule must see a runnable test immediately;
-        // otherwise it exits Quickshell before the async FileView load.
-        when: true
-
-        function test_real_card_pointer_and_save() {
-            tryCompare(archive, "storageState", "empty", 8000);
-            tryCompare(card, "dossierPreviewReady", true, 8000);
-            const save = root.findAction(card, "SAVE DOSSIER");
-            const provider = root.findAction(card, "ARCHIVE");
-            verify(save !== null, "SAVE DOSSIER ActionButton not found");
-            verify(provider !== null, "source-native ARCHIVE button not found");
-            compare(provider.available, false,
-                "source-native archive action must remain separate");
-            compare(save.available, false,
-                "unarmed user action must initially be disabled");
-
-            mouseClick(save, save.width / 2, save.height / 2,
-                       Qt.LeftButton);
-            compare(root.requestCount, 0,
-                "disabled pointer must never request a write");
-
-            root.armed = true;
-            tryCompare(save, "available", true, 2000);
-            mouseClick(save, save.width / 2, save.height / 2,
-                       Qt.LeftButton);
-            compare(root.requestCount, 1,
-                "one native mouse click must request one dossier");
-            tryCompare(archive, "storageState", "ready", 6000);
-            compare(root.savedCount, 1,
-                "native FileView callback must report one save");
-            compare(archive.eventCount("gdacs", "GDACS-M26C-CLICK"), 1);
-            compare(provider.available, false,
-                "dossier capture must not enable source-native archive");
-            root.success();
-        }
+    Timer {
+        interval: 250
+        repeat: false
+        running: root.complete
+        onTriggered: Qt.quit()
     }
 }

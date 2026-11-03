@@ -16,7 +16,7 @@ FRAME = "true-ecliptic-of-date"
 ORIGINS = frozenset(("geocentric", "topocentric", "heliocentric"))
 POSITION_MODELS = frozenset(("apparent", "geometric"))
 BODIES = frozenset((
-    "sun", "moon", "earth", "mercury", "venus", "mars",
+    "sun", "moon", "earth", "mercury", "venus", "mars", "mars_barycenter",
     "jupiter_barycenter", "saturn_barycenter", "uranus_barycenter",
     "neptune_barycenter", "pluto_barycenter",
 ))

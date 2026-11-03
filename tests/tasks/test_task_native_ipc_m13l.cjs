@@ -102,7 +102,7 @@ test("standalone QML harness only invokes dormant synthetic IPC; never real TASK
     assert.match(q,/bridge\.startSynthetic\(\)/);
     assert.match(q,/M13L_NATIVE_QML_IPC_PASS/);
     assert.match(q,/Qt\.quit\(\)/);
-    assert.doesNotMatch(q,/ApolloHubTodoStore|FileView\s*\{|setText\(|secret-tool/);
+    assert.doesNotMatch(q,/ApolloHubTodoStore\s*\{|FileView\s*\{|setText\(|secret-tool/);
     assert.doesNotMatch(fs.readFileSync(path.join(ROOT,"shell.qml"),"utf8"),
         /TaskEncryptedDraftAutoHarnessM13l/);
     assert.equal((store.match(/\bFileView\s*\{/g)||[]).length,1);

@@ -19,7 +19,9 @@ Rectangle {
         const value = String(state || "");
         if (value === "LIVE") return Colors.cyan;
         if (value === "READING") return Colors.orange;
-        if (value === "CACHE") return Colors.yellow;
+        if (value === "CACHE" || value === "FALLBACK")
+            return Colors.yellow;
+        if (value === "CACHE STALE") return Colors.orange;
         if (value === "IDLE" || value === "WAITING"
                 || value === "NO SELECTED PLACE") return Colors.white;
         return Colors.red;

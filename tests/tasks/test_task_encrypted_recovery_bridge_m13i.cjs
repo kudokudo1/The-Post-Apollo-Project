@@ -25,7 +25,7 @@ test("one live TASKS FileView, no second writer or source activation",()=>{
         assert.match(store,new RegExp(
             "readonly property bool "+gate+":\\s*false"));
     assert.match(store,/TaskEncryptedRecoveryBridgeM13i\s*\{\s*id:\s*encryptedRecoveryBridge/);
-    assert.match(store,/function inspectEncryptedRecoveryProvider\(\)\s*\{[\s\S]*?encryptedRecoveryBridge\.inspectProvider\(\)/);
+    assert.doesNotMatch(store,/function inspectEncryptedRecoveryProvider\(/);
     assert.match(store,/readonly property string encryptedRecoveryProviderStatus:[\s\S]*?encryptedRecoveryBridge\.providerStatus/);
     assert.doesNotMatch(store,/\b(?:secret-tool|gnome-keyring-daemon)\b/);
 });

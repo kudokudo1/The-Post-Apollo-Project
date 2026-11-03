@@ -2,12 +2,21 @@ import QtQuick
 import Quickshell
 import Quickshell.Io
 import "WeatherDataPolicy.js" as WeatherDataPolicy
+import "../location/WeatherLocationPolicy.js" as LocationPolicy
 
 Scope {
     id: weatherService
 
     property var cacheStore: null
     property var historyStore: null
+    // Optional shared user-selected place. Existing standalone consumers
+    // keep wttr.in's legacy location lookup when no manual Home is set.
+    property var placeRegistry: null
+    readonly property var selectedPlace:
+        placeRegistry ? placeRegistry.effectivePlace : null
+    property bool locationBooted: false
+    property string weatherRequestContextKey: ""
+    property string aqiRequestContextKey: ""
     property bool usingPersistentCurrentCache: false
     property bool usingPersistentForecastCache: false
     property bool usingPersistentAqiCache: false
@@ -48,10 +57,24 @@ Scope {
     readonly property bool forecastReady:
         hourlyForecast.length > 0 || dailyForecast.length > 0
 
-    property string latitude: ""
-    property string longitude: ""
+    // Provider values are retained separately. The public latitude/longitude
+    // always prefer a validated user-selected Home/Explore coordinate.
+    property string providerLatitude: ""
+    property string providerLongitude: ""
+    readonly property var resolvedCoordinates:
+        LocationPolicy.coordinates(
+            selectedPlace, providerLatitude, providerLongitude
+        )
+    readonly property string latitude: resolvedCoordinates.latitude
+    readonly property string longitude: resolvedCoordinates.longitude
+    readonly property string requestContextKey:
+        LocationPolicy.requestContextKey(selectedPlace, location)
+    readonly property bool hasManualPlace:
+        LocationPolicy.manualPoint(selectedPlace) !== null
 
     readonly property string historyScopeKey: {
+        if (latitude === "" || longitude === "")
+            return "";
         const lat = Number(latitude);
         const lon = Number(longitude);
         if (!isFinite(lat) || !isFinite(lon)
@@ -122,11 +145,10 @@ Scope {
     property string location: ""
 
     readonly property string endpoint: {
-        if (location.trim().length > 0) {
-            return "https://wttr.in/" + encodeURIComponent(location.trim()) + "?format=j1";
-        }
-
-        return "https://wttr.in/?format=j1";
+        const query = LocationPolicy.locationQuery(selectedPlace, location);
+        return query.length > 0
+            ? "https://wttr.in/" + encodeURIComponent(query) + "?format=j1"
+            : "https://wttr.in/?format=j1";
     }
 
     readonly property string airQualityEndpoint: {
@@ -157,14 +179,20 @@ Scope {
 
         stdout: StdioCollector {
             onStreamFinished: {
-                weatherService.parseWeather(text);
+                if (weatherService.weatherRequestContextKey
+                        === weatherService.requestContextKey)
+                    weatherService.parseWeather(text);
             }
         }
 
         onExited: function (exitCode, exitStatus) {
-            if (exitCode !== 0) {
-                weatherService.errorText = "wttr.in request failed";
+            if (weatherService.weatherRequestContextKey
+                    !== weatherService.requestContextKey) {
+                Qt.callLater(weatherService.refresh);
+                return;
             }
+            if (exitCode !== 0)
+                weatherService.errorText = "wttr.in request failed";
         }
     }
 
@@ -179,19 +207,27 @@ Scope {
 
         stdout: StdioCollector {
             onStreamFinished: {
-                weatherService.parseAirQuality(text);
+                if (weatherService.aqiRequestContextKey
+                        === weatherService.requestContextKey)
+                    weatherService.parseAirQuality(text);
             }
         }
 
         onExited: function (exitCode, exitStatus) {
-            if (exitCode !== 0) {
-                weatherService.aqiErrorText = "air quality request failed";
+            if (weatherService.aqiRequestContextKey
+                    !== weatherService.requestContextKey) {
+                Qt.callLater(weatherService.refreshAirQuality);
+                return;
             }
+            if (exitCode !== 0)
+                weatherService.aqiErrorText = "air quality request failed";
         }
     }
 
     function hydratePersistentCache() {
-        if (!cacheStore)
+        // The legacy weather cache is global, not keyed by user coordinates.
+        // Never label its payload as the selected Home or Explore destination.
+        if (!cacheStore || hasManualPlace)
             return false;
 
         const now = Date.now();
@@ -217,8 +253,8 @@ Scope {
                 localObservationDateTime =
                     String(p.localObservationDateTime || "");
                 localObservationAnchorMs = Number(saved.receivedAtMs);
-                latitude = String(p.latitude || "");
-                longitude = String(p.longitude || "");
+                providerLatitude = String(p.latitude || "");
+                providerLongitude = String(p.longitude || "");
                 lastUpdated = new Date(saved.receivedAtMs);
                 errorText = "";
                 ready = true;
@@ -292,7 +328,8 @@ Scope {
     }
 
     function persistCurrentWeather(receivedAtMs) {
-        if (!cacheStore)
+        // Keep user-scoped observations out of legacy unscoped cache records.
+        if (!cacheStore || hasManualPlace)
             return false;
         return cacheStore.put("weather-current", receivedAtMs, {
             "tempF": tempF,
@@ -361,7 +398,7 @@ Scope {
     }
 
     function persistForecast(receivedAtMs) {
-        if (!cacheStore || !forecastReady)
+        if (!cacheStore || hasManualPlace || !forecastReady)
             return false;
         return cacheStore.put("weather-forecast", receivedAtMs, {
             "hourlyForecast": hourlyForecast,
@@ -370,7 +407,7 @@ Scope {
     }
 
     function persistAirQuality(receivedAtMs) {
-        if (!cacheStore || !aqiReady)
+        if (!cacheStore || hasManualPlace || !aqiReady)
             return false;
         return cacheStore.put("air-quality", receivedAtMs, {
             "aqi": aqi,
@@ -431,15 +468,88 @@ Scope {
     // ─────────────────────────────────────────────
 
     function refresh() {
-        if (!weatherFetch.running)
+        if (!weatherFetch.running) {
+            weatherRequestContextKey = requestContextKey;
             weatherFetch.running = true;
+        }
     }
 
     function refreshAirQuality() {
         if (airQualityEndpoint === "")
             return;
-        if (!airQualityFetch.running)
+        if (!airQualityFetch.running) {
+            aqiRequestContextKey = requestContextKey;
             airQualityFetch.running = true;
+        }
+    }
+
+    function clearLocationData() {
+        ready = false;
+        aqiReady = false;
+        tempF = "--";
+        feelsLikeF = "--";
+        condition = "UNKNOWN";
+        weatherCode = "";
+        uvIndex = -1;
+        humidity = "--";
+        windMph = "--";
+        windDirection = "--";
+        pressureHpa = -1;
+        visibilityMiles = -1;
+        cloudCover = -1;
+        precipMm = -1;
+        observationTime = "";
+        localObservationDateTime = "";
+        localObservationAnchorMs = 0;
+        hourlyForecast = [];
+        dailyForecast = [];
+        providerLatitude = "";
+        providerLongitude = "";
+        airQualityForecast = [];
+        aqi = -1;
+        aqiLabel = "UNKNOWN";
+        ozoneAqi = -1;
+        nitrogenDioxideAqi = -1;
+        carbonMonoxideAqi = -1;
+        pm25 = -1;
+        pm10 = -1;
+        carbonMonoxide = -1;
+        nitrogenDioxide = -1;
+        ozone = -1;
+        dust = -1;
+        alderPollen = -1;
+        birchPollen = -1;
+        grassPollen = -1;
+        mugwortPollen = -1;
+        olivePollen = -1;
+        ragweedPollen = -1;
+        pollenAvailable = false;
+        airQualitySourceTime = "";
+        airQualityUtcOffsetMinutes = null;
+        airQualityTimezone = "";
+        airQualityTimezoneAbbreviation = "";
+        errorText = "";
+        aqiErrorText = "";
+        usingPersistentCurrentCache = false;
+        usingPersistentForecastCache = false;
+        usingPersistentAqiCache = false;
+    }
+
+    onRequestContextKeyChanged: {
+        if (!locationBooted)
+            return;
+        // Cancel the old request if possible, and guard both parsers against
+        // in-flight responses from the previous location.
+        clearLocationData();
+        if (weatherFetch.running)
+            weatherFetch.running = false;
+        if (airQualityFetch.running)
+            airQualityFetch.running = false;
+        Qt.callLater(function() {
+            weatherService.refresh();
+            // AQI can load from the saved point even when wttr.in times out.
+            weatherService.refreshAirQuality();
+        });
     }
 
     // ─────────────────────────────────────────────
@@ -511,10 +621,10 @@ Scope {
                 const nearest = data.nearest_area[0];
 
                 if (nearest.latitude)
-                    latitude = String(nearest.latitude);
+                    providerLatitude = String(nearest.latitude);
 
                 if (nearest.longitude)
-                    longitude = String(nearest.longitude);
+                    providerLongitude = String(nearest.longitude);
             }
 
             // Fallback for responses where the
@@ -525,8 +635,8 @@ Scope {
                 const match = query.match(/Lat\s+(-?\d+(?:\.\d+)?)\s+and\s+Lon\s+(-?\d+(?:\.\d+)?)/i);
 
                 if (match) {
-                    latitude = match[1];
-                    longitude = match[2];
+                    providerLatitude = match[1];
+                    providerLongitude = match[2];
                 }
             }
 
@@ -643,6 +753,10 @@ Scope {
 
     Component.onCompleted: {
         hydratePersistentCache();
+        locationBooted = true;
+        // AQI source now has a location from the Place Registry independently
+        // of the success/failure of the weather provider.
+        refreshAirQuality();
         refresh();
     }
 }

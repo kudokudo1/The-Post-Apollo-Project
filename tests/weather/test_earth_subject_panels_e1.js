@@ -109,7 +109,8 @@ test("EARTH map excludes unrelated weather radar and MEDIA news", () => {
   assert.match(discovery,/!stationDiscovery\.earthMapOnly\s*&& stationDiscovery\.weatherLayerEnabled\("radar"\)/);
   assert.match(discovery,/&& !stationDiscovery\.earthMapOnly\s*\? rainViewerRadarService\.strips/);
   assert.match(discovery,/!stationDiscovery\.earthMapOnly/);
-  assert.match(discovery,/source\.ready \? stationDiscovery\.visibleRows : \[\]/);
+  assert.match(discovery,/model: stationDiscovery.newsGroupVisible\("list"\)\s*&& source.ready\s*\? stationDiscovery.visibleRows : \[\]/);
+  assert.match(discovery,/mapCompanionEonetRows/);
   // NEWS mention inspector can be invoked by MEDIA → EARTH handoff.
   // It remains separate from USGS/EONET/GDACS/FIRMS event dossier context.
   assert.match(discovery,/visible: stationDiscovery\.newsMentionInspectorOpen/);

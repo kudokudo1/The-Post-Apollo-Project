@@ -1,0 +1,58 @@
+name: Weather M28-B MEDIA feed-first and EARTH map companion
+
+on:
+  pull_request:
+    paths:
+      - "widgets/weather/StationMediaSubjectPanelPolicy.js"
+      - "widgets/weather/StationMapCompanionPolicy.js"
+      - "widgets/weather/StationDiscovery.qml"
+      - "tests/weather/test_media_news_feed_map_companion_m28b.js"
+      - "tests/weather/fixtures/M28BStationDiscoveryService.qml"
+      - "tests/weather/fixtures/M28BNewsFeedFirst.qml"
+      - "scripts/weather/verify_news_feed_first_fedora_m28b.sh"
+      - "tests/weather/test_media_subject_panels_d1.js"
+      - "tests/weather/test_earth_subject_panels_e1.js"
+      - "tests/weather/test_weather_subject_panels_m2b.js"
+      - "tests/weather/test_station_news_report_filter.js"
+      - "tests/weather/test_media_earth_mentions_cutover_m28a.js"
+      - "docs/weather-subjects-m28b-feed-map-companion-handoff.md"
+      - ".github/workflows/weather-subjects-news-map-companion-m28b.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  news-earth:
+    runs-on: ubuntu-latest
+    container:
+      image: fedora:44
+    timeout-minutes: 20
+    steps:
+      - name: Install disposable Fedora Quickshell and X11 runner
+        run: |
+          dnf install -y --setopt=install_weak_deps=False dnf5-plugins
+          dnf copr enable -y errornointernet/quickshell
+          dnf install -y --setopt=install_weak_deps=False \
+            quickshell qt6-qtdeclarative qt6-qt5compat qt6-qtbase-gui \
+            qt6-qtsvg git nodejs coreutils findutils \
+            xdotool xorg-x11-server-Xvfb
+          quickshell --version
+          quickshell --version | grep '0.3.'
+      - uses: actions/checkout@v4
+      - name: M28-B original NEWS cards and compact EARTH source behavior
+        run: node --test tests/weather/test_media_news_feed_map_companion_m28b.js
+      - name: MEDIA D1 source/inspector separation
+        run: node --test tests/weather/test_media_subject_panels_d1.js
+      - name: EARTH E1 provider and dossier isolation
+        run: node --test tests/weather/test_earth_subject_panels_e1.js
+      - name: M2b WEATHER map and source separation
+        run: node --test tests/weather/test_weather_subject_panels_m2b.js
+      - name: Original GDELT news local filter and article contract
+        run: node tests/weather/test_station_news_report_filter.js
+      - name: M28-A subject-native NEWS place handoff
+        run: node --test tests/weather/test_media_earth_mentions_cutover_m28a.js
+      - name: Native EARTH NEWS mention marker and CLEAR without CLASSIC
+        run: bash scripts/weather/verify_media_earth_mentions_fedora_m28a.sh
+      - name: Native MEDIA NEWS headline card first, viewer and analytics routes
+        run: bash scripts/weather/verify_news_feed_first_fedora_m28b.sh

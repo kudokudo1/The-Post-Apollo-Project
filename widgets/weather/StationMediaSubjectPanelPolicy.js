@@ -39,13 +39,18 @@ function catalogSectionFor(path) {
 function newsGroupVisible(path,group) {
   if (path === "") return true;  // CLASSIC NEWS never filtered.
   if (kindForRoute(path) !== "news") return false;
-  if (group === "header" || group === "request" || group === "list"
-      || group === "status") return true;
-  if (group === "filters") return true; // Filtering remains available for every analytic submode.
+  if (group === "header" || group === "request" || group === "status")
+    return true;
+  if (group === "filters") return true; // Filters apply locally to every news submode.
+  // Feed-first NEWS is the article workspace. Dedicated analysis routes
+  // keep trend and story sections from burying the actual headline list.
+  if (group === "list")
+    return path === "media/news/reports" || path === "media/news/filters"
+        || path === "media/news/locations" || path === "media/news/viewer";
   if (group === "trend")
-    return path === "media/news/reports" || path === "media/news/trends";
+    return path === "media/news/trends";
   if (group === "stories")
-    return path === "media/news/reports" || path === "media/news/stories";
+    return path === "media/news/stories";
   if (group === "inspector-hint")
     return path === "media/news/locations" || path === "media/news/viewer";
   return false;

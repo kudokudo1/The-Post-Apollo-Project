@@ -51,10 +51,11 @@ test("NEWS routes share GDELT, one report loader, local filters, trend and story
     assert.equal(policy.newsGroupVisible(route,"header"),true);
     assert.equal(policy.newsGroupVisible(route,"request"),true);
     assert.equal(policy.newsGroupVisible(route,"filters"),true);
-    assert.equal(policy.newsGroupVisible(route,"list"),true);
+    assert.equal(policy.newsGroupVisible(route,"list"),
+      ["reports","filters","locations","viewer"].includes(part));
   }
-  assert.equal(policy.newsGroupVisible("media/news/reports","trend"),true);
-  assert.equal(policy.newsGroupVisible("media/news/reports","stories"),true);
+  assert.equal(policy.newsGroupVisible("media/news/reports","trend"),false);
+  assert.equal(policy.newsGroupVisible("media/news/reports","stories"),false);
   assert.equal(policy.newsGroupVisible("media/news/trends","trend"),true);
   assert.equal(policy.newsGroupVisible("media/news/trends","stories"),false);
   assert.equal(policy.newsGroupVisible("media/news/stories","stories"),true);

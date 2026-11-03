@@ -83,7 +83,9 @@ test("source script contains no local git or production process changes",()=>{
     const raw=fs.readFileSync(SCRIPT,"utf8");
     assert.match(raw,/exec "\$shell_binary" -p "\$panel"/);
     assert.match(raw,/^set -euo pipefail$/m);
-    assert.doesNotMatch(raw,/\b(?:git|sudo|killall|pkill|systemctl|gnome-keyring-daemon|secret-tool)\s+/);
+    assert.doesNotMatch(raw,/\b(?:sudo|killall|pkill|systemctl|gnome-keyring-daemon|secret-tool)\s+/);
+    assert.doesNotMatch(raw,/\bgit\s+(?:pull|reset|checkout|clean|fetch|add|commit|switch|restore|rebase)\b/);
+    assert.match(raw,/git hash-object -- "\$component"/);
     assert.doesNotMatch(raw,/\b(?:rm|sed -i|cp|mv|touch|install|chmod|chown|truncate)\s+/);
     assert.doesNotMatch(raw,/quickshell\s+-p\s+.*shell\.qml/);
 });

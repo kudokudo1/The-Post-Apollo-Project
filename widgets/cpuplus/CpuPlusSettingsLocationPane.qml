@@ -14,6 +14,7 @@ Item {
     readonly property bool editingText:
         homeLabelInput.activeFocus || homeLatitudeInput.activeFocus
         || homeLongitudeInput.activeFocus || explorePanel.editingText
+        || placeSearchPanel.editingText
     readonly property var savedHome:
         registry ? registry.homePlace : null
     readonly property bool canWrite:
@@ -74,6 +75,36 @@ Item {
                 width: parent.width
                 text: "HOME // MANUAL // LOCAL STORAGE"
                 font.pixelSize: 9
+            }
+
+            CpuPlusPlaceSearchPanel {
+                id: placeSearchPanel
+                width: parent.width
+
+                onUseForHome: function(candidate) {
+                    homeLabelInput.text = candidate.label;
+                    homeLatitudeInput.text = String(candidate.latitude);
+                    homeLongitudeInput.text = String(candidate.longitude);
+                    locationPane.feedback =
+                        "SEARCH RESULT LOADED // REVIEW THEN SAVE HOME";
+                    Qt.callLater(function() {
+                        const y = homeLabelInput.mapToItem(body, 0, 0).y - 45;
+                        locationScroll.contentY = Math.max(0, Math.min(
+                            Math.max(0, locationScroll.contentHeight
+                                       - locationScroll.height), y
+                        ));
+                    });
+                }
+                onUseForExplore: function(candidate) {
+                    explorePanel.fillDestination(candidate);
+                    Qt.callLater(function() {
+                        const y = explorePanel.mapToItem(body, 0, 0).y - 20;
+                        locationScroll.contentY = Math.max(0, Math.min(
+                            Math.max(0, locationScroll.contentHeight
+                                       - locationScroll.height), y
+                        ));
+                    });
+                }
             }
 
             Rectangle {

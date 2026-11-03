@@ -136,4 +136,60 @@ assert "id: sharedInstrumentScroll" in cpu
 assert "function selectSystemSubMode(category)" in cpu
 assert "function selectThermalSubMode(mode)" in cpu
 
-print("CPU++ SETTINGS / LOCATION M3 bookmark navigation: PASS")
+# M4: name lookup is a separate read-only, opt-in process. Only a chosen
+# result may prefill the Home or Explore editor, followed by explicit SAVE.
+search = (root / "widgets/cpuplus/CpuPlusPlaceSearchPanel.qml").read_text(encoding="utf-8")
+lookup = (root / "services/location/PlaceLookupService.qml").read_text(encoding="utf-8")
+search_policy = (root / "services/location/PlaceSearchPolicy.js").read_text(encoding="utf-8")
+for token in (
+    "CpuPlusPlaceSearchPanel {", "id: placeSearchPanel",
+    "onUseForHome:", "onUseForExplore:",
+    "homeLabelInput.text = candidate.label",
+    "homeLatitudeInput.text = String(candidate.latitude)",
+    "homeLongitudeInput.text = String(candidate.longitude)",
+    "explorePanel.fillDestination(candidate)",
+    "placeSearchPanel.editingText",
+    "REVIEW THEN SAVE HOME",
+):
+    assert token in location, token
+for token in (
+    "function fillDestination(candidate)", "exploreNameInput.text =",
+    "exploreLatitudeInput.text =", "exploreLongitudeInput.text =",
+    "REVIEW THEN EXPLORE HERE",
+):
+    assert token in explore, token
+for token in (
+    "signal useForHome(var candidate)", "signal useForExplore(var candidate)",
+    "readonly property bool editingText:", "PlaceLookupService {",
+    "function search()", "onClicked: searchPanel.search()",
+    "onAccepted: searchPanel.search()", "USE FOR HOME",
+    "USE FOR EXPLORE", "searchPanel.useForHome(",
+    "searchPanel.useForExplore(", "GEONAMES",
+    "NON-COMMERCIAL API",
+):
+    assert token in search, token
+for token in (
+    "function search(queryText)", "SearchPolicy.request(queryText)",
+    "SearchPolicy.parseResponse(responseText)", "status = \"loading\";",
+    "searchProcess.running = true;", "onStreamFinished:",
+    "onExited:", "max-filesize", "curl", "lastRequestMs + 2500",
+):
+    assert token in lookup, token
+for forbidden in (
+    "FileView {", "JsonAdapter {", "Quickshell.dataDir",
+    "POST_APOLLO_NWS_ALERT_POINT", "saveHome(", "exploreHere(",
+):
+    assert forbidden not in lookup, forbidden
+    assert forbidden not in search, forbidden
+for token in (
+    'const ENDPOINT = "https://geocoding-api.open-meteo.com/v1/search";',
+    "encodeURIComponent(query)", "const LIMIT = 8;",
+    "function parseResponse(", "function request(",
+):
+    assert token in search_policy, token
+assert "PlaceLookupService 1.0 PlaceLookupService.qml" in qmldir
+assert "searchProcess.running = true" in lookup  # search is user-triggered
+assert "onCompleted: searchPanel.search()" not in search
+assert "Component.onCompleted:" not in lookup
+
+print("CPU++ SETTINGS / LOCATION M4 search previews and existing modes: PASS")

@@ -116,7 +116,23 @@ var WIRED_IN_SUBJECTS = {
   "space-goes-flares":"M28-G",
   "space-watch-day":"M28-G",
   "space-warning-validity":"M28-G",
-  "space-bulletins":"M28-G"
+  "space-bulletins":"M28-G",
+  // M28-H: original single EARTH map, provider inspectors and manual archives.
+  // No implicit dossier capture or provider source ownership transfer.
+  "ground-usgs-seismic":"M28-H",
+  "map-natural-earth":"M28-H",
+  "map-spatial-canvas":"M28-H",
+  "map-earthquake-layer":"M28-H",
+  "map-eonet-layer":"M28-H",
+  "map-gdacs-layer":"M28-H",
+  "map-firms-hotspots":"M28-H",
+  "map-event-context":"M28-H",
+  "map-dossier-preview":"M28-H",
+  "map-event-archive":"M28-H",
+  "map-gdacs-inspector":"M28-H",
+  "map-usgs-inspector":"M28-H",
+  "map-eonet-inspector":"M28-H",
+  "map-firms-inspector":"M28-H"
 };
 
 function remainingSourcePagesForPath(path, panelRoutes) {

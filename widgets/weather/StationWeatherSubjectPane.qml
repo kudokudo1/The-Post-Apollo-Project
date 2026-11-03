@@ -20,6 +20,10 @@ Rectangle {
 
     readonly property string kind:
         WeatherPanelPolicy.kindForRoute(subjectRoute)
+    readonly property var runtimeRows:
+        kind === "map" && panelLoader.item
+        && Array.isArray(panelLoader.item.runtimeRows)
+        ? panelLoader.item.runtimeRows : []
 
     Loader {
         id: panelLoader

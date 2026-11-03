@@ -77,7 +77,7 @@ test("on-demand Process uses direct argv and explicit local kernel",()=>{
 });
 
 test("only explicit CALCULATE click loads, with clear unavailable state",()=>{
-  assert.match(pane,/label: "CALCULATE"/); // label is conditional; status separate
+  assert.match(pane,/"CALCULATING" : "CALCULATE"/);
   assert.match(pane,/onClicked: magickPane\.celestialSource\.refresh\(\)/);
   assert.match(pane,/magickPane\.celestialSource\.configured/);
   assert.match(pane,/magickPane\.celestialSource\.ready/);

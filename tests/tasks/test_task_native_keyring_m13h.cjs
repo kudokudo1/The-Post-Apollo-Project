@@ -35,7 +35,8 @@ test("CI executes same manual harness in separate disposable HOME and bus",()=>{
     assert.match(text,/gnome-keyring-daemon --unlock --components=secrets/);
     assert.match(text,/--native-disposable-test/);
     assert.match(text,/M13H_NATIVE_ENCRYPTED_RESTART_PASS/);
-    assert.doesNotMatch(text,/sudo |\\/var\\/home\\//);
+    assert.equal(text.includes('sudo '),false);
+    assert.equal(text.includes('/var/home/'),false);
 });
 test("production TASKS still has one FileView and compile-time disabled guards",()=>{
     const store=fs.readFileSync(path.join(ROOT,"services/hub/ApolloHubTodoStore.qml"),"utf8");

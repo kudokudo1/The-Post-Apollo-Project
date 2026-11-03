@@ -187,7 +187,6 @@ Rectangle {
                 onRouteRequested: function(path) {
                     browser.chooseRoute(path);
                 }
-                onIndexRequested: browser.openIndex()
                 onLegacyPageRequested: function(pageId) {
                     browser.legacyPageRequested(pageId);
                 }

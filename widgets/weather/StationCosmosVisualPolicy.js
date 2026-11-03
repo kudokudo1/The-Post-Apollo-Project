@@ -58,7 +58,8 @@ function moonDisplay(usnoReady,ephemeris,dailyFallback) {
         phaseId:ready?phase:"",
         phaseLabel:ready?(phase?phase.replace(/-/g," ").toUpperCase():"PHASE UNKNOWN"):"--",
         illumination:ready?illumination:null,
-        waxing:ready?waxingDirection(phase):true,
+        waxing:ready&&phase!==""?waxingDirection(phase):null,
+        directionKnown:ready&&phase!=="",
         source:ready?(usno?"USNO ONE-DAY":"WTTR DAILY FORECAST"):"NO VERIFIED PHASE",
         sourceDate:ready?String(usno?source.sourceDate:source.date||""):"",
         schematic:true

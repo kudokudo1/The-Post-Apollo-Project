@@ -31,6 +31,7 @@ function harness(route,extra={}) {
     Qt:{callLater:function(f){scheduled.push(f)}},
     terminalView:{
       terminalState:"IDLE",
+      outputName:"DP-3",
       openTerminal:function(){calls.launches++;return true;},
       get terminalMode(){return env.subjectNavigationOpen
         ?env.subjectTerminalMode:env.currentView;}
@@ -104,6 +105,13 @@ test("reject unauthorized modes/routes, INDEX and closed station",()=>{
     terminalView:{terminalState:"STARTING",openTerminal(){throw Error("NO");}}
   });
   assert.equal(starting.env.launchSubjectTerminal("terminal"),false);
+  const noScreen=harness("tools/terminal/star-map",{
+    terminalView:{terminalState:"IDLE",outputName:"",
+                  openTerminal(){throw Error("NO");}}
+  });
+  assert.equal(noScreen.env.launchSubjectTerminal("terminal"),false,
+               "missing compositor output must refuse before overlay");
+  assert.equal(noScreen.env.contextTerminalRequested,false);
 });
 
 test("queued session cannot start after route, owner or host changes",()=>{
@@ -119,6 +127,8 @@ test("queued session cannot start after route, owner or host changes",()=>{
     update(h.env);
     h.scheduled[0]();
     assert.equal(h.calls.launches,0);
+    assert.equal(h.env.contextTerminalRequested,false,
+                 "aborted launch cannot strand hidden SUBJECTS");
   }
 });
 

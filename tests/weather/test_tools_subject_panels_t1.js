@@ -48,22 +48,27 @@ test("eleven exact TOOLS routes are real descendants of the six-subject tree", (
     assert.equal(tools.kindForRoute(bad),"",bad);
 });
 
-test("TOOLS terminal routes safely hand off to the original CLASSIC Kitty controller", () => {
-  assert.equal(tools.legacyTerminalPage("tools/terminal/star-map"),"terminal");
-  assert.equal(tools.legacyTerminalPage("tools/terminal/consoles"),"home");
-  assert.equal(tools.legacyTerminalPage("tools/storage/cache"),"");
-  assert.match(tools.terminalInstructions("tools/terminal/star-map"),/ORIGINAL HEADER/);
-  assert.match(tools.terminalInstructions("tools/terminal/consoles"),/BASH/);
-  assert.match(pane,/signal legacyPageRequested\(string pageId\)/);
-  assert.match(pane,/onClicked:\s*\{/);
-  assert.match(pane,/toolsPane\.legacyPageRequested\(toolsPane\.terminalTarget\)/);
-  assert.match(browser,/onLegacyPageRequested: function\(pageId\)/);
-  assert.match(station,/weatherStation\.openLegacyFromSubject\(pageId\)/);
-  assert.match(station,/function openLegacyFromSubject\(pageId\)/);
+test("TOOLS terminal routes request one original root Kitty actor without CLASSIC", () => {
+  assert.equal(tools.terminalModeForRoute("tools/terminal/star-map"),"terminal");
+  assert.equal(tools.terminalModeForRoute("tools/terminal/consoles","home"),"home");
+  assert.equal(tools.terminalModeForRoute("tools/terminal/consoles","news"),"news");
+  assert.equal(tools.terminalModeForRoute("tools/terminal/consoles","fake"),"home");
+  assert.equal(tools.terminalModeForRoute("tools/storage/cache"),"");
+  assert.deepEqual(plain(tools.CONSOLE_MODES),
+                   ["home","ground","sky","space","map","news","radio"]);
+  assert.match(tools.terminalInstructions("tools/terminal/star-map"),/NO CLASSIC ROUTE/);
+  assert.match(tools.terminalInstructions("tools/terminal/consoles"),/PLAIN BASH/);
+  assert.match(pane,/signal terminalLaunchRequested\(string mode\)/);
+  assert.match(pane,/toolsPane\.terminalLaunchRequested\(toolsPane\.terminalTarget\)/);
+  assert.match(browser,/onTerminalLaunchRequested: function\(mode\)/);
+  assert.match(station,/function launchSubjectTerminal\(mode\)/);
+  assert.match(station,/weatherStation\.launchSubjectTerminal\(mode\)/);
   assert.match(station,/function launchContextTerminal\(\)/);
   assert.match(terminal,/sessionMode === "terminal" \? "weather-screen"/);
   assert.match(terminal,/kittyActorConfirmed/);
   assert.match(terminal,/function closeTerminal\(\)/);
+  assert.equal((station.match(/StationTerminal\s*\{/g)||[]).length,1,
+               "only one root exact-actor terminal");
   assert.ok(!pane.includes("StationTerminal {"),"no second terminal");
 });
 

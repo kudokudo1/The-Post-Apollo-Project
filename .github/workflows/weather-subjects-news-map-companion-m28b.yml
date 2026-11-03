@@ -11,6 +11,9 @@ on:
       - "tests/weather/fixtures/M28BNewsFeedFirst.qml"
       - "scripts/weather/verify_news_feed_first_fedora_m28b.sh"
       - "tests/weather/test_media_subject_panels_d1.js"
+      - "tests/weather/test_earth_subject_panels_e1.js"
+      - "tests/weather/test_weather_subject_panels_m2b.js"
+      - "tests/weather/test_station_news_report_filter.js"
       - "tests/weather/test_media_earth_mentions_cutover_m28a.js"
       - "docs/weather-subjects-m28b-feed-map-companion-handoff.md"
       - ".github/workflows/weather-subjects-news-map-companion-m28b.yml"
@@ -43,6 +46,10 @@ jobs:
         run: node --test tests/weather/test_media_subject_panels_d1.js
       - name: EARTH E1 provider and dossier isolation
         run: node --test tests/weather/test_earth_subject_panels_e1.js
+      - name: M2b WEATHER map and source separation
+        run: node --test tests/weather/test_weather_subject_panels_m2b.js
+      - name: Original GDELT news local filter and article contract
+        run: node tests/weather/test_station_news_report_filter.js
       - name: M28-A subject-native NEWS place handoff
         run: node --test tests/weather/test_media_earth_mentions_cutover_m28a.js
       - name: Native EARTH NEWS mention marker and CLEAR without CLASSIC

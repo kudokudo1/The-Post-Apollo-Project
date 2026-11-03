@@ -81,6 +81,53 @@ class ClockTimeSettingsContract(unittest.TestCase):
         self.assertEqual(outcome["status"], "unavailable")
         self.assertEqual(run.call_count, 2)
 
+    def test_auth_cancelled_is_distinct_from_execution_failure(self):
+        cancel = host.classify_failure(126, "User dismissed the dialogue")
+        self.assertEqual(cancel["status"], "cancelled")
+        self.assertEqual(cancel["errorCode"], "AUTH_CANCELLED")
+        exec_error = host.classify_failure(127, "Not authorized")
+        self.assertEqual(exec_error["errorCode"], "POLKIT_OR_EXEC_ERROR")
+
+    def test_chrony_reports_specific_source_failures_safely(self):
+        unavailable = host.classify_failure(
+            1, "No suitable source for synchronisation: 10.1.2.3")
+        self.assertEqual(unavailable["errorCode"], "SOURCE_UNAVAILABLE")
+        self.assertNotIn("10.1.2.3", unavailable["message"])
+        dns = host.classify_failure(
+            1, "Temporary failure in name resolution for private.example")
+        self.assertEqual(dns["errorCode"], "SOURCE_DNS")
+        self.assertNotIn("private.example", dns["message"])
+        generic = host.classify_failure(3, "other failure")
+        self.assertEqual(generic["errorCode"], "CHRONY_FAILED")
+        self.assertEqual(generic["exitCode"], 3)
+
+    def test_failed_privileged_attempt_is_not_reported_as_completed(self):
+        with patch.object(host.subprocess, "run", return_value=
+                          subprocess.CompletedProcess([], 126, "", "Dismissed")):
+            value = host.privileged([host.CHRONYC, "burst", "4/4"],
+                                    "requested", "SAMPLES REQUESTED", 45)
+        self.assertEqual(value["status"], "cancelled")
+
+    def test_readonly_diagnostic_of_inactive_service(self):
+        with patch.object(host.os.path, "isfile", return_value=True), \
+                patch.object(host.subprocess, "run", return_value=
+                             subprocess.CompletedProcess([], 3, "inactive\n", "")) as run:
+            value = host.diagnose()
+        self.assertEqual(value["status"], "ready")
+        self.assertIn("ONE-SHOT", value["message"])
+        self.assertEqual(run.call_count, 1)
+        self.assertEqual(run.call_args.args[0],
+                         ["systemctl", "is-active", "chronyd.service"])
+
+    def test_diagnostic_is_available_without_actuation(self):
+        service = (ROOT / "services/time/TimeSettings.qml").read_text()
+        pane = (ROOT / "widgets/TimeSettingsPane.qml").read_text()
+        self.assertIn("function diagnoseResync()", service)
+        self.assertIn('TimeHostControl.py"), "diagnose"', service)
+        self.assertIn("TimeSettings.diagnoseResync()", pane)
+        self.assertIn('label: "DIAGNOSE"', pane)
+        self.assertIn("TimeSettings.resyncErrorCode", pane)
+
     def test_resync_only_requests_fresh_samples(self):
         with patch.object(host.os.path, "isfile", return_value=True), \
                 patch.object(host.subprocess, "run", side_effect=[

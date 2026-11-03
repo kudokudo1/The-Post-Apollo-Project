@@ -55,6 +55,84 @@ def status():
     )
 
 
+def classify_failure(exit_code, stderr="", stdout=""):
+    """Summarize a privileged attempt without leaking arbitrary command logs."""
+    # These two return codes are reserved by pkexec for authorization errors.
+    # 127 can also indicate another execution error, so do not claim denial.
+    if exit_code == 126:
+        return result("cancelled", "AUTHENTICATION CANCELLED // NO VERIFIED SYNC",
+                      errorCode="AUTH_CANCELLED")
+    if exit_code == 127:
+        return result("failed", "POLKIT AUTH OR EXECUTION ERROR // CHECK AUTH AGENT",
+                      errorCode="POLKIT_OR_EXEC_ERROR")
+
+    output = (stderr + "\n" + stdout).lower()
+    if any(term in output for term in (
+            "could not resolve", "unable to resolve",
+            "temporary failure in name resolution", "name or service not known")):
+        return result("failed", "TIME SOURCE DNS RESOLUTION FAILED",
+                      errorCode="SOURCE_DNS")
+    if any(term in output for term in (
+            "no suitable source", "no sources online", "no reachable sources",
+            "can't synchronise", "cannot synchronise", "not synchronised",
+            "no source selected")):
+        return result("failed", "NO USABLE TIME SERVER SAMPLE // CHECK SOURCES",
+                      errorCode="SOURCE_UNAVAILABLE")
+    if any(term in output for term in (
+            "permission denied", "operation not permitted",
+            "not authorised", "not authorized")):
+        return result("failed", "CHRONY PERMISSION OR CAPABILITY ERROR",
+                      errorCode="CHRONY_PERMISSION")
+    if any(term in output for term in (
+            "another chronyd", "already running", "address already in use")):
+        return result("failed", "CHRONY INSTANCE CONFLICT // NO VERIFIED SYNC",
+                      errorCode="CHRONY_CONFLICT")
+    return result("failed", "CHRONY COMMAND FAILED // NO VERIFIED SYNC",
+                  errorCode="CHRONY_FAILED", exitCode=exit_code)
+
+
+def diagnose():
+    """Read-only prerequisites. Does not contact time servers or change time."""
+    chronyd = next((p for p in CHRONYD_PATHS if os.path.isfile(p)), None)
+    if not os.path.isfile(PKEXEC):
+        return result("unavailable", "POLKIT EXECUTABLE MISSING",
+                      errorCode="NO_PKEXEC")
+    if chronyd is None:
+        return result("unavailable", "CHRONY DAEMON EXECUTABLE MISSING",
+                      errorCode="NO_CHRONYD")
+    try:
+        service = subprocess.run(
+            ["systemctl", "is-active", "chronyd.service"],
+            capture_output=True, text=True, timeout=TIMEOUT, check=False)
+    except (OSError, subprocess.TimeoutExpired):
+        return result("unavailable", "CANNOT READ CHRONY SERVICE STATE",
+                      errorCode="SERVICE_UNKNOWN")
+    state = service.stdout.strip()
+    if service.returncode == 0 and state == "active":
+        if not os.path.isfile(CHRONYC):
+            return result("unavailable", "CHRONY CONTROL CLIENT MISSING",
+                          errorCode="NO_CHRONYC")
+        try:
+            tracking = subprocess.run(
+                [CHRONYC, "tracking"], capture_output=True, text=True,
+                timeout=TIMEOUT, check=False)
+        except (OSError, subprocess.TimeoutExpired):
+            return result("unavailable", "CHRONY CONTROL QUERY FAILED",
+                          errorCode="CHRONYC_QUERY_FAILED")
+        if tracking.returncode:
+            return result("unavailable", "DAEMON ACTIVE // CONTROL SOCKET UNAVAILABLE",
+                          errorCode="CHRONY_SOCKET_UNAVAILABLE")
+        return result("ready", "DAEMON ACTIVE // BURST PATH READY",
+                      errorCode="",
+                      detail="TIME SERVER HEALTH AND AUTHORIZATION NOT VERIFIED")
+    if state in ("inactive", "failed"):
+        return result("ready", "DAEMON STOPPED // ONE-SHOT PATH READY",
+                      errorCode="",
+                      detail="TIME SERVER HEALTH AND AUTHORIZATION NOT VERIFIED")
+    return result("unavailable", "UNEXPECTED CHRONY SERVICE STATE",
+                  errorCode="SERVICE_UNKNOWN")
+
+
 def privileged(command, success_status, success_message, timeout):
     try:
         proc = subprocess.run(
@@ -65,7 +143,7 @@ def privileged(command, success_status, success_message, timeout):
     except OSError:
         return result("failed", "AUTHENTICATED SYNC COULD NOT START")
     if proc.returncode:
-        return result("failed", "SYNC DENIED OR SOURCE UNAVAILABLE // VERIFY STATUS")
+        return classify_failure(proc.returncode, proc.stderr, proc.stdout)
     return result(success_status, success_message)
 
 
@@ -112,10 +190,12 @@ def resync():
 
 
 def main():
-    if len(sys.argv) != 2 or sys.argv[1] not in ("status", "resync"):
+    if len(sys.argv) != 2 or sys.argv[1] not in ("status", "resync", "diagnose"):
         data = result("invalid", "EXPECTED STATUS OR RESYNC")
     elif sys.argv[1] == "status":
         data = status()
+    elif sys.argv[1] == "diagnose":
+        data = diagnose()
     else:
         data = resync()
     print(json.dumps(data, separators=(",", ":"), sort_keys=True))

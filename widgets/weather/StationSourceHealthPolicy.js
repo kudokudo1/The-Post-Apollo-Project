@@ -32,7 +32,10 @@ function accentFor(state) {
     case "RETRYING":
     case "WAITING": return "orange";
     case "STALE":
-    case "DEGRADED": return "yellow";
+    case "DEGRADED":
+    case "CACHE":
+    case "FALLBACK": return "yellow";
+    case "CACHE STALE": return "orange";
     case "OFFLINE": return "red";
     default: return "white";
     }
@@ -42,6 +45,8 @@ function sourceRow(config, nowMs) {
     const source = config || {};
     const ready = !!source.ready;
     const loading = !!source.loading;
+    const cached = source.cached === true;
+    const fallback = source.fallback === true;
     const error = String(source.error || "").trim();
     const successAge = ageMinutes(nowMs, source.lastSuccessMs);
     const sampleAge = finiteNumber(source.sampleAgeMinutes, -1);
@@ -51,7 +56,11 @@ function sourceRow(config, nowMs) {
                   && freshnessAge >= staleAfter;
 
     let state = "WAITING";
-    if (loading && error)
+    if (cached && ready)
+        state = stale ? "CACHE STALE" : "CACHE";
+    else if (fallback && ready)
+        state = "FALLBACK";
+    else if (loading && error)
         state = "RETRYING";
     else if (loading)
         state = ready ? "UPDATING" : "READING";
@@ -63,7 +72,11 @@ function sourceRow(config, nowMs) {
         state = "LIVE";
 
     let detail = String(source.provider || "");
-    if (error)
+    if (cached && ready)
+        detail = "LAST KNOWN // " + String(source.provider || "UNKNOWN");
+    else if (fallback && ready)
+        detail = "FALLBACK // " + String(source.provider || "UNKNOWN");
+    else if (error)
         detail = "LAST FAILURE // " + error.toUpperCase();
     else if (stale && freshnessAge >= 0)
         detail = "SOURCE SAMPLE " + compactAge(freshnessAge) + " OLD";

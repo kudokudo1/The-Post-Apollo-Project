@@ -1,0 +1,50 @@
+name: Weather M6c provider health and diagnostics
+
+on:
+  pull_request:
+    paths:
+      - "services/weather/WeatherService.qml"
+      - "widgets/weather/StationWeatherProviderDiagnostics.qml"
+      - "widgets/weather/StationProviderDiagnosticsPolicy.js"
+      - "widgets/weather/WeatherStationW.qml"
+      - "widgets/weather/StationHome.qml"
+      - "widgets/weather/StationSourceHealthPolicy.js"
+      - "tests/weather/test_weather_provider_diagnostics_m6c.cjs"
+      - "tests/weather/test_weather_provider_diagnostics_integration_m6c.py"
+      - "tests/weather/test_station_source_health.js"
+      - ".github/workflows/weather-provider-diagnostics-m6c.yml"
+  push:
+    branches:
+      - main
+    paths:
+      - "services/weather/WeatherService.qml"
+      - "widgets/weather/StationWeatherProviderDiagnostics.qml"
+      - "widgets/weather/StationProviderDiagnosticsPolicy.js"
+      - "widgets/weather/WeatherStationW.qml"
+      - "widgets/weather/StationHome.qml"
+      - "widgets/weather/StationSourceHealthPolicy.js"
+      - "tests/weather/test_weather_provider_diagnostics_m6c.cjs"
+      - "tests/weather/test_weather_provider_diagnostics_integration_m6c.py"
+      - "tests/weather/test_station_source_health.js"
+      - ".github/workflows/weather-provider-diagnostics-m6c.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  provider-health-contracts:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify provider-health state, reason and age math
+        run: node tests/weather/test_weather_provider_diagnostics_m6c.cjs
+      - name: Verify actual HOME source-health semantics
+        run: node tests/weather/test_station_source_health.js
+      - name: Verify DIAG panel wiring, Escape and no new collectors
+        run: python3 tests/weather/test_weather_provider_diagnostics_integration_m6c.py
+      - name: Preserve M6 provider failover behavior
+        run: node tests/weather/test_openmeteo_fallback_m6.cjs
+      - name: Preserve M6b coordinate-keyed last-known cache
+        run: node tests/weather/test_weather_place_cache_m6b.cjs
+      - name: Preserve SUBJECTS source parity
+        run: node tests/weather/test_index_sources_cutover_m28l.js

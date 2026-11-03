@@ -8,6 +8,7 @@ import "../../services/weather" as WeatherServices
 import "StationOfficialAlertPolicy.js" as OfficialAlertPolicy
 import "StationWeatherSubjectPanelPolicy.js" as SubjectPanelPolicy
 import "StationSubjectSourceBadgePolicy.js" as SubjectSourceBadge
+import "StationProviderDiagnosticsPolicy.js" as ProviderDiagnostics
 import "StationMagickSubjectPanelPolicy.js" as MagickPanelPolicy
 import "StationEarthSubjectPanelPolicy.js" as EarthPanelPolicy
 import "../../services/weather/WeatherRuntimePolicy.js" as RuntimePolicy
@@ -111,6 +112,11 @@ PanelWindow {
     signal keyboardOwnershipRequested()
 
     property bool menuOpen: false
+    property bool providerDiagnosticsOpen: false
+    onMenuOpenChanged: {
+        if (!menuOpen)
+            providerDiagnosticsOpen = false;
+    }
     property bool relationshipFocusModeActive: false
     property bool relationshipFocused: false
 
@@ -207,6 +213,40 @@ PanelWindow {
         sourceStatusClock;
         return Date.now();
     }
+
+    // Read-only view over one shared WeatherService. No diagnostics poller.
+    readonly property var weatherDiagnostics:
+        ProviderDiagnostics.snapshot({
+            ready: weatherService ? weatherService.ready : false,
+            loading: weatherService ? weatherService.loading : false,
+            activeProvider: weatherService
+                            ? weatherService.activeWeatherProvider : "NONE",
+            cachedProvider: weatherService
+                            ? weatherService.cachedWeatherProvider : "",
+            usingCache: weatherService
+                        ? weatherService.usingPersistentCurrentCache : false,
+            lastUpdated: weatherService ? weatherService.lastUpdated : null,
+            selectedPlace: weatherService ? weatherService.selectedPlace : null,
+            primaryStatus: weatherService
+                           ? weatherService.primaryWeatherStatus : "IDLE",
+            fallbackStatus: weatherService
+                            ? weatherService.fallbackWeatherStatus : "IDLE",
+            fallbackError: weatherService
+                           ? weatherService.fallbackWeatherError : "",
+            primaryLastSuccessAt: weatherService
+                                  ? weatherService.primaryLastSuccessAt : null,
+            fallbackLastSuccessAt: weatherService
+                                   ? weatherService.fallbackLastSuccessAt : null,
+            aqiReady: weatherService ? weatherService.aqiReady : false,
+            aqiLoading: weatherService ? weatherService.aqiLoading : false,
+            aqiUsingCache: weatherService
+                           ? weatherService.usingPersistentAqiCache : false,
+            aqiLastUpdated: weatherService
+                            ? weatherService.aqiLastUpdated : null,
+            aqiError: weatherService
+                      ? weatherService.aqiErrorText : "",
+            error: weatherService ? weatherService.errorText : ""
+        }, runtimeNowMs)
 
     readonly property bool usesHomeSources:
         currentView === "home"
@@ -405,8 +445,14 @@ PanelWindow {
             return officialAlertSummary.headerText
                    + (officialAlertUsingPersistentCache ? " // CACHE" : "");
 
-        if (subjectNavigationOpen)
+        if (subjectNavigationOpen) {
+            // WEATHER pages use the true fallback/cache provenance. Other
+            // SUBJECTS and the deep INDEX retain their original badges.
+            if (!subjectNavigator.indexOpen
+                    && subjectNavigator.liveWeatherKind !== "")
+                return weatherDiagnostics.header;
             return subjectSourceBadge.text;
+        }
 
         if (usesHomeSources) {
             if (homeWeatherUsable && homeSpaceUsable) {
@@ -430,7 +476,7 @@ PanelWindow {
         }
 
         if (usesWeatherSource)
-            return runtimeHeaderText(weatherRuntimeState, "WEATHER LIVE");
+            return weatherDiagnostics.header;
 
         if (usesSpaceSource)
             return runtimeHeaderText(spaceRuntimeState, "SPACE LIVE");
@@ -467,8 +513,14 @@ PanelWindow {
             return officialAlertSummary.headerText
                    + (officialAlertUsingPersistentCache ? " // CACHE" : "");
 
-        if (subjectNavigationOpen)
+        if (subjectNavigationOpen) {
+            // WEATHER pages use the true fallback/cache provenance. Other
+            // SUBJECTS and the deep INDEX retain their original badges.
+            if (!subjectNavigator.indexOpen
+                    && subjectNavigator.liveWeatherKind !== "")
+                return weatherDiagnostics.header;
             return subjectSourceBadge.text;
+        }
 
         if (usesHomeSources) {
             if (homeWeatherUsable && homeSpaceUsable)
@@ -484,23 +536,8 @@ PanelWindow {
             return "CONNECTING // SOURCES";
         }
 
-        if (usesWeatherSource) {
-            if (!weatherService)
-                return "OFFLINE // NO SERVICE";
-            if (weatherService.loading)
-                return "READING // UPDATING";
-            if (!weatherService.ready)
-                return String(weatherService.errorText || "").length > 0
-                       ? "OFFLINE // NO LINK" : "CONNECTING // WAITING";
-
-            if (weatherAgeMinutes < 0)
-                return sourceStatusText;
-
-            const ageText = weatherAgeMinutes === 0
-                            ? "<1m"
-                            : weatherAgeMinutes + "m";
-            return sourceStatusText + " // " + ageText;
-        }
+        if (usesWeatherSource)
+            return weatherDiagnostics.header;
 
         if (usesMapRuntime) {
             if (currentPageRuntimeSummary.ready > 0)
@@ -523,6 +560,17 @@ PanelWindow {
             return officialAlertColor(officialAlertSummary.colorToken);
 
         if (subjectNavigationOpen) {
+            if (!subjectNavigator.indexOpen
+                    && subjectNavigator.liveWeatherKind !== "") {
+                if (weatherDiagnostics.currentState === "CACHE"
+                        || weatherDiagnostics.currentState === "FALLBACK")
+                    return Colors.yellow;
+                if (weatherDiagnostics.currentState === "OFFLINE")
+                    return Colors.red;
+                if (weatherDiagnostics.currentState === "READING")
+                    return Colors.orange;
+                return Colors.cyan;
+            }
             switch (subjectSourceBadge.tone) {
             case "red": return Colors.red;
             case "yellow": return Colors.yellow;
@@ -1057,8 +1105,27 @@ PanelWindow {
                     opacity: 0.85
                 }
 
+                // Inspect the live provider owners without adding another
+                // source or hijacking the existing header status indicator.
+                ActionButton {
+                    id: providerDiagnosticsButton
+                    width: 59
+                    height: 32
+                    label: weatherStation.providerDiagnosticsOpen
+                           ? "BACK" : "DIAG"
+                    labelPixelSize: 11
+                    contentPadding: 4
+                    accentColor: Colors.yellow
+                    available: weatherStation.menuOpen
+                               && !weatherStation.contextTerminalRequested
+                               && weatherStation.currentView !== "terminal"
+                    onLeftClicked:
+                        weatherStation.providerDiagnosticsOpen =
+                            !weatherStation.providerDiagnosticsOpen
+                }
+
                 // Live source badge, matching the Git/Finance header grammar.
-                // It is an indicator, not an input control.
+                // It remains an indicator, not an input control.
                 Rectangle {
                     id: sourceStatusIndicator
 
@@ -1368,6 +1435,22 @@ PanelWindow {
                 stationHeaderHeight: header.height
                 stationRailWidth: modeRail.width
             }
+
+            StationWeatherProviderDiagnostics {
+                id: providerDiagnosticsPane
+                z: 50
+                visible: weatherStation.providerDiagnosticsOpen
+                         && !terminalView.visible
+                enabled: visible
+                width: Math.min(478, parent.width - 24)
+                height: Math.min(460, parent.height - 24)
+                anchors.top: parent.top
+                anchors.right: parent.right
+                anchors.topMargin: 12
+                anchors.rightMargin: 12
+                snapshot: weatherStation.weatherDiagnostics
+                onCloseRequested: weatherStation.providerDiagnosticsOpen = false
+            }
         }
 
         Component {
@@ -1588,7 +1671,9 @@ PanelWindow {
         enabled: weatherStation.menuOpen
 
         onActivated: {
-            if (weatherStation.subjectNavigationOpen)
+            if (weatherStation.providerDiagnosticsOpen)
+                weatherStation.providerDiagnosticsOpen = false;
+            else if (weatherStation.subjectNavigationOpen)
                 weatherStation.subjectNavigationOpen = false;
             else
                 weatherStation.close();

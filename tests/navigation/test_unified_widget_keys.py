@@ -149,7 +149,10 @@ def test_weather_keyboard_live_indicator_and_close_follow_shared_contract():
     assert "borderColor: Colors.cyan" in src
 
     assert "id: sourceStatusIndicator" in src
-    assert 'runtimeHeaderText(weatherRuntimeState, "WEATHER LIVE")' in src
+    # M6c uses real provider health for WEATHER while preserving the
+    # existing RuntimePolicy freshness states for other contexts.
+    assert "ProviderDiagnostics.snapshot({" in src
+    assert "weatherDiagnostics.header" in src
     assert 'return "READING";' in src
     assert 'return "STALE";' in src
     assert 'return "OFFLINE";' in src
@@ -162,7 +165,11 @@ def test_weather_keyboard_live_indicator_and_close_follow_shared_contract():
     assert 'weatherRuntimeState.freshness === "STALE"' in src
     assert 'weatherRuntimeState.freshness === "EXPIRED"' in src
     assert "freshMs:1200000" in runtime  # preserve the existing 20m threshold
-    assert 'return sourceStatusText + " // " + ageText;' in src
+    # M6c preserves age calculations, but moves age detail from the
+    # cramped provider badge into the expandable diagnostics panel.
+    assert 'readonly property int weatherAgeMinutes:' in src
+    diagnostics_policy = read("widgets/weather/StationProviderDiagnosticsPolicy.js")
+    assert 'currentAge:ageText(s.lastUpdated, nowMs)' in diagnostics_policy
     assert 'width: 150' in src
     assert 'font.pixelSize: 11' in src
     assert "id: focusButton" not in src

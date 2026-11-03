@@ -120,7 +120,9 @@ assert.match(ui, /GDACS ALERT SQUARES \/\/ QUAKES CIRCLES \/\/ EONET DIAMONDS \/
 assert.match(ui, /EONET POINT CANVAS \/\/ PAN \+ ZOOM/);
 assert.match(ui, /GDELT NEWS MENTION POINTS/);
 assert.match(ui, /model: stationDiscovery\.mapNewsMentionRows/);
-assert.match(ui, /stationDiscovery\.selectedMapNewsMention = modelData/);
+assert.match(ui, /stationDiscovery\.inspectNewsMention\(modelData\)/);
+assert.match(ui, /function inspectNewsMention\(row\)/);
+assert.match(ui, /selectedMapNewsMention = row/);
 assert.match(ui, /label: "FOCUS NEWS"/);
 assert.match(ui, /label: "CLEAR NEWS"/);
 assert.match(ui, /NEWS MENTION INSPECTOR \/\/ GDELT GKG/);

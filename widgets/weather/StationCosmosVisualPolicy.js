@@ -70,7 +70,8 @@ function illuminatedSpan(percent,waxing,y,radius) {
     if(f===null||r===null||r<=0||row===null||Math.abs(row)>r)
         return null;
     var half=Math.sqrt(Math.max(0,r*r-row*row));
-    var boundary=(1-2*f)*half;
+    var fraction=f/100;
+    var boundary=(1-2*fraction)*half;
     return waxing
         ?{left:boundary,right:half}
         :{left:-half,right:-boundary};

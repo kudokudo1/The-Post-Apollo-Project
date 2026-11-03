@@ -1,0 +1,32 @@
+name: Weather Station V2 COSMOS Moon Phase and Solar Altitude Visuals
+
+on:
+  pull_request:
+    paths:
+      - 'widgets/weather/StationCosmosVisualPolicy.js'
+      - 'widgets/weather/StationCosmosVisualInstruments.qml'
+      - 'widgets/weather/StationSky.qml'
+      - 'tests/weather/test_cosmos_visual_instruments_v2.js'
+      - '.github/workflows/weather-cosmos-visual-instruments-v2.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  visual-contracts:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Verify Moon phase geometry and calibrated Sun model using actual source math
+        run: |
+          node --test tests/weather/test_cosmos_visual_instruments_v2.js
+          node --test tests/weather/test_visual_series_v1.js
+          node --test tests/weather/test_cosmos_subject_panels_c1.js
+          node --test tests/weather/test_magick_subject_panels_g1.js
+          node --test tests/weather/test_workspace_landing_w1.js
+          node --test tests/weather/test_workspace_left_rail_w1r.js

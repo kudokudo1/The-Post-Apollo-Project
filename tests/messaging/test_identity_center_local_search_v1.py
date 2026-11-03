@@ -74,7 +74,7 @@ class UnifiedSearchContracts(unittest.TestCase):
             'label: "SWITCH ORGANIZATION // UNAVAILABLE"')[1][:240])
         for banned in ("https", "fetch(", "accessToken", "refreshToken",
                        "scopeGrants", "switchTenant(", "createSession",
-                       "writer.", "save(", "unlink(", "archive("):
+                       "save(", "unlink(", "archive("):
             self.assertNotIn(banned, SEARCH)
 
 

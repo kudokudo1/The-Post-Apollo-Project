@@ -166,7 +166,8 @@ Column {
                 + account,
                 edge.id, edge.orgId, "", archivedOrg(edge.orgId)
                 || (edge.branchId && archivedBranch(edge.orgId, edge.branchId))
-                || !identity, "social identity account nickname");
+                || (identities.length > 0 && !identity),
+                "social identity account nickname");
         }
         return matched;
     }

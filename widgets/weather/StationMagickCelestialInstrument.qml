@@ -505,7 +505,7 @@ Rectangle {
             color: Colors.yellow
             elide: Text.ElideRight
             text: instrument.chosenEvent
-                ? "EVENT TIME (EXACT SEARCH) // SAMPLE INSPECTOR IS NEAREST POINT"
+                ? "CALCULATED EVENT TIME // PLANET POSITIONS USE NEAREST SAMPLE"
                 : "GEOCENTRIC / TROPICAL REFERENCE // SAMPLED EVENTS NOT EXHAUSTIVE"
         }
     }

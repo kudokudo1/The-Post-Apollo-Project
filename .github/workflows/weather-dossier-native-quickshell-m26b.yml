@@ -1,0 +1,37 @@
+name: Weather M26-B native isolated FileView
+
+on:
+  pull_request:
+    paths:
+      - "tests/weather/fixtures/M26NativeDossierShell.qml"
+      - "scripts/weather/verify_dossier_native_m26b.sh"
+      - "services/weather/WeatherDossierArchiveStore.qml"
+      - "services/weather/WeatherDossierArchivePolicy.js"
+      - "widgets/weather/StationDossierPreviewPolicy.js"
+      - "widgets/weather/StationDossierCapturePolicy.js"
+      - "widgets/weather/StationDossierSerializationPolicy.js"
+      - ".github/workflows/weather-dossier-native-quickshell-m26b.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  native-fileview:
+    runs-on: ubuntu-latest
+    container:
+      image: debian:unstable
+    timeout-minutes: 15
+    steps:
+      - name: Install isolated native Quickshell and Node
+        run: |
+          export DEBIAN_FRONTEND=noninteractive
+          apt-get update
+          apt-get install -y --no-install-recommends \
+            ca-certificates git nodejs quickshell qt6-qpa-plugins coreutils findutils
+          quickshell --version
+      - uses: actions/checkout@v4
+      - name: M26-A disposable JavaScript callback regression
+        run: node tests/weather/test_weather_dossier_disposable_restart_m26.js
+      - name: M26-B native FileView save, fresh process reload, corrupt refusal
+        run: bash scripts/weather/verify_dossier_native_m26b.sh

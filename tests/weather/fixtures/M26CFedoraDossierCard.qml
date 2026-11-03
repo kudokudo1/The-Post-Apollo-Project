@@ -105,7 +105,8 @@ ShellRoot {
             + " // requests=" + requestCount
             + " // saved=" + savedCount
             + " // state=" + archive.storageState);
-        Qt.quit();
+        // Quitting synchronously in a QtTest/TestSchedule signal handler
+        // destroys the runner in-flight. A separate timer owns shutdown.
     }
 
     function success() {
@@ -115,7 +116,14 @@ ShellRoot {
         console.log("M26C_UI_PASS // DISABLED_POINTER_IGNORED");
         console.log("M26C_UI_PASS // ENABLED_POINTER_SAVED");
         console.log("M26C_UI_PASS // SOURCE_ARCHIVE_SEPARATE");
-        Qt.quit();
+        // A timer quits after QtTest's assertion stack has unwound.
+    }
+
+    Timer {
+        interval: 250
+        repeat: false
+        running: root.complete
+        onTriggered: Qt.quit()
     }
 
     Component.onCompleted: {

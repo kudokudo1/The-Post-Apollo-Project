@@ -149,7 +149,8 @@ PanelWindow {
         ? (subjectNavigator.liveWeatherKind !== ""
            ? "WEATHER" : subjectNavigator.liveCosmosKind !== ""
              ? "COSMOS" : subjectNavigator.liveEarthKind !== ""
-               ? "EARTH" : "SUBJECT INDEX") : currentViewName
+               ? "EARTH" : subjectNavigator.liveMediaKind !== ""
+               ? "MEDIA" : "SUBJECT INDEX") : currentViewName
 
     readonly property var officialAlertSummary:
         OfficialAlertPolicy.summary(
@@ -372,7 +373,8 @@ PanelWindow {
             return subjectNavigator.liveWeatherKind !== ""
                    ? "WEATHER PANEL" : subjectNavigator.liveCosmosKind !== ""
                      ? "COSMOS PANEL" : subjectNavigator.liveEarthKind !== ""
-                       ? "EARTH PANEL" : "NAV PREVIEW";
+                       ? "EARTH PANEL" : subjectNavigator.liveMediaKind !== ""
+                         ? "MEDIA PANEL" : "NAV PREVIEW";
 
         if (usesHomeSources) {
             if (homeWeatherUsable && homeSpaceUsable) {
@@ -440,6 +442,8 @@ PanelWindow {
                 return "COSMOS // PANEL";
             if (subjectNavigator.liveEarthKind !== "")
                 return "EARTH // PANEL";
+            if (subjectNavigator.liveMediaKind !== "")
+                return "MEDIA // PANEL";
             return "INDEX // PREVIEW";
         }
 
@@ -1200,6 +1204,9 @@ PanelWindow {
             Loader {
                 id: weatherContentLoader
                 anchors.fill: parent
+                // SUBJECTS owns its own real panels, not a hidden duplicate
+                // CLASSIC NEWS/RADIO view with a second memory observer.
+                active: !weatherStation.subjectNavigationOpen
                 visible: weatherStation.currentView !== "terminal"
                          && !weatherStation.contextTerminalRequested
                          && !weatherStation.subjectNavigationOpen
@@ -1242,6 +1249,19 @@ PanelWindow {
                 runtimeNowMs: weatherStation.runtimeNowMs
                 onLegacyPageRequested: function(pageId) {
                     weatherStation.openLegacyFromSubject(pageId);
+                }
+                onNewsMapRequested: function(payload) {
+                    if (!payload || !Array.isArray(payload.locations)
+                            || payload.locations.length === 0)
+                        return;
+                    weatherStation.newsMapOverlay =
+                        JSON.parse(JSON.stringify(payload));
+                    weatherStation.subjectNavigationOpen = false;
+                    weatherStation.currentView = "map";
+                    weatherStation.navigationIndex =
+                        weatherStation.mainModes.findIndex(function(mode) {
+                            return mode.id === "map";
+                        });
                 }
             }
 

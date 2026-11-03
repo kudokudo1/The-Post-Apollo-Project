@@ -139,6 +139,8 @@ Rectangle {
                         QuietText {
                             width: parent.width
                             text: visual.moonData.source
+                                  +" // DATE "
+                                  +(visual.moonData.sourceDate||"--")
                             font.pixelSize: 9
                             color: Colors.cyan
                             wrapMode: Text.WordWrap
@@ -347,7 +349,14 @@ Rectangle {
                     color: Colors.orange
                     wrapMode: Text.WordWrap
                     text: "SOLAR CENTER / EXISTING CALIBRATED MODEL"
-                          +" // LOCAL CIVIL CLOCK, NOT MEASURED SKY PHOTO"
+                          +" // DATE "+(visual.solarData.ready
+                                       ?visual.solarData.date:"--")
+                          +" // CIVIL OFFSET "
+                          +(visual.twilightSummary
+                            &&visual.twilightSummary.available
+                            ?visual.twilightSummary.calibrationOffsetMinutes+"M"
+                            :"--")
+                          +" // NOT MEASURED SKY PHOTO"
                 }
             }
         }

@@ -407,7 +407,20 @@ Rectangle {
             "weather": {
                 "id": "weather",
                 "title": "WEATHER",
-                "provider": "WTTR.IN",
+                "provider": weatherService
+                    ? weatherService.usingPersistentCurrentCache
+                      ? "CACHE // " + (
+                          weatherService.cachedWeatherProvider === "OPEN_METEO"
+                          ? "OPEN-METEO" : "WTTR.IN")
+                      : weatherService.activeWeatherProvider === "OPEN_METEO"
+                      ? "OPEN-METEO" : "WTTR.IN"
+                    : "NO SERVICE",
+                "cached": weatherService
+                          ? weatherService.usingPersistentCurrentCache : false,
+                "fallback": weatherService
+                            ? weatherService.activeWeatherProvider === "OPEN_METEO"
+                              && !weatherService.usingPersistentCurrentCache
+                            : false,
                 "ready": weatherReady,
                 "loading": weatherService ? weatherService.loading : false,
                 "error": weatherService ? weatherService.errorText : "NO SERVICE",
@@ -420,6 +433,8 @@ Rectangle {
                 "id": "aqi",
                 "title": "AIR QUALITY",
                 "provider": "OPEN-METEO",
+                "cached": weatherService
+                          ? weatherService.usingPersistentAqiCache : false,
                 "ready": aqiReady,
                 "loading": weatherService ? weatherService.aqiLoading : false,
                 "error": weatherService ? weatherService.aqiErrorText : "NO SERVICE",

@@ -19,7 +19,9 @@ Rectangle {
     property var dossierArchiveStore: null
     property real runtimeNowMs: 0
 
-    signal legacyPageRequested(string pageId)
+    // Only a request. The root StationTerminal remains the sole Kitty/Sway
+    // owner, including window identity, geometry, launch and exact close.
+    signal terminalLaunchRequested(string mode)
 
     readonly property string kind:
         ToolsPolicy.kindForRoute(subjectRoute)
@@ -34,7 +36,7 @@ Rectangle {
     readonly property var visibleStorageRows:
         ToolsPolicy.storageRowsFor(subjectRoute,allStorageRows)
     readonly property string terminalTarget:
-        ToolsPolicy.legacyTerminalPage(subjectRoute)
+        ToolsPolicy.terminalModeForRoute(subjectRoute)
 
     function accentColor(token) {
         switch (String(token||"")) {
@@ -87,7 +89,7 @@ Rectangle {
 
                 StationSectionDivider {
                     width: parent.width
-                    title: "TERMINAL // SAFE CLASSIC HANDOFF"
+                    title: "TERMINAL // STATION KITTY SESSION"
                 }
 
                 QuietText {
@@ -111,13 +113,13 @@ Rectangle {
                     accentColor: Colors.cyan
                     onClicked: {
                         if (toolsPane.terminalTarget !== "")
-                            toolsPane.legacyPageRequested(toolsPane.terminalTarget);
+                            toolsPane.terminalLaunchRequested(toolsPane.terminalTarget);
                     }
                 }
 
                 QuietText {
                     width: parent.width
-                    text: "THE ORIGINAL STATION TERMINAL CONTINUES TO OWN THE WAYLAND APP-ID, BAY CUTOUT, VERIFIED WINDOW GEOMETRY AND EXACT CLOSE ACTION. NO NEW SESSION IS STARTED BY THIS PAGE."
+                    text: "THE EXISTING STATION TERMINAL CONTROLS THE WAYLAND APP-ID, BAY CUTOUT, VERIFIED WINDOW GEOMETRY AND EXACT CLOSE. LAUNCH USES THAT ONE CONTROLLER; THE HEADER CLOSE BUTTON RETURNS HERE."
                     wrapMode: Text.WordWrap
                     font.pixelSize: 10
                 }

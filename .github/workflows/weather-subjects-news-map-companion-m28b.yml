@@ -7,6 +7,9 @@ on:
       - "widgets/weather/StationMapCompanionPolicy.js"
       - "widgets/weather/StationDiscovery.qml"
       - "tests/weather/test_media_news_feed_map_companion_m28b.js"
+      - "tests/weather/fixtures/M28BStationDiscoveryService.qml"
+      - "tests/weather/fixtures/M28BNewsFeedFirst.qml"
+      - "scripts/weather/verify_news_feed_first_fedora_m28b.sh"
       - "tests/weather/test_media_subject_panels_d1.js"
       - "tests/weather/test_media_earth_mentions_cutover_m28a.js"
       - "docs/weather-subjects-m28b-feed-map-companion-handoff.md"
@@ -44,3 +47,5 @@ jobs:
         run: node --test tests/weather/test_media_earth_mentions_cutover_m28a.js
       - name: Native EARTH NEWS mention marker and CLEAR without CLASSIC
         run: bash scripts/weather/verify_media_earth_mentions_fedora_m28a.sh
+      - name: Native MEDIA NEWS headline card first, viewer and analytics routes
+        run: bash scripts/weather/verify_news_feed_first_fedora_m28b.sh

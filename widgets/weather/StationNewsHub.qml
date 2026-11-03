@@ -258,7 +258,8 @@ Rectangle {
                 height: 25
                 spacing: 12
                 GohuText {
-                    text: "MEDIA // " + stationNewsHub.effectiveSection
+                    text: (stationNewsHub.subjectRoute === "" ? "NEWS // " : "MEDIA // ")
+                      + stationNewsHub.effectiveSection
                     color: Colors.cyan
                     font.pixelSize: 20
                 }

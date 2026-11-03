@@ -15,6 +15,7 @@ import "../../services/weather/WeatherRuntimePolicy.js" as RuntimePolicy
 import "StationEventContextPolicy.js" as EventContextPolicy
 import "StationDossierPreviewPolicy.js" as DossierPreviewPolicy
 import "StationDossierCapturePolicy.js" as DossierCapturePolicy
+import "StationEarthSubjectPanelPolicy.js" as EarthPanelPolicy
 
 // Source-first stage. All records shown come from a backend, never examples.
 // MAP owns a local Natural Earth geographic basemap plus source-driven data
@@ -27,6 +28,28 @@ Rectangle {
     // M2b weather-only view of the existing CLASSIC map renderer.
     property bool weatherMapOnly: false
     property string weatherMapRoute: ""
+
+    // EARTH shares the real CLASSIC MAP and its manual dossier controls.
+    // Never clear selected event or geographic viewport during EARTH routing.
+    property bool earthMapOnly: false
+    property string earthMapRoute: ""
+    function earthLayerEnabled(layer) {
+        return !earthMapOnly
+            || EarthPanelPolicy.showsLayer(earthMapRoute,layer);
+    }
+    readonly property bool earthInvestigationRoute:
+        earthMapOnly && EarthPanelPolicy.investigationRoute(earthMapRoute)
+    onEarthMapRouteChanged: {
+        if (!earthMapOnly)
+            return;
+        // A dedicated source route must not be blanked by an earlier toggle.
+        if (earthMapRoute === "earth/geology/earthquakes")
+            mapShowEarthquakes = true;
+        else if (earthMapRoute === "earth/events/gdacs")
+            mapShowGdacs = true;
+        if (discoveryScroll)
+            discoveryScroll.contentY = 0;
+    }
 
     function weatherLayerEnabled(layer) {
         if (!weatherMapOnly || weatherMapRoute === "weather/maps")
@@ -312,20 +335,25 @@ Rectangle {
 
     readonly property var mapPointRows:
         weatherMapOnly ? [] : MapProjection.plottable(source ? source.rows : [])
+            .filter(function() {
+                return stationDiscovery.earthLayerEnabled("eonet");
+            })
     readonly property var mapNewsMentionRows:
         weatherMapOnly ? [] : MapProjection.plottable(
             newsMentionOverlay
             && Array.isArray(newsMentionOverlay.locations)
             ? newsMentionOverlay.locations : []
-        )
+        ).filter(function() {return !stationDiscovery.earthMapOnly;})
     readonly property var mapEarthquakeRows:
         !weatherMapOnly && mapShowEarthquakes
+        && earthLayerEnabled("quakes")
         && seismicSource
         && seismicSource.ready
         ? MapProjection.plottable(seismicSource.events)
         : []
     readonly property var mapGdacsRows:
         !weatherMapOnly && mapShowGdacs && gdacsService.ready
+        && earthLayerEnabled("gdacs")
         ? MapProjection.plottable(gdacsService.events)
         : []
     readonly property var gdacsSummary:
@@ -1080,21 +1108,51 @@ Rectangle {
     onStationOpenChanged: { if (!stationOpen) closeViewer(); }
 
     readonly property string modeTitle:
+        earthMapOnly ? "⌖  EARTH // MAP" :
         weatherMapOnly ? "☁  WEATHER // MAP" :
         domain === "map" ? "⌖  MAP // EVENT SOURCES"
         : domain === "news" ? "▤  NEWS // HEADLINES"
         : "◉  RADIO // STATIONS"
     readonly property string providerTitle:
+        earthMapOnly ? EarthPanelPolicy.routeLabel(earthMapRoute) :
         weatherMapOnly ? "WEATHER OVERLAYS // MANUAL LOAD" :
         domain === "map" ? "WORLD EVENTS // NASA EONET + GDACS"
         : domain === "news" ? "GDELT DOC // WORLD EVENT HEADLINES"
         : "RADIO BROWSER // TOP VOTED STREAMS"
     readonly property string sourceCaution:
+        earthMapOnly ? "NATURAL EARTH + USGS + NASA EONET + GDACS + NASA FIRMS // MANUAL HOTSPOT & SMOKE LOAD // PROVIDER-NATIVE EVENTS" :
         weatherMapOnly ? "NOAA MRMS + RAINVIEWER + NOAA HMS // NOT A DISASTER FEED" :
         domain === "map" ? "NATURAL EARTH + EONET + GDACS + USGS EARTHQUAKES + FIRMS + MRMS + RAINVIEWER FALLBACK + HMS SMOKE"
         : domain === "news" ? "ARTICLE DISCOVERY // LOCAL FILTERS // EXACT-HEADLINE SOURCE GROUPS // NOT FUZZY STORY CLUSTERING"
         : "STATION DIRECTORY // PERSISTENT PLAYBACK NOT YET WIRED"
     readonly property var plannedSources: {
+        if (earthMapOnly)
+            return [
+                {name:"NATURAL EARTH // SHARED LOCAL CARTOGRAPHY",
+                 state:"CONNECTED"},
+                {name:"USGS // OBSERVED EARTHQUAKES M2.5+",
+                 state: seismicSource && seismicSource.ready
+                      ? "EVENTS " + seismicSource.events.length
+                      : seismicSource && seismicSource.loading
+                        ? "RECEIVING" : "INACTIVE / WAITING"},
+                {name:"NASA EONET // NATURAL EVENTS",
+                 state: source.ready ? "EVENTS " + source.rows.length
+                       : source.loading ? "RECEIVING" : "INACTIVE / WAITING"},
+                {name:"GDACS // DISASTER EARLY WARNING",
+                 state: gdacsService.ready
+                        ? "EVENTS " + gdacsService.events.length
+                        : gdacsService.loading ? "RECEIVING"
+                          : "INACTIVE / WAITING"},
+                {name:"NASA FIRMS // VIIRS HOTSPOTS",
+                 state: !firmsService.configured ? "KEY REQUIRED"
+                      : firmsService.ready
+                        ? "HOTSPOTS " + firmsService.hotspots.length
+                        : "MANUAL READY"},
+                {name:"NOAA HMS // SMOKE PLUMES",
+                 state: hmsSmokeService.ready
+                      ? "PLUMES " + hmsSmokeService.polygons.length
+                      : "MANUAL READY"}
+            ];
         if (weatherMapOnly)
             return [
                 {name:"NATURAL EARTH // LOCAL BASEMAP", state:"CONNECTED"},
@@ -1222,6 +1280,9 @@ Rectangle {
         )
         active: stationDiscovery.stationOpen && stationDiscovery.visible
                 && !stationDiscovery.weatherMapOnly
+                && (!stationDiscovery.earthMapOnly
+                    || EarthPanelPolicy.needsSource(
+                           stationDiscovery.earthMapRoute,"eonet"))
     }
 
     WeatherServices.GdacsService {
@@ -1229,6 +1290,9 @@ Rectangle {
         cacheStore: stationDiscovery.persistentCacheStore
         active: stationDiscovery.domain === "map"
                 && !stationDiscovery.weatherMapOnly
+                && (!stationDiscovery.earthMapOnly
+                    || EarthPanelPolicy.needsSource(
+                           stationDiscovery.earthMapRoute,"gdacs"))
                 && stationDiscovery.stationOpen
                 && stationDiscovery.visible
     }
@@ -1245,6 +1309,7 @@ Rectangle {
         id: mrmsRadarService
         active: stationDiscovery.domain === "map"
                 && stationDiscovery.stationOpen
+                && !stationDiscovery.earthMapOnly
         onFrameReady: {
             if (!stationDiscovery.pendingRainViewerDisplay)
                 stationDiscovery.radarDisplaySource = "noaa";
@@ -1294,7 +1359,9 @@ Rectangle {
                 }
 
                 GohuText {
-                    text: stationDiscovery.weatherMapOnly ? "RADAR + SMOKE // MANUAL" :
+                    text: stationDiscovery.earthMapOnly
+                          ? "EARTH // SOURCE-SCOPED MAP" :
+                          stationDiscovery.weatherMapOnly ? "RADAR + SMOKE // MANUAL" :
                           source.failed ? source.errorText
                           : source.loading ? "RECEIVING"
                           : source.ready
@@ -1366,8 +1433,10 @@ Rectangle {
             Row {
                 id: mapFilterRail
                 width: parent.width
-                height: stationDiscovery.domain === "map" && !stationDiscovery.weatherMapOnly ? 34 : 0
+                height: stationDiscovery.domain === "map" && !stationDiscovery.weatherMapOnly
+                        && stationDiscovery.earthLayerEnabled("eonet") ? 34 : 0
                 visible: stationDiscovery.domain === "map" && !stationDiscovery.weatherMapOnly
+                         && stationDiscovery.earthLayerEnabled("eonet")
                 spacing: 8
 
                 Repeater {
@@ -1415,7 +1484,25 @@ Rectangle {
                 }
 
                 StationSectionDivider {
-                    visible: (!stationDiscovery.weatherMapOnly)
+                    visible: stationDiscovery.earthMapOnly
+                    width: parent.width
+                    title: EarthPanelPolicy.routeLabel(
+                        stationDiscovery.earthMapRoute)
+                }
+
+                QuietText {
+                    visible: stationDiscovery.earthInvestigationRoute
+                    width: parent.width
+                    wrapMode: Text.WordWrap
+                    font.pixelSize: 10
+                    color: Colors.yellow
+                    text: EarthPanelPolicy.selectionHint(
+                        stationDiscovery.earthMapRoute)
+                          + " // SELECT A MAP MARKER, THEN SCROLL TO EVENT CONTEXT BELOW."
+                }
+
+                StationSectionDivider {
+                    visible: (!stationDiscovery.weatherMapOnly) && !stationDiscovery.earthMapOnly
                     width: parent.width
                     title: "SPATIAL PLOT // GDACS + USGS QUAKES + EONET + FIRMS + NEWS"
                 }
@@ -1486,6 +1573,7 @@ Rectangle {
 
                 Row {
                     visible: (!stationDiscovery.weatherMapOnly)
+                             && stationDiscovery.earthLayerEnabled("quakes")
                     width: parent.width
                     height: 30
                     spacing: 10
@@ -1526,6 +1614,7 @@ Rectangle {
 
                 Row {
                     visible: (!stationDiscovery.weatherMapOnly)
+                             && stationDiscovery.earthLayerEnabled("gdacs")
                     width: parent.width
                     height: 30
                     spacing: 10
@@ -1572,8 +1661,10 @@ Rectangle {
                     QuietText {
                         anchors.verticalCenter: parent.verticalCenter
                         width: Math.max(0, parent.width - 120)
-                        text: stationDiscovery.weatherMapOnly
-                              ? "WHEEL ZOOM // DRAG PAN // MANUAL RADAR + SMOKE"
+                        text: stationDiscovery.earthMapOnly
+                              ? "WHEEL ZOOM // DRAG PAN // EVENT SELECTION PRESERVED"
+                              : stationDiscovery.weatherMapOnly
+                                ? "WHEEL ZOOM // DRAG PAN // MANUAL RADAR + SMOKE"
                               : "PLOTTABLE "
                               + stationDiscovery.mapPointRows.length
                               + " / " + source.rows.length
@@ -1596,7 +1687,9 @@ Rectangle {
                 Row {
                     width: parent.width
                     height: stationDiscovery.mapNewsMentionRows.length > 0 ? 30 : 0
-                    visible: (!stationDiscovery.weatherMapOnly) && (stationDiscovery.mapNewsMentionRows.length > 0)
+                    visible: (!stationDiscovery.weatherMapOnly)
+                             && !stationDiscovery.earthMapOnly
+                             && (stationDiscovery.mapNewsMentionRows.length > 0)
                     spacing: 10
 
                     ActionButton {
@@ -1633,13 +1726,14 @@ Rectangle {
                 }
 
                 StationSectionDivider {
-                    visible: (!stationDiscovery.weatherMapOnly)
+                    visible: (!stationDiscovery.weatherMapOnly) && stationDiscovery.earthLayerEnabled("firms")
                     width: parent.width
                     title: "FIRE HOTSPOTS // NASA FIRMS"
                 }
 
                 Row {
                     visible: (!stationDiscovery.weatherMapOnly)
+                             && stationDiscovery.earthLayerEnabled("firms")
                     width: parent.width
                     height: 32
                     spacing: 10
@@ -1692,6 +1786,7 @@ Rectangle {
 
                 QuietText {
                     visible: (!stationDiscovery.weatherMapOnly)
+                             && stationDiscovery.earthLayerEnabled("firms")
                     width: parent.width
                     text: "POST_APOLLO_FIRMS_MAP_KEY // OPTIONAL // KEY NEVER SHOWN OR PASSED IN PROCESS ARGV"
                     font.pixelSize: 9
@@ -1699,13 +1794,14 @@ Rectangle {
                 }
 
                 StationSectionDivider {
-                    visible: (!stationDiscovery.weatherMapOnly || stationDiscovery.weatherLayerEnabled("radar"))
+                    visible: (!stationDiscovery.weatherMapOnly || stationDiscovery.weatherLayerEnabled("radar")) && !stationDiscovery.earthMapOnly
                     width: parent.width
                     title: "RADAR // NOAA/NWS MRMS BASE REFLECTIVITY + 4H HISTORY"
                 }
 
                 Row {
                     visible: (!stationDiscovery.weatherMapOnly || stationDiscovery.weatherLayerEnabled("radar") || stationDiscovery.weatherLayerEnabled("radar-fallback"))
+                             && !stationDiscovery.earthMapOnly
                     width: parent.width
                     height: 30
                     spacing: 7
@@ -1746,6 +1842,7 @@ Rectangle {
 
                 Row {
                     visible: (!stationDiscovery.weatherMapOnly || stationDiscovery.weatherLayerEnabled("radar"))
+                             && !stationDiscovery.earthMapOnly
                     width: parent.width
                     height: 32
                     spacing: 10
@@ -1825,6 +1922,7 @@ Rectangle {
 
                 QuietText {
                     visible: (!stationDiscovery.weatherMapOnly || stationDiscovery.weatherLayerEnabled("radar"))
+                             && !stationDiscovery.earthMapOnly
                     width: parent.width
                     text: "NOAA / NWS / MRMS // OFFICIAL BASE REFLECTIVITY // 4H MOVING HISTORY // COVERAGE IS NOT GLOBAL"
                     font.pixelSize: 9
@@ -1832,13 +1930,14 @@ Rectangle {
                 }
 
                 StationSectionDivider {
-                    visible: (!stationDiscovery.weatherMapOnly || stationDiscovery.weatherLayerEnabled("radar-fallback"))
+                    visible: (!stationDiscovery.weatherMapOnly || stationDiscovery.weatherLayerEnabled("radar-fallback")) && !stationDiscovery.earthMapOnly
                     width: parent.width
                     title: "RADAR FALLBACK // RAINVIEWER PAST RADAR"
                 }
 
                 Row {
                     visible: (!stationDiscovery.weatherMapOnly || stationDiscovery.weatherLayerEnabled("radar-fallback"))
+                             && !stationDiscovery.earthMapOnly
                     width: parent.width
                     height: 32
                     spacing: 10
@@ -1915,6 +2014,7 @@ Rectangle {
 
                 Row {
                     visible: (!stationDiscovery.weatherMapOnly || stationDiscovery.weatherLayerEnabled("radar-fallback"))
+                             && !stationDiscovery.earthMapOnly
                     width: parent.width
                     height: 30
                     spacing: 10
@@ -1962,6 +2062,7 @@ Rectangle {
 
                 QuietText {
                     visible: (!stationDiscovery.weatherMapOnly || stationDiscovery.weatherLayerEnabled("radar-fallback"))
+                             && !stationDiscovery.earthMapOnly
                     width: parent.width
                     text: "RAINVIEWER API // SOURCE CREDIT REQUIRED // GLOBAL COVERAGE VARIES // PUBLIC FALLBACK HAS PAST RADAR ONLY"
                     font.pixelSize: 9
@@ -1969,13 +2070,14 @@ Rectangle {
                 }
 
                 StationSectionDivider {
-                    visible: (!stationDiscovery.weatherMapOnly || stationDiscovery.weatherLayerEnabled("smoke"))
+                    visible: (!stationDiscovery.weatherMapOnly || stationDiscovery.weatherLayerEnabled("smoke")) && stationDiscovery.earthLayerEnabled("smoke")
                     width: parent.width
                     title: "SMOKE PLUMES // NOAA HMS"
                 }
 
                 Row {
                     visible: (!stationDiscovery.weatherMapOnly || stationDiscovery.weatherLayerEnabled("smoke"))
+                             && stationDiscovery.earthLayerEnabled("smoke")
                     width: parent.width
                     height: 32
                     spacing: 10
@@ -2032,6 +2134,7 @@ Rectangle {
 
                 Row {
                     visible: (!stationDiscovery.weatherMapOnly || stationDiscovery.weatherLayerEnabled("smoke"))
+                             && stationDiscovery.earthLayerEnabled("smoke")
                     width: parent.width
                     spacing: 16
 
@@ -2365,6 +2468,7 @@ Rectangle {
                         height: northWest.valid && southEast.valid
                                 ? Math.max(0, southEast.y - northWest.y) : 0
                         visible: stationDiscovery.radarDisplaySource === "noaa"
+                                 && !stationDiscovery.earthMapOnly
                                  && stationDiscovery.weatherLayerEnabled("radar")
                                  && source !== ""
                                  && northWest.valid && southEast.valid
@@ -2376,6 +2480,7 @@ Rectangle {
                                === "rainviewer"
                                && rainViewerRadarService.ready
                                && stationDiscovery.weatherLayerEnabled("radar-fallback")
+                               && !stationDiscovery.earthMapOnly
                                ? rainViewerRadarService.strips : []
 
                         delegate: Image {
@@ -2440,6 +2545,7 @@ Rectangle {
                         z: 0.2
 
                         property var smokeRows: stationDiscovery.weatherLayerEnabled("smoke")
+                                                && stationDiscovery.earthLayerEnabled("smoke")
                                                 ? hmsSmokeService.polygons : []
                         property real viewZoom: stationDiscovery.mapZoom
                         property real viewCenterLon: stationDiscovery.mapCenterLon
@@ -2951,6 +3057,7 @@ Rectangle {
                     Repeater {
                         model: firmsService.ready ? firmsService.hotspots : []
                         visible: !stationDiscovery.weatherMapOnly
+                                 && stationDiscovery.earthLayerEnabled("firms")
 
                         delegate: Item {
                             required property var modelData
@@ -3941,6 +4048,7 @@ Rectangle {
                 width: parent.width
                 spacing: 7
                 visible: stationDiscovery.newsMentionInspectorOpen
+                         && !stationDiscovery.earthMapOnly
 
                 StationSectionDivider {
                     width: parent.width
@@ -4261,6 +4369,7 @@ Rectangle {
 
             QuietText {
                 visible: !stationDiscovery.weatherMapOnly
+                         && stationDiscovery.earthLayerEnabled("eonet")
                          && (source.failed || !source.ready || source.rows.length === 0)
                 width: parent.width
                 text: source.failed
@@ -4276,6 +4385,7 @@ Rectangle {
             Repeater {
                 model: source.ready ? stationDiscovery.visibleRows : []
                 visible: !stationDiscovery.weatherMapOnly
+                         && stationDiscovery.earthLayerEnabled("eonet")
 
                 delegate: Rectangle {
                     required property var modelData
@@ -4371,8 +4481,11 @@ Rectangle {
 
             QuietText {
                 width: parent.width
-                text: stationDiscovery.weatherMapOnly
-                      ? "RADAR + SMOKE // MANUAL SOURCE REQUESTS"
+                text: stationDiscovery.earthMapOnly
+                      ? EarthPanelPolicy.routeLabel(stationDiscovery.earthMapRoute)
+                        + " // NATIVE SOURCE RECORDS // SELECT TO INSPECT"
+                      : stationDiscovery.weatherMapOnly
+                        ? "RADAR + SMOKE // MANUAL SOURCE REQUESTS"
                       : source.ready
                       ? "LAST RECEIVED // "
                         + Qt.formatDateTime(source.lastUpdated, "hh:mm") + " LOCAL"

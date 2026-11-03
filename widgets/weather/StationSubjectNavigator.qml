@@ -4,6 +4,7 @@ import "StationSubjectNavigationPolicy.js" as SubjectRoutes
 import "StationSubjectNavigationPreviewPolicy.js" as PreviewRoutes
 import "StationWeatherSubjectPanelPolicy.js" as WeatherPanelPolicy
 import "StationCosmosSubjectPanelPolicy.js" as CosmosPanelPolicy
+import "StationEarthSubjectPanelPolicy.js" as EarthPanelPolicy
 
 // M1 bounded visual browser. Source panels remain in their original classic
 // QML pages; no new fetches, persistence, or fake submode content.
@@ -24,11 +25,15 @@ Rectangle {
     property var riverSource: null
     property var persistentCacheStore: null
     property var liveHistoryStore: null
+    property var eventArchiveStore: null
+    property var dossierArchiveStore: null
     property real runtimeNowMs: Date.now()
     readonly property string liveWeatherKind:
         WeatherPanelPolicy.kindForRoute(currentPath)
     readonly property string liveCosmosKind:
         CosmosPanelPolicy.kindForRoute(currentPath)
+    readonly property string liveEarthKind:
+        EarthPanelPolicy.kindForRoute(currentPath)
 
     readonly property var currentRoute: SubjectRoutes.findRoute(currentPath)
     readonly property var childrenRoutes: SubjectRoutes.childrenOf(currentPath)
@@ -104,6 +109,8 @@ Rectangle {
                   ? "WEATHER // SUBJECT VIEW"
                   : browser.liveCosmosKind !== ""
                     ? "COSMOS // SUBJECT VIEW"
+                    : browser.liveEarthKind !== ""
+                      ? "EARTH // SUBJECT VIEW"
                     : "SUBJECTS // NAVIGATION PREVIEW"
             color: Colors.magenta
             font.pixelSize: 17
@@ -168,6 +175,7 @@ Rectangle {
         clip: true
         visible: browser.liveWeatherKind === ""
                  && browser.liveCosmosKind === ""
+                 && browser.liveEarthKind === ""
         boundsBehavior: Flickable.StopAtBounds
         contentWidth: width
         contentHeight: Math.max(height, contentColumn.implicitHeight + 12)
@@ -262,7 +270,8 @@ Rectangle {
     Flickable {
         id: liveChildren
         visible: (browser.liveWeatherKind !== ""
-                  || browser.liveCosmosKind !== "")
+                  || browser.liveCosmosKind !== ""
+                  || browser.liveEarthKind !== "")
                  && browser.childrenRoutes.length > 0
         anchors.left: parent.left
         anchors.right: parent.right
@@ -332,6 +341,27 @@ Rectangle {
         runtimeNowMs: browser.runtimeNowMs
     }
 
+    StationEarthSubjectPane {
+        id: earthLivePane
+        anchors.left: parent.left
+        anchors.right: parent.right
+        anchors.top: liveChildren.visible
+                     ? liveChildren.bottom : breadcrumbRow.bottom
+        anchors.topMargin: liveChildren.visible ? 6 : 14
+        anchors.bottom: previewNote.top
+        anchors.bottomMargin: 6
+        visible: browser.visible && browser.liveEarthKind !== ""
+        subjectRoute: browser.currentPath
+        seismicSource: browser.seismicSource
+        lightningSource: browser.lightningSource
+        riverSource: browser.riverSource
+        weatherService: browser.weatherService
+        persistentCacheStore: browser.persistentCacheStore
+        eventArchiveStore: browser.eventArchiveStore
+        dossierArchiveStore: browser.dossierArchiveStore
+        runtimeNowMs: browser.runtimeNowMs
+    }
+
     // Post-Apollo shared star indicator; no new scroll behavior is invented.
     NeonScrollBar {
         flickable: routeScroll
@@ -339,6 +369,7 @@ Rectangle {
         handleStyle: "star"
         visible: browser.visible && browser.liveWeatherKind === ""
                  && browser.liveCosmosKind === ""
+                 && browser.liveEarthKind === ""
                  && routeScroll.contentHeight > routeScroll.height + 1
     }
 
@@ -357,6 +388,8 @@ Rectangle {
               ? "WEATHER // EXISTING SOURCE PANELS // SAME COLLECTORS"
               : browser.liveCosmosKind !== ""
                 ? "COSMOS // EXISTING SKY + SPACE PANELS // SAME COLLECTORS"
+                : browser.liveEarthKind !== ""
+                  ? "EARTH // SHARED MAP + EVENT DOSSIERS // ORIGINAL STORES"
                 : "SPEC-ONLY SUBJECTS // CLASSIC PAGES REMAIN CANONICAL UNTIL PANEL MIGRATION"
     }
 }

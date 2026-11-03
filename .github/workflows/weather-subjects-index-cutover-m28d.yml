@@ -1,0 +1,37 @@
+name: Weather M28-D deep INDEX SUBJECTS cutover links
+
+on:
+  pull_request:
+    paths:
+      - 'widgets/weather/StationSubjectNavigationPreviewPolicy.js'
+      - 'widgets/weather/StationSubjectNavigator.qml'
+      - 'tests/weather/test_index_subject_cutover_m28d.js'
+      - 'docs/weather-subjects-m28d-index-native-cutover-handoff.md'
+      - '.github/workflows/weather-subjects-index-cutover-m28d.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  index-cutover:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: M28-D cutover/remaining-source contract
+        run: node --test tests/weather/test_index_subject_cutover_m28d.js
+      - name: Preserve historical M0/M1 INDEX source provenance
+        run: |
+          node --test tests/weather/subject_navigation_contract.test.js
+          node --test tests/weather/subject_navigation_browser.test.js
+      - name: Preserve M28-A/B/C routed behavior and W1 navigation
+        run: |
+          node --test tests/weather/test_media_earth_mentions_cutover_m28a.js
+          node --test tests/weather/test_media_news_feed_map_companion_m28b.js
+          node --test tests/weather/test_tools_terminal_cutover_m28c.js
+          node --test tests/weather/test_workspace_landing_w1.js
+          node --test tests/weather/test_workspace_left_rail_w1r.js

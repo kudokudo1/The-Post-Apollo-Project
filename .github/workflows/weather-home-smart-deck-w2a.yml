@@ -1,0 +1,37 @@
+name: Weather W2a HOME smart deck rotation favorites and HOLD
+
+on:
+  pull_request:
+    paths:
+      - "widgets/weather/StationHomeDeckPolicy.js"
+      - "widgets/weather/StationWorkspaceSurface.qml"
+      - "widgets/weather/StationSubjectNavigator.qml"
+      - "widgets/weather/StationWorkspaceNavigationPolicy.js"
+      - "widgets/weather/StationHome.qml"
+      - "tests/weather/test_home_deck_w2a.js"
+      - "docs/weather-home-smart-deck-w2a-handoff.md"
+      - ".github/workflows/weather-home-smart-deck-w2a.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  smart-home:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Verify W2a randomized HOME rotation and favorites policy
+        run: node --test tests/weather/test_home_deck_w2a.js
+      - name: Preserve existing W1 HOME and seven-subject workspace
+        run: node --test tests/weather/test_workspace_landing_w1.js
+      - name: Preserve W1r canonical left family rail and INDEX
+        run: node --test tests/weather/test_workspace_left_rail_w1r.js
+      - name: Preserve classic HOME adaptive relevance
+        run: node tests/weather/test_station_home_policy.js
+      - name: Preserve M27-A WEATHER OVERVIEW adaptive cards
+        run: node --test tests/weather/test_weather_subject_panels_m2b.js

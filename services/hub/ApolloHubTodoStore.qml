@@ -40,6 +40,18 @@ Scope {
     TaskEncryptedRecoveryBridgeM13i {
         id: encryptedRecoveryBridge
     }
+
+    // M13k: dormant IPC seam for PRIVATE SYNTHETIC host exercises only.
+    // No TASKS caller is allowed to start it; the sole source writer is
+    // unchanged, and all encrypted recovery authority remains false.
+    readonly property bool encryptedDraftHostEnabled: false
+    readonly property bool encryptedDraftHostWriteAuthorized: false
+    readonly property string encryptedDraftHostStatus:
+        encryptedDraftHostBridge.status
+
+    TaskEncryptedDraftHostBridgeM13k {
+        id: encryptedDraftHostBridge
+    }
     property string ticketSessionNonce:
         String(Date.now()) + String(Math.floor(Math.random() * 1000000000))
     property int ticketSequence: 0

@@ -14,7 +14,7 @@ var PRESETS = [
 ];
 
 function finite(value) {
-    if(value===null || value===undefined || value==="")
+    if(value===null || value===undefined || (typeof value==="string" && value.trim()===""))
         return null;
     var n=Number(value);
     return isFinite(n)?n:null;
@@ -190,6 +190,15 @@ function formatNumber(value,digits){
     var v=finite(value);
     if(v===null)return "--";
     return v.toFixed(Math.max(0,Math.min(4,Math.floor(Number(digits)||0))));
+}
+function freshnessLabel(sampleMs,nowMs,staleAfterMinutes){
+    var t=positiveTime(sampleMs),now=positiveTime(nowMs);
+    if(t<=0 || now<=0 || t>now)return "NO SAMPLE";
+    var age=Math.floor((now-t)/60000);
+    var threshold=Number(staleAfterMinutes);
+    if(isFinite(threshold)&&threshold>0&&age>=threshold)
+        return "STALE "+age+"M";
+    return age<1 ? "FRESH <1M" : "FRESH "+age+"M";
 }
 function displayClock(ms){
     var t=positiveTime(ms);

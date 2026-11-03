@@ -104,6 +104,9 @@ PanelWindow {
     property bool subjectNavigationOpen: false
     property var newsMapOverlay: null
     property bool contextTerminalRequested: false
+    // M28-C: subject-native TOOLS launches reuse the ONE root StationTerminal.
+    // This is a fixed mode, never a user-supplied shell command.
+    property string subjectTerminalMode: "terminal"
 
     // The SAME geometry drives the layer-shell input mask and the actual
     // transparent visual opening. Sway owns Kitty's global positioning.
@@ -118,7 +121,8 @@ PanelWindow {
         && terminalHoleY + terminalHoleHeight <= stationBackground.height
     readonly property bool terminalHoleActive:
         menuOpen && (currentView === "terminal" || contextTerminalRequested)
-        && terminalView.sessionMode === currentView
+        && terminalView.sessionMode === (subjectNavigationOpen
+            ? subjectTerminalMode : currentView)
         && terminalView.terminalState === "VISIBLE"
         && terminalHoleValid
 
@@ -840,6 +844,34 @@ PanelWindow {
         });
     }
 
+    function launchSubjectTerminal(mode) {
+        // Keep the TOOLS workflow within SUBJECTS. Do not open a CLASSIC
+        // page, change currentView, or construct a second terminal actor.
+        if (!menuOpen || !subjectNavigationOpen || subjectNavigator.indexOpen
+                || contextTerminalRequested
+                || terminalView.terminalState !== "IDLE")
+            return false;
+        const route = subjectNavigator.currentPath;
+        const allowed = route === "tools/terminal/star-map"
+            ? "terminal" : route === "tools/terminal/consoles"
+            ? "home" : "";
+        if (!allowed || mode !== allowed)
+            return false;
+        subjectTerminalMode = allowed;
+        contextTerminalRequested = true;
+        // The root Terminal is now visible; launch only after geometry
+        // binding and terminalMode have adopted the requested identity.
+        Qt.callLater(function() {
+            if (menuOpen && subjectNavigationOpen && contextTerminalRequested
+                    && subjectNavigator.currentPath === route
+                    && terminalView.terminalMode === allowed) {
+                if (!terminalView.openTerminal())
+                    contextTerminalRequested = false;
+            }
+        });
+        return true;
+    }
+
     function closeContextTerminal() {
         terminalView.closeTerminal();
         contextTerminalRequested = false;
@@ -1296,6 +1328,9 @@ PanelWindow {
                 onLegacyPageRequested: function(pageId) {
                     weatherStation.openLegacyFromSubject(pageId);
                 }
+                onTerminalLaunchRequested: function(mode) {
+                    weatherStation.launchSubjectTerminal(mode);
+                }
             }
 
             StationTerminal {
@@ -1305,7 +1340,9 @@ PanelWindow {
                 visible: weatherStation.currentView === "terminal"
                          || weatherStation.contextTerminalRequested
                 stationOpen: weatherStation.menuOpen
-                terminalMode: weatherStation.currentView
+                terminalMode: weatherStation.subjectNavigationOpen
+                              ? weatherStation.subjectTerminalMode
+                              : weatherStation.currentView
                 targetScreen: weatherStation.screen
                 stationWidth: stationBackground.width
                 stationHeight: stationBackground.height

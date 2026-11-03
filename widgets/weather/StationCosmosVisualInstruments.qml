@@ -118,6 +118,18 @@ Rectangle {
                         }
                     }
 
+                    MouseArea {
+                        anchors.fill: moonCanvas
+                        enabled: visual.moonData.phaseId !== ""
+                        preventStealing: true
+                        cursorShape: Qt.PointingHandCursor
+                        onClicked: {
+                            visual.inspectedPhaseId =
+                                visual.inspectedPhaseId === visual.moonData.phaseId
+                                ? "" : visual.moonData.phaseId;
+                        }
+                    }
+
                     Column {
                         width: Math.max(0,parent.width-132)
                         height: parent.height
@@ -190,8 +202,11 @@ Rectangle {
                               ? "REFERENCE // "
                                 +VisualPolicy.phaseReference(
                                    visual.inspectedPhaseId).description
-                              : "CURRENT PHASE HIGHLIGHTED"
-                                +" // PICK ANY PHASE FOR REFERENCE"
+                              : (visual.moonData.phaseId !== ""
+                                 ? "CURRENT PHASE HIGHLIGHTED"
+                                   +" // PICK A PHASE OR CLICK MOON"
+                                 : "CURRENT PHASE UNAVAILABLE"
+                                   +" // PICK A REFERENCE BELOW")
                     }
 
                     ActionButton {

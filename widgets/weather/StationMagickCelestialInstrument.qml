@@ -316,8 +316,8 @@ Rectangle {
                         const ny=0.5+(mouse.y-graphCanvas.height/2)*0.36/radius;
                         const body=Celestial.nearestWheelBody(
                             instrument.graphModel,instrument.focusIndex,nx,ny);
-                        if(body!=="")instrument.selectedBody=body;
                         if(body===null)return;
+                        instrument.selectedBody=body;
                         instrument.lockedIndex=instrument.focusIndex;
                     }else {
                         instrument.lockedIndex=Celestial.indexAtFraction(

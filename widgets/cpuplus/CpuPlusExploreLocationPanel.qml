@@ -25,6 +25,16 @@ Item {
     readonly property bool hadExpiredExplore:
         registry && registry.hasStoredExplore && activeExplore === null
 
+    // Search selection only fills inputs; EXPLORE HERE remains explicit.
+    function fillDestination(candidate) {
+        if (!candidate)
+            return;
+        exploreNameInput.text = String(candidate.label || "");
+        exploreLatitudeInput.text = String(candidate.latitude);
+        exploreLongitudeInput.text = String(candidate.longitude);
+        feedback = "SEARCH RESULT LOADED // REVIEW THEN EXPLORE HERE";
+    }
+
     function explainError(code) {
         switch (String(code || "")) {
         case "HOME_NOT_SET": return "SET HOME BEFORE EXPLORING";

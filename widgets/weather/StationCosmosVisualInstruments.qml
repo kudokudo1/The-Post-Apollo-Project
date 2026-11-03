@@ -12,7 +12,7 @@ Rectangle {
     color: Colors.black
     border.width: 1
     border.color: Colors.cyan
-    height: 258
+    height: 304
 
     property bool showMoon: true
     property bool showSun: true
@@ -24,6 +24,10 @@ Rectangle {
     property real providerLocalMinute: -1
     property var latitude: ""
     property var longitude: ""
+    property string solarDate: ""
+    property var solarCivilOffsetMinutes: null
+    property string solarOffsetSource: "UNKNOWN"
+    property string inspectedPhaseId: ""
 
     property real hoveredMinute: -1
     property real lockedMinute: -1
@@ -33,11 +37,7 @@ Rectangle {
     readonly property var moonData: VisualPolicy.moonDisplay(
         moonReady,moonEphemeris,astronomySummary)
     readonly property var solarData: VisualPolicy.solarArc(
-        twilightSummary && twilightSummary.available
-            ? twilightSummary.date : "",
-        latitude,longitude,
-        twilightSummary && twilightSummary.available
-            ? twilightSummary.calibrationOffsetMinutes:null,
+        solarDate,latitude,longitude,solarCivilOffsetMinutes,
         function(minute,date,lat,lon,offset) {
             return TwilightPolicy.solarPosition(date,minute,lat,lon,offset);
         })
@@ -149,30 +149,59 @@ Rectangle {
                 }
 
                 Row {
+                    id: phaseButtonRow
                     width: parent.width
                     height: 33
                     spacing: 2
 
                     Repeater {
                         model: VisualPolicy.PHASES
-                        delegate: Rectangle {
+                        delegate: ActionButton {
                             required property var modelData
-                            width: Math.max(1,(moonBay.width-20-14)/8)
+                            width: Math.max(1,
+                                (phaseButtonRow.width-7*phaseButtonRow.spacing)/8)
                             height: 31
-                            color: visual.moonData.phaseId===modelData.id
-                                   ? Colors.magenta:Colors.black
-                            border.width: 1
-                            border.color: Colors.cyan
-                            GohuText {
-                                anchors.centerIn: parent
-                                text: String(modelData.label).split(" ").map(
-                                    function(s){return s.slice(0,1);}
-                                ).join("")
-                                font.pixelSize: 10
-                                color: visual.moonData.phaseId===modelData.id
-                                       ? Colors.black:Colors.cyan
-                            }
+                            label: modelData.short
+                            labelPixelSize: 10
+                            contentPadding: 1
+                            accentColor: visual.moonData.phaseId === modelData.id
+                                         ? Colors.magenta : Colors.cyan
+                            selected: visual.inspectedPhaseId !== ""
+                                      ? visual.inspectedPhaseId === modelData.id
+                                      : visual.moonData.phaseId === modelData.id
+                            onClicked: visual.inspectedPhaseId = modelData.id
                         }
+                    }
+                }
+
+                Row {
+                    width: parent.width
+                    height: 51
+                    spacing: 5
+
+                    QuietText {
+                        width: Math.max(0,parent.width-89)
+                        height: parent.height
+                        wrapMode: Text.WordWrap
+                        font.pixelSize: 9
+                        color: visual.inspectedPhaseId !== ""
+                               ? Colors.cyan : Colors.orange
+                        text: visual.inspectedPhaseId !== ""
+                              ? "REFERENCE // "
+                                +VisualPolicy.phaseReference(
+                                   visual.inspectedPhaseId).description
+                              : "CURRENT PHASE HIGHLIGHTED"
+                                +" // PICK ANY PHASE FOR REFERENCE"
+                    }
+
+                    ActionButton {
+                        width: 84
+                        height: 25
+                        label: "CURRENT"
+                        labelPixelSize: 9
+                        accentColor: Colors.magenta
+                        available: visual.inspectedPhaseId !== ""
+                        onClicked: visual.inspectedPhaseId = ""
                     }
                 }
 
@@ -184,6 +213,7 @@ Rectangle {
                     text: "EIGHT PHASE MARKERS // CURRENT STAGE ONLY"
                           +" // LIT SIDE SCHEMATIC, NOT LOCAL OPTICAL ORIENTATION"
                 }
+
             }
         }
 
@@ -266,14 +296,23 @@ Rectangle {
                     MouseArea {
                         anchors.fill: solarCanvas
                         hoverEnabled: true
+                        preventStealing: true
                         acceptedButtons: Qt.LeftButton
-                        cursorShape: Qt.CrossCursor
+                        cursorShape: visual.solarData.ready
+                                     ? Qt.CrossCursor : Qt.ArrowCursor
                         onPositionChanged: function(mouse) {
-                            if(visual.lockedMinute>=0)return;
+                            if(!visual.solarData.ready
+                               ||visual.lockedMinute>=0)return;
                             visual.hoveredMinute=Math.max(0,Math.min(1439,
                                  Math.floor(mouse.x/Math.max(1,width)*1439)));
                         }
                         onExited: visual.hoveredMinute=-1
+                        onPressed: function(mouse) {
+                            if(!visual.solarData.ready)return;
+                            if(visual.lockedMinute<0)
+                                visual.hoveredMinute=Math.max(0,Math.min(1439,
+                                    Math.floor(mouse.x/Math.max(1,width)*1439)));
+                        }
                         onClicked: function(mouse) {
                             if(!visual.solarData.ready)return;
                             visual.lockedMinute=Math.max(0,Math.min(1439,
@@ -284,7 +323,9 @@ Rectangle {
                     GohuText {
                         anchors.centerIn: parent
                         visible: !visual.solarData.ready
-                        text: "SOLAR MODEL UNAVAILABLE"
+                        text: VisualPolicy.solarUnavailableReason(
+                            visual.solarDate,visual.latitude,visual.longitude,
+                            visual.solarCivilOffsetMinutes)
                         font.pixelSize: 10
                         color: Colors.orange
                     }
@@ -316,13 +357,55 @@ Rectangle {
                 }
 
                 Row {
+                    id: solarPresetRow
+                    width: parent.width
+                    height: 27
+                    spacing: 4
+
+                    Repeater {
+                        model: [
+                            {id:"midnight",label:"00",minute:0},
+                            {id:"morning",label:"06",minute:360},
+                            {id:"noon",label:"12",minute:720},
+                            {id:"evening",label:"18",minute:1080},
+                            {id:"now",label:"NOW",minute:-1}
+                        ]
+                        delegate: ActionButton {
+                            required property var modelData
+                            width: Math.max(1,(solarPresetRow.width
+                                             -solarPresetRow.spacing*4)/5)
+                            height: 26
+                            contentPadding: 2
+                            label: modelData.label
+                            labelPixelSize: 10
+                            accentColor: modelData.id === "now"
+                                         ? Colors.magenta : Colors.cyan
+                            available: visual.solarData.ready
+                                       &&(modelData.id !== "now"
+                                          ||visual.providerLocalMinute >= 0)
+                            selected: visual.lockedMinute >= 0
+                                      && (modelData.id === "now"
+                                          ? visual.lockedMinute ===
+                                             Math.floor(visual.providerLocalMinute)
+                                          : visual.lockedMinute === modelData.minute)
+                            onClicked: {
+                                visual.lockedMinute = modelData.id === "now"
+                                    ? Math.floor(visual.providerLocalMinute)
+                                    : modelData.minute;
+                            }
+                        }
+                    }
+                }
+
+                Row {
                     width: parent.width
                     height: 25
                     spacing: 8
                     GohuText {
                         width: Math.max(0,parent.width-104)
                         text: visual.cursorSolar
-                              ? VisualPolicy.clockLabel(visual.cursorSolar.minute)
+                              ? "MODEL "+VisualPolicy.clockLabel(
+                                    visual.cursorSolar.minute)
                                 +"  "+visual.cursorSolar.altitude.toFixed(1)+"°"
                               : visual.currentSolarPosition
                                 && visual.currentSolarPosition.available
@@ -351,11 +434,10 @@ Rectangle {
                     text: "SOLAR CENTER / EXISTING CALIBRATED MODEL"
                           +" // DATE "+(visual.solarData.ready
                                        ?visual.solarData.date:"--")
-                          +" // CIVIL OFFSET "
-                          +(visual.twilightSummary
-                            &&visual.twilightSummary.available
-                            ?visual.twilightSummary.calibrationOffsetMinutes+"M"
-                            :"--")
+                          +" // OFFSET "+visual.solarOffsetSource+" "
+                          +(visual.solarCivilOffsetMinutes!==null
+                            &&visual.solarCivilOffsetMinutes!==undefined
+                            ?visual.solarCivilOffsetMinutes+"M":"--")
                           +" // NOT MEASURED SKY PHOTO"
                 }
             }

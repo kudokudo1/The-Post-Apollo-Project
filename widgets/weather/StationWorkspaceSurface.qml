@@ -2,7 +2,7 @@ import QtQuick
 import "../../components"
 import "StationWorkspaceNavigationPolicy.js" as Workspace
 
-// W1 // full-width subject workspaces, NOT a new source framework.
+// W1r // Left family rail and bottom submodes, NOT a new source framework.
 // HOME is one persistent original StationHome instance across all tabs.
 // Existing subject panes remain the only data-panel implementations.
 Rectangle {
@@ -28,70 +28,12 @@ Rectangle {
     signal routeRequested(string path)
     signal legacyPageRequested(string pageId)
     signal newsMapRequested(var payload)
-    signal indexRequested()
-
-    Rectangle {
-        id: topRail
-        anchors.top: parent.top
-        anchors.left: parent.left
-        anchors.right: parent.right
-        height: 52
-        color: Colors.black
-
-        Row {
-            anchors.fill: parent
-            anchors.margins: 6
-            spacing: 5
-
-            Repeater {
-                model: Workspace.FAMILIES
-                delegate: ModeButton {
-                    required property var modelData
-                    width: Math.max(71,(surface.width - 215 - 12
-                                     - (Workspace.FAMILIES.length - 1) * 5)
-                                    / Workspace.FAMILIES.length)
-                    height: 38
-                    bordered: false
-                    textOnly: true
-                    labelFontSize: 11
-                    labelText: modelData.label
-                    selected: surface.activeFamily === modelData.id
-                    onTriggered: surface.routeRequested(modelData.landing)
-                }
-            }
-
-            ActionButton {
-                width: 83
-                height: 38
-                label: "MORE"
-                labelPixelSize: 11
-                accentColor: Colors.cyan
-                onClicked: surface.indexRequested()
-            }
-            ActionButton {
-                width: 91
-                height: 38
-                label: "CLASSIC"
-                labelPixelSize: 11
-                accentColor: Colors.orange
-                onClicked: surface.legacyPageRequested("home")
-            }
-        }
-
-        Rectangle {
-            anchors.left: parent.left
-            anchors.right: parent.right
-            anchors.bottom: parent.bottom
-            height: 2
-            color: Colors.cyan
-        }
-    }
 
     Item {
         id: workspaceContent
         anchors.left: parent.left
         anchors.right: parent.right
-        anchors.top: topRail.bottom
+        anchors.top: parent.top
         anchors.bottom: bottomRail.top
 
         // Intentionally not a Loader. This one HOME survives navigation

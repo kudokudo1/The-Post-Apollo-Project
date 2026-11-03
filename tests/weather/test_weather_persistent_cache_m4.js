@@ -249,10 +249,16 @@ for (const needle of [
     'cacheStore.put("air-quality"'
 ])
     assert.ok(weather.includes(needle), needle);
-assert.match(
-    weather,
-    /Component\.onCompleted:\s*\{\s*hydratePersistentCache\(\);\s*refresh\(\);/
-);
+// Initial cache hydration still precedes provider fetches. With the M5
+// shared-Place seam, AQI can start independently from a manual coordinate,
+// rather than waiting for a successful wttr.in weather response.
+const boot = weather.slice(weather.lastIndexOf("Component.onCompleted:"));
+const hydrateAt = boot.indexOf("hydratePersistentCache();");
+const aqiAt = boot.indexOf("refreshAirQuality();");
+const weatherAt = boot.indexOf("refresh();");
+assert.ok(hydrateAt >= 0, "weather startup must attempt cache hydration");
+assert.ok(aqiAt > hydrateAt, "AQI may start after cache hydration");
+assert.ok(weatherAt > aqiAt, "shared WeatherService still starts live weather");
 assert.equal((weather.match(/\bProcess\s*\{/g) || []).length, 2);
 assert.equal((weather.match(/\bTimer\s*\{/g) || []).length, 1);
 assert.doesNotMatch(weather, /FileView\s*\{/);

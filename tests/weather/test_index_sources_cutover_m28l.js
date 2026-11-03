@@ -116,7 +116,10 @@ test("root badge uses real selected SUBJECTS runtimes and preserves original ale
   assert.match(station,/subjectNavigator\.currentPath,subjectNavigator\.indexOpen/);
   assert.match(station,/weatherRuntimeState,spaceRuntimeState,currentPageRuntimeSummary/);
   assert.match(station,/subjectNavigationOpen \? subjectNavigator\.liveMapRuntimeRows/);
-  assert.match(station,/if \(subjectNavigationOpen\)\s*return subjectSourceBadge\.text;/);
+  assert.match(station,/if \\(subjectNavigationOpen\\) \\{/);
+  assert.match(station,/subjectNavigator\\.liveWeatherKind !== ""/);
+  assert.match(station,/!subjectNavigator\\.indexOpen/);
+  assert.match(station,/return subjectSourceBadge\\.text;/);
   assert.match(station,/switch \(subjectSourceBadge\.tone\)/);
   assert.match(station,/if \(officialAlertSummary\.available\)/);
   assert.match(station,/text: weatherStation\.sourceStatusDisplay/);

@@ -140,7 +140,16 @@ var WIRED_IN_SUBJECTS = {
   "station-frame-cache":"M28-I",
   "station-persistent-cache":"M28-I",
   "station-live-history":"M28-I",
-  "station-event-store":"M28-I"
+  "station-event-store":"M28-I",
+  // M28-J: original WATCH destination catalogues and saved-creator controls.
+  // This is NOT a working embedded video engine or approved playback host.
+  "news-live":"M28-J",
+  "news-congress":"M28-J",
+  "news-reports-catalog":"M28-J",
+  "news-compare":"M28-J",
+  "news-satire":"M28-J",
+  "news-creators":"M28-J",
+  "news-uploads":"M28-J"
 };
 
 function remainingSourcePagesForPath(path, panelRoutes) {

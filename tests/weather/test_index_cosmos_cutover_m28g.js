@@ -148,7 +148,7 @@ test("deep INDEX uses concrete COSMOS leaf links and still preserves unresolved 
 test("COSMOS is observation and prediction, not a certified MAGICK ephemeris",()=>{
   for(const id of [
     "home-space-weather","ground-source","home-quick-conditions",
-    "news-live","map-source-rack"
+    "station-source-badge","map-source-rack"
   ])assert.equal(env.WIRED_IN_SUBJECTS[id],undefined,id+" unreviewed");
   assert.equal(cosmos.kindForRoute("magick/astrology/retrogrades"),"");
   assert.equal(cosmos.kindForRoute("weather/conditions/current"),"");

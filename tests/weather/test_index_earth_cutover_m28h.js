@@ -135,7 +135,7 @@ test("INDEX no longer routes already-reviewed EARTH source groups into CLASSIC",
 test("unreviewed tools and watch controls are not implicitly certified by EARTH parity",()=>{
   for(const id of [
     "map-source-rack","home-quick-conditions","home-aqi-humidity",
-    "ground-source","news-live","news-congress","station-source-badge"
+    "ground-source","home-aqi-wind","home-space-weather","station-source-badge"
   ]) assert.equal(c.WIRED_IN_SUBJECTS[id],undefined,id+" remains pending");
   assert.deepEqual(plain(c.nativeDestinationsForPath("../earth",c.PANELS)),[]);
   assert.deepEqual(plain(c.remainingSourcePagesForPath("earth//map",c.PANELS)),[]);

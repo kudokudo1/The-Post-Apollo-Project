@@ -151,11 +151,12 @@ test("INDEX offers concrete WEATHER routes, preserves unreviewed HOME and non-WE
   assert.ok(context.remainingSourcePagesForPath("weather",context.PANELS)
     .some(row=>row.id==="home"), "unreviewed HOME controls retain CLASSIC shortcut");
   for (const id of ["home-quick-conditions","home-aqi-humidity","home-aqi-wind",
-                    "ground-source","map-source-rack","news-live"]) {
+                    "ground-source","map-source-rack","station-source-badge"]) {
     assert.equal(context.WIRED_IN_SUBJECTS[id], undefined, id + " remains unreviewed");
   }
-  assert.deepEqual(plain(context.remainingSourcePagesForPath("media/watch",context.PANELS)),
-    plain(context.sourcePagesForPath("media/watch",context.PANELS)));
+  assert.ok(context.sourcePagesForPath("media/watch",context.PANELS).length>0);
+  assert.deepEqual(plain(context.remainingSourcePagesForPath("media/watch",context.PANELS)),[],
+    "later M28-J catalogs share the original MEDIA hub, independent of playback");
   assert.match(navigator,/model: browser\.nativeDestinations/);
   assert.match(navigator,/model: browser\.classicSources/);
   assert.match(navigator,/onClicked: browser\.legacyPageRequested\(modelData\.id\)/);

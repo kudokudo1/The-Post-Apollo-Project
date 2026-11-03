@@ -77,12 +77,13 @@ test("native RADIO retains original search, presets, paging, favorites, recents 
   assert.equal(media.radioGroupVisible("media/radio/transport","transport"),true);
 });
 
-test("WATCH and CREATORS remain unreviewed rather than being silently certified", () => {
-  for(const family of ["media/watch","media/creators"]) {
-    assert.deepEqual(plain(env.remainingSourcePagesForPath(family,env.PANELS)),
-      plain(env.sourcePagesForPath(family,env.PANELS)));
-    assert.deepEqual(plain(env.nativeDestinationsForPath(family,env.PANELS)),[]);
-  }
+test("M28-E RADIO source cutover stays exact even as later MEDIA catalogs are reviewed", () => {
+  const ids=Object.keys(env.WIRED_IN_SUBJECTS)
+    .filter(id=>env.WIRED_IN_SUBJECTS[id]==="M28-E");
+  assert.deepEqual(ids.sort(),radioIds.slice().sort());
+  for(const family of ["media/watch","media/creators"])
+    assert.ok(env.sourcePagesForPath(family,env.PANELS).length>0,
+      "historical source map remains intact for "+family);
   assert.deepEqual(plain(env.remainingSourcePagesForPath("media",null)),[]);
   assert.deepEqual(plain(env.nativeDestinationsForPath("../media",env.PANELS)),[]);
 });

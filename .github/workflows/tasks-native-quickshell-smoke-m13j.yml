@@ -1,0 +1,51 @@
+name: TASKS M13j native Quickshell provider panel preflight
+
+on:
+  pull_request:
+    paths:
+      - 'tests/tasks/tools/task_m13j_native_smoke.sh'
+      - 'tests/tasks/test_task_native_smoke_m13j.cjs'
+      - 'TaskEncryptedRecoveryHarnessM13i.qml'
+      - 'services/hub/TaskEncryptedRecoveryBridgeM13i.qml'
+      - 'services/hub/TaskRecoveryProviderHostM13i.py'
+      - 'services/hub/qmldir'
+      - 'docs/tasks-native-quickshell-smoke-m13j.md'
+      - '.github/workflows/tasks-native-quickshell-smoke-m13j.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'tests/tasks/tools/task_m13j_native_smoke.sh'
+      - 'tests/tasks/test_task_native_smoke_m13j.cjs'
+      - '.github/workflows/tasks-native-quickshell-smoke-m13j.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  source-and-parser-preflight:
+    runs-on: ubuntu-latest
+    timeout-minutes: 9
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Bash syntax check with no executable QML launch
+        run: bash -n tests/tasks/tools/task_m13j_native_smoke.sh
+      - name: Real preflight/missing-registry/source-pinning using synthetic fixture
+        run: node --test tests/tasks/test_task_native_smoke_m13j.cjs
+      - name: QML syntax parsing via Qt tooling only on disposable CI runner
+        run: |
+          sudo apt-get update -qq
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+            qt6-declarative-dev-tools
+          QT_QPA_PLATFORM=offscreen /usr/lib/qt6/bin/qmlformat \
+            TaskEncryptedRecoveryHarnessM13i.qml >/dev/null
+          QT_QPA_PLATFORM=offscreen /usr/lib/qt6/bin/qmlformat \
+            services/hub/TaskEncryptedRecoveryBridgeM13i.qml >/dev/null
+          QT_QPA_PLATFORM=offscreen /usr/lib/qt6/bin/qmlformat \
+            services/hub/ApolloHubTodoStore.qml >/dev/null
+      - name: Original M13i module registration and one-writer source boundary
+        run: node --test tests/tasks/test_task_encrypted_recovery_bridge_m13i.cjs
+      - name: Original M11d sole TASKS writer and public API inventory
+        run: python3 tests/tasks/test_task_writer_gate_inventory_m11d.py

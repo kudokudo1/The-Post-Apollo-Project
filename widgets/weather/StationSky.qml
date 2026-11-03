@@ -591,7 +591,7 @@ Rectangle {
                      && (CosmosPanelPolicy.visibleFor("sky",sky.subjectRoute,"moon")
                          || CosmosPanelPolicy.visibleFor("sky",sky.subjectRoute,"astronomy")
                          || CosmosPanelPolicy.visibleFor("sky",sky.subjectRoute,"twilight"))
-            height: visible ? 258 : 0
+            height: visible ? 304 : 0
             showMoon: CosmosPanelPolicy.visibleFor("sky",sky.subjectRoute,"moon")
             showSun: CosmosPanelPolicy.visibleFor("sky",sky.subjectRoute,"astronomy")
                      || CosmosPanelPolicy.visibleFor("sky",sky.subjectRoute,"twilight")
@@ -601,6 +601,11 @@ Rectangle {
             twilightSummary: sky.twilightSummary
             currentSolarPosition: sky.currentSolarPosition
             providerLocalMinute: sky.providerLocalMinute
+            solarDate: sky.astronomySummary.date
+            // Existing provider civil offset is preferred; calibrated
+            // sunrise offset remains the established fallback.
+            solarCivilOffsetMinutes: sky.moonCivilOffsetMinutes
+            solarOffsetSource: sky.moonCivilOffsetSource
             latitude: sky.weatherService ? sky.weatherService.latitude : ""
             longitude: sky.weatherService ? sky.weatherService.longitude : ""
         }

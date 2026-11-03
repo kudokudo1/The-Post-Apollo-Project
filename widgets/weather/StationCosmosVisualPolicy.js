@@ -7,15 +7,39 @@
 // No ephemeris fetcher, independent clock, storage or astrology inference.
 var FORMAT = "post-apollo.weather.cosmos-visuals.v2.v1";
 var PHASES = [
-    {id:"new",label:"NEW"},
-    {id:"waxing-crescent",label:"WAX CRES"},
-    {id:"first-quarter",label:"FIRST QTR"},
-    {id:"waxing-gibbous",label:"WAX GIB"},
-    {id:"full",label:"FULL"},
-    {id:"waning-gibbous",label:"WAN GIB"},
-    {id:"last-quarter",label:"LAST QTR"},
-    {id:"waning-crescent",label:"WAN CRES"}
+    {id:"new",short:"NM",label:"NEW"},
+    {id:"waxing-crescent",short:"WC",label:"WAX CRES"},
+    {id:"first-quarter",short:"FQ",label:"FIRST QTR"},
+    {id:"waxing-gibbous",short:"WG",label:"WAX GIB"},
+    {id:"full",short:"FM",label:"FULL"},
+    {id:"waning-gibbous",short:"NG",label:"WAN GIB"},
+    {id:"last-quarter",short:"LQ",label:"LAST QTR"},
+    {id:"waning-crescent",short:"NC",label:"WAN CRES"}
 ];
+// Educational reference text only. Selecting a marker must never change
+// the provider's current Moon phase, illumination, or source date.
+var PHASE_REFERENCES = {
+    "new": "MOON NEAR SUNWARD DIRECTION // THE EARTH-FACING SIDE IS MOSTLY DARK",
+    "waxing-crescent": "LIT FRACTION INCREASES AFTER NEW MOON // LESS THAN HALF",
+    "first-quarter": "ABOUT HALF OF THE NEAR SIDE LIT // FRACTION INCREASING",
+    "waxing-gibbous": "MORE THAN HALF LIT // APPROACHING FULL MOON",
+    "full": "NEAR SIDE NEARLY FULLY ILLUMINATED // SUN OPPOSITE IN THE SKY",
+    "waning-gibbous": "MORE THAN HALF LIT // FRACTION DECREASING AFTER FULL",
+    "last-quarter": "ABOUT HALF OF THE NEAR SIDE LIT // FRACTION DECREASING",
+    "waning-crescent": "LESS THAN HALF LIT // APPROACHING NEW MOON"
+};
+function phaseReference(id) {
+    var phase=String(id||"");
+    for(var i=0;i<PHASES.length;i++)
+        if(PHASES[i].id===phase)
+            return {
+                valid:true,id:phase,label:PHASES[i].label,
+                description:PHASE_REFERENCES[phase],
+                isReference:true
+            };
+    return {valid:false,id:"",label:"--",
+            description:"CHOOSE A PHASE TO INSPECT",isReference:true};
+}
 function finite(value) {
     if(value===null||value===undefined||String(value).trim()==="")
         return null;
@@ -75,6 +99,18 @@ function illuminatedSpan(percent,waxing,y,radius) {
     return waxing
         ?{left:boundary,right:half}
         :{left:-half,right:-boundary};
+}
+function solarUnavailableReason(date,latitude,longitude,offsetMinutes) {
+    var d=String(date||"");
+    if(!/^\d{4}-\d{2}-\d{2}$/.test(d))
+        return "PROVIDER DATE UNAVAILABLE";
+    var lat=finite(latitude),lon=finite(longitude);
+    if(lat===null||lon===null||Math.abs(lat)>=90||Math.abs(lon)>180)
+        return "WEATHER LOCATION UNAVAILABLE";
+    var offset=finite(offsetMinutes);
+    if(offset===null||offset< -720||offset>840)
+        return "CIVIL TIME OFFSET UNAVAILABLE";
+    return "SOLAR CALCULATION UNAVAILABLE";
 }
 function solarArc(date,latitude,longitude,offsetMinutes,evaluator) {
     var lat=finite(latitude),lon=finite(longitude),offset=finite(offsetMinutes);

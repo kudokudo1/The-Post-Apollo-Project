@@ -1,6 +1,5 @@
 import QtQuick
 import "../../components"
-import "../../services/weather" as WeatherServices
 import "StationSubjectNavigationPolicy.js" as SubjectRoutes
 import "StationSubjectNavigationPreviewPolicy.js" as PreviewRoutes
 import "StationWeatherSubjectPanelPolicy.js" as WeatherPanelPolicy
@@ -52,6 +51,8 @@ Rectangle {
 
     // Existing Weather Station sources supplied from the single owning root.
     property var weatherService: null
+    // Source is owned by the Weather Station root, not the navigator.
+    property var celestialSource: null
     property var spaceService: null
     property var nwsAlertSource: null
     property var historyService: null
@@ -78,15 +79,6 @@ Rectangle {
     readonly property string liveToolsKind:
         ToolsPanelPolicy.kindForRoute(currentPath)
 
-    // One M4 computation owner shared by workspace and INDEX preview.
-    // On-demand only, requires an explicitly configured local JPL kernel.
-    WeatherServices.CelestialVisualService {
-        id: celestialVisual
-        active: browser.visible
-                && MagickPanelPolicy.visualForRoute(browser.currentPath)
-        route: browser.currentPath
-        anchorNowMs: browser.runtimeNowMs
-    }
 
     readonly property var currentRoute: SubjectRoutes.findRoute(currentPath)
     readonly property var childrenRoutes: SubjectRoutes.childrenOf(currentPath)
@@ -271,7 +263,7 @@ Rectangle {
                 eventArchiveStore: browser.eventArchiveStore
                 dossierArchiveStore: browser.dossierArchiveStore
                 runtimeNowMs: browser.runtimeNowMs
-                celestialSource: celestialVisual
+                celestialSource: browser.celestialSource
                 onRouteRequested: function(path) {
                     browser.chooseRoute(path);
                 }
@@ -637,7 +629,7 @@ Rectangle {
 
     StationMagickSubjectPane {
         id: magickReferencePane
-        celestialSource: celestialVisual
+        celestialSource: browser.celestialSource
         anchors.left: parent.left
         anchors.right: parent.right
         anchors.top: liveChildren.visible

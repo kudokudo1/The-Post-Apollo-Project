@@ -9,6 +9,12 @@ Item {
     id: pane
     property bool panelVisible: visible
     property string calibratedPreview: "--:--:--//--"
+    // CPU++ shares the same pane/controller, but shows a narrower TIME scope.
+    // Clock keeps its existing preview and timezone information by default.
+    property bool showClockPreview: true
+    property bool showTimezoneDetails: true
+    property bool showResyncTrigger: false
+    property bool showSharedServiceCaption: true
 
     Flickable {
         id: scroll
@@ -38,6 +44,7 @@ Item {
                        ? Colors.white : Colors.orange
             }
             GohuText {
+                visible: pane.showClockPreview
                 width: parent.width
                 text: "PREVIEW // " + pane.calibratedPreview
                 font.pixelSize: 12
@@ -106,7 +113,9 @@ Item {
                     width: parent.width - hostRefresh.width - parent.spacing
                     height: parent.height
                     verticalAlignment: Text.AlignVCenter
-                    text: "HOST // TIMEZONE + DST"
+                    text: pane.showTimezoneDetails
+                          ? "HOST // TIMEZONE + DST"
+                          : "HOST // DAYLIGHT SAVING"
                     color: Colors.cyan
                     font.pixelSize: 12
                 }
@@ -124,12 +133,14 @@ Item {
             GohuText {
                 width: parent.width
                 elide: Text.ElideRight
+                visible: pane.showTimezoneDetails
                 text: "ZONE // " + String(TimeSettings.hostInfo.timezone || "UNKNOWN")
                 color: Colors.white
                 font.pixelSize: 11
             }
             GohuText {
                 width: parent.width
+                visible: pane.showTimezoneDetails
                 text: "OFFSET // " + String(TimeSettings.hostInfo.utcOffset || "UNKNOWN")
                 color: Colors.white
                 font.pixelSize: 11
@@ -178,15 +189,41 @@ Item {
                 opacity: 0.6
             }
 
-            GohuText {
-                text: "RESYNC // ONE-SHOT REQUEST"
-                font.pixelSize: 12
-                color: Colors.cyan
+            Row {
+                width: parent.width
+                height: 32
+                spacing: 6
+
+                GohuText {
+                    width: parent.width
+                           - (resyncLaunch.visible
+                              ? resyncLaunch.width + parent.spacing : 0)
+                    height: parent.height
+                    verticalAlignment: Text.AlignVCenter
+                    text: "RESYNC // ONE-SHOT REQUEST"
+                    font.pixelSize: 12
+                    color: Colors.cyan
+                    elide: Text.ElideRight
+                }
+                ActionButton {
+                    id: resyncLaunch
+                    visible: pane.showResyncTrigger
+                    width: 76
+                    height: 30
+                    label: "⟳ RESYNC"
+                    labelPixelSize: 10
+                    contentPadding: 3
+                    accentColor: Colors.cyan
+                    available: TimeSettings.resyncStatus !== "working"
+                    onLeftClicked: TimeSettings.prepareResync()
+                }
             }
             GohuText {
                 width: parent.width
                 wrapMode: Text.WordWrap
-                text: "Top-right ⟳ opens this confirmation. Active Chrony gets fresh samples; if stopped, a one-shot Chrony process may jump system time. A Polkit prompt may appear. NTP is never permanently enabled."
+                text: pane.showResyncTrigger
+                      ? "RESYNC opens confirmation. Active Chrony gets new samples; stopped Chrony may perform a one-shot jump. Polkit authorization may be required. NTP stays as configured."
+                      : "Top-right ⟳ opens this confirmation. Active Chrony gets fresh samples; if stopped, a one-shot Chrony process may jump system time. A Polkit prompt may appear. NTP is never permanently enabled."
                 font.pixelSize: 10
                 color: Colors.white
             }
@@ -230,6 +267,7 @@ Item {
             GohuText {
                 width: parent.width
                 wrapMode: Text.WordWrap
+                visible: pane.showSharedServiceCaption
                 text: "TIME SETTINGS // SHARED SERVICE READY FOR CPU++"
                 font.pixelSize: 9
                 color: Colors.white

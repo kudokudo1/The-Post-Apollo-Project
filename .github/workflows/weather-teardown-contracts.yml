@@ -111,6 +111,8 @@ jobs:
         run: python3 tests/weather/test_station_sky_iau_meteor_showers.py
       - name: Validate Weather Station Home relevance policy
         run: node tests/weather/test_station_home_policy.js
+      - name: Validate M27-A SUBJECTS overview adaptive HOME parity
+        run: node tests/weather/test_weather_subject_panels_m2b.js
       - name: Validate HOME recent archived-model history
         run: node tests/weather/test_station_home_recent_history.js
       - name: Validate Weather core source-health and per-feed state

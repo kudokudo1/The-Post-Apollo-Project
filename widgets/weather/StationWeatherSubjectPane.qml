@@ -15,6 +15,7 @@ Rectangle {
     property var riverSource: null
     property var persistentCacheStore: null
     property var liveHistoryStore: null
+    property var homeFavoritesStore: null
     property real runtimeNowMs: Date.now()
 
     readonly property string kind:
@@ -40,6 +41,7 @@ Rectangle {
             nwsAlertSource: weatherPane.nwsAlertSource
             historyService: weatherPane.historyService
             liveHistoryStore: weatherPane.liveHistoryStore
+            homeFavoritesStore: weatherPane.homeFavoritesStore
             runtimeNowMs: weatherPane.runtimeNowMs
         }
     }

@@ -15,7 +15,7 @@ const navigator=read("widgets/weather/StationSubjectNavigator.qml");
 const station=read("widgets/weather/WeatherStationW.qml");
 const terminal=read("widgets/weather/StationTerminal.qml");
 const policy=vm.createContext({Array,Object,Math,Number,String,isFinite,Date});
-vm.runInContext(policyText.replace(/^\\.pragma library\\s*$/m,""),policy);
+vm.runInContext(policyText.replace(/^\.pragma library\s*$/m,""),policy);
 const asList=x=>JSON.parse(JSON.stringify(x));
 
 function harness(route,extra={}) {
@@ -123,36 +123,36 @@ test("queued session cannot start after route, owner or host changes",()=>{
 });
 
 test("root masking/actor identity still uses the SAME original controller",()=>{
-  assert.equal((station.match(/StationTerminal\\s*\\{/g)||[]).length,1);
-  assert.equal((pane.match(/StationTerminal\\s*\\{/g)||[]).length,0);
-  assert.equal((surface.match(/StationTerminal\\s*\\{/g)||[]).length,0);
-  assert.equal((navigator.match(/StationTerminal\\s*\\{/g)||[]).length,0);
-  assert.match(terminal,/sessionMode === "terminal" \\? "weather-screen"/);
+  assert.equal((station.match(/StationTerminal\s*\{/g)||[]).length,1);
+  assert.equal((pane.match(/StationTerminal\s*\{/g)||[]).length,0);
+  assert.equal((surface.match(/StationTerminal\s*\{/g)||[]).length,0);
+  assert.equal((navigator.match(/StationTerminal\s*\{/g)||[]).length,0);
+  assert.match(terminal,/sessionMode === "terminal" \? "weather-screen"/);
   assert.match(terminal,/kittyActorConfirmed/);
-  assert.match(terminal,/SwayGeometry\\.observedContentWindow/);
-  assert.match(terminal,/function closeTerminal\\(\\)/);
+  assert.match(terminal,/SwayGeometry\.observedContentWindow/);
+  assert.match(terminal,/function closeTerminal\(\)/);
   assert.match(terminal,/swaymsg/);
-  assert.match(station,/terminalHoleActive:[\\s\\S]*?subjectTerminalMode : currentView/);
-  assert.match(station,/terminalMode: weatherStation\\.subjectNavigationOpen\\s*\\? weatherStation\\.subjectTerminalMode/);
-  assert.match(station,/StationChassisCutout\\s*\\{/);
-  assert.match(station,/mask: Region\\s*\\{/);
-  assert.match(station,/onLeftClicked: weatherStation\\.closeContextTerminal\\(\\)/);
-  assert.match(terminal,/onVisibleChanged:[\\s\\S]*?closeTerminal\\(\\)/);
+  assert.match(station,/terminalHoleActive:[\s\S]*?subjectTerminalMode : currentView/);
+  assert.match(station,/terminalMode: weatherStation\.subjectNavigationOpen\s*\? weatherStation\.subjectTerminalMode/);
+  assert.match(station,/StationChassisCutout\s*\{/);
+  assert.match(station,/mask: Region\s*\{/);
+  assert.match(station,/onLeftClicked: weatherStation\.closeContextTerminal\(\)/);
+  assert.match(terminal,/onVisibleChanged:[\s\S]*?closeTerminal\(\)/);
 });
 
 test("TOOLS signal chain never activates a CLASSIC page or a second actor",()=>{
-  assert.match(pane,/signal terminalLaunchRequested\\(string mode\\)/);
-  assert.match(pane,/onClicked:[\\s\\S]*?toolsPane\\.terminalLaunchRequested\\(toolsPane\\.terminalTarget\\)/);
-  assert.match(pane,/model: ToolsPolicy\\.CONSOLE_MODES/);
-  assert.match(surface,/signal terminalLaunchRequested\\(string mode\\)/);
-  assert.match(surface,/onTerminalLaunchRequested: function\\(mode\\)/);
-  assert.match(navigator,/signal terminalLaunchRequested\\(string mode\\)/);
-  assert.equal((navigator.match(/browser\\.terminalLaunchRequested\\(mode\\)/g)||[]).length,2);
-  assert.match(station,/onTerminalLaunchRequested: function\\(mode\\) \\{\\s*weatherStation\\.launchSubjectTerminal\\(mode\\)/);
+  assert.match(pane,/signal terminalLaunchRequested\(string mode\)/);
+  assert.match(pane,/onClicked:[\s\S]*?toolsPane\.terminalLaunchRequested\(toolsPane\.terminalTarget\)/);
+  assert.match(pane,/model: ToolsPolicy\.CONSOLE_MODES/);
+  assert.match(surface,/signal terminalLaunchRequested\(string mode\)/);
+  assert.match(surface,/onTerminalLaunchRequested: function\(mode\)/);
+  assert.match(navigator,/signal terminalLaunchRequested\(string mode\)/);
+  assert.equal((navigator.match(/browser\.terminalLaunchRequested\(mode\)/g)||[]).length,2);
+  assert.match(station,/onTerminalLaunchRequested: function\(mode\) \{\s*weatherStation\.launchSubjectTerminal\(mode\)/);
   assert.ok(!pane.includes("legacyPageRequested"),"TOOLS must not jump to CLASSIC");
   assert.ok(!surface.includes("toolsPane.legacyPageRequested"));
   assert.ok(!navigator.includes("toolsLivePane.legacyPageRequested"));
-  assert.match(station,/function openLegacyFromSubject\\(pageId\\)/,
+  assert.match(station,/function openLegacyFromSubject\(pageId\)/,
     "other legacy routes remain until separately accepted");
   for(const text of [pane,surface,navigator,policyText]){
     for(const forbidden of ["FileView {","Process {","kitty --",

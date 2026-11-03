@@ -22,13 +22,10 @@ ShellRoot {
         id: archive
     }
 
-    Window {
+    FloatingWindow {
         id: testWindow
         title: "M26C-DOSSIER-TEST"
-        flags: Qt.FramelessWindowHint
         visible: true
-        x: 0
-        y: 0
         width: 720
         height: 900
         color: "#16051F"

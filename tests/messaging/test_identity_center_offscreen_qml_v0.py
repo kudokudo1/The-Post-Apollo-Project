@@ -566,7 +566,16 @@ class RealQtOrganizationsSettingsPaneSmoke(unittest.TestCase):
             self.assertTrue(self.sections.setProperty(field, js), field)
         self.sections.setProperty("localEditingOrganizationId", "org-1")
         APP.processEvents()
-        self.assertEqual(len(_value(structure.property("visibleUnits"))), 1)
+        self.assertEqual(
+            len(_value(structure.property("visibleUnits"))), 1,
+            "synthetic Qt structure: company=" +
+            repr(self.sections.property("activeLocalEditingOrganizationId")) +
+            " selected=" + repr(structure.property("selectedOrgId")) +
+            " kind=" + repr(structure.property("selectedKind")) +
+            " search=" + repr(structure.property("searchQuery")) +
+            " store=" + repr(_value(self.sections.property("localStructureStore"))) +
+            " units=" + repr(_value(structure.property("visibleUnits"))),
+        )
 
         for obj in (directory, portfolios, structure):
             obj.setProperty("confirmationKey", "stale confirmation")

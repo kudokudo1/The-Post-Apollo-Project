@@ -8,14 +8,17 @@ import "StationEarthSubjectPanelPolicy.js" as EarthPanelPolicy
 import "StationMediaSubjectPanelPolicy.js" as MediaPanelPolicy
 import "StationMagickSubjectPanelPolicy.js" as MagickPanelPolicy
 import "StationToolsSubjectPanelPolicy.js" as ToolsPanelPolicy
+import "StationWorkspaceNavigationPolicy.js" as Workspace
 
-// M1 bounded visual browser. Source panels remain in their original classic
-// QML pages; no new fetches, persistence, or fake submode content.
+// W1 workspace shell, retaining the original M1 route index as MORE.
+// HOME is the original running StationHome. No extra providers or writers.
 Rectangle {
     id: browser
     color: Colors.black
 
-    property string currentPath: "weather"
+    property string currentPath: "home/overview"
+    property string lastWorkspacePath: "home/overview"
+    property bool indexOpen: false
     property var lastSubjectPaths: ({})
     property int navigationCursor: 0
     // Existing Weather Station sources supplied from the single owning root.
@@ -31,6 +34,8 @@ Rectangle {
     property var eventArchiveStore: null
     property var dossierArchiveStore: null
     property real runtimeNowMs: Date.now()
+    readonly property string liveHomeKind:
+        Workspace.isHomeRoute(currentPath) ? "home" : ""
     readonly property string liveWeatherKind:
         WeatherPanelPolicy.kindForRoute(currentPath)
     readonly property string liveCosmosKind:
@@ -53,8 +58,12 @@ Rectangle {
     signal legacyPageRequested(string pageId)
     signal newsMapRequested(var payload)
 
+    // All top-level family choices open a landing page directly.
+    // MORE retains access to the full 135-route original index.
     function chooseRoute(path) {
-        const candidate = SubjectRoutes.findRoute(path);
+        const home = Workspace.isHomeRoute(path);
+        const candidate = home ? {path:path,subject:"home"}
+                               : SubjectRoutes.findRoute(path);
         if (!candidate)
             return false;
         currentPath = candidate.path;
@@ -62,49 +71,141 @@ Rectangle {
         updated[candidate.subject] = candidate.path;
         lastSubjectPaths = updated;
         navigationCursor = 0;
-        routeScroll.contentY = 0;
+        indexOpen = false;
+        if (routeScroll)
+            routeScroll.contentY = 0;
         return true;
     }
 
     function selectSubject(subjectId) {
-        const subject = SubjectRoutes.findRoute(subjectId);
-        if (!subject || subject.depth !== 0)
-            return false;
-        const remembered = lastSubjectPaths[subjectId];
-        const valid = SubjectRoutes.findRoute(remembered);
-        return chooseRoute(valid && valid.subject === subjectId
-                           ? remembered : subjectId);
+        if (indexOpen) {
+            const subject = SubjectRoutes.findRoute(subjectId);
+            if (!subject || subject.depth !== 0)
+                return false;
+            currentPath = subjectId;
+            navigationCursor = 0;
+            routeScroll.contentY = 0;
+            return true;
+        }
+        return chooseRoute(Workspace.landingFor(subjectId));
+    }
+
+    function openIndex() {
+        lastWorkspacePath = Workspace.isHomeRoute(currentPath)
+            || SubjectRoutes.findRoute(currentPath)
+            ? currentPath : Workspace.landingFor("home");
+        const family = Workspace.familyFor(lastWorkspacePath);
+        currentPath = family === "home" ? "weather" : family;
+        indexOpen = true;
+        navigationCursor = 0;
+        if (routeScroll)
+            routeScroll.contentY = 0;
+    }
+
+    function returnToWorkspace() {
+        const route = Workspace.isHomeRoute(lastWorkspacePath)
+            || SubjectRoutes.findRoute(lastWorkspacePath)
+            ? lastWorkspacePath : Workspace.landingFor("home");
+        return chooseRoute(route);
     }
 
     function cycleSubjects(direction) {
-        const now = currentRoute ? currentRoute.subject : "weather";
-        const subjects = SubjectRoutes.SUBJECTS;
-        const index = subjects.findIndex(function(x) {return x.id === now;});
         const step = Number(direction) < 0 ? -1 : 1;
-        const next = (Math.max(0, index) + step + subjects.length) % subjects.length;
-        selectSubject(subjects[next].id);
+        if (indexOpen) {
+            const names = SubjectRoutes.SUBJECTS;
+            const current = Workspace.familyFor(currentPath);
+            const idx = names.findIndex(function(x){return x.id === current;});
+            return selectSubject(names[(Math.max(0,idx)+step+names.length)%names.length].id);
+        }
+        const tabs = Workspace.FAMILIES;
+        const now = Workspace.familyFor(currentPath);
+        const idx = tabs.findIndex(function(x){return x.id === now;});
+        return chooseRoute(tabs[(Math.max(0,idx)+step+tabs.length)%tabs.length].landing);
     }
 
     function moveCursor(direction) {
-        const count = childrenRoutes.length;
-        if (count === 0)
-            return;
+        const count = indexOpen ? childrenRoutes.length
+                                : Workspace.tabsFor(currentPath).length;
+        if (count === 0) return;
         const step = Number(direction) < 0 ? -1 : 1;
         navigationCursor = (navigationCursor + step + count) % count;
     }
 
     function activateCursor() {
-        if (childrenRoutes.length > 0)
-            chooseRoute(childrenRoutes[navigationCursor].path);
+        if (indexOpen) {
+            if (childrenRoutes.length > 0)
+                chooseRoute(childrenRoutes[navigationCursor].path);
+            return;
+        }
+        const tabs = Workspace.tabsFor(currentPath);
+        if (tabs.length > 0)
+            chooseRoute(tabs[Math.min(navigationCursor,tabs.length-1)].path);
     }
 
     function goUp() {
-        if (pathCrumbs.length > 1)
-            chooseRoute(pathCrumbs[pathCrumbs.length - 2].path);
+        if (indexOpen) {
+            if (pathCrumbs.length > 1)
+                chooseRoute(pathCrumbs[pathCrumbs.length-2].path);
+            return;
+        }
+        chooseRoute(Workspace.landingFor(Workspace.familyFor(currentPath)));
+    }
+
+    // Load only when SUBJECTS is visible. CLASSIC therefore never runs
+    // a second hidden HOME watcher or set of source-panel instances.
+    Loader {
+        id: workspaceLoader
+        anchors.fill: parent
+        active: browser.visible
+        visible: browser.visible && !browser.indexOpen
+        sourceComponent: Component {
+            StationWorkspaceSurface {
+                currentPath: browser.currentPath
+                weatherService: browser.weatherService
+                spaceService: browser.spaceService
+                nwsAlertSource: browser.nwsAlertSource
+                historyService: browser.historyService
+                seismicSource: browser.seismicSource
+                lightningSource: browser.lightningSource
+                riverSource: browser.riverSource
+                persistentCacheStore: browser.persistentCacheStore
+                liveHistoryStore: browser.liveHistoryStore
+                eventArchiveStore: browser.eventArchiveStore
+                dossierArchiveStore: browser.dossierArchiveStore
+                runtimeNowMs: browser.runtimeNowMs
+                onRouteRequested: function(path) {
+                    browser.chooseRoute(path);
+                }
+                onIndexRequested: browser.openIndex()
+                onLegacyPageRequested: function(pageId) {
+                    browser.legacyPageRequested(pageId);
+                }
+                onNewsMapRequested: function(payload) {
+                    browser.newsMapRequested(payload);
+                }
+            }
+        }
     }
 
     Item {
+        id: legacyIndexLayer
+        anchors.fill: parent
+        visible: browser.visible && browser.indexOpen
+        enabled: visible
+
+    Item {
         id: navigationHeading
+        ActionButton {
+            anchors.top: parent.top
+            anchors.right: parent.right
+            width: 110
+            height: 28
+            label: "WORKSPACE"
+            labelPixelSize: 10
+            accentColor: Colors.cyan
+            onClicked: browser.returnToWorkspace()
+        }
+
         anchors.left: parent.left
         anchors.right: parent.right
         anchors.top: parent.top
@@ -477,5 +578,6 @@ Rectangle {
                 : browser.liveToolsKind !== ""
                   ? "TOOLS // LIVE SOURCE READBACK // SHARED STORES // SAFE KITTY HANDOFF"
                 : "SPEC-ONLY SUBJECTS // CLASSIC PAGES REMAIN CANONICAL UNTIL PANEL MIGRATION"
+    }
     }
 }

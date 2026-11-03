@@ -51,6 +51,8 @@ Rectangle {
 
     // Existing Weather Station sources supplied from the single owning root.
     property var weatherService: null
+    // M5b // Read-only celestial source stays owned by WeatherStationW.
+    property var celestialSource: null
     property var spaceService: null
     property var nwsAlertSource: null
     property var historyService: null
@@ -289,6 +291,7 @@ Rectangle {
                 eventArchiveStore: browser.eventArchiveStore
                 dossierArchiveStore: browser.dossierArchiveStore
                 runtimeNowMs: browser.runtimeNowMs
+                celestialSource: browser.celestialSource
                 onRouteRequested: function(path) {
                     browser.chooseRoute(path);
                 }
@@ -656,6 +659,7 @@ Rectangle {
 
     StationMagickSubjectPane {
         id: magickReferencePane
+        celestialSource: browser.celestialSource
         anchors.left: parent.left
         anchors.right: parent.right
         anchors.top: liveChildren.visible

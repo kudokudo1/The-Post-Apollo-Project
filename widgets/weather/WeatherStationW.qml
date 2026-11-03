@@ -7,6 +7,7 @@ import "../../components"
 import "../../services/weather" as WeatherServices
 import "StationOfficialAlertPolicy.js" as OfficialAlertPolicy
 import "StationWeatherSubjectPanelPolicy.js" as SubjectPanelPolicy
+import "StationMagickSubjectPanelPolicy.js" as MagickPanelPolicy
 import "StationEarthSubjectPanelPolicy.js" as EarthPanelPolicy
 import "../../services/weather/WeatherRuntimePolicy.js" as RuntimePolicy
 
@@ -20,6 +21,19 @@ PanelWindow {
     property var liveHistoryStore: null
     property var eventArchiveStore: null
     property var dossierArchiveStore: null
+
+    // M5b // Single owner for M4 celestial graphs. Only runs after an
+    // explicit CALCULATE click on a supported MAGICK astronomy route.
+    // No polling, automatic download, local write, or extra provider.
+    WeatherServices.CelestialVisualService {
+        id: celestialVisualService
+        active: weatherStation.menuOpen
+                && weatherStation.subjectNavigationOpen
+                && !weatherStation.contextTerminalRequested
+                && MagickPanelPolicy.visualForRoute(subjectNavigator.currentPath)
+        route: subjectNavigator.currentPath
+        anchorNowMs: weatherStation.runtimeNowMs
+    }
 
     // W2b single Weather-owned bookmark writer; never touches AppControl.
     // The FileView reads at startup but only explicit pin clicks write.
@@ -1315,6 +1329,7 @@ PanelWindow {
 
             StationSubjectNavigator {
                 id: subjectNavigator
+                celestialSource: celestialVisualService
                 anchors.fill: parent
                 visible: weatherStation.subjectNavigationOpen
                          && !weatherStation.contextTerminalRequested

@@ -11,6 +11,10 @@ Rectangle {
 
     property string subjectRoute: ""
     property var weatherService: null
+    // One source owned by the persistent SUBJECTS navigator, not this pane.
+    property var celestialSource: null
+    readonly property bool showCelestial:
+        MagickPolicy.visualForRoute(subjectRoute)
     // Supplied by the existing Station root; no independent clock.
     property real runtimeNowMs: 0
 
@@ -43,7 +47,9 @@ Rectangle {
             font.pixelSize: 10
             wrapMode: Text.WordWrap
             color: Colors.yellow
-            text: magickPane.primaryObservation !== ""
+            text: magickPane.showCelestial
+                  ? "ASTRONOMY // M4 JPL POSITION SERIES   |   INTERPRETATION // NOT CONNECTED"
+                  : magickPane.primaryObservation !== ""
                   ? "OBSERVATION // EXISTING COSMOS DATA   |   INTERPRETATION // NOT CONNECTED"
                   : "INTERPRETIVE WORKSPACE // NOT IMPLEMENTED   |   NO DATA OR READING GENERATED"
         }
@@ -75,10 +81,77 @@ Rectangle {
             anchors.fill: parent
             anchors.margins: 4
             active: magickPane.visible && magickPane.kind === "reference"
-            sourceComponent: magickPane.secondaryObservation !== ""
+            sourceComponent: magickPane.showCelestial
+                             ? celestialReference
+                             : magickPane.secondaryObservation !== ""
                              ? overviewReference
                              : magickPane.primaryObservation !== ""
                                ? singleReference : unimplemented
+        }
+    }
+
+    // M5b // The visual host is an on-demand consumer of the SAME
+    // source verified M4 result in the owning StationSubjectNavigator.
+    // No timer, second Process or fallback invented orbital coordinates.
+    Component {
+        id: celestialReference
+        Item {
+            Flickable {
+                anchors.fill: parent
+                clip: true
+                contentWidth: width
+                contentHeight: Math.max(height, 518)
+                boundsBehavior: Flickable.StopAtBounds
+                Column {
+                    width: parent.width
+                    spacing: 6
+
+                    Row {
+                        width: parent.width
+                        height: 30
+                        spacing: 8
+                        QuietText {
+                            width: Math.max(0,parent.width-140)
+                            height: parent.height
+                            verticalAlignment: Text.AlignVCenter
+                            font.pixelSize: 10
+                            wrapMode: Text.WordWrap
+                            color: magickPane.celestialSource
+                                   && magickPane.celestialSource.ready
+                                   ? Colors.cyan : Colors.orange
+                            text: magickPane.celestialSource
+                                  ? magickPane.celestialSource.statusText
+                                  : "JPL CALCULATION OWNER UNAVAILABLE"
+                        }
+                        ActionButton {
+                            width: 132
+                            height: 28
+                            label: magickPane.celestialSource
+                                   && magickPane.celestialSource.loading
+                                   ? "CALCULATING" : "CALCULATE"
+                            labelPixelSize: 10
+                            accentColor: Colors.magenta
+                            available: !!magickPane.celestialSource
+                                       && magickPane.celestialSource.active
+                                       && magickPane.celestialSource.configured
+                                       && !magickPane.celestialSource.loading
+                            onClicked: magickPane.celestialSource.refresh()
+                        }
+                    }
+                    StationMagickCelestialInstrument {
+                        width: parent.width
+                        height: 466
+                        visualData: magickPane.celestialSource
+                                    && magickPane.celestialSource.ready
+                                    ? magickPane.celestialSource.visualData
+                                    : null
+                        mode: magickPane.subjectRoute === "magick/astrology/aspects"
+                              ? "aspects"
+                              : magickPane.subjectRoute === "magick/astrology/retrogrades"
+                              ? "motion" : "wheel"
+                    }
+                }
+            }
         }
     }
 

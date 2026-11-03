@@ -1,0 +1,44 @@
+name: Weather M6b coordinate-keyed last-known cache
+
+on:
+  pull_request:
+    paths:
+      - "services/weather/WeatherPlaceCachePolicy.js"
+      - "services/weather/WeatherPlaceCacheStore.qml"
+      - "services/weather/WeatherService.qml"
+      - "shell.qml"
+      - "tests/weather/test_weather_place_cache_m6b.cjs"
+      - "tests/weather/test_weather_place_cache_integration_m6b.py"
+      - ".github/workflows/weather-place-cache-m6b.yml"
+  push:
+    branches:
+      - main
+    paths:
+      - "services/weather/WeatherPlaceCachePolicy.js"
+      - "services/weather/WeatherPlaceCacheStore.qml"
+      - "services/weather/WeatherService.qml"
+      - "shell.qml"
+      - "tests/weather/test_weather_place_cache_m6b.cjs"
+      - "tests/weather/test_weather_place_cache_integration_m6b.py"
+      - ".github/workflows/weather-place-cache-m6b.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  contracts:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Exact-location cache normalization, TTL, isolation and eviction
+        run: node tests/weather/test_weather_place_cache_m6b.cjs
+      - name: Verify shared WeatherService M6b hydration and write boundaries
+        run: python3 tests/weather/test_weather_place_cache_integration_m6b.py
+      - name: Preserve M6 automatic fallback behavior
+        run: node tests/weather/test_openmeteo_fallback_m6.cjs
+      - name: Preserve M6 provider sequence and safety contract
+        run: python3 tests/weather/test_openmeteo_fallback_integration_m6.py
+      - name: Preserve M5 user-selected coordinate resolution
+        run: node tests/location/test_weather_location_policy.cjs
+      - name: Preserve original legacy unscoped weather cache
+        run: node tests/weather/test_weather_persistent_cache_m4.js

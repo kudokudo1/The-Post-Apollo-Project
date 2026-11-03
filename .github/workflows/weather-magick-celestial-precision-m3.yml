@@ -1,0 +1,52 @@
+name: MAGICK M3 numerical hardening
+
+on:
+  pull_request:
+    paths:
+      - 'scripts/weather/celestial_dynamics.py'
+      - 'tests/weather/test_celestial_precision_m3.py'
+      - '.github/workflows/weather-magick-celestial-precision-m3.yml'
+  push:
+    paths:
+      - 'scripts/weather/celestial_dynamics.py'
+      - 'tests/weather/test_celestial_precision_m3.py'
+      - '.github/workflows/weather-magick-celestial-precision-m3.yml'
+  workflow_dispatch:
+
+jobs:
+  pure-math:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: M0 through M3 offline regressions
+        run: |
+          python3 -m unittest discover -s tests/weather -p 'test_celestial_contract_m0.py' -v
+          python3 -m unittest discover -s tests/weather -p 'test_celestial_solver_m1.py' -v
+          python3 -m unittest discover -s tests/weather -p 'test_celestial_dynamics_m2.py' -v
+          python3 -m unittest discover -s tests/weather -p 'test_celestial_precision_m3.py' -v
+
+  real-ephemeris:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install isolated Skyfield runtime
+        run: python3 -m pip install 'skyfield==1.55'
+      - name: Download official JPL DE440s into disposable runner
+        run: |
+          curl --fail --location --retry 3 --connect-timeout 15 --max-time 180 --silent --show-error \
+            'https://ssd.jpl.nasa.gov/ftp/eph/planets/bsp/de440s.bsp' \
+            --output "$RUNNER_TEMP/de440s.bsp"
+          test "$(stat -c %s "$RUNNER_TEMP/de440s.bsp")" -gt 30000000
+      - name: M2 and M3 real-kernel tests
+        env:
+          MAGICK_M1_KERNEL: ${{ runner.temp }}/de440s.bsp
+        run: |
+          python3 -m unittest discover -s tests/weather -p 'test_celestial_dynamics_m2.py' -v
+          python3 -m unittest discover -s tests/weather -p 'test_celestial_precision_m3.py' -v

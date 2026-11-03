@@ -301,6 +301,13 @@ Item {
                 registry: locationPane.registry
             }
 
+            CpuPlusSavedPlacesPanel {
+                id: savedPlacesPanel
+                width: parent.width
+                registry: locationPane.registry
+                durationKey: explorePanel.durationKey
+            }
+
             Rectangle {
                 width: parent.width
                 height: 96

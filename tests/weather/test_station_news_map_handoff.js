@@ -73,8 +73,8 @@ assert.match(discovery, /model: stationDiscovery\.mapNewsMentionRows/);
 assert.match(discovery, /color: Colors\.magenta/);
 // The original map marker and the compact EARTH mention list now share
 // one inspector action instead of duplicating its selection mutation.
-assert.match(discovery, /stationDiscovery\\.inspectNewsMention\\(modelData\\)/);
-assert.match(discovery, /function inspectNewsMention\\(row\\)/);
+assert.match(discovery, /stationDiscovery\.inspectNewsMention\(modelData\)/);
+assert.match(discovery, /function inspectNewsMention\(row\)/);
 assert.match(discovery, /selectedMapNewsMention = row/);
 assert.match(discovery, /NEWS MENTION INSPECTOR \/\/ GDELT GKG/);
 assert.match(discovery, /MENTIONED LOCATION \/\/ NOT VERIFIED EVENT LOCATION/);

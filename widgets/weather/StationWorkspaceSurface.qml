@@ -10,6 +10,7 @@ Rectangle {
     id: surface
     color: Colors.black
     property string currentPath: "home/overview"
+    property var newsMentionOverlay: null
     property var weatherService: null
     property var spaceService: null
     property var nwsAlertSource: null
@@ -38,6 +39,7 @@ Rectangle {
     signal routeRequested(string path)
     signal legacyPageRequested(string pageId)
     signal newsMapRequested(var payload)
+    signal newsMapClearRequested()
     signal deckEnabledRequested(bool enabled)
     signal deckHeldRequested(bool held)
     signal deckModeRequested(string mode)
@@ -127,6 +129,8 @@ Rectangle {
             anchors.fill: parent
             visible: surface.activeFamily === "earth"
             subjectRoute: surface.currentPath
+            newsMentionOverlay: surface.newsMentionOverlay
+            onNewsMapClearRequested: surface.newsMapClearRequested()
             seismicSource: surface.seismicSource
             lightningSource: surface.lightningSource
             riverSource: surface.riverSource

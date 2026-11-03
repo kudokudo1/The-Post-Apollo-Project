@@ -149,7 +149,11 @@ test("WEATHER map does not fetch or plot non-weather events", () => {
   assert.match(discovery,/&& !stationDiscovery\.weatherMapOnly/);
   assert.match(discovery,/model: firmsService\.ready \? firmsService\.hotspots : \[\]/);
   assert.match(discovery,/visible: !stationDiscovery\.weatherMapOnly/);
-  assert.match(discovery,/model: source\.ready \? stationDiscovery\.visibleRows : \[\]/);
+  // Full source-row lists are now partitioned by DOMAIN:
+  // WEATHER map has none, EARTH has a compact EONET list, CLASSIC keeps
+  // its full source list until final migration parity acceptance.
+  assert.match(discovery,/model: stationDiscovery.domain === "map"\s*&& !stationDiscovery.earthMapOnly && source.ready\s*\? stationDiscovery.visibleRows : \[\]/);
+  assert.match(discovery,/model: stationDiscovery.domain === "map"\s*&& stationDiscovery.earthMapOnly\s*&& stationDiscovery.earthLayerEnabled\("eonet"\)\s*&& source.ready\s*\? stationDiscovery.mapCompanionEonetRows : \[\]/);
   assert.match(discovery,/weatherLayerEnabled\("smoke"\)/);
   assert.match(discovery,/weatherLayerEnabled\("radar"\)/);
   assert.match(discovery,/weatherLayerEnabled\("radar-fallback"\)/);

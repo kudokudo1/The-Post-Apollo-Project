@@ -66,6 +66,10 @@ Rectangle {
     property real runtimeNowMs: Date.now()
     readonly property string liveHomeKind:
         Workspace.isHomeRoute(currentPath) ? "home" : ""
+    readonly property var liveMapRuntimeRows:
+        !indexOpen && workspaceLoader.item
+        && Array.isArray(workspaceLoader.item.activeMapRuntimeRows)
+        ? workspaceLoader.item.activeMapRuntimeRows : []
     readonly property string liveWeatherKind:
         WeatherPanelPolicy.kindForRoute(currentPath)
     readonly property string liveCosmosKind:

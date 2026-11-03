@@ -32,8 +32,10 @@ test("M28-K reconciles exactly four original HOME controls without mutating M0 s
     .filter(id=>preview.WIRED_IN_SUBJECTS[id]==="M28-K").sort();
   assert.deepEqual(selected,legacy.map(row=>row[0]).sort());
   assert.equal(Object.keys(m0.PANELS).length,103);
-  assert.equal(Object.keys(preview.WIRED_IN_SUBJECTS).length,100);
-  assert.equal(103-100,3);
+  assert.equal(Object.values(preview.WIRED_IN_SUBJECTS).filter(v=>v==="M28-K").length,4,
+    "M28-K original four HOME semantic controls remain exact");
+  assert.ok(Object.keys(preview.WIRED_IN_SUBJECTS).length>=100,
+    "later independently reviewed SOURCE controls may increase the ledger");
   for(const [id,historical,native,section] of legacy){
     assert.equal(m0.PANELS[id],historical,id+" M0 original historical hint");
     assert.equal(preview.HOME_SOURCE_HINTS[id],historical);
@@ -129,11 +131,11 @@ test("no ghost HOME destination is created from forged source metadata or malfor
   assert.deepEqual(plain(preview.nativeDestinationsForPath("home",null)),[]);
 });
 
-test("only three broader SOURCE rack/badge controls remain to review before final CLASSIC retirement",()=>{
-  const pending=Object.keys(m0.PANELS).filter(id=>!preview.WIRED_IN_SUBJECTS[id]).sort();
-  assert.deepEqual(pending,["ground-source","map-source-rack","station-source-badge"]);
-  assert.deepEqual(plain(preview.remainingSourcePagesForPath("tools/sources/health",m0.PANELS)
-    .map(x=>x.id)),["ground","map"]);
+test("later M28-L source review does not erase M28-K HOME or historic source provenance",()=>{
+  assert.deepEqual(Object.keys(m0.PANELS).filter(id=>!preview.WIRED_IN_SUBJECTS[id]),[]);
+  assert.deepEqual(plain(preview.remainingSourcePagesForPath("tools/sources/health",m0.PANELS)),[]);
+  assert.deepEqual(plain(preview.sourcePagesForPath("tools/sources/health",m0.PANELS)
+    .map(x=>x.id)),["home","ground","map"]);
   assert.ok(preview.nativeDestinationsForPath("tools/sources/health",m0.PANELS).length>0);
   assert.match(station,/active: !weatherStation\.subjectNavigationOpen/);
   assert.match(station,/StationTerminal\s*\{/);

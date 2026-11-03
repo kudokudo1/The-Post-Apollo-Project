@@ -153,7 +153,8 @@ test("INDEX offers concrete WEATHER routes, preserves unreviewed HOME and non-WE
   assert.deepEqual(plain(context.remainingSourcePagesForPath("weather",context.PANELS)),[],
     "M28-K reroutes original HOME controls to the actual workspace");
   for (const id of ["ground-source","map-source-rack","station-source-badge"]) {
-    assert.equal(context.WIRED_IN_SUBJECTS[id], undefined, id + " remains unreviewed");
+    assert.equal(context.WIRED_IN_SUBJECTS[id],"M28-L",
+      id+" later reviewed without changing M28-F weather source ownership");
   }
   assert.ok(context.sourcePagesForPath("media/watch",context.PANELS).length>0);
   assert.deepEqual(plain(context.remainingSourcePagesForPath("media/watch",context.PANELS)),[],

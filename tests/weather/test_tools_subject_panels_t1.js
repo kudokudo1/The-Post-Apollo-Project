@@ -199,12 +199,13 @@ test("all previous subject panes, CLASSIC, runtime mask and terminal owner remai
   assert.match(browser,/spaceService: browser\.spaceService/);
   assert.match(browser,/runtimeNowMs: browser\.runtimeNowMs/);
   assert.match(station,/subjectNavigator\.liveToolsKind !== ""/);
-  assert.match(station,/TOOLS \/\/ SOURCE AND STORAGE STATUS/);
+  assert.match(station,/SubjectSourceBadge\.badgeFor\(/);
+  assert.match(station,/subjectNavigator\.currentPath,subjectNavigator\.indexOpen/);
   assert.match(station,/active: !weatherStation\.subjectNavigationOpen/);
   assert.match(station,/terminalHoleActive:/);
   assert.match(station,/StationTerminal\s*\{/);
   assert.match(station,/onNewsMapRequested: function\(payload\)/);
-  assert.match(station,/return "INDEX \/\/ PREVIEW"/);
+  assert.match(station,/if \(subjectNavigationOpen\)\s*return subjectSourceBadge\.text;/);
 });
 
 test("TOOLS adds no new writer, provider service, network process or session", () => {

@@ -174,7 +174,8 @@ test("CLASSIC MEDIA behavior and NEWS-to-MAP handoff remain available", () => {
   assert.match(station,/weatherStation\.newsMapOverlay/);
   assert.match(station,/weatherStation\.subjectNavigationOpen = false/);
   assert.match(station,/StationTerminal\s*\{/);
-  assert.match(station,/return "INDEX \/\/ PREVIEW"/);
+  assert.match(station,/SubjectSourceBadge\.badgeFor\(/);
+  assert.match(station,/subjectNavigator\.indexOpen/);
 });
 
 test("MEDIA routing never claims a new feed, media server or durable store", () => {

@@ -155,7 +155,13 @@ var WIRED_IN_SUBJECTS = {
   "home-aqi-humidity":"M28-K",
   "home-aqi-wind":"M28-K",
   "home-quick-conditions":"M28-K",
-  "home-space-weather":"M28-K"
+  "home-space-weather":"M28-K",
+  // M28-L: provider weather fix + AQI clock, original EARTH/WEATHER
+  // source racks, and the one subject-aware root status badge. Does not
+  // mean NEWS WebEngine playback or final CLASSIC retirement is approved.
+  "ground-source":"M28-L",
+  "map-source-rack":"M28-L",
+  "station-source-badge":"M28-L"
 };
 
 // M0 historical hints name pre-workspace WEATHER/COSMOS targets. Their actual

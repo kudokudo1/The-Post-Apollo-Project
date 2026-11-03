@@ -24,6 +24,9 @@ Rectangle {
 
     readonly property string kind:
         EarthPanelPolicy.kindForRoute(subjectRoute)
+    readonly property var runtimeRows:
+        earthLoader.item && Array.isArray(earthLoader.item.runtimeRows)
+        ? earthLoader.item.runtimeRows : []
 
     Loader {
         id: earthLoader

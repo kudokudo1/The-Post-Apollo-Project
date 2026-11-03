@@ -22,6 +22,8 @@ Rectangle {
     // Only a request. The root StationTerminal remains the sole Kitty/Sway
     // owner, including window identity, geometry, launch and exact close.
     signal terminalLaunchRequested(string mode)
+    // Only navigates to the original live map source racks.
+    signal routeRequested(string path)
     property string selectedConsoleMode: "home"
 
     readonly property string kind:
@@ -29,6 +31,8 @@ Rectangle {
     readonly property var healthRows:
         SourceHealth.buildCoreSources(
             ToolsPolicy.sourceInput(weatherService,spaceService,runtimeNowMs))
+    readonly property var groundSourceRows:
+        ToolsPolicy.groundSourceRows(weatherService)
     readonly property var sourceCatalog: RuntimePolicy.sourceCatalog()
     readonly property var fieldTimeRows:
         ToolsPolicy.fieldTimeRows(spaceService,runtimeNowMs)
@@ -216,6 +220,83 @@ Rectangle {
                             color: Colors.cyan
                             opacity: 0.30
                         }
+                    }
+                }
+            }
+
+            Column {
+                width: parent.width
+                spacing: 8
+                visible: ToolsPolicy.shows(toolsPane.subjectRoute,"health")
+
+                StationSectionDivider {
+                    width: parent.width
+                    title: "GROUND SOURCE // PROVIDER FIX + AQI SAMPLE"
+                }
+
+                Repeater {
+                    model: toolsPane.groundSourceRows
+                    delegate: Column {
+                        required property var modelData
+                        width: toolsContent.width
+                        spacing: 4
+
+                        GohuText {
+                            width: parent.width
+                            text: modelData.title
+                            font.pixelSize: 11
+                            color: Colors.cyan
+                        }
+
+                        GohuText {
+                            width: parent.width
+                            text: modelData.value
+                            font.pixelSize: 12
+                            color: Colors.white
+                            wrapMode: Text.WrapAnywhere
+                        }
+
+                        QuietText {
+                            width: parent.width
+                            text: modelData.detail
+                            font.pixelSize: 10
+                            wrapMode: Text.WordWrap
+                            color: Colors.yellow
+                        }
+                    }
+                }
+
+                StationSectionDivider {
+                    width: parent.width
+                    title: "MAP SOURCE RACKS // ORIGINAL PROVIDER STATES"
+                }
+
+                QuietText {
+                    width: parent.width
+                    text: "THE MAP SOURCE RACKS LIVE WITH THE ORIGINAL EVENT AND RADAR CONTROLLERS. OPEN THEIR NATIVE SUBJECT PANELS TO SEE ACTUAL SOURCE STATUS, KEY REQUIREMENTS AND MANUAL LOAD STATE; THESE BUTTONS DO NOT FETCH OR SAVE DATA."
+                    color: Colors.yellow
+                    wrapMode: Text.WordWrap
+                    font.pixelSize: 10
+                }
+
+                Flow {
+                    width: parent.width
+                    spacing: 8
+
+                    ActionButton {
+                        width: Math.min(272,toolsContent.width)
+                        height: 34
+                        label: "EARTH // EVENT SOURCE RACK"
+                        labelPixelSize: 11
+                        onClicked: toolsPane.routeRequested("earth/maps/overview")
+                    }
+
+                    ActionButton {
+                        width: Math.min(272,toolsContent.width)
+                        height: 34
+                        label: "WEATHER // RADAR SOURCE RACK"
+                        labelPixelSize: 11
+                        onClicked: toolsPane.routeRequested("weather/maps")
                     }
                 }
             }

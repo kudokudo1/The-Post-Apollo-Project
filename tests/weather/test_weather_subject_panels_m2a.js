@@ -159,7 +159,8 @@ test("route header reveals correct scope without claiming live provider success"
   assert.match(sky,/visible: sky\.subjectRoute === ""/);
   assert.match(sky,/text: "☁  SKY"/);
   assert.match(sky,/text: "☁  WEATHER"/);
-  assert.match(station,/return "WEATHER \/\/ PANEL"/);
-  assert.match(station,/return "INDEX \/\/ PREVIEW"/);
+  assert.match(station,/SubjectSourceBadge\.badgeFor\(/);
+  assert.match(station,/subjectNavigator\.currentPath,subjectNavigator\.indexOpen/);
+  assert.match(station,/if \(subjectNavigationOpen\)\s*return subjectSourceBadge\.text;/);
   assert.match(nav,/WEATHER \/\/ EXISTING SOURCE PANELS \/\/ SAME COLLECTORS/);
 });

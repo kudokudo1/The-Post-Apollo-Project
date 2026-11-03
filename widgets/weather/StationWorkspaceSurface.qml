@@ -37,6 +37,10 @@ Rectangle {
     readonly property string activeFamily: Workspace.familyFor(currentPath)
     readonly property string homeSection: Workspace.homeSectionFor(currentPath)
     readonly property var activeTabs: Workspace.tabsFor(currentPath)
+    // Read the currently mounted ORIGINAL map source, never start a new map.
+    readonly property var activeMapRuntimeRows:
+        activeFamily === "earth" ? earthSourcePane.runtimeRows
+        : activeFamily === "weather" ? weatherSourcePane.runtimeRows : []
     signal routeRequested(string path)
     signal legacyPageRequested(string pageId)
     signal terminalLaunchRequested(string mode)
@@ -103,6 +107,7 @@ Rectangle {
         }
 
         StationWeatherSubjectPane {
+            id: weatherSourcePane
             anchors.fill: parent
             visible: surface.activeFamily === "weather"
             subjectRoute: surface.currentPath
@@ -129,6 +134,7 @@ Rectangle {
         }
 
         StationEarthSubjectPane {
+            id: earthSourcePane
             anchors.fill: parent
             visible: surface.activeFamily === "earth"
             subjectRoute: surface.currentPath
@@ -164,6 +170,7 @@ Rectangle {
         }
 
         StationToolsSubjectPane {
+            id: toolsSourcePane
             anchors.fill: parent
             visible: surface.activeFamily === "tools"
             subjectRoute: surface.currentPath
@@ -176,6 +183,9 @@ Rectangle {
             runtimeNowMs: surface.runtimeNowMs
             onTerminalLaunchRequested: function(mode) {
                 surface.terminalLaunchRequested(mode);
+            }
+            onRouteRequested: function(path) {
+                surface.routeRequested(path);
             }
         }
 

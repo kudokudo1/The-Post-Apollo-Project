@@ -111,7 +111,7 @@ test("the new MAGICK view is routed only through SUBJECTS; CLASSIC unchanged", (
   assert.match(browser,/weatherService: browser\.weatherService/);
   assert.match(browser,/MagickPanelPolicy\.kindForRoute\(currentPath\)/);
   assert.match(station,/subjectNavigator\.liveMagickKind !== ""/);
-  assert.match(station,/MAGICK \/\/ ASTRONOMY REFERENCE/);
+  assert.match(station,/SubjectSourceBadge\.badgeFor\(/);
   assert.match(station,/active: !weatherStation\.subjectNavigationOpen/);
   assert.match(station,/StationTerminal\s*\{/);
   assert.match(station,/onNewsMapRequested: function\(payload\)/);

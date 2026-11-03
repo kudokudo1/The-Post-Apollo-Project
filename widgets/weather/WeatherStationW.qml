@@ -21,6 +21,12 @@ PanelWindow {
     property var eventArchiveStore: null
     property var dossierArchiveStore: null
 
+    // W2b single Weather-owned bookmark writer; never touches AppControl.
+    // The FileView reads at startup but only explicit pin clicks write.
+    WeatherServices.WeatherHomeFavoritesStore {
+        id: homeFavoritesStore
+    }
+
     WeatherServices.WeatherHistoryService {
         id: weatherHistoryService
         active: weatherStation.menuOpen
@@ -1285,6 +1291,7 @@ PanelWindow {
                 liveHistoryStore: weatherStation.liveHistoryStore
                 eventArchiveStore: weatherStation.eventArchiveStore
                 dossierArchiveStore: weatherStation.dossierArchiveStore
+                homeFavoritesStore: homeFavoritesStore
                 runtimeNowMs: weatherStation.runtimeNowMs
                 onLegacyPageRequested: function(pageId) {
                     weatherStation.openLegacyFromSubject(pageId);

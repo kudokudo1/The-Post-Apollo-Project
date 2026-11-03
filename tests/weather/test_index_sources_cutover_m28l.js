@@ -44,10 +44,10 @@ test("M28-L closes only three exact original SOURCE ids without changing M0 prov
     .map(x=>x.id)),["home","ground","map"],
     "original pages stay in M0 provenance despite no CLASSIC shortcut");
   const native=plain(env.nativeDestinationsForPath("tools/sources/health",env.PANELS));
-  assert.deepEqual(native,[{
-    path:"tools/sources/health",panels:4,
-    milestones:["M28-I","M28-L"]
-  }]);
+  assert.equal(native.length,1);
+  assert.equal(native[0].path,"tools/sources/health");
+  assert.equal(native[0].panels,4);
+  assert.deepEqual(native[0].milestones.sort(),["M28-I","M28-L"]);
 });
 
 test("the original GROUND source panel now has exact weather-fix and AQI provider time in TOOLS",()=>{

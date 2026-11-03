@@ -44,9 +44,9 @@ test("WEATHER overview and history display selected original HOME instruments", 
   assert.equal(groups.length,15);
   for (const section of groups)
     assert.equal(env.visibleFor("home","",section),true,"classic "+section);
-  for (const section of ["header","alerts","snapshot"])
+  for (const section of ["header","alerts","snapshot","relevant"])
     assert.ok(env.visibleFor("home","weather/overview",section),section);
-  for (const section of ["relations","history","quick","health","relevant"])
+  for (const section of ["relations","history","quick","health","runtime"])
     assert.ok(!env.visibleFor("home","weather/overview",section),"overview leaks "+section);
   assert.ok(env.visibleFor("home","weather/history/historical-forecast","history"));
   assert.ok(!env.visibleFor("home","weather/history/historical-forecast","snapshot"));
@@ -55,6 +55,24 @@ test("WEATHER overview and history display selected original HOME instruments", 
   assert.match(home,/text: "⌂  HOME"/);
   assert.match(home,/text: "⌂  WEATHER"/);
   assert.match(home,/visible: home\.subjectRoute === ""/);
+});
+
+test("M27-A reuses the existing adaptive HOME watch and keeps the original CLASSIC panels", () => {
+  assert.ok(env.visibleFor("home","weather/overview","relevant"));
+  assert.ok(!env.visibleFor("home","weather/history/historical-forecast","relevant"));
+  assert.ok(!env.visibleFor("home","weather/conditions/current","relevant"));
+  assert.ok(!env.visibleFor("sky","weather/overview","relevant"));
+  assert.match(home,/StationHomePolicy\.rankRelevant\(/);
+  assert.match(home,/watchItems\s*=\s*next/);
+  assert.match(home,/model:\s*home\.watchItems/);
+  assert.match(home,/visible:\s*home\.sectionVisible\("relevant"\)/);
+  assert.match(home,/if \(subjectRoute === "" && workspaceSection !== ""\)/);
+  assert.match(pane,/spaceService:\s*null/);
+  // No new duplicate ranker, fetcher, storage writer or file was added.
+  for (const t of ["Process {","FileView {","XMLHttpRequest","fetch(","swaymsg"])
+    assert.ok(!policySource.includes(t),"policy must stay passive "+t);
+  for (const s of ["relevant","quick","health","history","runtime"])
+    assert.ok(env.visibleFor("home","",s),"CLASSIC HOME "+s);
 });
 
 test("all relationship inspectors are collected within WEATHER > HISTORY", () => {

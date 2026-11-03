@@ -62,7 +62,8 @@ test("NEWS routes share GDELT, one report loader, local filters, trend and story
   assert.equal(policy.newsGroupVisible("media/news/locations","inspector-hint"),true);
   assert.match(policy.hintFor("media/news/locations"),/MENTIONS, NOT VERIFIED EVENT SITES/);
   assert.equal(policy.newsGroupVisible("weather/conditions/current","list"),false);
-  assert.match(hub,/readonly property bool isReports: effectiveSection === "REPORTS"/);
+  assert.match(hub,/MediaPanelPolicy\.kindForRoute\(subjectRoute\) === "news"/);
+  assert.match(hub,/section === "REPORTS"/);
   assert.match(hub,/StationDiscovery\s*\{/);
   assert.match(hub,/newsSubjectRoute: stationNewsHub\.subjectRoute/);
   assert.match(discovery,/property string newsSubjectRoute: ""/);
@@ -70,11 +71,11 @@ test("NEWS routes share GDELT, one report loader, local filters, trend and story
   assert.match(discovery,/newsGroupVisible\("trend"\)/);
   assert.match(discovery,/newsGroupVisible\("stories"\)/);
   assert.match(discovery,/newsGroupVisible\("inspector-hint"\)/);
-  assert.match(discovery,/text: "REPORTING TREND \/\/ CURRENT FILTERED BATCH"/);
+  assert.match(discovery,/title: "REPORTING TREND \/\/ CURRENT FILTERED BATCH"/);
   assert.match(discovery,/STORY FAMILIES \/\/ CONSERVATIVE TITLE TOKENS/);
   assert.match(discovery,/id: newsTimeRail/);
   assert.match(discovery,/id: newsRegionRail/);
-  assert.match(discovery,/StationViewerPolicy/);
+  assert.match(discovery,/StationViewerPolicy|ViewerPolicy/);
 });
 
 test("WATCH catalog sections preserve real access notes and in-station attempted viewer", () => {

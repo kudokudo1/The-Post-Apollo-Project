@@ -13,6 +13,7 @@ import sys
 import time
 
 CHRONYC = "/usr/bin/chronyc"
+CHRONYD_PATHS = ("/usr/sbin/chronyd", "/usr/bin/chronyd")
 PKEXEC = "/usr/bin/pkexec"
 TIMEOUT = 5
 
@@ -54,39 +55,60 @@ def status():
     )
 
 
-def resync():
-    # This is not timedatectl set-ntp true: it must never persistently enable
-    # synchronization behind the user's back.
-    if not os.path.isfile(CHRONYC):
-        return result("unavailable", "CHRONY NOT INSTALLED // CLOCK UNCHANGED")
+def privileged(command, success_status, success_message, timeout):
     try:
-        probe = subprocess.run(
-            [CHRONYC, "tracking"], capture_output=True, text=True,
-            timeout=TIMEOUT, check=False)
-    except (OSError, subprocess.TimeoutExpired):
-        return result("unavailable", "CHRONY NOT RESPONDING // CLOCK UNCHANGED")
-    if probe.returncode:
-        return result("unavailable",
-                      "NO ACTIVE CHRONY CONNECTION // CLOCK UNCHANGED")
-    if not os.path.isfile(PKEXEC):
-        return result("unavailable",
-                      "POLKIT AUTHENTICATION UNAVAILABLE // CLOCK UNCHANGED")
-    try:
-        # chronyc burst asks an already-running chronyd for fresh samples.
-        # The daemon chooses safe correction. Do NOT force makestep: large
-        # wall-clock jumps disrupt running apps, logs, and Machine timelines.
         proc = subprocess.run(
-            [PKEXEC, CHRONYC, "burst", "4/4"],
-            capture_output=True, text=True, timeout=45, check=False)
+            [PKEXEC] + command, capture_output=True, text=True,
+            timeout=timeout, check=False)
     except subprocess.TimeoutExpired:
-        return result("failed", "AUTH / CHRONY TIMEOUT // VERIFY SYSTEM STATUS")
+        return result("failed", "SYNC / AUTH TIMEOUT // VERIFY SYSTEM TIME")
     except OSError:
-        return result("failed", "RESYNC COMMAND COULD NOT START")
+        return result("failed", "AUTHENTICATED SYNC COULD NOT START")
     if proc.returncode:
-        return result("failed",
-                      "RESYNC NOT AUTHORIZED OR CHRONY REFUSED // CLOCK UNCHANGED")
-    return result("requested",
-                  "FRESH TIME SAMPLES REQUESTED // CORRECTION NOT YET VERIFIED")
+        return result("failed", "SYNC DENIED OR SOURCE UNAVAILABLE // VERIFY STATUS")
+    return result(success_status, success_message)
+
+
+def resync():
+    # Explicitly confirmed by the Settings UI. Never toggle NTP enablement.
+    if not os.path.isfile(PKEXEC):
+        return result("unavailable", "POLKIT AUTH UNAVAILABLE // CLOCK UNCHANGED")
+
+    # Preferred when the managed daemon is already running: ask for samples,
+    # and let Chrony slew the correction rather than forcibly step the clock.
+    if os.path.isfile(CHRONYC):
+        try:
+            probe = subprocess.run(
+                [CHRONYC, "tracking"], capture_output=True, text=True,
+                timeout=TIMEOUT, check=False)
+        except (OSError, subprocess.TimeoutExpired):
+            probe = None
+        if probe is not None and probe.returncode == 0:
+            return privileged(
+                [CHRONYC, "burst", "4/4"], "requested",
+                "FRESH CHRONY SAMPLES REQUESTED // CORRECTION NOT VERIFIED", 45)
+
+    # When the user has turned automatic synchronization off, a separate
+    # chronyd -q process can set the clock once and exit, without enabling
+    # the background service. This CAN jump wall time, hence UI confirmation.
+    # Do not start a second daemon if the service state is not clearly stopped.
+    chronyd = next((name for name in CHRONYD_PATHS if os.path.isfile(name)), None)
+    if chronyd is None:
+        return result("unavailable", "CHRONY ONE-SHOT NOT INSTALLED")
+    try:
+        active = subprocess.run(
+            ["systemctl", "is-active", "chronyd.service"],
+            capture_output=True, text=True, timeout=TIMEOUT, check=False)
+    except (OSError, subprocess.TimeoutExpired):
+        return result("unavailable", "CHRONY SERVICE STATE UNKNOWN // NO CHANGE")
+    if active.returncode == 0 or active.stdout.strip() not in ("inactive", "failed"):
+        return result("unavailable", "CHRONY SERVICE NOT SAFELY STOPPED // NO CHANGE")
+
+    # -q exits after one correction. -t limits how long it waits for samples.
+    # Uses the machine's configured Chrony sources, not invented servers.
+    return privileged(
+        [chronyd, "-q", "-t", "15"], "completed",
+        "ONE-SHOT TIME CORRECTION COMPLETED // VERIFY SYSTEM TIME", 45)
 
 
 def main():

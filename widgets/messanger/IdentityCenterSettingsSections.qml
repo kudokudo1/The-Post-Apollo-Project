@@ -210,6 +210,31 @@ Item {
                         wrapMode: Text.WordWrap
                     }
 
+                    IdentityCenterLocalRecordsSearch {
+                        id: localRecordsSearch
+                        objectName: "orgLocalSearch"
+                        width: parent.width
+                        directoryStore: sections.localDirectoryStore
+                        portfolioStore: sections.localPortfoliosStore
+                        structureStore: sections.localStructureStore
+                        functionLocationStore: sections.localUnitLocationLinksStore
+                        branchLocationStore: sections.localBranchLocationLinksStore
+                        reportingStore: sections.localFunctionalReportingStore
+                        socialLinksStore: sections.localLinksStore
+                        identitiesSnapshot: sections.socialIdentitiesSnapshot
+                        accountDetailsStore: sections.socialAccountDetailsStore
+                        onRecordFocused: function(orgId, unitKind, category) {
+                            if (!sections.localOrganizationsForEditing.some(function(org) {
+                                return org.id === orgId;
+                            }))
+                                return;
+                            sections.localEditingOrganizationId = orgId;
+                            if (category === "units" &&
+                                ["division", "department", "location", "team"].includes(unitKind))
+                                localStructureEditor.selectedKind = unitKind;
+                        }
+                    }
+
                     // Shared local record editing context. ALL shows company records;
                     // Structure and Modifiers require an explicit active company.
                     Column {
@@ -273,12 +298,14 @@ Item {
                         width: parent.width
                         directoryStore: sections.localDirectoryStore
                         focusedOrganizationId: sections.activeLocalEditingOrganizationId
+                        searchQuery: localRecordsSearch.searchText
                     }
 
                     IdentityCenterLocalPortfolioEditor {
                         width: parent.width
                         directoryStore: sections.localDirectoryStore
                         portfolioStore: sections.localPortfoliosStore
+                        searchQuery: localRecordsSearch.searchText
                     }
 
                     IdentityCenterLocalStructureEditor {
@@ -288,6 +315,7 @@ Item {
                         structureStore: sections.localStructureStore
                         useSharedContext: true
                         selectedOrgId: sections.activeLocalEditingOrganizationId
+                        searchQuery: localRecordsSearch.searchText
                     }
 
                     // One source/target form applies existing link modifiers across
@@ -298,6 +326,7 @@ Item {
                         width: parent.width
                         useSharedContext: true
                         selectedOrgId: sections.activeLocalEditingOrganizationId
+                        searchQuery: localRecordsSearch.searchText
                         directoryStore: sections.localDirectoryStore
                         structureStore: sections.localStructureStore
                         functionLocationStore: sections.localUnitLocationLinksStore

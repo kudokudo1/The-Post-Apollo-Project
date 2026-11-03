@@ -10,7 +10,9 @@ Column {
     spacing: 6
 
     Repeater {
-        model: SubjectRoutes.SUBJECTS
+        // HOME is a W1 workspace, not a seventh M0 deep subject node.
+        // Render it on the INDEX rail without changing SubjectRoutes.SUBJECTS.
+        model: [{id:"home",label:"HOME"}].concat(SubjectRoutes.SUBJECTS)
         delegate: ModeButton {
             required property var modelData
             width: subjectRail.width

@@ -2,6 +2,7 @@ import QtQuick
 import Quickshell
 import Quickshell.Io
 import "WeatherDataPolicy.js" as WeatherDataPolicy
+import "OpenMeteoFallbackPolicy.js" as FallbackPolicy
 import "../location/WeatherLocationPolicy.js" as LocationPolicy
 
 Scope {
@@ -20,6 +21,20 @@ Scope {
     property bool usingPersistentCurrentCache: false
     property bool usingPersistentForecastCache: false
     property bool usingPersistentAqiCache: false
+
+    // Both sources feed the same WeatherService data contract. The primary
+    // gets a bounded attempt at every scheduled refresh, so recovery does
+    // not require a manual reset. Fallback never owns a place selection.
+    property string activeWeatherProvider: "NONE"
+    property string primaryWeatherStatus: "IDLE"
+    property string fallbackWeatherStatus: "IDLE"
+    property string fallbackWeatherError: ""
+    property int weatherGeneration: 0
+    property bool primaryParseSucceeded: false
+    property bool fallbackParseSucceeded: false
+    property int fallbackGeneration: 0
+    property string fallbackRequestContextKey: ""
+    property date fallbackLastUpdated
 
     // ─────────────────────────────────────────────
     // WEATHER DATA
@@ -87,7 +102,8 @@ Scope {
 
     property date lastUpdated
 
-    readonly property bool loading: weatherFetch.running
+    readonly property bool loading:
+        weatherFetch.running || fallbackWeatherFetch.running
 
     // ─────────────────────────────────────────────
     // AIR QUALITY DATA
@@ -151,6 +167,9 @@ Scope {
             : "https://wttr.in/?format=j1";
     }
 
+    readonly property string fallbackWeatherEndpoint:
+        hasManualPlace ? FallbackPolicy.endpoint(latitude, longitude) : ""
+
     readonly property string airQualityEndpoint: {
         if (latitude === "" || longitude === "")
             return "";
@@ -186,13 +205,67 @@ Scope {
         }
 
         onExited: function (exitCode, exitStatus) {
-            if (weatherService.weatherRequestContextKey
-                    !== weatherService.requestContextKey) {
-                Qt.callLater(weatherService.refresh);
-                return;
+            // Give StdioCollector a chance to settle before deciding whether
+            // the completed request needs a fallback.
+            Qt.callLater(function() {
+                if (weatherService.weatherRequestContextKey
+                        !== weatherService.requestContextKey) {
+                    weatherService.refresh();
+                    return;
+                }
+                if (exitCode === 0 && weatherService.primaryParseSucceeded) {
+                    weatherService.primaryWeatherStatus = "READY";
+                    return;
+                }
+                weatherService.primaryWeatherStatus = exitCode === 0
+                    ? "PARSE_FAILED" : "REQUEST_FAILED";
+                if (!weatherService.startFallbackWeather() && !weatherService.ready)
+                    weatherService.errorText = "wttr.in request failed";
+            });
+        }
+    }
+
+    // Separate process only runs after primary failure, for manual Home or
+    // Explore coordinates. It is never a duplicate continuous poller.
+    Process {
+        id: fallbackWeatherFetch
+        command: [
+            "curl", "-fsSL", "--max-time", "10", "--connect-timeout", "5",
+            weatherService.fallbackWeatherEndpoint
+        ]
+        stdout: StdioCollector {
+            onStreamFinished: {
+                if (weatherService.fallbackRequestContextKey
+                        === weatherService.requestContextKey
+                        && weatherService.fallbackGeneration
+                           === weatherService.weatherGeneration)
+                    weatherService.parseFallbackWeather(text);
             }
-            if (exitCode !== 0)
-                weatherService.errorText = "wttr.in request failed";
+        }
+        onExited: function(exitCode, exitStatus) {
+            Qt.callLater(function() {
+                if (weatherService.fallbackRequestContextKey
+                        !== weatherService.requestContextKey
+                        || weatherService.fallbackGeneration
+                           !== weatherService.weatherGeneration) {
+                    // A new primary may have failed while the previous
+                    // fallback was still exiting. Try the pending context.
+                    if (weatherService.primaryWeatherStatus !== "READY"
+                            && !weatherService.ready)
+                        weatherService.startFallbackWeather();
+                    return;
+                }
+                if (exitCode === 0 && weatherService.fallbackParseSucceeded) {
+                    weatherService.fallbackWeatherStatus = "READY";
+                    return;
+                }
+                weatherService.fallbackWeatherStatus = exitCode === 0
+                    ? "PARSE_FAILED" : "REQUEST_FAILED";
+                weatherService.fallbackWeatherError =
+                    "Open-Meteo forecast unavailable";
+                if (!weatherService.ready)
+                    weatherService.errorText = "weather providers unavailable";
+            });
         }
     }
 
@@ -259,6 +332,7 @@ Scope {
                 errorText = "";
                 ready = true;
                 usingPersistentCurrentCache = true;
+                activeWeatherProvider = "CACHE";
                 hydrated = true;
             }
         }
@@ -469,9 +543,28 @@ Scope {
 
     function refresh() {
         if (!weatherFetch.running) {
+            weatherGeneration += 1;
             weatherRequestContextKey = requestContextKey;
+            primaryParseSucceeded = false;
+            primaryWeatherStatus = "FETCHING";
             weatherFetch.running = true;
         }
+    }
+
+    function startFallbackWeather() {
+        if (fallbackWeatherFetch.running)
+            return true;
+        if (fallbackWeatherEndpoint === "") {
+            fallbackWeatherStatus = "NO_MANUAL_PLACE";
+            return false;
+        }
+        fallbackGeneration = weatherGeneration;
+        fallbackRequestContextKey = requestContextKey;
+        fallbackParseSucceeded = false;
+        fallbackWeatherStatus = "FETCHING";
+        fallbackWeatherError = "";
+        fallbackWeatherFetch.running = true;
+        return true;
     }
 
     function refreshAirQuality() {
@@ -533,6 +626,10 @@ Scope {
         usingPersistentCurrentCache = false;
         usingPersistentForecastCache = false;
         usingPersistentAqiCache = false;
+        activeWeatherProvider = "NONE";
+        primaryWeatherStatus = "IDLE";
+        fallbackWeatherStatus = "IDLE";
+        fallbackWeatherError = "";
     }
 
     onRequestContextKeyChanged: {
@@ -641,6 +738,8 @@ Scope {
 
             errorText = "";
             ready = true;
+            primaryParseSucceeded = true;
+            activeWeatherProvider = "WTTR";
             usingPersistentCurrentCache = false;
             usingPersistentForecastCache = false;
 
@@ -656,6 +755,49 @@ Scope {
 
             errorText = "weather data parse failed";
         }
+    }
+
+    // Parse fallback into a complete temporary object before mutating the
+    // shared UI fields. A bad provider response leaves prior data intact.
+    function parseFallbackWeather(rawText) {
+        const parsed = FallbackPolicy.parse(rawText);
+        if (!parsed.ok) {
+            fallbackWeatherError = parsed.reason;
+            return false;
+        }
+        const current = parsed.current;
+        tempF = current.tempF;
+        feelsLikeF = current.feelsLikeF;
+        condition = current.condition;
+        weatherCode = current.weatherCode;
+        uvIndex = current.uvIndex;
+        humidity = current.humidity;
+        windMph = current.windMph;
+        windDirection = current.windDirection;
+        pressureHpa = current.pressureHpa;
+        visibilityMiles = current.visibilityMiles;
+        cloudCover = current.cloudCover;
+        precipMm = current.precipMm;
+        observationTime = current.observationTime;
+        localObservationDateTime = current.localObservationDateTime;
+        localObservationAnchorMs = Date.now();
+        hourlyForecast = parsed.hourly;
+        dailyForecast = parsed.daily;
+        const receivedAt = new Date();
+        lastUpdated = receivedAt;
+        forecastLastUpdated = receivedAt;
+        fallbackLastUpdated = receivedAt;
+        ready = true;
+        fallbackParseSucceeded = true;
+        activeWeatherProvider = "OPEN_METEO";
+        errorText = "";
+        usingPersistentCurrentCache = false;
+        usingPersistentForecastCache = false;
+        persistCurrentWeather(receivedAt.getTime());
+        persistForecast(receivedAt.getTime());
+        captureCurrentHistory(receivedAt.getTime());
+        refreshAirQuality();
+        return true;
     }
 
     // ─────────────────────────────────────────────

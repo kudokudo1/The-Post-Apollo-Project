@@ -1,0 +1,43 @@
+name: Weather M6 Open-Meteo fallback contracts
+
+on:
+  pull_request:
+    paths:
+      - "services/weather/WeatherService.qml"
+      - "services/weather/OpenMeteoFallbackPolicy.js"
+      - "services/weather/WeatherDataPolicy.js"
+      - "tests/weather/test_openmeteo_fallback_m6.cjs"
+      - "tests/weather/test_openmeteo_fallback_integration_m6.py"
+      - "tests/weather/test_weather_persistent_cache_m4.js"
+      - ".github/workflows/weather-openmeteo-fallback-m6.yml"
+  push:
+    branches:
+      - main
+    paths:
+      - "services/weather/WeatherService.qml"
+      - "services/weather/OpenMeteoFallbackPolicy.js"
+      - "tests/weather/test_openmeteo_fallback_m6.cjs"
+      - "tests/weather/test_openmeteo_fallback_integration_m6.py"
+      - "tests/weather/test_weather_persistent_cache_m4.js"
+      - ".github/workflows/weather-openmeteo-fallback-m6.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  fallback-contracts:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify Open-Meteo payload and unit normalization
+        run: node tests/weather/test_openmeteo_fallback_m6.cjs
+      - name: Verify shared service fallback contract
+        run: python3 tests/weather/test_openmeteo_fallback_integration_m6.py
+      - name: Preserve original weather parser
+        run: node tests/weather/test_weather_data_policy.js
+      - name: Preserve persistent-cache guard
+        run: node tests/weather/test_weather_persistent_cache_m4.js
+      - name: Preserve shared Home Explore location
+        run: node tests/location/test_weather_location_policy.cjs
+      - name: Preserve Weather Service location integration
+        run: python3 tests/location/test_weather_location_integration.py

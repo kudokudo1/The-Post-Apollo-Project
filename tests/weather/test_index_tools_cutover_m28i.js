@@ -42,8 +42,11 @@ test("exact six M28-I source controls have existing native TOOLS owners",()=>{
     assert.ok(policy.routeInfo(route),id+" actual native panel");
   }
   assert.equal(Object.keys(env.PANELS).length,103);
-  assert.equal(Object.keys(env.WIRED_IN_SUBJECTS).length,89);
-  assert.equal(103-89,14);
+  assert.equal(Object.values(env.WIRED_IN_SUBJECTS)
+    .filter(milestone=>milestone==="M28-I").length,6,
+    "M28-I retains its exact original six source/clock/store controls");
+  assert.ok(Object.keys(env.WIRED_IN_SUBJECTS).length>=89,
+    "independently reviewed later MEDIA catalogs may increase the total");
   assert.deepEqual(plain(env.remainingSourcePagesForPath("tools/storage",env.PANELS)),[]);
   assert.deepEqual(plain(env.remainingSourcePagesForPath("tools/sources/provenance",env.PANELS)),[]);
   assert.deepEqual(plain(env.nativeDestinationsForPath("tools/storage",env.PANELS).map(x=>x.path)),
@@ -140,12 +143,12 @@ test("cache, history, event, dossier and FRAME CONTRACT stay read-only with orig
 
 test("still-pending source racks, HOME semantics and WATCH hosting remain visibly unresolved",()=>{
   for(const id of [
-    "home-quick-conditions","home-aqi-humidity","home-aqi-wind",
-    "home-space-weather","ground-source","map-source-rack",
-    "station-source-badge","news-live","news-creators","news-uploads"
+    "ground-source","map-source-rack","station-source-badge"
   ])assert.equal(env.WIRED_IN_SUBJECTS[id],undefined,id+" not silently accepted");
-  assert.deepEqual(plain(env.remainingSourcePagesForPath("media/watch",env.PANELS)),
-    plain(env.sourcePagesForPath("media/watch",env.PANELS)));
+  assert.ok(env.sourcePagesForPath("media/watch",env.PANELS).length>0,
+    "original NEWS catalog source provenance remains");
+  assert.deepEqual(plain(env.remainingSourcePagesForPath("media/watch",env.PANELS)),[],
+    "M28-J classifies the catalog, not video playback");
   assert.match(navigator,/model: browser\.nativeDestinations/);
   assert.match(navigator,/model: browser\.classicSources/);
   assert.deepEqual(plain(env.nativeDestinationsForPath("../tools",env.PANELS)),[]);

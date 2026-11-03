@@ -51,7 +51,7 @@ Rectangle {
 
     // Existing Weather Station sources supplied from the single owning root.
     property var weatherService: null
-    // Source is owned by the Weather Station root, not the navigator.
+    // M5b // Read-only celestial source stays owned by WeatherStationW.
     property var celestialSource: null
     property var spaceService: null
     property var nwsAlertSource: null
@@ -79,10 +79,23 @@ Rectangle {
     readonly property string liveToolsKind:
         ToolsPanelPolicy.kindForRoute(currentPath)
 
-
-    readonly property var currentRoute: SubjectRoutes.findRoute(currentPath)
-    readonly property var childrenRoutes: SubjectRoutes.childrenOf(currentPath)
-    readonly property var pathCrumbs: SubjectRoutes.breadcrumbs(currentPath)
+    // M28-K: HOME is a real W1 workspace family, deliberately separate from
+    // the M0 six-subject deep taxonomy. The INDEX may inspect it directly
+    // without forging a seventh M0 SubjectRoutes node.
+    readonly property var currentRoute:
+        currentPath === "home"
+        ? ({path:"home",label:"HOME // ORIGINAL WORKSPACE",subject:"home",group:true})
+        : SubjectRoutes.findRoute(currentPath)
+    readonly property var childrenRoutes:
+        currentPath === "home"
+        ? Workspace.GROUPS.home.map(function(entry) {
+            return {path:entry.path,label:entry.label,subject:"home",group:false};
+          })
+        : SubjectRoutes.childrenOf(currentPath)
+    readonly property var pathCrumbs:
+        currentPath === "home"
+        ? [{path:"home",label:"HOME"}]
+        : SubjectRoutes.breadcrumbs(currentPath)
     // Preserve historical source lineage but present only unresolved legacy
     // shortcuts; exact M28-A/B/C routes are offered as native SUBJECTS links.
     readonly property var classicSources:
@@ -119,6 +132,12 @@ Rectangle {
     // All top-level family choices open a landing page directly.
     // MORE retains access to the full 135-route original index.
     function chooseRoute(path) {
+        if (indexOpen && path === "home") {
+            currentPath = "home";
+            navigationCursor = 0;
+            if (routeScroll) routeScroll.contentY = 0;
+            return true;
+        }
         const home = Workspace.isHomeRoute(path);
         const candidate = home ? {path:path,subject:"home"}
                                : SubjectRoutes.findRoute(path);
@@ -144,6 +163,15 @@ Rectangle {
     }
 
     function selectSubject(subjectId) {
+        if (subjectId === "home") {
+            if (indexOpen) {
+                currentPath = "home";
+                navigationCursor = 0;
+                if (routeScroll) routeScroll.contentY = 0;
+                return true;
+            }
+            return chooseRoute(Workspace.landingFor("home"));
+        }
         if (indexOpen) {
             const subject = SubjectRoutes.findRoute(subjectId);
             if (!subject || subject.depth !== 0)
@@ -161,7 +189,7 @@ Rectangle {
             || SubjectRoutes.findRoute(currentPath)
             ? currentPath : Workspace.landingFor("home");
         const family = Workspace.familyFor(lastWorkspacePath);
-        currentPath = family === "home" ? "weather" : family;
+        currentPath = family === "home" ? "home" : family;
         indexOpen = true;
         navigationCursor = 0;
         if (routeScroll)
@@ -178,7 +206,7 @@ Rectangle {
     function cycleSubjects(direction) {
         const step = Number(direction) < 0 ? -1 : 1;
         if (indexOpen) {
-            const names = SubjectRoutes.SUBJECTS;
+            const names = [{id:"home"}].concat(SubjectRoutes.SUBJECTS);
             const current = Workspace.familyFor(currentPath);
             const idx = names.findIndex(function(x){return x.id === current;});
             return selectSubject(names[(Math.max(0,idx)+step+names.length)%names.length].id);
@@ -310,7 +338,9 @@ Rectangle {
             id: headingText
             anchors.top: parent.top
             anchors.left: parent.left
-            text: browser.liveWeatherKind !== ""
+            text: browser.currentPath === "home"
+                  ? "HOME // SOURCE ROUTES"
+                  : browser.liveWeatherKind !== ""
                   ? "WEATHER // SUBJECT VIEW"
                   : browser.liveCosmosKind !== ""
                     ? "COSMOS // SUBJECT VIEW"

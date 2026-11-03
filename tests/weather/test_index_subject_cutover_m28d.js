@@ -45,8 +45,10 @@ test("the historical M1 source map stays intact, without mislabeling all control
     ["map","news"]);
   assert.deepEqual(plain(ctx.sourcePagesForPath("tools/terminal", ctx.PANELS).map(x => x.id)),
     ["terminal"]);
-  assert.ok(ctx.remainingSourcePagesForPath("weather", ctx.PANELS).length > 0,
-    "unreviewed HOME quick/relationship controls must still offer CLASSIC access");
+  assert.ok(ctx.sourcePagesForPath("weather", ctx.PANELS).some(x=>x.id==="home"),
+    "M0 historical HOME source provenance must remain intact");
+  assert.deepEqual(plain(ctx.remainingSourcePagesForPath("weather", ctx.PANELS)),[],
+    "M28-K corrects original HOME controls into their native workspace");
   assert.ok(ctx.sourcePagesForPath("weather", ctx.PANELS).length
     >= ctx.remainingSourcePagesForPath("weather", ctx.PANELS).length,
     "historical provenance cannot shrink with later reviewed cutovers");
@@ -55,8 +57,11 @@ test("the historical M1 source map stays intact, without mislabeling all control
   assert.ok(ctx.remainingSourcePagesForPath("earth", ctx.PANELS).length
     <= ctx.sourcePagesForPath("earth", ctx.PANELS).length,
     "later independently reviewed EARTH controls may stop needing CLASSIC");
-  assert.deepEqual(plain(ctx.remainingSourcePagesForPath("media/watch", ctx.PANELS)),
-    plain(ctx.sourcePagesForPath("media/watch", ctx.PANELS)));
+  assert.deepEqual(plain(ctx.sourcePagesForPath("media/watch", ctx.PANELS).map(x=>x.id)),
+    ["news"], "M1 historical WATCH source is still NEWS");
+  assert.ok(ctx.remainingSourcePagesForPath("media/watch", ctx.PANELS).length
+    <= ctx.sourcePagesForPath("media/watch", ctx.PANELS).length,
+    "later reviewed WATCH catalog routes may be native");
   assert.equal(JSON.stringify(ctx.PANELS), before, "source map mutated");
 });
 
@@ -69,8 +74,8 @@ test("M28-A/B/C replaced only their own INDEX CLASSIC jumps", () => {
     ["tools/terminal/consoles", "tools/terminal/star-map"]);
   assert.deepEqual(plain(ctx.nativeDestinationsForPath("media/news/locations", ctx.PANELS)),
     [{path:"media/news/locations",panels:2,milestones:["M28-A"]}]);
-  assert.ok(ctx.remainingSourcePagesForPath("media", ctx.PANELS).length > 0,
-    "unreviewed MEDIA watch/radio/creator handoffs must remain reachable");
+  assert.deepEqual(plain(ctx.remainingSourcePagesForPath("media", ctx.PANELS)),[],
+    "later M28-J completes source-wiring classification for MEDIA catalogs, not video hosting");
 });
 
 test("native INDEX shortcuts point to known concrete subject panels and deduplicate by destination", () => {

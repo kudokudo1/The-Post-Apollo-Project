@@ -1,0 +1,45 @@
+name: Weather M28-I TOOLS sample time and storage cutover
+
+on:
+  pull_request:
+    paths:
+      - 'widgets/weather/StationToolsSubjectPanelPolicy.js'
+      - 'widgets/weather/StationToolsSubjectPane.qml'
+      - 'widgets/weather/StationSubjectNavigationPreviewPolicy.js'
+      - 'tests/weather/test_index_tools_cutover_m28i.js'
+      - 'tests/weather/test_index_weather_cutover_m28f.js'
+      - 'tests/weather/test_index_cosmos_cutover_m28g.js'
+      - 'tests/weather/test_index_earth_cutover_m28h.js'
+      - 'docs/weather-subjects-m28i-tools-source-clock-handoff.md'
+      - '.github/workflows/weather-subjects-tools-parity-m28i.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  tools-parity:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: M28-I four real NOAA sample clocks and exact six TOOLS cutovers
+        run: node --test tests/weather/test_index_tools_cutover_m28i.js
+      - name: Preserve T1 original TOOLS health, storage and provenance contracts
+        run: node --test tests/weather/test_tools_subject_panels_t1.js
+      - name: Preserve earlier source/route milestone proofs
+        run: |
+          node --test tests/weather/test_index_subject_cutover_m28d.js
+          node --test tests/weather/test_index_radio_cutover_m28e.js
+          node --test tests/weather/test_index_weather_cutover_m28f.js
+          node --test tests/weather/test_index_cosmos_cutover_m28g.js
+          node --test tests/weather/test_index_earth_cutover_m28h.js
+      - name: Preserve browser and seven-family workspace route behavior
+        run: |
+          node --test tests/weather/subject_navigation_contract.test.js
+          node --test tests/weather/subject_navigation_browser.test.js
+          node --test tests/weather/test_workspace_landing_w1.js
+          node --test tests/weather/test_workspace_left_rail_w1r.js

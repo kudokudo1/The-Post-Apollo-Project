@@ -11,7 +11,8 @@ Rectangle {
 
     property string subjectRoute: ""
     property var weatherService: null
-    property real runtimeNowMs: Date.now()
+    // Supplied by the existing Station root; no independent clock.
+    property real runtimeNowMs: 0
 
     readonly property string kind: MagickPolicy.kindForRoute(subjectRoute)
     readonly property string primaryObservation:

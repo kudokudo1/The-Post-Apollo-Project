@@ -1,4 +1,4 @@
-name: Weather M26-C Fedora offscreen dossier ActionButton
+name: Weather M26-C Fedora Xvfb dossier ActionButton
 
 on:
   pull_request:
@@ -26,10 +26,11 @@ jobs:
         run: |
           dnf install -y --setopt=install_weak_deps=False \
             quickshell qt6-qtdeclarative qt6-qt5compat \
-            qt6-qtbase-gui qt6-qtsvg git nodejs coreutils findutils
+            qt6-qtbase-gui qt6-qtsvg git nodejs coreutils findutils \
+            xdotool xorg-x11-server-Xvfb
           quickshell --version
       - uses: actions/checkout@v4
-      - name: M26-C actual Event Context card pointer and write smoke
+      - name: M26-C actual Xvfb Event Context card native pointer smoke
         run: bash scripts/weather/verify_dossier_card_fedora_m26c.sh
       - name: M26-A pure persistence and UI wiring regression
         run: node tests/weather/test_weather_dossier_persistent_m25.js

@@ -37,8 +37,8 @@ function sourcePagesForPath(path, panelRoutes) {
     });
 }
 
-// M28-D/E: These exact original control families already have a SUBJECTS
-// route and regression contract from M28-A/B/C and MEDIA D1 radio. This records routed wiring,
+// M28-D/F: These exact original control families have route-specific SUBJECTS
+// source wiring and tests. Original pages are still available until final parity.
 // NOT operator acceptance, native Sway/Kitty acceptance, or whole-page parity.
 // Do not add other panels merely because a destination appears in PANELS.
 var WIRED_IN_SUBJECTS = {
@@ -58,7 +58,39 @@ var WIRED_IN_SUBJECTS = {
   "radio-paging":"M28-E",
   "radio-favorites-recent":"M28-E",
   "radio-select-load-enter":"M28-E",
-  "radio-play-pause-stop":"M28-E"
+  "radio-play-pause-stop":"M28-E",
+  // M28-F: existing HOME/GROUND/SKY filtered WEATHER sections and map layers.
+  // Wired does not certify provider availability or live operator acceptance.
+  "home-official-alert":"M28-F",
+  "home-current-weather":"M28-F",
+  "home-next-hours":"M28-F",
+  "home-air-quality":"M28-F",
+  "home-historical-forecast":"M28-F",
+  "home-auto-relevant":"M28-F",
+  "ground-official-alerts":"M28-F",
+  "ground-coastal-relationship":"M28-F",
+  "ground-marine-relationships":"M28-F",
+  "ground-river-nwps":"M28-F",
+  "ground-river-nearby":"M28-F",
+  "ground-river-flood-context":"M28-F",
+  "ground-river-stageflow":"M28-F",
+  "ground-marine-ndbc":"M28-F",
+  "ground-coast-coops":"M28-F",
+  "ground-lightning-nowcoast":"M28-F",
+  "ground-heat-fire-weather":"M28-F",
+  "ground-air-particulates":"M28-F",
+  "ground-gases":"M28-F",
+  "ground-pollen-peak":"M28-F",
+  "ground-pollen-species":"M28-F",
+  "ground-air-12-hour":"M28-F",
+  "sky-current-conditions":"M28-F",
+  "sky-atmosphere":"M28-F",
+  "sky-hourly-forecast":"M28-F",
+  "sky-hour-inspector":"M28-F",
+  "sky-daily-forecast":"M28-F",
+  "map-mrms-radar":"M28-F",
+  "map-rainviewer":"M28-F",
+  "map-hms-smoke":"M28-F"
 };
 
 function remainingSourcePagesForPath(path, panelRoutes) {

@@ -90,7 +90,33 @@ var WIRED_IN_SUBJECTS = {
   "sky-daily-forecast":"M28-F",
   "map-mrms-radar":"M28-F",
   "map-rainviewer":"M28-F",
-  "map-hms-smoke":"M28-F"
+  "map-hms-smoke":"M28-F",
+  // M28-G: original filtered SKY celestial and SPACE SWPC sections in COSMOS.
+  // The mixed SKY WEATHER forecast controls remain M28-F; SPACE provenance
+  // is a separate TOOLS review, not silently included here.
+  "sky-sun-moon":"M28-G",
+  "sky-iss-passes":"M28-G",
+  "sky-moon-usno":"M28-G",
+  "sky-eclipses":"M28-G",
+  "sky-celestial-fix":"M28-G",
+  "sky-planet-clock":"M28-G",
+  "sky-meteor-showers":"M28-G",
+  "sky-twilight":"M28-G",
+  "sky-photo-light":"M28-G",
+  "sky-current-sun":"M28-G",
+  "space-geomagnetic-core":"M28-G",
+  "space-solar-context":"M28-G",
+  "space-noaa-scales":"M28-G",
+  "space-solar-cycle":"M28-G",
+  "space-kp-history":"M28-G",
+  "space-kp-forecast":"M28-G",
+  "space-suvi-imager":"M28-G",
+  "space-aurora":"M28-G",
+  "space-xray-flux":"M28-G",
+  "space-goes-flares":"M28-G",
+  "space-watch-day":"M28-G",
+  "space-warning-validity":"M28-G",
+  "space-bulletins":"M28-G"
 };
 
 function remainingSourcePagesForPath(path, panelRoutes) {

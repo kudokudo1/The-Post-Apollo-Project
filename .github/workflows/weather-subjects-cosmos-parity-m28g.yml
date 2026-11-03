@@ -1,0 +1,39 @@
+name: Weather M28-G COSMOS SKY and SPACE parity
+
+on:
+  pull_request:
+    paths:
+      - 'widgets/weather/StationSubjectNavigationPreviewPolicy.js'
+      - 'tests/weather/test_index_weather_cutover_m28f.js'
+      - 'tests/weather/test_index_cosmos_cutover_m28g.js'
+      - 'docs/weather-subjects-m28g-cosmos-parity-handoff.md'
+      - '.github/workflows/weather-subjects-cosmos-parity-m28g.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  cosmos-parity:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: M28-G exact SKY and SPACE source-to-COSMOS native route proof
+        run: node --test tests/weather/test_index_cosmos_cutover_m28g.js
+      - name: Preserve M28-F WEATHER exact sections and M0/M1 source identities
+        run: |
+          node --test tests/weather/test_index_weather_cutover_m28f.js
+          node --test tests/weather/subject_navigation_contract.test.js
+          node --test tests/weather/subject_navigation_browser.test.js
+      - name: Preserve C1 original COSMOS source gates and visual timeline
+        run: |
+          node --test tests/weather/test_cosmos_subject_panels_c1.js
+          node --test tests/weather/test_workspace_landing_w1.js
+      - name: Preserve M28-D/E earlier INDEX cutover semantics
+        run: |
+          node --test tests/weather/test_index_subject_cutover_m28d.js
+          node --test tests/weather/test_index_radio_cutover_m28e.js

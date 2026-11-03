@@ -151,7 +151,7 @@ test("INDEX offers concrete WEATHER routes, preserves unreviewed HOME and non-WE
   assert.ok(context.remainingSourcePagesForPath("weather",context.PANELS)
     .some(row=>row.id==="home"), "unreviewed HOME controls retain CLASSIC shortcut");
   for (const id of ["home-quick-conditions","home-aqi-humidity","home-aqi-wind",
-                    "ground-usgs-seismic","sky-sun-moon","news-live"]) {
+                    "ground-usgs-seismic","space-field-times","news-live"]) {
     assert.equal(context.WIRED_IN_SUBJECTS[id], undefined, id + " remains unreviewed");
   }
   assert.deepEqual(plain(context.remainingSourcePagesForPath("media/watch",context.PANELS)),
@@ -168,6 +168,9 @@ test("source-true cutover registry is guarded against missing/unknown destinatio
   }
   const count=Object.keys(context.PANELS).length;
   assert.equal(count,103,"unexpected source control inventory change");
-  assert.equal(Object.keys(context.WIRED_IN_SUBJECTS).length,46);
-  assert.equal(count-Object.keys(context.WIRED_IN_SUBJECTS).length,57);
+  assert.equal(Object.values(context.WIRED_IN_SUBJECTS)
+    .filter(milestone => milestone === "M28-F").length, 30,
+    "M28-F exact source-wiring milestone must remain unchanged");
+  assert.ok(Object.keys(context.WIRED_IN_SUBJECTS).length >= 46,
+    "later audited milestones may only add independent exact source controls");
 });

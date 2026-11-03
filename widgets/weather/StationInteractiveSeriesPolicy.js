@@ -119,29 +119,32 @@ function model(samples,field,nowMs,durationMs,maxPoints){
     var downsampled=boundedPoints(all,maxPoints);
     var median=medianInterval(all);
     var gapThreshold=Math.max(45*60000,median*3);
-    // Segment ORIGINAL observations before any pixel/downsample pass.
-    // No point after a gap is attached to the preceding line.
-    var grouped=[],group=[];
-    for(var i=0;i<all.length;i++){
-        if(group.length && all[i].timeMs-group[group.length-1].timeMs
-           >gapThreshold){
-            grouped.push(group);
-            group=[];
-        }
-        group.push(all[i]);
+    // Find discontinuities in ORIGINAL observations, before sampling.
+    // Then break the globally bounded chart at those exact timestamps.
+    // This prevents a dense sequence of tiny segments from violating
+    // the rendering point cap or drawing across an unavailable interval.
+    var cutTimes=[];
+    for(var i=1;i<all.length;i++){
+        if(all[i].timeMs-all[i-1].timeMs>gapThreshold)
+            cutTimes.push(all[i].timeMs);
     }
-    if(group.length)grouped.push(group);
-    // Cap points per source while preserving gap boundaries.
-    var groups=grouped.map(function(segment){
-        return boundedPoints(segment,Math.max(8,Math.floor(
-           Number(maxPoints||192)/Math.max(1,grouped.length))));
-    });
+    var groups=[],group=[],cut=0;
+    for(var j=0;j<downsampled.length;j++){
+        while(cut<cutTimes.length
+              && downsampled[j].timeMs>=cutTimes[cut]){
+            if(group.length)groups.push(group);
+            group=[];
+            cut++;
+        }
+        group.push(downsampled[j]);
+    }
+    if(group.length)groups.push(group);
     return {
         rows:downsampled,
         segments:groups,
         count:all.length,
         drawnCount:groups.reduce(function(n,s){return n+s.length;},0),
-        gaps:Math.max(0,groups.length-1),
+        gaps:cutTimes.length,
         startMs:now-period,endMs:now,
         firstMs:all[0].timeMs,lastMs:all[all.length-1].timeMs,
         axis:axisFor(all),gapThresholdMs:gapThreshold

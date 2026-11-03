@@ -234,6 +234,32 @@ Column {
             onTriggered: search.searchText = ""
         }
     }
+    Text {
+        width: parent.width
+        text: "RECORD ACTIONS // ADD, EDIT NAME + SAVE, ARCHIVE + CONFIRM, RESTORE"
+        color: Colors.cyan
+        font.pixelSize: 10
+        font.bold: true
+        wrapMode: Text.WordWrap
+    }
+    ActionButton {
+        objectName: "localShowArchivedRecords"
+        width: 188
+        height: 29
+        label: search.includeArchived ? "HIDE ARCHIVED RECORDS" : "SHOW ARCHIVED RECORDS"
+        labelPixelSize: 9
+        selected: search.includeArchived
+        onTriggered: search.includeArchived = !search.includeArchived
+    }
+    Text {
+        width: parent.width
+        visible: search.includeArchived
+        text: "Archived records retain their IDs. To restore an archived company, " +
+              "select ALL / NO SELECTION above its Directory row."
+        color: Colors.orange
+        font.pixelSize: 9
+        wrapMode: Text.WordWrap
+    }
     Flow {
         width: parent.width
         height: childrenRect.height
@@ -256,14 +282,6 @@ Column {
                 selected: search.scope === modelData.id
                 onTriggered: search.scope = modelData.id
             }
-        }
-        ActionButton {
-            width: 145
-            height: 28
-            label: search.includeArchived ? "HIDE ARCHIVED" : "INCLUDE ARCHIVED"
-            labelPixelSize: 8
-            selected: search.includeArchived
-            onTriggered: search.includeArchived = !search.includeArchived
         }
     }
     Text {

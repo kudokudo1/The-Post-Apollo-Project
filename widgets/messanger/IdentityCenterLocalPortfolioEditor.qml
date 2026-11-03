@@ -20,6 +20,8 @@ Column {
         return values.toLowerCase().indexOf(normalizedSearch) !== -1;
     }
     property bool showArchived: false
+    property bool useSharedArchiveControl: false
+    onShowArchivedChanged: confirmationKey = ""
     property string confirmationKey: ""
     readonly property bool editable: portfolioStore !== null
                                      && portfolioStore.state === "ready"
@@ -127,6 +129,7 @@ Column {
     ActionButton {
         width: 170
         height: 28
+        visible: !editor.useSharedArchiveControl
         label: showArchived ? "HIDE ARCHIVED" : "SHOW ARCHIVED"
         labelPixelSize: 9
         onTriggered: {

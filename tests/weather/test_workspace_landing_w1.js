@@ -109,6 +109,8 @@ test("workspace top/bottom buttons switch immediate working panels",()=>{
   assert.match(browser,/property string currentPath: "home\/overview"/);
   assert.match(browser,/Workspace\.landingFor\(subjectId\)/);
   assert.match(browser,/id: legacyIndexLayer/);
+  assert.match(browser,/if \(indexOpen && !home && candidate\.group\)/);
+  assert.match(browser,/function returnToWorkspace\(\)/);
   assert.match(browser,/onIndexRequested: browser\.openIndex\(\)/);
   assert.match(browser,/onLegacyPageRequested: function\(pageId\)/);
   assert.match(station,/StationSubjectNavigator\s*\{/);

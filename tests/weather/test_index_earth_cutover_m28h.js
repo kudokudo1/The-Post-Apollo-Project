@@ -57,8 +57,11 @@ test("M28-H is exactly fourteen reviewed original EARTH event and dossier source
     }
   }
   assert.equal(Object.keys(c.PANELS).length,103);
-  assert.equal(Object.keys(c.WIRED_IN_SUBJECTS).length,83);
-  assert.equal(103-83,20);
+  assert.equal(Object.values(c.WIRED_IN_SUBJECTS)
+    .filter(milestone=>milestone==="M28-H").length,14,
+    "M28-H fourteen event mappings remain an exact proof");
+  assert.ok(Object.keys(c.WIRED_IN_SUBJECTS).length>=83,
+    "later bounded reviews may add independently audited controls");
 });
 
 test("EARTH has one source-scoped map instance, not second event or archive writer",()=>{
@@ -132,7 +135,7 @@ test("INDEX no longer routes already-reviewed EARTH source groups into CLASSIC",
 test("unreviewed tools and watch controls are not implicitly certified by EARTH parity",()=>{
   for(const id of [
     "map-source-rack","home-quick-conditions","home-aqi-humidity",
-    "space-field-times","news-live","news-congress","station-event-store"
+    "ground-source","news-live","news-congress","station-source-badge"
   ]) assert.equal(c.WIRED_IN_SUBJECTS[id],undefined,id+" remains pending");
   assert.deepEqual(plain(c.nativeDestinationsForPath("../earth",c.PANELS)),[]);
   assert.deepEqual(plain(c.remainingSourcePagesForPath("earth//map",c.PANELS)),[]);

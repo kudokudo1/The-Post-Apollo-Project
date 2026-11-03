@@ -1,0 +1,48 @@
+name: Weather M28-K HOME QUICK and HISTORY native INDEX cutover
+
+on:
+  pull_request:
+    paths:
+      - 'widgets/weather/StationSubjectNavigationPreviewPolicy.js'
+      - 'widgets/weather/StationSubjectNavigator.qml'
+      - 'widgets/weather/StationSubjectRail.qml'
+      - 'tests/weather/test_index_home_cutover_m28k.js'
+      - 'tests/weather/test_index_subject_cutover_m28d.js'
+      - 'tests/weather/test_index_weather_cutover_m28f.js'
+      - 'tests/weather/test_index_cosmos_cutover_m28g.js'
+      - 'tests/weather/test_index_earth_cutover_m28h.js'
+      - 'tests/weather/test_index_tools_cutover_m28i.js'
+      - 'tests/weather/test_index_media_catalog_cutover_m28j.js'
+      - 'docs/weather-subjects-m28k-home-parity-handoff.md'
+      - '.github/workflows/weather-subjects-home-parity-m28k.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  home-parity:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: M28-K real persistent HOME workspace and deep INDEX route correctness
+        run: node --test tests/weather/test_index_home_cutover_m28k.js
+      - name: M0/M1 six-subject contract remains intact alongside W1 seven families
+        run: |
+          node --test tests/weather/subject_navigation_contract.test.js
+          node --test tests/weather/subject_navigation_browser.test.js
+          node --test tests/weather/test_workspace_landing_w1.js
+          node --test tests/weather/test_workspace_left_rail_w1r.js
+      - name: Protect earlier M28-D through J exact source cutovers
+        run: |
+          node --test tests/weather/test_index_subject_cutover_m28d.js
+          node --test tests/weather/test_index_radio_cutover_m28e.js
+          node --test tests/weather/test_index_weather_cutover_m28f.js
+          node --test tests/weather/test_index_cosmos_cutover_m28g.js
+          node --test tests/weather/test_index_earth_cutover_m28h.js
+          node --test tests/weather/test_index_tools_cutover_m28i.js
+          node --test tests/weather/test_index_media_catalog_cutover_m28j.js

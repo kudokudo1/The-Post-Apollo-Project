@@ -1,0 +1,42 @@
+name: Weather M26-E multi-provider MAP dossier identity
+
+on:
+  pull_request:
+    paths:
+      - "tests/weather/fixtures/M26EMultiSourceMap.qml"
+      - "tests/weather/fixtures/M26EGdacsService.qml"
+      - "tests/weather/fixtures/M26EStationDiscoveryService.qml"
+      - "tests/weather/fixtures/M26EFirmsHotspotService.qml"
+      - "scripts/weather/verify_dossier_multiprovider_fedora_m26e.sh"
+      - "widgets/weather/StationDiscovery.qml"
+      - "services/weather/WeatherDossierArchiveStore.qml"
+      - ".github/workflows/weather-dossier-multiprovider-m26e.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  multiprovider:
+    runs-on: ubuntu-latest
+    container:
+      image: fedora:44
+    timeout-minutes: 20
+    steps:
+      - name: Install Quickshell 0.3 and isolated X11 runner
+        run: |
+          dnf install -y --setopt=install_weak_deps=False dnf5-plugins
+          dnf copr enable -y errornointernet/quickshell
+          dnf install -y --setopt=install_weak_deps=False \
+            quickshell qt6-qtdeclarative qt6-qt5compat qt6-qtbase-gui \
+            qt6-qtsvg git nodejs coreutils findutils \
+            xdotool xorg-x11-server-Xvfb
+          quickshell --version
+          quickshell --version | grep '0.3.'
+      - uses: actions/checkout@v4
+      - name: Four real MAP marker clicks, distinct source-native dossiers
+        run: bash scripts/weather/verify_dossier_multiprovider_fedora_m26e.sh
+      - name: M25 persistence and identity regression
+        run: node tests/weather/test_weather_dossier_persistent_m25.js
+      - name: M26-D single-source MAP regression
+        run: node tests/weather/test_weather_dossier_disposable_restart_m26.js

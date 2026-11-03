@@ -137,13 +137,15 @@ test("solar arc refuses missing/invalid coordinates, date or civil offset",()=>{
 test("visual is mounted only on route-eligible COSMOS SKY, not CLASSIC or WEATHER",()=>{
     assert.match(sky,/StationCosmosVisualInstruments\s*\{/);
     assert.match(sky,/visible: sky\.subjectRoute\.indexOf\("cosmos\/"\) === 0/);
-    assert.match(sky,/showMoon: sky\.sectionVisible\("moon"\)/);
+    assert.match(sky,/showMoon: CosmosPanelPolicy\.visibleFor\("sky",sky\.subjectRoute,"moon"\)/);
     assert.match(sky,/moonReady: moonService\.ready/);
     assert.match(sky,/moonEphemeris: moonService\.ephemeris/);
     assert.match(sky,/astronomySummary: sky\.astronomySummary/);
     assert.match(sky,/twilightSummary: sky\.twilightSummary/);
     assert.match(sky,/providerLocalMinute: sky\.providerLocalMinute/);
     assert.match(sky,/currentSolarPosition: sky\.currentSolarPosition/);
+    assert.equal((sky.match(/sky\\.sectionVisible\\("([^"]+)"\\)/g)||[]).length,27,
+      "original CLASSIC/WEATHER section visibility calls must not change");
     assert.equal(n.visibleFor("sky","cosmos/moon/ephemeris","moon"),true);
     assert.equal(n.visibleFor("sky","cosmos/sun/position","astronomy"),true);
     assert.equal(n.visibleFor("sky","cosmos/sun/twilight","twilight"),true);

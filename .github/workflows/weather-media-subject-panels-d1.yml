@@ -1,0 +1,37 @@
+name: Weather Station MEDIA D1 NEWS WATCH RADIO CREATORS subject panels
+
+on:
+  pull_request:
+    paths:
+      - 'widgets/weather/StationMediaSubjectPanelPolicy.js'
+      - 'widgets/weather/StationMediaSubjectPane.qml'
+      - 'widgets/weather/StationNewsHub.qml'
+      - 'widgets/weather/StationRadio.qml'
+      - 'widgets/weather/StationDiscovery.qml'
+      - 'widgets/weather/StationSubjectNavigator.qml'
+      - 'widgets/weather/WeatherStationW.qml'
+      - 'tests/weather/test_media_subject_panels_d1.js'
+      - '.github/workflows/weather-media-subject-panels-d1.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  media-panels:
+    runs-on: ubuntu-latest
+    timeout-minutes: 7
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Verify media source routing and all preceding subject migrations
+        run: |
+          node --test tests/weather/subject_navigation_contract.test.js
+          node --test tests/weather/subject_navigation_browser.test.js
+          node --test tests/weather/test_weather_subject_panels_m2a.js
+          node --test tests/weather/test_weather_subject_panels_m2b.js
+          node --test tests/weather/test_cosmos_subject_panels_c1.js
+          node --test tests/weather/test_earth_subject_panels_e1.js
+          node --test tests/weather/test_media_subject_panels_d1.js

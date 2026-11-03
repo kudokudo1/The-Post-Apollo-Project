@@ -91,6 +91,47 @@ test("Wrong-day, malformed, absent and special-status input fail closed", () => 
     assert.equal(rows[1].events.length, 0);
 });
 
+test("QML array-like provider list survives cross-component var boundaries", () => {
+    const nativeRows = [
+        row("MERCURY"), row("VENUS"), row("MARS"),
+        row("JUPITER"), row("SATURN")
+    ];
+    // Reproducer: a QML QVariantList can expose length/index access while
+    // failing JavaScript's Array.isArray() across component boundaries.
+    const qmlList = {length: nativeRows.length};
+    nativeRows.forEach((entry, index) => { qmlList[index] = entry; });
+    assert.equal(Array.isArray(qmlList), false);
+    const projected = p.clockRows(qmlList, "2026-11-03");
+    assert.equal(p.rowCountWithEvents(projected), 5);
+    assert.ok(projected.every(p => p.events.length === 3));
+    const qmlEvents = {0: projected[0].events[0], length: 1};
+    assert.equal(p.eventsFor({events: qmlEvents}, "rise").length, 1);
+
+    const wrapped = row("MERCURY");
+    wrapped.name = {toString() { return "MERCURY"; }};
+    wrapped.date = {toString() { return "2026-11-03"; }};
+    wrapped.rise = {toString() { return "21:43"; }};
+    const wrappedRows = p.clockRows({0: wrapped, length: 1}, "2026-11-03");
+    assert.equal(wrappedRows[0].events.length, 3);
+    assert.equal(wrappedRows[0].events[0].minute, 1303);
+    assert.equal(p.rowCountWithEvents({0: wrappedRows[0], length: 1}), 1);
+});
+
+test("QML list support does not permit wrong dates or unbounded input", () => {
+    const wrong = {0: row("MARS", "2026-11-02"), length: 1};
+    assert.equal(p.rowCountWithEvents(p.clockRows(wrong, "2026-11-03")), 0);
+    const special = row("MARS");
+    special.status = "CONTINUOUSLY BELOW HORIZON";
+    assert.equal(p.rowCountWithEvents(
+        p.clockRows({0: special, length: 1}, "2026-11-03")), 0);
+    assert.equal(p.rowCountWithEvents(
+        p.clockRows({0: row("MARS"), length: 999999}, "2026-11-03")), 0);
+    assert.equal(p.rowCountWithEvents(
+        p.clockRows("not rows", "2026-11-03")), 0);
+    assert.equal(p.rowCountWithEvents(
+        p.clockRows({0: row("MARS"), length: "invalid"}, "2026-11-03")), 0);
+});
+
 test("No invented angle when USNO field is absent or invalid", () => {
     const source = row("VENUS");
     source.riseAzimuth = null;

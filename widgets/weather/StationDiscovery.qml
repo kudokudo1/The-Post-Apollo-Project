@@ -3282,6 +3282,101 @@ Rectangle {
                 }
             }
 
+            // The map's companion is adjacent to the canvas. It is not
+            // a second full MEDIA article feed or provider owner.
+            Column {
+                width: parent.width
+                spacing: 7
+                visible: stationDiscovery.domain === "map"
+                         && stationDiscovery.earthMapOnly
+
+                // No second news feed is created in EARTH. These are the
+                // mentioned locations already extracted for the selected MEDIA
+                // article. Each remains independently selectable on the map.
+                Column {
+                    width: parent.width
+                    spacing: 6
+                    visible: stationDiscovery.domain === "map"
+                             && stationDiscovery.earthMapOnly
+                             && stationDiscovery.mapNewsMentionRows.length > 0
+    
+                    StationSectionDivider {
+                        width: parent.width
+                        title: "MAP COMPANION // ARTICLE MENTIONED PLACES"
+                    }
+                    QuietText {
+                        width: parent.width
+                        text: stationDiscovery.newsMentionOverlay
+                              ? stationDiscovery.newsMentionOverlay.articleTitle
+                              : ""
+                        elide: Text.ElideRight
+                        color: Colors.magenta
+                        font.pixelSize: 10
+                    }
+                    Repeater {
+                        model: stationDiscovery.mapNewsMentionRows.slice(0, 5)
+                        delegate: ActionButton {
+                            required property var modelData
+                            width: Math.min(parent.width, 360)
+                            height: 28
+                            label: "◉ " + modelData.name
+                            labelPixelSize: 10
+                            accentColor: Colors.magenta
+                            selected: stationDiscovery.selectedMapNewsMention
+                                      === modelData
+                            onClicked: {
+                                stationDiscovery.inspectNewsMention(modelData);
+                                stationDiscovery.applyMapView(
+                                    MapProjection.fitRows([modelData], 1.35)
+                                );
+                            }
+                        }
+                    }
+                    QuietText {
+                        width: parent.width
+                        text: "ARTICLE MENTIONS ONLY // NOT VERIFIED EVENT LOCATIONS"
+                        font.pixelSize: 9
+                        color: Colors.orange
+                    }
+                }
+
+                StationSectionDivider {
+                    width: parent.width
+                    visible: stationDiscovery.earthLayerEnabled("eonet")
+                    title: stationDiscovery.earthMapRoute === "earth/events/eonet"
+                        ? "NASA EONET // FULL EVENT LIST"
+                        : "EARTH MAP CONTEXT // EONET EVENTS IN VIEW"
+                }
+                QuietText {
+                    width: parent.width
+                    visible: stationDiscovery.earthLayerEnabled("eonet")
+                    text: stationDiscovery.earthMapRoute === "earth/events/eonet"
+                        ? "ALL SOURCE EVENTS // SELECT TO INSPECT"
+                        : "SHOWING " + stationDiscovery.mapCompanionEonetRows.length
+                          + " CONTEXT EVENTS // COMPLETE LIST UNDER EARTH → EVENTS → EONET"
+                    color: Colors.cyan
+                    font.pixelSize: 9
+                }
+                QuietText {
+                    width: parent.width
+                    visible: stationDiscovery.earthLayerEnabled("eonet")
+                             && !source.ready
+                    text: source.failed ? source.errorText
+                          : source.retryWaitSeconds > 0
+                            ? "EONET REQUEST HELD // PROVIDER COOLDOWN"
+                          : source.loading ? "RECEIVING EONET EVENTS"
+                          : "EONET SOURCE WAITING"
+                    color: Colors.orange
+                    font.pixelSize: 9
+                }
+                Repeater {
+                    model: stationDiscovery.earthLayerEnabled("eonet")
+                            && source.ready
+                        ? stationDiscovery.mapCompanionEonetRows : []
+                    delegate: discoveryRecordCard
+                }
+            }
+
             Row {
                 width: parent.width
                 height: stationDiscovery.domain === "news" ? 34 : 0
@@ -4573,87 +4668,12 @@ Rectangle {
                 font.pixelSize: 12
             }
 
-            // Nearby map-event companion. This is EONET data, NOT GDELT
-            // headlines. Event record clicks reuse the original inspector.
-            StationSectionDivider {
-                width: parent.width
-                visible: stationDiscovery.domain === "map"
-                         && stationDiscovery.earthMapOnly
-                         && stationDiscovery.earthLayerEnabled("eonet")
-                title: stationDiscovery.earthMapRoute === "earth/events/eonet"
-                    ? "NASA EONET // FULL EVENT LIST"
-                    : "EARTH MAP CONTEXT // EONET EVENTS IN VIEW"
-            }
-
-            QuietText {
-                width: parent.width
-                visible: stationDiscovery.domain === "map"
-                         && stationDiscovery.earthMapOnly
-                         && stationDiscovery.earthLayerEnabled("eonet")
-                text: stationDiscovery.earthMapRoute === "earth/events/eonet"
-                    ? "ALL SOURCE EVENTS // SELECT TO INSPECT"
-                    : "SHOWING " + stationDiscovery.mapCompanionEonetRows.length
-                      + " CONTEXT EVENTS // COMPLETE LIST UNDER EARTH → EVENTS → EONET"
-                color: Colors.cyan
-                font.pixelSize: 9
-            }
-
-            // No second news feed is created in EARTH. These are the
-            // mentioned locations already extracted for the selected MEDIA
-            // article. Each remains independently selectable on the map.
-            Column {
-                width: parent.width
-                spacing: 6
-                visible: stationDiscovery.domain === "map"
-                         && stationDiscovery.earthMapOnly
-                         && stationDiscovery.mapNewsMentionRows.length > 0
-
-                StationSectionDivider {
-                    width: parent.width
-                    title: "MAP COMPANION // ARTICLE MENTIONED PLACES"
-                }
-                QuietText {
-                    width: parent.width
-                    text: stationDiscovery.newsMentionOverlay
-                          ? stationDiscovery.newsMentionOverlay.articleTitle
-                          : ""
-                    elide: Text.ElideRight
-                    color: Colors.magenta
-                    font.pixelSize: 10
-                }
-                Repeater {
-                    model: stationDiscovery.mapNewsMentionRows.slice(0, 5)
-                    delegate: ActionButton {
-                        required property var modelData
-                        width: Math.min(parent.width, 360)
-                        height: 28
-                        label: "◉ " + modelData.name
-                        labelPixelSize: 10
-                        accentColor: Colors.magenta
-                        selected: stationDiscovery.selectedMapNewsMention
-                                  === modelData
-                        onClicked: {
-                            stationDiscovery.inspectNewsMention(modelData);
-                            stationDiscovery.applyMapView(
-                                MapProjection.fitRows([modelData], 1.35)
-                            );
-                        }
-                    }
-                }
-                QuietText {
-                    width: parent.width
-                    text: "ARTICLE MENTIONS ONLY // NOT VERIFIED EVENT LOCATIONS"
-                    font.pixelSize: 9
-                    color: Colors.orange
-                }
-            }
-
             Repeater {
-                // The complete EONET list lives at EARTH → EVENTS → EONET.
-                // MAPS/OVERVIEW shows a small in-view companion with the
-                // currently selected record prioritized, not an endless feed.
-                model: stationDiscovery.domain === "map" && source.ready
-                    ? stationDiscovery.mapCompanionEonetRows : []
+                // Preserve the original complete CLASSIC MAP event list until
+                // all legacy capabilities pass the final SUBJECTS cutover.
+                model: stationDiscovery.domain === "map"
+                       && !stationDiscovery.earthMapOnly && source.ready
+                    ? stationDiscovery.visibleRows : []
                 visible: !stationDiscovery.weatherMapOnly
                          && stationDiscovery.earthLayerEnabled("eonet")
                 delegate: discoveryRecordCard

@@ -22,6 +22,8 @@ Item {
     property var localUnitLocationLinksStore: null
     // Local branch/geographic associations only, no verified tenant rights.
     property var localBranchLocationLinksStore: null
+    // Local functional reporting map, never trusted workforce authority.
+    property var localFunctionalReportingStore: null
     // Manual Social label associations only, not Identity Center grants.
     property var localLinksStore: null
     property var socialIdentitiesSnapshot: null
@@ -224,6 +226,13 @@ Item {
                         directoryStore: sections.localDirectoryStore
                         structureStore: sections.localStructureStore
                         linkStore: sections.localBranchLocationLinksStore
+                    }
+
+                    IdentityCenterLocalFunctionalReportingEditor {
+                        width: parent.width
+                        directoryStore: sections.localDirectoryStore
+                        structureStore: sections.localStructureStore
+                        reportingStore: sections.localFunctionalReportingStore
                     }
 
                     IdentityCenterLocalSocialLinksEditor {

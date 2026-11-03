@@ -995,6 +995,7 @@ Rectangle {
             localStructureStore: SocialLocalOrganizationStructureStore
             localUnitLocationLinksStore: SocialLocalUnitLocationLinksStore
             localBranchLocationLinksStore: SocialLocalBranchLocationLinksStore
+            localFunctionalReportingStore: SocialLocalFunctionalReportingStore
             localLinksStore: SocialOrganizationLinksStore
             socialIdentitiesSnapshot: appSelector.identitySnapshot
             socialAccountDetailsStore: SocialAccountDetailsStore

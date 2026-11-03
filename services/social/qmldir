@@ -10,3 +10,4 @@ singleton SocialLocalPortfoliosStore 1.0 SocialLocalPortfoliosStore.qml
 singleton SocialLocalOrganizationStructureStore 1.0 SocialLocalOrganizationStructureStore.qml
 singleton SocialLocalUnitLocationLinksStore 1.0 SocialLocalUnitLocationLinksStore.qml
 singleton SocialLocalBranchLocationLinksStore 1.0 SocialLocalBranchLocationLinksStore.qml
+singleton SocialLocalFunctionalReportingStore 1.0 SocialLocalFunctionalReportingStore.qml

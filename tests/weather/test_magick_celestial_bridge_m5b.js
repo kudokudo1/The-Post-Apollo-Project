@@ -8,6 +8,7 @@ const vm=require("node:vm");
 const root=path.resolve(__dirname,"../..");
 const read=p=>fs.readFileSync(path.join(root,p),"utf8");
 const navigator=read("widgets/weather/StationSubjectNavigator.qml");
+const station=read("widgets/weather/WeatherStationW.qml");
 const surface=read("widgets/weather/StationWorkspaceSurface.qml");
 const pane=read("widgets/weather/StationMagickSubjectPane.qml");
 const service=read("services/weather/CelestialVisualService.qml");
@@ -34,13 +35,16 @@ test("MAGICK calculation routes are explicit, other symbolic routes unchanged",(
   ]) assert.equal(context.visualForRoute(path),false);
 });
 
-test("persistent SUBJECTS navigator is sole calculation-service owner",()=>{
-  assert.equal((navigator.match(/WeatherServices\.CelestialVisualService\s*\{/g)||[]).length,1);
-  assert.match(navigator,/id: celestialVisual/);
-  assert.match(navigator,/MagickPanelPolicy\.visualForRoute\(browser\.currentPath\)/);
-  assert.match(navigator,/route: browser\.currentPath/);
-  assert.match(navigator,/anchorNowMs: browser\.runtimeNowMs/);
-  assert.match(navigator,/celestialSource: celestialVisual/g);
+test("Weather Station root is sole calculation owner and SUBJECTS only consumes",()=>{
+  assert.equal((station.match(/WeatherServices\.CelestialVisualService\s*\{/g)||[]).length,1);
+  assert.match(station,/id: celestialVisualService/);
+  assert.match(station,/MagickPanelPolicy\.visualForRoute\(subjectNavigator\.currentPath\)/);
+  assert.match(station,/route: subjectNavigator\.currentPath/);
+  assert.match(station,/anchorNowMs: weatherStation\.runtimeNowMs/);
+  assert.match(station,/celestialSource: celestialVisualService/);
+  assert.equal((navigator.match(/WeatherServices\./g)||[]).length,0);
+  assert.match(navigator,/property var celestialSource: null/);
+  assert.equal((navigator.match(/celestialSource: browser\.celestialSource/g)||[]).length,2);
   assert.match(surface,/property var celestialSource: null/);
   assert.equal((surface.match(/celestialSource: surface\.celestialSource/g)||[]).length,2);
   assert.match(pane,/property var celestialSource: null/);

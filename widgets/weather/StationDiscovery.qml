@@ -348,12 +348,15 @@ Rectangle {
             .filter(function() {
                 return stationDiscovery.earthLayerEnabled("eonet");
             })
+    // MEDIA owns article extraction. Both CLASSIC (during migration) and
+    // EARTH may plot the explicitly handed-off mentioned locations. These
+    // are NOT provider-native event records and never enter dossier capture.
     readonly property var mapNewsMentionRows:
         weatherMapOnly ? [] : MapProjection.plottable(
             newsMentionOverlay
             && Array.isArray(newsMentionOverlay.locations)
             ? newsMentionOverlay.locations : []
-        ).filter(function() {return !stationDiscovery.earthMapOnly;})
+        )
     readonly property var mapEarthquakeRows:
         !weatherMapOnly && mapShowEarthquakes
         && earthLayerEnabled("quakes")
@@ -1518,6 +1521,16 @@ Rectangle {
                 }
 
                 QuietText {
+                    visible: stationDiscovery.earthMapOnly
+                             && stationDiscovery.mapNewsMentionRows.length > 0
+                    width: parent.width
+                    wrapMode: Text.WordWrap
+                    text: "MEDIA → EARTH // GDELT ARTICLE MENTIONS // NOT VERIFIED EVENT LOCATIONS"
+                    color: Colors.magenta
+                    font.pixelSize: 10
+                }
+
+                QuietText {
                     width: parent.width
                     text: "BASEMAP // NATURAL EARTH 1:110m LAND // PUBLIC DOMAIN // LOCAL ASSET // NO TILE NETWORK"
                     font.pixelSize: 9
@@ -1698,7 +1711,6 @@ Rectangle {
                     width: parent.width
                     height: stationDiscovery.mapNewsMentionRows.length > 0 ? 30 : 0
                     visible: (!stationDiscovery.weatherMapOnly)
-                             && !stationDiscovery.earthMapOnly
                              && (stationDiscovery.mapNewsMentionRows.length > 0)
                     spacing: 10
 
@@ -4082,7 +4094,6 @@ Rectangle {
                 width: parent.width
                 spacing: 7
                 visible: stationDiscovery.newsMentionInspectorOpen
-                         && !stationDiscovery.earthMapOnly
 
                 StationSectionDivider {
                     width: parent.width

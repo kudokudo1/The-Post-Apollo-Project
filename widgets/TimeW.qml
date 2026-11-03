@@ -3,6 +3,7 @@ import QtQuick.Controls
 import Quickshell
 import Quickshell.Wayland
 import Quickshell.Io
+import qs.services.time
 import "../components"
 import "../services/hub/ApolloHubTimePolicy.js" as LocalTimePolicy
 import "../services/time/WorldClockPolicy.js" as WorldClockPolicy
@@ -44,7 +45,9 @@ PanelWindow {
     // dock or Hub preference. The Hub helper is pure and owns no clock tick.
     property bool use24Hour: true
     readonly property var localTimeSnapshot:
-        LocalTimePolicy.snapshot(localClock.date.getTime(), use24Hour)
+        LocalTimePolicy.snapshot(
+            TimeSettings.adjustedEpochMs(localClock.date.getTime()),
+            use24Hour)
     // Local clock display identity follows the dock's 24H/12H colors.
     // The window chassis remains white. Meridiem is intentionally visible
     // in both modes as //AM or //PM, even when the hour is in 24H format.
@@ -1283,7 +1286,9 @@ PanelWindow {
         { id: "clock", name: "CLOCK" },
         { id: "calc", name: "CALC" },
         { id: "tools", name: "TOOLS" },
-        { id: "machine", name: "MACHINE" }
+        { id: "machine", name: "MACHINE" },
+        { id: "settings", name: "SETTINGS" },
+        { id: "planned", name: "NEXT" }
     ]
     property int selectedModeIndex: 0
     readonly property string selectedMode: modes[selectedModeIndex].id
@@ -1957,7 +1962,8 @@ PanelWindow {
 
                 GohuText {
                     width: parent.width - stateIndicator.width
-                           - closeButton.width - header.spacing * 2
+                           - syncButton.width - closeButton.width
+                           - header.spacing * 3
                     height: parent.height
                     verticalAlignment: Text.AlignVCenter
                     font.pixelSize: 18
@@ -1978,8 +1984,31 @@ PanelWindow {
                         anchors.centerIn: parent
                         font.pixelSize: 11
                         color: timew.semanticColor
-                        text: timew.selectedMode === "clock"
+                        text: TimeSettings.resyncStatus === "working"
+                              ? "SYNC..."
+                              : TimeSettings.resyncStatus === "requested"
+                              ? "SAMPLES"
+                              : TimeSettings.resyncStatus === "failed"
+                                || TimeSettings.resyncStatus === "unavailable"
+                              ? "SYNC ERR"
+                              : timew.selectedMode === "clock"
                               ? "LOCAL" : "PLANNED"
+                    }
+                }
+
+                ActionButton {
+                    id: syncButton
+                    width: 35
+                    height: 32
+                    label: "⟳"
+                    labelPixelSize: 22
+                    contentPadding: 3
+                    trackLabelGlowLocally: true
+                    accentColor: Colors.cyan
+                    available: TimeSettings.resyncStatus !== "working"
+                    onLeftClicked: {
+                        timew.chooseMode(4);
+                        TimeSettings.requestResync();
                     }
                 }
 
@@ -5006,6 +5035,31 @@ PanelWindow {
                         }
                     }
 
+                    TimeSettingsPane {
+                        width: parent.width
+                        height: 505
+                        visible: timew.selectedMode === "settings"
+                    }
+
+                    Column {
+                        width: parent.width
+                        spacing: 12
+                        visible: timew.selectedMode === "planned"
+
+                        GohuText {
+                            text: "NEXT // RESERVED"
+                            font.pixelSize: 13
+                            color: Colors.cyan
+                        }
+                        GohuText {
+                            width: parent.width
+                            wrapMode: Text.WordWrap
+                            text: "A sixth main-mode slot is ready. No new capability has been assigned to this page."
+                            color: Colors.white
+                            font.pixelSize: 11
+                        }
+                    }
+
                     GohuText {
                         // The floating result sheet owns this space while it
                         // is open; the footer must not overlap its entries.
@@ -5019,7 +5073,9 @@ PanelWindow {
                               ? "TIME ZONE CONVERTER // READ ONLY"
                               : timew.selectedMode === "machine"
                               ? "MACHINE // LOCAL CHECKPOINTS"
-                              : "FOUNDATION PREVIEW // UI ONLY"
+                              : timew.selectedMode === "settings"
+                              ? "SETTINGS // DISPLAY OFFSET + SYSTEM STATUS"
+                              : "NEXT // RESERVED FOR LATER"
                         color: Colors.white
                         font.pixelSize: 11
                     }

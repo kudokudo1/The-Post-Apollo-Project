@@ -147,3 +147,30 @@ test("standalone instrument wires event buttons and preserves time/zoom actions"
          "XMLHttpRequest","Date.now()","Math.random("])
         assert.equal(qml.includes(prohibited),false,prohibited);
 });
+
+
+test("real JPL M4 events produce source-aware navigable positions",{
+    skip:!process.env.MAGICK_M5D_JSON_FILE
+},()=>{
+    const real=JSON.parse(fs.readFileSync(process.env.MAGICK_M5D_JSON_FILE,"utf8"));
+    const m=ctx.model(real);
+    assert.equal(m.ready,true,m.reason);
+    assert.equal(m.source,"de440s.bsp");
+    const view=ctx.windowFor(m,1,0.5);
+    const events=ctx.visibleEvents(m,view);
+    assert.ok(events.length>=5,"Moon/Sun events in 29-day window");
+    let previousTime=-Infinity;
+    for(let ordinal=0;ordinal<events.length;ordinal++){
+        const picked=ctx.eventAt(m,view,ordinal);
+        const next=ctx.stepEvent(m,view,ordinal-1,1);
+        assert.equal(next.ordinal,ordinal);
+        const t=Date.parse(picked.time_utc);
+        assert.ok(t>=previousTime);
+        previousTime=t;
+        assert.ok(next.sampleIndex>=0);
+        assert.ok(next.sampleIndex<m.sampleCount);
+        assert.ok(Math.abs(m.times[next.sampleIndex]-t)<=
+                  (m.times[1]-m.times[0])/2);
+        assert.match(ctx.bodyDetails(m,next.sampleIndex,m.series[0].body),/°/);
+    }
+});

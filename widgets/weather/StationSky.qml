@@ -2098,7 +2098,7 @@ Rectangle {
                      && CosmosPanelPolicy.visibleFor("sky",
                                                     sky.subjectRoute,
                                                     "planet-clock")
-            height: visible ? 361 : 0
+            height: visible ? 414 : 0
             sourceConfigured: planetRiseSetService.configured
             sourceReady: planetRiseSetService.ready
             sourceLoading: planetRiseSetService.loading

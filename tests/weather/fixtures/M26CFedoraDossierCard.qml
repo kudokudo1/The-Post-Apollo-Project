@@ -116,14 +116,7 @@ ShellRoot {
         console.log("M26C_UI_PASS // DISABLED_POINTER_IGNORED");
         console.log("M26C_UI_PASS // ENABLED_POINTER_SAVED");
         console.log("M26C_UI_PASS // SOURCE_ARCHIVE_SEPARATE");
-        // A timer quits after QtTest's assertion stack has unwound.
-    }
-
-    Timer {
-        interval: 250
-        repeat: false
-        running: root.complete
-        onTriggered: Qt.quit()
+        // QtTest owns shutdown when the running test function returns.
     }
 
     Component.onCompleted: {
@@ -147,11 +140,13 @@ ShellRoot {
 
     TestCase {
         name: "M26CFedoraDossierCard"
-        when: !!root.preview
-            && archive.storageState === "empty"
-            && testWindow.visible
+        // QtQuick TestSchedule must see a runnable test immediately;
+        // otherwise it exits Quickshell before the async FileView load.
+        when: true
 
         function test_real_card_pointer_and_save() {
+            tryCompare(archive, "storageState", "empty", 8000);
+            tryCompare(card, "dossierPreviewReady", true, 8000);
             const save = root.findAction(card, "SAVE DOSSIER");
             const provider = root.findAction(card, "ARCHIVE");
             verify(save !== null, "SAVE DOSSIER ActionButton not found");

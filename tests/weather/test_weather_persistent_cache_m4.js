@@ -259,7 +259,10 @@ const weatherAt = boot.indexOf("refresh();");
 assert.ok(hydrateAt >= 0, "weather startup must attempt cache hydration");
 assert.ok(aqiAt > hydrateAt, "AQI may start after cache hydration");
 assert.ok(weatherAt > aqiAt, "shared WeatherService still starts live weather");
-assert.equal((weather.match(/\bProcess\s*\{/g) || []).length, 2);
+// The M6 fallback adds an on-demand third Process, not an extra poll timer.
+// Cache hydration and the single shared WeatherService remain unchanged.
+assert.equal((weather.match(/\bProcess\s*\{/g) || []).length, 3);
+assert.ok(weather.includes("id: fallbackWeatherFetch"));
 assert.equal((weather.match(/\bTimer\s*\{/g) || []).length, 1);
 assert.doesNotMatch(weather, /FileView\s*\{/);
 

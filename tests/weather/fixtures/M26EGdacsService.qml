@@ -4,13 +4,13 @@ import Quickshell
 Scope {
     property var cacheStore: null
     property bool active: false
-    property bool ready: true
+    property bool ready: Quickshell.env("M26E_SOURCE") === "gdacs"
     property bool failed: false
     property bool loading: false
     property bool usingPersistentCache: false
     property string errorText: ""
     property date lastUpdated: new Date()
-    property var events: [{
+    property var events: ready ? [{
         id: "M26E-SHARED",
         eventId: "M26E",
         episodeId: "1",
@@ -31,6 +31,6 @@ Scope {
         severityText: "SYNTHETIC EVENT",
         reportUrl: "",
         detailsUrl: ""
-    }]
+    }] : []
     function refresh(force) {return false;}
 }

@@ -85,14 +85,20 @@ test("EARTH MAPS is compact, EONET source route retains full event list",()=>{
   assert.match(qml,/import "StationMapCompanionPolicy.js" as MapCompanion/);
   assert.match(qml,/earthMapRoute === "earth\/events\/eonet"\s*\? visibleRows/);
   assert.match(qml,/MapCompanion\.previewEonet\(\s*mapPointRows, selectedMapEvent, mapVisibleBounds, 4/);
-  assert.match(qml,/model: stationDiscovery.domain === "map" && source.ready\s*\? stationDiscovery.mapCompanionEonetRows/);
+  assert.match(qml,/model: stationDiscovery.earthLayerEnabled\("eonet"\)\s*&& source.ready\s*\? stationDiscovery.mapCompanionEonetRows/);
   assert.match(qml,/EARTH MAP CONTEXT \/\/ EONET EVENTS IN VIEW/);
   assert.match(qml,/NASA EONET \/\/ FULL EVENT LIST/);
   assert.match(qml,/COMPLETE LIST UNDER EARTH → EVENTS → EONET/);
   assert.match(earthPane,/domain: "map"/);
   assert.match(qml,/StationEventContextCard\s*\{/);
   const replay=qml.match(/delegate: discoveryRecordCard/g)||[];
-  assert.equal(replay.length,2,"two projections of one renderer, not two source services");
+  assert.equal(replay.length,3,"NEWS, EARTH and CLASSIC share one row renderer");
+  const mapStart=qml.indexOf("id: mapCanvasSection");
+  const places=qml.indexOf("MAP COMPANION // ARTICLE MENTIONED PLACES");
+  const eventList=qml.indexOf("EARTH MAP CONTEXT // EONET EVENTS IN VIEW");
+  const retry=qml.indexOf('label: "RETRY NEWS"');
+  assert.ok(mapStart < places && places < eventList && eventList < retry,
+            "EARTH companion must follow the map and precede unrelated sections");
 });
 
 test("EARTH news companion is the selected MEDIA article's known places, not another feed",()=>{

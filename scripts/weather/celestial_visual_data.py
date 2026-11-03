@@ -287,10 +287,18 @@ def compute_visual_data(query, kernel_path):
 def main(argv=None):
     parser = argparse.ArgumentParser(description="MAGICK M4 chart data backend")
     parser.add_argument("--kernel", required=True, help="Explicit local .bsp kernel")
-    parser.add_argument("--query", default="-", help="JSON query file or stdin")
+    sources = parser.add_mutually_exclusive_group()
+    sources.add_argument("--query", default=None,
+                         help="JSON query file or '-' for stdin")
+    sources.add_argument("--query-json", default=None,
+                         help="Bounded JSON query as one argv value (no shell)")
     args = parser.parse_args(argv)
     try:
-        if args.query == "-":
+        if args.query_json is not None:
+            if len(args.query_json) > 4096:
+                raise ContractError("query-json exceeds 4096 characters")
+            query = json.loads(args.query_json)
+        elif args.query is None or args.query == "-":
             query = json.load(sys.stdin)
         else:
             with open(args.query, encoding="utf-8") as source:

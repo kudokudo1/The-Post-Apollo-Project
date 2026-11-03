@@ -1503,19 +1503,20 @@ Rectangle {
             }
 
             StationRuntimeRack {
-                visible: !stationDiscovery.weatherMapOnly
+                // Both native map families expose their original providers.
+                visible: stationDiscovery.domain === "map"
                 width: parent.width
                 rows: stationDiscovery.runtimeRows
             }
 
             StationSectionDivider {
-                visible: !stationDiscovery.weatherMapOnly
+                visible: stationDiscovery.domain === "map"
                 width: parent.width
                 title: "SOURCE RACK // WHAT IS CONNECTED"
             }
 
             Column {
-                visible: !stationDiscovery.weatherMapOnly
+                visible: stationDiscovery.domain === "map"
                 width: parent.width
                 spacing: 5
 

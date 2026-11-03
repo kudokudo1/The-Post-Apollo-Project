@@ -23,6 +23,7 @@ Rectangle {
     property var eventArchiveStore: null
     property var dossierArchiveStore: null
     property var homeFavoritesStore: null
+    property var celestialSource: null
     property real runtimeNowMs: 0
 
     // W2a preferences are owned by the persistent SubjectNavigator. The
@@ -91,6 +92,7 @@ Rectangle {
         // MAGICK belongs to HOME's discovery controls but remains
         // clearly separated from unsupported spiritual calculations.
         StationMagickSubjectPane {
+            celestialSource: surface.celestialSource
             anchors.fill: parent
             anchors.bottomMargin: homeDeckBar.visible ? homeDeckBar.height : 0
             visible: surface.activeFamily === "home"
@@ -153,6 +155,7 @@ Rectangle {
         }
 
         StationMagickSubjectPane {
+            celestialSource: surface.celestialSource
             anchors.fill: parent
             visible: surface.activeFamily === "magick"
             subjectRoute: surface.currentPath

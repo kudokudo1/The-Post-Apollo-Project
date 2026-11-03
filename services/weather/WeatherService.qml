@@ -538,13 +538,10 @@ Scope {
     onRequestContextKeyChanged: {
         if (!locationBooted)
             return;
-        // Cancel the old request if possible, and guard both parsers against
-        // in-flight responses from the previous location.
+        // Keep in-flight requests bounded by their existing 10s timeout.
+        // Their parsers refuse old-context replies; onExited restarts the
+        // fetch for the new context. Avoid overlapping process restarts.
         clearLocationData();
-        if (weatherFetch.running)
-            weatherFetch.running = false;
-        if (airQualityFetch.running)
-            airQualityFetch.running = false;
         Qt.callLater(function() {
             weatherService.refresh();
             // AQI can load from the saved point even when wttr.in times out.

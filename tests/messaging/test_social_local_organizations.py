@@ -13,6 +13,8 @@ sys.path.insert(0, str(ROOT / "services/social"))
 import SocialOrganizationDirectory as directory  # noqa: E402
 
 SECTIONS = (ROOT / "widgets/messanger/IdentityCenterSettingsSections.qml").read_text()
+# Editors are composed inside the Organizations Navigation v2 workspace.
+SECTIONS += "\n" + (ROOT / "widgets/messanger/IdentityCenterLocalOrganizationsWorkspace.qml").read_text()
 EDITOR = (ROOT / "widgets/messanger/IdentityCenterLocalOrganizationEditor.qml").read_text()
 SELECTOR = (ROOT / "widgets/messanger/AppSelector.qml").read_text()
 STORE = (ROOT / "services/social/SocialOrganizationDirectoryStore.qml").read_text()

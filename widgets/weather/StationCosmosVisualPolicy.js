@@ -102,7 +102,7 @@ function illuminatedSpan(percent,waxing,y,radius) {
 }
 function solarUnavailableReason(date,latitude,longitude,offsetMinutes) {
     var d=String(date||"");
-    if(!/^\\d{4}-\\d{2}-\\d{2}$/.test(d))
+    if(!/^\d{4}-\d{2}-\d{2}$/.test(d))
         return "PROVIDER DATE UNAVAILABLE";
     var lat=finite(latitude),lon=finite(longitude);
     if(lat===null||lon===null||Math.abs(lat)>=90||Math.abs(lon)>180)

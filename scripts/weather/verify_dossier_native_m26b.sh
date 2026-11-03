@@ -98,14 +98,28 @@ after_sha="$(sha256sum "$archive_path" | cut -d ' ' -f 1)"
   exit 1
 }
 
-# Replace ONLY the disposable file with broken JSON. Actual FileView
-# must refuse it and the attempted capture must not overwrite those bytes.
-printf '{bad-json' > "$archive_path"
-bad_sha="$(sha256sum "$archive_path" | cut -d ' ' -f 1)"
-run_phase corrupt CORRUPT_FILE_WRITE_REFUSED
-new_sha="$(sha256sum "$archive_path" | cut -d ' ' -f 1)"
-[ "$bad_sha" = "$new_sha" ] || {
-  echo 'M26_NATIVE_FAIL // corrupt archive was overwritten' >&2
-  exit 1
-}
+# Test three separate present-but-unacceptable files in the disposable
+# archive. Neither invalid JSON, an existing empty file nor an unsupported
+# schema version may be normalized to a new empty document.
+for case_name in MALFORMED EMPTY UNSUPPORTED; do
+  case "$case_name" in
+    MALFORMED)
+      printf '{bad-json' > "$archive_path"
+      ;;
+    EMPTY)
+      : > "$archive_path"
+      ;;
+    UNSUPPORTED)
+      printf '%s' '{"schema":"post-apollo.weather-dossier-archive.v1","version":99,"revision":0,"entries":[]}' > "$archive_path"
+      ;;
+  esac
+  bad_sha="$(sha256sum "$archive_path" | cut -d ' ' -f 1)"
+  run_phase corrupt CORRUPT_FILE_WRITE_REFUSED
+  new_sha="$(sha256sum "$archive_path" | cut -d ' ' -f 1)"
+  [ "$bad_sha" = "$new_sha" ] || {
+    echo "M26_NATIVE_FAIL // $case_name archive was overwritten" >&2
+    exit 1
+  }
+  echo "M26_NATIVE_REFUSAL // $case_name // UNCHANGED"
+done
 echo 'M26_NATIVE_PASS // ISOLATED_FILEVIEW_SAVE_RELOAD_REFUSAL'

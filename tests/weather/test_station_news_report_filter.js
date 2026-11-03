@@ -171,7 +171,7 @@ assert.match(ui, /NO HEADLINES MATCH/);
 assert.match(ui, /FILTER IS LOCAL \/\/ SOURCE NOT REFETCHED/);
 assert.match(
     ui,
-    /model: source\.ready \? stationDiscovery\.visibleRows : \[\]/
+    /model: stationDiscovery.newsGroupVisible\("list"\)\s*&& source.ready\s*\? stationDiscovery.visibleRows : \[\]/
 );
 assert.match(ui, /LOCAL TOPIC FILTER \+ URL\/TITLE DEDUPE/);
 assert.match(ui, /EXACT-HEADLINE SOURCE GROUPS \/\/ NOT FUZZY STORY CLUSTERING/);

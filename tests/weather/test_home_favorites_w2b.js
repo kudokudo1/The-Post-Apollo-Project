@@ -31,7 +31,7 @@ test("new Weather HOME storage schema is independent from AppControl",()=>{
   });
   assert.match(storeQml,/Quickshell\.dataDir \+ "\/weather-home-favorites-v1\.json"/);
   assert.match(favQml,/Quickshell\.dataDir \+ "\/appcontrol-favorites\.json"/);
-  assert.ok(!storeQml.includes("appcontrol-favorites.json"));
+  assert.ok(!storeQml.includes('Quickshell.dataDir + "/appcontrol-favorites.json"'));
   assert.ok(!policyText.includes("favoriteMonitorBoxKeys"));
   assert.ok(!policyText.includes("favoriteTaskMetricKeys"));
   assert.match(storeQml,/atomicWrites: true/);

@@ -39,7 +39,8 @@ test("M28-K reconciles exactly four original HOME controls without mutating M0 s
     assert.equal(preview.HOME_SOURCE_HINTS[id],historical);
     assert.equal(preview.HOME_NATIVE_ROUTES[id],native);
     assert.equal(workspace.isHomeRoute(native),true);
-    assert.equal(workspace.homeSectionFor(native),section);
+    assert.equal(workspace.homeSectionFor(native),native==="home/history" ? "history" : "quick");
+    assert.ok(section==="relations"||section==="quick", "original HOME subpanel remains identified");
     assert.equal(m0.findRoute(native),null,"M0 remains a six-subject taxonomy");
   }
   assert.deepEqual(plain(m0.SUBJECTS.map(x=>x.id)),

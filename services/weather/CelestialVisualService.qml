@@ -2,22 +2,33 @@ import QtQuick
 import Quickshell
 import Quickshell.Io
 import "CelestialVisualQueryPolicy.js" as Query
+import "CelestialVisualInstallPolicy.js" as Install
 
 // MAGICK M5c // Single on-demand calculation owner, hosted by WeatherStationW.
 // Never polls, downloads, infers user location, or writes files.
-// Explicit opt-in runtime configuration:
-//   POST_APOLLO_CELESTIAL_KERNEL=/absolute/path/de440s.bsp
-//   POST_APOLLO_CELESTIAL_PYTHON=/path/to/venv/bin/python  (optional)
+// Automatically reuses the existing home-local MAGICK installation.
+// Optional POST_APOLLO_CELESTIAL_KERNEL and POST_APOLLO_CELESTIAL_PYTHON
+// environment overrides remain supported for development installations.
 Scope {
     id: celestial
 
     property bool active: false
     property string route: ""
     property real anchorNowMs: 0
-    property string kernelPath:
+    // These resolve paths only, not file existence. A missing installation
+    // fails safely when CALCULATE attempts to use the existing M4 backend.
+    readonly property string installHome:
+        String(Quickshell.env("HOME") || "")
+    readonly property string kernelOverride:
         String(Quickshell.env("POST_APOLLO_CELESTIAL_KERNEL") || "")
+    readonly property string pythonOverride:
+        String(Quickshell.env("POST_APOLLO_CELESTIAL_PYTHON") || "")
+    property string kernelPath:
+        Install.resolveKernel(kernelOverride, installHome)
     property string pythonExecutable:
-        String(Quickshell.env("POST_APOLLO_CELESTIAL_PYTHON") || "python3")
+        Install.resolvePython(pythonOverride, installHome)
+    readonly property string pathSource:
+        Install.pathSource(kernelOverride, pythonOverride, installHome)
 
     property var visualData: null
     property bool ready: false

@@ -1,0 +1,37 @@
+name: MAGICK normal startup auto-discovery
+
+on:
+  pull_request:
+    paths:
+      - 'services/weather/CelestialVisualInstallPolicy.js'
+      - 'services/weather/CelestialVisualService.qml'
+      - 'tests/weather/test_magick_default_paths_m5e.js'
+      - '.github/workflows/weather-magick-default-paths-m5e.yml'
+  push:
+    paths:
+      - 'services/weather/CelestialVisualInstallPolicy.js'
+      - 'services/weather/CelestialVisualService.qml'
+      - 'tests/weather/test_magick_default_paths_m5e.js'
+      - '.github/workflows/weather-magick-default-paths-m5e.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  default-install-paths:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Discover preinstalled MAGICK kernel/interpreter without launcher variables
+        run: node --test tests/weather/test_magick_default_paths_m5e.js
+      - name: Preserve existing M5b / M5c controls and visual contracts
+        run: |
+          node --test tests/weather/test_magick_celestial_bridge_m5b.js
+          node --test tests/weather/test_magick_celestial_query_m5c.js
+          node --test tests/weather/test_magick_celestial_visual_m5.js
+          node --test tests/weather/test_home_deck_w2a.js

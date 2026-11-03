@@ -30,6 +30,8 @@ Rectangle {
         SourceHealth.buildCoreSources(
             ToolsPolicy.sourceInput(weatherService,spaceService,runtimeNowMs))
     readonly property var sourceCatalog: RuntimePolicy.sourceCatalog()
+    readonly property var fieldTimeRows:
+        ToolsPolicy.fieldTimeRows(spaceService,runtimeNowMs)
     readonly property var frameRows: ToolsPolicy.frameSources(sourceCatalog)
     readonly property var allStorageRows:
         ToolsPolicy.storageRows(persistentCacheStore,liveHistoryStore,
@@ -235,6 +237,80 @@ Rectangle {
                     wrapMode: Text.WordWrap
                     color: Colors.yellow
                     font.pixelSize: 10
+                }
+
+                StationSectionDivider {
+                    width: parent.width
+                    title: "NOAA // FIELD SAMPLE CLOCKS"
+                }
+
+                QuietText {
+                    width: parent.width
+                    text: "FOUR SHARED SPACE SERVICE SAMPLE TIMES FROM THE ORIGINAL SPACE FIELD PANEL. PROVIDER SAMPLE AGE AND LAST SUCCESSFUL RECEIPT ARE DIFFERENT CLOCKS. NO NEW NOAA REQUEST IS MADE."
+                    wrapMode: Text.WordWrap
+                    color: Colors.yellow
+                    font.pixelSize: 10
+                }
+
+                Repeater {
+                    model: toolsPane.fieldTimeRows
+                    delegate: Column {
+                        required property var modelData
+                        width: toolsContent.width
+                        spacing: 3
+
+                        Row {
+                            width: parent.width
+                            spacing: 10
+
+                            GohuText {
+                                width: Math.min(165,parent.width * 0.38)
+                                text: modelData.title
+                                font.pixelSize: 11
+                                color: Colors.white
+                            }
+
+                            GohuText {
+                                width: Math.max(0,parent.width - 175)
+                                text: modelData.status
+                                font.pixelSize: 11
+                                color: modelData.status === "CURRENT"
+                                       ? Colors.green
+                                       : modelData.status === "STALE"
+                                         ? Colors.orange : Colors.yellow
+                            }
+                        }
+
+                        QuietText {
+                            width: parent.width
+                            font.pixelSize: 10
+                            wrapMode: Text.WrapAnywhere
+                            color: Colors.cyan
+                            text: "PROVIDER SAMPLE // " + modelData.sampleClock
+                                  + " // AGE " + modelData.ageText
+                                  + " // STALE AFTER "
+                                  + modelData.staleAfterMinutes + " MIN"
+                        }
+
+                        QuietText {
+                            width: parent.width
+                            font.pixelSize: 10
+                            wrapMode: Text.WrapAnywhere
+                            text: "LAST RECEIPT // " + modelData.receiptClock
+                        }
+
+                        Rectangle {
+                            width: parent.width
+                            height: 1
+                            color: Colors.cyan
+                            opacity: 0.25
+                        }
+                    }
+                }
+
+                StationSectionDivider {
+                    width: parent.width
+                    title: "SOURCE CONTRACT INVENTORY // NOT LIVE POLLS"
                 }
 
                 Repeater {

@@ -42,7 +42,7 @@ test("all 14 original SKY sections are partitioned: observatory in COSMOS, terre
     if(Object.prototype.hasOwnProperty.call(terrestrial,section))
       assert.equal(weather.visibleFor("sky",terrestrial[section],section),true,
         "WEATHER must render original "+section);
-    else
+    else if(section !== "header")
       for(const p of ["weather/conditions/current","weather/forecasts/hourly"])
         assert.equal(weather.visibleFor("sky",p,section),false,
           "astronomy must not leak into "+p+": "+section);

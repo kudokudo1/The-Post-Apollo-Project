@@ -30,7 +30,7 @@ This `Scope` contains a non-running `Process` and `SplitParser` with strict JSON
 
 **C. TASKS singleton binding:** `services/hub/ApolloHubTodoStore.qml`.
 
-This is the first intentional shared QML integration into the existing production TASKS coordinator. It instantiates **one** M13i bridge as a child, exposes read-only `encryptedRecoveryProviderStatus` and `encryptedRecoveryProviderPresent`, and provides `inspectEncryptedRecoveryProvider()` as an explicit read-only discovery call for a future UI. Its other new flags `encryptedRecoveryEnabled`, `encryptedRecoveryStorageAuthorized` and `encryptedRecoveryUnlockAuthorized` are all literal **false**.
+This is the first intentional shared QML integration into the existing production TASKS coordinator. It instantiates **one** M13i bridge as a child, exposes read-only `encryptedRecoveryProviderStatus` and `encryptedRecoveryProviderPresent`, but deliberately adds **no public TASKS function**: the M11d exact public-API inventory must remain unchanged. Its other new flags `encryptedRecoveryEnabled`, `encryptedRecoveryStorageAuthorized` and `encryptedRecoveryUnlockAuthorized` are all literal **false**.
 
 This does **not** add a second FileView or a persistent draft store, alter existing `stage()`/ticket behavior, or trigger a check automatically. Existing consumer surfaces are not changed.
 
@@ -54,7 +54,7 @@ quickshell -p /absolute/path/to/isolated-checkout/TaskEncryptedRecoveryHarnessM1
 
 Do not use the live `~/.config/quickshell` worktree for a checkout or reset. The panel is not needed for normal TASKS and **will never enable recovery**. The only active button is a D-Bus name-owner check. No secrets should be entered or displayed.
 
-Programmatically a future authorized QML consumer can *read* `ApolloHubTodoStore.encryptedRecoveryProviderStatus` or explicitly invoke `ApolloHubTodoStore.inspectEncryptedRecoveryProvider()`. That is service discovery only, **not** a write, authentication or unlock API.
+Programmatically a future authorized QML consumer can *read* `ApolloHubTodoStore.encryptedRecoveryProviderStatus`, which stays `NOT_CHECKED` until a separately authorized probe route exists. The **standalone panel only** invokes its own bridge’s `inspectProvider()` for the read-only discovery test. The production TASKS singleton adds **no new callable operation** and cannot launch provider discovery from existing consumers.
 
 ## VERIFY
 
@@ -82,7 +82,7 @@ In GitHub CI:
 - [x] Recheck M13h merge, Fedora native test checkpoint, Syntagma, active TASKS ownership and GitHub main
 - [x] Reuse existing D-Bus name-owner probe concept without keyring mutations
 - [x] Implement dormant QML `Process` boundary with strict no-power status reply
-- [x] Bind status to the existing singleton with all new and old writer gates `false`
+- [x] Bind dormant status to the existing singleton, retain exact existing public TASKS methods, and keep all writer/recovery gates `false`
 - [x] Add unmounted read-only Quickshell inspection panel
 - [x] Add Python, Node and prior-gate CI tests
 - [ ] CI complete / independent source review

@@ -1,0 +1,27 @@
+name: CPU++ TIME settings contracts
+
+on:
+  pull_request:
+    paths:
+      - "widgets/CpuPlusW.qml"
+      - "widgets/TimeSettingsPane.qml"
+      - "services/time/TimeSettings.qml"
+      - "services/time/TimeSettingsPolicy.js"
+      - "tests/cpuplus/test_cpuplus_time_settings_contract.py"
+      - ".github/workflows/cpuplus-time-settings-contracts.yml"
+  push:
+    paths:
+      - "widgets/CpuPlusW.qml"
+      - "widgets/TimeSettingsPane.qml"
+      - "services/time/TimeSettings.qml"
+      - "services/time/TimeSettingsPolicy.js"
+      - "tests/cpuplus/test_cpuplus_time_settings_contract.py"
+      - ".github/workflows/cpuplus-time-settings-contracts.yml"
+
+jobs:
+  time-settings-contracts:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Test CPU++ TIME settings read-only integration
+        run: python3 -m unittest discover -s tests/cpuplus -p 'test_cpuplus_time_settings_contract.py' -v

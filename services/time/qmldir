@@ -1,0 +1,3 @@
+module qs.services.time
+
+singleton TimeSettings 1.0 TimeSettings.qml

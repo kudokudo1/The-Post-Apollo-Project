@@ -5,6 +5,7 @@ import "StationSubjectNavigationPreviewPolicy.js" as PreviewRoutes
 import "StationWeatherSubjectPanelPolicy.js" as WeatherPanelPolicy
 import "StationCosmosSubjectPanelPolicy.js" as CosmosPanelPolicy
 import "StationEarthSubjectPanelPolicy.js" as EarthPanelPolicy
+import "StationMediaSubjectPanelPolicy.js" as MediaPanelPolicy
 
 // M1 bounded visual browser. Source panels remain in their original classic
 // QML pages; no new fetches, persistence, or fake submode content.
@@ -34,6 +35,8 @@ Rectangle {
         CosmosPanelPolicy.kindForRoute(currentPath)
     readonly property string liveEarthKind:
         EarthPanelPolicy.kindForRoute(currentPath)
+    readonly property string liveMediaKind:
+        MediaPanelPolicy.kindForRoute(currentPath)
 
     readonly property var currentRoute: SubjectRoutes.findRoute(currentPath)
     readonly property var childrenRoutes: SubjectRoutes.childrenOf(currentPath)
@@ -42,6 +45,7 @@ Rectangle {
         PreviewRoutes.sourcePagesForPath(currentPath, SubjectRoutes.PANELS)
 
     signal legacyPageRequested(string pageId)
+    signal newsMapRequested(var payload)
 
     function chooseRoute(path) {
         const candidate = SubjectRoutes.findRoute(path);
@@ -111,6 +115,8 @@ Rectangle {
                     ? "COSMOS // SUBJECT VIEW"
                     : browser.liveEarthKind !== ""
                       ? "EARTH // SUBJECT VIEW"
+                    : browser.liveMediaKind !== ""
+                      ? "MEDIA // SUBJECT VIEW"
                     : "SUBJECTS // NAVIGATION PREVIEW"
             color: Colors.magenta
             font.pixelSize: 17
@@ -176,6 +182,7 @@ Rectangle {
         visible: browser.liveWeatherKind === ""
                  && browser.liveCosmosKind === ""
                  && browser.liveEarthKind === ""
+                 && browser.liveMediaKind === ""
         boundsBehavior: Flickable.StopAtBounds
         contentWidth: width
         contentHeight: Math.max(height, contentColumn.implicitHeight + 12)
@@ -271,7 +278,8 @@ Rectangle {
         id: liveChildren
         visible: (browser.liveWeatherKind !== ""
                   || browser.liveCosmosKind !== ""
-                  || browser.liveEarthKind !== "")
+                  || browser.liveEarthKind !== ""
+                  || browser.liveMediaKind !== "")
                  && browser.childrenRoutes.length > 0
         anchors.left: parent.left
         anchors.right: parent.right
@@ -362,6 +370,23 @@ Rectangle {
         runtimeNowMs: browser.runtimeNowMs
     }
 
+    StationMediaSubjectPane {
+        id: mediaLivePane
+        anchors.left: parent.left
+        anchors.right: parent.right
+        anchors.top: liveChildren.visible
+                     ? liveChildren.bottom : breadcrumbRow.bottom
+        anchors.topMargin: liveChildren.visible ? 6 : 14
+        anchors.bottom: previewNote.top
+        anchors.bottomMargin: 6
+        visible: browser.visible && browser.liveMediaKind !== ""
+        subjectRoute: browser.currentPath
+        runtimeNowMs: browser.runtimeNowMs
+        onNewsMapRequested: function(payload) {
+            browser.newsMapRequested(payload);
+        }
+    }
+
     // Post-Apollo shared star indicator; no new scroll behavior is invented.
     NeonScrollBar {
         flickable: routeScroll
@@ -370,6 +395,7 @@ Rectangle {
         visible: browser.visible && browser.liveWeatherKind === ""
                  && browser.liveCosmosKind === ""
                  && browser.liveEarthKind === ""
+                 && browser.liveMediaKind === ""
                  && routeScroll.contentHeight > routeScroll.height + 1
     }
 
@@ -390,6 +416,8 @@ Rectangle {
                 ? "COSMOS // EXISTING SKY + SPACE PANELS // SAME COLLECTORS"
                 : browser.liveEarthKind !== ""
                   ? "EARTH // SHARED MAP + EVENT DOSSIERS // ORIGINAL STORES"
+                : browser.liveMediaKind !== ""
+                  ? "MEDIA // GDELT + PUBLISHER CATALOG + HI-FI RADIO // ORIGINAL SOURCES"
                 : "SPEC-ONLY SUBJECTS // CLASSIC PAGES REMAIN CANONICAL UNTIL PANEL MIGRATION"
     }
 }

@@ -144,8 +144,11 @@ Rectangle {
 
     function goUp() {
         if (indexOpen) {
-            if (pathCrumbs.length > 1)
-                chooseRoute(pathCrumbs[pathCrumbs.length-2].path);
+            if (pathCrumbs.length > 1) {
+                currentPath = pathCrumbs[pathCrumbs.length-2].path;
+                navigationCursor = 0;
+                if (routeScroll) routeScroll.contentY = 0;
+            }
             return;
         }
         chooseRoute(Workspace.landingFor(Workspace.familyFor(currentPath)));

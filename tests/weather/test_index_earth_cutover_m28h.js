@@ -132,10 +132,9 @@ test("INDEX no longer routes already-reviewed EARTH source groups into CLASSIC",
     "MEDIA mentioned places must not be promoted as EARTH-native event records");
 });
 
-test("unreviewed tools and watch controls are not implicitly certified by EARTH parity",()=>{
-  for(const id of [
-    "map-source-rack","ground-source","station-source-badge"
-  ]) assert.equal(c.WIRED_IN_SUBJECTS[id],undefined,id+" remains pending");
+test("later source rack and badge cutover does not reclassify EARTH provider events",()=>{
+  for(const id of ["map-source-rack","ground-source","station-source-badge"])
+    assert.equal(c.WIRED_IN_SUBJECTS[id],"M28-L",id+" later SOURCE review");
   assert.deepEqual(plain(c.nativeDestinationsForPath("../earth",c.PANELS)),[]);
   assert.deepEqual(plain(c.remainingSourcePagesForPath("earth//map",c.PANELS)),[]);
   assert.equal(e.kindForRoute("weather/maps/radar"),"");

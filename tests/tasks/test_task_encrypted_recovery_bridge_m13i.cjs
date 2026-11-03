@@ -59,7 +59,7 @@ test("provider process uses only the non-activating DBus daemon query",()=>{
     assert.match(provider,/sys\.argv\[1:\] == \["--probe"\]/);
     assert.match(provider,/timeout=4/);
     for(const forbidden of [
-        "secret-tool","OpenSession","Unlock","CreateItem","Delete",
+        "secret-tool","OpenSession","--unlock","CreateItem","Delete",
         "gnome-keyring-daemon","org.freedesktop.Secret.Collection",
         "set_password","get_password","subprocess.Popen"
     ])

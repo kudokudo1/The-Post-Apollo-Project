@@ -1987,6 +1987,10 @@ PanelWindow {
                         color: timew.semanticColor
                         text: TimeSettings.resyncStatus === "working"
                               ? "SYNC..."
+                              : TimeSettings.resyncStatus === "confirm"
+                              ? "CONFIRM"
+                              : TimeSettings.resyncStatus === "completed"
+                              ? "SYNC DONE"
                               : TimeSettings.resyncStatus === "requested"
                               ? "SAMPLES"
                               : TimeSettings.resyncStatus === "failed"

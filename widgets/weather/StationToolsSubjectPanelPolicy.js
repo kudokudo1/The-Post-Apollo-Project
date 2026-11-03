@@ -144,6 +144,40 @@ function sourceInput(weather,space,nowMs) {
         }
     };
 }
+// M28-I: the original SPACE FIELD TIME values, not runtime catalogue specs.
+// Read the SAME four existing NOAA SpaceService sample clocks and receipt dates.
+// A fresh network receipt must never silently mean a fresh provider sample.
+function fieldTimeRows(space,nowMs) {
+    var s=space || null;
+    var h=sourceInput(null,s,nowMs);
+    var rows=[
+        {id:"kp",title:"KP SAMPLE",value:s?s.kpTime:"",health:h.kp},
+        {id:"solar-wind",title:"WIND SAMPLE",value:s?s.solarWindTime:"",health:h.solarWind},
+        {id:"imf",title:"IMF SAMPLE",value:s?s.magneticFieldTime:"",health:h.magneticField},
+        {id:"solar-flux",title:"FLUX SAMPLE",value:s?s.solarFluxTime:"",health:h.solarFlux}
+    ];
+    return rows.map(function(row) {
+        var raw=String(row.value || "").trim();
+        var info=row.health;
+        var age=info.sampleAgeMinutes;
+        var receipt=info.lastSuccessMs>0
+            ? new Date(info.lastSuccessMs).toISOString() : "UNAVAILABLE";
+        var status=!info.ready ? "NOT READY"
+            : raw==="" ? "NO SAMPLE"
+            : age<0 ? "TIME UNVERIFIED"
+            : age>info.staleAfterMinutes ? "STALE" : "CURRENT";
+        return {
+            id:row.id, title:row.title,
+            sampleClock:raw!=="" ? raw:"UNAVAILABLE",
+            receiptClock:receipt,
+            sampleAgeMinutes:age,
+            status:status,
+            ageText:age>=0 ? age+" MIN":"UNKNOWN",
+            staleAfterMinutes:info.staleAfterMinutes
+        };
+    });
+}
+
 function countKeys(obj) {
     return obj && typeof obj === "object" && !Array.isArray(obj)
         ? Object.keys(obj).length:0;

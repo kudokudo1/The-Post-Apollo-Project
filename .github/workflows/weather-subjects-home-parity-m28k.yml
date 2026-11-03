@@ -7,6 +7,7 @@ on:
       - 'widgets/weather/StationSubjectNavigator.qml'
       - 'widgets/weather/StationSubjectRail.qml'
       - 'tests/weather/test_index_home_cutover_m28k.js'
+      - 'tests/weather/test_workspace_left_rail_w1r.js'
       - 'tests/weather/test_index_subject_cutover_m28d.js'
       - 'tests/weather/test_index_weather_cutover_m28f.js'
       - 'tests/weather/test_index_cosmos_cutover_m28g.js'

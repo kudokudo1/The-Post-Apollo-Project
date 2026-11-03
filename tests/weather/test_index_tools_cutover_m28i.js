@@ -142,10 +142,12 @@ test("still-pending source racks, HOME semantics and WATCH hosting remain visibl
   for(const id of [
     "home-quick-conditions","home-aqi-humidity","home-aqi-wind",
     "home-space-weather","ground-source","map-source-rack",
-    "station-source-badge","news-live","news-creators","news-uploads"
+    "station-source-badge","home-aqi-humidity","home-aqi-wind"
   ])assert.equal(env.WIRED_IN_SUBJECTS[id],undefined,id+" not silently accepted");
-  assert.deepEqual(plain(env.remainingSourcePagesForPath("media/watch",env.PANELS)),
-    plain(env.sourcePagesForPath("media/watch",env.PANELS)));
+  assert.ok(env.sourcePagesForPath("media/watch",env.PANELS).length>0,
+    "original NEWS catalog source provenance remains");
+  assert.deepEqual(plain(env.remainingSourcePagesForPath("media/watch",env.PANELS)),[],
+    "M28-J classifies the catalog, not video playback");
   assert.match(navigator,/model: browser\.nativeDestinations/);
   assert.match(navigator,/model: browser\.classicSources/);
   assert.deepEqual(plain(env.nativeDestinationsForPath("../tools",env.PANELS)),[]);

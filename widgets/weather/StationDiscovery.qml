@@ -16,6 +16,7 @@ import "StationEventContextPolicy.js" as EventContextPolicy
 import "StationDossierPreviewPolicy.js" as DossierPreviewPolicy
 import "StationDossierCapturePolicy.js" as DossierCapturePolicy
 import "StationEarthSubjectPanelPolicy.js" as EarthPanelPolicy
+import "StationMediaSubjectPanelPolicy.js" as MediaPanelPolicy
 
 // Source-first stage. All records shown come from a backend, never examples.
 // MAP owns a local Natural Earth geographic basemap plus source-driven data
@@ -25,6 +26,15 @@ Rectangle {
     id: stationDiscovery
 
     property string domain: "map"
+    // Existing GDELT, source cooldown and in-pane article inspector reused.
+    property string newsSubjectRoute: ""
+    function newsGroupVisible(group) {
+        return MediaPanelPolicy.newsGroupVisible(newsSubjectRoute,group);
+    }
+    onNewsSubjectRouteChanged: {
+        if (discoveryScroll)
+            discoveryScroll.contentY = 0;
+    }
     // M2b weather-only view of the existing CLASSIC map renderer.
     property bool weatherMapOnly: false
     property string weatherMapRoute: ""
@@ -3181,6 +3191,7 @@ Rectangle {
                 width: parent.width
                 height: stationDiscovery.domain === "news" ? 34 : 0
                 visible: stationDiscovery.domain === "news"
+                         && stationDiscovery.newsGroupVisible("filters")
                 spacing: 7
 
                 Repeater {
@@ -3229,6 +3240,7 @@ Rectangle {
                 width: parent.width
                 height: stationDiscovery.domain === "news" ? 34 : 0
                 visible: stationDiscovery.domain === "news"
+                         && stationDiscovery.newsGroupVisible("filters")
                 spacing: 8
 
                 Rectangle {
@@ -3303,6 +3315,7 @@ Rectangle {
                 width: parent.width
                 height: stationDiscovery.domain === "news" ? 34 : 0
                 visible: stationDiscovery.domain === "news"
+                         && stationDiscovery.newsGroupVisible("filters")
                 spacing: 7
 
                 Repeater {
@@ -3348,6 +3361,7 @@ Rectangle {
                 width: parent.width
                 height: stationDiscovery.domain === "news" ? 34 : 0
                 visible: stationDiscovery.domain === "news"
+                         && stationDiscovery.newsGroupVisible("filters")
                 spacing: 8
 
                 Rectangle {
@@ -3424,6 +3438,7 @@ Rectangle {
                 width: parent.width
                 height: stationDiscovery.domain === "news" ? 42 : 0
                 visible: stationDiscovery.domain === "news"
+                         && stationDiscovery.newsGroupVisible("filters")
                 spacing: 7
 
                 Repeater {
@@ -3474,13 +3489,17 @@ Rectangle {
                 width: parent.width
                 spacing: 7
                 visible: stationDiscovery.domain === "news"
+                         && (stationDiscovery.newsGroupVisible("trend")
+                             || stationDiscovery.newsGroupVisible("stories"))
 
                 StationSectionDivider {
+                    visible: stationDiscovery.newsGroupVisible("trend")
                     width: parent.width
                     title: "REPORTING TREND // CURRENT FILTERED BATCH"
                 }
 
                 Row {
+                    visible: stationDiscovery.newsGroupVisible("trend")
                     width: parent.width
                     spacing: 12
 
@@ -3603,6 +3622,7 @@ Rectangle {
                 }
 
                 QuietText {
+                    visible: stationDiscovery.newsGroupVisible("trend")
                     width: parent.width
                     text: "ORANGE = ARTICLES // CYAN = UNIQUE PUBLISHERS // LOCAL HISTOGRAM FROM GDELT SEENDATE // FILTER CHANGES RECOMPUTE WITHOUT REFETCH"
                     font.pixelSize: 9
@@ -3610,6 +3630,7 @@ Rectangle {
                 }
 
                 StationSectionDivider {
+                    visible: stationDiscovery.newsGroupVisible("stories")
                     width: parent.width
                     title: "STORY FAMILIES // CONSERVATIVE TITLE TOKENS"
                 }
@@ -3617,7 +3638,8 @@ Rectangle {
                 Column {
                     width: parent.width
                     spacing: 5
-                    visible: stationDiscovery.newsStoryFamilies.length > 0
+                    visible: stationDiscovery.newsGroupVisible("stories")
+                             && stationDiscovery.newsStoryFamilies.length > 0
 
                     Repeater {
                         model: stationDiscovery.newsStoryFamilies.slice(0, 4)
@@ -3691,18 +3713,30 @@ Rectangle {
                 }
 
                 QuietText {
-                    visible: stationDiscovery.newsStoryFamilies.length === 0
+                    visible: stationDiscovery.newsGroupVisible("stories")
+                             && stationDiscovery.newsStoryFamilies.length === 0
                     width: parent.width
                     text: "NO MULTI-HEADLINE FAMILY CLEARS THE STRICT LOCAL TOKEN THRESHOLD IN THIS FILTERED BATCH"
                     font.pixelSize: 9
                 }
 
                 QuietText {
+                    visible: stationDiscovery.newsGroupVisible("stories")
                     width: parent.width
                     text: "LOCAL TITLE-TOKEN CLUSTERS // ≥3 SHARED TOKENS + ≥75% SHORTER-TITLE OVERLAP + ≥62% JACCARD // NOT EMBEDDING SEMANTICS OR VERIFIED EVENT IDENTITY"
                     font.pixelSize: 9
                     color: Colors.orange
                 }
+            }
+
+            QuietText {
+                visible: stationDiscovery.domain === "news"
+                         && stationDiscovery.newsGroupVisible("inspector-hint")
+                width: parent.width
+                wrapMode: Text.WordWrap
+                color: Colors.yellow
+                text: MediaPanelPolicy.hintFor(stationDiscovery.newsSubjectRoute)
+                font.pixelSize: 10
             }
 
             QuietText {

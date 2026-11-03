@@ -68,7 +68,7 @@ for token in (
     assert token in home, token
 assert 'case "CACHE": return "yellow";' not in health or 'case "CACHE"' in health
 assert 'state = stale ? "CACHE STALE" : "CACHE";' in health
-assert 'state = "FALLBACK";' in health
+assert 'state = stale ? "FALLBACK STALE" : "FALLBACK";' in health
 assert 'detail = "LAST KNOWN // "' in health
 
 print("Weather M6c single-owner, UI navigation and source-provenance contract: PASS")

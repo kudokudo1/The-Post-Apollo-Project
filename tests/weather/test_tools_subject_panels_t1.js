@@ -205,7 +205,10 @@ test("all previous subject panes, CLASSIC, runtime mask and terminal owner remai
   assert.match(station,/terminalHoleActive:/);
   assert.match(station,/StationTerminal\s*\{/);
   assert.match(station,/onNewsMapRequested: function\(payload\)/);
-  assert.match(station,/if \(subjectNavigationOpen\)\s*return subjectSourceBadge\.text;/);
+  assert.match(station,/if \(subjectNavigationOpen\) \{/);
+  assert.match(station,/subjectNavigator\.liveWeatherKind !== ""/);
+  assert.match(station,/!subjectNavigator\.indexOpen/);
+  assert.match(station,/return subjectSourceBadge\.text;/);
 });
 
 test("TOOLS adds no new writer, provider service, network process or session", () => {

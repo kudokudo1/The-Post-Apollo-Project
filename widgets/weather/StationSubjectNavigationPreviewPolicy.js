@@ -36,3 +36,58 @@ function sourcePagesForPath(path, panelRoutes) {
       return {id:key, label:LABELS[key], panels:counts[key], status:"CLASSIC_SOURCE"};
     });
 }
+
+// M28-D: These exact original control families already have a SUBJECTS
+// route and regression contract from M28-A/B/C. This records routed wiring,
+// NOT operator acceptance, native Sway/Kitty acceptance, or whole-page parity.
+// Do not add other panels merely because a destination appears in PANELS.
+var WIRED_IN_SUBJECTS = {
+  "map-news-mentions":"M28-A",
+  "map-news-inspector":"M28-A",
+  "news-topic-filter":"M28-B",
+  "news-publisher-country-filter":"M28-B",
+  "news-language-time-region-filter":"M28-B",
+  "news-reporting-trend":"M28-B",
+  "news-story-families":"M28-B",
+  "news-article-viewer":"M28-B",
+  "terminal-star-map":"M28-C",
+  "terminal-context-console":"M28-C"
+};
+
+function remainingSourcePagesForPath(path, panelRoutes) {
+  // Retain the M1 historical source map unchanged. Only exact reviewed
+  // cutovers stop offering a redundant jump to the whole CLASSIC page.
+  if (!panelRoutes || typeof panelRoutes !== "object") return [];
+  var unresolved = {};
+  Object.keys(panelRoutes).forEach(function(panel) {
+    if (!Object.prototype.hasOwnProperty.call(WIRED_IN_SUBJECTS, panel))
+      unresolved[panel] = panelRoutes[panel];
+  });
+  return sourcePagesForPath(path, unresolved);
+}
+
+function nativeDestinationsForPath(path, panelRoutes) {
+  if (typeof path !== "string"
+      || !/^[a-z0-9-]+(?:\/[a-z0-9-]+)*$/.test(path)
+      || !panelRoutes || typeof panelRoutes !== "object")
+    return [];
+  var destinations = {};
+  Object.keys(panelRoutes).sort().forEach(function(panel) {
+    if (!Object.prototype.hasOwnProperty.call(WIRED_IN_SUBJECTS, panel))
+      return;
+    var target = panelRoutes[panel];
+    if (typeof target !== "string"
+        || (target !== path && target.indexOf(path + "/") !== 0))
+      return;
+    if (!Object.prototype.hasOwnProperty.call(destinations, target))
+      destinations[target] = {path:target, panels:0, milestones:[]};
+    var item = destinations[target];
+    item.panels++;
+    var milestone = WIRED_IN_SUBJECTS[panel];
+    if (item.milestones.indexOf(milestone) < 0)
+      item.milestones.push(milestone);
+  });
+  return Object.keys(destinations).sort().map(function(target) {
+    return destinations[target];
+  });
+}

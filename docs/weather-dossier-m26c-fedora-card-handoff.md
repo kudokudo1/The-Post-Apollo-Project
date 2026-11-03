@@ -1,90 +1,96 @@
-# Weather Station // M26-C Fedora Offscreen Card Pointer Smoke
+# Weather Station // M26-C Fedora Virtual-X Native Card-Click Smoke
 
 **Patient:** `The-Post-Apollo-Project`  
 **Room:** Weather Station / Dossier Graphical Interaction Verification  
-**Staff:** external Hospital-compatible ChatGPT; no live Hospital registration  
-**Assignment:** native Fedora 44 test of actual event-context card, ActionButton pointer, independent FileView writer; no live desktop mutation  
+**Staff:** external Hospital-compatible ChatGPT, not live registered  
+**Assignment:** native Fedora 44 test of actual event-context card and
+ActionButton pointer into independent FileView, isolated from live desktop.  
 **Baseline:** `main` @ `d66e9e8e1e06180681f2e899ad2db29696c55f0e`.
 
 ## IMPLEMENTATION
 
-M26-A verified the M25 store's QML JavaScript callback bodies against a
-disposable filesystem. M26-B then exercised **actual Quickshell FileView**
-save/restart/refusal in Debian CI, merged as PR #1080.
+M26-A verified M25 QML JavaScript callbacks using a mock FileView.
+M26-B (merged PR #1080) exercised real Quickshell FileView save/restart
+and corruption refusal in a disposable Debian runner.
 
-M26-C adds one more bounded integration test: the **actual production
-`StationEventContextCard.qml`** and its imported `ActionButton.qml`,
-inside a visible, offscreen Qt `Window` in a disposable Fedora 44
-GitHub Actions container. The shell copies components, weather card and
-M22–M25 storage/admission policies into temporary XDG directories.
-It loads no production shell, news provider, map service or personal data.
+M26-C adds a **real production `StationEventContextCard.qml`** and
+`ActionButton.qml` smoke in a Fedora 44 container. It copies the
+component directory, card, and M22–M25 storage/admission code into a
+throwaway configuration, launches actual Quickshell in a throwaway
+**Xvfb X11 server** and sends real mouse clicks using `xdotool`.
+No production `shell.qml`, provider network, personal data, or real
+Wayland desktop is involved.
 
-The QML `QtTest.TestCase` locates the ActionButtons by their displayed
-labels and attempts actual native pointer clicks:
+The test verifies:
+1. With `SAVE DOSSIER` disarmed, native left-click must not fire the
+   `onDossierSaveRequested` signal or write a file.
+2. After a separate timer arms the button, an actual X11 click at the
+   ActionButton's QML-computed coordinates must trigger exactly one
+   explicit dossier request, with correct M23 staging and M25 persistence.
+3. Real FileView saved callback and disk bytes must report the exact
+   selected `gdacs` provider-native event ID, and preserve non-incident
+   semantics.
+4. The distinct source-native `ARCHIVE` button remains unavailable;
+   its archive file must not be written.
 
-1. Verify `SAVE DOSSIER` is visible but disabled before the fixture
-   explicitly enables capture; clicking it must request no write.
-2. Verify independent `ARCHIVE` remains unavailable, and cannot be
-   implicitly activated by dossier capture.
-3. Enable the dossier button after the separate dossier store opens
-   as an empty archive; click it with QtTest's native mouse event helper.
-4. Assert one `onDossierSaveRequested` call, one native `dossierSaved`
-   callback, and one persisted dossier with exact source-native ID.
-5. Confirm no `weather-event-archive-v1.json` source-native archive file
-   was written by this cross-domain save path.
-
-The test script removes the temporary tree on exit; there is no live
-`~/.config/quickshell`, shell restart or Wayland compositor connection.
+The fixture originally used QtTest's TestCase. Fedora's Quickshell
+0.2.1 was observed aborting when the TestSchedule handler was exited
+synchronously; after deferring shutdown, QtTest exited before the
+conditional test executed. Those fixture-only attempts did **not**
+establish a production issue. M26-C now uses separate Xvfb/xdotool
+to avoid QtTest's application lifecycle entirely.
 
 ## HOW TO USE
 
-CI: `bash scripts/weather/verify_dossier_card_fedora_m26c.sh`.
+GitHub CI: `bash scripts/weather/verify_dossier_card_fedora_m26c.sh`.
+This script intentionally requires installed `quickshell`, `Xvfb`,
+`xdotool` and Node. It creates its own isolated `HOME`, XDG directories
+and X server. It cleans these up at exit.
 
-This is intentionally a GitHub CI test. Do **not** deploy to or execute
-on the operator's live Fedora Silverblue host without separate local
-permission. The script is sandboxed, but review still matters.
+**Do not run on the operator's live Fedora Silverblue host without explicit
+permission**. This is a CI acceptance test, not a local-install instruction.
 
 ## VERIFY
 
-At PR creation, Fedora native CI was not yet confirmed. A successful result
-must show `M26C_UI_PASS // FEDORA_OFFSCREEN_CARD_POINTER_STORAGE` in the
-CI logs and pass the M25 source regression. If QtTest cannot issue a mouse
-event in offscreen mode or Fedora's Qt/QML module dependency is missing,
-report a test-environment blocker, not a production bug.
+The test requires the marker
+`M26C_UI_PASS // FEDORA_XVFB_CARD_POINTER_STORAGE` followed by full
+Weather teardown / grammar success. The runner checks actual JSON bytes
+and assures no source-native archive file is created.
+
+If virtual X or the old Fedora package lacks a Qt module, report a CI
+compatibility blocker instead of weakening the pointer contract or
+altering production QML.
 
 ## WATCH OUT FOR
 
-This is an **isolated event-context CARD-level smoke**, not the full
-`StationDiscovery.qml` map, production UI geometry, Wayland focus,
-Stage Director embedding or the operator's custom Quickshell binary.
-The fixture reproduces the card's M23 admission and save signal wiring
-and uses real M22–M25 policies and the actual M25 FileView store.
+This is a **card-level smoke**, not the full StationDiscovery MAP,
+production menu geometry, real Sway/Wayland focus, Stage Director,
+the operator's custom Quickshell build, physical mouse input, or live
+deployment. It exercises native X11 pointer propagation in CI.
+Do not overstate that distinction.
 
-Avoid changing `StationEventContextCard.qml` and `WeatherStationW.qml`
-without coordinating Weather workers; this test owns only its fixture,
-script, CI workflow and handoff.
-
-No retention/pruning/export policy is changed, and no automatic capture
-or cross-source incident merge is introduced.
+The branch modifies **only** test fixture, script, CI workflow and this
+handoff. Other Weather workers may modify WeatherStationW and map
+surfaces independently; do not overwrite their source.
 
 ## CHECKLIST
 
-- [x] M26-B merged and source rechecked
-- [x] Fresh GitHub `main` / concurrent owner preflight
-- [x] Actual-card isolated Fedora fixture
-- [x] Disposable XDG runner
-- [x] Fedora package CI workflow
-- [ ] Fedora native test passes
-- [ ] Operator merge/acceptance
-- [ ] Full MAP inspector and local visual acceptance separately
+- [x] M26-B merge and source rechecked
+- [x] GitHub ownership and main preflight
+- [x] Real card and ActionButton fixture
+- [x] Disposable Fedora Xvfb server and native pointer runner
+- [ ] Native Fedora virtual-X smoke pass
+- [ ] Operator merge/review
+- [ ] Full MAP and local graphical acceptance separately
 
 ## NEXT
 
-Diagnose Fedora test environment and resolve only fixture/CI issues. If
-the production card itself fails to load, document the exact Qt error
-and request a production owner decision before widening scope.
+Inspect CI evidence. Fix only isolated test/environment issues.
+If actual product QML fails, report the symptom and obtain scope approval
+before changing production code or shared components.
 
 ## DECISIONS
 
-Test-only GitHub work. No Fedora user-host change, production source edit,
-live Quickshell restart, merge, Hospital registration or final acceptance.
+Test-only GitHub branch. No local machine modification, production edit,
+live Quickshell restart, merge, automatic capture, storage migration or
+final user acceptance.

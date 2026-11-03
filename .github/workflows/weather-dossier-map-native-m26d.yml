@@ -1,0 +1,39 @@
+name: Weather M26-D full MAP event to dossier
+
+on:
+  pull_request:
+    paths:
+      - "tests/weather/fixtures/M26DDiscoveryMap.qml"
+      - "tests/weather/fixtures/M26DGdacsSource.qml"
+      - "scripts/weather/verify_dossier_map_fedora_m26d.sh"
+      - "widgets/weather/StationDiscovery.qml"
+      - "widgets/weather/StationEventContextCard.qml"
+      - "services/weather/WeatherDossierArchiveStore.qml"
+      - ".github/workflows/weather-dossier-map-native-m26d.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  map-dossier:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    container:
+      image: fedora:44
+    steps:
+      - name: Install disposable Fedora Quickshell 0.3 and virtual display
+        run: |
+          dnf install -y --setopt=install_weak_deps=False dnf5-plugins
+          dnf copr enable -y errornointernet/quickshell
+          dnf install -y --setopt=install_weak_deps=False \
+            quickshell qt6-qtdeclarative qt6-qt5compat qt6-qtbase-gui \
+            qt6-qtsvg git nodejs coreutils findutils \
+            xdotool xorg-x11-server-Xvfb
+          quickshell --version
+          quickshell --version | grep '0.3.'
+      - uses: actions/checkout@v4
+      - name: Actual StationDiscovery GDACS map marker to saved dossier
+        run: bash scripts/weather/verify_dossier_map_fedora_m26d.sh
+      - name: M25 dossier identity and safety regressions
+        run: node tests/weather/test_weather_dossier_persistent_m25.js

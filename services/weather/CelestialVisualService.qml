@@ -73,6 +73,7 @@ Scope {
         spanDays=days;
         return true;
     }
+    function cycleSpan() { spanDays=Query.spanAfter(spanDays); }
 
     function clearState() {
         if (calculation.running)

@@ -264,6 +264,48 @@ Item {
                 color: TimeSettings.resyncStatus === "requested"
                        ? Colors.cyan : Colors.orange
             }
+            Row {
+                width: parent.width
+                spacing: 8
+                height: 32
+
+                ActionButton {
+                    id: resyncDiagnoseButton
+                    width: 96
+                    height: 29
+                    label: "DIAGNOSE"
+                    labelPixelSize: 10
+                    accentColor: Colors.cyan
+                    available: !TimeSettings.diagnosticBusy
+                    onLeftClicked: TimeSettings.diagnoseResync()
+                }
+                GohuText {
+                    width: Math.max(0, parent.width - resyncDiagnoseButton.width - parent.spacing)
+                    height: parent.height
+                    verticalAlignment: Text.AlignVCenter
+                    text: TimeSettings.resyncErrorCode
+                          ? "ERROR // " + TimeSettings.resyncErrorCode
+                          : "CHECK // READ ONLY"
+                    font.pixelSize: 10
+                    color: Colors.orange
+                    elide: Text.ElideRight
+                }
+            }
+            GohuText {
+                width: parent.width
+                wrapMode: Text.WordWrap
+                text: "DIAG // " + TimeSettings.diagnosticMessage
+                font.pixelSize: 10
+                color: Colors.cyan
+            }
+            GohuText {
+                width: parent.width
+                visible: TimeSettings.diagnosticDetail !== ""
+                wrapMode: Text.WordWrap
+                text: TimeSettings.diagnosticDetail
+                font.pixelSize: 9
+                color: Colors.white
+            }
             GohuText {
                 width: parent.width
                 wrapMode: Text.WordWrap

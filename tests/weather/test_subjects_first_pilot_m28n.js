@@ -62,7 +62,7 @@ test("root opens into SUBJECTS, closes to unload, and retains direct CLASSIC fal
   assert.match(station,/subjectNavigator\.openIndex\(\)/);
   assert.match(station,/onLegacyPageRequested: function\(pageId\)/);
   assert.match(station,/weatherStation\.openLegacyFromSubject\(pageId\)/);
-  assert.match(station,/visible: weatherStation\.subjectNavigationOpen/);
+  assert.match(station,/visible: weatherStation\.subjectNavigationOpen\s*&& weatherStation\.menuOpen/);
   assert.match(station,/active: !weatherStation\.subjectNavigationOpen/);
 });
 

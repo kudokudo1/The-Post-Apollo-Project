@@ -49,7 +49,11 @@ Rectangle {
     property var creatorFeedRows: []
     property string selectedCreatorId: ""
     property string inflightCreatorId: ""
-    readonly property bool isReports: effectiveSection === "REPORTS"
+    // CLASSIC REPORTS means GDELT; MEDIA WATCH / REPORTS means
+    // publisher catalogue. Never select a data source by label alone.
+    readonly property bool isReports: subjectRoute === ""
+        ? section === "REPORTS"
+        : MediaPanelPolicy.kindForRoute(subjectRoute) === "news"
     readonly property var runtimeRows:
         isReports && reportsLoader.item
         && Array.isArray(reportsLoader.item.runtimeRows)

@@ -16,9 +16,10 @@ function onOpen(pilotEnabled) {
     return preferredView(pilotEnabled) === "subjects";
 }
 function onClose(pilotEnabled) {
-    // Closing tears down transient terminal/view state while preserving the
-    // pilot's next-open preference, not a pinned CLASSIC emergency fallback.
-    return onOpen(pilotEnabled);
+    // The station's PanelWindow remains visible with 0x0 geometry on close.
+    // Always unload SUBJECTS while collapsed; the next open chooses again.
+    // pilotEnabled stays a read-only preference, never a hidden active view.
+    return false;
 }
 function escapeAction(subjectsOpen, indexOpen) {
     // INDEX is a nested route explorer: first Escape returns to its original

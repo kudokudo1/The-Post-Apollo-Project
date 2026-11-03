@@ -1,0 +1,40 @@
+name: Places → Weather shared-location bridge M5
+
+on:
+  pull_request:
+    paths:
+      - "services/location/WeatherLocationPolicy.js"
+      - "services/location/PlaceRegistry.qml"
+      - "services/weather/WeatherService.qml"
+      - "shell.qml"
+      - "tests/location/test_weather_location_policy.cjs"
+      - "tests/location/test_weather_location_integration.py"
+      - ".github/workflows/places-weather-location-m5.yml"
+  push:
+    branches:
+      - main
+    paths:
+      - "services/location/WeatherLocationPolicy.js"
+      - "services/location/PlaceRegistry.qml"
+      - "services/weather/WeatherService.qml"
+      - "shell.qml"
+      - "tests/location/test_weather_location_policy.cjs"
+      - "tests/location/test_weather_location_integration.py"
+      - ".github/workflows/places-weather-location-m5.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  contracts:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify explicit location routing and fallback
+        run: node tests/location/test_weather_location_policy.cjs
+      - name: Verify WeatherService wiring, no stale cache, AQI independence
+        run: python3 tests/location/test_weather_location_integration.py
+      - name: Preserve WeatherDataPolicy parser regression
+        run: node tests/weather/test_weather_data_policy.js
+      - name: Preserve Places Home and Explore persistence
+        run: node tests/location/test_place_registry_policy.cjs

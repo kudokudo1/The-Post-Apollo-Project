@@ -73,7 +73,8 @@ test("browser is opt-in, names preview status, and explicitly links CLASSIC", ()
   assert.match(stationSource,/if \(subjectNavigationOpen\)\s*\{\s*subjectNavigator\.cycleSubjects/);
   assert.match(stationSource,/subjectNavigator\.moveCursor\(direction\)/);
   assert.match(stationSource,/subjectNavigator\.activateCursor\(\)/);
-  assert.match(stationSource,/return "INDEX \/\/ PREVIEW"/);
+  assert.match(stationSource,/SubjectSourceBadge\.badgeFor\(/);
+  assert.match(stationSource,/subjectNavigator\.indexOpen/);
   assert.ok(stationSource.includes("StationSubjectRail {"));
   assert.equal(stationSource.split("ModeButton {").length - 1, 1);
   assert.equal(railSource.split("ModeButton {").length - 1, 1);

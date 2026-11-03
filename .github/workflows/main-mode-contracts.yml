@@ -14,6 +14,11 @@ on:
       - "services/location/PlaceSearchPolicy.js"
       - "tests/location/test_place_search_policy.cjs"
       - "services/location/PlaceRegistry.qml"
+      - "services/location/WeatherLocationPolicy.js"
+      - "services/weather/WeatherService.qml"
+      - "shell.qml"
+      - "tests/location/test_weather_location_policy.cjs"
+      - "tests/location/test_weather_location_integration.py"
       - "services/location/PlacePolicy.js"
       - "services/location/qmldir"
       - "tests/location/test_place_registry_policy.cjs"
@@ -48,6 +53,11 @@ on:
       - "services/location/PlaceSearchPolicy.js"
       - "tests/location/test_place_search_policy.cjs"
       - "services/location/PlaceRegistry.qml"
+      - "services/location/WeatherLocationPolicy.js"
+      - "services/weather/WeatherService.qml"
+      - "shell.qml"
+      - "tests/location/test_weather_location_policy.cjs"
+      - "tests/location/test_weather_location_integration.py"
       - "services/location/PlacePolicy.js"
       - "services/location/qmldir"
       - "tests/location/test_place_registry_policy.cjs"
@@ -91,6 +101,12 @@ jobs:
         run: node tests/location/test_place_registry_policy.cjs
       - name: Verify explicit Place Search and geocoding response policy
         run: node tests/location/test_place_search_policy.cjs
+      - name: Verify Weather routing to shared Home or Explore
+        run: node tests/location/test_weather_location_policy.cjs
+      - name: Verify WeatherService location integration contracts
+        run: python3 tests/location/test_weather_location_integration.py
+      - name: Preserve legacy weather parsing
+        run: node tests/weather/test_weather_data_policy.js
       - name: Verify CPU++ A/B sampled-text glow source lifecycle
         run: python3 tests/components/test_cpuplus_glow_ab_contracts.py
       - name: Preserve existing visual language recipes

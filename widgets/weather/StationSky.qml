@@ -2089,6 +2089,27 @@ Rectangle {
         }
 
 
+        // V2b interactive USNO event clock. The existing planet service
+        // remains the sole data owner and original five cards stay below.
+        // This route-scoped visualization never activates in CLASSIC or WEATHER.
+        StationCosmosPlanetEventClock {
+            width: parent.width
+            visible: sky.subjectRoute.indexOf("cosmos/") === 0
+                     && CosmosPanelPolicy.visibleFor("sky",
+                                                    sky.subjectRoute,
+                                                    "planet-clock")
+            height: visible ? 414 : 0
+            sourceConfigured: planetRiseSetService.configured
+            sourceReady: planetRiseSetService.ready
+            sourceLoading: planetRiseSetService.loading
+            sourcePartial: planetRiseSetService.partial
+            sourceError: planetRiseSetService.errorText
+            sourcePrecision: planetRiseSetService.precision
+            azimuthReference: planetRiseSetService.azimuthReference
+            civilDate: sky.astronomySummary.date
+            providerRows: planetRiseSetService.rows
+        }
+
         StationSectionDivider {
             visible: sky.sectionVisible("planet-clock")
             width: parent.width

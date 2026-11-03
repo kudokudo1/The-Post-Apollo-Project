@@ -149,7 +149,10 @@ def test_weather_keyboard_live_indicator_and_close_follow_shared_contract():
     assert "borderColor: Colors.cyan" in src
 
     assert "id: sourceStatusIndicator" in src
-    assert 'runtimeHeaderText(weatherRuntimeState, "WEATHER LIVE")' in src
+    # M6c uses real provider health for WEATHER while preserving the
+    # existing RuntimePolicy freshness states for other contexts.
+    assert "ProviderDiagnostics.snapshot({" in src
+    assert "weatherDiagnostics.header" in src
     assert 'return "READING";' in src
     assert 'return "STALE";' in src
     assert 'return "OFFLINE";' in src

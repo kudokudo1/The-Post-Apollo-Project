@@ -555,7 +555,8 @@ Rectangle {
         anchors.topMargin: liveChildren.visible ? 6 : 14
         anchors.bottom: previewNote.top
         anchors.bottomMargin: 6
-        visible: browser.visible && browser.liveEarthKind !== ""
+        visible: browser.visible && browser.indexOpen
+                 && browser.liveEarthKind !== ""
         subjectRoute: browser.currentPath
         newsMentionOverlay: browser.newsMentionOverlay
         onNewsMapClearRequested: browser.clearNewsMentions()

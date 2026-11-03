@@ -176,7 +176,8 @@ test("one shared SpaceService flows through station/browser/COSMOS while Weather
   assert.match(browser,/StationWeatherSubjectPane\s*\{/);
   assert.match(browser,/visible: browser\.visible && browser\.liveWeatherKind !== ""/);
   assert.match(station,/property bool subjectNavigationOpen: false/);
-  assert.match(station,/return "INDEX \/\/ PREVIEW"/);
+  assert.match(station,/SubjectSourceBadge\.badgeFor\(/);
+  assert.match(station,/subjectNavigator\.indexOpen/);
   assert.match(station,/StationTerminal\s*\{/);
   assert.match(station,/onNewsMapRequested: function\(payload\)/);
 });

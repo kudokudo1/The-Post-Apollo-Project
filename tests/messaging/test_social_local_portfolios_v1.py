@@ -16,8 +16,6 @@ import SocialLocalPortfolios as p  # noqa: E402
 import SocialOrganizationDirectory as orgs  # noqa: E402
 
 SECTIONS = (ROOT / "widgets/messanger/IdentityCenterSettingsSections.qml").read_text()
-# The original editors now live in the consolidated local workspace.
-SECTIONS += "\n" + (ROOT / "widgets/messanger/IdentityCenterLocalOrganizationsWorkspace.qml").read_text()
 APP = (ROOT / "widgets/messanger/AppSelector.qml").read_text()
 EDITOR = (ROOT / "widgets/messanger/IdentityCenterLocalPortfolioEditor.qml").read_text()
 STORE = (ROOT / "services/social/SocialLocalPortfoliosStore.qml").read_text()
@@ -184,7 +182,7 @@ class UIContractTests(unittest.TestCase):
     def test_existing_organizations_page_and_frozen_switcher(self):
         self.assertIn("IdentityCenterLocalOrganizationEditor {", SECTIONS)
         self.assertIn("IdentityCenterLocalPortfolioEditor {", SECTIONS)
-        self.assertIn("IdentityCenterLocalSocialLinksEditor {", SECTIONS)
+        self.assertIn("IdentityCenterLocalRelationshipModifiers {", SECTIONS)
         self.assertIn("localPortfoliosStore: SocialLocalPortfoliosStore", APP)
         self.assertIn("singleton SocialLocalPortfoliosStore 1.0", QMLDIR)
         self.assertIn('label: "SWITCH ORGANIZATION // UNAVAILABLE"', SECTIONS)

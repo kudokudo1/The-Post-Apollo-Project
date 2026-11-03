@@ -16,8 +16,6 @@ import SocialOrganizationDirectory as orgdir  # noqa: E402
 import SocialOrganizationLinks as links  # noqa: E402
 
 SECTIONS = (ROOT / "widgets/messanger/IdentityCenterSettingsSections.qml").read_text()
-# The original editors now live in the consolidated local workspace.
-SECTIONS += "\n" + (ROOT / "widgets/messanger/IdentityCenterLocalOrganizationsWorkspace.qml").read_text()
 SELECTOR = (ROOT / "widgets/messanger/AppSelector.qml").read_text()
 EDITOR = (ROOT / "widgets/messanger/IdentityCenterLocalSocialLinksEditor.qml").read_text()
 STORE = (ROOT / "services/social/SocialOrganizationLinksStore.qml").read_text()
@@ -172,7 +170,7 @@ class ManualAssociationTests(unittest.TestCase):
 class LocalLinkUIContracts(unittest.TestCase):
     def test_existing_user_settings_injection_and_disabled_switcher(self):
         self.assertIn("IdentityCenterLocalOrganizationEditor {", SECTIONS)
-        self.assertIn("IdentityCenterLocalSocialLinksEditor {", SECTIONS)
+        self.assertIn("IdentityCenterLocalRelationshipModifiers {", SECTIONS)
         self.assertIn("localLinksStore: SocialOrganizationLinksStore", SELECTOR)
         self.assertIn("socialIdentitiesSnapshot: appSelector.identitySnapshot", SELECTOR)
         self.assertIn("socialAccountDetailsStore: SocialAccountDetailsStore", SELECTOR)

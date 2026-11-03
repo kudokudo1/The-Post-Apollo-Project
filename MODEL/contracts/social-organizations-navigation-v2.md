@@ -1,5 +1,7 @@
 # Social Organizations / Navigation v2 UI consolidation
 
+**SUPERSEDED BY OPERATOR CORRECTION (2026-11-03):** The four-workspace navigation was rejected as too many menus. The focused replacement is documented in [Inline Modifier Editor v1](./social-inline-organization-modifiers-v1.md). This file is preserved as historical context, not a current UI specification.
+
 **PATIENT:** kudokudo1/The-Post-Apollo-Project  
 **PROVIDER:** OPEN AI // CHATGPT, external Hospital-compatible, not verified registered in any live Room/Staff Role/Assignment.  
 **SCOPE:** Existing Social USER → SETTINGS → ORGANIZATIONS UI-only, not a new backend or owner.  

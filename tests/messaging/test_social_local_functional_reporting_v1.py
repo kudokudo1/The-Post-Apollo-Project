@@ -21,8 +21,6 @@ import SocialLocalBranchLocationLinks as branch_locations  # noqa: E402
 import SocialLocalFunctionalReporting as reporting  # noqa: E402
 
 SETTINGS = (ROOT / "widgets/messanger/IdentityCenterSettingsSections.qml").read_text()
-# The original editors now live in the consolidated local workspace.
-SETTINGS += "\n" + (ROOT / "widgets/messanger/IdentityCenterLocalOrganizationsWorkspace.qml").read_text()
 SELECTOR = (ROOT / "widgets/messanger/AppSelector.qml").read_text()
 EDITOR = (ROOT / "widgets/messanger/IdentityCenterLocalFunctionalReportingEditor.qml").read_text()
 STORE = (ROOT / "services/social/SocialLocalFunctionalReportingStore.qml").read_text()
@@ -276,10 +274,10 @@ class FunctionalReportingUIContracts(unittest.TestCase):
         for marker in ("IdentityCenterLocalOrganizationEditor {",
                        "IdentityCenterLocalPortfolioEditor {",
                        "IdentityCenterLocalStructureEditor {",
-                       "IdentityCenterLocalUnitLocationsEditor {",
-                       "IdentityCenterLocalBranchLocationsEditor {",
-                       "IdentityCenterLocalFunctionalReportingEditor {",
-                       "IdentityCenterLocalSocialLinksEditor {"):
+                       "IdentityCenterLocalRelationshipModifiers {",
+                       "IdentityCenterLocalRelationshipModifiers {",
+                       "IdentityCenterLocalRelationshipModifiers {",
+                       "IdentityCenterLocalRelationshipModifiers {"):
             self.assertIn(marker, SETTINGS)
         self.assertIn("localFunctionalReportingStore: SocialLocalFunctionalReportingStore",
                       SELECTOR)

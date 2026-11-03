@@ -221,6 +221,10 @@ function activeExplore(documentRaw, nowMs) {
     if (!Number.isSafeInteger(now) || now <= 0)
         return null;
     const explore = base.document.explore;
+    // A clock that moves behind the original start must not reactivate a
+    // temporary destination. Fail closed to the explicitly saved Home.
+    if (now < explore.startedAtMs)
+        return null;
     return explore.expiresAtMs === null || now < explore.expiresAtMs
            ? explore : null;
 }

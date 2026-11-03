@@ -41,7 +41,7 @@ After **separately authorized** local deployment: open Weather Station normally;
 - `onCurrentViewChanged` originally forces `subjectNavigationOpen=false`, a potential trap when restoring legacy terminal or changing hidden CLASSIC state. Preserve the one root terminal cleanup but avoid forcing a subject-to-classic switch accidentally.
 - `StationSubjectNavigator` persists `indexOpen` and `currentPath` across closes. Reopening must not display a parent group with no renderable content just because INDEX was previously open.
 - Original `WeatherStationW.qml` `sourceStatusText`, `currentView` and footer rely on CLASSIC routing. Only the SUBJECTS-first *preference* is changing, not complete legacy retirement.
-- Concurrent Weather M6c PR #1146 changes WeatherService, StationHome, **WeatherStationW** and SOURCE tests. Do not overwrite its provider-health work; check current `main` and PR head before touching root or shipping.
+- Weather M6c PR #1146 has **merged**. The pilot root patch was authored over its merged WeatherStationW, preserving provider diagnostics and its Escape priority. PR #1148 (the original incomplete draft) was separately merged before root wiring; corrective PR #1150 contains that missing root integration. Do not mistake the earlier merge for finished functionality.
 - Stage Director isolated playback remains a separate blocker; 103/103 source mapping does not imply video hosting or operator acceptance.
 
 ## CHECKLIST
@@ -49,15 +49,15 @@ After **separately authorized** local deployment: open Weather Station normally;
 - [x] Review Syntagma AGENTS / Hospital authority and previous M28-M dependency handoff.
 - [x] Identify root 0x0 PanelWindow close-state and background workspace risk.
 - [x] Implement isolated pure pilot policy, test and CI without sharing a root file with active M6c ownership.
-- [ ] Integrate root open/close/keyboard/terminal guards after M6c settles; no duplicate collectors.
-- [ ] Update only historical assertions for prior CLASSIC-first behavior.
-- [ ] Verify all GitHub CI on final exact commit and resolve failures.
-- [ ] Merge bounded PR if authorized, green and collision-free.
+- [x] Integrate root open/close/keyboard/terminal guards after M6c merged; no duplicate collectors.
+- [x] Update only historical assertions for the guarded CLASSIC fallback and M6c diagnostics Escape priority.
+- [x] Complete corrective PR #1150 code and all 34/34 automated checks on pre-documentation head `57701f937c78e8db1bf2ff7ef88948d740663348`; final HEAD must be reverified after this documentation amendment.
+- [ ] Merge corrective PR #1150 if its final HEAD is green and collision-free.
 - [ ] Live Fedora/Quickshell/Sway acceptance and explicit CLASSIC deletion permission remain separate.
 
 ## NEXT
 
-After a green reversible pilot PR lands, leave both views available and gather real operator acceptance of open/close, keyboard/INDEX, single Kitty identity, weather/space source lifecycle, provider health and saved state across normal restarts. Deletion of CLASSIC presentation is a distinct, higher-risk milestone requiring separate approval.
+After corrective PR #1150 lands, leave both views available and gather real operator acceptance of open/close, keyboard/INDEX, single Kitty identity, weather/space source lifecycle, provider health and saved state across normal restarts. Use `StationSubjectDefaultPolicy.SUBJECTS_FIRST_PILOT=false` as the source-level rollback if user acceptance fails. Deletion of CLASSIC presentation is a distinct, higher-risk milestone requiring separate approval.
 
 ## DECISIONS
 

@@ -68,7 +68,8 @@ ShellRoot {
                 console.log("M28B_TICK // "+root.phase+
                             " rows="+news.visibleRows.length);
             if(root.phase==="init"){
-                if(news.visibleRows.length!==2)return;
+                // Allow first-polish Qt Quick Column/Repeater layout to settle.
+                if(root.ticks < 4 || news.visibleRows.length!==2)return;
                 const feed=root.divider("NEWS HEADLINES // CURRENT FILTERED BATCH");
                 const trend=root.divider("REPORTING TREND // CURRENT FILTERED BATCH");
                 const stories=root.divider("STORY FAMILIES // CONSERVATIVE TITLE TOKENS");
@@ -78,6 +79,9 @@ ShellRoot {
                 if(stories&&stories.visible){root.fail("STORIES_BURIED_HEADLINES");return;}
                 const a=feed.mapToItem(s,0,0);
                 const b=row.mapToItem(s,0,0);
+                console.log("M28B_ORDER // feedY="+a.y+" cardY="+b.y
+                            +" scrollY="+s.contentY
+                            +" feedVisible="+feed.visible+" cardVisible="+row.visible);
                 if(!(a.y < b.y)){root.fail("HEADLINE_ORDER_WRONG");return;}
                 const p=row.mapToItem(s,row.width/2,row.height/2);
                 s.contentY=Math.max(0,Math.min(s.contentHeight-s.height,

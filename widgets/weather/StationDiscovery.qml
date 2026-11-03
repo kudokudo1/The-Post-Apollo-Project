@@ -3734,7 +3734,11 @@ Rectangle {
                 }
 
                 Repeater {
-                    model: source.ready ? stationDiscovery.visibleRows : []
+                    // NEWS reports/filters/locations/viewer only. Analytic
+                    // routes must not instantiate a hidden headline feed.
+                    model: stationDiscovery.newsGroupVisible("list")
+                           && source.ready
+                        ? stationDiscovery.visibleRows : []
                     delegate: discoveryRecordCard
                 }
             }

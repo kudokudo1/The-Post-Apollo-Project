@@ -9,11 +9,11 @@ Item {
     property bool awaitingSave: false
     property string feedback: ""
 
-    // The CPU++ window owns global keyboard shortcuts. Do not cycle a mode
-    // while any of the Home coordinate text fields has active focus.
+    // CPU++ window shortcuts are suspended while any Home or Explore
+    // field is focused. Escape in a field only releases its text focus.
     readonly property bool editingText:
         homeLabelInput.activeFocus || homeLatitudeInput.activeFocus
-        || homeLongitudeInput.activeFocus
+        || homeLongitudeInput.activeFocus || explorePanel.editingText
     readonly property var savedHome:
         registry ? registry.homePlace : null
     readonly property bool canWrite:
@@ -295,35 +295,46 @@ Item {
                         : "ONLY SAVE HOME CHANGES THE DEFAULT PLACE")
             }
 
+            CpuPlusExploreLocationPanel {
+                id: explorePanel
+                width: parent.width
+                registry: locationPane.registry
+            }
+
             Rectangle {
                 width: parent.width
-                height: 91
+                height: 96
                 color: Colors.black
                 border.width: 1
-                border.color: Colors.cyan
+                border.color: Colors.magenta
+
                 Column {
                     anchors.fill: parent
                     anchors.margins: 9
-                    spacing: 7
+                    spacing: 6
                     GohuText {
-                        text: "⌖  EXPLORE LOCATION"
-                        color: Colors.cyan
-                        font.pixelSize: 11
+                        text: "SHARED CONTEXT // "
+                              + (locationPane.registry
+                                 ? locationPane.registry.contextKind : "UNKNOWN")
+                        font.pixelSize: 10
+                        color: Colors.magenta
+                    }
+                    GohuText {
+                        width: parent.width
+                        elide: Text.ElideRight
+                        font.pixelSize: 10
+                        color: Colors.white
+                        text: locationPane.registry && locationPane.registry.effectivePlace
+                              ? locationPane.registry.effectivePlace.label
+                              : "NO HOME CONFIGURED"
                     }
                     QuietText {
                         width: parent.width
                         wrapMode: Text.WordWrap
                         font.pixelSize: 9
-                        text: "NOT ACTIVE // TEMPORARY DESTINATIONS AND EXPIRATION ARE NEXT."
+                        text: "CONTEXT READY // ROUTING TO WEATHER, SKY, GROUND AND MAP IS NOT WIRED. ALERT TARGETS REMAIN PINNED."
                     }
                 }
-            }
-
-            QuietText {
-                width: parent.width
-                wrapMode: Text.WordWrap
-                font.pixelSize: 9
-                text: "SHARED CONTEXT // NOT WIRED TO WEATHER, SKY, GROUND OR MAP. EMERGENCY ALERT POINTS STAY INDEPENDENT."
             }
         }
     }

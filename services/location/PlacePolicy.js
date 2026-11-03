@@ -1,12 +1,14 @@
 .pragma library
 
-// Post-Apollo Places M1: one explicitly supplied Home point.
-// No IP geolocation, external lookup, time-zone guessing or automatic fallback.
+// Post-Apollo Places M2: user-supplied Home and temporary Explore context.
+// A v1 Home-only file remains valid. No IP guessing, geocoding, or network calls.
 const SCHEMA = "post-apollo.places.v1";
 const MAX_REVISION = 9007199254740990;
+const EXPLORE_DURATIONS = {"30M":1800000, "2H":7200000, "1D":86400000,
+                           "MANUAL":null};
 
 function initialDocument() {
-    return {schema:SCHEMA, revision:0, home:null};
+    return {schema:SCHEMA, revision:0, home:null, explore:null};
 }
 
 function coordinate(value, maxAbs) {
@@ -39,6 +41,48 @@ function place(labelRaw, latitudeRaw, longitudeRaw) {
     };
 }
 
+function normalizeExplore(raw) {
+    if (raw === null || raw === undefined)
+        return {ok:true, value:null};
+    if (!raw || typeof raw !== "object" || Array.isArray(raw)
+            || !raw.place || typeof raw.place !== "object"
+            || raw.place.source !== "MANUAL")
+        return {ok:false, reason:"EXPLORE_INVALID"};
+
+    const normalized = place(raw.place.label,
+                             raw.place.latitude, raw.place.longitude);
+    if (!normalized.ok)
+        return {ok:false, reason:"EXPLORE_INVALID"};
+
+    const duration = String(raw.durationKey || "");
+    if (!Object.prototype.hasOwnProperty.call(EXPLORE_DURATIONS, duration))
+        return {ok:false, reason:"EXPLORE_DURATION_INVALID"};
+    const startedAtMs = raw.startedAtMs;
+    if (!Number.isSafeInteger(startedAtMs) || startedAtMs <= 0
+            || startedAtMs > MAX_REVISION)
+        return {ok:false, reason:"EXPLORE_TIME_INVALID"};
+    let expiresAtMs = null;
+    if (duration !== "MANUAL") {
+        expiresAtMs = startedAtMs + EXPLORE_DURATIONS[duration];
+        if (!Number.isSafeInteger(expiresAtMs)
+                || expiresAtMs > MAX_REVISION
+                || raw.expiresAtMs !== expiresAtMs)
+            return {ok:false, reason:"EXPLORE_TIME_INVALID"};
+    } else if (raw.expiresAtMs !== null) {
+        return {ok:false, reason:"EXPLORE_TIME_INVALID"};
+    }
+
+    return {
+        ok:true,
+        value:{
+            place:normalized.value,
+            durationKey:duration,
+            startedAtMs:startedAtMs,
+            expiresAtMs:expiresAtMs
+        }
+    };
+}
+
 function normalize(documentRaw) {
     if (!documentRaw || typeof documentRaw !== "object"
             || Array.isArray(documentRaw))
@@ -49,6 +93,7 @@ function normalize(documentRaw) {
     if (!Number.isSafeInteger(revision) || revision < 0
             || revision > MAX_REVISION)
         return {ok:false, reason:"REVISION_INVALID"};
+
     let home = null;
     if (documentRaw.home !== null) {
         if (!documentRaw.home || typeof documentRaw.home !== "object"
@@ -62,7 +107,16 @@ function normalize(documentRaw) {
             return {ok:false, reason:"HOME_INVALID"};
         home = normalized.value;
     }
-    return {ok:true, document:{schema:SCHEMA, revision:revision, home:home}};
+
+    // Files created by M1 omit explore altogether. Both forms are valid.
+    const explore = normalizeExplore(documentRaw.explore);
+    if (!explore.ok)
+        return explore;
+    if (explore.value && home === null)
+        return {ok:false, reason:"EXPLORE_WITHOUT_HOME"};
+    return {ok:true, document:{
+        schema:SCHEMA, revision:revision, home:home, explore:explore.value
+    }};
 }
 
 function parse(textRaw) {
@@ -78,12 +132,19 @@ function parse(textRaw) {
     return normalize(input);
 }
 
+function nextRevision(document) {
+    if (document.revision >= MAX_REVISION)
+        return {ok:false, reason:"REVISION_LIMIT"};
+    return {ok:true, revision:document.revision + 1};
+}
+
 function withHome(documentRaw, label, latitude, longitude) {
     const base = normalize(documentRaw);
     if (!base.ok)
         return base;
-    if (base.document.revision >= MAX_REVISION)
-        return {ok:false, reason:"REVISION_LIMIT"};
+    const rev = nextRevision(base.document);
+    if (!rev.ok)
+        return rev;
     const nextHome = place(label, latitude, longitude);
     if (!nextHome.ok)
         return nextHome;
@@ -91,8 +152,94 @@ function withHome(documentRaw, label, latitude, longitude) {
         ok:true,
         document:{
             schema:SCHEMA,
-            revision:base.document.revision + 1,
-            home:nextHome.value
+            revision:rev.revision,
+            home:nextHome.value,
+            explore:base.document.explore
         }
     };
+}
+
+function withExplore(documentRaw, label, latitude, longitude,
+                     durationKey, nowMs) {
+    const base = normalize(documentRaw);
+    if (!base.ok)
+        return base;
+    if (!base.document.home)
+        return {ok:false, reason:"HOME_NOT_SET"};
+    const next = nextRevision(base.document);
+    if (!next.ok)
+        return next;
+    const destination = place(label, latitude, longitude);
+    if (!destination.ok)
+        return destination;
+
+    const duration = String(durationKey || "");
+    if (!Object.prototype.hasOwnProperty.call(EXPLORE_DURATIONS, duration))
+        return {ok:false, reason:"EXPLORE_DURATION_INVALID"};
+    const started = Number(nowMs);
+    if (!Number.isSafeInteger(started) || started <= 0
+            || started > MAX_REVISION)
+        return {ok:false, reason:"EXPLORE_TIME_INVALID"};
+    const expiry = duration === "MANUAL"
+        ? null : started + EXPLORE_DURATIONS[duration];
+    if (expiry !== null && (!Number.isSafeInteger(expiry)
+                            || expiry > MAX_REVISION))
+        return {ok:false, reason:"EXPLORE_TIME_INVALID"};
+    return {ok:true, document:{
+        schema:SCHEMA, revision:next.revision,
+        home:base.document.home,
+        explore:{
+            place:destination.value,
+            durationKey:duration,
+            startedAtMs:started,
+            expiresAtMs:expiry
+        }
+    }};
+}
+
+function withoutExplore(documentRaw) {
+    const base = normalize(documentRaw);
+    if (!base.ok)
+        return base;
+    if (!base.document.explore)
+        return {ok:false, reason:"NO_EXPLORE_TO_CLEAR"};
+    const next = nextRevision(base.document);
+    if (!next.ok)
+        return next;
+    return {ok:true, document:{
+        schema:SCHEMA, revision:next.revision,
+        home:base.document.home, explore:null
+    }};
+}
+
+function activeExplore(documentRaw, nowMs) {
+    const base = normalize(documentRaw);
+    if (!base.ok || !base.document.explore)
+        return null;
+    const now = Number(nowMs);
+    // Invalid clocks fail closed to Home, never activate stale exploration.
+    if (!Number.isSafeInteger(now) || now <= 0)
+        return null;
+    const explore = base.document.explore;
+    // A clock that moves behind the original start must not reactivate a
+    // temporary destination. Fail closed to the explicitly saved Home.
+    if (now < explore.startedAtMs)
+        return null;
+    return explore.expiresAtMs === null || now < explore.expiresAtMs
+           ? explore : null;
+}
+
+function effectivePlace(documentRaw, nowMs) {
+    const active = activeExplore(documentRaw, nowMs);
+    if (active)
+        return active.place;
+    const base = normalize(documentRaw);
+    return base.ok ? base.document.home : null;
+}
+
+function contextKind(documentRaw, nowMs) {
+    if (activeExplore(documentRaw, nowMs))
+        return "EXPLORE";
+    const base = normalize(documentRaw);
+    return base.ok && base.document.home ? "HOME" : "NONE";
 }

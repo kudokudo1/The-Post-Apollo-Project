@@ -168,6 +168,9 @@ test("source-true cutover registry is guarded against missing/unknown destinatio
   }
   const count=Object.keys(context.PANELS).length;
   assert.equal(count,103,"unexpected source control inventory change");
-  assert.equal(Object.keys(context.WIRED_IN_SUBJECTS).length,46);
-  assert.equal(count-Object.keys(context.WIRED_IN_SUBJECTS).length,57);
+  assert.equal(Object.values(context.WIRED_IN_SUBJECTS)
+    .filter(milestone => milestone === "M28-F").length, 30,
+    "M28-F exact source-wiring milestone must remain unchanged");
+  assert.ok(Object.keys(context.WIRED_IN_SUBJECTS).length >= 46,
+    "later audited milestones may only add independent exact source controls");
 });

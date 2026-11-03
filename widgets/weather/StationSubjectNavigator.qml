@@ -6,6 +6,7 @@ import "StationWeatherSubjectPanelPolicy.js" as WeatherPanelPolicy
 import "StationCosmosSubjectPanelPolicy.js" as CosmosPanelPolicy
 import "StationEarthSubjectPanelPolicy.js" as EarthPanelPolicy
 import "StationMediaSubjectPanelPolicy.js" as MediaPanelPolicy
+import "StationMagickSubjectPanelPolicy.js" as MagickPanelPolicy
 
 // M1 bounded visual browser. Source panels remain in their original classic
 // QML pages; no new fetches, persistence, or fake submode content.
@@ -37,6 +38,8 @@ Rectangle {
         EarthPanelPolicy.kindForRoute(currentPath)
     readonly property string liveMediaKind:
         MediaPanelPolicy.kindForRoute(currentPath)
+    readonly property string liveMagickKind:
+        MagickPanelPolicy.kindForRoute(currentPath)
 
     readonly property var currentRoute: SubjectRoutes.findRoute(currentPath)
     readonly property var childrenRoutes: SubjectRoutes.childrenOf(currentPath)
@@ -117,6 +120,8 @@ Rectangle {
                       ? "EARTH // SUBJECT VIEW"
                     : browser.liveMediaKind !== ""
                       ? "MEDIA // SUBJECT VIEW"
+                    : browser.liveMagickKind !== ""
+                      ? "MAGICK // INTERPRETIVE REFERENCE"
                     : "SUBJECTS // NAVIGATION PREVIEW"
             color: Colors.magenta
             font.pixelSize: 17
@@ -183,6 +188,7 @@ Rectangle {
                  && browser.liveCosmosKind === ""
                  && browser.liveEarthKind === ""
                  && browser.liveMediaKind === ""
+                 && browser.liveMagickKind === ""
         boundsBehavior: Flickable.StopAtBounds
         contentWidth: width
         contentHeight: Math.max(height, contentColumn.implicitHeight + 12)
@@ -279,7 +285,8 @@ Rectangle {
         visible: (browser.liveWeatherKind !== ""
                   || browser.liveCosmosKind !== ""
                   || browser.liveEarthKind !== ""
-                  || browser.liveMediaKind !== "")
+                  || browser.liveMediaKind !== ""
+                  || browser.liveMagickKind !== "")
                  && browser.childrenRoutes.length > 0
         anchors.left: parent.left
         anchors.right: parent.right
@@ -387,6 +394,21 @@ Rectangle {
         }
     }
 
+    StationMagickSubjectPane {
+        id: magickReferencePane
+        anchors.left: parent.left
+        anchors.right: parent.right
+        anchors.top: liveChildren.visible
+                     ? liveChildren.bottom : breadcrumbRow.bottom
+        anchors.topMargin: liveChildren.visible ? 6 : 14
+        anchors.bottom: previewNote.top
+        anchors.bottomMargin: 6
+        visible: browser.visible && browser.liveMagickKind !== ""
+        subjectRoute: browser.currentPath
+        weatherService: browser.weatherService
+        runtimeNowMs: browser.runtimeNowMs
+    }
+
     // Post-Apollo shared star indicator; no new scroll behavior is invented.
     NeonScrollBar {
         flickable: routeScroll
@@ -396,6 +418,7 @@ Rectangle {
                  && browser.liveCosmosKind === ""
                  && browser.liveEarthKind === ""
                  && browser.liveMediaKind === ""
+                 && browser.liveMagickKind === ""
                  && routeScroll.contentHeight > routeScroll.height + 1
     }
 
@@ -418,6 +441,8 @@ Rectangle {
                   ? "EARTH // SHARED MAP + EVENT DOSSIERS // ORIGINAL STORES"
                 : browser.liveMediaKind !== ""
                   ? "MEDIA // GDELT + PUBLISHER CATALOG + HI-FI RADIO // ORIGINAL SOURCES"
+                : browser.liveMagickKind !== ""
+                  ? "MAGICK // ASTRONOMICAL REFERENCE ONLY // NO CALCULATED READINGS"
                 : "SPEC-ONLY SUBJECTS // CLASSIC PAGES REMAIN CANONICAL UNTIL PANEL MIGRATION"
     }
 }

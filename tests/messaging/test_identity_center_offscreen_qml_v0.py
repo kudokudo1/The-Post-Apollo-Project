@@ -601,6 +601,67 @@ class RealQtOrganizationsSettingsPaneSmoke(unittest.TestCase):
         self.assertEqual(len(_value(structure.property("visibleUnits"))), 1)
         self.assertFalse(self.sections.property("organizationDisplayReady"))
 
+    def test_inline_save_feedback_uses_actual_revision_and_errors(self):
+        self._open_organizations()
+        feedback = self.sections.findChild(QObject, "orgLocalSaveFeedback")
+        self.assertIsNotNone(feedback, "Save status missing from real Organizations QML")
+        self.assertEqual(feedback.property("lastKind"), "neutral")
+        self.assertIn("No write in progress", feedback.property("displayedStatus"))
+
+        def state(field, value, revision, error=""):
+            payload = {"state": value, "errorCode": error,
+                       "saved": {"revision": revision}}
+            js = self.engine.evaluate("(" + json.dumps(payload) + ")")
+            self.assertFalse(js.isError(), field)
+            self.assertTrue(self.sections.setProperty(field, js), field)
+            APP.processEvents()
+
+        state("localDirectoryStore", "ready", 3)
+        self.assertNotIn("SAVED //", feedback.property("displayedStatus"))
+
+        state("localDirectoryStore", "saving", 3)
+        self.assertEqual(feedback.property("savingCount"), 1)
+        self.assertIn("Not yet saved", feedback.property("displayedStatus"))
+        self.assertNotIn("SAVED //", feedback.property("displayedStatus"))
+
+        state("localDirectoryStore", "ready", 4)
+        self.assertEqual(feedback.property("savingCount"), 0)
+        self.assertEqual(feedback.property("lastKind"), "saved")
+        self.assertIn("SAVED // Organizations / Branches",
+                      feedback.property("displayedStatus"))
+        self.assertIn("revision 4", feedback.property("displayedStatus"))
+
+        # An asynchronous method returning true is merely queue admission:
+        # if the writer fails, READY must never be inferred from the click.
+        state("localDirectoryStore", "saving", 4)
+        state("localDirectoryStore", "error", 4, "REVISION_CONFLICT")
+        self.assertEqual(feedback.property("lastKind"), "conflict")
+        self.assertTrue(feedback.property("hasConflict"))
+        self.assertIn("REVISION_CONFLICT", feedback.property("displayedStatus"))
+        self.assertNotIn("SAVED //", feedback.property("displayedStatus"))
+
+        # An explicit read-only reload clears the error but must not become
+        # a false write confirmation.
+        state("localDirectoryStore", "loading", 4)
+        state("localDirectoryStore", "ready", 4)
+        self.assertEqual(feedback.property("lastKind"), "loaded")
+        self.assertIn("RELOADED //", feedback.property("displayedStatus"))
+        self.assertFalse(feedback.property("hasConflict"))
+
+        # Test a second independent store without changing the original one.
+        state("localPortfoliosStore", "ready", 11)
+        state("localPortfoliosStore", "saving", 11)
+        state("localPortfoliosStore", "ready", 12)
+        self.assertIn("SAVED // Portfolios", feedback.property("displayedStatus"))
+        self.assertIn("revision 12", feedback.property("displayedStatus"))
+
+        # A store returning READY without a revision increment is unconfirmed.
+        state("localPortfoliosStore", "saving", 12)
+        state("localPortfoliosStore", "ready", 12)
+        self.assertEqual(feedback.property("lastKind"), "unconfirmed")
+        self.assertIn("NOT CONFIRMED //", feedback.property("displayedStatus"))
+        self.assertFalse(self.sections.property("organizationDisplayReady"))
+
     def test_host_logout_and_failure_are_reflected_in_real_panel(self):
         self._open_organizations()
         self._finish(_body())

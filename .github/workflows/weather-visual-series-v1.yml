@@ -1,0 +1,33 @@
+name: Weather Station V1 Interactive COSMOS Observation Timeline
+
+on:
+  pull_request:
+    paths:
+      - 'widgets/weather/StationInteractiveSeriesPolicy.js'
+      - 'widgets/weather/StationInteractiveHistoryChart.qml'
+      - 'widgets/weather/StationSpaceWeatherTimelinePane.qml'
+      - 'widgets/weather/StationCosmosSubjectPane.qml'
+      - 'tests/weather/test_visual_series_v1.js'
+      - '.github/workflows/weather-visual-series-v1.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  observation-chart:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Test real time series geometry and original COSMOS/WORKSPACE contracts
+        run: |
+          node --test tests/weather/test_visual_series_v1.js
+          node --test tests/weather/test_cosmos_subject_panels_c1.js
+          node --test tests/weather/test_magick_subject_panels_g1.js
+          node --test tests/weather/test_workspace_landing_w1.js
+          node --test tests/weather/test_workspace_left_rail_w1r.js
+          node --test tests/weather/subject_navigation_browser.test.js

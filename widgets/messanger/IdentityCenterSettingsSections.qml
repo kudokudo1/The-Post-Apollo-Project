@@ -20,6 +20,8 @@ Item {
     property var localStructureStore: null
     // Local-only functional-unit to location planning labels.
     property var localUnitLocationLinksStore: null
+    // Local branch/geographic associations only, no verified tenant rights.
+    property var localBranchLocationLinksStore: null
     // Manual Social label associations only, not Identity Center grants.
     property var localLinksStore: null
     property var socialIdentitiesSnapshot: null
@@ -215,6 +217,13 @@ Item {
                         directoryStore: sections.localDirectoryStore
                         structureStore: sections.localStructureStore
                         linkStore: sections.localUnitLocationLinksStore
+                    }
+
+                    IdentityCenterLocalBranchLocationsEditor {
+                        width: parent.width
+                        directoryStore: sections.localDirectoryStore
+                        structureStore: sections.localStructureStore
+                        linkStore: sections.localBranchLocationLinksStore
                     }
 
                     IdentityCenterLocalSocialLinksEditor {

@@ -954,10 +954,19 @@ PanelWindow {
                     labelPixelSize: 11
                     contentPadding: 4
                     available: weatherStation.menuOpen
-                               && !weatherStation.subjectNavigationOpen
                                && terminalView.terminalState === "IDLE"
+                               && !weatherStation.contextTerminalRequested
                     accentColor: Colors.cyan
-                    onLeftClicked: weatherStation.launchContextTerminal()
+                    onLeftClicked: {
+                        if (weatherStation.subjectNavigationOpen) {
+                            if (subjectNavigator.indexOpen)
+                                subjectNavigator.returnToWorkspace();
+                            else
+                                subjectNavigator.openIndex();
+                        } else {
+                            weatherStation.launchContextTerminal();
+                        }
+                    }
                 }
 
                 ActionButton {
@@ -1096,11 +1105,10 @@ PanelWindow {
             anchors.bottom: footer.top
             anchors.left: parent.left
 
-            // Horizontal WORKSPACE rows use the full content width.
-            // The legacy 160px rail returns for CLASSIC or MORE / INDEX.
-            // Exact compositor terminal geometry is unchanged in CLASSIC.
-            width: weatherStation.subjectNavigationOpen
-                   && !subjectNavigator.indexOpen ? 0 : 160
+            // The original 160px mode rail is shared by CLASSIC,
+            // the seven-family workspace, and the deep INDEX view.
+            // Terminal placement stays on this original geometry.
+            width: 160
 
             color: Colors.black
 
@@ -1161,8 +1169,20 @@ PanelWindow {
                 }
             }
 
-            // The new subject rail lives in its own QML component so this
-            // file keeps its one canonical existing Main Mode delegate.
+            // Main family buttons share the CLASSIC left rail's visual
+            // grammar. The existing deep subject rail remains for INDEX.
+            StationWorkspaceFamilyRail {
+                id: workspaceFamilyRailColumn
+                visible: weatherStation.subjectNavigationOpen
+                         && !subjectNavigator.indexOpen
+                anchors.top: parent.top
+                anchors.left: parent.left
+                anchors.right: parent.right
+                anchors.topMargin: 14
+                navigator: subjectNavigator
+            }
+
+            // The existing detailed subject INDEX still uses its rail.
             StationSubjectRail {
                 id: subjectRailColumn
                 visible: weatherStation.subjectNavigationOpen
@@ -1185,8 +1205,7 @@ PanelWindow {
                 anchors.rightMargin: 9
                 anchors.bottomMargin: 12
                 height: 36
-                visible: !weatherStation.subjectNavigationOpen
-                         || subjectNavigator.indexOpen
+                visible: true
                 label: weatherStation.subjectNavigationOpen
                        ? "CLASSIC" : "SUBJECTS"
                 labelPixelSize: 12

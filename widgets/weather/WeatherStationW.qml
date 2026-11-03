@@ -7,6 +7,7 @@ import "../../components"
 import "../../services/weather" as WeatherServices
 import "StationOfficialAlertPolicy.js" as OfficialAlertPolicy
 import "StationWeatherSubjectPanelPolicy.js" as SubjectPanelPolicy
+import "StationSubjectSourceBadgePolicy.js" as SubjectSourceBadge
 import "StationMagickSubjectPanelPolicy.js" as MagickPanelPolicy
 import "StationEarthSubjectPanelPolicy.js" as EarthPanelPolicy
 import "../../services/weather/WeatherRuntimePolicy.js" as RuntimePolicy
@@ -224,12 +225,19 @@ PanelWindow {
         usesNewsSource && weatherContentLoader.item
         ? weatherContentLoader.item : null
 
+    // During SUBJECTS use the one active map's runtime rows, not the
+    // now-unloaded CLASSIC page. No additional event or radar poller.
     readonly property var currentPageRuntimeRows:
-        weatherContentLoader.item
-        && Array.isArray(weatherContentLoader.item.runtimeRows)
-        ? weatherContentLoader.item.runtimeRows : []
+        subjectNavigationOpen ? subjectNavigator.liveMapRuntimeRows
+        : weatherContentLoader.item
+          && Array.isArray(weatherContentLoader.item.runtimeRows)
+          ? weatherContentLoader.item.runtimeRows : []
     readonly property var currentPageRuntimeSummary:
         RuntimePolicy.summarizeRows(currentPageRuntimeRows)
+    readonly property var subjectSourceBadge:
+        SubjectSourceBadge.badgeFor(
+            subjectNavigator.currentPath,subjectNavigator.indexOpen,
+            weatherRuntimeState,spaceRuntimeState,currentPageRuntimeSummary)
     readonly property bool usesMapRuntime:
         currentView === "map"
 
@@ -398,14 +406,7 @@ PanelWindow {
                    + (officialAlertUsingPersistentCache ? " // CACHE" : "");
 
         if (subjectNavigationOpen)
-            return subjectNavigator.liveHomeKind !== ""
-                   ? "HOME DYNAMIC" : subjectNavigator.liveWeatherKind !== ""
-                   ? "WEATHER PANEL" : subjectNavigator.liveCosmosKind !== ""
-                     ? "COSMOS PANEL" : subjectNavigator.liveEarthKind !== ""
-                       ? "EARTH PANEL" : subjectNavigator.liveMediaKind !== ""
-                         ? "MEDIA PANEL" : subjectNavigator.liveMagickKind !== ""
-                           ? "MAGICK REFERENCE" : subjectNavigator.liveToolsKind !== ""
-                             ? "TOOLS READ-ONLY" : "NAV PREVIEW";
+            return subjectSourceBadge.text;
 
         if (usesHomeSources) {
             if (homeWeatherUsable && homeSpaceUsable) {
@@ -466,23 +467,8 @@ PanelWindow {
             return officialAlertSummary.headerText
                    + (officialAlertUsingPersistentCache ? " // CACHE" : "");
 
-        if (subjectNavigationOpen) {
-            if (subjectNavigator.liveHomeKind !== "")
-                return "HOME // AUTO RELEVANCE + HISTORY";
-            if (subjectNavigator.liveWeatherKind !== "")
-                return "WEATHER // PANEL";
-            if (subjectNavigator.liveCosmosKind !== "")
-                return "COSMOS // PANEL";
-            if (subjectNavigator.liveEarthKind !== "")
-                return "EARTH // PANEL";
-            if (subjectNavigator.liveMediaKind !== "")
-                return "MEDIA // PANEL";
-            if (subjectNavigator.liveMagickKind !== "")
-                return "MAGICK // ASTRONOMY REFERENCE";
-            if (subjectNavigator.liveToolsKind !== "")
-                return "TOOLS // SOURCE AND STORAGE STATUS";
-            return "INDEX // PREVIEW";
-        }
+        if (subjectNavigationOpen)
+            return subjectSourceBadge.text;
 
         if (usesHomeSources) {
             if (homeWeatherUsable && homeSpaceUsable)
@@ -536,8 +522,17 @@ PanelWindow {
         if (officialAlertSummary.available)
             return officialAlertColor(officialAlertSummary.colorToken);
 
-        if (subjectNavigationOpen)
-            return Colors.cyan;
+        if (subjectNavigationOpen) {
+            switch (subjectSourceBadge.tone) {
+            case "red": return Colors.red;
+            case "yellow": return Colors.yellow;
+            case "orange": return Colors.orange;
+            case "blue": return Colors.blue;
+            case "green": return Colors.green;
+            case "magenta": return Colors.magenta;
+            default: return Colors.cyan;
+            }
+        }
 
         if (usesHomeSources) {
             if (homeWeatherUsable && homeSpaceUsable) {

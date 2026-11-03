@@ -1,0 +1,49 @@
+name: Weather M28-N reversible SUBJECTS-first pilot
+
+on:
+  pull_request:
+    paths:
+      - 'widgets/weather/StationSubjectDefaultPolicy.js'
+      - 'widgets/weather/WeatherStationW.qml'
+      - 'tests/weather/test_subjects_first_pilot_m28n.js'
+      - 'tests/weather/subject_navigation_browser.test.js'
+      - 'tests/weather/test_workspace_landing_w1.js'
+      - 'tests/weather/test_workspace_left_rail_w1r.js'
+      - 'tests/weather/test_weather_subject_panels_m2a.js'
+      - 'tests/weather/test_earth_subject_panels_e1.js'
+      - 'tests/weather/test_cosmos_subject_panels_c1.js'
+      - 'docs/weather-subjects-m28n-default-pilot-handoff.md'
+      - '.github/workflows/weather-subjects-first-pilot-m28n.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  pilot:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: SUBJECTS first, closed unload, CLASSIC fallback and keyboard parity
+        run: node --test tests/weather/test_subjects_first_pilot_m28n.js
+      - name: Existing browser and W1 workspace rail contracts
+        run: |
+          node --test tests/weather/subject_navigation_browser.test.js
+          node --test tests/weather/test_workspace_landing_w1.js
+          node --test tests/weather/test_workspace_left_rail_w1r.js
+      - name: Original page ownership and 103-control source cutover
+        run: |
+          node --test tests/weather/test_weather_subject_panels_m2a.js
+          node --test tests/weather/test_cosmos_subject_panels_c1.js
+          node --test tests/weather/test_earth_subject_panels_e1.js
+          node --test tests/weather/test_index_sources_cutover_m28l.js
+      - name: Terminal and original provider reuse
+        run: |
+          node --test tests/weather/test_tools_terminal_cutover_m28c.js
+          node --test tests/weather/test_weather_live_runtime_m3.js
+          node --test tests/weather/test_station_official_alert_hierarchy.js
+          node --test tests/weather/test_station_terminal_geometry.js

@@ -147,7 +147,7 @@ function run() {
         }else if(root){fileCleaned=false;}
         if(!itemCleaned||!fileCleaned){
             if(!itemCleaned)process.stderr.write('M13H_TEST_KEY_CLEANUP_UNVERIFIED id='+token+'\n');
-            if(!fileCleaned)process.stderr.write('M13H_TEST_FILE_CLEANUP_UNVERIFIED\n');
+            if(!fileCleaned)process.stderr.write('M13H_TEST_FILE_CLEANUP_UNVERIFIED path='+root+'\n');
             // Crypto success plus leaked test material is not a PASS.
             return 'REFUSED_TEST_CLEANUP_UNVERIFIED';
         }

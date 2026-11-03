@@ -269,6 +269,7 @@ Item {
                     onClicked: {
                         locationPane.feedback = "";
                         locationPane.awaitingSave = true;
+                        locationPane.feedback = "SAVING // WAIT FOR CONFIRMATION";
                         const ok = locationPane.registry.saveHome(
                             homeLabelInput.text,
                             homeLatitudeInput.text,
@@ -279,8 +280,6 @@ Item {
                             locationPane.feedback = locationPane.readableError(
                                 locationPane.registry.errorCode
                             );
-                        } else {
-                            locationPane.feedback = "SAVING // WAIT FOR CONFIRMATION";
                         }
                     }
                 }

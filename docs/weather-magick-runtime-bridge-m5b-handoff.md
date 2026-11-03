@@ -13,7 +13,7 @@ OWNER BOUNDARY // Do not change COSMOS collectors, CLASSIC routing, Stage Direct
 
 M5b uses the **existing** JPL/Skyfield M4 producer and the **merged** M5a QML visualization. There is exactly one new runtime calculation service and zero timers or recurring pollers.
 
-- New services/weather/CelestialVisualService.qml: one Quickshell.Io Process owned by the persistent StationSubjectNavigator, not by individual MAGICK page instances.
+- New services/weather/CelestialVisualService.qml: one Quickshell.Io Process owned by the WeatherStationW root, not by StationSubjectNavigator or individual MAGICK page instances.
 - The service is active only on MAGICK astrology routes (charts, zodiac, aspects, retrogrades) and runs **only when the CALCULATE button is pressed**.
 - New configuration reading from Quickshell.env:
   - POST_APOLLO_CELESTIAL_KERNEL: explicitly provided path to an existing local JPL .bsp ephemeris.
@@ -23,7 +23,7 @@ M5b uses the **existing** JPL/Skyfield M4 producer and the **merged** M5a QML vi
 - No external network request is made by the runtime solver. The kernel is read locally and source provenance is returned from the merged M4 backend.
 - The service strictly bounds output length (524288 chars), parses the JSON, checks the query frame/body IDs and source fingerprint, and exposes one read-only visualData value. The M5a presentation policy validates the full series before drawing.
 - Page switches or changed UTC day/kernel configuration clear stale results without automatically triggering more calculations. In-flight jobs are stopped when the visual route becomes inactive.
-- The same service reference is passed through StationWorkspaceSurface to its MAGICK pane and directly to the existing INDEX-mode MAGICK pane. There are no duplicate graph backends or redundant collectors.
+- The same root-owned service reference is passed through StationSubjectNavigator and StationWorkspaceSurface to the workspace MAGICK pane, and directly from the navigator into the INDEX-mode MAGICK pane. There are no duplicate graph backends or redundant collectors.
 - StationMagickSubjectPane uses existing routes and headers, a visible status label, an explicit CALCULATE button, and the existing StationMagickCelestialInstrument with wheel/aspect/motion defaults.
 - Existing COSMOS SKY observational references remain in their own routes. Non-astrology MAGICK routes remain explanatory placeholders, not automated mystical readings.
 - M4 CLI gains a **bounded --query-json argument**, allowing Quickshell.Process to pass the well-formed JSON request as a single argv element without shell quoting, temporary request files or writes. The original --query file/stdin modes remain intact.
@@ -31,6 +31,7 @@ M5b uses the **existing** JPL/Skyfield M4 producer and the **merged** M5a QML vi
 Touched files:
 - scripts/weather/celestial_visual_data.py
 - services/weather/CelestialVisualService.qml (new)
+- widgets/weather/WeatherStationW.qml
 - widgets/weather/StationSubjectNavigator.qml
 - widgets/weather/StationWorkspaceSurface.qml
 - widgets/weather/StationMagickSubjectPane.qml
@@ -103,7 +104,7 @@ After adding this documentation, recheck final PR head, all checks and mergeabil
 ## CHECKLIST
 
 - [x] Verified M5a merged; rechecked current main and concurrent Weather work
-- [x] Single source owner in persistent SUBJECTS navigator
+- [x] Single source owner in WeatherStationW root; SUBJECTS navigator remains a source-free consumer
 - [x] Opt-in explicit kernel and interpreter, manual-only calculation
 - [x] M4 argv JSON transport, no shell or temporary request files
 - [x] Both MAGICK layout paths connected to the same service
@@ -124,4 +125,4 @@ Longer term: add operator-controlled historical time range and body selectors, r
 
 ## DECISIONS
 
-This implementation uses one explicitly triggered Process and no additional poller or cache writer. Backend and UI concerns remain separated, no personal MAGICK journal or divination inference is added, and no live Hospital registration or local system changes are claimed.
+This implementation uses one explicitly triggered Process owned at the Station root and no additional poller or cache writer. Backend and UI concerns remain separated, no personal MAGICK journal or divination inference is added, and no live Hospital registration or local system changes are claimed.

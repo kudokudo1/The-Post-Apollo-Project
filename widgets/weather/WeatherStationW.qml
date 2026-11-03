@@ -151,7 +151,8 @@ PanelWindow {
              ? "COSMOS" : subjectNavigator.liveEarthKind !== ""
                ? "EARTH" : subjectNavigator.liveMediaKind !== ""
                ? "MEDIA" : subjectNavigator.liveMagickKind !== ""
-                 ? "MAGICK" : "SUBJECT INDEX") : currentViewName
+                 ? "MAGICK" : subjectNavigator.liveToolsKind !== ""
+                   ? "TOOLS" : "SUBJECT INDEX") : currentViewName
 
     readonly property var officialAlertSummary:
         OfficialAlertPolicy.summary(
@@ -376,7 +377,8 @@ PanelWindow {
                      ? "COSMOS PANEL" : subjectNavigator.liveEarthKind !== ""
                        ? "EARTH PANEL" : subjectNavigator.liveMediaKind !== ""
                          ? "MEDIA PANEL" : subjectNavigator.liveMagickKind !== ""
-                           ? "MAGICK REFERENCE" : "NAV PREVIEW";
+                           ? "MAGICK REFERENCE" : subjectNavigator.liveToolsKind !== ""
+                             ? "TOOLS READ-ONLY" : "NAV PREVIEW";
 
         if (usesHomeSources) {
             if (homeWeatherUsable && homeSpaceUsable) {
@@ -448,6 +450,8 @@ PanelWindow {
                 return "MEDIA // PANEL";
             if (subjectNavigator.liveMagickKind !== "")
                 return "MAGICK // ASTRONOMY REFERENCE";
+            if (subjectNavigator.liveToolsKind !== "")
+                return "TOOLS // SOURCE AND STORAGE STATUS";
             return "INDEX // PREVIEW";
         }
 

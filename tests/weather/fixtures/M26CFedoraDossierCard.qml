@@ -16,6 +16,7 @@ ShellRoot {
     property int requestCount: 0
     property int savedCount: 0
     property bool complete: false
+    property int tickCount: 0
 
     WeatherDossierArchiveStore {
         id: archive
@@ -129,6 +130,7 @@ ShellRoot {
     }
 
     Component.onCompleted: {
+        console.log("M26C_UI_BOOT // ROOT_COMPLETED");
         const now = Date.now();
         preview = DossierPreview.preview({
             sourceId:"gdacs", sourceLabel:"GDACS",
@@ -145,6 +147,16 @@ ShellRoot {
         repeat: true
         running: !root.complete
         onTriggered: {
+            root.tickCount++;
+            if (root.tickCount === 1 || root.tickCount % 30 === 0) {
+                const save = root.findAction(card, "SAVE DOSSIER");
+                console.log("M26C_UI_HEARTBEAT // tick=" + root.tickCount
+                    + " // store=" + archive.storageState
+                    + " // preview=" + !!root.preview
+                    + " // cardVisible=" + card.visible
+                    + " // saveFound=" + !!save
+                    + " // saveAvailable=" + (save ? save.available : "NO"));
+            }
             if (root.readyLogged || archive.storageState !== "empty"
                     || !root.preview || !testWindow.visible)
                 return;

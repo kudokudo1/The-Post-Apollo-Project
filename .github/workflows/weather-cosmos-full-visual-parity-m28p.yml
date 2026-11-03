@@ -1,0 +1,39 @@
+name: Weather M28-P full SKY and SPACE visual parity
+
+on:
+  pull_request:
+    paths:
+      - 'widgets/weather/StationCosmosSubjectPanelPolicy.js'
+      - 'widgets/weather/StationSubjectNavigationPolicy.js'
+      - 'widgets/weather/StationWorkspaceNavigationPolicy.js'
+      - 'tests/weather/test_cosmos_full_visual_parity_m28p.js'
+      - 'tests/weather/test_cosmos_subject_panels_c1.js'
+      - 'docs/weather-subjects-m28p-visual-parity-handoff.md'
+      - '.github/workflows/weather-cosmos-full-visual-parity-m28p.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  cosmos-full-parity:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Verify original SKY 14 and SPACE 17 section families fully visible
+        run: node --test tests/weather/test_cosmos_full_visual_parity_m28p.js
+      - name: Protect COSMOS scoped routes and original services
+        run: |
+          node --test tests/weather/test_cosmos_subject_panels_c1.js
+          node --test tests/weather/test_index_cosmos_cutover_m28g.js
+          node --test tests/weather/subject_navigation_contract.test.js
+      - name: Protect W1 seven-family bottom mode navigation and weather separation
+        run: |
+          node --test tests/weather/test_workspace_landing_w1.js
+          node --test tests/weather/test_workspace_left_rail_w1r.js
+          node --test tests/weather/test_weather_subject_panels_m2a.js
+          node --test tests/weather/test_index_sources_cutover_m28l.js

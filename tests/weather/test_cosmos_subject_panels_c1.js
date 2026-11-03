@@ -24,11 +24,13 @@ vm.runInContext(cosmosSource.replace(/^\.pragma library\s*$/m, ""), cosmos);
 vm.runInContext(weatherPolicy.replace(/^\.pragma library\s*$/m, ""), weather);
 const plain = obj => JSON.parse(JSON.stringify(obj));
 
-test("COSMOS has exactly 20 real destinations present in the canonical subject tree", () => {
+test("COSMOS retains the 20 scoped routes plus two complete original SKY/SPACE views", () => {
   assert.equal(cosmos.FORMAT, "post-apollo.weather.cosmos-panels.c1.v1");
   const keys = Object.keys(cosmos.ROUTES);
-  assert.equal(keys.length, 20);
-  assert.equal(new Set(keys).size, 20);
+  assert.equal(keys.length, 22);
+  assert.equal(new Set(keys).size, 22);
+  assert.deepEqual(keys.filter(k=>cosmos.ROUTES[k].full===true).sort(),
+    ["cosmos/sky/full","cosmos/space-weather/full"]);
   for (const route of keys) {
     const info = nav.findRoute(route);
     assert.ok(info, route);

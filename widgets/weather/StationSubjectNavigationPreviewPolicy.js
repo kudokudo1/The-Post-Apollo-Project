@@ -37,8 +37,8 @@ function sourcePagesForPath(path, panelRoutes) {
     });
 }
 
-// M28-D: These exact original control families already have a SUBJECTS
-// route and regression contract from M28-A/B/C. This records routed wiring,
+// M28-D/E: These exact original control families already have a SUBJECTS
+// route and regression contract from M28-A/B/C and MEDIA D1 radio. This records routed wiring,
 // NOT operator acceptance, native Sway/Kitty acceptance, or whole-page parity.
 // Do not add other panels merely because a destination appears in PANELS.
 var WIRED_IN_SUBJECTS = {
@@ -51,7 +51,14 @@ var WIRED_IN_SUBJECTS = {
   "news-story-families":"M28-B",
   "news-article-viewer":"M28-B",
   "terminal-star-map":"M28-C",
-  "terminal-context-console":"M28-C"
+  "terminal-context-console":"M28-C",
+  // M28-E: reuse StationRadio, shared Hi-Fi/MPD and its existing memory.
+  "radio-directory":"M28-E",
+  "radio-search-presets":"M28-E",
+  "radio-paging":"M28-E",
+  "radio-favorites-recent":"M28-E",
+  "radio-select-load-enter":"M28-E",
+  "radio-play-pause-stop":"M28-E"
 };
 
 function remainingSourcePagesForPath(path, panelRoutes) {

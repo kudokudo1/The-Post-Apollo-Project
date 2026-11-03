@@ -58,14 +58,38 @@ virtual X server; it does not operate the live Post-Apollo shell.
 
 ## VERIFY
 
-At creation, M26-E native CI was **not yet run**. Only count a pass if
-the latest head's focused CI logs include:
-`M26E_PASS // FOUR_PROVIDER_MAP_SELECTIONS_DISTINCT_AND_PERSISTENT`
-and all four per-source identity confirmations, and Weather teardown
-and grammar checks have succeeded.
+The first complete M26-E implementation commit,
+`c7193b57ff0385b8343706af00df9ba57fdea911`, passed **3/3 GitHub
+workflows** (2026-11-03 UTC):
 
-M26-D previously passed full GDACS MAP click and saved JSON validation.
-That earlier success does not substitute for M26-E's additional sources.
+- [Native M26-E four-provider MAP and FileView, run #41590281077](https://github.com/kudokudo1/The-Post-Apollo-Project/actions/runs/41590281077) — **SUCCESS**
+- Weather Station Teardown Contracts, run #41590280877 — **SUCCESS**
+- Meta Apollo Grammar, run #41590280937 — **SUCCESS**
+
+The Fedora 44 runner used Quickshell 0.3.2 from COPR and recorded:
+
+```text
+M26E_PASS // SOURCE=gdacs REVISION=1 EXACT_PROVIDER_EVENT_KEY_PERSISTED
+M26E_DISK_PASS // DISTINCT_PROVIDER_KEYS=1
+M26E_PASS // SOURCE=usgs REVISION=2 EXACT_PROVIDER_EVENT_KEY_PERSISTED
+M26E_DISK_PASS // DISTINCT_PROVIDER_KEYS=2
+M26E_PASS // SOURCE=eonet REVISION=3 EXACT_PROVIDER_EVENT_KEY_PERSISTED
+M26E_DISK_PASS // DISTINCT_PROVIDER_KEYS=3
+M26E_PASS // SOURCE=firms REVISION=4 EXACT_PROVIDER_EVENT_KEY_PERSISTED
+M26E_DISK_PASS // DISTINCT_PROVIDER_KEYS=4
+M26E_PASS // FOUR_PROVIDER_MAP_SELECTIONS_DISTINCT_AND_PERSISTENT
+```
+
+Each source used an actual native marker click, then native SAVE DOSSIER
+click in a separate Quickshell process, reloading the same disposable
+archive. The script verified no automatic file write on selection,
+revision increments 1→4, all four composite provider keys with identical
+synthetic event IDs, non-incident semantics, no cross-source overwrite,
+and no source-native archive file. M25 policy and M26-A callback
+regressions also passed in the focused job.
+
+The final workflow/documentation changes still require latest-head CI
+verification before a final green declaration.
 
 ## WATCH OUT FOR
 
@@ -91,7 +115,8 @@ user data, TASKS or shared shell files are changed in M26-E.
 - [x] Actual MAP marker → dossier review → save button fixture
 - [x] Same-ID cross-provider collision and per-restart raw disk assertions
 - [x] Focused Fedora CI workflow and documentation
-- [ ] Latest-head multi-provider native CI pass
+- [x] First M26-E implementation head: 3/3 workflows green
+- [ ] Final evidence-and-workflow head CI pass
 - [ ] Operator merge and acceptance
 - [ ] Real provider and local Wayland/Fedora acceptance separately
 

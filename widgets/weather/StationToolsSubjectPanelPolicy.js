@@ -93,21 +93,44 @@ function sampleAgeMinutes(value,nowMs) {
 function sourceInput(weather,space,nowMs) {
     var w=weather || null, s=space || null;
     var now=Number(nowMs);
+    // M7: use the actual WeatherService provider and cache provenance.
+    // The HOME rack already does this; TOOLS must not claim WTTR for fallback.
+    var weatherCached=!!w&&w.usingPersistentCurrentCache===true;
+    var aqiCached=!!w&&w.usingPersistentAqiCache===true;
+    var active=w?String(w.activeWeatherProvider||""):"";
+    var original=w?String(w.cachedWeatherProvider||""):"";
+    var weatherProvider=!w?"NO SERVICE"
+        :weatherCached?"CACHE // "+(original==="OPEN_METEO"?"OPEN-METEO"
+                                        :original==="WTTR"?"WTTR.IN":"UNKNOWN")
+        :active==="OPEN_METEO"?"OPEN-METEO"
+        :active==="WTTR"?"WTTR.IN":"UNKNOWN";
+    var weatherStamp=timestampMs(w?w.lastUpdated:null);
+    var aqiStamp=timestampMs(w?w.aqiLastUpdated:null);
+    var cacheAge=function(stamp) {
+        return stamp>0&&isFinite(now)&&now>=stamp
+            ?Math.floor((now-stamp)/60000):-1;
+    };
     return {
         nowMs: now,
         weather:{
-            id:"weather",title:"WEATHER",provider:"WTTR.IN",
+            id:"weather",title:"WEATHER",provider:weatherProvider,
             ready:!!w&&!!w.ready,loading:!!w&&!!w.loading,
+            cached:weatherCached,
+            fallback:!weatherCached&&active==="OPEN_METEO",
             error:w?String(w.errorText||""):"NO SERVICE",
-            lastSuccessMs:timestampMs(w?w.lastUpdated:null),
-            sampleAgeMinutes:-1,staleAfterMinutes:20
+            // Cache timestamp is a saved sample, not a new live success.
+            lastSuccessMs:weatherCached?-1:weatherStamp,
+            sampleAgeMinutes:weatherCached?cacheAge(weatherStamp):-1,
+            staleAfterMinutes:20
         },
         aqi:{
             id:"aqi",title:"AIR QUALITY",provider:"OPEN-METEO",
             ready:!!w&&!!w.aqiReady,loading:!!w&&!!w.aqiLoading,
+            cached:aqiCached,
             error:w?String(w.aqiErrorText||""):"NO SERVICE",
-            lastSuccessMs:timestampMs(w?w.aqiLastUpdated:null),
-            sampleAgeMinutes:-1,staleAfterMinutes:20
+            lastSuccessMs:aqiCached?-1:aqiStamp,
+            sampleAgeMinutes:aqiCached?cacheAge(aqiStamp):-1,
+            staleAfterMinutes:20
         },
         kp:{
             id:"kp",title:"KP INDEX",provider:"NOAA SWPC",

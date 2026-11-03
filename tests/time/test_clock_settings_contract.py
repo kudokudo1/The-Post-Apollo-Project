@@ -111,7 +111,7 @@ class ClockTimeSettingsContract(unittest.TestCase):
     def test_readonly_diagnostic_of_inactive_service(self):
         with patch.object(host.os.path, "isfile", return_value=True), \
                 patch.object(host.subprocess, "run", return_value=
-                             subprocess.CompletedProcess([], 3, "inactive\\n", "")) as run:
+                             subprocess.CompletedProcess([], 3, "inactive\n", "")) as run:
             value = host.diagnose()
         self.assertEqual(value["status"], "ready")
         self.assertIn("ONE-SHOT", value["message"])

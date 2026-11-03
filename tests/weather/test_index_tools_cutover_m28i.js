@@ -42,8 +42,11 @@ test("exact six M28-I source controls have existing native TOOLS owners",()=>{
     assert.ok(policy.routeInfo(route),id+" actual native panel");
   }
   assert.equal(Object.keys(env.PANELS).length,103);
-  assert.equal(Object.keys(env.WIRED_IN_SUBJECTS).length,89);
-  assert.equal(103-89,14);
+  assert.equal(Object.values(env.WIRED_IN_SUBJECTS)
+    .filter(milestone=>milestone==="M28-I").length,6,
+    "M28-I retains its exact original six source/clock/store controls");
+  assert.ok(Object.keys(env.WIRED_IN_SUBJECTS).length>=89,
+    "independently reviewed later MEDIA catalogs may increase the total");
   assert.deepEqual(plain(env.remainingSourcePagesForPath("tools/storage",env.PANELS)),[]);
   assert.deepEqual(plain(env.remainingSourcePagesForPath("tools/sources/provenance",env.PANELS)),[]);
   assert.deepEqual(plain(env.nativeDestinationsForPath("tools/storage",env.PANELS).map(x=>x.path)),

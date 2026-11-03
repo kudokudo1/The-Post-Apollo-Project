@@ -1,0 +1,49 @@
+name: TASKS M13h native disposable keyring acceptance harness
+
+on:
+  pull_request:
+    paths:
+      - 'tests/tasks/fixtures/TaskNativeKeyringRecoveryM13h.cjs'
+      - 'tests/tasks/fixtures/TaskNativeKeyringIsolatedCIM13h.sh'
+      - 'tests/tasks/test_task_native_keyring_m13h.cjs'
+      - '.github/workflows/tasks-native-keyring-m13h.yml'
+      - 'docs/tasks-native-keyring-fedora-m13h.md'
+      - 'services/hub/ApolloHubTodoStore.qml'
+  push:
+    branches: [main]
+    paths:
+      - 'tests/tasks/fixtures/TaskNativeKeyringRecoveryM13h.cjs'
+      - 'tests/tasks/fixtures/TaskNativeKeyringIsolatedCIM13h.sh'
+      - 'tests/tasks/test_task_native_keyring_m13h.cjs'
+      - '.github/workflows/tasks-native-keyring-m13h.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  native-disposable-harness:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Native runner syntax and no-production-actuation checks
+        run: node --test tests/tasks/test_task_native_keyring_m13h.cjs
+      - name: Install provider only in temporary GitHub runner
+        run: |
+          sudo apt-get update -qq
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+            dbus dbus-x11 gnome-keyring libsecret-tools libglib2.0-bin
+      - name: Run exact manual Fedora harness against disposable CI keyring
+        run: dbus-run-session -- bash tests/tasks/fixtures/TaskNativeKeyringIsolatedCIM13h.sh
+      - name: Earlier isolated provider acceptance regression
+        run: dbus-run-session -- bash tests/tasks/fixtures/TaskSecretServiceIsolatedM13g.sh
+      - name: Encryption and tamper rejection regression
+        run: node --test tests/tasks/test_task_encrypted_recovery_m13f.cjs
+      - name: Production writer and disabled-mode source guard
+        run: python3 tests/tasks/test_task_writer_gate_inventory_m11d.py

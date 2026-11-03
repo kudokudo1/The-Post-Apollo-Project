@@ -5050,6 +5050,7 @@ PanelWindow {
                         width: parent.width
                         height: 505
                         visible: timew.selectedMode === "settings"
+                        calibratedPreview: timew.clockReadoutText
                     }
 
                     Column {

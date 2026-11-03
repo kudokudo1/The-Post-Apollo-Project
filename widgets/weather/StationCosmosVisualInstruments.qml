@@ -102,7 +102,8 @@ Rectangle {
                             ctx.lineWidth=1.3;
                             ctx.stroke();
                             const info=visual.moonData;
-                            if(!info.ready || info.illumination===null)return;
+                            if(!info.ready || info.illumination===null
+                               || !info.directionKnown)return;
                             ctx.fillStyle=String(Colors.yellow);
                             // Horizontal circular slices integrate to the
                             // provider's illuminated fraction without

@@ -144,7 +144,7 @@ test("W1 moves controls and panels, not additional data collectors or new settin
   // W2b adds explicit card pins via a single Weather-root writer, not
   // via HOME itself. The original W1 source ownership remains unchanged.
   assert.match(home,/property var homeFavoritesStore: null/);
-  assert.match(home,/CardProvenance\.provenance\(modelData, home\.sourceHealthRows\)/);
+  assert.match(home,/CardProvenance\.provenance\(\s*modelData,\s*home\.sourceHealthRows\s*\)/);
   assert.ok(!home.includes("FileView {"));
   assert.ok(!home.includes("Process {"));
 });

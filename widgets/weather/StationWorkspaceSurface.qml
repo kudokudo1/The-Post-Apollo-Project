@@ -38,6 +38,7 @@ Rectangle {
     readonly property var activeTabs: Workspace.tabsFor(currentPath)
     signal routeRequested(string path)
     signal legacyPageRequested(string pageId)
+    signal terminalLaunchRequested(string mode)
     signal newsMapRequested(var payload)
     signal newsMapClearRequested()
     signal deckEnabledRequested(bool enabled)
@@ -170,8 +171,8 @@ Rectangle {
             eventArchiveStore: surface.eventArchiveStore
             dossierArchiveStore: surface.dossierArchiveStore
             runtimeNowMs: surface.runtimeNowMs
-            onLegacyPageRequested: function(pageId) {
-                surface.legacyPageRequested(pageId);
+            onTerminalLaunchRequested: function(mode) {
+                surface.terminalLaunchRequested(mode);
             }
         }
 

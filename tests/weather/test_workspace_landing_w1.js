@@ -141,5 +141,10 @@ test("W1 moves controls and panels, not additional data collectors or new settin
       "swaymsg","curl ","saveCreator(","archiveEvent(","capture("])
       assert.ok(!source.includes(pattern),"unexpected owner "+pattern);
   }
-  assert.ok(!/favo(?:u)?rite/i.test(home),"HOME favorite pinning remains separately scoped");
+  // W2b adds explicit card pins via a single Weather-root writer, not
+  // via HOME itself. The original W1 source ownership remains unchanged.
+  assert.match(home,/property var homeFavoritesStore: null/);
+  assert.match(home,/CardProvenance\.provenance\(modelData, home\.sourceHealthRows\)/);
+  assert.ok(!home.includes("FileView {"));
+  assert.ok(!home.includes("Process {"));
 });

@@ -41,7 +41,9 @@ test("WEATHER overview and history display selected original HOME instruments", 
   assert.equal(env.kindForRoute("weather/history/historical-forecast"),"home");
   assert.equal(env.kindForRoute("weather/history/relationships"),"home");
   const groups = [...home.matchAll(/home\.sectionVisible\("([^"]+)"\)/g)].map(x=>x[1]);
-  assert.equal(groups.length,15);
+  // W2b adds two guarded PINNED/STORE STATUS sections within RELEVANT;
+  // no extra source panel or collector is introduced.
+  assert.equal(groups.length,17);
   for (const section of groups)
     assert.equal(env.visibleFor("home","",section),true,"classic "+section);
   for (const section of ["header","alerts","snapshot","relevant"])

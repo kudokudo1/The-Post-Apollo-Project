@@ -138,8 +138,8 @@ test("deep INDEX uses concrete COSMOS leaf links and still preserves unresolved 
     [{path:"cosmos/space-weather/history",panels:3,milestones:["M28-G"]}]);
   assert.ok(env.remainingSourcePagesForPath("cosmos",env.PANELS)
     .some(x=>x.id==="home"),"HOME SPACE card must remain a separate parity review");
-  assert.ok(env.remainingSourcePagesForPath("tools/sources/provenance",env.PANELS)
-    .some(x=>x.id==="space"),"SPACE field-time provenance remains pending");
+  assert.deepEqual(plain(env.remainingSourcePagesForPath("tools/sources/provenance",env.PANELS)),[],
+    "M28-I original SPACE field clocks now have their own source-backed TOOLS view");
   assert.match(navigator,/model: browser\.nativeDestinations/);
   assert.match(navigator,/model: browser\.classicSources/);
   assert.deepEqual(plain(env.nativeDestinationsForPath("not-a-route",env.PANELS)),[]);
@@ -147,7 +147,7 @@ test("deep INDEX uses concrete COSMOS leaf links and still preserves unresolved 
 
 test("COSMOS is observation and prediction, not a certified MAGICK ephemeris",()=>{
   for(const id of [
-    "home-space-weather","space-field-times","home-quick-conditions",
+    "home-space-weather","ground-source","home-quick-conditions",
     "news-live","map-source-rack"
   ])assert.equal(env.WIRED_IN_SUBJECTS[id],undefined,id+" unreviewed");
   assert.equal(cosmos.kindForRoute("magick/astrology/retrogrades"),"");

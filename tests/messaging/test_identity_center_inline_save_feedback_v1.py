@@ -33,7 +33,7 @@ class InlineSaveFeedback(unittest.TestCase):
             "rev > baseline", 'lastKind = "saved"',
             'lastKind = "unconfirmed"', '"NOT CONFIRMED // "',
             '"SAVING // "', '"SAVED // "', '"REVISION_CONFLICT"',
-            '"No new write was confirmed."', "snapshotSignature",
+            '". No new write was confirmed."', "snapshotSignature",
             "onSnapshotSignatureChanged: observeAll()", "inFlight",
             "lastKind = code ===", 'lastKind = "loaded"',
         ):

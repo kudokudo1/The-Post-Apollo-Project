@@ -52,7 +52,7 @@ test("root opens into SUBJECTS, closes to unload, and retains direct CLASSIC fal
   assert.match(station,/import "StationSubjectDefaultPolicy\.js" as SubjectDefaultPolicy/);
   assert.match(station,/property bool subjectsFirstPilotEnabled:\s*SubjectDefaultPolicy\.SUBJECTS_FIRST_PILOT/);
   assert.match(station,/property bool subjectNavigationOpen: false/);
-  assert.match(station,/function open\(\)\s*\{[\s\S]*?subjectNavigationOpen =\s*SubjectDefaultPolicy\.onOpen\(subjectsFirstPilotEnabled\);[\s\S]*?menuOpen = true;/);
+  assert.match(station,/function open\(\)\s*\{[\s\S]*?subjectNavigationOpen =\s*SubjectDefaultPolicy\.onOpen\(subjectsFirstPilotEnabled\)\s*&& terminalView\.terminalState === "IDLE";[\s\S]*?menuOpen = true;/);
   assert.match(station,/function close\(\)\s*\{[\s\S]*?closeContextTerminal\(\);[\s\S]*?subjectNavigationOpen =\s*SubjectDefaultPolicy\.onClose\(subjectsFirstPilotEnabled\);[\s\S]*?menuOpen = false;/);
   assert.match(station,/function openSubjectNavigation\(\)/);
   assert.match(station,/function openLegacyFromSubject\(pageId\)/);
@@ -68,10 +68,11 @@ test("root opens into SUBJECTS, closes to unload, and retains direct CLASSIC fal
 
 test("root Escape is identical for real Qt Keys and WindowShortcut and leaves terminal ownership intact",()=>{
   assert.match(station,/function handleEscape\(\)\s*\{/);
+  assert.match(station,/if \(providerDiagnosticsOpen\)\s*\{\s*providerDiagnosticsOpen = false;/);
   assert.match(station,/SubjectDefaultPolicy\.escapeAction\(\s*subjectNavigationOpen,\s*subjectNavigator\.indexOpen\s*\)/);
   assert.match(station,/subjectNavigator\.returnToWorkspace\(\)/);
   assert.equal((station.match(/weatherStation\.handleEscape\(\)/g)||[]).length,2);
-  assert.match(station,/onCurrentViewChanged:\s*\{\s*\/\/ M28-N/s);
+  assert.match(station,/onCurrentViewChanged:\s*\{\s*subjectNavigationOpen = false;/);
   assert.match(station,/closeContextTerminal\(\);\s*\}/);
   assert.match(station,/terminalHoleX: modeRail\.width \+ terminalView\.visibleBayX/);
   assert.match(station,/terminalMode: weatherStation\.subjectNavigationOpen/);

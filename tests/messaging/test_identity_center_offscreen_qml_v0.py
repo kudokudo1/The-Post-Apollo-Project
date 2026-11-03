@@ -566,16 +566,7 @@ class RealQtOrganizationsSettingsPaneSmoke(unittest.TestCase):
             self.assertTrue(self.sections.setProperty(field, js), field)
         self.sections.setProperty("localEditingOrganizationId", "org-1")
         APP.processEvents()
-        self.assertEqual(
-            len(_value(structure.property("visibleUnits"))), 1,
-            "synthetic Qt structure: company=" +
-            repr(self.sections.property("activeLocalEditingOrganizationId")) +
-            " selected=" + repr(structure.property("selectedOrgId")) +
-            " kind=" + repr(structure.property("selectedKind")) +
-            " search=" + repr(structure.property("searchQuery")) +
-            " store=" + repr(_value(self.sections.property("localStructureStore"))) +
-            " units=" + repr(_value(structure.property("visibleUnits"))),
-        )
+        self.assertEqual(len(_value(structure.property("visibleUnits"))), 1)
 
         for obj in (directory, portfolios, structure):
             obj.setProperty("confirmationKey", "stale confirmation")
@@ -598,6 +589,11 @@ class RealQtOrganizationsSettingsPaneSmoke(unittest.TestCase):
         search.setProperty("includeArchived", False)
         APP.processEvents()
         self.assertEqual(search.property("matchCount"), 0)
+        # Restore the unfiltered Structure list before checking its normal
+        # active/archived unit count. A search for "ARCHIVED COMPANY" correctly
+        # matches no units regardless of visibility.
+        search.setProperty("searchText", "")
+        APP.processEvents()
         for obj, field in ((directory, "showArchived"),
                            (portfolios, "showArchived"),
                            (structure, "showArchivedUnits")):

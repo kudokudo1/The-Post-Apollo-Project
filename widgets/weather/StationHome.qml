@@ -1,6 +1,7 @@
 import QtQuick
 import "../../components"
 import "StationHomePolicy.js" as StationHomePolicy
+import "StationHomeCardProvenancePolicy.js" as CardProvenance
 import "StationWeatherSubjectPanelPolicy.js" as SubjectPanelPolicy
 import "StationSourceHealthPolicy.js" as SourceHealth
 import "StationOfficialAlertPolicy.js" as OfficialAlertPolicy
@@ -44,6 +45,9 @@ Rectangle {
     property var nwsAlertSource: null
     property var historyService: null
     property var liveHistoryStore: null
+    // Inject only in SUBJECTS. CLASSIC continues without favorites controls.
+    // One Weather-root FileView writer owns all durable bookmark updates.
+    property var homeFavoritesStore: null
     property real runtimeNowMs: Date.now()
 
     readonly property int liveHistoryRevision:
@@ -502,6 +506,9 @@ Rectangle {
 
     property var watchItems: []
     property var activeWatchIds: []
+    readonly property var pinnedCardRows: CardProvenance.pinnedRows(
+        homeFavoritesStore ? homeFavoritesStore.cardKeys : [], watchItems
+    )
 
     function finiteNumber(value, fallback) {
         const number = Number(value);
@@ -1576,8 +1583,78 @@ Rectangle {
                     meterValue: modelData.meterValue
                     meterFillColor:
                         home.sourceMeterFill(modelData.source)
+                    provenanceText:
+                        CardProvenance.provenance(modelData, home.sourceHealthRows)
+                    pinEnabled: !!home.homeFavoritesStore
+                    pinned: home.homeFavoritesStore
+                        ? home.homeFavoritesStore.cardKeys.indexOf(
+                            CardProvenance.cardKey(modelData)
+                          ) >= 0 : false
+                    pinAvailable: home.homeFavoritesStore
+                        ? home.homeFavoritesStore.writable : false
+                    onPinRequested: {
+                        if (home.homeFavoritesStore)
+                            home.homeFavoritesStore.toggleCardFavorite(
+                                modelData.source, modelData.id
+                            );
+                    }
                 }
             }
+        }
+
+        // Saved identities are NOT saved observations. When an item has
+        // fallen out of the current top-three watch, show that explicitly
+        // and keep its UNPIN action available without inventing old data.
+        Column {
+            width: parent.width
+            spacing: 6
+            visible: home.sectionVisible("relevant")
+                     && home.homeFavoritesStore
+                     && home.pinnedCardRows.length > 0
+            GohuText {
+                text: "★  PINNED CARD IDS // CURRENT RANKING IS SEPARATE"
+                font.pixelSize: 10
+                color: Colors.yellow
+            }
+            Flow {
+                width: parent.width
+                spacing: 6
+                Repeater {
+                    model: home.pinnedCardRows
+                    delegate: ActionButton {
+                        required property var modelData
+                        width: Math.min(266, Math.max(165, modelData.id.length * 7 + 93))
+                        height: 26
+                        label: "★ " + modelData.id.toUpperCase()
+                               + (modelData.active ? " // WATCH" : " // NOT IN WATCH")
+                        labelPixelSize: 9
+                        accentColor: modelData.active ? Colors.yellow : Colors.orange
+                        available: home.homeFavoritesStore
+                            && home.homeFavoritesStore.writable
+                        onClicked: home.homeFavoritesStore.toggleCardFavorite(
+                            modelData.source, modelData.id
+                        )
+                    }
+                }
+            }
+            QuietText {
+                width: parent.width
+                wrapMode: Text.WordWrap
+                text: "PINS REMEMBER SOURCE + CARD ID ONLY // NO STORED VALUES OR LIVE CLAIMS"
+                font.pixelSize: 9
+            }
+        }
+
+        QuietText {
+            width: parent.width
+            visible: home.sectionVisible("relevant")
+                     && home.homeFavoritesStore
+                     && (home.homeFavoritesStore.storageState === "error"
+                         || home.homeFavoritesStore.storageState === "unsupported")
+            text: "HOME BOOKMARKS UNAVAILABLE // FILE PRESERVED // "
+                  + home.homeFavoritesStore.errorCode
+            wrapMode: Text.WordWrap
+            font.pixelSize: 10
         }
         }
     }

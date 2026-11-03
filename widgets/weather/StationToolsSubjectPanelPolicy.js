@@ -50,23 +50,29 @@ function shows(path,section) {
         return path === "tools/settings/display";
     return false;
 }
-function legacyTerminalPage(path) {
+var CONSOLE_MODES = ["home","ground","sky","space","map","news","radio"];
+function isConsoleMode(value) {
+    return CONSOLE_MODES.indexOf(value) !== -1;
+}
+function terminalModeForRoute(path,consoleMode) {
+    // Exact existing StationTerminal modes, not a CLASSIC route or command.
     if (path === "tools/terminal/star-map") return "terminal";
-    if (path === "tools/terminal/consoles") return "home";
+    if (path === "tools/terminal/consoles")
+        return isConsoleMode(consoleMode) ? consoleMode : "home";
     return "";
 }
 function titleForTerminalAction(path) {
     if (path === "tools/terminal/star-map")
-        return "OPEN CLASSIC STAR MAP BAY";
+        return "LAUNCH STAR MAP";
     if (path === "tools/terminal/consoles")
-        return "OPEN CLASSIC HOME CONSOLE";
+        return "LAUNCH CONTEXT CONSOLE";
     return "";
 }
 function terminalInstructions(path) {
     if (path === "tools/terminal/star-map")
-        return "THIS OPENS THE EXISTING CLASSIC TERMINAL BAY. THEN PRESS STAR MAP IN THE ORIGINAL HEADER TO LAUNCH THE ONE KITTY/STAR MAP SESSION. CLOSE IS STILL THE ORIGINAL EXACT-ACTOR CONTROL.";
+        return "START THE ORIGINAL STAR MAP KITTY IN THE STATION TERMINAL VIEWPORT. THE STATION HEADER CLOSE BUTTON TARGETS ONLY THIS CONFIRMED ACTOR. NO CLASSIC ROUTE IS OPENED.";
     if (path === "tools/terminal/consoles")
-        return "THIS OPENS CLASSIC HOME. PRESS HOME IN THE ORIGINAL HEADER FOR ITS PLAIN BASH CONTEXT CONSOLE. THE KITTY APP-ID AND SWAY WINDOW ID REMAIN UNDER THE ORIGINAL TERMINAL OWNER.";
+        return "CHOOSE HOME, GROUND, SKY, SPACE, MAP, NEWS OR RADIO. THE ORIGINAL KITTY CONTROLLER OPENS A PLAIN BASH CONSOLE WITH A UNIQUE MODE-SCOPED APP-ID, VERIFIED GEOMETRY AND EXACT CLOSE. NO CLASSIC PAGE IS OPENED.";
     return "";
 }
 function timestampMs(value) {

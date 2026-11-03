@@ -87,6 +87,7 @@ Rectangle {
     // This is transient view context, never a source event or archive write.
     property var newsMentionOverlay: null
     signal legacyPageRequested(string pageId)
+    signal terminalLaunchRequested(string mode)
 
     function showNewsMentionsOnEarth(payload) {
         if (!payload || !Array.isArray(payload.locations))
@@ -260,6 +261,9 @@ Rectangle {
                 }
                 onLegacyPageRequested: function(pageId) {
                     browser.legacyPageRequested(pageId);
+                }
+                onTerminalLaunchRequested: function(mode) {
+                    browser.terminalLaunchRequested(mode);
                 }
                 onNewsMapRequested: function(payload) {
                     browser.showNewsMentionsOnEarth(payload);
@@ -620,8 +624,8 @@ Rectangle {
         eventArchiveStore: browser.eventArchiveStore
         dossierArchiveStore: browser.dossierArchiveStore
         runtimeNowMs: browser.runtimeNowMs
-        onLegacyPageRequested: function(pageId) {
-            browser.legacyPageRequested(pageId);
+        onTerminalLaunchRequested: function(mode) {
+            browser.terminalLaunchRequested(mode);
         }
     }
 

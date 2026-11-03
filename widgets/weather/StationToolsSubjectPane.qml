@@ -19,7 +19,10 @@ Rectangle {
     property var dossierArchiveStore: null
     property real runtimeNowMs: 0
 
-    signal legacyPageRequested(string pageId)
+    // Only a request. The root StationTerminal remains the sole Kitty/Sway
+    // owner, including window identity, geometry, launch and exact close.
+    signal terminalLaunchRequested(string mode)
+    property string selectedConsoleMode: "home"
 
     readonly property string kind:
         ToolsPolicy.kindForRoute(subjectRoute)
@@ -34,7 +37,7 @@ Rectangle {
     readonly property var visibleStorageRows:
         ToolsPolicy.storageRowsFor(subjectRoute,allStorageRows)
     readonly property string terminalTarget:
-        ToolsPolicy.legacyTerminalPage(subjectRoute)
+        ToolsPolicy.terminalModeForRoute(subjectRoute,selectedConsoleMode)
 
     function accentColor(token) {
         switch (String(token||"")) {
@@ -87,7 +90,7 @@ Rectangle {
 
                 StationSectionDivider {
                     width: parent.width
-                    title: "TERMINAL // SAFE CLASSIC HANDOFF"
+                    title: "TERMINAL // STATION KITTY SESSION"
                 }
 
                 QuietText {
@@ -100,24 +103,47 @@ Rectangle {
                     color: Colors.yellow
                 }
 
+                Flow {
+                    width: parent.width
+                    spacing: 6
+                    visible: toolsPane.subjectRoute === "tools/terminal/consoles"
+                    Repeater {
+                        model: ToolsPolicy.CONSOLE_MODES
+                        delegate: ModeButton {
+                            required property string modelData
+                            width: Math.max(75,Math.min(101,(toolsContent.width - 42)/7))
+                            height: 31
+                            textOnly: true
+                            bordered: false
+                            selected: toolsPane.selectedConsoleMode === modelData
+                            labelText: modelData.toUpperCase()
+                            labelFontSize: 10
+                            onTriggered: toolsPane.selectedConsoleMode = modelData
+                        }
+                    }
+                }
+
                 ActionButton {
                     width: Math.min(350,parent.width)
                     height: 36
                     label: toolsPane.terminalTarget === ""
                            ? "NO TERMINAL TARGET"
                            : ToolsPolicy.titleForTerminalAction(toolsPane.subjectRoute)
+                             + (toolsPane.subjectRoute === "tools/terminal/consoles"
+                                ? " // " + toolsPane.selectedConsoleMode.toUpperCase()
+                                : "")
                     labelPixelSize: 11
                     available: toolsPane.terminalTarget !== ""
                     accentColor: Colors.cyan
                     onClicked: {
                         if (toolsPane.terminalTarget !== "")
-                            toolsPane.legacyPageRequested(toolsPane.terminalTarget);
+                            toolsPane.terminalLaunchRequested(toolsPane.terminalTarget);
                     }
                 }
 
                 QuietText {
                     width: parent.width
-                    text: "THE ORIGINAL STATION TERMINAL CONTINUES TO OWN THE WAYLAND APP-ID, BAY CUTOUT, VERIFIED WINDOW GEOMETRY AND EXACT CLOSE ACTION. NO NEW SESSION IS STARTED BY THIS PAGE."
+                    text: "THE EXISTING STATION TERMINAL CONTROLS THE WAYLAND APP-ID, BAY CUTOUT, VERIFIED WINDOW GEOMETRY AND EXACT CLOSE. LAUNCH USES THAT ONE CONTROLLER; THE HEADER CLOSE BUTTON RETURNS HERE."
                     wrapMode: Text.WordWrap
                     font.pixelSize: 10
                 }

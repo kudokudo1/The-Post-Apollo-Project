@@ -1,0 +1,44 @@
+name: Weather M26-F EARTH route continuity and CLASSIC boundary
+
+on:
+  pull_request:
+    paths:
+      - "tests/weather/fixtures/M26FEarthRouteContinuity.qml"
+      - "scripts/weather/verify_earth_navigation_continuity_m26f.sh"
+      - "tests/weather/test_dossier_navigation_boundary_m26f.js"
+      - "widgets/weather/WeatherStationW.qml"
+      - "widgets/weather/StationSubjectNavigator.qml"
+      - "widgets/weather/StationEarthSubjectPane.qml"
+      - "widgets/weather/StationDiscovery.qml"
+      - "services/weather/WeatherDossierArchiveStore.qml"
+      - ".github/workflows/weather-dossier-navigation-m26f.yml"
+      - "docs/weather-dossier-m26f-navigation-boundary-handoff.md"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  native-earth:
+    runs-on: ubuntu-latest
+    container:
+      image: fedora:44
+    timeout-minutes: 20
+    steps:
+      - name: Install disposable Fedora Quickshell and X11 runner
+        run: |
+          dnf install -y --setopt=install_weak_deps=False dnf5-plugins
+          dnf copr enable -y errornointernet/quickshell
+          dnf install -y --setopt=install_weak_deps=False \
+            quickshell qt6-qtdeclarative qt6-qt5compat qt6-qtbase-gui \
+            qt6-qtsvg git nodejs coreutils findutils \
+            xdotool xorg-x11-server-Xvfb
+          quickshell --version
+          quickshell --version | grep '0.3.'
+      - uses: actions/checkout@v4
+      - name: Classify root CLASSIC and EARTH instance ownership
+        run: node --test tests/weather/test_dossier_navigation_boundary_m26f.js
+      - name: Native EARTH routes preserve one event and independent saved dossier
+        run: bash scripts/weather/verify_earth_navigation_continuity_m26f.sh
+      - name: M25 persistence safety regression
+        run: node tests/weather/test_weather_dossier_persistent_m25.js

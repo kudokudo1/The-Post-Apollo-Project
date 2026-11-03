@@ -1,0 +1,50 @@
+name: Weather M28-C TOOLS terminal SUBJECTS cutover
+
+on:
+  pull_request:
+    paths:
+      - "widgets/weather/WeatherStationW.qml"
+      - "widgets/weather/StationTerminal.qml"
+      - "widgets/weather/StationSubjectNavigator.qml"
+      - "widgets/weather/StationWorkspaceSurface.qml"
+      - "widgets/weather/StationToolsSubjectPane.qml"
+      - "widgets/weather/StationToolsSubjectPanelPolicy.js"
+      - "tests/weather/test_tools_terminal_cutover_m28c.js"
+      - "tests/weather/test_tools_subject_panels_t1.js"
+      - "tests/weather/fixtures/M28CToolsTerminalControls.qml"
+      - "scripts/weather/verify_tools_terminal_controls_fedora_m28c.sh"
+      - "docs/weather-subjects-m28c-terminal-cutover-handoff.md"
+      - ".github/workflows/weather-tools-terminal-cutover-m28c.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  subject-terminal:
+    runs-on: ubuntu-latest
+    container:
+      image: fedora:44
+    timeout-minutes: 20
+    steps:
+      - name: Install disposable Fedora Quickshell and X11 click runner
+        run: |
+          dnf install -y --setopt=install_weak_deps=False dnf5-plugins
+          dnf copr enable -y errornointernet/quickshell
+          dnf install -y --setopt=install_weak_deps=False \
+            quickshell qt6-qtdeclarative qt6-qt5compat qt6-qtbase-gui \
+            qt6-qtsvg git nodejs coreutils findutils \
+            xdotool xorg-x11-server-Xvfb
+          quickshell --version
+          quickshell --version | grep '0.3.'
+      - uses: actions/checkout@v4
+      - name: Verify M28-C one Kitty controller and no CLASSIC routing
+        run: node --test tests/weather/test_tools_terminal_cutover_m28c.js
+      - name: Preserve T1 source and storage routes
+        run: node --test tests/weather/test_tools_subject_panels_t1.js
+      - name: Preserve W1 workspace and family rail
+        run: node --test tests/weather/test_workspace_landing_w1.js
+      - name: Preserve W1r canonical left rail
+        run: node --test tests/weather/test_workspace_left_rail_w1r.js
+      - name: Native click on TOOLS console mode and STAR MAP buttons
+        run: bash scripts/weather/verify_tools_terminal_controls_fedora_m28c.sh

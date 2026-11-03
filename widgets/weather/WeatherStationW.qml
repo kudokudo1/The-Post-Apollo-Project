@@ -1296,19 +1296,6 @@ PanelWindow {
                 onLegacyPageRequested: function(pageId) {
                     weatherStation.openLegacyFromSubject(pageId);
                 }
-                onNewsMapRequested: function(payload) {
-                    if (!payload || !Array.isArray(payload.locations)
-                            || payload.locations.length === 0)
-                        return;
-                    weatherStation.newsMapOverlay =
-                        JSON.parse(JSON.stringify(payload));
-                    weatherStation.subjectNavigationOpen = false;
-                    weatherStation.currentView = "map";
-                    weatherStation.navigationIndex =
-                        weatherStation.mainModes.findIndex(function(mode) {
-                            return mode.id === "map";
-                        });
-                }
             }
 
             StationTerminal {

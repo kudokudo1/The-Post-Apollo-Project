@@ -9,6 +9,7 @@ import "StationMediaSubjectPanelPolicy.js" as MediaPanelPolicy
 import "StationMagickSubjectPanelPolicy.js" as MagickPanelPolicy
 import "StationToolsSubjectPanelPolicy.js" as ToolsPanelPolicy
 import "StationWorkspaceNavigationPolicy.js" as Workspace
+import "StationMapProjectionPolicy.js" as MapProjection
 
 // W1 workspace shell, retaining the original M1 route index as MORE.
 // HOME is the original running StationHome. No extra providers or writers.
@@ -82,8 +83,30 @@ Rectangle {
     readonly property var classicSources:
         PreviewRoutes.sourcePagesForPath(currentPath, SubjectRoutes.PANELS)
 
+    // MEDIA owns article extraction. EARTH owns map plotting and inspection.
+    // This is transient view context, never a source event or archive write.
+    property var newsMentionOverlay: null
     signal legacyPageRequested(string pageId)
-    signal newsMapRequested(var payload)
+
+    function showNewsMentionsOnEarth(payload) {
+        if (!payload || !Array.isArray(payload.locations))
+            return false;
+        const locations = MapProjection.plottable(payload.locations);
+        if (locations.length === 0)
+            return false;
+        // Copy only data from the existing MEDIA handoff. Never mutate
+        // the originating article object or infer disaster locations.
+        const incoming = JSON.parse(JSON.stringify(payload));
+        incoming.locations = JSON.parse(JSON.stringify(locations));
+        if (!chooseRoute("earth/maps/overview"))
+            return false;
+        newsMentionOverlay = incoming;
+        return true;
+    }
+
+    function clearNewsMentions() {
+        newsMentionOverlay = null;
+    }
 
     // All top-level family choices open a landing page directly.
     // MORE retains access to the full 135-route original index.
@@ -199,6 +222,7 @@ Rectangle {
         sourceComponent: Component {
             StationWorkspaceSurface {
                 currentPath: browser.currentPath
+                newsMentionOverlay: browser.newsMentionOverlay
                 deckEnabled: browser.homeDeckEnabled
                 deckHeld: browser.homeDeckHeld
                 deckMode: browser.homeDeckMode
@@ -238,8 +262,9 @@ Rectangle {
                     browser.legacyPageRequested(pageId);
                 }
                 onNewsMapRequested: function(payload) {
-                    browser.newsMapRequested(payload);
+                    browser.showNewsMentionsOnEarth(payload);
                 }
+                onNewsMapClearRequested: browser.clearNewsMentions()
             }
         }
     }
@@ -530,8 +555,11 @@ Rectangle {
         anchors.topMargin: liveChildren.visible ? 6 : 14
         anchors.bottom: previewNote.top
         anchors.bottomMargin: 6
-        visible: browser.visible && browser.liveEarthKind !== ""
+        visible: browser.visible && browser.indexOpen
+                 && browser.liveEarthKind !== ""
         subjectRoute: browser.currentPath
+        newsMentionOverlay: browser.newsMentionOverlay
+        onNewsMapClearRequested: browser.clearNewsMentions()
         seismicSource: browser.seismicSource
         lightningSource: browser.lightningSource
         riverSource: browser.riverSource
@@ -555,7 +583,7 @@ Rectangle {
         subjectRoute: browser.currentPath
         runtimeNowMs: browser.runtimeNowMs
         onNewsMapRequested: function(payload) {
-            browser.newsMapRequested(payload);
+            browser.showNewsMentionsOnEarth(payload);
         }
     }
 

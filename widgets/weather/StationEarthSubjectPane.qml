@@ -10,6 +10,9 @@ Rectangle {
     color: Colors.black
 
     property string subjectRoute: ""
+    // MEDIA-sourced article location context, not an EARTH source collector.
+    property var newsMentionOverlay: null
+    signal newsMapClearRequested()
     property var seismicSource: null
     property var lightningSource: null
     property var riverSource: null
@@ -37,6 +40,8 @@ Rectangle {
             domain: "map"
             earthMapOnly: true
             earthMapRoute: earthPane.subjectRoute
+            newsMentionOverlay: earthPane.newsMentionOverlay
+            onNewsMapClearRequested: earthPane.newsMapClearRequested()
 
             seismicSource: earthPane.seismicSource
             lightningSource: earthPane.lightningSource
@@ -46,7 +51,6 @@ Rectangle {
             eventArchiveStore: earthPane.eventArchiveStore
             dossierArchiveStore: earthPane.dossierArchiveStore
             runtimeNowMs: earthPane.runtimeNowMs
-            // Deliberately do not pass MEDIA news mentions into EARTH.
         }
     }
 }

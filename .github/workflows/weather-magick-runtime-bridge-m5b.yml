@@ -1,0 +1,76 @@
+name: MAGICK M5b on-demand runtime bridge
+on:
+  pull_request:
+    paths:
+      - 'scripts/weather/celestial_visual_data.py'
+      - 'services/weather/CelestialVisualService.qml'
+      - 'widgets/weather/StationSubjectNavigator.qml'
+      - 'widgets/weather/StationWorkspaceSurface.qml'
+      - 'widgets/weather/StationMagickSubjectPane.qml'
+      - 'widgets/weather/StationMagickSubjectPanelPolicy.js'
+      - 'tests/weather/test_magick_celestial_bridge_m5b.js'
+      - 'tests/weather/test_celestial_visual_cli_m5b.py'
+      - '.github/workflows/weather-magick-runtime-bridge-m5b.yml'
+  push:
+    paths:
+      - 'scripts/weather/celestial_visual_data.py'
+      - 'services/weather/CelestialVisualService.qml'
+      - 'widgets/weather/StationSubjectNavigator.qml'
+      - 'widgets/weather/StationWorkspaceSurface.qml'
+      - 'widgets/weather/StationMagickSubjectPane.qml'
+      - 'widgets/weather/StationMagickSubjectPanelPolicy.js'
+      - 'tests/weather/test_magick_celestial_bridge_m5b.js'
+      - 'tests/weather/test_celestial_visual_cli_m5b.py'
+      - '.github/workflows/weather-magick-runtime-bridge-m5b.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  bridge-contracts:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: M5b runtime ownership, route, and CLI tests
+        run: |
+          node --test tests/weather/test_magick_celestial_bridge_m5b.js
+          python3 -m unittest discover -s tests/weather -p 'test_celestial_visual_cli_m5b.py' -v
+      - name: Preserve M5a and prior Station contracts
+        run: |
+          node --test tests/weather/test_magick_celestial_visual_m5.js
+          node --test tests/weather/test_magick_subject_panels_g1.js
+          node --test tests/weather/test_cosmos_visual_interactions_v2r.js
+          python3 -m unittest discover -s tests/weather -p 'test_celestial_visual_data_m4.py' -v
+  jpl-to-station-contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install isolated Skyfield
+        run: python3 -m pip install 'skyfield==1.55'
+      - name: Obtain official DE440s only in temporary runner
+        run: |
+          curl --fail --location --retry 3 --connect-timeout 15 --max-time 180 --silent --show-error \
+            'https://ssd.jpl.nasa.gov/ftp/eph/planets/bsp/de440s.bsp' \
+            --output "$RUNNER_TEMP/de440s.bsp"
+          test "$(stat -c %s "$RUNNER_TEMP/de440s.bsp")" -gt 30000000
+      - name: Execute actual M5b argv JSON query through M4 and M5 policy
+        run: |
+          python3 scripts/weather/celestial_visual_data.py \
+            --kernel "$RUNNER_TEMP/de440s.bsp" \
+            --query-json '{"format":"post-apollo.weather.celestial-visual-data.v1","start_utc":"2026-10-01T00:00:00Z","end_utc":"2026-10-15T00:00:00Z","bodies":["moon","sun"],"step_hours":12,"include_events":true}' \
+            > "$RUNNER_TEMP/m4.json"
+          MAGICK_M5_JSON_FILE="$RUNNER_TEMP/m4.json" \
+            node --test tests/weather/test_magick_celestial_visual_m5_jpl.js

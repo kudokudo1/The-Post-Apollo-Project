@@ -3,6 +3,7 @@ import QtQuick.Controls
 import Quickshell
 import Quickshell.Wayland
 import Quickshell.Io
+import qs.services.time
 import "../components"
 import "../services/hub/ApolloHubTimePolicy.js" as LocalTimePolicy
 import "../services/time/WorldClockPolicy.js" as WorldClockPolicy
@@ -43,18 +44,24 @@ PanelWindow {
     // Presentation choice is local to TimeW; it does not change the Clock
     // dock or Hub preference. The Hub helper is pure and owns no clock tick.
     property bool use24Hour: true
+    // Keep raw system time unchanged for Hub / legacy TimeW contracts.
     readonly property var localTimeSnapshot:
         LocalTimePolicy.snapshot(localClock.date.getTime(), use24Hour)
+    // Calibration affects presentation only, not actual time consumers.
+    readonly property var displayLocalTimeSnapshot:
+        LocalTimePolicy.snapshot(
+            TimeSettings.adjustedEpochMs(localClock.date.getTime()),
+            use24Hour)
     // Local clock display identity follows the dock's 24H/12H colors.
     // The window chassis remains white. Meridiem is intentionally visible
     // in both modes as //AM or //PM, even when the hour is in 24H format.
     readonly property color clockReadoutColor:
         use24Hour ? Colors.orange : Colors.cyan
     readonly property string clockReadoutText:
-        localTimeSnapshot.state === "ready"
-        ? (use24Hour ? localTimeSnapshot.time24
-                     : localTimeSnapshot.time12.slice(0, 8))
-          + "//" + localTimeSnapshot.meridiem
+        displayLocalTimeSnapshot.state === "ready"
+        ? (use24Hour ? displayLocalTimeSnapshot.time24
+                     : displayLocalTimeSnapshot.time12.slice(0, 8))
+          + "//" + displayLocalTimeSnapshot.meridiem
         : "--:--:--//--"
 
     // Two CALC views, with MATH split into duration shift vs. interval.
@@ -1283,7 +1290,9 @@ PanelWindow {
         { id: "clock", name: "CLOCK" },
         { id: "calc", name: "CALC" },
         { id: "tools", name: "TOOLS" },
-        { id: "machine", name: "MACHINE" }
+        { id: "machine", name: "MACHINE" },
+        { id: "settings", name: "SETTINGS" },
+        { id: "planned", name: "NEXT" }
     ]
     property int selectedModeIndex: 0
     readonly property string selectedMode: modes[selectedModeIndex].id
@@ -1314,6 +1323,7 @@ PanelWindow {
         if (!menuOpen) {
             dismissWorldSearchPopup();
             closeConverterDropdowns();
+            TimeSettings.cancelResync();
         }
         if (menuOpen) {
             Qt.callLater(restoreKeyboardFocus);
@@ -1957,7 +1967,8 @@ PanelWindow {
 
                 GohuText {
                     width: parent.width - stateIndicator.width
-                           - closeButton.width - header.spacing * 2
+                           - syncButton.width - closeButton.width
+                           - header.spacing * 3
                     height: parent.height
                     verticalAlignment: Text.AlignVCenter
                     font.pixelSize: 18
@@ -1978,8 +1989,35 @@ PanelWindow {
                         anchors.centerIn: parent
                         font.pixelSize: 11
                         color: timew.semanticColor
-                        text: timew.selectedMode === "clock"
+                        text: TimeSettings.resyncStatus === "working"
+                              ? "SYNC..."
+                              : TimeSettings.resyncStatus === "confirm"
+                              ? "CONFIRM"
+                              : TimeSettings.resyncStatus === "completed"
+                              ? "SYNC DONE"
+                              : TimeSettings.resyncStatus === "requested"
+                              ? "SAMPLES"
+                              : TimeSettings.resyncStatus === "failed"
+                                || TimeSettings.resyncStatus === "unavailable"
+                              ? "SYNC ERR"
+                              : timew.selectedMode === "clock"
                               ? "LOCAL" : "PLANNED"
+                    }
+                }
+
+                ActionButton {
+                    id: syncButton
+                    width: 35
+                    height: 32
+                    label: "⟳"
+                    labelPixelSize: 22
+                    contentPadding: 3
+                    trackLabelGlowLocally: true
+                    accentColor: Colors.cyan
+                    available: TimeSettings.resyncStatus !== "working"
+                    onLeftClicked: {
+                        timew.chooseMode(4);
+                        TimeSettings.prepareResync();
                     }
                 }
 
@@ -2115,21 +2153,23 @@ PanelWindow {
 
                         GohuText {
                             width: parent.width
-                            text: timew.localTimeSnapshot.dateLabel
+                            text: timew.displayLocalTimeSnapshot.dateLabel
                             color: Colors.white
                             font.pixelSize: 18
                         }
 
                         GohuText {
                             width: parent.width
-                            text: timew.localTimeSnapshot.utcOffsetLabel
+                            text: timew.displayLocalTimeSnapshot.utcOffsetLabel
                             color: Colors.orange
                             font.pixelSize: 11
                         }
 
                         GohuText {
-                            text: timew.localTimeSnapshot.state === "ready"
-                                  ? "LOCAL CLOCK // SYSTEM TIME"
+                            text: timew.displayLocalTimeSnapshot.state === "ready"
+                                  ? TimeSettings.displayOffsetMs === 0
+                                    ? "LOCAL CLOCK // SYSTEM TIME"
+                                    : "LOCAL CLOCK // CALIBRATED DISPLAY"
                                   : "LOCAL CLOCK // UNAVAILABLE"
                             color: Colors.orange
                             font.pixelSize: 11
@@ -5006,6 +5046,32 @@ PanelWindow {
                         }
                     }
 
+                    TimeSettingsPane {
+                        width: parent.width
+                        height: 505
+                        visible: timew.selectedMode === "settings"
+                        calibratedPreview: timew.clockReadoutText
+                    }
+
+                    Column {
+                        width: parent.width
+                        spacing: 12
+                        visible: timew.selectedMode === "planned"
+
+                        GohuText {
+                            text: "NEXT // RESERVED"
+                            font.pixelSize: 13
+                            color: Colors.cyan
+                        }
+                        GohuText {
+                            width: parent.width
+                            wrapMode: Text.WordWrap
+                            text: "A sixth main-mode slot is ready. No new capability has been assigned to this page."
+                            color: Colors.white
+                            font.pixelSize: 11
+                        }
+                    }
+
                     GohuText {
                         // The floating result sheet owns this space while it
                         // is open; the footer must not overlap its entries.
@@ -5019,7 +5085,11 @@ PanelWindow {
                               ? "TIME ZONE CONVERTER // READ ONLY"
                               : timew.selectedMode === "machine"
                               ? "MACHINE // LOCAL CHECKPOINTS"
-                              : "FOUNDATION PREVIEW // UI ONLY"
+                              : timew.selectedMode === "settings"
+                              ? "SETTINGS // DISPLAY OFFSET + SYSTEM STATUS"
+                              : timew.selectedMode === "tools"
+                              ? "FOUNDATION PREVIEW // UI ONLY"
+                              : "NEXT // RESERVED FOR LATER"
                         color: Colors.white
                         font.pixelSize: 11
                     }

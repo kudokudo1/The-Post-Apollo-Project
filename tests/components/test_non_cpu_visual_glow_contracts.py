@@ -84,11 +84,11 @@ assert "normalDockGlowColor: normalForegroundColor" in clock
 assert "normalContentGlowColor: normalDockGlowColor" in clock
 assert clock.count("color: clockButton.foregroundColor") == 4
 assert clock.count("color: clockButton.contentGlowColor") == 8
-assert 'Qt.formatDateTime(clock.date, "hh AP").split(" ")[0]' in clock
-assert 'Qt.formatDateTime(clock.date, "HH")' in clock
+assert 'Qt.formatDateTime(clockArea.adjustedDate, "hh AP").split(" ")[0]' in clock
+assert 'Qt.formatDateTime(clockArea.adjustedDate, "HH")' in clock
 assert 'text: "//"' in clock
 assert "width: clockPeriodSeparator.implicitWidth + 4" in clock
-assert 'text: Qt.formatDateTime(clock.date, "AP")' in clock
+assert 'text: Qt.formatDateTime(clockArea.adjustedDate, "AP")' in clock
 assert '? "24H"' not in clock
 assert "property int contentLeftPadding: 2" in clock
 assert "property int contentRightPadding: 4" in clock

@@ -121,8 +121,9 @@ assert "glowColor: timew.semanticColor" in window
 assert "borderColor: timew.semanticColor" in window
 assert "idlePrimaryColor: timew.semanticColor" in window
 assert 'text: timew.selectedName + " // TIMEW"\n                        color: timew.semanticColor' in window
-# TimeW displays the tested local-time formatter using its preexisting
-# SystemClock tick. There is no second timer, backend, or global preference.
+# TimeW preserves the original raw local-time snapshot for Hub consumers.
+# The new shared settings service only adjusts the displayed local readout.
+# SystemClock remains the only tick; no separate time worker is started.
 assert 'import "../services/hub/ApolloHubTimePolicy.js" as LocalTimePolicy' in window
 assert "LocalTimePolicy.snapshot(localClock.date.getTime(), use24Hour)" in window
 assert window.count("SystemClock {") == 1
@@ -136,16 +137,16 @@ assert "property bool use24Hour: true" in window
 assert "readonly property color clockReadoutColor:" in window
 assert "use24Hour ? Colors.orange : Colors.cyan" in window
 assert "readonly property string clockReadoutText:" in window
-assert "localTimeSnapshot.state === \"ready\"" in window
-assert "use24Hour ? localTimeSnapshot.time24" in window
-assert "localTimeSnapshot.time12.slice(0, 8)" in window
-assert '+ "//" + localTimeSnapshot.meridiem' in window
+assert "displayLocalTimeSnapshot.state === \"ready\"" in window
+assert "use24Hour ? displayLocalTimeSnapshot.time24" in window
+assert "displayLocalTimeSnapshot.time12.slice(0, 8)" in window
+assert '+ "//" + displayLocalTimeSnapshot.meridiem' in window
 assert 'text: timew.clockReadoutText' in window
 assert 'color: timew.clockReadoutColor' in window
 assert 'accentColor: timew.clockReadoutColor' in window
 assert "text: timew.localTimeSnapshot.displayTime" not in window
-assert "text: timew.localTimeSnapshot.dateLabel" in window
-assert "text: timew.localTimeSnapshot.utcOffsetLabel" in window
+assert "text: timew.displayLocalTimeSnapshot.dateLabel" in window
+assert "text: timew.displayLocalTimeSnapshot.utcOffsetLabel" in window
 # Both local display modes now share the exact same font size.
 assert "font.pixelSize: 22" in window
 assert "font.pixelSize: timew.use24Hour ? 22 : 19" not in window

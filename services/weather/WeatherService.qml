@@ -246,8 +246,14 @@ Scope {
                 if (weatherService.fallbackRequestContextKey
                         !== weatherService.requestContextKey
                         || weatherService.fallbackGeneration
-                           !== weatherService.weatherGeneration)
+                           !== weatherService.weatherGeneration) {
+                    // A new primary may have failed while the previous
+                    // fallback was still exiting. Try the pending context.
+                    if (weatherService.primaryWeatherStatus !== "READY"
+                            && !weatherService.ready)
+                        weatherService.startFallbackWeather();
                     return;
+                }
                 if (exitCode === 0 && weatherService.fallbackParseSucceeded) {
                     weatherService.fallbackWeatherStatus = "READY";
                     return;

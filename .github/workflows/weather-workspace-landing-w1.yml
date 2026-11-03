@@ -1,0 +1,38 @@
+name: Weather Station W1 horizontal subject workspace and preserved HOME
+
+on:
+  pull_request:
+    paths:
+      - 'widgets/weather/StationWorkspaceNavigationPolicy.js'
+      - 'widgets/weather/StationWorkspaceSurface.qml'
+      - 'widgets/weather/StationHome.qml'
+      - 'widgets/weather/StationSubjectNavigator.qml'
+      - 'widgets/weather/WeatherStationW.qml'
+      - 'tests/weather/test_workspace_landing_w1.js'
+      - '.github/workflows/weather-workspace-landing-w1.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  workspace:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Confirm 7 families, 44 mode controls and HOME mechanism retention
+        run: |
+          node --test tests/weather/subject_navigation_contract.test.js
+          node --test tests/weather/subject_navigation_browser.test.js
+          node --test tests/weather/test_weather_subject_panels_m2a.js
+          node --test tests/weather/test_weather_subject_panels_m2b.js
+          node --test tests/weather/test_cosmos_subject_panels_c1.js
+          node --test tests/weather/test_earth_subject_panels_e1.js
+          node --test tests/weather/test_media_subject_panels_d1.js
+          node --test tests/weather/test_magick_subject_panels_g1.js
+          node --test tests/weather/test_tools_subject_panels_t1.js
+          node --test tests/weather/test_workspace_landing_w1.js

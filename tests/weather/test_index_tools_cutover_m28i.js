@@ -141,10 +141,11 @@ test("cache, history, event, dossier and FRAME CONTRACT stay read-only with orig
     assert.ok(!toolPolicy.includes(forbidden),"TOOLS policy has no effects: "+forbidden);
 });
 
-test("still-pending source racks, HOME semantics and WATCH hosting remain visibly unresolved",()=>{
-  for(const id of [
-    "ground-source","map-source-rack","station-source-badge"
-  ])assert.equal(env.WIRED_IN_SUBJECTS[id],undefined,id+" not silently accepted");
+test("later M28-L source racks preserve M28-I six exact source and storage owners",()=>{
+  assert.equal(Object.values(env.WIRED_IN_SUBJECTS)
+    .filter(milestone=>milestone==="M28-I").length,6);
+  for(const id of ["ground-source","map-source-rack","station-source-badge"])
+    assert.equal(env.WIRED_IN_SUBJECTS[id],"M28-L",id+" independently reviewed");
   assert.ok(env.sourcePagesForPath("media/watch",env.PANELS).length>0,
     "original NEWS catalog source provenance remains");
   assert.deepEqual(plain(env.remainingSourcePagesForPath("media/watch",env.PANELS)),[],

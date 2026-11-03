@@ -11,6 +11,7 @@ const read=p=>fs.readFileSync(path.join(root,p),"utf8");
 const newPolicy=read("widgets/weather/StationWorkspaceNavigationPolicy.js");
 const treeSource=read("widgets/weather/StationSubjectNavigationPolicy.js");
 const workspace=read("widgets/weather/StationWorkspaceSurface.qml");
+const familyRail=read("widgets/weather/StationWorkspaceFamilyRail.qml");
 const browser=read("widgets/weather/StationSubjectNavigator.qml");
 const station=read("widgets/weather/WeatherStationW.qml");
 const home=read("widgets/weather/StationHome.qml");
@@ -19,7 +20,7 @@ const tree=vm.createContext({}),nav=vm.createContext({});
 vm.runInContext(treeSource.replace(/^\.pragma library\s*$/m,""),tree);
 vm.runInContext(newPolicy.replace(/^\.pragma library\s*$/m,""),nav);
 
-test("seven top row families open real landing pages, not route-directory root previews",()=>{
+test("seven main-mode families open real landing pages, not route-directory root previews",()=>{
   const rows=JSON.parse(JSON.stringify(nav.FAMILIES));
   assert.deepEqual(rows.map(x=>x.id),
     ["home","weather","cosmos","earth","media","magick","tools"]);
@@ -94,27 +95,27 @@ test("single original HOME retains ranking, timer, snapshots, history and runtim
   assert.match(station,/subjectNavigator\.currentPath, "history"/);
 });
 
-test("workspace top/bottom buttons switch immediate working panels",()=>{
-  assert.equal((workspace.match(/Repeater\s*\{/g)||[]).length,2);
-  assert.match(workspace,/model: Workspace\.FAMILIES/);
+test("left family rail and bottom workspace buttons switch immediate working panels",()=>{
+  assert.equal((workspace.match(/Repeater\s*\{/g)||[]).length,1);
+  assert.match(familyRail,/model: Workspace\.FAMILIES/);
   assert.match(workspace,/model: surface\.activeTabs/);
-  assert.match(workspace,/onTriggered: surface\.routeRequested\(modelData\.landing\)/);
+  assert.match(familyRail,/familyRail\.navigator\.chooseRoute\(modelData\.landing\)/);
   assert.match(workspace,/onTriggered: surface\.routeRequested\(modelData\.path\)/);
   for(const name of ["Weather","Cosmos","Earth","Media","Magick","Tools"])
     assert.ok(workspace.includes("Station"+name+"SubjectPane {"),name);
-  assert.match(workspace,/id: topRail/);
+  assert.ok(!workspace.includes("id: topRail"));
   assert.match(workspace,/id: bottomRail/);
-  assert.match(workspace,/label: "MORE"/);
-  assert.match(workspace,/label: "CLASSIC"/);
+  assert.match(station,/\? "INDEX"/);
+  assert.match(station,/\? "CLASSIC" : "SUBJECTS"/);
   assert.match(browser,/property string currentPath: "home\/overview"/);
   assert.match(browser,/Workspace\.landingFor\(subjectId\)/);
   assert.match(browser,/id: legacyIndexLayer/);
   assert.match(browser,/if \(indexOpen && !home && candidate\.group\)/);
   assert.match(browser,/function returnToWorkspace\(\)/);
-  assert.match(browser,/onIndexRequested: browser\.openIndex\(\)/);
+  assert.match(station,/subjectNavigator\.openIndex\(\)/);
   assert.match(browser,/onLegacyPageRequested: function\(pageId\)/);
   assert.match(station,/StationSubjectNavigator\s*\{/);
-  assert.match(station,/&& !subjectNavigator\.indexOpen \? 0 : 160/);
+  assert.match(station,/width: 160/);
 });
 
 test("source owners and 160px CLASSIC terminal geometry remain unchanged",()=>{

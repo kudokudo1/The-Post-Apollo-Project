@@ -50,8 +50,11 @@ test("the historical M1 source map stays intact, without mislabeling all control
   assert.ok(ctx.sourcePagesForPath("weather", ctx.PANELS).length
     >= ctx.remainingSourcePagesForPath("weather", ctx.PANELS).length,
     "historical provenance cannot shrink with later reviewed cutovers");
-  assert.deepEqual(plain(ctx.remainingSourcePagesForPath("earth", ctx.PANELS)),
-    plain(ctx.sourcePagesForPath("earth", ctx.PANELS)));
+  assert.deepEqual(plain(ctx.sourcePagesForPath("earth", ctx.PANELS).map(x=>x.id)),
+    ["ground","map"], "M1 historical EARTH source provenance remains unchanged");
+  assert.ok(ctx.remainingSourcePagesForPath("earth", ctx.PANELS).length
+    <= ctx.sourcePagesForPath("earth", ctx.PANELS).length,
+    "later independently reviewed EARTH controls may stop needing CLASSIC");
   assert.deepEqual(plain(ctx.remainingSourcePagesForPath("media/watch", ctx.PANELS)),
     plain(ctx.sourcePagesForPath("media/watch", ctx.PANELS)));
   assert.equal(JSON.stringify(ctx.PANELS), before, "source map mutated");

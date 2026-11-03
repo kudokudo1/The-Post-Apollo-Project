@@ -41,6 +41,7 @@ PanelWindow {
     // SYSTEM extends the same interaction pattern to hardware categories.
     property int thermalSubMode: 0 // 0 = temperature, 1 = fans
     property string systemSubMode: "ALL"
+    property string settingsSubMode: "LOCATION"
 
     readonly property var thermalSubModes: [
         { name: "TEMP", key: 0, symbol: "🌡" },
@@ -57,6 +58,11 @@ PanelWindow {
         { name: "", key: "__SPACER_LEFT__", symbol: "", spacer: true },
         { name: "SWAP", key: "SWAP", symbol: "⇄" },
         { name: "", key: "__SPACER_RIGHT__", symbol: "", spacer: true }
+    ]
+
+    // SETTINGS categories do not own SYSTEM monitor filters.
+    readonly property var settingsSubModes: [
+        { name: "LOCATION", key: "LOCATION", symbol: "⌖" }
     ]
 
     // Rail-face animation state, matching AppControl's FAVORITES behavior.
@@ -98,6 +104,11 @@ PanelWindow {
         {
             name: "SYSTEM",
             symbol: "🖳",
+            kind: "text"
+        },
+        {
+            name: "SETTINGS",
+            symbol: "⚙",
             kind: "text"
         }
     ]
@@ -171,11 +182,13 @@ PanelWindow {
             ? thermalSubModes
             : selectedModeIndex === 3
             ? systemSubModes.filter(function(choice) { return !choice.spacer; })
-            : [];
+            : selectedModeIndex === 4 ? settingsSubModes : [];
         if (choices.length < 2)
             return;
         const value = selectedModeIndex === 2
-            ? String(thermalSubMode) : String(systemSubMode);
+            ? String(thermalSubMode)
+            : selectedModeIndex === 3 ? String(systemSubMode)
+            : String(settingsSubMode);
         const current = Math.max(0, choices.findIndex(function(choice) {
             return String(choice.key) === value;
         }));
@@ -183,8 +196,10 @@ PanelWindow {
         const choice = choices[(current + step + choices.length) % choices.length];
         if (selectedModeIndex === 2)
             selectThermalSubMode(choice.key);
-        else
+        else if (selectedModeIndex === 3)
             selectSystemSubMode(choice.key);
+        else if (selectedModeIndex === 4)
+            selectSettingsSubMode(choice.key);
     }
 
     function cycleMonitorRow(direction) {
@@ -287,6 +302,15 @@ PanelWindow {
         monitorSelectorScroll.contentY = 0;
         sharedInstrumentScroll.contentY = 0;
         refreshSharedMonitors();
+    }
+
+    function selectSettingsSubMode(key) {
+        const next = String(key || "");
+        if (!settingsSubModes.some(function(choice) {
+            return choice.key === next;
+        }))
+            return;
+        settingsSubMode = next;
     }
 
     function selectedMonitorIndex() {
@@ -1020,6 +1044,8 @@ PanelWindow {
                 ? "THERMAL MONITOR"
                 : cpuPlusWindow.selectedModeIndex === 3
                 ? "SYSTEM MONITOR"
+                : cpuPlusWindow.selectedModeIndex === 4
+                ? "SETTINGS // OVERVIEW"
                 : "SHARED INSTRUMENT"
 
             font.pixelSize: 13
@@ -1316,6 +1342,8 @@ PanelWindow {
                     ? "THERMAL STATE"
                     : cpuPlusWindow.selectedModeIndex === 3
                     ? "SYSTEM STATE"
+                    : cpuPlusWindow.selectedModeIndex === 4
+                    ? "SETTINGS STATE"
                     : "INSTRUMENT STATE"
 
                 font.pixelSize: 13
@@ -1415,7 +1443,9 @@ PanelWindow {
                     text:
                         cpuPlusWindow.selectedModeIndex === 0
                         ? "FAVORITES BAY"
-                        : "PROCESS BAY"
+                        : cpuPlusWindow.selectedModeIndex === 1
+                        ? "PROCESS BAY"
+                        : "LOCATION // SETTINGS"
 
                     font.pixelSize: 14
                     color: Colors.magenta
@@ -1469,6 +1499,8 @@ PanelWindow {
                 ? "THERMAL TARGET"
                 : cpuPlusWindow.selectedModeIndex === 3
                 ? "SYSTEM TARGET"
+                : cpuPlusWindow.selectedModeIndex === 4
+                ? "SETTINGS // CATEGORIES"
                 : "TARGET"
 
             font.pixelSize: 12
@@ -1516,11 +1548,13 @@ PanelWindow {
                 ? 52
                 : cpuPlusWindow.selectedModeIndex === 3
                 ? 92
-                : 0
+                : cpuPlusWindow.selectedModeIndex === 4
+                ? 52 : 0
 
             visible:
                 cpuPlusWindow.selectedModeIndex === 2
                 || cpuPlusWindow.selectedModeIndex === 3
+                || cpuPlusWindow.selectedModeIndex === 4
 
             Flow {
                 anchors.fill: parent
@@ -1530,7 +1564,9 @@ PanelWindow {
                     model:
                         cpuPlusWindow.selectedModeIndex === 2
                         ? cpuPlusWindow.thermalSubModes
-                        : cpuPlusWindow.systemSubModes
+                        : cpuPlusWindow.selectedModeIndex === 3
+                        ? cpuPlusWindow.systemSubModes
+                        : cpuPlusWindow.settingsSubModes
 
                     Rectangle {
                         id: subModeButton
@@ -1541,7 +1577,9 @@ PanelWindow {
                         readonly property bool isSelected:
                             cpuPlusWindow.selectedModeIndex === 2
                             ? cpuPlusWindow.thermalSubMode === Number(modelData.key)
-                            : cpuPlusWindow.systemSubMode === String(modelData.key)
+                            : cpuPlusWindow.selectedModeIndex === 3
+                            ? cpuPlusWindow.systemSubMode === String(modelData.key)
+                            : cpuPlusWindow.settingsSubMode === String(modelData.key)
 
                         readonly property bool isHovered:
                             subModeMouse.containsMouse
@@ -1555,12 +1593,14 @@ PanelWindow {
                         width:
                             cpuPlusWindow.selectedModeIndex === 2
                             ? (targetSubModeStrip.width - 4) / 2
+                            : cpuPlusWindow.selectedModeIndex === 4
+                            ? targetSubModeStrip.width
                             : (targetSubModeStrip.width - 8) / 3
 
                         height:
                             cpuPlusWindow.selectedModeIndex === 2
-                            ? 38
-                            : 27
+                            || cpuPlusWindow.selectedModeIndex === 4
+                            ? 38 : 27
 
                         color:
                             isSpacer
@@ -1702,8 +1742,10 @@ PanelWindow {
                             onClicked: {
                                 if (cpuPlusWindow.selectedModeIndex === 2)
                                     cpuPlusWindow.selectThermalSubMode(modelData.key);
-                                else
+                                else if (cpuPlusWindow.selectedModeIndex === 3)
                                     cpuPlusWindow.selectSystemSubMode(modelData.key);
+                                else if (cpuPlusWindow.selectedModeIndex === 4)
+                                    cpuPlusWindow.selectSettingsSubMode(modelData.key);
                             }
                         }
 
@@ -1726,6 +1768,36 @@ PanelWindow {
                         }
                     }
                 }
+            }
+        }
+
+        Column {
+            id: settingsCategorySummary
+            visible: cpuPlusWindow.selectedModeIndex === 4
+            anchors.top: targetSubModeStrip.bottom
+            anchors.left: parent.left
+            anchors.right: parent.right
+            anchors.topMargin: 20
+            anchors.leftMargin: 14
+            anchors.rightMargin: 14
+            spacing: 9
+
+            GohuText {
+                text: "LOCATION // CONTEXT"
+                color: Colors.cyan
+                font.pixelSize: 12
+            }
+            QuietText {
+                width: parent.width
+                wrapMode: Text.WordWrap
+                text: "HOME // EXPLORE // SUBJECT OVERRIDES"
+                font.pixelSize: 10
+            }
+            SecondaryText {
+                width: parent.width
+                wrapMode: Text.WordWrap
+                text: "CATEGORY VIEW READY. LOCATION BACKEND NOT CONNECTED."
+                font.pixelSize: 10
             }
         }
 
@@ -2122,7 +2194,9 @@ PanelWindow {
             anchors.top: parent.top
             anchors.topMargin: 16
 
-            text: "CPU++ ACTUATORS"
+            text: cpuPlusWindow.selectedModeIndex === 4
+                  ? "LOCATION // SETTINGS"
+                  : "CPU++ ACTUATORS"
 
             font.pixelSize: 12
             color: Colors.magenta
@@ -2146,6 +2220,19 @@ PanelWindow {
                 opacity: 0.38
                 color: Colors.cyan
             }
+        }
+        CpuPlusSettingsLocationPane {
+            id: settingsLocationPane
+            visible: cpuPlusWindow.selectedModeIndex === 4
+                     && cpuPlusWindow.settingsSubMode === "LOCATION"
+            anchors.left: parent.left
+            anchors.right: parent.right
+            anchors.top: actuatorHeader.bottom
+            anchors.bottom: parent.bottom
+            anchors.leftMargin: 10
+            anchors.rightMargin: 10
+            anchors.topMargin: 20
+            anchors.bottomMargin: 10
         }
     }
 }

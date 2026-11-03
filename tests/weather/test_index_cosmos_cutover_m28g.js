@@ -65,8 +65,11 @@ test("only 23 existing SKY and SPACE control families enter the COSMOS ledger",(
     assert.equal(cosmos.visibleFor(page,route,section),true,id+" filtered section");
   }
   assert.equal(Object.keys(env.PANELS).length,103);
-  assert.equal(Object.keys(env.WIRED_IN_SUBJECTS).length,69);
-  assert.equal(103-69,34);
+  assert.equal(Object.values(env.WIRED_IN_SUBJECTS)
+    .filter(milestone=>milestone==="M28-G").length,23,
+    "M28-G exact SKY/SPACE classification remains stable");
+  assert.ok(Object.keys(env.WIRED_IN_SUBJECTS).length>=69,
+    "later independently reviewed cutovers may add to the ledger");
 });
 
 test("SKY cosmos-only source gates stay separate from WEATHER forecasts",()=>{
@@ -144,8 +147,8 @@ test("deep INDEX uses concrete COSMOS leaf links and still preserves unresolved 
 
 test("COSMOS is observation and prediction, not a certified MAGICK ephemeris",()=>{
   for(const id of [
-    "home-space-weather","space-field-times","ground-usgs-seismic",
-    "news-live","map-eonet-layer"
+    "home-space-weather","space-field-times","home-quick-conditions",
+    "news-live","map-source-rack"
   ])assert.equal(env.WIRED_IN_SUBJECTS[id],undefined,id+" unreviewed");
   assert.equal(cosmos.kindForRoute("magick/astrology/retrogrades"),"");
   assert.equal(cosmos.kindForRoute("weather/conditions/current"),"");

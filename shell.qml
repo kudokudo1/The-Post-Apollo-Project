@@ -15,6 +15,7 @@ import "services/weather"
 import "services/system"
 import "services/audio" as AudioOwner
 import qs.services.hub
+import qs.services.location
 import "services/hub/ApolloHubProcessesPolicy.js" as HubProcessesPolicy
 import qs.services.notifications
 
@@ -380,6 +381,9 @@ PanelWindow {
         id: weatherService
         cacheStore: weatherPersistentCache
         historyStore: weatherLiveHistory
+        // Single shared operator-selected Home/Explore point for weather,
+        // astronomy coordinates, nearby-gauge sources and AQI requests.
+        placeRegistry: PlaceRegistry
     }
 
     // P3-B DRAFT INTEGRATION GATE: Team 6's one shared stream owner.

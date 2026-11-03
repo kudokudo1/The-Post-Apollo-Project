@@ -8,6 +8,7 @@ import "../components"
 Item {
     id: pane
     property bool panelVisible: visible
+    property string calibratedPreview: "--:--:--//--"
 
     Flickable {
         id: scroll
@@ -38,6 +39,12 @@ Item {
             }
             GohuText {
                 width: parent.width
+                text: "PREVIEW // " + pane.calibratedPreview
+                font.pixelSize: 12
+                color: Colors.cyan
+            }
+            GohuText {
+                width: parent.width
                 wrapMode: Text.WordWrap
                 text: "Only the Clock dock and local readout shift. UTC, world calculations, timers and Linux time do not."
                 font.pixelSize: 10
@@ -51,11 +58,11 @@ Item {
 
                 Repeater {
                     model: [
+                        { label: "-1M", delta: -60000 },
                         { label: "-1S", delta: -1000 },
-                        { label: "-100MS", delta: -100 },
                         { label: "RESET", delta: 0, reset: true },
-                        { label: "+100MS", delta: 100 },
-                        { label: "+1S", delta: 1000 }
+                        { label: "+1S", delta: 1000 },
+                        { label: "+1M", delta: 60000 }
                     ]
                     ActionButton {
                         required property var modelData

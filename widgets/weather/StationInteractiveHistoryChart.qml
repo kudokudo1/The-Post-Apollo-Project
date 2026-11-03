@@ -102,9 +102,9 @@ Rectangle {
             ActionButton {
                 width: 130
                 height: 24
-                label: inspector.lockedTimeMs > 0 ? "UNLOCK POINT" : "INSPECT POINT"
+                label: "UNLOCK POINT"
                 labelPixelSize: 9
-                available: inspector.lockedTimeMs > 0 || inspector.hasPoints
+                available: inspector.lockedTimeMs > 0
                 accentColor: Colors.orange
                 onClicked: inspector.lockedTimeMs = -1
             }
@@ -285,7 +285,13 @@ Rectangle {
             font.pixelSize: 9
             wrapMode: Text.WordWrap
             color: Colors.yellow
-            text: "NOAA SWPC VIA EXISTING 48H LIVE HISTORY // EACH SERIES SCALED SEPARATELY"
+            text: "NOAA SWPC // WIND "
+                 +Series.freshnessLabel(inspector.leftModel.lastMs,
+                                        inspector.runtimeNowMs,45)
+                 +" // BZ "
+                 +Series.freshnessLabel(inspector.rightModel.lastMs,
+                                        inspector.runtimeNowMs,45)
+                 +" // SEPARATE AXES // OBSERVED TIMES"
                  + " // WIND GAPS "+inspector.leftModel.gaps
                  +" // BZ GAPS "+inspector.rightModel.gaps
                  +" // POINTS NEED OBSERVATION + RECEIPT TIMESTAMPS"

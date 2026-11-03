@@ -59,7 +59,8 @@ test("CLASSIC toggle remains on left rail, detailed INDEX also retains its own r
   assert.match(station,/\? "CLASSIC" : "SUBJECTS"/);
   assert.match(station,/StationSubjectRail\s*\{/);
   assert.match(station,/visible: weatherStation\.subjectNavigationOpen\s*&& subjectNavigator\.indexOpen/);
-  assert.match(classicRail,/model: SubjectRoutes\.SUBJECTS/);
+  assert.match(classicRail,/model: \[\{id:"home",label:"HOME"\}\]\.concat\(SubjectRoutes\.SUBJECTS\)/);
+  assert.equal((classicRail.match(/ModeButton\s*\{/g)||[]).length,1,"single deep INDEX rail delegate");
   assert.match(station,/visible: !weatherStation\.subjectNavigationOpen/);
 });
 

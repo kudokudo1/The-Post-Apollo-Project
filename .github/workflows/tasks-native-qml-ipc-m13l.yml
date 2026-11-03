@@ -1,0 +1,58 @@
+name: TASKS M13l isolated native Quickshell IPC acceptance preflight
+
+on:
+  pull_request:
+    paths:
+      - 'TaskEncryptedDraftAutoHarnessM13l.qml'
+      - 'tests/tasks/tools/task_m13l_native_ipc.sh'
+      - 'tests/tasks/test_task_native_ipc_m13l.cjs'
+      - 'docs/tasks-isolated-native-qml-ipc-m13l.md'
+      - '.github/workflows/tasks-native-qml-ipc-m13l.yml'
+      - 'services/hub/TaskEncryptedDraftHostBridgeM13k.qml'
+      - 'services/hub/qmldir'
+      - 'tests/tasks/fixtures/TaskEncryptedDraftHostM13k.cjs'
+  push:
+    branches: [main]
+    paths:
+      - 'TaskEncryptedDraftAutoHarnessM13l.qml'
+      - 'tests/tasks/tools/task_m13l_native_ipc.sh'
+      - 'tests/tasks/test_task_native_ipc_m13l.cjs'
+      - '.github/workflows/tasks-native-qml-ipc-m13l.yml'
+permissions:
+  contents: read
+jobs:
+  native-acceptance-preflight:
+    runs-on: ubuntu-latest
+    timeout-minutes: 13
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install isolated D-Bus/keyring and QML syntax parser only in CI runner
+        run: |
+          sudo apt-get update -qq
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+            dbus dbus-x11 gnome-keyring libsecret-tools libglib2.0-bin qt6-declarative-dev-tools
+      - name: QML syntax parse of unattended windowless native test scene
+        run: QT_QPA_PLATFORM=offscreen /usr/lib/qt6/bin/qmlformat TaskEncryptedDraftAutoHarnessM13l.qml >/dev/null
+      - name: Read-only source preflight and negative cases
+        run: |
+          bash -n tests/tasks/tools/task_m13l_native_ipc.sh
+          node --test tests/tasks/test_task_native_ipc_m13l.cjs
+      - name: Fake Quickshell executable validates isolated launcher plumbing only
+        run: |
+          set -euo pipefail
+          fake_bin="$(mktemp -d /tmp/m13l-fake-shell-XXXXXXXX)"
+          trap 'rm -rf -- "$fake_bin"' EXIT
+          printf '%s\n' '#!/bin/sh' 'printf "%s\n" "M13L_NATIVE_QML_IPC_PASS"' >"$fake_bin/quickshell"
+          chmod 700 "$fake_bin/quickshell"
+          result="$(PATH="$fake_bin:$PATH" bash tests/tasks/tools/task_m13l_native_ipc.sh --run .)"
+          test "$result" = "$(printf 'M13L_REVIEWED_SOURCE_READY\nM13L_STARTING_PRIVATE_NATIVE_TEST\nM13L_REVIEWED_SOURCE_READY\nM13L_NATIVE_QML_IPC_AND_CLEANUP_PASS')"
+          printf '%s\n' "M13L_FAKE_SHELL_ISOLATION_ONLY_PASS"
+      - name: Actual Secret Service encrypted synthetic host regression, without QML
+        run: dbus-run-session -- bash tests/tasks/fixtures/TaskEncryptedDraftHostPrivateM13k.sh
+      - name: Production source one-writer and QML module registration unchanged
+        run: |
+          node --test tests/tasks/test_task_encrypted_draft_host_m13k.cjs
+          python3 tests/tasks/test_task_writer_gate_inventory_m11d.py

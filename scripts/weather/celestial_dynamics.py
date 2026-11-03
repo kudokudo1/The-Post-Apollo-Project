@@ -187,6 +187,77 @@ def longitude_rate(lon_at, at, window_hours=6):
     return change / (2 * half_window.total_seconds() / 86400)
 
 
+
+def _golden_extremum(fn, lower, upper, seek_minimum):
+    """Refine a sampled extremum; bracket width is a numerical stop criterion."""
+    ratio = (math.sqrt(5) - 1) / 2
+    left, right = lower, upper
+    x = right - (right - left) * ratio
+    y = left + (right - left) * ratio
+    fx, fy = _finite(fn(x), "extremum value"), _finite(fn(y), "extremum value")
+    for _ in range(90):
+        if (right - left).total_seconds() <= ROOT_TOLERANCE_SECONDS:
+            return left + (right - left) / 2
+        if (fx < fy) == seek_minimum:
+            right, y, fy = y, x, fx
+            x = right - (right - left) * ratio
+            fx = _finite(fn(x), "extremum value")
+        else:
+            left, x, fx = x, y, fy
+            y = left + (right - left) * ratio
+            fy = _finite(fn(y), "extremum value")
+    raise ContractError("extremum refinement did not converge")
+
+
+def find_tangent_aspect_events(lon_a_at, lon_b_at, start_utc, end_utc,
+                              step_hours=6, tangent_tolerance_deg=0.00001):
+    """Find sampled extremum contacts that may have NO angular sign crossing.
+
+    Looks for *candidate* local minima/maxima of unwrapped relative longitude,
+    refines each with golden-section search, and only reports near-zero
+    residual contacts. Sampling cannot prove completeness or causal meaning.
+    """
+    tolerance = _finite(tangent_tolerance_deg, "tangent_tolerance_deg", 0, 0.01)
+    if tolerance <= 0:
+        raise ContractError("tangent_tolerance_deg must be positive")
+    grid = _time_grid(_utc(start_utc), _utc(end_utc), step_hours)
+    phases = [_phase(lon_a_at(t), lon_b_at(t)) for t in grid]
+    unwrapped = [phases[0]]
+    for prev, cur in zip(phases, phases[1:]):
+        delta = ((cur - prev + 180) % 360) - 180
+        if abs(delta) >= 90:
+            raise ContractError("large relative motion per interval: reduce step_hours")
+        unwrapped.append(unwrapped[-1] + delta)
+
+    found = []
+    for i in range(1, len(grid) - 1):
+        left_slope = unwrapped[i] - unwrapped[i - 1]
+        right_slope = unwrapped[i + 1] - unwrapped[i]
+        if left_slope * right_slope >= 0:
+            continue
+        minimum = left_slope < 0 and right_slope > 0
+        anchor = unwrapped[i]
+        def value_at(t):
+            return _near_unwrapped(_phase(lon_a_at(t), lon_b_at(t)), anchor)
+        t = _golden_extremum(value_at, grid[i - 1], grid[i + 1], minimum)
+        value = _finite(value_at(t), "refined phase")
+        for angle, name, separation in ASPECTS:
+            target = angle + 360 * round((value - angle) / 360)
+            residual = value - target
+            if abs(residual) <= tolerance:
+                found.append({
+                    "type": "exact_longitude_aspect",
+                    "name": name, "angle_deg": separation,
+                    "orientation_deg": angle,
+                    "time_utc": _stamp(t),
+                    "separation_deg": longitude_separation(lon_a_at(t), lon_b_at(t)),
+                    "contact_kind": "tangent_candidate",
+                    "residual_deg": abs(residual),
+                    "angular_tolerance_deg": tolerance,
+                })
+    return _deduplicate(found)
+
+
 def find_station_events(lon_at, start_utc, end_utc, step_hours=12, rate_window_hours=6):
     """Find direct/retrograde station crossings; time is finite-difference estimate."""
     grid = _time_grid(_utc(start_utc), _utc(end_utc), step_hours)
@@ -240,6 +311,15 @@ def event_report(query, kernel_path):
     grid = _time_grid(start, end, step)
     rate_window = _finite(query.get("rate_window_hours", 6),
                           "rate_window_hours", 0.5, 24)
+    detect_tangents = query.get("detect_tangents", False)
+    if not isinstance(detect_tangents, bool):
+        raise ContractError("detect_tangents must be boolean")
+    if detect_tangents and mode != "aspects":
+        raise ContractError("tangent contact search only supports aspects")
+    tangent_tolerance = _finite(query.get("tangent_tolerance_deg", 0.00001),
+                                "tangent_tolerance_deg", 0, 0.01)
+    if tangent_tolerance <= 0:
+        raise ContractError("tangent_tolerance_deg must be positive")
     path = _kernel_file(kernel_path)
     version, load_file, loader, wgs84, ecliptic_frame = _import_skyfield()
     try:
@@ -260,6 +340,22 @@ def event_report(query, kernel_path):
                 events = find_aspect_events(
                     lambda t: lon(bodies[0], t), lambda t: lon(bodies[1], t),
                     _stamp(start), _stamp(end), step)
+                if detect_tangents:
+                    for e in events:
+                        e["contact_kind"] = "crossing"
+                    tangent_candidates = find_tangent_aspect_events(
+                        lambda t: lon(bodies[0], t), lambda t: lon(bodies[1], t),
+                        _stamp(start), _stamp(end), step, tangent_tolerance)
+                    for candidate in tangent_candidates:
+                        if not any(
+                            other["name"] == candidate["name"] and
+                            other["orientation_deg"] == candidate["orientation_deg"] and
+                            abs((_utc(other["time_utc"]) -
+                                 _utc(candidate["time_utc"])).total_seconds()) < 60
+                            for other in events
+                        ):
+                            events.append(candidate)
+                    events = _deduplicate(events)
             else:
                 events = find_station_events(lambda t: lon(bodies[0], t),
                     _stamp(start), _stamp(end), step, rate_window)
@@ -279,6 +375,8 @@ def event_report(query, kernel_path):
                 "frame": FRAME,
                 "step_hours": step,
                 "rate_window_hours": rate_window if mode == "stations" else None,
+                "detect_tangents": detect_tangents,
+                "tangent_tolerance_deg": tangent_tolerance if detect_tangents else None,
             },
             "provenance": {
                 "engine": "skyfield", "engine_version": version,
@@ -286,8 +384,11 @@ def event_report(query, kernel_path):
                 "time_data_id": f"skyfield-{version}-builtin-timescale",
                 "generated_at_utc": _stamp(datetime.now(timezone.utc)),
             },
-            "search_method": "sampled_bracket_and_bisection",
+            "search_method": ("sampled_crossings_plus_extremum_candidates"
+                              if detect_tangents else "sampled_bracket_and_bisection"),
             "complete_for_tangent_contacts": False,
+            "tangent_detection": ("sampled_local_extrema_only" if detect_tangents
+                                  else "disabled"),
             "time_tolerance_seconds": ROOT_TOLERANCE_SECONDS,
             "events": events,
         }

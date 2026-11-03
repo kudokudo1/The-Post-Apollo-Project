@@ -59,7 +59,7 @@ test("bottom row modes are navigable real paths with clear family grouping",()=>
 
 test("HOME tab focus is bounded to the existing ten section families",()=>{
   assert.deepEqual(["overview","auto","quick","snapshot","history","runtime","health","magick"],
-    nav.GROUPS.home.map(x=>x.key));
+    JSON.parse(JSON.stringify(nav.GROUPS.home.map(x=>x.key))));
   for(const mode of nav.GROUPS.home)
     assert.equal(nav.homeSectionFor(mode.path),mode.key);
   assert.equal(nav.homeSectionFor("weather/overview"),"");

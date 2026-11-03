@@ -57,10 +57,10 @@ class ClockTimeSettingsContract(unittest.TestCase):
         run.assert_not_called()
 
     def test_disabled_daemon_uses_one_shot_without_enabling_ntp(self):
-        with patch.object(host.os.path, "isfile", return_value=True), \\
+        with patch.object(host.os.path, "isfile", return_value=True), \
                 patch.object(host.subprocess, "run", side_effect=[
                     subprocess.CompletedProcess([], 1, "", "not running"),
-                    subprocess.CompletedProcess([], 3, "inactive\\n", ""),
+                    subprocess.CompletedProcess([], 3, "inactive\n", ""),
                     subprocess.CompletedProcess([], 0, "corrected", ""),
                 ]) as run:
             outcome = host.resync()
@@ -72,10 +72,10 @@ class ClockTimeSettingsContract(unittest.TestCase):
         self.assertFalse(any("set-ntp" in command for command in commands))
 
     def test_running_service_not_duplicated_when_probe_fails(self):
-        with patch.object(host.os.path, "isfile", return_value=True), \\
+        with patch.object(host.os.path, "isfile", return_value=True), \
                 patch.object(host.subprocess, "run", side_effect=[
                     subprocess.CompletedProcess([], 1, "", "no socket"),
-                    subprocess.CompletedProcess([], 0, "active\\n", ""),
+                    subprocess.CompletedProcess([], 0, "active\n", ""),
                 ]) as run:
             outcome = host.resync()
         self.assertEqual(outcome["status"], "unavailable")

@@ -5087,6 +5087,8 @@ PanelWindow {
                               ? "MACHINE // LOCAL CHECKPOINTS"
                               : timew.selectedMode === "settings"
                               ? "SETTINGS // DISPLAY OFFSET + SYSTEM STATUS"
+                              : timew.selectedMode === "tools"
+                              ? "FOUNDATION PREVIEW // UI ONLY"
                               : "NEXT // RESERVED FOR LATER"
                         color: Colors.white
                         font.pixelSize: 11

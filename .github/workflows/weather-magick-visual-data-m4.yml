@@ -1,0 +1,56 @@
+name: MAGICK M4 visual-data backend
+on:
+  pull_request:
+    paths:
+      - 'scripts/weather/celestial_visual_data.py'
+      - 'tests/weather/test_celestial_visual_data_m4.py'
+      - 'scripts/weather/celestial_contract.py'
+      - 'scripts/weather/celestial_solver.py'
+      - 'scripts/weather/celestial_dynamics.py'
+      - '.github/workflows/weather-magick-visual-data-m4.yml'
+  push:
+    paths:
+      - 'scripts/weather/celestial_visual_data.py'
+      - 'tests/weather/test_celestial_visual_data_m4.py'
+      - 'scripts/weather/celestial_contract.py'
+      - 'scripts/weather/celestial_solver.py'
+      - 'scripts/weather/celestial_dynamics.py'
+      - '.github/workflows/weather-magick-visual-data-m4.yml'
+  workflow_dispatch:
+
+jobs:
+  offline-contract:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Run M0 through M4 isolated tests
+        run: |
+          python3 -m unittest discover -s tests/weather -p 'test_celestial_contract_m0.py' -v
+          python3 -m unittest discover -s tests/weather -p 'test_celestial_solver_m1.py' -v
+          python3 -m unittest discover -s tests/weather -p 'test_celestial_dynamics_m2.py' -v
+          python3 -m unittest discover -s tests/weather -p 'test_celestial_precision_m3.py' -v
+          python3 -m unittest discover -s tests/weather -p 'test_celestial_visual_data_m4.py' -v
+
+  real-jpl-data:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install Skyfield only inside GitHub runner
+        run: python3 -m pip install 'skyfield==1.55'
+      - name: Obtain official JPL DE440s into disposable runner
+        run: |
+          curl --fail --location --retry 3 --connect-timeout 15 --max-time 180 --silent --show-error \
+            'https://ssd.jpl.nasa.gov/ftp/eph/planets/bsp/de440s.bsp' \
+            --output "$RUNNER_TEMP/de440s.bsp"
+          test "$(stat -c %s "$RUNNER_TEMP/de440s.bsp")" -gt 30000000
+      - name: Verify M4 JPL series versus M1 and event markers versus M2
+        env:
+          MAGICK_M1_KERNEL: ${{ runner.temp }}/de440s.bsp
+        run: python3 -m unittest discover -s tests/weather -p 'test_celestial_visual_data_m4.py' -v

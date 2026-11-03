@@ -21,7 +21,7 @@ After review/merge and separately approved local source sync: **USER → SETTING
 
 ## VERIFY
 
-Synthetic tests cover three fictional organizations, branches, Structure locations, many-to-many sharing, cross-company refusal, wrong-kind rejection, archived data, stale unlink, exact revision conflicts, corrupt/symlink/unsafe file refusal, private modes, fixed CLI and **byte-for-byte preservation of all five original stores**. The new CI workflow reruns original organization, portfolio, structure, function-location, Social-link and Settings tests plus actual Qt6 offscreen QML loading. Native Quickshell and live mouse-click verification are separate.
+Synthetic tests cover three fictional organizations, branches, Structure locations, many-to-many sharing, cross-company refusal, wrong-kind rejection, archived data, stale unlink, exact revision conflicts, corrupt/symlink/unsafe file refusal, private modes, fixed CLI and **byte-for-byte preservation of all five original stores**. The new CI workflow reruns original organization, portfolio, structure, function-location, Social-link and Settings tests plus actual Qt6 offscreen QML loading. A second CI workflow launches genuine Quickshell 0.3.2 twice in disposable offscreen XDG roots, creates branch/location links across three fictional organizations, confirms file modes and immutable original organization/structure/portfolio/Social/function-location stores, and reloads the saved links in a new process. Live desktop mouse-click verification is separate.
 
 ## WATCH OUT FOR
 
@@ -34,7 +34,7 @@ Manual planning pointers are not legal ownership, real addresses, employee membe
 - [x] Existing Settings screen editor and two-click unlink
 - [x] Synthetic tests, regression tests and Qt6 workflow
 - [ ] Exact-head CI green
-- [ ] Genuine native Quickshell persistence verified
+- [ ] Exact-head genuine native Quickshell persistence verified
 - [ ] Operator review, merge and live acceptance
 
 ## NEXT

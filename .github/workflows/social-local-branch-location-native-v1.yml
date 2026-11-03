@@ -1,0 +1,56 @@
+name: Social branch to location genuine Quickshell persistence v1
+
+on:
+  pull_request:
+    paths:
+      - 'LocalBranchLocationNativeSmokeV1.qml'
+      - 'tests/identity/native_local_branch_location_smoke_v1.py'
+      - 'tests/identity/test_native_branch_location_guard_v1.py'
+      - '.github/workflows/social-local-branch-location-native-v1.yml'
+      - 'services/social/SocialLocalBranchLocationLinks*'
+      - 'widgets/messanger/IdentityCenterLocalBranchLocationsEditor.qml'
+      - 'widgets/messanger/IdentityCenterSettingsSections.qml'
+      - 'widgets/messanger/AppSelector.qml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  native-branch-locations:
+    name: Genuine Quickshell 0.3.2 / 3 fake orgs / save and reload
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    container:
+      image: debian:unstable-slim
+    steps:
+      - name: Install existing pinned disposable Quickshell runtime
+        run: |
+          apt-get update -qq
+          DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+            git ca-certificates python3 quickshell=0.3.2-1 \
+            qt6-qpa-plugins qml6-module-qtquick \
+            qml6-module-qtquick-layouts qml6-module-qtquick-effects \
+            qml6-module-qt5compat-graphicaleffects qml6-module-qtqml
+      - uses: actions/checkout@v4
+      - name: Native isolated branch-location save/reload with independent process
+        run: |
+          python3 -m py_compile tests/identity/native_local_branch_location_smoke_v1.py
+          python3 tests/identity/native_local_branch_location_smoke_v1.py
+
+  isolation-and-regressions:
+    name: Isolated fixture, unchanged original stores
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Check no live mounts or user HOME accesses
+        run: python3 -m unittest discover -s tests/identity -p 'test_native_branch_location_guard_v1.py' -v
+      - name: Synthetic branch and location source regression tests
+        run: |
+          python3 -m unittest discover -s tests/messaging -p 'test_social_local_branch_locations_v1.py' -v
+          python3 -m unittest discover -s tests/messaging -p 'test_social_local_unit_locations_v1.py' -v
+          python3 -m unittest discover -s tests/messaging -p 'test_social_local_organizations.py' -v

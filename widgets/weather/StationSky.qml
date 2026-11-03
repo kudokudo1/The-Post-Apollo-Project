@@ -572,11 +572,16 @@ Rectangle {
             }
 
             GohuText {
-                text: sky.weatherReady
-                      ? "WEATHER ONLINE"
-                      : sky.weatherLoading
-                        ? "RECEIVING"
-                        : "OFFLINE"
+                // COSMOS needs the weather service for local coordinates
+                // and solar time, not for presenting an Earth-weather feed.
+                text: sky.subjectRoute.indexOf("cosmos/") === 0
+                      ? (sky.weatherReady ? "LOCAL REFERENCE READY"
+                                          : "LOCAL REFERENCE WAITING")
+                      : sky.weatherReady
+                        ? "WEATHER ONLINE"
+                        : sky.weatherLoading
+                          ? "RECEIVING"
+                          : "OFFLINE"
                 font.pixelSize: 12
                 color: sky.weatherReady ? Colors.cyan : Colors.orange
             }

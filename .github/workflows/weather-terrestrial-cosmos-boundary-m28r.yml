@@ -1,0 +1,44 @@
+name: Weather M28-R terrestrial versus Cosmos section ownership
+
+on:
+  pull_request:
+    paths:
+      - 'widgets/weather/StationSky.qml'
+      - 'widgets/weather/StationCosmosSubjectPanelPolicy.js'
+      - 'widgets/weather/StationWeatherSubjectPanelPolicy.js'
+      - 'widgets/weather/StationWorkspaceNavigationPolicy.js'
+      - 'widgets/weather/StationSubjectNavigationPolicy.js'
+      - 'tests/weather/test_weather_cosmos_domain_separation_m28r.js'
+      - 'tests/weather/test_cosmos_full_visual_parity_m28p.js'
+      - 'tests/weather/test_weather_subject_panels_m2a.js'
+      - 'docs/weather-subjects-m28r-terrestrial-cosmos-boundary.md'
+      - '.github/workflows/weather-terrestrial-cosmos-boundary-m28r.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  domain-boundary:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Verify all 14 original SKY sections have correct WEATHER/COSMOS owners
+        run: node --test tests/weather/test_weather_cosmos_domain_separation_m28r.js
+      - name: Preserve original M28-P full visual parity and M2a weather instruments
+        run: |
+          node --test tests/weather/test_cosmos_full_visual_parity_m28p.js
+          node --test tests/weather/test_cosmos_subject_panels_c1.js
+          node --test tests/weather/test_weather_subject_panels_m2a.js
+      - name: Preserve navigation, provider activation and original 103-control ledger
+        run: |
+          node --test tests/weather/subject_navigation_contract.test.js
+          node --test tests/weather/subject_navigation_browser.test.js
+          node --test tests/weather/test_workspace_landing_w1.js
+          node --test tests/weather/test_index_cosmos_cutover_m28g.js
+          node --test tests/weather/test_index_weather_cutover_m28f.js
+          node --test tests/weather/test_index_sources_cutover_m28l.js

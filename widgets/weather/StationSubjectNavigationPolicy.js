@@ -35,9 +35,10 @@ var SUBJECTS = [
   ]},
   {id:"cosmos",label:"COSMOS",sections:[
     {id:"overview",label:"OVERVIEW"},
-    // M28-P full-page native renderers, not a second CLASSIC instance.
-    {id:"sky",label:"FULL SKY",children:[
-      {id:"full",label:"SKY // ALL ORIGINAL INSTRUMENTS"}]},
+    // Native observatory reuses SKY's astronomical instruments only.
+    // Original terrestrial SKY weather panels now belong to WEATHER.
+    {id:"sky",label:"ASTRONOMY",children:[
+      {id:"full",label:"ASTRONOMY // CELESTIAL INSTRUMENTS"}]},
     {id:"sun",label:"SUN",children:[
       {id:"position",label:"POSITION"}, {id:"twilight",label:"TWILIGHT"},
       {id:"photo-light",label:"PHOTO LIGHT"}]},

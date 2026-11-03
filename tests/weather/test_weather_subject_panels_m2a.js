@@ -65,7 +65,9 @@ test("selected WEATHER routes show only their own sections", () => {
   assert.equal(env.visibleFor("sky","weather/conditions/current","current"),true);
   assert.equal(env.visibleFor("sky","weather/conditions/current","astronomy"),false);
   assert.equal(env.visibleFor("sky","weather/forecasts/hourly","hourly"),true);
-  assert.equal(env.visibleFor("sky","weather/forecasts/hourly","daily"),false);
+  assert.equal(env.visibleFor("sky","weather/forecasts/hourly","daily"),true);
+  assert.equal(env.visibleFor("sky","weather/forecasts/hourly","twilight"),true);
+  assert.equal(env.visibleFor("sky","weather/conditions/current","atmosphere"),true);
   assert.equal(env.visibleFor("ground","weather/conditions/air","air-pm"),true);
   assert.equal(env.visibleFor("ground","weather/conditions/air","air-gases"),true);
   assert.equal(env.visibleFor("ground","weather/conditions/air","seismic"),false);

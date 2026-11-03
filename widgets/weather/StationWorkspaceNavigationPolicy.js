@@ -36,9 +36,8 @@ var GROUPS = {
         {label:"OVERVIEW",path:"cosmos/overview",key:"overview"},
         {label:"SUN",path:"cosmos/sun/position",key:"sun"},
         {label:"MOON",path:"cosmos/moon/ephemeris",key:"moon"},
-        // Full-page access is intentionally a *main* swap. The original
-        // visual/forecast/ephemeris panels were hidden behind narrow filters.
-        {label:"SKY // ALL",path:"cosmos/sky/full",key:"sky"},
+        // Observatory only: terrestrial weather belongs to WEATHER.
+        {label:"ASTRONOMY",path:"cosmos/sky/full",key:"sky"},
         {label:"EVENTS",path:"cosmos/events/iss",key:"events"},
         {label:"SPACE // ALL",path:"cosmos/space-weather/full",key:"space-weather"}
     ],

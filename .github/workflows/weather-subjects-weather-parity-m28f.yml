@@ -1,0 +1,43 @@
+name: Weather M28-F source-backed WEATHER INDEX parity
+
+on:
+  pull_request:
+    paths:
+      - 'widgets/weather/StationSubjectNavigationPolicy.js'
+      - 'widgets/weather/StationSubjectNavigationPreviewPolicy.js'
+      - 'tests/weather/test_index_subject_cutover_m28d.js'
+      - 'tests/weather/test_index_weather_cutover_m28f.js'
+      - 'docs/weather-subjects-m28f-weather-parity-handoff.md'
+      - '.github/workflows/weather-subjects-weather-parity-m28f.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  weather-parity:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Validate exact M28-F source-to-route and native panel mapping
+        run: node --test tests/weather/test_index_weather_cutover_m28f.js
+      - name: Preserve original six-subject taxonomy and M0/M1 historical source model
+        run: |
+          node --test tests/weather/subject_navigation_contract.test.js
+          node --test tests/weather/subject_navigation_browser.test.js
+      - name: Preserve original M2a/M2b WEATHER, W1/W1r and HOME parity
+        run: |
+          node --test tests/weather/test_weather_subject_panels_m2a.js
+          node --test tests/weather/test_weather_subject_panels_m2b.js
+          node --test tests/weather/test_workspace_landing_w1.js
+          node --test tests/weather/test_workspace_left_rail_w1r.js
+      - name: Preserve M28-D/E INDEX, MEDIA, RADIO and TERMINAL boundaries
+        run: |
+          node --test tests/weather/test_index_subject_cutover_m28d.js
+          node --test tests/weather/test_index_radio_cutover_m28e.js
+          node --test tests/weather/test_media_news_feed_map_companion_m28b.js
+          node --test tests/weather/test_tools_terminal_cutover_m28c.js

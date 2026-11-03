@@ -858,7 +858,7 @@ PanelWindow {
             ? mode === "terminal"
             : route === "tools/terminal/consoles"
               && consoleModes.indexOf(mode) >= 0;
-        if (!allowed)
+        if (!allowed || !terminalView.outputName)
             return false;
         subjectTerminalMode = mode;
         contextTerminalRequested = true;
@@ -870,6 +870,10 @@ PanelWindow {
                     && terminalView.terminalMode === mode) {
                 if (!terminalView.openTerminal())
                     contextTerminalRequested = false;
+            } else if (terminalView.terminalState === "IDLE") {
+                // The route/host changed before the deferred launch.
+                // Never strand SUBJECTS behind a blank terminal overlay.
+                contextTerminalRequested = false;
             }
         });
         return true;

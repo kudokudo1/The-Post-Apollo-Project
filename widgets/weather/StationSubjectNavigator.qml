@@ -28,6 +28,25 @@ Rectangle {
     property bool homeDeckHeld: false
     property string homeDeckMode: "mixed"
     property var homeDeckFavorites: []
+    property var homeFavoritesStore: null
+
+    function syncHomeDeckFavorites() {
+        if (!homeFavoritesStore ||
+                (homeFavoritesStore.storageState !== "ready"
+                && homeFavoritesStore.storageState !== "empty")) {
+            return;
+        }
+        const paths = homeFavoritesStore.panelRoutes.slice();
+        browser.homeDeckFavorites = paths;
+    }
+
+    onHomeFavoritesStoreChanged: syncHomeDeckFavorites()
+
+    Connections {
+        target: browser.homeFavoritesStore
+        function onFavoritesLoaded() { browser.syncHomeDeckFavorites(); }
+        function onFavoritesSaved(revision) { browser.syncHomeDeckFavorites(); }
+    }
 
     // Existing Weather Station sources supplied from the single owning root.
     property var weatherService: null
@@ -184,6 +203,7 @@ Rectangle {
                 deckHeld: browser.homeDeckHeld
                 deckMode: browser.homeDeckMode
                 deckFavorites: browser.homeDeckFavorites
+                homeFavoritesStore: browser.homeFavoritesStore
                 deckIndexOpen: browser.indexOpen
                 onDeckEnabledRequested: function(enabled) {
                     browser.homeDeckEnabled = enabled;
@@ -195,7 +215,9 @@ Rectangle {
                     browser.homeDeckMode = mode;
                 }
                 onDeckFavoritesRequested: function(paths) {
-                    browser.homeDeckFavorites = paths;
+                    // Store is the only durable owner; UI syncs after save.
+                    if (browser.homeFavoritesStore)
+                        browser.homeFavoritesStore.replacePanelFavorites(paths);
                 }
                 weatherService: browser.weatherService
                 spaceService: browser.spaceService

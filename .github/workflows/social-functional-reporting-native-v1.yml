@@ -1,0 +1,56 @@
+name: Social local functional reporting genuine Quickshell persistence
+
+on:
+  pull_request:
+    paths:
+      - 'LocalFunctionalReportingNativeSmokeV1.qml'
+      - 'tests/identity/native_local_functional_reporting_smoke_v1.py'
+      - 'tests/identity/test_native_functional_reporting_guard_v1.py'
+      - '.github/workflows/social-functional-reporting-native-v1.yml'
+      - 'services/social/SocialLocalFunctionalReporting*'
+      - 'widgets/messanger/IdentityCenterLocalFunctionalReportingEditor.qml'
+      - 'widgets/messanger/IdentityCenterSettingsSections.qml'
+      - 'widgets/messanger/AppSelector.qml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  native-functional-reporting:
+    name: Genuine Quickshell 0.3.2 / 3 fake orgs / save and reload
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    container:
+      image: debian:unstable-slim
+    steps:
+      - name: Install pinned disposable Quickshell runtime
+        run: |
+          apt-get update -qq
+          DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+            git ca-certificates python3 quickshell=0.3.2-1 \
+            qt6-qpa-plugins qml6-module-qtquick \
+            qml6-module-qtquick-layouts qml6-module-qtquick-effects \
+            qml6-module-qt5compat-graphicaleffects qml6-module-qtqml
+      - uses: actions/checkout@v4
+      - name: Two independent Quickshell persistence checks
+        run: |
+          python3 -m py_compile tests/identity/native_local_functional_reporting_smoke_v1.py
+          python3 tests/identity/native_local_functional_reporting_smoke_v1.py
+
+  isolation-and-regressions:
+    name: Synthetic-only source guard and existing graph regressions
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Guard source mount and disposable XDG data boundaries
+        run: python3 -m unittest discover -s tests/identity -p 'test_native_functional_reporting_guard_v1.py' -v
+      - name: Verify graph and original local structure
+        run: |
+          python3 -m unittest discover -s tests/messaging -p 'test_social_local_functional_reporting_v1.py' -v
+          python3 -m unittest discover -s tests/messaging -p 'test_social_local_org_structure_v1.py' -v
+          python3 -m unittest discover -s tests/messaging -p 'test_social_local_portfolios_v1.py' -v

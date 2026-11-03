@@ -14,6 +14,19 @@ Item {
     property bool settingsOpen: false
     // Injected by Social; null in synthetic Qt tests.
     property var localDirectoryStore: null
+    // Editing focus for LOCAL saved records. This is not a verified tenant
+    // selection, authorization context, membership, or sign-in.
+    property string localEditingOrganizationId: ""
+    readonly property var localOrganizationsForEditing:
+        localDirectoryStore && localDirectoryStore.state === "ready"
+        && localDirectoryStore.saved && Array.isArray(localDirectoryStore.saved.organizations)
+        ? localDirectoryStore.saved.organizations.filter(function(org) {
+            return !org.archived;
+        }) : []
+    readonly property string activeLocalEditingOrganizationId:
+        localOrganizationsForEditing.some(function(org) {
+            return org.id === sections.localEditingOrganizationId;
+        }) ? sections.localEditingOrganizationId : ""
     // Local portfolio groupings are display metadata, never verified rights.
     property var localPortfoliosStore: null
     // Local division/department/location/team labels, never verified grants.
@@ -197,9 +210,69 @@ Item {
                         wrapMode: Text.WordWrap
                     }
 
+                    // Shared local record editing context. ALL shows company records;
+                    // Structure and Modifiers require an explicit active company.
+                    Column {
+                        id: localEditingContext
+                        objectName: "orgLocalEditingContext"
+                        width: parent.width
+                        spacing: 6
+
+                        Text {
+                            width: parent.width
+                            text: "LOCAL ORGANIZATION TO EDIT"
+                            color: Colors.cyan
+                            font.bold: true
+                            font.pixelSize: 11
+                        }
+                        Text {
+                            width: parent.width
+                            text: "Choose once for Structure and Apply Modifier. " +
+                                  "ALL keeps Organizations and Portfolios browsable. " +
+                                  "This does not switch verified company access."
+                            color: Colors.orange
+                            font.pixelSize: 10
+                            wrapMode: Text.WordWrap
+                        }
+                        Flow {
+                            width: parent.width
+                            height: childrenRect.height
+                            spacing: 5
+                            ActionButton {
+                                width: 147
+                                height: 29
+                                label: "ALL / NO SELECTION"
+                                labelPixelSize: 9
+                                selected: sections.activeLocalEditingOrganizationId === ""
+                                onTriggered: sections.localEditingOrganizationId = ""
+                            }
+                            Repeater {
+                                model: sections.localOrganizationsForEditing
+                                delegate: ActionButton {
+                                    required property var modelData
+                                    width: Math.min(190, Math.max(110, localEditingContext.width - 12))
+                                    height: 29
+                                    label: modelData.name
+                                    labelPixelSize: 9
+                                    selected: sections.activeLocalEditingOrganizationId === modelData.id
+                                    onTriggered: sections.localEditingOrganizationId = modelData.id
+                                }
+                            }
+                        }
+                        Text {
+                            width: parent.width
+                            visible: sections.localOrganizationsForEditing.length === 0
+                            text: "Create or restore a local organization below to choose it here."
+                            color: Colors.orange
+                            font.pixelSize: 10
+                            wrapMode: Text.WordWrap
+                        }
+                    }
+
                     IdentityCenterLocalOrganizationEditor {
                         width: parent.width
                         directoryStore: sections.localDirectoryStore
+                        focusedOrganizationId: sections.activeLocalEditingOrganizationId
                     }
 
                     IdentityCenterLocalPortfolioEditor {
@@ -209,9 +282,12 @@ Item {
                     }
 
                     IdentityCenterLocalStructureEditor {
+                        objectName: "localStructureEditor"
                         width: parent.width
                         directoryStore: sections.localDirectoryStore
                         structureStore: sections.localStructureStore
+                        useSharedContext: true
+                        selectedOrgId: sections.activeLocalEditingOrganizationId
                     }
 
                     // One source/target form applies existing link modifiers across
@@ -220,6 +296,8 @@ Item {
                         id: organizationModifiers
                         objectName: "orgModifierForm"
                         width: parent.width
+                        useSharedContext: true
+                        selectedOrgId: sections.activeLocalEditingOrganizationId
                         directoryStore: sections.localDirectoryStore
                         structureStore: sections.localStructureStore
                         functionLocationStore: sections.localUnitLocationLinksStore

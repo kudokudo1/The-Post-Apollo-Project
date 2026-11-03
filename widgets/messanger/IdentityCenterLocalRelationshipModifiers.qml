@@ -16,6 +16,8 @@ Column {
     property var accountDetailsStore: null
 
     property string selectedOrgId: ""
+    // Parent page may supply the same local editing focus used by Structure.
+    property bool useSharedContext: false
     property string selectedSourceId: ""
     property string selectedSourceKind: ""
     property string modifier: "location"
@@ -387,6 +389,7 @@ Column {
 
     Text {
         width: parent.width
+        visible: !editor.useSharedContext
         text: "ORGANIZATION"
         font.pixelSize: 10
         font.bold: true
@@ -396,6 +399,7 @@ Column {
         width: parent.width
         height: childrenRect.height
         spacing: 5
+        visible: !editor.useSharedContext
         Repeater {
             model: editor.activeOrganizations
             delegate: ActionButton {

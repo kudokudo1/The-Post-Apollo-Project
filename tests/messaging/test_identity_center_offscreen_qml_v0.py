@@ -350,6 +350,63 @@ class RealQtOrganizationsSettingsPaneSmoke(unittest.TestCase):
         self.assertFalse(modifier.property("structureReady"))
         self.assertFalse(self.sections.property("organizationDisplayReady"))
 
+    def test_shared_local_org_selector_keeps_structure_and_modifiers_in_sync(self):
+        self._open_organizations()
+        self.assertIsNotNone(
+            self.sections.findChild(QObject, "orgLocalEditingContext")
+        )
+        structure = self.sections.findChild(QObject, "localStructureEditor")
+        modifier = self.sections.findChild(QObject, "orgModifierForm")
+        self.assertIsNotNone(structure)
+        self.assertIsNotNone(modifier)
+        self.assertTrue(structure.property("useSharedContext"))
+        self.assertTrue(modifier.property("useSharedContext"))
+        self.assertEqual(self.sections.property("activeLocalEditingOrganizationId"), "")
+
+        # Disposable local Directory snapshot. No storage writes, authentication,
+        # provider accounts or real company data.
+        sample = {
+            "state": "ready",
+            "saved": {"organizations": [
+                {"id": "org-1", "name": "FAKE LLC ONE", "kind": "llc",
+                 "archived": False, "branches": []},
+                {"id": "org-2", "name": "FAKE NONPROFIT", "kind": "nonprofit",
+                 "archived": False, "branches": []},
+                {"id": "org-3", "name": "FAKE ARCHIVED", "kind": "llc",
+                 "archived": True, "branches": []},
+            ]},
+        }
+        # A QML var needs a JS object with real JavaScript arrays; passing
+        # a Python QVariantMap can lose Array.isArray and filter semantics.
+        js_sample = self.engine.evaluate("(" + json.dumps(sample) + ")")
+        self.assertFalse(js_sample.isError())
+        self.assertTrue(self.sections.setProperty("localDirectoryStore", js_sample))
+        APP.processEvents()
+        self.sections.setProperty("localEditingOrganizationId", "org-1")
+        APP.processEvents()
+        self.assertEqual(
+            self.sections.property("activeLocalEditingOrganizationId"), "org-1",
+            "QML source: " + repr(self.sections.property("localDirectoryStore")) +
+            " / choices: " + repr(_value(self.sections.property(
+                "localOrganizationsForEditing"))),
+        )
+        self.assertEqual(structure.property("selectedOrgId"), "org-1")
+        self.assertEqual(modifier.property("selectedOrgId"), "org-1")
+
+        self.sections.setProperty("localEditingOrganizationId", "org-2")
+        APP.processEvents()
+        self.assertEqual(structure.property("selectedOrgId"), "org-2")
+        self.assertEqual(modifier.property("selectedOrgId"), "org-2")
+
+        # Archived and unknown IDs must fail closed.
+        for invalid in ("org-3", "org-999", ""):
+            self.sections.setProperty("localEditingOrganizationId", invalid)
+            APP.processEvents()
+            self.assertEqual(self.sections.property("activeLocalEditingOrganizationId"), "")
+            self.assertEqual(structure.property("selectedOrgId"), "")
+            self.assertEqual(modifier.property("selectedOrgId"), "")
+            self.assertFalse(modifier.property("validSelection"))
+
     def test_host_logout_and_failure_are_reflected_in_real_panel(self):
         self._open_organizations()
         self._finish(_body())

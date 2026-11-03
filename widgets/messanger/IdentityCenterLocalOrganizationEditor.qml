@@ -5,6 +5,9 @@ import "../../components"
 Column {
     id: editor
     property var directoryStore: null
+    // Optional focus supplied by the one-page editing selector.
+    // Empty focus retains the accepted all-organizations editor.
+    property string focusedOrganizationId: ""
     property string newKind: "llc"
     property bool showArchived: false
     property string confirmationKey: ""
@@ -131,7 +134,9 @@ Column {
             required property var modelData
             width: editor.width
             spacing: 6
-            visible: !modelData.archived || editor.showArchived
+            visible: (!modelData.archived || editor.showArchived)
+                     && (editor.focusedOrganizationId === ""
+                         || editor.focusedOrganizationId === modelData.id)
             height: visible ? implicitHeight : 0
 
             Rectangle {

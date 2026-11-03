@@ -5,6 +5,10 @@ on:
     paths:
       - 'widgets/messanger/IdentityCenterSettingsSections.qml'
       - 'widgets/messanger/IdentityCenterLocalRelationshipModifiers.qml'
+      - 'widgets/messanger/IdentityCenterLocalOrganizationEditor.qml'
+      - 'widgets/messanger/IdentityCenterLocalStructureEditor.qml'
+      - 'tests/messaging/test_identity_center_shared_local_org_selector_v1.py'
+      - 'MODEL/contracts/social-shared-local-org-editing-selector-v1.md'
       - 'widgets/messanger/IdentityCenterLocalOrganizationsWorkspace.qml'
       - 'tests/messaging/test_identity_center_inline_modifiers_v1.py'
       - 'tests/messaging/test_identity_center_offscreen_qml_v0.py'
@@ -31,6 +35,7 @@ jobs:
       - name: One-page composition, original local stores and associations
         run: |
           python3 -m unittest discover -s tests/messaging -p 'test_identity_center_inline_modifiers_v1.py' -v
+          python3 -m unittest discover -s tests/messaging -p 'test_identity_center_shared_local_org_selector_v1.py' -v
           python3 -m unittest discover -s tests/messaging -p 'test_identity_center_settings_sections.py' -v
           python3 -m unittest discover -s tests/messaging -p 'test_social_local_organizations.py' -v
           python3 -m unittest discover -s tests/messaging -p 'test_social_local_portfolios_v1.py' -v

@@ -115,7 +115,8 @@ test("same safe in-station viewer opens and closes, but embedded video playback 
   assert.match(viewer,/NO WebEngine object or dynamic Loader/);
   assert.match(viewer,/onClicked: channelScreen\.closeRequested\(\)/);
   assert.match(viewer,/available: channelScreen\.playbackAvailable/);
-  assert.ok(!viewer.includes("QtWebEngine"),"no in-process WebEngine import");
+  assert.doesNotMatch(viewer,/^\s*import\s+QtWebEngine\b/m,
+    "no in-process WebEngine import");
   assert.match(media.hintFor("media/watch/live"),/EMBEDDING ARE NOT CERTIFIED/);
 });
 

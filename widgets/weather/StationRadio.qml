@@ -4,6 +4,7 @@ import Quickshell.Io
 import "../../components"
 import "../../services/media" as MediaServices
 import "StationRadioMemoryPolicy.js" as RadioMemory
+import "StationMediaSubjectPanelPolicy.js" as MediaPanelPolicy
 
 // A news-first RADIO surface using the SAME private Hi-Fi controller and
 // guarded MPD relay. No second Radio Browser fetcher, MPD or direct stream URLs.
@@ -12,6 +13,14 @@ Rectangle {
     id: stationRadio
 
     property bool stationOpen: true
+    property string subjectRoute: ""
+    function sectionVisible(group) {
+        return MediaPanelPolicy.radioGroupVisible(subjectRoute,group);
+    }
+    onSubjectRouteChanged: {
+        if (radioScroll)
+            radioScroll.contentY = 0;
+    }
     property int browseIndex: 0
     property int presetIndex: 0
     property string notice: "NEWS FIRST // CHOOSE A STATION"
@@ -299,6 +308,7 @@ Rectangle {
         repeat: true
         running: stationRadio.stationOpen
                  && stationRadio.visible && !stationRadio.initialSearchSent
+                 && stationRadio.sectionVisible("directory")
         onTriggered: {
             if (stationRadio.search("tag:news", null))
                 stationRadio.initialSearchSent = true;
@@ -323,6 +333,7 @@ Rectangle {
             spacing: 10
 
             Row {
+            visible: stationRadio.sectionVisible("header")
                 width: parent.width
                 spacing: 18
 
@@ -344,17 +355,20 @@ Rectangle {
             }
 
             StationSectionDivider {
+            visible: stationRadio.sectionVisible("source")
                 width: parent.width
                 title: "SHARED HI-FI // RADIO BROWSER // MPD"
             }
 
             QuietText {
+            visible: stationRadio.sectionVisible("source")
                 width: parent.width
                 font.pixelSize: 11
                 text: "SAME RADIO SERVICE AS HI-FI // DIRECTORY CLASSIFICATION IS NOT VERIFIED NEWS CONTENT"
             }
 
             Row {
+            visible: stationRadio.sectionVisible("search")
                 id: presetRow
                 width: parent.width
                 spacing: 6
@@ -377,6 +391,7 @@ Rectangle {
             }
 
             Row {
+            visible: stationRadio.sectionVisible("search")
                 id: queryRow
                 width: parent.width
                 height: 33
@@ -433,17 +448,20 @@ Rectangle {
             }
 
             QuietText {
+            visible: stationRadio.sectionVisible("search")
                 width: parent.width
                 text: "NAME / TAG:NEWS / TAG:TALK / COUNTRY:US / LANGUAGE:ENGLISH"
                 font.pixelSize: 10
             }
 
             StationSectionDivider {
+            visible: stationRadio.sectionVisible("saved")
                 width: parent.width
                 title: "SAVED // FAVORITES + RECENTLY LOADED"
             }
 
             Row {
+            visible: stationRadio.sectionVisible("saved")
                 width: parent.width
                 spacing: 10
 
@@ -578,17 +596,20 @@ Rectangle {
             }
 
             QuietText {
+            visible: stationRadio.sectionVisible("saved")
                 width: parent.width
                 text: "RECALL SEARCHES THE LIVE DIRECTORY BY NAME, THEN REQUIRES THE EXACT SAVED UUID // NO STORED STREAM URL // NO AUTOPLAY"
                 font.pixelSize: 9
             }
 
             StationSectionDivider {
+            visible: stationRadio.sectionVisible("directory")
                 width: parent.width
                 title: "STATIONS // BROWSE + SELECT"
             }
 
             GohuText {
+            visible: stationRadio.sectionVisible("directory")
                 width: parent.width
                 text: "RESULTS " + stationRadio.browseItems.length
                       + " // " + (controller.browse
@@ -599,7 +620,7 @@ Rectangle {
             }
 
             QuietText {
-                visible: stationRadio.browseItems.length === 0
+                visible: stationRadio.sectionVisible("directory") && (stationRadio.browseItems.length === 0)
                 width: parent.width
                 text: controller.errorText !== "" ? controller.message
                       : "NO STATIONS RETURNED // TRY SEARCH OR ALL RADIO"
@@ -607,6 +628,7 @@ Rectangle {
             }
 
             Repeater {
+            visible: stationRadio.sectionVisible("directory")
                 model: stationRadio.browseItems
 
                 delegate: Rectangle {
@@ -703,11 +725,13 @@ Rectangle {
             }
 
             StationSectionDivider {
+            visible: stationRadio.sectionVisible("transport")
                 width: parent.width
                 title: "STATION CONTROLS // SELECT → LOAD → PLAY"
             }
 
             Row {
+            visible: stationRadio.sectionVisible("transport")
                 width: parent.width
                 spacing: 8
 
@@ -783,6 +807,7 @@ Rectangle {
             }
 
             GohuText {
+            visible: stationRadio.sectionVisible("status")
                 width: parent.width
                 text: controller.errorText !== ""
                       ? controller.message : stationRadio.notice
@@ -791,6 +816,7 @@ Rectangle {
             }
 
             QuietText {
+            visible: stationRadio.sectionVisible("status")
                 width: parent.width
                 text: "SELECTED // " + (stationRadio.selectedRef
                       ? String(stationRadio.selectedRef.id) : "--")
@@ -799,6 +825,7 @@ Rectangle {
             }
 
             GohuText {
+            visible: stationRadio.sectionVisible("status")
                 width: parent.width
                 text: "LOADED // "
                       + (stationRadio.loadedMedia && stationRadio.loadedMedia.item
@@ -811,6 +838,7 @@ Rectangle {
             }
 
             QuietText {
+            visible: stationRadio.sectionVisible("status")
                 width: parent.width
                 text: "SHARED MPD STATE // "
                       + controller.playbackState.toUpperCase()
@@ -820,6 +848,7 @@ Rectangle {
             }
 
             QuietText {
+            visible: stationRadio.sectionVisible("status")
                 width: parent.width
                 text: "MPRIS EXTERNAL PLAYERS REMAIN A SEPARATE HI-FI MODE // WEATHER DOES NOT CLAIM THEIR CONTROL"
                 font.pixelSize: 10

@@ -6,6 +6,7 @@ import "../components"
 import "appcontrol"
 import "cpuplus"
 import qs.services.location
+import qs.services.time
 import "thermal"
 
 PanelWindow {
@@ -62,8 +63,10 @@ PanelWindow {
     ]
 
     // SETTINGS categories do not own SYSTEM monitor filters.
+    // Both surfaces consume existing single-owner services, never new writers.
     readonly property var settingsSubModes: [
-        { name: "LOCATION", key: "LOCATION", symbol: "⌖" }
+        { name: "LOCATION", key: "LOCATION", symbol: "⌖" },
+        { name: "TIME", key: "TIME", symbol: "🕰" }
     ]
 
     // Rail-face animation state, matching AppControl's FAVORITES behavior.
@@ -1596,7 +1599,7 @@ PanelWindow {
                             cpuPlusWindow.selectedModeIndex === 2
                             ? (targetSubModeStrip.width - 4) / 2
                             : cpuPlusWindow.selectedModeIndex === 4
-                            ? targetSubModeStrip.width
+                            ? (targetSubModeStrip.width - 4) / 2
                             : (targetSubModeStrip.width - 8) / 3
 
                         height:
@@ -1785,20 +1788,27 @@ PanelWindow {
             spacing: 9
 
             GohuText {
-                text: "LOCATION // CONTEXT"
+                text: cpuPlusWindow.settingsSubMode === "TIME"
+                      ? "TIME // CONFIGURATION" : "LOCATION // CONTEXT"
                 color: Colors.cyan
                 font.pixelSize: 12
             }
             QuietText {
                 width: parent.width
                 wrapMode: Text.WordWrap
-                text: "HOME // EXPLORE // SUBJECT OVERRIDES"
+                text: cpuPlusWindow.settingsSubMode === "TIME"
+                      ? "CALIBRATION // DAYLIGHT SAVING // SYNC"
+                      : "HOME // EXPLORE // SUBJECT OVERRIDES"
                 font.pixelSize: 10
             }
             SecondaryText {
                 width: parent.width
                 wrapMode: Text.WordWrap
-                text: "CATEGORY VIEW READY. LOCATION BACKEND NOT CONNECTED."
+                text: cpuPlusWindow.settingsSubMode === "TIME"
+                      ? "DISPLAY OFFSET // " + TimeSettings.displayOffsetLabel
+                      : PlaceRegistry.hasHome
+                        ? "HOME // " + PlaceRegistry.homePlace.label
+                        : "HOME NOT YET CONFIGURED"
                 font.pixelSize: 10
             }
         }
@@ -2197,7 +2207,8 @@ PanelWindow {
             anchors.topMargin: 16
 
             text: cpuPlusWindow.selectedModeIndex === 4
-                  ? "LOCATION // SETTINGS"
+                  ? (cpuPlusWindow.settingsSubMode === "TIME"
+                     ? "TIME // SETTINGS" : "LOCATION // SETTINGS")
                   : "CPU++ ACTUATORS"
 
             font.pixelSize: 12
@@ -2228,6 +2239,28 @@ PanelWindow {
             registry: PlaceRegistry
             visible: cpuPlusWindow.selectedModeIndex === 4
                      && cpuPlusWindow.settingsSubMode === "LOCATION"
+            anchors.left: parent.left
+            anchors.right: parent.right
+            anchors.top: actuatorHeader.bottom
+            anchors.bottom: parent.bottom
+            anchors.leftMargin: 10
+            anchors.rightMargin: 10
+            anchors.topMargin: 20
+            anchors.bottomMargin: 10
+        }
+
+        // Reuses the Clock's settings view and its single persistent service.
+        // CPU++ shows only calibration, DST and guarded sync; it owns no
+        // timezone picker, timer, SystemClock or independent configuration.
+        TimeSettingsPane {
+            id: settingsTimePane
+            visible: cpuPlusWindow.selectedModeIndex === 4
+                     && cpuPlusWindow.settingsSubMode === "TIME"
+            panelVisible: visible && cpuPlusWindow.menuOpen
+            showClockPreview: false
+            showTimezoneDetails: false
+            showResyncTrigger: true
+            showSharedServiceCaption: false
             anchors.left: parent.left
             anchors.right: parent.right
             anchors.top: actuatorHeader.bottom

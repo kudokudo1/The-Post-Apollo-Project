@@ -21,6 +21,9 @@ class ClockTimeSettingsContract(unittest.TestCase):
         self.assertIn("TimeSettings.displayOffsetMs", clock)
         self.assertIn("clockArea.adjustedDate", clock)
         self.assertIn("TimeSettings.adjustedEpochMs", timew)
+        self.assertIn("TimeSettings.prepareResync()", timew)
+        self.assertIn("TimeSettings.requestResync()", (
+            ROOT / "widgets/TimeSettingsPane.qml").read_text())
         self.assertIn('id: "settings", name: "SETTINGS"', timew)
         self.assertIn('id: "planned", name: "NEXT"', timew)
         self.assertIn('label: "⟳"', timew)
@@ -52,6 +55,31 @@ class ClockTimeSettingsContract(unittest.TestCase):
             result = host.resync()
         self.assertEqual(result["status"], "unavailable")
         run.assert_not_called()
+
+    def test_disabled_daemon_uses_one_shot_without_enabling_ntp(self):
+        with patch.object(host.os.path, "isfile", return_value=True), \\
+                patch.object(host.subprocess, "run", side_effect=[
+                    subprocess.CompletedProcess([], 1, "", "not running"),
+                    subprocess.CompletedProcess([], 3, "inactive\\n", ""),
+                    subprocess.CompletedProcess([], 0, "corrected", ""),
+                ]) as run:
+            outcome = host.resync()
+        self.assertEqual(outcome["status"], "completed")
+        commands = [call.args[0] for call in run.call_args_list]
+        self.assertEqual(commands[1], ["systemctl", "is-active", "chronyd.service"])
+        self.assertEqual(commands[2], [
+            host.PKEXEC, host.CHRONYD_PATHS[0], "-q", "-t", "15"])
+        self.assertFalse(any("set-ntp" in command for command in commands))
+
+    def test_running_service_not_duplicated_when_probe_fails(self):
+        with patch.object(host.os.path, "isfile", return_value=True), \\
+                patch.object(host.subprocess, "run", side_effect=[
+                    subprocess.CompletedProcess([], 1, "", "no socket"),
+                    subprocess.CompletedProcess([], 0, "active\\n", ""),
+                ]) as run:
+            outcome = host.resync()
+        self.assertEqual(outcome["status"], "unavailable")
+        self.assertEqual(run.call_count, 2)
 
     def test_resync_only_requests_fresh_samples(self):
         with patch.object(host.os.path, "isfile", return_value=True), \

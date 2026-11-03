@@ -295,17 +295,23 @@ Item {
                     }
 
                     IdentityCenterLocalOrganizationEditor {
+                        objectName: "orgLocalDirectoryEditor"
                         width: parent.width
                         directoryStore: sections.localDirectoryStore
                         focusedOrganizationId: sections.activeLocalEditingOrganizationId
                         searchQuery: localRecordsSearch.searchText
+                        useSharedArchiveControl: true
+                        showArchived: localRecordsSearch.includeArchived
                     }
 
                     IdentityCenterLocalPortfolioEditor {
+                        objectName: "orgLocalPortfolioEditor"
                         width: parent.width
                         directoryStore: sections.localDirectoryStore
                         portfolioStore: sections.localPortfoliosStore
                         searchQuery: localRecordsSearch.searchText
+                        useSharedArchiveControl: true
+                        showArchived: localRecordsSearch.includeArchived
                     }
 
                     IdentityCenterLocalStructureEditor {
@@ -316,6 +322,8 @@ Item {
                         useSharedContext: true
                         selectedOrgId: sections.activeLocalEditingOrganizationId
                         searchQuery: localRecordsSearch.searchText
+                        useSharedArchiveControl: true
+                        showArchivedUnits: localRecordsSearch.includeArchived
                     }
 
                     // One source/target form applies existing link modifiers across

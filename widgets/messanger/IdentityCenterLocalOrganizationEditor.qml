@@ -27,6 +27,8 @@ Column {
     }
     property string newKind: "llc"
     property bool showArchived: false
+    property bool useSharedArchiveControl: false
+    onShowArchivedChanged: confirmationKey = ""
     property string confirmationKey: ""
     readonly property bool editable: directoryStore !== null && directoryStore.state === "ready"
     readonly property var organizations: directoryStore && directoryStore.saved
@@ -130,6 +132,7 @@ Column {
     ActionButton {
         width: 175
         height: 28
+        visible: !editor.useSharedArchiveControl
         label: editor.showArchived ? "HIDE ARCHIVED" : "SHOW ARCHIVED"
         labelPixelSize: 9
         onTriggered: {

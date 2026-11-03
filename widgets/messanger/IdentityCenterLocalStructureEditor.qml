@@ -23,6 +23,8 @@ Column {
     onSelectedOrgIdChanged: confirmationKey = ""
     property string selectedKind: "division"
     property bool showArchivedUnits: false
+    property bool useSharedArchiveControl: false
+    onShowArchivedUnitsChanged: confirmationKey = ""
     property bool showArchivedOrganizations: false
     property string confirmationKey: ""
 
@@ -242,6 +244,7 @@ Column {
     }
     Row {
         spacing: 6
+        visible: !editor.useSharedArchiveControl
         ActionButton {
             width: 174
             height: 28

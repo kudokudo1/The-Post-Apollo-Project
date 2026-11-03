@@ -516,6 +516,86 @@ class RealQtOrganizationsSettingsPaneSmoke(unittest.TestCase):
         self.assertEqual(structure.property("searchQuery"), "")
         self.assertFalse(self.sections.property("organizationDisplayReady"))
 
+    def test_one_archived_toggle_updates_all_inline_record_editors(self):
+        self._open_organizations()
+        search = self.sections.findChild(QObject, "orgLocalSearch")
+        directory = self.sections.findChild(QObject, "orgLocalDirectoryEditor")
+        portfolios = self.sections.findChild(QObject, "orgLocalPortfolioEditor")
+        structure = self.sections.findChild(QObject, "localStructureEditor")
+        archive_button = self.sections.findChild(QObject, "localShowArchivedRecords")
+        for name, obj in (
+            ("search", search), ("directory", directory),
+            ("portfolios", portfolios), ("structure", structure),
+            ("global archived button", archive_button),
+        ):
+            self.assertIsNotNone(obj, name + " missing from real QML")
+        for obj, field in ((directory, "showArchived"),
+                           (portfolios, "showArchived"),
+                           (structure, "showArchivedUnits")):
+            self.assertFalse(obj.property(field))
+            self.assertTrue(obj.property("useSharedArchiveControl"))
+        self.assertFalse(search.property("includeArchived"))
+
+        fixtures = {
+            "localDirectoryStore": {"state": "ready", "saved": {
+                "organizations": [
+                    {"id": "org-1", "name": "FAKE ACTIVE", "kind": "llc",
+                     "archived": False, "branches": [
+                         {"id": "branch-4", "name": "FAKE ARCHIVED BRANCH",
+                          "archived": True}]},
+                    {"id": "org-2", "name": "FAKE ARCHIVED COMPANY",
+                     "kind": "nonprofit", "archived": True, "branches": []},
+                ]}},
+            "localPortfoliosStore": {"state": "ready", "saved": {
+                "portfolios": [
+                    {"id": "portfolio-1", "name": "FAKE ARCHIVED GROUP",
+                     "orgIds": ["org-1"], "archived": True}]}},
+            "localStructureStore": {"state": "ready", "saved": {
+                "units": [
+                    {"id": "unit-1", "orgId": "org-1",
+                     "kind": "division", "name": "FAKE ACTIVE DIVISION",
+                     "archived": False},
+                    {"id": "unit-2", "orgId": "org-1",
+                     "kind": "division", "name": "FAKE ARCHIVED DIVISION",
+                     "archived": True},
+                ]}},
+        }
+        for field, value in fixtures.items():
+            js = self.engine.evaluate("(" + json.dumps(value) + ")")
+            self.assertFalse(js.isError(), field)
+            self.assertTrue(self.sections.setProperty(field, js), field)
+        self.sections.setProperty("localEditingOrganizationId", "org-1")
+        APP.processEvents()
+        self.assertEqual(len(_value(structure.property("visibleUnits"))), 1)
+
+        for obj in (directory, portfolios, structure):
+            obj.setProperty("confirmationKey", "stale confirmation")
+        # The actual page-wide archive button updates this same property.
+        self.assertTrue(search.setProperty("includeArchived", True))
+        APP.processEvents()
+        for obj, field in ((directory, "showArchived"),
+                           (portfolios, "showArchived"),
+                           (structure, "showArchivedUnits")):
+            self.assertTrue(obj.property(field), field)
+            self.assertEqual(obj.property("confirmationKey"), "", field)
+        self.assertEqual(len(_value(structure.property("visibleUnits"))), 2)
+
+        search.setProperty("scope", "organizations")
+        search.setProperty("searchText", "ARCHIVED COMPANY")
+        APP.processEvents()
+        self.assertEqual(search.property("matchCount"), 1)
+        self.assertTrue(_value(search.property("visibleMatches"))[0]["archived"])
+
+        search.setProperty("includeArchived", False)
+        APP.processEvents()
+        self.assertEqual(search.property("matchCount"), 0)
+        for obj, field in ((directory, "showArchived"),
+                           (portfolios, "showArchived"),
+                           (structure, "showArchivedUnits")):
+            self.assertFalse(obj.property(field), field)
+        self.assertEqual(len(_value(structure.property("visibleUnits"))), 1)
+        self.assertFalse(self.sections.property("organizationDisplayReady"))
+
     def test_host_logout_and_failure_are_reflected_in_real_panel(self):
         self._open_organizations()
         self._finish(_body())

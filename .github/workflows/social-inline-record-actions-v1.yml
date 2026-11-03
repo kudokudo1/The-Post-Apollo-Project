@@ -1,0 +1,50 @@
+name: Social inline record actions and global archived control v1
+
+on:
+  pull_request:
+    paths:
+      - 'widgets/messanger/IdentityCenterSettingsSections.qml'
+      - 'widgets/messanger/IdentityCenterLocalRecordsSearch.qml'
+      - 'widgets/messanger/IdentityCenterLocalOrganizationEditor.qml'
+      - 'widgets/messanger/IdentityCenterLocalPortfolioEditor.qml'
+      - 'widgets/messanger/IdentityCenterLocalStructureEditor.qml'
+      - 'tests/messaging/test_identity_center_inline_record_actions_v1.py'
+      - 'tests/messaging/test_identity_center_offscreen_qml_v0.py'
+      - '.github/workflows/social-inline-record-actions-v1.yml'
+      - 'MODEL/contracts/social-inline-record-actions-v1.md'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  inline-record-actions:
+    runs-on: ubuntu-latest
+    timeout-minutes: 13
+    env:
+      QT_QPA_PLATFORM: offscreen
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Shared archived visibility and original CRUD regression suites
+        run: |
+          python3 -m unittest discover -s tests/messaging -p 'test_identity_center_inline_record_actions_v1.py' -v
+          python3 -m unittest discover -s tests/messaging -p 'test_identity_center_local_search_v1.py' -v
+          python3 -m unittest discover -s tests/messaging -p 'test_identity_center_shared_local_org_selector_v1.py' -v
+          python3 -m unittest discover -s tests/messaging -p 'test_identity_center_inline_modifiers_v1.py' -v
+          python3 -m unittest discover -s tests/messaging -p 'test_social_local_organizations.py' -v
+          python3 -m unittest discover -s tests/messaging -p 'test_social_local_portfolios_v1.py' -v
+          python3 -m unittest discover -s tests/messaging -p 'test_social_local_org_structure_v1.py' -v
+          python3 -m unittest discover -s tests/messaging -p 'test_social_local_unit_locations_v1.py' -v
+          python3 -m unittest discover -s tests/messaging -p 'test_social_local_branch_locations_v1.py' -v
+          python3 -m unittest discover -s tests/messaging -p 'test_social_local_functional_reporting_v1.py' -v
+          python3 -m unittest discover -s tests/messaging -p 'test_social_org_links_v1.py' -v
+      - name: Install Qt6 in disposable offscreen CI
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends libegl1 libopengl0 libgl1 libxkbcommon0
+          python3 -m pip install --disable-pip-version-check 'PySide6==6.9.3'
+      - name: Real Qt6 shared archive UI acceptance test
+        run: python3 -m unittest discover -s tests/messaging -p 'test_identity_center_offscreen_qml_v0.py' -v

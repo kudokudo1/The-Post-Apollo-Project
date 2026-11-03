@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 # M13h CI-only dry run of the EXACT operator-facing Fedora harness.
+# Executed by workflow under dbus-run-session, NOT the user's session.
 # The keyring and HOME below belong to a disposable GitHub runner session.
 set -euo pipefail
 umask 077

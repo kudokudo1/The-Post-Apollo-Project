@@ -5,6 +5,7 @@ import Qt5Compat.GraphicalEffects
 import "../components"
 import "appcontrol"
 import "cpuplus"
+import qs.services.location
 import "thermal"
 
 PanelWindow {
@@ -168,6 +169,7 @@ PanelWindow {
     // window-local and cannot take over another visible widget's controls.
     readonly property bool standardKeysAvailable:
         menuOpen && (!relationshipFocusModeActive || relationshipFocused)
+        && !(selectedModeIndex === 4 && settingsLocationPane.editingText)
 
     function cycleMainMode(direction) {
         const count = modes.length;
@@ -2223,6 +2225,7 @@ PanelWindow {
         }
         CpuPlusSettingsLocationPane {
             id: settingsLocationPane
+            registry: PlaceRegistry
             visible: cpuPlusWindow.selectedModeIndex === 4
                      && cpuPlusWindow.settingsSubMode === "LOCATION"
             anchors.left: parent.left

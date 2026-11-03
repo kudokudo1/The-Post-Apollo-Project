@@ -7,6 +7,10 @@ on:
       - "widgets/AppControlW.qml"
       - "widgets/CpuPlusW.qml"
       - "widgets/cpuplus/CpuPlusSettingsLocationPane.qml"
+      - "services/location/PlaceRegistry.qml"
+      - "services/location/PlacePolicy.js"
+      - "services/location/qmldir"
+      - "tests/location/test_place_registry_policy.cjs"
       - "tests/components/test_cpuplus_settings_mode_contracts.py"
       - "tests/components/test_cpuplus_caption_slot_contracts.py"
       - "widgets/weather/WeatherStationW.qml"
@@ -31,6 +35,10 @@ on:
       - "widgets/AppControlW.qml"
       - "widgets/CpuPlusW.qml"
       - "widgets/cpuplus/CpuPlusSettingsLocationPane.qml"
+      - "services/location/PlaceRegistry.qml"
+      - "services/location/PlacePolicy.js"
+      - "services/location/qmldir"
+      - "tests/location/test_place_registry_policy.cjs"
       - "tests/components/test_cpuplus_settings_mode_contracts.py"
       - "tests/components/test_cpuplus_caption_slot_contracts.py"
       - "widgets/weather/WeatherStationW.qml"
@@ -67,6 +75,8 @@ jobs:
         run: python3 tests/components/test_cpuplus_caption_slot_contracts.py
       - name: Verify CPU++ SETTINGS and LOCATION navigation
         run: python3 tests/components/test_cpuplus_settings_mode_contracts.py
+      - name: Verify persistent Home coordinate policy
+        run: node tests/location/test_place_registry_policy.cjs
       - name: Verify CPU++ A/B sampled-text glow source lifecycle
         run: python3 tests/components/test_cpuplus_glow_ab_contracts.py
       - name: Preserve existing visual language recipes

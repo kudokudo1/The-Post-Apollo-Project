@@ -852,19 +852,22 @@ PanelWindow {
                 || terminalView.terminalState !== "IDLE")
             return false;
         const route = subjectNavigator.currentPath;
+        const consoleModes = ["home","ground","sky","space","map",
+                              "news","radio"];
         const allowed = route === "tools/terminal/star-map"
-            ? "terminal" : route === "tools/terminal/consoles"
-            ? "home" : "";
-        if (!allowed || mode !== allowed)
+            ? mode === "terminal"
+            : route === "tools/terminal/consoles"
+              && consoleModes.indexOf(mode) >= 0;
+        if (!allowed)
             return false;
-        subjectTerminalMode = allowed;
+        subjectTerminalMode = mode;
         contextTerminalRequested = true;
         // The root Terminal is now visible; launch only after geometry
         // binding and terminalMode have adopted the requested identity.
         Qt.callLater(function() {
             if (menuOpen && subjectNavigationOpen && contextTerminalRequested
                     && subjectNavigator.currentPath === route
-                    && terminalView.terminalMode === allowed) {
+                    && terminalView.terminalMode === mode) {
                 if (!terminalView.openTerminal())
                     contextTerminalRequested = false;
             }

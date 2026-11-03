@@ -12,6 +12,22 @@ const bridge=read("services/hub/TaskEncryptedRecoveryBridgeM13i.qml");
 const provider=read("services/hub/TaskRecoveryProviderHostM13i.py");
 const standalone=read("TaskEncryptedRecoveryHarnessM13i.qml");
 const shell=read("shell.qml");
+const qmldir=read("services/hub/qmldir");
+
+
+test("M13i bridge is actually exported by the qs.services.hub qmldir",()=>{
+    // Source-level registration test. Earlier static tests passed while the
+    // real shell failed at startup because this line was omitted.
+    assert.match(qmldir,/^module qs\.services\.hub$/m);
+    const declarations=qmldir.split(/\r?\n/).filter(
+        line=>line.trim()&&!line.startsWith("module ")&&!line.startsWith("#")
+    );
+    const matches=declarations.filter(line=>/^TaskEncryptedRecoveryBridgeM13i\s/.test(line));
+    assert.equal(matches.length,1,"exactly one QML type registration");
+    assert.equal(matches[0],
+        "TaskEncryptedRecoveryBridgeM13i 1.0 TaskEncryptedRecoveryBridgeM13i.qml");
+    assert.equal(fs.existsSync(path.join(root,"services/hub/TaskEncryptedRecoveryBridgeM13i.qml")),true);
+});
 
 test("one live TASKS FileView, no second writer or source activation",()=>{
     assert.equal((store.match(/\bFileView\s*\{/g)||[]).length,1);

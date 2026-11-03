@@ -6,3 +6,4 @@ ApolloHubUptimeSource 1.0 ApolloHubUptimeSource.qml
 singleton ApolloHubTodoStore 1.0 ApolloHubTodoStore.qml
 singleton ApolloHubNotesStore 1.0 ApolloHubNotesStore.qml
 ApolloHubAudioStreamGate 1.0 ApolloHubAudioStreamGate.qml
+TaskEncryptedRecoveryBridgeM13i 1.0 TaskEncryptedRecoveryBridgeM13i.qml

@@ -27,8 +27,9 @@ PanelWindow {
                 && ((!weatherStation.subjectNavigationOpen
                      && weatherStation.currentView === "home")
                     || (weatherStation.subjectNavigationOpen
-                        && SubjectPanelPolicy.needsSource(
-                               subjectNavigator.currentPath, "history")))
+                        && (subjectNavigator.liveHomeKind !== ""
+                            || SubjectPanelPolicy.needsSource(
+                               subjectNavigator.currentPath, "history"))))
         latitude: weatherStation.weatherService
                   ? weatherStation.weatherService.latitude : ""
         longitude: weatherStation.weatherService
@@ -146,7 +147,8 @@ PanelWindow {
 
     readonly property string currentContext:
         subjectNavigationOpen
-        ? (subjectNavigator.liveWeatherKind !== ""
+        ? (subjectNavigator.liveHomeKind !== ""
+           ? "HOME" : subjectNavigator.liveWeatherKind !== ""
            ? "WEATHER" : subjectNavigator.liveCosmosKind !== ""
              ? "COSMOS" : subjectNavigator.liveEarthKind !== ""
                ? "EARTH" : subjectNavigator.liveMediaKind !== ""
@@ -372,7 +374,8 @@ PanelWindow {
                    + (officialAlertUsingPersistentCache ? " // CACHE" : "");
 
         if (subjectNavigationOpen)
-            return subjectNavigator.liveWeatherKind !== ""
+            return subjectNavigator.liveHomeKind !== ""
+                   ? "HOME DYNAMIC" : subjectNavigator.liveWeatherKind !== ""
                    ? "WEATHER PANEL" : subjectNavigator.liveCosmosKind !== ""
                      ? "COSMOS PANEL" : subjectNavigator.liveEarthKind !== ""
                        ? "EARTH PANEL" : subjectNavigator.liveMediaKind !== ""
@@ -440,6 +443,8 @@ PanelWindow {
                    + (officialAlertUsingPersistentCache ? " // CACHE" : "");
 
         if (subjectNavigationOpen) {
+            if (subjectNavigator.liveHomeKind !== "")
+                return "HOME // AUTO RELEVANCE + HISTORY";
             if (subjectNavigator.liveWeatherKind !== "")
                 return "WEATHER // PANEL";
             if (subjectNavigator.liveCosmosKind !== "")
@@ -1091,7 +1096,11 @@ PanelWindow {
             anchors.bottom: footer.top
             anchors.left: parent.left
 
-            width: 160
+            // Horizontal WORKSPACE rows use the full content width.
+            // The legacy 160px rail returns for CLASSIC or MORE / INDEX.
+            // Exact compositor terminal geometry is unchanged in CLASSIC.
+            width: weatherStation.subjectNavigationOpen
+                   && !subjectNavigator.indexOpen ? 0 : 160
 
             color: Colors.black
 
@@ -1157,6 +1166,7 @@ PanelWindow {
             StationSubjectRail {
                 id: subjectRailColumn
                 visible: weatherStation.subjectNavigationOpen
+                         && subjectNavigator.indexOpen
                 anchors.top: parent.top
                 anchors.left: parent.left
                 anchors.right: parent.right
@@ -1175,6 +1185,8 @@ PanelWindow {
                 anchors.rightMargin: 9
                 anchors.bottomMargin: 12
                 height: 36
+                visible: !weatherStation.subjectNavigationOpen
+                         || subjectNavigator.indexOpen
                 label: weatherStation.subjectNavigationOpen
                        ? "CLASSIC" : "SUBJECTS"
                 labelPixelSize: 12

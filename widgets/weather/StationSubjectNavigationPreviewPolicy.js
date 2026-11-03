@@ -132,7 +132,15 @@ var WIRED_IN_SUBJECTS = {
   "map-gdacs-inspector":"M28-H",
   "map-usgs-inspector":"M28-H",
   "map-eonet-inspector":"M28-H",
-  "map-firms-inspector":"M28-H"
+  "map-firms-inspector":"M28-H",
+  // M28-I: actual core health, NOAA field clocks and shared store status.
+  // Frame retention is a contract inventory, NOT a newly created archive.
+  "home-source-health":"M28-I",
+  "space-field-times":"M28-I",
+  "station-frame-cache":"M28-I",
+  "station-persistent-cache":"M28-I",
+  "station-live-history":"M28-I",
+  "station-event-store":"M28-I"
 };
 
 function remainingSourcePagesForPath(path, panelRoutes) {

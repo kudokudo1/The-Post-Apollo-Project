@@ -1,0 +1,35 @@
+name: Weather M26-C Fedora offscreen dossier ActionButton
+
+on:
+  pull_request:
+    paths:
+      - "tests/weather/fixtures/M26CFedoraDossierCard.qml"
+      - "scripts/weather/verify_dossier_card_fedora_m26c.sh"
+      - "widgets/weather/StationEventContextCard.qml"
+      - "components/**"
+      - "services/weather/WeatherDossierArchiveStore.qml"
+      - "widgets/weather/StationDossierCapturePolicy.js"
+      - ".github/workflows/weather-dossier-fedora-card-m26c.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  fedora-card:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    container:
+      image: fedora:44
+    steps:
+      - name: Install Fedora Quickshell, Qt QML components and Node
+        run: |
+          dnf install -y --setopt=install_weak_deps=False \
+            quickshell qt6-qtdeclarative qt6-qt5compat \
+            qt6-qtbase-gui qt6-qtsvg git nodejs coreutils findutils
+          quickshell --version
+      - uses: actions/checkout@v4
+      - name: M26-C actual Event Context card pointer and write smoke
+        run: bash scripts/weather/verify_dossier_card_fedora_m26c.sh
+      - name: M26-A pure persistence and UI wiring regression
+        run: node tests/weather/test_weather_dossier_persistent_m25.js

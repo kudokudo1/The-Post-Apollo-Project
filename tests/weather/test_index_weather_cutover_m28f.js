@@ -151,7 +151,7 @@ test("INDEX offers concrete WEATHER routes, preserves unreviewed HOME and non-WE
   assert.ok(context.remainingSourcePagesForPath("weather",context.PANELS)
     .some(row=>row.id==="home"), "unreviewed HOME controls retain CLASSIC shortcut");
   for (const id of ["home-quick-conditions","home-aqi-humidity","home-aqi-wind",
-                    "ground-usgs-seismic","sky-sun-moon","news-live"]) {
+                    "ground-usgs-seismic","space-field-times","news-live"]) {
     assert.equal(context.WIRED_IN_SUBJECTS[id], undefined, id + " remains unreviewed");
   }
   assert.deepEqual(plain(context.remainingSourcePagesForPath("media/watch",context.PANELS)),

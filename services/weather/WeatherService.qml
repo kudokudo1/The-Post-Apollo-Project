@@ -102,7 +102,8 @@ Scope {
 
     property date lastUpdated
 
-    readonly property bool loading: weatherFetch.running
+    readonly property bool loading:
+        weatherFetch.running || fallbackWeatherFetch.running
 
     // ─────────────────────────────────────────────
     // AIR QUALITY DATA

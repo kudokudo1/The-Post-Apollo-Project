@@ -365,6 +365,11 @@ PanelWindow {
         id: weatherPersistentCache
     }
 
+    // Per-coordinate Home/Explore cache stays separate from the legacy one.
+    WeatherPlaceCacheStore {
+        id: weatherPlaceCache
+    }
+
     WeatherLiveHistoryStore {
         id: weatherLiveHistory
     }
@@ -380,6 +385,7 @@ PanelWindow {
     WeatherService {
         id: weatherService
         cacheStore: weatherPersistentCache
+        locationCacheStore: weatherPlaceCache
         historyStore: weatherLiveHistory
         // Single shared operator-selected Home/Explore point for weather,
         // astronomy coordinates, nearby-gauge sources and AQI requests.

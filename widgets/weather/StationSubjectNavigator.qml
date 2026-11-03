@@ -21,6 +21,14 @@ Rectangle {
     property bool indexOpen: false
     property var lastSubjectPaths: ({})
     property int navigationCursor: 0
+
+    // W2a: HOME deck choices survive tab/subject switches and closing the
+    // SUBJECTS layer for this StationNavigator lifetime. No disk writes.
+    property bool homeDeckEnabled: false
+    property bool homeDeckHeld: false
+    property string homeDeckMode: "mixed"
+    property var homeDeckFavorites: []
+
     // Existing Weather Station sources supplied from the single owning root.
     property var weatherService: null
     property var spaceService: null
@@ -172,6 +180,23 @@ Rectangle {
         sourceComponent: Component {
             StationWorkspaceSurface {
                 currentPath: browser.currentPath
+                deckEnabled: browser.homeDeckEnabled
+                deckHeld: browser.homeDeckHeld
+                deckMode: browser.homeDeckMode
+                deckFavorites: browser.homeDeckFavorites
+                deckIndexOpen: browser.indexOpen
+                onDeckEnabledRequested: function(enabled) {
+                    browser.homeDeckEnabled = enabled;
+                }
+                onDeckHeldRequested: function(held) {
+                    browser.homeDeckHeld = held;
+                }
+                onDeckModeRequested: function(mode) {
+                    browser.homeDeckMode = mode;
+                }
+                onDeckFavoritesRequested: function(paths) {
+                    browser.homeDeckFavorites = paths;
+                }
                 weatherService: browser.weatherService
                 spaceService: browser.spaceService
                 nwsAlertSource: browser.nwsAlertSource

@@ -1319,6 +1319,7 @@ PanelWindow {
         if (!menuOpen) {
             dismissWorldSearchPopup();
             closeConverterDropdowns();
+            TimeSettings.cancelResync();
         }
         if (menuOpen) {
             Qt.callLater(restoreKeyboardFocus);
@@ -2008,7 +2009,7 @@ PanelWindow {
                     available: TimeSettings.resyncStatus !== "working"
                     onLeftClicked: {
                         timew.chooseMode(4);
-                        TimeSettings.requestResync();
+                        TimeSettings.prepareResync();
                     }
                 }
 

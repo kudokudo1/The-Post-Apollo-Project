@@ -582,6 +582,29 @@ Rectangle {
             }
         }
 
+        // V2 COSMOS visual astronomy. Reads the same existing Moon
+        // response and calibrated Sun calculation as the text instruments.
+        // CLASSIC and WEATHER pages keep their original layout unchanged.
+        StationCosmosVisualInstruments {
+            width: parent.width
+            visible: sky.subjectRoute.indexOf("cosmos/") === 0
+                     && (sky.sectionVisible("moon")
+                         || sky.sectionVisible("astronomy")
+                         || sky.sectionVisible("twilight"))
+            height: visible ? 258 : 0
+            showMoon: sky.sectionVisible("moon")
+            showSun: sky.sectionVisible("astronomy")
+                     || sky.sectionVisible("twilight")
+            moonReady: moonService.ready
+            moonEphemeris: moonService.ephemeris
+            astronomySummary: sky.astronomySummary
+            twilightSummary: sky.twilightSummary
+            currentSolarPosition: sky.currentSolarPosition
+            providerLocalMinute: sky.providerLocalMinute
+            latitude: sky.weatherService ? sky.weatherService.latitude : ""
+            longitude: sky.weatherService ? sky.weatherService.longitude : ""
+        }
+
         StationRuntimeRack {
             visible: sky.sectionVisible("runtime")
             width: parent.width

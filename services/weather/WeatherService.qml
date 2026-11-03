@@ -9,6 +9,7 @@ Scope {
     id: weatherService
 
     property var cacheStore: null
+    property var locationCacheStore: null
     property var historyStore: null
     // Optional shared user-selected place. Existing standalone consumers
     // keep wttr.in's legacy location lookup when no manual Home is set.
@@ -26,6 +27,7 @@ Scope {
     // gets a bounded attempt at every scheduled refresh, so recovery does
     // not require a manual reset. Fallback never owns a place selection.
     property string activeWeatherProvider: "NONE"
+    property string cachedWeatherProvider: ""
     property string primaryWeatherStatus: "IDLE"
     property string fallbackWeatherStatus: "IDLE"
     property string fallbackWeatherError: ""
@@ -401,6 +403,165 @@ Scope {
         return hydrated;
     }
 
+    // The user-selected cache is completely separate from the legacy
+    // unscoped source records. A record can only hydrate its own MANUAL key.
+    function hydrateLocationCache() {
+        if (!hasManualPlace || !locationCacheStore)
+            return false;
+        const storeState = String(locationCacheStore.storageState || "");
+        if (storeState !== "ready" && storeState !== "empty")
+            return false;
+
+        const now = Date.now();
+        const key = requestContextKey;
+        let hydrated = false;
+        if (!ready) {
+            const saved = locationCacheStore.record("weather-current", key, now);
+            if (saved && saved.payload) {
+                const p = saved.payload;
+                tempF = String(p.tempF || "--");
+                feelsLikeF = String(p.feelsLikeF || "--");
+                condition = String(p.condition || "UNKNOWN");
+                weatherCode = String(p.weatherCode || "");
+                uvIndex = Number(p.uvIndex);
+                humidity = String(p.humidity || "--");
+                windMph = String(p.windMph || "--");
+                windDirection = String(p.windDirection || "--");
+                pressureHpa = Number(p.pressureHpa);
+                visibilityMiles = Number(p.visibilityMiles);
+                cloudCover = Number(p.cloudCover);
+                precipMm = Number(p.precipMm);
+                observationTime = String(p.observationTime || "");
+                localObservationDateTime =
+                    String(p.localObservationDateTime || "");
+                localObservationAnchorMs = Number(saved.receivedAtMs);
+                lastUpdated = new Date(saved.receivedAtMs);
+                ready = true;
+                errorText = "";
+                activeWeatherProvider = "CACHE";
+                cachedWeatherProvider = String(saved.provider || "");
+                usingPersistentCurrentCache = true;
+                hydrated = true;
+            }
+        }
+
+        if (!forecastReady) {
+            const saved = locationCacheStore.record(
+                "weather-forecast", key, now
+            );
+            if (saved && saved.payload) {
+                hourlyForecast =
+                    Array.isArray(saved.payload.hourlyForecast)
+                    ? saved.payload.hourlyForecast.slice() : [];
+                dailyForecast =
+                    Array.isArray(saved.payload.dailyForecast)
+                    ? saved.payload.dailyForecast.slice() : [];
+                if (forecastReady) {
+                    forecastLastUpdated = new Date(saved.receivedAtMs);
+                    usingPersistentForecastCache = true;
+                    hydrated = true;
+                }
+            }
+        }
+
+        if (!aqiReady) {
+            const saved = locationCacheStore.record("air-quality", key, now);
+            if (saved && saved.payload) {
+                const p = saved.payload;
+                aqi = Number(p.aqi);
+                aqiLabel = String(p.aqiLabel || describeAqi(aqi));
+                ozoneAqi = Number(p.ozoneAqi);
+                nitrogenDioxideAqi = Number(p.nitrogenDioxideAqi);
+                carbonMonoxideAqi = Number(p.carbonMonoxideAqi);
+                pm25 = Number(p.pm25);
+                pm10 = Number(p.pm10);
+                carbonMonoxide = Number(p.carbonMonoxide);
+                nitrogenDioxide = Number(p.nitrogenDioxide);
+                ozone = Number(p.ozone);
+                dust = Number(p.dust);
+                alderPollen = Number(p.alderPollen);
+                birchPollen = Number(p.birchPollen);
+                grassPollen = Number(p.grassPollen);
+                mugwortPollen = Number(p.mugwortPollen);
+                olivePollen = Number(p.olivePollen);
+                ragweedPollen = Number(p.ragweedPollen);
+                pollenAvailable = p.pollenAvailable === true;
+                airQualitySourceTime = String(p.airQualitySourceTime || "");
+                airQualityUtcOffsetMinutes =
+                    p.airQualityUtcOffsetMinutes === null
+                    || p.airQualityUtcOffsetMinutes === undefined
+                    ? null : Number(p.airQualityUtcOffsetMinutes);
+                airQualityTimezone = String(p.airQualityTimezone || "");
+                airQualityTimezoneAbbreviation =
+                    String(p.airQualityTimezoneAbbreviation || "");
+                airQualityForecast =
+                    Array.isArray(p.airQualityForecast)
+                    ? p.airQualityForecast.slice() : [];
+                aqiLastUpdated = new Date(saved.receivedAtMs);
+                aqiReady = true;
+                aqiErrorText = "";
+                usingPersistentAqiCache = true;
+                hydrated = true;
+            }
+        }
+        return hydrated;
+    }
+
+    function placeCachePut(kind, receivedAtMs, provider, payload) {
+        if (!hasManualPlace || !locationCacheStore)
+            return false;
+        return locationCacheStore.put(
+            kind, requestContextKey, receivedAtMs, provider, payload
+        );
+    }
+
+    function persistSelectedCurrentWeather(receivedAtMs) {
+        if (!ready || (activeWeatherProvider !== "WTTR"
+                       && activeWeatherProvider !== "OPEN_METEO"))
+            return false;
+        return placeCachePut("weather-current", receivedAtMs,
+                             activeWeatherProvider, {
+            tempF:tempF,feelsLikeF:feelsLikeF,condition:condition,
+            weatherCode:weatherCode,uvIndex:uvIndex,humidity:humidity,
+            windMph:windMph,windDirection:windDirection,
+            pressureHpa:pressureHpa,visibilityMiles:visibilityMiles,
+            cloudCover:cloudCover,precipMm:precipMm,
+            observationTime:observationTime,
+            localObservationDateTime:localObservationDateTime
+        });
+    }
+
+    function persistSelectedForecast(receivedAtMs) {
+        if (!forecastReady || (activeWeatherProvider !== "WTTR"
+                               && activeWeatherProvider !== "OPEN_METEO"))
+            return false;
+        return placeCachePut("weather-forecast", receivedAtMs,
+                             activeWeatherProvider, {
+            hourlyForecast:hourlyForecast,dailyForecast:dailyForecast
+        });
+    }
+
+    function persistSelectedAirQuality(receivedAtMs) {
+        if (!aqiReady)
+            return false;
+        return placeCachePut("air-quality",receivedAtMs,"OPEN_METEO_AQI",{
+            aqi:aqi,aqiLabel:aqiLabel,ozoneAqi:ozoneAqi,
+            nitrogenDioxideAqi:nitrogenDioxideAqi,
+            carbonMonoxideAqi:carbonMonoxideAqi,
+            pm25:pm25,pm10:pm10,carbonMonoxide:carbonMonoxide,
+            nitrogenDioxide:nitrogenDioxide,ozone:ozone,dust:dust,
+            alderPollen:alderPollen,birchPollen:birchPollen,
+            grassPollen:grassPollen,mugwortPollen:mugwortPollen,
+            olivePollen:olivePollen,ragweedPollen:ragweedPollen,
+            pollenAvailable:pollenAvailable,
+            airQualitySourceTime:airQualitySourceTime,
+            airQualityUtcOffsetMinutes:airQualityUtcOffsetMinutes,
+            airQualityTimezone:airQualityTimezone,
+            airQualityTimezoneAbbreviation:airQualityTimezoneAbbreviation,
+            airQualityForecast:airQualityForecast
+        });
+    }
+
     function persistCurrentWeather(receivedAtMs) {
         // Keep user-scoped observations out of legacy unscoped cache records.
         if (!cacheStore || hasManualPlace)
@@ -523,6 +684,20 @@ Scope {
         }
     }
 
+    Connections {
+        target: weatherService.locationCacheStore
+        enabled: !!weatherService.locationCacheStore
+        function onStorageStateChanged() {
+            if (!weatherService.locationCacheStore)
+                return;
+            const state = String(
+                weatherService.locationCacheStore.storageState || ""
+            );
+            if (state === "ready" || state === "empty")
+                weatherService.hydrateLocationCache();
+        }
+    }
+
     // ─────────────────────────────────────────────
     // REFRESH TIMER
     // ─────────────────────────────────────────────
@@ -627,6 +802,7 @@ Scope {
         usingPersistentForecastCache = false;
         usingPersistentAqiCache = false;
         activeWeatherProvider = "NONE";
+        cachedWeatherProvider = "";
         primaryWeatherStatus = "IDLE";
         fallbackWeatherStatus = "IDLE";
         fallbackWeatherError = "";
@@ -640,6 +816,9 @@ Scope {
         // fetch for the new context. Avoid overlapping process restarts.
         clearLocationData();
         Qt.callLater(function() {
+            weatherService.hydrateLocationCache();
+            // Legacy no-Home path keeps its own independent unscoped cache.
+            weatherService.hydratePersistentCache();
             weatherService.refresh();
             // AQI can load from the saved point even when wttr.in times out.
             weatherService.refreshAirQuality();
@@ -740,11 +919,14 @@ Scope {
             ready = true;
             primaryParseSucceeded = true;
             activeWeatherProvider = "WTTR";
+            cachedWeatherProvider = "";
             usingPersistentCurrentCache = false;
             usingPersistentForecastCache = false;
 
             persistCurrentWeather(receivedAt.getTime());
             persistForecast(receivedAt.getTime());
+            persistSelectedCurrentWeather(receivedAt.getTime());
+            persistSelectedForecast(receivedAt.getTime());
             captureCurrentHistory(receivedAt.getTime());
 
             // Once weather gives us coordinates,
@@ -790,11 +972,14 @@ Scope {
         ready = true;
         fallbackParseSucceeded = true;
         activeWeatherProvider = "OPEN_METEO";
+        cachedWeatherProvider = "";
         errorText = "";
         usingPersistentCurrentCache = false;
         usingPersistentForecastCache = false;
         persistCurrentWeather(receivedAt.getTime());
         persistForecast(receivedAt.getTime());
+        persistSelectedCurrentWeather(receivedAt.getTime());
+        persistSelectedForecast(receivedAt.getTime());
         captureCurrentHistory(receivedAt.getTime());
         refreshAirQuality();
         return true;
@@ -852,6 +1037,7 @@ Scope {
             aqiReady = true;
             usingPersistentAqiCache = false;
             persistAirQuality(aqiLastUpdated.getTime());
+            persistSelectedAirQuality(aqiLastUpdated.getTime());
             captureAirQualityHistory(aqiLastUpdated.getTime());
         } catch (error) {
             console.log("WeatherService AQI parse error:", error);
@@ -892,6 +1078,7 @@ Scope {
 
     Component.onCompleted: {
         hydratePersistentCache();
+        hydrateLocationCache();
         locationBooted = true;
         // AQI source now has a location from the Place Registry independently
         // of the success/failure of the weather provider.

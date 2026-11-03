@@ -110,7 +110,9 @@ test("EARTH map excludes unrelated weather radar and MEDIA news", () => {
   assert.match(discovery,/&& !stationDiscovery\.earthMapOnly\s*\? rainViewerRadarService\.strips/);
   assert.match(discovery,/!stationDiscovery\.earthMapOnly/);
   assert.match(discovery,/source\.ready \? stationDiscovery\.visibleRows : \[\]/);
-  assert.match(discovery,/newsMentionInspectorOpen\s*&& !stationDiscovery\.earthMapOnly/);
+  // NEWS mention inspector can be invoked by MEDIA → EARTH handoff.
+  // It remains separate from USGS/EONET/GDACS/FIRMS event dossier context.
+  assert.match(discovery,/visible: stationDiscovery\.newsMentionInspectorOpen/);
   assert.match(discovery,/stationDiscovery\.weatherMapOnly \? "RADAR \+ SMOKE \/\/ MANUAL"/);
   assert.match(discovery,/WHEEL ZOOM \/\/ DRAG PAN/);
 });
@@ -157,8 +159,9 @@ test("one EARTH map instance persists event selection and zoom while navigating 
   for(const name of ["selectedMapEvent =","selectedMapEarthquake =","selectedMapHotspot =",
                      "selectedMapGdacsEvent =","mapCenterLon =","mapCenterLat =","mapZoom =","resetMapView()"])
     assert.ok(!changed.includes(name),"EARTH route wrongly resets "+name);
-  assert.ok(!earthPane.includes("newsMentionOverlay:"),
-    "EARTH must not receive the MEDIA news overlay binding");
+  assert.match(earthPane,/newsMentionOverlay: earthPane\.newsMentionOverlay/);
+  assert.match(earthPane,/onNewsMapClearRequested: earthPane\.newsMapClearRequested\(\)/);
+  assert.match(earthPane,/property var newsMentionOverlay: null/);
 });
 
 test("CLASSIC, WEATHER, COSMOS, the terminal and data store ownership remain intact", () => {

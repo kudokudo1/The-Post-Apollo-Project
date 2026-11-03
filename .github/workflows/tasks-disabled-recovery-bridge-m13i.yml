@@ -1,0 +1,55 @@
+name: TASKS M13i disabled native QML recovery bridge
+
+on:
+  pull_request:
+    paths:
+      - 'services/hub/TaskRecoveryProviderHostM13i.py'
+      - 'services/hub/TaskEncryptedRecoveryBridgeM13i.qml'
+      - 'services/hub/ApolloHubTodoStore.qml'
+      - 'TaskEncryptedRecoveryHarnessM13i.qml'
+      - 'tests/tasks/test_task_encrypted_recovery_provider_m13i.py'
+      - 'tests/tasks/test_task_encrypted_recovery_bridge_m13i.cjs'
+      - 'docs/tasks-disabled-encrypted-recovery-bridge-m13i.md'
+      - '.github/workflows/tasks-disabled-recovery-bridge-m13i.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'services/hub/TaskRecoveryProviderHostM13i.py'
+      - 'services/hub/TaskEncryptedRecoveryBridgeM13i.qml'
+      - 'services/hub/ApolloHubTodoStore.qml'
+      - 'TaskEncryptedRecoveryHarnessM13i.qml'
+      - '.github/workflows/tasks-disabled-recovery-bridge-m13i.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  disabled-provider-bridge:
+    runs-on: ubuntu-latest
+    timeout-minutes: 9
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Host uses only the read-only nonactivating Secret Service owner query
+        run: python3 -m unittest -v tests/tasks/test_task_encrypted_recovery_provider_m13i.py
+      - name: QML bridge and sole production writer source fences
+        run: node --test tests/tasks/test_task_encrypted_recovery_bridge_m13i.cjs
+      - name: Verify host default no-action mode
+        run: |
+          python3 services/hub/TaskRecoveryProviderHostM13i.py > m13i-no-action.json
+          python3 -c 'import json
+          v=json.load(open("m13i-no-action.json",encoding="utf8"))
+          assert v["status"]=="REFUSED_NO_ACTION"
+          assert v["recoveryEnabled"] is False
+          assert v["writeAuthorized"] is False
+          assert v["decryptAuthorized"] is False'
+          rm -f m13i-no-action.json
+      - name: Prior encrypted Fedora disposable keyring test remains independent
+        run: node --test tests/tasks/test_task_native_keyring_m13h.cjs
+      - name: One FileView and disabled ticket/guard modes
+        run: python3 tests/tasks/test_task_writer_gate_inventory_m11d.py

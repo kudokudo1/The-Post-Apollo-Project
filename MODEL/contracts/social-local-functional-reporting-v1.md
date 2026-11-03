@@ -21,7 +21,7 @@ After operator-controlled PR merge and separately approved desktop update: open 
 
 ## VERIFY
 
-New tests/messaging/test_social_local_functional_reporting_v1.py covers three fictional organizations, directed links, multiple parents, cycles and reverse-edge refusal, source archiving, stale removal, wrong-kind/cross-company refusal, duplicate/self/unknown request fields, private modes, symlinks/corruption/future-schema refusal, stdin CLI/revision checks and **byte-for-byte preservation of the six accepted local source stores**. CI also runs all relevant previous Social tests and an offscreen Qt6 Settings loader. Native genuine Quickshell two-process persistence and live desktop check are separate verification boundaries unless added here.
+New tests/messaging/test_social_local_functional_reporting_v1.py covers three fictional organizations, directed links, multiple parents, cycles and reverse-edge refusal, source archiving, stale removal, wrong-kind/cross-company refusal, duplicate/self/unknown request fields, private modes, symlinks/corruption/future-schema refusal, stdin CLI/revision checks and **byte-for-byte preservation of the six accepted local source stores**. CI also runs all relevant previous Social tests and an offscreen Qt6 Settings loader. A separate CI workflow runs genuine pinned Quickshell 0.3.2 twice in disposable offscreen XDG roots, saving and reloading a fictional graph across three organizations. It checks private file modes, exact saved edges, byte-for-byte no rewrite on read, and preservation of six original synthetic stores. Live desktop mouse-click behavior remains a separate acceptance boundary.
 
 ## WATCH OUT FOR
 
@@ -34,7 +34,7 @@ This graph is **manual organization metadata**, not trusted workforce reporting 
 - [x] Existing Settings editor, active selection, stale cleanup
 - [x] Synthetic tests and Qt offscreen workflow
 - [ ] Exact-head CI green
-- [ ] Genuine native Quickshell persistence
+- [ ] Exact-head genuine native Quickshell persistence
 - [ ] Operator review/merge
 - [ ] Live functional UI acceptance
 

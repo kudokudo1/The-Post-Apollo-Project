@@ -20,7 +20,11 @@ var ROUTES = {
   "weather/hazards/lightning": {page:"ground", sections:["header","lightning"]},
   "weather/hazards/heat-fire": {page:"ground", sections:["header","heat-fire"]},
   // M2b reuses the original HOME and map renderers instead of cloning them.
-  "weather/overview": {page:"home", sections:["header","alerts","snapshot"]},
+  // M27-A: show HOME's existing adaptive AUTO RELEVANT cards on the WEATHER
+  // overview. Reuse the original HOME ranker; no new fetch, timer or writer.
+  // COSMOS signals remain under COSMOS: the WEATHER pane deliberately passes
+  // a null spaceService to this shared renderer.
+  "weather/overview": {page:"home", sections:["header","alerts","snapshot","relevant"]},
   "weather/history/historical-forecast": {page:"home", sections:["header","history"]},
   "weather/history/relationships": {page:"home", sections:["header","relations"]},
   "weather/history/relationships/aqi": {page:"home", sections:["header","relations"]},

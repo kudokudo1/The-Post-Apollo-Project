@@ -1,0 +1,36 @@
+name: Weather Station TOOLS T1 source health storage and terminal contracts
+
+on:
+  pull_request:
+    paths:
+      - 'widgets/weather/StationToolsSubjectPanelPolicy.js'
+      - 'widgets/weather/StationToolsSubjectPane.qml'
+      - 'widgets/weather/StationSubjectNavigator.qml'
+      - 'widgets/weather/WeatherStationW.qml'
+      - 'tests/weather/test_tools_subject_panels_t1.js'
+      - '.github/workflows/weather-tools-subject-panels-t1.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  tools-contracts:
+    runs-on: ubuntu-latest
+    timeout-minutes: 7
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Verify six subject families and TOOLS read-only ownership
+        run: |
+          node --test tests/weather/subject_navigation_contract.test.js
+          node --test tests/weather/subject_navigation_browser.test.js
+          node --test tests/weather/test_weather_subject_panels_m2a.js
+          node --test tests/weather/test_weather_subject_panels_m2b.js
+          node --test tests/weather/test_cosmos_subject_panels_c1.js
+          node --test tests/weather/test_earth_subject_panels_e1.js
+          node --test tests/weather/test_media_subject_panels_d1.js
+          node --test tests/weather/test_magick_subject_panels_g1.js
+          node --test tests/weather/test_tools_subject_panels_t1.js

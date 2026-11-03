@@ -79,6 +79,22 @@ current = row({
 });
 assert.equal(current.state, "STALE");
 
+// The existing HOME rack must never call cached weather LIVE.
+current = row({cached:true,provider:"CACHE // OPEN-METEO"});
+assert.equal(current.state, "CACHE");
+assert.equal(current.accent, "yellow");
+assert.match(current.detail, /LAST KNOWN/);
+current = row({cached:true,provider:"CACHE // WTTR.IN",
+               lastSuccessMs:now-21*60000});
+assert.equal(current.state, "CACHE STALE");
+assert.equal(current.accent, "orange");
+current = row({fallback:true,provider:"OPEN-METEO"});
+assert.equal(current.state, "FALLBACK");
+assert.equal(current.accent, "yellow");
+assert.match(current.detail, /FALLBACK/);
+current = row({cached:false,fallback:false});
+assert.equal(current.state, "LIVE");
+
 assert.equal(health.ageMinutes(now, now), 0);
 assert.equal(health.compactAge(0), "<1m");
 assert.equal(health.compactAge(-1), "--");

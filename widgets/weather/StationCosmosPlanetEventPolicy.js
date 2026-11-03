@@ -9,10 +9,12 @@ var PLANETS = ["MERCURY", "VENUS", "MARS", "JUPITER", "SATURN"];
 var KINDS = ["rise", "transit", "set"];
 
 function minuteOf(value) {
-    if (typeof value !== "string" || !/^\d{2}:\d{2}$/.test(value))
-        return null;
-    var h = Number(value.slice(0, 2));
-    var m = Number(value.slice(3, 5));
+    // A QML property var can carry a QString-like value across a component
+    // boundary. Parse its text, but still reject anything except exact HH:MM.
+    var clock = value === null || value === undefined ? "" : String(value);
+    if (!/^\d{2}:\d{2}$/.test(clock)) return null;
+    var h = Number(clock.slice(0, 2));
+    var m = Number(clock.slice(3, 5));
     return h < 24 && m < 60 ? h * 60 + m : null;
 }
 
@@ -48,39 +50,53 @@ function eventFor(row, kind, date) {
     return data;
 }
 
+function indexedRows(value) {
+    // QQmlListProperty / QVariantList style values can be indexed and used
+    // by Repeater even when Array.isArray(value) is false in another scope.
+    // Reject unbounded, string or non-indexed inputs instead of guessing.
+    if (!value || typeof value === "string") return [];
+    var count = Number(value.length);
+    if (!isFinite(count) || count < 0 || count > 32
+        || Math.floor(count) !== count) return [];
+    var result = [];
+    for (var i = 0; i < count; i++) result.push(value[i]);
+    return result;
+}
+
 function clockRows(providerRows, date) {
-    var input = Array.isArray(providerRows) ? providerRows : [];
-    var dateOk = validDate(date);
+    var input = indexedRows(providerRows);
+    var requestedDate = date === null || date === undefined ? "" : String(date);
+    var dateOk = validDate(requestedDate);
     var result = [];
     for (var p = 0; p < PLANETS.length; p++) {
         var name = PLANETS[p], provider = null;
         for (var i = 0; i < input.length; i++) {
             var candidate = input[i];
-            if (dateOk && candidate && candidate.name === name
-                && candidate.date === date) {
+            if (dateOk && candidate
+                && String(candidate.name || "").trim().toUpperCase() === name
+                && String(candidate.date || "") === requestedDate) {
                 provider = candidate;
                 break;
             }
         }
-        var status = provider ? String(provider.status || "UNAVAILABLE")
+        var status = provider ? String(provider.status || "UNAVAILABLE").trim()
                               : "NO DATED RESPONSE";
         var events = [];
         if (provider && status === "NORMAL") {
             for (var k = 0; k < KINDS.length; k++) {
-                var event = eventFor(provider, KINDS[k], date);
+                var event = eventFor(provider, KINDS[k], requestedDate);
                 if (event) events.push(event);
             }
             if (events.length < 3) status = "PARTIAL EVENTS";
         }
         result.push({name:name, status:status, events:events,
-                     available:events.length > 0, date:dateOk ? date : ""});
+                     available:events.length > 0, date:dateOk ? requestedDate : ""});
     }
     return result;
 }
 
 function eventsFor(planetRow, kind) {
-    var events = planetRow && Array.isArray(planetRow.events)
-                 ? planetRow.events : [];
+    var events = planetRow ? indexedRows(planetRow.events) : [];
     return kind === "ALL" ? events.slice()
                          : events.filter(function(e) { return e.kind === kind; });
 }
@@ -109,6 +125,6 @@ function eventDetail(event) {
 }
 
 function rowCountWithEvents(rows) {
-    return Array.isArray(rows)
-        ? rows.filter(function(row) { return row.available; }).length : 0;
+    return indexedRows(rows)
+        .filter(function(row) { return row && row.available; }).length;
 }

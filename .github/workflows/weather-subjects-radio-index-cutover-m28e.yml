@@ -1,0 +1,32 @@
+name: Weather M28-E RADIO direct SUBJECTS INDEX cutover
+
+on:
+  pull_request:
+    paths:
+      - 'widgets/weather/StationSubjectNavigationPreviewPolicy.js'
+      - 'tests/weather/test_index_subject_cutover_m28d.js'
+      - 'tests/weather/test_index_radio_cutover_m28e.js'
+      - 'docs/weather-subjects-m28e-radio-index-cutover-handoff.md'
+      - '.github/workflows/weather-subjects-radio-index-cutover-m28e.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  radio-index:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Verify M28-E RADIO deep INDEX and original controls
+        run: node --test tests/weather/test_index_radio_cutover_m28e.js
+      - name: Preserve M28-D earlier cutovers and M1 historical source map
+        run: |
+          node --test tests/weather/test_index_subject_cutover_m28d.js
+          node --test tests/weather/subject_navigation_browser.test.js
+      - name: Preserve existing MEDIA D1 radio transport, source and storage
+        run: node --test tests/weather/test_media_subject_panels_d1.js

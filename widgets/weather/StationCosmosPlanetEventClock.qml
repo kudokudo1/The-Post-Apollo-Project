@@ -10,7 +10,7 @@ Rectangle {
     color: Colors.black
     border.color: Colors.cyan
     border.width: 1
-    height: 361
+    height: 414
 
     property var providerRows: []
     property string civilDate: ""

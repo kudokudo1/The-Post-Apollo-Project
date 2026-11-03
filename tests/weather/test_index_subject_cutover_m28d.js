@@ -45,8 +45,11 @@ test("the historical M1 source map stays intact, without mislabeling all control
     ["map","news"]);
   assert.deepEqual(plain(ctx.sourcePagesForPath("tools/terminal", ctx.PANELS).map(x => x.id)),
     ["terminal"]);
-  assert.deepEqual(plain(ctx.remainingSourcePagesForPath("weather", ctx.PANELS)),
-    plain(ctx.sourcePagesForPath("weather", ctx.PANELS)));
+  assert.ok(ctx.remainingSourcePagesForPath("weather", ctx.PANELS).length > 0,
+    "unreviewed HOME quick/relationship controls must still offer CLASSIC access");
+  assert.ok(ctx.sourcePagesForPath("weather", ctx.PANELS).length
+    >= ctx.remainingSourcePagesForPath("weather", ctx.PANELS).length,
+    "historical provenance cannot shrink with later reviewed cutovers");
   assert.deepEqual(plain(ctx.remainingSourcePagesForPath("earth", ctx.PANELS)),
     plain(ctx.sourcePagesForPath("earth", ctx.PANELS)));
   assert.deepEqual(plain(ctx.remainingSourcePagesForPath("media/watch", ctx.PANELS)),

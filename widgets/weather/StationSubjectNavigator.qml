@@ -66,6 +66,14 @@ Rectangle {
                                : SubjectRoutes.findRoute(path);
         if (!candidate)
             return false;
+        // MORE is a real nested explorer. Group selection must descend
+        // inside that index, not open an unrenderable parent route.
+        if (indexOpen && !home && candidate.group) {
+            currentPath = candidate.path;
+            navigationCursor = 0;
+            if (routeScroll) routeScroll.contentY = 0;
+            return true;
+        }
         currentPath = candidate.path;
         const updated = Object.assign({}, lastSubjectPaths);
         updated[candidate.subject] = candidate.path;

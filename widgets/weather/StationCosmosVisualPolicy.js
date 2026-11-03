@@ -16,6 +16,30 @@ var PHASES = [
     {id:"last-quarter",label:"LAST QTR"},
     {id:"waning-crescent",label:"WAN CRES"}
 ];
+// Educational reference text only. Selecting a marker must never change
+// the provider's current Moon phase, illumination, or source date.
+var PHASE_REFERENCES = {
+    "new": "MOON NEAR SUNWARD DIRECTION // THE EARTH-FACING SIDE IS MOSTLY DARK",
+    "waxing-crescent": "LIT FRACTION INCREASES AFTER NEW MOON // LESS THAN HALF",
+    "first-quarter": "ABOUT HALF OF THE NEAR SIDE LIT // FRACTION INCREASING",
+    "waxing-gibbous": "MORE THAN HALF LIT // APPROACHING FULL MOON",
+    "full": "NEAR SIDE NEARLY FULLY ILLUMINATED // SUN OPPOSITE IN THE SKY",
+    "waning-gibbous": "MORE THAN HALF LIT // FRACTION DECREASING AFTER FULL",
+    "last-quarter": "ABOUT HALF OF THE NEAR SIDE LIT // FRACTION DECREASING",
+    "waning-crescent": "LESS THAN HALF LIT // APPROACHING NEW MOON"
+};
+function phaseReference(id) {
+    var phase=String(id||"");
+    for(var i=0;i<PHASES.length;i++)
+        if(PHASES[i].id===phase)
+            return {
+                valid:true,id:phase,label:PHASES[i].label,
+                description:PHASE_REFERENCES[phase],
+                isReference:true
+            };
+    return {valid:false,id:"",label:"--",
+            description:"CHOOSE A PHASE TO INSPECT",isReference:true};
+}
 function finite(value) {
     if(value===null||value===undefined||String(value).trim()==="")
         return null;

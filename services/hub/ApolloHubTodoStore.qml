@@ -37,11 +37,6 @@ Scope {
     readonly property bool encryptedRecoveryProviderPresent:
         encryptedRecoveryBridge.providerPresent
 
-    function inspectEncryptedRecoveryProvider() {
-        // Explicit read-only D-Bus name-owner check only; no secret I/O.
-        return encryptedRecoveryBridge.inspectProvider();
-    }
-
     TaskEncryptedRecoveryBridgeM13i {
         id: encryptedRecoveryBridge
     }

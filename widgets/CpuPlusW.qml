@@ -45,6 +45,22 @@ PanelWindow {
     property string systemSubMode: "ALL"
     property string settingsSubMode: "LOCATION"
 
+    // A prepared resync is an explicit, view-scoped confirmation request.
+    // Closing or leaving this CPU++ TIME surface must not leave it armed.
+    onMenuOpenChanged: {
+        if (!menuOpen && selectedModeIndex === 4
+                && settingsSubMode === "TIME")
+            TimeSettings.cancelResync();
+    }
+    onSelectedModeIndexChanged: {
+        if (selectedModeIndex !== 4 && settingsSubMode === "TIME")
+            TimeSettings.cancelResync();
+    }
+    onSettingsSubModeChanged: {
+        if (settingsSubMode !== "TIME")
+            TimeSettings.cancelResync();
+    }
+
     readonly property var thermalSubModes: [
         { name: "TEMP", key: 0, symbol: "🌡" },
         { name: "FAN", key: 1, symbol: "✇" }

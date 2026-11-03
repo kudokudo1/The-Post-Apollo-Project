@@ -1,0 +1,51 @@
+name: Weather M28-A MEDIA to EARTH mentioned-location cutover
+
+on:
+  pull_request:
+    paths:
+      - "widgets/weather/WeatherStationW.qml"
+      - "widgets/weather/StationSubjectNavigator.qml"
+      - "widgets/weather/StationWorkspaceSurface.qml"
+      - "widgets/weather/StationEarthSubjectPane.qml"
+      - "widgets/weather/StationDiscovery.qml"
+      - "widgets/weather/StationMediaSubjectPane.qml"
+      - "widgets/weather/StationMapProjectionPolicy.js"
+      - "tests/weather/test_media_earth_mentions_cutover_m28a.js"
+      - "tests/weather/test_earth_subject_panels_e1.js"
+      - "tests/weather/fixtures/M28AMediaEarthMentions.qml"
+      - "scripts/weather/verify_media_earth_mentions_fedora_m28a.sh"
+      - "docs/weather-subjects-m28a-media-earth-handoff.md"
+      - ".github/workflows/weather-subjects-media-earth-m28a.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  media-earth:
+    runs-on: ubuntu-latest
+    container:
+      image: fedora:44
+    timeout-minutes: 20
+    steps:
+      - name: Install isolated Fedora Quickshell and X11 pointer runner
+        run: |
+          dnf install -y --setopt=install_weak_deps=False dnf5-plugins
+          dnf copr enable -y errornointernet/quickshell
+          dnf install -y --setopt=install_weak_deps=False \
+            quickshell qt6-qtdeclarative qt6-qt5compat qt6-qtbase-gui \
+            qt6-qtsvg git nodejs coreutils findutils \
+            xdotool xorg-x11-server-Xvfb
+          quickshell --version
+          quickshell --version | grep '0.3.'
+      - uses: actions/checkout@v4
+      - name: Verify exact MEDIA to EARTH subject ownership and source identity
+        run: node --test tests/weather/test_media_earth_mentions_cutover_m28a.js
+      - name: Preserve original EARTH E1 scope and dossier behavior
+        run: node --test tests/weather/test_earth_subject_panels_e1.js
+      - name: Preserve existing MEDIA D1 news, radio and viewer behavior
+        run: node --test tests/weather/test_media_subject_panels_d1.js
+      - name: Preserve W1 main workspace and subject navigator
+        run: node --test tests/weather/test_workspace_landing_w1.js
+      - name: Native SUBJECTS route to EARTH map marker and clear
+        run: bash scripts/weather/verify_media_earth_mentions_fedora_m28a.sh

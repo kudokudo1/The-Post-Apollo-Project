@@ -55,6 +55,11 @@ test("Moon display prefers USNO and explicitly labels WTTR daily fallback",()=>{
     const missing=v.moonDisplay(false,null,null);
     assert.equal(missing.ready,false);
     assert.equal(missing.illumination,null);
+    assert.equal(missing.directionKnown,false);
+    const incomplete=v.moonDisplay(true,{available:true,phase:"--",illumination:38,sourceDate:"2026-11-03"},null);
+    assert.equal(incomplete.ready,true);
+    assert.equal(incomplete.directionKnown,false);
+    assert.equal(incomplete.waxing,null);
     assert.equal(missing.source,"NO VERIFIED PHASE");
 });
 

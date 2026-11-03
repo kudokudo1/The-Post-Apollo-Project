@@ -1583,8 +1583,10 @@ Rectangle {
                     meterValue: modelData.meterValue
                     meterFillColor:
                         home.sourceMeterFill(modelData.source)
-                    provenanceText:
-                        CardProvenance.provenance(modelData, home.sourceHealthRows)
+                    provenanceText: home.homeFavoritesStore
+                        ? CardProvenance.provenance(
+                            modelData, home.sourceHealthRows
+                          ) : ""
                     pinEnabled: !!home.homeFavoritesStore
                     pinned: home.homeFavoritesStore
                         ? home.homeFavoritesStore.cardKeys.indexOf(

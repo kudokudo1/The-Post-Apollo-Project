@@ -135,14 +135,15 @@ test("catalogue transfer does not create duplicate NEWS writer, web renderer or 
   assert.match(navigator,/model: browser\.classicSources/);
 });
 
-test("the seven unrelated HOME/source-rack controls remain pending, despite catalogue completion",()=>{
-  const expected=[
-    "home-aqi-humidity","home-aqi-wind","home-quick-conditions",
-    "home-space-weather","ground-source","map-source-rack","station-source-badge"
-  ];
+test("M28-J seven catalog controls remain exact after HOME is separately reviewed",()=>{
+  assert.equal(Object.values(env.WIRED_IN_SUBJECTS)
+    .filter(milestone=>milestone==="M28-J").length,7,
+    "M28-J retains all five WATCH and two creator controls");
+  const expected=["ground-source","map-source-rack","station-source-badge"];
   const pending=Object.keys(env.PANELS).filter(id=>!env.WIRED_IN_SUBJECTS[id]).sort();
   assert.deepEqual(pending,expected.sort());
   assert.ok(env.remainingSourcePagesForPath("tools/sources/health",env.PANELS).length>0);
-  assert.ok(env.remainingSourcePagesForPath("weather",env.PANELS).length>0);
+  assert.deepEqual(plain(env.remainingSourcePagesForPath("weather",env.PANELS)),[],
+    "M28-K original HOME controls belong to the native HOME workspace");
   assert.deepEqual(plain(env.nativeDestinationsForPath("../media",env.PANELS)),[]);
 });

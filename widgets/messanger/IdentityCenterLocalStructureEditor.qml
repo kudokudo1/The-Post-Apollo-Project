@@ -8,6 +8,8 @@ Column {
     property var directoryStore: null
     property var structureStore: null
     property string selectedOrgId: ""
+    property bool useSharedContext: false
+    onSelectedOrgIdChanged: confirmationKey = ""
     property string selectedKind: "division"
     property bool showArchivedUnits: false
     property bool showArchivedOrganizations: false
@@ -84,6 +86,7 @@ Column {
     }
     Text {
         width: parent.width
+        visible: !editor.useSharedContext
         text: "1 // ORGANIZATION"
         color: Colors.cyan
         font.bold: true
@@ -91,6 +94,7 @@ Column {
     }
     Flow {
         width: parent.width
+        visible: !editor.useSharedContext
         spacing: 5
         height: childrenRect.height
         Repeater {
@@ -112,6 +116,7 @@ Column {
     ActionButton {
         width: 170
         height: 27
+        visible: !editor.useSharedContext
         label: editor.showArchivedOrganizations
                ? "HIDE ARCHIVED ORGS" : "SHOW ARCHIVED ORGS"
         labelPixelSize: 9

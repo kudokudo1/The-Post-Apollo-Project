@@ -16,6 +16,8 @@ import SocialLocalOrganizationStructure as structure  # noqa: E402
 import SocialOrganizationDirectory as directory  # noqa: E402
 
 SECTIONS = (ROOT / "widgets/messanger/IdentityCenterSettingsSections.qml").read_text()
+# The original editors now live in the consolidated local workspace.
+SECTIONS += "\n" + (ROOT / "widgets/messanger/IdentityCenterLocalOrganizationsWorkspace.qml").read_text()
 APP = (ROOT / "widgets/messanger/AppSelector.qml").read_text()
 EDITOR = (ROOT / "widgets/messanger/IdentityCenterLocalStructureEditor.qml").read_text()
 STORE = (ROOT / "services/social/SocialLocalOrganizationStructureStore.qml").read_text()

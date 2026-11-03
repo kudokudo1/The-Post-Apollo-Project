@@ -1,0 +1,51 @@
+name: Social Organizations Navigation v2 UI-only consolidation
+
+on:
+  pull_request:
+    paths:
+      - 'widgets/messanger/IdentityCenterSettingsSections.qml'
+      - 'widgets/messanger/IdentityCenterLocalOrganizationsWorkspace.qml'
+      - 'widgets/messanger/IdentityCenterLocalStructureEditor.qml'
+      - 'widgets/messanger/IdentityCenterLocalUnitLocationsEditor.qml'
+      - 'widgets/messanger/IdentityCenterLocalBranchLocationsEditor.qml'
+      - 'widgets/messanger/IdentityCenterLocalFunctionalReportingEditor.qml'
+      - 'widgets/messanger/IdentityCenterLocalSocialLinksEditor.qml'
+      - 'tests/messaging/test_identity_center_local_navigation_v2.py'
+      - 'tests/messaging/test_social_local_*'
+      - 'tests/messaging/test_social_org_links_v1.py'
+      - '.github/workflows/social-organizations-navigation-v2.yml'
+      - 'MODEL/contracts/social-organizations-navigation-v2.md'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  organizations-navigation:
+    runs-on: ubuntu-latest
+    timeout-minutes: 13
+    env:
+      QT_QPA_PLATFORM: offscreen
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Navigation contract and original private-store regressions
+        run: |
+          python3 -m unittest discover -s tests/messaging -p 'test_identity_center_local_navigation_v2.py' -v
+          python3 -m unittest discover -s tests/messaging -p 'test_identity_center_settings_sections.py' -v
+          python3 -m unittest discover -s tests/messaging -p 'test_social_local_organizations.py' -v
+          python3 -m unittest discover -s tests/messaging -p 'test_social_local_portfolios_v1.py' -v
+          python3 -m unittest discover -s tests/messaging -p 'test_social_local_org_structure_v1.py' -v
+          python3 -m unittest discover -s tests/messaging -p 'test_social_local_unit_locations_v1.py' -v
+          python3 -m unittest discover -s tests/messaging -p 'test_social_local_branch_locations_v1.py' -v
+          python3 -m unittest discover -s tests/messaging -p 'test_social_local_functional_reporting_v1.py' -v
+          python3 -m unittest discover -s tests/messaging -p 'test_social_org_links_v1.py' -v
+      - name: Install disposable offscreen Qt6 engine
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends libegl1 libopengl0 libgl1 libxkbcommon0
+          python3 -m pip install --disable-pip-version-check 'PySide6==6.9.3'
+      - name: Load real Settings QML and gated Identity Center reader
+        run: python3 -m unittest discover -s tests/messaging -p 'test_identity_center_offscreen_qml_v0.py' -v

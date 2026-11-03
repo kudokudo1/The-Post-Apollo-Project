@@ -330,6 +330,58 @@ class RealQtOrganizationsSettingsPaneSmoke(unittest.TestCase):
         self._finish(_body())
         self.assertIsNone(self._display())
 
+    def test_navigation_v2_real_qt_shows_one_workspace_and_mode(self):
+        self._open_organizations()
+        nav = self.sections.findChild(QObject, "orgNavigationV2")
+        self.assertIsNotNone(nav, "Navigation workspace not constructed")
+        self.assertEqual(nav.property("activeWorkspace"), "overview")
+
+        def item(name):
+            found = self.sections.findChild(QObject, name)
+            self.assertIsNotNone(found, name + " not found in real QML tree")
+            return found
+
+        companies = item("navV2Companies")
+        portfolios = item("navV2Portfolios")
+        structure = item("navV2Structure")
+        reporting = item("navV2Reporting")
+        functions = item("navV2Functions")
+        branches = item("navV2Branches")
+        social = item("navV2Social")
+
+        nav.setProperty("activeWorkspace", "companies")
+        APP.processEvents()
+        self.assertTrue(companies.property("visible"))
+        self.assertFalse(portfolios.property("visible"))
+        nav.setProperty("companyMode", "portfolios")
+        APP.processEvents()
+        self.assertFalse(companies.property("visible"))
+        self.assertTrue(portfolios.property("visible"))
+
+        nav.setProperty("activeWorkspace", "structure")
+        APP.processEvents()
+        self.assertTrue(structure.property("visible"))
+        self.assertFalse(companies.property("visible"))
+
+        nav.setProperty("activeWorkspace", "relationships")
+        APP.processEvents()
+        for mode, selected in (
+            ("reporting", reporting),
+            ("functions", functions),
+            ("branches", branches),
+            ("social", social),
+        ):
+            nav.setProperty("relationshipMode", mode)
+            APP.processEvents()
+            self.assertTrue(selected.property("visible"), mode)
+            self.assertEqual(
+                [x.property("visible") for x in (reporting, functions, branches, social)].count(True),
+                1, "Multiple relationship forms visible in " + mode,
+            )
+        self.assertFalse(structure.property("visible"))
+        self.assertFalse(self.sections.property("organizationDisplayReady"))
+
+
     def test_host_logout_and_failure_are_reflected_in_real_panel(self):
         self._open_organizations()
         self._finish(_body())

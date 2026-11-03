@@ -16,6 +16,8 @@ import SocialLocalPortfolios as p  # noqa: E402
 import SocialOrganizationDirectory as orgs  # noqa: E402
 
 SECTIONS = (ROOT / "widgets/messanger/IdentityCenterSettingsSections.qml").read_text()
+# The original editors now live in the consolidated local workspace.
+SECTIONS += "\n" + (ROOT / "widgets/messanger/IdentityCenterLocalOrganizationsWorkspace.qml").read_text()
 APP = (ROOT / "widgets/messanger/AppSelector.qml").read_text()
 EDITOR = (ROOT / "widgets/messanger/IdentityCenterLocalPortfolioEditor.qml").read_text()
 STORE = (ROOT / "services/social/SocialLocalPortfoliosStore.qml").read_text()

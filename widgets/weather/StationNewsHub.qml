@@ -4,6 +4,7 @@ import Quickshell
 import Quickshell.Io
 import "../../components"
 import "StationNewsCatalogPolicy.js" as Catalog
+import "StationMediaSubjectPanelPolicy.js" as MediaPanelPolicy
 
 // NEWS domain channel rack. Sources are explicit catalog destinations, NOT
 // claims of streaming health. One in-pane viewer; GDELT headlines remain a
@@ -13,6 +14,16 @@ Rectangle {
     property bool stationOpen: true
     property real runtimeNowMs: Date.now()
     property string section: "LIVE"
+    // Empty route keeps the original CLASSIC NEWS hub unchanged.
+    property string subjectRoute: ""
+    readonly property string effectiveSection: subjectRoute === ""
+        ? section : MediaPanelPolicy.catalogSectionFor(subjectRoute)
+    onSubjectRouteChanged: {
+        if (viewerOpen)
+            closeViewer();
+        if (catalogScroll)
+            catalogScroll.contentY = 0;
+    }
     property bool viewerOpen: false
     property var chosenRecord: null
     signal newsMapRequested(var payload)
@@ -38,21 +49,21 @@ Rectangle {
     property var creatorFeedRows: []
     property string selectedCreatorId: ""
     property string inflightCreatorId: ""
-    readonly property bool isReports: section === "REPORTS"
+    readonly property bool isReports: effectiveSection === "REPORTS"
     readonly property var runtimeRows:
         isReports && reportsLoader.item
         && Array.isArray(reportsLoader.item.runtimeRows)
         ? reportsLoader.item.runtimeRows : []
     readonly property string feedBadge: isReports
         ? (reportsLoader.item ? reportsLoader.item.feedBadge : "NEWS // CONNECTING")
-        : "NEWS // " + section + " CATALOG"
+        : "NEWS // " + effectiveSection + " CATALOG"
     readonly property color feedBadgeColor: isReports && reportsLoader.item
         ? reportsLoader.item.feedBadgeColor : Colors.cyan
 
     readonly property var creatorEntries: creatorAdapter.creatorEntries
     readonly property var visibleItems: {
-        const base = Catalog.itemsFor(section);
-        if (section !== "CREATORS") return base;
+        const base = Catalog.itemsFor(effectiveSection);
+        if (effectiveSection !== "CREATORS") return base;
         const saved = creatorEntries;
         const result = base.slice();
         for (let i = 0; i < saved.length && i < 40; ++i) {
@@ -179,9 +190,10 @@ Rectangle {
         anchors.right: parent.right
         anchors.top: parent.top
         anchors.margins: 10
-        height: 33
+        height: stationNewsHub.subjectRoute === "" ? 33 : 0
         spacing: 7
-        visible: !stationNewsHub.viewerOpen
+        visible: stationNewsHub.subjectRoute === ""
+                 && !stationNewsHub.viewerOpen
 
         Repeater {
             model: Catalog.sections
@@ -191,7 +203,7 @@ Rectangle {
                 height: 32
                 label: modelData
                 labelPixelSize: 11
-                selected: stationNewsHub.section === modelData
+                selected: stationNewsHub.effectiveSection === modelData
                 onClicked: {
                     stationNewsHub.closeViewer();
                     stationNewsHub.section = modelData;
@@ -214,6 +226,7 @@ Rectangle {
             StationDiscovery {
                 domain: "news"
                 stationOpen: stationNewsHub.stationOpen
+                newsSubjectRoute: stationNewsHub.subjectRoute
                 runtimeNowMs: stationNewsHub.runtimeNowMs
                 onNewsMapRequested: function(payload) {
                     stationNewsHub.newsMapRequested(payload);
@@ -245,7 +258,7 @@ Rectangle {
                 height: 25
                 spacing: 12
                 GohuText {
-                    text: "NEWS // " + stationNewsHub.section
+                    text: "MEDIA // " + stationNewsHub.effectiveSection
                     color: Colors.cyan
                     font.pixelSize: 20
                 }
@@ -259,13 +272,13 @@ Rectangle {
                 width: parent.width
                 wrapMode: Text.WordWrap
                 font.pixelSize: 11
-                text: stationNewsHub.section === "CONGRESS"
+                text: stationNewsHub.effectiveSection === "CONGRESS"
                       ? "OFFICIAL FLOOR AND HEARING WEBCASTS // LIVE ONLY WHEN IN SESSION"
-                      : stationNewsHub.section === "COMPARE"
+                      : stationNewsHub.effectiveSection === "COMPARE"
                       ? "COMPARE OUTLETS, NOT A CLAIM OF PERFECT NEUTRALITY // RATINGS OWNED BY PROVIDER"
-                      : stationNewsHub.section === "CREATORS"
+                      : stationNewsHub.effectiveSection === "CREATORS"
                       ? "DISCUSSION & USER-SAVED CHANNELS // NOT EDITORIAL NEWS CERTIFICATION"
-                      : stationNewsHub.section === "SATIRE"
+                      : stationNewsHub.effectiveSection === "SATIRE"
                       ? "PARODY AND FICTIONAL NEWS // NOT VERIFIED CURRENT EVENTS"
                       : "SOURCE PAGES REGISTERED // VIDEO ENGINE TEMPORARILY DISABLED"
             }
@@ -357,7 +370,7 @@ Rectangle {
             Column {
                 width: parent.width
                 spacing: 9
-                visible: stationNewsHub.section === "CREATORS"
+                visible: stationNewsHub.effectiveSection === "CREATORS"
 
                 StationSectionDivider {
                     width: parent.width

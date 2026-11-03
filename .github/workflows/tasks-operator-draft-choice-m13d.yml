@@ -1,0 +1,46 @@
+name: TASKS M13d explicit synthetic draft choice
+
+on:
+  pull_request:
+    paths:
+      - 'tests/tasks/fixtures/TaskOperatorDraftChoiceM13d.cjs'
+      - 'tests/tasks/test_task_operator_draft_choice_m13d.cjs'
+      - 'docs/tasks-operator-draft-choice-m13d.md'
+      - '.github/workflows/tasks-operator-draft-choice-m13d.yml'
+      - 'services/hub/ApolloHubTodoStore.qml'
+  push:
+    branches: [main]
+    paths:
+      - 'tests/tasks/fixtures/TaskOperatorDraftChoiceM13d.cjs'
+      - 'tests/tasks/test_task_operator_draft_choice_m13d.cjs'
+      - '.github/workflows/tasks-operator-draft-choice-m13d.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  synthetic-choice:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: M13d synthetic keep/export/delete choices and no-actuation proof
+        run: node --test tests/tasks/test_task_operator_draft_choice_m13d.cjs
+      - name: M13c fake pinned evidence and no-deletion age
+        run: node --test tests/tasks/test_task_recovery_evidence_m13c.cjs
+      - name: M13b read-only recovery display
+        run: node --test tests/tasks/test_task_recovery_display_m13b.cjs
+      - name: M13a fresh-owner stage recovery
+        run: node --test tests/tasks/test_task_restart_review_m13a.cjs
+      - name: M12o four-consumer draft contract
+        run: node --test tests/tasks/test_task_disabled_ticket_api_m12o.cjs
+      - name: M12p Hub presenter
+        run: node --test tests/tasks/test_task_hub_ticket_presenter_m12p.cjs
+      - name: M11d sole live writer and ticket gates disabled
+        run: python3 tests/tasks/test_task_writer_gate_inventory_m11d.py

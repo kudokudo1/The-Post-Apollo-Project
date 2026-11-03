@@ -193,3 +193,77 @@ function axisText(ms) {
     if(number(ms)===null)return "--";
     return new Date(ms).toISOString().slice(0,16).replace("T"," ")+"Z";
 }
+
+
+// M5d // Pure read-only event navigation. Event timestamps are exact-search
+// results; selected body coordinates are explicitly the nearest M4 sample.
+function nearestSampleIndex(m,unixMs) {
+    if(!m || !m.ready || number(unixMs)===null)return -1;
+    var times=m.times,lo=0,hi=times.length-1;
+    if(unixMs<=times[0])return 0;
+    if(unixMs>=times[hi])return hi;
+    while(lo+1<hi) {
+        var mid=Math.floor((lo+hi)/2);
+        if(times[mid]<unixMs)lo=mid;
+        else hi=mid;
+    }
+    return unixMs-times[lo]<=times[hi]-unixMs?lo:hi;
+}
+function visibleEvents(m,view) {
+    if(!m || !m.ready || !view || view.count<2)return [];
+    var start=m.times[view.from],end=m.times[view.to];
+    if(number(start)===null || number(end)===null)return [];
+    return m.events.filter(function(event){
+        var ms=Date.parse(event.time_utc);
+        return ms>=start && ms<=end;
+    }).sort(function(a,b){return Date.parse(a.time_utc)-Date.parse(b.time_utc);});
+}
+function eventAt(m,view,ordinal) {
+    var events=visibleEvents(m,view);
+    return typeof ordinal==="number" && ordinal>=0 &&
+        ordinal<events.length && Math.floor(ordinal)===ordinal
+        ? events[ordinal] : null;
+}
+function stepEvent(m,view,currentOrdinal,direction) {
+    var events=visibleEvents(m,view);
+    if(!events.length)return null;
+    var next;
+    if(typeof currentOrdinal!=="number" || currentOrdinal<0 ||
+       currentOrdinal>=events.length || Math.floor(currentOrdinal)!==currentOrdinal)
+        next=direction<0?events.length-1:0;
+    else next=(currentOrdinal+(direction<0?-1:1)+events.length)%events.length;
+    var event=events[next];
+    return {ordinal:next,event:event,
+            sampleIndex:nearestSampleIndex(m,Date.parse(event.time_utc))};
+}
+function eventLabel(m,view,ordinal) {
+    var events=visibleEvents(m,view);
+    if(!events.length)return "NO CALCULATED EVENTS IN VIEW";
+    var e=eventAt(m,view,ordinal);
+    if(!e)return events.length+" EVENTS // SELECT TO INSPECT";
+    var kind=e.contact_kind==="tangent_candidate"?"GRAZING CANDIDATE":
+        e.type==="apparent_longitude_station"?"ESTIMATED STATION":"ANGLE CROSSING";
+    return (ordinal+1)+"/"+events.length+"  "+
+        String(e.name||"event").replace(/_/g," ").toUpperCase()+
+        " // "+kind+" // "+axisText(Date.parse(e.time_utc));
+}
+function bodyDetails(m,index,body) {
+    if(!m || !m.ready || index<0)return "NO POSITION SELECTED";
+    var entry=m.series.find(function(s){return s.body===body;});
+    if(!entry || index>=entry.rows.length)return "NO POSITION SELECTED";
+    var p=entry.rows[index],signIndex=Math.floor(p.longitude_deg/30)%12;
+    return body.toUpperCase()+"  "+p.longitude_deg.toFixed(3)+"° "+
+        SIGNS[signIndex]+" "+(p.longitude_deg%30).toFixed(2)+"°"+
+        "  LAT "+p.latitude_deg.toFixed(2)+"°  "+
+        p.distance_au.toFixed(4)+" AU";
+}
+function pairDetails(m,index) {
+    if(!m || !m.ready || index<0)return "NO RELATIONSHIP SELECTED";
+    if(!m.relationships.length)return "SINGLE BODY // NO PAIR";
+    var rel=m.relationships[0],sample=rel.samples[index];
+    if(!sample)return "NO RELATIONSHIP SELECTED";
+    var aspects=sample.aspects.map(function(a){return String(a.name||"").toUpperCase();});
+    return rel.bodies.map(function(body){return body.toUpperCase();}).join(" / ")+
+        "  SEPARATION "+sample.longitude_separation_deg.toFixed(3)+"°"+
+        (aspects.length?"  "+aspects.join(", "):"  NO ASPECT IN ORB");
+}

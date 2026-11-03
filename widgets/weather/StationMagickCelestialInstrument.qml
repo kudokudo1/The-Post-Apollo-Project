@@ -22,6 +22,18 @@ Rectangle {
     property int hoveredIndex: -1
     property real zoom: 1.0
     property real panPosition: 0.5
+    property int eventOrdinal: -1
+
+    readonly property var eventsInView: Celestial.visibleEvents(graphModel,viewWindow)
+    readonly property var chosenEvent: Celestial.eventAt(graphModel,viewWindow,eventOrdinal)
+
+    function stepToEvent(direction) {
+        const chosen=Celestial.stepEvent(graphModel,viewWindow,eventOrdinal,direction);
+        if(!chosen)return false;
+        instrument.eventOrdinal=chosen.ordinal;
+        instrument.lockedIndex=chosen.sampleIndex;
+        return true;
+    }
 
     readonly property var graphModel: Celestial.model(visualData)
     readonly property var viewWindow: Celestial.windowFor(
@@ -40,11 +52,16 @@ Rectangle {
         instrument.selectedBody="";
         instrument.zoom=1.0;
         instrument.panPosition=0.5;
+        instrument.eventOrdinal=-1;
     }
     onGraphModelChanged: graphCanvas.requestPaint()
     onFocusIndexChanged: graphCanvas.requestPaint()
     onModeChanged: graphCanvas.requestPaint()
-    onViewWindowChanged: graphCanvas.requestPaint()
+    onViewWindowChanged: {
+        instrument.eventOrdinal=-1;
+        graphCanvas.requestPaint();
+    }
+    onEventOrdinalChanged: graphCanvas.requestPaint()
     onSelectedBodyChanged: graphCanvas.requestPaint()
     onWidthChanged: graphCanvas.requestPaint()
     onHeightChanged: graphCanvas.requestPaint()
@@ -171,6 +188,13 @@ Rectangle {
                 const t=Date.parse(instrument.graphModel.events[e].time_utc);
                 if(t<start||t>end)continue;
                 const x=(t-start)/Math.max(1,end-start)*width;
+                const event=instrument.graphModel.events[e];
+                const selected=instrument.chosenEvent &&
+                    event.time_utc===instrument.chosenEvent.time_utc &&
+                    event.name===instrument.chosenEvent.name;
+                ctx.strokeStyle=selected?String(Colors.magenta):String(Colors.yellow);
+                ctx.globalAlpha=selected?1:0.38;
+                ctx.lineWidth=selected?2:1;
                 ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x,height);
                 ctx.stroke();
             }
@@ -249,7 +273,7 @@ Rectangle {
         Rectangle {
             id: chartFrame
             width: parent.width
-            height: Math.max(170,instrument.height-189)
+            height: Math.max(155,instrument.height-225)
             color: Colors.dark
             border.width: 1
             border.color: Colors.cyan
@@ -296,6 +320,7 @@ Rectangle {
                                 -(mouse.x-previousX)/Math.max(1,width),
                                 0,1);
                         } else if (panning && instrument.mode==="wheel") {
+                            instrument.eventOrdinal=-1;
                             instrument.lockedIndex=Celestial.indexAtFraction(
                                 instrument.graphModel,instrument.viewWindow,
                                 mouse.x/Math.max(1,width));
@@ -318,8 +343,10 @@ Rectangle {
                             instrument.graphModel,instrument.focusIndex,nx,ny);
                         if(body===null)return;
                         instrument.selectedBody=body;
+                        instrument.eventOrdinal=-1;
                         instrument.lockedIndex=instrument.focusIndex;
                     }else {
+                        instrument.eventOrdinal=-1;
                         instrument.lockedIndex=Celestial.indexAtFraction(
                             instrument.graphModel,instrument.viewWindow,
                             mouse.x/Math.max(1,width));
@@ -361,6 +388,45 @@ Rectangle {
             }
         }
 
+        // Event times are backend-calculated; the wheel/curve is deliberately
+        // locked to the nearest *sample*, not an invented interpolated point.
+        Row {
+            width: parent.width
+            height: 24
+            spacing: 5
+            ActionButton {
+                width: 79
+                height: 24
+                label: "◀ EVENT"
+                labelPixelSize: 9
+                contentPadding: 2
+                accentColor: Colors.yellow
+                available: instrument.graphModel.ready && instrument.eventsInView.length>0
+                onClicked: instrument.stepToEvent(-1)
+            }
+            QuietText {
+                width: Math.max(0,parent.width-158-10)
+                height: 24
+                font.pixelSize: 9
+                verticalAlignment: Text.AlignVCenter
+                horizontalAlignment: Text.AlignHCenter
+                elide: Text.ElideRight
+                color: Colors.white
+                text: Celestial.eventLabel(instrument.graphModel,
+                                          instrument.viewWindow,instrument.eventOrdinal)
+            }
+            ActionButton {
+                width: 79
+                height: 24
+                label: "EVENT ▶"
+                labelPixelSize: 9
+                contentPadding: 2
+                accentColor: Colors.yellow
+                available: instrument.graphModel.ready && instrument.eventsInView.length>0
+                onClicked: instrument.stepToEvent(1)
+            }
+        }
+
         Row {
             width: parent.width
             height: 30
@@ -383,22 +449,27 @@ Rectangle {
                                  ? Colors.orange:Colors.cyan
                     available: instrument.graphModel.ready
                     onClicked: {
-                        if(modelData.id==="back")
+                        if(modelData.id==="back") {
+                            instrument.eventOrdinal=-1;
                             instrument.lockedIndex=Celestial.clamp(
                                 instrument.focusIndex-1,0,
                                 instrument.graphModel.sampleCount-1);
-                        else if(modelData.id==="next")
+                        } else if(modelData.id==="next") {
+                            instrument.eventOrdinal=-1;
                             instrument.lockedIndex=Celestial.clamp(
                                 instrument.focusIndex+1,0,
                                 instrument.graphModel.sampleCount-1);
-                        else if(modelData.id==="unlock")
+                        } else if(modelData.id==="unlock") {
+                            instrument.eventOrdinal=-1;
                             instrument.lockedIndex=-1;
+                        }
                         else if(modelData.id==="reset"){
                             instrument.lockedIndex=-1;
                             instrument.hoveredIndex=-1;
                             instrument.zoom=1;
                             instrument.panPosition=0.5;
                             instrument.selectedBody="";
+                            instrument.eventOrdinal=-1;
                         }
                     }
                 }
@@ -407,26 +478,35 @@ Rectangle {
 
         GohuText {
             width: parent.width
-            font.pixelSize: 11
+            height: 14
+            font.pixelSize: 10
             color: Colors.white
             elide: Text.ElideRight
             text: instrument.graphModel.ready
                 ? Celestial.axisText(
-                     instrument.graphModel.times[instrument.focusIndex])
-                  +" // "+Celestial.valueLabel(
-                     instrument.graphModel,instrument.focusIndex,
-                     instrument.focusBody)
+                    instrument.graphModel.times[instrument.focusIndex])
+                    +" // "+Celestial.bodyDetails(instrument.graphModel,
+                        instrument.focusIndex,instrument.focusBody)
                 : "NO SOURCE-VERIFIED OBSERVATION OR CALCULATION"
         }
         QuietText {
             width: parent.width
+            height: 14
+            font.pixelSize: 10
+            color: Colors.cyan
+            elide: Text.ElideRight
+            text: Celestial.pairDetails(instrument.graphModel,
+                                        instrument.focusIndex)
+        }
+        QuietText {
+            width: parent.width
+            height: 14
             font.pixelSize: 9
             color: Colors.yellow
-            wrapMode: Text.WordWrap
-            text: "GEOCENTRIC APPARENT // TRUE ECLIPTIC OF DATE"
-                  +" // ZODIAC IS TROPICAL REFERENCE"
-                  +" // ASPECTS ARE LONGITUDE CONVENTIONS"
-                  +" // EVENTS ARE SAMPLED, NOT EXHAUSTIVE"
+            elide: Text.ElideRight
+            text: instrument.chosenEvent
+                ? "CALCULATED EVENT TIME // PLANET POSITIONS USE NEAREST SAMPLE"
+                : "GEOCENTRIC / TROPICAL REFERENCE // SAMPLED EVENTS NOT EXHAUSTIVE"
         }
     }
 }

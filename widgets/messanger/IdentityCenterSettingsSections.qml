@@ -201,6 +201,7 @@ Item {
 
                     IdentityCenterLocalOrganizationsWorkspace {
                         id: localOrganizationsWorkspace
+                        objectName: "orgNavigationV2"
                         width: parent.width
                         directoryStore: sections.localDirectoryStore
                         portfolioStore: sections.localPortfoliosStore

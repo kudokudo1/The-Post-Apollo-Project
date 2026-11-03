@@ -265,11 +265,13 @@ Column {
             }
         }
         IdentityCenterLocalOrganizationEditor {
+        objectName: "navV2Companies"
             width: parent.width
             visible: workspace.companyMode === "organizations"
             directoryStore: workspace.directoryStore
         }
         IdentityCenterLocalPortfolioEditor {
+        objectName: "navV2Portfolios"
             width: parent.width
             visible: workspace.companyMode === "portfolios"
             directoryStore: workspace.directoryStore
@@ -278,6 +280,7 @@ Column {
     }
 
     IdentityCenterLocalStructureEditor {
+        objectName: "navV2Structure"
         width: parent.width
         visible: workspace.activeWorkspace === "structure"
         directoryStore: workspace.directoryStore
@@ -329,6 +332,7 @@ Column {
             wrapMode: Text.WordWrap
         }
         IdentityCenterLocalFunctionalReportingEditor {
+        objectName: "navV2Reporting"
             width: parent.width
             visible: workspace.relationshipMode === "reporting"
             directoryStore: workspace.directoryStore
@@ -338,6 +342,7 @@ Column {
             selectedOrgId: workspace.currentOrgId
         }
         IdentityCenterLocalUnitLocationsEditor {
+        objectName: "navV2Functions"
             width: parent.width
             visible: workspace.relationshipMode === "functions"
             directoryStore: workspace.directoryStore
@@ -347,6 +352,7 @@ Column {
             selectedOrgId: workspace.currentOrgId
         }
         IdentityCenterLocalBranchLocationsEditor {
+        objectName: "navV2Branches"
             width: parent.width
             visible: workspace.relationshipMode === "branches"
             directoryStore: workspace.directoryStore
@@ -356,6 +362,7 @@ Column {
             selectedOrgId: workspace.currentOrgId
         }
         IdentityCenterLocalSocialLinksEditor {
+        objectName: "navV2Social"
             width: parent.width
             visible: workspace.relationshipMode === "social"
             directoryStore: workspace.directoryStore

@@ -445,8 +445,14 @@ PanelWindow {
             return officialAlertSummary.headerText
                    + (officialAlertUsingPersistentCache ? " // CACHE" : "");
 
-        if (subjectNavigationOpen)
+        if (subjectNavigationOpen) {
+            // WEATHER pages use the true fallback/cache provenance. Other
+            // SUBJECTS and the deep INDEX retain their original badges.
+            if (!subjectNavigator.indexOpen
+                    && subjectNavigator.liveWeatherKind !== "")
+                return weatherDiagnostics.header;
             return subjectSourceBadge.text;
+        }
 
         if (usesHomeSources) {
             if (homeWeatherUsable && homeSpaceUsable) {
@@ -507,8 +513,14 @@ PanelWindow {
             return officialAlertSummary.headerText
                    + (officialAlertUsingPersistentCache ? " // CACHE" : "");
 
-        if (subjectNavigationOpen)
+        if (subjectNavigationOpen) {
+            // WEATHER pages use the true fallback/cache provenance. Other
+            // SUBJECTS and the deep INDEX retain their original badges.
+            if (!subjectNavigator.indexOpen
+                    && subjectNavigator.liveWeatherKind !== "")
+                return weatherDiagnostics.header;
             return subjectSourceBadge.text;
+        }
 
         if (usesHomeSources) {
             if (homeWeatherUsable && homeSpaceUsable)
@@ -548,6 +560,17 @@ PanelWindow {
             return officialAlertColor(officialAlertSummary.colorToken);
 
         if (subjectNavigationOpen) {
+            if (!subjectNavigator.indexOpen
+                    && subjectNavigator.liveWeatherKind !== "") {
+                if (weatherDiagnostics.currentState === "CACHE"
+                        || weatherDiagnostics.currentState === "FALLBACK")
+                    return Colors.yellow;
+                if (weatherDiagnostics.currentState === "OFFLINE")
+                    return Colors.red;
+                if (weatherDiagnostics.currentState === "READING")
+                    return Colors.orange;
+                return Colors.cyan;
+            }
             switch (subjectSourceBadge.tone) {
             case "red": return Colors.red;
             case "yellow": return Colors.yellow;

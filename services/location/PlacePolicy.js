@@ -1,14 +1,17 @@
 .pragma library
 
-// Post-Apollo Places M2: user-supplied Home and temporary Explore context.
-// A v1 Home-only file remains valid. No IP guessing, geocoding, or network calls.
+// Post-Apollo Places M3: manual Home, Explore and saved-place bookmarks.
+// Earlier Home/Explore files migrate on load. No IP/network geolocation.
 const SCHEMA = "post-apollo.places.v1";
 const MAX_REVISION = 9007199254740990;
+const MAX_SAVED_PLACES = 32;
+const MAX_DOCUMENT_BYTES = 16384;
 const EXPLORE_DURATIONS = {"30M":1800000, "2H":7200000, "1D":86400000,
                            "MANUAL":null};
 
 function initialDocument() {
-    return {schema:SCHEMA, revision:0, home:null, explore:null};
+    return {schema:SCHEMA, revision:0, home:null, explore:null,
+            savedPlaces:[], nextSavedPlaceId:1};
 }
 
 function coordinate(value, maxAbs) {
@@ -83,6 +86,35 @@ function normalizeExplore(raw) {
     };
 }
 
+function normalizeSavedPlaces(rawItems, rawNextId) {
+    // M1/M2 documents had no saved-place fields.
+    const items = rawItems === undefined ? [] : rawItems;
+    const nextId = rawNextId === undefined && rawItems === undefined
+                   ? 1 : rawNextId;
+    if (!Array.isArray(items) || items.length > MAX_SAVED_PLACES
+            || !Number.isSafeInteger(nextId) || nextId < 1
+            || nextId > MAX_REVISION)
+        return {ok:false, reason:"SAVED_PLACES_INVALID"};
+    const seen = new Set();
+    const saved = [];
+    for (let i = 0; i < items.length; ++i) {
+        const item = items[i];
+        if (!item || typeof item !== "object" || Array.isArray(item)
+                || !Number.isSafeInteger(item.id) || item.id < 1
+                || item.id >= nextId || seen.has(item.id)
+                || !item.place || typeof item.place !== "object"
+                || item.place.source !== "MANUAL")
+            return {ok:false, reason:"SAVED_PLACES_INVALID"};
+        const validated = place(item.place.label, item.place.latitude,
+                                item.place.longitude);
+        if (!validated.ok)
+            return {ok:false, reason:"SAVED_PLACES_INVALID"};
+        seen.add(item.id);
+        saved.push({id:item.id, place:validated.value});
+    }
+    return {ok:true, savedPlaces:saved, nextSavedPlaceId:nextId};
+}
+
 function normalize(documentRaw) {
     if (!documentRaw || typeof documentRaw !== "object"
             || Array.isArray(documentRaw))
@@ -114,14 +146,20 @@ function normalize(documentRaw) {
         return explore;
     if (explore.value && home === null)
         return {ok:false, reason:"EXPLORE_WITHOUT_HOME"};
+    const bookmarks = normalizeSavedPlaces(documentRaw.savedPlaces,
+                                           documentRaw.nextSavedPlaceId);
+    if (!bookmarks.ok)
+        return bookmarks;
     return {ok:true, document:{
-        schema:SCHEMA, revision:revision, home:home, explore:explore.value
+        schema:SCHEMA, revision:revision, home:home, explore:explore.value,
+        savedPlaces:bookmarks.savedPlaces,
+        nextSavedPlaceId:bookmarks.nextSavedPlaceId
     }};
 }
 
 function parse(textRaw) {
     const raw = String(textRaw === undefined || textRaw === null ? "" : textRaw);
-    if (!raw.trim() || raw.length > 4096)
+    if (!raw.trim() || raw.length > MAX_DOCUMENT_BYTES)
         return {ok:false, reason:"DOCUMENT_INVALID"};
     let input;
     try {
@@ -154,7 +192,9 @@ function withHome(documentRaw, label, latitude, longitude) {
             schema:SCHEMA,
             revision:rev.revision,
             home:nextHome.value,
-            explore:base.document.explore
+            explore:base.document.explore,
+            savedPlaces:base.document.savedPlaces,
+            nextSavedPlaceId:base.document.nextSavedPlaceId
         }
     };
 }
@@ -193,7 +233,9 @@ function withExplore(documentRaw, label, latitude, longitude,
             durationKey:duration,
             startedAtMs:started,
             expiresAtMs:expiry
-        }
+        },
+        savedPlaces:base.document.savedPlaces,
+        nextSavedPlaceId:base.document.nextSavedPlaceId
     }};
 }
 
@@ -208,7 +250,9 @@ function withoutExplore(documentRaw) {
         return next;
     return {ok:true, document:{
         schema:SCHEMA, revision:next.revision,
-        home:base.document.home, explore:null
+        home:base.document.home, explore:null,
+        savedPlaces:base.document.savedPlaces,
+        nextSavedPlaceId:base.document.nextSavedPlaceId
     }};
 }
 
@@ -242,4 +286,78 @@ function contextKind(documentRaw, nowMs) {
         return "EXPLORE";
     const base = normalize(documentRaw);
     return base.ok && base.document.home ? "HOME" : "NONE";
+}
+
+function withSavedPlace(documentRaw, placeRaw) {
+    const base = normalize(documentRaw);
+    if (!base.ok)
+        return base;
+    if (!placeRaw || typeof placeRaw !== "object"
+            || placeRaw.source !== "MANUAL")
+        return {ok:false, reason:"SAVED_PLACE_INVALID"};
+    const normalized = place(placeRaw.label, placeRaw.latitude,
+                             placeRaw.longitude);
+    if (!normalized.ok)
+        return {ok:false, reason:"SAVED_PLACE_INVALID"};
+    const entries = base.document.savedPlaces;
+    if (entries.length >= MAX_SAVED_PLACES)
+        return {ok:false, reason:"SAVED_PLACES_FULL"};
+    const duplicate = entries.some(function(item) {
+        return item.place.label.toLowerCase()
+               === normalized.value.label.toLowerCase()
+               && item.place.latitude === normalized.value.latitude
+               && item.place.longitude === normalized.value.longitude;
+    });
+    if (duplicate)
+        return {ok:false, reason:"SAVED_PLACE_DUPLICATE"};
+    const id = base.document.nextSavedPlaceId;
+    if (id >= MAX_REVISION)
+        return {ok:false, reason:"SAVED_PLACE_ID_LIMIT"};
+    const next = nextRevision(base.document);
+    if (!next.ok)
+        return next;
+    return {ok:true, document:{
+        schema:SCHEMA, revision:next.revision,
+        home:base.document.home,
+        explore:base.document.explore,
+        savedPlaces:entries.concat([{id:id, place:normalized.value}]),
+        nextSavedPlaceId:id + 1
+    }};
+}
+
+function withoutSavedPlace(documentRaw, idRaw) {
+    const base = normalize(documentRaw);
+    if (!base.ok)
+        return base;
+    if (!Number.isSafeInteger(idRaw) || idRaw < 1)
+        return {ok:false, reason:"SAVED_PLACE_NOT_FOUND"};
+    const remaining = base.document.savedPlaces.filter(function(item) {
+        return item.id !== idRaw;
+    });
+    if (remaining.length === base.document.savedPlaces.length)
+        return {ok:false, reason:"SAVED_PLACE_NOT_FOUND"};
+    const next = nextRevision(base.document);
+    if (!next.ok)
+        return next;
+    return {ok:true, document:{
+        schema:SCHEMA, revision:next.revision,
+        home:base.document.home,
+        explore:base.document.explore,
+        savedPlaces:remaining,
+        nextSavedPlaceId:base.document.nextSavedPlaceId
+    }};
+}
+
+function withSavedPlaceExplore(documentRaw, idRaw, durationKey, nowMs) {
+    const base = normalize(documentRaw);
+    if (!base.ok)
+        return base;
+    const item = base.document.savedPlaces.find(function(row) {
+        return row.id === idRaw;
+    });
+    if (!item)
+        return {ok:false, reason:"SAVED_PLACE_NOT_FOUND"};
+    return withExplore(base.document, item.place.label,
+                       item.place.latitude, item.place.longitude,
+                       durationKey, nowMs);
 }

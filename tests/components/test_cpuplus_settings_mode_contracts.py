@@ -1,11 +1,12 @@
 #!/usr/bin/env python3
-"""CPU++ SETTINGS/LOCATION M2 navigation, Explore expiry and safety contract."""
+"""CPU++ SETTINGS/LOCATION M3 Home, Explore and Saved Places contracts."""
 from pathlib import Path
 
 root = Path(__file__).resolve().parents[2]
 cpu = (root / "widgets/CpuPlusW.qml").read_text(encoding="utf-8")
 location = (root / "widgets/cpuplus/CpuPlusSettingsLocationPane.qml").read_text(encoding="utf-8")
 explore = (root / "widgets/cpuplus/CpuPlusExploreLocationPanel.qml").read_text(encoding="utf-8")
+saved = (root / "widgets/cpuplus/CpuPlusSavedPlacesPanel.qml").read_text(encoding="utf-8")
 
 # Preserve all original mode positions and add SETTINGS only at the end.
 modes = cpu[cpu.index("readonly property var modes: ["):cpu.index("function open()")]
@@ -42,6 +43,8 @@ for token in (
     "CpuPlusExploreLocationPanel {", "id: explorePanel",
     "explorePanel.editingText", "registry.effectivePlace",
     "registry.contextKind",
+    "CpuPlusSavedPlacesPanel {", "id: savedPlacesPanel",
+    "durationKey: explorePanel.durationKey",
 ):
     assert token in location, token
 
@@ -57,12 +60,23 @@ for token in (
 ):
     assert token in explore, token
 
-# The pane edits Home through one shared service. It is not itself a
-# geolocation provider, file writer, weather adapter or alert-point owner.
+for token in (
+    "SAVED PLACES", "SAVE CURRENT PLACE", "RECALL // EXPLORE",
+    "EXPLORE", "REMOVE", "CONFIRM REMOVE",
+    "registry.saveCurrentPlace()", "registry.exploreSavedPlace(",
+    "registry.removeSavedPlace(", "savedPanel.durationKey",
+    "savedPanel.bookmarks", "canSaveCurrentPlace", "canChangeExplore",
+    "function onStorageStateChanged()",
+):
+    assert token in saved, token
+
+# All location panes talk to the shared registry. None opens a network
+# request, edits the filesystem or mutates the system clock/alert target.
 for forbidden in ("Process {", "FileView {", "JsonAdapter {",
                   "Quickshell.env(", "Qt.openUrlExternally"):
     assert forbidden not in location, forbidden
     assert forbidden not in explore, forbidden
+    assert forbidden not in saved, forbidden
 
 assert explore.count("Keys.onEscapePressed:") == 3
 assert "readonly property bool editingText:" in explore
@@ -94,7 +108,12 @@ for token in ("pragma Singleton", "atomicWrites: true", "FileView {",
               "readonly property var activeExplore:",
               "readonly property var effectivePlace:",
               "readonly property string contextKind:",
-              "clockMs = Date.now()", "running: registry.activeExplore !== null"):
+              "clockMs = Date.now()", "running: registry.activeExplore !== null",
+              "readonly property var savedPlaces:", "canSaveCurrentPlace:",
+              "function saveCurrentPlace()", "function exploreSavedPlace(",
+              "function removeSavedPlace(",
+              "PlacePolicy.withSavedPlace(", "PlacePolicy.withSavedPlaceExplore(",
+              "PlacePolicy.withoutSavedPlace("):
     assert token in store, token
 forbidden_store = ("Process {", "Qt.openUrlExternally", "https://", "http://",
                    "POST_APOLLO_NWS_ALERT_POINT")
@@ -105,7 +124,9 @@ for token in ('const SCHEMA = "post-apollo.places.v1";', 'source:"MANUAL"',
               "function coordinate(", "function parse(", "function withHome(",
               "function withExplore(", "function withoutExplore(",
               "function activeExplore(", "function effectivePlace(",
-              "function contextKind("):
+              "function contextKind(", "function normalizeSavedPlaces(",
+              "function withSavedPlace(", "function withoutSavedPlace(",
+              "function withSavedPlaceExplore("):
     assert token in policy, token
 
 assert 'required property var systemTelemetry' in cpu
@@ -115,4 +136,4 @@ assert "id: sharedInstrumentScroll" in cpu
 assert "function selectSystemSubMode(category)" in cpu
 assert "function selectThermalSubMode(mode)" in cpu
 
-print("CPU++ SETTINGS / LOCATION M2 Home + Explore navigation: PASS")
+print("CPU++ SETTINGS / LOCATION M3 bookmark navigation: PASS")

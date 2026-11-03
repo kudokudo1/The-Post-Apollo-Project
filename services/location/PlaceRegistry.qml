@@ -27,6 +27,11 @@ Scope {
         (storageState === "ready" || storageState === "empty")
         && pendingDocument === null
     readonly property bool canChangeExplore: canSaveHome && hasHome
+    readonly property var savedPlaces:
+        document && Array.isArray(document.savedPlaces)
+        ? document.savedPlaces : []
+    readonly property bool canSaveCurrentPlace:
+        canSaveHome && effectivePlace !== null && savedPlaces.length < 32
     readonly property bool hasStoredExplore:
         document && document.explore !== null && document.explore !== undefined
     readonly property var activeExplore:
@@ -105,6 +110,40 @@ Scope {
             return false;
         }
         return beginWrite(PlacePolicy.withoutExplore(document));
+    }
+
+    function saveCurrentPlace() {
+        if (!canSaveHome) {
+            errorCode = "STORAGE_NOT_READY";
+            return false;
+        }
+        // Resolve the effective location against the actual clock to avoid
+        // bookmarking an expired destination when its timer has not ticked.
+        const selected = PlacePolicy.effectivePlace(document, Date.now());
+        if (!selected) {
+            errorCode = "NO_PLACE_TO_SAVE";
+            return false;
+        }
+        return beginWrite(PlacePolicy.withSavedPlace(document, selected));
+    }
+
+    function exploreSavedPlace(id, durationKey) {
+        if (!canChangeExplore) {
+            errorCode = hasHome ? "STORAGE_NOT_READY" : "HOME_NOT_SET";
+            return false;
+        }
+        clockMs = Date.now();
+        return beginWrite(PlacePolicy.withSavedPlaceExplore(
+            document, id, durationKey, clockMs
+        ));
+    }
+
+    function removeSavedPlace(id) {
+        if (!canSaveHome) {
+            errorCode = "STORAGE_NOT_READY";
+            return false;
+        }
+        return beginWrite(PlacePolicy.withoutSavedPlace(document, id));
     }
 
     FileView {

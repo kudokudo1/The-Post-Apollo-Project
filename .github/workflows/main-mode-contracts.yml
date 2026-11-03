@@ -8,6 +8,7 @@ on:
       - "widgets/CpuPlusW.qml"
       - "widgets/cpuplus/CpuPlusSettingsLocationPane.qml"
       - "widgets/cpuplus/CpuPlusExploreLocationPanel.qml"
+      - "widgets/cpuplus/CpuPlusSavedPlacesPanel.qml"
       - "services/location/PlaceRegistry.qml"
       - "services/location/PlacePolicy.js"
       - "services/location/qmldir"
@@ -37,6 +38,7 @@ on:
       - "widgets/CpuPlusW.qml"
       - "widgets/cpuplus/CpuPlusSettingsLocationPane.qml"
       - "widgets/cpuplus/CpuPlusExploreLocationPanel.qml"
+      - "widgets/cpuplus/CpuPlusSavedPlacesPanel.qml"
       - "services/location/PlaceRegistry.qml"
       - "services/location/PlacePolicy.js"
       - "services/location/qmldir"
@@ -77,7 +79,7 @@ jobs:
         run: python3 tests/components/test_cpuplus_caption_slot_contracts.py
       - name: Verify CPU++ SETTINGS and LOCATION navigation
         run: python3 tests/components/test_cpuplus_settings_mode_contracts.py
-      - name: Verify Home and Explore coordinate/expiry policy
+      - name: Verify Home, Explore and Saved Places persistence policy
         run: node tests/location/test_place_registry_policy.cjs
       - name: Verify CPU++ A/B sampled-text glow source lifecycle
         run: python3 tests/components/test_cpuplus_glow_ab_contracts.py

@@ -12,7 +12,8 @@ const source = fs.readFileSync(
 ).replace(/^\.pragma library\s*/, "");
 const policy = vm.runInNewContext(source + `
 ;({initialDocument, coordinate, place, normalize, parse, withHome,
-   withExplore, withoutExplore, activeExplore, effectivePlace, contextKind})
+   withExplore, withoutExplore, activeExplore, effectivePlace, contextKind,
+   withSavedPlace, withoutSavedPlace, withSavedPlaceExplore})
 `);
 
 const empty = policy.initialDocument();
@@ -76,7 +77,7 @@ assert.equal(policy.parse(JSON.stringify({schema:empty.schema,revision:1,home:{}
              "HOME_INVALID");
 assert.equal(policy.parse(JSON.stringify({schema:empty.schema,revision:1})).reason,
              "HOME_INVALID");
-assert.equal(policy.parse("x".repeat(4097)).reason, "DOCUMENT_INVALID");
+assert.equal(policy.parse("x".repeat(16385)).reason, "DOCUMENT_INVALID");
 const badVersion = policy.withHome({schema:"future",revision:2,home:null},"Home","0","0");
 assert.equal(badVersion.reason, "UNSUPPORTED_VERSION");
 
@@ -190,4 +191,117 @@ assert.equal(policy.parse(JSON.stringify(orphan)).reason,
 assert.equal(policy.contextKind(held.document, ""), "HOME");
 assert.equal(policy.effectivePlace(held.document, NaN).label, "Example City");
 
-console.log("Place Registry M1/M2 Home and Explore policy: PASS");
+// M3: M1/M2 on-disk records gain empty bookmarks without replacing Home.
+assert.equal(migrated.document.savedPlaces.length, 0);
+assert.equal(migrated.document.nextSavedPlaceId, 1);
+const m2Legacy = JSON.parse(JSON.stringify(held.document));
+delete m2Legacy.savedPlaces;
+delete m2Legacy.nextSavedPlaceId;
+const m2Restored = policy.parse(JSON.stringify(m2Legacy));
+assert.equal(m2Restored.ok, true);
+assert.equal(m2Restored.document.home.label, "Example City");
+assert.equal(m2Restored.document.explore.place.label, "Tokyo");
+assert.equal(m2Restored.document.savedPlaces.length, 0);
+
+// An explicit current point becomes a durable bookmark; Home/Explore remain.
+const firstSave = policy.withSavedPlace(held.document, held.document.explore.place);
+assert.equal(firstSave.ok, true);
+assert.equal(firstSave.document.savedPlaces.length, 1);
+assert.equal(firstSave.document.savedPlaces[0].id, 1);
+assert.equal(firstSave.document.savedPlaces[0].place.label, "Tokyo");
+assert.equal(firstSave.document.savedPlaces[0].place.source, "MANUAL");
+assert.equal(firstSave.document.nextSavedPlaceId, 2);
+assert.equal(firstSave.document.home.label, "Example City");
+assert.equal(firstSave.document.explore.place.label, "Tokyo");
+
+const duplicate = policy.withSavedPlace(firstSave.document,
+                                       held.document.explore.place);
+assert.equal(duplicate.reason, "SAVED_PLACE_DUPLICATE");
+assert.equal(firstSave.document.savedPlaces.length, 1);
+const missingSource = {...held.document.explore.place, source:"AUTO"};
+assert.equal(policy.withSavedPlace(firstSave.document, missingSource).reason,
+             "SAVED_PLACE_INVALID");
+const invalidBookmark = {label:"Invalid", latitude:"", longitude:"-149",
+                         source:"MANUAL"};
+assert.equal(policy.withSavedPlace(firstSave.document, invalidBookmark).reason,
+             "SAVED_PLACE_INVALID");
+
+const secondSave = policy.withSavedPlace(firstSave.document, saved.document.home);
+assert.equal(secondSave.ok, true);
+assert.equal(secondSave.document.savedPlaces[1].id, 2);
+assert.equal(secondSave.document.nextSavedPlaceId, 3);
+const recalled = policy.withSavedPlaceExplore(secondSave.document, 2, "30M", start);
+assert.equal(recalled.ok, true);
+assert.equal(recalled.document.explore.place.label, "Example City");
+assert.equal(recalled.document.explore.durationKey, "30M");
+assert.equal(recalled.document.home.label, "Example City");
+assert.equal(recalled.document.savedPlaces.length, 2);
+assert.equal(recalled.document.nextSavedPlaceId, 3);
+assert.equal(policy.withSavedPlaceExplore(secondSave.document, 999, "2H", start).reason,
+             "SAVED_PLACE_NOT_FOUND");
+
+// Changing Home or Explore must retain the entire saved-place list unchanged.
+const fromSavedHome = policy.withHome(secondSave.document, "New Home", "0", "0");
+assert.equal(fromSavedHome.ok, true);
+assert.equal(fromSavedHome.document.savedPlaces.length, 2);
+assert.equal(fromSavedHome.document.nextSavedPlaceId, 3);
+const fromSavedExplore = policy.withExplore(secondSave.document, "Anchorage",
+                                           "61.2181", "-149.9003", "2H", start);
+assert.equal(fromSavedExplore.ok, true);
+assert.equal(fromSavedExplore.document.savedPlaces.length, 2);
+const backWithBookmarks = policy.withoutExplore(fromSavedExplore.document);
+assert.equal(backWithBookmarks.document.savedPlaces.length, 2);
+
+// Removing a bookmark does not change Home or any active Explore session.
+const removed = policy.withoutSavedPlace(secondSave.document, 1);
+assert.equal(removed.ok, true);
+assert.equal(removed.document.savedPlaces.length, 1);
+assert.equal(removed.document.savedPlaces[0].id, 2);
+assert.equal(removed.document.nextSavedPlaceId, 3);
+assert.equal(removed.document.home.label, secondSave.document.home.label);
+assert.equal(removed.document.explore.place.label,
+             secondSave.document.explore.place.label);
+assert.equal(policy.withoutSavedPlace(removed.document, 1).reason,
+             "SAVED_PLACE_NOT_FOUND");
+assert.equal(policy.withoutSavedPlace(removed.document, "2").reason,
+             "SAVED_PLACE_NOT_FOUND");
+const thirdSave = policy.withSavedPlace(removed.document,
+    {label:"Anchorage",latitude:61.2181,longitude:-149.9003,source:"MANUAL"});
+assert.equal(thirdSave.document.savedPlaces[1].id, 3);
+assert.equal(thirdSave.document.nextSavedPlaceId, 4);
+
+// Invalid persisted ids/coordinates/metadata are refused (never silently used).
+const malformed = JSON.parse(JSON.stringify(secondSave.document));
+malformed.savedPlaces[1].id = 1;
+assert.equal(policy.parse(JSON.stringify(malformed)).reason,
+             "SAVED_PLACES_INVALID");
+malformed.savedPlaces[1].id = 2;
+malformed.savedPlaces[1].place.latitude = "";
+assert.equal(policy.parse(JSON.stringify(malformed)).reason,
+             "SAVED_PLACES_INVALID");
+malformed.savedPlaces[1].place.latitude = 38.8243;
+malformed.nextSavedPlaceId = 2;
+assert.equal(policy.parse(JSON.stringify(malformed)).reason,
+             "SAVED_PLACES_INVALID");
+malformed.nextSavedPlaceId = 3;
+malformed.savedPlaces = {};
+assert.equal(policy.parse(JSON.stringify(malformed)).reason,
+             "SAVED_PLACES_INVALID");
+
+// Hard cap: 32 bookmark rows and monotonic IDs.
+let full = saved.document;
+for (let i = 1; i <= 32; ++i) {
+    const res = policy.withSavedPlace(full, {
+        label:"Point " + i, latitude:"0",longitude:String(i),source:"MANUAL"
+    });
+    assert.equal(res.ok, true);
+    full = res.document;
+}
+assert.equal(full.savedPlaces.length, 32);
+assert.equal(policy.withSavedPlace(full, {
+    label:"Over",latitude:1,longitude:1,source:"MANUAL"
+}).reason, "SAVED_PLACES_FULL");
+assert.equal(policy.parse(JSON.stringify(full)).ok, true);
+assert.equal(policy.parse("x".repeat(16385)).reason, "DOCUMENT_INVALID");
+
+console.log("Place Registry M1/M2/M3 Home, Explore and bookmarks: PASS");

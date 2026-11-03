@@ -133,9 +133,24 @@ Rectangle {
             ctx.fill();
             ctx.strokeStyle=String(Colors.black);
             ctx.lineWidth=1;ctx.stroke();
+            // Marker remains on its true ecliptic angle; text is offset
+            // independently so neighboring planet names remain legible.
+        }
+        const labels=Celestial.wheelLabels(instrument.graphModel,
+                         instrument.focusIndex,graphCanvas.width,graphCanvas.height);
+        for(let l=0;l<labels.length;l++){
+            const point=labels[l];
+            ctx.beginPath();
+            ctx.moveTo(point.pointX,point.pointY);
+            ctx.lineTo(point.x,point.y-3);
+            ctx.strokeStyle=point.color;
+            ctx.globalAlpha=0.5;
+            ctx.lineWidth=1;
+            ctx.stroke();
+            ctx.globalAlpha=1;
             ctx.fillStyle=point.color;
             ctx.font="10px monospace";
-            ctx.fillText(point.body.toUpperCase().slice(0,9),x+8,y+3);
+            ctx.fillText(point.label,point.x,point.y);
         }
         ctx.restore();
     }
@@ -143,36 +158,79 @@ Rectangle {
         const width=graphCanvas.width,height=graphCanvas.height;
         const view=instrument.viewWindow;
         const range=Celestial.rangeFor(instrument.graphModel,view,
-                                        instrument.mode);
-        ctx.save();
-        ctx.font="10px monospace";
-        ctx.lineWidth=1;
-        for(let i=0;i<=4;i++){
-            const y=i*height/4;
-            ctx.globalAlpha=0.3;
-            ctx.strokeStyle=String(Colors.cyan);
-            ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(width,y);ctx.stroke();
-            ctx.globalAlpha=0.8;
-            ctx.fillStyle=String(Colors.white);
-            ctx.fillText((range.max-(range.max-range.min)*i/4)
-                         .toFixed(1)+"°",2,Math.max(10,y-3));
-        }
-        ctx.globalAlpha=1;
+                                       instrument.mode);
+        const layout=Celestial.chartLayout(width,height);
         const series=instrument.mode==="aspects"
             ? instrument.graphModel.relationships
             : instrument.graphModel.series;
+        const legend=Celestial.legendRows(instrument.graphModel,instrument.mode);
+        ctx.save();
+        ctx.font="10px monospace";
+        ctx.lineWidth=1;
+        ctx.globalAlpha=0.9;
+        ctx.fillStyle=String(Colors.white);
+        ctx.fillText(instrument.mode==="aspects"
+                     ? "ECLIPTIC SEPARATION (°)" : "UNWRAPPED LONGITUDE (°)",
+                     2,10);
+        // Legend colors are the same as the rendered series colors.
+        let legendX=layout.left;
+        for(let l=0;l<legend.length;l++) {
+            const label=legend[l];
+            const labelWidth=Math.min(125,label.text.length*6+18);
+            if(legendX+labelWidth>width-3)break;
+            ctx.globalAlpha=1;
+            ctx.fillStyle=label.color;
+            ctx.fillRect(legendX,16,9,3);
+            ctx.font="9px monospace";
+            ctx.fillText(label.text,legendX+13,23);
+            legendX+=labelWidth+5;
+        }
+        ctx.font="10px monospace";
+        // Reserve a left gutter for ° ticks, plus bottom UTC date labels.
+        for(let tick=0;tick<=4;tick++){
+            const y=layout.top+tick*layout.height/4;
+            ctx.globalAlpha=0.24;
+            ctx.strokeStyle=String(Colors.cyan);
+            ctx.beginPath();
+            ctx.moveTo(layout.left,y);ctx.lineTo(layout.right,y);
+            ctx.stroke();
+            ctx.globalAlpha=0.82;
+            ctx.fillStyle=String(Colors.white);
+            ctx.fillText((range.max-(range.max-range.min)*tick/4)
+                         .toFixed(1)+"°",2,y+3);
+        }
+        const timeTicks=[view.from,Math.round((view.from+view.to)/2),view.to];
+        for(let ti=0;ti<timeTicks.length;ti++){
+            const idx=timeTicks[ti];
+            if(ti>0 && idx===timeTicks[ti-1])continue;
+            const t=instrument.graphModel.times[idx];
+            const x=Celestial.plotX(idx,view,layout);
+            const text=Celestial.axisText(t).slice(5,16);
+            ctx.globalAlpha=0.3;
+            ctx.strokeStyle=String(Colors.cyan);
+            ctx.beginPath();
+            ctx.moveTo(x,layout.top);ctx.lineTo(x,layout.bottom);
+            ctx.stroke();
+            ctx.globalAlpha=0.85;
+            ctx.fillStyle=String(Colors.white);
+            const offset=ti===0?0:ti===2?text.length*6:text.length*3;
+            ctx.fillText(text,x-offset,height-5);
+        }
         for(let rowIndex=0;rowIndex<series.length;rowIndex++){
             const row=series[rowIndex];
             const points=instrument.mode==="aspects"?row.samples:row.rows;
+            const isFocused=instrument.mode==="aspects" ||
+                instrument.focusBody===row.body;
             ctx.strokeStyle=instrument.chartInk(rowIndex);
-            ctx.lineWidth=2;
+            ctx.globalAlpha=isFocused?1:0.65;
+            ctx.lineWidth=isFocused?2.2:1.5;
             ctx.beginPath();
             for(let index=view.from;index<=view.to;index++){
                 const value=instrument.mode==="aspects"
                     ? points[index].longitude_separation_deg
                     : points[index].unwrapped_longitude_deg;
-                const x=Celestial.chartX(index,view,width);
-                const y=Celestial.chartY(value,range,height);
+                const x=Celestial.plotX(index,view,layout);
+                const y=Celestial.plotY(value,range,layout);
                 if(index===view.from)ctx.moveTo(x,y);
                 else ctx.lineTo(x,y);
             }
@@ -180,33 +238,45 @@ Rectangle {
         }
         const start=instrument.graphModel.times[view.from];
         const end=instrument.graphModel.times[view.to];
-        if (instrument.graphModel.events.length>0){
-            ctx.strokeStyle=String(Colors.yellow);
-            ctx.globalAlpha=0.38;
-            ctx.lineWidth=1;
+        if(instrument.graphModel.events.length>0){
             for(let e=0;e<instrument.graphModel.events.length;e++){
-                const t=Date.parse(instrument.graphModel.events[e].time_utc);
-                if(t<start||t>end)continue;
-                const x=(t-start)/Math.max(1,end-start)*width;
                 const event=instrument.graphModel.events[e];
+                const t=Date.parse(event.time_utc);
+                if(t<start||t>end)continue;
+                const x=layout.left+(t-start)/Math.max(1,end-start)*layout.width;
                 const selected=instrument.chosenEvent &&
                     event.time_utc===instrument.chosenEvent.time_utc &&
                     event.name===instrument.chosenEvent.name;
                 ctx.strokeStyle=selected?String(Colors.magenta):String(Colors.yellow);
                 ctx.globalAlpha=selected?1:0.38;
                 ctx.lineWidth=selected?2:1;
-                ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x,height);
-                ctx.stroke();
+                ctx.beginPath();ctx.moveTo(x,layout.top);
+                ctx.lineTo(x,layout.bottom);ctx.stroke();
             }
         }
         const focusTime=instrument.graphModel.times[instrument.focusIndex];
         if(focusTime>=start && focusTime<=end){
-            ctx.globalAlpha=0.95;
+            const focusX=layout.left+(focusTime-start)
+                          /Math.max(1,end-start)*layout.width;
             ctx.strokeStyle=String(Colors.magenta);
+            ctx.globalAlpha=0.95;
             ctx.lineWidth=1;
-            const focusX=(focusTime-start)/Math.max(1,end-start)*width;
-            ctx.beginPath();ctx.moveTo(focusX,0);
-            ctx.lineTo(focusX,height);ctx.stroke();
+            ctx.beginPath();ctx.moveTo(focusX,layout.top);
+            ctx.lineTo(focusX,layout.bottom);ctx.stroke();
+            for(let rowIndex=0;rowIndex<series.length;rowIndex++){
+                const row=series[rowIndex];
+                const sample=instrument.mode==="aspects"
+                    ? row.samples[instrument.focusIndex]
+                    : row.rows[instrument.focusIndex];
+                const value=instrument.mode==="aspects"
+                    ? sample.longitude_separation_deg
+                    : sample.unwrapped_longitude_deg;
+                const y=Celestial.plotY(value,range,layout);
+                ctx.beginPath();ctx.arc(focusX,y,3.5,0,2*Math.PI);
+                ctx.fillStyle=instrument.chartInk(rowIndex);
+                ctx.globalAlpha=1;
+                ctx.fill();
+            }
         }
         ctx.restore();
     }
@@ -303,6 +373,11 @@ Rectangle {
                 property real previousX: 0
                 property real gestureOriginX: 0
                 property bool panning: false
+                function sampleFraction(x) {
+                    return instrument.mode==="wheel"
+                        ? x/Math.max(1,width)
+                        : Celestial.plotFraction(x,width,height);
+                }
 
                 onPressed: function(mouse) {
                     previousX=mouse.x;
@@ -317,19 +392,20 @@ Rectangle {
                             instrument.zoom>1) {
                             instrument.panPosition=Celestial.clamp(
                                 instrument.panPosition
-                                -(mouse.x-previousX)/Math.max(1,width),
+                                -(mouse.x-previousX)
+                                /Math.max(1,Celestial.chartLayout(width,height).width),
                                 0,1);
                         } else if (panning && instrument.mode==="wheel") {
                             instrument.eventOrdinal=-1;
                             instrument.lockedIndex=Celestial.indexAtFraction(
                                 instrument.graphModel,instrument.viewWindow,
-                                mouse.x/Math.max(1,width));
+                                sampleFraction(mouse.x));
                         }
                         previousX=mouse.x;
                     } else if (instrument.lockedIndex<0) {
                         instrument.hoveredIndex=Celestial.indexAtFraction(
                             instrument.graphModel,instrument.viewWindow,
-                            mouse.x/Math.max(1,width));
+                            sampleFraction(mouse.x));
                     }
                 }
                 onClicked: function(mouse) {
@@ -349,7 +425,7 @@ Rectangle {
                         instrument.eventOrdinal=-1;
                         instrument.lockedIndex=Celestial.indexAtFraction(
                             instrument.graphModel,instrument.viewWindow,
-                            mouse.x/Math.max(1,width));
+                            sampleFraction(mouse.x));
                     }
                 }
                 onExited: {

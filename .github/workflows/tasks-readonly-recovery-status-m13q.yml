@@ -1,0 +1,59 @@
+name: TASKS M13q read-only shared Connections recovery status
+
+on:
+  pull_request:
+    paths:
+      - 'widgets/tasks/TaskRecoveryStatusPolicyM13q.js'
+      - 'widgets/tasks/TaskRecoveryStatusPaneM13q.qml'
+      - 'widgets/tasks/TaskSyncConnectionsPane.qml'
+      - 'tests/tasks/test_task_recovery_status_m13q.cjs'
+      - 'docs/tasks-shared-connections-recovery-status-m13q.md'
+      - '.github/workflows/tasks-readonly-recovery-status-m13q.yml'
+      - 'services/connections/ConnectionsBroker.qml'
+      - 'services/hub/ApolloHubTodoStore.qml'
+  push:
+    branches: [main]
+    paths:
+      - 'widgets/tasks/TaskRecoveryStatusPolicyM13q.js'
+      - 'widgets/tasks/TaskRecoveryStatusPaneM13q.qml'
+      - 'widgets/tasks/TaskSyncConnectionsPane.qml'
+      - 'tests/tasks/test_task_recovery_status_m13q.cjs'
+      - '.github/workflows/tasks-readonly-recovery-status-m13q.yml'
+permissions:
+  contents: read
+
+jobs:
+  readonly-status:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Qt6 QML syntax parser for status pane and SYNC tabs
+        run: |
+          sudo apt-get update -qq
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends qt6-declarative-dev-tools
+          QT_QPA_PLATFORM=offscreen /usr/lib/qt6/bin/qmlformat widgets/tasks/TaskRecoveryStatusPaneM13q.qml >/dev/null
+          QT_QPA_PLATFORM=offscreen /usr/lib/qt6/bin/qmlformat widgets/tasks/TaskSyncConnectionsPane.qml >/dev/null
+      - name: M13q shared keyring state projection and disabled authority
+        run: node --test tests/tasks/test_task_recovery_status_m13q.cjs
+      - name: Existing TASKS GitW SYNC navigation and previous owner safety
+        run: |
+          python3 tests/tasks/test_task_sync_connections_ui_contracts.py
+          python3 tests/tasks/test_task_writer_gate_inventory_m11d.py
+      - name: Existing shared Connections presence-only probe contract
+        run: |
+          node tests/cpuplus/test_connections_broker_c2a.js
+          node tests/cpuplus/test_connections_status_c2g.js
+      - name: No newly introduced production Process, writer, key access or automatic probe
+        run: |
+          set -euo pipefail
+          ! grep -Eq 'Process *\{|FileView *\{|Component\.onCompleted|Timer *\{' \
+            widgets/tasks/TaskRecoveryStatusPaneM13q.qml
+          ! grep -Eq 'secret-tool|DBUS_SESSION_BUS_ADDRESS|keyringUnlock|authorize\(' \
+            widgets/tasks/TaskRecoveryStatusPaneM13q.qml
+          test "$(grep -c 'ConnectionsBroker.checkAvailability()' \
+            widgets/tasks/TaskRecoveryStatusPaneM13q.qml)" = 1
+          printf '%s\n' "M13Q_SHARED_KEYRING_READ_ONLY_RECOVERY_STATUS_PASS"

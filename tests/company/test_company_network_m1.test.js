@@ -138,8 +138,11 @@ test("central yellow city sits 2px below the white ornaments without shifting th
         ["header",source("widgets/CompanyNetworkW.qml"),"headerCity","headerCityGlyphCell","headerCityGlyph",18]
     ];
     for(const [label,sourceText,rowId,cellId,glyphId,fontSize] of cases) {
-        const row=sourceText.split("id: "+rowId,2)[1];
-        assert.ok(row,label+" Row still exists");
+        const tail=sourceText.split("id: "+rowId,2)[1];
+        assert.ok(tail,label+" Row still exists");
+        const row=tail.split(label==="dock"
+            ? "onLeftClicked: toggleRequested()"
+            : "\n            GohuText {",1)[0];
         const cityBlock=row.split("id: "+cellId,2)[1];
         assert.ok(cityBlock,label+" owns a city-only wrapper");
         assert.match(cityBlock,new RegExp("width: "+glyphId+"\\.implicitWidth"),

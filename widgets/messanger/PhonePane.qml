@@ -601,6 +601,7 @@ Rectangle {
 
                 Text {
                     width: parent.width
+                    height: 45 // Stable bay position across stage state changes.
                     visible: phonePane.stageWanted || phonePane.stageState === "UNAVAILABLE"
                     text: phonePane.stageState === "ALIGNED"
                           ? "BLUEFERRY SETUP // TERMINAL BELOW"

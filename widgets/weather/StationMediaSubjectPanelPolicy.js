@@ -5,6 +5,9 @@
 var FORMAT = "post-apollo.weather.media-panels.d1.v1";
 var ROUTES = {
   "media/overview": {page:"overview"},
+  // M28-T: exact original CLASSIC NEWS channel tab bar + complete reports.
+  // Retain focused NEWS routes and the existing one StationNewsHub.
+  "media/news/full": {page:"news",section:"REPORTS",full:true},
   "media/news/reports": {page:"news",section:"REPORTS"},
   "media/news/filters": {page:"news",section:"REPORTS"},
   "media/news/trends": {page:"news",section:"REPORTS"},
@@ -16,6 +19,9 @@ var ROUTES = {
   "media/watch/reports": {page:"catalog",section:"REPORTS"},
   "media/watch/compare": {page:"catalog",section:"COMPARE"},
   "media/watch/satire": {page:"catalog",section:"SATIRE"},
+  // M28-T: complete CLASSIC RADIO controls, bookmarks and transport.
+  // One existing MPD/headless controller, no second client.
+  "media/radio/full": {page:"radio",full:true},
   "media/radio/directory": {page:"radio"},
   "media/radio/saved": {page:"radio"},
   "media/radio/transport": {page:"radio"},
@@ -32,12 +38,20 @@ function kindForRoute(path) {
   var row=routeInfo(path);
   return row ? row.page : "";
 }
+function isFullNews(path) {
+  var row=routeInfo(path);
+  return !!row && row.page === "news" && row.full === true;
+}
+function isFullRadio(path) {
+  var row=routeInfo(path);
+  return !!row && row.page === "radio" && row.full === true;
+}
 function catalogSectionFor(path) {
   var row=routeInfo(path);
   return row && row.section ? row.section : "";
 }
 function newsGroupVisible(path,group) {
-  if (path === "") return true;  // CLASSIC NEWS never filtered.
+  if (path === "" || isFullNews(path)) return true; // Exact CLASSIC NEWS sections.
   if (kindForRoute(path) !== "news") return false;
   if (group === "header" || group === "request" || group === "status")
     return true;
@@ -56,7 +70,8 @@ function newsGroupVisible(path,group) {
   return false;
 }
 function radioGroupVisible(path,group) {
-  if (path === "" || path === "media/overview") return true;
+  if (path === "" || path === "media/overview" || isFullRadio(path))
+    return true; // Full original RADIO directory, favorites and transport.
   if (kindForRoute(path) !== "radio") return false;
   if (group === "header" || group === "source" || group === "transport"
       || group === "status") return true;

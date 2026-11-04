@@ -23,11 +23,12 @@ vm.runInContext(navSrc.replace(/^\.pragma library\s*$/m,""),nav);
 vm.runInContext(policySrc.replace(/^\.pragma library\s*$/m,""),policy);
 const asArray = x => JSON.parse(JSON.stringify(x));
 
-test("17 MEDIA destinations are real and belong to the canonical subject-first tree", () => {
+test("17 original MEDIA destinations plus two exact CLASSIC full-page routes are canonical", () => {
   assert.equal(policy.FORMAT,"post-apollo.weather.media-panels.d1.v1");
   const rows=Object.keys(policy.ROUTES);
-  assert.equal(rows.length,17);
-  assert.equal(new Set(rows).size,17);
+  assert.equal(rows.length,19);
+  assert.equal(new Set(rows).size,19);
+  assert.equal(rows.filter(x=>x!=="media/news/full" && x!=="media/radio/full").length,17);
   const kinds={overview:0,news:0,catalog:0,radio:0};
   for(const route of rows) {
     const found=nav.findRoute(route);
@@ -37,7 +38,7 @@ test("17 MEDIA destinations are real and belong to the canonical subject-first t
     assert.ok(kind in kinds,route+" "+kind);
     kinds[kind]++;
   }
-  assert.deepEqual(kinds,{overview:1,news:6,catalog:7,radio:3});
+  assert.deepEqual(kinds,{overview:1,news:7,catalog:7,radio:4});
   for(const p of ["media","media/news","media/radio","media/watch","media/creators",
                     "weather/overview","cosmos/overview","earth/overview","magick/astrology/charts"])
     assert.equal(policy.kindForRoute(p),"",p);
@@ -160,8 +161,9 @@ test("CLASSIC MEDIA behavior and NEWS-to-MAP handoff remain available", () => {
   assert.equal(policy.newsGroupVisible("","filters"),true);
   assert.equal(policy.radioGroupVisible("","saved"),true);
   assert.match(hub,/property string section: "LIVE"/);
-  assert.match(hub,/subjectRoute === ""\s*\? section/);
-  assert.match(hub,/stationNewsHub\.subjectRoute === "" \? 33 : 0/);
+  assert.match(hub,/subjectRoute === "" \|\| MediaPanelPolicy\.isFullNews\(subjectRoute\)/);
+  assert.match(hub,/usesOriginalChannelTabs\s*\? section/);
+  assert.match(hub,/stationNewsHub\.usesOriginalChannelTabs \? 33 : 0/);
   assert.match(hub,/path: Quickshell\.dataDir \+ "\/weather-news-creators\.json"/);
   assert.match(radio,/property bool stationOpen: true/);
   assert.match(browser,/StationWeatherSubjectPane\s*\{/);

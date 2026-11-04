@@ -16,8 +16,11 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
-      - name: Offline and authority contracts
-        run: python3 -m unittest discover -s tests/company -p 'test_company_vector_probe_m5.py' -v
+      - name: Offline, style and real-vector smoke contracts
+        run: |
+          python3 -m unittest discover -s tests/company -p 'test_company_vector_probe_m5.py' -v
+          python3 -m unittest discover -s tests/company -p 'test_company_vector_style_m7.py' -v
+          python3 -m unittest discover -s tests/company -p 'test_company_native_online_m8.py' -v
 
   native-qt:
     # All Qt/MapLibre downloads happen on the disposable GitHub runner.

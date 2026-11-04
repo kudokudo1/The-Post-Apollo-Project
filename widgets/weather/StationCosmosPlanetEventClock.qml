@@ -10,7 +10,7 @@ Rectangle {
     color: Colors.black
     border.color: Colors.cyan
     border.width: 1
-    height: 414
+    height: 442
 
     property var providerRows: []
     property string civilDate: ""
@@ -32,9 +32,12 @@ Rectangle {
     readonly property var inspectedEvent: PlanetPolicy.selectedEvent(
         lockedEvent, hoveredEvent)
     readonly property int populatedPlanets: PlanetPolicy.rowCountWithEvents(rows)
+    readonly property var inspectableEvents: PlanetPolicy.orderedEvents(
+        rows, selectedPlanet, selectedKind)
 
     onProviderRowsChanged: { hoveredEvent = null; lockedEvent = null; }
     onCivilDateChanged: { hoveredEvent = null; lockedEvent = null; }
+    onSelectedPlanetChanged: { hoveredEvent = null; lockedEvent = null; }
     onSourceReadyChanged: {
         if (!sourceReady) { hoveredEvent = null; lockedEvent = null; }
     }
@@ -103,7 +106,7 @@ Rectangle {
                     width: Math.max(1, (planetFilterRow.width - 5 * planetFilterRow.spacing) / 6)
                     height: 28
                     contentPadding: 1
-                    label: modelData
+                    label: PlanetPolicy.planetLabel(modelData)
                     labelPixelSize: 10
                     selected: clock.selectedPlanet === modelData
                     accentColor: Colors.cyan
@@ -164,7 +167,8 @@ Rectangle {
                     ActionButton {
                         width: 80
                         height: 25
-                        label: planetRow.modelData.name
+                        label: PlanetPolicy.planetLabel(
+                            planetRow.modelData.name)
                         labelPixelSize: 9
                         contentPadding: 1
                         accentColor: planetRow.modelData.available
@@ -179,10 +183,17 @@ Rectangle {
                         id: lane
                         width: Math.max(0, planetRow.width - 85)
                         height: 25
-                        color: Colors.dark
+                        color: clock.inspectedEvent
+                               && clock.inspectedEvent.planet
+                                  === planetRow.modelData.name
+                               ? Colors.black : Colors.dark
                         border.width: 1
-                        border.color: planetRow.modelData.available
-                                      ? Colors.blue : Colors.orange
+                        border.color: clock.inspectedEvent
+                                      && clock.inspectedEvent.planet
+                                         === planetRow.modelData.name
+                                      ? Colors.magenta
+                                      : planetRow.modelData.available
+                                        ? Colors.blue : Colors.orange
                         clip: true
 
                         Repeater {
@@ -221,6 +232,12 @@ Rectangle {
                                     PlanetPolicy.timeX(modelData.minute,
                                                       lane.width - width - 2)))
                                 radius: 2
+                                scale: clock.inspectedEvent
+                                       && clock.inspectedEvent.id === modelData.id
+                                       ? 1.08 : 1.0
+                                Behavior on scale {
+                                    NumberAnimation { duration: 120 }
+                                }
                                 color: clock.lockedEvent
                                        && clock.lockedEvent.id === modelData.id
                                        ? Colors.yellow : Colors.black
@@ -230,6 +247,18 @@ Rectangle {
                                 border.color: modelData.kind === "rise" ? Colors.cyan
                                               : modelData.kind === "transit"
                                               ? Colors.magenta : Colors.orange
+                                Rectangle {
+                                    anchors.fill: parent
+                                    anchors.margins: -2
+                                    color: "transparent"
+                                    radius: 4
+                                    border.width: 1
+                                    border.color: Colors.yellow
+                                    visible: clock.inspectedEvent
+                                             && clock.inspectedEvent.id
+                                                === eventMarker.modelData.id
+                                    opacity: 0.65
+                                }
                                 GohuText {
                                     anchors.centerIn: parent
                                     text: eventMarker.modelData.kind === "rise" ? "R"
@@ -310,32 +339,81 @@ Rectangle {
 
         Rectangle {
             width: parent.width
-            height: 45
+            height: 73
             color: Colors.dark
             border.width: 1
             border.color: clock.inspectedEvent ? Colors.magenta : Colors.blue
             Column {
                 anchors.fill: parent
                 anchors.margins: 5
-                spacing: 2
-                GohuText {
+                spacing: 4
+                Row {
                     width: parent.width
-                    font.pixelSize: 11
-                    color: Colors.yellow
-                    elide: Text.ElideRight
-                    text: clock.inspectedEvent
-                          ? PlanetPolicy.eventDetail(clock.inspectedEvent)
-                          : "CHOOSE A PLANET / CLICK R, T OR S TO LOCK"
+                    height: 35
+                    spacing: 5
+                    Column {
+                        width: Math.max(0, parent.width - 120)
+                        height: 35
+                        spacing: 3
+                        GohuText {
+                            width: parent.width
+                            font.pixelSize: 11
+                            color: Colors.yellow
+                            elide: Text.ElideRight
+                            text: clock.inspectedEvent
+                                  ? PlanetPolicy.eventDetail(clock.inspectedEvent)
+                                  : "SELECT A REAL RISE / TRANSIT / SET MARKER"
+                        }
+                        QuietText {
+                            width: parent.width
+                            font.pixelSize: 9
+                            color: Colors.cyan
+                            elide: Text.ElideRight
+                            text: clock.inspectedEvent
+                                  ? PlanetPolicy.eventOrdinal(
+                                        clock.inspectableEvents,
+                                        clock.inspectedEvent)
+                                    + " // " + clock.inspectedEvent.date
+                                    + " // USNO MRST"
+                                  : clock.inspectableEvents.length
+                                    + " REAL EVENTS // LOCAL CIVIL TIME"
+                        }
+                    }
+                    ActionButton {
+                        width: 55
+                        height: 29
+                        label: "PREV"
+                        labelPixelSize: 10
+                        contentPadding: 1
+                        accentColor: Colors.cyan
+                        available: clock.inspectableEvents.length > 0
+                        onClicked: clock.lockedEvent = PlanetPolicy.stepEvent(
+                                       clock.inspectableEvents,
+                                       clock.inspectedEvent, -1)
+                    }
+                    ActionButton {
+                        width: 55
+                        height: 29
+                        label: "NEXT"
+                        labelPixelSize: 10
+                        contentPadding: 1
+                        accentColor: Colors.magenta
+                        available: clock.inspectableEvents.length > 0
+                        onClicked: clock.lockedEvent = PlanetPolicy.stepEvent(
+                                       clock.inspectableEvents,
+                                       clock.inspectedEvent, 1)
+                    }
                 }
                 QuietText {
                     width: parent.width
                     font.pixelSize: 9
-                    color: Colors.cyan
+                    color: clock.sourceError ? Colors.orange : Colors.cyan
                     elide: Text.ElideRight
                     text: clock.sourceError
                           ? clock.sourceError
-                          : (clock.lockedEvent ? "LOCKED // UNLOCK TO INSPECT MORE"
-                             : "HOVER FOR DETAILS // CLICK TO HOLD EVENT")
+                          : (clock.lockedEvent
+                             ? "LOCKED // PREV / NEXT CYCLE REAL EVENTS // UNLOCK TO HOVER"
+                             : "HOVER TO PREVIEW // CLICK MARKER OR PREV / NEXT TO LOCK")
                 }
             }
         }

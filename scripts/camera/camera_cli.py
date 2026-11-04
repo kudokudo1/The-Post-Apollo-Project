@@ -7,6 +7,7 @@ screenshot-like files immediately inside Desktop, only after preview and a
 second explicit confirmation. "Trash" uses GIO; no unlink/rm fallback.
 """
 import argparse
+from collections import deque
 import datetime as dt
 import hashlib
 import json
@@ -28,7 +29,10 @@ SCREENSHOT_NAME = re.compile(
 PLAN_PATTERN = re.compile(r"^[a-f0-9]{32}$")
 PLAN_TTL = 600
 MAX_TRASH = 20000
-MAX_GALLERY = 150
+GALLERY_PAGE_SIZE = 120
+MAX_SCAN_FILES = 60000
+MAX_SCAN_DIRS = 1600
+MAX_SCAN_DEPTH = 4
 MAX_OUTPUT_BYTES = 1000000
 
 
@@ -100,23 +104,144 @@ def direct_images(root, source, only_screenshots=False):
     return out
 
 
-def gallery():
-    records = (direct_images(pictures(), "camera") +
-               direct_images(screenshots_root(), "screenshots") +
-               direct_images(desktop(), "desktop"))
+def safe_user_folder(raw):
+    """User-requested local folder. Refuse HOME root and symlink traversal."""
+    candidate = os.path.expanduser(str(raw or "").strip())
+    if not candidate or not os.path.isabs(candidate):
+        return None
+    path = Path(candidate)
+    if ".." in path.parts or any(piece.startswith(".") for piece in
+                                  path.parts[len(home().parts):]):
+        return None
+    try:
+        relative = path.relative_to(home())
+    except ValueError:
+        return None
+    if not relative.parts or relative.parts[0] in (
+            ".cache", ".config", ".local", ".ssh"):
+        return None
+    current = home()
+    for part in relative.parts:
+        current = current / part
+        if current.is_symlink():
+            return None
+    return path if path.is_dir() else None
+
+
+def gallery_roots(extra_folder=""):
+    # Pictures covers legacy nested screenshot folders, while Desktop and
+    # Downloads catch screenshots saved before Camera existed. Do not scan
+    # the whole home, network mounts or private dotdirectories by default.
+    roots = [
+        (pictures(), "camera"),
+        (screenshots_root(), "screenshots"),
+        (home() / "Pictures", "pictures"),
+        (desktop(), "desktop"),
+        (home() / "Downloads", "downloads"),
+        (home() / "Screenshots", "screenshots"),
+    ]
+    if extra_folder:
+        custom = safe_user_folder(extra_folder)
+        if custom is None:
+            return None
+        roots.append((custom, "chosen-folder"))
+    return roots
+
+
+def scan_gallery(extra_folder=""):
+    roots = gallery_roots(extra_folder)
+    if roots is None:
+        return None, [], True
+    by_path = {}
+    seen_dirs = set()
+    queue = deque((root, source, 0) for root, source in roots)
+    files_examined = 0
+    folders_examined = 0
+    truncated = False
+    while queue:
+        root, source, depth = queue.popleft()
+        if root in seen_dirs or root.is_symlink() or not root.is_dir():
+            continue
+        if folders_examined >= MAX_SCAN_DIRS:
+            truncated = True
+            break
+        seen_dirs.add(root)
+        folders_examined += 1
+        try:
+            with os.scandir(root) as listing:
+                for entry in listing:
+                    if entry.name.startswith(".") or entry.is_symlink():
+                        continue
+                    if entry.is_dir(follow_symlinks=False):
+                        if depth < MAX_SCAN_DEPTH:
+                            queue.append((root / entry.name, source, depth + 1))
+                        else:
+                            truncated = True
+                        continue
+                    if not entry.is_file(follow_symlinks=False):
+                        continue
+                    files_examined += 1
+                    if files_examined > MAX_SCAN_FILES:
+                        truncated = True
+                        queue.clear()
+                        break
+                    if not is_image(entry):
+                        continue
+                    try:
+                        st = entry.stat(follow_symlinks=False)
+                    except OSError:
+                        continue
+                    if not stat.S_ISREG(st.st_mode):
+                        continue
+                    path = root / entry.name
+                    if str(path) in by_path:
+                        continue
+                    shot_dir = (source in ("camera", "screenshots") or
+                                "screenshot" in str(root).lower())
+                    by_path[str(path)] = {
+                        "id": hashlib.sha256(os.fsencode(str(path))).hexdigest()[:24],
+                        "path": str(path),
+                        "name": entry.name,
+                        "source": source,
+                        "bytes": st.st_size,
+                        "modifiedMs": st.st_mtime_ns // 1000000,
+                        "screenshotLikely": bool(shot_dir or is_screenshot_name(entry.name)),
+                    }
+        except OSError:
+            continue
+    return roots, list(by_path.values()), truncated
+
+
+def gallery(page=0, query="", extra_folder="", shots_only=False):
+    """Bounded local directory traversal, server-side search and paging."""
+    if not isinstance(page, int) or page < 0 or page > 100000:
+        return {"ok": False, "kind": "gallery", "error": "INVALID_PAGE"}
+    if len(query) > 200:
+        return {"ok": False, "kind": "gallery", "error": "QUERY_TOO_LONG"}
+    roots, records, truncated = scan_gallery(extra_folder)
+    if roots is None:
+        return {"ok": False, "kind": "gallery", "error": "FOLDER_NOT_PERMITTED"}
+    if shots_only:
+        records = [row for row in records if row["screenshotLikely"]]
+    if query.strip():
+        needle = query.strip().casefold()
+        records = [row for row in records
+                   if needle in row["name"].casefold()]
     records.sort(key=lambda row: (-row["modifiedMs"], row["path"]))
     total = len(records)
-    size = sum(r["bytes"] for r in records)
-    # Exact paths and names are local view data, not network requests.
-    for row in records:
-        row.pop("signature")
+    start = page * GALLERY_PAGE_SIZE
+    result = records[start:start + GALLERY_PAGE_SIZE]
     return {
-        "ok": True, "kind": "gallery", "total": total,
-        "totalBytes": size,
-        "shown": min(total, MAX_GALLERY),
-        "files": records[:MAX_GALLERY],
-        "roots": [str(pictures()), str(screenshots_root()), str(desktop())],
-        "limitNote": "First 150 newest files; no files were moved.",
+        "ok": True, "kind": "gallery", "page": page,
+        "pageSize": GALLERY_PAGE_SIZE, "total": total,
+        "shown": len(result), "files": result,
+        "hasMore": start + len(result) < total,
+        "truncated": truncated,
+        "roots": [str(root) for root, _ in roots],
+        "query": query,
+        "shotsOnly": bool(shots_only),
+        "extraFolder": extra_folder,
+        "limitNote": "Paged; only capped by the reported directory scan safety limits.",
     }
 
 
@@ -312,27 +437,143 @@ def trash_plan(token, confirmed):
     }
 
 
+def preview_selected_trash(raw_path):
+    """Selection-specific preview. This action never alters the picture."""
+    target = Path(str(raw_path or ""))
+    if target.suffix.lower() not in IMAGE_EXTS:
+        return {"ok": False, "kind": "preview-selected", "error": "NOT_AN_IMAGE"}
+    # The path must stay under HOME, with no hidden/private/symlink parent.
+    # Explicitly chosen extra galleries follow the same guard as defaults.
+    if safe_user_folder(str(target.parent)) != target.parent:
+        return {"ok": False, "kind": "preview-selected",
+                "error": "FOLDER_NOT_PERMITTED"}
+    try:
+        st = target.lstat()
+        if not stat.S_ISREG(st.st_mode) or target.is_symlink():
+            return {"ok": False, "kind": "preview-selected", "error": "NOT_A_FILE"}
+    except OSError:
+        return {"ok": False, "kind": "preview-selected", "error": "NOT_A_FILE"}
+    directory = plan_dir()
+    if directory.is_symlink():
+        return {"ok": False, "kind": "preview-selected", "error": "PLAN_DIR_SYMLINK"}
+    try:
+        directory.mkdir(parents=True, mode=0o700, exist_ok=True)
+        token = secrets.token_hex(16)
+        plan = {
+            "version": 2, "createdAt": time.time(),
+            "root": str(home()),
+            "records": [{"path": str(target), "signature": [
+                st.st_dev, st.st_ino, st.st_size, st.st_mtime_ns
+            ]}],
+        }
+        fd = os.open(directory / (token + ".json"),
+                     os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600)
+        with os.fdopen(fd, "w", encoding="utf-8") as out:
+            json.dump(plan, out, separators=(",", ":"))
+            out.flush()
+            os.fsync(out.fileno())
+        return {
+            "ok": True, "kind": "preview-selected", "planId": token,
+            "name": target.name, "path": str(target), "bytes": st.st_size,
+            "expiresSeconds": PLAN_TTL,
+            "warning": "A separate confirmation moves this one unchanged file to Trash.",
+        }
+    except OSError:
+        return {"ok": False, "kind": "preview-selected", "error": "PLAN_SAVE_FAILED"}
+
+
+def trash_selected(token, confirmation):
+    """Confirmed one-file GIO Trash with a checked one-use, short-lived plan."""
+    if confirmation != "MOVE_TO_TRASH" or not PLAN_PATTERN.fullmatch(token or ""):
+        return {"ok": False, "kind": "trash-selected",
+                "error": "CONFIRMATION_REQUIRED"}
+    gio = shutil.which("gio")
+    if not gio:
+        return {"ok": False, "kind": "trash-selected", "error": "GIO_NOT_INSTALLED"}
+    directory = plan_dir()
+    if directory.is_symlink():
+        return {"ok": False, "kind": "trash-selected", "error": "PLAN_DIR_SYMLINK"}
+    path = directory / (token + ".json")
+    if path.is_symlink() or not path.is_file():
+        return {"ok": False, "kind": "trash-selected", "error": "PLAN_NOT_FOUND"}
+    try:
+        if path.stat().st_size > MAX_OUTPUT_BYTES:
+            return {"ok": False, "kind": "trash-selected", "error": "PLAN_TOO_LARGE"}
+        plan = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return {"ok": False, "kind": "trash-selected", "error": "PLAN_INVALID"}
+    if (not isinstance(plan, dict) or plan.get("version") != 2
+            or plan.get("root") != str(home())
+            or not isinstance(plan.get("records"), list)
+            or len(plan["records"]) != 1
+            or not isinstance(plan.get("createdAt"), (int, float))
+            or not 0 <= time.time() - plan["createdAt"] <= PLAN_TTL):
+        return {"ok": False, "kind": "trash-selected",
+                "error": "PLAN_EXPIRED_OR_INVALID"}
+    record = plan["records"][0]
+    if not isinstance(record, dict):
+        return {"ok": False, "kind": "trash-selected", "error": "PLAN_INVALID"}
+    target = Path(str(record.get("path", "")))
+    if (target.suffix.lower() not in IMAGE_EXTS or
+            safe_user_folder(str(target.parent)) != target.parent):
+        return {"ok": False, "kind": "trash-selected", "error": "FOLDER_NOT_PERMITTED"}
+    try:
+        st = target.lstat()
+        fingerprint = [st.st_dev, st.st_ino, st.st_size, st.st_mtime_ns]
+        if not stat.S_ISREG(st.st_mode) or target.is_symlink() or (
+                fingerprint != record.get("signature")):
+            return {"ok": False, "kind": "trash-selected", "error": "FILE_CHANGED"}
+        proc = subprocess.run([gio, "trash", str(target)], timeout=18,
+                              capture_output=True, check=False)
+    except (OSError, subprocess.SubprocessError):
+        return {"ok": False, "kind": "trash-selected", "error": "TRASH_FAILED"}
+    if proc.returncode:
+        return {"ok": False, "kind": "trash-selected", "error": "TRASH_FAILED"}
+    try:
+        path.unlink(missing_ok=True)  # Only the used plan, never a screenshot.
+    except OSError:
+        pass
+    return {
+        "ok": True, "kind": "trash-selected", "moved": 1,
+        "name": target.name, "recoverable": True, "destination": "Freedesktop Trash",
+    }
+
+
 def main(argv=None):
     parser = argparse.ArgumentParser()
     command = parser.add_subparsers(dest="action", required=True)
     command.add_parser("status")
-    command.add_parser("gallery")
+    gallery_parser = command.add_parser("gallery")
+    gallery_parser.add_argument("--page", type=int, default=0)
+    gallery_parser.add_argument("--query", default="")
+    gallery_parser.add_argument("--folder", default="")
+    gallery_parser.add_argument("--shots-only", action="store_true")
     capture_parser = command.add_parser("capture")
     capture_parser.add_argument("mode", choices=["region", "focused", "all"])
     command.add_parser("preview-trash")
     trash_parser = command.add_parser("trash")
     trash_parser.add_argument("plan_id")
     trash_parser.add_argument("confirmation")
+    selected_preview = command.add_parser("preview-selected")
+    selected_preview.add_argument("path")
+    selected_trash = command.add_parser("trash-selected")
+    selected_trash.add_argument("plan_id")
+    selected_trash.add_argument("confirmation")
     options = parser.parse_args(argv)
 
     if options.action == "status":
         result = status()
     elif options.action == "gallery":
-        result = gallery()
+        result = gallery(options.page, options.query,
+                         options.folder, options.shots_only)
     elif options.action == "capture":
         result = capture(options.mode)
     elif options.action == "preview-trash":
         result = preview_desktop_trash()
+    elif options.action == "preview-selected":
+        result = preview_selected_trash(options.path)
+    elif options.action == "trash-selected":
+        result = trash_selected(options.plan_id, options.confirmation)
     else:
         result = trash_plan(options.plan_id, options.confirmation)
     print(json.dumps(result, ensure_ascii=True, separators=(",", ":")))

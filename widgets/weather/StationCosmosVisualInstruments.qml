@@ -43,7 +43,7 @@ Rectangle {
     readonly property bool referenceWaxing:
         inspectedPhaseId.indexOf("waning")!==0
         && inspectedPhaseId!=="last-quarter"
-    readonly property real visibleIllumination: previewReference
+    readonly property var visibleIllumination: previewReference
         ? phaseReferenceIllumination : moonData.illumination
 
     property real hoveredMinute: -1

@@ -79,6 +79,7 @@ class CameraOfflineTests(unittest.TestCase):
         token = preview["planId"]
         with patch.object(camera.shutil, "which", return_value="/usr/bin/gio"):
             with patch.object(camera.subprocess, "run") as run:
+                run.return_value.returncode = 0
                 self.assertEqual(camera.trash_plan(token, "anything")["error"],
                                  "CONFIRMATION_REQUIRED")
                 run.assert_not_called()

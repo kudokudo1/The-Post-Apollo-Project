@@ -54,6 +54,17 @@ class SharedArchiveAndRecordActions(unittest.TestCase):
         self.assertIn('"p:" + portfolioRow.modelData.id', PORT)
         self.assertIn('"unit:" + unitRow.modelData.id', STRUCTURE)
 
+    def test_red_direct_x_and_confirmation_are_in_original_rows(self):
+        for source, expected in ((ORG, 2), (PORT, 1), (STRUCTURE, 1)):
+            self.assertEqual(source.count('objectName: "orgDirectDeleteX"'), expected)
+            self.assertEqual(source.count('label: "CONFIRM DELETE"'), expected)
+            self.assertEqual(source.count('label: "CANCEL"'), expected)
+            self.assertIn('role: "danger"', source)
+            self.assertIn("requestDirectDelete(", source)
+            self.assertIn("deletePending(", source)
+            self.assertIn("removalController: null", source)
+        self.assertEqual(PANE.count("removalController: localArchiveTray"), 3)
+
     def test_legacy_standalone_controls_remain_available_if_unembedded(self):
         for source in (ORG, PORT, STRUCTURE):
             self.assertIn("property bool useSharedArchiveControl: false", source)

@@ -1062,9 +1062,9 @@ class RealQtOrganizationsSettingsPaneSmoke(unittest.TestCase):
         # Confirm two distinct user intents before any subprocess is started.
         group = next(x for x in records if x["kind"] == "portfolio")
         self.assertFalse(tray.requestRemove(group))
-        self.assertEqual(tray.property("confirmationKey"), "portfolio:portfolio-1")
+        self.assertEqual(tray.property("confirmationKey"), "portfolio:portfolio-1:5:FICTIONAL GROUP")
         self.assertFalse(process.property("running"))
-        self.assertIn("CONFIRM PERMANENT REMOVAL", tray.property("resultText"))
+        self.assertIn("CONFIRM PERMANENT DELETE", tray.property("resultText"))
         self.assertTrue(tray.requestRemove(group))
         self.assertTrue(process.property("running"))
         self.assertTrue(tray.property("busy"))

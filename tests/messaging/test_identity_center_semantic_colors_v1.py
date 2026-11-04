@@ -9,11 +9,11 @@ ROLE = (Q / "IdentityCenterLocalActionButton.qml").read_text()
 PANE = (Q / "IdentityCenterSettingsSections.qml").read_text()
 FILE_ROLES = {
     "IdentityCenterLocalOrganizationEditor.qml":
-        ["refresh","add","navigate","manage","manage","manage","manage","manage","add"],
+        ["refresh","add","navigate","manage","manage","manage","danger","danger","navigate","manage","manage","danger","danger","navigate","add"],
     "IdentityCenterLocalPortfolioEditor.qml":
-        ["refresh","add","manage","manage","manage","danger","add"],
+        ["refresh","add","manage","manage","manage","danger","danger","navigate","danger","add"],
     "IdentityCenterLocalStructureEditor.qml":
-        ["refresh","navigate","manage","navigate","add","manage","manage","manage"],
+        ["refresh","navigate","manage","navigate","add","manage","manage","manage","danger","danger","navigate"],
     "IdentityCenterLocalRelationshipModifiers.qml":
         ["navigate","navigate","navigate","navigate","navigate","navigate","navigate",
          "primary","navigate","refresh","danger"],
@@ -84,6 +84,7 @@ class SemanticOrganizationColors(unittest.TestCase):
         self.assertIn("interactive: false", PANE.split(
             'label: "SWITCH ORGANIZATION // UNAVAILABLE"')[1][:160])
         for component in (
+            "IdentityCenterLocalArchiveTray {",
             "IdentityCenterLocalRecordsSearch {",
             "IdentityCenterLocalSaveFeedback {",
             "IdentityCenterLocalRefreshAll {",

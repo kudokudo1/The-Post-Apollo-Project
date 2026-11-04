@@ -13,7 +13,8 @@ Confirm which exact commit is deployed. Use safe fictional/test company records 
 | 2. Local search | Search company, branch, portfolio, team, location, link; clear | Same-page record matches and filters, no new menus | DEFERRED |
 | 3. Record actions | Show/hide archived and restore a safe test record | Archived records display consistently, confirmations clear | DEFERRED |
 | 3b. Archive discovery | Open Organizations, locate ARCHIVE TRAY and its archived count, view archived-only rows | Obvious destination before Search; company, branch, portfolio and unit types clearly named | OPERATOR-REPORTED PROBLEM (2026-11-04), RECHECK AFTER FIX |
-| 3c. Red permanent remove | **Only on a disposable archived test record with fresh private backup**, click Remove then Confirm Remove | Red control; two-stage confirmation; linked/child/unbacked records refused; confirmed safe removal persists after Refresh All | DEFERRED, NEVER TEST ON LIVE IMPORTANT DATA |
+| 3c. Red permanent remove from tray | On a disposable archived record, click Remove then Confirm Remove (backup optional) | Red control; two-stage confirmation; linked/child records refused; confirmed safe removal persists after Refresh All | DEFERRED, NEVER TEST ON IMPORTANT DATA |
+| 3d. Direct red X deletion | On disposable ACTIVE company, branch, portfolio and unit rows click X, then Cancel; repeat and Confirm Delete only for disposable data | No mandatory Archive or Backup; red X next to Save/Archive; shared two-step confirmation; references block unsafe deletion; inline result | DEFERRED, NEVER TEST ON IMPORTANT DATA |
 | 4. Save feedback | Save a harmless test record and reopen | Saving then revision-confirmed Saved, truthful failures | DEFERRED |
 | 5. Refresh All | Click once and repeatedly while busy | Seven stores reload, busy protects in-progress writes, results remain | DEFERRED |
 | 6a. Backup Now / List Backups | Operator created a backup and viewed the list in the live UI | Buttons created and listed a backup as observed by operator; private file mode not manually inspected | OPERATOR-PASSED (2026-11-04) |
@@ -35,3 +36,7 @@ Proceed with bounded functional controls. When the operator elects to test, use 
 ## Archive Tray user evidence // 2026-11-04
 
 The operator provided two live desktop screenshots and reported archived records were difficult to locate. The operator explicitly requested **red permanent removal as distinct from Archive**. The new tray/archived deletion path is a corrective implementation proposal until merged and live-accepted. Do not mark it personally accepted based on source tests. Never use important production company records for a destructive UI test.
+
+## Operator decision // 2026-11-04
+
+Existing live Archive Tray was visually confirmed much better. Explicitly **no mandatory backup and no archive prerequisite before delete**. Preserve independent Archive vs red X Delete actions. No claim of real desktop deletion tested.

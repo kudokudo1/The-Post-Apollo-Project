@@ -1,4 +1,4 @@
-"""Fail-closed permanent removal of archived owner-local labels only."""
+"""Direct removal of active or archived labels with no mandatory backups."""
 from __future__ import annotations
 import fcntl
 import os
@@ -60,36 +60,31 @@ class ArchivedRemoval(unittest.TestCase):
                 "orgId": org_id, "expectedName": name,
                 "expectedRevision": revision}
 
-    def test_requires_archived_and_matching_private_backup(self):
-        self.save_org()
+    def test_no_archive_or_backup_requirement(self):
+        self.save_org(archived=False)
         req = self.request("organization", "org-1", "Sample Company", org_id="org-1")
-        with self.assertRaisesRegex(removal.RemovalError, "BACKUP_REQUIRED"):
-            removal.remove(req)
-        self.assertEqual(len(directory.load()["organizations"]), 1)
-        backup.make_backup()
-        updated = removal.remove(req)
-        self.assertTrue(updated["ok"])
-        self.assertEqual(updated["revision"], 2)
-        doc = directory.load()
-        self.assertEqual(doc["organizations"], [])
-        self.assertEqual(doc["nextId"], 3)
+        result = removal.remove(req)
+        self.assertTrue(result["ok"])
+        self.assertEqual(result["revision"], 2)
+        self.assertEqual(directory.load()["organizations"], [])
+        self.assertEqual(directory.load()["nextId"], 3)
+        # No snapshot was generated during deletion.
+        self.assertEqual(backup.names(), [])
         with self.assertRaisesRegex(removal.RemovalError, "REVISION_CONFLICT"):
             removal.remove(req)
 
-    def test_active_unarchived_record_cannot_be_removed(self):
-        self.save_org(archived=False)
-        backup.make_backup()
+    def test_archived_record_can_also_be_removed_without_backup(self):
+        self.save_org(archived=True)
         req = self.request("organization", "org-1", "Sample Company", org_id="org-1")
-        with self.assertRaisesRegex(removal.RemovalError, "ARCHIVE_BEFORE_REMOVE"):
-            removal.remove(req)
+        self.assertTrue(removal.remove(req)["ok"])
+        self.assertEqual(directory.load()["organizations"], [])
 
-    def test_backup_must_include_exact_current_archived_record(self):
-        backup.make_backup()  # Valid snapshot from before the record existed.
+    def test_old_backup_is_irrelevant_to_direct_removal(self):
+        backup.make_backup()  # Optional earlier empty snapshot.
         self.save_org()
         req = self.request("organization", "org-1", "Sample Company", org_id="org-1")
-        with self.assertRaisesRegex(removal.RemovalError, "BACKUP_REQUIRED"):
-            removal.remove(req)
-        self.assertEqual(directory.load()["revision"], 1)
+        self.assertTrue(removal.remove(req)["ok"])
+        self.assertEqual(directory.load()["organizations"], [])
 
     def test_org_with_branches_units_or_portfolio_members_fails_closed(self):
         branch = {"id": "branch-2", "name": "Sample Branch", "archived": True}
@@ -107,7 +102,7 @@ class ArchivedRemoval(unittest.TestCase):
         with self.assertRaisesRegex(removal.RemovalError, "DETACH_PORTFOLIOS_FIRST"):
             removal.remove(req)
 
-    def test_branch_requires_archive_backup_and_unlinked_social(self):
+    def test_branch_unlinked_social_guard_without_backup_requirement(self):
         self.save_org(archived=False, branches=[
             {"id": "branch-2", "name": "Sample Branch", "archived": True}])
         req = self.request("branch", "branch-2", "Sample Branch", org_id="org-1")
@@ -117,7 +112,6 @@ class ArchivedRemoval(unittest.TestCase):
                        "identityId": "identity-1",
                        "serviceId": None, "accountId": None}],
         })
-        backup.make_backup()
         with self.assertRaisesRegex(removal.RemovalError, "UNLINK_BRANCH_SOCIAL_FIRST"):
             removal.remove(req)
         social.save(social.initial())
@@ -132,10 +126,7 @@ class ArchivedRemoval(unittest.TestCase):
         with self.assertRaisesRegex(removal.RemovalError, "DETACH_PORTFOLIO_MEMBERS_FIRST"):
             removal.remove(req)
         self.save_portfolio(members=[])
-        # Earlier backup is not a snapshot of the empty portfolio state.
-        with self.assertRaisesRegex(removal.RemovalError, "BACKUP_REQUIRED"):
-            removal.remove(req)
-        backup.make_backup()
+        # Once references are cleared, removing needs no new backup.
         self.assertTrue(removal.remove(req)["ok"])
         self.assertEqual(portfolio.load()["portfolios"], [])
 
@@ -147,8 +138,8 @@ class ArchivedRemoval(unittest.TestCase):
         self.assertTrue(removal.remove(req)["ok"])
         self.assertEqual(structure.load()["units"], [])
         self.save_unit(archived=False)
-        with self.assertRaisesRegex(removal.RemovalError, "ARCHIVE_BEFORE_REMOVE"):
-            removal.remove(req)
+        self.assertTrue(removal.remove(req)["ok"])
+        self.assertEqual(structure.load()["units"], [])
 
     def test_organization_social_link_stays_until_explicit_unlink(self):
         self.save_org()

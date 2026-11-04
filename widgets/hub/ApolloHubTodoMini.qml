@@ -49,6 +49,21 @@ Item {
         todoSnapshot && Number.isInteger(todoSnapshot.total)
         ? Math.max(0, todoSnapshot.total) : 0
     readonly property bool editingTitle: editingTaskId.length > 0
+    // M13s: status-only signal for TASKS recovery readiness. Never exposes
+    // title or editor contents. The Hub tile keeps all existing editing
+    // and saving behavior. Pending asynchronous writes are tracked separately.
+    readonly property bool unsavedLocalEntryDraft: {
+        if (pendingWriteKind !== "")
+            return false;
+        if (!editingTitle)
+            return entryInput.text.length > 0;
+        for (var i = 0; i < entries.length; ++i) {
+            if (String(entries[i].id) === editingTaskId)
+                return entryInput.text !== String(entries[i].title || "");
+        }
+        // Missing target is not evidence that the edit is safely saved.
+        return entryInput.text.length > 0;
+    }
     readonly property bool titleValid: entryInput.text.trim().length > 0
         && entryInput.text.trim().length <= 160
         && !/[\x00-\x1f\x7f]/.test(entryInput.text)

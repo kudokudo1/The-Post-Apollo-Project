@@ -451,6 +451,30 @@ Item {
                                 ctx.fillText(country[1],loc.x+8,loc.y-7);
                             }
                         }
+
+                        // Owner-entered hub claims: hollow orange map pins,
+                        // explicitly distinct from geographic reference dots.
+                        for(var z=0;z<root.hubRows.length;z++) {
+                            var hub=root.hubRows[z];
+                            if(hub.archived) continue;
+                            var hp=Geo.project(hub.longitude,hub.latitude,
+                                width,height,root.regionKey,root.zoom,
+                                root.centerLon,root.centerLat);
+                            if(!hp.visible) continue;
+                            var chosenHub=hub.id===root.selectedHubId;
+                            ctx.beginPath();
+                            ctx.arc(hp.x,hp.y,chosenHub?8:5,0,2*Math.PI);
+                            ctx.fillStyle="#16051F";
+                            ctx.fill();
+                            ctx.lineWidth=chosenHub?3:2;
+                            ctx.strokeStyle=chosenHub?"#C74EC7":"#ED981A";
+                            ctx.stroke();
+                            if(chosenHub) {
+                                ctx.font="11px monospace";
+                                ctx.fillStyle="#F2BE4E";
+                                ctx.fillText(hub.label,hp.x+10,hp.y-9);
+                            }
+                        }
                     }
 
                     onWidthChanged: requestPaint()
@@ -489,6 +513,36 @@ Item {
 
                     onReleased: function(mouse) {
                         if (dragged) return;
+                        if (root.hubPlacementArmed) {
+                            var placed=Geo.unproject(mouse.x,mouse.y,
+                                mapCanvas.width,mapCanvas.height,
+                                root.regionKey,root.zoom,root.centerLon,root.centerLat);
+                            if (placed) root.openHubEditor(placed.lon,placed.lat);
+                            return;
+                        }
+
+                        var closestHub=null;
+                        var bestHubDistance=13*13;
+                        for(var h=0;h<root.hubRows.length;h++) {
+                            var candidate=root.hubRows[h];
+                            if(candidate.archived) continue;
+                            var point=Geo.project(candidate.longitude,candidate.latitude,
+                                mapCanvas.width,mapCanvas.height,root.regionKey,
+                                root.zoom,root.centerLon,root.centerLat);
+                            if(!point.visible) continue;
+                            var dist=(point.x-mouse.x)*(point.x-mouse.x)
+                                +(point.y-mouse.y)*(point.y-mouse.y);
+                            if(dist<=bestHubDistance) {
+                                bestHubDistance=dist;
+                                closestHub=candidate;
+                            }
+                        }
+                        if(closestHub) {
+                            root.selectedHubId=closestHub.id;
+                            root.selectedCode="";
+                            root.selectedCountryCode="";
+                            return;
+                        }
                         var nearestState=Geo.nearestState(root.regionKey,mouse.x,mouse.y,
                             mapCanvas.width,mapCanvas.height,root.zoom,
                             root.centerLon,root.centerLat,13);

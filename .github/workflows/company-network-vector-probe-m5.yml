@@ -181,8 +181,8 @@ jobs:
               "label":"CI DEMO HUB",
               "organizationLabel":"CI SYNTHETIC",
               "city":"CI TEST",
-              "regionCode":"MD","countryCode":"US",
-              "longitude":-76.4901,"latitude":38.9801,
+              "regionCode":"MI","countryCode":"US",
+              "longitude":-83.6875,"latitude":43.0125,
               "serviceFamily":"BENEFITS"
           }
           doc=store.apply(store.initial(),

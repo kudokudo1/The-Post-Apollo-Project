@@ -13,6 +13,8 @@ const magickSource=read("widgets/weather/StationMagickSubjectPanelPolicy.js");
 const cosmosSource=read("widgets/weather/StationCosmosSubjectPanelPolicy.js");
 const pane=read("widgets/weather/StationMagickSubjectPane.qml");
 const overview=read("widgets/weather/StationMagickOverviewPane.qml");
+const lunarSolar=read("widgets/weather/StationMagickLunarSolarPane.qml");
+const cosmosVisual=read("widgets/weather/StationCosmosVisualInstruments.qml");
 const instrument=read("widgets/weather/StationMagickCelestialInstrument.qml");
 const network=read("widgets/weather/StationCosmosCelestialNetwork.qml");
 const surface=read("widgets/weather/StationWorkspaceSurface.qml");
@@ -257,4 +259,45 @@ test("M30-C Sun time controls select actual calibrated samples without refetchin
   assert.match(overview,/CosmosVisual\.clockLabel\(/);
   assert.match(overview,/deck\.routeRequested\("magick\/planetary\/hours"\)/);
   assert.doesNotMatch(overview,/weatherService\.refresh\(|observationOwner\.refresh\(/);
+});
+
+
+test("M30-D LUNAR + SOLAR uses focused top tabs, no page scroll and no new collectors", () => {
+  for(const route of [
+    "magick/lunar-solar/moon",
+    "magick/lunar-solar/seasons",
+    "magick/lunar-solar/calendar"
+  ]) {
+    assert.ok(nav.findRoute(route),"missing existing source route "+route);
+    assert.ok(lunarSolar.includes('{id:"'+route+'"'),
+      "missing tab "+route);
+  }
+  assert.match(pane,/magickPane\.subjectRoute\.indexOf\("magick\/lunar-solar\/"\) === 0\s*\? lunarSolarReference/);
+  assert.match(pane,/id: lunarSolarReference[\s\S]*StationMagickLunarSolarPane\s*\{/);
+  assert.match(lunarSolar,/id: focusTabs/);
+  assert.match(lunarSolar,/onClicked: lunarSolarPane\.routeRequested\(modelData\.id\)/);
+  assert.match(lunarSolar,/StationSky\s*\{/);
+  assert.match(lunarSolar,/sourceOnly: true/);
+  assert.match(lunarSolar,/subjectRoute: lunarSolarPane\.isSolar\s*\? "cosmos\/sun\/position" : "cosmos\/moon\/ephemeris"/);
+  assert.match(lunarSolar,/StationCosmosVisualInstruments\s*\{/);
+  assert.match(lunarSolar,/compactMode: true/);
+  assert.match(lunarSolar,/showMoon: !lunarSolarPane\.isSolar/);
+  assert.match(lunarSolar,/showSun: lunarSolarPane\.isSolar/);
+  assert.match(lunarSolar,/moonEphemeris: sourceSky\.moonObservation/);
+  assert.match(lunarSolar,/currentSolarPosition: sourceSky\.currentSolarPosition/);
+  assert.match(lunarSolar,/solarCivilOffsetMinutes: sourceSky\.moonCivilOffsetMinutes/);
+  assert.match(lunarSolar,/PRACTICE CALENDAR \/\/ NOT CONNECTED/);
+  assert.match(lunarSolar,/NO SAVED RITUAL EVENTS|NO SAVED/);
+  assert.doesNotMatch(lunarSolar,/Flickable\s*\{|ScrollView\s*\{|Process\s*\{|FileView\s*\{|Timer\s*\{/);
+  assert.doesNotMatch(lunarSolar,/Date\.now\(|XMLHttpRequest|writeAdapter/);
+  // The original full COSMOS visual retains its exact default height.
+  assert.match(cosmosVisual,/property bool compactMode: false/);
+  assert.match(cosmosVisual,/height: compactMode \? 204 : 304/);
+  assert.match(cosmosVisual,/readonly property var visibleIllumination: previewReference/);
+  assert.match(cosmosVisual,/onInspectedPhaseIdChanged: moonCanvas\.requestPaint\(\)/);
+  assert.match(cosmosVisual,/visual\.previewReference\s*\? visual\.referenceWaxing : info\.waxing/);
+  assert.match(cosmosVisual,/id: phaseButtonRow/);
+  assert.match(cosmosVisual,/id: solarPresetRow/);
+  assert.match(cosmosVisual,/onClicked: visual\.inspectedPhaseId = modelData\.id/);
+  assert.match(cosmosVisual,/visual\.lockedMinute = modelData\.id === "now"/);
 });

@@ -87,6 +87,8 @@ Rectangle {
             active: magickPane.visible && magickPane.kind === "reference"
             sourceComponent: magickPane.showCelestial
                              ? celestialReference
+                             : magickPane.subjectRoute.indexOf("magick/lunar-solar/") === 0
+                             ? lunarSolarReference
                              : magickPane.secondaryObservation !== ""
                              ? overviewReference
                              : magickPane.primaryObservation !== ""
@@ -425,6 +427,20 @@ Rectangle {
         StationMagickOverviewPane {
             weatherService: magickPane.weatherService
             celestialSource: magickPane.celestialSource
+            runtimeNowMs: magickPane.runtimeNowMs
+            onRouteRequested: function(path) {
+                magickPane.routeRequested(path)
+            }
+        }
+    }
+
+    // M30-D // Single focused Moon/Solar screen with fixed top-row tabs.
+    // The original SKY view remains available on COSMOS and elsewhere.
+    Component {
+        id: lunarSolarReference
+        StationMagickLunarSolarPane {
+            subjectRoute: magickPane.subjectRoute
+            weatherService: magickPane.weatherService
             runtimeNowMs: magickPane.runtimeNowMs
             onRouteRequested: function(path) {
                 magickPane.routeRequested(path)

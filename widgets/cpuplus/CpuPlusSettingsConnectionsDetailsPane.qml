@@ -103,6 +103,74 @@ Item {
             }
 
             Rectangle {width:parent.width; height:1; color:Colors.cyan}
+            // TASKS M13r-UI // same right-hand details bay and native
+            // controls as other Connections sources. The C2 presence
+            // check is explicitly requested; no unlock or grant action.
+            Column {
+                visible: details.selectedId === "tasks-recovery"
+                width: parent.width
+                spacing: 7
+
+                GohuText {
+                    width: parent.width
+                    text: "TASKS RECOVERY // SECURITY STATUS"
+                    color: Colors.magenta
+                    font.pixelSize: 11
+                    wrapMode: Text.WordWrap
+                }
+                QuietText {
+                    width: parent.width
+                    text: details.source ? details.source.detail : "KEYRING // NOT CHECKED"
+                    font.pixelSize: 10
+                    wrapMode: Text.WordWrap
+                }
+                QuietText {
+                    width: parent.width
+                    text: "CREDENTIAL OWNER // SHARED CONNECTIONS BROKER"
+                    color: Colors.cyan
+                    font.pixelSize: 9
+                    wrapMode: Text.WordWrap
+                }
+                QuietText {
+                    width: parent.width
+                    text: "DRAFT CAPTURE // DISABLED"
+                    color: Colors.orange
+                    font.pixelSize: 9
+                    wrapMode: Text.WordWrap
+                }
+                QuietText {
+                    width: parent.width
+                    text: "UNLOCK / PREVIEW // DISABLED"
+                    color: Colors.orange
+                    font.pixelSize: 9
+                    wrapMode: Text.WordWrap
+                }
+                QuietText {
+                    width: parent.width
+                    text: "CHECKPOINT DELETE // DISABLED"
+                    color: Colors.orange
+                    font.pixelSize: 9
+                    wrapMode: Text.WordWrap
+                }
+                ActionButton {
+                    width: Math.min(parent.width, 170)
+                    height: 30
+                    label: ConnectionsBroker.checking
+                           ? "CHECKING..." : "CHECK KEYRING"
+                    labelPixelSize: 10
+                    accentColor: Colors.cyan
+                    available: !ConnectionsBroker.checking
+                    onClicked: ConnectionsBroker.checkAvailability()
+                }
+                QuietText {
+                    width: parent.width
+                    text: "READ ONLY // KEYRING PRESENCE DOES NOT PROVE UNLOCK OR APPROVAL"
+                    color: Colors.orange
+                    font.pixelSize: 9
+                    wrapMode: Text.WordWrap
+                }
+            }
+
             ActionButton {
                 width: Math.min(parent.width, 180)
                 height: 32

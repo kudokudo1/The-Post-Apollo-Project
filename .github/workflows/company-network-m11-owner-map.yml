@@ -1,0 +1,35 @@
+name: Company Network M11 owner-local map projection
+
+on:
+  pull_request:
+    paths:
+      - 'services/company/CompanyHubMapReadOnly.py'
+      - 'tests/company/test_company_hub_map_readonly_m11.py'
+      - 'experiments/company-vector-qt/HANDOFF_M11.md'
+      - '.github/workflows/company-network-m11-owner-map.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  owner-local-projection:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Project only unverified map coordinates and refuse writes
+        run: |
+          python3 -m unittest discover -s tests/company -p 'test_company_hub_map_readonly_m11.py' -v
+      - name: Retain M3 directory permission and revision invariants
+        run: |
+          python3 -m unittest discover -s tests/company -p 'test_company_hub_directory_m3.py' -v
+      - name: No implicit directory reads when option absent
+        shell: bash
+        run: |
+          set -euo pipefail
+          set +e
+          output="$(python3 services/company/CompanyHubMapReadOnly.py)"
+          code="$?"
+          set -e
+          test "$code" -eq 2
+          test "$output" = '{"ok": false, "error": "EXPLICIT_OWNER_VIEW_REQUIRED"}'

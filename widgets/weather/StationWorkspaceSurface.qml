@@ -42,7 +42,6 @@ Rectangle {
         activeFamily === "earth" ? earthSourcePane.runtimeRows
         : activeFamily === "weather" ? weatherSourcePane.runtimeRows : []
     signal routeRequested(string path)
-    signal legacyPageRequested(string pageId)
     signal terminalLaunchRequested(string mode)
     signal newsMapRequested(var payload)
     signal newsMapClearRequested()

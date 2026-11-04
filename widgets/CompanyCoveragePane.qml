@@ -89,8 +89,11 @@ Item {
     function visibleCities() {
         var q = String(stateSearch.text || "").trim().toLowerCase();
         if (!q) return [];
+        var box=root.bounds;
         return CityData.cities.filter(function(city) {
-            return city[0].toLowerCase().indexOf(q)>=0;
+            return city[1]>=box.west && city[1]<=box.east
+                && city[2]>=box.south && city[2]<=box.north
+                && city[0].toLowerCase().indexOf(q)>=0;
         }).slice(0,25);
     }
 
@@ -322,6 +325,21 @@ Item {
                     } else root.beginHubEntry();
                 }
             }
+
+            ModeButton {
+                width: 83
+                height: filtersRow.height
+                textOnly: true
+                labelText: root.showCities ? "CITIES ON" : "CITIES OFF"
+                labelFontSize: 10
+                bordered: false
+                selected: root.showCities
+                idlePrimaryColor: Colors.white
+                selectedPrimaryColor: Colors.cyan
+                hoverPrimaryColor: Colors.yellow
+                perimeterGlowColor: Colors.blue
+                onTriggered: root.showCities = !root.showCities
+            }
         }
 
         Row {
@@ -482,6 +500,39 @@ Item {
                                 ctx.font="11px monospace";
                                 ctx.fillStyle="#DCF3FA";
                                 ctx.fillText(country[1],loc.x+8,loc.y-7);
+                            }
+                        }
+
+                        // Cities are neutral public reference labels, not
+                        // confirmed company locations. Budget text labels by
+                        // display cell so 1,251 records do not crowd a viewport.
+                        if (root.showCities) {
+                            var minPopulation = root.regionKey==="global"
+                                ? (root.zoom<2 ? 3200000 : 750000)
+                                : root.zoom<1.8 ? 240000
+                                : root.zoom<3.8 ? 85000 : 25000;
+                            var cityRows=CityData.cities.slice().sort(function(a,b) {
+                                return b[4]-a[4];
+                            });
+                            var occupied={};
+                            var labelCount=0;
+                            ctx.font="10px monospace";
+                            for(var ci=0;ci<cityRows.length && labelCount<95;ci++) {
+                                var city=cityRows[ci];
+                                if(city[4]<minPopulation) continue;
+                                if(city[1]<root.bounds.west || city[1]>root.bounds.east
+                                    ||city[2]<root.bounds.south ||city[2]>root.bounds.north) continue;
+                                var cp=Geo.project(city[1],city[2],width,height,
+                                    root.regionKey,root.zoom,root.centerLon,root.centerLat);
+                                if(!cp.visible) continue;
+                                var cell=Math.floor(cp.x/76)+":"+Math.floor(cp.y/25);
+                                if(occupied[cell]) continue;
+                                occupied[cell]=true;
+                                ctx.fillStyle="#8CA8B8";
+                                ctx.fillRect(cp.x-1,cp.y-1,2,2);
+                                ctx.fillStyle="#C7D9E6";
+                                ctx.fillText(city[0],cp.x+5,cp.y-3);
+                                labelCount++;
                             }
                         }
 
@@ -708,6 +759,8 @@ Item {
                     GohuText {
                         text: root.selectedHub
                               ? root.selectedHub.label
+                              : root.selectedCity
+                              ? root.selectedCity[0] + " // CITY REFERENCE"
                               : root.selectedCountry
                               ? root.selectedCountry[1] + " // " + root.selectedCountry[0]
                               : root.selectedState
@@ -726,6 +779,8 @@ Item {
                               ? root.selectedHub.organizationLabel + " / "
                                 + root.selectedHub.city + " / "
                                 + root.selectedHub.serviceFamily
+                              : root.selectedCity
+                              ? "PUBLIC GEOGRAPHIC REFERENCE, NOT A HUB"
                               : root.selectedCountry
                               ? "NATIONAL CAPITAL: " + root.selectedCountry[2]
                               : root.selectedState
@@ -796,6 +851,37 @@ Item {
                                             root.selectedCode="";
                                             root.selectedCountryCode="";
                                         }
+                                    }
+                                }
+                            }
+
+                            Repeater {
+                                model: root.visibleCities()
+                                Rectangle {
+                                    id: cityRow
+                                    required property var modelData
+                                    width: stateRows.width
+                                    height: 25
+                                    color: root.selectedCity
+                                        && root.selectedCity[0]===modelData[0]
+                                        ? Colors.yellow : Colors.black
+                                    border.width: 1
+                                    border.color: Colors.cyan
+
+                                    GohuText {
+                                        anchors.fill: parent
+                                        anchors.leftMargin: 6
+                                        verticalAlignment: Text.AlignVCenter
+                                        font.pixelSize: 10
+                                        text: "• " + cityRow.modelData[0]
+                                        color: root.selectedCity
+                                            && root.selectedCity[0]===cityRow.modelData[0]
+                                            ? Colors.black : Colors.white
+                                        elide: Text.ElideRight
+                                    }
+                                    MouseArea {
+                                        anchors.fill: parent
+                                        onClicked: root.chooseCity(cityRow.modelData)
                                     }
                                 }
                             }

@@ -318,9 +318,47 @@ Item {
                         }
                         ctx.globalAlpha=1;
 
+                        // 1:110m admin-1 lines are context, not service edges.
+                        // Repaint actual lake *water* after internal borders
+                        // so Michigan/Huron/Superior/Erie/Ontario do not
+                        // appear as land or fill with state boundary strokes.
+                        var lakes=Lakes.lakes || [];
+                        ctx.fillStyle="#16051F";
+                        ctx.strokeStyle="#6989AD";
+                        ctx.lineWidth=1.0;
+                        ctx.globalAlpha=1.0;
+                        for (var lakeIndex=0;lakeIndex<lakes.length;lakeIndex++) {
+                            var lake=lakes[lakeIndex];
+                            for (var lakeRing=0;lakeRing<lake.rings.length;lakeRing++) {
+                                if (!intersects(lake.rings[lakeRing],root.bounds)) continue;
+                                drawLine(ctx,lake.rings[lakeRing],true);
+                                ctx.fill();
+                                ctx.stroke();
+                            }
+                        }
+
+                        // Draw international boundaries over land/lake shapes,
+                        // including the US/Canada and US/Mexico borders.
+                        // Natural Earth admin-0 context is generalized and may
+                        // include disputed borders; never an eligibility gate.
+                        var borders=Context.admin0Lines || [];
+                        ctx.strokeStyle="#A3BBD8";
+                        ctx.lineWidth=1.1;
+                        ctx.globalAlpha=0.82;
+                        for (var borderIndex=0;borderIndex<borders.length;borderIndex++) {
+                            if (!intersects(borders[borderIndex].line,root.bounds)) continue;
+                            drawLine(ctx,borders[borderIndex].line,false);
+                            ctx.stroke();
+                        }
+                        ctx.globalAlpha=1.0;
+
                         // Capital markers are *navigation anchors*, not hubs.
                         if (root.showReferencePoints) {
                             var points=Geo.visibleStates(root.regionKey,"");
+                            // National perspective: show country landmarks
+                            // before crowded individual state capitals.
+                            if (root.regionKey==="global" && root.zoom<2)
+                                points=[];
                             for (var n=0;n<points.length;n++) {
                                 var row=points[n];
                                 var xy=Geo.project(row[3],row[4],width,height,
@@ -335,9 +373,30 @@ Item {
                                 ctx.lineWidth=active?2:1;
                                 ctx.stroke();
                             }
+
+                            var countries=Geo.visibleCountries(root.regionKey,"");
+                            for(var m=0;m<countries.length;m++) {
+                                var country=countries[m];
+                                var loc=Geo.project(country[3],country[4],width,height,
+                                    root.regionKey,root.zoom,root.centerLon,root.centerLat);
+                                if(!loc.visible) continue;
+                                var chosen=country[0]===root.selectedCountryCode;
+                                ctx.beginPath();
+                                ctx.arc(loc.x,loc.y,chosen?7:4,0,2*Math.PI);
+                                ctx.fillStyle=chosen?"#F2BE4E":"#55CFCA";
+                                ctx.fill();
+                                ctx.lineWidth=1.3;
+                                ctx.strokeStyle=chosen?"#C74EC7":"#16051F";
+                                ctx.stroke();
+                                ctx.font="11px monospace";
+                                ctx.fillStyle="#DCF3FA";
+                                ctx.fillText(country[1],loc.x+8,loc.y-7);
+                            }
                         }
                     }
 
+                    onWidthChanged: requestPaint()
+                    onHeightChanged: requestPaint()
                     Component.onCompleted: requestPaint()
                 }
 
@@ -352,6 +411,7 @@ Item {
                     property bool dragged: false
 
                     onPressed: function(mouse) {
+                        root.serviceMenuOpen = false;
                         lastX=mouse.x;
                         lastY=mouse.y;
                         dragged=false;
@@ -371,10 +431,30 @@ Item {
 
                     onReleased: function(mouse) {
                         if (dragged) return;
-                        var closest=Geo.nearestState(root.regionKey,mouse.x,mouse.y,
+                        var nearestState=Geo.nearestState(root.regionKey,mouse.x,mouse.y,
                             mapCanvas.width,mapCanvas.height,root.zoom,
                             root.centerLon,root.centerLat,13);
-                        if (closest) root.chooseState(closest);
+                        var nearestCountry=Geo.nearestCountry(root.regionKey,mouse.x,mouse.y,
+                            mapCanvas.width,mapCanvas.height,root.zoom,
+                            root.centerLon,root.centerLat,13);
+                        if (nearestCountry && nearestState) {
+                            var sp=Geo.project(nearestState[3],nearestState[4],
+                                mapCanvas.width,mapCanvas.height,root.regionKey,
+                                root.zoom,root.centerLon,root.centerLat);
+                            var cp=Geo.project(nearestCountry[3],nearestCountry[4],
+                                mapCanvas.width,mapCanvas.height,root.regionKey,
+                                root.zoom,root.centerLon,root.centerLat);
+                            var sd=(sp.x-mouse.x)*(sp.x-mouse.x)
+                                +(sp.y-mouse.y)*(sp.y-mouse.y);
+                            var cd=(cp.x-mouse.x)*(cp.x-mouse.x)
+                                +(cp.y-mouse.y)*(cp.y-mouse.y);
+                            if(cd<sd) root.chooseCountry(nearestCountry);
+                            else root.chooseState(nearestState);
+                        } else if (nearestCountry) {
+                            root.chooseCountry(nearestCountry);
+                        } else if (nearestState) {
+                            root.chooseState(nearestState);
+                        }
                     }
 
                     onWheel: function(wheel) {
@@ -436,7 +516,7 @@ Item {
 
                     GohuText {
                         width: parent.width
-                        text: "STATE DIRECTORY"
+                        text: "REFERENCE DIRECTORY"
                         font.bold: true
                         font.pixelSize: 13
                         color: Colors.yellow
@@ -470,7 +550,7 @@ Item {
 
                         GohuText {
                             visible: !stateSearch.text.length && !stateSearch.activeFocus
-                            text: "FIND STATE / CAPITAL"
+                            text: "FIND COUNTRY / STATE"
                             anchors.left: parent.left
                             anchors.leftMargin: 8
                             anchors.verticalCenter: parent.verticalCenter
@@ -481,9 +561,11 @@ Item {
                     }
 
                     GohuText {
-                        text: root.selectedState
+                        text: root.selectedCountry
+                              ? root.selectedCountry[1] + " // " + root.selectedCountry[0]
+                              : root.selectedState
                               ? root.selectedState[1] + " // " + root.selectedState[0]
-                              : "SELECT STATE"
+                              : "SELECT PLACE"
                         font.bold: true
                         font.pixelSize: 12
                         color: Colors.magenta
@@ -493,8 +575,10 @@ Item {
 
                     GohuText {
                         width: parent.width
-                        text: root.selectedState
-                              ? "CAPITAL REFERENCE: " + root.selectedState[2]
+                        text: root.selectedCountry
+                              ? "NATIONAL CAPITAL: " + root.selectedCountry[2]
+                              : root.selectedState
+                              ? "STATE CAPITAL: " + root.selectedState[2]
                               : "Select a marker or directory row."
                         font.pixelSize: 10
                         color: Colors.white
@@ -522,6 +606,37 @@ Item {
                             id: stateRows
                             width: parent.width
                             spacing: 3
+
+                            Repeater {
+                                model: Geo.visibleCountries(root.regionKey,stateSearch.text)
+                                Rectangle {
+                                    id: countryRow
+                                    required property var modelData
+                                    width: stateRows.width
+                                    height: 25
+                                    color: root.selectedCountryCode===modelData[0]
+                                        ? Colors.yellow : Colors.black
+                                    border.width: 1
+                                    border.color: root.selectedCountryCode===modelData[0]
+                                        ? Colors.magenta : Colors.blue
+
+                                    GohuText {
+                                        anchors.fill: parent
+                                        anchors.leftMargin: 6
+                                        verticalAlignment: Text.AlignVCenter
+                                        font.pixelSize: 10
+                                        text: modelData[0] + "  " + modelData[1]
+                                        color: root.selectedCountryCode===countryRow.modelData[0]
+                                            ? Colors.black : Colors.white
+                                        elide: Text.ElideRight
+                                    }
+
+                                    MouseArea {
+                                        anchors.fill: parent
+                                        onClicked: root.chooseCountry(countryRow.modelData)
+                                    }
+                                }
+                            }
 
                             Repeater {
                                 model: Geo.visibleStates(root.regionKey,stateSearch.text)
@@ -567,11 +682,12 @@ Item {
 
             GohuText {
                 width: parent.width
-                text: (root.selectedState
-                        ? root.selectedState[1] + " // " : "NO STATE SELECTED // ")
-                    + "No company service areas, workforce or partner records connected. "
-                    + "County/city coverage awaits verified data. "
-                    + "Reference markers are state capitals, NOT provider hubs."
+                text: (root.selectedCountry ? root.selectedCountry[1] + " // "
+                    : root.selectedState ? root.selectedState[1] + " // "
+                    : "NO PLACE SELECTED // ")
+                    + "Canada, Mexico, USA and world geography are reference only. "
+                    + "NO VERIFIED COMPANY COVERAGE. Service selection does not "
+                    + "create provider areas. Capitals are not company hubs."
                 font.pixelSize: 11
                 color: Colors.white
                 wrapMode: Text.WordWrap

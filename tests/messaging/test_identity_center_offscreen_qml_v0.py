@@ -17,7 +17,7 @@ os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 from PySide6.QtCore import QObject, QUrl, QMetaObject
 from PySide6.QtGui import QGuiApplication, QColor
 from PySide6.QtQml import QQmlComponent, QQmlEngine
-from PySide6.QtQuick import QQuickItem
+from PySide6.QtQuick import QQuickItem, QQuickWindow
 
 ROOT = Path(__file__).resolve().parents[2]
 QML = ROOT / "widgets/messanger/IdentityCenterOrganizationDisplayReader.qml"
@@ -960,11 +960,26 @@ class RealQtOrganizationsSettingsPaneSmoke(unittest.TestCase):
                          QColor("#c74ec7"))
         self.assertEqual(QColor(frame.property("focusBorderColor")),
                          QColor("#5b5fd4"))
-        input_item.forceActiveFocus()
-        APP.processEvents()
-        self.assertTrue(frame.property("intentFocused"))
-        self.assertEqual(QColor(frame.property("focusBorderColor")),
-                         QColor("#c74ec7"))
+        # A QQuickItem without a window cannot acquire activeFocus in Qt,
+        # so attach the already-loaded test component to a disposable window.
+        window = QQuickWindow()
+        try:
+            window.setWidth(900)
+            window.setHeight(650)
+            self.sections.setParentItem(window.contentItem())
+            window.show()
+            window.requestActivate()
+            APP.processEvents()
+            input_item.forceActiveFocus()
+            APP.processEvents()
+            self.assertTrue(frame.property("intentFocused"))
+            self.assertEqual(QColor(frame.property("focusBorderColor")),
+                             QColor("#c74ec7"))
+        finally:
+            self.sections.setParentItem(None)
+            window.hide()
+            window.deleteLater()
+            APP.processEvents()
         self.assertFalse(self.sections.property("organizationDisplayReady"))
 
     def test_host_logout_and_failure_are_reflected_in_real_panel(self):

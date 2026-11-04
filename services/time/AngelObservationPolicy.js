@@ -8,7 +8,7 @@ var MAX_ROWS = 4096;
 var MAX_DIGITS = 8;
 var MAX_FILE_LENGTH = 2097152;
 var MAX_SEQUENCE = 1000000000;
-var FILTERS = ["all", "repeat", "mirror", "sequence", "add", "subtract", "other"];
+var FILTERS = ["all", "repeat", "mirror", "sequence", "add", "subtract", "other", "err"];
 
 function integer(value, low, high) {
     return typeof value === "number" && isFinite(value)
@@ -46,7 +46,9 @@ function validObservation(row) {
            && validZone(row.zoneId)
            && integer(row.utcOffsetMinutes, -840, 840)
            && integer(row.displayCalibrationMs, -300000, 300000)
-           && (row.captureMode === "clock" || row.captureMode === "manual");
+           && (row.captureMode === "clock" || row.captureMode === "manual")
+           // v1 journals written before ERR existed have no mark property.
+           && (row.errMarked === undefined || typeof row.errMarked === "boolean");
 }
 
 function emptyDocument() {
@@ -91,7 +93,8 @@ function clone(document) {
                 zoneId: row.zoneId,
                 utcOffsetMinutes: row.utcOffsetMinutes,
                 displayCalibrationMs: row.displayCalibrationMs,
-                captureMode: row.captureMode
+                captureMode: row.captureMode,
+                errMarked: row.errMarked === true
             };
         })
     };
@@ -135,7 +138,8 @@ function create(document, digits, capture, nowMs) {
         zoneId: capture.zoneId,
         utcOffsetMinutes: capture.utcOffsetMinutes,
         displayCalibrationMs: capture.displayCalibrationMs,
-        captureMode: capture.captureMode
+        captureMode: capture.captureMode,
+        errMarked: false
     });
     next.nextId += 1;
     return {ok: true, document: next};
@@ -154,6 +158,25 @@ function remove(document, id, confirmed) {
     var next = clone(document);
     next.observations.splice(index, 1);
     return {ok: true, document: next};
+}
+
+// Explicit user review marking is per observation ID, never per number.
+// 222 marked ERR leaves every other 222 observation untouched. This stages
+// a new document; the singleton publishes only after atomic save succeeds.
+function toggleErr(document, id) {
+    var check = validate(document);
+    if (!check.ok) return check;
+    var index = document.observations.findIndex(function(row) {
+        return row.id === id;
+    });
+    if (index < 0)
+        return {ok: false, reason: "UNKNOWN_ID"};
+    var next = clone(document);
+    next.observations[index].errMarked = !next.observations[index].errMarked;
+    return {
+        ok: true, document: next,
+        errMarked: next.observations[index].errMarked
+    };
 }
 
 function repeat(digits) {
@@ -210,6 +233,7 @@ function matchesFilter(digits, kind) {
     case "add": return add(digits);
     case "subtract": return subtract(digits);
     case "other": return patternTags(digits)[0] === "OTHER";
+    case "err": return patternTags(digits)[0] === "OTHER";
     default: return false;
     }
 }
@@ -223,7 +247,9 @@ function filter(observations, query, kind) {
     return observations.filter(function(row) {
         return validObservation(row)
                && row.digits.indexOf(query) !== -1
-               && matchesFilter(row.digits, kind);
+               && (kind === "err"
+                   ? (row.errMarked === true || matchesFilter(row.digits, "other"))
+                   : matchesFilter(row.digits, kind));
     }).sort(function(a, b) {
         return b.observedAtMs - a.observedAtMs
                || Number(b.id.slice(1)) - Number(a.id.slice(1));

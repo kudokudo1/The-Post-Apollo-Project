@@ -86,6 +86,27 @@ class AngelJournalContracts(unittest.TestCase):
         self.assertIn("selectedObservation", PANE)
         self.assertIn("AngelObservationsStore.total", PANE)
 
+    def test_err_filter_combines_other_with_explicit_per_entry_review(self):
+        self.assertIn('key: "err", label: "ERR"', PANE)
+        self.assertIn('case "err":', POLICY)
+        self.assertIn('kind === "err"', POLICY)
+        self.assertIn('row.errMarked === true', POLICY)
+        self.assertIn('matchesFilter(row.digits, "other")', POLICY)
+        self.assertIn('function toggleErr(document, id)', POLICY)
+        self.assertIn('function toggleErrObservation(id)', STORE)
+        self.assertIn('Journal.toggleErr(document, id)', STORE)
+        self.assertIn('id: errMarkButton', PANE)
+        self.assertIn('"CLEAR ERR" : "MARK ERR"', PANE)
+        self.assertIn('AngelObservationsStore.toggleErrObservation(pane.selectedId)', PANE)
+        self.assertIn('modelData.errMarked === true ? "ERR* // "', PANE)
+        self.assertIn('OTHER = NO PATTERN // ERR = OTHER + USER-MARKED', PANE)
+        self.assertIn('row.errMarked === undefined', POLICY)
+        self.assertIn('errMarked: row.errMarked === true', POLICY)
+        self.assertIn('errMarked: false', POLICY)
+        self.assertIn('atomicWrites: true', STORE)
+        self.assertEqual(STORE.count("FileView {"), 1)
+        self.assertNotIn("FileView {", PANE)
+
     def test_history_deletion_is_confirmed_and_red(self):
         self.assertIn('"CONFIRM ×" : "DELETE ×"', PANE)
         self.assertIn('accentColor: Colors.red', PANE)

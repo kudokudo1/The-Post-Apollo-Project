@@ -47,8 +47,18 @@ jobs:
           trap 'rm -rf -- "$fake_bin"' EXIT
           printf '%s\n' '#!/bin/sh' 'printf "%s\n" "M13L_NATIVE_QML_IPC_PASS"' >"$fake_bin/quickshell"
           chmod 700 "$fake_bin/quickshell"
+          set +e
           result="$(PATH="$fake_bin:$PATH" bash tests/tasks/tools/task_m13l_native_ipc.sh --run .)"
-          test "$result" = "$(printf 'M13L_REVIEWED_SOURCE_READY\nM13L_STARTING_PRIVATE_NATIVE_TEST\nM13L_REVIEWED_SOURCE_READY\nM13L_NATIVE_QML_IPC_AND_CLEANUP_PASS')"
+          code=$?
+          set -e
+          expected="$(printf 'M13L_REVIEWED_SOURCE_READY\nM13L_STARTING_PRIVATE_NATIVE_TEST\nM13L_REVIEWED_SOURCE_READY\nM13L_NATIVE_QML_IPC_AND_CLEANUP_PASS')"
+          if [[ "$code" != "0" || "$result" != "$expected" ]]; then
+            # No dynamic private paths, stderr, secrets or log contents.
+            printf '%s\n' "$result" |
+              awk '/^M13L_[A-Z0-9_]+$/ { print }'
+            printf '%s\n' "M13L_FAKE_SHELL_ISOLATION_NOT_VERIFIED"
+            exit 1
+          fi
           printf '%s\n' "M13L_FAKE_SHELL_ISOLATION_ONLY_PASS"
       - name: Fake shell refusal reports only fixed QML phases and no raw logs
         run: |

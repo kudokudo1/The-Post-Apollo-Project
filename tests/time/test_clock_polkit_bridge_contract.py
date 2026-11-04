@@ -19,7 +19,7 @@ HOST = (ROOT / "services/time/TimeHostControl.py").read_text()
 class NativePolkitClockResyncContracts(unittest.TestCase):
     def test_confirmation_waits_for_agent_registration(self):
         prepare = SERVICE.split("function requestResync() {", 1)[1].split(
-            "function launchResyncAfterAgentReady()", 1)[0]
+            "function launchResyncAfterAgentReady(nativeRegistered)", 1)[0]
         self.assertIn("resyncConfirmRequired = false", prepare)
         self.assertIn("resyncAuthPending = true", prepare)
         self.assertIn('resyncStatus = "auth-preparing"', prepare)

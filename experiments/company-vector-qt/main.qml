@@ -37,6 +37,29 @@ Window {
 
     property var syntheticMarker: null
     property var fixtureMarkers: []
+    property var ownerLocalMarkers: []
+
+    function installOwnerLocalMarkers() {
+        if (!probeOwnerLocalMode || !probeOwnerLocalHubs
+                || ownerLocalMarkers.length>0
+                || !mapView.map || !mapView.map.mapReady) return;
+        var created=[];
+        for(var i=0;i<probeOwnerLocalHubs.length;i++) {
+            var record=probeOwnerLocalHubs[i];
+            var instance=ownerReportedHubTemplate.createObject(mapView.map, {
+                coordinate: QtPositioning.coordinate(record.latitude,record.longitude)
+            });
+            if(!instance) {
+                console.warn("OWNER_LOCAL_MARKER_CREATE_FAILED");
+                return;
+            }
+            mapView.map.addMapItem(instance);
+            created.push(instance);
+        }
+        ownerLocalMarkers=created;
+        // Count only; never log coordinates, local IDs or organization names.
+        console.log("OWNER_LOCAL_MARKERS_ADDED count="+ownerLocalMarkers.length);
+    }
     property int motionTick: 0
 
     function installFixtureMarkers() {
@@ -86,6 +109,8 @@ Window {
             Qt.callLater(function(){ root.installSyntheticMarker(); });
         if (probeFixtureHubs && probeFixtureHubs.length)
             Qt.callLater(function(){ root.installFixtureMarkers(); });
+        if (probeOwnerLocalMode)
+            Qt.callLater(function(){ root.installOwnerLocalMarkers(); });
     }
 
     function goToSample(label) {
@@ -123,6 +148,7 @@ Window {
                 Qt.callLater(function() {
                     root.installSyntheticMarker();
                     root.installFixtureMarkers();
+                    root.installOwnerLocalMarkers();
                 });
         }
     }
@@ -157,6 +183,47 @@ Window {
                         font.pixelSize: 11
                         font.bold: true
                     }
+                }
+            }
+        }
+    }
+
+    // Owner-only *reported* local locations. No names, no real organization
+    // grants, no automatic camera pan, no event logs containing local IDs.
+    Component {
+        id: ownerReportedHubTemplate
+        MapQuickItem {
+            anchorPoint.x: 9
+            anchorPoint.y: 9
+            autoFadeIn: false
+            sourceItem: Item {
+                width: 120
+                height: 26
+                Rectangle {
+                    width: 18
+                    height: 18
+                    radius: 9
+                    color: "#1B0623"
+                    border.width: 3
+                    border.color: "#ED981A"
+                }
+                Rectangle {
+                    x: 24
+                    width: 95
+                    height: 24
+                    color: "#1B0623"
+                    border.width: 1
+                    border.color: "#C74EC7"
+                    Text {
+                        anchors.centerIn: parent
+                        text: "REPORTED HUB"
+                        font.pixelSize: 10
+                        color: "#F2BE4E"
+                    }
+                }
+                MouseArea {
+                    anchors.fill: parent
+                    onClicked: console.log("OWNER_LOCAL_REPORTED_MARKER_SELECTED")
                 }
             }
         }
@@ -260,7 +327,8 @@ Window {
             anchors.right: parent.right
             anchors.rightMargin: 16
             anchors.verticalCenter: parent.verticalCenter
-            text: probeStyledOnline ? "POST-APOLLO VECTOR // ONLINE"
+            text: probeOwnerLocalMode ? "OWNER-LOCAL REPORTED HUBS // NOT VERIFIED"
+                : probeStyledOnline ? "POST-APOLLO VECTOR // ONLINE"
                 : probeOnline ? "ONLINE VECTOR // REFERENCE"
                 : "OFFLINE SYNTHETIC FIXTURE"
             color: "#C74EC7"

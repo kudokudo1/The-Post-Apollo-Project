@@ -163,7 +163,7 @@ class M6aContractTests(unittest.TestCase):
                             [e["event_id"] for e in d["events"]])
 
     def test_distinct_grazing_candidate_never_masquerades_as_crossing(self):
-        raw = model("moon", "sun")
+        raw = model("moon", "sun", detect_tangents=True)
         sample = next(e for e in raw["event_markers"] if e["name"] == "sextile")
         candidate = deepcopy(sample)
         candidate["contact_kind"] = "tangent_candidate"
@@ -178,6 +178,26 @@ class M6aContractTests(unittest.TestCase):
         bad = deepcopy(raw)
         bad["event_markers"][-1]["residual_deg"] = 0.5
         with self.assertRaisesRegex(contract.ContractError, "tolerance"):
+            catalogue.build_catalogue(bad)
+        not_requested = deepcopy(raw)
+        not_requested["query"]["detect_tangents"] = False
+        not_requested["query"]["tangent_tolerance_deg"] = None
+        with self.assertRaisesRegex(contract.ContractError, "not requested"):
+            catalogue.build_catalogue(not_requested)
+        wrong_tolerance = deepcopy(raw)
+        wrong_tolerance["event_markers"][-1]["angular_tolerance_deg"] = 0.001
+        with self.assertRaisesRegex(contract.ContractError, "tolerance"):
+            catalogue.build_catalogue(wrong_tolerance)
+
+    def test_station_rate_settings_and_body_metadata_must_match_source(self):
+        station = model("mercury")
+        changed = deepcopy(station)
+        changed["event_markers"][0]["rate_window_hours"] = 12.0
+        with self.assertRaisesRegex(contract.ContractError, "rate window"):
+            catalogue.build_catalogue(changed)
+        bad = deepcopy(station)
+        bad["event_markers"][0]["bodies"] = [[]]
+        with self.assertRaisesRegex(contract.ContractError, "body IDs"):
             catalogue.build_catalogue(bad)
 
     def test_reject_source_time_provenance_and_pair_tampering(self):

@@ -53,6 +53,18 @@ class CpuPlusTimeThreeBayContracts(unittest.TestCase):
         self.assertIn("property bool showHostDiagnostics: true", CLOCK_PANE)
         self.assertIn("property bool showResyncDiagnostics: true", CLOCK_PANE)
 
+    def test_hidden_diagnostics_row_has_one_qml_height_assignment(self):
+        # A duplicate height or accent binding can make all of shell.qml fail
+        # to load. This explicitly guards the previously broken class.
+        head = CLOCK_PANE.split("id: resyncDiagnoseButton", 1)[0]
+        start = head.rfind("            Row {")
+        self.assertGreaterEqual(start, 0)
+        row = head[start:]
+        self.assertEqual(sum(
+            1 for line in row.splitlines()
+            if line.strip().startswith("height:")
+        ), 1)
+
     def test_center_live_status_does_not_claim_unverified_accuracy(self):
         self.assertIn("SystemClock {", ACTIVE)
         self.assertIn("precision: SystemClock.Seconds", ACTIVE)

@@ -380,6 +380,7 @@ PanelWindow {
         && !mathZonePicker.searchFocused
         && !differenceEndPicker.searchFocused
         && !clockSettingsPane.zoneSearchFocused
+        && !angelPane.editingText
         && !differenceEndDateInput.activeFocus
         && !differenceEndTimeInput.activeFocus
         && !countdownNameField.activeFocus
@@ -5212,23 +5213,12 @@ PanelWindow {
                         calibratedPreview: timew.clockReadoutText
                     }
 
-                    Column {
+                    AngelPane {
+                        id: angelPane
                         width: parent.width
-                        spacing: 12
+                        height: 505
                         visible: timew.selectedMode === "planned"
-
-                        GohuText {
-                            text: "ANGEL // RESERVED"
-                            font.pixelSize: 13
-                            color: Colors.cyan
-                        }
-                        GohuText {
-                            width: parent.width
-                            wrapMode: Text.WordWrap
-                            text: "ANGEL is reserved for a future main-mode capability."
-                            color: Colors.white
-                            font.pixelSize: 11
-                        }
+                        currentEpochMs: localClock.date.getTime()
                     }
 
                     GohuText {
@@ -5248,7 +5238,7 @@ PanelWindow {
                               ? "SETTINGS // DISPLAY OFFSET + SYSTEM STATUS"
                               : timew.selectedMode === "tools"
                               ? "TOOLS // STOPWATCH + COUNTDOWN // MONOTONIC"
-                              : "ANGEL // RESERVED FOR LATER"
+                              : "ANGEL // EXPLICIT JOURNAL // LOCAL ONLY"
                         color: Colors.white
                         font.pixelSize: 11
                     }

@@ -101,6 +101,59 @@ function eventsFor(planetRow, kind) {
                          : events.filter(function(e) { return e.kind === kind; });
 }
 
+// Visual reference symbols only. Planet names remain explicit for legibility
+// and font fallback; this does not encode physical/ecliptic positions.
+var PLANET_GLYPHS = {
+    MERCURY:"☿", VENUS:"♀", MARS:"♂", JUPITER:"♃", SATURN:"♄"
+};
+function planetLabel(name) {
+    var id = String(name || "").toUpperCase();
+    return Object.prototype.hasOwnProperty.call(PLANET_GLYPHS, id)
+        ? PLANET_GLYPHS[id] + " " + id : id;
+}
+
+// Flat chronological inspection of source-backed event points; never a
+// simulated trajectory between rise, transit and set. Use the same selected
+// planet/kind gates as the visible markers.
+function orderedEvents(planetRows, selectedPlanet, selectedKind) {
+    var rows = indexedRows(planetRows), output = [];
+    for (var i = 0; i < rows.length; i++) {
+        var row = rows[i];
+        if (!row || (selectedPlanet !== "ALL" && row.name !== selectedPlanet))
+            continue;
+        var markers = eventsFor(row, selectedKind);
+        for (var j = 0; j < markers.length; j++) {
+            var e = markers[j];
+            if (e && typeof e.id === "string"
+                && boundedNumber(e.minute, 0, 1439) !== null)
+                output.push(e);
+        }
+    }
+    output.sort(function(a, b) {
+        if (a.minute !== b.minute) return a.minute - b.minute;
+        if (a.planet !== b.planet)
+            return PLANETS.indexOf(a.planet) - PLANETS.indexOf(b.planet);
+        return KINDS.indexOf(a.kind) - KINDS.indexOf(b.kind);
+    });
+    return output;
+}
+function stepEvent(events, current, direction) {
+    var list = indexedRows(events);
+    if (!list.length || (direction !== 1 && direction !== -1)) return null;
+    var id = current && typeof current.id === "string" ? current.id : "";
+    var index = -1;
+    for (var i = 0; i < list.length; i++)
+        if (list[i] && list[i].id === id) { index = i; break; }
+    if (index < 0) return direction > 0 ? list[0] : list[list.length-1];
+    return list[(index + direction + list.length) % list.length];
+}
+function eventOrdinal(events, current) {
+    var list = indexedRows(events), id = current && current.id;
+    for (var i = 0; i < list.length; i++)
+        if (list[i] && list[i].id === id) return (i+1) + "/" + list.length;
+    return "—/" + list.length;
+}
+
 function selectedEvent(locked, hovered) {
     return locked && typeof locked.id === "string" ? locked
          : hovered && typeof hovered.id === "string" ? hovered : null;

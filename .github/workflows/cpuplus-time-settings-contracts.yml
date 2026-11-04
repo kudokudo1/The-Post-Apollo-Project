@@ -5,6 +5,9 @@ on:
     paths:
       - "widgets/CpuPlusW.qml"
       - "widgets/TimeSettingsPane.qml"
+      - "widgets/cpuplus/CpuPlusSettingsTimeActivePane.qml"
+      - "widgets/cpuplus/CpuPlusSettingsTimeAdvancedPane.qml"
+      - "tests/cpuplus/test_cpuplus_time_three_bay_contract.py"
       - "services/time/TimeSettings.qml"
       - "services/time/TimeSettingsPolicy.js"
       - "tests/cpuplus/test_cpuplus_time_settings_contract.py"
@@ -13,6 +16,9 @@ on:
     paths:
       - "widgets/CpuPlusW.qml"
       - "widgets/TimeSettingsPane.qml"
+      - "widgets/cpuplus/CpuPlusSettingsTimeActivePane.qml"
+      - "widgets/cpuplus/CpuPlusSettingsTimeAdvancedPane.qml"
+      - "tests/cpuplus/test_cpuplus_time_three_bay_contract.py"
       - "services/time/TimeSettings.qml"
       - "services/time/TimeSettingsPolicy.js"
       - "tests/cpuplus/test_cpuplus_time_settings_contract.py"
@@ -23,5 +29,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Test CPU++ TIME settings read-only integration
+      - name: Test existing CPU++ TIME settings shared-service integration
         run: python3 -m unittest discover -s tests/cpuplus -p 'test_cpuplus_time_settings_contract.py' -v
+      - name: Test CPU++ three-bay basic active advanced isolation
+        run: python3 -m unittest discover -s tests/cpuplus -p 'test_cpuplus_time_three_bay_contract.py' -v

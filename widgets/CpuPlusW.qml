@@ -189,6 +189,8 @@ PanelWindow {
     readonly property bool standardKeysAvailable:
         menuOpen && (!relationshipFocusModeActive || relationshipFocused)
         && !(selectedModeIndex === 4 && settingsLocationPane.editingText)
+        && !(selectedModeIndex === 4 && settingsSubMode === "TIME"
+             && settingsTimeBasicsPane.zoneSearchFocused)
 
     function cycleMainMode(direction) {
         const count = modes.length;
@@ -1066,7 +1068,9 @@ PanelWindow {
                 : cpuPlusWindow.selectedModeIndex === 3
                 ? "SYSTEM MONITOR"
                 : cpuPlusWindow.selectedModeIndex === 4
-                ? "SETTINGS // OVERVIEW"
+                ? (cpuPlusWindow.settingsSubMode === "TIME"
+                   ? "TIME // BASIC CONTROLS"
+                   : "SETTINGS // OVERVIEW")
                 : "SHARED INSTRUMENT"
 
             font.pixelSize: 13
@@ -1364,7 +1368,8 @@ PanelWindow {
                     : cpuPlusWindow.selectedModeIndex === 3
                     ? "SYSTEM STATE"
                     : cpuPlusWindow.selectedModeIndex === 4
-                    ? "SETTINGS STATE"
+                    ? (cpuPlusWindow.settingsSubMode === "TIME"
+                       ? "CLOCK // CONTROL" : "SETTINGS STATE")
                     : "INSTRUMENT STATE"
 
                 font.pixelSize: 13
@@ -1410,6 +1415,10 @@ PanelWindow {
         Flickable {
             id: sharedInstrumentScroll
 
+            // SETTINGS/TIME owns this left slot with the shared Clock basic
+            // control pane, not the inert instrument placeholder.
+            visible: !(cpuPlusWindow.selectedModeIndex === 4
+                       && cpuPlusWindow.settingsSubMode === "TIME")
             anchors.left: parent.left
             anchors.right: parent.right
             anchors.top: sharedStateHeader.bottom
@@ -1478,6 +1487,30 @@ PanelWindow {
             flickable: sharedInstrumentScroll
             visible: sharedInstrumentScroll.visible && scrollable
         }
+
+        // One reused Clock pane, not a second calibration or timezone owner.
+        // Keep it entirely inside the existing left instrument bay.
+        TimeSettingsPane {
+            id: settingsTimeBasicsPane
+            visible: cpuPlusWindow.selectedModeIndex === 4
+                     && cpuPlusWindow.settingsSubMode === "TIME"
+            panelVisible: visible && cpuPlusWindow.menuOpen
+            showClockPreview: false
+            showTimezoneDetails: true
+            showResyncTrigger: true
+            showSharedServiceCaption: false
+            showHostDiagnostics: false
+            showResyncDiagnostics: false
+            showReferenceExplanation: false
+            anchors.left: parent.left
+            anchors.right: parent.right
+            anchors.top: sharedStateHeader.bottom
+            anchors.bottom: parent.bottom
+            anchors.leftMargin: 13
+            anchors.rightMargin: 13
+            anchors.topMargin: 8
+            anchors.bottomMargin: 9
+        }
     }
 
     // ============================================================
@@ -1521,7 +1554,8 @@ PanelWindow {
                 : cpuPlusWindow.selectedModeIndex === 3
                 ? "SYSTEM TARGET"
                 : cpuPlusWindow.selectedModeIndex === 4
-                ? "SETTINGS // CATEGORIES"
+                ? (cpuPlusWindow.settingsSubMode === "TIME"
+                   ? "TIME // ACTIVE" : "SETTINGS // CATEGORIES")
                 : "TARGET"
 
             font.pixelSize: 12
@@ -1795,6 +1829,7 @@ PanelWindow {
         Column {
             id: settingsCategorySummary
             visible: cpuPlusWindow.selectedModeIndex === 4
+                     && cpuPlusWindow.settingsSubMode !== "TIME"
             anchors.top: targetSubModeStrip.bottom
             anchors.left: parent.left
             anchors.right: parent.right
@@ -1827,6 +1862,21 @@ PanelWindow {
                         : "HOME NOT YET CONFIGURED"
                 font.pixelSize: 10
             }
+        }
+
+        CpuPlusSettingsTimeActivePane {
+            id: settingsTimeActivePane
+            visible: cpuPlusWindow.selectedModeIndex === 4
+                     && cpuPlusWindow.settingsSubMode === "TIME"
+            panelVisible: visible && cpuPlusWindow.menuOpen
+            anchors.left: parent.left
+            anchors.right: parent.right
+            anchors.top: targetSubModeStrip.bottom
+            anchors.bottom: parent.bottom
+            anchors.leftMargin: 10
+            anchors.rightMargin: 10
+            anchors.topMargin: 10
+            anchors.bottomMargin: 9
         }
 
         Flickable {
@@ -2186,9 +2236,8 @@ PanelWindow {
     // ============================================================
     // CPU++ ACTUATOR BAY
     //
-    // Intentionally kept structurally empty for now. This bay is reserved
-    // for controls that mutate machine state; informational filler does not
-    // belong here.
+    // SETTINGS/TIME owns this slot for advanced host diagnostics only during
+    // milestone 1. No new machine policy or RTC mutations are introduced.
     // ============================================================
 
     Rectangle {
@@ -2224,7 +2273,7 @@ PanelWindow {
 
             text: cpuPlusWindow.selectedModeIndex === 4
                   ? (cpuPlusWindow.settingsSubMode === "TIME"
-                     ? "TIME // SETTINGS" : "LOCATION // SETTINGS")
+                     ? "TIME // ADVANCED" : "LOCATION // SETTINGS")
                   : "CPU++ ACTUATORS"
 
             font.pixelSize: 12
@@ -2265,18 +2314,13 @@ PanelWindow {
             anchors.bottomMargin: 10
         }
 
-        // Reuses the Clock's settings view and its single persistent service.
-        // CPU++ shows only calibration, DST and guarded sync; it owns no
-        // timezone picker, timer, SystemClock or independent configuration.
-        TimeSettingsPane {
-            id: settingsTimePane
+        // Host diagnostics only. The left TimeSettingsPane owns actual
+        // basic control interactions, while the middle owns live state.
+        CpuPlusSettingsTimeAdvancedPane {
+            id: settingsTimeAdvancedPane
             visible: cpuPlusWindow.selectedModeIndex === 4
                      && cpuPlusWindow.settingsSubMode === "TIME"
             panelVisible: visible && cpuPlusWindow.menuOpen
-            showClockPreview: false
-            showTimezoneDetails: false
-            showResyncTrigger: true
-            showSharedServiceCaption: false
             anchors.left: parent.left
             anchors.right: parent.right
             anchors.top: actuatorHeader.bottom

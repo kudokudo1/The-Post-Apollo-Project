@@ -93,8 +93,10 @@ class TimezoneSettingsContracts(unittest.TestCase):
         self.assertIn("onZoneChosen: function(zoneId)", PANE)
         self.assertIn("clockSettingsPane.zoneSearchFocused", TIMEW)
 
-    def test_zone_is_clock_only_with_explicit_confirmation(self):
-        self.assertIn("showTimezoneDetails: false", CPU)
+    def test_zone_is_shared_through_clock_owned_controller_with_explicit_confirmation(self):
+        # CPU++ can display the existing timezone selector, but the Clock
+        # TimeSettings service remains the only authorization and host writer.
+        self.assertIn("showTimezoneDetails: true", CPU)
         self.assertIn("visible: pane.showTimezoneDetails", PANE)
         self.assertIn("TimeSettings.prepareTimezone(zoneId)", PANE)
         self.assertIn("TimeSettings.requestTimezone()", PANE)

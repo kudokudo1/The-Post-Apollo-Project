@@ -15,6 +15,11 @@ Item {
     property bool showTimezoneDetails: true
     property bool showResyncTrigger: false
     property bool showSharedServiceCaption: true
+    // Clock retains the full established surface. CPU++ distributes the same
+    // service-backed controls across its BASIC / ACTIVE / ADVANCED bays.
+    property bool showHostDiagnostics: true
+    property bool showResyncDiagnostics: true
+    property bool showReferenceExplanation: true
     property bool zonePickerExpanded: false
     readonly property bool zoneSearchFocused: systemZonePicker.searchFocused
 
@@ -298,6 +303,7 @@ Item {
             }
             GohuText {
                 width: parent.width
+                visible: pane.showHostDiagnostics
                 text: "DST // AUTO // "
                       + (TimeSettings.hostInfo.status !== "ready"
                          ? "UNKNOWN"
@@ -307,6 +313,7 @@ Item {
             }
             GohuText {
                 width: parent.width
+                visible: pane.showHostDiagnostics
                 text: "NTP // " + String(TimeSettings.hostInfo.ntpEnabled || "unknown").toUpperCase()
                       + " // SYNC " + String(TimeSettings.hostInfo.ntpSynchronized || "unknown").toUpperCase()
                 color: Colors.white
@@ -314,6 +321,7 @@ Item {
             }
             GohuText {
                 width: parent.width
+                visible: pane.showHostDiagnostics
                 text: "RTC LOCAL // " + String(TimeSettings.hostInfo.rtcLocal || "unknown").toUpperCase()
                 color: TimeSettings.hostInfo.rtcLocal === "yes"
                        ? Colors.orange : Colors.white
@@ -322,12 +330,14 @@ Item {
             GohuText {
                 width: parent.width
                 wrapMode: Text.WordWrap
+                visible: pane.showHostDiagnostics
                 text: "DST follows Linux's IANA timezone rules. An RTC stored in local time can complicate DST transitions."
                 font.pixelSize: 10
                 color: Colors.white
             }
             GohuText {
-                visible: TimeSettings.hostError !== ""
+                visible: pane.showHostDiagnostics
+                         && TimeSettings.hostError !== ""
                 width: parent.width
                 text: TimeSettings.hostError
                 font.pixelSize: 10
@@ -416,7 +426,8 @@ Item {
                 color: Colors.yellow
             }
             GohuText {
-                visible: TimeSettings.resyncAuthPath !== "NOT REQUESTED"
+                visible: pane.showResyncDiagnostics
+                         && TimeSettings.resyncAuthPath !== "NOT REQUESTED"
                 width: parent.width
                 wrapMode: Text.WordWrap
                 text: "AUTH // " + TimeSettings.resyncAuthPath
@@ -425,9 +436,10 @@ Item {
             }
             GohuText {
                 width: parent.width
-                visible: TimeSettings.authSessionActive
-                         || TimeSettings.resyncErrorCode !== ""
-                         || TimeSettings.timezoneErrorCode !== ""
+                visible: pane.showResyncDiagnostics
+                         && (TimeSettings.authSessionActive
+                             || TimeSettings.resyncErrorCode !== ""
+                             || TimeSettings.timezoneErrorCode !== "")
                 wrapMode: Text.WordWrap
                 text: "POLKIT // " + TimeSettings.authFlowStage
                       + (TimeSettings.authActionId !== ""
@@ -438,7 +450,8 @@ Item {
             Row {
                 width: parent.width
                 spacing: 8
-                height: 32
+                visible: pane.showResyncDiagnostics
+                height: visible ? 32 : 0
 
                 TimeActionButton {
                     id: resyncDiagnoseButton
@@ -465,13 +478,15 @@ Item {
             GohuText {
                 width: parent.width
                 wrapMode: Text.WordWrap
+                visible: pane.showResyncDiagnostics
                 text: "DIAG // " + TimeSettings.diagnosticMessage
                 font.pixelSize: 10
                 color: Colors.yellow
             }
             GohuText {
                 width: parent.width
-                visible: TimeSettings.diagnosticDetail !== ""
+                visible: pane.showResyncDiagnostics
+                         && TimeSettings.diagnosticDetail !== ""
                 wrapMode: Text.WordWrap
                 text: TimeSettings.diagnosticDetail
                 font.pixelSize: 9
@@ -510,6 +525,7 @@ Item {
             GohuText {
                 width: parent.width
                 wrapMode: Text.WordWrap
+                visible: pane.showReferenceExplanation
                 text: "CHECK TIME CONTACTS YOUR CONFIGURED NTP SOURCES; THEY CAN SEE YOUR IP. IT NEVER SETS TIME. THE DOCK LINE SHOWS A MANUAL OFFSET, A MISMATCH BETWEEN THE DISPLAYED AND HOST TIMEZONE OFFSETS, OR A FRESH MEASURED ERROR OF AT LEAST 1 SECOND. NO LINE DOES NOT GUARANTEE ACCURACY."
                 font.pixelSize: 9
                 color: Colors.white

@@ -30,7 +30,9 @@ class CpuPlusTimeSettingsContracts(unittest.TestCase):
         self.assertIn("TimeSettingsPane {", CPU)
         self.assertIn("TimeSettings.displayOffsetLabel", CPU)
         self.assertIn("showClockPreview: false", CPU)
-        self.assertIn("showTimezoneDetails: false", CPU)
+        self.assertIn("showTimezoneDetails: true", CPU)
+        self.assertIn("showHostDiagnostics: false", CPU)
+        self.assertIn("showResyncDiagnostics: false", CPU)
         self.assertIn("showResyncTrigger: true", CPU)
         self.assertIn("panelVisible: visible && cpuPlusWindow.menuOpen", CPU)
         self.assertIn("time-settings-v1.json", TIME_SETTINGS)
@@ -41,7 +43,9 @@ class CpuPlusTimeSettingsContracts(unittest.TestCase):
         self.assertNotIn("FileView {", CPU)
         self.assertNotIn("TimeHostControl.py", CPU)
         self.assertNotIn("set-timezone", CPU)
-        self.assertIn("TIME // SETTINGS", CPU)
+        self.assertIn("TIME // BASIC CONTROLS", CPU)
+        self.assertIn("TIME // ACTIVE", CPU)
+        self.assertIn("TIME // ADVANCED", CPU)
         self.assertIn("HOST // DAYLIGHT SAVING", PANE)
         self.assertIn("visible: pane.showTimezoneDetails", PANE)
         self.assertIn("visible: pane.showClockPreview", PANE)
@@ -59,7 +63,8 @@ class CpuPlusTimeSettingsContracts(unittest.TestCase):
         self.assertIn("TimeSettings.hostInfo.dstActive", PANE)
         self.assertIn("TimeSettings.hostInfo.rtcLocal", PANE)
         self.assertIn("TimeSettings.hostInfo.ntpEnabled", PANE)
-        # Zone mutation is Clock-owned and intentionally not exposed in CPU++.
+        # Zone mutation remains Clock-owned: CPU++ only embeds the guarded
+        # shared UI, without implementing an independent host writer.
         self.assertNotIn("set-timezone", CPU)
         self.assertIn('"set-timezone", zoneChoice', TIME_SETTINGS)
         self.assertNotIn("set-ntp", TIME_SETTINGS)

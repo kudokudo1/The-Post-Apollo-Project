@@ -36,6 +36,31 @@ Window {
     ]
 
     property var syntheticMarker: null
+    property var fixtureMarkers: []
+    property int motionTick: 0
+
+    function installFixtureMarkers() {
+        if (!probeFixtureHubs || probeFixtureHubs.length===0 ||
+                fixtureMarkers.length>0 || !mapView.map || !mapView.map.mapReady)
+            return;
+        var created=[];
+        for(var i=0;i<probeFixtureHubs.length;i++) {
+            var record=probeFixtureHubs[i];
+            var instance=fixtureHubTemplate.createObject(mapView.map,{
+                coordinate: QtPositioning.coordinate(record.latitude,record.longitude),
+                fixtureId: record.id,
+                displayLabel: record.label
+            });
+            if(!instance) {
+                console.warn("FIXTURE_MARKER_CREATE_FAILED");
+                return;
+            }
+            mapView.map.addMapItem(instance);
+            created.push(instance);
+        }
+        fixtureMarkers=created;
+        console.log("FIXTURE_MARKERS_ADDED count="+fixtureMarkers.length);
+    }
 
     function installSyntheticMarker() {
         if (!probeMockHub || syntheticMarker !== null || !mapView.map
@@ -59,6 +84,8 @@ Window {
             Qt.callLater(function(){ root.goToSample(probeSample); });
         if (probeMockHub)
             Qt.callLater(function(){ root.installSyntheticMarker(); });
+        if (probeFixtureHubs && probeFixtureHubs.length)
+            Qt.callLater(function(){ root.installFixtureMarkers(); });
     }
 
     function goToSample(label) {
@@ -93,7 +120,10 @@ Window {
         target: mapView.map
         function onMapReadyChanged() {
             if (mapView.map.mapReady)
-                Qt.callLater(function() { root.installSyntheticMarker(); });
+                Qt.callLater(function() {
+                    root.installSyntheticMarker();
+                    root.installFixtureMarkers();
+                });
         }
     }
 
@@ -128,6 +158,82 @@ Window {
                         font.bold: true
                     }
                 }
+            }
+        }
+    }
+
+    // A fixed public Toronto fixture validates record -> geographic marker.
+    // It does not read CompanyHubDirectory or define service coverage.
+    Component {
+        id: fixtureHubTemplate
+        MapQuickItem {
+            id: pin
+            property string fixtureId: ""
+            property string displayLabel: ""
+            anchorPoint.x: 7
+            anchorPoint.y: 7
+            autoFadeIn: false
+            sourceItem: Item {
+                width: 115
+                height: 33
+                Rectangle {
+                    width: 14
+                    height: 14
+                    radius: 7
+                    color: "#1B0623"
+                    border.width: 2
+                    border.color: "#ED981A"
+                }
+                Rectangle {
+                    x: 18
+                    width: 95
+                    height: 24
+                    color: "#1B0623"
+                    border.width: 1
+                    border.color: "#C74EC7"
+                    Text {
+                        anchors.centerIn: parent
+                        color: "#F2BE4E"
+                        font.pixelSize: 10
+                        text: pin.displayLabel
+                    }
+                }
+                MouseArea {
+                    anchors.fill: parent
+                    onClicked: console.log("FIXTURE_MARKER_SELECTED "+pin.fixtureId)
+                }
+            }
+        }
+    }
+
+    // Fixed automated motion from a known public map coordinate. The Qt
+    // C++ process samples frameSwapped intervals, not mouse or user location.
+    Timer {
+        id: beginMotion
+        interval: 8000
+        repeat: false
+        running: probeBenchMotion
+        onTriggered: {
+            root.motionTick=0;
+            motionDriver.start();
+            console.log("BENCH_MOTION_STARTED");
+        }
+    }
+    Timer {
+        id: motionDriver
+        interval: 33
+        repeat: true
+        running: false
+        onTriggered: {
+            root.motionTick += 1;
+            var t=root.motionTick/28;
+            mapView.map.center=QtPositioning.coordinate(
+                43.655+Math.sin(t)*0.0018,
+                -79.383+Math.cos(t)*0.0025);
+            mapView.map.zoomLevel=15.6+0.25*Math.sin(t/2);
+            if (root.motionTick>=150) {
+                motionDriver.stop();
+                console.log("BENCH_MOTION_DONE steps="+root.motionTick);
             }
         }
     }

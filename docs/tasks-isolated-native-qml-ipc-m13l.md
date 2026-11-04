@@ -138,3 +138,43 @@ Interpret phase markers to distinguish component load, environment gate, process
 ### DECISIONS
 
 No local workstation write by worker, no keyring change, no production activation, no second TASKS writer, no live Hospital registration, and no claim of native acceptance.
+
+---
+
+## M13l-S // November 4, 2026 native watchdog follow-up
+
+### IMPLEMENTATION
+
+The operator reran the reviewed M13l-R native Fedora test. Source hashes passed, the private D-Bus launched, and Quickshell exited 0, but the actual 45-second QML watchdog fired. Output showed M13L_QML_INTERNAL_TIMER_EXPIRED, M13L_QML_REFUSAL_OBSERVED and M13L_QML_PASS_MARKER_MISSING. No private Secret Service owner or test-key cleanup failure was reported. Portal, accessibility and GVfs warnings were present but not proven causal.
+
+The M13l QML startup had relied on root Component.onCompleted calling Qt.callLater. Most progress messages used console.log and were absent from captured diagnostics, while console.warn for the watchdog was visible. We cannot yet separate a silent startup from missing low-severity logs. M13l-S replaces that callback with a one-shot 100ms Timer, the same QML event-loop mechanism whose 45-second timer actually fired. Its startup, verified gate, process-accepted, received-reply, settled and PASS messages are now fixed console.warn markers. A separate five-second Timer classifies undispatched startup, pending stdin, awaiting host reply, reply waiting for exit or settled without result. The runner reports only fixed categories and pins the revised QML SHA.
+
+### HOW TO USE
+
+No local workstation change or native test was performed by the browser worker. After GitHub checks and operator review, use a fresh isolated clone of the M13l-S branch, call --preflight and then explicitly --run. Never pull/reset the dirty live Quickshell repository or start any synthetic code on the normal login D-Bus bus.
+
+### VERIFY
+
+CI parses revised QML, checks that Qt.callLater was removed and an explicit 100ms Timer drives the test, verifies source hashes and fixed QML phase markers, runs fake Quickshell success/refusal and real isolated M13k encryption regressions. These checks cannot substitute for the actual Fedora Quickshell Process reply.
+
+### WATCH OUT FOR
+
+Timeout indicates failure of native test completion, not a demonstrated encryption defect. The M13k production QML bridge and host are NOT modified by this patch. The disposable private HOME will still be deleted by the runner; only fixed categories should be pasted into the conversation.
+
+### CHECKLIST
+
+- [x] Confirm M13l-R merged and inspect actual operator watchdog-only result
+- [x] Timer-driven startup and visible phase markers
+- [x] Five-second status classification and source pin update
+- [x] CI assertions for timer dispatch and fake refusal categories
+- [ ] GitHub checks, operator review/merge
+- [ ] Actual Fedora isolated native rerun
+- [ ] Evidence-backed callback/stdio fix or M13l native acceptance
+
+### NEXT
+
+If M13L_OBSERVED_BOOT_TIMER_FIRED and M13L_OBSERVED_PRIVATE_GATE_READY appear, the test dispatched. M13L_STDIN_NOT_SENT means the Quickshell Process running callback did not send the request. M13L_AWAITING_HOST_REPLY means start was accepted and QML is waiting for output; inspect host/process lifecycle without opening real secrets. M13L_REPLY_WAITING_HOST_EXIT means the JSON returned but subprocess exit is pending. If success+cleanup PASS appears, native M13l can be accepted and then M13m scoped separately.
+
+### DECISIONS
+
+One isolated test-harness change only; no live TASKS writer, encrypted-draft activation, workstation modification, keyring change or PR merge. M13l remains unaccepted without actual native PASS.

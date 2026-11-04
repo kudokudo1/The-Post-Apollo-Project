@@ -1,0 +1,23 @@
+name: Company Network M7 nationwide vector style contract
+
+on:
+  pull_request:
+    paths:
+      - 'experiments/company-vector-qt/**'
+      - 'tests/company/test_company_vector_probe_m5.py'
+      - 'tests/company/test_company_vector_style_m7.py'
+      - '.github/workflows/company-network-vector-style-m7.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  style-schema:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify offline default, vector style classes and map coverage
+        run: |
+          python3 -m unittest discover -s tests/company -p 'test_company_vector_probe_m5.py' -v
+          python3 -m unittest discover -s tests/company -p 'test_company_vector_style_m7.py' -v

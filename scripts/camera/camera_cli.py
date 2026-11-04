@@ -15,6 +15,7 @@ import os
 from pathlib import Path
 import re
 import secrets
+import signal
 import shutil
 import stat
 import subprocess
@@ -22,6 +23,9 @@ import sys
 import time
 
 IMAGE_EXTS = {".png", ".jpg", ".jpeg", ".webp"}
+VIDEO_EXTS = {".mp4", ".mkv", ".webm"}
+MEDIA_EXTS = IMAGE_EXTS | VIDEO_EXTS
+VIDEO_DEVICE = re.compile(r"^/dev/video[0-9]+$")
 SCREENSHOT_NAME = re.compile(
     r"(screenshot|screen[\s_-]?shot|grim|spectacle|swappy|flameshot)",
     re.IGNORECASE,
@@ -48,6 +52,18 @@ def pictures():
     return home() / "Pictures" / "Screenshots" / "Post-Apollo"
 
 
+def video_root():
+    return home() / "Videos" / "Post-Apollo"
+
+
+def webcam_root():
+    return home() / "Pictures" / "Camera" / "Post-Apollo"
+
+
+def recording_state_path():
+    return plan_dir().parent / "camera-recording.json"
+
+
 def screenshots_root():
     return home() / "Pictures" / "Screenshots"
 
@@ -61,7 +77,7 @@ def is_image(entry):
     try:
         return (entry.is_file(follow_symlinks=False) and
                 not entry.is_symlink() and
-                Path(entry.name).suffix.lower() in IMAGE_EXTS)
+                Path(entry.name).suffix.lower() in MEDIA_EXTS)
     except OSError:
         return False
 
@@ -97,6 +113,7 @@ def direct_images(root, source, only_screenshots=False):
                     "bytes": st.st_size,
                     "modifiedMs": st.st_mtime_ns // 1000000,
                     "screenshotLikely": is_screenshot_name(entry.name),
+                    "mediaType": media_type(path, source),
                     "signature": [st.st_dev, st.st_ino, st.st_size, st.st_mtime_ns],
                 })
     except OSError:
@@ -133,6 +150,8 @@ def gallery_roots(extra_folder=""):
     # Downloads catch screenshots saved before Camera existed. Do not scan
     # the whole home, network mounts or private dotdirectories by default.
     roots = [
+        (webcam_root(), "webcam"),
+        (video_root(), "recordings"),
         (pictures(), "camera"),
         (screenshots_root(), "screenshots"),
         (home() / "Pictures", "pictures"),
@@ -205,14 +224,15 @@ def scan_gallery(extra_folder=""):
                         "source": source,
                         "bytes": st.st_size,
                         "modifiedMs": st.st_mtime_ns // 1000000,
-                        "screenshotLikely": bool(shot_dir or is_screenshot_name(entry.name)),
+                        "screenshotLikely": bool(shot_dir or is_screenshot_name(entry.name)) and path.suffix.lower() in IMAGE_EXTS,
+                        "mediaType": media_type(path, source),
                     }
         except OSError:
             continue
     return roots, list(by_path.values()), truncated
 
 
-def gallery(page=0, query="", extra_folder="", shots_only=False):
+def gallery(page=0, query="", extra_folder="", shots_only=False, media_filter="all"):
     """Bounded local directory traversal, server-side search and paging."""
     if not isinstance(page, int) or page < 0 or page > 100000:
         return {"ok": False, "kind": "gallery", "error": "INVALID_PAGE"}
@@ -221,8 +241,16 @@ def gallery(page=0, query="", extra_folder="", shots_only=False):
     roots, records, truncated = scan_gallery(extra_folder)
     if roots is None:
         return {"ok": False, "kind": "gallery", "error": "FOLDER_NOT_PERMITTED"}
-    if shots_only:
+    if media_filter not in ("all", "screenshots", "webcam", "videos", "screen-recordings"):
+        return {"ok": False, "kind": "gallery", "error": "INVALID_FILTER"}
+    if shots_only or media_filter == "screenshots":
         records = [row for row in records if row["screenshotLikely"]]
+    elif media_filter == "webcam":
+        records = [row for row in records if row["mediaType"] in ("webcam-photo", "webcam-video")]
+    elif media_filter == "videos":
+        records = [row for row in records if row["mediaType"] in ("webcam-video", "screen-video", "other-video")]
+    elif media_filter == "screen-recordings":
+        records = [row for row in records if row["mediaType"] == "screen-video"]
     if query.strip():
         needle = query.strip().casefold()
         records = [row for row in records
@@ -240,6 +268,7 @@ def gallery(page=0, query="", extra_folder="", shots_only=False):
         "roots": [str(root) for root, _ in roots],
         "query": query,
         "shotsOnly": bool(shots_only),
+        "mediaFilter": media_filter,
         "extraFolder": extra_folder,
         "limitNote": "Paged; only capped by the reported directory scan safety limits.",
     }
@@ -275,6 +304,12 @@ def status():
         "swaymsg": bool(shutil.which("swaymsg")),
         "outputs": outputs(),
         "saveDirectory": str(pictures()),
+        "webcamDirectory": str(webcam_root()),
+        "recordingDirectory": str(video_root()),
+        "ffmpeg": bool(shutil.which("ffmpeg")),
+        "wfRecorder": bool(shutil.which("wf-recorder")),
+        "videoDevices": video_devices(),
+        "recording": recording_status(),
         "desktop": str(desktop()),
     }
 
@@ -440,7 +475,7 @@ def trash_plan(token, confirmed):
 def preview_selected_trash(raw_path):
     """Selection-specific preview. This action never alters the picture."""
     target = Path(str(raw_path or ""))
-    if target.suffix.lower() not in IMAGE_EXTS:
+    if target.suffix.lower() not in MEDIA_EXTS:
         return {"ok": False, "kind": "preview-selected", "error": "NOT_AN_IMAGE"}
     # The path must stay under HOME, with no hidden/private/symlink parent.
     # Explicitly chosen extra galleries follow the same guard as defaults.
@@ -514,7 +549,7 @@ def trash_selected(token, confirmation):
     if not isinstance(record, dict):
         return {"ok": False, "kind": "trash-selected", "error": "PLAN_INVALID"}
     target = Path(str(record.get("path", "")))
-    if (target.suffix.lower() not in IMAGE_EXTS or
+    if (target.suffix.lower() not in MEDIA_EXTS or
             safe_user_folder(str(target.parent)) != target.parent):
         return {"ok": False, "kind": "trash-selected", "error": "FOLDER_NOT_PERMITTED"}
     try:
@@ -539,6 +574,181 @@ def trash_selected(token, confirmation):
     }
 
 
+
+def media_type(path, source):
+    """Classify by owned output folder and extension, never filename alone for videos."""
+    suffix = path.suffix.lower()
+    if suffix in VIDEO_EXTS:
+        if source == "recordings":
+            return "webcam-video" if path.name.startswith("webcam_") else "screen-video" if path.name.startswith("screen_") else "other-video"
+        return "other-video"
+    if source == "webcam":
+        return "webcam-photo"
+    if source in ("camera", "screenshots") or is_screenshot_name(path.name):
+        return "screenshot"
+    return "other-image"
+
+
+def video_devices():
+    """Read-only V4L2 device discovery; capture requires an explicit valid node."""
+    return [str(p) for p in sorted(Path("/dev").glob("video[0-9]*"))
+            if VIDEO_DEVICE.fullmatch(str(p)) and p.exists()]
+
+
+def camera_device(raw):
+    candidate = str(raw or "")
+    if not candidate:
+        devices = video_devices()
+        candidate = devices[0] if devices else ""
+    return candidate if VIDEO_DEVICE.fullmatch(candidate) and Path(candidate).exists() else None
+
+
+def output_target(root, prefix, suffix):
+    if root.is_symlink() or any(p.is_symlink() for p in (root.parent,)):
+        raise OSError("SYMLINK_OUTPUT")
+    root.mkdir(parents=True, mode=0o700, exist_ok=True)
+    now = dt.datetime.now().astimezone()
+    name = prefix + "_" + now.strftime("%Y%m%d_%H%M%S_%f") + "_" + secrets.token_hex(3) + suffix
+    target = root / name
+    if target.exists():
+        raise OSError("OUTPUT_EXISTS")
+    return target
+
+
+def webcam_photo_capture(device=""):
+    ffmpeg = shutil.which("ffmpeg")
+    node = camera_device(device)
+    if not ffmpeg:
+        return {"ok": False, "kind": "webcam-photo", "error": "FFMPEG_MISSING"}
+    if not node:
+        return {"ok": False, "kind": "webcam-photo", "error": "NO_WEBCAM_DEVICE"}
+    try:
+        target = output_target(webcam_root(), "webcam", ".jpg")
+        result = subprocess.run([ffmpeg, "-hide_banner", "-loglevel", "error",
+            "-nostdin", "-f", "video4linux2", "-i", node,
+            "-frames:v", "1", "-y", str(target)], timeout=25,
+            capture_output=True, check=False)
+        if result.returncode or not target.is_file() or target.stat().st_size == 0:
+            target.unlink(missing_ok=True)
+            return {"ok": False, "kind": "webcam-photo", "error": "WEBCAM_CAPTURE_FAILED"}
+        return {"ok": True, "kind": "webcam-photo", "path": str(target),
+                "name": target.name, "bytes": target.stat().st_size}
+    except (OSError, subprocess.SubprocessError):
+        return {"ok": False, "kind": "webcam-photo", "error": "WEBCAM_UNAVAILABLE"}
+
+
+def _pid_start_ticks(pid):
+    try:
+        # /proc/PID/stat field 22; the command name may contain spaces.
+        fields = Path("/proc/%d/stat" % pid).read_text().rsplit(")", 1)[1].strip().split()
+        return fields[19]
+    except (OSError, ValueError, IndexError):
+        return None
+
+
+def _read_recording():
+    path = recording_state_path()
+    if path.is_symlink() or not path.is_file():
+        return None
+    try:
+        if path.stat().st_size > 4096:
+            return None
+        data = json.loads(path.read_text())
+        if (not isinstance(data, dict) or
+                type(data.get("pid")) is not int or data["pid"] <= 1 or
+                not isinstance(data.get("ticks"), str) or
+                data.get("mode") not in ("webcam", "screen") or
+                not isinstance(data.get("path"), str)):
+            return None
+        return data
+    except (OSError, ValueError):
+        return None
+
+
+def _recording_alive(data):
+    return bool(data and _pid_start_ticks(data["pid"]) == data["ticks"])
+
+
+def recording_status():
+    data = _read_recording()
+    live = _recording_alive(data)
+    return {"ok": True, "kind": "record-status", "recording": live,
+            "mode": data["mode"] if live else "",
+            "path": data["path"] if live else ""}
+
+
+def record_start_action(mode, device=""):
+    if _recording_alive(_read_recording()):
+        return {"ok": False, "kind": "record-start", "error": "ALREADY_RECORDING"}
+    if mode == "webcam":
+        tool = shutil.which("ffmpeg")
+        node = camera_device(device)
+        if not tool or not node:
+            return {"ok": False, "kind": "record-start", "error": "WEBCAM_OR_FFMPEG_MISSING"}
+    else:
+        tool = shutil.which("wf-recorder")
+        if not tool:
+            return {"ok": False, "kind": "record-start", "error": "WF_RECORDER_MISSING"}
+    state = recording_state_path()
+    if state.is_symlink() or state.parent.is_symlink():
+        return {"ok": False, "kind": "record-start", "error": "STATE_SYMLINK"}
+    try:
+        target = output_target(video_root(), mode, ".mp4")
+        if mode == "webcam":
+            args = [tool, "-hide_banner", "-loglevel", "error", "-nostdin",
+                    "-f", "video4linux2", "-i", node, "-c:v", "libx264",
+                    "-preset", "ultrafast", "-pix_fmt", "yuv420p", str(target)]
+        else:
+            args = [tool, "-f", str(target)]
+        # No shell or network. Start an isolated process group for an explicit
+        # STOP action; persist PID and Linux start ticks to avoid PID reuse.
+        process = subprocess.Popen(args, stdin=subprocess.DEVNULL,
+                                   stdout=subprocess.DEVNULL,
+                                   stderr=subprocess.DEVNULL,
+                                   start_new_session=True, close_fds=True)
+        ticks = None
+        for _ in range(10):
+            ticks = _pid_start_ticks(process.pid)
+            if ticks:
+                break
+            time.sleep(0.01)
+        if not ticks:
+            process.terminate()
+            return {"ok": False, "kind": "record-start", "error": "PROCESS_NOT_TRACKABLE"}
+        state.parent.mkdir(parents=True, mode=0o700, exist_ok=True)
+        fd = os.open(state, os.O_WRONLY | os.O_CREAT | os.O_TRUNC | os.O_NOFOLLOW, 0o600)
+        with os.fdopen(fd, "w") as out:
+            json.dump({"pid": process.pid, "ticks": ticks, "mode": mode,
+                       "path": str(target)}, out)
+        return {"ok": True, "kind": "record-start", "recording": True,
+                "mode": mode, "path": str(target), "name": target.name}
+    except OSError:
+        return {"ok": False, "kind": "record-start", "error": "RECORD_START_FAILED"}
+
+
+def record_stop_action():
+    data = _read_recording()
+    if not _recording_alive(data):
+        return {"ok": False, "kind": "record-stop", "error": "NOT_RECORDING"}
+    try:
+        # The process was started as its own session; only stop the exact
+        # still-matching process, never an unrelated PID after reuse.
+        os.kill(data["pid"], signal.SIGINT)
+        for _ in range(40):
+            if not _recording_alive(data):
+                break
+            time.sleep(0.1)
+        if _recording_alive(data):
+            return {"ok": False, "kind": "record-stop", "error": "STOP_TIMEOUT"}
+        recording_state_path().unlink(missing_ok=True)
+        target = Path(data["path"])
+        return {"ok": True, "kind": "record-stop", "recording": False,
+                "path": str(target), "name": target.name,
+                "bytes": target.stat().st_size if target.is_file() else 0}
+    except OSError:
+        return {"ok": False, "kind": "record-stop", "error": "STOP_FAILED"}
+
+
 def main(argv=None):
     parser = argparse.ArgumentParser()
     command = parser.add_subparsers(dest="action", required=True)
@@ -548,8 +758,16 @@ def main(argv=None):
     gallery_parser.add_argument("--query", default="")
     gallery_parser.add_argument("--folder", default="")
     gallery_parser.add_argument("--shots-only", action="store_true")
+    gallery_parser.add_argument("--media-filter", default="all", choices=["all", "screenshots", "webcam", "videos", "screen-recordings"])
     capture_parser = command.add_parser("capture")
     capture_parser.add_argument("mode", choices=["region", "focused", "all"])
+    webcam_photo = command.add_parser("webcam-photo")
+    webcam_photo.add_argument("--device", default="")
+    record_start = command.add_parser("record-start")
+    record_start.add_argument("mode", choices=["webcam", "screen"])
+    record_start.add_argument("--device", default="")
+    command.add_parser("record-status")
+    command.add_parser("record-stop")
     command.add_parser("preview-trash")
     trash_parser = command.add_parser("trash")
     trash_parser.add_argument("plan_id")
@@ -565,9 +783,17 @@ def main(argv=None):
         result = status()
     elif options.action == "gallery":
         result = gallery(options.page, options.query,
-                         options.folder, options.shots_only)
+                         options.folder, options.shots_only, options.media_filter)
     elif options.action == "capture":
         result = capture(options.mode)
+    elif options.action == "webcam-photo":
+        result = webcam_photo_capture(options.device)
+    elif options.action == "record-start":
+        result = record_start_action(options.mode, options.device)
+    elif options.action == "record-stop":
+        result = record_stop_action()
+    elif options.action == "record-status":
+        result = recording_status()
     elif options.action == "preview-trash":
         result = preview_desktop_trash()
     elif options.action == "preview-selected":

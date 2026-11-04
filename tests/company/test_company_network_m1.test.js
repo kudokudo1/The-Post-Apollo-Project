@@ -132,6 +132,41 @@ test("city icon and star ornaments share one vertical text-cell frame in dock an
     assert.match(widget,/anchors\.verticalCenter: parent\.verticalCenter/);
 });
 
+test("central yellow city sits 2px below the white ornaments without shifting their cells",()=>{
+    const cases=[
+        ["dock",source("modules/CompanyNetwork.qml"),"companyMark","cityGlyphCell","cityGlyph",24],
+        ["header",source("widgets/CompanyNetworkW.qml"),"headerCity","headerCityGlyphCell","headerCityGlyph",18]
+    ];
+    for(const [label,sourceText,rowId,cellId,glyphId,fontSize] of cases) {
+        const tail=sourceText.split("id: "+rowId,2)[1];
+        assert.ok(tail,label+" Row still exists");
+        const row=tail.split(label==="dock"
+            ? "onLeftClicked: toggleRequested()"
+            : "\n            GohuText {",1)[0];
+        const cityBlock=row.split("id: "+cellId,2)[1];
+        assert.ok(cityBlock,label+" owns a city-only wrapper");
+        assert.match(cityBlock,new RegExp("width: "+glyphId+"\\.implicitWidth"),
+            label+" retains intrinsic city width");
+        assert.match(cityBlock,new RegExp("height: "+rowId+"\\.height"),
+            label+" leaves shared Row geometry unchanged");
+        assert.match(cityBlock,new RegExp("id: "+glyphId+"\\s+y: 2"),
+            label+" lowers only the yellow city 2px");
+        assert.match(cityBlock,new RegExp("font\\.pixelSize: "+fontSize),
+            label+" preserves city glyph size");
+        assert.match(cityBlock,/text: "🏙︎"/);
+        assert.match(cityBlock,/color: Colors\.yellow/);
+        // Both white ornament glyphs remain direct Row children and
+        // preserve their original centered text cells.
+        const firstStar=row.indexOf('text: ". ݁₊⊹"');
+        const lastStar=row.indexOf('text: "๋࣭⭑"');
+        const cell=row.indexOf("id: "+cellId);
+        assert.ok(firstStar>=0 && cell>firstStar && lastStar>cell,
+            label+" preserves the three-glyph artwork order");
+        assert.equal((row.match(/y: 2/g)||[]).length,1,
+            label+" applies only one intentional pixel offset");
+    }
+});
+
 test("coverage UI is interactive, reference-only and contains no company data writer",()=>{
     const pane=source("widgets/CompanyCoveragePane.qml");
     const widget=source("widgets/CompanyNetworkW.qml");

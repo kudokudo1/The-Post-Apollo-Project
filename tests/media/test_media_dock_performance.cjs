@@ -48,18 +48,21 @@ function cavaDelegateSource() {
     return source.slice(start, end);
 }
 
-test("left taskbar places Media before Tray without duplicating either instance", () => {
+test("left taskbar places Tray before Media and Camera without duplication", () => {
     const left = shellSource.split("// ===== LEFT MODULES", 2)[1]
         ?.split("// ===== CENTER MODULE", 2)[0];
     assert.ok(left, "left taskbar row must exist");
     const workspaces = left.indexOf("Workspaces {}");
     const media = left.indexOf("Mediaplayer {\n            id: sharedMediaDock\n        }");
     const tray = left.indexOf("Tray {}");
+    const camera = left.indexOf("id: cameraHost");
     const hospital = left.indexOf("// Hospital");
-    assert.ok(workspaces >= 0 && workspaces < media && media < tray && tray < hospital,
-        "expected Workspaces → Media Player → Tray → Hospital");
+    assert.ok(workspaces >= 0 && workspaces < tray && tray < media &&
+        media < camera && camera < hospital,
+        "expected Workspaces → Tray → Media Player → Camera → Hospital");
     assert.equal((left.match(/Mediaplayer \{/g) || []).length, 1);
     assert.equal((left.match(/Tray \{\}/g) || []).length, 1);
+    assert.equal((left.match(/id:\s*cameraHost/g) || []).length, 1);
     assert.match(shellSource, /mediaControllerSource:\s*sharedMediaDock\.hubMediaController/);
     assert.match(shellSource, /mpdDockSource:\s*sharedMediaDock/);
 });
@@ -84,11 +87,12 @@ test("left taskbar uses close 8px gaps except App Control to Workspaces", () => 
     const workspace = left.indexOf("Workspaces {}");
     const media = left.indexOf("Mediaplayer {");
     const tray = left.indexOf("Tray {}");
+    const camera = left.indexOf("id: cameraHost");
     const hospital = left.indexOf("// Hospital");
     const finance = left.indexOf("// Finance");
     const git = left.indexOf("// Git");
     const tasks = left.indexOf("Tasks {\n                id: tasksButton");
-    assert.ok([launcher, gapAt, workspace, media, tray, hospital, finance, git, tasks]
+    assert.ok([launcher, gapAt, workspace, tray, media, camera, hospital, finance, git, tasks]
         .every((v, i, a) => v >= 0 && (!i || v > a[i - 1])),
         "spacer must appear only after App Control and all left-module order is preserved");
 });

@@ -379,6 +379,7 @@ PanelWindow {
         && !converterTargetPicker.searchFocused
         && !mathZonePicker.searchFocused
         && !differenceEndPicker.searchFocused
+        && !clockSettingsPane.zoneSearchFocused
         && !differenceEndDateInput.activeFocus
         && !differenceEndTimeInput.activeFocus
         && !countdownNameField.activeFocus
@@ -5050,6 +5051,7 @@ PanelWindow {
                     }
 
                     TimeSettingsPane {
+                        id: clockSettingsPane
                         width: parent.width
                         height: 505
                         visible: timew.selectedMode === "settings"

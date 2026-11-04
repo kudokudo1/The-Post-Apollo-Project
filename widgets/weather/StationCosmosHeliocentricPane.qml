@@ -8,6 +8,7 @@ import "StationCosmosHeliocentricPolicy.js" as Helio
 Item {
     id: spatial
     property var visualData: null
+    property bool embedded: false
     property var graphModel: null
     property var verifiedNetwork: null
     property int focusIndex: -1
@@ -187,6 +188,7 @@ Item {
     }
 
     Column {
+        visible: !spatial.embedded
         anchors.top: parent.top
         anchors.topMargin: 5
         anchors.right: parent.right

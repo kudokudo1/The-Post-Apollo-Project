@@ -5,6 +5,13 @@ on:
     paths:
       - 'widgets/weather/StationCosmosCelestialNetwork.qml'
       - 'widgets/weather/StationCosmosCelestialNetworkPolicy.js'
+      - 'widgets/weather/StationCosmosHeliocentricPane.qml'
+      - 'widgets/weather/StationCosmosHeliocentricPolicy.js'
+      - 'services/weather/CelestialVisualQueryPolicy.js'
+      - 'scripts/weather/celestial_spatial_data.py'
+      - 'scripts/weather/celestial_visual_data.py'
+      - 'tests/weather/test_cosmos_heliocentric_spatial_v4c.js'
+      - 'tests/weather/test_magick_celestial_query_m5c.js'
       - 'widgets/weather/StationCosmosCelestialDepthPane.qml'
       - 'widgets/weather/StationCosmosCelestialDepthPolicy.js'
       - 'widgets/weather/StationMagickCelestialInstrument.qml'
@@ -29,6 +36,10 @@ jobs:
         run: node --test tests/weather/test_cosmos_jpl_relationship_network_v4a.js
       - name: Verify V4b apparent geocentric AU depth data and shared selection
         run: node --test tests/weather/test_cosmos_apparent_depth_v4b.js
+      - name: Verify V4c source-matched JPL HELIO XYZ and linked controls
+        run: |
+          node --test tests/weather/test_cosmos_heliocentric_spatial_v4c.js
+          node --test tests/weather/test_magick_celestial_query_m5c.js
       - name: Preserve MAGICK M4/M5 sources and interaction behavior
         run: |
           node --test tests/weather/test_magick_celestial_visual_m5.js

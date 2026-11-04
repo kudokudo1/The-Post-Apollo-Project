@@ -75,7 +75,7 @@ test("EARTH has one source-scoped map instance, not second event or archive writ
   assert.match(earthPane,/eventArchiveStore: earthPane\.eventArchiveStore/);
   assert.match(earthPane,/dossierArchiveStore: earthPane\.dossierArchiveStore/);
   assert.match(navigator,/StationEarthSubjectPane\s*\{/);
-  assert.match(station,/active: !weatherStation\.subjectNavigationOpen/);
+  assert.ok(!station.includes("weatherContentLoader"));
   for(const bad of ["WeatherServices.","FileView {","Process {","XMLHttpRequest"])
     assert.ok(!earthPane.includes(bad),"no duplicate source or store "+bad);
 });
@@ -127,7 +127,8 @@ test("INDEX no longer routes already-reviewed EARTH source groups into CLASSIC",
   assert.ok(native.every(x=>x.path.startsWith("earth/") && !c.findRoute(x.path).group));
   assert.match(navigator,/model: browser\.nativeDestinations/);
   assert.match(navigator,/onClicked: browser\.chooseRoute\(modelData\.path\)/);
-  assert.match(navigator,/model: browser\.classicSources/);
+  assert.ok(!navigator.includes("classicSources"));
+  assert.ok(!navigator.includes("legacyPageRequested"));
   assert.equal(c.WIRED_IN_SUBJECTS["map-news-mentions"],"M28-A",
     "MEDIA mentioned places must not be promoted as EARTH-native event records");
 });

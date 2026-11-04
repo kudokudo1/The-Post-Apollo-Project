@@ -143,7 +143,8 @@ test("deep INDEX uses concrete COSMOS leaf links and still preserves unresolved 
   assert.deepEqual(plain(env.remainingSourcePagesForPath("tools/sources/provenance",env.PANELS)),[],
     "M28-I original SPACE field clocks now have their own source-backed TOOLS view");
   assert.match(navigator,/model: browser\.nativeDestinations/);
-  assert.match(navigator,/model: browser\.classicSources/);
+  assert.ok(!navigator.includes("classicSources"));
+  assert.ok(!navigator.includes("legacyPageRequested"));
   assert.deepEqual(plain(env.nativeDestinationsForPath("not-a-route",env.PANELS)),[]);
 });
 

@@ -160,8 +160,8 @@ test("INDEX offers concrete WEATHER routes, preserves unreviewed HOME and non-WE
   assert.deepEqual(plain(context.remainingSourcePagesForPath("media/watch",context.PANELS)),[],
     "later M28-J catalogs share the original MEDIA hub, independent of playback");
   assert.match(navigator,/model: browser\.nativeDestinations/);
-  assert.match(navigator,/model: browser\.classicSources/);
-  assert.match(navigator,/onClicked: browser\.legacyPageRequested\(modelData\.id\)/);
+  assert.ok(!navigator.includes("classicSources"));
+  assert.ok(!navigator.includes("legacyPageRequested"));
 });
 
 test("source-true cutover registry is guarded against missing/unknown destinations", () => {

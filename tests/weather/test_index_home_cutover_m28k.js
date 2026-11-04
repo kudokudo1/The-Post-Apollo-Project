@@ -137,7 +137,8 @@ test("later M28-L source review does not erase M28-K HOME or historic source pro
   assert.deepEqual(plain(preview.sourcePagesForPath("tools/sources/health",m0.PANELS)
     .map(x=>x.id)),["home","ground","map"]);
   assert.ok(preview.nativeDestinationsForPath("tools/sources/health",m0.PANELS).length>0);
-  assert.match(station,/active: !weatherStation\.subjectNavigationOpen/);
+  assert.ok(!station.includes("weatherContentLoader"));
+  assert.match(station,/subjectNavigationOpen = true;/);
   assert.match(station,/StationTerminal\s*\{/);
   for(const forbidden of ["Process {","FileView {","XMLHttpRequest","Qt.callLater"])
     assert.ok(!browser.includes(forbidden),"INDEX must not become a service owner: "+forbidden);

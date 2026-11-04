@@ -175,10 +175,11 @@ assert.match(news, /runtimeNowMs: stationNewsHub\.runtimeNowMs/);
 const station = read("widgets/weather/WeatherStationW.qml");
 assert.match(station, /readonly property real runtimeNowMs:/);
 assert.match(station, /RuntimePolicy\.summarizeRows\(currentPageRuntimeRows\)/);
-assert.match(station, /readonly property bool usesMapRuntime:/);
-assert.match(station, /return "MAP LIVE";/);
-assert.match(station, /return "MAP CACHE";/);
-assert.match(station, /currentPageRuntimeSummary\.ready \+ " READY"/);
+assert.match(station, /readonly property var currentPageRuntimeRows:/);
+assert.match(station, /subjectNavigator\.liveMapRuntimeRows/);
+assert.match(station, /SubjectSourceBadge\.badgeFor\(/);
+assert.match(station, /return subjectSourceBadge\.text;/);
+assert.match(station, /sourceStatusDisplay: sourceStatusText/);
 assert.match(station, /runtimeNowMs: weatherStation\.runtimeNowMs/);
 
 // One Station clock updates page ages. M2 adds no per-provider timer.

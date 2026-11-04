@@ -13,6 +13,8 @@ const magickSource=read("widgets/weather/StationMagickSubjectPanelPolicy.js");
 const cosmosSource=read("widgets/weather/StationCosmosSubjectPanelPolicy.js");
 const pane=read("widgets/weather/StationMagickSubjectPane.qml");
 const overview=read("widgets/weather/StationMagickOverviewPane.qml");
+const instrument=read("widgets/weather/StationMagickCelestialInstrument.qml");
+const network=read("widgets/weather/StationCosmosCelestialNetwork.qml");
 const surface=read("widgets/weather/StationWorkspaceSurface.qml");
 const browser=read("widgets/weather/StationSubjectNavigator.qml");
 const station=read("widgets/weather/WeatherStationW.qml");
@@ -106,7 +108,7 @@ test("MAGICK keeps source evidence visibly separated from symbolic interpretatio
   assert.match(overview,/id: lunarCard/);
   assert.match(overview,/id: solarCard/);
   assert.doesNotMatch(overview,/id: interpretation/);
-  assert.match(overview,/id: celestialCanvas/);
+  assert.match(overview,/id: overviewChart/);
   assert.match(overview,/id: solarCanvas/);
   assert.match(overview,/readonly property var moonModel: CosmosVisual\.moonDisplay/);
   assert.match(overview,/readonly property var solarModel: CosmosVisual\.solarArc/);
@@ -141,9 +143,9 @@ test("M30-A overview is compact, routed and source-honest", () => {
   assert.match(sky,/visible: !sky\.sourceOnly && scrollable/);
   assert.match(overview,/CosmosVisual\.illuminatedSpan/);
   assert.match(overview,/TwilightPolicy\.solarPosition/);
-  assert.match(overview,/TRADITIONS \/ CORRESPONDENCES \/\/ NOT CONNECTED/);
-  assert.match(overview,/CelestialVisual\.model\(/);
-  assert.match(overview,/CelestialVisual\.wheelPositions\(/);
+  assert.match(overview,/SYMBOLIC INTERPRETATION \/\/ NOT CONNECTED/);
+  assert.match(overview,/StationMagickCelestialInstrument\s*\{/);
+  assert.match(overview,/compactMode: true/);
   assert.match(overview,/deck\.celestialSource\.refresh\(\)/);
   assert.match(overview,/deck\.celestialSource\.configured/);
   assert.match(station,/subjectNavigator\.currentPath === "magick\/overview"/);
@@ -186,10 +188,10 @@ test("M30-B astro hero replaces solar hero without losing the Moon and Sun instr
   assert.match(overview,/label: deck\.celestialSource && deck\.celestialSource\.loading\s*\? "CALCULATING" : "CALCULATE"/);
   assert.match(overview,/onClicked: deck\.celestialSource\.refresh\(\)/);
   assert.match(overview,/available: !!deck\.celestialSource\s*&& deck\.celestialSource\.active\s*&& deck\.celestialSource\.configured\s*&& !deck\.celestialSource\.loading/);
-  assert.match(overview,/readonly property var chartModel: CelestialVisual\.model/);
-  assert.match(overview,/if \(!deck\.chartModel\.ready\)return;/);
+  assert.match(overview,/StationMagickCelestialInstrument\s*\{/);
+  assert.match(overview,/visualData: deck\.celestialSource && deck\.celestialSource\.ready/);
   assert.match(overview,/id: heroFooter/);
-  assert.match(overview,/TRADITIONS \/ CORRESPONDENCES \/\/ NOT CONNECTED/);
+  assert.match(overview,/SYMBOLIC INTERPRETATION \/\/ NOT CONNECTED/);
   assert.doesNotMatch(overview,/id: interpretation/);
   assert.match(overview,/anchors\.bottom: parent\.bottom\s*anchors\.topMargin: deck\.gutter/);
   assert.match(overview,/id: lunarCard/);
@@ -201,4 +203,58 @@ test("M30-B astro hero replaces solar hero without losing the Moon and Sun instr
   assert.doesNotMatch(overview,/Flickable\s*\{|Process\s*\{|Timer\s*\{/);
   assert.match(station,/MagickPanelPolicy\.visualForRoute\(subjectNavigator\.currentPath\)[\s\S]*?subjectNavigator\.currentPath === "magick\/overview"/);
   assert.equal((station.match(/WeatherServices\.CelestialVisualService\s*\{/g)||[]).length,1);
+});
+
+
+test("M30-C compact overview hosts the existing interactive astrology modes", () => {
+  assert.match(overview,/StationMagickCelestialInstrument\s*\{/);
+  assert.match(overview,/id: overviewChart/);
+  assert.match(overview,/compactMode: true/);
+  assert.match(overview,/visualData: deck\.celestialSource && deck\.celestialSource\.ready/);
+  assert.match(instrument,/property bool compactMode: false/);
+  for(const token of ['id:"wheel"','id:"motion"','id:"aspects"',
+                      'id:"relations"','id:"network"','id:"helio"'])
+    assert.ok(instrument.includes(token),"mode missing "+token);
+  assert.match(instrument,/displayMode: instrument\.compactMode && instrument\.mode === "helio"\s*\? "heliocentric" : "chords"/);
+  assert.match(instrument,/onClicked: instrument\.mode = modelData\.id/);
+  assert.match(network,/StationCosmosHeliocentricPane\s*\{/);
+  assert.match(network,/visible: !graph\.compactMode/);
+  assert.match(instrument,/id: chartFrame[\s\S]*height: instrument\.compactMode/);
+  assert.match(instrument,/id: eventTimeline[\s\S]*visible: !instrument\.compactMode/);
+  // Compact means visual controls take the screen; it cannot turn on a new engine.
+  assert.equal((overview.match(/StationMagickCelestialInstrument\s*\{/g)||[]).length,1);
+  assert.equal((station.match(/WeatherServices\.CelestialVisualService\s*\{/g)||[]).length,1);
+  assert.match(overview,/onClicked: deck\.celestialSource\.refresh\(\)/);
+  assert.doesNotMatch(overview,/Process\s*\{|Timer\s*\{|FileView\s*\{/);
+});
+
+test("M30-C Moon phase selector previews references without changing observed data", () => {
+  assert.match(overview,/property string inspectedPhaseId: ""/);
+  assert.match(overview,/CosmosVisual\.phaseReference\(/);
+  assert.match(overview,/id: phasePresetRow/);
+  assert.match(overview,/model: CosmosVisual\.PHASES/);
+  assert.match(overview,/deck\.inspectedPhaseId === modelData\.id \? ""/);
+  assert.match(overview,/onClicked: deck\.inspectedPhaseId = ""/);
+  assert.match(overview,/SCHEMATIC REFERENCE/);
+  assert.match(overview,/deck\.displayedMoonIllumination/);
+  assert.match(overview,/CosmosVisual\.illuminatedSpan/);
+  assert.match(overview,/deck\.routeRequested\("magick\/lunar-solar\/moon"\)/);
+  // Observed illumination stays derived from the original USNO/forecast model.
+  assert.match(overview,/readonly property var moonModel: CosmosVisual\.moonDisplay/);
+  assert.doesNotMatch(overview,/moonModel\.(?:illumination|phaseId)\s*=/);
+});
+
+test("M30-C Sun time controls select actual calibrated samples without refetching", () => {
+  assert.match(overview,/id: solarPresetRow/);
+  for(const time of ["00","06","12","18","NOW"])
+    assert.ok(overview.includes('label:"'+time+'"'),time);
+  assert.match(overview,/property real lockedSolarMinute: -1/);
+  assert.match(overview,/property real hoveredSolarMinute: -1/);
+  assert.match(overview,/CosmosVisual\.nearestSolar\(/);
+  assert.match(overview,/CosmosVisual\.positionX\(rows\[i\]\.minute,w\)/);
+  assert.match(overview,/deck\.lockedSolarMinute=modelData\.minute/);
+  assert.match(overview,/deck\.selectedSolarMinute/);
+  assert.match(overview,/CosmosVisual\.clockLabel\(/);
+  assert.match(overview,/deck\.routeRequested\("magick\/planetary\/hours"\)/);
+  assert.doesNotMatch(overview,/weatherService\.refresh\(|observationOwner\.refresh\(/);
 });

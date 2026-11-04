@@ -2541,10 +2541,7 @@ Rectangle {
         contentPadding: 2
         accentColor: Colors.cyan
         selected: appSelector.settingsOpen
-        onTriggered: {
-            appSelector.phoneOpen = false;
-            appSelector.settingsOpen = !appSelector.settingsOpen;
-        }
+        onTriggered: appSelector.settingsOpen = !appSelector.settingsOpen
     }
 
     // Keep launch errors visible in the selector even when the external

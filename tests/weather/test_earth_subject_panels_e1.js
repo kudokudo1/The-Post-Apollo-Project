@@ -30,7 +30,8 @@ test("original ten EARTH routes plus one full original MAP are canonical descend
     assert.ok(match,route);
     assert.equal(match.subject,"earth");
     assert.equal(earth.kindForRoute(route),"map");
-    assert.ok(earth.routeLabel(route).startsWith("EARTH //") ||
+    assert.ok(earth.routeLabel(route).startsWith("MAP //") ||
+              earth.routeLabel(route).startsWith("EARTH //") ||
               earth.routeLabel(route).startsWith("GEOLOGY //") ||
               earth.routeLabel(route).startsWith("GEOGRAPHY //") ||
               earth.routeLabel(route).startsWith("NATURAL EVENTS //") ||

@@ -122,7 +122,7 @@ class PhoneStageTests(unittest.TestCase):
     def test_outside_social_window_refuses_to_move(self):
         t = tree()
         execute = Mock()
-        for local in ((390, 330, 510, 290), (0, 650, 400, 120),
+        for local in ((390, 330, 511, 290), (0, 650, 400, 120),
                       (-1, 100, 250, 250), (0, 0, 199, 200),
                       (0, 0, 300, 100), (10, 20, 0, 200),
                       (True, 20, 400, 250), (1.0, 20, 400, 250),

@@ -33,8 +33,8 @@ test("all twelve signs contain non-empty, executable font-independent strokes",(
         }
         assert.ok(commands>=4,"visible glyph geometry "+i);
     }
-    assert.deepEqual(context.strokesFor(-1),[]);
-    assert.deepEqual(context.strokesFor(12),[]);
+    assert.deepEqual(JSON.parse(JSON.stringify(context.strokesFor(-1))),[]);
+    assert.deepEqual(JSON.parse(JSON.stringify(context.strokesFor(12))),[]);
 });
 
 test("symbol chips fit inside the actual narrow Station Canvas and remain separated",()=>{

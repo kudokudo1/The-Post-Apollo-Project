@@ -13,6 +13,7 @@
 #include <QDebug>
 #include <QColor>
 #include <algorithm>
+#include <cmath>
 #include <QFile>
 #include <QJsonDocument>
 #include <QJsonObject>

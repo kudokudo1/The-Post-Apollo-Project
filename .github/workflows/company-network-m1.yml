@@ -1,0 +1,21 @@
+name: Company Network M1 offline geography and chassis
+
+on:
+  pull_request:
+    paths:
+      - 'modules/CompanyNetwork.qml'
+      - 'widgets/CompanyNetworkW.qml'
+      - 'widgets/CompanyCoveragePolicy.js'
+      - 'widgets/CompanyCoveragePane.qml'
+      - 'widgets/CompanyChassisPolicy.js'
+      - 'tests/company/**'
+      - '.github/workflows/company-network-m1.yml'
+  workflow_dispatch:
+
+jobs:
+  offline-model:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify Company Network M1 policy and source contracts
+        run: node --test tests/company/test_company_network_m1.test.js

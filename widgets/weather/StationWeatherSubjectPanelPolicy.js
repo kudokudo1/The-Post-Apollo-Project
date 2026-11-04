@@ -64,6 +64,31 @@ function visibleFor(page, path, section) {
     && (info.full === true || info.sections.indexOf(section) >= 0);
 }
 
+// M29-A: route-focused river presentations over the SAME one NWPS source.
+// Parent RIVERS, full GROUND, historical relationships and flood hazards
+// retain their existing combined panels and source activation.
+var RIVER_ROUTE_FOCUS = {
+  "weather/water/rivers/gauges":"gauges",
+  "weather/water/rivers/nearby":"nearby",
+  "weather/water/rivers/flood":"flood",
+  "weather/water/rivers/hydrograph":"hydrograph"
+};
+function riverFocusForRoute(path) {
+  return Object.prototype.hasOwnProperty.call(RIVER_ROUTE_FOCUS,path)
+    ? RIVER_ROUTE_FOCUS[path] : "all";
+}
+function riverGroupVisible(path,group) {
+  if (["nearby","flood","hydrograph"].indexOf(group)<0)
+    return false;
+  var focus=riverFocusForRoute(path);
+  return focus==="all" || focus===group;
+}
+function riverTitleFor(path) {
+  var focus=riverFocusForRoute(path);
+  return focus==="all" ? "RIVER // NOAA NWPS"
+    : "RIVER // NOAA NWPS // " + focus.toUpperCase();
+}
+
 function needsSource(path, source) {
   // Existing collector lifetimes remain untouched in classic mode.
   if (path === "") return true;

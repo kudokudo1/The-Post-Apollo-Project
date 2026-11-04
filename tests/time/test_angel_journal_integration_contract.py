@@ -98,7 +98,7 @@ class AngelJournalContracts(unittest.TestCase):
         self.assertIn('id: errMarkButton', PANE)
         self.assertIn('"CLEAR ERR" : "MARK ERR"', PANE)
         self.assertIn('AngelObservationsStore.toggleErrObservation(pane.selectedId)', PANE)
-        self.assertIn('modelData.errMarked === true ? "ERR* // "', PANE)
+        self.assertIn('label: (isMarkedErr ? "ERR* // " : "")', PANE)
         self.assertIn('OTHER = NO PATTERN // ERR = OTHER + USER-MARKED', PANE)
         self.assertIn('row.errMarked === undefined', POLICY)
         self.assertIn('errMarked: row.errMarked === true', POLICY)
@@ -106,6 +106,46 @@ class AngelJournalContracts(unittest.TestCase):
         self.assertIn('atomicWrites: true', STORE)
         self.assertEqual(STORE.count("FileView {"), 1)
         self.assertNotIn("FileView {", PANE)
+
+    def test_err_color_identity_without_recoloring_unmatched_other_rows(self):
+        # Filter and history delegates must use the SAME user-mark flag,
+        # but automatic OTHER classification must not turn rows red.
+        filter_section = PANE.split("id: angelPatternFilters", 1)[1].split(
+            "id: angelHistoryArea", 1)[0]
+        row_section = PANE.split("delegate: ActionButton {", 1)[1].split(
+            "onLeftClicked: {", 1)[0]
+
+        self.assertIn('modelData.key === "err"', filter_section)
+        self.assertIn("readonly property bool isErrFilter:", filter_section)
+        self.assertIn("accentColor: isErrFilter ? Colors.red : Colors.white",
+                      filter_section)
+        self.assertIn("selectedFillColor: isErrFilter ? Colors.red : Colors.yellow",
+                      filter_section)
+        self.assertIn("selectedForegroundColor: isErrFilter ? Colors.white : Colors.magenta",
+                      filter_section)
+        self.assertIn("selectedBorderColor: isErrFilter ? Colors.red : Colors.magenta",
+                      filter_section)
+        self.assertIn("selectedContentGlowColor: isErrFilter ? Colors.red : Colors.magenta",
+                      filter_section)
+        self.assertIn("hoverForegroundColor: isErrFilter ? Colors.red : Colors.orange",
+                      filter_section)
+
+        self.assertIn("readonly property bool isMarkedErr:", row_section)
+        self.assertIn("modelData.errMarked === true", row_section)
+        self.assertIn("accentColor: isMarkedErr ? Colors.red : Colors.white",
+                      row_section)
+        self.assertIn("selectedFillColor: isMarkedErr ? Colors.red : Colors.yellow",
+                      row_section)
+        self.assertIn("selectedForegroundColor: isMarkedErr ? Colors.white : Colors.magenta",
+                      row_section)
+        self.assertIn("selectedBorderColor: isMarkedErr ? Colors.red : Colors.magenta",
+                      row_section)
+        self.assertIn("selectedContentGlowColor: isMarkedErr ? Colors.red : Colors.magenta",
+                      row_section)
+        self.assertIn("hoverForegroundColor: isMarkedErr ? Colors.red : Colors.orange",
+                      row_section)
+        self.assertNotIn("matchesFilter(", row_section)
+        self.assertNotIn("activeFilter ===", row_section)
 
     def test_history_deletion_is_confirmed_and_red(self):
         self.assertIn('"CONFIRM ×" : "DELETE ×"', PANE)

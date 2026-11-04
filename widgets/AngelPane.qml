@@ -302,15 +302,31 @@ Item {
                               * (pane.filters.length - 1))
                            / pane.filters.length
                     height: 28
+                    readonly property bool isErrFilter:
+                        modelData.key === "err"
                     label: modelData.label
                     labelPixelSize: 9
                     contentPadding: 1
                     trackLabelGlowLocally: true
-                    accentColor: Colors.white
+                    // ERR has a persistent red identity in idle and selected
+                    // states. This is a review/error bucket, not DELETE.
+                    accentColor: isErrFilter ? Colors.red : Colors.white
+                    hoverFillColor: isErrFilter ? Colors.black : Colors.yellow
+                    hoverForegroundColor: isErrFilter ? Colors.red : Colors.orange
+                    hoverBorderColor: isErrFilter ? Colors.red : Colors.orange
+                    hoverContentGlowColor: isErrFilter ? Colors.red : Colors.orange
+                    hoverSoftGlowColor: isErrFilter ? Colors.red : Colors.orange
+                    pressedFillColor: isErrFilter ? Colors.red : Colors.magenta
+                    pressedForegroundColor: isErrFilter ? Colors.white : Colors.black
+                    pressedBorderColor: isErrFilter ? Colors.red : Colors.magenta
+                    pressedContentGlowColor: isErrFilter ? Colors.red : Colors.black
+                    pressedSoftGlowColor: isErrFilter ? Colors.red : Colors.orange
                     selected: pane.activeFilter === modelData.key
-                    selectedFillColor: Colors.yellow
-                    selectedForegroundColor: Colors.magenta
-                    selectedBorderColor: Colors.magenta
+                    selectedFillColor: isErrFilter ? Colors.red : Colors.yellow
+                    selectedForegroundColor: isErrFilter ? Colors.white : Colors.magenta
+                    selectedBorderColor: isErrFilter ? Colors.red : Colors.magenta
+                    selectedContentGlowColor: isErrFilter ? Colors.red : Colors.magenta
+                    selectedSoftGlowColor: isErrFilter ? Colors.red : Colors.magenta
                     onLeftClicked: pane.activeFilter = modelData.key
                 }
             }
@@ -342,9 +358,11 @@ Item {
                 model: pane.filteredRows
 
                 delegate: ActionButton {
+                    readonly property bool isMarkedErr:
+                        modelData.errMarked === true
                     width: angelHistoryList.width
                     height: 41
-                    label: (modelData.errMarked === true ? "ERR* // " : "")
+                    label: (isMarkedErr ? "ERR* // " : "")
                            + modelData.digits + " // "
                            + AngelPolicy.patternTags(modelData.digits).join("+")
                            + " // " + modelData.displayTime
@@ -352,11 +370,25 @@ Item {
                     labelHorizontalAlignment: Text.AlignLeft
                     contentPadding: 5
                     trackLabelGlowLocally: true
-                    accentColor: Colors.white
+                    // Only an explicit per-observation ERR mark turns a row
+                    // red. Unmatched OTHER rows remain white, even in ERR.
+                    accentColor: isMarkedErr ? Colors.red : Colors.white
+                    hoverFillColor: isMarkedErr ? Colors.black : Colors.yellow
+                    hoverForegroundColor: isMarkedErr ? Colors.red : Colors.orange
+                    hoverBorderColor: isMarkedErr ? Colors.red : Colors.orange
+                    hoverContentGlowColor: isMarkedErr ? Colors.red : Colors.orange
+                    hoverSoftGlowColor: isMarkedErr ? Colors.red : Colors.orange
+                    pressedFillColor: isMarkedErr ? Colors.red : Colors.magenta
+                    pressedForegroundColor: isMarkedErr ? Colors.white : Colors.black
+                    pressedBorderColor: isMarkedErr ? Colors.red : Colors.magenta
+                    pressedContentGlowColor: isMarkedErr ? Colors.red : Colors.black
+                    pressedSoftGlowColor: isMarkedErr ? Colors.red : Colors.orange
                     selected: pane.selectedId === modelData.id
-                    selectedFillColor: Colors.yellow
-                    selectedForegroundColor: Colors.magenta
-                    selectedBorderColor: Colors.magenta
+                    selectedFillColor: isMarkedErr ? Colors.red : Colors.yellow
+                    selectedForegroundColor: isMarkedErr ? Colors.white : Colors.magenta
+                    selectedBorderColor: isMarkedErr ? Colors.red : Colors.magenta
+                    selectedContentGlowColor: isMarkedErr ? Colors.red : Colors.magenta
+                    selectedSoftGlowColor: isMarkedErr ? Colors.red : Colors.magenta
                     onLeftClicked: {
                         pane.selectedId = modelData.id;
                         pane.pendingDeleteId = "";

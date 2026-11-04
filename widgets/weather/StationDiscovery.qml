@@ -3406,6 +3406,18 @@ Rectangle {
                 }
             }
 
+            // Publisher RSS stays separate from GDELT's filtered report,
+            // rate limit, and story grouping. No second NEWS controller.
+            StationPublisherFeeds {
+                width: parent.width
+                visible: stationDiscovery.domain === "news"
+                         && stationDiscovery.newsGroupVisible("request")
+                stationOpen: stationDiscovery.stationOpen
+                onHeadlineSelected: function(row) {
+                    stationDiscovery.openRow(row);
+                }
+            }
+
             Row {
                 id: newsTopicRail
                 width: parent.width

@@ -68,7 +68,9 @@ function scene(payload,model,network,index) {
     // Every timestamp is compared against M4, not just the selected one.
     // No stale sample or silent interpolation is allowed.
     for(var t=0;t<raw.sample_count;t++) {
-        if(number(raw.times_unix_ms[t])===null ||
+        if(typeof raw.times_unix_ms[t]!=="number" ||
+           !isFinite(raw.times_unix_ms[t]) ||
+           Math.floor(raw.times_unix_ms[t])!==raw.times_unix_ms[t] ||
            raw.times_unix_ms[t]!==model.times[t])
             return blank("SOLAR ATLAS UTC GRID DOES NOT MATCH M4");
     }

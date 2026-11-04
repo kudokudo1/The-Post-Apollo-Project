@@ -241,7 +241,7 @@ test("M30-C Moon phase selector previews references without changing observed da
   assert.match(overview,/deck\.routeRequested\("magick\/lunar-solar\/moon"\)/);
   // Observed illumination stays derived from the original USNO/forecast model.
   assert.match(overview,/readonly property var moonModel: CosmosVisual\.moonDisplay/);
-  assert.doesNotMatch(overview,/moonModel\.(?:illumination|phaseId)\s*=/);
+  assert.doesNotMatch(overview,/moonModel\.(?:illumination|phaseId)\s*=(?!=)/);
 });
 
 test("M30-C Sun time controls select actual calibrated samples without refetching", () => {

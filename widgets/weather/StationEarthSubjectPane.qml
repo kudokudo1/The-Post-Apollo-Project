@@ -41,7 +41,9 @@ Rectangle {
         StationDiscovery {
             stationOpen: earthPane.visible
             domain: "map"
-            earthMapOnly: true
+            // Only the exact full MAP route drops EARTH's layer filters.
+            // All other EARTH routes keep their original source-scoped view.
+            earthMapOnly: !EarthPanelPolicy.isFullMap(earthPane.subjectRoute)
             earthMapRoute: earthPane.subjectRoute
             newsMentionOverlay: earthPane.newsMentionOverlay
             onNewsMapClearRequested: earthPane.newsMapClearRequested()

@@ -5135,7 +5135,7 @@ PanelWindow {
                               : timew.selectedMode === "settings"
                               ? "SETTINGS // DISPLAY OFFSET + SYSTEM STATUS"
                               : timew.selectedMode === "tools"
-                              ? "FOUNDATION PREVIEW // UI ONLY"
+                              ? "TOOLS // STOPWATCH + COUNTDOWN // MONOTONIC"
                               : "ANGEL // RESERVED FOR LATER"
                         color: Colors.white
                         font.pixelSize: 11

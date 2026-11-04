@@ -150,13 +150,22 @@ PanelWindow {
                     font.pixelSize: 15
                     color: Colors.white
                 }
-                NotoText {
+                // Match the dock: a two-pixel city-only optical nudge.
+                Item {
+                    id: headerCityGlyphCell
+                    width: headerCityGlyph.implicitWidth
                     height: headerCity.height
-                    verticalAlignment: Text.AlignVCenter
-                    textFormat: Text.PlainText
-                    text: "🏙︎"
-                    font.pixelSize: 18
-                    color: Colors.yellow
+
+                    NotoText {
+                        id: headerCityGlyph
+                        y: 2
+                        height: headerCity.height
+                        verticalAlignment: Text.AlignVCenter
+                        textFormat: Text.PlainText
+                        text: "🏙︎"
+                        font.pixelSize: 18
+                        color: Colors.yellow
+                    }
                 }
                 NotoText {
                     height: headerCity.height

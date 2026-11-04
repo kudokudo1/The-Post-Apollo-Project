@@ -77,7 +77,7 @@ Item {
             spacing: 10
 
             GohuText {
-                text: "COVERAGE // US TERRITORIES"
+                text: "COVERAGE // UNITED STATES"
                 font.pixelSize: root.compactLayout ? 13 : 18
                 font.bold: true
                 color: Colors.yellow
@@ -177,7 +177,6 @@ Item {
                     id: mapCanvas
                     anchors.fill: parent
                     anchors.margins: 1
-                    renderTarget: Canvas.FramebufferObject
 
                     function intersects(points, limits) {
                         var lowLon=Infinity, highLon=-Infinity;
@@ -301,6 +300,7 @@ Item {
                     }
 
                     onWheel: function(wheel) {
+                        if (!wheel.angleDelta.y) return;
                         root.zoomBy(wheel.angleDelta.y>0?1:-1,wheel.x,wheel.y);
                         wheel.accepted=true;
                     }
@@ -448,6 +448,7 @@ Item {
                             Repeater {
                                 model: Geo.visibleStates(root.regionKey,stateSearch.text)
                                 Rectangle {
+                                    id: stateRow
                                     required property var modelData
                                     width: stateRows.width
                                     height: 25
@@ -463,14 +464,14 @@ Item {
                                         verticalAlignment: Text.AlignVCenter
                                         font.pixelSize: 10
                                         text: modelData[0] + "  " + modelData[1]
-                                        color: parent.color===Colors.yellow
+                                        color: root.selectedCode===stateRow.modelData[0]
                                             ? Colors.black : Colors.white
                                         elide: Text.ElideRight
                                     }
 
                                     MouseArea {
                                         anchors.fill: parent
-                                        onClicked: root.chooseState(modelData)
+                                        onClicked: root.chooseState(stateRow.modelData)
                                     }
                                 }
                             }

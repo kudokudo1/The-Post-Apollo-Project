@@ -35,7 +35,8 @@ PanelWindow {
     visible: authAgent.isActive
 
     function clearSecret() {
-        responseField.text = "";
+        if (responseField)
+            responseField.text = "";
     }
 
     function focusPrompt() {

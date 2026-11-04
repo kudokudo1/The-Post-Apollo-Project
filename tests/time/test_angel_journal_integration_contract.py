@@ -84,7 +84,6 @@ class AngelJournalContracts(unittest.TestCase):
         self.assertIn("modelData.displayTime", PANE)
         self.assertIn("selectedObservation", PANE)
         self.assertIn("AngelObservationsStore.total", PANE)
-        self.assertIn("searchInput", "angelSearchInput")
 
     def test_history_deletion_is_confirmed_and_red(self):
         self.assertIn('label: "CONFIRM ×"', PANE)

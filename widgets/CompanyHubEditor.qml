@@ -150,7 +150,7 @@ Rectangle {
                 color: Colors.white
                 text: "Enter the hub information, then use PICK LOCATION to mark its "
                     + "position on the map. Operator-reported only, NOT verified "
-                    + "service coverage. No client or employee details."
+                    + "service coverage. Do not enter client or employee details."
             }
 
             Row {

@@ -345,13 +345,32 @@ Rectangle {
                         ? Compare.eventLabel(comparisonPane.measurement.eventB)
                         : "ONLY MATCHED SOURCE EVENTS ARE COMPARED"
                 }
-                GohuText {
+                Row {
                     width: parent.width
-                    font.pixelSize: 11
-                    color: Colors.yellow
-                    elide: Text.ElideRight
-                    text: comparisonPane.activeSide==="A"
-                          ? "ACTIVE // A" : "ACTIVE // B"
+                    height: 25
+                    spacing: 5
+                    ActionButton {
+                        width: 57
+                        height: 24
+                        contentPadding: 0
+                        labelPixelSize: 9
+                        label: "FOCUS A"
+                        accentColor: Colors.cyan
+                        selected: comparisonPane.activeSide === "A"
+                        available: comparisonPane.measurement.ready
+                        onClicked: comparisonPane.activeSide = "A"
+                    }
+                    ActionButton {
+                        width: 57
+                        height: 24
+                        contentPadding: 0
+                        labelPixelSize: 9
+                        label: "FOCUS B"
+                        accentColor: Colors.orange
+                        selected: comparisonPane.activeSide === "B"
+                        available: comparisonPane.measurement.ready
+                        onClicked: comparisonPane.activeSide = "B"
+                    }
                 }
                 QuietText {
                     width: parent.width

@@ -75,6 +75,7 @@ Item {
         applyView(Geo.defaultView(regionKey));
         selectedCode = "";
         selectedCountryCode = "";
+        selectedHubId = "";
         serviceMenuOpen = false;
         stateSearch.text = "";
     }
@@ -86,6 +87,7 @@ Item {
             setRegion(state[5]);
         selectedCode = state[0];
         selectedCountryCode = "";
+        selectedHubId = "";
         serviceMenuOpen = false;
     }
 
@@ -95,6 +97,7 @@ Item {
             setRegion("northAmerica");
         selectedCountryCode = country[0];
         selectedCode = "";
+        selectedHubId = "";
         serviceMenuOpen = false;
     }
 
@@ -266,6 +269,25 @@ Item {
                 selectedPrimaryColor: Colors.yellow
                 perimeterGlowColor: Colors.blue
                 onTriggered: root.cycleStatus()
+            }
+
+            ModeButton {
+                width: root.compactLayout ? 94 : 108
+                height: filtersRow.height
+                textOnly: true
+                labelText: root.hubPlacementArmed ? "PICK MAP" : "+ HUB"
+                labelFontSize: 10
+                bordered: false
+                selected: root.hubPlacementArmed
+                idlePrimaryColor: Colors.white
+                hoverPrimaryColor: Colors.yellow
+                selectedPrimaryColor: Colors.magenta
+                perimeterGlowColor: Colors.blue
+                onTriggered: {
+                    if (hubStore.state !== "ready") return;
+                    root.hubPlacementArmed = !root.hubPlacementArmed;
+                    root.serviceMenuOpen = false;
+                }
             }
         }
 

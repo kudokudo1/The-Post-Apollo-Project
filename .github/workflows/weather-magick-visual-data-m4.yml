@@ -3,6 +3,8 @@ on:
   pull_request:
     paths:
       - 'scripts/weather/celestial_visual_data.py'
+      - 'scripts/weather/celestial_spatial_data.py'
+      - 'tests/weather/test_celestial_spatial_v4c.py'
       - 'tests/weather/test_celestial_visual_data_m4.py'
       - 'scripts/weather/celestial_contract.py'
       - 'scripts/weather/celestial_solver.py'
@@ -11,6 +13,8 @@ on:
   push:
     paths:
       - 'scripts/weather/celestial_visual_data.py'
+      - 'scripts/weather/celestial_spatial_data.py'
+      - 'tests/weather/test_celestial_spatial_v4c.py'
       - 'tests/weather/test_celestial_visual_data_m4.py'
       - 'scripts/weather/celestial_contract.py'
       - 'scripts/weather/celestial_solver.py'
@@ -33,6 +37,7 @@ jobs:
           python3 -m unittest discover -s tests/weather -p 'test_celestial_dynamics_m2.py' -v
           python3 -m unittest discover -s tests/weather -p 'test_celestial_precision_m3.py' -v
           python3 -m unittest discover -s tests/weather -p 'test_celestial_visual_data_m4.py' -v
+          python3 -m unittest discover -s tests/weather -p 'test_celestial_spatial_v4c.py' -v
 
   real-jpl-data:
     runs-on: ubuntu-latest
@@ -53,4 +58,6 @@ jobs:
       - name: Verify M4 JPL series versus M1 and event markers versus M2
         env:
           MAGICK_M1_KERNEL: ${{ runner.temp }}/de440s.bsp
-        run: python3 -m unittest discover -s tests/weather -p 'test_celestial_visual_data_m4.py' -v
+        run: |
+          python3 -m unittest discover -s tests/weather -p 'test_celestial_visual_data_m4.py' -v
+          python3 -m unittest discover -s tests/weather -p 'test_celestial_spatial_v4c.py' -v

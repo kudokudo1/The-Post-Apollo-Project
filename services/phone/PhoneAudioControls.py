@@ -167,16 +167,20 @@ def apply(
         after = probe()
     except Exception:
         return _output("NOT_CONFIRMED", execution="USER_ACTION")
-    match = (
+    valid_status = (
         type(after) is dict
+        and after.get("schema") == SCHEMA
+        and after.get("execution") == "READ_ONLY"
         and after.get("result") == "OBSERVED"
         and after.get("canAdjust") is True
-        and (
-            after.get("mediaPreference") == selection.upper()
-            if family == "media"
-            else after.get("callsEnabled") is CALL_CHOICES[selection]
-        )
+        and after.get("trustedPhoneLink") == "UNVERIFIED"
+        and after.get("contentAccessEnabled") is False
     )
+    match = False
+    if valid_status and family == "media":
+        match = after.get("mediaPreference") == selection.upper()
+    elif valid_status and family == "calls":
+        match = after.get("callsEnabled") is CALL_CHOICES[selection]
     if not match:
         return _output("NOT_CONFIRMED", execution="USER_ACTION")
     return _output(

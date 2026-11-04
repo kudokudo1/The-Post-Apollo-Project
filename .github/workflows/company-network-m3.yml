@@ -1,0 +1,22 @@
+name: Company Network M3 hub-claim directory
+
+on:
+  pull_request:
+    paths:
+      - 'services/company/**'
+      - 'widgets/CompanyCoveragePane.qml'
+      - 'widgets/CompanyHubEditor.qml'
+      - 'tests/company/test_company_hub_directory_m3.py'
+      - 'tests/company/test_company_hub_m3.test.js'
+      - '.github/workflows/company-network-m3.yml'
+  workflow_dispatch:
+
+jobs:
+  nonpersonal-local-store:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Private hub document and security guards
+        run: python3 -m unittest discover -s tests/company -p 'test_company_hub_directory_m3.py' -v
+      - name: UI/source ownership and existing geographic contracts
+        run: node --test tests/company/test_company_hub_m3.test.js tests/company/test_company_network_m1.test.js tests/company/test_company_network_m2.test.js

@@ -1,5 +1,6 @@
 import QtQuick
 import "../components"
+import "../services/company"
 import "CompanyCoveragePolicy.js" as Geo
 import "weather/StationNaturalEarthLand110.js" as Land
 import "weather/StationNaturalEarthContext110.js" as Context
@@ -16,6 +17,17 @@ Item {
     property string selectedCode: ""
     property string selectedCountryCode: ""
     property bool serviceMenuOpen: false
+    property bool hubPlacementArmed: false
+    property bool hubEditorOpen: false
+    property string selectedHubId: ""
+    readonly property var hubRows: hubStore.saved && Array.isArray(hubStore.saved.hubs)
+        ? hubStore.saved.hubs : []
+    readonly property var selectedHub: {
+        for (var i=0;i<hubRows.length;i++)
+            if(hubRows[i].id===selectedHubId && !hubRows[i].archived)
+                return hubRows[i];
+        return null;
+    }
     property string serviceFamily: "ALL SERVICES"
     property string statusFilter: "ALL STATUS"
     property bool showReferencePoints: true
@@ -27,7 +39,30 @@ Item {
     readonly property var selectedState: Geo.stateForCode(selectedCode)
     readonly property var selectedCountry: Geo.countryForCode(selectedCountryCode)
     readonly property var bounds: Geo.regions[Geo.regionKey(regionKey)]
-    onVisibleChanged: if (!visible) serviceMenuOpen = false
+    onVisibleChanged: if (!visible) {
+        serviceMenuOpen=false;
+        hubPlacementArmed=false;
+    }
+
+    CompanyHubStore {
+        id: hubStore
+        visible: false
+        onSavedChanged: mapCanvas.requestPaint()
+        onSavedSuccessfully: {
+            root.selectedHubId = "hub-" + (saved.nextId - 1);
+            root.hubEditorOpen = false;
+            root.hubPlacementArmed = false;
+            mapCanvas.requestPaint();
+        }
+    }
+
+    function openHubEditor(lon,lat) {
+        if(!isFinite(lon) || !isFinite(lat)) return;
+        hubEditor.prepare(lon,lat,root.selectedState ? root.selectedState[0] : "");
+        root.hubEditorOpen=true;
+        root.hubPlacementArmed=false;
+        root.serviceMenuOpen=false;
+    }
 
     function applyView(next) {
         zoom = next.zoom;
@@ -40,6 +75,7 @@ Item {
         applyView(Geo.defaultView(regionKey));
         selectedCode = "";
         selectedCountryCode = "";
+        selectedHubId = "";
         serviceMenuOpen = false;
         stateSearch.text = "";
     }
@@ -51,6 +87,7 @@ Item {
             setRegion(state[5]);
         selectedCode = state[0];
         selectedCountryCode = "";
+        selectedHubId = "";
         serviceMenuOpen = false;
     }
 
@@ -60,6 +97,7 @@ Item {
             setRegion("northAmerica");
         selectedCountryCode = country[0];
         selectedCode = "";
+        selectedHubId = "";
         serviceMenuOpen = false;
     }
 
@@ -82,6 +120,7 @@ Item {
     onRegionKeyChanged: mapCanvas.requestPaint()
     onSelectedCodeChanged: mapCanvas.requestPaint()
     onSelectedCountryCodeChanged: mapCanvas.requestPaint()
+    onSelectedHubIdChanged: mapCanvas.requestPaint()
     onZoomChanged: mapCanvas.requestPaint()
     onCenterLonChanged: mapCanvas.requestPaint()
     onCenterLatChanged: mapCanvas.requestPaint()
@@ -230,6 +269,25 @@ Item {
                 selectedPrimaryColor: Colors.yellow
                 perimeterGlowColor: Colors.blue
                 onTriggered: root.cycleStatus()
+            }
+
+            ModeButton {
+                width: root.compactLayout ? 94 : 108
+                height: filtersRow.height
+                textOnly: true
+                labelText: root.hubPlacementArmed ? "PICK MAP" : "+ HUB"
+                labelFontSize: 10
+                bordered: false
+                selected: root.hubPlacementArmed
+                idlePrimaryColor: Colors.white
+                hoverPrimaryColor: Colors.yellow
+                selectedPrimaryColor: Colors.magenta
+                perimeterGlowColor: Colors.blue
+                onTriggered: {
+                    if (hubStore.state !== "ready") return;
+                    root.hubPlacementArmed = !root.hubPlacementArmed;
+                    root.serviceMenuOpen = false;
+                }
             }
         }
 
@@ -393,6 +451,30 @@ Item {
                                 ctx.fillText(country[1],loc.x+8,loc.y-7);
                             }
                         }
+
+                        // Owner-entered hub claims: hollow orange map pins,
+                        // explicitly distinct from geographic reference dots.
+                        for(var z=0;z<root.hubRows.length;z++) {
+                            var hub=root.hubRows[z];
+                            if(hub.archived) continue;
+                            var hp=Geo.project(hub.longitude,hub.latitude,
+                                width,height,root.regionKey,root.zoom,
+                                root.centerLon,root.centerLat);
+                            if(!hp.visible) continue;
+                            var chosenHub=hub.id===root.selectedHubId;
+                            ctx.beginPath();
+                            ctx.arc(hp.x,hp.y,chosenHub?8:5,0,2*Math.PI);
+                            ctx.fillStyle="#16051F";
+                            ctx.fill();
+                            ctx.lineWidth=chosenHub?3:2;
+                            ctx.strokeStyle=chosenHub?"#C74EC7":"#ED981A";
+                            ctx.stroke();
+                            if(chosenHub) {
+                                ctx.font="11px monospace";
+                                ctx.fillStyle="#F2BE4E";
+                                ctx.fillText(hub.label,hp.x+10,hp.y-9);
+                            }
+                        }
                     }
 
                     onWidthChanged: requestPaint()
@@ -431,6 +513,36 @@ Item {
 
                     onReleased: function(mouse) {
                         if (dragged) return;
+                        if (root.hubPlacementArmed) {
+                            var placed=Geo.unproject(mouse.x,mouse.y,
+                                mapCanvas.width,mapCanvas.height,
+                                root.regionKey,root.zoom,root.centerLon,root.centerLat);
+                            if (placed) root.openHubEditor(placed.lon,placed.lat);
+                            return;
+                        }
+
+                        var closestHub=null;
+                        var bestHubDistance=13*13;
+                        for(var h=0;h<root.hubRows.length;h++) {
+                            var candidate=root.hubRows[h];
+                            if(candidate.archived) continue;
+                            var point=Geo.project(candidate.longitude,candidate.latitude,
+                                mapCanvas.width,mapCanvas.height,root.regionKey,
+                                root.zoom,root.centerLon,root.centerLat);
+                            if(!point.visible) continue;
+                            var dist=(point.x-mouse.x)*(point.x-mouse.x)
+                                +(point.y-mouse.y)*(point.y-mouse.y);
+                            if(dist<=bestHubDistance) {
+                                bestHubDistance=dist;
+                                closestHub=candidate;
+                            }
+                        }
+                        if(closestHub) {
+                            root.selectedHubId=closestHub.id;
+                            root.selectedCode="";
+                            root.selectedCountryCode="";
+                            return;
+                        }
                         var nearestState=Geo.nearestState(root.regionKey,mouse.x,mouse.y,
                             mapCanvas.width,mapCanvas.height,root.zoom,
                             root.centerLon,root.centerLat,13);
@@ -561,7 +673,9 @@ Item {
                     }
 
                     GohuText {
-                        text: root.selectedCountry
+                        text: root.selectedHub
+                              ? root.selectedHub.label
+                              : root.selectedCountry
                               ? root.selectedCountry[1] + " // " + root.selectedCountry[0]
                               : root.selectedState
                               ? root.selectedState[1] + " // " + root.selectedState[0]
@@ -575,7 +689,11 @@ Item {
 
                     GohuText {
                         width: parent.width
-                        text: root.selectedCountry
+                        text: root.selectedHub
+                              ? root.selectedHub.organizationLabel + " / "
+                                + root.selectedHub.city + " / "
+                                + root.selectedHub.serviceFamily
+                              : root.selectedCountry
                               ? "NATIONAL CAPITAL: " + root.selectedCountry[2]
                               : root.selectedState
                               ? "STATE CAPITAL: " + root.selectedState[2]
@@ -587,7 +705,9 @@ Item {
 
                     GohuText {
                         width: parent.width
-                        text: "SERVICE COVERAGE: UNVERIFIED"
+                        text: root.selectedHub
+                              ? "HUB CLAIM // REPORTED, NOT VERIFIED"
+                              : "SERVICE COVERAGE: UNVERIFIED"
                         font.pixelSize: 10
                         color: Colors.yellow
                         wrapMode: Text.WordWrap
@@ -606,6 +726,46 @@ Item {
                             id: stateRows
                             width: parent.width
                             spacing: 3
+
+                            Repeater {
+                                model: root.hubRows.filter(function(hub) {
+                                    var q=String(stateSearch.text||"").toLowerCase();
+                                    return !hub.archived && (!q
+                                        || hub.label.toLowerCase().indexOf(q)>=0
+                                        || hub.city.toLowerCase().indexOf(q)>=0
+                                        || hub.organizationLabel.toLowerCase().indexOf(q)>=0);
+                                })
+                                Rectangle {
+                                    id: hubRow
+                                    required property var modelData
+                                    width: stateRows.width
+                                    height: 26
+                                    color: root.selectedHubId===modelData.id
+                                        ? Colors.yellow : Colors.black
+                                    border.width: 1
+                                    border.color: Colors.orange
+
+                                    GohuText {
+                                        anchors.fill: parent
+                                        anchors.leftMargin: 6
+                                        verticalAlignment: Text.AlignVCenter
+                                        text: "⌂ " + hubRow.modelData.label
+                                        color: root.selectedHubId===hubRow.modelData.id
+                                            ? Colors.black : Colors.orange
+                                        font.pixelSize: 10
+                                        elide: Text.ElideRight
+                                    }
+
+                                    MouseArea {
+                                        anchors.fill: parent
+                                        onClicked: {
+                                            root.selectedHubId=hubRow.modelData.id;
+                                            root.selectedCode="";
+                                            root.selectedCountryCode="";
+                                        }
+                                    }
+                                }
+                            }
 
                             Repeater {
                                 model: Geo.visibleCountries(root.regionKey,stateSearch.text)
@@ -682,15 +842,44 @@ Item {
 
             GohuText {
                 width: parent.width
-                text: (root.selectedCountry ? root.selectedCountry[1] + " // "
+                text: root.hubPlacementArmed
+                    ? "CLICK MAP TO PLACE A HUB. Then enter a company label, city, "
+                    + "region and service type. Saved records remain unverified."
+                    : (root.selectedHub ? root.selectedHub.label + " // "
+                    : root.selectedCountry ? root.selectedCountry[1] + " // "
                     : root.selectedState ? root.selectedState[1] + " // "
                     : "NO PLACE SELECTED // ")
-                    + "Canada, Mexico, USA and world geography are reference only. "
-                    + "NO COMPANY COVERAGE VERIFIED. Service selection does not "
-                    + "create provider areas. Capitals are not company hubs."
+                    + root.hubRows.filter(function(h){return !h.archived;}).length
+                    + " operator-reported hub(s). NO COMPANY COVERAGE VERIFIED. "
+                    + "Orange pins are local claims, not confirmed operations."
                 font.pixelSize: 11
                 color: Colors.white
                 wrapMode: Text.WordWrap
+            }
+        }
+
+    }
+
+    // Map-picked hub editor is confined to Company Coverage; it never
+    // accesses verified Identity Center membership or personal client data.
+    CompanyHubEditor {
+        id: hubEditor
+        anchors.fill: parent
+        z: 50
+        visible: root.hubEditorOpen
+        focus: root.hubEditorOpen
+        saving: hubStore.state === "saving"
+        saveError: hubStore.state === "error" ? hubStore.errorCode : ""
+        onCancelRequested: {
+            if (hubStore.state !== "saving")
+                root.hubEditorOpen = false;
+        }
+        onSaveRequested: function(hub) {
+            if (!hubStore.createHub(
+                    hub.label, hub.organizationLabel, hub.city,
+                    hub.regionCode, hub.countryCode, hub.longitude,
+                    hub.latitude, hub.serviceFamily)) {
+                hubEditor.localError = "DIRECTORY BUSY OR UNAVAILABLE. RELOAD REQUIRED.";
             }
         }
     }

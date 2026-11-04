@@ -119,17 +119,22 @@ jobs:
           # Explicit, bounded public-area network test; no private user
           # location, hub, provider or worker data is passed to MapLibre.
           # Each test runs alone and captures only its current visible area.
-          for sample in USA RURAL CANADA; do
+          for sample in USA RURAL CANADA NEIGHBORHOOD VILLAGE BORDER; do
             echo "::group::Post-Apollo styled vector real-map sample: $sample"
+            mock=()
+            if [ "$sample" = NEIGHBORHOOD ]; then mock+=(--mock-hub); fi
             xvfb-run -a -s '-screen 0 1280x900x24' \
               timeout 45s ./company-vector-probe --styled-online \
-              "--sample=$sample" --capture 2>&1 | tee "styled-${sample}.log"
+              "--sample=$sample" "${mock[@]}" --capture 2>&1 | tee "styled-${sample}.log"
             test -s company-vector-probe.png
+            if [ "$sample" = NEIGHBORHOOD ]; then
+              grep -q 'SYNTHETIC_MARKER_ADDED' "styled-${sample}.log"
+            fi
             cp company-vector-probe.png "$GITHUB_WORKSPACE/company-vector-${sample}.png"
             rm company-vector-probe.png
             echo "::endgroup::"
           done
-          echo "Four independent screenshots (offline, USA, RURAL, CANADA) captured"
+          echo "Seven screenshots: offline, USA, RURAL, CANADA, NEIGHBORHOOD, VILLAGE, BORDER"
 
       - uses: actions/upload-artifact@v4
         if: always()

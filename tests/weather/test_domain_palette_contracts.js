@@ -5,6 +5,7 @@
 // semantic identities and telemetry severity colors while layout polish remains
 // intentionally deferred.
 const assert = require("node:assert/strict");
+const vm = require("node:vm");
 const fs = require("node:fs");
 const path = require("node:path");
 const root = path.resolve(__dirname, "../..");
@@ -277,15 +278,67 @@ assert.match(homePolicySource, /PRESSURE TREND/);
 assert.match(homePolicySource, /SUNRISE/);
 assert.match(homePolicySource, /SUNSET/);
 
-// HOME consumes both source families, so the header badge must describe the
-// aggregate rather than pretending HOME is Weather-only.
-assert.match(windowSource, /readonly property bool usesHomeSources:/);
-assert.match(windowSource, /return "HOME LIVE";/);
-assert.match(windowSource, /return "HOME MIXED";/);
-assert.match(windowSource, /return "HOME CACHE";/);
-assert.match(windowSource, /return sourceStatusText \+ " \/\/ 2 FEEDS";/);
-assert.match(windowSource, /return sourceStatusText \+ " \/\/ WEATHER";/);
-assert.match(windowSource, /return sourceStatusText \+ " \/\/ SPACE";/);
+// M28-V // The one SUBJECTS header badge uses a pure source-aware policy.
+// Exercise the actual family/state model rather than asserting deleted
+// CLASSIC status strings. Real NWS alerts retain explicit root precedence.
+const badgePolicySource = read("widgets/weather/StationSubjectSourceBadgePolicy.js");
+const badgeEnv = vm.createContext({Math, Number, String, isFinite});
+vm.runInContext(badgePolicySource.replace(/^\\.pragma library\\s*$/m,""),badgeEnv);
+const plain = value => JSON.parse(JSON.stringify(value));
+const sourceState = availability => ({availability});
+const sourceBadge = (route,weather,space,map={}) =>
+    plain(badgeEnv.badgeFor(route,false,sourceState(weather),sourceState(space),map));
+
+assert.match(windowSource, /import "StationSubjectSourceBadgePolicy\\.js" as SubjectSourceBadge/);
+assert.match(windowSource, /readonly property var subjectSourceBadge:/);
+assert.match(windowSource, /SubjectSourceBadge\\.badgeFor\\(/);
+assert.match(windowSource, /subjectNavigator\\.currentPath,subjectNavigator\\.indexOpen/);
+assert.match(windowSource, /weatherRuntimeState,spaceRuntimeState,currentPageRuntimeSummary/);
+assert.match(windowSource, /readonly property string sourceStatusDisplay: sourceStatusText/);
+assert.match(windowSource, /if \\(officialAlertSummary\\.available\\)[\\s\\S]*?return officialAlertSummary\\.headerText/);
+assert.match(windowSource, /return weatherDiagnostics\\.header;/);
+assert.match(windowSource, /return subjectSourceBadge\\.text;/);
+assert.match(windowSource, /switch \\(subjectSourceBadge\\.tone\\)/);
+for (const color of ["red","yellow","orange","blue","green","magenta","cyan"])
+    assert.ok(windowSource.includes('case "'+color+'": return Colors.'+color+';'),
+        "source badge tone mapping: "+color);
+
+for (const [weather,space,expectedText,expectedTone] of [
+    ["LIVE","LIVE","HOME // 2 LIVE","magenta"],
+    ["LIVE","CACHE_FRESH","HOME // CACHE","blue"],
+    ["LIVE_STALE","LIVE","HOME // STALE","yellow"],
+    ["LIVE_AGING","LIVE","HOME // AGING","yellow"],
+    ["OFFLINE","LIVE","HOME // PARTIAL","yellow"],
+    ["OFFLINE","OFFLINE","HOME // OFFLINE","red"],
+    ["READING","WAITING","HOME // READING","orange"],
+    ["WAITING","WAITING","HOME // WAITING","orange"],
+]) {
+    assert.deepEqual(sourceBadge("home/overview",weather,space),
+        {text:expectedText,tone:expectedTone},
+        weather+" / "+space+" HOME badge");
+}
+assert.deepEqual(sourceBadge("weather/conditions/current","LIVE","OFFLINE"),
+    {text:"WEATHER // LIVE",tone:"magenta"});
+assert.deepEqual(sourceBadge("cosmos/space-weather/full","OFFLINE","LIVE_STALE"),
+    {text:"COSMOS // STALE",tone:"yellow"});
+assert.deepEqual(sourceBadge("earth/maps/full","LIVE","LIVE",{ready:2}),
+    {text:"EARTH // 2 READY",tone:"magenta"});
+assert.deepEqual(sourceBadge("weather/maps/radar","LIVE","LIVE",{cached:1}),
+    {text:"WEATHER // CACHE",tone:"blue"});
+assert.deepEqual(plain(badgeEnv.badgeFor("home/overview",true,
+    sourceState("LIVE"),sourceState("LIVE"),{ready:5})),
+    {text:"INDEX // PREVIEW",tone:"cyan"});
+for (const [route,label] of [
+    ["media/news/full","MEDIA // CATALOG"],
+    ["magick/overview","MAGICK // REFERENCE"],
+    ["tools/sources/health","TOOLS // SOURCES"],
+]) {
+    assert.deepEqual(sourceBadge(route,"LIVE","LIVE"),
+        {text:label,tone:"cyan"});
+}
+// No legacy CLASSIC source badge branch or second data collector.
+assert.doesNotMatch(windowSource, /readonly property bool usesHomeSources:/);
+assert.doesNotMatch(windowSource, /id: weatherContentLoader/);
 
 // Footer is source-level freshness, not a duplicate of the aggregate HOME badge.
 assert.match(windowSource, /readonly property int spaceAgeMinutes:/);

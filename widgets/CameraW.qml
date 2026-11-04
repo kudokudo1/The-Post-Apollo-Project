@@ -39,8 +39,8 @@ PanelWindow {
     property var selectedTrashPreview: null
     property string lastTrashReceipt: ""
     property string captureMode: "region"
-    // Region selection needs an explicit, persistent help step before slurp.
-    property bool regionGuideOpen: false
+    // The native slurp overlay owns the region drag; Camera unmaps while it runs.
+    property bool nativeRegionSelecting: false
     // Same finance-size policy and top/bottom chrome budget for medium
     // and fullscreen, while preserving Camera's existing 770x675 compact
     // frame. One mapped PanelWindow persists across all size changes.
@@ -77,13 +77,12 @@ PanelWindow {
     readonly property var filteredFiles: galleryFiles
 
     function toggle() {
-        menuOpen = !menuOpen;
+        // Do not remap the Camera layer above the native selector in progress.
+        if (!nativeRegionSelecting)
+            menuOpen = !menuOpen;
     }
 
     onMenuOpenChanged: {
-        // Never reopen a stale instruction overlay after Camera is closed.
-        if (!menuOpen)
-            regionGuideOpen = false;
         // Read-only tool status on explicit open; no image copies or writes.
         if (menuOpen && statusReport === null && !busy)
             run("status", ["status"]);
@@ -159,38 +158,22 @@ PanelWindow {
     }
 
     function prepareCapture(mode) {
-        if (busy || (mode !== "region" && mode !== "focused" && mode !== "all"))
+        if (busy || nativeRegionSelecting
+                || (mode !== "region" && mode !== "focused" && mode !== "all"))
             return false;
         captureMode = mode;
         if (mode === "region") {
-            // Do not hide the menu or invoke slurp before instructions are read.
-            regionGuideOpen = true;
-            feedback = "REGION // CLICK + DRAG A RECTANGLE // RELEASE TO SAVE";
-            return true;
+            // The one click hands control to the native Wayland selector.
+            // Unmap our persistent overlay so it cannot cover slurp or
+            // intercept its pointer/keyboard focus.
+            nativeRegionSelecting = true;
+            feedback = "REGION // DRAG TO SELECT // RELEASE TO SAVE // ESC CANCELS";
+        } else {
+            feedback = "CAMERA // HIDING PANEL BEFORE SHUTTER";
         }
-        regionGuideOpen = false;
-        feedback = "CAMERA // HIDING PANEL BEFORE SHUTTER";
         menuOpen = false;
         shutterDelay.restart();
         return true;
-    }
-
-    function beginRegionSelection() {
-        if (busy || !regionGuideOpen)
-            return false;
-        regionGuideOpen = false;
-        captureMode = "region";
-        feedback = "REGION // CLICK + DRAG // RELEASE TO SAVE // ESC CANCELS";
-        menuOpen = false;
-        shutterDelay.restart();
-        return true;
-    }
-
-    function cancelRegionSelection() {
-        if (!regionGuideOpen)
-            return;
-        regionGuideOpen = false;
-        feedback = "REGION // CANCELLED BEFORE SELECTION";
     }
 
     function webcamPhoto() {
@@ -229,6 +212,10 @@ PanelWindow {
             return;
         pendingAction = "";
         busy = false;
+        // Restore the Camera surface only after slurp has exited, including
+        // cancel and backend-error paths.
+        if (action === "capture")
+            nativeRegionSelecting = false;
         let payload = null;
         try { payload = JSON.parse(String(raw || "").trim()); }
         catch (error) {
@@ -331,7 +318,7 @@ PanelWindow {
     focusable: menuOpen
     color: "transparent"
     surfaceFormat.opaque: false
-    visible: true
+    visible: !camera.nativeRegionSelecting
     mask: Region {
         x: camera.glowGutter
         y: camera.frameTopInset
@@ -355,8 +342,10 @@ PanelWindow {
                     camera.pendingAction = "";
                     camera.busy = false;
                     camera.feedback = "CAMERA // BACKEND PROCESS UNAVAILABLE";
-                    if (action === "capture")
+                    if (action === "capture") {
+                        camera.nativeRegionSelecting = false;
                         camera.menuOpen = true;
+                    }
                 }
             });
         }
@@ -364,7 +353,9 @@ PanelWindow {
 
     Timer {
         id: shutterDelay
-        interval: 250
+        // Allow the Camera layer-shell surface to fully unmap before slurp
+        // requests compositor focus. Other screenshot modes are unaffected.
+        interval: 350
         repeat: false
         onTriggered: camera.run("capture", ["capture", camera.captureMode])
     }
@@ -408,9 +399,7 @@ PanelWindow {
         glowVisible: camera.menuOpen
         glowColor: Colors.magenta
         Keys.onEscapePressed: function(event) {
-            if (camera.regionGuideOpen) {
-                camera.cancelRegionSelection();
-            } else if (camera.activeFocusItem
+            if (camera.activeFocusItem
                     && camera.activeFocusItem !== frame) {
                 camera.activeFocusItem.focus = false;
             } else {
@@ -502,8 +491,6 @@ PanelWindow {
                         selectedForegroundColor: Colors.magenta
                         selectedBorderColor: Colors.magenta
                         onLeftClicked: {
-                            if (camera.regionGuideOpen)
-                                camera.cancelRegionSelection();
                             if (modelData.id === "gallery")
                                 camera.loadGallery();
                             else
@@ -1180,109 +1167,6 @@ PanelWindow {
                     }
                 }
 
-                // Instruction gate shown as soon as REGION is clicked.
-                // No timer, keyboard shortcut or hidden handoff until BEGIN.
-                Item {
-                    id: regionGuide
-                    anchors.fill: parent
-                    visible: camera.regionGuideOpen && camera.activeView === "capture"
-                    z: 20
-
-                    Rectangle {
-                        anchors.fill: parent
-                        color: Colors.black
-                        border.width: 2
-                        border.color: Colors.magenta
-                    }
-
-                    // Swallow outside clicks while this instruction gate is up.
-                    MouseArea {
-                        anchors.fill: parent
-                        acceptedButtons: Qt.AllButtons
-                    }
-
-                    Column {
-                        anchors.centerIn: parent
-                        width: Math.min(parent.width - 40, 610)
-                        spacing: 15
-
-                        GohuText {
-                            width: parent.width
-                            height: 31
-                            text: "REGION // SELECT AN AREA"
-                            color: Colors.magenta
-                            font.pixelSize: 18
-                            horizontalAlignment: Text.AlignHCenter
-                        }
-
-                        GohuText {
-                            width: parent.width
-                            height: 50
-                            wrapMode: Text.WordWrap
-                            horizontalAlignment: Text.AlignHCenter
-                            text: "Camera will hide, then the selection crosshair appears on your desktop."
-                            color: Colors.cyan
-                            font.pixelSize: 12
-                        }
-
-                        Rectangle {
-                            width: parent.width
-                            height: 105
-                            color: "transparent"
-                            border.width: 1
-                            border.color: Colors.cyan
-
-                            Rectangle {
-                                anchors.centerIn: parent
-                                width: Math.min(parent.width * 0.66, 260)
-                                height: 63
-                                color: "transparent"
-                                border.width: 2
-                                border.color: Colors.yellow
-                            }
-                            GohuText {
-                                anchors.centerIn: parent
-                                text: "CLICK  +  DRAG"
-                                color: Colors.white
-                                font.pixelSize: 13
-                            }
-                        }
-
-                        GohuText {
-                            width: parent.width
-                            height: 60
-                            wrapMode: Text.WordWrap
-                            horizontalAlignment: Text.AlignHCenter
-                            text: "1 // Hold LEFT MOUSE and drag to size your screenshot.\n"
-                                  + "2 // RELEASE to capture. ESC cancels."
-                            color: Colors.white
-                            font.pixelSize: 12
-                        }
-
-                        Row {
-                            width: parent.width
-                            height: 47
-                            spacing: 12
-
-                            ActionButton {
-                                width: (parent.width - parent.spacing) * 0.62
-                                height: 44
-                                label: "BEGIN SELECTING"
-                                labelPixelSize: 13
-                                accentColor: Colors.magenta
-                                onLeftClicked: camera.beginRegionSelection()
-                            }
-                            ActionButton {
-                                width: (parent.width - parent.spacing) * 0.38
-                                height: 44
-                                label: "CANCEL"
-                                labelPixelSize: 12
-                                accentColor: Colors.cyan
-                                onLeftClicked: camera.cancelRegionSelection()
-                            }
-                        }
-                    }
-                }
             }
 
             GohuText {

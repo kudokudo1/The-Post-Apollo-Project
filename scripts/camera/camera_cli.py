@@ -337,8 +337,18 @@ def capture(mode):
         if not slurp:
             return {"ok": False, "kind": "capture", "error": "SLURP_NOT_INSTALLED"}
         try:
-            selected = subprocess.run([slurp], capture_output=True, text=True,
-                                      timeout=120, check=False)
+            # slurp reads rectangles from stdin when launched without a TTY.
+            # Quickshell's child pipe can remain open and block slurp before
+            # its Wayland selector appears. Give it EOF immediately.
+            # -d shows live dimensions; high-contrast Post-Apollo colors
+            # make the native drag rectangle obvious on every monitor.
+            selected = subprocess.run([
+                slurp, "-d", "-b", "1B062399", "-c", "C74EC7FF",
+                "-s", "55CFCA44", "-w", "3",
+            ], stdin=subprocess.DEVNULL, capture_output=True, text=True,
+                timeout=120, check=False)
+        except subprocess.TimeoutExpired:
+            return {"ok": False, "kind": "capture", "error": "REGION_SELECTOR_TIMEOUT"}
         except (OSError, subprocess.SubprocessError):
             return {"ok": False, "kind": "capture", "error": "REGION_UNAVAILABLE"}
         geometry = selected.stdout.strip()

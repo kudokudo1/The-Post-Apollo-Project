@@ -1,6 +1,7 @@
 import QtQuick
 import "../../components"
 import qs.services.connections
+import "../../services/connections/ConnectionsReviewPolicy.js" as ReviewPolicy
 
 // CPU++ actuator bay. All "setup" guidance is in-world, but C1 has no
 // credential editor, adapter handoff, permission grant or session mutation.
@@ -8,9 +9,16 @@ Item {
     id: details
     property string selectedId: "social"
     property bool guideOpen: false
+    property bool permissionReviewOpen: false
+    property string reviewFeedback: ""
     readonly property var source: ConnectionsRegistry.entry(selectedId)
     readonly property var keyRequirement: ConnectionsBroker.requirement(selectedId)
-    onSelectedIdChanged: guideOpen = false
+    readonly property var permissionPreview: ReviewPolicy.preview(keyRequirement)
+    onSelectedIdChanged: {
+        guideOpen = false;
+        permissionReviewOpen = false;
+        reviewFeedback = "";
+    }
 
     Flickable {
         id: scroll
@@ -160,6 +168,110 @@ Item {
                 }
             }
 
+            Column {
+                visible: details.permissionPreview.known
+                width: parent.width
+                spacing: 7
+
+                Rectangle {
+                    width: parent.width
+                    height: 1
+                    color: Colors.cyan
+                }
+                GohuText {
+                    width: parent.width
+                    text: "ACCESS REVIEW // IN-WORLD"
+                    color: Colors.magenta
+                    font.pixelSize: 10
+                    wrapMode: Text.WordWrap
+                }
+                ActionButton {
+                    visible: !details.permissionReviewOpen
+                    width: Math.min(parent.width, 180)
+                    height: 30
+                    label: "REVIEW ACCESS"
+                    labelPixelSize: 10
+                    accentColor: Colors.cyan
+                    onClicked: {
+                        details.reviewFeedback = "";
+                        details.permissionReviewOpen = true;
+                    }
+                }
+                Column {
+                    visible: details.permissionReviewOpen
+                    width: parent.width
+                    spacing: 7
+                    GohuText {
+                        width: parent.width
+                        text: "REVIEW ONLY // NOT A PERMISSION PROMPT"
+                        color: Colors.orange
+                        font.pixelSize: 10
+                        wrapMode: Text.WordWrap
+                    }
+                    ActionButton {
+                        width: Math.min(parent.width, 160)
+                        height: 30
+                        label: "DISMISS REVIEW"
+                        labelPixelSize: 10
+                        accentColor: Colors.cyan
+                        onClicked: {
+                            details.permissionReviewOpen = false;
+                            details.reviewFeedback = "REVIEW CLOSED // NO ACCESS GRANTED";
+                        }
+                    }
+                    QuietText {
+                        width: parent.width
+                        text: "PROVIDER // " + details.permissionPreview.provider
+                        font.pixelSize: 9
+                        wrapMode: Text.WordWrap
+                    }
+                    QuietText {
+                        width: parent.width
+                        text: "REQUESTING COMPONENTS // "
+                              + details.permissionPreview.consumers.join(" / ")
+                        font.pixelSize: 9
+                        wrapMode: Text.WordWrap
+                    }
+                    QuietText {
+                        width: parent.width
+                        text: "OPERATIONS // "
+                              + details.permissionPreview.operations.join(" / ")
+                        font.pixelSize: 9
+                        wrapMode: Text.WordWrap
+                    }
+                    QuietText {
+                        width: parent.width
+                        text: details.permissionPreview.authentication
+                        font.pixelSize: 9
+                        wrapMode: Text.WordWrap
+                    }
+                    GohuText {
+                        width: parent.width
+                        text: details.permissionPreview.status
+                        color: Colors.orange
+                        font.pixelSize: 9
+                        wrapMode: Text.WordWrap
+                    }
+                    ActionButton {
+                        width: Math.min(parent.width, 180)
+                        height: 30
+                        label: "APPROVE // UNAVAILABLE"
+                        labelPixelSize: 9
+                        accentColor: Colors.orange
+                        available: false
+                    }
+
+                }
+                QuietText {
+                    visible: details.reviewFeedback !== ""
+                    width: parent.width
+                    text: details.reviewFeedback
+                    font.pixelSize: 9
+                    color: Colors.orange
+                    wrapMode: Text.WordWrap
+                }
+            }
+
             ActionButton {
                 visible: details.selectedId === "social"
                 width: Math.min(parent.width, 160)
@@ -172,7 +284,7 @@ Item {
             QuietText {
                 width: parent.width
                 wrapMode: Text.WordWrap
-                text: "C2a // READ-ONLY KEYRING PROBE. NO SECRET STORAGE, ACCOUNT LOGIN OR CROSS-APP GRANTS ARE ENABLED."
+                text: "C2e // ACCESS REVIEW ONLY. HOST APPROVAL, SECRET STORAGE, ACCOUNT LOGIN AND CROSS-APP GRANTS REMAIN DISABLED."
                 color: Colors.orange
                 font.pixelSize: 9
             }

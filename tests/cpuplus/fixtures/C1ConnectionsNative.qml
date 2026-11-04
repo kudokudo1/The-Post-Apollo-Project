@@ -153,6 +153,33 @@ ShellRoot {
                 }
                 console.log("C2A_PASS // READONLY_KEYRING_PROBE // "
                             + ConnectionsBroker.status);
+                if (root.announce(root.button("REVIEW ACCESS"),
+                                  "REVIEW_ACCESS"))
+                    root.phase = "accessReviewClicked";
+            } else if (root.phase === "accessReviewClicked") {
+                if (!details.permissionReviewOpen) return;
+                const preview = details.permissionPreview;
+                const approve = root.button("APPROVE // UNAVAILABLE");
+                if (!preview.known || preview.provider !== "nasa-firms"
+                        || preview.canApprove || preview.hasActiveGrant
+                        || !approve || approve.available
+                        || ConnectionsBroker.credentialActionsEnabled) {
+                    root.fail("FALSE_ACCESS_REVIEW_AUTHORITY"); return;
+                }
+                if (root.announce(root.button("DISMISS REVIEW"),
+                                  "DISMISS_REVIEW"))
+                    root.phase = "reviewDismissClicked";
+            } else if (root.phase === "reviewDismissClicked") {
+                if (details.permissionReviewOpen) return;
+                if (details.reviewFeedback !==
+                        "REVIEW CLOSED // NO ACCESS GRANTED" ||
+                        ConnectionsBroker.authorize({
+                           provider:"nasa-firms",consumer:"weather-earth",
+                           operation:"fires.hotspots.read"
+                        }).allowed) {
+                    root.fail("REVIEW_CREATED_A_GRANT"); return;
+                }
+                console.log("C2E_PASS // NATIVE_ACCESS_REVIEW_DISMISS_NO_GRANT");
                 if (root.announce(root.providerButton("social"),
                                   "SOCIAL_BUTTON"))
                     root.phase = "socialClicked";

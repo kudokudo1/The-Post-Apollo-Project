@@ -1,0 +1,43 @@
+name: Connections C2e in-world access review
+
+on:
+  pull_request:
+    paths:
+      - "services/connections/ConnectionsReviewPolicy.js"
+      - "widgets/cpuplus/CpuPlusSettingsConnectionsDetailsPane.qml"
+      - "tests/cpuplus/test_connections_review_c2e.js"
+      - "tests/cpuplus/fixtures/C1ConnectionsNative.qml"
+      - "scripts/cpuplus/verify_connections_native_c1.sh"
+      - ".github/workflows/cpuplus-connections-review-c2e.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  access-review-contracts:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Check all permission review paths are denied
+        run: node tests/cpuplus/test_connections_review_c2e.js
+      - name: Preserve legacy Connections and Secret Service restrictions
+        run: |
+          node tests/cpuplus/test_cpuplus_connections_c1.js
+          node tests/cpuplus/test_connections_broker_c2a.js
+          node tests/connections/test_connections_c2b_fake_only.cjs
+      - name: Preserve native review click fixture syntax and browser containment
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          text=Path("widgets/cpuplus/CpuPlusSettingsConnectionsDetailsPane.qml").read_text()
+          assert "APPROVE // UNAVAILABLE" in text and "available: false" in text
+          assert "Qt.openUrlExternally" not in text
+          assert "ConnectionsBroker.authorize" not in text
+          assert "Quickshell.env(" not in text
+          print("C2E_PASS // NO_SECRET_ENTRY_OR_PERMISSION_ACTUATION")
+          PY

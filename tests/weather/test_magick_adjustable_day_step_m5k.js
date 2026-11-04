@@ -97,6 +97,10 @@ test("compact editor and dynamic arrows are wired into the shared M5c service",(
     assert.match(pane,/function applyStep\(\)/);
     assert.match(pane,/source\.setDateStepDays\(text\)/);
     assert.match(pane,/Keys\.onEscapePressed: function\(event\)/);
+    assert.match(pane,/Keys\.onReturnPressed: function\(event\)/);
+    assert.match(pane,/Keys\.onEnterPressed: function\(event\)/);
+    assert.match(pane,/onActiveFocusChanged:/);
+    assert.match(pane,/if\(!activeFocus\)applyStep\(\)/);
     assert.match(pane,/Keys\.onUpPressed: function\(event\)/);
     assert.match(pane,/Keys\.onDownPressed: function\(event\)/);
     assert.match(pane,/onDateStepDaysChanged\(\)/);

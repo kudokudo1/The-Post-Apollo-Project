@@ -1590,6 +1590,8 @@ PanelWindow {
     }
 
     function activateApp(index, retainSelectorFocus) {
+        // Phone is a companion workspace, not another provider app index.
+        appSelector.phoneOpen = false;
         hideProviderDesktop();
         if (providerWebOpen) {
             hideX();
@@ -1715,9 +1717,11 @@ PanelWindow {
                 // The in-rail settings sheet is not an application.
                 // Escape returns to the app rail; other keys must not invisibly
                 // activate apps while their buttons are hidden.
-                if (appSelector.settingsOpen) {
-                    if (event.key === Qt.Key_Escape)
+                if (appSelector.settingsOpen || appSelector.phoneOpen) {
+                    if (event.key === Qt.Key_Escape) {
                         appSelector.settingsOpen = false;
+                        appSelector.phoneOpen = false;
+                    }
                     event.accepted = true;
                     return;
                 }
@@ -1926,6 +1930,15 @@ PanelWindow {
                 }
             }
 
+            onPhoneOpenChanged: {
+                if (!messagingWindow.menuOpen || !phoneOpen)
+                    return;
+                discordRaiseDelay.stop();
+                xRaiseDelay.stop();
+                messagingWindow.focusAppSelector();
+                socialWindow.requestActivate();
+            }
+
             onSettingsOpenChanged: {
                 if (!messagingWindow.menuOpen)
                     return;
@@ -1959,6 +1972,21 @@ PanelWindow {
         }
 
         // ========================================================
+        // PHONE // READ-ONLY COMPANION WORKSPACE
+        // ========================================================
+
+        PhonePane {
+            id: phonePane
+            x: messagingWindow.appSelectorWidth
+            y: 0
+            width: Math.max(1, messagingContent.width - x)
+            height: messagingContent.height
+            visible: messagingWindow.menuOpen && appSelector.phoneOpen
+                     && !appSelector.settingsOpen
+            z: 8
+        }
+
+        // ========================================================
         // CONTACT LIST
         // ========================================================
 
@@ -1974,6 +2002,7 @@ PanelWindow {
             // Discord keeps the normal contact panel instantiated underneath
             // Vesktop; discordMode only empties its inner contents.
             visible: messagingWindow.menuOpen && !appSelector.settingsOpen
+                     && !appSelector.phoneOpen
                      && !providerAccessPanel.visible
                      && !messagingWindow.providerDesktopManaged
 
@@ -2026,6 +2055,7 @@ PanelWindow {
             width: Math.max(1, messagingContent.width - x)
             height: messagingContent.height
             visible: messagingWindow.menuOpen && !appSelector.settingsOpen
+                     && !appSelector.phoneOpen
                      && messagingWindow.activeAppIndex === 2
                      && (messageRouter.telegramNeedsSetup
                          || messagingWindow.telegramAppKeyEditorOpen)
@@ -2046,6 +2076,7 @@ PanelWindow {
             width: Math.max(1, messagingContent.width - x)
             height: messagingContent.height
             visible: messagingWindow.menuOpen && !appSelector.settingsOpen
+                     && !appSelector.phoneOpen
                      && messagingWindow.providerAccessSelected
                      && !messagingWindow.providerWebOpen && !messagingWindow.providerDesktopManaged
             z: 2
@@ -2082,6 +2113,7 @@ PanelWindow {
             // Discord keeps the normal chat panel instantiated underneath
             // Vesktop; discordMode only empties its inner contents.
             visible: messagingWindow.menuOpen && !appSelector.settingsOpen
+                     && !appSelector.phoneOpen
                      && !telegramConnectPanel.visible
                      && !providerAccessPanel.visible
                      && !messagingWindow.providerDesktopManaged
@@ -2174,6 +2206,7 @@ PanelWindow {
         // unsupported status; reset without touching provider login sessions.
         providerWebOpen = false;
         appSelector.settingsOpen = false;
+        appSelector.phoneOpen = false;
         setGeometryWatch(menuOpen);
 
         if (menuOpen) {

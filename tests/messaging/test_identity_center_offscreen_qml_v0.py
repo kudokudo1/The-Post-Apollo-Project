@@ -1000,6 +1000,114 @@ class RealQtOrganizationsSettingsPaneSmoke(unittest.TestCase):
             APP.processEvents()
         self.assertFalse(self.sections.property("organizationDisplayReady"))
 
+    def test_archive_tray_counts_and_red_two_step_removal(self):
+        self._open_organizations()
+        tray = self.sections.findChild(QObject, "orgLocalArchiveTray")
+        title = self.sections.findChild(QObject, "orgArchiveTrayTitle")
+        toggle = self.sections.findChild(QObject, "orgArchiveTrayToggle")
+        process = self.sections.findChild(QObject, "orgArchiveRemoveProcess")
+        self.assertIsNotNone(tray)
+        self.assertIsNotNone(title)
+        self.assertIsNotNone(toggle)
+        self.assertIsNotNone(process)
+        self.assertEqual(tray.property("archivedCount"), 0)
+
+        fixtures = {
+            "localDirectoryStore": {
+                "state": "ready", "saved": {"revision": 4, "organizations": [
+                    {"id": "org-1", "name": "FICTIONAL ACTIVE", "kind": "llc",
+                     "archived": False, "branches": [
+                         {"id": "branch-2", "name": "FICTIONAL BRANCH",
+                          "archived": True}]},
+                    {"id": "org-3", "name": "FICTIONAL OLD", "kind": "nonprofit",
+                     "archived": True, "branches": []}]}},
+            "localPortfoliosStore": {
+                "state": "ready", "saved": {"revision": 5, "portfolios": [
+                    {"id": "portfolio-1", "name": "FICTIONAL GROUP",
+                     "archived": True, "orgIds": []}]}},
+            "localStructureStore": {
+                "state": "ready", "saved": {"revision": 7, "units": [
+                    {"id": "unit-1", "orgId": "org-1", "kind": "team",
+                     "name": "FICTIONAL UNIT", "archived": True}]}},
+        }
+        for field in ("localUnitLocationLinksStore",
+                      "localBranchLocationLinksStore",
+                      "localFunctionalReportingStore", "localLinksStore"):
+            fixtures[field] = {"state": "ready",
+                               "saved": {"revision": 1, "links": []}}
+        for field, payload in fixtures.items():
+            source = "(" + json.dumps(payload) + ")"
+            if field == "localPortfoliosStore":
+                # The source store's refresh method is called only after
+                # an actual success response. No real Python process runs.
+                source = ("(function(){var s = " + json.dumps(payload) +
+                          "; s.calls = 0; s.refresh=function(){this.calls++;"
+                          "return true;}; return s;})()")
+            value = self.engine.evaluate(source)
+            self.assertFalse(value.isError(), field)
+            self.assertTrue(self.sections.setProperty(field, value), field)
+        APP.processEvents()
+        self.assertTrue(tray.property("storesReady"))
+        self.assertEqual(tray.property("archivedCount"), 4)
+        self.assertIn("4 ARCHIVED RECORDS", title.property("text"))
+        self.assertIn("VIEW ARCHIVES // 4", toggle.property("label"))
+        self.assertFalse(tray.property("expanded"))
+        tray.setProperty("expanded", True)
+        APP.processEvents()
+        self.assertTrue(toggle.property("selected"))
+        records = _value(tray.property("archivedRecords"))
+        self.assertEqual({x["kind"] for x in records},
+                         {"organization", "branch", "portfolio", "unit"})
+
+        # Confirm two distinct user intents before any subprocess is started.
+        group = next(x for x in records if x["kind"] == "portfolio")
+        self.assertFalse(tray.requestRemove(group))
+        self.assertEqual(tray.property("confirmationKey"), "portfolio:portfolio-1")
+        self.assertFalse(process.property("running"))
+        self.assertIn("CONFIRM PERMANENT REMOVAL", tray.property("resultText"))
+        self.assertTrue(tray.requestRemove(group))
+        self.assertTrue(process.property("running"))
+        self.assertTrue(tray.property("busy"))
+        payload = json.loads(process.property("lastInput"))
+        self.assertEqual(payload["kind"], "portfolio")
+        self.assertEqual(payload["expectedRevision"], 5)
+        self.assertEqual(payload["expectedName"], "FICTIONAL GROUP")
+
+        # Backend refusal explains the dependency, no refresh.
+        process.finishWith(json.dumps({
+            "ok": False, "error": "DETACH_PORTFOLIO_MEMBERS_FIRST"
+        }), 2)
+        APP.processEvents()
+        self.assertIn("REMOVE REFUSED", tray.property("resultText"))
+        self.assertIn("Detach portfolio members first", tray.property("resultText"))
+        self.assertFalse(tray.property("busy"))
+
+        # Simulated backend success triggers a read-only refresh, not a UI
+        # deletion based solely on the button press.
+        self.assertFalse(tray.requestRemove(group))
+        self.assertTrue(tray.requestRemove(group))
+        process.finishWith(json.dumps({
+            "ok": True, "kind": "portfolio", "id": "portfolio-1",
+            "source": "portfolios", "revision": 6
+        }), 0)
+        APP.processEvents()
+        self.assertIn("REMOVED PERMANENTLY", tray.property("resultText"))
+        self.assertEqual(tray.property("resultKind"), "removed")
+        self.assertFalse(tray.property("busy"))
+        portfolio_store = self.sections.property("localPortfoliosStore")
+        self.assertEqual(portfolio_store.property("calls").toInt(), 1)
+
+        # Red removal is a separate action from green Restore; no backend
+        # writes were performed with this disposable QML process stub.
+        danger_buttons = [b for b in self.sections.findChildren(QObject)
+                          if b.property("label") == "REMOVE PERMANENTLY"]
+        self.assertGreaterEqual(len(danger_buttons), 1)
+        for button in danger_buttons:
+            self.assertEqual(button.property("role"), "danger")
+            self.assertEqual(QColor(button.property("roleColor")),
+                             QColor("#d16041"))
+        self.assertFalse(self.sections.property("organizationDisplayReady"))
+
     def test_host_logout_and_failure_are_reflected_in_real_panel(self):
         self._open_organizations()
         self._finish(_body())

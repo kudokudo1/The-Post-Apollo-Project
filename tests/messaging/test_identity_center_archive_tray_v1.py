@@ -19,7 +19,7 @@ class ArchiveTrayV1(unittest.TestCase):
         self.assertIn('objectName: "orgArchiveTrayToggle"', TRAY)
         self.assertIn('text: "ARCHIVE TRAY // " + tray.archivedCount', TRAY)
         self.assertIn('label: tray.expanded ? "CLOSE ARCHIVE TRAY"', TRAY)
-        self.assertIn('label: "REMOVE PERMANENTLY"', TRAY)
+        self.assertIn('"REMOVE PERMANENTLY"', TRAY)
         for source in ("IdentityCenterLocalOrganizationEditor {",
                        "IdentityCenterLocalPortfolioEditor {",
                        "IdentityCenterLocalStructureEditor {",

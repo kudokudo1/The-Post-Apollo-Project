@@ -1,0 +1,54 @@
+name: Social archived-only removal and discoverable tray v1
+
+on:
+  pull_request:
+    paths:
+      - 'services/social/SocialLocalOrgArchivedRemoval.py'
+      - 'widgets/messanger/IdentityCenterLocalArchiveTray.qml'
+      - 'widgets/messanger/IdentityCenterSettingsSections.qml'
+      - 'widgets/messanger/IdentityCenterLocalRecordsSearch.qml'
+      - 'tests/messaging/test_social_archived_permanent_removal_v1.py'
+      - 'tests/messaging/test_identity_center_archive_tray_v1.py'
+      - 'tests/messaging/test_identity_center_offscreen_qml_v0.py'
+      - 'tests/messaging/fixtures/identity_qml_stubs/Quickshell/Io/Process.qml'
+      - 'MODEL/contracts/social-archive-tray-and-safe-removal-v1.md'
+      - 'MODEL/contracts/social-org-manager-deferred-live-tests-v1.md'
+      - '.github/workflows/social-archive-tray-safe-removal-v1.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  archive-tray-and-removal:
+    runs-on: ubuntu-latest
+    timeout-minutes: 13
+    env:
+      QT_QPA_PLATFORM: offscreen
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Secure archived-only removal, dependencies, prior controls
+        run: |
+          python3 -m unittest discover -s tests/messaging -p 'test_social_archived_permanent_removal_v1.py' -v
+          python3 -m unittest discover -s tests/messaging -p 'test_identity_center_archive_tray_v1.py' -v
+          python3 -m unittest discover -s tests/messaging -p 'test_identity_center_inline_record_actions_v1.py' -v
+          python3 -m unittest discover -s tests/messaging -p 'test_identity_center_local_search_v1.py' -v
+          python3 -m unittest discover -s tests/messaging -p 'test_identity_center_semantic_colors_v1.py' -v
+          python3 -m unittest discover -s tests/messaging -p 'test_identity_center_org_backup_ui_v1.py' -v
+          python3 -m unittest discover -s tests/messaging -p 'test_social_local_org_backups_v1.py' -v
+          python3 -m unittest discover -s tests/messaging -p 'test_identity_center_unified_refresh_v1.py' -v
+          python3 -m unittest discover -s tests/messaging -p 'test_identity_center_inline_save_feedback_v1.py' -v
+          python3 -m unittest discover -s tests/messaging -p 'test_identity_center_local_session_activity_v1.py' -v
+          python3 -m unittest discover -s tests/messaging -p 'test_social_local_organizations.py' -v
+          python3 -m unittest discover -s tests/messaging -p 'test_social_local_portfolios_v1.py' -v
+          python3 -m unittest discover -s tests/messaging -p 'test_social_local_org_structure_v1.py' -v
+      - name: Install isolated Qt6 offscreen runtime
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends libegl1 libopengl0 libgl1 libxkbcommon0
+          python3 -m pip install --disable-pip-version-check 'PySide6==6.9.3'
+      - name: Real Qt QML archive listing, confirmation, red action, refusal
+        run: python3 -m unittest discover -s tests/messaging -p 'test_identity_center_offscreen_qml_v0.py' -v

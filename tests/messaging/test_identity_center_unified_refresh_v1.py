@@ -58,7 +58,8 @@ class UnifiedRefreshV1(unittest.TestCase):
             self.assertNotIn(forbidden, REFRESH)
 
     def test_saves_loading_and_repeated_clicks_are_guarded(self):
-        for expected in ('state === "saving"', 'state === "loading"',
+        for expected in ('refreshPanel.stateOf(entry.store) === "saving"',
+                         'refreshPanel.stateOf(entry.store) === "loading"',
                          'state === "error"', 'state === "ready"',
                          'typeof entry.store.refresh !== "function"',
                          "refreshInProgress", "onStateSignatureChanged: checkCompletion()",

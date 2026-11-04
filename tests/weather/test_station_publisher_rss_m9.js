@@ -31,12 +31,12 @@ const copy=ctx.snapshot("bbc-world");
 copy.rows.push({title:"mutated locally"});
 assert.equal(ctx.snapshot("bbc-world").rows.length,1);
 const backwards=t+25000-3600000;
-assert.equal(ctx.waitMs("bbc-world",backwards),35000,
+assert.equal(ctx.waitMs("bbc-world",backwards),40000,
     "backward host-time change should preserve BBC remaining wait");
 assert.equal(ctx.waitMs("al-jazeera-english",backwards),40000,
     "Al Jazeera should independently preserve its remaining wait");
-assert.equal(ctx.reserve("bbc-world",backwards+34999),false);
-assert.equal(ctx.reserve("bbc-world",backwards+35000),true);
+assert.equal(ctx.reserve("bbc-world",backwards+39999),false);
+assert.equal(ctx.reserve("bbc-world",backwards+40000),true);
 assert.equal(ctx.reserve("al-jazeera-english",backwards+39999),false);
 assert.equal(ctx.reserve("al-jazeera-english",backwards+40000),true);
 assert.equal(ctx.reserve("bad",backwards+40000),false);

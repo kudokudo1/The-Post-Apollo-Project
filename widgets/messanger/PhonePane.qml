@@ -24,6 +24,22 @@ Rectangle {
     property bool stageWanted: false
     property string stageState: "IDLE"
     property int stagePollCount: 0
+    property int stageHostX: 0
+    property int stageHostY: 0
+    property int stageHostWidth: 0
+    property int stageHostHeight: 0
+    onStageHostXChanged: {
+        if (stageWanted) stageState = "POSITIONING";
+    }
+    onStageHostYChanged: {
+        if (stageWanted) stageState = "POSITIONING";
+    }
+    onStageHostWidthChanged: {
+        if (stageWanted) stageState = "POSITIONING";
+    }
+    onStageHostHeightChanged: {
+        if (stageWanted) stageState = "POSITIONING";
+    }
     readonly property int stageHoleX: Math.round(phoneChatFeed.x + 10)
     readonly property int stageHoleY: Math.round(
         phoneChatFeed.y + setupHeader.height + setupColumn.implicitHeight + 24)
@@ -57,7 +73,8 @@ Rectangle {
         if (!stageWanted || !visible || selectedSection !== "DEVICE"
                 || !stageHoleValid || stageProcess.running)
             return;
-        stagePollCount += 1;
+        if (stageState === "ALIGNED") stagePollCount = 0;
+        else stagePollCount += 1;
         if (stagePollCount > 40) {
             stageWanted = false;
             stageState = "UNAVAILABLE";

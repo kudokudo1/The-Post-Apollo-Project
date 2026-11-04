@@ -165,6 +165,94 @@ function timeX(minute, width) {
     return m === null || w === null ? null : m / 1440 * w;
 }
 
+// V2d // Pure, bounded local-day viewport geometry. Zoom changes the
+// displayed scale, never the source record or source time. A hidden marker
+// is not a missing provider event.
+var WINDOW_HOURS = [6, 12, 24];
+
+function viewportSpan(hours) {
+    var value = Number(hours);
+    return WINDOW_HOURS.indexOf(value) >= 0 ? value * 60 : 1440;
+}
+
+function clampViewStart(start, span) {
+    var s = Number(span), n = Number(start);
+    if (!isFinite(s) || s < 1 || s > 1440) return 0;
+    if (!isFinite(n)) n = 0;
+    return Math.max(0, Math.min(1440 - s, Math.round(n)));
+}
+
+function zoomStart(start, previousSpan, nextSpan, focusMinute) {
+    var oldSpan = Number(previousSpan), span = Number(nextSpan);
+    if (!isFinite(oldSpan) || oldSpan <= 0 || oldSpan > 1440 ||
+        !isFinite(span) || span <= 0 || span > 1440)
+        return 0;
+    var oldStart = clampViewStart(start, oldSpan);
+    var focus = boundedNumber(focusMinute, 0, 1440);
+    if (focus === null) focus = oldStart + oldSpan / 2;
+    var ratio = Math.max(0, Math.min(1, (focus - oldStart) / oldSpan));
+    return clampViewStart(focus - ratio * span, span);
+}
+
+function panStart(start, span, dragPixels, plotWidth) {
+    var distance = Number(dragPixels), width = Number(plotWidth);
+    if (!isFinite(distance) || !isFinite(width) || width <= 0)
+        return clampViewStart(start, span);
+    return clampViewStart(Number(start) - (distance / width) * span, span);
+}
+
+function inWindow(minute, start, span) {
+    var m = boundedNumber(minute, 0, 1439);
+    var width = Number(span);
+    if (m === null || !isFinite(width) || width <= 0 || width > 1440)
+        return false;
+    var from = clampViewStart(start, width);
+    return m >= from && m < from + width;
+}
+
+function visibleEvents(row, kind, start, span) {
+    return eventsFor(row, kind).filter(function(e) {
+        return e && inWindow(e.minute, start, span);
+    });
+}
+
+// Marker LEFT EDGE, with space for its entire clickable shell.
+// The matching ruler uses the same 0..1 source-minute fraction.
+function viewX(minute, start, span, laneWidth, markerWidth) {
+    if (!inWindow(minute, start, span)) return null;
+    var width = Number(laneWidth), marker = Number(markerWidth);
+    if (!isFinite(width) || !isFinite(marker)
+        || width <= marker + 2 || marker < 1) return null;
+    var from = clampViewStart(start, span);
+    return 1 + (Number(minute) - from) / Number(span) * (width - marker - 2);
+}
+
+function localMinuteLabel(value) {
+    var m = Number(value);
+    if (!isFinite(m) || m < 0 || m > 1440) return "--:--";
+    var min = Math.round(m);
+    return String(Math.floor(min / 60)).padStart(2, "0") + ":"
+           + String(min % 60).padStart(2, "0");
+}
+
+function rulerTicks(start, span) {
+    var width = Number(span);
+    if (!isFinite(width) || width <= 0 || width > 1440) return [];
+    var from = clampViewStart(start, width), result = [];
+    for (var i = 0; i <= 4; i++) {
+        var minute = from + i * width / 4;
+        result.push({minute:minute, label:localMinuteLabel(minute)});
+    }
+    return result;
+}
+
+function revealStart(eventMinute, start, span) {
+    var minute = boundedNumber(eventMinute, 0, 1439);
+    if (minute === null) return clampViewStart(start, span);
+    if (inWindow(minute, start, span)) return clampViewStart(start, span);
+    return clampViewStart(minute - Number(span) / 2, span);
+}
+
 function eventDetail(event) {
     if (!event || KINDS.indexOf(event.kind) < 0) return "SELECT AN EVENT MARKER";
     var detail = event.planet + " // " + event.kind.toUpperCase()

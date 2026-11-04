@@ -16,6 +16,12 @@ Rectangle {
     property var celestialSource: null
     readonly property bool showCelestial:
         MagickPolicy.visualForRoute(subjectRoute)
+    readonly property bool standaloneAstrology:
+        subjectRoute === "magick/astrology/charts"
+    readonly property bool lensesLanding:
+        subjectRoute === "magick/planetary/correspondences"
+    readonly property bool independentScreen:
+        standaloneAstrology || lensesLanding
     // Supplied by the existing Station root; no independent clock.
     property real runtimeNowMs: 0
 
@@ -27,12 +33,14 @@ Rectangle {
 
     Column {
         id: contextHeader
+        visible: !magickPane.independentScreen
+        height: visible ? implicitHeight : 0
         anchors.left: parent.left
         anchors.right: parent.right
         anchors.top: parent.top
         anchors.leftMargin: 16
         anchors.rightMargin: 16
-        anchors.topMargin: 10
+        anchors.topMargin: magickPane.independentScreen ? 0 : 10
         spacing: 7
 
         GohuText {
@@ -71,21 +79,25 @@ Rectangle {
         anchors.left: parent.left
         anchors.right: parent.right
         anchors.top: contextHeader.bottom
-        anchors.topMargin: 9
+        anchors.topMargin: magickPane.independentScreen ? 0 : 9
         anchors.bottom: parent.bottom
-        anchors.leftMargin: 13
-        anchors.rightMargin: 13
-        anchors.bottomMargin: 8
+        anchors.leftMargin: magickPane.independentScreen ? 0 : 13
+        anchors.rightMargin: magickPane.independentScreen ? 0 : 13
+        anchors.bottomMargin: magickPane.independentScreen ? 0 : 8
         color: Colors.black
-        border.width: 1
+        border.width: magickPane.independentScreen ? 0 : 1
         border.color: Colors.magenta
         clip: true
 
         Loader {
             anchors.fill: parent
-            anchors.margins: 4
+            anchors.margins: magickPane.independentScreen ? 0 : 4
             active: magickPane.visible && magickPane.kind === "reference"
-            sourceComponent: magickPane.showCelestial
+            sourceComponent: magickPane.standaloneAstrology
+                             ? standaloneAstrologyReference
+                             : magickPane.lensesLanding
+                             ? lensesReference
+                             : magickPane.showCelestial
                              ? celestialReference
                              : magickPane.subjectRoute.indexOf("magick/lunar-solar/") === 0
                              ? lunarSolarReference
@@ -93,6 +105,29 @@ Rectangle {
                              ? overviewReference
                              : magickPane.primaryObservation !== ""
                                ? singleReference : unimplemented
+        }
+    }
+
+    // M30-F // Standalone, non-scrolling ASTROLOGY. The original rich
+    // 620px chart/timeline inspector remains available on deeper legacy
+    // astrology routes in INDEX, but the bottom ASTROLOGY screen uses this.
+    Component {
+        id: standaloneAstrologyReference
+        StationMagickAstrologyPane {
+            subjectRoute: magickPane.subjectRoute
+            celestialSource: magickPane.celestialSource
+        }
+    }
+
+    // M30-F // New LENSES landing replaces the redundant solar-hours
+    // bottom tab. Existing deep planetary routes remain available in INDEX.
+    Component {
+        id: lensesReference
+        StationMagickLensesPane {
+            celestialSource: magickPane.celestialSource
+            onRouteRequested: function(path) {
+                magickPane.routeRequested(path)
+            }
         }
     }
 

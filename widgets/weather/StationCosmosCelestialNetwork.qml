@@ -16,6 +16,9 @@ Item {
     property string selectedPairKey: ""
     // V4b internally linked views; existing M4 sample and focus stay shared.
     property string displayMode: "chords"
+    // Compact MAGICK overview hosts the real network/HELIO canvas without
+    // stealing its limited viewport for the full network inspector.
+    property bool compactMode: false
     property string hoverBody: ""
     property string hoverPairKey: ""
     readonly property var scene: Network.network(graphModel,focusIndex)
@@ -256,6 +259,7 @@ Item {
     // without lengthening the parent MAGICK instrument.
     Flickable {
         id: inspectorFlick
+        visible: !graph.compactMode
         anchors.right: parent.right
         anchors.rightMargin: 5
         anchors.top: parent.top
@@ -485,6 +489,7 @@ Item {
         anchors.bottom: parent.bottom
         anchors.margins: 2
         width: Math.max(0,parent.width*0.72)
+        visible: !graph.compactMode
         font.pixelSize: 9
         color: Colors.orange
         elide: Text.ElideRight

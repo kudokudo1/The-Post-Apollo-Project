@@ -137,18 +137,31 @@ PanelWindow {
                 anchors.left: parent.left
                 anchors.leftMargin: 12
                 anchors.verticalCenter: parent.verticalCenter
+                height: 24
                 spacing: 1
+
+                // Same fixed-height centered glyph cells as the dock mark.
+                // Never align mixed-size symbols by separate implicit top edges.
                 NotoText {
+                    height: headerCity.height
+                    verticalAlignment: Text.AlignVCenter
+                    textFormat: Text.PlainText
                     text: ". ݁₊⊹"
                     font.pixelSize: 15
                     color: Colors.white
                 }
                 NotoText {
+                    height: headerCity.height
+                    verticalAlignment: Text.AlignVCenter
+                    textFormat: Text.PlainText
                     text: "🏙︎"
                     font.pixelSize: 18
                     color: Colors.yellow
                 }
                 NotoText {
+                    height: headerCity.height
+                    verticalAlignment: Text.AlignVCenter
+                    textFormat: Text.PlainText
                     text: "๋࣭⭑"
                     font.pixelSize: 15
                     color: Colors.white

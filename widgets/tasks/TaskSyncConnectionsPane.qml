@@ -17,7 +17,8 @@ Item {
         {id:"overview", label:"OVERVIEW"},
         {id:"mappings", label:"MAP"},
         {id:"review", label:"REVIEW"},
-        {id:"history", label:"HISTORY"}
+        {id:"history", label:"HISTORY"},
+        {id:"recovery", label:"RECOVERY"}
     ]
 
     Column {
@@ -38,7 +39,9 @@ Item {
 
         GohuText {
             width: parent.width
-            text: "LOCAL PREVIEW // REMOTE VIA GIT"
+            text: syncConnections.selectedSubmode === "recovery"
+                  ? "LOCAL RECOVERY // STATUS ONLY"
+                  : "LOCAL PREVIEW // REMOTE VIA GIT"
             color: Colors.cyan
             font.pixelSize: 9
             elide: Text.ElideRight
@@ -53,7 +56,9 @@ Item {
                 model: syncConnections.submodes
                 ModeButton {
                     required property var modelData
-                    width: Math.floor((syncTabRail.width - syncTabRail.spacing * 3) / 4)
+                    width: Math.floor((syncTabRail.width - syncTabRail.spacing
+                                       * (syncConnections.submodes.length - 1))
+                                       / syncConnections.submodes.length)
                     height: syncTabRail.height
                     textOnly: true
                     labelText: modelData.label
@@ -200,6 +205,13 @@ Item {
                 font.pixelSize: 10
                 wrapMode: Text.WordWrap
             }
+        }
+
+        // M13q status-only recovery panel reuses the existing shared C2a
+        // keyring probe. It introduces no grant, writer or separate service.
+        TaskRecoveryStatusPaneM13q {
+            anchors.fill: parent
+            visible: syncConnections.selectedSubmode === "recovery"
         }
 
         // Preserve the M8 field/identity preview intact and accessible.

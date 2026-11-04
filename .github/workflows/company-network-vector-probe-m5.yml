@@ -23,6 +23,8 @@ jobs:
           python3 -m unittest discover -s tests/company -p 'test_company_native_online_m8.py' -v
           python3 -m unittest discover -s tests/company -p 'test_company_vector_locality_m9.py' -v
           python3 -m unittest discover -s tests/company -p 'test_company_vector_motion_m10.py' -v
+          python3 -m unittest discover -s tests/company -p 'test_company_hub_map_readonly_m11.py' -v
+          python3 -m unittest discover -s tests/company -p 'test_company_vector_owner_consumer_m12.py' -v
 
   native-qt:
     # All Qt/MapLibre downloads happen on the disposable GitHub runner.
@@ -165,6 +167,38 @@ jobs:
           assert r["p50_ms"] <= r["p95_ms"] <= r["max_ms"]
           print("M10_FRAME_DIAGNOSTIC_VALID",r)
           PY
+
+          # M12 owner-local projection uses disposable, private *fake* data.
+          # No confidential Company files, identities, personal data or
+          # browser session state are mounted into the CI runner.
+          export XDG_DATA_HOME="$RUNNER_TEMP/company-owner-test"
+          mkdir -m 700 -p "$XDG_DATA_HOME"
+          python3 - "$GITHUB_WORKSPACE" <<'PY'
+          import sys
+          sys.path.insert(0,sys.argv[1]+"/services/company")
+          import CompanyHubDirectory as store
+          fake={
+              "label":"CI DEMO HUB",
+              "organizationLabel":"CI SYNTHETIC",
+              "city":"CI TEST",
+              "regionCode":"MI","countryCode":"US",
+              "longitude":-83.6875,"latitude":43.0125,
+              "serviceFamily":"BENEFITS"
+          }
+          doc=store.apply(store.initial(),
+              {"action":"create","expectedRevision":0,**fake})
+          store.save(doc)
+          PY
+          xvfb-run -a -s '-screen 0 1280x900x24' \
+            timeout 25s ./company-vector-probe \
+              --owner-local-hubs --capture 2>&1 | tee company-m12-owner.log
+          grep -q 'OWNER_LOCAL_PROJECTION_VALIDATED 1' company-m12-owner.log
+          grep -q 'OWNER_LOCAL_MARKERS_ADDED count=1' company-m12-owner.log
+          test -s company-vector-probe.png
+          cp company-vector-probe.png "$GITHUB_WORKSPACE/company-vector-owner-local.png"
+          rm company-vector-probe.png
+          unset XDG_DATA_HOME
+
 
       - uses: actions/upload-artifact@v4
         if: always()

@@ -18,6 +18,7 @@ target_compile_definitions(company-vector-probe PRIVATE
     COMPANY_PROBE_STYLE_PATH="${CMAKE_CURRENT_SOURCE_DIR}/style-fixture.json"
     COMPANY_PROBE_ONLINE_STYLE_PATH="${CMAKE_CURRENT_SOURCE_DIR}/style-post-apollo-online.json"
     COMPANY_PROBE_HUB_FIXTURE_PATH="${CMAKE_CURRENT_SOURCE_DIR}/fixture-hubs.json"
+    COMPANY_OWNER_MAP_READONLY_SCRIPT="${CMAKE_CURRENT_SOURCE_DIR}/../../services/company/CompanyHubMapReadOnly.py"
 )
 target_link_libraries(company-vector-probe PRIVATE
     Qt6::Quick Qt6::Location Qt6::Positioning QMapLibre::Location

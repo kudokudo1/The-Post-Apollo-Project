@@ -42,7 +42,7 @@ jobs:
           host: 'linux'
           target: 'desktop'
           arch: 'linux_gcc_64'
-          modules: 'qtlocation'
+          modules: 'qtlocation qtpositioning'
           cache: false
 
       - name: Fetch pinned MapLibre v3 for exact Qt6.7.3 ABI

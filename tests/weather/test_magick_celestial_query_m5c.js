@@ -63,6 +63,7 @@ test("14, 29 and 90-day bounded query windows keep original M4 contract",()=>{
         assert.deepEqual(req.bodies,["moon","sun"]);
         assert.equal(req.step_hours,12);
         assert.equal(req.include_events,true);
+        assert.equal(req.include_heliocentric_spatial,true);
         assert.equal((Date.parse(req.end_utc)-Date.parse(req.start_utc))/86400000,
                      span);
         assert.ok(span*2+1<=721);
@@ -89,10 +90,21 @@ test("result matching rejects stale date/pair/span even with valid-looking SHA",
             bodies:expected.bodies.slice().sort(),
             start_utc:expected.start_utc.replace(".000Z",".000000Z"),
             end_utc:expected.end_utc.replace(".000Z",".000000Z"),
-            step_hours:12,include_events:true},
+            step_hours:12,include_events:true,
+            include_heliocentric_spatial:true},
+        sample_count:2,
+        heliocentric_spatial:{
+            format:"post-apollo.weather.heliocentric-spatial.v1",
+            origin:"heliocentric",origin_body:"sun",
+            position_model:"geometric",frame:"true-ecliptic-of-date",
+            sample_count:2,series:[{},{}]
+        },
         series:[{},{}],relationships:[{}],event_markers:[]
     };
     assert.equal(context.matchesResult(row,expected),true);
+    const noSpatial=JSON.parse(JSON.stringify(row));
+    delete noSpatial.heliocentric_spatial;
+    assert.equal(context.matchesResult(noSpatial,expected),false);
     const changed=plain(context.requestFor("2026-11-03",30,"venus-mars",29));
     assert.equal(context.matchesResult(row,changed),false);
     assert.equal(context.matchesResult(row,

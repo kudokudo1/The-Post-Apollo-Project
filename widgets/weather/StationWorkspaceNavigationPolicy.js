@@ -62,7 +62,7 @@ var GROUPS = {
     magick:[
         {label:"OVERVIEW",path:"magick/overview",key:"overview"},
         {label:"LUNAR + SOLAR",path:"magick/lunar-solar/moon",key:"lunar-solar"},
-        {label:"PLANETARY",path:"magick/planetary/hours",key:"planetary"},
+        {label:"LENSES",path:"magick/planetary/correspondences",key:"lenses"},
         {label:"ASTROLOGY",path:"magick/astrology/charts",key:"astrology"},
         {label:"DIVINATION",path:"magick/divination/tarot",key:"divination"},
         {label:"GRIMOIRE",path:"magick/grimoire/references",key:"grimoire"}
@@ -112,6 +112,9 @@ function selectedGroup(path) {
     // Keep the PLANETS+STARS deep INDEX subtree associated with the full
     // SKY bottom swap, while its detailed route stays available in INDEX.
     if(family==="cosmos" && group==="planets-stars") return "sky";
+    // M30-F: historical PLANETARY INDEX routes still highlight the new
+    // LENSES category; the duplicated solar-hours bottom tab was retired.
+    if(family==="magick" && group==="planetary") return "lenses";
     for(var k=0;k<groups.length;k++)
         if(groups[k].key===group) return group;
     return "overview";

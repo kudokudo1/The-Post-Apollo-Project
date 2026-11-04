@@ -22,6 +22,7 @@ jobs:
           python3 -m unittest discover -s tests/company -p 'test_company_vector_style_m7.py' -v
           python3 -m unittest discover -s tests/company -p 'test_company_native_online_m8.py' -v
           python3 -m unittest discover -s tests/company -p 'test_company_vector_locality_m9.py' -v
+          python3 -m unittest discover -s tests/company -p 'test_company_vector_motion_m10.py' -v
 
   native-qt:
     # All Qt/MapLibre downloads happen on the disposable GitHub runner.
@@ -137,9 +138,38 @@ jobs:
           done
           echo "Seven screenshots: offline, USA, RURAL, CANADA, NEIGHBORHOOD, VILLAGE, BORDER"
 
+          # Motion + read-only fixture proof. Public Toronto test camera only.
+          # Frame swap measurements are host/environment-specific and never
+          # treated as a desktop FPS certificate.
+          xvfb-run -a -s '-screen 0 1280x900x24' \
+            timeout 28s ./company-vector-probe --styled-online \
+              --sample=NEIGHBORHOOD --fixture-hubs \
+              --bench-pan-zoom 2>&1 | tee company-m10-bench.log
+          grep -q 'SYNTHETIC_FIXTURE_VALIDATED 3' company-m10-bench.log
+          grep -q 'FIXTURE_MARKERS_ADDED count=3' company-m10-bench.log
+          grep -q 'BENCH_MOTION_DONE steps=150' company-m10-bench.log
+          grep -q 'BENCH_FRAME_PACING' company-m10-bench.log
+          cp company-m10-bench.log "$GITHUB_WORKSPACE/company-m10-bench.log"
+          python3 - "$GITHUB_WORKSPACE/company-m10-bench.log" <<'PY'
+          import json, math, pathlib, sys
+          log=pathlib.Path(sys.argv[1]).read_text()
+          records=[json.loads(x.split("BENCH_FRAME_PACING ",1)[1])
+                   for x in log.splitlines() if "BENCH_FRAME_PACING " in x]
+          assert len(records)==1, "exactly one benchmark record required"
+          r=records[0]
+          assert r["online"] is True and r["sample"] == "NEIGHBORHOOD"
+          assert r["frame_intervals"] >= 10, "insufficient frame samples"
+          for k in ("p50_ms","p95_ms","max_ms"):
+              assert math.isfinite(r[k]) and r[k] > 0, k
+          assert r["p50_ms"] <= r["p95_ms"] <= r["max_ms"]
+          print("M10_FRAME_DIAGNOSTIC_VALID",r)
+          PY
+
       - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: company-vector-qt-native-capture
-          path: company-vector-*.png
+          path: |
+            company-vector-*.png
+            company-m10-bench.log
           if-no-files-found: ignore

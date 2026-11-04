@@ -1,0 +1,66 @@
+name: MAGICK M5h neon zodiac and draggable timeline
+on:
+  pull_request:
+    paths:
+      - 'widgets/weather/StationMagickCelestialInstrument.qml'
+      - 'widgets/weather/StationMagickCelestialVisualPolicy.js'
+      - 'tests/weather/test_magick_neon_scrubber_m5h.js'
+      - '.github/workflows/weather-magick-neon-scrubber-m5h.yml'
+  push:
+    paths:
+      - 'widgets/weather/StationMagickCelestialInstrument.qml'
+      - 'widgets/weather/StationMagickCelestialVisualPolicy.js'
+      - 'tests/weather/test_magick_neon_scrubber_m5h.js'
+      - '.github/workflows/weather-magick-neon-scrubber-m5h.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  neon-and-drag-contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Verify actual zodiac glyphs, glow palette and draggable source handle
+        run: node --test tests/weather/test_magick_neon_scrubber_m5h.js
+      - name: Recheck existing M5a through M5g, HOME and COSMOS visual contracts
+        run: |
+          node --test tests/weather/test_magick_celestial_visual_m5.js
+          node --test tests/weather/test_magick_event_inspector_m5d.js
+          node --test tests/weather/test_magick_chart_legibility_m5f.js
+          node --test tests/weather/test_magick_relations_timeline_m5g.js
+          node --test tests/weather/test_magick_celestial_bridge_m5b.js
+          node --test tests/weather/test_magick_celestial_query_m5c.js
+          node --test tests/weather/test_magick_default_paths_m5e.js
+          node --test tests/weather/test_home_deck_w2a.js
+          node --test tests/weather/test_cosmos_visual_interactions_v2r.js
+  real-jpl-scrub:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install Skyfield only in temporary CI runner
+        run: python3 -m pip install 'skyfield==1.55'
+      - name: Obtain official DE440s only in temporary CI storage
+        run: |
+          curl --fail --location --retry 3 --connect-timeout 15 --max-time 180 --silent --show-error \
+            'https://ssd.jpl.nasa.gov/ftp/eph/planets/bsp/de440s.bsp' \
+            --output "$RUNNER_TEMP/de440s.bsp"
+          test "$(stat -c %s "$RUNNER_TEMP/de440s.bsp")" -gt 30000000
+      - name: Confirm glow/scrubber retains measured M4 source relationships
+        run: |
+          python3 scripts/weather/celestial_visual_data.py \
+            --kernel "$RUNNER_TEMP/de440s.bsp" \
+            --query-json '{"format":"post-apollo.weather.celestial-visual-data.v1","start_utc":"2026-10-15T00:00:00Z","end_utc":"2026-11-13T00:00:00Z","bodies":["moon","sun"],"step_hours":12,"include_events":true}' \
+            > "$RUNNER_TEMP/m4.json"
+          MAGICK_M5G_JSON_FILE="$RUNNER_TEMP/m4.json" \
+            node --test tests/weather/test_magick_relations_timeline_m5g.js

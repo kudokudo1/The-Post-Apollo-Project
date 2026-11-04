@@ -12,6 +12,7 @@ on:
       - "widgets/TimeActionButton.qml"
       - "widgets/TimeResyncAuthW.qml"
       - "tests/time/test_clock_visual_calibration_contract.py"
+      - "tests/time/test_clock_m1_accuracy_status_contract.py"
       - "tests/time/test_clock_settings_contract.py"
       - ".github/workflows/clock-visual-calibration-contracts.yml"
   push:
@@ -25,6 +26,7 @@ on:
       - "widgets/TimeActionButton.qml"
       - "widgets/TimeResyncAuthW.qml"
       - "tests/time/test_clock_visual_calibration_contract.py"
+      - "tests/time/test_clock_m1_accuracy_status_contract.py"
       - "tests/time/test_clock_settings_contract.py"
       - ".github/workflows/clock-visual-calibration-contracts.yml"
 
@@ -37,6 +39,8 @@ jobs:
         run: python3 -m py_compile services/time/TimeHostControl.py
       - name: Test Clock visual semantics, measured drift and calibration queue
         run: python3 -m unittest discover -s tests/time -p 'test_clock_visual_calibration_contract.py' -v
+      - name: Test Clock header state, reference quality and post-sync verification
+        run: python3 -m unittest discover -s tests/time -p 'test_clock_m1_accuracy_status_contract.py' -v
       - name: Preserve Clock time contracts
         run: python3 -m unittest discover -s tests/time -p 'test_clock_settings_contract.py' -v
       - name: Preserve system timezone and Polkit contracts

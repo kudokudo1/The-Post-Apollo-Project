@@ -5,6 +5,7 @@ import "CompanyCoveragePolicy.js" as Geo
 import "weather/StationNaturalEarthLand110.js" as Land
 import "weather/StationNaturalEarthContext110.js" as Context
 import "CompanyNaturalEarthLakes110.js" as Lakes
+import "CompanyCities50.js" as CityData
 
 // Company Network Coverage M1: real geographic *reference* map.
 // Natural Earth is public domain and already pinned by Weather Station.
@@ -19,6 +20,10 @@ Item {
     property bool serviceMenuOpen: false
     property bool hubPlacementArmed: false
     property bool hubEditorOpen: false
+    property bool showCities: true
+    property var selectedCity: null
+    property bool streetConsentOpen: false
+    property bool streetMode: false
     property string selectedHubId: ""
     readonly property var hubRows: hubStore.saved && Array.isArray(hubStore.saved.hubs)
         ? hubStore.saved.hubs : []
@@ -56,12 +61,57 @@ Item {
         }
     }
 
+    function beginHubEntry() {
+        hubEditor.begin(root.selectedState ? root.selectedState[0] : "");
+        root.hubEditorOpen = true;
+        root.hubPlacementArmed = false;
+        root.serviceMenuOpen = false;
+    }
+
     function openHubEditor(lon,lat) {
-        if(!isFinite(lon) || !isFinite(lat)) return;
-        hubEditor.prepare(lon,lat,root.selectedState ? root.selectedState[0] : "");
+        // Returning from PICK LOCATION must not reset typed form values.
+        if (!hubEditor.setCoordinates(lon,lat)) return;
         root.hubEditorOpen=true;
         root.hubPlacementArmed=false;
         root.serviceMenuOpen=false;
+    }
+
+    function chooseCity(city) {
+        if (!city) return;
+        selectedCity = city;
+        selectedHubId = "";
+        selectedCode = "";
+        selectedCountryCode = "";
+        var next = Geo.view(regionKey,Math.max(zoom,3.5),city[1],city[2]);
+        applyView(next);
+        if(streetMode) streetMap.focusAt(city[1],city[2],12);
+    }
+
+    function startStreetView() {
+        var lon=centerLon,lat=centerLat,z=5;
+        if(selectedCity) {
+            lon=selectedCity[1];lat=selectedCity[2];z=12;
+        } else if(selectedHub) {
+            lon=selectedHub.longitude;lat=selectedHub.latitude;z=12;
+        } else if(selectedState) {
+            lon=selectedState[3];lat=selectedState[4];z=11;
+        } else if(selectedCountry) {
+            lon=selectedCountry[3];lat=selectedCountry[4];z=9;
+        }
+        streetMode=true;
+        streetConsentOpen=false;
+        streetMap.focusAt(lon,lat,z);
+    }
+
+    function visibleCities() {
+        var q = String(stateSearch.text || "").trim().toLowerCase();
+        if (!q) return [];
+        var box=root.bounds;
+        return CityData.cities.filter(function(city) {
+            return city[1]>=box.west && city[1]<=box.east
+                && city[2]>=box.south && city[2]<=box.north
+                && city[0].toLowerCase().indexOf(q)>=0;
+        }).slice(0,25);
     }
 
     function applyView(next) {
@@ -76,8 +126,13 @@ Item {
         selectedCode = "";
         selectedCountryCode = "";
         selectedHubId = "";
+        selectedCity = null;
         serviceMenuOpen = false;
         stateSearch.text = "";
+        if(streetMode) {
+            var next=Geo.defaultView(regionKey);
+            streetMap.focusAt(next.centerLon,next.centerLat,5);
+        }
     }
 
     function chooseState(state) {
@@ -121,6 +176,8 @@ Item {
     onSelectedCodeChanged: mapCanvas.requestPaint()
     onSelectedCountryCodeChanged: mapCanvas.requestPaint()
     onSelectedHubIdChanged: mapCanvas.requestPaint()
+    onSelectedCityChanged: mapCanvas.requestPaint()
+    onShowCitiesChanged: mapCanvas.requestPaint()
     onZoomChanged: mapCanvas.requestPaint()
     onCenterLonChanged: mapCanvas.requestPaint()
     onCenterLatChanged: mapCanvas.requestPaint()
@@ -190,17 +247,17 @@ Item {
             }
         }
 
-        Row {
+        Flow {
             id: filtersRow
             width: parent.width
-            height: 31
+            height: childrenRect.height
             spacing: 8
             z: 20
 
             Item {
                 id: serviceSelector
                 width: root.compactLayout ? 152 : 190
-                height: filtersRow.height
+                height: 31
 
                 ModeButton {
                     id: serviceButton
@@ -259,7 +316,7 @@ Item {
 
             ModeButton {
                 width: root.compactLayout ? 134 : 174
-                height: filtersRow.height
+                height: 31
                 textOnly: true
                 labelText: "STATUS: " + root.statusFilter
                 labelFontSize: 10
@@ -273,7 +330,7 @@ Item {
 
             ModeButton {
                 width: root.compactLayout ? 94 : 108
-                height: filtersRow.height
+                height: 31
                 textOnly: true
                 labelText: root.hubPlacementArmed ? "PICK MAP" : "+ HUB"
                 labelFontSize: 10
@@ -284,9 +341,43 @@ Item {
                 selectedPrimaryColor: Colors.magenta
                 perimeterGlowColor: Colors.blue
                 onTriggered: {
-                    if (hubStore.state !== "ready") return;
-                    root.hubPlacementArmed = !root.hubPlacementArmed;
-                    root.serviceMenuOpen = false;
+                    if (root.hubPlacementArmed) {
+                        root.hubPlacementArmed = false;
+                        root.hubEditorOpen = true;
+                    } else root.beginHubEntry();
+                }
+            }
+
+            ModeButton {
+                width: 83
+                height: 31
+                textOnly: true
+                labelText: root.showCities ? "CITIES ON" : "CITIES OFF"
+                labelFontSize: 10
+                bordered: false
+                selected: root.showCities
+                idlePrimaryColor: Colors.white
+                selectedPrimaryColor: Colors.cyan
+                hoverPrimaryColor: Colors.yellow
+                perimeterGlowColor: Colors.blue
+                onTriggered: root.showCities = !root.showCities
+            }
+
+            ModeButton {
+                width: 104
+                height: 31
+                textOnly: true
+                labelText: root.streetMode ? "STREETS ON" : "STREETS ▾"
+                labelFontSize: 10
+                bordered: false
+                selected: root.streetMode
+                idlePrimaryColor: Colors.white
+                selectedPrimaryColor: Colors.cyan
+                hoverPrimaryColor: Colors.yellow
+                perimeterGlowColor: Colors.blue
+                onTriggered: {
+                    if(root.streetMode) root.streetMode=false;
+                    else root.streetConsentOpen=true;
                 }
             }
         }
@@ -452,6 +543,39 @@ Item {
                             }
                         }
 
+                        // Cities are neutral public reference labels, not
+                        // confirmed company locations. Budget text labels by
+                        // display cell so 1,251 records do not crowd a viewport.
+                        if (root.showCities) {
+                            var minPopulation = root.regionKey==="global"
+                                ? (root.zoom<2 ? 3200000 : 750000)
+                                : root.zoom<1.8 ? 240000
+                                : root.zoom<3.8 ? 85000 : 25000;
+                            var cityRows=CityData.cities.slice().sort(function(a,b) {
+                                return b[4]-a[4];
+                            });
+                            var occupied={};
+                            var labelCount=0;
+                            ctx.font="10px monospace";
+                            for(var ci=0;ci<cityRows.length && labelCount<95;ci++) {
+                                var city=cityRows[ci];
+                                if(city[4]<minPopulation) continue;
+                                if(city[1]<root.bounds.west || city[1]>root.bounds.east
+                                    ||city[2]<root.bounds.south ||city[2]>root.bounds.north) continue;
+                                var cp=Geo.project(city[1],city[2],width,height,
+                                    root.regionKey,root.zoom,root.centerLon,root.centerLat);
+                                if(!cp.visible) continue;
+                                var cell=Math.floor(cp.x/76)+":"+Math.floor(cp.y/25);
+                                if(occupied[cell]) continue;
+                                occupied[cell]=true;
+                                ctx.fillStyle="#8CA8B8";
+                                ctx.fillRect(cp.x-1,cp.y-1,2,2);
+                                ctx.fillStyle="#C7D9E6";
+                                ctx.fillText(city[0],cp.x+5,cp.y-3);
+                                labelCount++;
+                            }
+                        }
+
                         // Owner-entered hub claims: hollow orange map pins,
                         // explicitly distinct from geographic reference dots.
                         for(var z=0;z<root.hubRows.length;z++) {
@@ -576,11 +700,32 @@ Item {
                     }
                 }
 
+                CompanyStreetMap {
+                    id: streetMap
+                    anchors.fill: mapCanvas
+                    visible: root.streetMode
+                    active: root.streetMode && root.visible
+                    hubRows: root.hubRows
+                    selectedHubId: root.selectedHubId
+                    pickingLocation: root.hubPlacementArmed
+                    z: 5
+                    onLocationPicked: function(lon,lat) {
+                        root.openHubEditor(lon,lat);
+                    }
+                    onHubPicked: function(id) {
+                        root.selectedHubId=id;
+                        root.selectedCode="";
+                        root.selectedCountryCode="";
+                        root.selectedCity=null;
+                    }
+                }
+
                 Column {
                     anchors.top: parent.top
                     anchors.right: parent.right
                     anchors.margins: 10
                     spacing: 5
+                    visible: !root.streetMode
                     z: 2
 
                     ActionButton {
@@ -606,6 +751,7 @@ Item {
                     anchors.leftMargin: 10
                     anchors.bottom: parent.bottom
                     anchors.bottomMargin: 8
+                    visible: !root.streetMode
                     text: root.bounds.label + "  //  " + Math.round(root.zoom*100) + "%"
                     color: Colors.white
                     font.pixelSize: 10
@@ -675,6 +821,8 @@ Item {
                     GohuText {
                         text: root.selectedHub
                               ? root.selectedHub.label
+                              : root.selectedCity
+                              ? root.selectedCity[0] + " // CITY REFERENCE"
                               : root.selectedCountry
                               ? root.selectedCountry[1] + " // " + root.selectedCountry[0]
                               : root.selectedState
@@ -693,6 +841,8 @@ Item {
                               ? root.selectedHub.organizationLabel + " / "
                                 + root.selectedHub.city + " / "
                                 + root.selectedHub.serviceFamily
+                              : root.selectedCity
+                              ? "PUBLIC GEOGRAPHIC REFERENCE, NOT A HUB"
                               : root.selectedCountry
                               ? "NATIONAL CAPITAL: " + root.selectedCountry[2]
                               : root.selectedState
@@ -763,6 +913,37 @@ Item {
                                             root.selectedCode="";
                                             root.selectedCountryCode="";
                                         }
+                                    }
+                                }
+                            }
+
+                            Repeater {
+                                model: root.visibleCities()
+                                Rectangle {
+                                    id: cityRow
+                                    required property var modelData
+                                    width: stateRows.width
+                                    height: 25
+                                    color: root.selectedCity
+                                        && root.selectedCity[0]===modelData[0]
+                                        ? Colors.yellow : Colors.black
+                                    border.width: 1
+                                    border.color: Colors.cyan
+
+                                    GohuText {
+                                        anchors.fill: parent
+                                        anchors.leftMargin: 6
+                                        verticalAlignment: Text.AlignVCenter
+                                        font.pixelSize: 10
+                                        text: "• " + cityRow.modelData[0]
+                                        color: root.selectedCity
+                                            && root.selectedCity[0]===cityRow.modelData[0]
+                                            ? Colors.black : Colors.white
+                                        elide: Text.ElideRight
+                                    }
+                                    MouseArea {
+                                        anchors.fill: parent
+                                        onClicked: root.chooseCity(cityRow.modelData)
                                     }
                                 }
                             }
@@ -843,8 +1024,8 @@ Item {
             GohuText {
                 width: parent.width
                 text: root.hubPlacementArmed
-                    ? "CLICK MAP TO PLACE A HUB. Then enter a company label, city, "
-                    + "region and service type. Saved records remain unverified."
+                    ? "CLICK MAP TO SET HUB COORDINATES. THE FORM WILL RETURN "
+                    + "WITH THE FIELDS YOU ALREADY ENTERED."
                     : (root.selectedHub ? root.selectedHub.label + " // "
                     : root.selectedCountry ? root.selectedCountry[1] + " // "
                     : root.selectedState ? root.selectedState[1] + " // "
@@ -860,6 +1041,66 @@ Item {
 
     }
 
+    // Requires a separate deliberate click before requesting remote tiles.
+    Rectangle {
+        id: streetConsent
+        anchors.centerIn: parent
+        z: 65
+        visible: root.streetConsentOpen
+        width: Math.min(parent.width-20,500)
+        height: 225
+        color: Colors.black
+        border.color: Colors.magenta
+        border.width: 2
+
+        Column {
+            anchors.fill: parent
+            anchors.margins: 15
+            spacing: 12
+            GohuText {
+                text: "ENABLE ONLINE STREET DETAIL?"
+                font.pixelSize: 16
+                font.bold: true
+                color: Colors.yellow
+            }
+            GohuText {
+                width: parent.width
+                wrapMode: Text.WordWrap
+                color: Colors.white
+                font.pixelSize: 12
+                text: "Street tiles come from OpenStreetMap. The viewed map "
+                    + "tile coordinates are sent to the provider. No hub names, "
+                    + "employees, clients or organization records are sent. "
+                    + "Tiles are cached locally. Internet required; no business SLA."
+            }
+            GohuText {
+                text: "© OpenStreetMap contributors"
+                color: Colors.cyan
+                font.pixelSize: 11
+            }
+            Row {
+                spacing: 10
+                ModeButton {
+                    width: 175
+                    height: 38
+                    textOnly: true
+                    labelText: "ENABLE STREETS"
+                    bordered: false
+                    selected: true
+                    onTriggered: root.startStreetView()
+                }
+                ModeButton {
+                    width: 90
+                    height: 38
+                    textOnly: true
+                    labelText: "CANCEL"
+                    bordered: false
+                    onTriggered: root.streetConsentOpen=false
+                }
+            }
+        }
+    }
+
     // Map-picked hub editor is confined to Company Coverage; it never
     // accesses verified Identity Center membership or personal client data.
     CompanyHubEditor {
@@ -869,7 +1110,15 @@ Item {
         visible: root.hubEditorOpen
         focus: root.hubEditorOpen
         saving: hubStore.state === "saving"
+        storeState: hubStore.state
+        storeError: hubStore.errorCode
         saveError: hubStore.state === "error" ? hubStore.errorCode : ""
+        onPickLocationRequested: {
+            root.hubEditorOpen = false;
+            root.hubPlacementArmed = true;
+            root.serviceMenuOpen = false;
+        }
+        onRetryStoreRequested: hubStore.refresh()
         onCancelRequested: {
             if (hubStore.state !== "saving")
                 root.hubEditorOpen = false;

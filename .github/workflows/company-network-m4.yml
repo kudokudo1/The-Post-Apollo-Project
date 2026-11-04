@@ -1,0 +1,27 @@
+name: Company Network M4 hub UI, cities and opt-in street tiles
+
+on:
+  pull_request:
+    paths:
+      - 'widgets/CompanyCoveragePane.qml'
+      - 'widgets/CompanyHubEditor.qml'
+      - 'widgets/CompanyStreetMap.qml'
+      - 'widgets/CompanyStreetMath.js'
+      - 'widgets/CompanyCities50.js'
+      - 'services/company/CompanyStreetTiles.py'
+      - 'tests/company/test_company_map_m4.test.js'
+      - 'tests/company/test_company_street_tiles_m4.py'
+      - '.github/workflows/company-network-m4.yml'
+  workflow_dispatch:
+
+jobs:
+  offline-contracts:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Test Company Network M4 geometry, city source and hub flow
+        run: node --test tests/company/test_company_map_m4.test.js tests/company/test_company_hub_m3.test.js tests/company/test_company_network_m1.test.js tests/company/test_company_network_m2.test.js
+      - name: Test private directory and street tile policy without network
+        run: python3 -m unittest discover -s tests/company -p 'test_company_*_m4.py' -v
+      - name: Test hub directory and revision protocol
+        run: python3 -m unittest discover -s tests/company -p 'test_company_hub_directory_m3.py' -v

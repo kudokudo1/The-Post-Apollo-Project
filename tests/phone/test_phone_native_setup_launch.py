@@ -66,6 +66,18 @@ class NativeSetupLaunchTests(unittest.TestCase):
         find.assert_called_once_with("kdeconnect-app")
         self.assertEqual(launcher.call_args.args[0], ["/usr/bin/kdeconnect-app"])
 
+    def test_fallback_to_qt_when_gtk_cannot_launch(self):
+        def find(name):
+            return "/usr/bin/" + name
+        def launch(args, **kwargs):
+            if args == ["/usr/bin/blueferry-gtk"]:
+                raise OSError("PRIVATE_DESKTOP_LOG")
+        response = module.open_setup(
+            "iphone", find_executable=find, launcher=launch)
+        self.assert_locked(response)
+        self.assertEqual(response["status"], "OPEN_REQUESTED")
+        self.assertNotIn("PRIVATE", str(response))
+
     def test_missing_desktop_client_never_runs_background_service(self):
         launcher = mock.Mock()
         result = module.open_setup(

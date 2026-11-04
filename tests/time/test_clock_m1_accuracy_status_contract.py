@@ -98,7 +98,7 @@ class ClockAccuracyStatusContract(unittest.TestCase):
         self.assertNotIn('"PLANNED"', header)
         self.assertNotIn("timew.selectedMode", header)
         self.assertIn("accuracyColor", header)
-        self.assertIn("ANGEL // RESERVED", TIMEW)
+        self.assertIn("ANGEL // EXPLICIT JOURNAL // LOCAL ONLY", TIMEW)
 
     def test_health_status_uses_actual_evidence_with_unknown_fallback(self):
         self.assertIn('case "out-of-sync": return "OUT OF SYNC"', SERVICE)

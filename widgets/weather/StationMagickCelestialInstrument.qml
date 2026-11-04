@@ -53,11 +53,9 @@ Rectangle {
         instrument.zoom=1.0;
         instrument.panPosition=0.5;
         instrument.eventOrdinal=-1;
-    }
-    onGraphModelChanged: {
-        graphCanvas.requestPaint();
         eventTimelineCanvas.requestPaint();
     }
+    onGraphModelChanged: graphCanvas.requestPaint()
     onFocusIndexChanged: {
         graphCanvas.requestPaint();
         eventTimelineCanvas.requestPaint();

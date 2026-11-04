@@ -1,0 +1,50 @@
+name: TASKS M13p closed Connections scoped consent model
+
+on:
+  pull_request:
+    paths:
+      - 'tests/tasks/fixtures/TaskDraftConnectionsPermissionM13p.cjs'
+      - 'tests/tasks/test_task_connections_permission_m13p.cjs'
+      - 'docs/tasks-connections-draft-permission-m13p.md'
+      - '.github/workflows/tasks-connections-permission-m13p.yml'
+      - 'services/connections/ConnectionsBrokerPolicy.js'
+      - 'services/connections/ConnectionsBroker.qml'
+      - 'services/hub/ApolloHubTodoStore.qml'
+  push:
+    branches: [main]
+    paths:
+      - 'tests/tasks/fixtures/TaskDraftConnectionsPermissionM13p.cjs'
+      - 'tests/tasks/test_task_connections_permission_m13p.cjs'
+      - '.github/workflows/tasks-connections-permission-m13p.yml'
+permissions:
+  contents: read
+jobs:
+  simulated-scoped-review-only:
+    runs-on: ubuntu-latest
+    timeout-minutes: 9
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Strict fake-only review, three scopes, expiry and revocation
+        run: |
+          node --check tests/tasks/fixtures/TaskDraftConnectionsPermissionM13p.cjs
+          node --test tests/tasks/test_task_connections_permission_m13p.cjs
+      - name: Existing CPU++ Connections closed broker and displayed statuses
+        run: |
+          node tests/cpuplus/test_connections_broker_c2a.js
+          node tests/cpuplus/test_connections_status_c2g.js
+      - name: Previous encrypted source-bound synthetic transaction
+        run: node --test tests/tasks/test_task_encrypted_draft_transaction_m13m.cjs
+      - name: Existing TASKS one-writer and literal-false activation audit
+        run: python3 tests/tasks/test_task_writer_gate_inventory_m11d.py
+      - name: No production import and no credential/API actuation
+        run: |
+          set -euo pipefail
+          ! grep -q 'TaskDraftConnectionsPermissionM13p' services/connections/ConnectionsBroker.qml
+          ! grep -q 'TaskDraftConnectionsPermissionM13p' services/hub/ApolloHubTodoStore.qml
+          ! grep -q 'TaskDraftConnectionsPermissionM13p' widgets/CpuPlusW.qml
+          ! grep -Eq 'secret-tool|gnome-keyring|writeFile|Quickshell\.env|\.setText\(' \
+            tests/tasks/fixtures/TaskDraftConnectionsPermissionM13p.cjs
+          printf '%s\n' 'M13P_CONNECTIONS_SCOPED_DRAFT_REVIEW_ONLY_NO_AUTHORITY_PASS'

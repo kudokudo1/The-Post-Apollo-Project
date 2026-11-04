@@ -83,12 +83,6 @@ function riverGroupVisible(path,group) {
   var focus=riverFocusForRoute(path);
   return focus==="all" || focus===group;
 }
-function riverTitleFor(path) {
-  var focus=riverFocusForRoute(path);
-  return focus==="all" ? "RIVER // NOAA NWPS"
-    : "RIVER // NOAA NWPS // " + focus.toUpperCase();
-}
-
 function needsSource(path, source) {
   // Existing collector lifetimes remain untouched in classic mode.
   if (path === "") return true;

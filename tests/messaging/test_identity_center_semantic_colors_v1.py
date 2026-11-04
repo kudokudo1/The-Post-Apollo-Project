@@ -9,11 +9,11 @@ ROLE = (Q / "IdentityCenterLocalActionButton.qml").read_text()
 PANE = (Q / "IdentityCenterSettingsSections.qml").read_text()
 FILE_ROLES = {
     "IdentityCenterLocalOrganizationEditor.qml":
-        ["refresh","primary","navigate","manage","manage","manage","manage","manage","primary"],
+        ["refresh","add","navigate","manage","manage","manage","manage","manage","add"],
     "IdentityCenterLocalPortfolioEditor.qml":
-        ["refresh","primary","manage","manage","manage","danger","primary"],
+        ["refresh","add","manage","manage","manage","danger","add"],
     "IdentityCenterLocalStructureEditor.qml":
-        ["refresh","navigate","manage","navigate","primary","manage","manage","manage"],
+        ["refresh","navigate","manage","navigate","add","manage","manage","manage"],
     "IdentityCenterLocalRelationshipModifiers.qml":
         ["navigate","navigate","navigate","navigate","navigate","navigate","navigate",
          "primary","navigate","refresh","danger"],
@@ -43,12 +43,12 @@ class SemanticOrganizationColors(unittest.TestCase):
             'role === "refresh" ? Colors.green',
             'role === "manage" ? Colors.yellow',
             'role === "primary" ? Colors.orange',
+            'role === "add" ? Colors.magenta',
             'role === "focus" ? Colors.magenta',
             'role === "neutral" ? Colors.white',
             ': Colors.blue',
             'pressedFillColor: destructive ? Colors.red : Colors.magenta',
-            'selectedBorderColor: Colors.magenta',
-            'wideGlowEnabled: effectiveSelected',
+            'Preserve base selected/keyboard-selected fill, glow and border rules.',
             'unavailableOpacity: 0.38',
             "hoverFillColor: Qt.rgba(",
         ):
@@ -58,6 +58,12 @@ class SemanticOrganizationColors(unittest.TestCase):
         self.assertNotIn("onTriggered:", ROLE)
         self.assertNotIn("signal triggered", ROLE)
         self.assertIn('import "../../components"', ROLE)
+        # Open/selected retains the inherited base yellow fill/magenta edge,
+        # rather than a custom all-magenta open-state fill.
+        for override in ("selectedFillColor:", "selectedBorderColor:",
+                         "selectedForegroundColor:", "selectedSoftGlowColor:",
+                         "keyboardSelectedFillColor:", "wideGlowEnabled:"):
+            self.assertNotIn(override, ROLE)
 
     def test_each_existing_action_has_a_reviewed_role(self):
         for path, expected in FILE_ROLES.items():
@@ -96,6 +102,12 @@ class SemanticOrganizationColors(unittest.TestCase):
             for name in names:
                 self.assertIn("id: " + name, source)
                 self.assertIn("selectionColor: Colors.magenta", source)
+                self.assertRegex(source,
+                    r"id: " + name + r"\n\s*cursorDelegate: Rectangle \{\n"
+                    r"\s*width: 2\n\s*color: Colors.orange")
+                # Typed text itself is magenta, not just the border/selection.
+                self.assertRegex(source,
+                    r"id: " + name + r"[\s\S]{0,850}?color: Colors.magenta")
                 self.assertIn("selectedTextColor: Colors.black", source)
                 self.assertIn(name + ".activeFocus", source)
                 self.assertIn("? Colors.magenta : Colors.blue", source)
@@ -129,6 +141,27 @@ class SemanticOrganizationColors(unittest.TestCase):
             'label: "RESTORE // LOCKED"')[1][:100])
         self.assertIn('signal activityObserved', backup)
         self.assertIn('snapshotSignature', feedback)
+
+
+    def test_every_add_or_plus_action_is_magenta(self):
+        expected = {
+            "IdentityCenterLocalOrganizationEditor.qml":
+                ['label: "+ ORGANIZATION"', 'label: "+ BRANCH"'],
+            "IdentityCenterLocalPortfolioEditor.qml":
+                ['label: "+ PORTFOLIO"', 'label: "+ " + modelData.name'],
+            "IdentityCenterLocalStructureEditor.qml":
+                ['label: "+ ADD UNIT"'],
+        }
+        for path, labels in expected.items():
+            src = (Q / path).read_text()
+            for label in labels:
+                self.assertIn(label, src)
+                # The corresponding button declaration is the closest
+                # preceding locally themed button, even in Repeater delegates.
+                index = src.index(label)
+                previous = src.rfind("IdentityCenterLocalActionButton {", 0, index)
+                self.assertGreater(previous, 0)
+                self.assertIn('role: "add"', src[previous:index])
 
     def test_no_new_privileged_or_unreviewed_operations(self):
         for forbidden in (

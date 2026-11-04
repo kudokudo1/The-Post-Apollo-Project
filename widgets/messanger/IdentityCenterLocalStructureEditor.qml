@@ -218,11 +218,15 @@ Column {
                 ? Colors.magenta : Colors.blue
             TextInput {
                 id: newUnitName
+                cursorDelegate: Rectangle {
+                    width: 2
+                    color: Colors.orange
+                }
                 selectionColor: Colors.magenta
                 selectedTextColor: Colors.black
                 anchors.fill: parent
                 anchors.margins: 6
-                color: Colors.white
+                color: Colors.magenta
                 font.pixelSize: 11
                 maximumLength: 80
                 clip: true
@@ -241,7 +245,7 @@ Column {
             }
         }
         IdentityCenterLocalActionButton {
-            role: "primary"
+            role: "add"
             width: 136
             height: 30
             label: "+ ADD UNIT"
@@ -320,12 +324,16 @@ Column {
                         ? Colors.magenta : Colors.blue
                     TextInput {
                         id: unitName
+                        cursorDelegate: Rectangle {
+                            width: 2
+                            color: Colors.orange
+                        }
                         selectionColor: Colors.magenta
                         selectedTextColor: Colors.black
                         anchors.fill: parent
                         anchors.margins: 6
                         text: unitRow.modelData.name
-                        color: Colors.white
+                        color: Colors.magenta
                         font.pixelSize: 10
                         maximumLength: 80
                         clip: true

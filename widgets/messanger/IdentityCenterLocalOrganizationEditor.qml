@@ -86,11 +86,15 @@ Column {
                 ? Colors.magenta : Colors.blue
             TextInput {
                 id: newOrgName
+                cursorDelegate: Rectangle {
+                    width: 2
+                    color: Colors.orange
+                }
                 selectionColor: Colors.magenta
                 selectedTextColor: Colors.black
                 anchors.fill: parent
                 anchors.margins: 6
-                color: Colors.white
+                color: Colors.magenta
                 font.pixelSize: 11
                 maximumLength: 80
                 clip: true
@@ -109,7 +113,7 @@ Column {
             }
         }
         IdentityCenterLocalActionButton {
-            role: "primary"
+            role: "add"
             width: 136
             height: 30
             label: "+ ORGANIZATION"
@@ -198,12 +202,16 @@ Column {
                         ? Colors.magenta : Colors.blue
                     TextInput {
                         id: orgName
+                        cursorDelegate: Rectangle {
+                            width: 2
+                            color: Colors.orange
+                        }
                         selectionColor: Colors.magenta
                         selectedTextColor: Colors.black
                         anchors.fill: parent
                         anchors.margins: 6
                         text: orgRow.modelData.name
-                        color: Colors.white
+                        color: Colors.magenta
                         font.pixelSize: 10
                         maximumLength: 80
                         clip: true
@@ -266,12 +274,16 @@ Column {
                                 ? Colors.magenta : Colors.blue
                             TextInput {
                                 id: branchName
+                                cursorDelegate: Rectangle {
+                                    width: 2
+                                    color: Colors.orange
+                                }
                                 selectionColor: Colors.magenta
                                 selectedTextColor: Colors.black
                                 anchors.fill: parent
                                 anchors.margins: 6
                                 text: branchRow.modelData.name
-                                color: Colors.white
+                                color: Colors.magenta
                                 font.pixelSize: 10
                                 maximumLength: 80
                                 clip: true
@@ -323,11 +335,15 @@ Column {
                             ? Colors.magenta : Colors.blue
                         TextInput {
                             id: newBranchName
+                            cursorDelegate: Rectangle {
+                                width: 2
+                                color: Colors.orange
+                            }
                             selectionColor: Colors.magenta
                             selectedTextColor: Colors.black
                             anchors.fill: parent
                             anchors.margins: 6
-                            color: Colors.white
+                            color: Colors.magenta
                             font.pixelSize: 10
                             maximumLength: 80
                             clip: true
@@ -346,7 +362,7 @@ Column {
                         }
                     }
                     IdentityCenterLocalActionButton {
-                        role: "primary"
+                        role: "add"
                         width: 136
                         height: 28
                         label: "+ BRANCH"

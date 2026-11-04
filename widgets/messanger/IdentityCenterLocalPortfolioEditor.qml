@@ -100,11 +100,15 @@ Column {
                 ? Colors.magenta : Colors.blue
             TextInput {
                 id: createName
+                cursorDelegate: Rectangle {
+                    width: 2
+                    color: Colors.orange
+                }
                 selectionColor: Colors.magenta
                 selectedTextColor: Colors.black
                 anchors.fill: parent
                 anchors.margins: 6
-                color: Colors.white
+                color: Colors.magenta
                 font.pixelSize: 11
                 maximumLength: 80
                 enabled: editor.editable
@@ -123,7 +127,7 @@ Column {
             }
         }
         IdentityCenterLocalActionButton {
-            role: "primary"
+            role: "add"
             width: 136
             height: 30
             label: "+ PORTFOLIO"
@@ -196,13 +200,17 @@ Column {
                         ? Colors.magenta : Colors.blue
                     TextInput {
                         id: portfolioName
+                        cursorDelegate: Rectangle {
+                            width: 2
+                            color: Colors.orange
+                        }
                         selectionColor: Colors.magenta
                         selectedTextColor: Colors.black
                         anchors.fill: parent
                         anchors.margins: 6
                         text: portfolioRow.modelData.name
                         font.pixelSize: 10
-                        color: Colors.white
+                        color: Colors.magenta
                         maximumLength: 80
                         readOnly: !editor.editable || portfolioRow.modelData.archived
                         clip: true
@@ -323,7 +331,7 @@ Column {
                     Repeater {
                         model: editor.availableToAdd(portfolioRow.modelData)
                         delegate: IdentityCenterLocalActionButton {
-                            role: "primary"
+                            role: "add"
                             required property var modelData
                             width: Math.min(200, Math.max(105, portfolioRow.width - 20))
                             height: 29

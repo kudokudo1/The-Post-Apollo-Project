@@ -40,8 +40,8 @@ class SocialUserSettingsRailContracts(unittest.TestCase):
         self.assertIn("anchors.bottom: parent.bottom", SELECTOR[footer:footer + 220])
         self.assertIn('label: "USER // SETTINGS"', SELECTOR[footer:footer + 480])
         self.assertIn(
-            "appSelector.settingsOpen = !appSelector.settingsOpen;",
-            SELECTOR[footer:footer + 650],
+            "onTriggered: appSelector.settingsOpen = !appSelector.settingsOpen",
+            SELECTOR[footer:footer + 550],
         )
         self.assertNotIn("appSelector.appActivated", SELECTOR[footer:footer + 600])
         self.assertIn("visible: true", SELECTOR)

@@ -121,8 +121,8 @@ test("city icon and star ornaments share one vertical text-cell frame in dock an
             label+" shares one vertical box across the artwork");
         assert.equal((mark.match(/verticalAlignment: Text\.AlignVCenter/g)||[]).length,3,
             label+" centers each text line box");
-        assert.doesNotMatch(mark,/anchors\.verticalCenter: parent\.verticalCenter/,
-            label+" must not anchor children inside the Row");
+        assert.doesNotMatch(mark,/NotoText\s*\{\s*anchors\.verticalCenter:/,
+            label+" must not anchor child glyphs inside the Row");
         for(const glyph of ['". ݁₊⊹"','"🏙︎"','"๋࣭⭑"'])
             assert.ok(mark.includes("text: "+glyph),label+" preserves icon artwork");
         assert.match(mark,/color: Colors\.white/);

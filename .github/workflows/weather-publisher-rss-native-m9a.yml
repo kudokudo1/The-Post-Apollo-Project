@@ -1,0 +1,38 @@
+name: Weather M9a native publisher RSS smoke
+
+on:
+  pull_request:
+    paths:
+      - "tests/weather/fixtures/M9APublisherRssFake.py"
+      - "tests/weather/fixtures/M9APublisherRssNative.qml"
+      - "scripts/weather/verify_publisher_rss_native_m9a.sh"
+      - ".github/workflows/weather-publisher-rss-native-m9a.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  native-publisher-rss:
+    runs-on: ubuntu-latest
+    container:
+      image: fedora:44
+    timeout-minutes: 15
+    steps:
+      - name: Install Fedora Quickshell, X11 pointer runner and Python
+        run: |
+          dnf install -y --setopt=install_weak_deps=False dnf5-plugins
+          dnf copr enable -y errornointernet/quickshell
+          dnf install -y --setopt=install_weak_deps=False \
+            quickshell qt6-qtdeclarative qt6-qt5compat qt6-qtbase-gui \
+            qt6-qtsvg nodejs python3 coreutils findutils \
+            xdotool xorg-x11-server-Xvfb
+          quickshell --version
+          quickshell --version | grep '0.3.'
+      - uses: actions/checkout@v4
+      - name: Native fake-only BBC and Al Jazeera source controls and inspectors
+        run: bash scripts/weather/verify_publisher_rss_native_m9a.sh
+      - name: Preserve previous M9 RSS isolation and parser contracts
+        run: |
+          python3 tests/weather/test_station_publisher_rss_m9.py
+          node tests/weather/test_station_publisher_rss_m9.js

@@ -56,8 +56,24 @@ jobs:
           tar -xjf "$RUNNER_TEMP/maplibre.tar.bz2" -C "$RUNNER_TEMP/maplibre"
           config="$(find "$RUNNER_TEMP/maplibre" -type f -name QMapLibreConfig.cmake -print -quit)"
           test -n "$config"
+          # The release archive includes an extra package-name directory.
+          # Find actual QML and geoservices plugin roots, not the extraction dir.
+          qmldir="$(find "$RUNNER_TEMP/maplibre" -type f -path '*/MapLibre/qmldir' -print -quit)"
+          geoplugin="$(find "$RUNNER_TEMP/maplibre" -type f -path '*/geoservices/*' -iname '*maplibre*.so' -print -quit)"
+          echo "MapLibre QML descriptor: $qmldir"
+          echo "MapLibre geoservices plugin: $geoplugin"
+          test -n "$qmldir"
+          test -n "$geoplugin"
+          qmlroot="$(dirname "$(dirname "$qmldir")")"
+          pluginroot="$(dirname "$(dirname "$geoplugin")")"
+          # MapLibre package ships shared libraries under the extracted prefix.
+          libdir="$(find "$RUNNER_TEMP/maplibre" -type f -name 'libQMapLibre.so*' -print -quit)"
+          test -n "$libdir"
+          libdir="$(dirname "$libdir")"
           echo "QMAPLIBRE_DIR=$(dirname "$config")" >> "$GITHUB_ENV"
-          echo "MAPLIBRE_ROOT=$RUNNER_TEMP/maplibre" >> "$GITHUB_ENV"
+          echo "MAPLIBRE_QML_ROOT=$qmlroot" >> "$GITHUB_ENV"
+          echo "MAPLIBRE_PLUGIN_ROOT=$pluginroot" >> "$GITHUB_ENV"
+          echo "MAPLIBRE_LIB_DIR=$libdir" >> "$GITHUB_ENV"
 
       - name: Compile independent QtQuick MapLibre app
         shell: bash
@@ -77,9 +93,13 @@ jobs:
           export QT_QPA_PLATFORM=xcb
           export LIBGL_ALWAYS_SOFTWARE=1
           export QSG_RHI_BACKEND=opengl
-          export QT_PLUGIN_PATH="$MAPLIBRE_ROOT/plugins:$QT_ROOT_DIR/plugins"
-          export QML_IMPORT_PATH="$MAPLIBRE_ROOT/qml:$QT_ROOT_DIR/qml"
-          export LD_LIBRARY_PATH="$MAPLIBRE_ROOT/lib:$QT_ROOT_DIR/lib:$LD_LIBRARY_PATH"
+          export QT_PLUGIN_PATH="$MAPLIBRE_PLUGIN_ROOT:$QT_ROOT_DIR/plugins"
+          export QML_IMPORT_PATH="$MAPLIBRE_QML_ROOT:$QT_ROOT_DIR/qml"
+          export QML2_IMPORT_PATH="$MAPLIBRE_QML_ROOT:$QT_ROOT_DIR/qml"
+          export LD_LIBRARY_PATH="$MAPLIBRE_LIB_DIR:$QT_ROOT_DIR/lib:${LD_LIBRARY_PATH:-}"
+          echo "MapLibre QML module: $MAPLIBRE_QML_ROOT/MapLibre"
+          echo "MapLibre plugin dir: $MAPLIBRE_PLUGIN_ROOT/geoservices"
+          test -f "$MAPLIBRE_QML_ROOT/MapLibre/qmldir"
           cd "$RUNNER_TEMP/company-vector-build"
           xvfb-run -a -s '-screen 0 1280x900x24' \
             timeout 25s ./company-vector-probe --capture

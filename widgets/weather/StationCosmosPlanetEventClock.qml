@@ -10,7 +10,7 @@ Rectangle {
     color: Colors.black
     border.color: Colors.cyan
     border.width: 1
-    height: 442
+    height: 414
 
     property var providerRows: []
     property string civilDate: ""
@@ -45,7 +45,7 @@ Rectangle {
     Column {
         anchors.fill: parent
         anchors.margins: 11
-        spacing: 7
+        spacing: 5
 
         Row {
             width: parent.width

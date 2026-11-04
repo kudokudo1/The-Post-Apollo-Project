@@ -42,8 +42,9 @@ class PhoneStageLayoutTests(unittest.TestCase):
         self.assertIn(
             'height: phonePane.stageHoleActive ? phonePane.stageHoleHeight : 0',
             self.social)
-        self.assertIn('fillOpacity: phonePane.stageHoleActive ? 0 : 0.20',
+        self.assertIn('fillVisible: !phonePane.stageHoleActive',
                       self.social)
+        self.assertIn('fillOpacity: 0.20', self.social)
         self.assertIn('id: phonePane', self.social)
         self.assertIn('title: "QS_SOCIAL_MENU"', self.social)
 
@@ -83,8 +84,7 @@ class PhoneStageLayoutTests(unittest.TestCase):
         self.assertNotIn('terminalView.openTerminal', self.phone)
         self.assertNotIn('messageRouter.sendMessage', self.phone)
         self.assertNotIn('SocialIdentityStore.', self.phone)
-        self.assertNotIn('phonePane.stageHoleActive ? 0 : 0.20\n        borderVisible: true',
-                         self.social)
+        self.assertIn('fillVisible: !phonePane.stageHoleActive', self.social)
 
 
 if __name__ == "__main__":

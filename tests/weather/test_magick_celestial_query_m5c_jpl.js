@@ -23,7 +23,20 @@ test("real JPL 90-day M4 output matches M5c pair and M5 presentation",{
     const payload=JSON.parse(fs.readFileSync(filename,"utf8"));
     const req=Query.requestFor("2026-11-03",0,pairId,90);
     assert.ok(req,"preset recognized");
+    // The 90-day / 10-body spatial payload must remain inside the current
+    // Quickshell collector's strict 524288-character response limit.
+    assert.ok(fs.statSync(filename).size < 524288,"M4 response exceeds service cap");
     assert.equal(Query.matchesResult(payload,req),true);
+    const atlas=payload.solar_overview;
+    assert.equal(atlas.format,"post-apollo.weather.solar-overview.v1");
+    assert.equal(atlas.origin,"heliocentric");
+    assert.equal(atlas.position_model,"geometric");
+    assert.deepEqual(atlas.series.map(s=>s.body),JSON.parse(
+        JSON.stringify(req.solar_overview_bodies)));
+    assert.deepEqual(atlas.times_unix_ms,payload.series[0].samples
+        .map(sample=>sample.unix_ms));
+    assert.equal(atlas.series.length,10);
+    assert.equal(atlas.sample_count,181);
     assert.equal(payload.provenance.ephemeris_id,"de440s.bsp");
     assert.equal(payload.query.step_hours,12);
     assert.equal(payload.query.include_events,true);

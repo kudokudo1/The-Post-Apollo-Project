@@ -27,6 +27,8 @@ class NativePolkitClockResyncContracts(unittest.TestCase):
         launch = SERVICE.split("function launchResyncAfterAgentReady(nativeRegistered) {", 1)[1].split(
             "Timer {", 1)[0]
         self.assertIn("resyncAuthPending = false", launch)
+        self.assertIn("authSessionActive = true", SERVICE)
+        self.assertIn("authSessionActive = false", SERVICE)
         self.assertIn("resyncProcess.exec([", launch)
         self.assertIn('"resync"', launch)
         self.assertIn("authRegistrationFallback.stop()", launch)
@@ -35,7 +37,7 @@ class NativePolkitClockResyncContracts(unittest.TestCase):
         self.assertIn("import qs.services.time", SHELL)
         self.assertIn("LazyLoader {", SHELL)
         self.assertIn("TimeSettings.resyncAuthPending", SHELL)
-        self.assertIn('TimeSettings.resyncStatus === "working"', SHELL)
+        self.assertIn("TimeSettings.authSessionActive", SHELL)
         self.assertIn("TimeResyncAuthW.qml", SHELL)
         self.assertIn('authRegistrationFallback.restart()', SERVICE)
         self.assertIn("launchResyncAfterAgentReady(true)", AUTH)
@@ -70,7 +72,7 @@ class NativePolkitClockResyncContracts(unittest.TestCase):
         self.assertIn('[chronyd, "-q", "-t", "15"]', HOST)
         self.assertNotIn("set-ntp", SERVICE)
         self.assertNotIn("set-local-rtc", HOST)
-        self.assertNotIn("set-timezone", HOST)
+        self.assertIn('["timedatectl", "set-timezone", zone]', HOST)
 
 
 if __name__ == "__main__":

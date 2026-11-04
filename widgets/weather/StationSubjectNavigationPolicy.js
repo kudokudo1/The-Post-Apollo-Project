@@ -82,6 +82,7 @@ var SUBJECTS = [
   {id:"media",label:"MEDIA",sections:[
     {id:"overview",label:"OVERVIEW"},
     {id:"news",label:"NEWS",children:[
+      {id:"full",label:"NEWS // ALL ORIGINAL TABS AND REPORTS"},
       {id:"reports",label:"REPORTS"}, {id:"filters",label:"FILTERS"},
       {id:"trends",label:"REPORTING TRENDS"}, {id:"stories",label:"STORY FAMILIES"},
       {id:"locations",label:"MENTIONED LOCATIONS"}, {id:"viewer",label:"ARTICLE INSPECTOR"}]},
@@ -90,6 +91,7 @@ var SUBJECTS = [
       {id:"reports",label:"PUBLISHER DESTINATIONS"},
       {id:"compare",label:"SOURCE COMPARISON"}, {id:"satire",label:"SATIRE"}]},
     {id:"radio",label:"RADIO",children:[
+      {id:"full",label:"RADIO // ALL ORIGINAL CONTROLS"},
       {id:"directory",label:"STATION DIRECTORY"},
       {id:"saved",label:"FAVORITES AND RECENTS"},
       {id:"transport",label:"PLAYBACK"}]},

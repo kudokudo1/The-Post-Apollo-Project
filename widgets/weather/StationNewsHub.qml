@@ -16,7 +16,11 @@ Rectangle {
     property string section: "LIVE"
     // Empty route keeps the original CLASSIC NEWS hub unchanged.
     property string subjectRoute: ""
-    readonly property string effectiveSection: subjectRoute === ""
+    // M28-T: the native NEWS // ALL route restores the exact CLASSIC
+    // six-tab channel controls and the same GDELT report inspector.
+    readonly property bool usesOriginalChannelTabs:
+        subjectRoute === "" || MediaPanelPolicy.isFullNews(subjectRoute)
+    readonly property string effectiveSection: usesOriginalChannelTabs
         ? section : MediaPanelPolicy.catalogSectionFor(subjectRoute)
     onSubjectRouteChanged: {
         if (viewerOpen)
@@ -51,7 +55,7 @@ Rectangle {
     property string inflightCreatorId: ""
     // CLASSIC REPORTS means GDELT; MEDIA WATCH / REPORTS means
     // publisher catalogue. Never select a data source by label alone.
-    readonly property bool isReports: subjectRoute === ""
+    readonly property bool isReports: usesOriginalChannelTabs
         ? section === "REPORTS"
         : MediaPanelPolicy.kindForRoute(subjectRoute) === "news"
     readonly property var runtimeRows:
@@ -194,9 +198,9 @@ Rectangle {
         anchors.right: parent.right
         anchors.top: parent.top
         anchors.margins: 10
-        height: stationNewsHub.subjectRoute === "" ? 33 : 0
+        height: stationNewsHub.usesOriginalChannelTabs ? 33 : 0
         spacing: 7
-        visible: stationNewsHub.subjectRoute === ""
+        visible: stationNewsHub.usesOriginalChannelTabs
                  && !stationNewsHub.viewerOpen
 
         Repeater {
@@ -262,7 +266,7 @@ Rectangle {
                 height: 25
                 spacing: 12
                 GohuText {
-                    text: (stationNewsHub.subjectRoute === "" ? "NEWS // " : "MEDIA // ")
+                    text: (stationNewsHub.usesOriginalChannelTabs ? "NEWS // " : "MEDIA // ")
                       + stationNewsHub.effectiveSection
                     color: Colors.cyan
                     font.pixelSize: 20

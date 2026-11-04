@@ -104,7 +104,7 @@ test("MAP source rack is opened in-place into both original provider-owned map v
     "NOAA MRMS // MANUAL RADAR",
     "RAINVIEWER // PAST RADAR FALLBACK"
   ])assert.ok(discovery.includes(literal),literal);
-  assert.match(earthPane,/earthMapOnly: true/);
+  assert.match(earthPane,/earthMapOnly: !EarthPanelPolicy\.isFullMap\(earthPane\.subjectRoute\)/);
   assert.match(weatherPane,/weatherMapOnly: true/);
   assert.match(discovery,/NOAA HMS \+ SMOKE PLUMES|NOAA HMS \/\/ SMOKE PLUMES/);
   assert.match(discovery,/KEY REQUIRED/);

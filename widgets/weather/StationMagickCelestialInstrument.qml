@@ -43,8 +43,13 @@ Rectangle {
     readonly property var graphModel: Celestial.model(visualData)
     readonly property var viewWindow: Celestial.windowFor(
         graphModel,zoom,panPosition)
-    readonly property int focusIndex: Celestial.selectedIndex(
-        graphModel,lockedIndex,hoveredIndex)
+    // The thumb and inspector always refer to a sample in the current
+    // zoom/pan window, even when an earlier lock has moved off screen.
+    readonly property int focusIndex: graphModel.ready
+        ? Celestial.clamp(
+            Celestial.selectedIndex(graphModel,lockedIndex,hoveredIndex),
+            viewWindow.from,viewWindow.to)
+        : -1
     readonly property var wheelPoints: Celestial.wheelPositions(
         graphModel,focusIndex)
     readonly property string focusBody: selectedBody !== "" &&

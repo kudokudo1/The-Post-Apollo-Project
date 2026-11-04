@@ -1,0 +1,58 @@
+name: Connections C2i read-only local host observation
+
+on:
+  pull_request:
+    paths:
+      - "services/connections/ConnectionsHostStatusInspect.py"
+      - "services/connections/ConnectionsHostStatusPolicy.js"
+      - "services/connections/ConnectionsHostObservation.qml"
+      - "services/connections/qmldir"
+      - "widgets/cpuplus/CpuPlusSettingsConnectionsDetailsPane.qml"
+      - "tests/connections/test_connections_c2i_host_inspection.py"
+      - "tests/cpuplus/test_connections_host_inspection_c2i.js"
+      - "tests/cpuplus/fixtures/C1ConnectionsNative.qml"
+      - "scripts/cpuplus/verify_connections_native_c1.sh"
+      - ".github/workflows/connections-c2i-local-host-inspection.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  readonly-private-host:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Test fixed private socket observation and offline/malicious response handling
+        run: timeout 35s python3 -B tests/connections/test_connections_c2i_host_inspection.py
+      - name: Test CPU++ projection cannot turn observed state into a permission
+        run: node tests/cpuplus/test_connections_host_inspection_c2i.js
+      - name: Preserve C2g read-only status and C2e/C2a closed grant contracts
+        run: |
+          node tests/cpuplus/test_connections_status_c2g.js
+          node tests/cpuplus/test_connections_review_c2e.js
+          node tests/cpuplus/test_connections_broker_c2a.js
+          node tests/cpuplus/test_cpuplus_connections_c1.js
+      - name: Preserve C2f fake host state machine
+        run: timeout 55s python3 -B tests/connections/test_connections_c2f_request_lifecycle.py
+      - name: Assert real request-status singleton and credential release remain disabled
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          request = Path("services/connections/ConnectionsRequestStatus.qml").read_text()
+          broker = Path("services/connections/ConnectionsBroker.qml").read_text()
+          inspector = Path("services/connections/ConnectionsHostObservation.qml").read_text()
+          assert "readonly property bool hostConnected: false" in request
+          assert "readonly property bool hostAuthenticated: false" in request
+          assert "readonly property var latestStatus: null" in request
+          assert "readonly property bool credentialActionsEnabled: false" in broker
+          assert "readonly property bool credentialActionsEnabled: false" in inspector
+          print("C2I_PASS // PRODUCTION_GRANT_AND_HOST_AUTHENTICATION_CLOSED")
+          PY

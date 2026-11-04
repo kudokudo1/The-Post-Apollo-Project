@@ -115,8 +115,8 @@ test("root badge uses real selected SUBJECTS runtimes and preserves original ale
   assert.match(station,/SubjectSourceBadge\.badgeFor\(/);
   assert.match(station,/subjectNavigator\.currentPath,subjectNavigator\.indexOpen/);
   assert.match(station,/weatherRuntimeState,spaceRuntimeState,currentPageRuntimeSummary/);
-  assert.match(station,/subjectNavigationOpen \? subjectNavigator\.liveMapRuntimeRows/);
-  assert.match(station,/if \(subjectNavigationOpen\) \{/);
+  assert.match(station,/subjectNavigator\.liveMapRuntimeRows/);
+  assert.match(station,/sourceStatusDisplay: sourceStatusText/);
   assert.match(station,/subjectNavigator\.liveWeatherKind !== ""/);
   assert.match(station,/!subjectNavigator\.indexOpen/);
   assert.match(station,/return subjectSourceBadge\.text;/);
@@ -125,7 +125,7 @@ test("root badge uses real selected SUBJECTS runtimes and preserves original ale
   assert.match(station,/text: weatherStation\.sourceStatusDisplay/);
   assert.match(station,/border\.color: weatherStation\.sourceStatusColor/);
   assert.match(station,/onTriggered: weatherStation\.sourceStatusClock\+\+/);
-  assert.match(station,/active: !weatherStation\.subjectNavigationOpen/);
+  assert.ok(!station.includes("weatherContentLoader"));
   assert.equal((station.match(/id: sourceStatusIndicator/g)||[]).length,1);
 });
 
@@ -180,9 +180,9 @@ test("100%-mapped source ledger is NOT video, GPS, Sway, or CLASSIC retirement a
   assert.deepEqual(plain(env.remainingSourcePagesForPath("tools",env.PANELS)),[]);
   assert.deepEqual(plain(env.remainingSourcePagesForPath("earth",env.PANELS)),[]);
   assert.deepEqual(plain(env.remainingSourcePagesForPath("weather",env.PANELS)),[]);
-  assert.match(station,/\? "CLASSIC" : "SUBJECTS"/);
+  assert.ok(!station.includes('subjectBrowserToggle'));
   assert.match(station,/StationTerminal\s*\{/);
-  assert.match(station,/onLegacyPageRequested: function\(pageId\)/);
+  assert.ok(!station.includes("openLegacyFromSubject"));
   const viewer=read("widgets/weather/StationChannelScreen.qml");
   assert.match(viewer,/readonly property bool playbackAvailable: false/);
   assert.match(viewer,/WEBENGINE DISABLED \/\/ QUICKSHELL CRASH PROTECTION/);

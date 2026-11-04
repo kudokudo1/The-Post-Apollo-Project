@@ -27,6 +27,14 @@ After review and merge under operator authorization, and separately approved loc
 - Existing `.github/workflows/weather-cosmos-planet-events-v2b.yml` now triggers for both new source files and runs V3d alongside V2b/V2c/V2d/V3a/V3b/V3c, prior COSMOS V2/V2r/C1 and W1r regressions. PR head status must be checked.
 - Native QML rendering (real canvas, fonts, input propagation, parent scroll containment, geometry at actual station width) remains UNVERIFIED until operator desktop test. Code CI cannot prove the buttons or markers receive actual mouse events.
 
+### PR #1206 verification boundary (2026-11-04)
+
+- GitHub Actions head `ca274385fc9c8a1bb5d040580d0feb95ed1b64cc`: dedicated **Weather COSMOS V2b USNO Planet Event Clock** passed; Meta Apollo Grammar and TASKS M11d passed.
+- **Weather Station Teardown Contracts** failed at `Validate Weather Station domain palette and live meter contracts`: `tests/weather/test_domain_palette_contracts.js:282` still asserts `/readonly property bool usesHomeSources:/` against `widgets/weather/WeatherStationW.qml`.
+- Current `main` and this branch have byte-identical blob SHA `71a08f5a513e6fdf98001208e992a9927ca09ca8` for `WeatherStationW.qml`; both lack `usesHomeSources`. The test file is also byte-identical (`3e140348a2a67ecad46f1846e30f1813ed40250f`). This is a **pre-existing mismatch following the other worker's CLASSIC-source retirement**, not a V3d source regression.
+- Ownership stays with the M28-V CLASSIC migration/test owner. Do **not** patch their shared source or rewrite the palette contract from this visual Lane B assignment. Keep V3d PR in draft until the suite is reconciled or the owner explicitly adjudicates this blocker.
+- The current draft has not been merged or installed; native Canvas/mouse acceptance remains pending.
+
 ## WATCH OUT FOR
 
 - Do not call this an orbital clock, ephemeris position wheel or planetary aspect: the angular coordinate is time-of-day for a discrete rise/transit/set calculation; different markers can refer to different moments. The existing MAGICK JPL source and associated M4/M5 relationship instruments are separately owned.
@@ -42,7 +50,8 @@ After review and merge under operator authorization, and separately approved loc
 - [x] Implement interactive five-planet circle and honest markers
 - [x] Wire internal DAY RING switch; preserve previous views
 - [x] Add unit/contract regressions and CI trigger
-- [ ] Final GitHub CI green
+- [x] Dedicated COSMOS CI green
+- [ ] Repository-wide teardown contract repaired by the owning worker
 - [ ] Native Fedora/Quickshell visual and mouse test
 - [ ] Operator acceptance
 

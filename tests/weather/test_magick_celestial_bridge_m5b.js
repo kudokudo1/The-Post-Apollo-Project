@@ -39,6 +39,7 @@ test("Weather Station root is sole calculation owner and SUBJECTS only consumes"
   assert.equal((station.match(/WeatherServices\.CelestialVisualService\s*\{/g)||[]).length,1);
   assert.match(station,/id: celestialVisualService/);
   assert.match(station,/MagickPanelPolicy\.visualForRoute\(subjectNavigator\.currentPath\)/);
+  assert.match(station,/subjectNavigator\.currentPath === "magick\/overview"/);
   assert.match(station,/route: subjectNavigator\.currentPath/);
   assert.match(station,/anchorNowMs: weatherStation\.runtimeNowMs/);
   assert.match(station,/celestialSource: celestialVisualService/);

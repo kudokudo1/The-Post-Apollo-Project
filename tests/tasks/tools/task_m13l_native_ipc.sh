@@ -47,7 +47,7 @@ fi
 # Hashes are the reviewed GitHub blobs, not a trust guarantee for plugins
 # or for executable files outside this narrow test boundary.
 if [[ "$(git hash-object -- "$qml")" != "2f678121aec04f763b0e130f937fec6af0ad2734" ||
-      "$(git hash-object -- "$scene")" != "8a3c8514cc7e072d443be8ba9f2aeb26368048e3" ||
+      "$(git hash-object -- "$scene")" != "52d5228053e15191846f7dbad57a3441bda7033d" ||
       "$(git hash-object -- "$host")" != "40f96104ab48a56267bf4c6aab78bbb4d2a5b41c" ||
       "$(git hash-object -- "$fixture")" != "fe9707077db3e49c6d65edc9c01f9bb6ae2926df" ||
       "$(git hash-object -- "$cipher")" != "ede2a14684c15255244781d8897934472fd7fc2e" ]]; then
@@ -173,6 +173,13 @@ else
       index($0,"M13L_PHASE_BRIDGE_SETTLED") { settled=1 }
       index($0,"M13L_PHASE_HOST_EXIT_UNVERIFIED") { exitbad=1 }
       index($0,"M13L_PHASE_HOST_RESPONSE_INVALID") { responsebad=1 }
+      index($0,"M13L_PHASE_HOST_REQUEST_TIMEOUT") { hostrequesttimeout=1 }
+      index($0,"M13L_PHASE_HOST_REQUEST_INVALID") { hostrequestinvalid=1 }
+      index($0,"M13L_PHASE_HOST_PRIVATE_SESSION_REFUSED") { hostsessionrefused=1 }
+      index($0,"M13L_PHASE_HOST_ENCRYPT_REFUSED") { hostencryptrefused=1 }
+      index($0,"M13L_PHASE_HOST_REOPEN_REFUSED") { hostreopenrefused=1 }
+      index($0,"M13L_PHASE_HOST_MISSING_KEY_GATE_REFUSED") { hostmissingkeyrefused=1 }
+      index($0,"M13L_PHASE_HOST_CLEANUP_UNVERIFIED") { hostcleanupbad=1 }
       index($0,"M13L_PHASE_QML_TIMER_EXPIRED") { qtmtime=1 }
       index($0,"M13L_NATIVE_QML_IPC_REFUSED") { refused=1 }
       index($0,"is not a type") { badtype=1 }
@@ -190,6 +197,13 @@ else
         if(startdenied) print "M13L_QML_START_REFUSED"
         if(exitbad) print "M13L_QML_HOST_EXIT_UNVERIFIED"
         if(responsebad) print "M13L_QML_HOST_RESPONSE_INVALID"
+        if(hostrequesttimeout) print "M13L_HOST_REQUEST_TIMEOUT"
+        if(hostrequestinvalid) print "M13L_HOST_REQUEST_INVALID"
+        if(hostsessionrefused) print "M13L_HOST_PRIVATE_SESSION_REFUSED"
+        if(hostencryptrefused) print "M13L_HOST_ENCRYPT_REFUSED"
+        if(hostreopenrefused) print "M13L_HOST_REOPEN_REFUSED"
+        if(hostmissingkeyrefused) print "M13L_HOST_MISSING_KEY_GATE_REFUSED"
+        if(hostcleanupbad) print "M13L_HOST_CLEANUP_UNVERIFIED"
         if(qtmtime) print "M13L_QML_INTERNAL_TIMER_EXPIRED"
         if(refused) print "M13L_QML_REFUSAL_OBSERVED"
         if(badtype) print "M13L_QML_TYPE_RESOLUTION_FAILURE"

@@ -15,6 +15,8 @@ Item {
     property bool showTimezoneDetails: true
     property bool showResyncTrigger: false
     property bool showSharedServiceCaption: true
+    property bool zonePickerExpanded: false
+    readonly property bool zoneSearchFocused: systemZonePicker.searchFocused
 
     Flickable {
         id: scroll
@@ -129,6 +131,147 @@ Item {
                     available: !TimeSettings.hostRefreshing
                     onLeftClicked: TimeSettings.refreshHostStatus()
                 }
+            }
+            // This uses TimeW's existing country-aware, scrollable star-rail
+            // zone selector, but applies the chosen zone to Linux via timedated.
+            // CPU++ TIME keeps its intentionally narrower view for now.
+            GohuText {
+                width: parent.width
+                visible: pane.showTimezoneDetails
+                text: "SYSTEM TIMEZONE // CHANGE"
+                font.pixelSize: 12
+                color: Colors.cyan
+            }
+            Row {
+                id: zonePresetRow
+                width: parent.width
+                height: pane.showTimezoneDetails ? 32 : 0
+                visible: pane.showTimezoneDetails
+                spacing: 5
+                Repeater {
+                    model: [
+                        { label: "UTC", zone: "UTC" },
+                        { label: "NYC", zone: "America/New_York" },
+                        { label: "LON", zone: "Europe/London" },
+                        { label: "TOK", zone: "Asia/Tokyo" }
+                    ]
+                    ActionButton {
+                        required property var modelData
+                        width: (zonePresetRow.width - 3 * zonePresetRow.spacing) / 4
+                        height: 31
+                        label: modelData.label
+                        labelPixelSize: 10
+                        contentPadding: 2
+                        accentColor: Colors.cyan
+                        available: !TimeSettings.authSessionActive
+                        onLeftClicked: {
+                            pane.zonePickerExpanded = false;
+                            TimeSettings.prepareTimezone(modelData.zone);
+                        }
+                    }
+                }
+            }
+            Item {
+                width: parent.width
+                height: pane.showTimezoneDetails
+                        ? (pane.zonePickerExpanded ? 255 : 38) : 0
+                visible: pane.showTimezoneDetails
+                TimeZonePicker {
+                    id: systemZonePicker
+                    width: parent.width
+                    selectedZone: TimeSettings.zoneChoice !== ""
+                                  ? TimeSettings.zoneChoice
+                                  : String(TimeSettings.hostInfo.timezone || "UTC")
+                    expanded: pane.zonePickerExpanded
+                    catalog: TimeSettings.zoneCatalog
+                    countryIndex: TimeSettings.zoneCountryIndex
+                    catalogLoading: TimeSettings.zoneCatalogLoading
+                    catalogFailed: TimeSettings.zoneCatalogFailed
+                    onOpenRequested: {
+                        TimeSettings.loadZoneCatalog();
+                        pane.zonePickerExpanded = true;
+                    }
+                    onToggleRequested: {
+                        if (!pane.zonePickerExpanded)
+                            TimeSettings.loadZoneCatalog();
+                        pane.zonePickerExpanded = !pane.zonePickerExpanded;
+                    }
+                    onZoneChosen: function(zoneId) {
+                        pane.zonePickerExpanded = false;
+                        TimeSettings.prepareTimezone(zoneId);
+                    }
+                }
+            }
+            GohuText {
+                width: parent.width
+                visible: pane.showTimezoneDetails
+                wrapMode: Text.WordWrap
+                text: "DIRECTORY // "
+                      + (TimeSettings.zoneCatalogLoading ? "LOADING"
+                         : TimeSettings.zoneCatalogFailed ? "UNAVAILABLE"
+                         : TimeSettings.zoneCatalogLoaded
+                           ? TimeSettings.zoneCatalog.length + " ZONES"
+                           : "NOT LOADED")
+                font.pixelSize: 9
+                color: Colors.white
+            }
+            GohuText {
+                width: parent.width
+                visible: pane.showTimezoneDetails
+                wrapMode: Text.WordWrap
+                text: "CHANGES SYSTEM LOCAL TIME IN ALL APPS. UTC INSTANT STAYS UNCHANGED. WHEN RTC LOCAL=YES, SYSTEMD MAY ALSO UPDATE HARDWARE TIME."
+                font.pixelSize: 9
+                color: Colors.orange
+            }
+            GohuText {
+                width: parent.width
+                visible: pane.showTimezoneDetails
+                         && TimeSettings.timezoneConfirmRequired
+                text: "APPLY // " + TimeSettings.zoneChoice
+                font.pixelSize: 10
+                color: Colors.magenta
+                wrapMode: Text.WordWrap
+            }
+            Row {
+                width: parent.width
+                visible: pane.showTimezoneDetails
+                         && TimeSettings.timezoneConfirmRequired
+                height: visible ? 34 : 0
+                spacing: 5
+                ActionButton {
+                    width: (parent.width - parent.spacing) / 2
+                    height: 32
+                    label: "APPLY ZONE"
+                    labelPixelSize: 10
+                    accentColor: Colors.orange
+                    onLeftClicked: TimeSettings.requestTimezone()
+                }
+                ActionButton {
+                    width: (parent.width - parent.spacing) / 2
+                    height: 32
+                    label: "CANCEL"
+                    labelPixelSize: 10
+                    accentColor: Colors.cyan
+                    onLeftClicked: TimeSettings.cancelTimezone()
+                }
+            }
+            GohuText {
+                visible: pane.showTimezoneDetails
+                width: parent.width
+                wrapMode: Text.WordWrap
+                text: "ZONE RESULT // " + TimeSettings.timezoneMessage
+                color: TimeSettings.timezoneStatus === "completed"
+                       || TimeSettings.timezoneStatus === "unchanged"
+                       ? Colors.cyan : Colors.orange
+                font.pixelSize: 9
+            }
+            GohuText {
+                visible: pane.showTimezoneDetails
+                         && TimeSettings.timezoneErrorCode !== ""
+                width: parent.width
+                text: "ERROR // " + TimeSettings.timezoneErrorCode
+                color: Colors.orange
+                font.pixelSize: 9
             }
             GohuText {
                 width: parent.width
@@ -273,6 +416,18 @@ Item {
                 font.pixelSize: 9
                 color: Colors.cyan
             }
+            GohuText {
+                width: parent.width
+                visible: TimeSettings.authSessionActive
+                         || TimeSettings.resyncErrorCode !== ""
+                         || TimeSettings.timezoneErrorCode !== ""
+                wrapMode: Text.WordWrap
+                text: "POLKIT // " + TimeSettings.authFlowStage
+                      + (TimeSettings.authActionId !== ""
+                         ? " // " + TimeSettings.authActionId : "")
+                font.pixelSize: 9
+                color: Colors.cyan
+            }
             Row {
                 width: parent.width
                 spacing: 8
@@ -327,7 +482,12 @@ Item {
     }
 
     onPanelVisibleChanged: {
-        if (panelVisible)
+        if (panelVisible) {
             TimeSettings.refreshHostStatus();
+            if (showTimezoneDetails)
+                TimeSettings.loadZoneCatalog();
+        } else {
+            zonePickerExpanded = false;
+        }
     }
 }

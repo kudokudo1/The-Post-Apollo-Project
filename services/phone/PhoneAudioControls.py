@@ -131,7 +131,10 @@ def apply(
     else:
         return _output("REFUSED", execution="USER_ACTION")
 
-    before = probe()
+    try:
+        before = probe()
+    except Exception:
+        return _output("BRIDGE_UNAVAILABLE", execution="USER_ACTION")
     if (type(before) is not dict or before.get("schema") != SCHEMA
             or before.get("execution") != "READ_ONLY"
             or before.get("result") != "OBSERVED"
@@ -160,7 +163,10 @@ def apply(
         return _output("CHANGE_FAILED", execution="USER_ACTION")
     # The upstream CLI's exit code only means a request was submitted.
     # Require an independent status reread before claiming a saved preference.
-    after = probe()
+    try:
+        after = probe()
+    except Exception:
+        return _output("NOT_CONFIRMED", execution="USER_ACTION")
     match = (
         type(after) is dict
         and after.get("result") == "OBSERVED"

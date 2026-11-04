@@ -1,0 +1,67 @@
+name: TASKS M13s real editor presence read-only
+
+on:
+  pull_request:
+    paths:
+      - 'widgets/hub/ApolloHubTodoMini.qml'
+      - 'widgets/TasksW.qml'
+      - 'widgets/tasks/TaskSyncConnectionsPane.qml'
+      - 'widgets/tasks/TaskRecoveryStatusPaneM13q.qml'
+      - 'widgets/tasks/TaskDraftPresencePolicyM13s.js'
+      - 'tests/tasks/test_task_live_draft_presence_m13s.cjs'
+      - 'docs/tasks-live-draft-presence-m13s.md'
+      - '.github/workflows/tasks-live-draft-presence-m13s.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'widgets/hub/ApolloHubTodoMini.qml'
+      - 'widgets/TasksW.qml'
+      - 'widgets/tasks/TaskSyncConnectionsPane.qml'
+      - 'widgets/tasks/TaskRecoveryStatusPaneM13q.qml'
+      - 'widgets/tasks/TaskDraftPresencePolicyM13s.js'
+      - 'tests/tasks/test_task_live_draft_presence_m13s.cjs'
+      - '.github/workflows/tasks-live-draft-presence-m13s.yml'
+permissions:
+  contents: read
+
+jobs:
+  bounded-draft-presence:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: QML syntax of the real editor and Recovery routing
+        run: |
+          sudo apt-get update -qq
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends qt6-declarative-dev-tools
+          for qml in \
+            widgets/hub/ApolloHubTodoMini.qml \
+            widgets/TasksW.qml \
+            widgets/tasks/TaskSyncConnectionsPane.qml \
+            widgets/tasks/TaskRecoveryStatusPaneM13q.qml; do
+            QT_QPA_PLATFORM=offscreen /usr/lib/qt6/bin/qmlformat "$qml" >/dev/null
+          done
+      - name: New bounded real editor dirty-state assertions
+        run: node --test tests/tasks/test_task_live_draft_presence_m13s.cjs
+      - name: Existing M13q status and TASKS chassis/Sync behavior
+        run: |
+          node --test tests/tasks/test_task_recovery_status_m13q.cjs
+          node --test tests/tasks/test_task_chassis_policy.cjs
+          python3 tests/tasks/test_task_sync_connections_ui_contracts.py
+          python3 tests/tasks/test_task_details_ui_contracts.py
+      - name: Existing single TASKS writer and shared Connections grant closed
+        run: |
+          python3 tests/tasks/test_task_writer_gate_inventory_m11d.py
+          node tests/cpuplus/test_connections_broker_c2a.js
+      - name: No new capture, file writer, keyring client or production grants
+        run: |
+          set -euo pipefail
+          ! grep -Eq 'Process *\{|FileView *\{|secret-tool|\.setText\(' \
+            widgets/tasks/TaskDraftPresencePolicyM13s.js
+          ! grep -Eq 'Process *\{|FileView *\{|secret-tool|ApolloHubTodoStore\.stage\(' \
+            widgets/tasks/TaskRecoveryStatusPaneM13q.qml
+          test "$(grep -c 'readonly property bool unsavedLocalEntryDraft:' widgets/hub/ApolloHubTodoMini.qml)" = 1
+          printf '%s\n' 'M13S_REAL_DRAFT_PRESENCE_READ_ONLY_NO_CAPTURE_PASS'

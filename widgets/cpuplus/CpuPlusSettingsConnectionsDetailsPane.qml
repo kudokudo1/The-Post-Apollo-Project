@@ -208,6 +208,17 @@ Item {
                         font.pixelSize: 10
                         wrapMode: Text.WordWrap
                     }
+                    ActionButton {
+                        width: Math.min(parent.width, 160)
+                        height: 30
+                        label: "DISMISS REVIEW"
+                        labelPixelSize: 10
+                        accentColor: Colors.cyan
+                        onClicked: {
+                            details.permissionReviewOpen = false;
+                            details.reviewFeedback = "REVIEW CLOSED // NO ACCESS GRANTED";
+                        }
+                    }
                     QuietText {
                         width: parent.width
                         text: "PROVIDER // " + details.permissionPreview.provider
@@ -249,17 +260,7 @@ Item {
                         accentColor: Colors.orange
                         available: false
                     }
-                    ActionButton {
-                        width: Math.min(parent.width, 160)
-                        height: 30
-                        label: "DISMISS REVIEW"
-                        labelPixelSize: 10
-                        accentColor: Colors.cyan
-                        onClicked: {
-                            details.permissionReviewOpen = false;
-                            details.reviewFeedback = "REVIEW CLOSED // NO ACCESS GRANTED";
-                        }
-                    }
+
                 }
                 QuietText {
                     visible: details.reviewFeedback !== ""

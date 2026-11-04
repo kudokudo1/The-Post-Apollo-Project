@@ -1,0 +1,52 @@
+name: Social local organization private backups v1
+
+on:
+  pull_request:
+    paths:
+      - 'services/social/SocialLocalOrgBackup.py'
+      - 'widgets/messanger/IdentityCenterLocalOrgBackup.qml'
+      - 'widgets/messanger/IdentityCenterSettingsSections.qml'
+      - 'tests/messaging/test_social_local_org_backups_v1.py'
+      - 'tests/messaging/test_identity_center_org_backup_ui_v1.py'
+      - 'tests/messaging/test_identity_center_offscreen_qml_v0.py'
+      - '.github/workflows/social-local-org-backups-v1.yml'
+      - 'MODEL/contracts/social-local-org-backups-v1.md'
+      - 'MODEL/contracts/social-org-manager-deferred-live-tests-v1.md'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  private-backup-snapshot:
+    runs-on: ubuntu-latest
+    timeout-minutes: 13
+    env:
+      QT_QPA_PLATFORM: offscreen
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Owner-private snapshots, integrity, locks and original backend regression
+        run: |
+          python3 -m unittest discover -s tests/messaging -p 'test_social_local_org_backups_v1.py' -v
+          python3 -m unittest discover -s tests/messaging -p 'test_identity_center_org_backup_ui_v1.py' -v
+          python3 -m unittest discover -s tests/messaging -p 'test_identity_center_unified_refresh_v1.py' -v
+          python3 -m unittest discover -s tests/messaging -p 'test_identity_center_inline_save_feedback_v1.py' -v
+          python3 -m unittest discover -s tests/messaging -p 'test_identity_center_inline_record_actions_v1.py' -v
+          python3 -m unittest discover -s tests/messaging -p 'test_identity_center_inline_modifiers_v1.py' -v
+          python3 -m unittest discover -s tests/messaging -p 'test_social_local_organizations.py' -v
+          python3 -m unittest discover -s tests/messaging -p 'test_social_local_portfolios_v1.py' -v
+          python3 -m unittest discover -s tests/messaging -p 'test_social_local_org_structure_v1.py' -v
+          python3 -m unittest discover -s tests/messaging -p 'test_social_local_unit_locations_v1.py' -v
+          python3 -m unittest discover -s tests/messaging -p 'test_social_local_branch_locations_v1.py' -v
+          python3 -m unittest discover -s tests/messaging -p 'test_social_local_functional_reporting_v1.py' -v
+          python3 -m unittest discover -s tests/messaging -p 'test_social_org_links_v1.py' -v
+      - name: Install disposable Qt6 offscreen runtime
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends libegl1 libopengl0 libgl1 libxkbcommon0
+          python3 -m pip install --disable-pip-version-check 'PySide6==6.9.3'
+      - name: Load actual Settings QML with backup UI
+        run: python3 -m unittest discover -s tests/messaging -p 'test_identity_center_offscreen_qml_v0.py' -v

@@ -14,7 +14,7 @@ import unittest
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
-from PySide6.QtCore import QObject, QUrl, QMetaObject
+from PySide6.QtCore import QObject, QUrl, QMetaObject, Q_ARG
 from PySide6.QtGui import QGuiApplication
 from PySide6.QtQml import QQmlComponent, QQmlEngine
 from PySide6.QtQuick import QQuickItem
@@ -749,6 +749,82 @@ class RealQtOrganizationsSettingsPaneSmoke(unittest.TestCase):
                       refresher.property("lastRefreshResult"))
         self.assertIn("READ_UNAVAILABLE", refresher.property("lastRefreshResult"))
         self.assertNotIn("SAVED //", refresher.property("lastRefreshResult"))
+        self.assertFalse(self.sections.property("organizationDisplayReady"))
+
+    def test_private_backup_buttons_are_inline_and_restore_remains_locked(self):
+        self._open_organizations()
+        backup = self.sections.findChild(QObject, "orgLocalBackup")
+        process = self.sections.findChild(QObject, "orgBackupProcess")
+        create = self.sections.findChild(QObject, "orgBackupCreateButton")
+        listing = self.sections.findChild(QObject, "orgBackupListButton")
+        verify = self.sections.findChild(QObject, "orgBackupValidateButton")
+        restore = self.sections.findChild(QObject, "orgBackupRestoreLockedButton")
+        for name, obj in (("backup", backup), ("process", process),
+                          ("create", create), ("list", listing),
+                          ("verify", verify), ("restore", restore)):
+            self.assertIsNotNone(obj, name)
+        self.assertFalse(backup.property("sourcesReady"))
+        self.assertFalse(create.property("interactive"))
+        self.assertFalse(restore.property("interactive"))
+
+        fixture_names = (
+            ("localDirectoryStore", "organizations"),
+            ("localPortfoliosStore", "portfolios"),
+            ("localStructureStore", "units"),
+            ("localUnitLocationLinksStore", "links"),
+            ("localBranchLocationLinksStore", "links"),
+            ("localFunctionalReportingStore", "links"),
+            ("localLinksStore", "links"),
+        )
+        for field, records in fixture_names:
+            doc = {"state": "ready", "saved": {"revision": 1, records: []}}
+            js = self.engine.evaluate("(" + json.dumps(doc) + ")")
+            self.assertFalse(js.isError())
+            self.assertTrue(self.sections.setProperty(field, js))
+        APP.processEvents()
+        self.assertTrue(backup.property("sourcesReady"))
+        self.assertTrue(create.property("interactive"))
+
+        # Real QML function + fake OS process: no disk or live app touched.
+        self.assertTrue(QMetaObject.invokeMethod(backup, "runAction", Q_ARG(str, "create")))
+        self.assertTrue(backup.property("busy"))
+        self.assertFalse(create.property("interactive"))
+        self.assertTrue(process.property("running"))
+        self.assertIn("BACKUP WORKING", backup.property("resultText"))
+        self.assertFalse(restore.property("interactive"))
+
+        filename = "org-backup-20261104T012300Z-aabbcc112233.json"
+        process.finishWith(json.dumps({
+            "ok": True, "backup": filename, "createdAt": "2026-11-04T01:23:00Z",
+            "inventory": {}, "restored": False
+        }), 0)
+        APP.processEvents()
+        self.assertFalse(backup.property("busy"))
+        self.assertEqual(backup.property("selectedBackup"), filename)
+        self.assertIn("BACKUP CREATED", backup.property("resultText"))
+        self.assertTrue(verify.property("interactive"))
+        self.assertFalse(restore.property("interactive"))
+
+        self.assertTrue(QMetaObject.invokeMethod(backup, "runAction", Q_ARG(str, "verify")))
+        self.assertTrue(backup.property("busy"))
+        process.finishWith(json.dumps({
+            "ok": True, "valid": True, "backup": filename,
+            "createdAt": "2026-11-04T01:23:00Z",
+            "inventory": {}, "restoreAvailable": False
+        }), 0)
+        APP.processEvents()
+        self.assertIn("VALID BACKUP", backup.property("resultText"))
+        self.assertIn("RESTORE NOT ENABLED", backup.property("resultText"))
+        self.assertFalse(restore.property("interactive"))
+
+        self.assertTrue(QMetaObject.invokeMethod(backup, "runAction", Q_ARG(str, "list")))
+        process.finishWith(json.dumps({
+            "ok": True, "backups": [filename], "total": 1,
+            "folder": "organization-backups-v1"
+        }), 0)
+        APP.processEvents()
+        self.assertEqual(len(_value(backup.property("backups"))), 1)
+        self.assertIn("BACKUPS LISTED", backup.property("resultText"))
         self.assertFalse(self.sections.property("organizationDisplayReady"))
 
     def test_host_logout_and_failure_are_reflected_in_real_panel(self):

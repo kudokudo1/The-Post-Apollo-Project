@@ -12,8 +12,11 @@ Rectangle {
     color: Colors.black
     border.width: 1
     border.color: Colors.cyan
-    height: 304
+    height: compactMode ? 204 : 304
 
+    // M30-D // Existing full COSMOS V2 visual remains unchanged by default.
+    // MAGICK lunar/solar explicitly chooses the fixed-viewport presentation.
+    property bool compactMode: false
     property bool showMoon: true
     property bool showSun: true
     property bool moonReady: false
@@ -28,6 +31,20 @@ Rectangle {
     property var solarCivilOffsetMinutes: null
     property string solarOffsetSource: "UNKNOWN"
     property string inspectedPhaseId: ""
+    readonly property var referencePhase:
+        VisualPolicy.phaseReference(inspectedPhaseId)
+    readonly property bool previewReference:
+        compactMode && referencePhase.valid
+    readonly property var phaseReferenceIllumination: ({
+        "new":0,"waxing-crescent":25,"first-quarter":50,
+        "waxing-gibbous":75,"full":100,"waning-gibbous":75,
+        "last-quarter":50,"waning-crescent":25
+    })[inspectedPhaseId]
+    readonly property bool referenceWaxing:
+        inspectedPhaseId.indexOf("waning")!==0
+        && inspectedPhaseId!=="last-quarter"
+    readonly property real visibleIllumination: previewReference
+        ? phaseReferenceIllumination : moonData.illumination
 
     property real hoveredMinute: -1
     property real lockedMinute: -1
@@ -45,6 +62,7 @@ Rectangle {
         solarData.rows,selectedMinute)
 
     onMoonDataChanged: moonCanvas.requestPaint()
+    onInspectedPhaseIdChanged: moonCanvas.requestPaint()
     onSolarDataChanged: solarCanvas.requestPaint()
     onSelectedMinuteChanged: solarCanvas.requestPaint()
     onWidthChanged: {
@@ -55,8 +73,8 @@ Rectangle {
     Row {
         id: visualRow
         anchors.fill: parent
-        anchors.margins: 10
-        spacing: 12
+        anchors.margins: visual.compactMode ? 5 : 10
+        spacing: visual.compactMode ? 5 : 12
 
         Rectangle {
             id: moonBay
@@ -70,30 +88,31 @@ Rectangle {
 
             Column {
                 anchors.fill: parent
-                anchors.margins: 9
-                spacing: 5
+                anchors.margins: visual.compactMode ? 5 : 9
+                spacing: visual.compactMode ? 3 : 5
 
                 GohuText {
                     width: parent.width
                     text: "MOON // PHASE ILLUMINATION"
-                    font.pixelSize: 12
+                    font.pixelSize: visual.compactMode ? 10 : 12
                     color: Colors.magenta
                     elide: Text.ElideRight
                 }
 
                 Row {
-                    height: 124
+                    height: visual.compactMode ? 75 : 124
                     width: parent.width
-                    spacing: 12
+                    spacing: visual.compactMode ? 7 : 12
 
                     Canvas {
                         id: moonCanvas
-                        width: 120
-                        height: 120
+                        width: visual.compactMode ? 73 : 120
+                        height: width
                         onPaint: {
                             const ctx=getContext("2d");
                             ctx.clearRect(0,0,width,height);
-                            const radius=52, cx=width/2, cy=height/2;
+                            const radius=Math.max(1,Math.min(width,height)/2-8),
+                                  cx=width/2, cy=height/2;
                             ctx.beginPath();
                             ctx.arc(cx,cy,radius,0,2*Math.PI);
                             ctx.fillStyle=String(Colors.black);
@@ -102,15 +121,19 @@ Rectangle {
                             ctx.lineWidth=1.3;
                             ctx.stroke();
                             const info=visual.moonData;
-                            if(!info.ready || info.illumination===null
-                               || !info.directionKnown)return;
+                            if((!info.ready || info.illumination===null
+                               || !info.directionKnown)
+                               && !visual.previewReference)return;
                             ctx.fillStyle=String(Colors.yellow);
                             // Horizontal circular slices integrate to the
                             // provider's illuminated fraction without
                             // inventing a positional ephemeris.
                             for(let iy=-radius;iy<radius;iy+=1) {
                                 const row=VisualPolicy.illuminatedSpan(
-                                    info.illumination,info.waxing,iy+0.5,radius);
+                                    visual.visibleIllumination,
+                                    visual.previewReference
+                                    ? visual.referenceWaxing : info.waxing,
+                                    iy+0.5,radius);
                                 if(!row)continue;
                                 ctx.fillRect(cx+row.left,cy+iy,
                                              Math.max(0,row.right-row.left),1);
@@ -131,31 +154,38 @@ Rectangle {
                     }
 
                     Column {
-                        width: Math.max(0,parent.width-132)
+                        width: Math.max(0,parent.width-moonCanvas.width-12)
                         height: parent.height
-                        spacing: 9
+                        spacing: visual.compactMode ? 3 : 9
                         GohuText {
                             width: parent.width
-                            text: visual.moonData.phaseLabel
-                            font.pixelSize: 12
+                            text: visual.previewReference
+                                  ? "REF // " + visual.referencePhase.label
+                                  : visual.moonData.phaseLabel
+                            font.pixelSize: visual.compactMode ? 10 : 12
                             color: Colors.white
-                            wrapMode: Text.WordWrap
+                            wrapMode: visual.compactMode ? Text.NoWrap : Text.WordWrap
+                            elide: Text.ElideRight
                         }
                         GohuText {
                             width: parent.width
-                            text: visual.moonData.illumination===null
-                                ? "--" : Math.round(visual.moonData.illumination)+"%"
-                            font.pixelSize: 27
+                            text: visual.visibleIllumination===null
+                                  || visual.visibleIllumination===undefined
+                                ? "--" : Math.round(visual.visibleIllumination)+"%"
+                            font.pixelSize: visual.compactMode ? 21 : 27
                             color: Colors.yellow
                         }
                         QuietText {
                             width: parent.width
-                            text: visual.moonData.source
+                            text: visual.previewReference
+                                  ? "SCHEMATIC REFERENCE"
+                                  : visual.moonData.source
                                   +" // DATE "
                                   +(visual.moonData.sourceDate||"--")
-                            font.pixelSize: 9
-                            color: Colors.cyan
-                            wrapMode: Text.WordWrap
+                            font.pixelSize: visual.compactMode ? 8 : 9
+                            color: visual.previewReference ? Colors.magenta : Colors.cyan
+                            wrapMode: visual.compactMode ? Text.NoWrap : Text.WordWrap
+                            elide: Text.ElideRight
                         }
                     }
                 }
@@ -163,7 +193,7 @@ Rectangle {
                 Row {
                     id: phaseButtonRow
                     width: parent.width
-                    height: 33
+                    height: visual.compactMode ? 23 : 33
                     spacing: 2
 
                     Repeater {
@@ -172,9 +202,9 @@ Rectangle {
                             required property var modelData
                             width: Math.max(1,
                                 (phaseButtonRow.width-7*phaseButtonRow.spacing)/8)
-                            height: 31
+                            height: visual.compactMode ? 22 : 31
                             label: modelData.short
-                            labelPixelSize: 10
+                            labelPixelSize: visual.compactMode ? 9 : 10
                             contentPadding: 1
                             accentColor: visual.moonData.phaseId === modelData.id
                                          ? Colors.magenta : Colors.cyan
@@ -188,14 +218,14 @@ Rectangle {
 
                 Row {
                     width: parent.width
-                    height: 51
-                    spacing: 5
+                    height: visual.compactMode ? 33 : 51
+                    spacing: visual.compactMode ? 4 : 5
 
                     QuietText {
-                        width: Math.max(0,parent.width-89)
+                        width: Math.max(0,parent.width-(visual.compactMode?68:89))
                         height: parent.height
                         wrapMode: Text.WordWrap
-                        font.pixelSize: 9
+                        font.pixelSize: visual.compactMode ? 8 : 9
                         color: visual.inspectedPhaseId !== ""
                                ? Colors.cyan : Colors.orange
                         text: visual.inspectedPhaseId !== ""
@@ -210,8 +240,8 @@ Rectangle {
                     }
 
                     ActionButton {
-                        width: 84
-                        height: 25
+                        width: visual.compactMode ? 64 : 84
+                        height: visual.compactMode ? 22 : 25
                         label: "CURRENT"
                         labelPixelSize: 9
                         accentColor: Colors.magenta
@@ -222,6 +252,7 @@ Rectangle {
 
                 QuietText {
                     width: parent.width
+                    visible: !visual.compactMode
                     font.pixelSize: 8
                     color: Colors.orange
                     wrapMode: Text.WordWrap
@@ -244,19 +275,19 @@ Rectangle {
 
             Column {
                 anchors.fill: parent
-                anchors.margins: 9
-                spacing: 6
+                anchors.margins: visual.compactMode ? 5 : 9
+                spacing: visual.compactMode ? 3 : 6
 
                 GohuText {
                     text: "SUN // 24H ALTITUDE MODEL"
                     width: parent.width
-                    font.pixelSize: 12
+                    font.pixelSize: visual.compactMode ? 10 : 12
                     color: Colors.orange
                 }
 
                 Rectangle {
                     width: parent.width
-                    height: 119
+                    height: visual.compactMode ? 75 : 119
                     color: Colors.black
                     border.width: 1
                     border.color: Colors.blue
@@ -348,7 +379,7 @@ Rectangle {
 
                 Row {
                     width: parent.width
-                    height: 15
+                    height: visual.compactMode ? 12 : 15
                     GohuText {
                         width: parent.width/5
                         text: "00"
@@ -374,7 +405,7 @@ Rectangle {
                 Row {
                     id: solarPresetRow
                     width: parent.width
-                    height: 27
+                    height: visual.compactMode ? 23 : 27
                     spacing: 4
 
                     Repeater {
@@ -389,10 +420,10 @@ Rectangle {
                             required property var modelData
                             width: Math.max(1,(solarPresetRow.width
                                              -solarPresetRow.spacing*4)/5)
-                            height: 26
-                            contentPadding: 2
+                            height: visual.compactMode ? 22 : 26
+                            contentPadding: visual.compactMode ? 1 : 2
                             label: modelData.label
-                            labelPixelSize: 10
+                            labelPixelSize: visual.compactMode ? 9 : 10
                             accentColor: modelData.id === "now"
                                          ? Colors.magenta : Colors.cyan
                             available: visual.solarData.ready
@@ -414,10 +445,11 @@ Rectangle {
 
                 Row {
                     width: parent.width
-                    height: 25
-                    spacing: 8
+                    height: visual.compactMode ? 22 : 25
+                    spacing: visual.compactMode ? 4 : 8
                     GohuText {
-                        width: Math.max(0,parent.width-104)
+                        width: Math.max(0,parent.width-
+                            (visual.compactMode ? 72 : 104))
                         text: visual.cursorSolar
                               ? "MODEL "+VisualPolicy.clockLabel(
                                     visual.cursorSolar.minute)
@@ -427,14 +459,14 @@ Rectangle {
                                 ? "NOW "
                                   +visual.currentSolarPosition.altitudeDegrees.toFixed(1)+"°"
                                 : "ALTITUDE --"
-                        font.pixelSize: 12
+                        font.pixelSize: visual.compactMode ? 10 : 12
                         color: Colors.yellow
                     }
                     ActionButton {
-                        width: 95
-                        height: 24
+                        width: visual.compactMode ? 68 : 95
+                        height: visual.compactMode ? 21 : 24
                         label: "UNLOCK"
-                        labelPixelSize: 10
+                        labelPixelSize: visual.compactMode ? 9 : 10
                         accentColor: Colors.cyan
                         available: visual.lockedMinute>=0
                         onClicked: visual.lockedMinute=-1
@@ -442,6 +474,7 @@ Rectangle {
                 }
 
                 QuietText {
+                    visible: !visual.compactMode
                     width: parent.width
                     font.pixelSize: 8
                     color: Colors.orange

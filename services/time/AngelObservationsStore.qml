@@ -75,6 +75,12 @@ Scope {
         return stage(Journal.remove(document, id, confirmed));
     }
 
+    // An explicit review flag is a journal edit, never a deletion or a
+    // claim that a number has no traditional interpretation.
+    function toggleErrObservation(id) {
+        return stage(Journal.toggleErr(document, id));
+    }
+
     FileView {
         id: journalFile
         path: angel.storagePath

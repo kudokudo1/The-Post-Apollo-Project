@@ -17,7 +17,7 @@ import socket
 import subprocess
 import sys
 
-BROKER_SCRIPT = (Path(__file__).resolve().parents[2] /
+BROKER_SCRIPT = (Path(__file__).resolve().parents[3] /
                  "tests/connections/fixtures/C2cDescriptorBroker.py")
 MAX_PACKET = 4096
 REQUEST = {
@@ -192,14 +192,21 @@ class FakeConnectionsHost:
             self._weather.stdin.write(message + "\n")
             self._weather.stdin.flush()
             # A crashed/misbehaving client must not hang its owner indefinitely.
-            with selectors.DefaultSelector() as selector:
-                selector.register(self._weather.stdout, selectors.EVENT_READ)
-                if not selector.select(timeout=2):
-                    raise TimeoutError("C2D_CLIENT_TIMED_OUT")
-            line = self._weather.stdout.readline(MAX_PACKET + 1)
-            if not line or len(line.encode()) > MAX_PACKET:
+            # Read bounded bytes. TextIO.readline after a partial write
+            # could block despite selector readiness on a broken client.
+            payload = bytearray()
+            while b"\n" not in payload and len(payload) <= MAX_PACKET:
+                with selectors.DefaultSelector() as selector:
+                    selector.register(self._weather.stdout, selectors.EVENT_READ)
+                    if not selector.select(timeout=2):
+                        raise TimeoutError("C2D_CLIENT_TIMED_OUT")
+                chunk = os.read(self._weather.stdout.fileno(), MAX_PACKET + 1 - len(payload))
+                if not chunk:
+                    raise RuntimeError("C2D_CLIENT_DISCONNECTED")
+                payload.extend(chunk)
+            if len(payload) > MAX_PACKET or not payload.endswith(b"\n"):
                 raise RuntimeError("C2D_CLIENT_REPLY_INVALID")
-            response = json.loads(line)
+            response = json.loads(payload.decode("utf-8"))
             if not isinstance(response, dict):
                 raise ValueError("C2D_NON_OBJECT_CLIENT_RESPONSE")
             return response

@@ -90,12 +90,33 @@ function geometry(width,height) {
     return {ready:true,x:w/2,y:h/2,radius:Math.max(0,Math.min(w,h)/2-24)};
 }
 
-function point(azimuth,width,height) {
-    var az=bounded(azimuth,0,360), g=geometry(width,height);
+// V3b: five concentric DISPLAY lanes, inner Mercury -> outer Saturn.
+// The radial lane distinguishes simultaneous bearings from different planets.
+// Radius never represents planet distance, altitude, orbital size, or visibility.
+function laneRadius(name, width, height) {
+    var i=PLANETS.indexOf(String(name || ""));
+    var g=geometry(width,height);
+    if(i<0 || !g.ready || g.radius<=0) return null;
+    return g.radius*(0.40+0.15*i);
+}
+
+function point(azimuth,width,height,planet) {
+    var az=bounded(azimuth,0,360),g=geometry(width,height);
     if(!g.ready || az===null || g.radius<=0) return null;
+    // Omitting a planet preserves the previous full-radius cardinal geometry.
+    var radius=planet===undefined ? g.radius
+              : laneRadius(planet,width,height);
+    if(radius===null)return null;
     var rad=az*Math.PI/180;
-    return {x:g.x+Math.sin(rad)*g.radius,
-            y:g.y-Math.cos(rad)*g.radius};
+    return {x:g.x+Math.sin(rad)*radius,
+            y:g.y-Math.cos(rad)*radius};
+}
+
+// A 0–90° transit altitude is mapped to one circular progress revolution,
+// independently of the azimuth compass. Missing data draw NO progress arc.
+function altitudeFraction(altitude) {
+    var value=bounded(altitude,0,90);
+    return value===null ? null : value/90;
 }
 
 function pick(markersInput, x, y, width, height, hitRadius) {
@@ -105,7 +126,7 @@ function pick(markersInput, x, y, width, height, hitRadius) {
             || radius<=0||radius>50) return null;
     var best=null, distance=radius*radius;
     for(var i=0;i<source.length;i++) {
-        var e=source[i], p=e?point(e.azimuth,width,height):null;
+        var e=source[i], p=e?point(e.azimuth,width,height,e.planet):null;
         if(!p)continue;
         var d=(p.x-px)*(p.x-px)+(p.y-py)*(p.y-py);
         if(d<=distance) {distance=d;best=e;}

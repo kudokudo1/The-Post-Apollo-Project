@@ -59,8 +59,8 @@ test("V3a geometry respects true north, east, south and west",()=>{
 
 test("V3a pointer hit testing locks only real source markers",()=>{
     const source=h.markers(rows(),"MERCURY");
-    const rise=h.point(90,240,240);
-    const set=h.point(270,240,240);
+    const rise=h.point(90,240,240,"MERCURY");
+    const set=h.point(270,240,240,"MERCURY");
     assert.equal(h.pick(source,rise.x,rise.y,240,240,13).kind,"rise");
     assert.equal(h.pick(source,set.x,set.y,240,240,13).kind,"set");
     assert.equal(h.pick(source,120,120,240,240,13),null);

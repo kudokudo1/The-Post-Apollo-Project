@@ -110,6 +110,7 @@ Rectangle {
             anchors.fill: parent
             visible: surface.activeFamily === "weather"
             subjectRoute: surface.currentPath
+            onRouteRequested: function(path) { surface.routeRequested(path); }
             weatherService: surface.weatherService
             nwsAlertSource: surface.nwsAlertSource
             historyService: surface.historyService

@@ -36,7 +36,7 @@ test("seven main-mode families open real landing pages, not route-directory root
 });
 
 test("bottom row modes are navigable real paths with clear family grouping",()=>{
-  const sizes={home:8,weather:7,cosmos:6,earth:7,media:5,magick:6,tools:5};
+  const sizes={home:8,weather:8,cosmos:6,earth:7,media:5,magick:6,tools:5};
   for(const family of nav.FAMILIES) {
     const modes=JSON.parse(JSON.stringify(nav.tabsFor(family.landing)));
     assert.equal(modes.length,sizes[family.id],family.id);

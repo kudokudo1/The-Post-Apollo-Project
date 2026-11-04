@@ -1,6 +1,4 @@
 import QtQuick
-import Quickshell
-import Quickshell.Io
 import "../components"
 import "../services/company"
 import "CompanyCoveragePolicy.js" as Geo
@@ -27,9 +25,6 @@ Item {
     property bool streetConsentOpen: false
     property bool streetMode: false
     property bool vectorConsentOpen: false
-    property string vectorStatus: "RUNTIME NOT CHECKED"
-    property bool vectorRequestedStop: false
-    property string vectorOutput: ""
     property string selectedHubId: ""
     readonly property var hubRows: hubStore.saved && Array.isArray(hubStore.saved.hubs)
         ? hubStore.saved.hubs : []
@@ -54,58 +49,26 @@ Item {
         serviceMenuOpen=false;
         hubPlacementArmed=false;
         vectorConsentOpen=false;
-        // Closing Company Coverage stops the attached sidecar, not a
-        // detached background application or persistent Company service.
-        if (vectorRunner.running) {
-            vectorRequestedStop=true;
-            vectorRunner.running=false;
-        }
+        vectorController.stop();
     }
 
     function openVectorChoice() {
-        if (vectorRunner.running) {
-            vectorRequestedStop=true;
-            vectorRunner.running=false;
-            vectorStatus="CLOSING";
-        } else {
+        if (vectorController.running)
+            vectorController.stop();
+        else
             vectorConsentOpen=true;
-        }
     }
 
     function launchVector(online) {
-        if (vectorRunner.running) return;
+        if (vectorController.running) return;
         vectorConsentOpen=false;
-        vectorOutput="";
-        vectorRequestedStop=false;
-        vectorStatus="LAUNCHING";
-        vectorRunner.command = ["/usr/bin/python3",
-            Quickshell.shellPath("services/company/CompanyVectorSidecarLaunch.py"),
-            online ? "online" : "offline"];
-        vectorRunner.running=true;
+        vectorController.launch(online);
     }
 
-    Process {
-        id: vectorRunner
-        running: false
-        stdout: StdioCollector {
-            onStreamFinished: root.vectorOutput = String(text || "")
-        }
-        onStarted: root.vectorStatus="STARTED / NATIVE WINDOW UNVERIFIED"
-        onExited: function(code, status) {
-            if (root.vectorRequestedStop) {
-                root.vectorStatus="CLOSED";
-                root.vectorRequestedStop=false;
-                return;
-            }
-            var parsed=null;
-            try { parsed=JSON.parse(root.vectorOutput); } catch(e) {}
-            if (parsed && parsed.status==="NOT_INSTALLED")
-                root.vectorStatus="NOT INSTALLED";
-            else if (parsed && parsed.status==="LAUNCH_FAILED")
-                root.vectorStatus="LAUNCH FAILED";
-            else
-                root.vectorStatus="EXITED / CHECK NATIVE INSTALL";
-        }
+    // The Coverage UI is not allowed to own Process or FileView.
+    // All native sidecar lifecycle lives with the Company controller.
+    CompanyVectorSidecarController {
+        id: vectorController
     }
 
     CompanyHubStore {
@@ -441,16 +404,16 @@ Item {
             }
 
             // Separate-process vector atlas, never a silent map replacement.
-            // The running state is owned by Quickshell Process, not by a PID
-            // written to disk. No native binary is installed by this control.
+            // The running state belongs to CompanyVectorSidecarController.
+            // No native binary is installed by this control.
             ModeButton {
                 width: root.compactLayout ? 105 : 124
                 height: 31
                 textOnly: true
-                labelText: vectorRunner.running ? "CLOSE VECTOR" : "VECTOR VIEW ▸"
+                labelText: vectorController.running ? "CLOSE VECTOR" : "VECTOR VIEW ▸"
                 labelFontSize: 10
                 bordered: false
-                selected: vectorRunner.running
+                selected: vectorController.running
                 idlePrimaryColor: Colors.yellow
                 hoverPrimaryColor: Colors.blue
                 selectedPrimaryColor: Colors.magenta
@@ -1218,7 +1181,7 @@ Item {
                 font.pixelSize: 10
                 color: Colors.cyan
                 wrapMode: Text.WordWrap
-                text: "STATUS: " + root.vectorStatus
+                text: "STATUS: " + vectorController.status
             }
             Row {
                 spacing: 7

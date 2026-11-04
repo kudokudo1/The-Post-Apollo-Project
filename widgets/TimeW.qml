@@ -1984,8 +1984,8 @@ PanelWindow {
                     height: 32
                     color: "transparent"
                     border.width: 1
-                    // The header is an accuracy mini-report, not another
-                    // mode-dependent "PLANNED" placeholder or sync success.
+                    // This header shows measured time health, not a
+                    // main-mode placeholder or an assumed sync success.
                     readonly property string accuracyState:
                         TimeSettings.clockAccuracyState(localClock.date.getTime())
                     readonly property color accuracyColor:

@@ -118,8 +118,11 @@ class CameraLineGlyphContract(unittest.TestCase):
         self.assertNotIn("Row {", self.dock)
         self.assertNotIn('text: "CAM"', self.dock)
         self.assertIn("anchors.centerIn: parent", self.dock)
-        self.assertIn("width: 64", self.dock)
-        self.assertIn("height: 48", self.dock)
+        self.assertIn("width: 48", self.dock)
+        self.assertIn("height: 36", self.dock)
+        self.assertIn("implicitWidth: 84", self.dock)
+        self.assertIn("implicitHeight: 50", self.dock)
+        self.assertIn("onLeftClicked: toggleRequested()", self.dock)
 
     def test_keeps_camera_and_social_independently_mounted(self):
         self.assertIn("Screenshot {", self.shell)

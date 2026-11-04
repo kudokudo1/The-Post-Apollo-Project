@@ -137,6 +137,8 @@ def _relationships(raw, query, by_body, expected, times_ms):
         pair = item.get("bodies")
         if not isinstance(pair, list) or len(pair) != 2:
             raise ContractError("invalid relationship bodies")
+        if any(not isinstance(body, str) for body in pair):
+            raise ContractError("relationship body IDs must be strings")
         pair = tuple(sorted(pair))
         if pair not in expected_pairs or pair in got:
             raise ContractError("duplicate or unsupported pair")
@@ -189,9 +191,13 @@ def _event(marker, query, source, ordinal):
         raise ContractError("event outside calculated time window")
     stamp = _stamp(when)
     bodies = marker.get("bodies")
-    if not isinstance(bodies, list) or not bodies or len(set(bodies)) != len(bodies):
+    if not isinstance(bodies, list) or not bodies or any(
+        not isinstance(body, str) for body in bodies
+    ):
         raise ContractError("event has invalid body IDs")
-    if any(not isinstance(body, str) or body not in query["bodies"] for body in bodies):
+    if len(set(bodies)) != len(bodies):
+        raise ContractError("event body IDs repeated")
+    if any(body not in query["bodies"] for body in bodies):
         raise ContractError("event references unrequested body")
     kind = marker.get("type")
     name = marker.get("name")
@@ -213,6 +219,8 @@ def _event(marker, query, source, ordinal):
         contact = marker.get("contact_kind", "crossing")
         if contact not in ("crossing", "tangent_candidate"):
             raise ContractError("unsupported aspect contact kind")
+        if contact == "tangent_candidate" and not query["detect_tangents"]:
+            raise ContractError("tangent candidate was not requested")
         evidence = ("computed_crossing" if contact == "crossing"
                     else "bounded_grazing_candidate")
         result = {
@@ -230,8 +238,10 @@ def _event(marker, query, source, ordinal):
                                "candidate residual", 0)
             tolerance = _finite(marker.get("angular_tolerance_deg"),
                                 "candidate tolerance", 0, 0.01)
-            if tolerance <= 0 or residual > tolerance:
-                raise ContractError("candidate exceeds angular tolerance")
+            if tolerance <= 0 or residual > tolerance or not math.isclose(
+                tolerance, query["tangent_tolerance_deg"], abs_tol=1e-12
+            ):
+                raise ContractError("candidate exceeds or contradicts angular tolerance")
             result["candidate_residual_deg"] = residual
             result["candidate_tolerance_deg"] = tolerance
     elif kind == "apparent_longitude_station":
@@ -256,6 +266,8 @@ def _event(marker, query, source, ordinal):
         }
         if result["source_longitude_deg"] >= 360:
             raise ContractError("station longitude must be below 360")
+        if result["rate_window_hours"] != query["rate_window_hours"]:
+            raise ContractError("station rate window contradicts source query")
     else:
         raise ContractError("M6-A cannot classify unsupported M4 event marker")
 

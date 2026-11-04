@@ -71,6 +71,14 @@ Ownership collision: separate worker owns M30-A MAGICK overview PR #1256. No fil
 - [ ] Authorized merge and separately approved local desktop install
 - [ ] Operator native acceptance (JPL, clicks, geometry, zoom, overlap)
 
+## POST-MERGE VERIFICATION CHECKPOINT // 2026-11-04
+
+- V4d [PR #1264](https://github.com/kudokudo1/The-Post-Apollo-Project/pull/1264) was merged to main as merge commit `c037f79f086386bc5f3e4c045a3b8949ebb81a80`. There were **no GitHub workflow runs returned for its PR-head SHA or merge SHA at audit time**. Therefore technical CI success for V4d was **not** proven merely by the merge.
+- A separate follow-up branch `fix/weather-magick-v4d-atlas-source-gate-20261104` adds the missing *service-level* checks of every source UTC index and vector before displaying READY. The HELIO visual policy already fails closed; the transport status must agree.
+- The follow-up also asserts the actual 90-day full JPL pair+solar atlas response is below the current 524288-character Quickshell collector cap and tests the original M4/JPL plus M5c and V4d visual contracts under GitHub Actions.
+- Preserve the returning MAGICK worker's Room and concurrent M30-A Overview PR #1256 ownership. This verification branch touches only the JPL transport gate, relevant tests/workflow, and handoff.
+- Do not claim native Fedora deployment, JPL runtime, pointer acceptance or final operator approval until checked. Merging a PR before CI completion is not evidence of passed tests.
+
 ## NEXT
 
 Verify PR-head full suite, inspect failures and correct isolated regressions. The real 90-day DE440s test is the critical response-size/actual target gate. Once merged and installed, inspect Earth/Moon and selected barycenter IDs; test 90-day CALCULATE plus source status, ALL AU / INNER, TOP / TILT, complete scrollable list, horizontal time scrub and other view restoration. The returning MAGICK worker must reacquire current Hospital state and review this durable handoff, not assume an old branch is still current.

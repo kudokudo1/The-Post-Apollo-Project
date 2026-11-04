@@ -14,7 +14,7 @@ import unittest
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
-from PySide6.QtCore import QObject, QUrl, QMetaObject, Q_ARG
+from PySide6.QtCore import QObject, QUrl, QMetaObject
 from PySide6.QtGui import QGuiApplication
 from PySide6.QtQml import QQmlComponent, QQmlEngine
 from PySide6.QtQuick import QQuickItem
@@ -786,7 +786,7 @@ class RealQtOrganizationsSettingsPaneSmoke(unittest.TestCase):
         self.assertTrue(create.property("interactive"))
 
         # Real QML function + fake OS process: no disk or live app touched.
-        self.assertTrue(QMetaObject.invokeMethod(backup, "runAction", Q_ARG(str, "create")))
+        self.assertTrue(backup.runAction("create"))
         self.assertTrue(backup.property("busy"))
         self.assertFalse(create.property("interactive"))
         self.assertTrue(process.property("running"))
@@ -805,7 +805,7 @@ class RealQtOrganizationsSettingsPaneSmoke(unittest.TestCase):
         self.assertTrue(verify.property("interactive"))
         self.assertFalse(restore.property("interactive"))
 
-        self.assertTrue(QMetaObject.invokeMethod(backup, "runAction", Q_ARG(str, "verify")))
+        self.assertTrue(backup.runAction("verify"))
         self.assertTrue(backup.property("busy"))
         process.finishWith(json.dumps({
             "ok": True, "valid": True, "backup": filename,
@@ -817,7 +817,7 @@ class RealQtOrganizationsSettingsPaneSmoke(unittest.TestCase):
         self.assertIn("RESTORE NOT ENABLED", backup.property("resultText"))
         self.assertFalse(restore.property("interactive"))
 
-        self.assertTrue(QMetaObject.invokeMethod(backup, "runAction", Q_ARG(str, "list")))
+        self.assertTrue(backup.runAction("list"))
         process.finishWith(json.dumps({
             "ok": True, "backups": [filename], "total": 1,
             "folder": "organization-backups-v1"

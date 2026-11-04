@@ -1,0 +1,40 @@
+name: Social Phone Provider Observation P2
+
+on:
+  pull_request:
+    paths:
+      - 'services/phone/PhoneProviderObservation.py'
+      - 'tests/phone/test_phone_provider_observation.py'
+      - 'services/phone/BlueFerryReadiness.py'
+      - 'services/phone/KdeConnectDbusProbe.py'
+      - 'MODEL/contracts/social-phone-provider-observation-p2-v0.md'
+      - '.github/workflows/social-phone-provider-observation.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'services/phone/PhoneProviderObservation.py'
+      - 'tests/phone/test_phone_provider_observation.py'
+      - 'services/phone/BlueFerryReadiness.py'
+      - 'services/phone/KdeConnectDbusProbe.py'
+      - 'MODEL/contracts/social-phone-provider-observation-p2-v0.md'
+      - '.github/workflows/social-phone-provider-observation.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  provider-observation:
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    steps:
+      - uses: actions/checkout@v4
+      - name: Compile observation and upstream probes
+        run: |
+          python3 -m py_compile services/phone/PhoneProviderObservation.py tests/phone/test_phone_provider_observation.py
+          python3 -m py_compile services/phone/BlueFerryReadiness.py services/phone/KdeConnectDbusProbe.py
+      - name: Synthetic observation and upstream regressions
+        run: |
+          python3 -m unittest discover -s tests/phone -p 'test_phone_provider_observation.py' -v
+          python3 -m unittest discover -s tests/phone -p 'test_blueferry_readiness.py' -v
+          python3 -m unittest discover -s tests/phone -p 'test_kdeconnect_dbus_probe.py' -v

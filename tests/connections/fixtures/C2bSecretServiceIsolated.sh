@@ -50,9 +50,17 @@ chmod 600 "$temp/.c2b-private-bus"
 printf %s 'Post-Apollo-C2b-CI-disposable-not-a-user-password' |
   gnome-keyring-daemon --unlock --components=secrets >/dev/null 2>&1
 
-owner="$(gdbus call --session --dest org.freedesktop.DBus \
+# The unlock process may prepare the login collection before it acquires
+# the service name. Attach the secrets component to this private bus only.
+gnome-keyring-daemon --start --components=secrets >/dev/null 2>&1 || true
+owner=""
+for ((i=0; i<40; i++)); do
+  owner="$(gdbus call --session --dest org.freedesktop.DBus \
     --object-path /org/freedesktop/DBus \
-    --method org.freedesktop.DBus.NameHasOwner org.freedesktop.secrets)"
+    --method org.freedesktop.DBus.NameHasOwner org.freedesktop.secrets)" || owner=""
+  [[ "$owner" == "(true,)" ]] && break
+  sleep 0.1
+done
 [[ "$owner" == "(true,)" ]] || {
   echo "REFUSED_C2B_PRIVATE_SECRET_SERVICE_MISSING"; exit 1;
 }

@@ -1005,7 +1005,7 @@ Rectangle {
         StationSectionDivider {
             visible: ground.sectionVisible("rivers")
             width: parent.width
-            title: SubjectPanelPolicy.riverTitleFor(ground.subjectRoute)
+            title: "RIVER // NOAA NWPS"
         }
 
         // The four deep RIVERS routes stay directly reachable without
@@ -1034,6 +1034,15 @@ Rectangle {
                     onTriggered: ground.routeRequested(modelData.path)
                 }
             }
+        }
+
+        QuietText {
+            width: parent.width
+            visible: ground.subjectRoute.indexOf("weather/water/rivers/") === 0
+            text: "FOCUS // " + SubjectPanelPolicy.riverFocusForRoute(
+                ground.subjectRoute).toUpperCase()
+            color: Colors.magenta
+            font.pixelSize: 10
         }
 
         Column {

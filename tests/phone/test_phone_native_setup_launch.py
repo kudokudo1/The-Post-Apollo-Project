@@ -69,7 +69,7 @@ class NativeSetupLaunchTests(unittest.TestCase):
 
     def test_fallback_to_qt_when_gtk_cannot_launch(self):
         def find(name):
-            return "/usr/bin/" + name
+            return "/usr/bin/" + name if name in ("blueferry-gtk", "blueferry-qt") else None
         def launch(args, **kwargs):
             if args == ["/usr/bin/blueferry-gtk"]:
                 raise OSError("PRIVATE_DESKTOP_LOG")

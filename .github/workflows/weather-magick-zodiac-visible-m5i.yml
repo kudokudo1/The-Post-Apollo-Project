@@ -1,0 +1,52 @@
+name: MAGICK M5i visible zodiac vector glyphs
+on:
+  pull_request:
+    paths:
+      - 'widgets/weather/StationMagickCelestialInstrument.qml'
+      - 'widgets/weather/StationMagickZodiacVectorPolicy.js'
+      - 'tests/weather/test_magick_neon_scrubber_m5h.js'
+      - 'tests/weather/test_magick_zodiac_visible_m5i.js'
+      - 'tests/weather/test_magick_zodiac_visible_m5i_pixels.py'
+      - '.github/workflows/weather-magick-zodiac-visible-m5i.yml'
+  push:
+    paths:
+      - 'widgets/weather/StationMagickCelestialInstrument.qml'
+      - 'widgets/weather/StationMagickZodiacVectorPolicy.js'
+      - 'tests/weather/test_magick_neon_scrubber_m5h.js'
+      - 'tests/weather/test_magick_zodiac_visible_m5i.js'
+      - 'tests/weather/test_magick_zodiac_visible_m5i_pixels.py'
+      - '.github/workflows/weather-magick-zodiac-visible-m5i.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  font-free-compact-render:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Check all 12 zodiac vectors and compact geometry
+        run: node --test tests/weather/test_magick_zodiac_visible_m5i.js
+      - name: Rasterize actual sign vectors without any font
+        run: |
+          python3 -m pip install 'CairoSVG>=2.7,<3' 'Pillow>=10,<13'
+          node tests/weather/test_magick_zodiac_visible_m5i.js \
+            --emit-svg "$RUNNER_TEMP/zodiac-compact.svg"
+          python3 tests/weather/test_magick_zodiac_visible_m5i_pixels.py \
+            "$RUNNER_TEMP/zodiac-compact.svg"
+      - name: Preserve existing M5a through M5h and HOME contracts
+        run: |
+          node --test tests/weather/test_magick_neon_scrubber_m5h.js
+          node --test tests/weather/test_magick_relations_timeline_m5g.js
+          node --test tests/weather/test_magick_chart_legibility_m5f.js
+          node --test tests/weather/test_magick_event_inspector_m5d.js
+          node --test tests/weather/test_magick_celestial_visual_m5.js
+          node --test tests/weather/test_magick_celestial_bridge_m5b.js
+          node --test tests/weather/test_magick_celestial_query_m5c.js
+          node --test tests/weather/test_home_deck_w2a.js

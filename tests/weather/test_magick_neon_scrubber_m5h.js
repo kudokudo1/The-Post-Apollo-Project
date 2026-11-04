@@ -111,11 +111,15 @@ test("a drag resolves to nearby samples without creating intermediate positions"
     assert.equal(picked.sampleIndex,1); // 1.5 day tie goes earlier
 });
 
-test("QML uses actual symbol text, Qt Canvas neon and existing semantic palette",()=>{
+test("QML uses font-independent zodiac symbol vectors, Qt Canvas neon and semantic palette",()=>{
     assert.match(qml,/import QtQuick\.Effects/);
-    assert.match(qml,/Celestial\.zodiacGlyph\(sign\)/);
+    assert.match(qml,/import "StationMagickZodiacVectorPolicy.js" as ZodiacVector/);
+    assert.match(qml,/ZodiacVector\.strokesFor\(sign\)/);
+    assert.match(qml,/ZodiacVector\.sectorCenter\(/);
+    assert.match(qml,/function paintZodiacVector\(ctx,sign,x,y,color,isSelected\)/);
+    assert.match(qml,/instrument\.paintZodiacVector\(ctx,sign,at\.x,at\.y,/);
     assert.match(qml,/Celestial\.zodiacColor\(sign\)/);
-    assert.match(qml,/18px 'Noto Sans Symbols 2'/);
+    assert.doesNotMatch(qml,/Noto Sans Symbols 2/);
     assert.match(qml,/function neonStroke\(ctx,color,width,blur\)/);
     assert.match(qml,/function neonText\(ctx,text,x,y,color,blur\)/);
     assert.match(qml,/ctx\.shadowColor=String\(color\)/);

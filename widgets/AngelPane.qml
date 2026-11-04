@@ -36,8 +36,7 @@ Item {
         {key: "other", label: "OTHER"}
     ]
 
-    function recordObservation(inputDigits, mode) {
-        const observedAtMs = Date.now();
+    function recordObservation(inputDigits, mode, observedAtMs) {
         const displayEpochMs = TimeSettings.adjustedEpochMs(observedAtMs);
         const capture = AngelPolicy.clockCapture(displayEpochMs);
         if (capture === null)
@@ -59,14 +58,14 @@ Item {
         const value = AngelPolicy.clockCapture(
             TimeSettings.adjustedEpochMs(observedAtMs));
         if (value !== null)
-            recordObservation(value.digits, "clock");
+            recordObservation(value.digits, "clock", observedAtMs);
     }
 
     function recordManual() {
         const digits = manualDigitsInput.text.trim();
         if (!AngelPolicy.validDigits(digits))
             return;
-        if (recordObservation(digits, "manual"))
+        if (recordObservation(digits, "manual", Date.now()))
             manualDigitsInput.text = "";
     }
 

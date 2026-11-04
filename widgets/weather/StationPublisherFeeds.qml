@@ -42,6 +42,7 @@ Column {
         ]
 
         delegate: Column {
+            id: publisherSourceRow
             required property var modelData
             readonly property var backend:
                 modelData.id === "bbc-world" ? bbc : alJazeera

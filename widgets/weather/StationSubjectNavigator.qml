@@ -625,6 +625,7 @@ Rectangle {
 
     StationMagickSubjectPane {
         id: magickReferencePane
+        onRouteRequested: function(path) { browser.chooseRoute(path); }
         celestialSource: browser.celestialSource
         anchors.left: parent.left
         anchors.right: parent.right

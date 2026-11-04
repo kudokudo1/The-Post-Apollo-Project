@@ -15,6 +15,9 @@ import SocialOrganizationDirectory as directory
 import SocialLocalPortfolios as portfolio
 import SocialLocalOrganizationStructure as structure
 import SocialOrganizationLinks as social
+import SocialLocalUnitLocationLinks as unit_locations
+import SocialLocalBranchLocationLinks as branch_locations
+import SocialLocalFunctionalReporting as reporting
 
 
 class ArchivedRemoval(unittest.TestCase):
@@ -146,6 +149,66 @@ class ArchivedRemoval(unittest.TestCase):
         self.save_unit(archived=False)
         with self.assertRaisesRegex(removal.RemovalError, "ARCHIVE_BEFORE_REMOVE"):
             removal.remove(req)
+
+    def test_organization_social_link_stays_until_explicit_unlink(self):
+        self.save_org()
+        social.save({
+            "schema": social.SCHEMA, "revision": 1, "nextId": 2,
+            "links": [{"id": "link-1", "orgId": "org-1", "branchId": None,
+                       "identityId": "identity-1", "serviceId": None,
+                       "accountId": None}],
+        })
+        backup.make_backup()
+        req = self.request("organization", "org-1", "Sample Company", org_id="org-1")
+        with self.assertRaisesRegex(removal.RemovalError, "UNLINK_ORGANIZATION_FIRST"):
+            removal.remove(req)
+        self.assertEqual(len(directory.load()["organizations"]), 1)
+
+    def test_branch_location_link_blocks_removal(self):
+        self.save_org(archived=False, branches=[
+            {"id": "branch-2", "name": "Sample Branch", "archived": True}])
+        branch_locations.save({
+            "schema": branch_locations.SCHEMA, "revision": 1, "nextId": 2,
+            "links": [{"id": "branch-placement-1", "orgId": "org-1",
+                       "branchId": "branch-2", "locationId": "unit-1"}],
+        })
+        backup.make_backup()
+        req = self.request("branch", "branch-2", "Sample Branch", org_id="org-1")
+        with self.assertRaisesRegex(removal.RemovalError, "UNLINK_BRANCH_LOCATION_FIRST"):
+            removal.remove(req)
+        self.assertEqual(len(directory.load()["organizations"][0]["branches"]), 1)
+
+    def test_unit_location_and_reporting_references_block_removal(self):
+        self.save_org(archived=False)
+        self.save_unit()
+        req = self.request("unit", "unit-1", "Sample Unit", org_id="org-1")
+        unit_locations.save({
+            "schema": unit_locations.SCHEMA, "revision": 1, "nextId": 2,
+            "links": [{"id": "placement-1", "orgId": "org-1",
+                       "functionId": "unit-1", "locationId": "unit-2"}],
+        })
+        backup.make_backup()
+        with self.assertRaisesRegex(removal.RemovalError, "UNLINK_UNIT_LOCATION_FIRST"):
+            removal.remove(req)
+        unit_locations.save(unit_locations.initial())
+        branch_locations.save({
+            "schema": branch_locations.SCHEMA, "revision": 1, "nextId": 2,
+            "links": [{"id": "branch-placement-1", "orgId": "org-1",
+                       "branchId": "branch-2", "locationId": "unit-1"}],
+        })
+        with self.assertRaisesRegex(removal.RemovalError, "UNLINK_BRANCH_LOCATION_FIRST"):
+            removal.remove(req)
+        branch_locations.save(branch_locations.initial())
+        reporting.save({
+            "schema": reporting.SCHEMA, "revision": 1, "nextId": 2,
+            "links": [{"id": "report-link-1", "orgId": "org-1",
+                       "parentId": "unit-1", "childId": "unit-2"}],
+        })
+        with self.assertRaisesRegex(removal.RemovalError, "UNLINK_REPORTING_FIRST"):
+            removal.remove(req)
+        reporting.save(reporting.initial())
+        self.assertTrue(removal.remove(req)["ok"])
+        self.assertEqual(structure.load()["units"], [])
 
     def test_invalid_mismatch_and_lock_refusal(self):
         self.save_org()

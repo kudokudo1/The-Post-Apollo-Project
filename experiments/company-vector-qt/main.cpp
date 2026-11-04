@@ -14,6 +14,7 @@
 #include <QColor>
 #include <algorithm>
 #include <cmath>
+#include <memory>
 #include <QFile>
 #include <QJsonDocument>
 #include <QJsonObject>
@@ -168,41 +169,47 @@ int main(int argc, char **argv) {
         // Real Qt event-loop cadence can stretch scripted 33ms timers to
         // 50-100ms under software rendering. Finish when QML confirms its
         // 150th update, not at an arbitrary 14.6-second wall-clock cutoff.
-        QElapsedTimer watch;
-        watch.start();
-        QVector<qint64> intervals;
-        qint64 lastSwapNs = -1;
+        struct MotionMetrics {
+            QElapsedTimer watch;
+            QVector<qint64> intervals;
+            qint64 lastSwapNs = -1;
+        };
+        // Shared state survives until the event-loop callbacks finish.
+        // Stack-reference captures would be dangling after this block.
+        auto metrics = std::make_shared<MotionMetrics>();
+        metrics->watch.start();
         QObject::connect(window, &QQuickWindow::frameSwapped, window,
-            [&watch, &intervals, &lastSwapNs]() {
-                const qint64 now = watch.nsecsElapsed();
+            [metrics]() {
+                const qint64 now = metrics->watch.nsecsElapsed();
                 if (now < 8000000000LL) return;
-                if (lastSwapNs >= 0) intervals.append(now-lastSwapNs);
-                lastSwapNs = now;
+                if (metrics->lastSwapNs >= 0)
+                    metrics->intervals.append(now-metrics->lastSwapNs);
+                metrics->lastSwapNs = now;
             });
 
         auto *completionPoll = new QTimer(&app);
         completionPoll->setInterval(100);
         QObject::connect(completionPoll, &QTimer::timeout, &app,
-            [&app, &watch, &intervals, completionPoll, window, sample, anyOnline]() {
+            [&app, metrics, completionPoll, window, sample, anyOnline]() {
                 const int ticks = window->property("motionTick").toInt();
                 if (ticks < 150) return;
                 completionPoll->stop();
-                std::sort(intervals.begin(), intervals.end());
-                const int n = intervals.size();
-                auto percentileMs = [&intervals, n](double fraction) -> double {
+                std::sort(metrics->intervals.begin(), metrics->intervals.end());
+                const int n = metrics->intervals.size();
+                auto percentileMs = [metrics, n](double fraction) -> double {
                     if (!n) return 0;
                     const int idx = std::min(n-1, std::max(0, int(std::ceil(n*fraction)-1)));
-                    return double(intervals[idx])/1000000.0;
+                    return double(metrics->intervals[idx])/1000000.0;
                 };
                 const double p50 = percentileMs(0.50);
                 const double p95 = percentileMs(0.95);
-                const double maxMs = n ? double(intervals.last())/1000000.0 : 0.0;
+                const double maxMs = n ? double(metrics->intervals.last())/1000000.0 : 0.0;
                 QJsonObject report{
                     {"sample", sample}, {"online", anyOnline},
                     {"motion_steps", ticks},
                     {"frame_intervals", n},
                     {"p50_ms", p50}, {"p95_ms", p95}, {"max_ms", maxMs},
-                    {"window_ms", std::max(0.0, double(watch.elapsed()-8000))},
+                    {"window_ms", std::max(0.0, double(metrics->watch.elapsed()-8000))},
                     {"note", "software-renderer scheduling; not host GPU performance"}
                 };
                 qInfo().noquote() << "BENCH_FRAME_PACING"

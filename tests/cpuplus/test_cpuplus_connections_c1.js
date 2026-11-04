@@ -85,7 +85,7 @@ assert.match(service,/SocialIdentityStore\.snapshot/);
 assert.match(service,/SocialAccountDetailsStore\.saved/);
 assert.match(service,/NotificationsService\.historyReady/);
 assert.match(service,/FirmsPolicy\.configuredKey/);
-assert.match(service,/ConnectionsPolicy\.build/);
+assert.match(service,/ConnectionPolicy\.build/);
 assert.match(service,/SocialIdentityStore\.reloadFromDisk\(\)/);
 assert.match(service,/SocialAccountDetailsStore\.refresh\(\)/);
 assert.doesNotMatch(service,/FileView|Process\s*\{|setText\(|write\(|Qt\.openUrlExternally/);

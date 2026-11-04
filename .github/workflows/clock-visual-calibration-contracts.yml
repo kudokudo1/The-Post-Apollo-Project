@@ -1,0 +1,45 @@
+name: Clock calibration and visual attention contracts
+
+on:
+  pull_request:
+    paths:
+      - "modules/Clock.qml"
+      - "services/time/TimeSettings.qml"
+      - "services/time/TimeHostControl.py"
+      - "widgets/TimeW.qml"
+      - "widgets/TimeSettingsPane.qml"
+      - "widgets/TimeZonePicker.qml"
+      - "widgets/TimeActionButton.qml"
+      - "widgets/TimeResyncAuthW.qml"
+      - "tests/time/test_clock_visual_calibration_contract.py"
+      - "tests/time/test_clock_settings_contract.py"
+      - ".github/workflows/clock-visual-calibration-contracts.yml"
+  push:
+    paths:
+      - "modules/Clock.qml"
+      - "services/time/TimeSettings.qml"
+      - "services/time/TimeHostControl.py"
+      - "widgets/TimeW.qml"
+      - "widgets/TimeSettingsPane.qml"
+      - "widgets/TimeZonePicker.qml"
+      - "widgets/TimeActionButton.qml"
+      - "widgets/TimeResyncAuthW.qml"
+      - "tests/time/test_clock_visual_calibration_contract.py"
+      - "tests/time/test_clock_settings_contract.py"
+      - ".github/workflows/clock-visual-calibration-contracts.yml"
+
+jobs:
+  contracts:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check Python syntax
+        run: python3 -m py_compile services/time/TimeHostControl.py
+      - name: Test Clock visual semantics, measured drift and calibration queue
+        run: python3 -m unittest discover -s tests/time -p 'test_clock_visual_calibration_contract.py' -v
+      - name: Preserve Clock time contracts
+        run: python3 -m unittest discover -s tests/time -p 'test_clock_settings_contract.py' -v
+      - name: Preserve system timezone and Polkit contracts
+        run: python3 -m unittest discover -s tests/time -p 'test_clock_system_timezone_contract.py' -v
+      - name: Preserve CPU++ TIME integration
+        run: python3 -m unittest discover -s tests/cpuplus -p 'test_cpuplus_time_settings_contract.py' -v

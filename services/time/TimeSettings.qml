@@ -16,15 +16,77 @@ Scope {
     property string storageState: "loading"
     property string errorCode: ""
     property var document: Policy.initialDocument()
+    // One in-flight atomic write plus the latest queued adjustment. A burst
+    // of button clicks updates the display immediately without concurrent
+    // FileView writes, and the last accepted offset wins on disk.
     property var pendingDocument: null
+    property var queuedDocument: null
 
     readonly property int displayOffsetMs:
-        document ? Number(document.displayOffsetMs || 0) : 0
+        queuedDocument !== null ? Number(queuedDocument.displayOffsetMs)
+        : pendingDocument !== null ? Number(pendingDocument.displayOffsetMs)
+        : document ? Number(document.displayOffsetMs || 0) : 0
     readonly property string displayOffsetLabel:
         Policy.formatOffset(displayOffsetMs)
     readonly property bool canEdit:
-        (storageState === "ready" || storageState === "empty")
-        && pendingDocument === null
+        storageState === "ready" || storageState === "empty"
+        || storageState === "saving"
+
+    // Evidence-based attention for the dock. An unapplied zone choice or
+    // disabled NTP alone does NOT prove the host clock is inaccurate.
+    readonly property bool displayDeviationActive: displayOffsetMs !== 0
+    // Explicit reference checks only: disabled NTP and a pending timezone
+    // choice are not evidence that the computer's time is wrong.
+    property bool referenceChecking: false
+    property string referenceStatus: "unchecked"
+    property string referenceMessage: "NO EXTERNAL MEASUREMENT"
+    property double referenceOffsetMs: 0
+    property double referenceCheckedAtMs: 0
+    readonly property int referenceMaxAgeMs: 15 * 60 * 1000
+    readonly property int referenceWarningThresholdMs: 1000
+
+    function hasFreshReference(nowEpochMs) {
+        return referenceStatus === "measured"
+               && Number.isFinite(nowEpochMs)
+               && nowEpochMs >= referenceCheckedAtMs
+               && nowEpochMs - referenceCheckedAtMs <= referenceMaxAgeMs;
+    }
+
+    function dockZoneOffsetMismatch(nowEpochMs) {
+        if (hostInfo.status !== "ready" || !Number.isFinite(nowEpochMs))
+            return false;
+        const text = String(hostInfo.utcOffset || "");
+        const match = /^UTC([+-])(\\d{2}):(\\d{2})$/.exec(text);
+        if (!match)
+            return false; // Unknown is not evidence of mismatch.
+        const hostMinutes =
+            (match[1] === "-" ? -1 : 1)
+            * (Number(match[2]) * 60 + Number(match[3]));
+        const qmlMinutes = -new Date(nowEpochMs).getTimezoneOffset();
+        return hostMinutes !== qmlMinutes;
+    }
+
+    function dockTimeUnderlined(nowEpochMs) {
+        return displayDeviationActive
+               || dockZoneOffsetMismatch(nowEpochMs)
+               || (hasFreshReference(nowEpochMs)
+                   && Math.abs(referenceOffsetMs)
+                      >= referenceWarningThresholdMs);
+    }
+
+    function checkTimeAccuracy() {
+        if (referenceChecking || authSessionActive)
+            return false;
+        referenceChecking = true;
+        referenceStatus = "checking";
+        referenceMessage = "CONTACTING CONFIGURED CHRONY SOURCES...";
+        referenceCheckedAtMs = 0;
+        referenceProcess.exec([
+            "python3", "-B", "-I",
+            Quickshell.shellPath("services/time/TimeHostControl.py"), "measure"
+        ]);
+        return true;
+    }
 
     property var hostInfo: ({ status: "unavailable", timezone: "UNKNOWN",
                                utcOffset: "UNKNOWN", dstActive: false,
@@ -72,6 +134,12 @@ Scope {
         return Policy.adjustedEpochMs(epochMs, displayOffsetMs);
     }
 
+    function beginOffsetWrite(nextDocument) {
+        pendingDocument = nextDocument;
+        storageState = "saving";
+        settingsFile.setText(JSON.stringify(pendingDocument, null, 2) + "\n");
+    }
+
     function persistOffset(ms) {
         if (!canEdit) {
             errorCode = "STORAGE_NOT_READY";
@@ -82,10 +150,14 @@ Scope {
             errorCode = next.reason;
             return false;
         }
-        pendingDocument = next.document;
         errorCode = "";
-        storageState = "saving";
-        settingsFile.setText(JSON.stringify(pendingDocument, null, 2) + "\n");
+        if (pendingDocument !== null) {
+            // Do not invoke FileView.setText while an atomic write is
+            // outstanding; coalesce successive clicks into one queued value.
+            queuedDocument = next.document;
+        } else {
+            beginOffsetWrite(next.document);
+        }
         return true;
     }
 
@@ -111,6 +183,7 @@ Scope {
         }
         document = parsed.document;
         pendingDocument = null;
+        queuedDocument = null;
         storageState = "ready";
         errorCode = "";
     }
@@ -236,6 +309,9 @@ Scope {
 
     function cancelTimezone() {
         timezoneConfirmRequired = false;
+        // Revert the visible selection to the verified host zone. A cancelled
+        // candidate must never look like an already-applied timezone.
+        zoneChoice = "";
         if (timezoneStatus === "confirm") {
             timezoneStatus = "idle";
             timezoneMessage = "TIMEZONE CHANGE CANCELLED";
@@ -364,13 +440,22 @@ Scope {
             if (timeSettings.storageState !== "saving"
                     || timeSettings.pendingDocument === null)
                 return;
-            timeSettings.document = timeSettings.pendingDocument;
+            const saved = timeSettings.pendingDocument;
+            const queued = timeSettings.queuedDocument;
+            timeSettings.document = saved;
             timeSettings.pendingDocument = null;
-            timeSettings.storageState = "ready";
+            timeSettings.queuedDocument = null;
             timeSettings.errorCode = "";
+            if (queued !== null
+                    && queued.displayOffsetMs !== saved.displayOffsetMs) {
+                timeSettings.beginOffsetWrite(queued);
+            } else {
+                timeSettings.storageState = "ready";
+            }
         }
         onSaveFailed: function(error) {
             timeSettings.pendingDocument = null;
+            timeSettings.queuedDocument = null;
             timeSettings.storageState = "error";
             timeSettings.errorCode = "FILE_SAVE_FAILED";
         }
@@ -396,6 +481,42 @@ Scope {
             timeSettings.hostRefreshing = false;
             if (code !== 0)
                 timeSettings.hostError = "HOST STATUS READ FAILED";
+        }
+    }
+
+    Process {
+        id: referenceProcess
+        running: false
+        stdout: StdioCollector {
+            onStreamFinished: {
+                try {
+                    const value = JSON.parse(this.text);
+                    const offset = Number(value.offsetMs);
+                    if (value.status === "measured"
+                            && Number.isFinite(offset)) {
+                        timeSettings.referenceOffsetMs = offset;
+                        timeSettings.referenceCheckedAtMs = Date.now();
+                        timeSettings.referenceStatus = "measured";
+                        timeSettings.referenceMessage =
+                            "REFERENCE OFFSET // "
+                            + (offset / 1000).toFixed(3) + " SECONDS";
+                    } else {
+                        timeSettings.referenceStatus = "unavailable";
+                        timeSettings.referenceMessage =
+                            String(value.message || "NO REFERENCE SAMPLE");
+                    }
+                } catch (error) {
+                    timeSettings.referenceStatus = "unavailable";
+                    timeSettings.referenceMessage = "REFERENCE RESULT INVALID";
+                }
+            }
+        }
+        onExited: function(code, exitStatus) {
+            timeSettings.referenceChecking = false;
+            if (code !== 0) {
+                timeSettings.referenceStatus = "unavailable";
+                timeSettings.referenceMessage = "REFERENCE PROCESS FAILED";
+            }
         }
     }
 
@@ -450,6 +571,10 @@ Scope {
                 timeSettings.resyncStatus = "failed";
                 timeSettings.resyncMessage = "RESYNC PROCESS FAILED";
             }
+            // A successful one-shot correction has already contacted the
+            // time source. Verify its residual offset without altering time.
+            if (code === 0 && timeSettings.resyncStatus === "completed")
+                timeSettings.checkTimeAccuracy();
         }
     }
 }

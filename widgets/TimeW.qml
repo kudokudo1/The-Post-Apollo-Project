@@ -1292,8 +1292,8 @@ PanelWindow {
         { id: "calc", name: "CALC" },
         { id: "tools", name: "TOOLS" },
         { id: "machine", name: "MACHINE" },
-        { id: "settings", name: "SETTINGS" },
-        { id: "planned", name: "NEXT" }
+        { id: "planned", name: "ANGEL" },
+        { id: "settings", name: "SETTINGS" }
     ]
     property int selectedModeIndex: 0
     readonly property string selectedMode: modes[selectedModeIndex].id
@@ -2016,11 +2016,27 @@ PanelWindow {
                     labelPixelSize: 22
                     contentPadding: 3
                     trackLabelGlowLocally: true
-                    accentColor: Colors.cyan
+                    accentColor: Colors.yellow
+                    idleForegroundColor: Colors.yellow
+                    hoverForegroundColor: Colors.yellow
+                    pressedForegroundColor: Colors.yellow
+                    idleBorderColor: Colors.yellow
+                    hoverBorderColor: Colors.yellow
+                    pressedBorderColor: Colors.yellow
+                    idleContentGlowColor: Colors.yellow
+                    hoverContentGlowColor: Colors.yellow
+                    pressedContentGlowColor: Colors.yellow
+                    idleSoftGlowColor: Colors.yellow
+                    hoverSoftGlowColor: Colors.yellow
+                    pressedSoftGlowColor: Colors.yellow
+                    idleWideGlowColor: Colors.yellow
+                    hoverWideGlowColor: Colors.yellow
+                    pressedWideGlowColor: Colors.yellow
+                    wideGlowEnabled: true
                     available: TimeSettings.resyncStatus !== "working"
                                && !TimeSettings.resyncAuthPending
                     onLeftClicked: {
-                        timew.chooseMode(4);
+                        timew.chooseMode(timew.modes.length - 1);
                         TimeSettings.prepareResync();
                     }
                 }
@@ -2080,6 +2096,11 @@ PanelWindow {
                         labelFontSize: 11
                         trackDefaultGlowsLocally: true
                         idlePrimaryColor: timew.semanticColor
+                        hoverPrimaryColor: Colors.white
+                        selectedPrimaryColor: Colors.magenta
+                        selectedFillColor: Colors.yellow
+                        perimeterGlowColor: timew.selectedModeIndex === index
+                                            ? Colors.magenta : Colors.white
                         selected: timew.selectedModeIndex === index
                         keyboardActive: timew.standardKeysAvailable
                         keyboardSelected: timew.selectedModeIndex === index
@@ -5064,14 +5085,14 @@ PanelWindow {
                         visible: timew.selectedMode === "planned"
 
                         GohuText {
-                            text: "NEXT // RESERVED"
+                            text: "ANGEL // RESERVED"
                             font.pixelSize: 13
                             color: Colors.cyan
                         }
                         GohuText {
                             width: parent.width
                             wrapMode: Text.WordWrap
-                            text: "A sixth main-mode slot is ready. No new capability has been assigned to this page."
+                            text: "ANGEL is reserved for a future main-mode capability."
                             color: Colors.white
                             font.pixelSize: 11
                         }
@@ -5094,7 +5115,7 @@ PanelWindow {
                               ? "SETTINGS // DISPLAY OFFSET + SYSTEM STATUS"
                               : timew.selectedMode === "tools"
                               ? "FOUNDATION PREVIEW // UI ONLY"
-                              : "NEXT // RESERVED FOR LATER"
+                              : "ANGEL // RESERVED FOR LATER"
                         color: Colors.white
                         font.pixelSize: 11
                     }

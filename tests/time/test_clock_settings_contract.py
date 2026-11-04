@@ -25,7 +25,7 @@ class ClockTimeSettingsContract(unittest.TestCase):
         self.assertIn("TimeSettings.requestResync()", (
             ROOT / "widgets/TimeSettingsPane.qml").read_text())
         self.assertIn('id: "settings", name: "SETTINGS"', timew)
-        self.assertIn('id: "planned", name: "NEXT"', timew)
+        self.assertIn('id: "planned", name: "ANGEL"', timew)
         self.assertIn('label: "⟳"', timew)
 
     def test_shared_service_persists_only_display_offset(self):

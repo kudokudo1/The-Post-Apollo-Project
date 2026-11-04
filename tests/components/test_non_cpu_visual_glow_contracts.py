@@ -19,6 +19,7 @@ SURFACES = {
         "clockMinute",
         "clockPeriodSeparator",
         "clockPeriod",
+        "timeDifferenceUnderline",
     ),
     "modules/Volumebar.qml": (
         "volumebarIcon",
@@ -69,6 +70,7 @@ for source in (
     "clockMinute",
     "clockPeriodSeparator",
     "clockPeriod",
+    "timeDifferenceUnderline",
 ):
     assert f"id: {source}" in clock
     assert f"safeSource: {source}" in clock
@@ -112,6 +114,17 @@ assert "font.pixelSize: 11" not in clock
 assert "font.pixelSize: 17" not in clock
 assert "font.pixelSize: 20" in clock
 assert "color: Colors.magenta" not in clock
-assert "color: Colors.yellow" not in clock
+# Only the newly added reference-deviation underline is yellow. The existing
+# clock glyph sources must retain their 12h cyan / 24h orange identities.
+glyph_region, warning_region = clock.split("// Underline exactly the readout cluster", 1)
+assert "color: Colors.yellow" not in glyph_region
+assert "color: Colors.yellow" in warning_region
 
 print("Non-CPU sampled-glow structural contracts: PASS")
+
+# A ninth independent sampled glow serves only the optional dock warning
+# underline. It does not recolor or merge the eight original glyph sources.
+assert 'safeSource: timeDifferenceUnderline' in clock
+assert 'requestedVisible: timeDifferenceUnderline.visible' in clock
+assert 'TimeSettings.dockTimeUnderlined(clock.date.getTime())' in clock
+assert 'width: clockReadout.width' in clock

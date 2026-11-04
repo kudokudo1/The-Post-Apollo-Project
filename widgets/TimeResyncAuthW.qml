@@ -200,22 +200,23 @@ PanelWindow {
                 height: 34
                 spacing: 8
 
-                ActionButton {
+                TimeActionButton {
+                    actionRole: TimeSettings.timezoneStatus === "working"
+                                ? "time" : "sync"
                     width: (parent.width - parent.spacing) / 2
                     height: 33
                     label: "AUTHORIZE"
                     labelPixelSize: 11
-                    accentColor: Colors.cyan
                     available: authAgent.flow !== null
                                && authAgent.flow.isResponseRequired
                     onLeftClicked: authWindow.submitResponse()
                 }
-                ActionButton {
+                TimeActionButton {
+                    actionRole: "cancel"
                     width: (parent.width - parent.spacing) / 2
                     height: 33
                     label: "CANCEL"
                     labelPixelSize: 11
-                    accentColor: Colors.orange
                     onLeftClicked: authWindow.cancelRequest()
                 }
             }

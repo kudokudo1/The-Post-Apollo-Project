@@ -85,7 +85,10 @@ function requestFor(utcDay,offset,pairId,spanDays) {
         step_hours:12,
         rate_window_hours:6,
         orb_degrees:6,
-        include_events:true
+        include_events:true,
+        // V4c: same on-demand kernel invocation, same UTC grid and pair.
+        // Adds geometric Sun-origin coordinates; geocentric M4 remains intact.
+        include_heliocentric_spatial:true
     };
 }
 function matchesResult(payload,expected) {
@@ -103,6 +106,20 @@ function matchesResult(payload,expected) {
     var bodies=expected.bodies.slice().sort();
     if(JSON.stringify(payload.query.bodies)!==JSON.stringify(bodies))
         return false;
+    if(expected.include_heliocentric_spatial===true) {
+        var spatial=payload.heliocentric_spatial;
+        if(payload.query.include_heliocentric_spatial!==true ||
+           !spatial ||
+           spatial.format!=="post-apollo.weather.heliocentric-spatial.v1" ||
+           spatial.origin!=="heliocentric" ||
+           spatial.origin_body!=="sun" ||
+           spatial.position_model!=="geometric" ||
+           spatial.frame!=="true-ecliptic-of-date" ||
+           !Array.isArray(spatial.series) ||
+           spatial.series.length!==expected.bodies.length ||
+           spatial.sample_count!==payload.sample_count)
+            return false;
+    }
     if(Date.parse(payload.query.start_utc)!==Date.parse(expected.start_utc) ||
        Date.parse(payload.query.end_utc)!==Date.parse(expected.end_utc) ||
        payload.query.step_hours!==expected.step_hours ||

@@ -40,8 +40,8 @@ class SocialUserSettingsRailContracts(unittest.TestCase):
         self.assertIn("anchors.bottom: parent.bottom", SELECTOR[footer:footer + 220])
         self.assertIn('label: "USER // SETTINGS"', SELECTOR[footer:footer + 480])
         self.assertIn(
-            "onTriggered: appSelector.settingsOpen = !appSelector.settingsOpen",
-            SELECTOR[footer:footer + 550],
+            "appSelector.settingsOpen = !appSelector.settingsOpen;",
+            SELECTOR[footer:footer + 650],
         )
         self.assertNotIn("appSelector.appActivated", SELECTOR[footer:footer + 600])
         self.assertIn("visible: true", SELECTOR)
@@ -51,7 +51,7 @@ class SocialUserSettingsRailContracts(unittest.TestCase):
         self.assertIn("id: settingsPage", SELECTOR)
         self.assertIn("visible: appSelector.settingsOpen", SELECTOR)
         self.assertIn(
-            "bottom: statusMessage.visible ? statusMessage.top : settingsFooter.top",
+            "bottom: statusMessage.visible ? statusMessage.top : phoneFooter.top",
             SELECTOR,
         )
         self.assertIn("anchors.bottom: settingsFooter.top", SELECTOR)
@@ -65,7 +65,7 @@ class SocialUserSettingsRailContracts(unittest.TestCase):
         self.assertIn("Qt.Key_Escape", scope)
         self.assertIn("event.accepted = true", scope)
         self.assertIn("onSettingsOpenChanged:", HOST)
-        self.assertIn("appSelector.settingsOpen = false;\n        setGeometryWatch(menuOpen)", HOST)
+        self.assertIn("appSelector.settingsOpen = false;\n        appSelector.phoneOpen = false;\n        setGeometryWatch(menuOpen)", HOST)
         self.assertIn("const count = appSelector.visibleAppIndices.length;", HOST)
 
     def test_external_input_mask_and_routing_unchanged(self):

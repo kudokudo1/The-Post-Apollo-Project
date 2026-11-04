@@ -9,6 +9,8 @@ Item {
     id: syncConnections
 
     property var todoSnapshot: null
+    // Metadata only. Never a draft body, key, persisted receipt or grant.
+    property var editorSignals: null
     property string selectedSubmode: "overview"
     signal openGithubProjectsRequested()
 
@@ -212,6 +214,7 @@ Item {
         TaskRecoveryStatusPaneM13q {
             anchors.fill: parent
             visible: syncConnections.selectedSubmode === "recovery"
+            editorSignals: syncConnections.editorSignals
         }
 
         // Preserve the M8 field/identity preview intact and accessible.

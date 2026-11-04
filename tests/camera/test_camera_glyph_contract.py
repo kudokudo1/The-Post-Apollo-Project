@@ -89,14 +89,37 @@ class CameraLineGlyphContract(unittest.TestCase):
         self.assertIn("CameraGlyph {", self.dock)
         self.assertIn("id: cameraMark", self.dock)
         self.assertIn("contentGlowSource: cameraMark", self.dock)
-        self.assertIn("bodyColor: cameraDock.foregroundColor", self.dock)
-        self.assertIn("lensColor: cameraDock.menuOpen", self.dock)
-        self.assertIn("ornamentColor: cameraDock.menuOpen", self.dock)
-        self.assertIn('text: "CAM"', self.dock)
+        self.assertIn("bodyColor: cameraDock.glyphInk", self.dock)
+        self.assertIn("lensColor: cameraDock.glyphInk", self.dock)
+        self.assertIn("ornamentColor: cameraDock.glyphInk", self.dock)
+        self.assertNotIn('text: "CAM"', self.dock)
         self.assertIn("onLeftClicked: toggleRequested()", self.dock)
         self.assertNotIn('text: "📷︎"', self.dock)
         self.assertNotIn("NotoText {", self.dock)
         self.assertNotIn("Image {", self.dock)
+
+    def test_camera_glyph_white_closed_and_entirely_magenta_when_open(self):
+        # All shape paths use only the three stroke roles, and the dock binds
+        # all roles to the SAME color. No hard-coded white lens on open.
+        self.assertIn('property color bodyColor: "#FFFFFF"', self.icon)
+        self.assertIn("property color lensColor: bodyColor", self.icon)
+        self.assertIn("property color ornamentColor: bodyColor", self.icon)
+        self.assertIn(
+            "readonly property color glyphInk: menuOpen ? Colors.magenta : Colors.white",
+            self.dock)
+        self.assertIn("bodyColor: cameraDock.glyphInk", self.dock)
+        self.assertIn("lensColor: cameraDock.glyphInk", self.dock)
+        self.assertIn("ornamentColor: cameraDock.glyphInk", self.dock)
+        self.assertIn("normalContentGlowColor: Colors.white", self.dock)
+        self.assertIn("hoverContentGlowColor: Colors.white", self.dock)
+        self.assertIn("pressedContentGlowColor: Colors.white", self.dock)
+        self.assertIn("openGlowColor: Colors.magenta", self.dock)
+        self.assertNotIn("GohuText {", self.dock)
+        self.assertNotIn("Row {", self.dock)
+        self.assertNotIn('text: "CAM"', self.dock)
+        self.assertIn("anchors.centerIn: parent", self.dock)
+        self.assertIn("width: 64", self.dock)
+        self.assertIn("height: 48", self.dock)
 
     def test_keeps_camera_and_social_independently_mounted(self):
         self.assertIn("Screenshot {", self.shell)

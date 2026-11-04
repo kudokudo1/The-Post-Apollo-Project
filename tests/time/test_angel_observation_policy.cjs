@@ -123,4 +123,54 @@ for (let i = 1; i <= 4096; i++) {
 }
 assert.equal(policy.validate(full).ok, true);
 assert.equal(policy.create(full, "222", context(), 1793803000000).reason, "CAPACITY");
+
+// ERR is a review bucket, not a mutually exclusive claim about numerology.
+// It includes structurally unmatched numbers and any selected observation
+// explicitly marked by the user, without modifying other sightings.
+assert.equal(policy.FILTERS.includes("err"), true);
+const errBase = policy.emptyDocument();
+const errFirst = policy.create(errBase, "222", context(), 2000);
+const errSecond = policy.create(errFirst.document, "222", context(), 3000);
+const errOther = policy.create(errSecond.document, "809", context(), 4000);
+const errDoc = copy(errOther.document);
+assert.equal(policy.matchesFilter("809", "other"), true);
+assert.equal(policy.matchesFilter("809", "err"), true);
+assert.deepEqual(copy(policy.filter(errDoc.observations, "", "err")
+    .map(x => x.digits)), ["809"], "unmatched automatically belongs to ERR");
+assert.equal(policy.filter(errDoc.observations, "", "repeat").length, 2);
+assert.equal(policy.toggleErr(errDoc, "a999").reason, "UNKNOWN_ID");
+const marked = policy.toggleErr(errDoc, "a1");
+assert.equal(marked.ok, true);
+assert.equal(marked.errMarked, true);
+assert.equal(errDoc.observations[0].errMarked, false,
+    "marking must never mutate the confirmed document");
+assert.equal(marked.document.observations[1].errMarked, false,
+    "same number, different occurrence must remain unmarked");
+assert.deepEqual(copy(policy.filter(marked.document.observations, "", "err")
+    .map(x => x.id)), ["a3", "a1"]);
+assert.deepEqual(copy(policy.filter(marked.document.observations, "22", "err")
+    .map(x => x.id)), ["a1"]);
+assert.equal(policy.filter(marked.document.observations, "", "other").length, 1,
+    "OTHER remains purely automatic, not influenced by manually marked ERR");
+assert.equal(policy.filter(marked.document.observations, "", "repeat").length, 2,
+    "a mark cannot destroy original classifications");
+const unmarked = policy.toggleErr(marked.document, "a1");
+assert.equal(unmarked.ok, true);
+assert.equal(unmarked.errMarked, false);
+assert.deepEqual(copy(policy.filter(unmarked.document.observations, "", "err")
+    .map(x => x.id)), ["a3"]);
+assert.equal(policy.parse(JSON.stringify(marked.document)).ok, true,
+    "flag survives JSON roundtrip");
+const legacy = copy(errDoc);
+for (const row of legacy.observations) delete row.errMarked;
+assert.equal(policy.parse(JSON.stringify(legacy)).ok, true,
+    "existing v1 journals without errMarked must load unmodified");
+assert.deepEqual(copy(policy.parse(JSON.stringify(legacy)).document
+    .observations.map(x => x.errMarked)), [false, false, false]);
+assert.equal(policy.parse(JSON.stringify({
+    ...errDoc, observations: [{
+        ...errDoc.observations[0], errMarked: "true"
+    }]
+})).ok, false, "reject invalid review field type");
+
 console.log("ANGEL_OBSERVATION_POLICY_PASS");

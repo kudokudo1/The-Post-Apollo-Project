@@ -37,6 +37,7 @@ Scope {
     // Signal to the root-shell LazyLoader to register a temporary, native
     // Quickshell Polkit authentication agent. Registration must precede pkexec.
     property bool resyncAuthPending: false
+    property string resyncAuthPath: "NOT REQUESTED"
     property string resyncMessage: "NOT REQUESTED"
     property string resyncErrorCode: ""
     property bool diagnosticBusy: false
@@ -140,16 +141,20 @@ Scope {
         resyncConfirmRequired = false;
         resyncAuthPending = true;
         resyncStatus = "auth-preparing";
+        resyncAuthPath = "REGISTERING NATIVE POLKIT";
         resyncErrorCode = "";
         resyncMessage = "PREPARING GRAPHICAL POLKIT AUTHORIZATION...";
         authRegistrationFallback.restart();
     }
 
-    function launchResyncAfterAgentReady() {
+    function launchResyncAfterAgentReady(nativeRegistered) {
         if (!resyncAuthPending || resyncProcess.running)
             return;
         resyncAuthPending = false;
         authRegistrationFallback.stop();
+        resyncAuthPath = nativeRegistered === true
+            ? "NATIVE POLKIT AGENT REGISTERED"
+            : "EXISTING SESSION AGENT FALLBACK (UNVERIFIED)";
         resyncStatus = "working";
         resyncErrorCode = "";
         resyncMessage = "AUTHENTICATE TO REQUEST ONE-SHOT TIME CORRECTION...";
@@ -167,7 +172,7 @@ Scope {
         id: authRegistrationFallback
         interval: 2500
         repeat: false
-        onTriggered: timeSettings.launchResyncAfterAgentReady()
+        onTriggered: timeSettings.launchResyncAfterAgentReady(false)
     }
 
     FileView {

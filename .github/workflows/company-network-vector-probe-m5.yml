@@ -23,7 +23,7 @@ jobs:
     # All Qt/MapLibre downloads happen on the disposable GitHub runner.
     needs: static-contract
     runs-on: ubuntu-24.04
-    timeout-minutes: 25
+    timeout-minutes: 55
     steps:
       - uses: actions/checkout@v4
 
@@ -32,7 +32,9 @@ jobs:
           sudo apt-get update -qq
           sudo apt-get install -y --no-install-recommends \
             ninja-build g++ cmake curl bzip2 xvfb mesa-utils \
-            libgl1-mesa-dri libegl1 libopengl0 libxkbcommon-x11-0 \
+            libicu-dev libgl1-mesa-dev libgl1-mesa-dri libegl1 libopengl0 \
+            libpulse-dev libgstreamer-gl1.0-0 libxkbcommon-dev \
+            libxkbcommon-x11-0 libxcb-xkb-dev \
             libxcb-cursor0 libxcb-xinerama0 libxcb-icccm4 \
             libxcb-image0 libxcb-keysyms1 libxcb-render-util0
 
@@ -45,35 +47,40 @@ jobs:
           modules: 'qtlocation qtpositioning'
           cache: false
 
-      - name: Fetch pinned MapLibre v3 for exact Qt6.7.3 ABI
+      - name: Build pinned MapLibre Qt v3 from source using compatible ICU
         shell: bash
         run: |
           set -euo pipefail
-          mkdir -p "$RUNNER_TEMP/maplibre"
-          curl -fLS --retry 2 --max-time 120 \
-            'https://github.com/maplibre/maplibre-native-qt/releases/download/v3.0.0/maplibre-native-qt_v3.0.0_Qt6.7.3_Linux.tar.bz2' \
-            -o "$RUNNER_TEMP/maplibre.tar.bz2"
-          tar -xjf "$RUNNER_TEMP/maplibre.tar.bz2" -C "$RUNNER_TEMP/maplibre"
-          config="$(find "$RUNNER_TEMP/maplibre" -type f -name QMapLibreConfig.cmake -print -quit)"
+          # Published Linux binary requires obsolete libicuuc.so.56.
+          # Avoid grafting that library onto either CI or the operator machine.
+          git clone --depth 1 --branch v3.0.0 \
+            https://github.com/maplibre/maplibre-native-qt.git \
+            "$RUNNER_TEMP/maplibre-src"
+          test "$(git -C "$RUNNER_TEMP/maplibre-src" rev-parse HEAD)" = \
+            'd929c783737120787b43417d9ef05da88da75dfd'
+          git -C "$RUNNER_TEMP/maplibre-src" submodule update \
+            --init --recursive --jobs 3
+          cmake -S "$RUNNER_TEMP/maplibre-src" \
+            -B "$RUNNER_TEMP/maplibre-source-build" -G Ninja \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_PREFIX_PATH="$QT_ROOT_DIR" \
+            -DCMAKE_INSTALL_PREFIX="$RUNNER_TEMP/maplibre-install" \
+            -DMLN_QT_WITH_INTERNAL_ICU=ON
+          cmake --build "$RUNNER_TEMP/maplibre-source-build" --parallel 3
+          cmake --install "$RUNNER_TEMP/maplibre-source-build"
+          config="$(find "$RUNNER_TEMP/maplibre-install" -type f -name QMapLibreConfig.cmake -print -quit)"
           test -n "$config"
-          # The release archive includes an extra package-name directory.
-          # Find actual QML and geoservices plugin roots, not the extraction dir.
-          qmldir="$(find "$RUNNER_TEMP/maplibre" -type f -path '*/MapLibre/qmldir' -print -quit)"
-          geoplugin="$(find "$RUNNER_TEMP/maplibre" -type f -path '*/geoservices/*' -iname '*maplibre*.so' -print -quit)"
-          echo "MapLibre QML descriptor: $qmldir"
-          echo "MapLibre geoservices plugin: $geoplugin"
+          qmldir="$(find "$RUNNER_TEMP/maplibre-install" -type f -path '*/MapLibre/qmldir' -print -quit)"
+          geoplugin="$(find "$RUNNER_TEMP/maplibre-install" -type f -path '*/geoservices/*' -iname '*maplibre*.so' -print -quit)"
           test -n "$qmldir"
           test -n "$geoplugin"
-          qmlroot="$(dirname "$(dirname "$qmldir")")"
-          pluginroot="$(dirname "$(dirname "$geoplugin")")"
-          # MapLibre package ships shared libraries under the extracted prefix.
-          libdir="$(find "$RUNNER_TEMP/maplibre" -type f -name 'libQMapLibre.so*' -print -quit)"
+          libdir="$(find "$RUNNER_TEMP/maplibre-install" -type f -name 'libQMapLibre.so*' -print -quit)"
           test -n "$libdir"
-          libdir="$(dirname "$libdir")"
           echo "QMAPLIBRE_DIR=$(dirname "$config")" >> "$GITHUB_ENV"
-          echo "MAPLIBRE_QML_ROOT=$qmlroot" >> "$GITHUB_ENV"
-          echo "MAPLIBRE_PLUGIN_ROOT=$pluginroot" >> "$GITHUB_ENV"
-          echo "MAPLIBRE_LIB_DIR=$libdir" >> "$GITHUB_ENV"
+          echo "MAPLIBRE_QML_ROOT=$(dirname "$(dirname "$qmldir")")" >> "$GITHUB_ENV"
+          echo "MAPLIBRE_PLUGIN_ROOT=$(dirname "$(dirname "$geoplugin")")" >> "$GITHUB_ENV"
+          echo "MAPLIBRE_LIB_DIR=$(dirname "$libdir")" >> "$GITHUB_ENV"
+          echo "MapLibre source build installed at: $RUNNER_TEMP/maplibre-install"
 
       - name: Compile independent QtQuick MapLibre app
         shell: bash

@@ -93,8 +93,8 @@ assert.match(ui,/function retryClock\(value\)/);
 assert.match(ui,/EARLIEST RETRY IN/);
 assert.match(ui,/RETRY MAY STILL BE THROTTLED/);
 assert.match(ui,/available: source\.canRetry/);
-assert.match(ui,/DiscoveryPolicy\\.newsRackState\\(source\\)/);
-assert.match(ui,/DiscoveryPolicy\\.smokeRackState\\(hmsSmokeService\\)/);
+assert.match(ui,/DiscoveryPolicy\.newsRackState\(source\)/);
+assert.match(ui,/DiscoveryPolicy\.smokeRackState\(hmsSmokeService\)/);
 assert.doesNotMatch(ui,/state:"ENDPOINT CONFIGURED"/);
 assert.match(ui,/NEWS CACHED/);
 assert.match(ui,/NEWS RECEIVED/);
@@ -107,7 +107,7 @@ assert.match(workflow,/node tests\/weather\/test_station_discovery_rate_limit\.j
 const shiftedCtx={};
 vm.runInNewContext(
     read("services/weather/StationDiscoveryPolicy.js")
-        .replace(/^\\.pragma library\\s*/m,""),shiftedCtx);
+        .replace(/^\.pragma library\s*/m,""),shiftedCtx);
 const start=1780000000000;
 assert.equal(shiftedCtx.reserveNewsRequest(start),true);
 assert.equal(shiftedCtx.recordNewsThrottle(start+1000),300000);

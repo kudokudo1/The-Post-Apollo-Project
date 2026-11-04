@@ -544,6 +544,7 @@ Rectangle {
 
     StationWeatherSubjectPane {
         id: weatherLivePane
+        onRouteRequested: function(path) { browser.chooseRoute(path); }
         anchors.left: parent.left
         anchors.right: parent.right
         anchors.top: liveChildren.visible

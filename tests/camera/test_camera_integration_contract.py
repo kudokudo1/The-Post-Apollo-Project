@@ -75,6 +75,33 @@ class CameraWidgetContracts(unittest.TestCase):
         self.assertIn('"Post-Apollo"', BACKEND)
         self.assertNotIn("shell=True", BACKEND)
 
+    def test_region_button_opens_persistent_mouse_instructions_before_slurp(self):
+        self.assertIn('property bool regionGuideOpen: false', PANEL)
+        self.assertIn('if (mode === "region") {', PANEL)
+        self.assertIn('regionGuideOpen = true;', PANEL)
+        self.assertIn('function beginRegionSelection()', PANEL)
+        self.assertIn('function cancelRegionSelection()', PANEL)
+        self.assertIn('id: regionGuide', PANEL)
+        self.assertIn('visible: camera.regionGuideOpen && camera.activeView === "capture"', PANEL)
+        self.assertIn('label: "BEGIN SELECTING"', PANEL)
+        self.assertIn('onLeftClicked: camera.beginRegionSelection()', PANEL)
+        self.assertIn('onLeftClicked: camera.cancelRegionSelection()', PANEL)
+        self.assertIn('CLICK  +  DRAG', PANEL)
+        self.assertIn('RELEASE to capture. ESC cancels.', PANEL)
+        # Keeping the instruction panel open is intentional; shutter only
+        # starts after the separate, explicit Begin action.
+        setup = PANEL.split('function prepareCapture(mode)', 1)[1].split(
+            'function beginRegionSelection()', 1)[0]
+        self.assertLess(setup.index('regionGuideOpen = true;'),
+                        setup.index('menuOpen = false;'))
+        start = PANEL.split('function beginRegionSelection()', 1)[1].split(
+            'function cancelRegionSelection()', 1)[0]
+        self.assertIn('menuOpen = false;', start)
+        self.assertIn('shutterDelay.restart();', start)
+        # Normal monitor capture remains a one-click action.
+        self.assertIn('camera.prepareCapture("focused")', PANEL)
+        self.assertIn('camera.prepareCapture("all")', PANEL)
+
     def test_gallery_is_local_file_based_and_scrollable(self):
         self.assertIn('label: "GALLERY"', PANEL)
         self.assertIn("model: camera.filteredFiles", PANEL)

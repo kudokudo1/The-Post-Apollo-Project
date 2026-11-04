@@ -5,6 +5,7 @@ on:
     paths:
       - "modules/Screenshot.qml"
       - "components/CameraGlyph.qml"
+      - "components/qmldir"
       - "widgets/CameraW.qml"
       - "shell.qml"
       - "scripts/camera/**"
@@ -15,6 +16,7 @@ on:
     paths:
       - "modules/Screenshot.qml"
       - "components/CameraGlyph.qml"
+      - "components/qmldir"
       - "widgets/CameraW.qml"
       - "shell.qml"
       - "scripts/camera/**"

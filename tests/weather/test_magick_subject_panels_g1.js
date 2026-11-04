@@ -105,12 +105,15 @@ test("MAGICK keeps source evidence visibly separated from symbolic interpretatio
   assert.match(overview,/id: hero/);
   assert.match(overview,/id: lunarCard/);
   assert.match(overview,/id: solarCard/);
-  assert.match(overview,/id: interpretation/);
+  assert.doesNotMatch(overview,/id: interpretation/);
+  assert.match(overview,/id: celestialCanvas/);
+  assert.match(overview,/id: solarCanvas/);
   assert.match(overview,/readonly property var moonModel: CosmosVisual\.moonDisplay/);
   assert.match(overview,/readonly property var solarModel: CosmosVisual\.solarArc/);
   assert.match(overview,/sourceOnly: true/);
   assert.doesNotMatch(overview,/Flickable\s*\{/);
-  assert.match(overview,/MOON \+ SUN OBSERVATIONS|SOLAR DAY ARC/);
+  assert.match(overview,/MAGICK \/\/ CELESTIAL CHART/);
+  assert.match(overview,/SUN \/\/ DAYLIGHT/);
   assert.match(pane,/onRouteRequested: function\(path\)/);
   assert.match(pane,/active: magickPane\.visible && magickPane\.kind === "reference"/);
   assert.match(pane,/MagickPolicy\.noteFor\(magickPane\.subjectRoute\)/);
@@ -139,6 +142,11 @@ test("M30-A overview is compact, routed and source-honest", () => {
   assert.match(overview,/CosmosVisual\.illuminatedSpan/);
   assert.match(overview,/TwilightPolicy\.solarPosition/);
   assert.match(overview,/TRADITIONS \/ CORRESPONDENCES \/\/ NOT CONNECTED/);
+  assert.match(overview,/CelestialVisual\.model\(/);
+  assert.match(overview,/CelestialVisual\.wheelPositions\(/);
+  assert.match(overview,/deck\.celestialSource\.refresh\(\)/);
+  assert.match(overview,/deck\.celestialSource\.configured/);
+  assert.match(station,/subjectNavigator\.currentPath === "magick\/overview"/);
   assert.doesNotMatch(overview,/Process\s*\{|FileView\s*\{|Timer\s*\{|curl /);
   assert.equal((overview.match(/StationSky\s*\{/g)||[]).length,1);
   assert.equal((pane.match(/StationSky\s*\{/g)||[]).length,1);
@@ -170,4 +178,27 @@ test("MAGICK creates no standalone service, side-effect writer or secret storage
   }
   for(const key of Object.keys(magick.ROUTES))
     assert.equal(magick.isInterpretationImplemented(key),false);
+});
+
+test("M30-B astro hero replaces solar hero without losing the Moon and Sun instruments", () => {
+  assert.match(overview,/id: hero/);
+  assert.match(overview,/text: "MAGICK \/\/ CELESTIAL CHART"/);
+  assert.match(overview,/label: deck\.celestialSource && deck\.celestialSource\.loading\s*\? "CALCULATING" : "CALCULATE"/);
+  assert.match(overview,/onClicked: deck\.celestialSource\.refresh\(\)/);
+  assert.match(overview,/available: !!deck\.celestialSource\s*&& deck\.celestialSource\.active\s*&& deck\.celestialSource\.configured\s*&& !deck\.celestialSource\.loading/);
+  assert.match(overview,/readonly property var chartModel: CelestialVisual\.model/);
+  assert.match(overview,/if \(!deck\.chartModel\.ready\)return;/);
+  assert.match(overview,/id: heroFooter/);
+  assert.match(overview,/TRADITIONS \/ CORRESPONDENCES \/\/ NOT CONNECTED/);
+  assert.doesNotMatch(overview,/id: interpretation/);
+  assert.match(overview,/anchors\.bottom: parent\.bottom\s*anchors\.topMargin: deck\.gutter/);
+  assert.match(overview,/id: lunarCard/);
+  assert.match(overview,/id: solarCard/);
+  assert.match(overview,/id: solarCard[\s\S]*id: solarCanvas/);
+  assert.match(overview,/onClicked: deck\.routeRequested\("magick\/lunar-solar\/moon"\)/);
+  assert.match(overview,/onClicked: deck\.routeRequested\("magick\/planetary\/hours"\)/);
+  assert.match(overview,/onClicked: deck\.routeRequested\("magick\/planetary\/correspondences"\)/);
+  assert.doesNotMatch(overview,/Flickable\s*\{|Process\s*\{|Timer\s*\{/);
+  assert.match(station,/MagickPanelPolicy\.visualForRoute\(subjectNavigator\.currentPath\)[\s\S]*?subjectNavigator\.currentPath === "magick\/overview"/);
+  assert.equal((station.match(/WeatherServices\.CelestialVisualService\s*\{/g)||[]).length,1);
 });

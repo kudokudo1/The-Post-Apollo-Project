@@ -9,6 +9,7 @@ on:
       - 'TaskEncryptedDraftHarnessM13k.qml'
       - 'tests/tasks/fixtures/TaskEncryptedDraftHostM13k.cjs'
       - 'tests/tasks/fixtures/TaskEncryptedDraftHostPrivateM13k.sh'
+      - 'tests/tasks/fixtures/TaskEncryptedDraftHeldStdinM13n.cjs'
       - 'tests/tasks/test_task_encrypted_draft_host_m13k.cjs'
       - 'docs/tasks-disabled-encrypted-draft-host-m13k.md'
       - '.github/workflows/tasks-encrypted-draft-host-m13k.yml'
@@ -20,6 +21,8 @@ on:
       - 'services/hub/qmldir'
       - 'TaskEncryptedDraftHarnessM13k.qml'
       - 'tests/tasks/fixtures/TaskEncryptedDraftHostM13k.cjs'
+      - 'tests/tasks/fixtures/TaskEncryptedDraftHeldStdinM13n.cjs'
+      - 'tests/tasks/fixtures/TaskEncryptedDraftHostPrivateM13k.sh'
       - 'tests/tasks/test_task_encrypted_draft_host_m13k.cjs'
       - '.github/workflows/tasks-encrypted-draft-host-m13k.yml'
 
@@ -41,6 +44,7 @@ jobs:
       - name: Static and negative host-guard assertions
         run: |
           node --test tests/tasks/test_task_encrypted_draft_host_m13k.cjs
+          node --check tests/tasks/fixtures/TaskEncryptedDraftHeldStdinM13n.cjs
           bash -n tests/tasks/fixtures/TaskEncryptedDraftHostPrivateM13k.sh
       - name: QML syntax parser with no Quickshell GUI activation
         run: |

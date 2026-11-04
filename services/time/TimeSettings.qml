@@ -41,7 +41,10 @@ Scope {
     property string referenceStatus: "unchecked"
     property string referenceMessage: "NO EXTERNAL MEASUREMENT"
     property double referenceOffsetMs: 0
+    property double referenceUncertaintyMs: 0
+    property string referenceSource: "NONE"
     property double referenceCheckedAtMs: 0
+    property bool postResyncVerificationPending: false
     readonly property int referenceMaxAgeMs: 15 * 60 * 1000
     readonly property int referenceWarningThresholdMs: 1000
 
@@ -56,7 +59,7 @@ Scope {
         if (hostInfo.status !== "ready" || !Number.isFinite(nowEpochMs))
             return false;
         const text = String(hostInfo.utcOffset || "");
-        const match = /^UTC([+-])(\\d{2}):(\\d{2})$/.exec(text);
+        const match = /^UTC([+-])(\d{2}):(\d{2})$/.exec(text);
         if (!match)
             return false; // Unknown is not evidence of mismatch.
         const hostMinutes =
@@ -66,12 +69,78 @@ Scope {
         return hostMinutes !== qmlMinutes;
     }
 
+    function referenceIsOutOfSync(nowEpochMs) {
+        return hasFreshReference(nowEpochMs)
+               && (Math.abs(referenceOffsetMs) >= referenceWarningThresholdMs
+                   || referenceUncertaintyMs >= referenceWarningThresholdMs);
+    }
+
+    // The Clock header and dock use identical evidence and expiry. A
+    // successful command is not proof of accuracy; NTP=off is not a fault.
+    function clockAccuracyState(nowEpochMs) {
+        if (resyncStatus === "working" || resyncStatus === "auth-preparing")
+            return "syncing";
+        if (referenceChecking)
+            return "checking";
+        if (referenceIsOutOfSync(nowEpochMs))
+            return "out-of-sync";
+        if (dockZoneOffsetMismatch(nowEpochMs))
+            return "zone-mismatch";
+        if (displayDeviationActive)
+            return "dirty";
+        if (hasFreshReference(nowEpochMs))
+            return "in-sync";
+        if (resyncStatus === "failed" || resyncStatus === "cancelled"
+                || resyncStatus === "unavailable")
+            return "sync-error";
+        return "unverified";
+    }
+
+    function clockAccuracyLabel(nowEpochMs) {
+        switch (clockAccuracyState(nowEpochMs)) {
+        case "syncing": return "SYNCING";
+        case "checking": return "CHECKING";
+        case "out-of-sync": return "OUT OF SYNC";
+        case "zone-mismatch": return "ZONE DIFF";
+        case "dirty": return "DIRTY";
+        case "in-sync": return "IN SYNC";
+        case "sync-error": return "SYNC ERROR";
+        default: return "UNCHECKED";
+        }
+    }
+
+    function clockAccuracyDetail(nowEpochMs) {
+        const state = clockAccuracyState(nowEpochMs);
+        if (state === "syncing")
+            return "CHRONY / AUTH";
+        if (state === "checking")
+            return "REFERENCE";
+        if (state === "out-of-sync" || state === "in-sync") {
+            if (referenceSource === "CHRONY_TRACKING")
+                return "TRACKING EST.";
+            return "ERR " + (Math.abs(referenceOffsetMs) / 1000).toFixed(2) + "S";
+        }
+        if (state === "zone-mismatch")
+            return "OFFSET DIFF";
+        if (state === "dirty")
+            return "CAL " + displayOffsetLabel;
+        if (state === "sync-error")
+            return "SEE SETTINGS";
+        return "NO FRESH REF";
+    }
+
     function dockTimeUnderlined(nowEpochMs) {
         return displayDeviationActive
                || dockZoneOffsetMismatch(nowEpochMs)
-               || (hasFreshReference(nowEpochMs)
-                   && Math.abs(referenceOffsetMs)
-                      >= referenceWarningThresholdMs);
+               || referenceIsOutOfSync(nowEpochMs);
+    }
+
+    function runPostResyncVerification() {
+        if (!postResyncVerificationPending || resyncProcess.running
+                || authSessionActive)
+            return;
+        postResyncVerificationPending = false;
+        checkTimeAccuracy();
     }
 
     function checkTimeAccuracy() {
@@ -79,8 +148,10 @@ Scope {
             return false;
         referenceChecking = true;
         referenceStatus = "checking";
-        referenceMessage = "CONTACTING CONFIGURED CHRONY SOURCES...";
+        referenceMessage = "CHECKING CONFIGURED CHRONY REFERENCE...";
         referenceCheckedAtMs = 0;
+        referenceUncertaintyMs = 0;
+        referenceSource = "NONE";
         referenceProcess.exec([
             "python3", "-B", "-I",
             Quickshell.shellPath("services/time/TimeHostControl.py"), "measure"
@@ -244,6 +315,13 @@ Scope {
         resyncAuthPath = "REGISTERING NATIVE POLKIT";
         resyncErrorCode = "";
         resyncMessage = "PREPARING GRAPHICAL POLKIT AUTHORIZATION...";
+        // Never show a pre-sync reading as freshly confirmed after a
+        // privileged correction or a new burst request.
+        referenceStatus = "unchecked";
+        referenceCheckedAtMs = 0;
+        referenceUncertaintyMs = 0;
+        referenceSource = "NONE";
+        postResyncVerificationPending = false;
         authRegistrationFallback.restart();
     }
 
@@ -492,14 +570,23 @@ Scope {
                 try {
                     const value = JSON.parse(this.text);
                     const offset = Number(value.offsetMs);
+                    const uncertainty = Number(value.uncertaintyMs || 0);
                     if (value.status === "measured"
-                            && Number.isFinite(offset)) {
+                            && Number.isFinite(offset)
+                            && Number.isFinite(uncertainty)
+                            && uncertainty >= 0) {
                         timeSettings.referenceOffsetMs = offset;
+                        timeSettings.referenceUncertaintyMs = uncertainty;
+                        timeSettings.referenceSource =
+                            String(value.source || "CHRONYD_ONESHOT");
                         timeSettings.referenceCheckedAtMs = Date.now();
                         timeSettings.referenceStatus = "measured";
                         timeSettings.referenceMessage =
-                            "REFERENCE OFFSET // "
-                            + (offset / 1000).toFixed(3) + " SECONDS";
+                            "REFERENCE // "
+                            + (offset / 1000).toFixed(3) + "S"
+                            + (timeSettings.referenceSource === "CHRONY_TRACKING"
+                               ? " // DAEMON TRACKING ESTIMATE"
+                               : " // CHRONYD MEASUREMENT");
                     } else {
                         timeSettings.referenceStatus = "unavailable";
                         timeSettings.referenceMessage =
@@ -558,6 +645,16 @@ Scope {
                         String(value.message || "NO RESYNC RESULT");
                     timeSettings.resyncErrorCode =
                         String(value.errorCode || "");
+                    timeSettings.postResyncVerificationPending =
+                        value.status === "completed"
+                        || value.status === "requested";
+                    if (timeSettings.postResyncVerificationPending) {
+                        timeSettings.referenceStatus = "unchecked";
+                        timeSettings.referenceCheckedAtMs = 0;
+                        timeSettings.referenceMessage =
+                            "SYNC REQUEST ACCEPTED // VERIFYING RESULT...";
+                    }
+                    timeSettings.runPostResyncVerification();
                 } catch (error) {
                     timeSettings.resyncStatus = "failed";
                     timeSettings.resyncMessage = "RESYNC RESULT UNAVAILABLE";
@@ -568,13 +665,14 @@ Scope {
         onExited: function(code, exitStatus) {
             timeSettings.authSessionActive = false;
             if (code !== 0) {
+                timeSettings.postResyncVerificationPending = false;
                 timeSettings.resyncStatus = "failed";
                 timeSettings.resyncMessage = "RESYNC PROCESS FAILED";
             }
-            // A successful one-shot correction has already contacted the
-            // time source. Verify its residual offset without altering time.
-            if (code === 0 && timeSettings.resyncStatus === "completed")
-                timeSettings.checkTimeAccuracy();
+            // Collector/exited callbacks may arrive in either order. A single
+            // pending flag ensures both completed and requested paths get
+            // exactly one read-only follow-up check, not a second time change.
+            timeSettings.runPostResyncVerification();
         }
     }
 }

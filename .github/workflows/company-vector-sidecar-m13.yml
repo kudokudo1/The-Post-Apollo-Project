@@ -1,0 +1,34 @@
+name: Company Network M13 controlled vector sidecar
+
+on:
+  pull_request:
+    paths:
+      - 'services/company/CompanyVectorSidecarLaunch.py'
+      - 'widgets/CompanyCoveragePane.qml'
+      - 'tests/company/test_company_vector_sidecar_m13.py'
+      - '.github/workflows/company-vector-sidecar-m13.yml'
+      - 'experiments/company-vector-qt/HANDOFF_M13.md'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  safe-sidecar-control:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify fixed-path launcher, online consent and tracked close
+        run: python3 -m unittest discover -s tests/company -p 'test_company_vector_sidecar_m13.py' -v
+      - name: Check no replacement of existing Company map
+        shell: bash
+        run: |
+          set -euo pipefail
+          grep -q 'CompanyStreetMap {' widgets/CompanyCoveragePane.qml
+          grep -q 'Canvas {' widgets/CompanyCoveragePane.qml
+          grep -q 'vectorRunner.running=false' widgets/CompanyCoveragePane.qml
+          grep -q 'visible: root.streetConsentOpen' widgets/CompanyCoveragePane.qml
+          if grep -q -- '--owner-local-hubs' services/company/CompanyVectorSidecarLaunch.py; then
+            echo "Unexpected real owner data import in launcher"
+            exit 1
+          fi

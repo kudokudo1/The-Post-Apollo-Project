@@ -35,4 +35,16 @@ for n in 1 2; do
     exit 1
   fi
 done
+# Quickshell keeps its QProcess stdin open after sending one request.
+# Unlike the pipeline above, this parent keeps the write descriptor OPEN
+# and insists that the actual Node host exits anyway.
+held="tests/tasks/fixtures/TaskEncryptedDraftHeldStdinM13n.cjs"
+test "$(node "$held" --held-open-malformed)" =     "M13N_HELD_STDIN_MALFORMED_CHILD_EXIT_PASS"
+test "$(node "$held" --held-open-valid)" =     "M13N_HELD_STDIN_ENCRYPTED_CHILD_EXIT_PASS"
+test ! -e "$HOME/m13g-disposable/draft.enc"
+if secret-tool lookup service post-apollo-m13g-ci id M13gSynthetic001 >/dev/null 2>&1; then
+  printf '%s\n' "M13N_UNEXPECTED_TEST_KEY_REMAINS" >&2
+  exit 1
+fi
+printf '%s\n' "M13N_HELD_STDIN_AND_PRIVATE_CLEANUP_PASS"
 printf '%s\n' "M13K_PRIVATE_HOST_IPC_AND_CLEANUP_PASS"

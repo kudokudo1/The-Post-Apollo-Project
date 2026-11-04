@@ -98,9 +98,13 @@ assert.match(ui,/DiscoveryPolicy\.smokeRackState\(hmsSmokeService\)/);
 assert.doesNotMatch(ui,/state:"ENDPOINT CONFIGURED"/);
 assert.match(ui,/NEWS CACHED/);
 assert.match(ui,/NEWS RECEIVED/);
-assert.match(shell,/id: weatherContentLoader/);
-assert.match(shell,/newsSourceItem\.feedBadge/);
-assert.match(shell,/newsSourceItem\.feedBadgeColor/);
+const mediaPane=read("widgets/weather/StationMediaSubjectPane.qml");
+const navigator=read("widgets/weather/StationSubjectNavigator.qml");
+assert.ok(!shell.includes("weatherContentLoader"));
+assert.match(shell,/StationSubjectNavigator\s*\{/);
+assert.match(mediaPane,/StationNewsHub\s*\{/);
+assert.match(navigator,/StationMediaSubjectPane\s*\{/);
+assert.match(shell,/SubjectSourceBadge\.badgeFor\(/);
 assert.match(workflow,/node tests\/weather\/test_station_discovery_rate_limit\.js/);
 // An operator time correction can move Date.now() backwards by an hour.
 // Preserve the provider's remaining 429 cooldown and the manual-only gate.

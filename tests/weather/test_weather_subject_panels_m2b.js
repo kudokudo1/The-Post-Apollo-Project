@@ -15,6 +15,7 @@ const discovery = read("widgets/weather/StationDiscovery.qml");
 const ground = read("widgets/weather/StationGround.qml");
 const sky = read("widgets/weather/StationSky.qml");
 const pane = read("widgets/weather/StationWeatherSubjectPane.qml");
+const surface = read("widgets/weather/StationWorkspaceSurface.qml");
 const nav = read("widgets/weather/StationSubjectNavigator.qml");
 const station = read("widgets/weather/WeatherStationW.qml");
 const env = vm.createContext({});
@@ -110,6 +111,63 @@ test("existing river instrument stays intact under deep river routes and flood h
   assert.equal(env.needsSource("weather/maps/lightning","lightning"),true);
   assert.ok(env.visibleFor("ground","weather/maps/lightning","lightning"));
   assert.ok(!env.visibleFor("ground","weather/maps/lightning","seismic"));
+});
+
+test("M29-A river deep routes focus their own existing data blocks", () => {
+  const routes = {
+    "weather/water/rivers/gauges":"gauges",
+    "weather/water/rivers/nearby":"nearby",
+    "weather/water/rivers/flood":"flood",
+    "weather/water/rivers/hydrograph":"hydrograph"
+  };
+  for (const [route, focus] of Object.entries(routes)) {
+    assert.ok(env.findRoute(route),route + " navigation route");
+    assert.equal(env.kindForRoute(route),"ground");
+    assert.equal(env.visibleFor("ground",route,"rivers"),true);
+    assert.equal(env.needsSource(route,"river"),true);
+    assert.equal(env.riverFocusForRoute(route),focus);
+    assert.equal(env.riverTitleFor(route),"RIVER // NOAA NWPS // "+focus.toUpperCase());
+    for (const group of ["nearby","flood","hydrograph"])
+      assert.equal(env.riverGroupVisible(route,group),focus===group,
+        route+" / "+group);
+  }
+  for (const route of [
+    "", "weather/water/rivers", "weather/ground/full",
+    "weather/hazards/flood", "weather/history/relationships/rivers"
+  ]) {
+    assert.equal(env.riverFocusForRoute(route),"all",route);
+    assert.equal(env.riverTitleFor(route),"RIVER // NOAA NWPS",route);
+    for (const group of ["nearby","flood","hydrograph"])
+      assert.equal(env.riverGroupVisible(route,group),true,
+        "original combined "+route+" / "+group);
+  }
+  assert.equal(env.riverGroupVisible("weather/water/rivers/nearby","unknown"),false);
+  assert.equal(env.needsSource("media/news/full","river"),false);
+  // The focused pages gate only existing visuals, not the shared NWPS
+  // fetch, gauge identity, observed/forecast origin or safety warnings.
+  for (const token of [
+    'title: SubjectPanelPolicy.riverTitleFor(ground.subjectRoute)',
+    'ground.subjectRoute,"nearby")',
+    'ground.subjectRoute,"flood")',
+    'ground.subjectRoute,"hydrograph")',
+    'ONLY ONE NWPS GAUGE RETURNED // NO NEARBY COMPARISON AVAILABLE',
+    'NEARBY COMPARE // SAME NWPS SNAPSHOT',
+    'FLOOD CONTEXT // IMPACTS + CRESTS',
+    'STAGEFLOW // OBSERVED + OFFICIAL FORECAST',
+    'STAGE IS RELATIVE TO THE GAUGE DATUM'
+  ]) assert.ok(ground.includes(token),token);
+  assert.equal(ground.split('signal routeRequested(string path)').length-1,1);
+  const riverButtons=ground.slice(
+    ground.indexOf('// The four deep RIVERS routes'),
+    ground.indexOf('Column {\n            visible: ground.sectionVisible("rivers")')
+  );
+  assert.equal((riverButtons.match(/path:"weather\\/water\\/rivers/g)||[]).length,5);
+  assert.match(riverButtons,/onTriggered: ground\\.routeRequested\\(modelData\\.path\\)/);
+  assert.match(ground,/onSubjectRouteChanged:[\\s\\S]*?groundScroll\\.contentY = 0/);
+  assert.match(pane,/onRouteRequested: function\\(path\\) \\{ weatherPane\\.routeRequested\\(path\\); \\}/);
+  assert.match(surface,/onRouteRequested: function\\(path\\) \\{ surface\\.routeRequested\\(path\\); \\}/);
+  assert.match(nav,/onRouteRequested: function\\(path\\) \\{ browser\\.chooseRoute\\(path\\); \\}/);
+  assert.equal((station.match(/WeatherServices\\.NwpsRiverService\\s*\\{/g)||[]).length,1);
 });
 
 test("historical model collector is shared and activated only for its explicit subject route", () => {

@@ -4,8 +4,8 @@ import Quickshell.Io
 import "../../components"
 
 // Archives are a visible, separate inline destination, not a search filter.
-// Permanent removal is archived-only, confirmed twice, backed up and checked
-// against all seven independent source stores by the backend.
+// Delete works on active or archived labels. No backup is required.
+// Two-click confirmation, current revision and seven-store references are checked.
 Column {
     id: tray
     property var directoryStore: null
@@ -18,6 +18,7 @@ Column {
     property bool expanded: false
     property bool busy: false
     property string confirmationKey: ""
+    property string lastTargetKind: ""
     property var pendingRequest: null
     property string replyText: ""
     property string resultText: ""
@@ -97,19 +98,35 @@ Column {
         }
         return store.restoreUnit(record.id);
     }
+    function confirmationFor(record) {
+        return record.kind + ":" + record.id + ":" + record.revision
+            + ":" + record.name;
+    }
+    function isConfirmed(record) {
+        return confirmationKey === confirmationFor(record);
+    }
+    function cancelDelete() {
+        if (busy) return false;
+        confirmationKey = "";
+        resultText = "";
+        lastTargetKind = "";
+        return true;
+    }
     function requestRemove(record) {
-        if (!storesReady || busy || !expanded)
+        if (!record || !storesReady || busy)
             return false;
-        const key = record.kind + ":" + record.id;
+        const key = confirmationFor(record);
+        lastTargetKind = record.kind;
         if (confirmationKey !== key) {
             confirmationKey = key;
             resultKind = "warning";
-            resultText = "CONFIRM PERMANENT REMOVAL // " + record.label
-                + " // Cannot undo with Restore. A matching private backup is required.";
+            resultText = "CONFIRM PERMANENT DELETE // " + record.label
+                + " // No backup is required or created. This cannot be undone "
+                + "with Restore. Click the red confirmation to proceed.";
             return false;
         }
-        // An actual removal still requires a backend-validated backup,
-        // current revision, archived record and zero dependent references.
+        // The backend rechecks the current revision, identity and dependencies.
+        // Neither an archive operation nor a private backup is required.
         pendingRequest = {
             action:"remove", kind:record.kind, id:record.id,
             orgId:record.orgId, expectedName:record.name,
@@ -135,7 +152,6 @@ Column {
             const code = response && response.error
                 ? String(response.error) : "REMOVE_UNAVAILABLE";
             const instructions = {
-                BACKUP_REQUIRED:"Use BACK UP NOW after archiving this record first.",
                 REMOVE_BRANCHES_FIRST:"Remove archived branches before the company.",
                 REMOVE_UNITS_FIRST:"Remove its archived structure units first.",
                 DETACH_PORTFOLIOS_FIRST:"Detach the company from every portfolio.",
@@ -146,7 +162,6 @@ Column {
                 UNLINK_REPORTING_FIRST:"Remove parent/child reporting links.",
                 DETACH_PORTFOLIO_MEMBERS_FIRST:"Detach portfolio members first.",
                 REVISION_CONFLICT:"Refresh local records and review before retry.",
-                ARCHIVE_BEFORE_REMOVE:"Archive the record before removal.",
                 RECORD_CHANGED:"Refresh; this record was renamed."
             };
             resultText = "REMOVE REFUSED // " + code
@@ -181,8 +196,8 @@ Column {
     Text {
         width: parent.width
         text: "Archived companies, branches, portfolios and structure units live here. " +
-              "Archive hides; Restore reactivates; red Remove permanently deletes " +
-              "only a safe, backed-up archived record."
+              "Archive hides; Restore reactivates. Red X buttons in the editors " +
+              "delete active records directly. Backups are optional."
         color: Colors.white
         font.pixelSize: 10
         wrapMode: Text.WordWrap
@@ -254,8 +269,7 @@ Column {
                     width: 153
                     height: 28
                     labelPixelSize: 8
-                    label: tray.confirmationKey ===
-                           archivedRow.modelData.kind + ":" + archivedRow.modelData.id
+                    label: tray.isConfirmed(archivedRow.modelData)
                            ? "CONFIRM REMOVE" : "REMOVE PERMANENTLY"
                     interactive: tray.storesReady && !tray.busy
                     onTriggered: tray.requestRemove(archivedRow.modelData)
@@ -277,9 +291,9 @@ Column {
     Text {
         width: parent.width
         visible: tray.expanded
-        text: "Removal requires a verified private backup of that exact record. " +
-              "Companies with children and records referenced by links or portfolios " +
-              "must be unlinked/cleared first. There is no automatic cascade."
+        text: "Backups OPTIONAL. Delete works directly on active or archived labels. " +
+              "Children, portfolio members and saved links must be cleared first. " +
+              "There is no automatic cascade."
         color: Colors.orange
         font.pixelSize: 9
         wrapMode: Text.WordWrap

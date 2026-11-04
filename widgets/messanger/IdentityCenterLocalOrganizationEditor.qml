@@ -5,6 +5,7 @@ import "../../components"
 Column {
     id: editor
     property var directoryStore: null
+    property var removalController: null
     // Optional focus supplied by the one-page editing selector.
     // Empty focus retains the accepted all-organizations editor.
     property string focusedOrganizationId: ""
@@ -34,6 +35,23 @@ Column {
     readonly property bool editable: directoryStore !== null && directoryStore.state === "ready"
     readonly property var organizations: directoryStore && directoryStore.saved
         ? directoryStore.saved.organizations : []
+    // Both active and archived Delete buttons use the same guarded writer.
+    function deleteTarget(kind, id, orgId, name, revision, label) {
+        return {kind:kind, id:id, orgId:orgId, name:name,
+                revision:revision, label:label};
+    }
+    function requestDirectDelete(kind, id, orgId, name, revision, label) {
+        return removalController && removalController.requestRemove(
+            deleteTarget(kind, id, orgId, name, revision, label));
+    }
+    function deletePending(kind, id, orgId, name, revision, label) {
+        return removalController && removalController.isConfirmed(
+            deleteTarget(kind, id, orgId, name, revision, label));
+    }
+    function cancelDirectDelete() {
+        if (removalController) removalController.cancelDelete();
+    }
+
     spacing: 10
 
     Text {
@@ -162,6 +180,17 @@ Column {
         color: Colors.white
         font.pixelSize: 10
     }
+    Text {
+        width: parent.width
+        visible: editor.removalController && (editor.removalController.lastTargetKind === "organization"
+            || editor.removalController.lastTargetKind === "branch")
+            && editor.removalController.resultText !== ""
+        text: editor.removalController ? editor.removalController.resultText : ""
+        color: editor.removalController && editor.removalController.resultKind === "error"
+            ? Colors.red : Colors.orange
+        font.pixelSize: 9
+        wrapMode: Text.WordWrap
+    }
     Repeater {
         model: editor.organizations
         delegate: Column {
@@ -193,7 +222,7 @@ Column {
                 width: parent.width
                 spacing: 6
                 Rectangle {
-                    width: Math.max(100, parent.width - 202)
+                    width: Math.max(100, parent.width - 240)
                     height: 30
                     color: orgName.activeFocus && orgName.enabled && !orgName.readOnly
                         ? Qt.rgba(Colors.magenta.r, Colors.magenta.g, Colors.magenta.b, 0.12)
@@ -247,6 +276,42 @@ Column {
                             editor.confirmationKey = "org:" + orgRow.modelData.id;
                     }
                 }
+                IdentityCenterLocalActionButton {
+                    role: "danger"
+                    objectName: "orgDirectDeleteX"
+                    width: 32
+                    height: 30
+                    label: "X"
+                    labelPixelSize: 10
+                    interactive: editor.removalController
+                        && editor.removalController.storesReady
+                        && !editor.removalController.busy
+                    onTriggered: editor.requestDirectDelete("organization", orgRow.modelData.id, orgRow.modelData.id, orgRow.modelData.name, directoryStore.saved.revision, "COMPANY // " + orgRow.modelData.name)
+                }
+            }
+            Flow {
+                width: parent.width
+                height: childrenRect.height
+                spacing: 6
+                visible: editor.deletePending("organization", orgRow.modelData.id, orgRow.modelData.id, orgRow.modelData.name, directoryStore.saved.revision, "COMPANY // " + orgRow.modelData.name)
+                IdentityCenterLocalActionButton {
+                    role: "danger"
+                    width: 163
+                    height: 28
+                    label: "CONFIRM DELETE"
+                    labelPixelSize: 9
+                    interactive: editor.removalController
+                        && !editor.removalController.busy
+                    onTriggered: editor.requestDirectDelete("organization", orgRow.modelData.id, orgRow.modelData.id, orgRow.modelData.name, directoryStore.saved.revision, "COMPANY // " + orgRow.modelData.name)
+                }
+                IdentityCenterLocalActionButton {
+                    role: "navigate"
+                    width: 88
+                    height: 28
+                    label: "CANCEL"
+                    labelPixelSize: 9
+                    onTriggered: editor.cancelDirectDelete()
+                }
             }
             Column {
                 width: parent.width - 16
@@ -256,16 +321,20 @@ Column {
                 height: visible ? implicitHeight : 0
                 Repeater {
                     model: orgRow.modelData.branches
-                    delegate: Row {
+                    delegate: Column {
                         id: branchRow
                         required property var modelData
                         width: parent.width
                         spacing: 6
                         visible: (!modelData.archived || editor.showArchived)
                                  && editor.matchesBranch(orgRow.modelData, modelData)
-                        height: visible ? 28 : 0
-                        Rectangle {
-                            width: Math.max(90, parent.width - 194)
+                        height: visible ? implicitHeight : 0
+                        Row {
+                            width: parent.width
+                            height: 28
+                            spacing: 6
+                            Rectangle {
+                            width: Math.max(90, parent.width - 232)
                             height: 28
                             color: branchName.activeFocus && branchName.enabled && !branchName.readOnly
                                 ? Qt.rgba(Colors.magenta.r, Colors.magenta.g, Colors.magenta.b, 0.12)
@@ -318,6 +387,43 @@ Column {
                                     editor.confirmationKey = "";
                                 } else
                                     editor.confirmationKey = "branch:" + branchRow.modelData.id;
+                            }
+                        }
+                            IdentityCenterLocalActionButton {
+                                role: "danger"
+                                objectName: "orgDirectDeleteX"
+                                width: 32
+                                height: 28
+                                label: "X"
+                                labelPixelSize: 10
+                                interactive: editor.removalController
+                                    && editor.removalController.storesReady
+                                    && !editor.removalController.busy
+                                onTriggered: editor.requestDirectDelete("branch", branchRow.modelData.id, orgRow.modelData.id, branchRow.modelData.name, directoryStore.saved.revision, "BRANCH // " + branchRow.modelData.name)
+                            }
+                        }
+                        Flow {
+                            width: parent.width
+                            height: childrenRect.height
+                            spacing: 6
+                            visible: editor.deletePending("branch", branchRow.modelData.id, orgRow.modelData.id, branchRow.modelData.name, directoryStore.saved.revision, "BRANCH // " + branchRow.modelData.name)
+                            IdentityCenterLocalActionButton {
+                                role: "danger"
+                                width: 163
+                                height: 28
+                                label: "CONFIRM DELETE"
+                                labelPixelSize: 9
+                                interactive: editor.removalController
+                                    && !editor.removalController.busy
+                                onTriggered: editor.requestDirectDelete("branch", branchRow.modelData.id, orgRow.modelData.id, branchRow.modelData.name, directoryStore.saved.revision, "BRANCH // " + branchRow.modelData.name)
+                            }
+                            IdentityCenterLocalActionButton {
+                                role: "navigate"
+                                width: 88
+                                height: 28
+                                label: "CANCEL"
+                                labelPixelSize: 9
+                                onTriggered: editor.cancelDirectDelete()
                             }
                         }
                     }

@@ -24,6 +24,7 @@ Item {
     property var selectedCity: null
     property bool streetConsentOpen: false
     property bool streetMode: false
+    property bool vectorConsentOpen: false
     property string selectedHubId: ""
     readonly property var hubRows: hubStore.saved && Array.isArray(hubStore.saved.hubs)
         ? hubStore.saved.hubs : []
@@ -47,6 +48,27 @@ Item {
     onVisibleChanged: if (!visible) {
         serviceMenuOpen=false;
         hubPlacementArmed=false;
+        vectorConsentOpen=false;
+        vectorController.stop();
+    }
+
+    function openVectorChoice() {
+        if (vectorController.running)
+            vectorController.stop();
+        else
+            vectorConsentOpen=true;
+    }
+
+    function launchVector(online) {
+        if (vectorController.running) return;
+        vectorConsentOpen=false;
+        vectorController.launch(online);
+    }
+
+    // The Coverage UI is not allowed to own Process or FileView.
+    // All native sidecar lifecycle lives with the Company controller.
+    CompanyVectorSidecarController {
+        id: vectorController
     }
 
     CompanyHubStore {
@@ -379,6 +401,24 @@ Item {
                     if(root.streetMode) root.streetMode=false;
                     else root.streetConsentOpen=true;
                 }
+            }
+
+            // Separate-process vector atlas, never a silent map replacement.
+            // The running state belongs to CompanyVectorSidecarController.
+            // No native binary is installed by this control.
+            ModeButton {
+                width: root.compactLayout ? 105 : 124
+                height: 31
+                textOnly: true
+                labelText: vectorController.running ? "CLOSE VECTOR" : "VECTOR VIEW ▸"
+                labelFontSize: 10
+                bordered: false
+                selected: vectorController.running
+                idlePrimaryColor: Colors.yellow
+                hoverPrimaryColor: Colors.blue
+                selectedPrimaryColor: Colors.magenta
+                perimeterGlowColor: Colors.blue
+                onTriggered: root.openVectorChoice()
             }
         }
 
@@ -1096,6 +1136,80 @@ Item {
                     labelText: "CANCEL"
                     bordered: false
                     onTriggered: root.streetConsentOpen=false
+                }
+            }
+        }
+    }
+
+    // Vector preview is a separate Qt process. Its online mode explicitly
+    // discloses public viewport tile coordinates, not business hub records.
+    Rectangle {
+        id: vectorConsent
+        anchors.centerIn: parent
+        z: 66
+        visible: root.vectorConsentOpen
+        width: Math.min(parent.width - 20, 520)
+        height: 245
+        color: Colors.black
+        border.color: Colors.magenta
+        border.width: 2
+
+        Column {
+            anchors.fill: parent
+            anchors.margins: 14
+            spacing: 10
+            GohuText {
+                text: "OPEN SEPARATE VECTOR MAP?"
+                color: Colors.yellow
+                font.bold: true
+                font.pixelSize: 15
+            }
+            GohuText {
+                width: parent.width
+                wrapMode: Text.WordWrap
+                color: Colors.white
+                font.pixelSize: 11
+                text: "The vector renderer is a separate Qt window, not the "
+                    + "Company Coverage map. It must be installed separately. "
+                    + "Offline preview uses synthetic geography; Online Streets "
+                    + "requests real tiles from OpenFreeMap, disclosing the viewed "
+                    + "map area and IP. No Company hub, worker, or client data "
+                    + "is passed to either preview."
+            }
+            GohuText {
+                width: parent.width
+                font.pixelSize: 10
+                color: Colors.cyan
+                wrapMode: Text.WordWrap
+                text: "STATUS: " + vectorController.status
+            }
+            Row {
+                spacing: 7
+                ModeButton {
+                    width: 136
+                    height: 34
+                    textOnly: true
+                    labelText: "OFFLINE TEST"
+                    bordered: false
+                    selected: false
+                    onTriggered: root.launchVector(false)
+                }
+                ModeButton {
+                    width: 148
+                    height: 34
+                    textOnly: true
+                    labelText: "ONLINE STREETS"
+                    bordered: false
+                    selected: true
+                    onTriggered: root.launchVector(true)
+                }
+                ModeButton {
+                    width: 82
+                    height: 34
+                    textOnly: true
+                    labelText: "CANCEL"
+                    bordered: false
+                    onTriggered: root.vectorConsentOpen=false
                 }
             }
         }

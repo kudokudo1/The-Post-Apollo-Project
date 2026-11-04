@@ -52,8 +52,23 @@ Scope {
                && nowEpochMs - referenceCheckedAtMs <= referenceMaxAgeMs;
     }
 
+    function dockZoneOffsetMismatch(nowEpochMs) {
+        if (hostInfo.status !== "ready" || !Number.isFinite(nowEpochMs))
+            return false;
+        const text = String(hostInfo.utcOffset || "");
+        const match = /^UTC([+-])(\\d{2}):(\\d{2})$/.exec(text);
+        if (!match)
+            return false; // Unknown is not evidence of mismatch.
+        const hostMinutes =
+            (match[1] === "-" ? -1 : 1)
+            * (Number(match[2]) * 60 + Number(match[3]));
+        const qmlMinutes = -new Date(nowEpochMs).getTimezoneOffset();
+        return hostMinutes !== qmlMinutes;
+    }
+
     function dockTimeUnderlined(nowEpochMs) {
         return displayDeviationActive
+               || dockZoneOffsetMismatch(nowEpochMs)
                || (hasFreshReference(nowEpochMs)
                    && Math.abs(referenceOffsetMs)
                       >= referenceWarningThresholdMs);

@@ -1,0 +1,19 @@
+name: Company Network M2 lakes, North America, world, dropdown
+
+on:
+  pull_request:
+    paths:
+      - 'widgets/CompanyCoveragePane.qml'
+      - 'widgets/CompanyCoveragePolicy.js'
+      - 'widgets/CompanyNaturalEarthLakes110.js'
+      - 'tests/company/test_company_network_m2.test.js'
+      - '.github/workflows/company-network-m2.yml'
+  workflow_dispatch:
+
+jobs:
+  offline-map-contracts:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Test Company Network M1 + M2 geographic controls
+        run: node --test tests/company/test_company_network_m1.test.js tests/company/test_company_network_m2.test.js

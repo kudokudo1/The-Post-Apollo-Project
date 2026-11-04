@@ -16,15 +16,25 @@ Scope {
     property string storageState: "loading"
     property string errorCode: ""
     property var document: Policy.initialDocument()
+    // One in-flight atomic write plus the latest queued adjustment. A burst
+    // of button clicks updates the display immediately without concurrent
+    // FileView writes, and the last accepted offset wins on disk.
     property var pendingDocument: null
+    property var queuedDocument: null
 
     readonly property int displayOffsetMs:
-        document ? Number(document.displayOffsetMs || 0) : 0
+        queuedDocument !== null ? Number(queuedDocument.displayOffsetMs)
+        : pendingDocument !== null ? Number(pendingDocument.displayOffsetMs)
+        : document ? Number(document.displayOffsetMs || 0) : 0
     readonly property string displayOffsetLabel:
         Policy.formatOffset(displayOffsetMs)
     readonly property bool canEdit:
-        (storageState === "ready" || storageState === "empty")
-        && pendingDocument === null
+        storageState === "ready" || storageState === "empty"
+        || storageState === "saving"
+
+    // Evidence-based attention for the dock. An unapplied zone choice or
+    // disabled NTP alone does NOT prove the host clock is inaccurate.
+    readonly property bool displayDeviationActive: displayOffsetMs !== 0
 
     property var hostInfo: ({ status: "unavailable", timezone: "UNKNOWN",
                                utcOffset: "UNKNOWN", dstActive: false,
@@ -72,6 +82,12 @@ Scope {
         return Policy.adjustedEpochMs(epochMs, displayOffsetMs);
     }
 
+    function beginOffsetWrite(nextDocument) {
+        pendingDocument = nextDocument;
+        storageState = "saving";
+        settingsFile.setText(JSON.stringify(pendingDocument, null, 2) + "\n");
+    }
+
     function persistOffset(ms) {
         if (!canEdit) {
             errorCode = "STORAGE_NOT_READY";
@@ -82,10 +98,14 @@ Scope {
             errorCode = next.reason;
             return false;
         }
-        pendingDocument = next.document;
         errorCode = "";
-        storageState = "saving";
-        settingsFile.setText(JSON.stringify(pendingDocument, null, 2) + "\n");
+        if (pendingDocument !== null) {
+            // Do not invoke FileView.setText while an atomic write is
+            // outstanding; coalesce successive clicks into one queued value.
+            queuedDocument = next.document;
+        } else {
+            beginOffsetWrite(next.document);
+        }
         return true;
     }
 
@@ -111,6 +131,7 @@ Scope {
         }
         document = parsed.document;
         pendingDocument = null;
+        queuedDocument = null;
         storageState = "ready";
         errorCode = "";
     }
@@ -364,13 +385,22 @@ Scope {
             if (timeSettings.storageState !== "saving"
                     || timeSettings.pendingDocument === null)
                 return;
-            timeSettings.document = timeSettings.pendingDocument;
+            const saved = timeSettings.pendingDocument;
+            const queued = timeSettings.queuedDocument;
+            timeSettings.document = saved;
             timeSettings.pendingDocument = null;
-            timeSettings.storageState = "ready";
+            timeSettings.queuedDocument = null;
             timeSettings.errorCode = "";
+            if (queued !== null
+                    && queued.displayOffsetMs !== saved.displayOffsetMs) {
+                timeSettings.beginOffsetWrite(queued);
+            } else {
+                timeSettings.storageState = "ready";
+            }
         }
         onSaveFailed: function(error) {
             timeSettings.pendingDocument = null;
+            timeSettings.queuedDocument = null;
             timeSettings.storageState = "error";
             timeSettings.errorCode = "FILE_SAVE_FAILED";
         }

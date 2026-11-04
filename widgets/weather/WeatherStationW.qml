@@ -46,13 +46,10 @@ PanelWindow {
 
     WeatherServices.WeatherHistoryService {
         id: weatherHistoryService
-        active: weatherStation.menuOpen
-                && ((!weatherStation.subjectNavigationOpen
-                     && weatherStation.currentView === "home")
-                    || (weatherStation.subjectNavigationOpen
-                        && (subjectNavigator.liveHomeKind !== ""
-                            || SubjectPanelPolicy.needsSource(
-                               subjectNavigator.currentPath, "history"))))
+        active: weatherStation.menuOpen && weatherStation.subjectNavigationOpen
+                && (subjectNavigator.liveHomeKind !== ""
+                    || SubjectPanelPolicy.needsSource(
+                        subjectNavigator.currentPath, "history"))
         latitude: weatherStation.weatherService
                   ? weatherStation.weatherService.latitude : ""
         longitude: weatherStation.weatherService
@@ -65,28 +62,21 @@ PanelWindow {
     WeatherServices.SeismicService {
         id: seismicService
         cacheStore: weatherStation.persistentCacheStore
-        active: weatherStation.menuOpen
-                && ((!weatherStation.subjectNavigationOpen
-                     && (weatherStation.currentView === "ground"
-                         || weatherStation.currentView === "map"))
-                    || (weatherStation.subjectNavigationOpen
-                        && (EarthPanelPolicy.needsSource(
+        active: weatherStation.menuOpen && weatherStation.subjectNavigationOpen
+                && (EarthPanelPolicy.needsSource(
                                subjectNavigator.currentPath, "seismic")
                             || SubjectPanelPolicy.needsSource(
-                               subjectNavigator.currentPath, "seismic"))))
+                               subjectNavigator.currentPath, "seismic"))
+
     }
 
     WeatherServices.NowcoastLightningService {
         id: lightningService
-        active: weatherStation.menuOpen
-                && ((!weatherStation.subjectNavigationOpen
-                     && (weatherStation.currentView === "ground"
-                         || weatherStation.currentView === "map"))
-                    || (weatherStation.subjectNavigationOpen
-                        && (SubjectPanelPolicy.needsSource(
+        active: weatherStation.menuOpen && weatherStation.subjectNavigationOpen
+                && (SubjectPanelPolicy.needsSource(
                                subjectNavigator.currentPath, "lightning")
                             || EarthPanelPolicy.needsSource(
-                               subjectNavigator.currentPath, "lightning"))))
+                               subjectNavigator.currentPath, "lightning"))
         latitude: weatherStation.weatherService
                   ? weatherStation.weatherService.latitude : ""
         longitude: weatherStation.weatherService
@@ -96,15 +86,11 @@ PanelWindow {
     WeatherServices.NwpsRiverService {
         id: riverService
         cacheStore: weatherStation.persistentCacheStore
-        active: weatherStation.menuOpen
-                && ((!weatherStation.subjectNavigationOpen
-                     && (weatherStation.currentView === "ground"
-                         || weatherStation.currentView === "map"))
-                    || (weatherStation.subjectNavigationOpen
-                        && (SubjectPanelPolicy.needsSource(
+        active: weatherStation.menuOpen && weatherStation.subjectNavigationOpen
+                && (SubjectPanelPolicy.needsSource(
                                subjectNavigator.currentPath, "river")
                             || EarthPanelPolicy.needsSource(
-                               subjectNavigator.currentPath, "river"))))
+                               subjectNavigator.currentPath, "river"))
         latitude: weatherStation.weatherService
                   ? weatherStation.weatherService.latitude : ""
         longitude: weatherStation.weatherService
@@ -119,9 +105,7 @@ PanelWindow {
     signal keyboardOwnershipRequested()
 
     property bool menuOpen: false
-    // M28-N reversible source-controlled preference; CLASSIC remains a
-    // per-open rescue control. This is not a persistent user setting.
-    property bool subjectsFirstPilotEnabled: SubjectDefaultPolicy.SUBJECTS_FIRST_PILOT
+    // SUBJECTS is the only presentation; the collapsed host unloads it.
     property bool providerDiagnosticsOpen: false
     onMenuOpenChanged: {
         if (!menuOpen)
@@ -130,11 +114,9 @@ PanelWindow {
     property bool relationshipFocusModeActive: false
     property bool relationshipFocused: false
 
-    property string currentView: "home"
     // Collapsed 0x0 PanelWindow must NEVER keep SUBJECTS workspace loaded.
     // The M28-N pilot selects SUBJECTS only on explicit open(), not at init.
     property bool subjectNavigationOpen: false
-    property var newsMapOverlay: null
     property bool contextTerminalRequested: false
     // M28-C: subject-native TOOLS launches reuse the ONE root StationTerminal.
     // This is a fixed mode, never a user-supplied shell command.
@@ -152,51 +134,24 @@ PanelWindow {
         && terminalHoleX + terminalHoleWidth <= stationBackground.width
         && terminalHoleY + terminalHoleHeight <= stationBackground.height
     readonly property bool terminalHoleActive:
-        menuOpen && (currentView === "terminal" || contextTerminalRequested)
-        && terminalView.sessionMode === (subjectNavigationOpen
-            ? subjectTerminalMode : currentView)
+        menuOpen && contextTerminalRequested
+        && terminalView.sessionMode === subjectTerminalMode
         && terminalView.terminalState === "VISIBLE"
         && terminalHoleValid
 
-    // A keyboard cursor previews rail controls; Enter activates it.
-    property int navigationIndex: 0
     readonly property bool standardKeysAvailable:
-        menuOpen
-        && keyboardActive
+        menuOpen && keyboardActive
         && (!relationshipFocusModeActive || relationshipFocused)
 
-    // HOME, GROUND, SKY and SPACE are peers now. MAP/NEWS/RADIO/TERMINAL
-    // remain peers in the same Main Mode family; page-local Sub Modes can be
-    // added later without pretending a domain is a filter under HOME.
-    readonly property var mainModes: [
-        { "id": "home", "name": "HOME", "symbol": "⌂" },
-        { "id": "ground", "name": "GROUND", "symbol": "⌁" },
-        { "id": "sky", "name": "SKY", "symbol": "☁" },
-        { "id": "space", "name": "SPACE", "symbol": "✦" },
-        { "id": "map", "name": "MAP", "symbol": "⌖" },
-        { "id": "news", "name": "NEWS", "symbol": "▤" },
-        { "id": "radio", "name": "RADIO", "symbol": "◉" },
-        { "id": "terminal", "name": "TERMINAL", "symbol": ">_" }
-    ]
-
-    readonly property string currentViewName: {
-        for (let i = 0; i < mainModes.length; i++) {
-            if (mainModes[i].id === currentView)
-                return mainModes[i].name;
-        }
-        return "UNKNOWN";
-    }
-
     readonly property string currentContext:
-        subjectNavigationOpen
-        ? (subjectNavigator.liveHomeKind !== ""
-           ? "HOME" : subjectNavigator.liveWeatherKind !== ""
-           ? "WEATHER" : subjectNavigator.liveCosmosKind !== ""
-             ? "COSMOS" : subjectNavigator.liveEarthKind !== ""
-               ? "EARTH" : subjectNavigator.liveMediaKind !== ""
-               ? "MEDIA" : subjectNavigator.liveMagickKind !== ""
-                 ? "MAGICK" : subjectNavigator.liveToolsKind !== ""
-                   ? "TOOLS" : "SUBJECT INDEX") : currentViewName
+        subjectNavigator.liveHomeKind !== "" ? "HOME"
+        : subjectNavigator.liveWeatherKind !== "" ? "WEATHER"
+        : subjectNavigator.liveCosmosKind !== "" ? "COSMOS"
+        : subjectNavigator.liveEarthKind !== "" ? "EARTH"
+        : subjectNavigator.liveMediaKind !== "" ? "MEDIA"
+        : subjectNavigator.liveMagickKind !== "" ? "MAGICK"
+        : subjectNavigator.liveToolsKind !== "" ? "TOOLS"
+        : "SUBJECT INDEX"
 
     readonly property var officialAlertSummary:
         OfficialAlertPolicy.summary(
@@ -259,58 +214,15 @@ PanelWindow {
             error: weatherService ? weatherService.errorText : ""
         }, runtimeNowMs)
 
-    readonly property bool usesHomeSources:
-        currentView === "home"
-
-    readonly property bool usesWeatherSource:
-        currentView === "ground"
-        || currentView === "sky"
-
-    readonly property bool usesSpaceSource:
-        currentView === "space"
-
-    readonly property bool usesNewsSource: currentView === "news"
-    // The NEWS provider belongs to the loaded StationDiscovery instance.
-    // Read its exposed status rather than invent a parallel NEWS poller.
-    readonly property var newsSourceItem:
-        usesNewsSource && weatherContentLoader.item
-        ? weatherContentLoader.item : null
-
-    // During SUBJECTS use the one active map's runtime rows, not the
-    // now-unloaded CLASSIC page. No additional event or radar poller.
+    // The one active SUBJECTS map owns the runtime rows.
     readonly property var currentPageRuntimeRows:
-        subjectNavigationOpen ? subjectNavigator.liveMapRuntimeRows
-        : weatherContentLoader.item
-          && Array.isArray(weatherContentLoader.item.runtimeRows)
-          ? weatherContentLoader.item.runtimeRows : []
+        subjectNavigator.liveMapRuntimeRows
     readonly property var currentPageRuntimeSummary:
         RuntimePolicy.summarizeRows(currentPageRuntimeRows)
     readonly property var subjectSourceBadge:
         SubjectSourceBadge.badgeFor(
             subjectNavigator.currentPath,subjectNavigator.indexOpen,
             weatherRuntimeState,spaceRuntimeState,currentPageRuntimeSummary)
-    readonly property bool usesMapRuntime:
-        currentView === "map"
-
-    // NEWS player viewport in the 1000x700 Station chassis's local logical
-    // coordinate system. The Station window's *global* coordinates remain
-    // compositor-owned. This read-only QML geometry is not browser authority.
-    readonly property rect newsViewerViewportRect: {
-        const hub = newsSourceItem;
-        if (!menuOpen || contextTerminalRequested || !hub || !hub.viewerOpen)
-            return Qt.rect(0, 0, 0, 0);
-        const bay = hub.playerViewportRect;
-        if (!bay || bay.width <= 0 || bay.height <= 0)
-            return Qt.rect(0, 0, 0, 0);
-        const origin = hub.mapToItem(stationBackground, bay.x, bay.y);
-        return Qt.rect(origin.x, origin.y, bay.width, bay.height);
-    }
-    readonly property bool newsViewerGeometryValid:
-        menuOpen && currentView === "news" && !contextTerminalRequested
-        && newsViewerViewportRect.x >= 0 && newsViewerViewportRect.y >= 0
-        && newsViewerViewportRect.width > 0 && newsViewerViewportRect.height > 0
-        && newsViewerViewportRect.x + newsViewerViewportRect.width <= stationBackground.width
-        && newsViewerViewportRect.y + newsViewerViewportRect.height <= stationBackground.height
 
     readonly property var weatherRuntimeSpec:
         RuntimePolicy.sourceSpec("weather-current")
@@ -455,192 +367,35 @@ PanelWindow {
         if (officialAlertSummary.available)
             return officialAlertSummary.headerText
                    + (officialAlertUsingPersistentCache ? " // CACHE" : "");
-
-        if (subjectNavigationOpen) {
-            // WEATHER pages use the true fallback/cache provenance. Other
-            // SUBJECTS and the deep INDEX retain their original badges.
-            if (!subjectNavigator.indexOpen
-                    && subjectNavigator.liveWeatherKind !== "")
-                return weatherDiagnostics.header;
-            return subjectSourceBadge.text;
-        }
-
-        if (usesHomeSources) {
-            if (homeWeatherUsable && homeSpaceUsable) {
-                if (runtimeCached(weatherRuntimeState)
-                        && runtimeCached(spaceRuntimeState))
-                    return "HOME CACHE";
-                if (runtimeCached(weatherRuntimeState)
-                        || runtimeCached(spaceRuntimeState))
-                    return "HOME MIXED";
-                return "HOME LIVE";
-            }
-            if (homeWeatherUsable || homeSpaceUsable)
-                return runtimeCached(weatherRuntimeState)
-                       || runtimeCached(spaceRuntimeState)
-                       ? "PARTIAL CACHE" : "PARTIAL";
-            if (homeSourceLoading)
-                return "READING";
-            if (homeSourceError)
-                return "OFFLINE";
-            return "CONNECTING";
-        }
-
-        if (usesWeatherSource)
+        if (!subjectNavigator.indexOpen
+                && subjectNavigator.liveWeatherKind !== "")
             return weatherDiagnostics.header;
-
-        if (usesSpaceSource)
-            return runtimeHeaderText(spaceRuntimeState, "SPACE LIVE");
-
-        if (usesMapRuntime) {
-            if (currentPageRuntimeSummary.expired > 0
-                    && currentPageRuntimeSummary.expired
-                       >= currentPageRuntimeSummary.ready)
-                return "MAP EXPIRED";
-            if ((currentPageRuntimeSummary.problem > 0
-                    || currentPageRuntimeSummary.offline > 0)
-                    && currentPageRuntimeSummary.ready === 0)
-                return "OFFLINE";
-            if (currentPageRuntimeSummary.loading > 0
-                    && currentPageRuntimeSummary.ready === 0)
-                return "READING";
-            if (currentPageRuntimeSummary.cached > 0)
-                return "MAP CACHE";
-            if (currentPageRuntimeSummary.stale > 0)
-                return "STALE";
-            if (currentPageRuntimeSummary.ready > 0)
-                return "MAP LIVE";
-            return "CONNECTING";
-        }
-
-        if (usesNewsSource)
-            return newsSourceItem ? newsSourceItem.feedBadge : "CONNECTING // NEWS";
-
-        return "NO FEED";
+        return subjectSourceBadge.text;
     }
-
-    readonly property string sourceStatusDisplay: {
-        if (officialAlertSummary.available)
-            return officialAlertSummary.headerText
-                   + (officialAlertUsingPersistentCache ? " // CACHE" : "");
-
-        if (subjectNavigationOpen) {
-            // WEATHER pages use the true fallback/cache provenance. Other
-            // SUBJECTS and the deep INDEX retain their original badges.
-            if (!subjectNavigator.indexOpen
-                    && subjectNavigator.liveWeatherKind !== "")
-                return weatherDiagnostics.header;
-            return subjectSourceBadge.text;
-        }
-
-        if (usesHomeSources) {
-            if (homeWeatherUsable && homeSpaceUsable)
-                return sourceStatusText + " // 2 FEEDS";
-            if (homeWeatherUsable)
-                return sourceStatusText + " // WEATHER";
-            if (homeSpaceUsable)
-                return sourceStatusText + " // SPACE";
-            if (homeSourceLoading)
-                return "READING // SOURCES";
-            if (homeSourceError)
-                return "OFFLINE // SOURCES";
-            return "CONNECTING // SOURCES";
-        }
-
-        if (usesWeatherSource)
-            return weatherDiagnostics.header;
-
-        if (usesMapRuntime) {
-            if (currentPageRuntimeSummary.ready > 0)
-                return sourceStatusText + " // "
-                       + currentPageRuntimeSummary.ready + " READY";
-            if (currentPageRuntimeSummary.loading > 0)
-                return sourceStatusText + " // "
-                       + currentPageRuntimeSummary.loading + " READING";
-            return sourceStatusText + " // SOURCES";
-        }
-
-        if (usesSpaceSource || usesNewsSource)
-            return sourceStatusText;
-
-        return "NO FEED // NOT WIRED";
-    }
-
+    readonly property string sourceStatusDisplay: sourceStatusText
     readonly property color sourceStatusColor: {
         if (officialAlertSummary.available)
             return officialAlertColor(officialAlertSummary.colorToken);
-
-        if (subjectNavigationOpen) {
-            if (!subjectNavigator.indexOpen
-                    && subjectNavigator.liveWeatherKind !== "") {
-                if (weatherDiagnostics.currentState === "CACHE"
-                        || weatherDiagnostics.currentState === "FALLBACK")
-                    return Colors.yellow;
-                if (weatherDiagnostics.currentState === "OFFLINE")
-                    return Colors.red;
-                if (weatherDiagnostics.currentState === "READING")
-                    return Colors.orange;
-                return Colors.cyan;
-            }
-            switch (subjectSourceBadge.tone) {
-            case "red": return Colors.red;
-            case "yellow": return Colors.yellow;
-            case "orange": return Colors.orange;
-            case "blue": return Colors.blue;
-            case "green": return Colors.green;
-            case "magenta": return Colors.magenta;
-            default: return Colors.cyan;
-            }
-        }
-
-        if (usesHomeSources) {
-            if (homeWeatherUsable && homeSpaceUsable) {
-                if (runtimeCached(weatherRuntimeState)
-                        || runtimeCached(spaceRuntimeState))
-                    return Colors.blue;
-                return Colors.magenta;
-            }
-            if (homeWeatherUsable || homeSpaceUsable)
+        if (!subjectNavigator.indexOpen
+                && subjectNavigator.liveWeatherKind !== "") {
+            if (weatherDiagnostics.currentState === "CACHE"
+                    || weatherDiagnostics.currentState === "FALLBACK")
                 return Colors.yellow;
-            if (homeSourceLoading)
+            if (weatherDiagnostics.currentState === "OFFLINE")
+                return Colors.red;
+            if (weatherDiagnostics.currentState === "READING")
                 return Colors.orange;
-            if (homeSourceError)
-                return Colors.red;
-            return Colors.orange;
+            return Colors.cyan;
         }
-
-        if (usesWeatherSource)
-            return runtimeHeaderColor(weatherRuntimeState, Colors.magenta);
-
-        if (usesSpaceSource)
-            return runtimeHeaderColor(spaceRuntimeState, Colors.magenta);
-
-        if (usesMapRuntime) {
-            if (currentPageRuntimeSummary.expired > 0
-                    && currentPageRuntimeSummary.expired
-                       >= currentPageRuntimeSummary.ready)
-                return Colors.red;
-            if ((currentPageRuntimeSummary.problem > 0
-                    || currentPageRuntimeSummary.offline > 0)
-                    && currentPageRuntimeSummary.ready === 0)
-                return Colors.red;
-            if (currentPageRuntimeSummary.cached > 0)
-                return Colors.blue;
-            if (currentPageRuntimeSummary.stale > 0
-                    || currentPageRuntimeSummary.problem > 0)
-                return Colors.yellow;
-            if (currentPageRuntimeSummary.loading > 0
-                    && currentPageRuntimeSummary.ready === 0)
-                return Colors.orange;
-            if (currentPageRuntimeSummary.ready > 0)
-                return Colors.magenta;
-            return Colors.orange;
+        switch (subjectSourceBadge.tone) {
+        case "red": return Colors.red;
+        case "yellow": return Colors.yellow;
+        case "orange": return Colors.orange;
+        case "blue": return Colors.blue;
+        case "green": return Colors.green;
+        case "magenta": return Colors.magenta;
+        default: return Colors.cyan;
         }
-
-        if (usesNewsSource)
-            return newsSourceItem ? newsSourceItem.feedBadgeColor : Colors.orange;
-
-        return Colors.orange;
     }
 
     Timer {
@@ -773,15 +528,13 @@ PanelWindow {
     }
 
     function handleEscape() {
-        // M6c diagnostics owns the first Escape when its read-only panel
-        // is visible. INDEX then returns to its real workspace; the active
-        // SUBJECTS workspace and CLASSIC both close the station normally.
+        // Diagnostics closes first; INDEX returns to its workspace;
+        // Escape from the workspace closes the station.
         if (providerDiagnosticsOpen) {
             providerDiagnosticsOpen = false;
             return;
         }
-        const action = SubjectDefaultPolicy.escapeAction(
-            subjectNavigationOpen, subjectNavigator.indexOpen);
+        const action = SubjectDefaultPolicy.escapeAction(subjectNavigator.indexOpen);
         if (action === "workspace")
             subjectNavigator.returnToWorkspace();
         else
@@ -807,40 +560,15 @@ PanelWindow {
     }
 
 
-    // Every visible rail page is a Main Mode. Tab/Shift+Tab cycles them
-    // in rail order; Up/Down previews the same list and Enter activates it.
+    // Keyboard navigation only targets the native SUBJECTS/INDEX rail.
     function cycleMainMode(direction) {
-        if (subjectNavigationOpen) {
-            subjectNavigator.cycleSubjects(direction);
-            return;
-        }
-        const current = Math.max(0, mainModes.findIndex(function(mode) {
-            return mode.id === currentView;
-        }));
-        const step = Number(direction) < 0 ? -1 : 1;
-        const next = (current + step + mainModes.length) % mainModes.length;
-        currentView = mainModes[next].id;
-        navigationIndex = next;
+        subjectNavigator.cycleSubjects(direction);
     }
-
     function moveNavigationCursor(direction) {
-        if (subjectNavigationOpen) {
-            subjectNavigator.moveCursor(direction);
-            return;
-        }
-        const step = Number(direction) < 0 ? -1 : 1;
-        navigationIndex =
-            (navigationIndex + step + mainModes.length) % mainModes.length;
+        subjectNavigator.moveCursor(direction);
     }
-
     function activateNavigationCursor() {
-        if (subjectNavigationOpen) {
-            subjectNavigator.activateCursor();
-            return;
-        }
-        if (navigationIndex < 0 || navigationIndex >= mainModes.length)
-            return;
-        currentView = mainModes[navigationIndex].id;
+        subjectNavigator.activateCursor();
     }
 
     Shortcut {
@@ -880,92 +608,42 @@ PanelWindow {
         onActivated: weatherStation.activateNavigationCursor()
     }
 
-    function openSubjectNavigation() {
-        // The M1 browser is intentionally passive; never obscure a live
-        // terminal actor or reinterpret its exact legacy session identity.
-        if (!menuOpen || contextTerminalRequested
-                || terminalView.terminalState !== "IDLE")
-            return;
-        if (currentView === "terminal") {
-            currentView = "home";
-            navigationIndex = 0;
-        }
-        subjectNavigationOpen = true;
-    }
-
-    function switchToClassic() {
-        // M28-U: disable manual fallback during the retirement rehearsal.
-        if (SubjectDefaultPolicy.CLASSIC_RETIREMENT_PREVIEW)
+    // Notifications retain historical view tokens but now open native routes.
+    function openNotificationView(view) {
+        const targets = {
+            "home":"home/overview",
+            "ground":"weather/ground/full",
+            "sky":"weather/conditions/current",
+            "space":"cosmos/space-weather/full",
+            "map":"earth/maps/full",
+            "news":"media/news/full",
+            "radio":"media/radio/full",
+            "terminal":"tools/terminal/star-map"
+        };
+        const target = targets[String(view || "")];
+        if (!target)
             return false;
-        if (!SubjectDefaultPolicy.switchToClassic(
-                subjectNavigationOpen,
-                SubjectDefaultPolicy.canSwitch(
-                    menuOpen, contextTerminalRequested,
-                    terminalView.terminalState)))
+        if (!menuOpen)
+            open();
+        if (!menuOpen || contextTerminalRequested)
             return false;
-        providerDiagnosticsOpen = false;
-        subjectNavigationOpen = false;
-        return true;
-    }
-
-    function openLegacyFromSubject(pageId) {
-        // INDEX source records are historic provenance, not active fallback.
-        if (SubjectDefaultPolicy.CLASSIC_RETIREMENT_PREVIEW)
-            return false;
-        const index = mainModes.findIndex(function(mode) {
-            return mode.id === pageId;
-        });
-        if (index < 0)
-            return;
-        subjectNavigationOpen = false;
-        navigationIndex = index;
-        currentView = pageId;
+        return subjectNavigator.chooseRoute(target);
     }
 
     function open() {
-        // A stuck Kitty actor must not accidentally reveal CLASSIC when
-        // SUBJECTS cannot be admitted; keep the Station collapsed instead.
-        if (SubjectDefaultPolicy.CLASSIC_RETIREMENT_PREVIEW
-                && terminalView.terminalState !== "IDLE")
+        // A live compositor-backed Kitty actor must not be masked by opening.
+        if (terminalView.terminalState !== "IDLE")
             return;
         weatherStation.keyboardOwnershipRequested();
-        // A previously selected CLASSIC TERMINAL must not sit on top of
-        // SUBJECTS as an IDLE transparent overlay. Preserve legacy
-        // currentView for every other CLASSIC fallback page.
-        if (subjectsFirstPilotEnabled) {
-            if (currentView === "terminal") {
-                currentView = "home";
-                navigationIndex = 0;
-            }
-            if (subjectNavigator.indexOpen)
-                subjectNavigator.returnToWorkspace();
-        }
-        // The host is an always-visible 0x0 PanelWindow when closed.
-        // Choose a view before expanding it, but admit only an IDLE Kitty.
-        subjectNavigationOpen = SubjectDefaultPolicy.onOpen(subjectsFirstPilotEnabled)
-                                && terminalView.terminalState === "IDLE";
+        if (subjectNavigator.indexOpen)
+            subjectNavigator.returnToWorkspace();
+        subjectNavigationOpen = true;
         menuOpen = true;
         Qt.callLater(weatherStation.restoreWeatherKeyboardFocus);
     }
 
-    function launchContextTerminal() {
-        if (!menuOpen || subjectNavigationOpen
-                || terminalView.terminalState !== "IDLE")
-            return;
-        contextTerminalRequested = true;
-        // Wait for the host to become visible before requesting Kitty.
-        Qt.callLater(function() {
-            if (menuOpen && contextTerminalRequested
-                    && terminalView.terminalMode === currentView) {
-                if (!terminalView.openTerminal())
-                    contextTerminalRequested = false;
-            }
-        });
-    }
-
     function launchSubjectTerminal(mode) {
-        // Keep the TOOLS workflow within SUBJECTS. Do not open a CLASSIC
-        // page, change currentView, or construct a second terminal actor.
+        // TOOLS owns this routed launch; reuse the single root Kitty actor.
         if (!menuOpen || !subjectNavigationOpen || subjectNavigator.indexOpen
                 || contextTerminalRequested
                 || terminalView.terminalState !== "IDLE")
@@ -1003,18 +681,10 @@ PanelWindow {
         contextTerminalRequested = false;
     }
 
-    onCurrentViewChanged: {
-        subjectNavigationOpen = false;
-        // One compositor-backed session at a time. Each new mode has a
-        // different app ID; never direct Sway to close the wrong actor.
-        closeContextTerminal();
-    }
-
     function close() {
         closeContextTerminal();
-        // Always unload SUBJECTS in the collapsed layer-shell surface.
-        // The preference is reapplied by the next explicit open().
-        subjectNavigationOpen = SubjectDefaultPolicy.onClose(subjectsFirstPilotEnabled);
+        // Unload SUBJECTS in the collapsed 0x0 layer-shell host.
+        subjectNavigationOpen = false;
         menuOpen = false;
     }
 
@@ -1114,9 +784,7 @@ PanelWindow {
                     id: contextTerminalLaunch
                     width: 106
                     height: 32
-                    label: weatherStation.subjectNavigationOpen
-                           ? "INDEX" : weatherStation.currentView === "terminal"
-                           ? "STAR MAP" : weatherStation.currentViewName
+                    label: "INDEX"
                     labelPixelSize: 11
                     contentPadding: 4
                     available: weatherStation.menuOpen
@@ -1124,14 +792,10 @@ PanelWindow {
                                && !weatherStation.contextTerminalRequested
                     accentColor: Colors.cyan
                     onLeftClicked: {
-                        if (weatherStation.subjectNavigationOpen) {
-                            if (subjectNavigator.indexOpen)
-                                subjectNavigator.returnToWorkspace();
-                            else
-                                subjectNavigator.openIndex();
-                        } else {
-                            weatherStation.launchContextTerminal();
-                        }
+                        if (subjectNavigator.indexOpen)
+                            subjectNavigator.returnToWorkspace();
+                        else
+                            subjectNavigator.openIndex();
                     }
                 }
 
@@ -1182,7 +846,6 @@ PanelWindow {
                     accentColor: Colors.yellow
                     available: weatherStation.menuOpen
                                && !weatherStation.contextTerminalRequested
-                               && weatherStation.currentView !== "terminal"
                     onLeftClicked:
                         weatherStation.providerDiagnosticsOpen =
                             !weatherStation.providerDiagnosticsOpen
@@ -1290,8 +953,7 @@ PanelWindow {
             anchors.bottom: footer.top
             anchors.left: parent.left
 
-            // The original 160px mode rail is shared by CLASSIC,
-            // the seven-family workspace, and the deep INDEX view.
+            // Seven-family workspace and deep INDEX share this rail.
             // Terminal placement stays on this original geometry.
             width: 160
 
@@ -1307,55 +969,8 @@ PanelWindow {
                 color: Colors.cyan
             }
 
-            Column {
-                id: railColumn
-                visible: !weatherStation.subjectNavigationOpen
-
-                anchors.top: parent.top
-                anchors.left: parent.left
-                anchors.right: parent.right
-                anchors.topMargin: 14
-
-                spacing: 6
-
-                Repeater {
-                    model: weatherStation.mainModes
-
-                    delegate: ModeButton {
-                        id: mainModeButton
-
-                        required property int index
-                        required property var modelData
-
-                        width: railColumn.width
-                        height: 48
-
-                        keyboardActive: weatherStation.standardKeysAvailable
-                        keyboardSelected:
-                            weatherStation.navigationIndex === index
-                        onPointerMoved:
-                            weatherStation.navigationIndex = index
-
-                        selected:
-                            weatherStation.currentView === modelData.id
-                        bordered: false
-                        horizontalContent: true
-                        contentSpacing: 10
-                        iconFontSize: 18
-                        labelFontSize: 18
-                        iconText: modelData.symbol
-                        labelText: modelData.name
-
-                        onTriggered: {
-                            weatherStation.navigationIndex = index;
-                            weatherStation.currentView = modelData.id;
-                        }
-                    }
-                }
-            }
-
-            // Main family buttons share the CLASSIC left rail's visual
-            // grammar. The existing deep subject rail remains for INDEX.
+            // Native family rail reuses original 160px geometry.
+            // INDEX retains the separate detailed rail.
             StationWorkspaceFamilyRail {
                 id: workspaceFamilyRailColumn
                 visible: weatherStation.subjectNavigationOpen
@@ -1379,32 +994,6 @@ PanelWindow {
                 navigator: subjectNavigator
             }
 
-            // Explicit CLASSIC return. This is an index preview, not a
-            // premature activation of migrated source panels.
-            ActionButton {
-                id: subjectBrowserToggle
-                anchors.left: parent.left
-                anchors.right: parent.right
-                anchors.bottom: parent.bottom
-                anchors.leftMargin: 9
-                anchors.rightMargin: 9
-                anchors.bottomMargin: 12
-                height: 36
-                visible: !SubjectDefaultPolicy.CLASSIC_RETIREMENT_PREVIEW
-                label: weatherStation.subjectNavigationOpen
-                       ? "CLASSIC" : "SUBJECTS"
-                labelPixelSize: 12
-                selected: weatherStation.subjectNavigationOpen
-                available: weatherStation.menuOpen
-                           && terminalView.terminalState === "IDLE"
-                           && !weatherStation.contextTerminalRequested
-                onClicked: {
-                    if (weatherStation.subjectNavigationOpen)
-                        weatherStation.switchToClassic();
-                    else
-                        weatherStation.openSubjectNavigation();
-                }
-            }
         }
 
         // ─────────────────────────────────────────
@@ -1419,39 +1008,10 @@ PanelWindow {
             anchors.left: modeRail.right
             anchors.right: parent.right
 
-            color: weatherStation.currentView === "terminal"
-                   || weatherStation.contextTerminalRequested
+            color: weatherStation.contextTerminalRequested
                    ? "transparent" : Colors.black
 
             clip: true
-
-            Loader {
-                id: weatherContentLoader
-                anchors.fill: parent
-                // SUBJECTS owns its own real panels, not a hidden duplicate
-                // CLASSIC NEWS/RADIO view with a second memory observer.
-                active: !weatherStation.subjectNavigationOpen
-                visible: weatherStation.currentView !== "terminal"
-                         && !weatherStation.contextTerminalRequested
-                         && !weatherStation.subjectNavigationOpen
-
-                sourceComponent:
-                    weatherStation.currentView === "home"
-                    ? homeViewComponent
-                    : weatherStation.currentView === "ground"
-                    ? groundViewComponent
-                    : weatherStation.currentView === "sky"
-                    ? skyViewComponent
-                    : weatherStation.currentView === "space"
-                    ? spaceViewComponent
-                    : weatherStation.currentView === "map"
-                    ? mapViewComponent
-                    : weatherStation.currentView === "news"
-                    ? newsViewComponent
-                    : weatherStation.currentView === "radio"
-                    ? radioViewComponent
-                    : placeholderViewComponent
-            }
 
             StationSubjectNavigator {
                 id: subjectNavigator
@@ -1474,9 +1034,6 @@ PanelWindow {
                 dossierArchiveStore: weatherStation.dossierArchiveStore
                 homeFavoritesStore: homeFavoritesStore
                 runtimeNowMs: weatherStation.runtimeNowMs
-                onLegacyPageRequested: function(pageId) {
-                    weatherStation.openLegacyFromSubject(pageId);
-                }
                 onTerminalLaunchRequested: function(mode) {
                     weatherStation.launchSubjectTerminal(mode);
                 }
@@ -1486,12 +1043,9 @@ PanelWindow {
                 id: terminalView
 
                 anchors.fill: parent
-                visible: weatherStation.currentView === "terminal"
-                         || weatherStation.contextTerminalRequested
+                visible: weatherStation.contextTerminalRequested
                 stationOpen: weatherStation.menuOpen
-                terminalMode: weatherStation.subjectNavigationOpen
-                              ? weatherStation.subjectTerminalMode
-                              : weatherStation.currentView
+                terminalMode: weatherStation.subjectTerminalMode
                 targetScreen: weatherStation.screen
                 stationWidth: stationBackground.width
                 stationHeight: stationBackground.height
@@ -1515,131 +1069,6 @@ PanelWindow {
                 anchors.rightMargin: 12
                 snapshot: weatherStation.weatherDiagnostics
                 onCloseRequested: weatherStation.providerDiagnosticsOpen = false
-            }
-        }
-
-        Component {
-            id: homeViewComponent
-
-            StationHome {
-                weatherService: weatherStation.weatherService
-                spaceService: weatherStation.spaceService
-                nwsAlertSource: weatherStation.nwsAlertSource
-                historyService: weatherHistoryService
-                liveHistoryStore: weatherStation.liveHistoryStore
-                runtimeNowMs: weatherStation.runtimeNowMs
-            }
-        }
-
-        Component {
-            id: groundViewComponent
-
-            StationGround {
-                weatherService: weatherStation.weatherService
-                nwsAlertSource: weatherStation.nwsAlertSource
-                seismicSource: seismicService
-                lightningSource: lightningService
-                riverSource: riverService
-                persistentCacheStore: weatherStation.persistentCacheStore
-                liveHistoryStore: weatherStation.liveHistoryStore
-                runtimeNowMs: weatherStation.runtimeNowMs
-            }
-        }
-
-        Component {
-            id: skyViewComponent
-
-            StationSky {
-                weatherService: weatherStation.weatherService
-                runtimeNowMs: weatherStation.runtimeNowMs
-            }
-        }
-
-        Component {
-            id: spaceViewComponent
-
-            StationSpace {
-                spaceService: weatherStation.spaceService
-                weatherService: weatherStation.weatherService
-                liveHistoryStore: weatherStation.liveHistoryStore
-                runtimeNowMs: weatherStation.runtimeNowMs
-            }
-        }
-
-        Component {
-            id: mapViewComponent
-
-            StationDiscovery {
-                stationOpen: weatherStation.menuOpen
-                domain: "map"
-                seismicSource: seismicService
-                lightningSource: lightningService
-                riverSource: riverService
-                weatherService: weatherStation.weatherService
-                persistentCacheStore: weatherStation.persistentCacheStore
-                eventArchiveStore: weatherStation.eventArchiveStore
-                dossierArchiveStore: weatherStation.dossierArchiveStore
-                newsMentionOverlay: weatherStation.newsMapOverlay
-                runtimeNowMs: weatherStation.runtimeNowMs
-                onNewsMapClearRequested: {
-                    weatherStation.newsMapOverlay = null;
-                }
-            }
-        }
-
-        Component {
-            id: newsViewComponent
-
-            StationNewsHub {
-                stationOpen: weatherStation.menuOpen
-                runtimeNowMs: weatherStation.runtimeNowMs
-                onNewsMapRequested: function(payload) {
-                    if (!payload
-                            || !Array.isArray(payload.locations)
-                            || payload.locations.length === 0)
-                        return;
-                    weatherStation.newsMapOverlay =
-                        JSON.parse(JSON.stringify(payload));
-                    weatherStation.currentView = "map";
-                    weatherStation.navigationIndex =
-                        weatherStation.mainModes.findIndex(function(mode) {
-                            return mode.id === "map";
-                        });
-                }
-            }
-        }
-
-        Component {
-            id: radioViewComponent
-
-            StationRadio {
-                stationOpen: weatherStation.menuOpen
-            }
-        }
-
-        Component {
-            id: placeholderViewComponent
-
-            Rectangle {
-                color: Colors.black
-
-                Column {
-                    anchors.centerIn: parent
-                    spacing: 12
-
-                    GohuText {
-                        anchors.horizontalCenter: parent.horizontalCenter
-                        text: weatherStation.currentViewName
-                        font.pixelSize: 28
-                        color: Colors.orange
-                    }
-
-                    SecondaryText {
-                        anchors.horizontalCenter: parent.horizontalCenter
-                        text: "SOURCE NOT YET CONNECTED"
-                        font.pixelSize: 16
-                    }
-                }
             }
         }
 
@@ -1718,8 +1147,7 @@ PanelWindow {
 
                 anchors.rightMargin: 20
 
-                text: weatherStation.subjectNavigationOpen
-                      ? "SUBJECTS" : weatherStation.currentViewName
+                text: "SUBJECTS"
 
                 font.family: "GohuFont 11 Nerd Font Mono"
 

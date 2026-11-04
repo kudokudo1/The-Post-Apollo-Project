@@ -1,5 +1,6 @@
 import QtQuick
 import "../components"
+import "../services/company"
 import "CompanyCoveragePolicy.js" as Geo
 import "weather/StationNaturalEarthLand110.js" as Land
 import "weather/StationNaturalEarthContext110.js" as Context
@@ -16,6 +17,17 @@ Item {
     property string selectedCode: ""
     property string selectedCountryCode: ""
     property bool serviceMenuOpen: false
+    property bool hubPlacementArmed: false
+    property bool hubEditorOpen: false
+    property string selectedHubId: ""
+    readonly property var hubRows: hubStore.saved && Array.isArray(hubStore.saved.hubs)
+        ? hubStore.saved.hubs : []
+    readonly property var selectedHub: {
+        for (var i=0;i<hubRows.length;i++)
+            if(hubRows[i].id===selectedHubId && !hubRows[i].archived)
+                return hubRows[i];
+        return null;
+    }
     property string serviceFamily: "ALL SERVICES"
     property string statusFilter: "ALL STATUS"
     property bool showReferencePoints: true
@@ -27,7 +39,30 @@ Item {
     readonly property var selectedState: Geo.stateForCode(selectedCode)
     readonly property var selectedCountry: Geo.countryForCode(selectedCountryCode)
     readonly property var bounds: Geo.regions[Geo.regionKey(regionKey)]
-    onVisibleChanged: if (!visible) serviceMenuOpen = false
+    onVisibleChanged: if (!visible) {
+        serviceMenuOpen=false;
+        hubPlacementArmed=false;
+    }
+
+    CompanyHubStore {
+        id: hubStore
+        visible: false
+        onSavedChanged: mapCanvas.requestPaint()
+        onSavedSuccessfully: {
+            root.selectedHubId = "hub-" + (saved.nextId - 1);
+            root.hubEditorOpen = false;
+            root.hubPlacementArmed = false;
+            mapCanvas.requestPaint();
+        }
+    }
+
+    function openHubEditor(lon,lat) {
+        if(!isFinite(lon) || !isFinite(lat)) return;
+        hubEditor.prepare(lon,lat,root.selectedState ? root.selectedState[0] : "");
+        root.hubEditorOpen=true;
+        root.hubPlacementArmed=false;
+        root.serviceMenuOpen=false;
+    }
 
     function applyView(next) {
         zoom = next.zoom;
@@ -82,6 +117,7 @@ Item {
     onRegionKeyChanged: mapCanvas.requestPaint()
     onSelectedCodeChanged: mapCanvas.requestPaint()
     onSelectedCountryCodeChanged: mapCanvas.requestPaint()
+    onSelectedHubIdChanged: mapCanvas.requestPaint()
     onZoomChanged: mapCanvas.requestPaint()
     onCenterLonChanged: mapCanvas.requestPaint()
     onCenterLatChanged: mapCanvas.requestPaint()

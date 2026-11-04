@@ -807,128 +807,136 @@ Rectangle {
                     lineHeight: 1.35
                 }
 
-                // Only the currently selected BlueFerry iPhone is affected.
-                // These are its two existing provider preferences, not a
-                // universal Post-Apollo or OS-wide audio default.
-                Text {
-                    width: parent.width
-                    visible: phonePane.setupState === "CHECKED"
-                    text: "IPHONE AUDIO"
-                    color: Colors.cyan
-                    font.pixelSize: 12
-                    font.bold: true
-                }
-
-                Text {
-                    width: parent.width
-                    visible: phonePane.setupState === "CHECKED"
-                    text: phonePane.phoneAudioCheck === "CHECKING"
-                          ? "Reading iPhone audio preferences..."
-                          : phonePane.phoneAudioCheck !== "CHECKED"
-                            || phonePane.phoneAudioStatus.result !== "OBSERVED"
-                          ? "Audio settings unavailable until BlueFerry's configured background service responds."
-                          : "Media preference: " + phonePane.phoneAudioStatus.mediaPreference +
-                            "  |  Current route: " + phonePane.phoneAudioStatus.mediaRoute
-                    color: Colors.white
-                    font.pixelSize: 10
-                    wrapMode: Text.WordWrap
-                }
-
-                Row {
-                    id: mediaRouteChoices
+                Column {
+                    id: phoneAudioSettings
                     width: setupColumn.width
-                    spacing: 6
-                    visible: phonePane.setupState === "CHECKED"
+                    spacing: 9
+                    visible: phonePane.setupState === "CHECKED" && !phonePane.stageWanted
 
-                    Repeater {
-                        model: [
-                            { title: "IPHONE", route: "phone" },
-                            { title: "COMPUTER", route: "pc" },
-                            { title: "AUTO", route: "auto" }
-                        ]
-                        delegate: ActionButton {
-                            required property var modelData
-                            width: Math.max(66, (mediaRouteChoices.width - 12) / 3)
-                            height: 34
-                            label: modelData.title
-                            labelPixelSize: 9
-                            accentColor: Colors.magenta
-                            selected: phonePane.phoneAudioStatus.mediaPreference
-                                      === modelData.route.toUpperCase()
-                            interactive: phonePane.phoneAudioCheck === "CHECKED"
-                                         && phonePane.phoneAudioStatus.canAdjust === true
-                                         && !audioActionProcess.running
-                                         && !audioStatusProcess.running
-                                         && !phonePane.stageWanted
-                            onTriggered: phonePane.changePhoneAudio("media", modelData.route)
+                    // Only the currently selected BlueFerry iPhone is affected.
+                    // These are its two existing provider preferences, not a
+                    // universal Post-Apollo or OS-wide audio default.
+                    Text {
+                        width: parent.width
+                        visible: phonePane.setupState === "CHECKED"
+                        text: "IPHONE AUDIO"
+                        color: Colors.cyan
+                        font.pixelSize: 12
+                        font.bold: true
+                    }
+
+                    Text {
+                        width: parent.width
+                        visible: phonePane.setupState === "CHECKED"
+                        text: phonePane.phoneAudioCheck === "CHECKING"
+                              ? "Reading iPhone audio preferences..."
+                              : phonePane.phoneAudioCheck !== "CHECKED"
+                                || phonePane.phoneAudioStatus.result !== "OBSERVED"
+                              ? "Audio settings unavailable until BlueFerry's configured background service responds."
+                              : "Media preference: " + phonePane.phoneAudioStatus.mediaPreference +
+                                "  |  Current route: " + phonePane.phoneAudioStatus.mediaRoute
+                        color: Colors.white
+                        font.pixelSize: 10
+                        wrapMode: Text.WordWrap
+                    }
+
+                    Row {
+                        id: mediaRouteChoices
+                        width: setupColumn.width
+                        spacing: 6
+                        visible: phonePane.setupState === "CHECKED"
+
+                        Repeater {
+                            model: [
+                                { title: "IPHONE", route: "phone" },
+                                { title: "COMPUTER", route: "pc" },
+                                { title: "AUTO", route: "auto" }
+                            ]
+                            delegate: ActionButton {
+                                required property var modelData
+                                width: Math.max(66, (mediaRouteChoices.width - 12) / 3)
+                                height: 34
+                                label: modelData.title
+                                labelPixelSize: 9
+                                accentColor: Colors.magenta
+                                selected: phonePane.phoneAudioStatus.mediaPreference
+                                          === modelData.route.toUpperCase()
+                                interactive: phonePane.phoneAudioCheck === "CHECKED"
+                                             && phonePane.phoneAudioStatus.canAdjust === true
+                                             && !audioActionProcess.running
+                                             && !audioStatusProcess.running
+                                             && !phonePane.stageWanted
+                                onTriggered: phonePane.changePhoneAudio("media", modelData.route)
+                            }
                         }
                     }
-                }
 
-                Text {
-                    width: parent.width
-                    visible: phonePane.setupState === "CHECKED"
-                    text: "Media = music, video and other iPhone playback. This does not switch phone-call audio."
-                    color: Colors.white
-                    font.pixelSize: 10
-                    wrapMode: Text.WordWrap
-                }
+                    Text {
+                        width: parent.width
+                        visible: phonePane.setupState === "CHECKED"
+                        text: "Media = music, video and other iPhone playback. This does not switch phone-call audio."
+                        color: Colors.white
+                        font.pixelSize: 10
+                        wrapMode: Text.WordWrap
+                    }
 
-                ActionButton {
-                    width: Math.min(210, setupColumn.width)
-                    height: 36
-                    visible: phonePane.setupState === "CHECKED"
-                    label: phonePane.phoneAudioStatus.callsEnabled === true
-                           ? "CALLS ON PC: ON" : "CALLS ON PC: OFF"
-                    labelPixelSize: 10
-                    accentColor: Colors.magenta
-                    selected: phonePane.phoneAudioStatus.callsEnabled === true
-                    interactive: phonePane.phoneAudioCheck === "CHECKED"
-                                 && phonePane.phoneAudioStatus.canAdjust === true
-                                 && phonePane.phoneAudioStatus.callsEnabled !== null
-                                 && (phonePane.phoneAudioStatus.callsEnabled === true
-                                     || phonePane.phoneAudioStatus.ofonoActive === true)
-                                 && !audioActionProcess.running
-                                 && !audioStatusProcess.running
-                                 && !phonePane.stageWanted
-                    onTriggered: phonePane.changePhoneAudio(
-                        "calls", phonePane.phoneAudioStatus.callsEnabled === true
-                                 ? "disable" : "enable")
-                }
+                    ActionButton {
+                        width: Math.min(210, setupColumn.width)
+                        height: 36
+                        visible: phonePane.setupState === "CHECKED"
+                        label: phonePane.phoneAudioStatus.callsEnabled === true
+                               ? "CALLS ON PC: ON" : "CALLS ON PC: OFF"
+                        labelPixelSize: 10
+                        accentColor: Colors.magenta
+                        selected: phonePane.phoneAudioStatus.callsEnabled === true
+                        interactive: phonePane.phoneAudioCheck === "CHECKED"
+                                     && phonePane.phoneAudioStatus.canAdjust === true
+                                     && phonePane.phoneAudioStatus.callsEnabled !== null
+                                     && (phonePane.phoneAudioStatus.callsEnabled === true
+                                         || phonePane.phoneAudioStatus.ofonoActive === true)
+                                     && !audioActionProcess.running
+                                     && !audioStatusProcess.running
+                                     && !phonePane.stageWanted
+                        onTriggered: phonePane.changePhoneAudio(
+                            "calls", phonePane.phoneAudioStatus.callsEnabled === true
+                                     ? "disable" : "enable")
+                    }
 
-                Text {
-                    width: parent.width
-                    visible: phonePane.setupState === "CHECKED"
-                    text: phonePane.phoneAudioStatus.callsEnabled === true
-                          ? "Call preference on. HFP status: " + String(phonePane.phoneAudioStatus.callsState || "UNKNOWN") +
-                            ". Actual call audio depends on oFono and the system's hands-free routing."
-                          : "For calls only, choose IPHONE above and enable CALLS ON PC when supported." +
-                            (phonePane.phoneAudioCheck === "CHECKED"
-                             && phonePane.phoneAudioStatus.ofonoActive !== true
-                             ? " Calls require an oFono hands-free backend; not ready on this desktop." : "")
-                    color: Colors.orange
-                    font.pixelSize: 10
-                    wrapMode: Text.WordWrap
-                }
+                    Text {
+                        width: parent.width
+                        visible: phonePane.setupState === "CHECKED"
+                        text: phonePane.phoneAudioStatus.callsEnabled === true
+                              ? "Call preference on. HFP status: " + String(phonePane.phoneAudioStatus.callsState || "UNKNOWN") +
+                                ". Actual call audio depends on oFono and the system's hands-free routing."
+                              : "For calls only, choose IPHONE above and enable CALLS ON PC when supported." +
+                                (phonePane.phoneAudioCheck === "CHECKED"
+                                 && phonePane.phoneAudioStatus.ofonoActive !== true
+                                 ? " Calls require an oFono hands-free backend; not ready on this desktop." : "")
+                        color: Colors.orange
+                        font.pixelSize: 10
+                        wrapMode: Text.WordWrap
+                    }
 
-                Text {
-                    width: parent.width
-                    visible: phonePane.setupState === "CHECKED"
-                             && phonePane.phoneAudioResultText().length > 0
-                    text: phonePane.phoneAudioResultText()
-                    color: Colors.orange
-                    font.pixelSize: 10
-                    wrapMode: Text.WordWrap
-                }
+                    Text {
+                        width: parent.width
+                        visible: phonePane.setupState === "CHECKED"
+                                 && phonePane.phoneAudioResultText().length > 0
+                        text: phonePane.phoneAudioResultText()
+                        color: Colors.orange
+                        font.pixelSize: 10
+                        wrapMode: Text.WordWrap
+                    }
 
-                Text {
-                    width: parent.width
-                    visible: phonePane.setupState === "CHECKED"
-                    text: "First media change may briefly interrupt other Bluetooth sound while WirePlumber applies BlueFerry's per-phone rule."
-                    color: Colors.white
-                    opacity: 0.75
-                    font.pixelSize: 9
-                    wrapMode: Text.WordWrap
+                    Text {
+                        width: parent.width
+                        visible: phonePane.setupState === "CHECKED"
+                        text: "First media change may briefly interrupt other Bluetooth sound while WirePlumber applies BlueFerry's per-phone rule."
+                        color: Colors.white
+                        opacity: 0.75
+                        font.pixelSize: 9
+                        wrapMode: Text.WordWrap
+                    }
+
                 }
 
                 Text {

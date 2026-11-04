@@ -82,13 +82,15 @@ class OwnerLocalMapReadOnlyTests(unittest.TestCase):
                         bridge.read_explicitly(bridge.ALLOWED_COMMAND)
 
     def test_owner_read_has_no_writes_or_directory_mutation(self):
+        if os.geteuid()==0:
+            self.skipTest("owner-only on a non-root CI identity")
         doc=populated()
         directory.save(doc)
         path=Path(self.temp.name)/"post-apollo"/"company"/"hubs-v1.json"
         original=path.read_bytes()
         original_stat=path.stat()
-        with patch.object(bridge.os,"getuid",return_value=1000),\
-             patch.object(bridge.os,"geteuid",return_value=1000):
+        with patch.object(bridge.os,"getuid",return_value=os.getuid()),\
+             patch.object(bridge.os,"geteuid",return_value=os.geteuid()):
             result=bridge.read_explicitly(bridge.ALLOWED_COMMAND)
         self.assertEqual(len(result["hubs"]),1)
         self.assertEqual(path.read_bytes(),original)
@@ -96,17 +98,21 @@ class OwnerLocalMapReadOnlyTests(unittest.TestCase):
         self.assertEqual(path.stat().st_mode & 0o777,0o600)
 
     def test_empty_owner_store_does_not_create_any_file(self):
-        with patch.object(bridge.os,"getuid",return_value=1000),\
+        if os.geteuid()==0:
+            self.skipTest("owner-only on a non-root CI identity")
+        with patch.object(bridge.os,"getuid",return_value=os.getuid()),\
              patch.object(bridge.os,"geteuid",return_value=1000):
             self.assertEqual(bridge.read_explicitly(bridge.ALLOWED_COMMAND)["hubs"],[])
         self.assertEqual(list(Path(self.temp.name).iterdir()),[])
 
     def test_corrupt_or_unsafe_directory_fails_closed(self):
+        if os.geteuid()==0:
+            self.skipTest("owner-only on a non-root CI identity")
         directory.save(populated())
         path=Path(self.temp.name)/"post-apollo"/"company"/"hubs-v1.json"
         path.chmod(0o644)
-        with patch.object(bridge.os,"getuid",return_value=1000),\
-             patch.object(bridge.os,"geteuid",return_value=1000):
+        with patch.object(bridge.os,"getuid",return_value=os.getuid()),\
+             patch.object(bridge.os,"geteuid",return_value=os.geteuid()):
             with self.assertRaises(directory.HubError):
                 bridge.read_explicitly(bridge.ALLOWED_COMMAND)
 

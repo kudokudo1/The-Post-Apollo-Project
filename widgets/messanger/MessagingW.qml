@@ -948,6 +948,17 @@ PanelWindow {
                    : 0
 
             height: messagingWindow.menuOpen ? socialWindow.height : 0
+
+            // Weather Station's Stage Director pattern: an actual, verified
+            // foot actor receives input through ONLY the PHONE bay.
+            // No hole until Sway reports matching compositor geometry.
+            Region {
+                x: messagingWindow.appSelectorWidth + phonePane.stageHoleX
+                y: phonePane.stageHoleY
+                width: phonePane.stageHoleActive ? phonePane.stageHoleWidth : 0
+                height: phonePane.stageHoleActive ? phonePane.stageHoleHeight : 0
+                intersection: Intersection.Subtract
+            }
         }
     }
 
@@ -1689,7 +1700,10 @@ PanelWindow {
         fillColor: Colors.black
         // External apps float above the normal Social pane surfaces. Keep the
         // same chassis underneath Discord that X/browser apps already use.
+        // The verified PHONE stage bay must be genuinely transparent.
+        // Leave every other Social provider's ordinary fill unchanged.
         fillOpacity: 0.20
+        fillVisible: !phonePane.stageHoleActive
         borderVisible: false
         radius: 0
 
@@ -1981,6 +1995,12 @@ PanelWindow {
 
         PhonePane {
             id: phonePane
+            // The compositor owns the live Social rect. A move/resize
+            // invalidates a previously aligned foot actor until reverified.
+            stageHostX: messagingWindow.sharedPanelX
+            stageHostY: messagingWindow.sharedPanelY
+            stageHostWidth: messagingWindow.sharedPanelWidth
+            stageHostHeight: messagingWindow.sharedPanelHeight
             x: messagingWindow.appSelectorWidth
             y: 0
             width: Math.max(1, messagingContent.width - x)

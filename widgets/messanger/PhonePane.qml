@@ -2,12 +2,13 @@ import QtQuick
 import Quickshell
 import Quickshell.Io
 import "../../components"
+import "../weather" as WeatherStage
 
 // PHONE stays in Social. CONNECT PHONE performs an explicit read-only check
 // of existing provider observations; no pairing, permission or link is granted.
 Rectangle {
     id: phonePane
-    color: Colors.black
+    color: stageHoleActive ? "transparent" : Colors.black
     border.width: 1
     border.color: Colors.green
     clip: true
@@ -20,6 +21,92 @@ Rectangle {
     property bool detailsOpen: false
     property string nativeSetupTarget: ""
     property string nativeSetupStatus: "IDLE"
+    property bool stageWanted: false
+    property string stageState: "IDLE"
+    property int stagePollCount: 0
+    property int stageHostX: 0
+    property int stageHostY: 0
+    property int stageHostWidth: 0
+    property int stageHostHeight: 0
+    onStageHostXChanged: {
+        if (stageWanted) stageState = "POSITIONING";
+    }
+    onStageHostYChanged: {
+        if (stageWanted) stageState = "POSITIONING";
+    }
+    onStageHostWidthChanged: {
+        if (stageWanted) stageState = "POSITIONING";
+    }
+    onStageHostHeightChanged: {
+        if (stageWanted) stageState = "POSITIONING";
+    }
+    readonly property int stageHoleX: Math.round(phoneChatFeed.x + 10)
+    readonly property int stageHoleY: Math.round(
+        phoneChatFeed.y + setupHeader.height + setupColumn.implicitHeight + 24)
+    readonly property int stageHoleWidth: Math.round(phoneChatFeed.width - 20)
+    readonly property int stageHoleHeight: Math.round(height - stageHoleY - 12)
+    readonly property bool stageHoleValid:
+        stageHoleX >= 0 && stageHoleY >= 0
+        && stageHoleWidth >= 200 && stageHoleHeight >= 120
+        && stageHoleX + stageHoleWidth <= width
+        && stageHoleY + stageHoleHeight <= height
+    readonly property bool stageHoleActive:
+        visible && selectedSection === "DEVICE" && stageWanted
+        && stageState === "ALIGNED" && stageHoleValid
+
+    function closeStagedSetup() {
+        if (!stageWanted) return;
+        stageWanted = false;
+        stageState = "IDLE";
+        stagePollCount = 0;
+        if (!stageCloseProcess.running) {
+            stageCloseProcess.command = [
+                "python3",
+                Quickshell.shellPath("services/phone/PhoneStageDirector.py"),
+                "--close"
+            ];
+            stageCloseProcess.running = true;
+        }
+    }
+
+    function syncStagedSetup() {
+        if (!stageWanted || !visible || selectedSection !== "DEVICE"
+                || !stageHoleValid || stageProcess.running)
+            return;
+        if (stageState === "ALIGNED") stagePollCount = 0;
+        else stagePollCount += 1;
+        if (stagePollCount > 40) {
+            stageWanted = false;
+            stageState = "UNAVAILABLE";
+            return;
+        }
+        stageProcess.command = [
+            "python3",
+            Quickshell.shellPath("services/phone/PhoneStageDirector.py"),
+            "--sync",
+            String(Math.round(x + stageHoleX)),
+            String(Math.round(y + stageHoleY)),
+            String(stageHoleWidth),
+            String(stageHoleHeight)
+        ];
+        stageProcess.running = true;
+    }
+
+    onSelectedSectionChanged: {
+        if (selectedSection !== "DEVICE") closeStagedSetup();
+    }
+    onStageHoleXChanged: {
+        if (stageWanted) stageState = "POSITIONING";
+    }
+    onStageHoleYChanged: {
+        if (stageWanted) stageState = "POSITIONING";
+    }
+    onStageHoleWidthChanged: {
+        if (stageWanted) stageState = "POSITIONING";
+    }
+    onStageHoleHeightChanged: {
+        if (stageWanted) stageState = "POSITIONING";
+    }
 
     // BlueFerry's GetStatus is a self-report from an already-running daemon.
     // Active MAP/PBAP sessions do not prove content authorization or ownership.
@@ -45,7 +132,7 @@ Rectangle {
     }
 
     function startSetup() {
-        if (!visible || setupProcess.running)
+        if (!visible || setupProcess.running || stageWanted)
             return;
         selectedSection = "DEVICE";
         setupState = "CHECKING";
@@ -62,6 +149,7 @@ Rectangle {
 
     function openNativeSetup(target) {
         if (!visible || setupState !== "CHECKED" || nativeSetupProcess.running
+                || stageWanted
                 || (target !== "iphone" && target !== "android"))
             return;
         nativeSetupTarget = target;
@@ -75,6 +163,7 @@ Rectangle {
     }
 
     onVisibleChanged: {
+        if (!visible) closeStagedSetup();
         if (visible) {
             selectedSection = "MESSAGES";
             setupState = "NOT STARTED";
@@ -82,6 +171,9 @@ Rectangle {
             detailsOpen = false;
             nativeSetupStatus = "IDLE";
             nativeSetupTarget = "";
+            stageWanted = false;
+            stageState = "IDLE";
+            stagePollCount = 0;
             // No pairing or inventory action runs automatically on menu open.
         }
     }
@@ -172,11 +264,18 @@ Rectangle {
                             || result.execution !== "USER_INITIATED_NATIVE_SETUP"
                             || result.target !== phonePane.nativeSetupTarget
                             || ["OPEN_REQUESTED", "CLIENT_UNAVAILABLE", "LAUNCH_FAILED"].indexOf(result.status) < 0
+                            || typeof result.stageCandidate !== "boolean"
                             || result.trustedPhoneLink !== "UNVERIFIED"
                             || result.routeEligible !== false
                             || result.contentAccessEnabled !== false)
                         throw new Error("Invalid native setup handoff");
                     phonePane.nativeSetupStatus = result.status;
+                    if (result.status === "OPEN_REQUESTED"
+                            && result.stageCandidate && result.target === "iphone") {
+                        phonePane.stageState = "WAITING";
+                        phonePane.stageWanted = true;
+                        phonePane.stagePollCount = 0;
+                    }
                 } catch (error) {
                     phonePane.nativeSetupStatus = "LAUNCH_FAILED";
                 }
@@ -192,6 +291,66 @@ Rectangle {
     // PHONE is a normal Social conversation workspace: the same contact-list
     // and chat-feed components used by Sessions/Telegram, with zero trusted
     // phone content until the Phone Bridge explicitly authorizes it.
+    Process {
+        id: stageProcess
+        stdout: StdioCollector {
+            onStreamFinished: {
+                if (!phonePane.stageWanted || !phonePane.visible)
+                    return;
+                try {
+                    const result = JSON.parse(String(text || ""));
+                    if (result.schema !== "post-apollo.phone.stage-director.v0"
+                            || result.execution !== "STAGE_ONLY"
+                            || result.trustedPhoneLink !== "UNVERIFIED"
+                            || result.contentAccessEnabled !== false
+                            || typeof result.verifiedHole !== "boolean")
+                        throw new Error("Invalid Stage Director result");
+                    if (result.state === "ALIGNED" && result.verifiedHole === true)
+                        phonePane.stageState = "ALIGNED";
+                    else if (result.state === "POSITION_REQUESTED"
+                             || result.state === "ACTOR_NOT_FOUND"
+                             || result.state === "HOST_NOT_FOUND")
+                        phonePane.stageState = "POSITIONING";
+                    else
+                        throw new Error("Stage unavailable");
+                } catch (error) {
+                    phonePane.stageWanted = false;
+                    phonePane.stageState = "UNAVAILABLE";
+                }
+            }
+        }
+        onExited: function(exitCode) {
+            if (phonePane.stageWanted && exitCode !== 0) {
+                phonePane.stageWanted = false;
+                phonePane.stageState = "UNAVAILABLE";
+            }
+        }
+    }
+
+    Process {
+        id: stageCloseProcess
+    }
+
+    Timer {
+        interval: 700
+        repeat: true
+        running: phonePane.stageWanted && phonePane.visible
+                 && phonePane.selectedSection === "DEVICE"
+        onTriggered: phonePane.syncStagedSetup()
+    }
+
+    WeatherStage.StationChassisCutout {
+        anchors.fill: parent
+        visible: phonePane.stageHoleActive
+        holeX: phonePane.stageHoleX
+        holeY: phonePane.stageHoleY
+        holeWidth: phonePane.stageHoleWidth
+        holeHeight: phonePane.stageHoleHeight
+        panelColor: Colors.black
+        panelOpacity: 1
+        z: -1
+    }
+
     Rectangle {
         id: header
         anchors.top: parent.top
@@ -298,6 +457,7 @@ Rectangle {
         anchors.left: phoneContactList.right
         anchors.right: parent.right
         anchors.bottom: parent.bottom
+        visible: phonePane.selectedSection !== "DEVICE"
         conversation: null
         messages: []
         sendEnabled: false
@@ -314,7 +474,7 @@ Rectangle {
         id: setupOverlay
         anchors.fill: phoneChatFeed
         visible: phonePane.selectedSection === "DEVICE"
-        color: Colors.black
+        color: phonePane.stageHoleActive ? "transparent" : Colors.black
         border.width: 1
         border.color: Colors.cyan
         z: 5
@@ -426,7 +586,7 @@ Rectangle {
                         label: "SET UP IPHONE"
                         labelPixelSize: 9
                         accentColor: Colors.magenta
-                        interactive: !nativeSetupProcess.running
+                        interactive: !nativeSetupProcess.running && !phonePane.stageWanted
                         onTriggered: phonePane.openNativeSetup("iphone")
                     }
 
@@ -436,7 +596,7 @@ Rectangle {
                         label: "SET UP ANDROID"
                         labelPixelSize: 9
                         accentColor: Colors.magenta
-                        interactive: !nativeSetupProcess.running
+                        interactive: !nativeSetupProcess.running && !phonePane.stageWanted
                         onTriggered: phonePane.openNativeSetup("android")
                     }
                 }
@@ -456,12 +616,38 @@ Rectangle {
                     wrapMode: Text.WordWrap
                 }
 
+                Text {
+                    width: parent.width
+                    height: 45 // Stable bay position across stage state changes.
+                    visible: phonePane.stageWanted || phonePane.stageState === "UNAVAILABLE"
+                    text: phonePane.stageState === "ALIGNED"
+                          ? "BLUEFERRY SETUP // TERMINAL BELOW"
+                          : phonePane.stageState === "UNAVAILABLE"
+                          ? "Stage placement could not be verified. Terminal window remains external; no Social phone connection was granted."
+                          : "Placing BlueFerry's terminal inside the PHONE workspace..."
+                    color: Colors.orange
+                    font.pixelSize: 10
+                    wrapMode: Text.WordWrap
+                }
+
+                ActionButton {
+                    width: Math.min(190, setupColumn.width)
+                    height: 32
+                    visible: phonePane.stageWanted
+                    label: "CLOSE SETUP"
+                    labelPixelSize: 9
+                    accentColor: Colors.red
+                    destructive: true
+                    onTriggered: phonePane.closeStagedSetup()
+                }
+
                 ActionButton {
                     width: Math.min(190, setupColumn.width)
                     height: 38
                     label: phonePane.detailsOpen ? "HIDE DETAILS" : "DETAILS"
                     labelPixelSize: 9
                     accentColor: Colors.cyan
+                    interactive: !phonePane.stageWanted
                     onTriggered: {
                         phonePane.detailsOpen = !phonePane.detailsOpen;
                         if (phonePane.detailsOpen)

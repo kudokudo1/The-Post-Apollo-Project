@@ -18,11 +18,12 @@ class NativeSetupLaunchTests(unittest.TestCase):
     def assert_locked(self, response):
         self.assertEqual(response["schema"], module.SCHEMA)
         self.assertEqual(response["execution"], "USER_INITIATED_NATIVE_SETUP")
+        self.assertIs(type(response["stageCandidate"]), bool)
         self.assertEqual(response["trustedPhoneLink"], "UNVERIFIED")
         self.assertIs(response["routeEligible"], False)
         self.assertIs(response["contentAccessEnabled"], False)
         self.assertEqual(set(response), {
-            "schema", "execution", "target", "status",
+            "schema", "execution", "target", "status", "stageCandidate",
             "trustedPhoneLink", "routeEligible", "contentAccessEnabled",
         })
 
@@ -147,8 +148,10 @@ class NativeSetupLaunchTests(unittest.TestCase):
         self.assertEqual(result["status"], "OPEN_REQUESTED")
         self.assertEqual(
             launcher.call_args.args[0],
-            ["/usr/bin/foot", "-e", "/usr/bin/blueferry", "pair-setup"],
+            ["/usr/bin/foot", "--app-id", module.STAGE_APP_ID, "-e",
+             "/usr/bin/blueferry", "pair-setup"],
         )
+        self.assertIs(result["stageCandidate"], True)
         self.assertNotIn("shell", launcher.call_args.kwargs)
         self.assertTrue(launcher.call_args.kwargs["start_new_session"])
 
@@ -174,6 +177,7 @@ class NativeSetupLaunchTests(unittest.TestCase):
         self.assertEqual(result["status"], "OPEN_REQUESTED")
         self.assertEqual(launcher.call_args.args[0],
                          ["/usr/bin/blueferry-quickshell"])
+        self.assertIs(result["stageCandidate"], False)
         self.assertEqual(launcher.call_count, 1)
 
     def test_android_never_uses_iphone_wizard(self):

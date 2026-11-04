@@ -1,0 +1,41 @@
+name: Weather M28-Q original GROUND full visual parity
+
+on:
+  pull_request:
+    paths:
+      - 'widgets/weather/StationWeatherSubjectPanelPolicy.js'
+      - 'widgets/weather/StationSubjectNavigationPolicy.js'
+      - 'widgets/weather/StationWorkspaceNavigationPolicy.js'
+      - 'widgets/weather/WeatherStationW.qml'
+      - 'tests/weather/test_ground_full_visual_parity_m28q.js'
+      - 'tests/weather/test_workspace_landing_w1.js'
+      - 'docs/weather-subjects-m28q-ground-visual-parity-handoff.md'
+      - '.github/workflows/weather-ground-full-visual-parity-m28q.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  ground-full:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Prove all 16 original GROUND sections and five existing provider gates survive
+        run: node --test tests/weather/test_ground_full_visual_parity_m28q.js
+      - name: Preserve M28-F historical source controls, M2a original sources and W1 navigation
+        run: |
+          node --test tests/weather/test_index_weather_cutover_m28f.js
+          node --test tests/weather/test_weather_subject_panels_m2a.js
+          node --test tests/weather/test_workspace_landing_w1.js
+          node --test tests/weather/test_workspace_left_rail_w1r.js
+      - name: Preserve WEATHER/COSMOS separation and CLASSIC fallback
+        run: |
+          node --test tests/weather/test_weather_cosmos_domain_separation_m28r.js
+          node --test tests/weather/test_subjects_first_pilot_m28n.js
+          node --test tests/weather/subject_navigation_contract.test.js
+          node --test tests/weather/test_index_sources_cutover_m28l.js

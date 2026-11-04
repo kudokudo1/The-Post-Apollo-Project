@@ -71,7 +71,11 @@ Rectangle {
         graphCanvas.requestPaint();
         eventTimelineCanvas.requestPaint();
     }
-    onModeChanged: graphCanvas.requestPaint()
+    onModeChanged: {
+        // A chart hover sample must not follow us into the wheel.
+        instrument.hoveredIndex=-1;
+        graphCanvas.requestPaint();
+    }
     onViewWindowChanged: {
         instrument.eventOrdinal=-1;
         graphCanvas.requestPaint();

@@ -7,6 +7,14 @@
 
 ## IMPLEMENTATION
 
+### Confirmed geographic scope // NOT a Flint-only map
+
+The operator clarified that Flint, Michigan and neighboring Canadian communities were **examples of the required granularity**, never a geographical limit. The target is **one continuous Post-Apollo-styled geographic engine**, initially usable across the **entire United States**, including its interstate highways, state highways, local roads, service roads, residential streets, towns, rural communities, suburbs, neighborhoods and mapped buildings. It must also work across **Canada and Mexico**, with the same architecture extending worldwide wherever legally reusable map data exists. Do not limit data selection, styling, tile loading, geocoding, providers, routing or the business directory to Michigan, Flint, Ontario, or any short geographic corridor.
+
+**Zoom-dependent detail:** broad zooms show countries, states/provinces, major cities, interstate/highway networks; intermediate zooms reveal county/regional roads, small towns, villages and suburbs; local zooms reveal residential and service streets, neighborhood names, building footprints and available addresses/points of interest. Details depend on actual mapping completeness and provider coverage, not invented labels. Preserve a single camera and consistent Post-Apollo rendering while zooming and panning: do not swap to an unrelated-looking raster map at street scale.
+
+**Data boundary:** public roads/settlements are not company hubs, verified service territories, cross-border eligibility, travel times or contract authorization. Geographic basemaps and company records remain separate layers with source provenance, allowed reuse and attribution. Support appropriate online vector tiles and regional/offline extracts without assuming a free public tile server is acceptable for high-volume commercial deployment.
+
 This directory is a **separate Qt 6 application**. Its process-local C++ entry point selects OpenGL RHI before QML starts, as required by MapLibre Native Qt **v3.0**. It loads a QtLocation \`MapView\` backed by the \`maplibre\` geoservices plugin. CMake uses \`QMapLibre::Location\` and \`qmaplibre_location_setup_plugins\`, matching the upstream Qt 6 example.
 
 Two explicit modes:
@@ -64,13 +72,13 @@ The example CMake paths above are placeholders and should be filled from an insp
 - [ ] Native CI compile/plugin/window gate passes
 - [ ] Independent screenshot review and performance measurements
 - [ ] Fedora Silverblue + Quickshell compatibility investigation under operator authorization
-- [ ] Continuous vector map pilot using actual Flint/Ontario OSM data
+- [ ] Continuous vector-map pilot with nationwide US road classes and settlement detail, plus cross-border Canada/Mexico; Flint/Ontario may be one regression viewport, not an exclusive data boundary
 - [ ] Post-Apollo custom vector style, company layer overlaid, smooth pan/zoom
 - [ ] Operator accepts renderer replacement before touching shared widget
 
 ## NEXT
 
-On success, build a dedicated Post-Apollo vector style based on OpenMapTiles layer names, using an explicitly approved map source, then test detailed Flint/southern Ontario geography on a separate standalone application. On failure, record exact missing Qt, plugin, OpenGL or style resolution condition and try a separate-process fallback. **Do not replace the original Company map until operator acceptance.**
+On success, build a dedicated Post-Apollo vector style based on OpenMapTiles layer names using an explicitly approved map source. Verify representative **nationwide** zoom levels and places: interstate/highway networks, state/county roads, small-town/village/residential streets, and US–Canada/US–Mexico crossings; include rural as well as metropolitan views. Use Flint/nearby Ontario only as one sample regression area, not the roadmap scope. On failure, record the precise missing Qt, plugin, OpenGL or style-resolution condition and try a separate-process fallback. **Do not replace the original Company map until operator acceptance.**
 
 ## DECISIONS
 

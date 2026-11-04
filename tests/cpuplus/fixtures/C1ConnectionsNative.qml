@@ -73,6 +73,19 @@ ShellRoot {
             return item.label === label && item.available !== undefined;
         });
     }
+    function revealInDetails(item) {
+        if (!item) return;
+        const scroller = find(details, function(candidate) {
+            return candidate.contentY !== undefined
+                   && candidate.contentHeight !== undefined
+                   && candidate.contentItem !== undefined;
+        });
+        if (!scroller) return;
+        const pt = item.mapToItem(scroller.contentItem, 0, 0);
+        scroller.contentY = Math.max(0, Math.min(
+            Math.max(0, scroller.contentHeight - scroller.height),
+            pt.y - 40));
+    }
     function announce(item, marker) {
         if (!item || !item.visible || item.width < 4 || item.height < 4)
             return false;
@@ -85,6 +98,16 @@ ShellRoot {
         console.log("C1_" + marker + "_READY // x=" + Math.round(xy.x)
                     + " y=" + Math.round(xy.y));
         return true;
+    }
+    function c2gSynthetic(state, reason, remaining) {
+        return {
+            ok:true, requestId:"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            state:state, provider:"nasa-firms", consumer:"weather-earth",
+            operation:"fires.hotspots.read", profile:"ci-only-profile",
+            reason:reason, expiresInMs:remaining,
+            credentialPresent:false, realGrantActive:false,
+            canApproveInProduction:false, simulated:true
+        };
     }
     function fail(reason) {
         if (done) return;
@@ -166,8 +189,9 @@ ShellRoot {
                         || ConnectionsBroker.credentialActionsEnabled) {
                     root.fail("FALSE_ACCESS_REVIEW_AUTHORITY"); return;
                 }
-                if (root.announce(root.button("DISMISS REVIEW"),
-                                  "DISMISS_REVIEW"))
+                const dismiss = root.button("DISMISS REVIEW");
+                root.revealInDetails(dismiss);
+                if (root.announce(dismiss, "DISMISS_REVIEW"))
                     root.phase = "reviewDismissClicked";
             } else if (root.phase === "reviewDismissClicked") {
                 if (details.permissionReviewOpen) return;
@@ -180,6 +204,61 @@ ShellRoot {
                     root.fail("REVIEW_CREATED_A_GRANT"); return;
                 }
                 console.log("C2E_PASS // NATIVE_ACCESS_REVIEW_DISMISS_NO_GRANT");
+                const opener = root.button("VIEW REQUEST STATUS");
+                root.revealInDetails(opener);
+                if (root.announce(opener, "STATUS_OPEN"))
+                    root.phase = "statusOpened";
+            } else if (root.phase === "statusOpened") {
+                if (!details.requestStatusOpen) return;
+                if (details.requestStatusView.state !== "OFFLINE"
+                        || details.requestStatusView.title !== "HOST NOT CONNECTED"
+                        || ConnectionsBroker.credentialActionsEnabled) {
+                    root.fail("STATUS_PRETENDED_CONNECTED"); return;
+                }
+                details.syntheticStatusPreview = root.c2gSynthetic(
+                    "PENDING", "AWAITING_SIMULATED_REVIEW", 15000);
+                root.phase = "statusPending";
+            } else if (root.phase === "statusPending") {
+                if (details.requestStatusView.state !== "PENDING"
+                        || details.requestStatusView.title !== "SIMULATED // PENDING"
+                        || details.requestStatusView.live
+                        || details.requestStatusView.canApprove
+                        || details.requestStatusView.grantActive) {
+                    root.fail("UNSAFE_PENDING_STATUS"); return;
+                }
+                details.syntheticStatusPreview = root.c2gSynthetic(
+                    "APPROVED", "SIMULATED_HOST_APPROVED", 5000);
+                root.phase = "statusApproved";
+            } else if (root.phase === "statusApproved") {
+                if (details.requestStatusView.state !== "APPROVED"
+                        || details.requestStatusView.title !== "SIMULATED // APPROVED"
+                        || details.requestStatusView.grantActive
+                        || details.requestStatusView.canApprove) {
+                    root.fail("FAKE_APPROVED_AS_REAL_GRANT"); return;
+                }
+                details.syntheticStatusPreview = root.c2gSynthetic(
+                    "CANCELLED", "HOST_CANCELLED", 0);
+                root.phase = "statusCancelled";
+            } else if (root.phase === "statusCancelled") {
+                if (details.requestStatusView.state !== "CANCELLED"
+                        || details.requestStatusView.grantActive) {
+                    root.fail("CANCELLED_LEFT_GRANT"); return;
+                }
+                const closer = root.button("CLOSE REQUEST STATUS");
+                root.revealInDetails(closer);
+                if (root.announce(closer, "STATUS_CLOSE"))
+                    root.phase = "statusClosed";
+            } else if (root.phase === "statusClosed") {
+                if (details.requestStatusOpen) return;
+                details.syntheticStatusPreview = null;
+                if (details.requestStatusView.state !== "OFFLINE"
+                        || ConnectionsBroker.authorize({
+                           provider:"nasa-firms",consumer:"weather-earth",
+                           operation:"fires.hotspots.read"
+                        }).allowed) {
+                    root.fail("STATUS_CREATED_PERMISSION"); return;
+                }
+                console.log("C2G_PASS // NATIVE_OFFLINE_SIMULATED_STATES_NO_GRANTS");
                 if (root.announce(root.providerButton("social"),
                                   "SOCIAL_BUTTON"))
                     root.phase = "socialClicked";

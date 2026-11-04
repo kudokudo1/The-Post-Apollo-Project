@@ -1,0 +1,36 @@
+name: Connections C2g read-only request status
+
+on:
+  pull_request:
+    paths:
+      - "services/connections/ConnectionsRequestDisplayPolicy.js"
+      - "services/connections/ConnectionsRequestStatus.qml"
+      - "services/connections/qmldir"
+      - "widgets/cpuplus/CpuPlusSettingsConnectionsDetailsPane.qml"
+      - "tests/cpuplus/test_connections_status_c2g.js"
+      - "tests/cpuplus/fixtures/C1ConnectionsNative.qml"
+      - "scripts/cpuplus/verify_connections_native_c1.sh"
+      - ".github/workflows/cpuplus-connections-status-c2g.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  status-contracts:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Validate C2f status schema cannot forge active grants
+        run: node tests/cpuplus/test_connections_status_c2g.js
+      - name: Preserve existing CPU++ review and closed credential gate
+        run: |
+          node tests/cpuplus/test_connections_review_c2e.js
+          node tests/cpuplus/test_connections_broker_c2a.js
+          node tests/cpuplus/test_cpuplus_connections_c1.js
+      - name: Exercise fake-host lifecycle without changing running CPU++
+        run: timeout 55s python3 -B tests/connections/test_connections_c2f_request_lifecycle.py

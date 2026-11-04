@@ -60,7 +60,13 @@ click() {
     sed -E 's/.*x=([0-9]+) y=([0-9]+).*/\1 \2/')"
   [ -n "$coords" ] || { echo "C1_FAIL // missing geometry: $name"; exit 1; }
   read -r x y <<<"$coords"
-  xdotool mousemove --window "$wid" "$x" "$y" click 1
+  # Give Qt's pointer routing one frame to settle after moving into a
+  # Flickable. A same-instant move/click can be handled by the previous item.
+  xdotool mousemove --window "$wid" "$x" "$y"
+  sleep 0.15
+  xdotool mousedown 1
+  sleep 0.06
+  xdotool mouseup 1
 }
 wait_for "C1_FIRMS_BUTTON_READY // x="
 wid="$(xdotool search --onlyvisible --name 'C1-CONNECTIONS' | head -n 1)"

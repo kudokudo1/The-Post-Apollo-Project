@@ -7,6 +7,22 @@ var FORMAT = "post-apollo.weather.celestial-visual-data.v1";
 var MODES = ["wheel", "motion", "aspects", "relations"];
 var SIGNS = ["AR", "TA", "GE", "CN", "LE", "VI",
              "LI", "SC", "SG", "CP", "AQ", "PI"];
+// True Unicode zodiac symbols; SIGNS remains compact Latin text for
+// existing M5d inspector/backwards-compatible export.
+var ZODIAC_GLYPHS = ["♈","♉","♊","♋","♌","♍",
+                     "♎","♏","♐","♑","♒","♓"];
+// Fire, earth, air, water in the canonical Post-Apollo palette.
+var ZODIAC_COLORS = ["#ED981A","#9ECE6A","#55CFCA","#C74EC7",
+                     "#ED981A","#9ECE6A","#55CFCA","#C74EC7",
+                     "#ED981A","#9ECE6A","#55CFCA","#C74EC7"];
+function zodiacGlyph(index) {
+    return typeof index==="number" && index>=0 && index<12 &&
+           Math.floor(index)===index ? ZODIAC_GLYPHS[index] : "";
+}
+function zodiacColor(index) {
+    return typeof index==="number" && index>=0 && index<12 &&
+           Math.floor(index)===index ? ZODIAC_COLORS[index] : "#DCF3FA";
+}
 var BODY_COLORS = ["#ED981A", "#55CFCA", "#C74EC7", "#F2BE4E"];
 
 function number(value) {
@@ -417,4 +433,25 @@ function timelineSampleIndex(m,view,pixelX,width) {
     var frac=clamp(pixelX/width,0,1);
     return clamp(nearestSampleIndex(m,start+(end-start)*frac),
                  view.from,view.to);
+}
+
+
+// M5h // Slider thumb always corresponds to a REAL M4 series timestamp.
+// Its fraction tracks actual UTC time, not a fabricated interpolation,
+// and naturally changes when zoom/pan chooses another sample window.
+function timelineHandleFraction(m,view,index) {
+    if(!m || !m.ready || !view || view.count<2 ||
+       number(index)===null || Math.floor(index)!==index ||
+       number(view.from)===null || number(view.to)===null ||
+       view.from<0 || view.to>=m.sampleCount || view.to<=view.from)
+        return null;
+    var first=m.times[view.from],last=m.times[view.to];
+    if(last<=first)return null;
+    var visible=clamp(index,view.from,view.to);
+    return clamp((m.times[visible]-first)/(last-first),0,1);
+}
+function timelineHandleX(m,view,index,width) {
+    var fraction=timelineHandleFraction(m,view,index),w=number(width);
+    if(fraction===null || w===null || w<0)return null;
+    return fraction*w;
 }

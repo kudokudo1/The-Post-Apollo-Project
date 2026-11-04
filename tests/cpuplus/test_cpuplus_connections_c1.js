@@ -33,15 +33,27 @@ const socials = {
         }
     },
     notificationsReady: true,
-    firmsKeyPresent: false
+    firmsKeyPresent: false,
+    tasksProviderStatus: "NOT CHECKED",
+    tasksProviderChecking: false,
+    tasksBrokerActionsEnabled: false,
+    tasksRecoveryEnabled: false,
+    tasksRecoveryStorageAuthorized: false,
+    tasksRecoveryUnlockAuthorized: false,
+    tasksDraftHostEnabled: false,
+    tasksDraftHostWriteAuthorized: false
 };
 let rows = policy.build(socials);
-assert.equal(rows.length, 7);
-assert.equal(new Set(rows.map(x=>x.id)).size, 7);
+assert.equal(rows.length, 8);
+assert.equal(new Set(rows.map(x=>x.id)).size, 8);
 assert.equal(policy.find(rows,"social").status,"LAYOUT READY");
 assert.match(policy.find(rows,"social").detail,/Research/);
 assert.equal(policy.find(rows,"social").context,"SAVED ACCOUNT NAMES // 3");
 assert.equal(policy.find(rows,"notifications").status,"LOCAL ENGINE READY");
+assert.equal(policy.find(rows,"tasks-recovery").title,"TASKS // DRAFT RECOVERY");
+assert.equal(policy.find(rows,"tasks-recovery").status,"RECOVERY // OFF");
+assert.equal(policy.find(rows,"tasks-recovery").detail,"KEYRING // NOT CHECKED");
+assert.equal(policy.find(rows,"tasks-recovery").kind,"local");
 assert.equal(policy.find(rows,"proton-mail").status,"ADAPTER NOT CONNECTED");
 assert.equal(policy.find(rows,"nasa-firms").status,"KEY REQUIRED");
 assert.equal(policy.find(rows,"bbc-world").status,"PUBLIC // ON DEMAND");
@@ -58,6 +70,14 @@ rows = policy.build({...socials, firmsKeyPresent:true});
 assert.equal(policy.find(rows,"nasa-firms").status,
              "KEY PRESENT // UNVERIFIED");
 assert.equal(policy.counters(rows).keyRequired,0);
+rows = policy.build({...socials, tasksProviderStatus:"SERVICE_ACQUIRED"});
+assert.equal(policy.find(rows,"tasks-recovery").status,"RECOVERY // OFF");
+assert.equal(policy.find(rows,"tasks-recovery").detail,
+             "KEYRING FOUND // UNLOCK UNKNOWN");
+rows = policy.build({...socials, tasksRecoveryEnabled:true,
+    tasksProviderStatus:"SERVICE_ACQUIRED"});
+assert.equal(policy.find(rows,"tasks-recovery").status,
+             "RECOVERY // STATE REQUIRES REVIEW");
 rows = policy.build({...socials,
     socialState:"error", socialSnapshot:{activeName:"Stale",
                                        activeId:"identity-2"},

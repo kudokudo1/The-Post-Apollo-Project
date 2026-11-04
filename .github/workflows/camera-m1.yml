@@ -4,6 +4,7 @@ on:
   pull_request:
     paths:
       - "modules/Screenshot.qml"
+      - "components/CameraGlyph.qml"
       - "widgets/CameraW.qml"
       - "shell.qml"
       - "scripts/camera/**"
@@ -13,6 +14,7 @@ on:
   push:
     paths:
       - "modules/Screenshot.qml"
+      - "components/CameraGlyph.qml"
       - "widgets/CameraW.qml"
       - "shell.qml"
       - "scripts/camera/**"
@@ -30,6 +32,8 @@ jobs:
         run: python3 -m unittest discover -s tests/camera -p 'test_camera_cli.py' -v
       - name: Camera dock, panel and independent-owner source contract
         run: python3 -m unittest discover -s tests/camera -p 'test_camera_integration_contract.py' -v
+      - name: Native line glyph transparency, orbit, lens, stars and dock wiring
+        run: python3 -m unittest discover -s tests/camera -p 'test_camera_glyph_contract.py' -v
       - name: Retain existing Company and Clock source contracts
         run: |
           node --test tests/company/test_company_network_m1.test.js

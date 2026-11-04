@@ -67,7 +67,7 @@ Column {
     Text {
         width: parent.width
         text: "MY STRUCTURE // LOCAL ORGANIZATION UNITS"
-        color: Colors.cyan
+        color: Colors.blue
         font.bold: true
         font.pixelSize: 12
         wrapMode: Text.WordWrap
@@ -92,7 +92,8 @@ Column {
         font.pixelSize: 10
         wrapMode: Text.WordWrap
     }
-    ActionButton {
+    IdentityCenterLocalActionButton {
+        role: "refresh"
         width: 149
         height: 28
         visible: !editor.useSharedRefreshControl
@@ -116,7 +117,8 @@ Column {
         height: childrenRect.height
         Repeater {
             model: editor.visibleOrganizations
-            delegate: ActionButton {
+            delegate: IdentityCenterLocalActionButton {
+                role: "navigate"
                 required property var modelData
                 width: Math.min(190, Math.max(110, editor.width - 12))
                 height: 29
@@ -130,7 +132,8 @@ Column {
             }
         }
     }
-    ActionButton {
+    IdentityCenterLocalActionButton {
+        role: "manage"
         width: 170
         height: 27
         visible: !editor.useSharedContext
@@ -176,7 +179,8 @@ Column {
                 {id:"location", label:"LOCATIONS"},
                 {id:"team", label:"TEAMS"}
             ]
-            delegate: ActionButton {
+            delegate: IdentityCenterLocalActionButton {
+                role: "navigate"
                 required property var modelData
                 width: 113
                 height: 29
@@ -207,10 +211,15 @@ Column {
         Rectangle {
             width: Math.max(100, parent.width - 148)
             height: 30
-            color: Colors.black
-            border.color: Colors.cyan
+            color: newUnitName.activeFocus && newUnitName.enabled && !newUnitName.readOnly
+                ? Qt.rgba(Colors.magenta.r, Colors.magenta.g, Colors.magenta.b, 0.12)
+                : Colors.black
+            border.color: newUnitName.activeFocus && newUnitName.enabled && !newUnitName.readOnly
+                ? Colors.magenta : Colors.blue
             TextInput {
                 id: newUnitName
+                selectionColor: Colors.magenta
+                selectedTextColor: Colors.black
                 anchors.fill: parent
                 anchors.margins: 6
                 color: Colors.white
@@ -231,7 +240,8 @@ Column {
                 visible: newUnitName.text.length === 0
             }
         }
-        ActionButton {
+        IdentityCenterLocalActionButton {
+            role: "primary"
             width: 136
             height: 30
             label: "+ ADD UNIT"
@@ -247,7 +257,8 @@ Column {
     Row {
         spacing: 6
         visible: !editor.useSharedArchiveControl
-        ActionButton {
+        IdentityCenterLocalActionButton {
+            role: "manage"
             width: 174
             height: 28
             label: editor.showArchivedUnits ? "HIDE ARCHIVED UNITS"
@@ -302,10 +313,15 @@ Column {
                 Rectangle {
                     width: Math.max(100, parent.width - 202)
                     height: 30
-                    color: Colors.black
-                    border.color: Colors.cyan
+                    color: unitName.activeFocus && unitName.enabled && !unitName.readOnly
+                        ? Qt.rgba(Colors.magenta.r, Colors.magenta.g, Colors.magenta.b, 0.12)
+                        : Colors.black
+                    border.color: unitName.activeFocus && unitName.enabled && !unitName.readOnly
+                        ? Colors.magenta : Colors.blue
                     TextInput {
                         id: unitName
+                        selectionColor: Colors.magenta
+                        selectedTextColor: Colors.black
                         anchors.fill: parent
                         anchors.margins: 6
                         text: unitRow.modelData.name
@@ -317,7 +333,8 @@ Column {
                         verticalAlignment: TextInput.AlignVCenter
                     }
                 }
-                ActionButton {
+                IdentityCenterLocalActionButton {
+                    role: "manage"
                     width: 62
                     height: 30
                     label: "SAVE"
@@ -326,14 +343,14 @@ Column {
                     onTriggered: structureStore.renameUnit(
                         unitRow.modelData.id, unitName.text)
                 }
-                ActionButton {
+                IdentityCenterLocalActionButton {
+                    role: "manage"
                     width: 128
                     height: 30
                     label: unitRow.modelData.archived ? "RESTORE"
                            : editor.confirmationKey === "unit:" + unitRow.modelData.id
                            ? "CONFIRM ARCHIVE" : "ARCHIVE"
                     labelPixelSize: 8
-                    accentColor: Colors.orange
                     interactive: editor.canEdit
                     onTriggered: {
                         if (unitRow.modelData.archived)

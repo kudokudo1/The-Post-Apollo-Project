@@ -296,7 +296,7 @@ Item {
                         Text {
                             width: parent.width
                             text: "LOCAL ORGANIZATION TO EDIT"
-                            color: Colors.cyan
+                            color: Colors.white
                             font.bold: true
                             font.pixelSize: 11
                         }
@@ -313,7 +313,8 @@ Item {
                             width: parent.width
                             height: childrenRect.height
                             spacing: 5
-                            ActionButton {
+                            IdentityCenterLocalActionButton {
+                                role: "navigate"
                                 width: 147
                                 height: 29
                                 label: "ALL / NO SELECTION"
@@ -323,7 +324,8 @@ Item {
                             }
                             Repeater {
                                 model: sections.localOrganizationsForEditing
-                                delegate: ActionButton {
+                                delegate: IdentityCenterLocalActionButton {
+                                    role: "navigate"
                                     required property var modelData
                                     width: Math.min(190, Math.max(110, localEditingContext.width - 12))
                                     height: 29
@@ -459,7 +461,7 @@ Item {
                         labelPixelSize: 9
                         labelMinimumPixelSize: 8
                         interactive: false
-                        accentColor: Colors.orange
+                        accentColor: Colors.white
                         softGlowEnabled: false
                     }
 

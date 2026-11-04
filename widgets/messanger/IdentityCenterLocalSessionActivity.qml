@@ -65,7 +65,7 @@ Column {
         text: "CURRENT SESSION ACTIVITY // OBSERVED OUTCOMES"
         font.pixelSize: 11
         font.bold: true
-        color: Colors.cyan
+        color: Colors.white
         wrapMode: Text.WordWrap
     }
     Text {
@@ -81,7 +81,8 @@ Column {
         width: parent.width
         height: childrenRect.height
         spacing: 6
-        ActionButton {
+        IdentityCenterLocalActionButton {
+            role: "navigate"
             objectName: "orgSessionShowAll"
             width: 155
             height: 28
@@ -90,7 +91,8 @@ Column {
             interactive: activity.entryCount > 6
             onTriggered: activity.showAll = !activity.showAll
         }
-        ActionButton {
+        IdentityCenterLocalActionButton {
+            role: "danger"
             objectName: "orgSessionClearView"
             width: 151
             height: 28
@@ -140,7 +142,14 @@ Column {
                 color: activityRow.modelData.kind === "failure"
                         || activityRow.modelData.kind === "conflict"
                         || activityRow.modelData.kind === "unconfirmed"
-                       ? Colors.orange : Colors.white
+                       ? Colors.red
+                       : activityRow.modelData.kind === "saved"
+                         || activityRow.modelData.kind === "validation"
+                         || activityRow.modelData.kind === "refresh"
+                         ? Colors.green
+                       : activityRow.modelData.kind === "backup"
+                         ? Colors.yellow
+                       : Colors.white
                 text: activityRow.modelData.observedAt +
                       " // " + activityRow.modelData.kind.toUpperCase() +
                       " // " + activityRow.modelData.source

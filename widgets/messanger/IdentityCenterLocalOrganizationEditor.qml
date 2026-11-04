@@ -39,7 +39,7 @@ Column {
     Text {
         width: parent.width
         text: "MY ORGANIZATIONS // LOCAL DIRECTORY"
-        color: Colors.cyan
+        color: Colors.orange
         font.pixelSize: 12
         font.bold: true
     }
@@ -62,7 +62,8 @@ Column {
         font.pixelSize: 10
         wrapMode: Text.WordWrap
     }
-    ActionButton {
+    IdentityCenterLocalActionButton {
+        role: "refresh"
         width: 140
         height: 28
         visible: !editor.useSharedRefreshControl
@@ -78,10 +79,15 @@ Column {
         Rectangle {
             width: Math.max(100, parent.width - 148)
             height: 30
-            color: Colors.black
-            border.color: Colors.cyan
+            color: newOrgName.activeFocus && newOrgName.enabled && !newOrgName.readOnly
+                ? Qt.rgba(Colors.magenta.r, Colors.magenta.g, Colors.magenta.b, 0.12)
+                : Colors.black
+            border.color: newOrgName.activeFocus && newOrgName.enabled && !newOrgName.readOnly
+                ? Colors.magenta : Colors.blue
             TextInput {
                 id: newOrgName
+                selectionColor: Colors.magenta
+                selectedTextColor: Colors.black
                 anchors.fill: parent
                 anchors.margins: 6
                 color: Colors.white
@@ -102,7 +108,8 @@ Column {
                 visible: newOrgName.text.length === 0
             }
         }
-        ActionButton {
+        IdentityCenterLocalActionButton {
+            role: "primary"
             width: 136
             height: 30
             label: "+ ORGANIZATION"
@@ -120,7 +127,8 @@ Column {
             model: [{id:"llc",label:"LLC"},
                     {id:"nonprofit",label:"NONPROFIT"},
                     {id:"other",label:"OTHER"}]
-            delegate: ActionButton {
+            delegate: IdentityCenterLocalActionButton {
+                role: "navigate"
                 required property var modelData
                 width: 108
                 height: 28
@@ -131,7 +139,8 @@ Column {
             }
         }
     }
-    ActionButton {
+    IdentityCenterLocalActionButton {
+        role: "manage"
         width: 175
         height: 28
         visible: !editor.useSharedArchiveControl
@@ -182,10 +191,15 @@ Column {
                 Rectangle {
                     width: Math.max(100, parent.width - 202)
                     height: 30
-                    color: Colors.black
-                    border.color: Colors.cyan
+                    color: orgName.activeFocus && orgName.enabled && !orgName.readOnly
+                        ? Qt.rgba(Colors.magenta.r, Colors.magenta.g, Colors.magenta.b, 0.12)
+                        : Colors.black
+                    border.color: orgName.activeFocus && orgName.enabled && !orgName.readOnly
+                        ? Colors.magenta : Colors.blue
                     TextInput {
                         id: orgName
+                        selectionColor: Colors.magenta
+                        selectedTextColor: Colors.black
                         anchors.fill: parent
                         anchors.margins: 6
                         text: orgRow.modelData.name
@@ -197,7 +211,8 @@ Column {
                         verticalAlignment: TextInput.AlignVCenter
                     }
                 }
-                ActionButton {
+                IdentityCenterLocalActionButton {
+                    role: "manage"
                     width: 62
                     height: 30
                     label: "SAVE"
@@ -205,14 +220,14 @@ Column {
                     interactive: editor.editable && !orgRow.modelData.archived
                     onTriggered: directoryStore.renameOrganization(orgRow.modelData.id, orgName.text)
                 }
-                ActionButton {
+                IdentityCenterLocalActionButton {
+                    role: "manage"
                     width: 128
                     height: 30
                     label: orgRow.modelData.archived ? "RESTORE"
                            : editor.confirmationKey === "org:" + orgRow.modelData.id
                            ? "CONFIRM ARCHIVE" : "ARCHIVE"
                     labelPixelSize: 8
-                    accentColor: Colors.orange
                     interactive: editor.editable
                     onTriggered: {
                         if (orgRow.modelData.archived)
@@ -244,10 +259,15 @@ Column {
                         Rectangle {
                             width: Math.max(90, parent.width - 194)
                             height: 28
-                            color: Colors.black
-                            border.color: Colors.cyan
+                            color: branchName.activeFocus && branchName.enabled && !branchName.readOnly
+                                ? Qt.rgba(Colors.magenta.r, Colors.magenta.g, Colors.magenta.b, 0.12)
+                                : Colors.black
+                            border.color: branchName.activeFocus && branchName.enabled && !branchName.readOnly
+                                ? Colors.magenta : Colors.blue
                             TextInput {
                                 id: branchName
+                                selectionColor: Colors.magenta
+                                selectedTextColor: Colors.black
                                 anchors.fill: parent
                                 anchors.margins: 6
                                 text: branchRow.modelData.name
@@ -259,7 +279,8 @@ Column {
                                 verticalAlignment: TextInput.AlignVCenter
                             }
                         }
-                        ActionButton {
+                        IdentityCenterLocalActionButton {
+                            role: "manage"
                             width: 58
                             height: 28
                             label: "SAVE"
@@ -268,14 +289,14 @@ Column {
                             onTriggered: directoryStore.renameBranch(
                                 orgRow.modelData.id, branchRow.modelData.id, branchName.text)
                         }
-                        ActionButton {
+                        IdentityCenterLocalActionButton {
+                            role: "manage"
                             width: 124
                             height: 28
                             label: branchRow.modelData.archived ? "RESTORE"
                                    : editor.confirmationKey === "branch:" + branchRow.modelData.id
                                    ? "CONFIRM ARCHIVE" : "ARCHIVE"
                             labelPixelSize: 8
-                            accentColor: Colors.orange
                             interactive: editor.editable
                             onTriggered: {
                                 if (branchRow.modelData.archived)
@@ -295,10 +316,15 @@ Column {
                     Rectangle {
                         width: Math.max(100, parent.width - 148)
                         height: 28
-                        color: Colors.black
-                        border.color: Colors.cyan
+                        color: newBranchName.activeFocus && newBranchName.enabled && !newBranchName.readOnly
+                            ? Qt.rgba(Colors.magenta.r, Colors.magenta.g, Colors.magenta.b, 0.12)
+                            : Colors.black
+                        border.color: newBranchName.activeFocus && newBranchName.enabled && !newBranchName.readOnly
+                            ? Colors.magenta : Colors.blue
                         TextInput {
                             id: newBranchName
+                            selectionColor: Colors.magenta
+                            selectedTextColor: Colors.black
                             anchors.fill: parent
                             anchors.margins: 6
                             color: Colors.white
@@ -319,7 +345,8 @@ Column {
                             font.pixelSize: 9
                         }
                     }
-                    ActionButton {
+                    IdentityCenterLocalActionButton {
+                        role: "primary"
                         width: 136
                         height: 28
                         label: "+ BRANCH"

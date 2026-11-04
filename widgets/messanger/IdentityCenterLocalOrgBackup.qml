@@ -109,7 +109,7 @@ Column {
     Text {
         width: parent.width
         text: "LOCAL ORGANIZATION BACKUP // PRIVATE RECORDS"
-        color: Colors.cyan
+        color: Colors.yellow
         font.pixelSize: 11
         font.bold: true
         wrapMode: Text.WordWrap
@@ -127,7 +127,8 @@ Column {
         width: parent.width
         height: childrenRect.height
         spacing: 6
-        ActionButton {
+        IdentityCenterLocalActionButton {
+            role: "manage"
             objectName: "orgBackupCreateButton"
             width: 155
             height: 28
@@ -136,7 +137,8 @@ Column {
             interactive: !backupPanel.busy && backupPanel.sourcesReady
             onTriggered: backupPanel.runAction("create")
         }
-        ActionButton {
+        IdentityCenterLocalActionButton {
+            role: "navigate"
             objectName: "orgBackupListButton"
             width: 155
             height: 28
@@ -165,7 +167,8 @@ Column {
     }
     Repeater {
         model: backupPanel.backups
-        delegate: ActionButton {
+        delegate: IdentityCenterLocalActionButton {
+            role: "neutral"
             required property string modelData
             width: Math.min(275, backupPanel.width - 8)
             height: 28
@@ -180,7 +183,8 @@ Column {
         width: parent.width
         height: childrenRect.height
         spacing: 6
-        ActionButton {
+        IdentityCenterLocalActionButton {
+            role: "refresh"
             objectName: "orgBackupValidateButton"
             width: 171
             height: 28
@@ -189,7 +193,8 @@ Column {
             interactive: !backupPanel.busy && backupPanel.selectedBackup !== ""
             onTriggered: backupPanel.runAction("verify")
         }
-        ActionButton {
+        IdentityCenterLocalActionButton {
+            role: "danger"
             objectName: "orgBackupRestoreLockedButton"
             width: 172
             height: 28
@@ -202,7 +207,11 @@ Column {
         objectName: "orgBackupResult"
         width: parent.width
         text: backupPanel.resultText
-        color: backupPanel.resultKind === "error" ? Colors.orange : Colors.white
+        color: backupPanel.resultKind === "error" ? Colors.red
+             : backupPanel.resultKind === "verified" ? Colors.green
+             : backupPanel.resultKind === "saved" ? Colors.yellow
+             : backupPanel.resultKind === "busy" ? Colors.orange
+             : Colors.white
         font.pixelSize: 10
         wrapMode: Text.WordWrap
     }

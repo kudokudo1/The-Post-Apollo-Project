@@ -227,6 +227,15 @@ function viewX(minute, start, span, laneWidth, markerWidth) {
     return 1 + (Number(minute) - from) / Number(span) * (width - marker - 2);
 }
 
+function rulerX(index, laneWidth, markerWidth) {
+    var i = Number(index), width = Number(laneWidth);
+    var marker = Number(markerWidth);
+    if (!isFinite(i) || i < 0 || i > 4
+        || !isFinite(width) || !isFinite(marker)
+        || marker < 1 || width <= marker + 2) return null;
+    return 1 + marker / 2 + i / 4 * (width - marker - 2);
+}
+
 function localMinuteLabel(value) {
     var m = Number(value);
     if (!isFinite(m) || m < 0 || m > 1440) return "--:--";

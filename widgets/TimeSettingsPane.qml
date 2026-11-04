@@ -477,6 +477,43 @@ Item {
                 font.pixelSize: 9
                 color: Colors.white
             }
+            Row {
+                width: parent.width
+                height: 32
+                spacing: 8
+                TimeActionButton {
+                    width: 112
+                    height: 30
+                    actionRole: "sync"
+                    label: "CHECK TIME"
+                    labelPixelSize: 10
+                    available: !TimeSettings.referenceChecking
+                               && !TimeSettings.authSessionActive
+                    onLeftClicked: TimeSettings.checkTimeAccuracy()
+                }
+                GohuText {
+                    width: Math.max(0, parent.width - 120)
+                    height: parent.height
+                    verticalAlignment: Text.AlignVCenter
+                    text: "REFERENCE // " + TimeSettings.referenceStatus.toUpperCase()
+                    font.pixelSize: 9
+                    color: Colors.yellow
+                }
+            }
+            GohuText {
+                width: parent.width
+                wrapMode: Text.WordWrap
+                text: TimeSettings.referenceMessage
+                font.pixelSize: 10
+                color: Colors.yellow
+            }
+            GohuText {
+                width: parent.width
+                wrapMode: Text.WordWrap
+                text: "CHECK TIME CONTACTS YOUR CONFIGURED NTP SOURCES; THEY CAN SEE YOUR IP. IT NEVER SETS TIME. THE DOCK LINE SHOWS A MANUAL OFFSET OR A FRESH MEASURED ERROR OF AT LEAST 1 SECOND. NO LINE DOES NOT GUARANTEE ACCURACY."
+                font.pixelSize: 9
+                color: Colors.white
+            }
             GohuText {
                 width: parent.width
                 wrapMode: Text.WordWrap

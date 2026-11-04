@@ -140,7 +140,8 @@ test("QML fourth mode, event strip and pointer handlers are actually wired",()=>
     assert.match(qml,/instrument\.lockedIndex=chosen\.sampleIndex/);
     assert.match(qml,/eventTimelineCanvas\.requestPaint\(\)/);
     assert.match(qml,/instrument\.mode==="wheel" \|\| instrument\.mode==="relations"/);
-    assert.match(qml,/height: Math\.max\(150,instrument\.height-254\)/);
+    assert.match(qml,/height: instrument\.compactMode[\s\S]*?Math\.max\(150,instrument\.height-254\)/);
+  assert.match(qml,/property bool compactMode: false/);
     assert.match(qml,/onWheel: function\(wheel\)/);
     assert.match(qml,/instrument\.stepToEvent\(1\)/);
     assert.match(qml,/instrument\.stepToEvent\(-1\)/);

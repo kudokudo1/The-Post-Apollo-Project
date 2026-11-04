@@ -19,6 +19,9 @@ Rectangle {
     // M4 production JSON; a missing or unverified payload stays unavailable.
     property var visualData: null
     property string mode: "wheel"
+    // M30-C: same verified visual renderer, but hide only the detailed
+    // timeline/inspector controls when mounted in the overview hero.
+    property bool compactMode: false
     property string selectedBody: ""
     property int lockedIndex: -1
     property int hoveredIndex: -1
@@ -497,12 +500,13 @@ Rectangle {
 
     Column {
         anchors.fill: parent
-        anchors.margins: 10
-        spacing: 5
+        anchors.margins: instrument.compactMode ? 0 : 10
+        spacing: instrument.compactMode ? 2 : 5
 
         Row {
             width: parent.width
-            height: 27
+            visible: !instrument.compactMode
+            height: instrument.compactMode ? 0 : 27
             spacing: 8
             GohuText {
                 width: Math.max(0,parent.width-225)
@@ -532,10 +536,17 @@ Rectangle {
         Row {
             id: modeRow
             width: parent.width
-            height: 27
-            spacing: 5
+            height: instrument.compactMode ? 18 : 27
+            spacing: instrument.compactMode ? 2 : 5
             Repeater {
-                model: [
+                model: instrument.compactMode ? [
+                    {id:"wheel",label:"ZODIAC"},
+                    {id:"motion",label:"MOTION"},
+                    {id:"aspects",label:"ASPECTS"},
+                    {id:"relations",label:"RELATIONS"},
+                    {id:"network",label:"NETWORK"},
+                    {id:"helio",label:"HELIO"}
+                ] : [
                     {id:"wheel",label:"ZODIAC"},
                     {id:"motion",label:"MOTION"},
                     {id:"aspects",label:"ASPECTS"},
@@ -544,11 +555,13 @@ Rectangle {
                 ]
                 delegate: ActionButton {
                     required property var modelData
-                    width: Math.max(1,(modeRow.width-20)/5)
-                    height: 27
-                    contentPadding: 3
+                    width: Math.max(1,(modeRow.width-modeRow.spacing*
+                        (instrument.compactMode ? 5 : 4))/
+                        (instrument.compactMode ? 6 : 5))
+                    height: modeRow.height
+                    contentPadding: instrument.compactMode ? 1 : 3
                     label: modelData.label
-                    labelPixelSize: 10
+                    labelPixelSize: instrument.compactMode ? 8 : 10
                     selected: instrument.mode === modelData.id
                     accentColor: selected ? Colors.magenta : Colors.cyan
                     onClicked: instrument.mode = modelData.id
@@ -559,7 +572,9 @@ Rectangle {
         Rectangle {
             id: chartFrame
             width: parent.width
-            height: Math.max(150,instrument.height-254)
+            height: instrument.compactMode
+                    ? Math.max(1,instrument.height-20)
+                    : Math.max(150,instrument.height-254)
             color: Colors.dark
             border.width: 1
             border.color: Colors.cyan
@@ -568,8 +583,9 @@ Rectangle {
             Canvas {
                 id: graphCanvas
                 visible: instrument.mode !== "network"
+                         && instrument.mode !== "helio"
                 anchors.fill: parent
-                anchors.margins: 17
+                anchors.margins: instrument.compactMode ? 3 : 17
                 onPaint: {
                     const ctx=getContext("2d");
                     ctx.clearRect(0,0,width,height);
@@ -583,7 +599,9 @@ Rectangle {
             MouseArea {
                 id: pointer
                 anchors.fill: graphCanvas
-                enabled: instrument.graphModel.ready && instrument.mode !== "network"
+                enabled: instrument.graphModel.ready
+                         && instrument.mode !== "network"
+                         && instrument.mode !== "helio"
                 hoverEnabled: true
                 preventStealing: true
                 acceptedButtons: Qt.LeftButton
@@ -690,8 +708,12 @@ Rectangle {
             StationCosmosCelestialNetwork {
                 id: v4aNetwork
                 anchors.fill: parent
-                anchors.margins: 17
+                anchors.margins: instrument.compactMode ? 3 : 17
                 visible: instrument.mode === "network"
+                         || (instrument.compactMode && instrument.mode === "helio")
+                compactMode: instrument.compactMode
+                displayMode: instrument.compactMode && instrument.mode === "helio"
+                             ? "heliocentric" : "chords"
                 graphModel: instrument.graphModel
                 // Existing single M4 on-demand result, not a second provider.
                 spatialPayload: instrument.visualData
@@ -723,7 +745,7 @@ Rectangle {
                 width: Math.max(0,parent.width-32)
                 horizontalAlignment: Text.AlignHCenter
                 wrapMode: Text.WordWrap
-                font.pixelSize: 12
+                font.pixelSize: instrument.compactMode ? 9 : 12
                 color: Colors.orange
                 visible: !instrument.graphModel.ready
                 text: instrument.graphModel.reason
@@ -741,6 +763,7 @@ Rectangle {
                     ? "DRAG // TIME   |   CLICK // BODY   |   SCROLL // ZOOM TIME"
                     : "DRAG // PAN TIME   |   CLICK // LOCK   |   SCROLL // ZOOM"
                 visible: instrument.graphModel.ready
+                         && !instrument.compactMode
             }
         }
 
@@ -748,8 +771,9 @@ Rectangle {
         // A click outside an event selects the nearest existing M4 sample.
         Rectangle {
             id: eventTimeline
+            visible: !instrument.compactMode
             width: parent.width
-            height: 30
+            height: instrument.compactMode ? 0 : 30
             color: Colors.dark
             border.width: 1
             border.color: Colors.blue
@@ -912,8 +936,9 @@ Rectangle {
         // Event times are backend-calculated; the wheel/curve is deliberately
         // locked to the nearest *sample*, not an invented interpolated point.
         Row {
+            visible: !instrument.compactMode
             width: parent.width
-            height: 24
+            height: instrument.compactMode ? 0 : 24
             spacing: 5
             ActionButton {
                 width: 79
@@ -949,8 +974,9 @@ Rectangle {
         }
 
         Row {
+            visible: !instrument.compactMode
             width: parent.width
-            height: 30
+            height: instrument.compactMode ? 0 : 30
             spacing: 5
             Repeater {
                 model: [
@@ -998,8 +1024,9 @@ Rectangle {
         }
 
         GohuText {
+            visible: !instrument.compactMode
             width: parent.width
-            height: 14
+            height: instrument.compactMode ? 0 : 14
             font.pixelSize: 10
             color: Colors.white
             elide: Text.ElideRight
@@ -1011,8 +1038,9 @@ Rectangle {
                 : "NO SOURCE-VERIFIED OBSERVATION OR CALCULATION"
         }
         QuietText {
+            visible: !instrument.compactMode
             width: parent.width
-            height: 14
+            height: instrument.compactMode ? 0 : 14
             font.pixelSize: 10
             color: Colors.cyan
             elide: Text.ElideRight
@@ -1020,8 +1048,9 @@ Rectangle {
                                         instrument.focusIndex)
         }
         QuietText {
+            visible: !instrument.compactMode
             width: parent.width
-            height: 14
+            height: instrument.compactMode ? 0 : 14
             font.pixelSize: 9
             color: Colors.yellow
             elide: Text.ElideRight

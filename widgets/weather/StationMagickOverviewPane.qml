@@ -2,7 +2,6 @@ import QtQuick
 import "../../components"
 import "StationCosmosVisualPolicy.js" as CosmosVisual
 import "StationSkyTwilightPolicy.js" as TwilightPolicy
-import "StationMagickCelestialVisualPolicy.js" as CelestialVisual
 
 // M30-B // The overview is a compact astro hero plus lunar/solar instruments.
 // The single source-only SKY owns the existing USNO Moon actor. The solar
@@ -26,14 +25,42 @@ Rectangle {
             ? observationOwner.moonObservation.ephemeris : null,
         observationOwner.astronomySummary
     )
-    // Only a provenance-validated M4 payload can place bodies on the ring.
-    // Empty rings are visual framing, never claimed computed positions.
-    readonly property var chartModel: CelestialVisual.model(
-        deck.celestialSource && deck.celestialSource.ready
-        ? deck.celestialSource.visualData : null)
-    readonly property var chartPositions:
-        CelestialVisual.wheelPositions(
-            chartModel, chartModel.ready ? chartModel.sampleCount-1 : -1)
+    // Reference selectors are visual education only. They do not modify
+    // provider Moon readings, chronology, location or the source Moon phase.
+    property string inspectedPhaseId: ""
+    readonly property var inspectedPhase: CosmosVisual.phaseReference(
+        inspectedPhaseId)
+    readonly property real referenceIllumination: ({
+        "new":0,"waxing-crescent":25,"first-quarter":50,
+        "waxing-gibbous":75,"full":100,"waning-gibbous":75,
+        "last-quarter":50,"waning-crescent":25
+    })[inspectedPhaseId] === undefined ? -1 : ({
+        "new":0,"waxing-crescent":25,"first-quarter":50,
+        "waxing-gibbous":75,"full":100,"waning-gibbous":75,
+        "last-quarter":50,"waning-crescent":25
+    })[inspectedPhaseId]
+    readonly property real displayedMoonIllumination:
+        inspectedPhase.valid ? referenceIllumination
+        : moonModel.illumination === null ? -1 : moonModel.illumination
+    readonly property bool displayedMoonWaxing:
+        inspectedPhase.valid
+        ? inspectedPhaseId.indexOf("waning") !== 0
+            && inspectedPhaseId !== "last-quarter"
+        : moonModel.waxing
+    readonly property string displayedPhaseLabel:
+        inspectedPhase.valid ? "REF // " + inspectedPhase.label
+        : moonModel.phaseLabel
+
+    // Sun presets inspect existing calibrated solar samples, not the
+    // live observation and not an altered provider response.
+    property real lockedSolarMinute: -1
+    property real hoveredSolarMinute: -1
+    readonly property real selectedSolarMinute:
+        lockedSolarMinute >= 0 ? lockedSolarMinute
+        : hoveredSolarMinute >= 0 ? hoveredSolarMinute
+        : observationOwner.providerLocalMinute
+    readonly property var solarCursor: CosmosVisual.nearestSolar(
+        solarModel.rows,selectedSolarMinute)
 
     readonly property var solarModel: CosmosVisual.solarArc(
         observationOwner.astronomySummary.date,
@@ -112,106 +139,23 @@ Rectangle {
             }
         }
 
-        Row {
-            id: heroInstrument
+        // Reuse the actual wheel, motion, aspects, relations, network
+        // and heliocentric renderer. Compact mode removes only controls
+        // that would overflow the overview: the full chart keeps them.
+        StationMagickCelestialInstrument {
+            id: overviewChart
             anchors.left: parent.left
             anchors.right: parent.right
             anchors.top: parent.top
             anchors.bottom: heroFooter.top
-            anchors.leftMargin: 9
-            anchors.rightMargin: 9
+            anchors.leftMargin: 8
+            anchors.rightMargin: 8
             anchors.topMargin: 29
             anchors.bottomMargin: 3
-            spacing: 12
-
-            Canvas {
-                id: celestialCanvas
-                width: Math.min(heroInstrument.height,112)
-                height: heroInstrument.height
-                onWidthChanged: requestPaint()
-                onHeightChanged: requestPaint()
-                onPaint: {
-                    const ctx=getContext("2d");
-                    ctx.clearRect(0,0,width,height);
-                    const cx=width/2,cy=height/2;
-                    const radius=Math.max(1,Math.min(width,height)/2-4);
-                    // Rings and cardinal guides are a coordinate framework.
-                    // They never represent fabricated orbital observations.
-                    ctx.strokeStyle=String(Colors.magenta);
-                    ctx.lineWidth=1;
-                    ctx.globalAlpha=0.65;
-                    for (let ring=1;ring<=2;ring++) {
-                        ctx.beginPath();
-                        ctx.arc(cx,cy,radius*ring/2,0,Math.PI*2);
-                        ctx.stroke();
-                    }
-                    ctx.globalAlpha=0.40;
-                    ctx.beginPath();
-                    ctx.moveTo(cx-radius,cy);
-                    ctx.lineTo(cx+radius,cy);
-                    ctx.moveTo(cx,cy-radius);
-                    ctx.lineTo(cx,cy+radius);
-                    ctx.stroke();
-                    ctx.globalAlpha=1;
-                    if (!deck.chartModel.ready)return;
-                    const positions=deck.chartPositions;
-                    for(let i=0;i<positions.length;i++) {
-                        const point=positions[i];
-                        const x=cx+(point.x-0.5)*2.0*radius;
-                        const y=cy+(point.y-0.5)*2.0*radius;
-                        ctx.beginPath();
-                        ctx.arc(x,y,3.5,0,Math.PI*2);
-                        ctx.fillStyle=String(point.color);
-                        ctx.fill();
-                    }
-                }
-                Connections {
-                    target: deck
-                    function onChartModelChanged() {
-                        celestialCanvas.requestPaint();
-                    }
-                }
-            }
-            Column {
-                width: Math.max(0,heroInstrument.width-celestialCanvas.width-12)
-                anchors.verticalCenter: parent.verticalCenter
-                spacing: 5
-                GohuText {
-                    width: parent.width
-                    font.pixelSize: 11
-                    color: deck.chartModel.ready ? Colors.cyan : Colors.yellow
-                    text: deck.chartModel.ready
-                          ? "SOURCE-VERIFIED CELESTIAL POSITIONS"
-                          : "AWAITING CALCULATION"
-                    elide: Text.ElideRight
-                }
-                QuietText {
-                    width: parent.width
-                    font.pixelSize: 9
-                    color: Colors.white
-                    text: deck.celestialSource
-                          ? deck.celestialSource.pairLabel
-                            + " // " + deck.celestialSource.targetDayUtc
-                          : "JPL SOURCE NOT CONNECTED"
-                    elide: Text.ElideRight
-                }
-                QuietText {
-                    width: parent.width
-                    font.pixelSize: 9
-                    color: Colors.orange
-                    text: deck.celestialSource
-                          ? deck.celestialSource.statusText
-                          : "JPL CALCULATION OWNER UNAVAILABLE"
-                    elide: Text.ElideRight
-                }
-                QuietText {
-                    width: parent.width
-                    font.pixelSize: 8
-                    color: Colors.cyan
-                    text: "GEOCENTRIC // TRUE ECLIPTIC"
-                    elide: Text.ElideRight
-                }
-            }
+            compactMode: true
+            neonEnabled: true
+            visualData: deck.celestialSource && deck.celestialSource.ready
+                        ? deck.celestialSource.visualData : null
         }
 
         Row {
@@ -219,24 +163,53 @@ Rectangle {
             anchors.left: parent.left
             anchors.right: parent.right
             anchors.bottom: parent.bottom
-            anchors.leftMargin: 9
+            anchors.leftMargin: 7
             anchors.rightMargin: 7
             anchors.bottomMargin: 4
             height: 22
-            spacing: 6
+            spacing: 4
             QuietText {
-                width: Math.max(0,parent.width-65)
+                width: Math.max(0,parent.width-198)
                 anchors.verticalCenter: parent.verticalCenter
                 font.pixelSize: 8
                 color: Colors.yellow
-                text: "TRADITIONS / CORRESPONDENCES // NOT CONNECTED"
+                text: "SYMBOLIC INTERPRETATION // NOT CONNECTED"
                 elide: Text.ElideRight
             }
             ActionButton {
-                width: 59
+                width: 45
+                height: 21
+                label: "◀ PAIR"
+                labelPixelSize: 8
+                accentColor: Colors.cyan
+                available: !!deck.celestialSource && !deck.celestialSource.loading
+                onClicked: deck.celestialSource.cyclePair(-1)
+            }
+            ActionButton {
+                width: 45
+                height: 21
+                label: "PAIR ▶"
+                labelPixelSize: 8
+                accentColor: Colors.cyan
+                available: !!deck.celestialSource && !deck.celestialSource.loading
+                onClicked: deck.celestialSource.cyclePair(1)
+            }
+            ActionButton {
+                width: 53
+                height: 21
+                label: deck.celestialSource
+                       ? "SPAN " + deck.celestialSource.spanDays + "D"
+                       : "SPAN --"
+                labelPixelSize: 8
+                accentColor: Colors.yellow
+                available: !!deck.celestialSource && !deck.celestialSource.loading
+                onClicked: deck.celestialSource.cycleSpan()
+            }
+            ActionButton {
+                width: 43
                 height: 21
                 label: "LENS"
-                labelPixelSize: 9
+                labelPixelSize: 8
                 accentColor: Colors.magenta
                 onClicked: deck.routeRequested("magick/planetary/correspondences")
             }
@@ -272,6 +245,20 @@ Rectangle {
             }
             ActionButton {
                 anchors.top: parent.top
+                anchors.right: moonOpen.left
+                anchors.topMargin: 4
+                anchors.rightMargin: 3
+                width: 32
+                height: 19
+                label: "NOW"
+                labelPixelSize: 8
+                accentColor: Colors.magenta
+                available: deck.inspectedPhaseId !== ""
+                onClicked: deck.inspectedPhaseId = ""
+            }
+            ActionButton {
+                id: moonOpen
+                anchors.top: parent.top
                 anchors.right: parent.right
                 anchors.topMargin: 4
                 anchors.rightMargin: 5
@@ -287,16 +274,16 @@ Rectangle {
                 anchors.left: parent.left
                 anchors.right: parent.right
                 anchors.top: parent.top
-                anchors.bottom: parent.bottom
+                anchors.bottom: phasePresetRow.top
                 anchors.leftMargin: 6
                 anchors.rightMargin: 6
                 anchors.topMargin: 24
-                anchors.bottomMargin: 5
+                anchors.bottomMargin: 3
                 spacing: 7
 
                 Canvas {
                     id: moonCanvas
-                    width: Math.min(parent.height,68)
+                    width: Math.min(parent.height,58)
                     height: width
                     anchors.verticalCenter: parent.verticalCenter
                     onWidthChanged: requestPaint()
@@ -313,45 +300,81 @@ Rectangle {
                         ctx.strokeStyle=String(Colors.cyan);
                         ctx.lineWidth=1;
                         ctx.stroke();
-                        const m=deck.moonModel;
-                        if (!m.ready || m.illumination===null
-                            || !m.directionKnown) return;
+                        const illumination=deck.displayedMoonIllumination;
+                        if(illumination < 0 || (!deck.inspectedPhase.valid
+                                               && !deck.moonModel.directionKnown))
+                            return;
                         ctx.fillStyle=String(Colors.yellow);
-                        for(let y=-radius;y<radius;y+=1) {
+                        for(let y=-radius;y<radius;y+=1){
                             const row=CosmosVisual.illuminatedSpan(
-                                m.illumination,m.waxing,y+0.5,radius);
-                            if(row) ctx.fillRect(cx+row.left,cy+y,
+                                illumination,deck.displayedMoonWaxing,y+0.5,radius);
+                            if(row)ctx.fillRect(cx+row.left,cy+y,
                                 Math.max(0,row.right-row.left),1);
                         }
                     }
                     Connections {
                         target: deck
-                        function onMoonModelChanged() { moonCanvas.requestPaint(); }
+                        function onMoonModelChanged(){ moonCanvas.requestPaint(); }
+                        function onInspectedPhaseIdChanged(){ moonCanvas.requestPaint(); }
                     }
                 }
                 Column {
-                    width: Math.max(0,parent.width - moonCanvas.width - 7)
+                    width: Math.max(0,parent.width-moonCanvas.width-7)
                     anchors.verticalCenter: parent.verticalCenter
-                    spacing: 3
+                    spacing: 2
                     GohuText {
                         width: parent.width
-                        text: deck.moonModel.illumination===null
-                              ? "--" : Math.round(deck.moonModel.illumination)+"%"
-                        font.pixelSize: 19
+                        text: deck.displayedMoonIllumination<0
+                              ? "--" : Math.round(deck.displayedMoonIllumination)+"%"
+                        font.pixelSize: 18
                         color: Colors.yellow
                     }
                     QuietText {
                         width: parent.width
-                        text: deck.moonModel.phaseLabel
+                        text: deck.displayedPhaseLabel
                         font.pixelSize: 8
                         elide: Text.ElideRight
                     }
                     QuietText {
                         width: parent.width
-                        text: deck.moonModel.source
+                        text: deck.inspectedPhase.valid
+                              ? "SCHEMATIC REFERENCE"
+                              : deck.moonModel.source
                         font.pixelSize: 8
-                        color: Colors.cyan
+                        color: deck.inspectedPhase.valid
+                               ? Colors.magenta : Colors.cyan
                         elide: Text.ElideRight
+                    }
+                }
+            }
+            Row {
+                id: phasePresetRow
+                anchors.left: parent.left
+                anchors.right: parent.right
+                anchors.bottom: parent.bottom
+                anchors.leftMargin: 6
+                anchors.rightMargin: 6
+                anchors.bottomMargin: 3
+                height: 18
+                spacing: 2
+                Repeater {
+                    model: CosmosVisual.PHASES
+                    delegate: ActionButton {
+                        required property var modelData
+                        width: Math.max(1,(phasePresetRow.width
+                                         - phasePresetRow.spacing*7)/8)
+                        height: 18
+                        label: modelData.short
+                        labelPixelSize: 8
+                        contentPadding: 0
+                        selected: deck.inspectedPhaseId !== ""
+                                  ? deck.inspectedPhaseId === modelData.id
+                                  : deck.moonModel.phaseId === modelData.id
+                        accentColor: selected ? Colors.magenta : Colors.cyan
+                        // Clicking a selected reference returns to live.
+                        onClicked: deck.inspectedPhaseId =
+                            deck.inspectedPhaseId === modelData.id ? ""
+                            : modelData.id
                     }
                 }
             }
@@ -392,16 +415,16 @@ Rectangle {
                 anchors.left: parent.left
                 anchors.right: parent.right
                 anchors.top: parent.top
-                anchors.bottom: parent.bottom
+                anchors.bottom: solarPresetRow.top
                 anchors.leftMargin: 7
                 anchors.rightMargin: 7
                 anchors.topMargin: 26
-                anchors.bottomMargin: 5
+                anchors.bottomMargin: 3
                 spacing: 6
 
                 Canvas {
                     id: solarCanvas
-                    width: Math.max(45,parent.width*0.42)
+                    width: Math.max(45,parent.width*0.47)
                     height: parent.height
                     onWidthChanged: requestPaint()
                     onHeightChanged: requestPaint()
@@ -428,11 +451,41 @@ Rectangle {
                             else ctx.lineTo(x,y);
                         }
                         ctx.stroke();
+                        if(deck.selectedSolarMinute>=0
+                           && deck.selectedSolarMinute<1440){
+                            const x=CosmosVisual.positionX(
+                                deck.selectedSolarMinute,w);
+                            ctx.strokeStyle=String(Colors.magenta);
+                            ctx.globalAlpha=0.85;
+                            ctx.lineWidth=1;
+                            ctx.beginPath();
+                            ctx.moveTo(x,0);
+                            ctx.lineTo(x,h);
+                            ctx.stroke();
+                        }
                     }
                     Connections {
                         target: deck
-                        function onSolarModelChanged() {
+                        function onSolarModelChanged(){solarCanvas.requestPaint();}
+                        function onSelectedSolarMinuteChanged(){
                             solarCanvas.requestPaint();
+                        }
+                    }
+                    MouseArea {
+                        anchors.fill: parent
+                        enabled: deck.solarModel.ready
+                        hoverEnabled: true
+                        preventStealing: true
+                        cursorShape: Qt.CrossCursor
+                        onPositionChanged: function(mouse) {
+                            if(deck.lockedSolarMinute<0)
+                                deck.hoveredSolarMinute=Math.max(0,Math.min(1439,
+                                    Math.floor(mouse.x/Math.max(1,width)*1439)));
+                        }
+                        onExited: deck.hoveredSolarMinute=-1
+                        onClicked: function(mouse) {
+                            deck.lockedSolarMinute=Math.max(0,Math.min(1439,
+                                Math.floor(mouse.x/Math.max(1,width)*1439)));
                         }
                     }
                 }
@@ -440,33 +493,74 @@ Rectangle {
                 Column {
                     width: Math.max(0,parent.width-solarCanvas.width-6)
                     anchors.verticalCenter: parent.verticalCenter
-                    spacing: 3
+                    spacing: 2
                     GohuText {
                         width: parent.width
                         text: "RISE " + observationOwner.astronomySummary.sunrise
-                        font.pixelSize: 9
+                        font.pixelSize: 8
                         color: Colors.white
                         elide: Text.ElideRight
                     }
                     GohuText {
                         width: parent.width
                         text: "SET  " + observationOwner.astronomySummary.sunset
-                        font.pixelSize: 9
+                        font.pixelSize: 8
                         color: Colors.white
                         elide: Text.ElideRight
                     }
                     QuietText {
                         width: parent.width
-                        text: deck.solarModel.ready
-                              ? "SOLAR ARC // READY"
-                              : "SOLAR ARC // WAITING"
-                        color: deck.solarModel.ready ? Colors.cyan : Colors.yellow
+                        text: deck.solarCursor
+                              ? "MODEL "+CosmosVisual.clockLabel(
+                                    deck.solarCursor.minute)+" "
+                                +deck.solarCursor.altitude.toFixed(1)+"°"
+                              : "SOLAR MODEL // WAITING"
+                        color: deck.solarCursor ? Colors.yellow : Colors.orange
                         font.pixelSize: 8
                         elide: Text.ElideRight
                     }
                 }
             }
+            Row {
+                id: solarPresetRow
+                anchors.left: parent.left
+                anchors.right: parent.right
+                anchors.bottom: parent.bottom
+                anchors.leftMargin: 6
+                anchors.rightMargin: 6
+                anchors.bottomMargin: 3
+                height: 18
+                spacing: 2
+                Repeater {
+                    model: [
+                        {id:"midnight",label:"00",minute:0},
+                        {id:"morning",label:"06",minute:360},
+                        {id:"noon",label:"12",minute:720},
+                        {id:"evening",label:"18",minute:1080},
+                        {id:"now",label:"NOW",minute:-1}
+                    ]
+                    delegate: ActionButton {
+                        required property var modelData
+                        width: Math.max(1,(solarPresetRow.width
+                                         -solarPresetRow.spacing*4)/5)
+                        height: 18
+                        label: modelData.label
+                        labelPixelSize: 9
+                        contentPadding: 0
+                        selected: modelData.minute < 0
+                                  ? deck.lockedSolarMinute < 0
+                                  : deck.lockedSolarMinute === modelData.minute
+                        available: deck.solarModel.ready
+                                   && (modelData.minute >= 0
+                                       || observationOwner.providerLocalMinute >= 0)
+                        accentColor: selected ? Colors.magenta : Colors.cyan
+                        onClicked: {
+                            deck.lockedSolarMinute=modelData.minute;
+                            deck.hoveredSolarMinute=-1;
+                        }
+                    }
+                }
+            }
         }
     }
-
 }

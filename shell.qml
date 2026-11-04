@@ -628,6 +628,27 @@ PanelWindow {
             id: sharedMediaDock
         }
 
+        // CAMERA // Independent from Social, Media/TV, and Files. The
+        // original Screenshot.qml module was empty; it now owns this dock
+        // action. CameraW is a separate masked PanelWindow on the left.
+        Item {
+            id: cameraHost
+            width: cameraDock.implicitWidth
+            height: cameraDock.implicitHeight
+
+            Screenshot {
+                id: cameraDock
+                anchors.fill: parent
+                menuOpen: cameraWindow.menuOpen
+                onToggleRequested: cameraWindow.toggle()
+            }
+
+            CameraW {
+                id: cameraWindow
+                screen: shellRoot.screen
+            }
+        }
+
         // Tray
 
         Tray {}

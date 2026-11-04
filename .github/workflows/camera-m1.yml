@@ -1,0 +1,36 @@
+name: Camera M1 offline capture and library safety contracts
+
+on:
+  pull_request:
+    paths:
+      - "modules/Screenshot.qml"
+      - "widgets/CameraW.qml"
+      - "shell.qml"
+      - "scripts/camera/**"
+      - "tests/camera/**"
+      - "docs/camera-tv-shelf-foundation-2026-11-04.md"
+      - ".github/workflows/camera-m1.yml"
+  push:
+    paths:
+      - "modules/Screenshot.qml"
+      - "widgets/CameraW.qml"
+      - "shell.qml"
+      - "scripts/camera/**"
+      - "tests/camera/**"
+      - ".github/workflows/camera-m1.yml"
+
+jobs:
+  camera:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Python standard-library syntax
+        run: python3 -m py_compile scripts/camera/camera_cli.py
+      - name: Camera gallery, capture argv, preview and Trash offline tests
+        run: python3 -m unittest discover -s tests/camera -p 'test_camera_cli.py' -v
+      - name: Camera dock, panel and independent-owner source contract
+        run: python3 -m unittest discover -s tests/camera -p 'test_camera_integration_contract.py' -v
+      - name: Retain existing Company and Clock source contracts
+        run: |
+          node --test tests/company/test_company_network_m1.test.js
+          python3 -m unittest discover -s tests/time -p 'test_angel_journal_integration_contract.py' -v

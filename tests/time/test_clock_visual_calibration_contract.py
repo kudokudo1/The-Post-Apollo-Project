@@ -130,12 +130,33 @@ class ClockVisualCalibrationTests(unittest.TestCase):
                          [host.CHRONYD_PATHS[0], "-Q", "-t", "15"])
         self.assertEqual(run.call_count, 2)
 
-    def test_measurement_when_daemon_active_does_not_duplicate(self):
+    def test_measurement_when_daemon_active_reads_tracking_without_new_daemon(self):
+        # An active Chrony instance uses its existing recent source estimate.
+        # The measurement must not launch another chronyd or change the clock.
+        from datetime import datetime, timezone
+        tracking = (
+            "Reference ID : CB00710F (source)\n"
+            "Stratum : 3\n"
+            "Ref time (UTC) : Wed Nov 04 05:00:00 2026\n"
+            "System time : 0.050000000 seconds slow of NTP time\n"
+            "Root delay : 0.020000 seconds\n"
+            "Root dispersion : 0.010000 seconds\n"
+            "Leap status : Normal\n")
         with patch.object(host.os.path, "isfile", return_value=True), patch.object(
-                host.subprocess, "run", return_value=result(0, stdout="active\n")) as run:
-            data = host.measure_clock()
-        self.assertEqual(data["errorCode"], "DAEMON_ACTIVE")
-        self.assertEqual(run.call_count, 1)
+                host.subprocess, "run", side_effect=[
+                    result(0, stdout="active\n"),
+                    result(0, stdout=tracking),
+                ]) as run, patch.object(host, "parse_tracking_measurement",
+                    wraps=host.parse_tracking_measurement) as parse:
+            # Fix sample age deterministically without launching host commands.
+            with patch.object(host.datetime, "datetime", wraps=datetime) as dt:
+                dt.now.return_value = datetime(2026, 11, 4, 5, 1, tzinfo=timezone.utc)
+                data = host.measure_clock()
+        self.assertEqual(data["source"], "CHRONY_TRACKING")
+        self.assertEqual(data["offsetMs"], -50)
+        self.assertEqual(run.call_count, 2)
+        self.assertEqual(run.call_args_list[1].args[0],
+                         [host.CHRONYC, "tracking"])
 
     def test_measurement_requires_actual_sample_not_command_success(self):
         with patch.object(host.os.path, "isfile", return_value=True), patch.object(

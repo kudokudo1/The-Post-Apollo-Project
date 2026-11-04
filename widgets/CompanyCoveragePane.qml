@@ -5,6 +5,7 @@ import "CompanyCoveragePolicy.js" as Geo
 import "weather/StationNaturalEarthLand110.js" as Land
 import "weather/StationNaturalEarthContext110.js" as Context
 import "CompanyNaturalEarthLakes110.js" as Lakes
+import "CompanyCities50.js" as CityData
 
 // Company Network Coverage M1: real geographic *reference* map.
 // Natural Earth is public domain and already pinned by Weather Station.
@@ -19,6 +20,10 @@ Item {
     property bool serviceMenuOpen: false
     property bool hubPlacementArmed: false
     property bool hubEditorOpen: false
+    property bool showCities: true
+    property var selectedCity: null
+    property bool streetConsentOpen: false
+    property bool streetMode: false
     property string selectedHubId: ""
     readonly property var hubRows: hubStore.saved && Array.isArray(hubStore.saved.hubs)
         ? hubStore.saved.hubs : []
@@ -56,12 +61,37 @@ Item {
         }
     }
 
+    function beginHubEntry() {
+        hubEditor.begin(root.selectedState ? root.selectedState[0] : "");
+        root.hubEditorOpen = true;
+        root.hubPlacementArmed = false;
+        root.serviceMenuOpen = false;
+    }
+
     function openHubEditor(lon,lat) {
-        if(!isFinite(lon) || !isFinite(lat)) return;
-        hubEditor.prepare(lon,lat,root.selectedState ? root.selectedState[0] : "");
+        // Returning from PICK LOCATION must not reset typed form values.
+        if (!hubEditor.setCoordinates(lon,lat)) return;
         root.hubEditorOpen=true;
         root.hubPlacementArmed=false;
         root.serviceMenuOpen=false;
+    }
+
+    function chooseCity(city) {
+        if (!city) return;
+        selectedCity = city;
+        selectedHubId = "";
+        selectedCode = "";
+        selectedCountryCode = "";
+        var next = Geo.view(regionKey,Math.max(zoom,3.5),city[1],city[2]);
+        applyView(next);
+    }
+
+    function visibleCities() {
+        var q = String(stateSearch.text || "").trim().toLowerCase();
+        if (!q) return [];
+        return CityData.cities.filter(function(city) {
+            return city[0].toLowerCase().indexOf(q)>=0;
+        }).slice(0,25);
     }
 
     function applyView(next) {
@@ -121,6 +151,8 @@ Item {
     onSelectedCodeChanged: mapCanvas.requestPaint()
     onSelectedCountryCodeChanged: mapCanvas.requestPaint()
     onSelectedHubIdChanged: mapCanvas.requestPaint()
+    onSelectedCityChanged: mapCanvas.requestPaint()
+    onShowCitiesChanged: mapCanvas.requestPaint()
     onZoomChanged: mapCanvas.requestPaint()
     onCenterLonChanged: mapCanvas.requestPaint()
     onCenterLatChanged: mapCanvas.requestPaint()
@@ -284,9 +316,10 @@ Item {
                 selectedPrimaryColor: Colors.magenta
                 perimeterGlowColor: Colors.blue
                 onTriggered: {
-                    if (hubStore.state !== "ready") return;
-                    root.hubPlacementArmed = !root.hubPlacementArmed;
-                    root.serviceMenuOpen = false;
+                    if (root.hubPlacementArmed) {
+                        root.hubPlacementArmed = false;
+                        root.hubEditorOpen = true;
+                    } else root.beginHubEntry();
                 }
             }
         }
@@ -843,8 +876,8 @@ Item {
             GohuText {
                 width: parent.width
                 text: root.hubPlacementArmed
-                    ? "CLICK MAP TO PLACE A HUB. Then enter a company label, city, "
-                    + "region and service type. Saved records remain unverified."
+                    ? "CLICK MAP TO SET HUB COORDINATES. THE FORM WILL RETURN "
+                    + "WITH THE FIELDS YOU ALREADY ENTERED."
                     : (root.selectedHub ? root.selectedHub.label + " // "
                     : root.selectedCountry ? root.selectedCountry[1] + " // "
                     : root.selectedState ? root.selectedState[1] + " // "
@@ -869,7 +902,15 @@ Item {
         visible: root.hubEditorOpen
         focus: root.hubEditorOpen
         saving: hubStore.state === "saving"
+        storeState: hubStore.state
+        storeError: hubStore.errorCode
         saveError: hubStore.state === "error" ? hubStore.errorCode : ""
+        onPickLocationRequested: {
+            root.hubEditorOpen = false;
+            root.hubPlacementArmed = true;
+            root.serviceMenuOpen = false;
+        }
+        onRetryStoreRequested: hubStore.refresh()
         onCancelRequested: {
             if (hubStore.state !== "saving")
                 root.hubEditorOpen = false;

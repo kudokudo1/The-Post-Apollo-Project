@@ -5,6 +5,10 @@ on:
     paths:
       - 'widgets/messanger/PhonePane.qml'
       - 'services/phone/PhoneSetupReadiness.py'
+      - 'services/phone/PhoneNativeSetupLaunch.py'
+      - 'tests/phone/test_phone_native_setup_launch.py'
+      - 'tests/messaging/test_social_phone_native_setup_handoff.py'
+      - 'MODEL/contracts/social-phone-native-setup-handoff-p4-v0.md'
       - 'tests/phone/test_phone_setup_readiness.py'
       - 'tests/messaging/test_social_phone_connect_flow.py'
       - 'MODEL/contracts/social-phone-one-action-setup-p3-v0.md'
@@ -14,6 +18,10 @@ on:
     paths:
       - 'widgets/messanger/PhonePane.qml'
       - 'services/phone/PhoneSetupReadiness.py'
+      - 'services/phone/PhoneNativeSetupLaunch.py'
+      - 'tests/phone/test_phone_native_setup_launch.py'
+      - 'tests/messaging/test_social_phone_native_setup_handoff.py'
+      - 'MODEL/contracts/social-phone-native-setup-handoff-p4-v0.md'
       - 'tests/phone/test_phone_setup_readiness.py'
       - 'tests/messaging/test_social_phone_connect_flow.py'
       - 'MODEL/contracts/social-phone-one-action-setup-p3-v0.md'
@@ -31,11 +39,13 @@ jobs:
       - uses: actions/checkout@v4
       - name: Compile setup and provider code
         run: |
-          python3 -m py_compile services/phone/PhoneSetupReadiness.py services/phone/PhoneProviderObservation.py
-          python3 -m py_compile tests/phone/test_phone_setup_readiness.py tests/messaging/test_social_phone_connect_flow.py
+          python3 -m py_compile services/phone/PhoneSetupReadiness.py services/phone/PhoneProviderObservation.py services/phone/PhoneNativeSetupLaunch.py
+          python3 -m py_compile tests/phone/test_phone_setup_readiness.py tests/messaging/test_social_phone_connect_flow.py tests/phone/test_phone_native_setup_launch.py tests/messaging/test_social_phone_native_setup_handoff.py
       - name: Verify one-action check and existing PHONE surface
         run: |
           python3 -m unittest discover -s tests/phone -p 'test_phone_setup_readiness.py' -v
+          python3 -m unittest discover -s tests/phone -p 'test_phone_native_setup_launch.py' -v
+          python3 -m unittest discover -s tests/messaging -p 'test_social_phone_native_setup_handoff.py' -v
           python3 -m unittest discover -s tests/messaging -p 'test_social_phone_connect_flow.py' -v
           python3 -m unittest discover -s tests/phone -p 'test_phone_provider_observation.py' -v
           python3 -m unittest discover -s tests/messaging -p 'test_social_phone_menu_readonly.py' -v

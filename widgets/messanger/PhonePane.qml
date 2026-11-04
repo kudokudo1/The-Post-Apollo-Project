@@ -18,6 +18,8 @@ Rectangle {
     property string setupState: "NOT STARTED"
     property var setupReport: ({})
     property bool detailsOpen: false
+    property string nativeSetupTarget: ""
+    property string nativeSetupStatus: "IDLE"
 
     // BlueFerry's GetStatus is a self-report from an already-running daemon.
     // Active MAP/PBAP sessions do not prove content authorization or ownership.
@@ -47,6 +49,8 @@ Rectangle {
             return;
         setupState = "CHECKING";
         setupReport = ({});
+        nativeSetupStatus = "IDLE";
+        nativeSetupTarget = "";
         setupProcess.command = [
             "python3",
             Quickshell.shellPath("services/phone/PhoneSetupReadiness.py"),
@@ -55,13 +59,29 @@ Rectangle {
         setupProcess.running = true;
     }
 
+    function openNativeSetup(target) {
+        if (!visible || setupState !== "CHECKED" || nativeSetupProcess.running
+                || (target !== "iphone" && target !== "android"))
+            return;
+        nativeSetupTarget = target;
+        nativeSetupStatus = "OPENING";
+        nativeSetupProcess.command = [
+            "python3",
+            Quickshell.shellPath("services/phone/PhoneNativeSetupLaunch.py"),
+            "--open", target
+        ];
+        nativeSetupProcess.running = true;
+    }
+
     onVisibleChanged: {
         if (visible) {
             selectedSection = "DEVICE";
             setupState = "NOT STARTED";
             setupReport = ({});
             detailsOpen = false;
-            // KDE Connect and device inventory are only probed by a click.
+            nativeSetupStatus = "IDLE";
+            nativeSetupTarget = "";
+            // No pairing or inventory action runs automatically on menu open.
         }
     }
 
@@ -136,6 +156,35 @@ Rectangle {
                 phonePane.setupReport = ({});
                 phonePane.setupState = "UNAVAILABLE";
             }
+        }
+    }
+
+    Process {
+        id: nativeSetupProcess
+        stdout: StdioCollector {
+            onStreamFinished: {
+                if (!phonePane.visible || phonePane.nativeSetupStatus !== "OPENING")
+                    return;
+                try {
+                    var result = JSON.parse(String(text || ""));
+                    if (result.schema !== "post-apollo.phone.native-setup-launch.v0"
+                            || result.execution !== "USER_INITIATED_NATIVE_SETUP"
+                            || result.target !== phonePane.nativeSetupTarget
+                            || ["OPEN_REQUESTED", "CLIENT_UNAVAILABLE", "LAUNCH_FAILED"].indexOf(result.status) < 0
+                            || result.trustedPhoneLink !== "UNVERIFIED"
+                            || result.routeEligible !== false
+                            || result.contentAccessEnabled !== false)
+                        throw new Error("Invalid native setup handoff");
+                    phonePane.nativeSetupStatus = result.status;
+                } catch (error) {
+                    phonePane.nativeSetupStatus = "LAUNCH_FAILED";
+                }
+            }
+        }
+        onExited: function(exitCode) {
+            if (phonePane.visible && phonePane.nativeSetupStatus === "OPENING"
+                    && exitCode !== 0)
+                phonePane.nativeSetupStatus = "LAUNCH_FAILED";
         }
     }
 
@@ -238,7 +287,7 @@ Rectangle {
             Text {
                 width: parent.width
                 visible: phonePane.selectedSection === "DEVICE"
-                text: "Connection check only for now. Post-Apollo cannot pair or authorize messages, calls or contacts yet; any required permission is handled by your phone."
+                text: "Choose iPhone or Android below to open its existing setup app. Phone-side pairing stays under your control; Social message access is not enabled yet."
                 color: Colors.orange
                 font.pixelSize: 10
                 wrapMode: Text.WordWrap
@@ -258,6 +307,49 @@ Rectangle {
                              : "UNAVAILABLE") +
                       "\nSocial phone link: NOT VERIFIED"
                 color: Colors.white
+                font.pixelSize: 10
+                wrapMode: Text.WordWrap
+            }
+
+            Row {
+                width: sectionContent.width
+                spacing: 8
+                visible: phonePane.selectedSection === "DEVICE"
+                         && phonePane.setupState === "CHECKED"
+
+                ActionButton {
+                    width: Math.max(72, (sectionContent.width - 8) / 2)
+                    height: 38
+                    label: "SET UP IPHONE"
+                    labelPixelSize: 9
+                    accentColor: Colors.magenta
+                    interactive: !nativeSetupProcess.running
+                    onTriggered: phonePane.openNativeSetup("iphone")
+                }
+
+                ActionButton {
+                    width: Math.max(72, (sectionContent.width - 8) / 2)
+                    height: 38
+                    label: "SET UP ANDROID"
+                    labelPixelSize: 9
+                    accentColor: Colors.magenta
+                    interactive: !nativeSetupProcess.running
+                    onTriggered: phonePane.openNativeSetup("android")
+                }
+            }
+
+            Text {
+                width: parent.width
+                visible: phonePane.selectedSection === "DEVICE"
+                         && phonePane.nativeSetupStatus !== "IDLE"
+                text: phonePane.nativeSetupStatus === "OPENING"
+                      ? "Opening your phone setup app..."
+                      : phonePane.nativeSetupStatus === "OPEN_REQUESTED"
+                      ? "Native phone setup requested. Approve pairing in that app and on your phone, then use CONNECT PHONE to recheck. Social messages remain locked."
+                      : phonePane.nativeSetupStatus === "CLIENT_UNAVAILABLE"
+                      ? "The native setup app for that phone is not installed. No pairing changes made."
+                      : "Could not launch the native phone setup app. No pairing changes made."
+                color: Colors.orange
                 font.pixelSize: 10
                 wrapMode: Text.WordWrap
             }

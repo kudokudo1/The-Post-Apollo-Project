@@ -4,6 +4,7 @@ import Quickshell
 import Quickshell.Io
 import "TimeSettingsPolicy.js" as Policy
 import "WorldZoneSearch.js" as ZoneSearch
+import "WorldFavoritesPolicy.js" as Favorites
 
 // Shared time configuration owner. CLOCK is the first consumer; CPU++ can
 // import qs.services.time without borrowing a window or creating another
@@ -13,6 +14,10 @@ Scope {
 
     readonly property string storagePath:
         Quickshell.dataDir + "/time-settings-v1.json"
+    // Favorites are a separate document owned by this shared TIME service.
+    // The display-calibration v1 schema and Linux time are never touched.
+    readonly property string worldFavoritesPath:
+        Quickshell.dataDir + "/time-world-favorites-v1.json"
     property string storageState: "loading"
     property string errorCode: ""
     property var document: Policy.initialDocument()
@@ -207,6 +212,78 @@ Scope {
     property string zoneCountryTable: ""
     readonly property var zoneCountryIndex:
         ZoneSearch.parseCountryZones(zoneCountryTable, zoneCountryNames)
+
+    property string worldFavoriteState: "loading"
+    property string worldFavoriteError: ""
+    property string worldFavoriteMessage: "FAVORITES // LOADING"
+    property var worldFavoriteDocument: Favorites.initialDocument()
+    property var worldFavoritePendingDocument: null
+    property var worldFavoriteQueuedDocument: null
+    readonly property var worldFavoriteZones:
+        worldFavoriteQueuedDocument !== null ? worldFavoriteQueuedDocument.zones
+        : worldFavoritePendingDocument !== null ? worldFavoritePendingDocument.zones
+        : worldFavoriteDocument.zones
+    readonly property int worldFavoriteLimit: Favorites.MAX_FAVORITES
+    readonly property bool worldFavoriteCanEdit:
+        worldFavoriteState === "empty" || worldFavoriteState === "ready"
+        || worldFavoriteState === "saving"
+
+    function isWorldFavorite(zoneId) {
+        return Favorites.contains(worldFavoriteZones, zoneId);
+    }
+
+    function beginWorldFavoriteWrite(nextDocument) {
+        worldFavoritePendingDocument = nextDocument;
+        worldFavoriteState = "saving";
+        worldFavoritesFile.setText(JSON.stringify(nextDocument, null, 2) + "\n");
+    }
+
+    function toggleWorldFavorite(zoneId, installedZones) {
+        if (!worldFavoriteCanEdit) {
+            worldFavoriteMessage = "FAVORITES STORE NOT READY";
+            return false;
+        }
+        // WORLD resolves selections only through the installed tzdata list.
+        // A stale/hand-edited saved favorite is never blindly put into TZ.
+        if (!ZoneSearch.contains(installedZones, zoneId)) {
+            worldFavoriteMessage = "ZONE NOT INSTALLED // NOTHING SAVED";
+            return false;
+        }
+        const next = Favorites.toggle(worldFavoriteZones, zoneId);
+        if (!next.ok) {
+            worldFavoriteMessage = next.reason;
+            return false;
+        }
+        worldFavoriteError = "";
+        worldFavoriteMessage = next.added
+            ? "STARRED // " + zoneId : "UNSTARRED // " + zoneId;
+        if (worldFavoritePendingDocument !== null) {
+            // Coalesce rapid star taps; only the latest state is saved.
+            worldFavoriteQueuedDocument = next.document;
+        } else {
+            beginWorldFavoriteWrite(next.document);
+        }
+        return true;
+    }
+
+    function loadWorldFavoriteDocument(raw) {
+        if (worldFavoriteState === "saving")
+            return;
+        const parsed = Favorites.parse(raw);
+        if (!parsed.ok) {
+            worldFavoriteState =
+                parsed.reason === "UNSUPPORTED_VERSION" ? "unsupported" : "error";
+            worldFavoriteError = parsed.reason;
+            worldFavoriteMessage = "FAVORITES FILE INVALID // NOT OVERWRITTEN";
+            return;
+        }
+        worldFavoriteDocument = parsed.document;
+        worldFavoritePendingDocument = null;
+        worldFavoriteQueuedDocument = null;
+        worldFavoriteState = "ready";
+        worldFavoriteError = "";
+        worldFavoriteMessage = "FAVORITES READY";
+    }
 
     property string zoneChoice: ""
     property bool timezoneConfirmRequired: false
@@ -504,6 +581,55 @@ Scope {
                 timeSettings.timezoneMessage = "TIMEZONE PROCESS FAILED";
             }
             timeSettings.refreshHostStatus();
+        }
+    }
+
+    FileView {
+        id: worldFavoritesFile
+        path: timeSettings.worldFavoritesPath
+        watchChanges: false
+        atomicWrites: true
+        blockWrites: false
+        printErrors: false
+
+        onLoaded: timeSettings.loadWorldFavoriteDocument(worldFavoritesFile.text())
+        onLoadFailed: function(error) {
+            if (timeSettings.worldFavoriteState === "saving")
+                return;
+            if (error === FileViewError.FileNotFound) {
+                timeSettings.worldFavoriteDocument = Favorites.initialDocument();
+                timeSettings.worldFavoriteState = "empty";
+                timeSettings.worldFavoriteError = "";
+                timeSettings.worldFavoriteMessage = "FAVORITES EMPTY";
+            } else {
+                timeSettings.worldFavoriteState = "error";
+                timeSettings.worldFavoriteError = "FAVORITES_LOAD_FAILED";
+                timeSettings.worldFavoriteMessage = "FAVORITES FILE NOT LOADED";
+            }
+        }
+        onSaved: {
+            if (timeSettings.worldFavoriteState !== "saving"
+                    || timeSettings.worldFavoritePendingDocument === null)
+                return;
+            const saved = timeSettings.worldFavoritePendingDocument;
+            const queued = timeSettings.worldFavoriteQueuedDocument;
+            timeSettings.worldFavoriteDocument = saved;
+            timeSettings.worldFavoritePendingDocument = null;
+            timeSettings.worldFavoriteQueuedDocument = null;
+            timeSettings.worldFavoriteError = "";
+            if (queued !== null
+                    && JSON.stringify(queued.zones) !== JSON.stringify(saved.zones)) {
+                timeSettings.beginWorldFavoriteWrite(queued);
+            } else {
+                timeSettings.worldFavoriteState = "ready";
+            }
+        }
+        onSaveFailed: function(error) {
+            timeSettings.worldFavoritePendingDocument = null;
+            timeSettings.worldFavoriteQueuedDocument = null;
+            timeSettings.worldFavoriteState = "error";
+            timeSettings.worldFavoriteError = "FAVORITES_SAVE_FAILED";
+            timeSettings.worldFavoriteMessage = "FAVORITES NOT SAVED // CHECK STORAGE";
         }
     }
 

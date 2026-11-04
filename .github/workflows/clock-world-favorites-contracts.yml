@@ -1,0 +1,35 @@
+name: Clock WORLD favorites persistence contracts
+
+on:
+  pull_request:
+    paths:
+      - "widgets/TimeW.qml"
+      - "services/time/TimeSettings.qml"
+      - "services/time/WorldFavoritesPolicy.js"
+      - "tests/time/test_clock_world_favorites_contract.py"
+      - "tests/time/test_world_favorites_policy.cjs"
+      - "tests/timew/test_timew_foundation_contracts.py"
+      - ".github/workflows/clock-world-favorites-contracts.yml"
+  push:
+    paths:
+      - "widgets/TimeW.qml"
+      - "services/time/TimeSettings.qml"
+      - "services/time/WorldFavoritesPolicy.js"
+      - "tests/time/test_clock_world_favorites_contract.py"
+      - "tests/time/test_world_favorites_policy.cjs"
+      - "tests/timew/test_timew_foundation_contracts.py"
+      - ".github/workflows/clock-world-favorites-contracts.yml"
+
+jobs:
+  favorites:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Pure WORLD favorites schema and add/remove security tests
+        run: node tests/time/test_world_favorites_policy.cjs
+      - name: Clock favorites UI, storage, and single owner source contracts
+        run: python3 -m unittest discover -s tests/time -p 'test_clock_world_favorites_contract.py' -v
+      - name: Preserve original TimeW foundations and fixed quick presets
+        run: python3 tests/timew/test_timew_foundation_contracts.py
+      - name: Preserve Clock shared settings contracts
+        run: python3 -m unittest discover -s tests/time -p 'test_clock_settings_contract.py' -v

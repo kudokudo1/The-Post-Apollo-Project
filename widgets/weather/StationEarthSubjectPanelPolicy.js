@@ -12,6 +12,10 @@ var ROUTES = {
   "earth/events/gdacs": {layers:["gdacs"]},
   "earth/fires/hotspots": {layers:["firms","smoke"]},
   "earth/maps/overview": {layers:["quakes","eonet","gdacs","firms","smoke"]},
+  // M28-S restores the complete original CLASSIC MAP presentation (radar,
+  // smoke, weather context, geodata, map companion, native event inspectors)
+  // in one existing StationDiscovery instance. No collector is copied.
+  "earth/maps/full": {layers:["quakes","eonet","gdacs","firms","smoke"],full:true},
   "earth/investigations/context": {layers:["quakes","eonet","gdacs","firms","smoke"]},
   "earth/investigations/dossiers": {layers:["quakes","eonet","gdacs","firms","smoke"]},
   "earth/investigations/archive": {layers:["quakes","eonet","gdacs","firms","smoke"]}
@@ -25,6 +29,10 @@ function routeInfo(path) {
 
 function kindForRoute(path) {
   return routeInfo(path) ? "map" : "";
+}
+function isFullMap(path) {
+  var info=routeInfo(path);
+  return !!info && info.full === true;
 }
 
 function showsLayer(path, layer) {
@@ -41,6 +49,10 @@ function needsSource(path, source) {
   if (source === "seismic") return showsLayer(path,"quakes");
   if (source === "eonet") return showsLayer(path,"eonet");
   if (source === "gdacs") return showsLayer(path,"gdacs");
+  // Original CLASSIC MAP also gives flood/lightning event context from the
+  // same root sources. They remain active only for this exact full route.
+  if (source === "lightning" || source === "river")
+    return isFullMap(path);
   // FIRMS and NOAA HMS remain explicitly manually requested.
   return false;
 }
@@ -60,6 +72,7 @@ function routeLabel(path) {
     "earth/events/gdacs":"NATURAL EVENTS // GDACS",
     "earth/fires/hotspots":"FIRES // FIRMS + HMS SMOKE",
     "earth/maps/overview":"EARTH // EVENT MAP",
+    "earth/maps/full":"MAP // ALL ORIGINAL INSTRUMENTS",
     "earth/investigations/context":"INVESTIGATIONS // EVENT CONTEXT",
     "earth/investigations/dossiers":"INVESTIGATIONS // DOSSIERS",
     "earth/investigations/archive":"INVESTIGATIONS // EVENT ARCHIVE"

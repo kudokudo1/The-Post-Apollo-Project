@@ -9,6 +9,7 @@ Item {
     property string selectedId: "social"
     property bool guideOpen: false
     readonly property var source: ConnectionsRegistry.entry(selectedId)
+    readonly property var keyRequirement: ConnectionsBroker.requirement(selectedId)
     onSelectedIdChanged: guideOpen = false
 
     Flickable {
@@ -101,6 +102,64 @@ Item {
                 font.pixelSize: 10
                 color: Colors.white
             }
+            Column {
+                visible: details.keyRequirement.known
+                width: parent.width
+                spacing: 7
+
+                Rectangle {
+                    width: parent.width
+                    height: 1
+                    color: Colors.cyan
+                }
+                GohuText {
+                    width: parent.width
+                    text: "CREDENTIAL BROKER // OS STATUS"
+                    color: Colors.magenta
+                    font.pixelSize: 10
+                    wrapMode: Text.WordWrap
+                }
+                QuietText {
+                    width: parent.width
+                    text: ConnectionsBroker.label
+                    color: ConnectionsBroker.available
+                           ? Colors.yellow : Colors.orange
+                    wrapMode: Text.WordWrap
+                    font.pixelSize: 9
+                }
+                ActionButton {
+                    width: Math.min(parent.width, 170)
+                    height: 30
+                    label: ConnectionsBroker.checking
+                           ? "CHECKING..." : "CHECK KEYRING"
+                    labelPixelSize: 10
+                    accentColor: Colors.cyan
+                    available: !ConnectionsBroker.checking
+                    onClicked: ConnectionsBroker.checkAvailability()
+                }
+                QuietText {
+                    width: parent.width
+                    text: "SCOPES // "
+                          + details.keyRequirement.operations.join(" // ")
+                    font.pixelSize: 9
+                    wrapMode: Text.WordWrap
+                }
+                QuietText {
+                    width: parent.width
+                    text: "CONSUMERS // "
+                          + details.keyRequirement.consumers.join(" // ")
+                    font.pixelSize: 9
+                    wrapMode: Text.WordWrap
+                }
+                QuietText {
+                    width: parent.width
+                    text: "GRANTS CLOSED // PRESENCE DOES NOT PROVE UNLOCK, OWNERSHIP, OR PROVIDER AUTHENTICATION"
+                    color: Colors.orange
+                    wrapMode: Text.WordWrap
+                    font.pixelSize: 9
+                }
+            }
+
             ActionButton {
                 visible: details.selectedId === "social"
                 width: Math.min(parent.width, 160)
@@ -113,7 +172,7 @@ Item {
             QuietText {
                 width: parent.width
                 wrapMode: Text.WordWrap
-                text: "C1 // STATUS ONLY. SHARED SECRET VAULT AND LIVE PERMISSION GRANTS REQUIRE SEPARATE VERIFIED IMPLEMENTATION."
+                text: "C2a // READ-ONLY KEYRING PROBE. NO SECRET STORAGE, ACCOUNT LOGIN OR CROSS-APP GRANTS ARE ENABLED."
                 color: Colors.orange
                 font.pixelSize: 9
             }

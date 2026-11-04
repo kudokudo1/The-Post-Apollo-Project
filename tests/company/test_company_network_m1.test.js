@@ -106,10 +106,11 @@ test("city icon and star ornaments share one vertical text-cell frame in dock an
     // Mixed-size Noto glyphs previously used incompatible top/baseline
     // placement. Equal-height text cells with centered line boxes make
     // the stars and city share a common geometric center.
-    const dockMark=dock.split("id: companyMark",2)[1]
-        .split("onLeftClicked: toggleRequested()",1)[0];
-    const headerMark=widget.split("id: headerCity",2)[1]
-        .split("\n            GohuText {",1)[0];
+    const dockStart=dock.indexOf("id: companyMark\n");
+    const headerStart=widget.indexOf("id: headerCity\n");
+    assert.ok(dockStart>=0 && headerStart>=0);
+    const dockMark=dock.slice(dockStart).split("onLeftClicked: toggleRequested()",1)[0];
+    const headerMark=widget.slice(headerStart).split("\n            GohuText {",1)[0];
     for(const [label,mark,id,height] of [
         ["dock",dockMark,"companyMark",30],
         ["header",headerMark,"headerCity",24]
@@ -117,8 +118,8 @@ test("city icon and star ornaments share one vertical text-cell frame in dock an
         assert.match(mark,new RegExp("height: "+height));
         assert.equal((mark.match(/NotoText\s*\{/g)||[]).length,3,
             label+" keeps exactly three art layers");
-        assert.equal((mark.match(new RegExp("height: "+id+"\\.height","g"))||[]).length,3,
-            label+" shares one vertical box across the artwork");
+        assert.equal((mark.match(new RegExp("height: "+id+"\\.height","g"))||[]).length,4,
+            label+" shares a vertical box across the three glyphs and the city wrapper");
         assert.equal((mark.match(/verticalAlignment: Text\.AlignVCenter/g)||[]).length,3,
             label+" centers each text line box");
         assert.doesNotMatch(mark,/NotoText\s*\{\s*anchors\.verticalCenter:/,
@@ -132,14 +133,15 @@ test("city icon and star ornaments share one vertical text-cell frame in dock an
     assert.match(widget,/anchors\.verticalCenter: parent\.verticalCenter/);
 });
 
-test("central yellow city sits 2px below the white ornaments without shifting their cells",()=>{
+test("central yellow city sits 6px below the white ornaments without shifting their cells",()=>{
     const cases=[
         ["dock",source("modules/CompanyNetwork.qml"),"companyMark","cityGlyphCell","cityGlyph",24],
         ["header",source("widgets/CompanyNetworkW.qml"),"headerCity","headerCityGlyphCell","headerCityGlyph",18]
     ];
     for(const [label,sourceText,rowId,cellId,glyphId,fontSize] of cases) {
-        const tail=sourceText.split("id: "+rowId,2)[1];
-        assert.ok(tail,label+" Row still exists");
+        const rowStart=sourceText.indexOf("id: "+rowId+"\n");
+        assert.ok(rowStart>=0,label+" Row still exists");
+        const tail=sourceText.slice(rowStart);
         const row=tail.split(label==="dock"
             ? "onLeftClicked: toggleRequested()"
             : "\n            GohuText {",1)[0];
@@ -149,8 +151,8 @@ test("central yellow city sits 2px below the white ornaments without shifting th
             label+" retains intrinsic city width");
         assert.match(cityBlock,new RegExp("height: "+rowId+"\\.height"),
             label+" leaves shared Row geometry unchanged");
-        assert.match(cityBlock,new RegExp("id: "+glyphId+"\\s+y: 2"),
-            label+" lowers only the yellow city 2px");
+        assert.match(cityBlock,new RegExp("id: "+glyphId+"\\s+y: 6"),
+            label+" lowers only the yellow city 6px");
         assert.match(cityBlock,new RegExp("font\\.pixelSize: "+fontSize),
             label+" preserves city glyph size");
         assert.match(cityBlock,/text: "🏙︎"/);
@@ -162,7 +164,7 @@ test("central yellow city sits 2px below the white ornaments without shifting th
         const cell=row.indexOf("id: "+cellId);
         assert.ok(firstStar>=0 && cell>firstStar && lastStar>cell,
             label+" preserves the three-glyph artwork order");
-        assert.equal((row.match(/y: 2/g)||[]).length,1,
+        assert.equal((row.match(/y: 6/g)||[]).length,1,
             label+" applies only one intentional pixel offset");
     }
 });

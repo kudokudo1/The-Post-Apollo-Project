@@ -195,3 +195,27 @@ function parseViirsCsv(raw, limit) {
     }
     return rows;
 }
+
+
+// One truthful provider status for EARTH and the shared source rack.
+// A retained last-good batch is NOT evidence that a later request succeeded.
+function sourceState(source, area) {
+    if (!source)
+        return "UNAVAILABLE";
+    if (!source.configured)
+        return "KEY REQUIRED";
+    if (source.loading)
+        return "RECEIVING";
+    const rows = Array.isArray(source.hotspots) ? source.hotspots : [];
+    if (source.failed) {
+        const detail = clean(source.errorText, 80) || "REQUEST FAILED";
+        return source.ready
+            ? "LAST GOOD " + rows.length + " // " + detail
+            : detail;
+    }
+    if (source.ready)
+        return "HOTSPOTS " + rows.length;
+    if (area && area.valid === false)
+        return clean(area.reason, 80) || "MAP VIEW UNAVAILABLE";
+    return "MANUAL READY";
+}

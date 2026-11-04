@@ -372,12 +372,9 @@ Item {
             font.pixelSize: 9
             color: Colors.yellow
             wrapMode: Text.WordWrap
-            text: HelioSourceSummary()
-            function HelioSourceSummary() {
-                return heliocentricPane.scene.ready
-                    ? "SAMPLED UTC "+heliocentricPane.scene.utc
-                    : "MISSING JPL XYZ // NO FALLBACK";
-            }
+            text: heliocentricPane.scene.ready
+                ? "SAMPLED UTC "+heliocentricPane.scene.utc
+                : "MISSING JPL XYZ // NO FALLBACK"
         }
         Repeater {
             model: graph.scene.ready?graph.scene.nodes:[]

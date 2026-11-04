@@ -2,6 +2,7 @@ import QtQuick
 import Quickshell
 import Quickshell.Wayland
 import "../components"
+import "CompanyChassisPolicy.js" as CompanyChassisPolicy
 
 // Company Network v0: navigation-only geographic operations chassis.
 // No organization membership, employee directory or client data is loaded.
@@ -13,14 +14,20 @@ PanelWindow {
     property real dockCenterX: 0
     property real chassisTopY: 0
 
+    // Finance-style controls; default outer panel matches Weather Station
+    // exactly (1000 × 700) on a sufficiently large display.
+    property string chassisLevel: "standard"
+    property bool coverageLoaded: false
     readonly property int glowGutter: 12
     readonly property int frameTopInset: 9
     readonly property int bottomScreenGap: 12
-    readonly property int frameWidth: Math.max(1, Math.min(640,
-        (root.screen ? root.screen.width : 1280) - glowGutter * 2 - 20))
-    readonly property int frameHeight: Math.max(1, Math.min(470,
-        (root.screen ? root.screen.height : 720)
-        - frameTopInset - bottomScreenGap - 20))
+    readonly property var chassisFrame: CompanyChassisPolicy.frame(
+        chassisLevel,
+        root.screen ? root.screen.width : 2560,
+        root.screen ? root.screen.height : 1440,
+        glowGutter, frameTopInset, bottomScreenGap)
+    readonly property int frameWidth: chassisFrame.width
+    readonly property int frameHeight: chassisFrame.height
 
     readonly property var mainModes: [
         { id: "coverage", label: "COVERAGE", title: "TERRITORY COVERAGE",
@@ -39,12 +46,24 @@ PanelWindow {
         menuOpen = !menuOpen;
     }
 
+    function expandChassis() {
+        chassisLevel = CompanyChassisPolicy.step(chassisLevel, 1);
+    }
+
+    function collapseChassis() {
+        chassisLevel = CompanyChassisPolicy.step(chassisLevel, -1);
+    }
+
     onMenuOpenChanged: {
-        if (menuOpen)
+        if (menuOpen) {
+            // Load the geographic map only after first explicit opening.
+            // Keep it alive thereafter to preserve view while switching modes.
+            coverageLoaded = true;
             Qt.callLater(function() {
                 if (root.menuOpen)
                     companyFrame.forceActiveFocus();
             });
+        }
     }
 
     implicitWidth: frameWidth + glowGutter * 2
@@ -57,14 +76,12 @@ PanelWindow {
         right: false
     }
     margins {
-        top: Math.max(0, Math.min(
-            (root.screen ? root.screen.height : root.implicitHeight)
-                - root.implicitHeight,
-            Math.round(root.chassisTopY - root.glowGutter)))
-        left: Math.max(0, Math.min(
-            (root.screen ? root.screen.width : root.implicitWidth)
-                - root.implicitWidth,
-            Math.round(root.dockCenterX - root.implicitWidth / 2)))
+        top: CompanyChassisPolicy.topMargin(chassisLevel, chassisTopY,
+            root.screen ? root.screen.height : root.implicitHeight,
+            root.implicitHeight, glowGutter)
+        left: CompanyChassisPolicy.leftMargin(chassisLevel, dockCenterX,
+            root.screen ? root.screen.width : root.implicitWidth,
+            root.implicitWidth)
     }
 
     exclusiveZone: 0
@@ -114,10 +131,34 @@ PanelWindow {
             height: 56
             color: "transparent"
 
-            GohuText {
+            // Decorated identity: white star ornaments, yellow city.
+            Row {
+                id: headerCity
                 anchors.left: parent.left
-                anchors.leftMargin: 15
-                anchors.right: feedStatus.left
+                anchors.leftMargin: 12
+                anchors.verticalCenter: parent.verticalCenter
+                spacing: 1
+                NotoText {
+                    text: ". ݁₊⊹"
+                    font.pixelSize: 15
+                    color: Colors.white
+                }
+                NotoText {
+                    text: "🏙︎"
+                    font.pixelSize: 18
+                    color: Colors.yellow
+                }
+                NotoText {
+                    text: "๋࣭⭑"
+                    font.pixelSize: 15
+                    color: Colors.white
+                }
+            }
+
+            GohuText {
+                anchors.left: headerCity.right
+                anchors.leftMargin: 10
+                anchors.right: collapseChassisButton.left
                 anchors.rightMargin: 9
                 anchors.verticalCenter: parent.verticalCenter
                 font.pixelSize: 17
@@ -125,6 +166,35 @@ PanelWindow {
                 color: Colors.magenta
                 elide: Text.ElideRight
                 text: "COMPANY // " + root.activeMode.label
+            }
+
+            // Same ↓/↑ interaction as Finance; geometry only.
+            ActionButton {
+                id: collapseChassisButton
+                anchors.right: expandChassisButton.left
+                anchors.rightMargin: 4
+                anchors.verticalCenter: parent.verticalCenter
+                width: 30
+                height: 30
+                label: "↓"
+                labelPixelSize: 17
+                accentColor: Colors.cyan
+                available: root.chassisLevel !== "compact"
+                onLeftClicked: root.collapseChassis()
+            }
+
+            ActionButton {
+                id: expandChassisButton
+                anchors.right: feedStatus.left
+                anchors.rightMargin: 7
+                anchors.verticalCenter: parent.verticalCenter
+                width: 30
+                height: 30
+                label: "↑"
+                labelPixelSize: 17
+                accentColor: Colors.magenta
+                available: root.chassisLevel !== "fullscreen"
+                onLeftClicked: root.expandChassis()
             }
 
             Rectangle {
@@ -225,9 +295,20 @@ PanelWindow {
             anchors.bottom: parent.bottom
             anchors.bottomMargin: 18
 
+            Loader {
+                id: coverageLoader
+                anchors.fill: parent
+                active: root.coverageLoaded
+                visible: root.selectedMainModeIndex === 0
+                sourceComponent: Component {
+                    CompanyCoveragePane { }
+                }
+            }
+
             Column {
                 anchors.fill: parent
                 spacing: 16
+                visible: root.selectedMainModeIndex !== 0
 
                 GohuText {
                     width: parent.width

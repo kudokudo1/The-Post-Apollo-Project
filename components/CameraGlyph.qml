@@ -11,10 +11,12 @@ Item {
     implicitWidth: 58
     implicitHeight: 42
 
-    // Caller supplies the Post-Apollo dock palette. Colors are *strokes only*.
-    property color bodyColor: "#DCF3FA"
+    // Monochrome white by default; the Camera dock overrides all three
+    // stroke roles with one bound color (magenta whenever it is open).
+    // All paths remain hollow: these colors affect stroke, never fill.
+    property color bodyColor: "#FFFFFF"
     property color lensColor: bodyColor
-    property color ornamentColor: "#55CFCA"
+    property color ornamentColor: bodyColor
 
     // Source geometry is 128 x 96. This transforms the real vector paths,
     // including their stroke widths, instead of scaling a pre-rendered image.

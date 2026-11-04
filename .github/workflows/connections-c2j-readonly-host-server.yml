@@ -1,0 +1,62 @@
+name: Connections C2j explicit read-only host server
+
+on:
+  pull_request:
+    paths:
+      - "services/connections/ConnectionsHostStatusServer.py"
+      - "tests/connections/test_connections_c2j_host_status_server.py"
+      - "tests/connections/test_connections_c2j_fake_host_socket.py"
+      - ".github/workflows/connections-c2j-readonly-host-server.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  private-host-server:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Host owns fixed local socket, rejects unsafe clients, and cleans up
+        run: timeout 35s python3 -B tests/connections/test_connections_c2j_host_status_server.py
+      - name: Actual C2f fake host lifecycle delivered through C2j server and C2i reader
+        run: timeout 40s python3 -B tests/connections/test_connections_c2j_fake_host_socket.py
+      - name: C2i client security regressions and CPU++ no-grant status rendering
+        run: |
+          timeout 35s python3 -B tests/connections/test_connections_c2i_host_inspection.py
+          node tests/cpuplus/test_connections_host_inspection_c2i.js
+          node tests/cpuplus/test_connections_status_c2g.js
+          node tests/cpuplus/test_connections_broker_c2a.js
+      - name: Fail if host server autostarts or production grants enabled
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import ast
+          source=Path("services/connections/ConnectionsHostStatusServer.py").read_text()
+          module=ast.parse(source)
+          names=set()
+          for node in ast.walk(module):
+              if isinstance(node,ast.Import):
+                  names.update(a.name for a in node.names)
+              elif isinstance(node,ast.ImportFrom):
+                  names.add(node.module)
+          assert not names.intersection({"requests","urllib","httpx","subprocess","keyring"})
+          for bad in ("secret-tool","os.system(","subprocess.run(",
+                      ".listen(", "AF_INET", "POST_APOLLO_FIRMS_MAP_KEY"):
+              assert bad not in source, bad
+          assert "ConnectionsHostStatusServer" in source
+          assert "C2J_REFUSED_AUTOSTART_NO_HOST_OWNER" in source
+          broker=Path("services/connections/ConnectionsBroker.qml").read_text()
+          status=Path("services/connections/ConnectionsRequestStatus.qml").read_text()
+          assert "readonly property bool credentialActionsEnabled: false" in broker
+          assert "readonly property bool hostAuthenticated: false" in status
+          assert "readonly property var latestStatus: null" in status
+          print("C2J_PASS // PRODUCTION_AUTHORIZATION_AND_HOST_AUTOSTART_DISABLED")
+          PY

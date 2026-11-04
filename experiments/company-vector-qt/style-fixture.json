@@ -1,0 +1,251 @@
+{
+  "version": 8,
+  "name": "Post-Apollo isolated synthetic compatibility fixture",
+  "metadata": {
+    "post-apollo-fixture": true,
+    "not-real-streets": true
+  },
+  "center": [
+    -83.6875,
+    43.0125
+  ],
+  "zoom": 10,
+  "sources": {
+    "probe-features": {
+      "type": "geojson",
+      "data": {
+        "type": "FeatureCollection",
+        "features": [
+          {
+            "type": "Feature",
+            "properties": {
+              "kind": "area"
+            },
+            "geometry": {
+              "type": "Polygon",
+              "coordinates": [
+                [
+                  [
+                    -83.8,
+                    42.96
+                  ],
+                  [
+                    -83.53,
+                    42.96
+                  ],
+                  [
+                    -83.53,
+                    43.1
+                  ],
+                  [
+                    -83.8,
+                    43.1
+                  ],
+                  [
+                    -83.8,
+                    42.96
+                  ]
+                ]
+              ]
+            }
+          },
+          {
+            "type": "Feature",
+            "properties": {
+              "kind": "water"
+            },
+            "geometry": {
+              "type": "Polygon",
+              "coordinates": [
+                [
+                  [
+                    -83.75,
+                    43.09
+                  ],
+                  [
+                    -83.7,
+                    43.09
+                  ],
+                  [
+                    -83.67,
+                    43.02
+                  ],
+                  [
+                    -83.72,
+                    43.02
+                  ],
+                  [
+                    -83.75,
+                    43.09
+                  ]
+                ]
+              ]
+            }
+          },
+          {
+            "type": "Feature",
+            "properties": {
+              "kind": "major"
+            },
+            "geometry": {
+              "type": "LineString",
+              "coordinates": [
+                [
+                  -83.78,
+                  42.99
+                ],
+                [
+                  -83.73,
+                  43.01
+                ],
+                [
+                  -83.69,
+                  43.02
+                ],
+                [
+                  -83.58,
+                  43.07
+                ]
+              ]
+            }
+          },
+          {
+            "type": "Feature",
+            "properties": {
+              "kind": "minor"
+            },
+            "geometry": {
+              "type": "LineString",
+              "coordinates": [
+                [
+                  -83.73,
+                  43.08
+                ],
+                [
+                  -83.68,
+                  43.05
+                ],
+                [
+                  -83.65,
+                  42.99
+                ],
+                [
+                  -83.62,
+                  42.97
+                ]
+              ]
+            }
+          },
+          {
+            "type": "Feature",
+            "properties": {
+              "kind": "point"
+            },
+            "geometry": {
+              "type": "Point",
+              "coordinates": [
+                -83.6875,
+                43.0125
+              ]
+            }
+          }
+        ]
+      }
+    }
+  },
+  "layers": [
+    {
+      "id": "background",
+      "type": "background",
+      "paint": {
+        "background-color": "#1B0623"
+      }
+    },
+    {
+      "id": "land-fixture",
+      "type": "fill",
+      "source": "probe-features",
+      "filter": [
+        "==",
+        [
+          "get",
+          "kind"
+        ],
+        "area"
+      ],
+      "paint": {
+        "fill-color": "#2E183A",
+        "fill-opacity": 0.8
+      }
+    },
+    {
+      "id": "water-fixture",
+      "type": "fill",
+      "source": "probe-features",
+      "filter": [
+        "==",
+        [
+          "get",
+          "kind"
+        ],
+        "water"
+      ],
+      "paint": {
+        "fill-color": "#10061D"
+      }
+    },
+    {
+      "id": "major-fixture",
+      "type": "line",
+      "source": "probe-features",
+      "filter": [
+        "==",
+        [
+          "get",
+          "kind"
+        ],
+        "major"
+      ],
+      "paint": {
+        "line-color": "#55CFCA",
+        "line-width": 4
+      }
+    },
+    {
+      "id": "minor-fixture",
+      "type": "line",
+      "source": "probe-features",
+      "filter": [
+        "==",
+        [
+          "get",
+          "kind"
+        ],
+        "minor"
+      ],
+      "paint": {
+        "line-color": "#5B5FD4",
+        "line-width": 2
+      }
+    },
+    {
+      "id": "point-fixture",
+      "type": "circle",
+      "source": "probe-features",
+      "filter": [
+        "==",
+        [
+          "get",
+          "kind"
+        ],
+        "point"
+      ],
+      "paint": {
+        "circle-color": "#F2BE4E",
+        "circle-radius": 7,
+        "circle-stroke-color": "#C74EC7",
+        "circle-stroke-width": 2
+      }
+    }
+  ]
+}

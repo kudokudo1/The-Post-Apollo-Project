@@ -24,6 +24,11 @@ PanelWindow {
     property bool galleryHasMore: false
     property bool galleryScanTruncated: false
     property bool galleryShotsOnly: false
+    property string galleryMediaFilter: "all"
+    property string galleryRequestedMediaFilter: "all"
+    property bool recording: false
+    property string recordingMode: ""
+    property string webcamDevice: ""
     property string galleryCustomFolder: ""
     property string galleryRequestedQuery: ""
     property string galleryRequestedFolder: ""
@@ -115,11 +120,13 @@ PanelWindow {
         galleryRequestedQuery = gallerySearch.text.trim();
         galleryRequestedFolder = galleryCustomFolder;
         galleryRequestedShotsOnly = galleryShotsOnly;
+        galleryRequestedMediaFilter = galleryMediaFilter;
         return run("gallery", [
             "gallery",
             "--page", String(nextPage),
             "--query", galleryRequestedQuery,
-            "--folder", galleryCustomFolder
+            "--folder", galleryCustomFolder,
+            "--media-filter", galleryMediaFilter
         ].concat(galleryShotsOnly ? ["--shots-only"] : []));
     }
 
@@ -154,6 +161,20 @@ PanelWindow {
         menuOpen = false;
         shutterDelay.restart();
         return true;
+    }
+
+    function webcamPhoto() {
+        return run("webcamPhoto", ["webcam-photo", "--device", webcamDevice]);
+    }
+
+    function startRecording(mode) {
+        if (busy || recording) return false;
+        return run("recordStart", ["record-start", mode, "--device", webcamDevice]);
+    }
+
+    function stopRecording() {
+        if (busy || !recording) return false;
+        return run("recordStop", ["record-stop"]);
     }
 
     function previewCleanup() {
@@ -194,7 +215,25 @@ PanelWindow {
         }
         if (action === "status") {
             statusReport = payload;
+            recording = payload.recording && payload.recording.recording === true;
+            recordingMode = recording ? payload.recording.mode : "";
             feedback = "CAMERA // TOOL STATUS READY";
+        } else if (action === "recordStart") {
+            recording = true;
+            recordingMode = payload.mode;
+            feedback = "RECORDING // " + payload.mode.toUpperCase() + " // PRESS STOP TO SAVE";
+        } else if (action === "recordStop") {
+            recording = false;
+            recordingMode = "";
+            feedback = "RECORDING SAVED // " + payload.name;
+            activeView = "gallery";
+            galleryMediaFilter = "videos";
+            Qt.callLater(function() { camera.loadGallery(false); });
+        } else if (action === "webcamPhoto") {
+            feedback = "WEBCAM PHOTO SAVED // " + payload.name;
+            activeView = "gallery";
+            galleryMediaFilter = "webcam";
+            Qt.callLater(function() { camera.loadGallery(false); });
         } else if (action === "capture") {
             feedback = "CAPTURE SAVED // " + payload.name;
             menuOpen = true;
@@ -214,7 +253,8 @@ PanelWindow {
             // If the user typed while scanning, run the newest query next.
             if (gallerySearch.text.trim() !== galleryRequestedQuery
                     || galleryCustomFolder !== galleryRequestedFolder
-                    || galleryShotsOnly !== galleryRequestedShotsOnly)
+                    || galleryShotsOnly !== galleryRequestedShotsOnly
+                    || galleryMediaFilter !== galleryRequestedMediaFilter)
                 gallerySearchDebounce.restart();
         } else if (action === "previewSelected") {
             if (payload.path === selectedPath) {
@@ -444,11 +484,17 @@ PanelWindow {
                 width: parent.width
                 height: frame.height - 169
 
-                Column {
+                Flickable {
                     id: capturePage
                     anchors.fill: parent
                     visible: camera.activeView === "capture"
-                    spacing: 18
+                    clip: true
+                    contentHeight: captureContent.implicitHeight
+                    boundsBehavior: Flickable.StopAtBounds
+                    Column {
+                        id: captureContent
+                        width: capturePage.width
+                        spacing: 10
 
                     GohuText {
                         width: parent.width
@@ -499,6 +545,101 @@ PanelWindow {
 
                     GohuText {
                         width: parent.width
+                        font.pixelSize: 12
+                        color: Colors.magenta
+                        text: "WEBCAM // PHOTO + VIDEO"
+                    }
+                    Row {
+                        width: parent.width
+                        height: 34
+                        spacing: 8
+                        GohuText {
+                            width: 110
+                            height: 32
+                            verticalAlignment: Text.AlignVCenter
+                            color: Colors.cyan
+                            font.pixelSize: 11
+                            text: "CAMERA DEVICE"
+                        }
+                        ComboBox {
+                            id: webcamSelector
+                            width: parent.width - 118
+                            height: 32
+                            model: camera.statusReport && camera.statusReport.videoDevices
+                                   ? camera.statusReport.videoDevices : []
+                            onActivated: function(index) {
+                                camera.webcamDevice = String(webcamSelector.textAt(index));
+                            }
+                        }
+                    }
+                    Row {
+                        width: parent.width
+                        height: 43
+                        spacing: 8
+                        ActionButton {
+                            width: (parent.width - 16) / 3
+                            height: 42
+                            label: "TAKE PHOTO"
+                            labelPixelSize: 11
+                            accentColor: Colors.cyan
+                            available: !camera.busy && !camera.recording
+                            onLeftClicked: camera.webcamPhoto()
+                        }
+                        ActionButton {
+                            width: (parent.width - 16) / 3
+                            height: 42
+                            label: "RECORD WEBCAM"
+                            labelPixelSize: 10
+                            accentColor: Colors.magenta
+                            available: !camera.busy && !camera.recording
+                            onLeftClicked: camera.startRecording("webcam")
+                        }
+                        ActionButton {
+                            width: (parent.width - 16) / 3
+                            height: 42
+                            label: "RECORD SCREEN"
+                            labelPixelSize: 10
+                            accentColor: Colors.yellow
+                            available: !camera.busy && !camera.recording
+                            onLeftClicked: camera.startRecording("screen")
+                        }
+                    }
+                    Row {
+                        width: parent.width
+                        height: 42
+                        spacing: 10
+                        GohuText {
+                            width: parent.width - 180
+                            height: 40
+                            verticalAlignment: Text.AlignVCenter
+                            color: camera.recording ? Colors.red : Colors.cyan
+                            font.pixelSize: 12
+                            text: camera.recording
+                                  ? "● RECORDING // " + camera.recordingMode.toUpperCase()
+                                  : "RECORDER // STANDBY"
+                        }
+                        ActionButton {
+                            width: 170
+                            height: 40
+                            label: "STOP + SAVE"
+                            labelPixelSize: 12
+                            destructive: true
+                            accentColor: Colors.red
+                            available: camera.recording && !camera.busy
+                            onLeftClicked: camera.stopRecording()
+                        }
+                    }
+                    GohuText {
+                        width: parent.width
+                        height: 23
+                        font.pixelSize: 10
+                        color: Colors.cyan
+                        text: "WEBCAM // FFmpeg " + (camera.statusReport && camera.statusReport.ffmpeg ? "READY" : "MISSING")
+                              + " · SCREEN // " + (camera.statusReport && camera.statusReport.wfRecorder ? "READY" : "MISSING")
+                        elide: Text.ElideRight
+                    }
+                    GohuText {
+                        width: parent.width
                         wrapMode: Text.WordWrap
                         font.pixelSize: 11
                         color: Colors.white
@@ -535,6 +676,7 @@ PanelWindow {
                               + " // SWAY " + (camera.statusReport.swaymsg ? "READY" : "MISSING")
                               + " // GIO TRASH " + (camera.statusReport.gio ? "READY" : "MISSING")
                     }
+                    }
                 }
 
                 Row {
@@ -544,7 +686,7 @@ PanelWindow {
                     spacing: 12
 
                     Column {
-                        width: Math.floor(parent.width * 0.54)
+                        width: Math.floor(parent.width * 0.30)
                         height: parent.height
                         spacing: 8
 
@@ -660,39 +802,46 @@ PanelWindow {
                             }
                         }
 
-                        Row {
+                        Column {
                             width: parent.width
-                            height: 30
-                            spacing: 8
-                            ActionButton {
-                                width: (parent.width - parent.spacing) / 2
-                                height: 28
-                                label: "ALL IMAGES"
-                                labelPixelSize: 10
-                                selected: !camera.galleryShotsOnly
-                                accentColor: Colors.white
-                                onLeftClicked: {
-                                    camera.galleryShotsOnly = false;
-                                    camera.loadGallery(false);
-                                }
-                            }
-                            ActionButton {
-                                width: (parent.width - parent.spacing) / 2
-                                height: 28
-                                label: "SCREENSHOTS"
-                                labelPixelSize: 10
-                                selected: camera.galleryShotsOnly
-                                accentColor: Colors.white
-                                onLeftClicked: {
-                                    camera.galleryShotsOnly = true;
-                                    camera.loadGallery(false);
+                            spacing: 4
+                            Repeater {
+                                model: [
+                                    [{id: "all", label: "ALL IMAGES"},
+                                     {id: "screenshots", label: "SCREENSHOTS"},
+                                     {id: "webcam", label: "WEBCAM"}],
+                                    [{id: "videos", label: "VIDEOS"},
+                                     {id: "screen-recordings", label: "SCREEN VIDEO"}]
+                                ]
+                                Row {
+                                    id: filterRow
+                                    property var rowItems: modelData
+                                    width: galleryPage.width * 0.30
+                                    height: 29
+                                    spacing: 4
+                                    Repeater {
+                                        model: filterRow.rowItems
+                                        ActionButton {
+                                            width: (filterRow.width - (filterRow.rowItems.length - 1) * filterRow.spacing) / filterRow.rowItems.length
+                                            height: 27
+                                            label: modelData.label
+                                            labelPixelSize: 8
+                                            selected: camera.galleryMediaFilter === modelData.id
+                                            accentColor: Colors.white
+                                            onLeftClicked: {
+                                                camera.galleryShotsOnly = false;
+                                                camera.galleryMediaFilter = modelData.id;
+                                                camera.loadGallery(false);
+                                            }
+                                        }
+                                    }
                                 }
                             }
                         }
 
                         Item {
                             width: parent.width
-                            height: galleryPage.height - 205
+                            height: galleryPage.height - 241
 
                             ListView {
                                 id: photoList
@@ -710,9 +859,9 @@ PanelWindow {
 
                                 delegate: ActionButton {
                                     width: photoList.width
-                                    height: 58
-                                    label: "         " + modelData.name
-                                    labelPixelSize: 10
+                                    height: 48
+                                    label: "        " + modelData.name
+                                    labelPixelSize: 9
                                     labelHorizontalAlignment: Text.AlignLeft
                                     contentPadding: 6
                                     accentColor: Colors.white
@@ -723,11 +872,12 @@ PanelWindow {
                                     onLeftClicked: camera.selectImage(modelData)
 
                                     Image {
-                                        width: 47
-                                        height: 47
+                                        width: 35
+                                        height: 35
                                         x: 5
                                         y: 5
-                                        source: camera.fileUrl(modelData.path)
+                                        source: modelData.mediaType && modelData.mediaType.indexOf("video") >= 0
+                                                ? "" : camera.fileUrl(modelData.path)
                                         sourceSize.width: 94
                                         sourceSize.height: 94
                                         fillMode: Image.PreserveAspectFit
@@ -778,7 +928,7 @@ PanelWindow {
                     }
 
                     Column {
-                        width: parent.width - Math.floor(parent.width * 0.54)
+                        width: parent.width - Math.floor(parent.width * 0.30)
                                - parent.spacing
                         height: parent.height
                         spacing: 7
@@ -795,10 +945,30 @@ PanelWindow {
                             id: zoomViewer
                             width: parent.width
                             height: galleryPage.height - 230
-                            source: camera.selectedPath
+                            source: camera.selectedPath && camera.selectedRecord
+                                    && camera.selectedRecord.mediaType.indexOf("video") < 0
                                     ? camera.fileUrl(camera.selectedPath) : ""
                         }
 
+                        GohuText {
+                            width: parent.width
+                            height: 21
+                            visible: camera.selectedRecord !== null
+                                     && camera.selectedRecord.mediaType.indexOf("video") >= 0
+                            color: Colors.magenta
+                            font.pixelSize: 11
+                            text: "VIDEO SELECTED // OPEN IN LOCAL VIDEO PLAYER"
+                        }
+                        ActionButton {
+                            width: parent.width
+                            height: 30
+                            visible: camera.selectedRecord !== null
+                                     && camera.selectedRecord.mediaType.indexOf("video") >= 0
+                            label: "PLAY VIDEO"
+                            labelPixelSize: 11
+                            accentColor: Colors.cyan
+                            onLeftClicked: Qt.openUrlExternally(camera.fileUrl(camera.selectedPath))
+                        }
                         Row {
                             width: parent.width
                             height: 32

@@ -1,0 +1,63 @@
+name: Connections C2h native read-only host status stream
+
+on:
+  pull_request:
+    paths:
+      - "tests/connections/fixtures/C2hStatusProducer.py"
+      - "tests/connections/fixtures/C2hNativeStatusScene.qml"
+      - "tests/connections/fixtures/C2hNativeStatusRunner.sh"
+      - "tests/connections/test_connections_c2h_status_stream.py"
+      - ".github/workflows/connections-c2h-native-status-stream.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  fake-host-status-contracts:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Exercise actual C2f fake-host lifecycle and strict JSON status output
+        run: timeout 35s python3 -B tests/connections/test_connections_c2h_status_stream.py
+      - name: Preserve C2f, C2g and closed production broker contracts
+        run: |
+          timeout 55s python3 -B tests/connections/test_connections_c2f_request_lifecycle.py
+          node tests/cpuplus/test_connections_status_c2g.js
+          node tests/cpuplus/test_connections_broker_c2a.js
+      - name: Verify no production host status transport activated
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          status = Path("services/connections/ConnectionsRequestStatus.qml").read_text()
+          broker = Path("services/connections/ConnectionsBroker.qml").read_text()
+          assert "readonly property bool hostConnected: false" in status
+          assert "readonly property bool hostAuthenticated: false" in status
+          assert "readonly property var latestStatus: null" in status
+          assert "readonly property bool credentialActionsEnabled: false" in broker
+          print("C2H_PASS // PRODUCTION_STATUS_BRIDGE_OFFLINE")
+          PY
+
+  native-quickshell-status:
+    runs-on: ubuntu-latest
+    container:
+      image: fedora:44
+    timeout-minutes: 15
+    steps:
+      - name: Install disposable Fedora Quickshell native test dependencies
+        run: |
+          dnf install -y --setopt=install_weak_deps=False dnf5-plugins
+          dnf copr enable -y errornointernet/quickshell
+          dnf install -y --setopt=install_weak_deps=False \
+            quickshell qt6-qtdeclarative qt6-qt5compat qt6-qtbase-gui \
+            qt6-qtsvg nodejs python3 coreutils findutils grep sed \
+            xorg-x11-server-Xvfb
+          quickshell --version
+          quickshell --version | grep '0.3.'
+      - uses: actions/checkout@v4
+      - name: Quickshell QML receives real fake-host status transitions
+        run: bash tests/connections/fixtures/C2hNativeStatusRunner.sh

@@ -261,6 +261,19 @@ Item {
                         socialLinksStore: sections.localLinksStore
                     }
 
+                    IdentityCenterLocalOrgBackup {
+                        id: localOrgBackup
+                        objectName: "orgLocalBackup"
+                        width: parent.width
+                        directoryStore: sections.localDirectoryStore
+                        portfolioStore: sections.localPortfoliosStore
+                        structureStore: sections.localStructureStore
+                        functionLocationStore: sections.localUnitLocationLinksStore
+                        branchLocationStore: sections.localBranchLocationLinksStore
+                        reportingStore: sections.localFunctionalReportingStore
+                        socialLinksStore: sections.localLinksStore
+                    }
+
                     // Shared local record editing context. ALL shows company records;
                     // Structure and Modifiers require an explicit active company.
                     Column {

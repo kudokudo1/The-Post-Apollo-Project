@@ -673,7 +673,9 @@ Item {
                     }
 
                     GohuText {
-                        text: root.selectedCountry
+                        text: root.selectedHub
+                              ? root.selectedHub.label
+                              : root.selectedCountry
                               ? root.selectedCountry[1] + " // " + root.selectedCountry[0]
                               : root.selectedState
                               ? root.selectedState[1] + " // " + root.selectedState[0]
@@ -687,7 +689,11 @@ Item {
 
                     GohuText {
                         width: parent.width
-                        text: root.selectedCountry
+                        text: root.selectedHub
+                              ? root.selectedHub.organizationLabel + " / "
+                                + root.selectedHub.city + " / "
+                                + root.selectedHub.serviceFamily
+                              : root.selectedCountry
                               ? "NATIONAL CAPITAL: " + root.selectedCountry[2]
                               : root.selectedState
                               ? "STATE CAPITAL: " + root.selectedState[2]
@@ -699,7 +705,9 @@ Item {
 
                     GohuText {
                         width: parent.width
-                        text: "SERVICE COVERAGE: UNVERIFIED"
+                        text: root.selectedHub
+                              ? "HUB CLAIM // REPORTED, NOT VERIFIED"
+                              : "SERVICE COVERAGE: UNVERIFIED"
                         font.pixelSize: 10
                         color: Colors.yellow
                         wrapMode: Text.WordWrap
@@ -718,6 +726,46 @@ Item {
                             id: stateRows
                             width: parent.width
                             spacing: 3
+
+                            Repeater {
+                                model: root.hubRows.filter(function(hub) {
+                                    var q=String(stateSearch.text||"").toLowerCase();
+                                    return !hub.archived && (!q
+                                        || hub.label.toLowerCase().indexOf(q)>=0
+                                        || hub.city.toLowerCase().indexOf(q)>=0
+                                        || hub.organizationLabel.toLowerCase().indexOf(q)>=0);
+                                })
+                                Rectangle {
+                                    id: hubRow
+                                    required property var modelData
+                                    width: stateRows.width
+                                    height: 26
+                                    color: root.selectedHubId===modelData.id
+                                        ? Colors.yellow : Colors.black
+                                    border.width: 1
+                                    border.color: Colors.orange
+
+                                    GohuText {
+                                        anchors.fill: parent
+                                        anchors.leftMargin: 6
+                                        verticalAlignment: Text.AlignVCenter
+                                        text: "⌂ " + hubRow.modelData.label
+                                        color: root.selectedHubId===hubRow.modelData.id
+                                            ? Colors.black : Colors.orange
+                                        font.pixelSize: 10
+                                        elide: Text.ElideRight
+                                    }
+
+                                    MouseArea {
+                                        anchors.fill: parent
+                                        onClicked: {
+                                            root.selectedHubId=hubRow.modelData.id;
+                                            root.selectedCode="";
+                                            root.selectedCountryCode="";
+                                        }
+                                    }
+                                }
+                            }
 
                             Repeater {
                                 model: Geo.visibleCountries(root.regionKey,stateSearch.text)
@@ -794,12 +842,16 @@ Item {
 
             GohuText {
                 width: parent.width
-                text: (root.selectedCountry ? root.selectedCountry[1] + " // "
+                text: root.hubPlacementArmed
+                    ? "CLICK MAP TO PLACE A HUB. Then enter a company label, city, "
+                    + "region and service type. Saved records remain unverified."
+                    : (root.selectedHub ? root.selectedHub.label + " // "
+                    : root.selectedCountry ? root.selectedCountry[1] + " // "
                     : root.selectedState ? root.selectedState[1] + " // "
                     : "NO PLACE SELECTED // ")
-                    + "Canada, Mexico, USA and world geography are reference only. "
-                    + "NO COMPANY COVERAGE VERIFIED. Service selection does not "
-                    + "create provider areas. Capitals are not company hubs."
+                    + root.hubRows.filter(function(h){return !h.archived;}).length
+                    + " operator-reported hub(s). NO COMPANY COVERAGE VERIFIED. "
+                    + "Orange pins are local claims, not confirmed operations."
                 font.pixelSize: 11
                 color: Colors.white
                 wrapMode: Text.WordWrap

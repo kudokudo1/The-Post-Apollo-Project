@@ -7,6 +7,8 @@ on:
       - "widgets/CpuPlusW.qml"
       - "widgets/cpuplus/CpuPlusSettingsConnections*.qml"
       - "tests/cpuplus/test_cpuplus_connections_c1.js"
+      - "tests/cpuplus/fixtures/C1ConnectionsNative.qml"
+      - "scripts/cpuplus/verify_connections_native_c1.sh"
       - ".github/workflows/cpuplus-connections-c1.yml"
   workflow_dispatch:
 
@@ -31,3 +33,23 @@ jobs:
       - name: Preserve independent Social writer contracts
         run: |
           python3 -m py_compile services/social/SocialAccountDetails.py
+
+  native-connections:
+    runs-on: ubuntu-latest
+    container:
+      image: fedora:44
+    timeout-minutes: 15
+    steps:
+      - name: Install Fedora Quickshell and isolated pointer runner
+        run: |
+          dnf install -y --setopt=install_weak_deps=False dnf5-plugins
+          dnf copr enable -y errornointernet/quickshell
+          dnf install -y --setopt=install_weak_deps=False \
+            quickshell qt6-qtdeclarative qt6-qt5compat qt6-qtbase-gui \
+            qt6-qtsvg nodejs python3 coreutils findutils \
+            xdotool xorg-x11-server-Xvfb
+          quickshell --version
+          quickshell --version | grep '0.3.'
+      - uses: actions/checkout@v4
+      - name: Actual native Connections selection and Social reload
+        run: bash scripts/cpuplus/verify_connections_native_c1.sh

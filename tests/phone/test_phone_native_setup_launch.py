@@ -143,6 +143,7 @@ class NativeSetupLaunchTests(unittest.TestCase):
             "iphone",
             find_executable=programs.get,
             launcher=launcher,
+            configured=lambda: False,
         )
         self.assert_locked(result)
         self.assertEqual(result["status"], "OPEN_REQUESTED")
@@ -154,6 +155,32 @@ class NativeSetupLaunchTests(unittest.TestCase):
         self.assertIs(result["stageCandidate"], True)
         self.assertNotIn("shell", launcher.call_args.kwargs)
         self.assertTrue(launcher.call_args.kwargs["start_new_session"])
+
+    def test_saved_blueferry_configuration_opens_client_not_repair_wizard(self):
+        programs = {"blueferry": "/usr/bin/blueferry", "foot": "/usr/bin/foot"}
+        launcher = mock.Mock()
+        result = module.open_setup(
+            "iphone", find_executable=programs.get,
+            launcher=launcher, configured=lambda: True)
+        self.assert_locked(result)
+        self.assertEqual(result["status"], "OPEN_REQUESTED")
+        self.assertIs(result["stageCandidate"], True)
+        self.assertEqual(launcher.call_args.args[0], [
+            "/usr/bin/foot", "--app-id", module.STAGE_APP_ID, "-e",
+            "/usr/bin/blueferry", "tui",
+        ])
+
+    def test_config_probe_failure_is_not_silent_pairing_wizard_mutation(self):
+        programs = {"blueferry": "/usr/bin/blueferry", "foot": "/usr/bin/foot"}
+        launcher = mock.Mock()
+        def bad():
+            raise OSError("PRIVATE PATH")
+        result = module.open_setup(
+            "iphone", find_executable=programs.get,
+            launcher=launcher, configured=bad)
+        self.assert_locked(result)
+        self.assertEqual(launcher.call_args.args[0][-1], "pair-setup")
+        self.assertNotIn("PRIVATE", str(result))
 
     def test_no_terminal_or_cli_means_no_pairing(self):
         programs = {"blueferry": "/usr/bin/blueferry"}
@@ -199,7 +226,7 @@ class NativeSetupLaunchTests(unittest.TestCase):
                           "sudo ", "pkexec", "shell=True"):
             with self.subTest(forbidden=forbidden):
                 self.assertNotIn(forbidden, src)
-        self.assertIn('[terminal_path, *flags, wizard, "pair-setup"]', src)
+        self.assertIn('client_command = "tui" if existing_config else "pair-setup"', src)
 
 
 if __name__ == "__main__":

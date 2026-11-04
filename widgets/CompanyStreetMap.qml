@@ -20,6 +20,7 @@ Item {
     property string tileStatus: "STREETS OFF"
     property string tileError: ""
     property string responseText: ""
+    property bool pendingRefresh: false
 
     signal locationPicked(real longitude, real latitude)
     signal hubPicked(string id)
@@ -43,8 +44,13 @@ Item {
     }
 
     function requestTiles() {
-        if(!active || !visible || width<100 || height<100 || fetcher.running)
+        if(!active || !visible || width<100 || height<100)
             return false;
+        if(fetcher.running) {
+            pendingRefresh=true;
+            return false;
+        }
+        pendingRefresh=false;
         responseText="";
         tileStatus="FETCHING VISIBLE STREET TILES";
         tileError="";
@@ -62,6 +68,7 @@ Item {
         if(active) refreshDelay.restart();
         else {
             refreshDelay.stop();
+            pendingRefresh=false;
             tiles=[];
             tileStatus="STREETS OFF";
         }
@@ -102,8 +109,9 @@ Item {
                 street.tileError=response && response.error
                     ? response.error : "FETCH_UNAVAILABLE";
             }
-            // Re-evaluate any pending pan/zoom made during the last request.
-            if(refreshDelay.running) return;
+            // A pan/zoom during a running fetch must get a fresh viewport
+            // request after completion; never lose that update silently.
+            if(street.pendingRefresh && street.active) refreshDelay.restart();
         }
     }
 

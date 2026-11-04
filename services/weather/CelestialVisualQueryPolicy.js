@@ -27,7 +27,7 @@ function parseDayStep(value) {
     return n<=MAX_DAY_OFFSET ? n : null;
 }
 function adjustDayStep(current,direction) {
-    if(parseDayStep(current)===null ||
+    if(typeof current!=="number" || parseDayStep(current)===null ||
        typeof direction!=="number" || !isFinite(direction) ||
        Math.floor(direction)!==direction || Math.abs(direction)!==1)
        return null;

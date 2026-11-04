@@ -794,6 +794,30 @@ PanelWindow {
             }
         }
 
+        // Company Network: geographic services and expansion planning.
+        // The launcher owns only the click; the widget owns its visible state.
+        Item {
+            id: companyNetworkHost
+            width: companyNetworkButton.implicitWidth
+            height: companyNetworkButton.implicitHeight
+
+            CompanyNetwork {
+                id: companyNetworkButton
+                anchors.fill: parent
+                menuOpen: companyNetworkWindow.menuOpen
+                onToggleRequested: companyNetworkWindow.toggle()
+            }
+
+            CompanyNetworkW {
+                id: companyNetworkWindow
+                screen: shellRoot.screen
+                dockCenterX: shellRoot.margins.left + leftModules.x
+                             + companyNetworkHost.x + companyNetworkButton.width / 2
+                chassisTopY: hospitalWindow.panelTopMargin
+                             + hospitalWindow.topGlowGutter
+            }
+        }
+
         // Tasks
 
         Item {

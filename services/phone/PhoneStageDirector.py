@@ -153,6 +153,8 @@ def operation(action: str, *, local: tuple[int, int, int, int] | None = None,
         if action == "close":
             execute(f"{selector} kill")
             return _result("CLOSE_REQUESTED")
+        if stage.get("visible") is not True:
+            return _result("ACTOR_NOT_FOUND")
         social = _social_actor(observed)
         if social is None:
             return _result("HOST_NOT_FOUND")

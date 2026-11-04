@@ -14,6 +14,10 @@ Rectangle {
 
     // Optional WEATHER subject route. Empty keeps the exact CLASSIC page.
     property string subjectRoute: ""
+    // M30-A overview consumes the existing SKY observation service without
+    // rendering a second complete scroll surface. CLASSIC defaults unchanged.
+    property bool sourceOnly: false
+    readonly property var moonObservation: moonService
     function sectionVisible(section) {
         return SubjectPanelPolicy.visibleFor("sky",subjectRoute,section)
             || CosmosPanelPolicy.visibleFor("sky",subjectRoute,section);
@@ -527,6 +531,7 @@ Rectangle {
     // enlarged. Measure its real content and scroll rather than clipping rows.
     Flickable {
         id: skyScroll
+        visible: !sky.sourceOnly
         anchors.fill: parent
         clip: true
         boundsBehavior: Flickable.StopAtBounds
@@ -3359,6 +3364,6 @@ Rectangle {
         flickable: skyScroll
         handleStyle: "star"
         geometryHost: sky
-        visible: scrollable
+        visible: !sky.sourceOnly && scrollable
     }
 }

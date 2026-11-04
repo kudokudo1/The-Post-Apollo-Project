@@ -150,7 +150,7 @@ PanelWindow {
                     font.pixelSize: 15
                     color: Colors.white
                 }
-                // Match the dock: a two-pixel city-only optical nudge.
+                // Match the dock: six-pixel total city-only optical offset.
                 Item {
                     id: headerCityGlyphCell
                     width: headerCityGlyph.implicitWidth
@@ -158,7 +158,7 @@ PanelWindow {
 
                     NotoText {
                         id: headerCityGlyph
-                        y: 2
+                        y: 6
                         height: headerCity.height
                         verticalAlignment: Text.AlignVCenter
                         textFormat: Text.PlainText

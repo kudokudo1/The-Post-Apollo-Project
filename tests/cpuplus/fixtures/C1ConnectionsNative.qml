@@ -123,9 +123,13 @@ ShellRoot {
             if (root.ticks % 60 === 0)
                 console.log("C1_TICK // " + root.phase);
             if (root.phase === "boot") {
-                if (!ConnectionsRegistry.rows
-                        || ConnectionsRegistry.rows.length !== 7
-                        || !inventory.visible || !details.visible)
+                // Source counts grow as new Connections cards land.
+                // Verify the contracted providers, not a historic 7-row list.
+                const providers = ConnectionsRegistry.rows || [];
+                const has = id => providers.some(p => p.id === id);
+                if (!has("nasa-firms") || !has("proton-mail")
+                        || !has("social") || !inventory.visible
+                        || !details.visible)
                     return;
                 if (root.selectedId !== "social"
                         || !details.source

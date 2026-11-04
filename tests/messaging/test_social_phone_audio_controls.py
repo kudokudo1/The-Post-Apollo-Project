@@ -24,7 +24,7 @@ class PhoneAudioUiTests(unittest.TestCase):
         self.assertIn('onTriggered: phonePane.changePhoneAudio("media", modelData.route)', self.qml)
         self.assertIn('? "CALLS ON PC: ON" : "CALLS ON PC: OFF"', self.qml)
         self.assertIn('"calls", phonePane.phoneAudioStatus.callsEnabled === true', self.qml)
-        self.assertIn('For calls only, choose IPHONE above and enable CALLS ON PC', self.qml)
+        self.assertIn('For calls only, choose IPHONE above and select CALLS ON PC.', self.qml)
 
     def test_one_primary_connect_button_and_same_social_pane(self):
         self.assertEqual(self.qml.count('id: connectPhoneAction'), 1)
@@ -57,7 +57,7 @@ class PhoneAudioUiTests(unittest.TestCase):
     def test_call_on_state_never_claims_hfp_ready(self):
         self.assertIn('Call preference on. HFP status:', self.qml)
         self.assertIn('Actual call audio depends on oFono', self.qml)
-        self.assertIn('not ready on this desktop.', self.qml)
+        self.assertIn('Tap the call control for the missing hands-free requirement.', self.qml)
         self.assertIn('First media change may briefly interrupt', self.qml)
         self.assertIn('r.trustedPhoneLink !== "UNVERIFIED"', self.qml)
         self.assertIn('r.contentAccessEnabled !== false', self.qml)

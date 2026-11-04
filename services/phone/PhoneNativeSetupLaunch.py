@@ -16,9 +16,18 @@ from typing import Callable, Any
 
 SCHEMA = "post-apollo.phone.native-setup-launch.v0"
 TARGETS = {
-    "iphone": ("blueferry-gtk", "blueferry-qt"),
+    "iphone": ("blueferry-quickshell", "blueferry-gtk", "blueferry-qt"),
     "android": ("kdeconnect-app",),
 }
+# Fedora setups often have blueferry-backend (with its CLI) but no GTK/Qt
+# client. The terminal pairing wizard is officially supported and is selected
+# only when a person explicitly asks for iPhone setup.
+TERMINALS = (
+    ("foot", ("-e",)),
+    ("kitty", ("--hold",)),
+    ("alacritty", ("-e",)),
+    ("konsole", ("-e",)),
+)
 STATUS = frozenset({"OPEN_REQUESTED", "CLIENT_UNAVAILABLE", "LAUNCH_FAILED"})
 
 
@@ -40,11 +49,11 @@ def open_setup(
     find_executable: Callable[[str], str | None] = shutil.which,
     launcher: Callable[..., Any] = subprocess.Popen,
 ) -> dict[str, object]:
-    """Launch only a known desktop pairing UI, with no arguments or shell.
+    """Launch a known desktop client or explicit native pairing wizard; no shell.
 
     OPEN_REQUESTED means only the process spawned. It does not certify that
     a window opened, a device paired, an app linked, or a grant was issued.
-    Neither the target name nor the program path comes from device metadata.
+    Neither target nor executable path comes from device metadata.
     """
     if type(target) is not str or target not in TARGETS:
         return _result("UNSUPPORTED", "CLIENT_UNAVAILABLE")
@@ -57,7 +66,7 @@ def open_setup(
             path = None
         if type(path) is not str or not os.path.isabs(path):
             continue
-        # A resolved binary is explicit; no shell, arbitrary args, scripts,
+        # A resolved GUI is explicit; no shell, arbitrary args, scripts,
         # flags, phone addresses, tokens, content or service commands.
         try:
             launcher(
@@ -73,6 +82,35 @@ def open_setup(
             # Try another installed GUI client if available, never expose
             # executable paths or environmental errors to Social.
             launch_failed = True
+    # Only the explicitly chosen iPhone setup may use the upstream wizard.
+    # Launch a real interactive terminal, not a shell or automatic pair command.
+    # A paired phone need not be re-paired; the user remains in control of
+    # wizard prompts and can cancel before changing anything.
+    if target == "iphone":
+        try:
+            wizard = find_executable("blueferry")
+        except Exception:
+            wizard = None
+        if type(wizard) is str and os.path.isabs(wizard):
+            for terminal, flags in TERMINALS:
+                try:
+                    terminal_path = find_executable(terminal)
+                except Exception:
+                    terminal_path = None
+                if type(terminal_path) is not str or not os.path.isabs(terminal_path):
+                    continue
+                try:
+                    launcher(
+                        [terminal_path, *flags, wizard, "pair-setup"],
+                        stdin=subprocess.DEVNULL,
+                        stdout=subprocess.DEVNULL,
+                        stderr=subprocess.DEVNULL,
+                        start_new_session=True,
+                        close_fds=True,
+                    )
+                    return _result(target, "OPEN_REQUESTED")
+                except Exception:
+                    launch_failed = True
     return _result(target, "LAUNCH_FAILED" if launch_failed else "CLIENT_UNAVAILABLE")
 
 

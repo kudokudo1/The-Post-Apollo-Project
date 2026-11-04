@@ -91,6 +91,13 @@ test("Bash syntax valid and native runner changes only disposable HOME",()=>{
     assert.match(src,/git hash-object -- "\$scene"/);
     assert.match(src,/timeout --signal=TERM/);
     assert.match(src,/M13L_NATIVE_QML_IPC_AND_CLEANUP_PASS/);
+    assert.match(src,/M13L_NATIVE_DIAGNOSTIC_COMPLETE/);
+    assert.match(src,/M13L_OBSERVED_QML_LOADED/);
+    assert.match(src,/M13L_QML_INTERNAL_TIMER_EXPIRED/);
+    assert.match(src,/M13L_PRIVATE_SECRET_SERVICE_OWNER_UNVERIFIED/);
+    assert.match(src,/org\.freedesktop\.DBus\.NameHasOwner/);
+    assert.match(src,/owner_verified/);
+    assert.match(src,/M13L_QML_PASS_MARKER_MISSING/);
     assert.doesNotMatch(src,/git\s+(?:pull|checkout|reset|clean|switch|rebase)\b/);
     assert.doesNotMatch(src,/quickshell\s+-p\s+.*shell\.qml/);
     assert.doesNotMatch(src,/pkill|killall|systemctl|sudo\s+/);
@@ -102,6 +109,11 @@ test("standalone QML harness only invokes dormant synthetic IPC; never real TASK
     assert.match(q,/bridge\.startSynthetic\(\)/);
     assert.match(q,/M13L_NATIVE_QML_IPC_PASS/);
     assert.match(q,/Qt\.quit\(\)/);
+    for(const phase of ["M13L_PHASE_QML_COMPONENT_LOADED",
+        "M13L_PHASE_START_ATTEMPT","M13L_PHASE_PROCESS_START_ACCEPTED",
+        "M13L_PHASE_REPLY_PARSED","M13L_PHASE_BRIDGE_SETTLED",
+        "M13L_PHASE_QML_TIMER_EXPIRED"])
+        assert.ok(q.includes(phase),"Missing bounded QML diagnostic: "+phase);
     assert.doesNotMatch(q,/ApolloHubTodoStore\s*\{|FileView\s*\{|setText\(|secret-tool/);
     assert.doesNotMatch(fs.readFileSync(path.join(ROOT,"shell.qml"),"utf8"),
         /TaskEncryptedDraftAutoHarnessM13l/);

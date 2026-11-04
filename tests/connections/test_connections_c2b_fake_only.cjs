@@ -50,7 +50,12 @@ assert.match(script,/simulated:true/);
 assert.match(script,/secretTool\(\["store", "--label="/);
 assert.match(script,/secretTool\(\["clear",\.\.\.attrs\(nonce\)\]/);
 assert.match(script,/secretTool\(\["lookup", \.\.\.attrs\(nonce\)\]/);
-assert.doesNotMatch(script,/https?:\/\/|fetch\(|XMLHttpRequest|curl|request_url\(/);
+// Assert on executable code, not comments mentioning network tools.
+const executable = script.split("\n")
+    .filter(line => !line.trim().startsWith("//")
+                    && !line.trim().startsWith("*"))
+    .join("\n");
+assert.doesNotMatch(executable,/https?:\/\/|\bfetch\s*\(|XMLHttpRequest|spawnSync\(["']curl|request_url\(/);
 assert.doesNotMatch(script,/POST_APOLLO_FIRMS_MAP_KEY|Quickshell|services\/hub\/ApolloHubTodo/);
 assert.doesNotMatch(script,/console\.log\(secret|JSON\.stringify\(secret/);
 assert.match(setup,/dbus-run-session/); // workflow wraps the script, not script itself

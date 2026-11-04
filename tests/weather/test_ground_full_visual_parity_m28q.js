@@ -60,8 +60,9 @@ test("GROUND full page is a reachable leaf in the seven-family WEATHER workspace
     assert.equal(workspace.selectedGroup(FULL),"ground");
     assert.equal(workspace.familyFor(FULL),"weather");
     assert.equal(tabs.length,8);
-    assert.deepEqual(tabs.filter(x=>["water","hazards","conditions","forecasts"].includes(x.key))
-                   .map(x=>x.path),[
+    assert.deepEqual(JSON.parse(JSON.stringify(
+        tabs.filter(x=>["water","hazards","conditions","forecasts"].includes(x.key))
+            .map(x=>x.path))),[
         "weather/conditions/current","weather/forecasts/hourly",
         "weather/water/rivers","weather/hazards/alerts"
     ]);

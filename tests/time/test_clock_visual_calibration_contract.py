@@ -131,13 +131,13 @@ class ClockVisualCalibrationTests(unittest.TestCase):
         self.assertEqual(run.call_count, 2)
 
     def test_measurement_when_daemon_active_reads_tracking_without_new_daemon(self):
-        # An active Chrony instance uses its existing recent source estimate.
-        # The measurement must not launch another chronyd or change the clock.
+        # The active daemon's recent estimate is read without a new chronyd.
         from datetime import datetime, timezone
+        stamp = datetime.now(timezone.utc).strftime("%a %b %d %H:%M:%S %Y")
         tracking = (
             "Reference ID : CB00710F (source)\n"
             "Stratum : 3\n"
-            "Ref time (UTC) : Wed Nov 04 05:00:00 2026\n"
+            f"Ref time (UTC) : {stamp}\n"
             "System time : 0.050000000 seconds slow of NTP time\n"
             "Root delay : 0.020000 seconds\n"
             "Root dispersion : 0.010000 seconds\n"
@@ -146,14 +146,11 @@ class ClockVisualCalibrationTests(unittest.TestCase):
                 host.subprocess, "run", side_effect=[
                     result(0, stdout="active\n"),
                     result(0, stdout=tracking),
-                ]) as run, patch.object(host, "parse_tracking_measurement",
-                    wraps=host.parse_tracking_measurement) as parse:
-            # Fix sample age deterministically without launching host commands.
-            with patch.object(host.datetime, "datetime", wraps=datetime) as dt:
-                dt.now.return_value = datetime(2026, 11, 4, 5, 1, tzinfo=timezone.utc)
-                data = host.measure_clock()
+                ]) as run:
+            data = host.measure_clock()
         self.assertEqual(data["source"], "CHRONY_TRACKING")
         self.assertEqual(data["offsetMs"], -50)
+        self.assertEqual(data["uncertaintyMs"], 20)
         self.assertEqual(run.call_count, 2)
         self.assertEqual(run.call_args_list[1].args[0],
                          [host.CHRONYC, "tracking"])

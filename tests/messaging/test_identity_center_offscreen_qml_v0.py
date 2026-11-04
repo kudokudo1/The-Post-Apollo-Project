@@ -15,7 +15,7 @@ import unittest
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
 from PySide6.QtCore import QObject, QUrl, QMetaObject
-from PySide6.QtGui import QGuiApplication
+from PySide6.QtGui import QGuiApplication, QColor
 from PySide6.QtQml import QQmlComponent, QQmlEngine
 from PySide6.QtQuick import QQuickItem
 
@@ -904,6 +904,67 @@ class RealQtOrganizationsSettingsPaneSmoke(unittest.TestCase):
         activity.setProperty("entries", [])
         APP.processEvents()
         self.assertEqual(activity.property("entryCount"), 0)
+        self.assertFalse(self.sections.property("organizationDisplayReady"))
+
+    def test_semantic_action_roles_and_magenta_input_focus(self):
+        self._open_organizations()
+
+        cases = (
+            ("orgRefreshAllButton", "refresh", "#9ece6a", 150, 28),
+            ("orgBackupCreateButton", "manage", "#f2be4e", 155, 28),
+            ("orgBackupListButton", "navigate", "#5b5fd4", 155, 28),
+            ("orgBackupValidateButton", "refresh", "#9ece6a", 171, 28),
+            ("orgBackupRestoreLockedButton", "danger", "#d16041", 172, 28),
+            ("orgSessionShowAll", "navigate", "#5b5fd4", 155, 28),
+            ("orgSessionClearView", "danger", "#d16041", 151, 28),
+            ("localShowArchivedRecords", "manage", "#f2be4e", 188, 29),
+        )
+        for name, role, accent, width, height in cases:
+            button = self.sections.findChild(QObject, name)
+            self.assertIsNotNone(button, "Missing themed " + name)
+            self.assertEqual(button.property("role"), role, name)
+            self.assertEqual(QColor(button.property("roleColor")),
+                             QColor(accent), name)
+            self.assertEqual(button.property("width"), width, name)
+            self.assertEqual(button.property("height"), height, name)
+            self.assertEqual(QColor(button.property("idleBorderColor")),
+                             QColor(accent), name)
+            self.assertEqual(QColor(button.property("selectedBorderColor")),
+                             QColor("#c74ec7"), name)
+            self.assertEqual(QColor(button.property("pressedFillColor")),
+                             QColor("#d16041") if role == "danger"
+                             else QColor("#c74ec7"), name)
+
+        locked = self.sections.findChild(QObject, "orgBackupRestoreLockedButton")
+        self.assertFalse(locked.property("interactive"))
+        self.assertTrue(locked.property("destructive"))
+
+        scope = self.sections.findChild(QObject, "orgLocalSearch")
+        archived = self.sections.findChild(QObject, "localShowArchivedRecords")
+        self.assertIsNotNone(scope)
+        self.assertFalse(archived.property("selected"))
+        scope.setProperty("includeArchived", True)
+        APP.processEvents()
+        self.assertTrue(archived.property("selected"))
+        self.assertEqual(QColor(archived.property("activeBorderColor")),
+                         QColor("#c74ec7"))
+
+        # The real input/frame preserve the original 32px bar but use
+        # different colors for idle navigation vs intentional typing.
+        frame = self.sections.findChild(QObject, "orgSearchInputFrame")
+        input_item = self.sections.findChild(QObject, "orgSearchInput")
+        self.assertIsNotNone(frame)
+        self.assertIsNotNone(input_item)
+        self.assertEqual(frame.property("height"), 32)
+        self.assertEqual(QColor(input_item.property("selectionColor")),
+                         QColor("#c74ec7"))
+        self.assertEqual(QColor(frame.property("focusBorderColor")),
+                         QColor("#5b5fd4"))
+        input_item.forceActiveFocus()
+        APP.processEvents()
+        self.assertTrue(frame.property("intentFocused"))
+        self.assertEqual(QColor(frame.property("focusBorderColor")),
+                         QColor("#c74ec7"))
         self.assertFalse(self.sections.property("organizationDisplayReady"))
 
     def test_host_logout_and_failure_are_reflected_in_real_panel(self):

@@ -198,15 +198,20 @@ Column {
         width: parent.width
         spacing: 6
         Rectangle {
+            objectName: "orgSearchInputFrame"
             width: Math.max(110, parent.width - 137)
             height: 32
-            color: searchInput.activeFocus && searchInput.enabled && !searchInput.readOnly
+            readonly property bool intentFocused:
+                searchInput.activeFocus && searchInput.enabled && !searchInput.readOnly
+            readonly property color focusBorderColor:
+                intentFocused ? Colors.magenta : Colors.blue
+            color: intentFocused
                 ? Qt.rgba(Colors.magenta.r, Colors.magenta.g, Colors.magenta.b, 0.12)
                 : Colors.black
-            border.color: searchInput.activeFocus && searchInput.enabled && !searchInput.readOnly
-                ? Colors.magenta : Colors.blue
+            border.color: focusBorderColor
             TextInput {
                 id: searchInput
+                objectName: "orgSearchInput"
                 selectionColor: Colors.magenta
                 selectedTextColor: Colors.black
                 anchors.fill: parent

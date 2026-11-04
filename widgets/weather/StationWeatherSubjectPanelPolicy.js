@@ -6,6 +6,9 @@
 var FORMAT = "post-apollo.weather.subject-panels.m2a.v1";
 
 var ROUTES = {
+  // M28-Q: complete original GROUND surface, including its 16 source/visual
+  // sections. Preserve one original StationGround instance and scrollbar.
+  "weather/ground/full": {page:"ground",full:true},
   // NOW + AIR aggregates original terrestrial readings in one scrollable
   // StationSky view; detailed ground air/gas/pollen pages stay independent.
   "weather/conditions/current": {page:"sky", sections:["header","runtime","current","atmosphere"]},
@@ -58,7 +61,7 @@ function visibleFor(page, path, section) {
   if (path === "") return true;
   var info = typeof path === "string" ? ROUTES[path] : null;
   return !!info && info.page === page
-    && info.sections.indexOf(section) >= 0;
+    && (info.full === true || info.sections.indexOf(section) >= 0);
 }
 
 function needsSource(path, source) {
@@ -66,6 +69,12 @@ function needsSource(path, source) {
   if (path === "") return true;
   if (kindForRoute(path) === "")
     return false;
+  // Full original GROUND includes all its established source-bound sections.
+  // No second source owner; these gates feed the existing root services
+  // and the original StationGround marine/coastal actors.
+  if (path === "weather/ground/full")
+    return ["river","lightning","marine","coastal","seismic"]
+      .indexOf(source) >= 0;
   if (source === "river")
     return path === "weather/water/rivers"
       || path.indexOf("weather/water/rivers/") === 0

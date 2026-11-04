@@ -13,6 +13,17 @@
 #include <QDebug>
 #include <QColor>
 #include <algorithm>
+#include <QFile>
+#include <QJsonDocument>
+#include <QJsonObject>
+#include <QJsonArray>
+#include <QJsonParseError>
+#include <QVariantList>
+#include <QVariantMap>
+#include <QSet>
+#include <QElapsedTimer>
+#include <QVector>
+#include <QtMath>
 
 int main(int argc, char **argv) {
     // MapLibre Native Qt v3 QML needs OpenGL RHI. This is PROCESS-LOCAL.
@@ -26,6 +37,12 @@ int main(int argc, char **argv) {
     const bool anyOnline = online || styledOnline;
     const bool capture = args.contains("--capture");
     const bool mockHub = args.contains("--mock-hub");
+    const bool fixtureHubs = args.contains("--fixture-hubs");
+    const bool benchMotion = args.contains("--bench-pan-zoom");
+    if (fixtureHubs && !anyOnline) {
+        qCritical() << "FIXTURE_HUBS_REQUIRE_EXPLICIT_ONLINE_MODE";
+        return 8;
+    }
     if (mockHub && !anyOnline) {
         qCritical() << "MOCK_HUB_REQUIRES_EXPLICIT_ONLINE_MODE";
         return 7;
@@ -75,12 +92,67 @@ int main(int argc, char **argv) {
     if (anyOnline)
         qInfo() << "ONLINE_MAP_PRIVACY: IP and viewed map tiles may reach OpenFreeMap.";
 
+    // This is a fixed repo-owned, *synthetic* fixture, not a user-supplied
+    // path and never a read of $XDG_DATA_HOME or CompanyHubDirectory.py.
+    // Reject additional/private fields and any malformed coordinates.
+    QVariantList fixtureRecords;
+    if (fixtureHubs) {
+        QFile fixture(QStringLiteral(COMPANY_PROBE_HUB_FIXTURE_PATH));
+        if (!fixture.open(QIODevice::ReadOnly) || fixture.size() > 4096) {
+            qCritical() << "FIXTURE_READ_FAILED";
+            return 10;
+        }
+        QJsonParseError parseError;
+        auto doc = QJsonDocument::fromJson(fixture.readAll(), &parseError);
+        if (parseError.error != QJsonParseError::NoError || !doc.isObject()) {
+            qCritical() << "FIXTURE_PARSE_FAILED";
+            return 10;
+        }
+        const auto json = doc.object();
+        const auto records = json.value("records").toArray();
+        if (json.size() != 2 || json.value("schema").toString() !=
+                QStringLiteral("post-apollo.company-hubs.fixture.v1")
+                || records.size() != 3) {
+            qCritical() << "FIXTURE_SCHEMA_REFUSED";
+            return 10;
+        }
+        QSet<QString> ids;
+        for (const auto &entry : records) {
+            if (!entry.isObject()) return 10;
+            const auto hub = entry.toObject();
+            const QString id = hub.value("id").toString();
+            const QString label = hub.value("label").toString();
+            if (hub.size() != 4 || !id.startsWith("fixture-")
+                    || ids.contains(id)
+                    || !label.startsWith("DEMO NODE ")
+                    || label.size() > 24
+                    || !hub.value("latitude").isDouble()
+                    || !hub.value("longitude").isDouble()) {
+                qCritical() << "FIXTURE_FIELD_REFUSED";
+                return 10;
+            }
+            const double lat = hub.value("latitude").toDouble();
+            const double lon = hub.value("longitude").toDouble();
+            if (!qIsFinite(lat) || !qIsFinite(lon) ||
+                    lat < -85 || lat > 85 || lon < -180 || lon > 180) {
+                qCritical() << "FIXTURE_COORDINATES_REFUSED";
+                return 10;
+            }
+            ids.insert(id);
+            fixtureRecords.append(QVariantMap{{"id", id}, {"label", label},
+                {"latitude", lat}, {"longitude", lon}});
+        }
+        qInfo() << "SYNTHETIC_FIXTURE_VALIDATED" << fixtureRecords.size();
+    }
+
     QQmlApplicationEngine engine;
     engine.rootContext()->setContextProperty("probeStyleUrl", styleUrl.toString());
     engine.rootContext()->setContextProperty("probeOnline", anyOnline);
     engine.rootContext()->setContextProperty("probeStyledOnline", styledOnline);
     engine.rootContext()->setContextProperty("probeSample", sample);
     engine.rootContext()->setContextProperty("probeMockHub", mockHub);
+    engine.rootContext()->setContextProperty("probeFixtureHubs", fixtureRecords);
+    engine.rootContext()->setContextProperty("probeBenchMotion", benchMotion);
     engine.load(QUrl(QStringLiteral("qrc:/CompanyVectorProbe/main.qml")));
     if (engine.rootObjects().isEmpty()) {
         qCritical() << "QML_PLUGIN_OR_WINDOW_LOAD_FAILED";
@@ -90,6 +162,44 @@ int main(int argc, char **argv) {
     if (!window) {
         qCritical() << "UNEXPECTED_ROOT_OBJECT";
         return 4;
+    }
+    if (benchMotion) {
+        // QQuickWindow::frameSwapped timestamps include CPU, GPU, compositor
+        // and CI scheduling effects. Not a desktop latency/FPS guarantee.
+        QElapsedTimer watch;
+        watch.start();
+        QVector<qint64> intervals;
+        qint64 lastSwapNs = -1;
+        QObject::connect(window, &QQuickWindow::frameSwapped, window,
+            [&watch, &intervals, &lastSwapNs]() {
+                const qint64 now = watch.nsecsElapsed();
+                // QML starts fixed camera motion at 8 sec, stops by 13 sec.
+                if (now < 8000000000LL || now > 13500000000LL) return;
+                if (lastSwapNs >= 0) intervals.append(now-lastSwapNs);
+                lastSwapNs = now;
+            });
+        QTimer::singleShot(14600, &app, [&app, &intervals, sample, anyOnline]() {
+            std::sort(intervals.begin(), intervals.end());
+            const int n = intervals.size();
+            auto percentileMs = [&intervals, n](double fraction) -> double {
+                if (!n) return 0;
+                const int idx = std::min(n-1, std::max(0, int(std::ceil(n*fraction)-1)));
+                return double(intervals[idx])/1000000.0;
+            };
+            const double p50 = percentileMs(0.50);
+            const double p95 = percentileMs(0.95);
+            const double maxMs = n ? double(intervals.last())/1000000.0 : 0.0;
+            QJsonObject report{
+                {"sample", sample}, {"online", anyOnline},
+                {"frame_intervals", n},
+                {"p50_ms", p50}, {"p95_ms", p95}, {"max_ms", maxMs},
+                {"window_ms", 5500},
+                {"note", "software-renderer scheduling; not host GPU performance"}
+            };
+            qInfo().noquote() << "BENCH_FRAME_PACING"
+                << QString::fromUtf8(QJsonDocument(report).toJson(QJsonDocument::Compact));
+            app.exit(n >= 10 ? 0 : 11);
+        });
     }
     if (capture) {
         // Screenshot proves only that a Qt scene was captured, not that

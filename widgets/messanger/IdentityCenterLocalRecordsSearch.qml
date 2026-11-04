@@ -211,6 +211,10 @@ Column {
             border.color: focusBorderColor
             TextInput {
                 id: searchInput
+                cursorDelegate: Rectangle {
+                    width: 2
+                    color: Colors.orange
+                }
                 objectName: "orgSearchInput"
                 selectionColor: Colors.magenta
                 selectedTextColor: Colors.black
@@ -219,7 +223,7 @@ Column {
                 text: search.searchText
                 onTextChanged: search.searchText = text
                 maximumLength: 80
-                color: Colors.white
+                color: Colors.magenta
                 font.pixelSize: 11
                 verticalAlignment: TextInput.AlignVCenter
                 clip: true

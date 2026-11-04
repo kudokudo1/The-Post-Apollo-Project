@@ -54,3 +54,21 @@ Review the resulting live page when operator chooses, adjust hues/glows selectiv
 ## DECISIONS
 
 One semantic language, applied only to Social Organizations. No global theme changes, different sizes, new menus, new backend writes or auth permissions. Magenta denotes direct focus/selection and press; it is not a bypass of safety confirmations.
+
+
+---
+
+## REFINEMENT v1.1 // operator clarification, 2026-11-04
+
+This section supersedes only the conflicting visual behavior described earlier in v1. All record-operation, geometry, backend and permission decisions are preserved.
+
+1. **Already open/selected controls keep the original shared ActionButton open-state rules**. The Organizations-local wrapper no longer overrides selected or keyboard-selected fill, border, foreground, content glow or wide glow. The base component remains the canonical source of these states. The underlying selected state is *not* recolored to magenta merely for being open.
+2. **Add and + buttons are magenta** in their ordinary idle role. In particular, `+ ORGANIZATION`, `+ BRANCH`, `+ PORTFOLIO`, `+ ADD UNIT`, and the `+ <organization>` portfolio-association buttons now use local role `add` (magenta). This overrides v1's orange role only for these five creation/add controls. Other primary Apply/Focus actions remain orange.
+3. **User-entered text is magenta**, even when not focused, in the ten existing editable Organizations TextInput controls. The **insertion cursor is orange** via the QtQuick TextInput `cursorDelegate`; its appearance does not change the typed text color or input size. Focused field border/translucent fill remains magenta and idle border blue.
+4. **Direct press remains magenta** for non-destructive buttons (red for destructive ones). An open-state and a press-state are different: being open is not a new press.
+
+Both the shared `components/ActionButton.qml` and `components/Colors.qml` remain untouched. No button dimensions, action handlers, saved records, Restore lock, or Quickshell session are changed.
+
+**Verification:** dedicated contract checks confirm all five magenta Add buttons, all ten magenta text/orange cursor delegates, no local selected-state override; offscreen Qt tests check instantiated Add role/accent, inherited selected colors, typed text color, cursor delegate existence, and focus. Live visual acceptance is deferred unless separately confirmed by the operator.
+
+**Hospital checkpoint:** Patient `kudokudo1/The-Post-Apollo-Project`, external ChatGPT worker, live Room/Assignment unverified. Preserve the earlier user-confirmed Backup Now / List / Validate passes and all other deferred tests. Merge and desktop update remain operator-owned.

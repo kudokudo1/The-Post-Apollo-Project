@@ -442,11 +442,15 @@ Column {
         visible: editor.selectedOrg !== null
         TextInput {
             id: subjectSearch
+            cursorDelegate: Rectangle {
+                width: 2
+                color: Colors.orange
+            }
             selectionColor: Colors.magenta
             selectedTextColor: Colors.black
             anchors.fill: parent
             anchors.margins: 6
-            color: Colors.white
+            color: Colors.magenta
             font.pixelSize: 10
             text: editor.subjectQuery
             onTextChanged: editor.subjectQuery = text

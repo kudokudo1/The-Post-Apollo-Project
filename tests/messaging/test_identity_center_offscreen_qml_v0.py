@@ -931,6 +931,10 @@ class RealQtOrganizationsSettingsPaneSmoke(unittest.TestCase):
                              QColor(accent), name)
             self.assertEqual(QColor(button.property("selectedBorderColor")),
                              QColor("#c74ec7"), name)
+            self.assertEqual(QColor(button.property("selectedFillColor")),
+                             QColor("#f2be4e"), name)
+            self.assertEqual(QColor(button.property("selectedForegroundColor")),
+                             QColor("#c74ec7"), name)
             self.assertEqual(QColor(button.property("pressedFillColor")),
                              QColor("#d16041") if role == "danger"
                              else QColor("#c74ec7"), name)
@@ -938,6 +942,17 @@ class RealQtOrganizationsSettingsPaneSmoke(unittest.TestCase):
         locked = self.sections.findChild(QObject, "orgBackupRestoreLockedButton")
         self.assertFalse(locked.property("interactive"))
         self.assertTrue(locked.property("destructive"))
+
+        # The add family gets magenta at rest. Its pressed feedback still
+        # comes from the original safe ActionButton gesture contract.
+        add_labels = ("+ ORGANIZATION", "+ PORTFOLIO", "+ ADD UNIT")
+        for label in add_labels:
+            buttons = [obj for obj in self.sections.findChildren(QObject)
+                       if obj.property("label") == label]
+            self.assertEqual(len(buttons), 1, label)
+            self.assertEqual(buttons[0].property("role"), "add", label)
+            self.assertEqual(QColor(buttons[0].property("roleColor")),
+                             QColor("#c74ec7"), label)
 
         scope = self.sections.findChild(QObject, "orgLocalSearch")
         archived = self.sections.findChild(QObject, "localShowArchivedRecords")
@@ -958,6 +973,9 @@ class RealQtOrganizationsSettingsPaneSmoke(unittest.TestCase):
         self.assertEqual(frame.property("height"), 32)
         self.assertEqual(QColor(input_item.property("selectionColor")),
                          QColor("#c74ec7"))
+        self.assertEqual(QColor(input_item.property("color")),
+                         QColor("#c74ec7"))
+        self.assertIsNotNone(input_item.property("cursorDelegate"))
         self.assertEqual(QColor(frame.property("focusBorderColor")),
                          QColor("#5b5fd4"))
         # A QQuickItem without a window cannot acquire activeFocus in Qt,

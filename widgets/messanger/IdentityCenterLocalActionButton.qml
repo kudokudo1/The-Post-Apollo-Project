@@ -3,7 +3,8 @@ import "../../components"
 
 // Social Organizations ONLY: semantic colors without geometry or behavioral
 // changes to shared ActionButton. Roles are designed for instant scanning.
-// Selected and pressed are magenta intent, except red destructive presses.
+// Open and selected controls keep the original shared ActionButton state colors.
+// Magenta is reserved here for Add and active press; danger press stays red.
 ActionButton {
     id: semanticButton
     property string role: "navigate"
@@ -11,6 +12,7 @@ ActionButton {
         role === "danger" ? Colors.red
         : role === "refresh" ? Colors.green
         : role === "manage" ? Colors.yellow
+        : role === "add" ? Colors.magenta
         : role === "primary" ? Colors.orange
         : role === "focus" ? Colors.magenta
         : role === "neutral" ? Colors.white
@@ -28,21 +30,9 @@ ActionButton {
     pressedBorderColor: destructive ? Colors.red : Colors.magenta
     pressedForegroundColor: Colors.black
 
-    selectedFillColor: Qt.rgba(Colors.magenta.r, Colors.magenta.g,
-                               Colors.magenta.b, 0.23)
-    selectedBorderColor: Colors.magenta
-    selectedForegroundColor: Colors.white
-    selectedContentGlowColor: Colors.magenta
-    selectedSoftGlowColor: Colors.magenta
-
-    keyboardSelectedFillColor: selectedFillColor
-    keyboardSelectedForegroundColor: selectedForegroundColor
-    keyboardSelectedBorderColor: Colors.magenta
+    // Preserve base selected/keyboard-selected fill, glow and border rules.
 
     softGlowIdleOpacity: role === "neutral" ? 0.10 : 0.22
     softGlowHoverOpacity: 0.55
-    softGlowSelectedOpacity: 0.64
-    wideGlowEnabled: effectiveSelected
-    wideGlowSelectedOpacity: 0.10
     unavailableOpacity: 0.38
 }

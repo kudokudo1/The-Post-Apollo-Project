@@ -186,7 +186,8 @@ Rectangle {
                         required property var modelData
                         required property int index
                         x: Math.max(0, Math.min(clockRuler.width - width,
-                             index / 4 * clockRuler.width - width / 2))
+                             PlanetPolicy.rulerX(index, clockRuler.width, 20)
+                             - width / 2))
                         y: 0
                         width: 42
                         height: 19
@@ -253,8 +254,7 @@ Rectangle {
                             delegate: Rectangle {
                                 required property var modelData
                                 required property int index
-                                x: Math.min(lane.width - 1,
-                                            index / 4 * (lane.width - 1))
+                                x: PlanetPolicy.rulerX(index, lane.width, 20)
                                 y: 0
                                 width: 1
                                 height: lane.height

@@ -96,6 +96,10 @@ def direct_images(root, source, only_screenshots=False):
             for entry in scan:
                 if not is_image(entry):
                     continue
+                # Desktop cleanup remains image-only; videos must never enter
+                # its screenshot-like deletion preview.
+                if Path(entry.name).suffix.lower() not in IMAGE_EXTS:
+                    continue
                 if only_screenshots and not is_screenshot_name(entry.name):
                     continue
                 try:

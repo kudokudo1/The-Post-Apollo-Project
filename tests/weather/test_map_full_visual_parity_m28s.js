@@ -130,5 +130,6 @@ test("original focused EARTH controls remain, full route does not turn FIRMS/HMS
   assert.equal(earth.investigationRoute("earth/investigations/dossiers"),true);
   assert.match(original,/onArchiveRequested:/);
   assert.match(original,/onDossierSaveRequested:/);
-  assert.match(original,/onNewsMapClearRequested/);
+  assert.match(original,/signal newsMapClearRequested\(\)/);
+  assert.match(pane,/onNewsMapClearRequested: earthPane\.newsMapClearRequested\(\)/);
 });

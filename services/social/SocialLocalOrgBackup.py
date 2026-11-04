@@ -227,7 +227,7 @@ def read_backup(filename: str) -> dict[str, Any]:
         doc = bundle["documents"][name]
         try:
             clean = module.validate(doc)
-        except (ValueError, TypeError, Exception) as error:
+        except Exception:
             raise BackupError("INVALID_BACKUP_DOCUMENT") from None
         if clean != doc:
             raise BackupError("NONCANONICAL_BACKUP")
@@ -258,7 +258,7 @@ def main(argv: list[str] | None = None) -> int:
         else:
             raise BackupError("INVALID_REQUEST")
         code = 0
-    except (BackupError, StoreError, OSError, ValueError, TypeError) as error:
+    except Exception as error:
         result = {"ok": False, "error": (error.code if hasattr(error, "code")
                                              else "STORAGE_UNAVAILABLE")}
         code = 2

@@ -89,6 +89,9 @@ class PrivateOrganizationBackups(unittest.TestCase):
         target.symlink_to(Path(self.temp.name) / "not-a-backup")
         with self.assertRaises(Exception):
             backups.verify(name)
+        # Fail-closed directory enumeration also rejects this fixture.
+        # Remove it before separately verifying a locked writer.
+        target.unlink()
         root = backups.root_path()
         lock = root / ".local-organizations.lock"
         import fcntl

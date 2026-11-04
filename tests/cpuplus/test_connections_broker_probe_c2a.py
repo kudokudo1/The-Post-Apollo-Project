@@ -27,7 +27,7 @@ def exercise(text: str, returncode: int = 0) -> dict:
     assert len(commands) == 1
     args, kwargs = commands[0]
     assert tuple(args) == p.QUERY
-    assert args[3] == "org.freedesktop.DBus"
+    assert args[4] == "org.freedesktop.DBus"
     assert args[-1] == "org.freedesktop.secrets"
     assert "org.freedesktop.secrets" not in args[0:8]
     assert kwargs == {

@@ -1,0 +1,41 @@
+name: Social PHONE One-Action Setup (Read-Only)
+
+on:
+  pull_request:
+    paths:
+      - 'widgets/messanger/PhonePane.qml'
+      - 'services/phone/PhoneSetupReadiness.py'
+      - 'tests/phone/test_phone_setup_readiness.py'
+      - 'tests/messaging/test_social_phone_connect_flow.py'
+      - 'MODEL/contracts/social-phone-one-action-setup-p3-v0.md'
+      - '.github/workflows/social-phone-one-action-setup.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'widgets/messanger/PhonePane.qml'
+      - 'services/phone/PhoneSetupReadiness.py'
+      - 'tests/phone/test_phone_setup_readiness.py'
+      - 'tests/messaging/test_social_phone_connect_flow.py'
+      - 'MODEL/contracts/social-phone-one-action-setup-p3-v0.md'
+      - '.github/workflows/social-phone-one-action-setup.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  phone-setup:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - name: Compile setup and provider code
+        run: |
+          python3 -m py_compile services/phone/PhoneSetupReadiness.py services/phone/PhoneProviderObservation.py
+          python3 -m py_compile tests/phone/test_phone_setup_readiness.py tests/messaging/test_social_phone_connect_flow.py
+      - name: Verify one-action check and existing PHONE surface
+        run: |
+          python3 -m unittest discover -s tests/phone -p 'test_phone_setup_readiness.py' -v
+          python3 -m unittest discover -s tests/messaging -p 'test_social_phone_connect_flow.py' -v
+          python3 -m unittest discover -s tests/phone -p 'test_phone_provider_observation.py' -v
+          python3 -m unittest discover -s tests/messaging -p 'test_social_phone_menu_readonly.py' -v

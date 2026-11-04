@@ -3,8 +3,8 @@ import Quickshell
 import Quickshell.Io
 import "../../components"
 
-// PHONE shares the existing Social workspace. This is a read-only readiness
-// view, not a BlueFerry session owner or permission/identity authority.
+// PHONE stays in Social. CONNECT PHONE performs an explicit read-only check
+// of existing provider observations; no pairing, permission or link is granted.
 Rectangle {
     id: phonePane
     color: Colors.black
@@ -15,6 +15,9 @@ Rectangle {
     property string selectedSection: "DEVICE"
     property string probeStatus: "NOT CHECKED"
     property var readiness: ({})
+    property string setupState: "NOT STARTED"
+    property var setupReport: ({})
+    property bool detailsOpen: false
 
     // BlueFerry's GetStatus is a self-report from an already-running daemon.
     // Active MAP/PBAP sessions do not prove content authorization or ownership.
@@ -39,10 +42,26 @@ Rectangle {
         readinessProcess.running = true;
     }
 
+    function startSetup() {
+        if (!visible || setupProcess.running)
+            return;
+        setupState = "CHECKING";
+        setupReport = ({});
+        setupProcess.command = [
+            "python3",
+            Quickshell.shellPath("services/phone/PhoneSetupReadiness.py"),
+            "--check"
+        ];
+        setupProcess.running = true;
+    }
+
     onVisibleChanged: {
         if (visible) {
             selectedSection = "DEVICE";
-            refreshReadiness();
+            setupState = "NOT STARTED";
+            setupReport = ({});
+            detailsOpen = false;
+            // KDE Connect and device inventory are only probed by a click.
         }
     }
 
@@ -86,6 +105,40 @@ Rectangle {
         }
     }
 
+    Process {
+        id: setupProcess
+        stdout: StdioCollector {
+            onStreamFinished: {
+                if (!phonePane.visible || phonePane.setupState !== "CHECKING")
+                    return;
+                try {
+                    var report = JSON.parse(String(text || ""));
+                    if (report.schema !== "post-apollo.phone.setup-check.v0"
+                            || report.execution !== "READ_ONLY_CHECK"
+                            || report.trustedPhoneLink !== "UNVERIFIED"
+                            || report.routeEligible !== false
+                            || report.contentAccessEnabled !== false
+                            || ["BRIDGE_REPORTED", "NO_BRIDGE_REPORTED"].indexOf(report.status) < 0
+                            || !report.providers
+                            || !report.providers.BLUEFERRY
+                            || !report.providers.KDECONNECT)
+                        throw new Error("Unexpected phone setup report");
+                    phonePane.setupReport = report;
+                    phonePane.setupState = "CHECKED";
+                } catch (error) {
+                    phonePane.setupReport = ({});
+                    phonePane.setupState = "UNAVAILABLE";
+                }
+            }
+        }
+        onExited: function(exitCode) {
+            if (phonePane.visible && phonePane.setupState === "CHECKING" && exitCode !== 0) {
+                phonePane.setupReport = ({});
+                phonePane.setupState = "UNAVAILABLE";
+            }
+        }
+    }
+
     Rectangle {
         id: header
         anchors.top: parent.top
@@ -98,7 +151,7 @@ Rectangle {
 
         Text {
             anchors.centerIn: parent
-            text: "PHONE // READINESS"
+            text: "PHONE // CONNECT"
             color: Colors.green
             font.family: "GohuFont 11 Nerd Font Mono"
             font.pixelSize: 12
@@ -121,7 +174,7 @@ Rectangle {
             spacing: 8
 
             Repeater {
-                model: ["DEVICE", "CALLS", "MESSAGES", "CONTACTS", "PERMISSIONS"]
+                model: ["DEVICE", "CALLS", "MESSAGES", "CONTACTS"]
                 delegate: ActionButton {
                     required property string modelData
                     width: sectionRail.width
@@ -143,7 +196,9 @@ Rectangle {
 
             Text {
                 width: parent.width
-                text: phonePane.selectedSection + " // " + phonePane.probeStatus
+                text: phonePane.selectedSection + " // " +
+                      (phonePane.selectedSection === "DEVICE"
+                       ? phonePane.setupState : "NOT CONNECTED")
                 color: Colors.green
                 font.pixelSize: 11
                 font.bold: true
@@ -153,6 +208,77 @@ Rectangle {
             Text {
                 width: parent.width
                 visible: phonePane.selectedSection === "DEVICE"
+                text: phonePane.setupState === "CHECKING"
+                      ? "Checking existing phone bridges..."
+                      : phonePane.setupState === "CHECKED"
+                        && phonePane.setupReport.status === "BRIDGE_REPORTED"
+                      ? "A phone bridge responded. Social has NOT linked a phone or enabled private content."
+                      : phonePane.setupState === "CHECKED"
+                      ? "No active phone bridge was reported. Pair through your phone and desktop settings if needed."
+                      : phonePane.setupState === "UNAVAILABLE"
+                      ? "Could not check existing phone bridges. Try again."
+                      : "One setup action. Use your existing phone pairing and normal phone permissions."
+                color: Colors.white
+                font.pixelSize: 11
+                wrapMode: Text.WordWrap
+            }
+
+            ActionButton {
+                id: connectPhoneAction
+                width: Math.min(190, sectionContent.width)
+                height: 38
+                visible: phonePane.selectedSection === "DEVICE"
+                label: setupProcess.running ? "CHECKING..." : "CONNECT PHONE"
+                labelPixelSize: 10
+                accentColor: Colors.magenta
+                interactive: !setupProcess.running
+                onTriggered: phonePane.startSetup()
+            }
+
+            Text {
+                width: parent.width
+                visible: phonePane.selectedSection === "DEVICE"
+                text: "Connection check only for now. Post-Apollo cannot pair or authorize messages, calls or contacts yet; any required permission is handled by your phone."
+                color: Colors.orange
+                font.pixelSize: 10
+                wrapMode: Text.WordWrap
+            }
+
+            Text {
+                width: parent.width
+                visible: phonePane.selectedSection === "DEVICE"
+                         && phonePane.setupState === "CHECKED"
+                text: "Bluetooth bridge: " +
+                      String((phonePane.setupReport.providers || {}).BLUEFERRY
+                             ? phonePane.setupReport.providers.BLUEFERRY.state
+                             : "UNAVAILABLE") +
+                      "\nNetwork bridge: " +
+                      String((phonePane.setupReport.providers || {}).KDECONNECT
+                             ? phonePane.setupReport.providers.KDECONNECT.state
+                             : "UNAVAILABLE") +
+                      "\nSocial phone link: NOT VERIFIED"
+                color: Colors.white
+                font.pixelSize: 10
+                wrapMode: Text.WordWrap
+            }
+
+            ActionButton {
+                width: Math.min(190, sectionContent.width)
+                height: 38
+                visible: phonePane.selectedSection === "DEVICE"
+                label: phonePane.detailsOpen ? "HIDE DETAILS" : "DETAILS"
+                labelPixelSize: 9
+                accentColor: Colors.green
+                onTriggered: {
+                    phonePane.detailsOpen = !phonePane.detailsOpen;
+                    if (phonePane.detailsOpen)
+                        phonePane.refreshReadiness();
+                }
+            }
+
+            Text {
+                width: parent.width
+                visible: phonePane.selectedSection === "DEVICE" && phonePane.detailsOpen
                 text: "BlueFerry package: " +
                       (phonePane.probeStatus !== "READINESS CHECKED" ? "NOT CHECKED" :
                        phonePane.readiness.blueferryInstalled ? "INSTALLED" : "NOT FOUND") +
@@ -196,7 +322,7 @@ Rectangle {
             ActionButton {
                 width: Math.min(190, sectionContent.width)
                 height: 38
-                visible: phonePane.selectedSection === "DEVICE"
+                visible: phonePane.selectedSection === "DEVICE" && phonePane.detailsOpen
                 label: "REFRESH READINESS"
                 labelPixelSize: 9
                 accentColor: Colors.green
@@ -206,7 +332,7 @@ Rectangle {
 
             Text {
                 width: parent.width
-                text: "READ-ONLY // NO PAIRING, MESSAGE, CONTACT, CALL OR ACCOUNT CHANGES"
+                text: "READ-ONLY SETUP PREVIEW // NO PAIRING, MESSAGES, CONTACTS OR CALL CHANGES"
                 color: Colors.orange
                 font.pixelSize: 9
                 wrapMode: Text.WordWrap

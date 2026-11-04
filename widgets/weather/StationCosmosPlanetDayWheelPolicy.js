@@ -95,6 +95,23 @@ function pick(events,x,y,width,height,tolerance) {
     return best;
 }
 
+// Empty-circle hit areas are also real controls: clicking a ring filters
+// that planet. This uses only categorical display radii, not event data.
+function pickRing(x,y,width,height,tolerance) {
+    var px=Number(x),py=Number(y),tol=Number(tolerance),
+        g=geometry(width,height);
+    if(!g.ready||!isFinite(px)||!isFinite(py)||!isFinite(tol)
+       ||tol<=0||tol>15)return "";
+    var distance=Math.sqrt((px-g.x)*(px-g.x)+(py-g.y)*(py-g.y));
+    var nearest="",delta=tol;
+    for(var i=0;i<PLANETS.length;i++) {
+        var ring=ringRadius(PLANETS[i],width,height);
+        var current=Math.abs(distance-ring);
+        if(ring!==null&&current<=delta){delta=current;nearest=PLANETS[i];}
+    }
+    return nearest;
+}
+
 function countKind(events,kind) {
     if(KINDS.indexOf(kind)<0)return 0;
     var input=indexed(events,15),n=0;

@@ -29,6 +29,8 @@ Rectangle {
 
     readonly property var eventsInView: Celestial.visibleEvents(graphModel,viewWindow)
     readonly property var chosenEvent: Celestial.eventAt(graphModel,viewWindow,eventOrdinal)
+    readonly property var timelineThumbFraction:
+        Celestial.timelineHandleFraction(graphModel,viewWindow,focusIndex)
 
     function stepToEvent(direction) {
         const chosen=Celestial.stepEvent(graphModel,viewWindow,eventOrdinal,direction);
@@ -420,7 +422,7 @@ Rectangle {
     Column {
         anchors.fill: parent
         anchors.margins: 10
-        spacing: 7
+        spacing: 5
 
         Row {
             width: parent.width
@@ -615,16 +617,16 @@ Rectangle {
         Rectangle {
             id: eventTimeline
             width: parent.width
-            height: 21
+            height: 30
             color: Colors.dark
             border.width: 1
             border.color: Colors.blue
-            clip: true
+            clip: false
             Canvas {
                 id: eventTimelineCanvas
                 anchors.fill: parent
-                anchors.leftMargin: 7
-                anchors.rightMargin: 7
+                anchors.leftMargin: 12
+                anchors.rightMargin: 12
                 onPaint: {
                     const ctx=getContext("2d");
                     ctx.clearRect(0,0,width,height);
@@ -632,11 +634,14 @@ Rectangle {
                     const markers=Celestial.timelineMarkers(
                         instrument.graphModel,instrument.viewWindow);
                     ctx.strokeStyle=String(Colors.cyan);
-                    ctx.globalAlpha=0.6;
-                    ctx.lineWidth=1;
+                    ctx.globalAlpha=0.75;
+                    ctx.lineWidth=2;
+                    ctx.shadowColor=String(Colors.cyan);
+                    ctx.shadowBlur=instrument.neonEnabled?9:0;
                     ctx.beginPath();
                     ctx.moveTo(0,height/2);ctx.lineTo(width,height/2);
                     ctx.stroke();
+                    ctx.shadowBlur=0;
                     const kindColors={
                         "crossing":String(Colors.yellow),
                         "station":String(Colors.magenta),
@@ -648,10 +653,13 @@ Rectangle {
                         ctx.strokeStyle=kindColors[marker.kind];
                         ctx.globalAlpha=selected?1:0.8;
                         ctx.lineWidth=selected?3:2;
+                        ctx.shadowColor=kindColors[marker.kind];
+                        ctx.shadowBlur=instrument.neonEnabled?8:0;
                         ctx.beginPath();
-                        ctx.moveTo(px,selected?1:4);
-                        ctx.lineTo(px,height-3);
+                        ctx.moveTo(px,selected?1:5);
+                        ctx.lineTo(px,height-5);
                         ctx.stroke();
+                        ctx.shadowBlur=0;
                     }
                     const t=instrument.graphModel.times[instrument.focusIndex];
                     const v=instrument.viewWindow;
@@ -661,27 +669,110 @@ Rectangle {
                         const px=(t-start)/Math.max(1,end-start)*width;
                         ctx.globalAlpha=1;
                         ctx.fillStyle=String(Colors.white);
+                        ctx.shadowColor=String(Colors.white);
+                        ctx.shadowBlur=instrument.neonEnabled?7:0;
                         ctx.beginPath();ctx.arc(px,height/2,2.5,0,Math.PI*2);
-                        ctx.fill();
+                        ctx.fill();ctx.shadowBlur=0;
                     }
                 }
             }
+            // M5h // Slider-style grab handle. It follows a real M4
+            // sample timestamp and never invents intermediate ephemeris data.
+            Rectangle {
+                id: timelineThumb
+                z: 2
+                visible: instrument.graphModel.ready
+                         && instrument.timelineThumbFraction !== null
+                width: 17
+                height: 20
+                radius: 3
+                x: eventTimelineCanvas.x
+                   + (instrument.timelineThumbFraction === null ? 0
+                      : instrument.timelineThumbFraction*eventTimelineCanvas.width)
+                   - width/2
+                anchors.verticalCenter: parent.verticalCenter
+                color: timelineInput.pressed ? Colors.yellow : Colors.white
+                border.width: 1
+                border.color: Colors.magenta
+
+                RectangularShadow {
+                    anchors.fill: parent
+                    z: -1
+                    spread: 5
+                    opacity: instrument.neonEnabled ? 0.75 : 0.0
+                    color: timelineInput.pressed ? Colors.orange : Colors.magenta
+                }
+                Row {
+                    anchors.centerIn: parent
+                    spacing: 3
+                    Repeater {
+                        model: 2
+                        Rectangle {
+                            width: 2
+                            height: 9
+                            radius: 1
+                            color: Colors.magenta
+                        }
+                    }
+                }
+                Behavior on x {
+                    enabled: !timelineInput.pressed
+                    NumberAnimation { duration: 80; easing.type: Easing.OutQuad }
+                }
+            }
             MouseArea {
+                id: timelineInput
+                z: 3
                 anchors.fill: eventTimelineCanvas
                 enabled: instrument.graphModel.ready
-                cursorShape: Qt.PointingHandCursor
+                hoverEnabled: true
+                preventStealing: true
+                cursorShape: Qt.SizeHorCursor
                 acceptedButtons: Qt.LeftButton
-                onClicked: function(mouse) {
-                    const chosen=Celestial.timelinePick(instrument.graphModel,
-                        instrument.viewWindow,mouse.x,width,10);
-                    if(chosen){
-                        instrument.eventOrdinal=chosen.ordinal;
-                        instrument.lockedIndex=chosen.sampleIndex;
-                    }else{
-                        instrument.eventOrdinal=-1;
-                        instrument.lockedIndex=Celestial.timelineSampleIndex(
-                            instrument.graphModel,instrument.viewWindow,mouse.x,width);
+
+                property real pressX: 0
+                property real grabOffset: 0
+                property bool didDrag: false
+
+                function scrubTo(x) {
+                    const index=Celestial.timelineSampleIndex(
+                        instrument.graphModel,instrument.viewWindow,x,width);
+                    if(index < 0)return;
+                    instrument.eventOrdinal=-1;
+                    instrument.lockedIndex=index;
+                }
+                onPressed: function(mouse) {
+                    pressX=mouse.x;
+                    didDrag=false;
+                    const centerX=Celestial.timelineHandleX(
+                        instrument.graphModel,instrument.viewWindow,
+                        instrument.focusIndex,width);
+                    grabOffset=centerX!==null && Math.abs(mouse.x-centerX)<=13
+                        ? mouse.x-centerX : 0;
+                }
+                onPositionChanged: function(mouse) {
+                    if(!pressed)return;
+                    if(Math.abs(mouse.x-pressX)>3)didDrag=true;
+                    if(didDrag)scrubTo(mouse.x-grabOffset);
+                }
+                onReleased: function(mouse) {
+                    if(!didDrag){
+                        // Preserve the existing clickable M4 event markers.
+                        const chosen=Celestial.timelinePick(instrument.graphModel,
+                            instrument.viewWindow,mouse.x,width,10);
+                        if(chosen){
+                            instrument.eventOrdinal=chosen.ordinal;
+                            instrument.lockedIndex=chosen.sampleIndex;
+                        }else{
+                            scrubTo(mouse.x);
+                        }
                     }
+                    didDrag=false;
+                    grabOffset=0;
+                }
+                onCanceled: {
+                    didDrag=false;
+                    grabOffset=0;
                 }
             }
         }

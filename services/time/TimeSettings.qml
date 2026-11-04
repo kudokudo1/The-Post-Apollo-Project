@@ -35,6 +35,43 @@ Scope {
     // Evidence-based attention for the dock. An unapplied zone choice or
     // disabled NTP alone does NOT prove the host clock is inaccurate.
     readonly property bool displayDeviationActive: displayOffsetMs !== 0
+    // Explicit reference checks only: disabled NTP and a pending timezone
+    // choice are not evidence that the computer's time is wrong.
+    property bool referenceChecking: false
+    property string referenceStatus: "unchecked"
+    property string referenceMessage: "NO EXTERNAL MEASUREMENT"
+    property double referenceOffsetMs: 0
+    property double referenceCheckedAtMs: 0
+    readonly property int referenceMaxAgeMs: 15 * 60 * 1000
+    readonly property int referenceWarningThresholdMs: 1000
+
+    function hasFreshReference(nowEpochMs) {
+        return referenceStatus === "measured"
+               && Number.isFinite(nowEpochMs)
+               && nowEpochMs >= referenceCheckedAtMs
+               && nowEpochMs - referenceCheckedAtMs <= referenceMaxAgeMs;
+    }
+
+    function dockTimeUnderlined(nowEpochMs) {
+        return displayDeviationActive
+               || (hasFreshReference(nowEpochMs)
+                   && Math.abs(referenceOffsetMs)
+                      >= referenceWarningThresholdMs);
+    }
+
+    function checkTimeAccuracy() {
+        if (referenceChecking || authSessionActive)
+            return false;
+        referenceChecking = true;
+        referenceStatus = "checking";
+        referenceMessage = "CONTACTING CONFIGURED CHRONY SOURCES...";
+        referenceCheckedAtMs = 0;
+        referenceProcess.exec([
+            "python3", "-B", "-I",
+            Quickshell.shellPath("services/time/TimeHostControl.py"), "measure"
+        ]);
+        return true;
+    }
 
     property var hostInfo: ({ status: "unavailable", timezone: "UNKNOWN",
                                utcOffset: "UNKNOWN", dstActive: false,
@@ -430,6 +467,42 @@ Scope {
     }
 
     Process {
+        id: referenceProcess
+        running: false
+        stdout: StdioCollector {
+            onStreamFinished: {
+                try {
+                    const value = JSON.parse(this.text);
+                    const offset = Number(value.offsetMs);
+                    if (value.status === "measured"
+                            && Number.isFinite(offset)) {
+                        timeSettings.referenceOffsetMs = offset;
+                        timeSettings.referenceCheckedAtMs = Date.now();
+                        timeSettings.referenceStatus = "measured";
+                        timeSettings.referenceMessage =
+                            "REFERENCE OFFSET // "
+                            + (offset / 1000).toFixed(3) + " SECONDS";
+                    } else {
+                        timeSettings.referenceStatus = "unavailable";
+                        timeSettings.referenceMessage =
+                            String(value.message || "NO REFERENCE SAMPLE");
+                    }
+                } catch (error) {
+                    timeSettings.referenceStatus = "unavailable";
+                    timeSettings.referenceMessage = "REFERENCE RESULT INVALID";
+                }
+            }
+        }
+        onExited: function(code, exitStatus) {
+            timeSettings.referenceChecking = false;
+            if (code !== 0) {
+                timeSettings.referenceStatus = "unavailable";
+                timeSettings.referenceMessage = "REFERENCE PROCESS FAILED";
+            }
+        }
+    }
+
+    Process {
         id: diagnosticsProcess
         running: false
         stdout: StdioCollector {
@@ -480,6 +553,10 @@ Scope {
                 timeSettings.resyncStatus = "failed";
                 timeSettings.resyncMessage = "RESYNC PROCESS FAILED";
             }
+            // A successful one-shot correction has already contacted the
+            // time source. Verify its residual offset without altering time.
+            if (code === 0 && timeSettings.resyncStatus === "completed")
+                timeSettings.checkTimeAccuracy();
         }
     }
 }

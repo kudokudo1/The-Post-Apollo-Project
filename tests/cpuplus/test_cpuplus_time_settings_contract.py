@@ -59,7 +59,9 @@ class CpuPlusTimeSettingsContracts(unittest.TestCase):
         self.assertIn("TimeSettings.hostInfo.dstActive", PANE)
         self.assertIn("TimeSettings.hostInfo.rtcLocal", PANE)
         self.assertIn("TimeSettings.hostInfo.ntpEnabled", PANE)
-        self.assertNotIn("set-timezone", TIME_SETTINGS)
+        # Zone mutation is Clock-owned and intentionally not exposed in CPU++.
+        self.assertNotIn("set-timezone", CPU)
+        self.assertIn('"set-timezone", zoneChoice', TIME_SETTINGS)
         self.assertNotIn("set-ntp", TIME_SETTINGS)
         self.assertNotIn("TimeSettings.", LOCATION)
 

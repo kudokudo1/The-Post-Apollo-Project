@@ -81,11 +81,11 @@ test("QML paints vector glyphs with visible contrast, NOT missing glyph fonts",(
     assert.match(painter,/ZodiacVector\.sectorCenter\(/);
     assert.match(painter,/ctx\.quadraticCurveTo\(/);
     assert.match(painter,/ctx\.bezierCurveTo\(/);
-    assert.match(painter,/ctx\.arc\(x,y,9\.3,0,2\*Math\.PI\)/);
+    assert.match(painter,/ctx\.arc\(x,y,visual\.chipRadius,0,2\*Math\.PI\)/);
     assert.match(painter,/ctx\.strokeStyle=String\(Colors\.black\)/);
-    assert.match(painter,/ctx\.lineWidth=4\.3/);
-    assert.match(painter,/ctx\.lineWidth=isSelected\?2\.6:2\.3/);
-    assert.match(painter,/ctx\.shadowBlur=instrument\.neonEnabled\?9:0/);
+    assert.match(painter,/ctx\.lineWidth=visual\.outlineWidth/);
+    assert.match(painter,/ctx\.lineWidth=visual\.inkWidth/);
+    assert.match(painter,/ctx\.shadowBlur=instrument\.neonEnabled\?visual\.inkGlow:0/);
     assert.match(painter,/Math\.floor\(activePoint\.longitude_deg\/30\)%12/);
     assert.match(painter,/paintZodiacVector\(ctx,sign,at\.x,at\.y,/);
     assert.doesNotMatch(painter,/Noto Sans Symbols 2/);
@@ -132,3 +132,18 @@ if(process.argv[2]==="--emit-svg"){
         '<rect width="'+w+'" height="'+h+'" fill="#1B0623"/>'+
         shapes.join("")+'</svg>');
 }
+
+
+test("M5j preserves tiny idle glyph legibility while emphasizing selected zodiac",()=>{
+    const idle=context.appearance(false),selected=context.appearance(true);
+    assert.ok(selected.chipRadius > idle.chipRadius*1.2);
+    assert.ok(selected.symbolScale > idle.symbolScale*1.25);
+    assert.ok(selected.inkGlow > idle.inkGlow*2);
+    assert.ok(selected.inkOpacity > idle.inkOpacity);
+    assert.ok(idle.inkOpacity >= 0.65,"idle symbols remain readable");
+    assert.ok(selected.inkWidth > idle.inkWidth);
+    assert.match(painter,/ZodiacVector\.appearance\(isSelected\)/);
+    assert.match(painter,/if\(sign===activeSign\)continue/);
+    assert.match(painter,/ZodiacVector\.sectorCenter\(\s*activeSign,/);
+    assert.match(painter,/Celestial\.zodiacColor\(activeSign\),true/);
+});

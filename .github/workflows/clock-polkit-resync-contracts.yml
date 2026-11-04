@@ -1,0 +1,33 @@
+name: Clock native Polkit resync contracts
+
+on:
+  pull_request:
+    paths:
+      - "shell.qml"
+      - "widgets/TimeResyncAuthW.qml"
+      - "widgets/TimeW.qml"
+      - "widgets/TimeSettingsPane.qml"
+      - "services/time/TimeSettings.qml"
+      - "services/time/TimeHostControl.py"
+      - "tests/time/test_clock_polkit_bridge_contract.py"
+      - ".github/workflows/clock-polkit-resync-contracts.yml"
+  push:
+    paths:
+      - "shell.qml"
+      - "widgets/TimeResyncAuthW.qml"
+      - "widgets/TimeW.qml"
+      - "widgets/TimeSettingsPane.qml"
+      - "services/time/TimeSettings.qml"
+      - "services/time/TimeHostControl.py"
+      - "tests/time/test_clock_polkit_bridge_contract.py"
+      - ".github/workflows/clock-polkit-resync-contracts.yml"
+
+jobs:
+  contracts:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check native Polkit authorization handoff
+        run: python3 -m unittest discover -s tests/time -p 'test_clock_polkit_bridge_contract.py' -v
+      - name: Check one-shot host resync behavior
+        run: python3 -m unittest discover -s tests/time -p 'test_clock_settings_contract.py' -v

@@ -50,15 +50,25 @@ DockButton {
             color: Colors.white
         }
 
-        NotoText {
+        // Keep the stars centered; move only the yellow city artwork
+        // 2px down inside its own equal-height Row cell.
+        Item {
+            id: cityGlyphCell
+            width: cityGlyph.implicitWidth
             height: companyMark.height
-            verticalAlignment: Text.AlignVCenter
-            textFormat: Text.PlainText
-            // U+FE0E requests monochrome text rendering so yellow tint
-            // is not silently replaced by a platform color-emoji glyph.
-            text: "🏙︎"
-            font.pixelSize: 24
-            color: Colors.yellow
+
+            NotoText {
+                id: cityGlyph
+                y: 2
+                height: companyMark.height
+                verticalAlignment: Text.AlignVCenter
+                textFormat: Text.PlainText
+                // U+FE0E requests monochrome text rendering so yellow tint
+                // is not silently replaced by a platform color-emoji glyph.
+                text: "🏙︎"
+                font.pixelSize: 24
+                color: Colors.yellow
+            }
         }
 
         NotoText {

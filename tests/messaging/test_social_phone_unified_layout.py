@@ -22,7 +22,8 @@ class UnifiedPhoneLayoutTests(unittest.TestCase):
         self.assertIn("        messages: []", self.phone)
         self.assertIn("        sendEnabled: false", self.phone)
         self.assertIn('emptyConversationLabel:', self.phone)
-        self.assertIn('text: "NO PHONE CHATS YET"', self.phone.replace('text: phonePane.selectedSection === "CONTACTS"\n              ? "NO PHONE CONTACTS\\nSYNC NOT AUTHORIZED"\n              : "NO PHONE CHATS YET"', 'text: "NO PHONE CHATS YET"'))
+        self.assertIn("NO PHONE CHATS YET", self.phone)
+        self.assertIn("NO PHONE CONTACTS", self.phone)
         self.assertNotIn("FloatingWindow {", self.phone)
         self.assertNotIn("PanelWindow {", self.phone)
 
@@ -74,9 +75,8 @@ class UnifiedPhoneLayoutTests(unittest.TestCase):
 
     def test_gui_launcher_has_cli_fallback_not_bluez_mutation(self):
         self.assertIn('"blueferry-quickshell"', self.launcher)
-        self.assertIn('["terminal_path",', self.launcher.replace(
-            '[terminal_path, *flags, wizard, "pair-setup"]',
-            '["terminal_path", *flags, wizard, "pair-setup"]'))
+        self.assertIn('[terminal_path, *flags, wizard, "pair-setup"]',
+                      self.launcher)
         self.assertIn('if target == "iphone":', self.launcher)
         self.assertNotIn('bluetoothctl pair', self.launcher)
         self.assertNotIn('systemctl start', self.launcher)

@@ -189,8 +189,9 @@ ShellRoot {
                         || ConnectionsBroker.credentialActionsEnabled) {
                     root.fail("FALSE_ACCESS_REVIEW_AUTHORITY"); return;
                 }
-                if (root.announce(root.button("DISMISS REVIEW"),
-                                  "DISMISS_REVIEW"))
+                const dismiss = root.button("DISMISS REVIEW");
+                root.revealInDetails(dismiss);
+                if (root.announce(dismiss, "DISMISS_REVIEW"))
                     root.phase = "reviewDismissClicked";
             } else if (root.phase === "reviewDismissClicked") {
                 if (details.permissionReviewOpen) return;

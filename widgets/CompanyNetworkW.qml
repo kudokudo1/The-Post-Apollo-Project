@@ -142,13 +142,23 @@ PanelWindow {
 
                 // Same fixed-height centered glyph cells as the dock mark.
                 // Never align mixed-size symbols by separate implicit top edges.
-                NotoText {
+                // Offset the left stars' artwork without shifting their
+                // Row cell or the right-hand stars.
+                Item {
+                    id: headerLeftStarCell
+                    width: headerLeftStarGlyph.implicitWidth
                     height: headerCity.height
-                    verticalAlignment: Text.AlignVCenter
-                    textFormat: Text.PlainText
-                    text: ". ݁₊⊹"
-                    font.pixelSize: 15
-                    color: Colors.white
+
+                    NotoText {
+                        id: headerLeftStarGlyph
+                        x: -2
+                        height: headerCity.height
+                        verticalAlignment: Text.AlignVCenter
+                        textFormat: Text.PlainText
+                        text: ". ݁₊⊹"
+                        font.pixelSize: 15
+                        color: Colors.white
+                    }
                 }
                 // Match the dock: six-pixel total city-only optical offset.
                 Item {
@@ -158,6 +168,7 @@ PanelWindow {
 
                     NotoText {
                         id: headerCityGlyph
+                        x: -2
                         y: 6
                         height: headerCity.height
                         verticalAlignment: Text.AlignVCenter

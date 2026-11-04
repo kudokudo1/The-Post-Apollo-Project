@@ -1,0 +1,48 @@
+name: TASKS M13o disposable private encrypted checkpoint storage
+
+on:
+  pull_request:
+    paths:
+      - 'tests/tasks/fixtures/TaskEncryptedDraftPrivateStorageM13o.cjs'
+      - 'tests/tasks/test_task_encrypted_draft_private_storage_m13o.cjs'
+      - 'docs/tasks-standard-security-private-draft-storage-m13o.md'
+      - '.github/workflows/tasks-encrypted-draft-storage-m13o.yml'
+      - 'tests/tasks/fixtures/TaskEncryptedDraftTransactionM13m.cjs'
+      - 'services/hub/ApolloHubTodoStore.qml'
+  push:
+    branches: [main]
+    paths:
+      - 'tests/tasks/fixtures/TaskEncryptedDraftPrivateStorageM13o.cjs'
+      - 'tests/tasks/test_task_encrypted_draft_private_storage_m13o.cjs'
+      - '.github/workflows/tasks-encrypted-draft-storage-m13o.yml'
+permissions:
+  contents: read
+jobs:
+  private-disposable-storage-contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Private 0700 and 0600 single-record checkpoint, CAS and explicit-clear tests
+        run: |
+          node --check tests/tasks/fixtures/TaskEncryptedDraftPrivateStorageM13o.cjs
+          node --test tests/tasks/test_task_encrypted_draft_private_storage_m13o.cjs
+      - name: Existing synthetic encryption/source-bound transaction regressions
+        run: |
+          node --test tests/tasks/test_task_encrypted_draft_transaction_m13m.cjs
+          node --test tests/tasks/test_task_encrypted_recovery_m13f.cjs
+      - name: Production one-writer and disabled host checks
+        run: |
+          python3 tests/tasks/test_task_writer_gate_inventory_m11d.py
+          node --test tests/tasks/test_task_encrypted_draft_host_m13k.cjs
+      - name: Not mounted, no keyring access, no user TASKS paths
+        run: |
+          set -euo pipefail
+          ! grep -q 'TaskEncryptedDraftPrivateStorageM13o' shell.qml
+          ! grep -q 'TaskEncryptedDraftPrivateStorageM13o' services/hub/ApolloHubTodoStore.qml
+          ! grep -Eq 'secret-tool|gnome-keyring|DBUS_SESSION_BUS_ADDRESS|Quickshell\.dataDir|apollo-hub-todo-v1\.json' \
+            tests/tasks/fixtures/TaskEncryptedDraftPrivateStorageM13o.cjs
+          printf '%s\n' 'M13O_DISPOSABLE_PRIVATE_ATOMIC_STORAGE_ONLY_PASS'

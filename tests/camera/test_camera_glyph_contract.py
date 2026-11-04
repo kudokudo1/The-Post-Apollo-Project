@@ -13,6 +13,7 @@ ICON_PATH = ROOT / "components" / "CameraGlyph.qml"
 DOCK_PATH = ROOT / "modules" / "Screenshot.qml"
 PANEL_PATH = ROOT / "widgets" / "CameraW.qml"
 SHELL_PATH = ROOT / "shell.qml"
+COMPONENTS_QMLDIR_PATH = ROOT / "components" / "qmldir"
 
 
 class CameraLineGlyphContract(unittest.TestCase):
@@ -22,6 +23,18 @@ class CameraLineGlyphContract(unittest.TestCase):
         cls.dock = DOCK_PATH.read_text(encoding="utf-8")
         cls.panel = PANEL_PATH.read_text(encoding="utf-8")
         cls.shell = SHELL_PATH.read_text(encoding="utf-8")
+        cls.qmldir = COMPONENTS_QMLDIR_PATH.read_text(encoding="utf-8")
+
+    def test_camera_glyph_is_exported_from_directory_import(self):
+        # Screenshot.qml imports ../components as a directory, and the
+        # directory owns a qmldir manifest. An unlisted QML file is not
+        # a usable type, causing the entire shell.qml load to fail.
+        self.assertIn('import "../components"', self.dock)
+        declarations = [line.strip() for line in self.qmldir.splitlines()
+                        if line.strip() and not line.lstrip().startswith("#")]
+        self.assertEqual(declarations.count("CameraGlyph 1.0 CameraGlyph.qml"), 1)
+        self.assertTrue(ICON_PATH.is_file())
+        self.assertIn("CameraGlyph {", self.dock)
 
     def test_actual_reusable_qt_shape_without_raster_or_filled_camera(self):
         code = self.icon

@@ -1,0 +1,55 @@
+name: Connections C2c private descriptor authority (fake only)
+
+on:
+  pull_request:
+    paths:
+      - "tests/connections/fixtures/C2cDescriptorBroker.py"
+      - "tests/connections/test_connections_c2c_descriptor_authority.py"
+      - ".github/workflows/connections-c2c-descriptor-authority.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  isolated-host-transport:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Test private process FD inheritance and separate host approvals
+        run: timeout 40s python3 -B tests/connections/test_connections_c2c_descriptor_authority.py
+      - name: Require no named socket, network, keyring or production activation
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import ast
+          src=Path("tests/connections/fixtures/C2cDescriptorBroker.py").read_text()
+          tree=ast.parse(src)
+          imported=set()
+          for node in ast.walk(tree):
+              if isinstance(node, ast.Import):
+                  imported.update(alias.name.split(".")[0] for alias in node.names)
+              if isinstance(node, ast.ImportFrom):
+                  imported.add((node.module or "").split(".")[0])
+          forbidden={"urllib","requests","http","httpx","asyncio","subprocess","ssl"}
+          assert not imported.intersection(forbidden), imported.intersection(forbidden)
+          assert "socket.AF_UNIX" not in src or "socket.AF_INET" not in src
+          assert ".bind(" not in src and ".listen(" not in src
+          assert "secret-tool" not in src and "POST_APOLLO_FIRMS_MAP_KEY" not in src
+          assert "Quickshell" not in src and "connect(" not in src
+          assert "SO_PEERCRED" not in src  # Inherited descriptor, not a self-declared PID claim
+          actual=Path("services/connections/ConnectionsBroker.qml").read_text()
+          policy=Path("services/connections/ConnectionsBrokerPolicy.js").read_text()
+          assert "readonly property bool credentialActionsEnabled: false" in actual
+          assert 'reason:"TRUSTED_BROKER_NOT_ACTIVATED"' in policy
+          print("C2C_PASS // NO_PRODUCTION_ACTIVATION_AND_NO_PUBLIC_SOCKET")
+          PY
+      - name: Preserve C2a/C2b closed authority contracts
+        run: |
+          node tests/cpuplus/test_connections_broker_c2a.js
+          node tests/connections/test_connections_c2b_fake_only.cjs
+          python3 tests/cpuplus/test_connections_broker_probe_c2a.py

@@ -7,6 +7,7 @@ Rectangle {
     id: weatherPane
     color: Colors.black
     property string subjectRoute: ""
+    signal routeRequested(string path)
     property var weatherService: null
     property var nwsAlertSource: null
     property var historyService: null
@@ -70,6 +71,7 @@ Rectangle {
         id: groundPanel
         StationGround {
             subjectRoute: weatherPane.subjectRoute
+            onRouteRequested: function(path) { weatherPane.routeRequested(path); }
             weatherService: weatherPane.weatherService
             nwsAlertSource: weatherPane.nwsAlertSource
             seismicSource: weatherPane.seismicSource

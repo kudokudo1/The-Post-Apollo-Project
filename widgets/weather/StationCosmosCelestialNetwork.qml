@@ -319,6 +319,14 @@ Item {
                     ? "M4 TAGS // "+graph.activePair.aspects.join(", ")
                     : "M4 ASPECT TAGS // NONE"
         }
+        QuietText {
+            width: parent.width
+            visible: graph.displayMode==="depth"
+            font.pixelSize: 9
+            color: Colors.yellow
+            wrapMode: Text.WordWrap
+            text: depthPane.focusDetail
+        }
         Repeater {
             model: graph.scene.ready?graph.scene.nodes:[]
             delegate: ActionButton {

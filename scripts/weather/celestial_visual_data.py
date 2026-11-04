@@ -23,6 +23,7 @@ from celestial_dynamics import (
 from celestial_solver import (
     _digest, _import_skyfield, _kernel_file, _observer, _position, _target,
 )
+from celestial_spatial_data import build_spatial_series
 
 FORMAT = "post-apollo.weather.celestial-visual-data.v1"
 MAX_BODIES = 4
@@ -31,7 +32,7 @@ EPOCH = datetime(1970, 1, 1, tzinfo=timezone.utc)
 QUERY_FIELDS = frozenset((
     "format", "start_utc", "end_utc", "bodies", "step_hours",
     "rate_window_hours", "orb_degrees", "include_events", "detect_tangents",
-    "tangent_tolerance_deg",
+    "tangent_tolerance_deg", "include_heliocentric_spatial",
 ))
 
 
@@ -71,6 +72,10 @@ def normalize_visual_query(raw):
                           "rate_window_hours", 0.5, 24)
     orb = _finite(raw.get("orb_degrees", 6), "orb_degrees", 0, 30)
     include_events = _boolean(raw.get("include_events", False), "include_events")
+    include_spatial = _boolean(
+        raw.get("include_heliocentric_spatial", False),
+        "include_heliocentric_spatial",
+    )
     detect_tangents = _boolean(raw.get("detect_tangents", False), "detect_tangents")
     tolerance = _finite(raw.get("tangent_tolerance_deg", 0.00001),
                         "tangent_tolerance_deg", 0, 0.01)
@@ -92,6 +97,7 @@ def normalize_visual_query(raw):
         "rate_window_hours": rate_window,
         "orb_degrees": orb,
         "include_events": include_events,
+        "include_heliocentric_spatial": include_spatial,
         "detect_tangents": detect_tangents,
         "tangent_tolerance_deg": tolerance if detect_tangents else None,
     }
@@ -273,6 +279,26 @@ def compute_visual_data(query, kernel_path):
             if isinstance(exc, ContractError):
                 raise
             raise ContractError("JPL kernel coverage or numerical evaluation unavailable") from exc
+        # V4c: an independent coordinate product from the SAME SPK/kernel,
+        # exact UTC samples, targets and loader. Apparent geocentric M4 is
+        # retained without alteration. Sun-relative vectors are instantaneous
+        # geometric differences, not light-time-adjusted positions.
+        if normalized["include_heliocentric_spatial"]:
+            sun_origin = _target(kernel, "sun")
+            moments = [
+                _utc(sample["time_utc"])
+                for sample in result["series"][0]["samples"]
+            ]
+
+            def heliocentric_xyz(body, moment):
+                t = ts.from_datetime(moment)
+                position = _position(sun_origin, targets[body], t, "geometric")
+                return tuple(float(value) for value in position.frame_xyz(frame).au)
+
+            result["heliocentric_spatial"] = build_spatial_series(
+                normalized["bodies"], moments, heliocentric_xyz,
+            )
+
         result["provenance"] = {
             "engine": "skyfield", "engine_version": version,
             "ephemeris_id": path.name, "ephemeris_sha256": _digest(path),

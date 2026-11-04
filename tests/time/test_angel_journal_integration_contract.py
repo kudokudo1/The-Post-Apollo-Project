@@ -62,6 +62,7 @@ class AngelJournalContracts(unittest.TestCase):
         self.assertIn("Date.now()", PANE)
         self.assertIn("TimeSettings.adjustedEpochMs(observedAtMs)", PANE)
         self.assertIn("displayCalibrationMs: TimeSettings.displayOffsetMs", PANE)
+        self.assertIn("const localDate = new Date(observedAtMs)", PANE)
         self.assertIn("utcOffsetMinutes: -localDate.getTimezoneOffset()", PANE)
         self.assertIn("zoneId: zone", PANE)
         self.assertIn("captureMode: mode", PANE)

@@ -34,8 +34,10 @@ DockButton {
     CameraGlyph {
         id: cameraMark
         anchors.centerIn: parent
-        width: 64
-        height: 48
+        // 25% smaller than the original 64×48 artwork; the DockButton
+        // remains 84×50 with its full click area and glow behavior.
+        width: 48
+        height: 36
         bodyColor: cameraDock.glyphInk
         lensColor: cameraDock.glyphInk
         ornamentColor: cameraDock.glyphInk

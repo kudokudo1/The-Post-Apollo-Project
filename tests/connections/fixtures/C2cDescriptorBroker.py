@@ -32,7 +32,7 @@ def allowed_fixture() -> bool:
         or os.environ.get("GITHUB_ACTIONS") != "true"
         or os.environ.get("POST_APOLLO_C2C_FAKE_ONLY") != "1"):
         return False
-    if not re.fullmatch(r"/tmp/postapollo-c2c-ci-[A-Za-z0-9]+/home", home):
+    if not re.fullmatch(r"/tmp/postapollo-c2c-ci-[A-Za-z0-9_-]+/home", home):
         return False
     root = Path(home).parent
     for directory in (root, Path(home)):

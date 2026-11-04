@@ -100,7 +100,7 @@ Rectangle {
                 anchors.fill: parent
                 clip: true
                 contentWidth: width
-                contentHeight: Math.max(height, 582)
+                contentHeight: Math.max(height, 620)
                 boundsBehavior: Flickable.StopAtBounds
                 Column {
                     width: parent.width
@@ -148,12 +148,14 @@ Rectangle {
                         ActionButton {
                             width: 83
                             height: 26
-                            label: "◀ 30D"
+                            label: magickPane.celestialSource
+                                   ? "◀ " + magickPane.celestialSource.dateStepDays + "D"
+                                   : "◀ --"
                             labelPixelSize: 10
                             accentColor: Colors.cyan
                             available: !!magickPane.celestialSource
                                        && !magickPane.celestialSource.loading
-                            onClicked: magickPane.celestialSource.shiftDate(-30)
+                            onClicked: magickPane.celestialSource.jumpDate(-1)
                         }
                         QuietText {
                             width: Math.max(20,parent.width-83-83-82-18)
@@ -180,14 +182,147 @@ Rectangle {
                         ActionButton {
                             width: 83
                             height: 26
-                            label: "30D ▶"
+                            label: magickPane.celestialSource
+                                   ? magickPane.celestialSource.dateStepDays + "D ▶"
+                                   : "-- ▶"
                             labelPixelSize: 10
                             accentColor: Colors.cyan
                             available: !!magickPane.celestialSource
                                        && !magickPane.celestialSource.loading
-                            onClicked: magickPane.celestialSource.shiftDate(30)
+                            onClicked: magickPane.celestialSource.jumpDate(1)
                         }
                     }
+                    // M5k // Calibrate DAY JUMP independently from SPAN.
+                    // Editing the number never re-runs the JPL calculation.
+                    Row {
+                        width: parent.width
+                        height: 27
+                        spacing: 6
+
+                        QuietText {
+                            width: 98
+                            height: parent.height
+                            verticalAlignment: Text.AlignVCenter
+                            font.pixelSize: 10
+                            text: "JUMP STEP / D"
+                            color: Colors.cyan
+                        }
+                        ActionButton {
+                            width: 34
+                            height: 26
+                            label: "−1"
+                            contentPadding: 1
+                            labelPixelSize: 11
+                            accentColor: Colors.cyan
+                            available: !!magickPane.celestialSource
+                                       && !magickPane.celestialSource.loading
+                                       && magickPane.celestialSource.dateStepDays > 1
+                            onClicked: {
+                                magickPane.celestialSource.adjustDateStepDays(-1)
+                                jumpStepInput.text=String(
+                                    magickPane.celestialSource.dateStepDays)
+                            }
+                        }
+                        Rectangle {
+                            width: 56
+                            height: 26
+                            color: Colors.black
+                            border.width: jumpStepInput.activeFocus ? 2 : 1
+                            border.color: jumpStepInput.activeFocus
+                                          ? Colors.magenta : Colors.cyan
+                            radius: 3
+
+                            TextInput {
+                                id: jumpStepInput
+                                anchors.fill: parent
+                                anchors.leftMargin: 3
+                                anchors.rightMargin: 3
+                                horizontalAlignment: Text.AlignHCenter
+                                verticalAlignment: Text.AlignVCenter
+                                color: Colors.white
+                                selectedTextColor: Colors.black
+                                selectionColor: Colors.yellow
+                                font.family: "GohuFont 11 Nerd Font Mono"
+                                font.pixelSize: 11
+                                maximumLength: 4
+                                selectByMouse: true
+                                inputMethodHints: Qt.ImhDigitsOnly
+                                validator: IntValidator { bottom: 1; top: 3650 }
+                                text: magickPane.celestialSource
+                                      ? String(magickPane.celestialSource.dateStepDays)
+                                      : "5"
+                                enabled: !!magickPane.celestialSource
+                                         && !magickPane.celestialSource.loading
+
+                                function applyStep() {
+                                    const source=magickPane.celestialSource
+                                    if(source)source.setDateStepDays(text)
+                                    text=source ? String(source.dateStepDays) : "5"
+                                }
+                                onEditingFinished: {
+                                    applyStep()
+                                    focus=false
+                                }
+                                Keys.onEscapePressed: function(event) {
+                                    text=magickPane.celestialSource
+                                          ? String(magickPane.celestialSource.dateStepDays)
+                                          : "5"
+                                    focus=false
+                                    event.accepted=true
+                                }
+                                Keys.onUpPressed: function(event) {
+                                    applyStep()
+                                    if(magickPane.celestialSource)
+                                        magickPane.celestialSource.adjustDateStepDays(1)
+                                    text=magickPane.celestialSource
+                                          ? String(magickPane.celestialSource.dateStepDays) : "5"
+                                    event.accepted=true
+                                }
+                                Keys.onDownPressed: function(event) {
+                                    applyStep()
+                                    if(magickPane.celestialSource)
+                                        magickPane.celestialSource.adjustDateStepDays(-1)
+                                    text=magickPane.celestialSource
+                                          ? String(magickPane.celestialSource.dateStepDays) : "5"
+                                    event.accepted=true
+                                }
+                            }
+                        }
+                        ActionButton {
+                            width: 34
+                            height: 26
+                            label: "+1"
+                            contentPadding: 1
+                            labelPixelSize: 11
+                            accentColor: Colors.cyan
+                            available: !!magickPane.celestialSource
+                                       && !magickPane.celestialSource.loading
+                                       && magickPane.celestialSource.dateStepDays < 3650
+                            onClicked: {
+                                magickPane.celestialSource.adjustDateStepDays(1)
+                                jumpStepInput.text=String(
+                                    magickPane.celestialSource.dateStepDays)
+                            }
+                        }
+                        QuietText {
+                            width: Math.max(0,parent.width-98-34-56-34-24)
+                            height: parent.height
+                            verticalAlignment: Text.AlignVCenter
+                            elide: Text.ElideRight
+                            font.pixelSize: 10
+                            text: "TYPE 1–3650 / ENTER"
+                            color: Colors.yellow
+                        }
+                        Connections {
+                            target: magickPane.celestialSource
+                            function onDateStepDaysChanged() {
+                                if(!jumpStepInput.activeFocus)
+                                    jumpStepInput.text=String(
+                                        magickPane.celestialSource.dateStepDays)
+                            }
+                        }
+                    }
+
                     Row {
                         width: parent.width
                         height: 27

@@ -68,9 +68,18 @@ ShellRoot {
                 && item.available !== undefined && item.selected !== undefined;
         });
     }
+    function effectivelyVisible(item) {
+        for (let current = item; current; current = current.parent) {
+            if (current.visible === false) return false;
+        }
+        return true;
+    }
     function button(label) {
+        // Multiple providers may have identically named actions. Never
+        // choose a hidden provider's button before the selected one.
         return find(window.contentItem, function(item) {
-            return item.label === label && item.available !== undefined;
+            return item.label === label && item.available !== undefined
+                   && root.effectivelyVisible(item);
         });
     }
     function revealInDetails(item) {
@@ -165,8 +174,9 @@ ShellRoot {
                            && details.source.setup.indexOf("NASA") < 0) {
                     root.fail("FAKE_READY_SETUP_GUIDE");return;
                 }
-                if (!root.announce(root.button("CHECK KEYRING"),
-                                   "KEYRING_BUTTON"))
+                const keyring = root.button("CHECK KEYRING");
+                root.revealInDetails(keyring);
+                if (!root.announce(keyring, "KEYRING_BUTTON"))
                     return;
                 root.phase = "keyringClicked";
             } else if (root.phase === "keyringClicked") {

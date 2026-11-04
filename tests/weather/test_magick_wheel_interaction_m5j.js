@@ -116,3 +116,31 @@ test("wheel body picking, zoom, timeline thumb and backend ownership survive",()
     for(const forbidden of ["Process {","Timer {","FileView {","XMLHttpRequest","Qt.openUrlExternally"])
         assert.equal(qml.includes(forbidden),false);
 });
+
+
+// A font-free rendered comparison of the same glyph with M5j idle/focused
+// styles. Unlike regex tests, this checks visible color and enlargement.
+if(process.argv[2]==="--emit-focus-svg"){
+    const target=process.argv[3];
+    if(!target)throw Error("expected SVG output path");
+    const signs=[{x:65,y:44,focus:false},{x:155,y:44,focus:true}];
+    const paths=art.strokesFor(4); // The SAME Leo vector in both states.
+    const shapes=['<rect width="220" height="88" fill="#1B0623"/>'];
+    for(const item of signs){
+        const a=art.appearance(item.focus),color="#ED981A";
+        shapes.push('<circle cx="'+item.x+'" cy="'+item.y+'" r="'+a.chipRadius+
+            '" fill="#16051F" fill-opacity="'+a.chipOpacity+'" stroke="'+color+
+            '" stroke-opacity="'+a.edgeOpacity+'" stroke-width="'+a.edgeWidth+'"/>');
+        for(const commands of paths){
+            const d=commands.map(cmd=>cmd.join(" ")).join(" ");
+            shapes.push('<path d="'+d+'" transform="translate('+item.x+
+                " "+item.y+") scale("+a.symbolScale+') translate(-12 -12)" '+
+                'fill="none" stroke="'+color+'" stroke-opacity="'+a.inkOpacity+
+                '" stroke-width="'+a.inkWidth+'" stroke-linecap="round"'+
+                ' stroke-linejoin="round"/>');
+        }
+    }
+    fs.writeFileSync(target,
+        '<svg xmlns="http://www.w3.org/2000/svg" width="220" height="88"'+
+        ' viewBox="0 0 220 88">'+shapes.join("")+"</svg>");
+}

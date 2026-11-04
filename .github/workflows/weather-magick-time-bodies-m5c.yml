@@ -67,7 +67,7 @@ jobs:
               venus-mars) bodies='["venus","mars_barycenter"]' ;;
               jupiter-saturn) bodies='["jupiter_barycenter","saturn_barycenter"]' ;;
             esac
-            query="{\"format\":\"post-apollo.weather.celestial-visual-data.v1\",\"start_utc\":\"2026-09-19T00:00:00Z\",\"end_utc\":\"2026-12-18T00:00:00Z\",\"bodies\":$bodies,\"step_hours\":12,\"rate_window_hours\":6,\"orb_degrees\":6,\"include_events\":true,\"include_heliocentric_spatial\":true}"
+            query="{\"format\":\"post-apollo.weather.celestial-visual-data.v1\",\"start_utc\":\"2026-09-19T00:00:00Z\",\"end_utc\":\"2026-12-18T00:00:00Z\",\"bodies\":$bodies,\"step_hours\":12,\"rate_window_hours\":6,\"orb_degrees\":6,\"include_events\":true,\"include_heliocentric_spatial\":true,\"solar_overview_bodies\":[\"mercury\",\"venus\",\"earth\",\"moon\",\"mars_barycenter\",\"jupiter_barycenter\",\"saturn_barycenter\",\"uranus_barycenter\",\"neptune_barycenter\",\"pluto_barycenter\"]}"
             python3 scripts/weather/celestial_visual_data.py \
               --kernel "$RUNNER_TEMP/de440s.bsp" --query-json "$query" \
               > "$RUNNER_TEMP/m5c-$item.json"

@@ -132,9 +132,25 @@ Column {
             && response.id === pendingRequest.id;
         if (!valid) {
             resultKind = "error";
-            resultText = "REMOVE REFUSED // " +
-                (response && response.error ? String(response.error) : "REMOVE_UNAVAILABLE")
-                + " // Existing records preserved.";
+            const code = response && response.error
+                ? String(response.error) : "REMOVE_UNAVAILABLE";
+            const instructions = {
+                BACKUP_REQUIRED:"Use BACK UP NOW after archiving this record first.",
+                REMOVE_BRANCHES_FIRST:"Remove archived branches before the company.",
+                REMOVE_UNITS_FIRST:"Remove its archived structure units first.",
+                DETACH_PORTFOLIOS_FIRST:"Detach the company from every portfolio.",
+                UNLINK_ORGANIZATION_FIRST:"Remove its saved relationships and labels.",
+                UNLINK_BRANCH_SOCIAL_FIRST:"Unlink this branch's Social label first.",
+                UNLINK_BRANCH_LOCATION_FIRST:"Unlink the branch/location relation.",
+                UNLINK_UNIT_LOCATION_FIRST:"Unlink this unit from its location.",
+                UNLINK_REPORTING_FIRST:"Remove parent/child reporting links.",
+                DETACH_PORTFOLIO_MEMBERS_FIRST:"Detach portfolio members first.",
+                REVISION_CONFLICT:"Refresh local records and review before retry.",
+                ARCHIVE_BEFORE_REMOVE:"Archive the record before removal.",
+                RECORD_CHANGED:"Refresh; this record was renamed."
+            };
+            resultText = "REMOVE REFUSED // " + code
+                + " // " + (instructions[code] || "Existing records preserved.");
             pendingRequest = null;
             return;
         }

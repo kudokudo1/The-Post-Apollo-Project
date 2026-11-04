@@ -46,7 +46,12 @@ def _has_backup(kind: str, ident: str, org_id: str, record: dict[str, Any]) -> b
     # an empty directory yesterday does not protect a record created today.
     for filename in backups.names():
         bundle = backups.read_backup(filename)
-        other, _ = _record(bundle["documents"], kind, ident, org_id)
+        try:
+            other, _ = _record(bundle["documents"], kind, ident, org_id)
+        except RemovalError as error:
+            if error.code == "ORGANIZATION_NOT_FOUND":
+                continue
+            raise
         if other == record:
             return True
     return False

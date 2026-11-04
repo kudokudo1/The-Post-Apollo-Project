@@ -1,0 +1,22 @@
+name: Weather M28-V Classic source retirement
+on:
+  pull_request:
+    paths:
+      - "widgets/weather/WeatherStationW.qml"
+      - "widgets/weather/StationSubjectNavigator.qml"
+      - "widgets/weather/StationWorkspaceSurface.qml"
+      - "widgets/weather/StationSubjectDefaultPolicy.js"
+      - "shell.qml"
+      - "tests/weather/test_classic_source_retirement_m28v.js"
+      - ".github/workflows/weather-classic-source-retirement-m28v.yml"
+  workflow_dispatch:
+jobs:
+  native-source-contract:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Native route and single owner contracts
+        run: node --test tests/weather/test_classic_source_retirement_m28v.js

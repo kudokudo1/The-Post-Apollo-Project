@@ -45,20 +45,20 @@ test("drag pans the chart without shifting provider event times",()=>{
     assert.equal(p.panStart(360,360,100,0),360);
     const source=sourcePlanet(), rows=p.clockRows([source],"2026-11-04");
     const events=p.eventsFor(rows[1],"ALL");
-    assert.deepEqual(events.map(e=>e.clock),["00:10","12:15","23:50"]);
-    assert.deepEqual(p.visibleEvents(rows[1],"ALL",540,360).map(e=>e.clock),
+    assert.deepEqual(plain(events.map(e=>e.clock)),["00:10","12:15","23:50"]);
+    assert.deepEqual(plain(p.visibleEvents(rows[1],"ALL",540,360).map(e=>e.clock)),
        ["12:15"]);
-    assert.deepEqual(events.map(e=>e.clock),["00:10","12:15","23:50"]);
-    assert.deepEqual(p.visibleEvents(rows[1],"rise",0,360).map(e=>e.clock),
+    assert.deepEqual(plain(events.map(e=>e.clock)),["00:10","12:15","23:50"]);
+    assert.deepEqual(plain(p.visibleEvents(rows[1],"rise",0,360).map(e=>e.clock)),
        ["00:10"]);
     assert.equal(p.visibleEvents(rows[1],"set",0,360).length,0);
     assert.equal(p.visibleEvents(rows[1],"ALL",1200,360).length,1);
 });
 
 test("labels and hit locations agree with source minute viewport",()=>{
-    assert.deepEqual(p.rulerTicks(360,360).map(t=>t.label),
+    assert.deepEqual(plain(p.rulerTicks(360,360).map(t=>t.label)),
         ["06:00","07:30","09:00","10:30","12:00"]);
-    assert.deepEqual(p.rulerTicks(0,1440).map(t=>t.label),
+    assert.deepEqual(plain(p.rulerTicks(0,1440).map(t=>t.label)),
         ["00:00","06:00","12:00","18:00","24:00"]);
     assert.equal(p.localMinuteLabel(1440),"24:00");
     assert.equal(p.localMinuteLabel(-1),"--:--");

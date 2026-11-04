@@ -41,6 +41,9 @@ Scope {
     // M5c // Only two exact JPL targets per request, preserving M4 event limits.
     property string pairPreset: "moon-sun"
     property int dateOffsetDays: 0
+    // User-adjustable navigation jump only; it never changes M4 sampling.
+    // Keep this setting when switching routes or returning to TODAY.
+    property int dateStepDays: Query.DEFAULT_DAY_STEP
     property int spanDays: 29
     readonly property string pairLabel:
         Query.pairFor(pairPreset) ? Query.pairFor(pairPreset).label : "UNKNOWN PAIR"
@@ -76,6 +79,22 @@ Scope {
         if (next===null)return false;
         dateOffsetDays=next;
         return true;
+    }
+    function setDateStepDays(value) {
+        const next=Query.parseDayStep(value);
+        if(next===null)return false;
+        dateStepDays=next;
+        return true;
+    }
+    function adjustDateStepDays(direction) {
+        const next=Query.adjustDayStep(dateStepDays,direction);
+        if(next===null)return false;
+        dateStepDays=next;
+        return true;
+    }
+    function jumpDate(direction) {
+        if(direction!==-1 && direction!==1)return false;
+        return shiftDate(direction*dateStepDays);
     }
     function returnToToday() { dateOffsetDays=0; }
     function cyclePair(direction) { pairPreset=Query.pairAfter(pairPreset,direction); }

@@ -15,6 +15,25 @@ var SPANS = [14,29,90];
 var MAX_DAY_OFFSET = 3650;
 var DAY_MS = 86400000;
 
+// MAGICK M5k // The date-navigation step is a UI calibration, NOT the
+// graph sampling interval and NOT a new JPL request field.
+// Strict decimal-only positive day counts: 1, 5, 10, 30, etc.
+var DEFAULT_DAY_STEP = 5;
+function parseDayStep(value) {
+    if(typeof value!=="string" && typeof value!=="number")return null;
+    var str=String(value).trim();
+    if(!/^[1-9][0-9]{0,3}$/.test(str))return null;
+    var n=Number(str);
+    return n<=MAX_DAY_OFFSET ? n : null;
+}
+function adjustDayStep(current,direction) {
+    if(typeof current!=="number" || parseDayStep(current)===null ||
+       typeof direction!=="number" || !isFinite(direction) ||
+       Math.floor(direction)!==direction || Math.abs(direction)!==1)
+       return null;
+    return Math.max(1,Math.min(MAX_DAY_OFFSET,current+direction));
+}
+
 function pairFor(id) {
     for (var i=0;i<PAIRS.length;i++)
         if(PAIRS[i].id===id)return PAIRS[i];

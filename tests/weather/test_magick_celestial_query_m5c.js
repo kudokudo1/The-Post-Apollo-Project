@@ -121,10 +121,16 @@ test("visible controls are functional and route through single owning service",(
     assert.match(service,/onCurrentKeyChanged: clearState\(\)/);
     assert.match(service,/calculation\.running=true/);
     assert.match(service,/onRouteChanged:/);
-    for(const call of ["shiftDate(-30)","shiftDate(30)","returnToToday()",
+    // M5k retains all original date-navigation semantics while allowing
+    // the day jump to be edited (previously hardcoded at 30).
+    for(const call of ["jumpDate(-1)","jumpDate(1)","returnToToday()",
+                       "adjustDateStepDays(-1)","adjustDateStepDays(1)",
                        "cyclePair(-1)","cyclePair(1)","cycleSpan()"])
         assert.ok(pane.includes("magickPane.celestialSource."+call),call);
-    assert.match(pane,/contentHeight: Math\.max\(height, 582\)/);
+    assert.match(service,/function shiftDate\(days\)/);
+    assert.match(service,/function jumpDate\(direction\)/);
+    assert.match(service,/property int dateStepDays:/);
+    assert.match(pane,/contentHeight: Math\.max\(height, 620\)/);
     assert.match(pane,/StationMagickCelestialInstrument\s*\{/);
     assert.equal((station.match(/WeatherServices\.CelestialVisualService\s*\{/g)||[]).length,1);
     for(const no of ["Process {","Timer {","FileView {","XMLHttpRequest",

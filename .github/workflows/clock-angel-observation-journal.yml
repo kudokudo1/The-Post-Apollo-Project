@@ -1,0 +1,41 @@
+name: Clock ANGEL observation journal contracts
+
+on:
+  pull_request:
+    paths:
+      - "widgets/AngelPane.qml"
+      - "widgets/TimeW.qml"
+      - "services/time/AngelObservationPolicy.js"
+      - "services/time/AngelObservationsStore.qml"
+      - "services/time/qmldir"
+      - "tests/time/test_angel_observation_policy.cjs"
+      - "tests/time/test_angel_journal_integration_contract.py"
+      - "tests/time/test_clock_visual_calibration_contract.py"
+      - ".github/workflows/clock-angel-observation-journal.yml"
+  push:
+    paths:
+      - "widgets/AngelPane.qml"
+      - "widgets/TimeW.qml"
+      - "services/time/AngelObservationPolicy.js"
+      - "services/time/AngelObservationsStore.qml"
+      - "services/time/qmldir"
+      - "tests/time/test_angel_observation_policy.cjs"
+      - "tests/time/test_angel_journal_integration_contract.py"
+      - "tests/time/test_clock_visual_calibration_contract.py"
+      - ".github/workflows/clock-angel-observation-journal.yml"
+
+jobs:
+  angel:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: ANGEL pure observation schema and numeric classifications
+        run: node tests/time/test_angel_observation_policy.cjs
+      - name: ANGEL journal singleton and TimeW UI integration
+        run: python3 -m unittest discover -s tests/time -p 'test_angel_journal_integration_contract.py' -v
+      - name: Preserve TimeW existing stopwatch world machine and keyboard paths
+        run: python3 tests/timew/test_timew_foundation_contracts.py
+      - name: Preserve Clock status, calibration and ANGEL mode contracts
+        run: python3 -m unittest discover -s tests/time -p 'test_clock_visual_calibration_contract.py' -v
+      - name: Preserve other Clock shared time controls
+        run: python3 -m unittest discover -s tests/time -p 'test_clock_settings_contract.py' -v

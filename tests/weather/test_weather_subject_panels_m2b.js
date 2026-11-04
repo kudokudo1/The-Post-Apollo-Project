@@ -161,13 +161,13 @@ test("M29-A river deep routes focus their own existing data blocks", () => {
     ground.indexOf('// The four deep RIVERS routes'),
     ground.indexOf('Column {\n            visible: ground.sectionVisible("rivers")')
   );
-  assert.equal((riverButtons.match(/path:"weather\\/water\\/rivers/g)||[]).length,5);
-  assert.match(riverButtons,/onTriggered: ground\\.routeRequested\\(modelData\\.path\\)/);
-  assert.match(ground,/onSubjectRouteChanged:[\\s\\S]*?groundScroll\\.contentY = 0/);
-  assert.match(pane,/onRouteRequested: function\\(path\\) \\{ weatherPane\\.routeRequested\\(path\\); \\}/);
-  assert.match(surface,/onRouteRequested: function\\(path\\) \\{ surface\\.routeRequested\\(path\\); \\}/);
-  assert.match(nav,/onRouteRequested: function\\(path\\) \\{ browser\\.chooseRoute\\(path\\); \\}/);
-  assert.equal((station.match(/WeatherServices\\.NwpsRiverService\\s*\\{/g)||[]).length,1);
+  assert.equal((riverButtons.match(/path:"weather\/water\/rivers/g)||[]).length,5);
+  assert.match(riverButtons,/onTriggered: ground\.routeRequested\(modelData\.path\)/);
+  assert.match(ground,/onSubjectRouteChanged:[\s\S]*?groundScroll\.contentY = 0/);
+  assert.match(pane,/onRouteRequested: function\(path\) \{ weatherPane\.routeRequested\(path\); \}/);
+  assert.match(surface,/onRouteRequested: function\(path\) \{ surface\.routeRequested\(path\); \}/);
+  assert.match(nav,/onRouteRequested: function\(path\) \{ browser\.chooseRoute\(path\); \}/);
+  assert.equal((station.match(/WeatherServices\.NwpsRiverService\s*\{/g)||[]).length,1);
 });
 
 test("historical model collector is shared and activated only for its explicit subject route", () => {

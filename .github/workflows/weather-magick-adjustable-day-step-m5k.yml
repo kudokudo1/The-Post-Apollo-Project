@@ -1,0 +1,46 @@
+name: MAGICK M5k adjustable UTC day-step navigator
+on:
+  pull_request:
+    paths:
+      - 'services/weather/CelestialVisualQueryPolicy.js'
+      - 'services/weather/CelestialVisualService.qml'
+      - 'widgets/weather/StationMagickSubjectPane.qml'
+      - 'tests/weather/test_magick_adjustable_day_step_m5k.js'
+      - 'tests/weather/test_magick_celestial_query_m5c.js'
+      - '.github/workflows/weather-magick-adjustable-day-step-m5k.yml'
+  push:
+    paths:
+      - 'services/weather/CelestialVisualQueryPolicy.js'
+      - 'services/weather/CelestialVisualService.qml'
+      - 'widgets/weather/StationMagickSubjectPane.qml'
+      - 'tests/weather/test_magick_adjustable_day_step_m5k.js'
+      - 'tests/weather/test_magick_celestial_query_m5c.js'
+      - '.github/workflows/weather-magick-adjustable-day-step-m5k.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  day-step-policy-and-ui:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Verify configurable day step and editable compact controls
+        run: node --test tests/weather/test_magick_adjustable_day_step_m5k.js
+      - name: Preserve M5c historical UTC and event controls
+        run: node --test tests/weather/test_magick_celestial_query_m5c.js
+      - name: Regression-check M5b M5e M5f M5g M5h M5i M5j and HOME
+        run: |
+          node --test tests/weather/test_magick_celestial_bridge_m5b.js
+          node --test tests/weather/test_magick_default_paths_m5e.js
+          node --test tests/weather/test_magick_chart_legibility_m5f.js
+          node --test tests/weather/test_magick_relations_timeline_m5g.js
+          node --test tests/weather/test_magick_neon_scrubber_m5h.js
+          node --test tests/weather/test_magick_zodiac_visible_m5i.js
+          node --test tests/weather/test_magick_wheel_interaction_m5j.js
+          node --test tests/weather/test_home_deck_w2a.js

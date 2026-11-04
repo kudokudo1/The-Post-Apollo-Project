@@ -38,7 +38,10 @@ class NativePolkitClockResyncContracts(unittest.TestCase):
         self.assertIn('TimeSettings.resyncStatus === "working"', SHELL)
         self.assertIn("TimeResyncAuthW.qml", SHELL)
         self.assertIn('authRegistrationFallback.restart()', SERVICE)
-        self.assertIn("launchResyncAfterAgentReady()", AUTH)
+        self.assertIn("launchResyncAfterAgentReady(true)", AUTH)
+        self.assertIn("launchResyncAfterAgentReady(false)", SERVICE)
+        self.assertIn("NATIVE POLKIT AGENT REGISTERED", SERVICE)
+        self.assertIn("TimeSettings.resyncAuthPath", PANE)
         self.assertIn("onIsRegisteredChanged", AUTH)
 
     def test_native_polkit_ui_never_collects_password_in_python(self):

@@ -1,46 +1,36 @@
 #!/usr/bin/env python3
-"""Weather Station domains are first-class Main Modes after separation."""
+"""Weather Station main navigation now uses the native seven SUBJECTS families."""
 
 from pathlib import Path
 import re
 
 root = Path(__file__).resolve().parents[2]
-weather = (root / "widgets/weather/WeatherStationW.qml").read_text(
-    encoding="utf-8"
-)
+station = (root / "widgets/weather/WeatherStationW.qml").read_text(encoding="utf-8")
+family_rail = (root / "widgets/weather/StationWorkspaceFamilyRail.qml").read_text(encoding="utf-8")
+index_rail = (root / "widgets/weather/StationSubjectRail.qml").read_text(encoding="utf-8")
+workspace = (root / "widgets/weather/StationWorkspaceSurface.qml").read_text(encoding="utf-8")
+navigation = (root / "widgets/weather/StationWorkspaceNavigationPolicy.js").read_text(encoding="utf-8")
 
-assert weather.count("ModeButton {") == 1
-assert "id: mainModeButton" in weather
+assert station.count("ModeButton {") == 0
+assert "id: railColumn" not in station
+assert "mainModes:" not in station
+assert "subjectBrowserToggle" not in station
+assert "StationWorkspaceFamilyRail {" in station
+assert "StationSubjectRail {" in station
+assert 'width: 160' in station
+assert family_rail.count("ModeButton {") == 1
+assert index_rail.count("ModeButton {") == 1
+assert "model: Workspace.FAMILIES" in family_rail
+assert 'onTriggered:' in family_rail
+assert 'familyRail.navigator.chooseRoute(modelData.landing)' in family_rail
+assert "model: surface.activeTabs" in workspace
 
-order_match = re.search(
-    r"readonly property var mainModes:\s*\[([^\]]+)\]",
-    weather,
-)
-assert order_match
-order = re.findall(r'"id":\s*"([^"]+)"', order_match.group(1))
-assert order == [
-    "home", "ground", "sky", "space",
-    "map", "news", "radio", "terminal",
-]
+family_ids = re.findall(r'\{id:"(home|weather|cosmos|earth|media|magick|tools)",label:', navigation)
+assert family_ids[:7] == ["home","weather","cosmos","earth","media","magick","tools"]
 
-for token in (
-    "model: weatherStation.mainModes",
-    "selected:",
-    "weatherStation.currentView === modelData.id",
-    "weatherStation.currentView = modelData.id;",
-    "iconText: modelData.symbol",
-    "labelText: modelData.name",
-    "horizontalContent: true",
-    "onTriggered:",
-):
-    assert token in weather, token
+for token in ("function cycleMainMode(direction)","function moveNavigationCursor(direction)",
+              "function activateNavigationCursor()","subjectNavigator.cycleSubjects(direction);",
+              "subjectNavigator.moveCursor(direction);","subjectNavigator.activateCursor();"):
+    assert token in station, token
 
-for old in (
-    "id: homeButton",
-    "id: domainButton",
-    "id: viewButton",
-    "weatherStation.activeDomain",
-):
-    assert old not in weather, old
-
-print("Weather Main Mode: PASS")
+print("Weather SUBECTS family navigation contracts: PASS")

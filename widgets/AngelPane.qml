@@ -33,7 +33,8 @@ Item {
         {key: "sequence", label: "SEQ"},
         {key: "add", label: "ADD"},
         {key: "subtract", label: "SUB"},
-        {key: "other", label: "OTHER"}
+        {key: "other", label: "OTHER"},
+        {key: "err", label: "ERR"}
     ]
 
     function recordObservation(inputDigits, mode, observedAtMs) {
@@ -250,7 +251,7 @@ Item {
 
         GohuText {
             width: parent.width
-            text: "REP SAME // MIR PALINDROME // SEQ RUN // ADD/SUB 3-DIGIT EQUATION"
+            text: "OTHER = NO PATTERN // ERR = OTHER + USER-MARKED"
             font.pixelSize: 9
             color: Colors.cyan
             elide: Text.ElideRight
@@ -276,7 +277,8 @@ Item {
                 delegate: ActionButton {
                     width: angelHistoryList.width
                     height: 41
-                    label: modelData.digits + " // "
+                    label: (modelData.errMarked === true ? "ERR* // " : "")
+                           + modelData.digits + " // "
                            + AngelPolicy.patternTags(modelData.digits).join("+")
                            + " // " + modelData.displayTime
                     labelPixelSize: 10
@@ -331,8 +333,9 @@ Item {
             spacing: 7
 
             GohuText {
-                width: Math.max(0, parent.width - deleteButton.width
-                                - cancelDelete.width - parent.spacing * 2)
+                width: Math.max(0, parent.width - errMarkButton.width
+                                - deleteButton.width - cancelDelete.width
+                                - parent.spacing * 3)
                 height: parent.height
                 verticalAlignment: Text.AlignVCenter
                 font.pixelSize: 9
@@ -354,6 +357,30 @@ Item {
                 accentColor: Colors.red
                 destructive: true
                 onLeftClicked: pane.pendingDeleteId = ""
+            }
+            ActionButton {
+                id: errMarkButton
+                width: 82
+                height: 30
+                label: pane.selectedObservation !== null
+                       && pane.selectedObservation.errMarked === true
+                       ? "CLEAR ERR" : "MARK ERR"
+                labelPixelSize: 9
+                accentColor: Colors.yellow
+                trackLabelGlowLocally: true
+                selected: pane.selectedObservation !== null
+                          && pane.selectedObservation.errMarked === true
+                selectedFillColor: Colors.yellow
+                selectedForegroundColor: Colors.magenta
+                selectedBorderColor: Colors.magenta
+                available: pane.selectedObservation !== null
+                           && AngelObservationsStore.writable
+                onLeftClicked: {
+                    if (pane.selectedObservation === null)
+                        return;
+                    pane.pendingDeleteId = "";
+                    AngelObservationsStore.toggleErrObservation(pane.selectedId);
+                }
             }
             ActionButton {
                 id: deleteButton

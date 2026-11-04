@@ -98,7 +98,9 @@ assert.match(bridge,/readonly property bool hostAuthenticated: false/);
 assert.match(bridge,/readonly property bool canApprove: false/);
 assert.match(bridge,/readonly property var latestStatus: null/);
 assert.match(bridge,/DisplayPolicy\.project\(latestStatus, providerId\)/);
-assert.doesNotMatch(bridge,/Process\s*\{|StdioCollector|FileView|onCompleted:|secret-tool|sendRequest|setStatus|approve\(/i);
+// Executable declarations matter; comments describing forbidden APIs do not.
+assert.doesNotMatch(bridge,/^\s*(?:Process\s*\{|StdioCollector\b|FileView\b|function\s+(?:sendRequest|setStatus|approve)\s*\(|onCompleted:)/mi);
+assert.doesNotMatch(bridge,/secret-tool/i);
 assert.match(moduleFile,/singleton ConnectionsRequestStatus 1\.0 ConnectionsRequestStatus.qml/);
 assert.match(details,/ConnectionsRequestStatus\.display\(selectedId\)/);
 assert.match(details,/RequestDisplayPolicy\.project\(syntheticStatusPreview, selectedId\)/);

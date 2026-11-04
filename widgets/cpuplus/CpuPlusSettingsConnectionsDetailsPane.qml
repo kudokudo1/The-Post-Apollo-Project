@@ -355,7 +355,7 @@ Item {
             QuietText {
                 width: parent.width
                 wrapMode: Text.WordWrap
-                text: "C2g // REQUEST STATUS IS READ-ONLY. REAL HOST FEED, APPROVAL, SECRET STORAGE AND ACCOUNT ACCESS ARE NOT CONNECTED."
+                text: "C2e // ACCESS REVIEW ONLY. HOST APPROVAL, SECRET STORAGE, ACCOUNT LOGIN AND CROSS-APP GRANTS REMAIN DISABLED. C2g // REQUEST STATUS READ-ONLY; NO VERIFIED HOST FEED."
                 color: Colors.orange
                 font.pixelSize: 9
             }

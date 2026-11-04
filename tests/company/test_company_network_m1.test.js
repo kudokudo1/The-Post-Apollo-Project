@@ -151,7 +151,7 @@ test("central yellow city sits 6px below the white ornaments without shifting th
             label+" retains intrinsic city width");
         assert.match(cityBlock,new RegExp("height: "+rowId+"\\.height"),
             label+" leaves shared Row geometry unchanged");
-        assert.match(cityBlock,new RegExp("id: "+glyphId+"\\s+y: 6"),
+        assert.match(cityBlock,new RegExp("id: "+glyphId+"\\s+x: -2\\s+y: 6"),
             label+" lowers only the yellow city 6px");
         assert.match(cityBlock,new RegExp("font\\.pixelSize: "+fontSize),
             label+" preserves city glyph size");

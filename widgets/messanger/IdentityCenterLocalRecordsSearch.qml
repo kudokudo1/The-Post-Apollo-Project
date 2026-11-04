@@ -270,8 +270,10 @@ Column {
     Text {
         width: parent.width
         visible: search.includeArchived
-        text: "Archived records retain their IDs. To restore an archived company, " +
-              "select ALL / NO SELECTION above its Directory row."
+        text: "ARCHIVE TRAY ABOVE contains every archived item and red permanent " +
+              "removal actions. This button also shows archived entries inside " +
+              "their original editors. To restore a company there, " +
+              "select ALL / NO SELECTION above the Directory row."
         color: Colors.orange
         font.pixelSize: 9
         wrapMode: Text.WordWrap

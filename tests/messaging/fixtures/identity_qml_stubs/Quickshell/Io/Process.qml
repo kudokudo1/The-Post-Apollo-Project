@@ -6,6 +6,13 @@ QtObject {
     objectName: "ciSnapshotProcess"
     property var command: []
     property bool running: false
+    property bool stdinEnabled: false
+    property string lastInput: ""
+    signal started()
+    onRunningChanged: {
+        if (running) started();
+    }
+    function write(text) { lastInput = String(text); }
     property QtObject stdout
     property QtObject stderr
     signal exited(int exitCode, int exitStatus)

@@ -8,6 +8,8 @@ Column {
     id: publisherFeeds
 
     property bool stationOpen: true
+    // Preserve GDELT's original visual order until the operator opens a feed.
+    property string expandedPublisher: ""
     spacing: 8
     signal headlineSelected(var row)
 
@@ -65,11 +67,30 @@ Column {
                     labelPixelSize: 10
                     accentColor: publisherSourceRow.sourceColor
                     available: publisherSourceRow.backend.canRequest
-                    onClicked: publisherSourceRow.backend.request()
+                    onClicked: {
+                        publisherFeeds.expandedPublisher =
+                            publisherSourceRow.modelData.id;
+                        publisherSourceRow.backend.request();
+                    }
+                }
+                ActionButton {
+                    width: 86
+                    height: 30
+                    label: publisherFeeds.expandedPublisher
+                           === publisherSourceRow.modelData.id ? "HIDE" : "VIEW"
+                    labelPixelSize: 10
+                    accentColor: publisherSourceRow.sourceColor
+                    available: publisherSourceRow.backend.ready
+                    onClicked: {
+                        publisherFeeds.expandedPublisher =
+                            publisherFeeds.expandedPublisher
+                            === publisherSourceRow.modelData.id
+                            ? "" : publisherSourceRow.modelData.id;
+                    }
                 }
                 GohuText {
                     anchors.verticalCenter: parent.verticalCenter
-                    width: Math.max(0, parent.width - 160)
+                    width: Math.max(0, parent.width - 254)
                     text: publisherSourceRow.modelData.label + " // " + publisherSourceRow.backend.sourceState
                     font.pixelSize: 11
                     color: publisherSourceRow.backend.failed ? Colors.orange : publisherSourceRow.sourceColor
@@ -91,7 +112,10 @@ Column {
                 elide: Text.ElideRight
             }
             Repeater {
-                model: publisherSourceRow.backend.ready ? publisherSourceRow.backend.rows : []
+                model: publisherFeeds.expandedPublisher
+                       === publisherSourceRow.modelData.id
+                       && publisherSourceRow.backend.ready
+                       ? publisherSourceRow.backend.rows : []
                 delegate: Rectangle {
                     required property var modelData
                     width: publisherFeeds.width
@@ -152,7 +176,7 @@ Column {
         width: parent.width
         font.pixelSize: 9
         color: Colors.orange
-        text: "SOURCE HEADLINES + RSS SUMMARIES ONLY // INSPECT USES IN-STATION METADATA VIEWER // GDELT ANALYSIS IS SEPARATE"
+        text: "OPEN ONE PUBLISHER AT A TIME WITH VIEW/HIDE // RSS SUMMARIES ONLY // INSPECT USES IN-STATION METADATA VIEWER // GDELT ANALYSIS IS SEPARATE"
         wrapMode: Text.WordWrap
     }
 }

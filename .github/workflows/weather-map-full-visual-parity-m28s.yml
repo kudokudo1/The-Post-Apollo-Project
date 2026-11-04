@@ -1,0 +1,45 @@
+name: Weather M28-S full CLASSIC MAP in SUBJECTS
+
+on:
+  pull_request:
+    paths:
+      - 'widgets/weather/StationEarthSubjectPane.qml'
+      - 'widgets/weather/StationEarthSubjectPanelPolicy.js'
+      - 'widgets/weather/StationSubjectNavigationPolicy.js'
+      - 'widgets/weather/StationWorkspaceNavigationPolicy.js'
+      - 'widgets/weather/WeatherStationW.qml'
+      - 'tests/weather/test_map_full_visual_parity_m28s.js'
+      - 'tests/weather/test_earth_subject_panels_e1.js'
+      - 'tests/weather/test_index_earth_cutover_m28h.js'
+      - 'tests/weather/test_workspace_landing_w1.js'
+      - 'docs/weather-subjects-m28s-map-full-handoff.md'
+      - '.github/workflows/weather-map-full-visual-parity-m28s.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  map-full:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Full MAP original source, UI and actor parity
+        run: node --test tests/weather/test_map_full_visual_parity_m28s.js
+      - name: EARTH original ten focused routes and M28-H exact provenance
+        run: |
+          node --test tests/weather/test_earth_subject_panels_e1.js
+          node --test tests/weather/test_index_earth_cutover_m28h.js
+          node --test tests/weather/test_workspace_landing_w1.js
+      - name: No source or cross-domain regression
+        run: |
+          node --test tests/weather/test_weather_subject_panels_m2a.js
+          node --test tests/weather/test_weather_subject_panels_m2b.js
+          node --test tests/weather/test_ground_full_visual_parity_m28q.js
+          node --test tests/weather/test_weather_cosmos_domain_separation_m28r.js
+          node --test tests/weather/subject_navigation_contract.test.js
+          node --test tests/weather/test_subjects_first_pilot_m28n.js

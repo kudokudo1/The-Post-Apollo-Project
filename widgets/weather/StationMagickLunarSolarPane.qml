@@ -66,7 +66,10 @@ Rectangle {
         anchors.right: parent.right
         anchors.top: focusTabs.bottom
         anchors.topMargin: 4
-        height: Math.max(0,lunarSolarPane.height-focusTabs.height-4)
+        // Keep the existing compact interactive controls at natural height,
+        // freeing the unused lower viewport for original ephemeris/light data.
+        height: Math.min(186,Math.max(0,
+            lunarSolarPane.height-focusTabs.height-4))
         visible: !lunarSolarPane.isCalendar
         compactMode: true
         showMoon: !lunarSolarPane.isSolar
@@ -87,6 +90,20 @@ Rectangle {
         solarDate: sourceSky.astronomySummary.date
         solarCivilOffsetMinutes: sourceSky.moonCivilOffsetMinutes
         solarOffsetSource: sourceSky.moonCivilOffsetSource
+    }
+
+    // M30-E // The former blank area is now a source-backed event rack.
+    // The two panels are siblings, never a whole-screen scrolling page.
+    StationMagickLunarSolarDetails {
+        id: detailRack
+        anchors.left: parent.left
+        anchors.right: parent.right
+        anchors.top: focusedInstrument.bottom
+        anchors.bottom: parent.bottom
+        anchors.topMargin: 4
+        visible: !lunarSolarPane.isCalendar
+        isSolar: lunarSolarPane.isSolar
+        skySource: sourceSky
     }
 
     Rectangle {

@@ -25,6 +25,11 @@ int main(int argc, char **argv) {
     const bool styledOnline = args.contains("--styled-online");
     const bool anyOnline = online || styledOnline;
     const bool capture = args.contains("--capture");
+    const bool mockHub = args.contains("--mock-hub");
+    if (mockHub && !anyOnline) {
+        qCritical() << "MOCK_HUB_REQUIRES_EXPLICIT_ONLINE_MODE";
+        return 7;
+    }
 
     // Limited public regression viewports only, never private user locations.
     QString sample;
@@ -37,7 +42,9 @@ int main(int argc, char **argv) {
         QStringLiteral("MIDWEST"), QStringLiteral("NORTHEAST"),
         QStringLiteral("RURAL"), QStringLiteral("CANADA"),
         QStringLiteral("MEXICO"), QStringLiteral("ALASKA"),
-        QStringLiteral("HAWAII"), QStringLiteral("FLINT")
+        QStringLiteral("HAWAII"), QStringLiteral("FLINT"),
+        QStringLiteral("SUBURB"), QStringLiteral("VILLAGE"),
+        QStringLiteral("NEIGHBORHOOD"), QStringLiteral("BORDER")
     };
     if ((!sample.isEmpty() && !allowedSamples.contains(sample))
             || (!sample.isEmpty() && !anyOnline)) {
@@ -73,6 +80,7 @@ int main(int argc, char **argv) {
     engine.rootContext()->setContextProperty("probeOnline", anyOnline);
     engine.rootContext()->setContextProperty("probeStyledOnline", styledOnline);
     engine.rootContext()->setContextProperty("probeSample", sample);
+    engine.rootContext()->setContextProperty("probeMockHub", mockHub);
     engine.load(QUrl(QStringLiteral("qrc:/CompanyVectorProbe/main.qml")));
     if (engine.rootObjects().isEmpty()) {
         qCritical() << "QML_PLUGIN_OR_WINDOW_LOAD_FAILED";
@@ -89,7 +97,7 @@ int main(int argc, char **argv) {
         // Offline synthetic capture is quick; online vector tiles and glyphs
         // need additional time before a screenshot can be inspected.
         const int settleMilliseconds = anyOnline ? 15000 : 5500;
-        QTimer::singleShot(settleMilliseconds, &app, [&app, window, sample, anyOnline]() {
+        QTimer::singleShot(settleMilliseconds, &app, [&app, window, sample, anyOnline, mockHub]() {
             const QImage screenshot = window->grabWindow();
             const QString out = QStringLiteral("company-vector-probe.png");
             if (screenshot.isNull() || !screenshot.save(out)) {
@@ -114,6 +122,33 @@ int main(int argc, char **argv) {
                 }
             }
             qInfo() << "CAPTURE_DIAGNOSTIC" << "non-purple-samples" << colorfulPixels;
+            // Sample the actual map area, excluding the title, footer and
+            // camera rail. This is quantitative evidence of palette content,
+            // not proof of specific streets or the accuracy of labels.
+            int cyanPixels = 0;
+            int violetPixels = 0;
+            int orangePixels = 0;
+            const int mapRight = std::max(0, screenshot.width() - 110);
+            const int mapBottom = std::max(64, screenshot.height() - 48);
+            for (int y = 60; y < mapBottom; y += 4) {
+                for (int x = 10; x < mapRight; x += 4) {
+                    const QColor v = screenshot.pixelColor(x, y);
+                    if (v.green() > 100 && v.blue() > 95
+                            && v.green() > v.red() * 1.28)
+                        ++cyanPixels;
+                    if (v.red() > 100 && v.blue() > 75
+                            && v.red() > v.green() * 1.27)
+                        ++violetPixels;
+                    if (v.red() > 160 && v.green() > 70
+                            && v.green() < 210 && v.blue() < 120)
+                        ++orangePixels;
+                }
+            }
+            qInfo() << "MAP_PALETTE_SAMPLES"
+                    << "cyan" << cyanPixels
+                    << "magenta" << violetPixels
+                    << "orange" << orangePixels
+                    << "mock_hub" << mockHub;
             app.exit(0);
         });
     }

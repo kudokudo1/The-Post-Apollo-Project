@@ -38,8 +38,7 @@ test("V3d clock angle is real 00/06/12/18 LOCAL time, not azimuth",()=>{
     assert.ok(Math.abs(D.timeAngle(minute)-angle)<1e-9);
   }
   for(const bad of [-1,1440,NaN,Infinity,"",null,30.5])
-    assert.equal(D.timeAngle(bad),bad===null||bad===""?0:null,
-      String(bad)); // empty-like primitive Number() compatibility
+    assert.equal(D.timeAngle(bad),null,String(bad));
   assert.equal(D.timeLabel(0),"00:00");
   assert.equal(D.timeLabel(360),"06:00");
   assert.equal(D.timeLabel(720),"12:00");

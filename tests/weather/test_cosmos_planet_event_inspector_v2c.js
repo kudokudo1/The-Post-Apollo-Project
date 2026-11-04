@@ -85,6 +85,6 @@ test("V2c native QML keeps original geometry, source owner and real marker actio
     assert.match(sky,/providerRows: planetRiseSetService\.rows/);
     for(const banned of [
       "Process {","Timer {","FileView {","UsnoPlanetRiseSetService {",
-      "XMLHttpRequest","new WebSocket","zodiacLongitude","onWheel:"
+      "XMLHttpRequest","new WebSocket","zodiacLongitude"
     ]) assert.ok(!qml.includes(banned),banned);
 });

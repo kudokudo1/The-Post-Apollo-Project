@@ -62,7 +62,7 @@ class UnifiedRefreshV1(unittest.TestCase):
                          'refreshPanel.stateOf(entry.store) === "loading"',
                          'state === "error"', 'state === "ready"',
                          'typeof entry.store.refresh !== "function"',
-                         "refreshInProgress", "onStateSignatureChanged: checkCompletion()",
+                         "refreshInProgress", "onStateSignatureChanged: Qt.callLater(refreshPanel.checkCompletion)",
                          "No automatic retry.", "REFRESH COMPLETE",
                          "REFRESH ENDED WITH ERRORS", "REFRESH NOT STARTED",
                          "No automatic", "Refresh reads existing local records"):

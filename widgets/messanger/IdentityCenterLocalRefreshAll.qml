@@ -106,10 +106,18 @@ Column {
         return rejected.length === 0;
     }
     function checkCompletion() {
-        if (!refreshInProgress || loadingCount > 0)
+        if (!refreshInProgress)
             return;
-        if (!sources().every(function(entry) {
-            const state = refreshPanel.stateOf(entry.store);
+        // Re-read each current source directly: bindings for derived counts
+        // may be a tick behind their underlying QML store-state notify.
+        const current = sources().map(function(entry) {
+            return refreshPanel.stateOf(entry.store);
+        });
+        if (current.some(function(state) {
+            return state === "saving" || state === "loading";
+        }))
+            return;
+        if (!current.every(function(state) {
             return state === "ready" || state === "error";
         }))
             return;
@@ -124,7 +132,7 @@ Column {
                 "/7 requests accepted. Check rejected stores before retry.";
         }
     }
-    onStateSignatureChanged: checkCompletion()
+    onStateSignatureChanged: Qt.callLater(refreshPanel.checkCompletion)
 
     Rectangle {
         width: parent.width

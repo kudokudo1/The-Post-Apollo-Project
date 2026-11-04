@@ -729,7 +729,12 @@ class RealQtOrganizationsSettingsPaneSmoke(unittest.TestCase):
         self.assertFalse(button.property("interactive"))
         for name, key in sources:
             inject(name, key, "ready")
-        self.assertFalse(refresher.property("refreshInProgress"))
+        self.assertFalse(
+            refresher.property("refreshInProgress"),
+            "inflight=" + str(refresher.property("refreshInProgress"))
+            + " signature=" + str(refresher.property("stateSignature"))
+            + " loading=" + str(refresher.property("loadingCount"))
+            + " result=" + str(refresher.property("lastRefreshResult")))
         self.assertIn("REFRESH COMPLETE", refresher.property("lastRefreshResult"))
         self.assertTrue(refresher.property("canRefresh"))
 

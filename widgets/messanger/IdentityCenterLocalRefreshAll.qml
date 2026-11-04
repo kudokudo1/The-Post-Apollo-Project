@@ -17,6 +17,7 @@ Column {
     property bool refreshInProgress: false
     property string lastRefreshResult: ""
     property int acceptedRefreshCount: 0
+    signal activityObserved(string kind, string detail)
     spacing: 5
 
     function sources() {
@@ -131,6 +132,9 @@ Column {
             lastRefreshResult = "REFRESH PARTIAL // " + acceptedRefreshCount +
                 "/7 requests accepted. Check rejected stores before retry.";
         }
+        refreshPanel.activityObserved(
+            failures.length === 0 && acceptedRefreshCount === 7
+            ? "refresh" : "failure", lastRefreshResult);
     }
     onStateSignatureChanged: Qt.callLater(refreshPanel.checkCompletion)
 

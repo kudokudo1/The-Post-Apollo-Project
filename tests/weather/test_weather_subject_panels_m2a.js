@@ -89,15 +89,20 @@ test("provider activation matches only relevant routes and preserves old collect
       key === "weather/water/rivers"
       || key.startsWith("weather/water/rivers/")
       || key === "weather/hazards/flood"
-      || key === "weather/history/relationships/rivers");
+      || key === "weather/history/relationships/rivers"
+      || key === "weather/ground/full");
     assert.equal(env.needsSource(key,"lightning"),
-      key === "weather/hazards/lightning" || key === "weather/maps/lightning");
+      key === "weather/hazards/lightning" || key === "weather/maps/lightning"
+      || key === "weather/ground/full");
     assert.equal(env.needsSource(key,"marine"),
       key === "weather/water/marine"
-      || key === "weather/history/relationships/marine");
+      || key === "weather/history/relationships/marine"
+      || key === "weather/ground/full");
     assert.equal(env.needsSource(key,"coastal"),
       key === "weather/water/coast"
-      || key === "weather/history/relationships/coastal");
+      || key === "weather/history/relationships/coastal"
+      || key === "weather/ground/full");
+    assert.equal(env.needsSource(key,"seismic"),key === "weather/ground/full");
   }
   assert.equal((sky.match(/SubjectPanelPolicy\.needsSource\(sky\.subjectRoute,"astronomy"\)/g)||[]).length,6);
   for (const s of ["marine","coastal"])

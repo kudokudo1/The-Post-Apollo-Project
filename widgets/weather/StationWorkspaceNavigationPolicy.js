@@ -28,6 +28,7 @@ var GROUPS = {
         {label:"NOW + AIR",path:"weather/conditions/current",key:"conditions"},
         {label:"FORECAST",path:"weather/forecasts/hourly",key:"forecasts"},
         {label:"WATER",path:"weather/water/rivers",key:"water"},
+        {label:"GROUND",path:"weather/ground/full",key:"ground"},
         {label:"HAZARDS",path:"weather/hazards/alerts",key:"hazards"},
         {label:"MAPS",path:"weather/maps",key:"maps"},
         {label:"HISTORY",path:"weather/history/historical-forecast",key:"history"}

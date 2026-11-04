@@ -8,6 +8,9 @@ var FORMAT = "post-apollo.weather.subject-navigation.v1";
 var SUBJECTS = [
   {id:"weather", label:"WEATHER", sections:[
     {id:"overview", label:"OVERVIEW"},
+    // M28-Q full legacy GROUND instrument inside native WEATHER.
+    {id:"ground", label:"GROUND", children:[
+      {id:"full",label:"GROUND // ALL ORIGINAL INSTRUMENTS"}]},
     {id:"conditions", label:"CONDITIONS", children:[
       {id:"current",label:"CURRENT"}, {id:"atmosphere",label:"ATMOSPHERE"},
       {id:"air",label:"AIR QUALITY"}, {id:"pollen",label:"POLLEN"}]},

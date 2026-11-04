@@ -70,8 +70,10 @@ PanelWindow {
                      && (weatherStation.currentView === "ground"
                          || weatherStation.currentView === "map"))
                     || (weatherStation.subjectNavigationOpen
-                        && EarthPanelPolicy.needsSource(
-                               subjectNavigator.currentPath, "seismic")))
+                        && (EarthPanelPolicy.needsSource(
+                               subjectNavigator.currentPath, "seismic")
+                            || SubjectPanelPolicy.needsSource(
+                               subjectNavigator.currentPath, "seismic"))))
     }
 
     WeatherServices.NowcoastLightningService {

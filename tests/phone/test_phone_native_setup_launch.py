@@ -34,7 +34,8 @@ class NativeSetupLaunchTests(unittest.TestCase):
         self.assert_locked(result)
         self.assertEqual(result["status"], "OPEN_REQUESTED")
         self.assertEqual(result["target"], "iphone")
-        find.assert_called_once_with("blueferry-gtk")
+        self.assertEqual([call.args[0] for call in find.call_args_list],
+                         ["blueferry-quickshell", "blueferry-gtk"])
         args, kwargs = launcher.call_args
         self.assertEqual(args[0], ["/usr/bin/blueferry-gtk"])
         self.assertEqual(kwargs["stdin"], subprocess.DEVNULL)
@@ -54,7 +55,7 @@ class NativeSetupLaunchTests(unittest.TestCase):
             "iphone", find_executable=find, launcher=launcher)
         self.assert_locked(response)
         self.assertEqual(response["status"], "OPEN_REQUESTED")
-        self.assertEqual(names, ["blueferry-gtk", "blueferry-qt"])
+        self.assertEqual(names, ["blueferry-quickshell", "blueferry-gtk", "blueferry-qt"])
         self.assertEqual(launcher.call_args.args[0], ["/usr/bin/blueferry-qt"])
 
     def test_android_launches_kde_connect_native_gui(self):
@@ -68,7 +69,7 @@ class NativeSetupLaunchTests(unittest.TestCase):
 
     def test_fallback_to_qt_when_gtk_cannot_launch(self):
         def find(name):
-            return "/usr/bin/" + name
+            return "/usr/bin/" + name if name in ("blueferry-gtk", "blueferry-qt") else None
         def launch(args, **kwargs):
             if args == ["/usr/bin/blueferry-gtk"]:
                 raise OSError("PRIVATE_DESKTOP_LOG")
@@ -131,13 +132,70 @@ class NativeSetupLaunchTests(unittest.TestCase):
             self.assertEqual(module.main(["--open", "android"]), 0)
             open_.assert_called_once_with("android")
 
+    def test_backend_only_install_can_open_official_pairing_wizard(self):
+        programs = {
+            "blueferry": "/usr/bin/blueferry",
+            "foot": "/usr/bin/foot",
+        }
+        launcher = mock.Mock()
+        result = module.open_setup(
+            "iphone",
+            find_executable=programs.get,
+            launcher=launcher,
+        )
+        self.assert_locked(result)
+        self.assertEqual(result["status"], "OPEN_REQUESTED")
+        self.assertEqual(
+            launcher.call_args.args[0],
+            ["/usr/bin/foot", "-e", "/usr/bin/blueferry", "pair-setup"],
+        )
+        self.assertNotIn("shell", launcher.call_args.kwargs)
+        self.assertTrue(launcher.call_args.kwargs["start_new_session"])
+
+    def test_no_terminal_or_cli_means_no_pairing(self):
+        programs = {"blueferry": "/usr/bin/blueferry"}
+        launcher = mock.Mock()
+        result = module.open_setup(
+            "iphone", find_executable=programs.get, launcher=launcher)
+        self.assert_locked(result)
+        self.assertEqual(result["status"], "CLIENT_UNAVAILABLE")
+        launcher.assert_not_called()
+
+    def test_native_gui_takes_precedence_over_pairing_wizard(self):
+        programs = {
+            "blueferry-quickshell": "/usr/bin/blueferry-quickshell",
+            "blueferry": "/usr/bin/blueferry",
+            "foot": "/usr/bin/foot",
+        }
+        launcher = mock.Mock()
+        result = module.open_setup(
+            "iphone", find_executable=programs.get, launcher=launcher)
+        self.assert_locked(result)
+        self.assertEqual(result["status"], "OPEN_REQUESTED")
+        self.assertEqual(launcher.call_args.args[0],
+                         ["/usr/bin/blueferry-quickshell"])
+        self.assertEqual(launcher.call_count, 1)
+
+    def test_android_never_uses_iphone_wizard(self):
+        programs = {
+            "blueferry": "/usr/bin/blueferry",
+            "foot": "/usr/bin/foot",
+        }
+        launcher = mock.Mock()
+        result = module.open_setup(
+            "android", find_executable=programs.get, launcher=launcher)
+        self.assert_locked(result)
+        self.assertEqual(result["status"], "CLIENT_UNAVAILABLE")
+        launcher.assert_not_called()
+
     def test_source_has_no_privileged_pairing_or_message_calls(self):
         src = FILE.read_text()
-        for forbidden in ("pair-setup", "systemctl start", "bluetoothctl pair",
+        for forbidden in ("systemctl start", "bluetoothctl pair",
                           "requestPairing(", "getMessages(", "sendMessage(",
                           "sudo ", "pkexec", "shell=True"):
             with self.subTest(forbidden=forbidden):
                 self.assertNotIn(forbidden, src)
+        self.assertIn('[terminal_path, *flags, wizard, "pair-setup"]', src)
 
 
 if __name__ == "__main__":

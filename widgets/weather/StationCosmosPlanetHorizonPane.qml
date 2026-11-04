@@ -56,12 +56,23 @@ Rectangle {
         if(!g.ready || g.radius<=0) return;
         ctx.save();
         ctx.lineWidth=1;
-        for(let ring=1;ring<=3;ring++) {
+        // Five display rings, never interpreted as orbital distance.
+        for(let ring=0;ring<Horizon.PLANETS.length;ring++) {
+            const planet=Horizon.PLANETS[ring];
+            const radius=Horizon.laneRadius(planet,w,h);
+            if(radius===null)continue;
+            const emphasized=horizonPane.selectedPlanet===planet
+                            || horizonPane.focusedMarker
+                               && horizonPane.focusedMarker.planet===planet;
             ctx.beginPath();
-            ctx.arc(g.x,g.y,g.radius*ring/3,0,Math.PI*2);
-            ctx.strokeStyle=String(Colors.cyan);
-            ctx.globalAlpha=ring===3?0.60:0.21;
+            ctx.arc(g.x,g.y,radius,0,Math.PI*2);
+            ctx.strokeStyle=String(emphasized?Colors.magenta:Colors.cyan);
+            ctx.globalAlpha=emphasized?0.80:0.28;
+            ctx.lineWidth=emphasized?1.6:1;
+            ctx.shadowColor=String(Colors.magenta);
+            ctx.shadowBlur=emphasized?5:0;
             ctx.stroke();
+            ctx.shadowBlur=0;
         }
         for(let angle=0;angle<360;angle+=30) {
             const rad=angle*Math.PI/180;
@@ -94,16 +105,20 @@ Rectangle {
 
         for(let i=0;i<horizonPane.markers.length;i++) {
             const marker=horizonPane.markers[i];
-            const pt=Horizon.point(marker.azimuth,w,h);
+            const pt=Horizon.point(marker.azimuth,w,h,marker.planet);
             if(!pt)continue;
             const picked=horizonPane.focusedMarker
                       && horizonPane.focusedMarker.id===marker.id;
             const color=horizonPane.ink(marker.kind);
+            const az=marker.azimuth*Math.PI/180;
+            const ring=Horizon.laneRadius(marker.planet,w,h);
             ctx.strokeStyle=color;
-            ctx.globalAlpha=picked?0.95:0.43;
-            ctx.lineWidth=picked?2.3:1.2;
+            ctx.globalAlpha=picked?0.90:0.60;
+            ctx.lineWidth=picked?2.2:1.2;
             ctx.beginPath();
-            ctx.moveTo(g.x,g.y);
+            if(picked) ctx.moveTo(g.x,g.y);
+            else ctx.moveTo(g.x+Math.sin(az)*(ring-8),
+                            g.y-Math.cos(az)*(ring-8));
             ctx.lineTo(pt.x,pt.y);
             ctx.stroke();
 
@@ -209,7 +224,7 @@ Rectangle {
         Row {
             id: compassRow
             width: parent.width
-            height: 212
+            height: 194
             spacing: 8
 
             Item {
@@ -237,13 +252,13 @@ Rectangle {
                     onPositionChanged: function(mouse) {
                         horizonPane.hoveredMarker=Horizon.pick(
                             horizonPane.markers,mouse.x,mouse.y,
-                            width,height,13);
+                            width,height,8);
                     }
                     onExited: horizonPane.hoveredMarker=null
                     onClicked: function(mouse) {
                         horizonPane.lockedMarker=Horizon.pick(
                             horizonPane.markers,mouse.x,mouse.y,
-                            width,height,13);
+                            width,height,8);
                     }
                 }
             }
@@ -290,6 +305,14 @@ Rectangle {
                     font.pixelSize: 9
                     color: Colors.orange
                     wrapMode: Text.WordWrap
+                    text: "INNER → OUTER: MER / VEN / MAR / JUP / SAT."
+                          + " RING DEPTH IS DISPLAY ONLY, NOT DISTANCE."
+                }
+                QuietText {
+                    width: parent.width
+                    font.pixelSize: 9
+                    color: Colors.orange
+                    wrapMode: Text.WordWrap
                     text: "BEARINGS ARE EVENT DIRECTIONS, NOT LIVE SKY POSITIONS"
                 }
                 ActionButton {
@@ -317,7 +340,7 @@ Rectangle {
         Row {
             id: transitBarRow
             width: parent.width
-            height: 55
+            height: 73
             spacing: 4
             Repeater {
                 model: horizonPane.transits
@@ -332,33 +355,90 @@ Rectangle {
                                   ? Colors.magenta : Colors.blue
                     Column {
                         anchors.fill: parent
-                        anchors.margins: 3
-                        spacing: 3
+                        anchors.margins: 2
+                        spacing: 1
                         GohuText {
                             width: parent.width
+                            height: 11
                             font.pixelSize: 9
+                            horizontalAlignment: Text.AlignHCenter
                             color: Colors.cyan
                             text: transitCard.modelData.planet
                             elide: Text.ElideRight
                         }
-                        Rectangle {
+                        Item {
                             width: parent.width
-                            height: 5
-                            color: Colors.black
-                            Rectangle {
-                                width: transitCard.modelData.altitude===null ? 0
-                                    : parent.width*transitCard.modelData.altitude/90
-                                height: parent.height
-                                color: Colors.magenta
+                            height: 40
+                            Canvas {
+                                id: altitudeDial
+                                width: 40
+                                height: 40
+                                anchors.centerIn: parent
+                                antialiasing: true
+                                renderTarget: Canvas.Image
+                                property real sourceAltitude:
+                                    transitCard.modelData.altitude===null
+                                    ? -1 : transitCard.modelData.altitude
+                                property bool selected:
+                                    horizonPane.selectedPlanet===transitCard.modelData.planet
+                                onSourceAltitudeChanged: requestPaint()
+                                onSelectedChanged: requestPaint()
+                                onPaint: {
+                                    const ctx=getContext("2d");
+                                    ctx.clearRect(0,0,width,height);
+                                    const fraction=Horizon.altitudeFraction(
+                                        sourceAltitude);
+                                    const x=width/2,y=height/2,r=15;
+                                    ctx.save();
+                                    ctx.beginPath();
+                                    ctx.arc(x,y,r,0,Math.PI*2);
+                                    ctx.strokeStyle=String(Colors.blue);
+                                    ctx.globalAlpha=0.48;
+                                    ctx.lineWidth=3.5;
+                                    ctx.stroke();
+                                    if(fraction!==null) {
+                                        ctx.beginPath();
+                                        ctx.arc(x,y,r,-Math.PI/2,
+                                                -Math.PI/2+fraction*Math.PI*2,false);
+                                        ctx.strokeStyle=String(selected
+                                            ? Colors.magenta : Colors.cyan);
+                                        ctx.globalAlpha=1;
+                                        ctx.lineWidth=4;
+                                        ctx.lineCap="round";
+                                        ctx.shadowColor=ctx.strokeStyle;
+                                        ctx.shadowBlur=selected?7:3;
+                                        ctx.stroke();
+                                    }
+                                    ctx.restore();
+                                }
+                            }
+                            GohuText {
+                                anchors.centerIn: parent
+                                font.pixelSize: 10
+                                color: transitCard.modelData.altitude===null
+                                      ? Colors.orange : Colors.yellow
+                                text: transitCard.modelData.altitude===null
+                                      ? "--" : transitCard.modelData.altitude+"°"
                             }
                         }
                         QuietText {
                             width: parent.width
+                            height: 12
                             font.pixelSize: 9
                             color: Colors.yellow
+                            horizontalAlignment: Text.AlignHCenter
                             elide: Text.ElideRight
-                            text: Horizon.altitudeLabel(transitCard.modelData)
+                            text: transitCard.modelData.altitude===null
+                                  ? "NO DATA"
+                                  : transitCard.modelData.clock+" LOCAL"
                         }
+                    }
+                    MouseArea {
+                        anchors.fill: parent
+                        acceptedButtons: Qt.LeftButton
+                        cursorShape: Qt.PointingHandCursor
+                        onClicked: horizonPane.planetPicked(
+                            transitCard.modelData.planet)
                     }
                 }
             }

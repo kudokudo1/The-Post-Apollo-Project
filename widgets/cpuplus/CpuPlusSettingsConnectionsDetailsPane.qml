@@ -2,6 +2,7 @@ import QtQuick
 import "../../components"
 import qs.services.connections
 import "../../services/connections/ConnectionsReviewPolicy.js" as ReviewPolicy
+import "../../services/connections/ConnectionsRequestDisplayPolicy.js" as RequestDisplayPolicy
 
 // CPU++ actuator bay. All "setup" guidance is in-world, but C1 has no
 // credential editor, adapter handoff, permission grant or session mutation.
@@ -11,12 +12,21 @@ Item {
     property bool guideOpen: false
     property bool permissionReviewOpen: false
     property string reviewFeedback: ""
+    property bool requestStatusOpen: false
+    // Synthetic preview is test-injected only and always labeled SIMULATED.
+    // It cannot set hostConnected, a permission or a credential.
+    property var syntheticStatusPreview: null
+    readonly property var requestStatusView:
+        syntheticStatusPreview !== null
+        ? RequestDisplayPolicy.project(syntheticStatusPreview, selectedId)
+        : ConnectionsRequestStatus.display(selectedId)
     readonly property var source: ConnectionsRegistry.entry(selectedId)
     readonly property var keyRequirement: ConnectionsBroker.requirement(selectedId)
     readonly property var permissionPreview: ReviewPolicy.preview(keyRequirement)
     onSelectedIdChanged: {
         guideOpen = false;
         permissionReviewOpen = false;
+        requestStatusOpen = false;
         reviewFeedback = "";
     }
 
@@ -272,6 +282,67 @@ Item {
                 }
             }
 
+            Column {
+                visible: details.permissionPreview.known
+                width: parent.width
+                spacing: 7
+                Rectangle {
+                    width: parent.width
+                    height: 1
+                    color: Colors.cyan
+                }
+                GohuText {
+                    width: parent.width
+                    text: "HOST REQUEST // STATUS"
+                    color: Colors.magenta
+                    font.pixelSize: 10
+                    wrapMode: Text.WordWrap
+                }
+                ActionButton {
+                    width: Math.min(parent.width, 185)
+                    height: 30
+                    label: details.requestStatusOpen
+                           ? "CLOSE REQUEST STATUS" : "VIEW REQUEST STATUS"
+                    labelPixelSize: 10
+                    accentColor: Colors.cyan
+                    onClicked: details.requestStatusOpen = !details.requestStatusOpen
+                }
+                Column {
+                    visible: details.requestStatusOpen
+                    width: parent.width
+                    spacing: 7
+                    GohuText {
+                        width: parent.width
+                        text: details.requestStatusView.title
+                        font.pixelSize: 10
+                        color: Colors.orange
+                        wrapMode: Text.WordWrap
+                    }
+                    QuietText {
+                        width: parent.width
+                        text: details.requestStatusView.explanation
+                        font.pixelSize: 9
+                        wrapMode: Text.WordWrap
+                    }
+                    QuietText {
+                        width: parent.width
+                        text: details.requestStatusView.state === "OFFLINE"
+                              ? "NO HOST-VERIFIED REQUESTS ON THIS DESKTOP"
+                              : "REQUEST STATE // " + details.requestStatusView.state
+                        color: Colors.orange
+                        font.pixelSize: 9
+                        wrapMode: Text.WordWrap
+                    }
+                    QuietText {
+                        width: parent.width
+                        text: "READ-ONLY STATUS // NO APPROVAL OR REAL GRANT"
+                        color: Colors.orange
+                        font.pixelSize: 9
+                        wrapMode: Text.WordWrap
+                    }
+                }
+            }
+
             ActionButton {
                 visible: details.selectedId === "social"
                 width: Math.min(parent.width, 160)
@@ -284,7 +355,7 @@ Item {
             QuietText {
                 width: parent.width
                 wrapMode: Text.WordWrap
-                text: "C2e // ACCESS REVIEW ONLY. HOST APPROVAL, SECRET STORAGE, ACCOUNT LOGIN AND CROSS-APP GRANTS REMAIN DISABLED."
+                text: "C2g // REQUEST STATUS IS READ-ONLY. REAL HOST FEED, APPROVAL, SECRET STORAGE AND ACCOUNT ACCESS ARE NOT CONNECTED."
                 color: Colors.orange
                 font.pixelSize: 9
             }

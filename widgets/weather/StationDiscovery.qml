@@ -1915,6 +1915,7 @@ Rectangle {
                           : "POST_APOLLO_FIRMS_MAP_KEY CONFIGURED // KEY NEVER SHOWN OR PASSED IN PROCESS ARGV"
                     font.pixelSize: 9
                     color: Colors.orange
+                    wrapMode: Text.WordWrap
                 }
 
                 StationSectionDivider {

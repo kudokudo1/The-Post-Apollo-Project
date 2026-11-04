@@ -197,7 +197,9 @@ Item {
                                        width,height,8);
             if(pair!=="")graph.selectedPairKey=pair;
         }
-        onReleased: didDrag=false
+        // Retain the drag flag through onClicked; reset on next press.
+        // Clearing it at onReleased would misinterpret a scrub as a click.
+        onCanceled: didDrag=false
         onExited: {
             if(!pressed){graph.hoverBody="";graph.hoverPairKey="";}
         }

@@ -68,9 +68,14 @@ const headerControls = windowSource.slice(headerActionsStart, sourceBadgeStart);
 assert.match(headerControls, /id:\s*contextTerminalLaunch/);
 assert.match(headerControls, /id:\s*contextTerminalClose/);
 assert.match(headerControls,/label:\s*"INDEX"/);
-assert.match(headerControls, /label:\s*"CLOSE"/);
-assert.match(headerControls, /destructive:\s*true/);
-assert.match(headerControls, /accentColor:\s*Colors\.red/);
+// Idle TERMINAL is cyan; a live/pending Kitty session switches this SAME
+// slot to red destructive CLOSE. INDEX and divider stay in place.
+assert.match(headerControls, /label:\s*terminalSessionActive \? "CLOSE" : "TERMINAL"/);
+assert.match(headerControls, /destructive:\s*terminalSessionActive/);
+assert.match(headerControls, /accentColor:\s*terminalSessionActive \? Colors\.red : Colors\.cyan/);
+assert.match(headerControls, /idleForegroundColor:\s*terminalSessionActive \? Colors\.red : Colors\.cyan/);
+assert.match(headerControls, /onLeftClicked:\s*\{[\s\S]*?weatherStation\.closeContextTerminal\(\);[\s\S]*?weatherStation\.launchHeaderTerminal\(\);/);
+assert.match(windowSource, /function launchHeaderTerminal\(\)/);
 assert.doesNotMatch(windowSource, /id:\s*observatoryButton/);
 assert.match(windowSource,/function launchSubjectTerminal\(mode\)/);
 assert.ok(!windowSource.includes("function launchContextTerminal()"));

@@ -126,7 +126,6 @@ test("M29-A river deep routes focus their own existing data blocks", () => {
     assert.equal(env.visibleFor("ground",route,"rivers"),true);
     assert.equal(env.needsSource(route,"river"),true);
     assert.equal(env.riverFocusForRoute(route),focus);
-    assert.equal(env.riverTitleFor(route),"RIVER // NOAA NWPS // "+focus.toUpperCase());
     for (const group of ["nearby","flood","hydrograph"])
       assert.equal(env.riverGroupVisible(route,group),focus===group,
         route+" / "+group);
@@ -136,7 +135,6 @@ test("M29-A river deep routes focus their own existing data blocks", () => {
     "weather/hazards/flood", "weather/history/relationships/rivers"
   ]) {
     assert.equal(env.riverFocusForRoute(route),"all",route);
-    assert.equal(env.riverTitleFor(route),"RIVER // NOAA NWPS",route);
     for (const group of ["nearby","flood","hydrograph"])
       assert.equal(env.riverGroupVisible(route,group),true,
         "original combined "+route+" / "+group);
@@ -146,7 +144,8 @@ test("M29-A river deep routes focus their own existing data blocks", () => {
   // The focused pages gate only existing visuals, not the shared NWPS
   // fetch, gauge identity, observed/forecast origin or safety warnings.
   for (const token of [
-    'title: SubjectPanelPolicy.riverTitleFor(ground.subjectRoute)',
+    'title: "RIVER // NOAA NWPS"',
+    'SubjectPanelPolicy.riverFocusForRoute(',
     'ground.subjectRoute,"nearby")',
     'ground.subjectRoute,"flood")',
     'ground.subjectRoute,"hydrograph")',

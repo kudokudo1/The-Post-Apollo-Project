@@ -1062,9 +1062,9 @@ class RealQtOrganizationsSettingsPaneSmoke(unittest.TestCase):
         # Confirm two distinct user intents before any subprocess is started.
         group = next(x for x in records if x["kind"] == "portfolio")
         self.assertFalse(tray.requestRemove(group))
-        self.assertEqual(tray.property("confirmationKey"), "portfolio:portfolio-1")
+        self.assertEqual(tray.property("confirmationKey"), "portfolio:portfolio-1:5:FICTIONAL GROUP")
         self.assertFalse(process.property("running"))
-        self.assertIn("CONFIRM PERMANENT REMOVAL", tray.property("resultText"))
+        self.assertIn("CONFIRM PERMANENT DELETE", tray.property("resultText"))
         self.assertTrue(tray.requestRemove(group))
         self.assertTrue(process.property("running"))
         self.assertTrue(tray.property("busy"))
@@ -1108,6 +1108,86 @@ class RealQtOrganizationsSettingsPaneSmoke(unittest.TestCase):
             self.assertEqual(QColor(button.property("roleColor")),
                              QColor("#d16041"))
         self.assertFalse(self.sections.property("organizationDisplayReady"))
+
+    def test_red_x_deletes_active_row_without_archive_or_backup(self):
+        self._open_organizations()
+        fixtures = {
+            "localDirectoryStore": {"state": "ready", "saved": {
+                "revision": 5, "organizations": [
+                    {"id": "org-1", "name": "FAKE ACTIVE COMPANY",
+                     "kind": "llc", "archived": False, "branches": [
+                         {"id": "branch-2", "name": "FAKE ACTIVE BRANCH",
+                          "archived": False}]}]}},
+            "localPortfoliosStore": {"state": "ready", "saved": {
+                "revision": 6, "portfolios": [
+                    {"id": "portfolio-1", "name": "FAKE ACTIVE PORTFOLIO",
+                     "archived": False, "orgIds": []}]}},
+            "localStructureStore": {"state": "ready", "saved": {
+                "revision": 7, "units": [
+                    {"id": "unit-1", "orgId": "org-1", "name": "FAKE ACTIVE UNIT",
+                     "kind": "division", "archived": False}]}},
+        }
+        for field in ("localUnitLocationLinksStore",
+                      "localBranchLocationLinksStore",
+                      "localFunctionalReportingStore", "localLinksStore"):
+            fixtures[field] = {"state": "ready",
+                               "saved": {"revision": 1, "links": []}}
+        for field, payload in fixtures.items():
+            fake = self.engine.evaluate("(" + json.dumps(payload) + ")")
+            self.assertFalse(fake.isError(), field)
+            self.assertTrue(self.sections.setProperty(field, fake), field)
+        self.sections.setProperty("localEditingOrganizationId", "org-1")
+        APP.processEvents()
+        controller = self.sections.findChild(QObject, "orgLocalArchiveTray")
+        editor = self.sections.findChild(QObject, "orgLocalDirectoryEditor")
+        process = self.sections.findChild(QObject, "orgArchiveRemoveProcess")
+        self.assertIsNotNone(controller)
+        self.assertIsNotNone(editor)
+        self.assertTrue(controller.property("storesReady"))
+        self.assertFalse(controller.property("expanded"))
+        self.assertEqual(controller.property("archivedCount"), 0)
+        x_buttons = [obj for obj in self._objects()
+                     if obj.property("objectName") == "orgDirectDeleteX"]
+        self.assertGreaterEqual(len(x_buttons), 4)
+        for obj in x_buttons:
+            self.assertEqual(obj.property("label"), "X")
+            self.assertEqual(obj.property("role"), "danger")
+            self.assertEqual(QColor(obj.property("roleColor")), QColor("#d16041"))
+            self.assertIn(obj.property("height"), (28, 30))
+        args = ("organization", "org-1", "org-1",
+                "FAKE ACTIVE COMPANY", 5, "COMPANY // FAKE ACTIVE COMPANY")
+        self.assertFalse(editor.requestDirectDelete(*args))
+        self.assertTrue(editor.deletePending(*args))
+        self.assertFalse(process.property("running"))
+        self.assertEqual(controller.property("confirmationKey"),
+                         "organization:org-1:5:FAKE ACTIVE COMPANY")
+        self.assertIn("No backup is required", controller.property("resultText"))
+        editor.cancelDirectDelete()
+        self.assertEqual(controller.property("confirmationKey"), "")
+        self.assertFalse(controller.property("resultText"))
+        self.assertFalse(process.property("running"))
+
+        self.assertFalse(editor.requestDirectDelete(*args))
+        self.assertTrue(editor.requestDirectDelete(*args))
+        self.assertTrue(process.property("running"))
+        payload = json.loads(process.property("lastInput"))
+        self.assertEqual(payload, {
+            "action": "remove", "kind": "organization", "id": "org-1",
+            "orgId": "org-1", "expectedName": "FAKE ACTIVE COMPANY",
+            "expectedRevision": 5,
+        })
+        # No backend edit occurs in this disposable Qt Process stub.
+        process.finishWith(json.dumps({
+            "ok": False, "error": "REMOVE_BRANCHES_FIRST"
+        }), 2)
+        APP.processEvents()
+        self.assertEqual(controller.property("resultKind"), "error")
+        self.assertIn("Delete the company's child branches first",
+                      controller.property("resultText"))
+        self.assertFalse(controller.property("busy"))
+        directory = self.sections.property("localDirectoryStore")
+        self.assertEqual(_value(directory.property("saved"))["organizations"][0]["id"],
+                         "org-1")
 
     def test_host_logout_and_failure_are_reflected_in_real_panel(self):
         self._open_organizations()

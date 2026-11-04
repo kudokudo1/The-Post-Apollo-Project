@@ -251,7 +251,7 @@ Column {
     }
     Text {
         width: parent.width
-        text: "RECORD ACTIONS // ADD, EDIT NAME + SAVE, ARCHIVE + CONFIRM, RESTORE"
+        text: "RECORD ACTIONS // ADD, EDIT NAME + SAVE, ARCHIVE, RED X DELETE + CONFIRM, RESTORE"
         color: Colors.cyan
         font.pixelSize: 10
         font.bold: true

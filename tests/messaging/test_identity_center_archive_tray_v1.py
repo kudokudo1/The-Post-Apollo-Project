@@ -42,13 +42,17 @@ class ArchiveTrayV1(unittest.TestCase):
         self.assertIn("!tray.busy", TRAY)
         self.assertIn("tray.storesReady", TRAY)
         self.assertIn("REMOVE REFUSED", TRAY)
-        self.assertIn("BACKUP_REQUIRED", TRAY)
+        self.assertIn("No backup is required or created.", TRAY)
+        self.assertIn("function cancelDelete()", TRAY)
+        self.assertIn("function isConfirmed(record)", TRAY)
 
-    def test_backend_all_seven_locks_no_cascade_and_snapshot_requirement(self):
+    def test_backend_all_seven_locks_no_cascade_or_forced_backup(self):
         self.assertIn("backups.lock_sources(stack)", REMOVE)
         self.assertIn("module.save(module.validate(doc))", REMOVE)
-        self.assertIn('raise RemovalError("ARCHIVE_BEFORE_REMOVE")', REMOVE)
-        self.assertIn('raise RemovalError("BACKUP_REQUIRED")', REMOVE)
+        self.assertNotIn('raise RemovalError("ARCHIVE_BEFORE_REMOVE")', REMOVE)
+        self.assertNotIn('raise RemovalError("BACKUP_REQUIRED")', REMOVE)
+        self.assertNotIn("backups.read_backup(", REMOVE)
+        self.assertNotIn("backups.names()", REMOVE)
         self.assertIn('raise RemovalError("REVISION_CONFLICT")', REMOVE)
         self.assertIn("if record[\"name\"] != request[\"expectedName\"]", REMOVE)
         self.assertIn("records.remove(record)", REMOVE)

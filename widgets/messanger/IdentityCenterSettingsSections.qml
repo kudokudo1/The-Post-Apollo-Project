@@ -365,6 +365,7 @@ Item {
                         objectName: "orgLocalDirectoryEditor"
                         width: parent.width
                         directoryStore: sections.localDirectoryStore
+                        removalController: localArchiveTray
                         focusedOrganizationId: sections.activeLocalEditingOrganizationId
                         searchQuery: localRecordsSearch.searchText
                         useSharedArchiveControl: true
@@ -377,6 +378,7 @@ Item {
                         width: parent.width
                         directoryStore: sections.localDirectoryStore
                         portfolioStore: sections.localPortfoliosStore
+                        removalController: localArchiveTray
                         searchQuery: localRecordsSearch.searchText
                         useSharedArchiveControl: true
                         useSharedRefreshControl: true
@@ -388,6 +390,7 @@ Item {
                         width: parent.width
                         directoryStore: sections.localDirectoryStore
                         structureStore: sections.localStructureStore
+                        removalController: localArchiveTray
                         useSharedContext: true
                         selectedOrgId: sections.activeLocalEditingOrganizationId
                         searchQuery: localRecordsSearch.searchText

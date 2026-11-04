@@ -6,6 +6,7 @@ import "../../components"
 Column {
     id: editor
     property var directoryStore: null
+    property var removalController: null
     property var structureStore: null
     property string searchQuery: ""
     readonly property string normalizedSearch: searchQuery.trim().toLowerCase()
@@ -56,6 +57,23 @@ Column {
         ? structureStore.saved.units : []
     readonly property bool canEdit: ready && activeOrganization
     width: parent ? parent.width : 400
+    // Both active and archived Delete buttons use the same guarded writer.
+    function deleteTarget(kind, id, orgId, name, revision, label) {
+        return {kind:kind, id:id, orgId:orgId, name:name,
+                revision:revision, label:label};
+    }
+    function requestDirectDelete(kind, id, orgId, name, revision, label) {
+        return removalController && removalController.requestRemove(
+            deleteTarget(kind, id, orgId, name, revision, label));
+    }
+    function deletePending(kind, id, orgId, name, revision, label) {
+        return removalController && removalController.isConfirmed(
+            deleteTarget(kind, id, orgId, name, revision, label));
+    }
+    function cancelDirectDelete() {
+        if (removalController) removalController.cancelDelete();
+    }
+
     spacing: 9
 
     Rectangle {
@@ -289,6 +307,16 @@ Column {
         color: Colors.white
         font.pixelSize: 10
     }
+    Text {
+        width: parent.width
+        visible: editor.removalController && (editor.removalController.lastTargetKind === "unit")
+            && editor.removalController.resultText !== ""
+        text: editor.removalController ? editor.removalController.resultText : ""
+        color: editor.removalController && editor.removalController.resultKind === "error"
+            ? Colors.red : Colors.orange
+        font.pixelSize: 9
+        wrapMode: Text.WordWrap
+    }
     Repeater {
         model: editor.visibleUnits
         delegate: Column {
@@ -315,7 +343,7 @@ Column {
                 width: parent.width
                 spacing: 6
                 Rectangle {
-                    width: Math.max(100, parent.width - 202)
+                    width: Math.max(100, parent.width - 240)
                     height: 30
                     color: unitName.activeFocus && unitName.enabled && !unitName.readOnly
                         ? Qt.rgba(Colors.magenta.r, Colors.magenta.g, Colors.magenta.b, 0.12)
@@ -370,6 +398,42 @@ Column {
                         } else
                             editor.confirmationKey = "unit:" + unitRow.modelData.id;
                     }
+                }
+                IdentityCenterLocalActionButton {
+                    role: "danger"
+                    objectName: "orgDirectDeleteX"
+                    width: 32
+                    height: 30
+                    label: "X"
+                    labelPixelSize: 10
+                    interactive: editor.removalController
+                        && editor.removalController.storesReady
+                        && !editor.removalController.busy
+                    onTriggered: editor.requestDirectDelete("unit", unitRow.modelData.id, unitRow.modelData.orgId, unitRow.modelData.name, structureStore.saved.revision, "UNIT // " + unitRow.modelData.name)
+                }
+            }
+            Flow {
+                width: parent.width
+                height: childrenRect.height
+                spacing: 6
+                visible: editor.deletePending("unit", unitRow.modelData.id, unitRow.modelData.orgId, unitRow.modelData.name, structureStore.saved.revision, "UNIT // " + unitRow.modelData.name)
+                IdentityCenterLocalActionButton {
+                    role: "danger"
+                    width: 163
+                    height: 28
+                    label: "CONFIRM DELETE"
+                    labelPixelSize: 9
+                    interactive: editor.removalController
+                        && !editor.removalController.busy
+                    onTriggered: editor.requestDirectDelete("unit", unitRow.modelData.id, unitRow.modelData.orgId, unitRow.modelData.name, structureStore.saved.revision, "UNIT // " + unitRow.modelData.name)
+                }
+                IdentityCenterLocalActionButton {
+                    role: "navigate"
+                    width: 88
+                    height: 28
+                    label: "CANCEL"
+                    labelPixelSize: 9
+                    onTriggered: editor.cancelDirectDelete()
                 }
             }
         }

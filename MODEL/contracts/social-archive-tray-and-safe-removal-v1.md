@@ -46,3 +46,20 @@ Correct any bounded CI failure, then hand off. Keep exact shades, global geometr
 ## DECISIONS
 
 No auto-cascade, no auto-purge on Archive, no unconfirmed destructive click, no local workstation modification, self-merge, production restart or new permission grant.
+
+
+---
+
+## SUPERSEDED SAFETY GATE // v1.1 operator decision, 2026-11-04
+
+The earlier v1 document required archiving plus a snapshot of the exact record before removal. **Those two prerequisites are withdrawn by the operator.** A backup is optional and is not made automatically. Users may permanently delete active records directly, without first archiving them. This is explicit, intentional deletion with no easy Restore undo. The original Archive control remains separate and reversible.
+
+The direct deletion writer retains **two independent user presses**, expected record name and source revision, nonblocking all-seven writer locks, fail-closed validation of current JSON stores, and refusal to delete records still referenced by child branches, units, portfolio membership, unit/branch location links, reporting graph edges, or Social associations. No cascade, no ID reuse and no authenticated company deletion. Removed data has no undelete path in the local UI. All destructive tests use fictional data and temporary XDG directories, never operator records.
+
+Each original active record editor gets a **red X** beside Save and Archive (company, branch, portfolio, division/department/team/location). Clicking the X reveals **red CONFIRM DELETE** and **CANCEL** beside that record. The same shared controller/CLI provides status and revision checks as the Archive Tray; no separate deletion writer or new navigation. The Archive Tray still supports red deletion for already archived records.
+
+**Latest operator screenshots:** the operator saw the merged Archive Tray in the live interface and called it much better. That is useful visual feedback but not proof of a successful deletion or acceptance of the new X flow. The operator explicitly rejected mandatory backups and mandatory archiving before deletion. Respect that choice in future work; do not reinstate either gate without new approval.
+
+### Risks & acceptance
+
+Deletion with no backup is deliberately permanent. An unexpected deletion or data loss cannot be reversed by the locked backup Restore action. The second click, linked-record refusal and revision check are the explicit protective boundaries, not a forced archive/backup. Use **fictional records** to test the X controls after operator-controlled merge and desktop load. No local live deletion, merge, restart, or global theme change by this external worker.

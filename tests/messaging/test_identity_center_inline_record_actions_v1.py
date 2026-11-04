@@ -19,7 +19,7 @@ class SharedArchiveAndRecordActions(unittest.TestCase):
         self.assertIn("onTriggered: search.includeArchived = !search.includeArchived", SEARCH)
         self.assertLess(SEARCH.index('objectName: "localShowArchivedRecords"'),
                         SEARCH.index('visible: search.needle.length > 0'))
-        self.assertIn("RECORD ACTIONS // ADD, EDIT NAME + SAVE, ARCHIVE + CONFIRM, RESTORE", SEARCH)
+        self.assertIn("RECORD ACTIONS // ADD, EDIT NAME + SAVE, ARCHIVE, RED X DELETE + CONFIRM, RESTORE", SEARCH)
         self.assertIn("select ALL / NO SELECTION", SEARCH)
         self.assertEqual(PANE.count("useSharedArchiveControl: true"), 3)
         self.assertEqual(PANE.count("localRecordsSearch.includeArchived"), 3)
@@ -53,6 +53,17 @@ class SharedArchiveAndRecordActions(unittest.TestCase):
         self.assertIn('"branch:" + branchRow.modelData.id', ORG)
         self.assertIn('"p:" + portfolioRow.modelData.id', PORT)
         self.assertIn('"unit:" + unitRow.modelData.id', STRUCTURE)
+
+    def test_red_direct_x_and_confirmation_are_in_original_rows(self):
+        for source, expected in ((ORG, 2), (PORT, 1), (STRUCTURE, 1)):
+            self.assertEqual(source.count('objectName: "orgDirectDeleteX"'), expected)
+            self.assertEqual(source.count('label: "CONFIRM DELETE"'), expected)
+            self.assertEqual(source.count('label: "CANCEL"'), expected)
+            self.assertIn('role: "danger"', source)
+            self.assertIn("requestDirectDelete(", source)
+            self.assertIn("deletePending(", source)
+            self.assertIn("removalController: null", source)
+        self.assertEqual(PANE.count("removalController: localArchiveTray"), 3)
 
     def test_legacy_standalone_controls_remain_available_if_unembedded(self):
         for source in (ORG, PORT, STRUCTURE):

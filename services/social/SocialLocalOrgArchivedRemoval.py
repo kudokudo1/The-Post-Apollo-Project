@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
-"""Archived-only owner-local record removal with seven-store reference guards.
+"""Explicit owner-local record deletion, active OR archived, with reference guards.
 
-No cascading deletion, credential actions, restoration, or remote company access.
-The last source revision is checked while all original writer locks are held.
+No backup or archiving is required. No cascading deletion, credential action,
+restoration, or remote company access. Current revisions and dependencies are
+checked under the original seven writer locks before touching the one document.
 """
 from __future__ import annotations
 
@@ -39,22 +40,6 @@ def _record(documents: dict[str, Any], kind: str, ident: str, org_id: str):
     key, container = KIND_TO_SOURCE[kind]
     records = documents[key][container]
     return next((x for x in records if x["id"] == ident), None), records
-
-
-def _has_backup(kind: str, ident: str, org_id: str, record: dict[str, Any]) -> bool:
-    # A snapshot must actually include the exact archived record. Backing up
-    # an empty directory yesterday does not protect a record created today.
-    for filename in backups.names():
-        bundle = backups.read_backup(filename)
-        try:
-            other, _ = _record(bundle["documents"], kind, ident, org_id)
-        except RemovalError as error:
-            if error.code == "ORGANIZATION_NOT_FOUND":
-                continue
-            raise
-        if other == record:
-            return True
-    return False
 
 
 def _check_references(documents: dict[str, Any], kind: str, ident: str, org_id: str,
@@ -130,15 +115,11 @@ def remove(request: Any) -> dict[str, Any]:
         record, records = _record(documents, kind, ident, org_id)
         if record is None:
             raise RemovalError("RECORD_NOT_FOUND")
-        if not record["archived"]:
-            raise RemovalError("ARCHIVE_BEFORE_REMOVE")
         if record["name"] != request["expectedName"]:
             raise RemovalError("RECORD_CHANGED")
         if kind == "unit" and record["orgId"] != org_id:
             raise RemovalError("WRONG_ORGANIZATION")
         _check_references(documents, kind, ident, org_id, record)
-        if not _has_backup(kind, ident, org_id, record):
-            raise RemovalError("BACKUP_REQUIRED")
         records.remove(record)
         doc["revision"] += 1  # Never reuse IDs. nextId remains monotonic.
         module = next(module for key, module, _, _ in backups.SOURCES

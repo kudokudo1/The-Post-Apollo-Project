@@ -7,6 +7,7 @@ Column {
     id: editor
     property var portfolioStore: null
     property var directoryStore: null
+    property var removalController: null
     property string searchQuery: ""
     readonly property string normalizedSearch: searchQuery.trim().toLowerCase()
     function matchesPortfolio(portfolio) {
@@ -31,6 +32,23 @@ Column {
     readonly property var organizations: directoryStore
                                          && directoryStore.state === "ready"
         ? directoryStore.saved.organizations : []
+    // Both active and archived Delete buttons use the same guarded writer.
+    function deleteTarget(kind, id, orgId, name, revision, label) {
+        return {kind:kind, id:id, orgId:orgId, name:name,
+                revision:revision, label:label};
+    }
+    function requestDirectDelete(kind, id, orgId, name, revision, label) {
+        return removalController && removalController.requestRemove(
+            deleteTarget(kind, id, orgId, name, revision, label));
+    }
+    function deletePending(kind, id, orgId, name, revision, label) {
+        return removalController && removalController.isConfirmed(
+            deleteTarget(kind, id, orgId, name, revision, label));
+    }
+    function cancelDirectDelete() {
+        if (removalController) removalController.cancelDelete();
+    }
+
     spacing: 9
 
     function organizationFor(orgId) {
@@ -161,6 +179,16 @@ Column {
         wrapMode: Text.WordWrap
     }
 
+    Text {
+        width: parent.width
+        visible: editor.removalController && (editor.removalController.lastTargetKind === "portfolio")
+            && editor.removalController.resultText !== ""
+        text: editor.removalController ? editor.removalController.resultText : ""
+        color: editor.removalController && editor.removalController.resultKind === "error"
+            ? Colors.red : Colors.orange
+        font.pixelSize: 9
+        wrapMode: Text.WordWrap
+    }
     Repeater {
         model: editor.portfolios
         delegate: Column {
@@ -191,7 +219,7 @@ Column {
                 width: parent.width
                 spacing: 6
                 Rectangle {
-                    width: Math.max(100, parent.width - 202)
+                    width: Math.max(100, parent.width - 240)
                     height: 30
                     color: portfolioName.activeFocus && portfolioName.enabled && !portfolioName.readOnly
                         ? Qt.rgba(Colors.magenta.r, Colors.magenta.g, Colors.magenta.b, 0.12)
@@ -246,6 +274,42 @@ Column {
                         } else
                             editor.confirmationKey = "p:" + portfolioRow.modelData.id;
                     }
+                }
+                IdentityCenterLocalActionButton {
+                    role: "danger"
+                    objectName: "orgDirectDeleteX"
+                    width: 32
+                    height: 30
+                    label: "X"
+                    labelPixelSize: 10
+                    interactive: editor.removalController
+                        && editor.removalController.storesReady
+                        && !editor.removalController.busy
+                    onTriggered: editor.requestDirectDelete("portfolio", portfolioRow.modelData.id, "", portfolioRow.modelData.name, portfolioStore.saved.revision, "PORTFOLIO // " + portfolioRow.modelData.name)
+                }
+            }
+            Flow {
+                width: parent.width
+                height: childrenRect.height
+                spacing: 6
+                visible: editor.deletePending("portfolio", portfolioRow.modelData.id, "", portfolioRow.modelData.name, portfolioStore.saved.revision, "PORTFOLIO // " + portfolioRow.modelData.name)
+                IdentityCenterLocalActionButton {
+                    role: "danger"
+                    width: 163
+                    height: 28
+                    label: "CONFIRM DELETE"
+                    labelPixelSize: 9
+                    interactive: editor.removalController
+                        && !editor.removalController.busy
+                    onTriggered: editor.requestDirectDelete("portfolio", portfolioRow.modelData.id, "", portfolioRow.modelData.name, portfolioStore.saved.revision, "PORTFOLIO // " + portfolioRow.modelData.name)
+                }
+                IdentityCenterLocalActionButton {
+                    role: "navigate"
+                    width: 88
+                    height: 28
+                    label: "CANCEL"
+                    labelPixelSize: 9
+                    onTriggered: editor.cancelDirectDelete()
                 }
             }
             Column {

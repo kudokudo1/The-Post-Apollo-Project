@@ -13,8 +13,11 @@ Item {
     property string selectedId: ""
     property string pendingDeleteId: ""
     property string activeFilter: "all"
+    property string activeView: "journal"
+    property string meaningSelection: ""
     readonly property bool editingText:
         manualDigitsInput.activeFocus || angelSearchInput.activeFocus
+        || angelMeaningPane.editingText
     readonly property var clockCandidate:
         AngelPolicy.clockCapture(
             TimeSettings.adjustedEpochMs(currentEpochMs))
@@ -36,6 +39,18 @@ Item {
         {key: "other", label: "OTHER"},
         {key: "err", label: "ERR"}
     ]
+
+    function showMeaning() {
+        const chosen = pane.selectedObservation !== null
+            ? pane.selectedObservation.digits
+            : AngelPolicy.validDigits(manualDigitsInput.text)
+              ? manualDigitsInput.text
+              : pane.clockCandidate !== null ? pane.clockCandidate.digits : "";
+        // Explicit view navigation is not a network request and does not
+        // write anything to the journal. It only chooses the number in focus.
+        pane.meaningSelection = chosen;
+        pane.activeView = "meaning";
+    }
 
     function recordObservation(inputDigits, mode, observedAtMs) {
         const displayEpochMs = TimeSettings.adjustedEpochMs(observedAtMs);
@@ -72,8 +87,60 @@ Item {
             manualDigitsInput.text = "";
     }
 
+    Row {
+        id: angelViewStrip
+        width: parent.width
+        height: 32
+        spacing: 7
+
+        ActionButton {
+            width: (parent.width - parent.spacing) / 2
+            height: parent.height
+            label: "JOURNAL"
+            labelPixelSize: 11
+            trackLabelGlowLocally: true
+            accentColor: Colors.white
+            selected: pane.activeView === "journal"
+            selectedFillColor: Colors.yellow
+            selectedForegroundColor: Colors.magenta
+            selectedBorderColor: Colors.magenta
+            onLeftClicked: pane.activeView = "journal"
+        }
+
+        ActionButton {
+            width: (parent.width - parent.spacing) / 2
+            height: parent.height
+            label: "MEANING"
+            labelPixelSize: 11
+            trackLabelGlowLocally: true
+            accentColor: Colors.white
+            selected: pane.activeView === "meaning"
+            selectedFillColor: Colors.yellow
+            selectedForegroundColor: Colors.magenta
+            selectedBorderColor: Colors.magenta
+            onLeftClicked: pane.showMeaning()
+        }
+    }
+
+    AngelMeaningPane {
+        id: angelMeaningPane
+        anchors.left: parent.left
+        anchors.right: parent.right
+        anchors.top: angelViewStrip.bottom
+        anchors.bottom: parent.bottom
+        anchors.topMargin: 8
+        visible: pane.activeView === "meaning"
+        initialDigits: pane.meaningSelection
+    }
+
     Column {
-        anchors.fill: parent
+        id: angelJournalView
+        anchors.left: parent.left
+        anchors.right: parent.right
+        anchors.top: angelViewStrip.bottom
+        anchors.bottom: parent.bottom
+        anchors.topMargin: 8
+        visible: pane.activeView === "journal"
         spacing: 7
 
         GohuText {
@@ -260,7 +327,7 @@ Item {
         Item {
             id: angelHistoryArea
             width: parent.width
-            height: Math.max(110, pane.height - 325)
+            height: Math.max(96, angelJournalView.height - 325)
 
             ListView {
                 id: angelHistoryList

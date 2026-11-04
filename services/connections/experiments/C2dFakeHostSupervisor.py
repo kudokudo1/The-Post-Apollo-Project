@@ -16,6 +16,7 @@ import selectors
 import socket
 import subprocess
 import sys
+import time
 
 BROKER_SCRIPT = (Path(__file__).resolve().parents[3] /
                  "tests/connections/fixtures/C2cDescriptorBroker.py")
@@ -195,10 +196,14 @@ class FakeConnectionsHost:
             # Read bounded bytes. TextIO.readline after a partial write
             # could block despite selector readiness on a broken client.
             payload = bytearray()
+            deadline = time.monotonic() + 2
             while b"\n" not in payload and len(payload) <= MAX_PACKET:
+                remaining = deadline - time.monotonic()
+                if remaining <= 0:
+                    raise TimeoutError("C2D_CLIENT_TIMED_OUT")
                 with selectors.DefaultSelector() as selector:
                     selector.register(self._weather.stdout, selectors.EVENT_READ)
-                    if not selector.select(timeout=2):
+                    if not selector.select(timeout=remaining):
                         raise TimeoutError("C2D_CLIENT_TIMED_OUT")
                 chunk = os.read(self._weather.stdout.fileno(), MAX_PACKET + 1 - len(payload))
                 if not chunk:
@@ -218,8 +223,8 @@ class FakeConnectionsHost:
         # Idempotent. All grants are lost when the broker is shut down.
         if self._state == "CLOSED":
             return "C2D_ALREADY_CLOSED"
-        if self._control is not None and self._broker is not None:
-            if self._broker.poll() is None:
+        if self._control is not None:
+            if self._broker is not None and self._broker.poll() is None:
                 for cmd in ({"op": "revoke"}, {"op": "shutdown"}):
                     try:
                         self._control_exchange(cmd)

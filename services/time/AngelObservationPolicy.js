@@ -18,23 +18,27 @@ function integer(value, low, high) {
 function validDigits(value) {
     return typeof value === "string"
            && value.length >= 1 && value.length <= MAX_DIGITS
-           && /^[0-9]+$/.test(value);
+           && !/[^0-9]/.test(value);
 }
 
 function validZone(value) {
     return typeof value === "string" && value.length <= 100
+           && !/[\r\n]/.test(value)
            && (value === "UNKNOWN" || value === "UTC"
                || /^[A-Za-z][A-Za-z0-9._+-]*(?:\/[A-Za-z0-9._+-]+)+$/.test(value));
 }
 
 function validDisplayTime(value) {
     return typeof value === "string"
+           && !/[\r\n]/.test(value)
            && /^([1-9]|1[0-2]):[0-5][0-9] (AM|PM)$/.test(value);
 }
 
 function validObservation(row) {
     return !!row && typeof row === "object" && !Array.isArray(row)
-           && typeof row.id === "string" && /^a[1-9][0-9]*$/.test(row.id)
+           && typeof row.id === "string"
+           && /^a[1-9][0-9]*$/.test(row.id)
+           && !/[\r\n]/.test(row.id)
            && integer(Number(row.id.slice(1)), 1, MAX_SEQUENCE)
            && validDigits(row.digits)
            && integer(row.observedAtMs, 1, Number.MAX_SAFE_INTEGER)

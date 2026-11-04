@@ -98,3 +98,43 @@ Complete CI, request operator review of M13l, then obtain explicit local test au
 **Created:** M13l windowless QML native acceptance test and isolated runner in remote repository only.  
 **Still unverified:** native M13l QML Process invocation, authenticated persistent user key access, real draft persistence or reboot recovery.  
 **Not authorized/performed:** local machine modifications, live Quickshell restarts, real user keyring changes, second TASKS writer, production activation, PR merge, live Hospital role registration or operator final acceptance.
+
+---
+
+## M13l-R // November 4, 2026 native failure checkpoint
+
+### IMPLEMENTATION
+
+The operator verified dbus-run-session 1.16.2 on Fedora Silverblue 44, cloned a new temporary checkout, and ran the actual M13l native test. Source preflight and private D-Bus startup succeeded, but the test printed M13L_NATIVE_TEST_NOT_VERIFIED and M13L_NATIVE_HOST_OR_QML_REFUSED. An asynchronous A connection to the bus can't be made message appeared after cleanup. Private-bus portal, accessibility and GVfs warnings appeared. Neither proves the root cause.
+
+The earlier runner deleted its QML log and combined multiple distinct failures into the same refusal. This corrective diagnostics patch adds *fixed, status-only QML phase markers* for component load, start, busy state, parsed reply, host exit/refusal and QML timeout. On failure the runner emits only fixed categories and a numeric exit code, not raw private QML logs. It also uses D-Bus NameHasOwner to ensure the *private* Secret Service owner is still alive before treating a failed exact test-key lookup as successful cleanup. Hash pins and fake-shell CI tests are updated.
+
+### HOW TO USE
+
+Do not repeat the older cloned runner. After review/merge, use a newly cloned isolated checkout, not a pull/reset of the dirty live Quickshell repository. Read-only --preflight first, then operator-initiated --run. Share only fixed M13L_ diagnostic markers. Normal user keyring and actual TASKS records remain outside scope.
+
+### VERIFY
+
+CI should validate QML parsing, source-pin checks, normal/private bus refusal guards, fake-shell PASS and synthetic QML refusal markers, real isolated encryption host regression and M11d single-writer inventory. Native Fedora acceptance remains unverified until the actual QML callback flow and cleanup pass.
+
+### WATCH OUT FOR
+
+The 49-second observed run is compatible with M13l's 45-second QML timer but does not prove it fired. Portal warnings are contextual. The raw log stays exclusively in private temp HOME and is removed. A dead private bus is now an explicit non-PASS condition.
+
+### CHECKLIST
+
+- [x] Diagnose reporting blind spot and reproduce source conditions from GitHub
+- [x] Add bounded phase markers without paths, keys or draft content
+- [x] Check private Secret Service owner before cleanup PASS
+- [x] Add fake Quickshell refusal CI regression
+- [ ] CI green and operator PR review
+- [ ] Single re-test from separate checkout with phase marker report
+- [ ] Evidence-based native callback fix and native acceptance
+
+### NEXT
+
+Interpret phase markers to distinguish component load, environment gate, process start, response parsing, process exit, timeout and cleanup. Fix only the confirmed boundary. Continue to M13m only after native M13l has passed.
+
+### DECISIONS
+
+No local workstation write by worker, no keyring change, no production activation, no second TASKS writer, no live Hospital registration, and no claim of native acceptance.

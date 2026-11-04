@@ -857,5 +857,30 @@ Item {
                 wrapMode: Text.WordWrap
             }
         }
+
+    }
+
+    // Map-picked hub editor is confined to Company Coverage; it never
+    // accesses verified Identity Center membership or personal client data.
+    CompanyHubEditor {
+        id: hubEditor
+        anchors.fill: parent
+        z: 50
+        visible: root.hubEditorOpen
+        focus: root.hubEditorOpen
+        saving: hubStore.state === "saving"
+        saveError: hubStore.state === "error" ? hubStore.errorCode : ""
+        onCancelRequested: {
+            if (hubStore.state !== "saving")
+                root.hubEditorOpen = false;
+        }
+        onSaveRequested: function(hub) {
+            if (!hubStore.createHub(
+                    hub.label, hub.organizationLabel, hub.city,
+                    hub.regionCode, hub.countryCode, hub.longitude,
+                    hub.latitude, hub.serviceFamily)) {
+                hubEditor.localError = "DIRECTORY BUSY OR UNAVAILABLE. RELOAD REQUIRED.";
+            }
+        }
     }
 }

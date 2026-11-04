@@ -294,6 +294,9 @@ Scope {
 
     function cancelTimezone() {
         timezoneConfirmRequired = false;
+        // Revert the visible selection to the verified host zone. A cancelled
+        // candidate must never look like an already-applied timezone.
+        zoneChoice = "";
         if (timezoneStatus === "confirm") {
             timezoneStatus = "idle";
             timezoneMessage = "TIMEZONE CHANGE CANCELLED";

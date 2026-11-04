@@ -37,7 +37,7 @@ class ClockVisualCalibrationTests(unittest.TestCase):
                         order.index('id: "settings", name: "SETTINGS"'))
         self.assertTrue(order.rstrip().endswith('{ id: "settings", name: "SETTINGS" }'))
         self.assertIn("timew.chooseMode(timew.modes.length - 1)", TIMEW)
-        self.assertIn("ANGEL // RESERVED", TIMEW)
+        self.assertIn("ANGEL // EXPLICIT JOURNAL // LOCAL ONLY", TIMEW)
 
     def test_selected_mode_uses_open_clock_style(self):
         self.assertIn("selectedFillColor: Colors.yellow", TIMEW)

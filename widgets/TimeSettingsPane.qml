@@ -265,6 +265,14 @@ Item {
                 color: TimeSettings.resyncStatus === "requested"
                        ? Colors.cyan : Colors.orange
             }
+            GohuText {
+                visible: TimeSettings.resyncAuthPath !== "NOT REQUESTED"
+                width: parent.width
+                wrapMode: Text.WordWrap
+                text: "AUTH // " + TimeSettings.resyncAuthPath
+                font.pixelSize: 9
+                color: Colors.cyan
+            }
             Row {
                 width: parent.width
                 spacing: 8

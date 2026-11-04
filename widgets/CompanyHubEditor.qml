@@ -12,6 +12,9 @@ Rectangle {
 
     property real longitude: 0
     property real latitude: 0
+    property bool hasLocation: false
+    property string storeState: "loading"
+    property string storeError: ""
     property string defaultRegionCode: ""
     property string countryCode: "US"
     property string serviceFamily: "BENEFITS"
@@ -20,10 +23,15 @@ Rectangle {
     property string localError: ""
     signal saveRequested(var hub)
     signal cancelRequested()
+    signal pickLocationRequested()
+    signal retryStoreRequested()
 
-    function prepare(lon, lat, region) {
-        longitude = Number(lon);
-        latitude = Number(lat);
+    // + HUB opens the form immediately. Map placement is a separate,
+    // visible action and MUST NOT be silently inferred from the viewport.
+    function begin(region) {
+        hasLocation = false;
+        longitude = 0;
+        latitude = 0;
         defaultRegionCode = String(region || "");
         regionInput.text = defaultRegionCode;
         labelInput.text = "";
@@ -34,7 +42,35 @@ Rectangle {
         localError = "";
     }
 
+    function setCoordinates(lon, lat) {
+        const x = Number(lon), y = Number(lat);
+        if (!isFinite(x) || !isFinite(y) || x < -180 || x > 180
+                || y < -90 || y > 90) {
+            localError = "INVALID MAP LOCATION";
+            return false;
+        }
+        longitude = x;
+        latitude = y;
+        hasLocation = true;
+        localError = "";
+        return true;
+    }
+
+    // Backward compatible entry point for existing map-picked callers.
+    function prepare(lon, lat, region) {
+        begin(region);
+        setCoordinates(lon, lat);
+    }
+
     function save() {
+        if (!hasLocation) {
+            localError = "PICK A LOCATION ON THE MAP BEFORE SAVING";
+            return;
+        }
+        if (storeState !== "ready") {
+            localError = "HUB DIRECTORY NOT READY: " + (storeError || storeState);
+            return;
+        }
         const label = labelInput.text.trim();
         const organization = organizationInput.text.trim();
         const city = cityInput.text.trim();
@@ -112,9 +148,58 @@ Rectangle {
                 font.pixelSize: 11
                 wrapMode: Text.WordWrap
                 color: Colors.white
-                text: "Location selected from the map. This is a local, "
-                    + "unverified place/service claim, NOT a confirmed coverage area. "
-                    + "Do not enter client or employee details."
+                text: "Enter the hub information, then use PICK LOCATION to mark its "
+                    + "position on the map. Operator-reported only, NOT verified "
+                    + "service coverage. No client or employee details."
+            }
+
+            Row {
+                width: parent.width
+                height: 38
+                spacing: 8
+                ModeButton {
+                    width: 200
+                    height: 36
+                    textOnly: true
+                    bordered: false
+                    labelText: editor.hasLocation ? "CHANGE MAP LOCATION" : "PICK LOCATION ON MAP"
+                    labelFontSize: 11
+                    selected: !editor.hasLocation
+                    onTriggered: editor.pickLocationRequested()
+                }
+                GohuText {
+                    width: parent.width - 208
+                    anchors.verticalCenter: parent.verticalCenter
+                    text: editor.hasLocation ? "COORDINATES SET" : "LOCATION REQUIRED"
+                    color: editor.hasLocation ? Colors.cyan : Colors.yellow
+                    font.pixelSize: 10
+                    elide: Text.ElideRight
+                }
+            }
+
+            Row {
+                width: parent.width
+                height: editor.storeState==="ready" ? 0 : 32
+                visible: editor.storeState !== "ready"
+                spacing: 8
+                GohuText {
+                    width: Math.max(110,parent.width - 110)
+                    anchors.verticalCenter: parent.verticalCenter
+                    text: "STORE: " + editor.storeState.toUpperCase()
+                        + (editor.storeError ? " // "+editor.storeError : "")
+                    color: Colors.red
+                    font.pixelSize: 10
+                    elide: Text.ElideRight
+                }
+                ModeButton {
+                    width: 96
+                    height: 30
+                    textOnly: true
+                    labelText: "RETRY LOAD"
+                    labelFontSize: 10
+                    bordered: false
+                    onTriggered: editor.retryStoreRequested()
+                }
             }
 
             // Named inputs ensure the view reads exactly what the user typed.
@@ -293,9 +378,11 @@ Rectangle {
 
             GohuText {
                 width: parent.width
-                text: "MAP POINT // "
-                    + Number(editor.latitude).toFixed(4) + "° N/S  // "
-                    + Number(editor.longitude).toFixed(4) + "° E/W"
+                text: editor.hasLocation
+                    ? "MAP POINT // "
+                        + Number(editor.latitude).toFixed(4) + "° latitude  // "
+                        + Number(editor.longitude).toFixed(4) + "° longitude"
+                    : "MAP POINT // NOT SELECTED"
                 font.pixelSize: 10
                 color: Colors.cyan
                 wrapMode: Text.WordWrap

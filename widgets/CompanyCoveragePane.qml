@@ -3,6 +3,7 @@ import "../components"
 import "CompanyCoveragePolicy.js" as Geo
 import "weather/StationNaturalEarthLand110.js" as Land
 import "weather/StationNaturalEarthContext110.js" as Context
+import "CompanyNaturalEarthLakes110.js" as Lakes
 
 // Company Network Coverage M1: real geographic *reference* map.
 // Natural Earth is public domain and already pinned by Weather Station.
@@ -13,6 +14,8 @@ Item {
 
     property string regionKey: "lower48"
     property string selectedCode: ""
+    property string selectedCountryCode: ""
+    property bool serviceMenuOpen: false
     property string serviceFamily: "ALL SERVICES"
     property string statusFilter: "ALL STATUS"
     property bool showReferencePoints: true
@@ -22,7 +25,9 @@ Item {
 
     readonly property bool compactLayout: width < 640
     readonly property var selectedState: Geo.stateForCode(selectedCode)
+    readonly property var selectedCountry: Geo.countryForCode(selectedCountryCode)
     readonly property var bounds: Geo.regions[Geo.regionKey(regionKey)]
+    onVisibleChanged: if (!visible) serviceMenuOpen = false
 
     function applyView(next) {
         zoom = next.zoom;
@@ -34,19 +39,34 @@ Item {
         regionKey = Geo.regionKey(key);
         applyView(Geo.defaultView(regionKey));
         selectedCode = "";
+        selectedCountryCode = "";
+        serviceMenuOpen = false;
         stateSearch.text = "";
     }
 
     function chooseState(state) {
         if (!state) return;
-        if (regionKey !== state[5])
+        if (regionKey !== state[5] && regionKey !== "northAmerica"
+                && regionKey !== "global")
             setRegion(state[5]);
         selectedCode = state[0];
+        selectedCountryCode = "";
+        serviceMenuOpen = false;
     }
 
-    function cycleService() {
-        var i=Geo.serviceFamilies.indexOf(serviceFamily);
-        serviceFamily=Geo.serviceFamilies[(i+1)%Geo.serviceFamilies.length];
+    function chooseCountry(country) {
+        if (!country) return;
+        if (regionKey === "alaska" || regionKey === "hawaii")
+            setRegion("northAmerica");
+        selectedCountryCode = country[0];
+        selectedCode = "";
+        serviceMenuOpen = false;
+    }
+
+    function selectService(family) {
+        if (Geo.serviceFamilies.indexOf(family) < 0) return;
+        serviceFamily = family;
+        serviceMenuOpen = false;
     }
 
     function cycleStatus() {
@@ -61,6 +81,7 @@ Item {
 
     onRegionKeyChanged: mapCanvas.requestPaint()
     onSelectedCodeChanged: mapCanvas.requestPaint()
+    onSelectedCountryCodeChanged: mapCanvas.requestPaint()
     onZoomChanged: mapCanvas.requestPaint()
     onCenterLonChanged: mapCanvas.requestPaint()
     onCenterLatChanged: mapCanvas.requestPaint()
@@ -72,12 +93,17 @@ Item {
         spacing: 8
 
         Row {
+            id: headingRow
             width: parent.width
             height: 27
             spacing: 10
 
             GohuText {
-                text: "COVERAGE // UNITED STATES"
+                text: root.regionKey === "global" ? "COVERAGE // WORLD"
+                    : root.regionKey === "northAmerica" ? "COVERAGE // NORTH AMERICA"
+                    : root.regionKey === "lower48" ? "COVERAGE // USA + NEIGHBORS"
+                    : root.regionKey === "alaska" ? "COVERAGE // ALASKA"
+                    : "COVERAGE // HAWAII"
                 font.pixelSize: root.compactLayout ? 13 : 18
                 font.bold: true
                 color: Colors.yellow
@@ -93,22 +119,24 @@ Item {
             }
         }
 
-        Row {
+        Flow {
             id: regionsRow
             width: parent.width
-            height: 33
-            spacing: 7
+            height: childrenRect.height
+            spacing: 6
 
             Repeater {
                 model: [
-                    { id:"lower48",name:"LOWER 48 + DC" },
-                    { id:"alaska",name:"ALASKA" },
-                    { id:"hawaii",name:"HAWAII" }
+                    { id:"lower48",name:"USA + NEIGHBORS",width:144 },
+                    { id:"northAmerica",name:"N. AMERICA",width:112 },
+                    { id:"global",name:"GLOBAL",width:80 },
+                    { id:"alaska",name:"ALASKA",width:78 },
+                    { id:"hawaii",name:"HAWAII",width:78 }
                 ]
                 ModeButton {
                     required property var modelData
-                    width: modelData.id === "lower48" ? 138 : 88
-                    height: regionsRow.height
+                    width: modelData.width
+                    height: 33
                     textOnly: true
                     labelText: modelData.name
                     labelFontSize: 10
@@ -128,19 +156,66 @@ Item {
             width: parent.width
             height: 31
             spacing: 8
+            z: 20
 
-            ModeButton {
+            Item {
+                id: serviceSelector
                 width: root.compactLayout ? 152 : 190
                 height: filtersRow.height
-                textOnly: true
-                labelText: "SERVICE: " + root.serviceFamily
-                labelFontSize: 10
-                bordered: false
-                idlePrimaryColor: Colors.white
-                hoverPrimaryColor: Colors.yellow
-                selectedPrimaryColor: Colors.yellow
-                perimeterGlowColor: Colors.blue
-                onTriggered: root.cycleService()
+
+                ModeButton {
+                    id: serviceButton
+                    width: parent.width
+                    height: parent.height
+                    textOnly: true
+                    labelText: "SERVICE: " + root.serviceFamily + " ▾"
+                    labelFontSize: 10
+                    bordered: false
+                    selected: root.serviceMenuOpen
+                    idlePrimaryColor: Colors.white
+                    hoverPrimaryColor: Colors.yellow
+                    selectedPrimaryColor: Colors.blue
+                    perimeterGlowColor: Colors.blue
+                    onTriggered: root.serviceMenuOpen = !root.serviceMenuOpen
+                }
+
+                Rectangle {
+                    id: serviceDropdown
+                    visible: root.serviceMenuOpen
+                    anchors.top: serviceButton.bottom
+                    anchors.topMargin: 4
+                    width: serviceSelector.width
+                    height: Geo.serviceFamilies.length * 31 + 8
+                    color: Colors.dark
+                    border.color: Colors.blue
+                    border.width: 1
+                    z: 30
+
+                    Column {
+                        anchors.fill: parent
+                        anchors.margins: 4
+                        spacing: 0
+
+                        Repeater {
+                            model: Geo.serviceFamilies
+                            ModeButton {
+                                required property string modelData
+                                width: serviceSelector.width - 8
+                                height: 31
+                                textOnly: true
+                                labelText: modelData
+                                labelFontSize: 10
+                                bordered: false
+                                selected: root.serviceFamily === modelData
+                                idlePrimaryColor: Colors.white
+                                hoverPrimaryColor: Colors.blue
+                                selectedPrimaryColor: Colors.yellow
+                                perimeterGlowColor: Colors.blue
+                                onTriggered: root.selectService(modelData)
+                            }
+                        }
+                    }
+                }
             }
 
             ModeButton {
@@ -162,7 +237,10 @@ Item {
             id: mapRow
             width: parent.width
             spacing: 10
-            height: Math.max(130, column.height - 27 - 33 - 31 - 50 - column.spacing * 4)
+            z: 0
+            height: Math.max(130, column.height - headingRow.height
+                - regionsRow.height - filtersRow.height - infoRow.height
+                - column.spacing * 4)
 
             Rectangle {
                 id: mapSurface
@@ -482,6 +560,7 @@ Item {
         }
 
         Row {
+            id: infoRow
             width: parent.width
             height: 50
             spacing: 10

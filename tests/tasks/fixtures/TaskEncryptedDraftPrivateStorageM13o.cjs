@@ -24,7 +24,7 @@ function privateRoot(root){
     if(process.platform!=="linux"||typeof process.getuid!=="function"
         ||process.getuid()===0||typeof root!=="string"
         ||path.dirname(root)!==os.tmpdir()
-        ||!/^postapollo-m13o-disposable-[A-Za-z0-9_-]{8,64}$/.test(path.basename(root)))
+        ||!/^postapollo-m13o-disposable-[A-Za-z0-9_-]{6,64}$/.test(path.basename(root)))
         return false;
     try {
         const st=fs.lstatSync(root);
@@ -105,6 +105,9 @@ function commitFake({root,prepared,expectedPreviousSequence}={}){
             if(old.proposedLedger.installationId!==record.proposedLedger.installationId
                 ||old.proposedLedger.epoch!==record.proposedLedger.epoch)
                 return deny("SIMULATED_INSTALLATION_OR_EPOCH_CHANGED");
+            if(old.proposedLedger.sourceDigest!==record.proposedLedger.sourceDigest
+                ||old.proposedLedger.sourceGeneration!==record.proposedLedger.sourceGeneration)
+                return deny("SIMULATED_SOURCE_ANCHOR_CHANGED");
         }
         const bytes=JSON.stringify(record)+"\n";
         if(Buffer.byteLength(bytes,"utf8")>160000)

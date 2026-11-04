@@ -63,6 +63,12 @@ test("labels and hit locations agree with source minute viewport",()=>{
     assert.equal(p.localMinuteLabel(1440),"24:00");
     assert.equal(p.localMinuteLabel(-1),"--:--");
     assert.equal(p.viewX(360,360,360,362,20),1);
+    assert.equal(p.rulerX(0,362,20),11);
+    assert.equal(p.rulerX(2,362,20),181);
+    assert.equal(p.viewX(540,360,360,362,20) + 10,
+                 p.rulerX(2,362,20));
+    assert.equal(p.rulerX(4,362,20),351);
+    assert.equal(p.rulerX(4,20,20),null);
     assert.equal(p.viewX(540,360,360,362,20),171);
     assert.equal(p.viewX(720,360,360,362,20),null);
     assert.equal(p.viewX(0,360,360,362,20),null);

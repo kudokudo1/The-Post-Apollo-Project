@@ -19,18 +19,26 @@ PanelWindow {
     property var statusReport: null
     property var galleryFiles: []
     property int galleryTotal: 0
+    property int galleryPageIndex: 0
+    property bool galleryHasMore: false
+    property bool galleryScanTruncated: false
+    property bool galleryShotsOnly: false
+    property string galleryCustomFolder: ""
+    property string galleryRequestedQuery: ""
+    property string galleryRequestedFolder: ""
+    property bool galleryRequestedShotsOnly: false
     property string selectedPath: ""
     property var selectedRecord: null
     property var trashPreview: null
+    property var selectedTrashPreview: null
+    property string lastTrashReceipt: ""
     property string captureMode: "region"
     readonly property int frameWidth: 770
     readonly property int frameHeight: 675
     readonly property int gutter: 12
-    readonly property var filteredFiles:
-        galleryFiles.filter(function(row) {
-            const query = gallerySearch.text.toLowerCase().trim();
-            return !query || String(row.name || "").toLowerCase().indexOf(query) >= 0;
-        })
+    // Filename filtering and pagination run against the complete backend
+    // inventory, not just the first page of 150 results.
+    readonly property var filteredFiles: galleryFiles
 
     function toggle() {
         menuOpen = !menuOpen;
@@ -62,11 +70,51 @@ PanelWindow {
         return true;
     }
 
-    function loadGallery() {
+    function loadGallery(append) {
+        if (busy)
+            return false;
         activeView = "gallery";
-        selectedPath = "";
-        selectedRecord = null;
-        return run("gallery", ["gallery"]);
+        const nextPage = append === true ? galleryPageIndex + 1 : 0;
+        if (append !== true) {
+            selectedPath = "";
+            selectedRecord = null;
+            selectedTrashPreview = null;
+            galleryFiles = [];
+        } else if (!galleryHasMore) {
+            return false;
+        }
+        galleryRequestedQuery = gallerySearch.text.trim();
+        galleryRequestedFolder = galleryCustomFolder;
+        galleryRequestedShotsOnly = galleryShotsOnly;
+        return run("gallery", [
+            "gallery",
+            "--page", String(nextPage),
+            "--query", galleryRequestedQuery,
+            "--folder", galleryCustomFolder
+        ].concat(galleryShotsOnly ? ["--shots-only"] : []));
+    }
+
+    function selectImage(record) {
+        selectedRecord = record;
+        selectedPath = String(record && record.path || "");
+        selectedTrashPreview = null;
+        lastTrashReceipt = "";
+        zoomViewer.reset();
+    }
+
+    function previewSelectedTrash() {
+        if (busy || !selectedPath)
+            return false;
+        selectedTrashPreview = null;
+        return run("previewSelected", ["preview-selected", selectedPath]);
+    }
+
+    function confirmSelectedTrash() {
+        const plan = selectedTrashPreview;
+        if (busy || !plan || !plan.planId || plan.path !== selectedPath)
+            return false;
+        selectedTrashPreview = null;
+        return run("trashSelected", ["trash-selected", plan.planId, "MOVE_TO_TRASH"]);
     }
 
     function prepareCapture(mode) {
@@ -124,9 +172,34 @@ PanelWindow {
             activeView = "gallery";
             Qt.callLater(function() { camera.loadGallery(); });
         } else if (action === "gallery") {
-            galleryFiles = payload.files || [];
+            const page = Number(payload.page || 0);
+            galleryFiles = page > 0
+                ? galleryFiles.concat(payload.files || [])
+                : (payload.files || []);
+            galleryPageIndex = page;
             galleryTotal = Number(payload.total || 0);
-            feedback = "GALLERY // " + galleryTotal + " FILES // VIEW ONLY";
+            galleryHasMore = payload.hasMore === true;
+            galleryScanTruncated = payload.truncated === true;
+            feedback = "GALLERY // " + galleryFiles.length + "/" + galleryTotal
+                       + (galleryScanTruncated ? " // SCAN LIMIT REACHED" : "");
+            // If the user typed while scanning, run the newest query next.
+            if (gallerySearch.text.trim() !== galleryRequestedQuery
+                    || galleryCustomFolder !== galleryRequestedFolder
+                    || galleryShotsOnly !== galleryRequestedShotsOnly)
+                gallerySearchDebounce.restart();
+        } else if (action === "previewSelected") {
+            if (payload.path === selectedPath) {
+                selectedTrashPreview = payload;
+                feedback = "CONFIRM // MOVE ONE IMAGE TO TRASH";
+            }
+        } else if (action === "trashSelected") {
+            selectedPath = "";
+            selectedRecord = null;
+            selectedTrashPreview = null;
+            lastTrashReceipt = "MOVED TO TRASH // " + payload.name;
+            feedback = lastTrashReceipt;
+            // Always refresh after the confirmed file is moved.
+            Qt.callLater(function() { camera.loadGallery(false); });
         } else if (action === "preview") {
             trashPreview = payload;
             feedback = "PREVIEW // " + payload.count
@@ -186,6 +259,29 @@ PanelWindow {
         interval: 250
         repeat: false
         onTriggered: camera.run("capture", ["capture", camera.captureMode])
+    }
+
+    Timer {
+        id: gallerySearchDebounce
+        interval: 330
+        repeat: false
+        onTriggered: {
+            if (camera.activeView === "gallery" && !camera.busy)
+                camera.loadGallery(false);
+        }
+    }
+
+    // Scroll through old screenshots continuously. Only fetch the next
+    // bounded page on reaching the end, and keep a visible manual fallback.
+    Timer {
+        id: galleryAutoNext
+        interval: 120
+        repeat: false
+        onTriggered: {
+            if (camera.activeView === "gallery" && !camera.busy
+                    && camera.galleryHasMore)
+                camera.loadGallery(true);
+        }
     }
 
     WindowPanelFrame {
@@ -395,24 +491,24 @@ PanelWindow {
                             width: parent.width
                             height: 34
                             spacing: 8
-
                             GohuText {
-                                width: parent.width - 100
+                                width: parent.width - 92
                                 height: parent.height
                                 verticalAlignment: Text.AlignVCenter
                                 color: Colors.white
                                 font.pixelSize: 11
-                                text: "LIBRARY // " + camera.galleryTotal
-                                      + " FILES"
+                                text: "LIBRARY // " + camera.galleryFiles.length
+                                      + "/" + camera.galleryTotal
+                                elide: Text.ElideRight
                             }
                             ActionButton {
-                                width: 90
+                                width: 84
                                 height: 32
                                 label: "REFRESH"
                                 labelPixelSize: 10
                                 available: !camera.busy
                                 accentColor: Colors.cyan
-                                onLeftClicked: camera.loadGallery()
+                                onLeftClicked: camera.loadGallery(false)
                             }
                         }
 
@@ -420,7 +516,7 @@ PanelWindow {
                             id: gallerySearch
                             width: parent.width
                             height: 35
-                            placeholderText: "FILTER FILENAME"
+                            placeholderText: "SEARCH ALL FILES BY NAME"
                             placeholderTextColor: Colors.cyan
                             color: Colors.magenta
                             font.family: "GohuFont 11 Nerd Font Mono"
@@ -432,6 +528,10 @@ PanelWindow {
                                 border.color: gallerySearch.activeFocus
                                               ? Colors.magenta : Colors.cyan
                             }
+                            onTextChanged: {
+                                if (camera.activeView === "gallery")
+                                    gallerySearchDebounce.restart();
+                            }
                             Keys.onPressed: function(event) {
                                 if (event.key === Qt.Key_Escape) {
                                     gallerySearch.focus = false;
@@ -440,9 +540,98 @@ PanelWindow {
                             }
                         }
 
+                        Row {
+                            width: parent.width
+                            height: 34
+                            spacing: 8
+
+                            TextField {
+                                id: galleryFolderInput
+                                width: parent.width - 154
+                                height: 32
+                                color: Colors.white
+                                placeholderText: "MORE FOLDERS: ~/Pictures/old"
+                                placeholderTextColor: Colors.cyan
+                                font.pixelSize: 10
+                                selectByMouse: true
+                                background: Rectangle {
+                                    color: Colors.black
+                                    border.width: 1
+                                    border.color: galleryFolderInput.activeFocus
+                                                  ? Colors.magenta : Colors.cyan
+                                }
+                                Keys.onPressed: function(event) {
+                                    if (event.key === Qt.Key_Escape) {
+                                        galleryFolderInput.focus = false;
+                                        event.accepted = true;
+                                    }
+                                }
+                                onAccepted: {
+                                    camera.galleryCustomFolder = text.trim();
+                                    camera.loadGallery(false);
+                                }
+                            }
+                            ActionButton {
+                                width: 72
+                                height: 32
+                                label: "SCAN"
+                                labelPixelSize: 10
+                                accentColor: Colors.cyan
+                                available: !camera.busy
+                                onLeftClicked: {
+                                    camera.galleryCustomFolder =
+                                        galleryFolderInput.text.trim();
+                                    camera.loadGallery(false);
+                                }
+                            }
+                            ActionButton {
+                                width: 66
+                                height: 32
+                                label: "CLEAR"
+                                labelPixelSize: 10
+                                accentColor: Colors.white
+                                available: !camera.busy
+                                onLeftClicked: {
+                                    galleryFolderInput.text = "";
+                                    camera.galleryCustomFolder = "";
+                                    camera.loadGallery(false);
+                                }
+                            }
+                        }
+
+                        Row {
+                            width: parent.width
+                            height: 30
+                            spacing: 8
+                            ActionButton {
+                                width: (parent.width - parent.spacing) / 2
+                                height: 28
+                                label: "ALL IMAGES"
+                                labelPixelSize: 10
+                                selected: !camera.galleryShotsOnly
+                                accentColor: Colors.white
+                                onLeftClicked: {
+                                    camera.galleryShotsOnly = false;
+                                    camera.loadGallery(false);
+                                }
+                            }
+                            ActionButton {
+                                width: (parent.width - parent.spacing) / 2
+                                height: 28
+                                label: "SCREENSHOTS"
+                                labelPixelSize: 10
+                                selected: camera.galleryShotsOnly
+                                accentColor: Colors.white
+                                onLeftClicked: {
+                                    camera.galleryShotsOnly = true;
+                                    camera.loadGallery(false);
+                                }
+                            }
+                        }
+
                         Item {
                             width: parent.width
-                            height: galleryPage.height - 90
+                            height: galleryPage.height - 205
 
                             ListView {
                                 id: photoList
@@ -452,6 +641,11 @@ PanelWindow {
                                 clip: true
                                 model: camera.filteredFiles
                                 boundsBehavior: Flickable.StopAtBounds
+                                onAtYEndChanged: {
+                                    if (atYEnd && camera.activeView === "gallery"
+                                            && camera.galleryHasMore && !camera.busy)
+                                        galleryAutoNext.restart();
+                                }
 
                                 delegate: ActionButton {
                                     width: photoList.width
@@ -465,10 +659,7 @@ PanelWindow {
                                     selectedFillColor: Colors.yellow
                                     selectedForegroundColor: Colors.magenta
                                     selectedBorderColor: Colors.magenta
-                                    onLeftClicked: {
-                                        camera.selectedPath = modelData.path;
-                                        camera.selectedRecord = modelData;
-                                    }
+                                    onLeftClicked: camera.selectImage(modelData)
 
                                     Image {
                                         width: 47
@@ -494,57 +685,156 @@ PanelWindow {
                                 visible: scrollable
                             }
                         }
+
+                        Row {
+                            width: parent.width
+                            height: 32
+                            spacing: 8
+                            GohuText {
+                                width: parent.width - 123
+                                height: parent.height
+                                verticalAlignment: Text.AlignVCenter
+                                text: camera.galleryScanTruncated
+                                      ? "SCAN LIMIT // SELECT A FOLDER"
+                                      : camera.galleryHasMore
+                                      ? "MORE OLD PHOTOS AVAILABLE"
+                                      : "ALL MATCHES LOADED"
+                                elide: Text.ElideRight
+                                font.pixelSize: 9
+                                color: camera.galleryScanTruncated
+                                       ? Colors.yellow : Colors.cyan
+                            }
+                            ActionButton {
+                                width: 115
+                                height: 30
+                                label: "LOAD 120 MORE"
+                                labelPixelSize: 10
+                                accentColor: Colors.white
+                                available: camera.galleryHasMore && !camera.busy
+                                onLeftClicked: camera.loadGallery(true)
+                            }
+                        }
                     }
 
                     Column {
                         width: parent.width - Math.floor(parent.width * 0.54)
                                - parent.spacing
                         height: parent.height
-                        spacing: 8
+                        spacing: 7
 
                         GohuText {
                             width: parent.width
-                            text: "VIEWFINDER // SELECT IMAGE"
-                            font.pixelSize: 11
+                            height: 18
+                            text: "VIEWFINDER // WHEEL ZOOM · DRAG PAN"
+                            font.pixelSize: 10
                             color: Colors.cyan
                         }
 
-                        Rectangle {
+                        CameraImageViewer {
+                            id: zoomViewer
                             width: parent.width
-                            height: galleryPage.height - 136
-                            color: Colors.black
-                            border.width: 1
-                            border.color: Colors.cyan
+                            height: galleryPage.height - 230
+                            source: camera.selectedPath
+                                    ? camera.fileUrl(camera.selectedPath) : ""
+                        }
 
-                            Image {
-                                anchors.fill: parent
-                                anchors.margins: 5
-                                source: camera.selectedPath
-                                        ? camera.fileUrl(camera.selectedPath) : ""
-                                fillMode: Image.PreserveAspectFit
-                                asynchronous: true
-                                cache: false
+                        Row {
+                            width: parent.width
+                            height: 32
+                            spacing: 7
+                            ActionButton {
+                                width: (parent.width - 95 - 14) / 2
+                                height: 30
+                                label: "ZOOM -"
+                                labelPixelSize: 10
+                                accentColor: Colors.white
+                                available: !!camera.selectedPath
+                                onLeftClicked: zoomViewer.changeZoom(
+                                    0.8, zoomViewer.width / 2, zoomViewer.height / 2)
+                            }
+                            ActionButton {
+                                width: 95
+                                height: 30
+                                label: "FIT / RESET"
+                                labelPixelSize: 10
+                                accentColor: Colors.cyan
+                                available: !!camera.selectedPath
+                                onLeftClicked: zoomViewer.reset()
+                            }
+                            ActionButton {
+                                width: (parent.width - 95 - 14) / 2
+                                height: 30
+                                label: "ZOOM +"
+                                labelPixelSize: 10
+                                accentColor: Colors.white
+                                available: !!camera.selectedPath
+                                onLeftClicked: zoomViewer.changeZoom(
+                                    1.25, zoomViewer.width / 2, zoomViewer.height / 2)
                             }
                         }
 
                         GohuText {
                             width: parent.width
+                            height: 36
                             font.pixelSize: 10
                             color: Colors.white
-                            wrapMode: Text.WordWrap
+                            wrapMode: Text.WrapAnywhere
                             text: camera.selectedRecord !== null
                                 ? camera.selectedRecord.name + "\n"
-                                  + Qt.formatDateTime(
+                                  + "FILE MODIFIED // " + Qt.formatDateTime(
                                       new Date(camera.selectedRecord.modifiedMs),
                                       "yyyy-MM-dd HH:mm:ss")
-                                : "CHOOSE A THUMBNAIL // VIEW IN CAMERA"
+                                : "SELECT A PICTURE // ALL ORIGINAL FILES STAY ON DISK"
+                        }
+
+                        ActionButton {
+                            width: parent.width
+                            height: 36
+                            label: "MOVE SELECTED TO TRASH"
+                            labelPixelSize: 11
+                            accentColor: Colors.red
+                            destructive: true
+                            available: !camera.busy && !!camera.selectedPath
+                            onLeftClicked: camera.previewSelectedTrash()
+                        }
+
+                        Row {
+                            width: parent.width
+                            height: 34
+                            visible: camera.selectedTrashPreview !== null
+                            spacing: 8
+                            ActionButton {
+                                width: (parent.width - parent.spacing) / 2
+                                height: 33
+                                label: "CANCEL"
+                                labelPixelSize: 11
+                                accentColor: Colors.cyan
+                                onLeftClicked: camera.selectedTrashPreview = null
+                            }
+                            ActionButton {
+                                width: (parent.width - parent.spacing) / 2
+                                height: 33
+                                label: "CONFIRM TRASH"
+                                labelPixelSize: 10
+                                accentColor: Colors.red
+                                destructive: true
+                                available: !camera.busy
+                                onLeftClicked: camera.confirmSelectedTrash()
+                            }
                         }
 
                         GohuText {
                             width: parent.width
+                            height: 24
                             font.pixelSize: 9
-                            color: Colors.cyan
-                            text: "FIRST 150 NEWEST SHOWN // NO FILE MOVEMENT"
+                            color: camera.selectedTrashPreview
+                                   ? Colors.red : Colors.cyan
+                            wrapMode: Text.WordWrap
+                            text: camera.selectedTrashPreview
+                                ? "CONFIRM ONE FILE // " + camera.selectedTrashPreview.name
+                                : camera.lastTrashReceipt
+                                  ? camera.lastTrashReceipt
+                                  : "TRASH IS REVERSIBLE // NOT PERMANENT DELETE"
                         }
                     }
                 }

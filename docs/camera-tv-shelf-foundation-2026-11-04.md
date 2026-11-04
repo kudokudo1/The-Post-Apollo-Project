@@ -3,7 +3,7 @@
 **Patient:** \`kudokudo1/The-Post-Apollo-Project\`  
 **Room/assignment:** new small desktop modules; first milestone Camera M1  
 **Role:** external Hospital-compatible development worker; no live registration claimed  
-**Status:** operator-approved direction, M1 code proposed for review; later phases deferred  
+**Status:** Camera M1 merged; M2 legacy gallery / zoom / selected Trash in draft PR #1265, native acceptance pending; future Zoom/TV/Shelf phases deferred  
 **Authority:** operator final acceptance; no merge, live restart, package installation or local file deletion authorized by this document
 
 ## DECISIONS
@@ -30,6 +30,17 @@ User has many thousands of screenshots on their Desktop and cannot conveniently 
 - Source tests are not a substitute for live Fedora/Wayland verification. Prerequisites: \`grim\`, \`slurp\`, \`swaymsg\`, and \`gio\` for Trash; inspect tool-status panel rather than assuming packages.
 
 **M1 acceptance:** native startup without QML errors; open/close without stealing Social state; capture all / focused / region; gallery PNG preview and date; preview Desktop matches without moving photos; confirm Trash on a *disposable fixture directory*, verify recovery in desktop Trash, then operator explicitly accepts use with the actual Desktop. Never run a mass cleanup on the user's live Desktop for initial testing.
+
+### CAMERA M2 // Legacy image inventory and viewfinder checkpoint (PR #1265)
+
+- **Implemented in draft source:** Gallery enumerates Desktop, Pictures (including historical nested screenshots), Downloads, and known Screenshots folders. An explicitly chosen additional visible directory under HOME can be scanned without moving originals. Hidden directories, symlinked paths and scanning all of HOME are excluded.
+- **Large libraries:** server-side search and 120-image pages replace the first-150 cutoff. ListView virtualizes thumbnails; reaching the end loads the next page automatically, with an explicit LOAD MORE fallback. Safety caps of 60,000 files, 1,600 directories and depth 4 report truncation. Nonstandard/external or very deep folders need separately scoped work.
+- **Viewfinder:** reusable components/CameraImageViewer.qml is registered in components/qmldir; pointer-centered wheel zoom, fit reset, +/- controls and mouse-drag pan up to 8× are read-only over original files.
+- **Single-picture Trash:** select an image, request preview, then separately CONFIRM TRASH or CANCEL. The Python helper writes a short-lived one-file signature plan and calls gio trash only after confirmation and unchanged-file checks. Existing Desktop bulk cleanup remains separate.
+- **Metadata honesty:** shown date is filesystem modified time, not necessarily the picture's original capture time after copying.
+- **Verification:** disposable 5,000-screenshot paging and safe Trash tests plus static QML source contracts. Native Fedora/Sway/Qt visual acceptance has not been performed and no personal image has been deleted or migrated.
+
+**Still pending:** multi-select, arbitrary removable/network volumes, date-range UI, metadata-driven duplicates, restore UI, nondestructive editing, and Zoom/camera meeting integration.
 
 ### CAMERA // Follow-on milestones
 

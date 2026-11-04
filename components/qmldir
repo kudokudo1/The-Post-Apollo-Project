@@ -20,6 +20,7 @@ ActionButton 1.0 ActionButton.qml
 HospitalActionButton 1.0 HospitalActionButton.qml
 SafeDropShadow 1.0 SafeDropShadow.qml
 CameraGlyph 1.0 CameraGlyph.qml
+CameraImageViewer 1.0 CameraImageViewer.qml
 WeatherCelestialGlyph 1.0 WeatherCelestialGlyph.qml
 SurfaceFrame 1.0 SurfaceFrame.qml
 SectionFrame 1.0 SectionFrame.qml

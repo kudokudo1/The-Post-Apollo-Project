@@ -541,5 +541,19 @@ Rectangle {
         sourceError: clock.sourceError
         onPlanetPicked: function(name) { clock.selectedPlanet = name; }
         onReturnToTimeline: clock.displayMode = "timeline"
+        onCompareRequested: clock.displayMode = "compare"
+    }
+
+    // Shares the exact same validated dated rows. No extra provider or
+    // overlapping MAGICK/JPL calculation contract is introduced.
+    StationCosmosBearingComparisonPane {
+        anchors.fill: parent
+        visible: clock.displayMode === "compare"
+        datedRows: clock.rows
+        civilDate: clock.civilDate
+        sourceReady: clock.sourceReady
+        sourceError: clock.sourceError
+        onBackToHorizon: clock.displayMode = "horizon"
+        onReturnToTimeline: clock.displayMode = "timeline"
     }
 }

@@ -59,46 +59,46 @@ Column {
                 ActionButton {
                     width: 150
                     height: 30
-                    label: backend.ready
-                           ? "REFRESH " + modelData.short
-                           : "LOAD " + modelData.short
+                    label: publisherSourceRow.backend.ready
+                           ? "REFRESH " + publisherSourceRow.modelData.short
+                           : "LOAD " + publisherSourceRow.modelData.short
                     labelPixelSize: 10
-                    accentColor: sourceColor
-                    available: backend.canRequest
-                    onClicked: backend.request()
+                    accentColor: publisherSourceRow.sourceColor
+                    available: publisherSourceRow.backend.canRequest
+                    onClicked: publisherSourceRow.backend.request()
                 }
                 GohuText {
                     anchors.verticalCenter: parent.verticalCenter
                     width: Math.max(0, parent.width - 160)
-                    text: modelData.label + " // " + backend.sourceState
+                    text: publisherSourceRow.modelData.label + " // " + publisherSourceRow.backend.sourceState
                     font.pixelSize: 11
-                    color: backend.failed ? Colors.orange : sourceColor
+                    color: publisherSourceRow.backend.failed ? Colors.orange : publisherSourceRow.sourceColor
                     elide: Text.ElideRight
                 }
             }
 
             QuietText {
                 width: parent.width
-                text: backend.retryWaitSeconds > 0
-                      ? "NEXT MANUAL REQUEST IN " + backend.retryWaitSeconds + "s"
-                      : backend.ready
+                text: publisherSourceRow.backend.retryWaitSeconds > 0
+                      ? "NEXT MANUAL REQUEST IN " + publisherSourceRow.backend.retryWaitSeconds + "s"
+                      : publisherSourceRow.backend.ready
                         ? "LAST RECEIVED // "
-                          + Qt.formatDateTime(backend.lastUpdated, "MMM d, hh:mm AP")
-                          + (backend.usingCache ? " // SESSION CACHE" : " // FRESH REQUEST")
+                          + Qt.formatDateTime(publisherSourceRow.backend.lastUpdated, "MMM d, hh:mm AP")
+                          + (publisherSourceRow.backend.usingCache ? " // SESSION CACHE" : " // FRESH REQUEST")
                         : "NOT REQUESTED // CLICK LOAD FOR PUBLISHER HEADLINES"
                 font.pixelSize: 9
                 color: Colors.white
                 elide: Text.ElideRight
             }
             Repeater {
-                model: backend.ready ? backend.rows : []
+                model: publisherSourceRow.backend.ready ? publisherSourceRow.backend.rows : []
                 delegate: Rectangle {
                     required property var modelData
                     width: publisherFeeds.width
                     height: 80
                     color: Colors.dark
                     border.width: 1
-                    border.color: sourceColor
+                    border.color: publisherSourceRow.sourceColor
 
                     Column {
                         anchors.fill: parent
@@ -124,7 +124,7 @@ Column {
                                 height: 29
                                 label: "INSPECT"
                                 labelPixelSize: 10
-                                accentColor: sourceColor
+                                accentColor: publisherSourceRow.sourceColor
                                 onClicked: publisherFeeds.headlineSelected(modelData)
                             }
                         }
@@ -133,7 +133,7 @@ Column {
                             width: parent.width
                             text: modelData.source + " // " + modelData.time
                             font.pixelSize: 9
-                            color: sourceColor
+                            color: publisherSourceRow.sourceColor
                             elide: Text.ElideRight
                         }
                         QuietText {

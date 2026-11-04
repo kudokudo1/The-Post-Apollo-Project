@@ -100,6 +100,38 @@ test("decorated dock keeps white stars/yellow city and open magenta halo",()=>{
     assert.match(qml,/onLeftClicked: toggleRequested\(\)/);
 });
 
+test("city icon and star ornaments share one vertical text-cell frame in dock and header",()=>{
+    const dock=source("modules/CompanyNetwork.qml");
+    const widget=source("widgets/CompanyNetworkW.qml");
+    // Mixed-size Noto glyphs previously used incompatible top/baseline
+    // placement. Equal-height text cells with centered line boxes make
+    // the stars and city share a common geometric center.
+    const dockMark=dock.split("id: companyMark",2)[1]
+        .split("onLeftClicked: toggleRequested()",1)[0];
+    const headerMark=widget.split("id: headerCity",2)[1]
+        .split("\n            GohuText {",1)[0];
+    for(const [label,mark,id,height] of [
+        ["dock",dockMark,"companyMark",30],
+        ["header",headerMark,"headerCity",24]
+    ]) {
+        assert.match(mark,new RegExp("height: "+height));
+        assert.equal((mark.match(/NotoText\s*\{/g)||[]).length,3,
+            label+" keeps exactly three art layers");
+        assert.equal((mark.match(new RegExp("height: "+id+"\\.height","g"))||[]).length,3,
+            label+" shares one vertical box across the artwork");
+        assert.equal((mark.match(/verticalAlignment: Text\.AlignVCenter/g)||[]).length,3,
+            label+" centers each text line box");
+        assert.doesNotMatch(mark,/anchors\.verticalCenter: parent\.verticalCenter/,
+            label+" must not anchor children inside the Row");
+        for(const glyph of ['". ݁₊⊹"','"🏙︎"','"๋࣭⭑"'])
+            assert.ok(mark.includes("text: "+glyph),label+" preserves icon artwork");
+        assert.match(mark,/color: Colors\.white/);
+        assert.match(mark,/color: Colors\.yellow/);
+    }
+    assert.match(dock,/anchors\.centerIn: parent/);
+    assert.match(widget,/anchors\.verticalCenter: parent\.verticalCenter/);
+});
+
 test("coverage UI is interactive, reference-only and contains no company data writer",()=>{
     const pane=source("widgets/CompanyCoveragePane.qml");
     const widget=source("widgets/CompanyNetworkW.qml");

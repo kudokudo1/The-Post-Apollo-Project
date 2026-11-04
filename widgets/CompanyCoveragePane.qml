@@ -686,7 +686,7 @@ Item {
                     : root.selectedState ? root.selectedState[1] + " // "
                     : "NO PLACE SELECTED // ")
                     + "Canada, Mexico, USA and world geography are reference only. "
-                    + "NO VERIFIED COMPANY COVERAGE. Service selection does not "
+                    + "NO COMPANY COVERAGE VERIFIED. Service selection does not "
                     + "create provider areas. Capitals are not company hubs."
                 font.pixelSize: 11
                 color: Colors.white

@@ -1,0 +1,29 @@
+name: Weather M10 FIRMS source truthfulness
+
+on:
+  pull_request:
+    paths:
+      - "services/weather/FirmsHotspotPolicy.js"
+      - "widgets/weather/StationDiscovery.qml"
+      - "tests/weather/test_station_firms_source_m10.js"
+      - ".github/workflows/weather-firms-source-m10.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  firms-source:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Verify bounded FIRMS parsing and conservative source statuses
+        run: |
+          node tests/weather/test_station_map_firms_hotspots.js
+          node tests/weather/test_station_firms_source_m10.js
+      - name: Verify API key never appears in process arguments
+        run: python3 tests/weather/test_station_firms_fetch_helper.py

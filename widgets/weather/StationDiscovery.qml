@@ -1176,10 +1176,7 @@ Rectangle {
                         : gdacsService.loading ? "RECEIVING"
                           : "INACTIVE / WAITING"},
                 {name:"NASA FIRMS // VIIRS HOTSPOTS",
-                 state: !firmsService.configured ? "KEY REQUIRED"
-                      : firmsService.ready
-                        ? "HOTSPOTS " + firmsService.hotspots.length
-                        : "MANUAL READY"},
+                 state: FirmsAreaPolicy.sourceState(firmsService, firmsArea)},
                 {name:"NOAA HMS // SMOKE PLUMES",
                  state: DiscoveryPolicy.smokeRackState(hmsSmokeService)}
             ];
@@ -1267,11 +1264,7 @@ Rectangle {
                 },
                 {
                     name:"NASA FIRMS // VIIRS NOAA-21 HOTSPOTS",
-                    state: firmsService.configured
-                           ? (firmsService.ready
-                              ? "FETCHED " + firmsService.hotspots.length
-                              : "MANUAL READY")
-                           : "KEY REQUIRED"
+                    state: FirmsAreaPolicy.sourceState(firmsService, firmsArea)
                 },
                 {name:"OTHER POLYGON LAYERS", state:"NOT WIRED"}
             ];
@@ -1892,17 +1885,8 @@ Rectangle {
                     GohuText {
                         anchors.verticalCenter: parent.verticalCenter
                         width: 190
-                        text: !firmsService.configured
-                              ? "KEY REQUIRED"
-                              : firmsService.loading
-                                ? "FETCHING"
-                                : firmsService.failed
-                                  ? firmsService.errorText
-                                  : firmsService.ready
-                                    ? "HOTSPOTS " + firmsService.hotspots.length
-                                    : stationDiscovery.firmsAreaReady
-                                      ? "MANUAL READY"
-                                      : stationDiscovery.firmsArea.reason
+                        text: FirmsAreaPolicy.sourceState(
+                                  firmsService, stationDiscovery.firmsArea)
                         elide: Text.ElideRight
                         font.pixelSize: 10
                         color: !firmsService.configured ? Colors.orange
@@ -1926,9 +1910,12 @@ Rectangle {
                     visible: (!stationDiscovery.weatherMapOnly)
                              && stationDiscovery.earthLayerEnabled("firms")
                     width: parent.width
-                    text: "POST_APOLLO_FIRMS_MAP_KEY // OPTIONAL // KEY NEVER SHOWN OR PASSED IN PROCESS ARGV"
+                    text: !firmsService.configured
+                          ? "FREE NASA FIRMS MAP_KEY REQUIRED // SET POST_APOLLO_FIRMS_MAP_KEY BEFORE QUICKSHELL LAUNCH // KEY NEVER SHOWN OR PASSED IN PROCESS ARGV"
+                          : "POST_APOLLO_FIRMS_MAP_KEY CONFIGURED // KEY NEVER SHOWN OR PASSED IN PROCESS ARGV"
                     font.pixelSize: 9
                     color: Colors.orange
+                    wrapMode: Text.WordWrap
                 }
 
                 StationSectionDivider {

@@ -25,6 +25,8 @@ PanelWindow {
     property bool galleryShotsOnly: false
     property string galleryCustomFolder: ""
     property string galleryRequestedQuery: ""
+    property string galleryRequestedFolder: ""
+    property bool galleryRequestedShotsOnly: false
     property string selectedPath: ""
     property var selectedRecord: null
     property var trashPreview: null
@@ -82,6 +84,8 @@ PanelWindow {
             return false;
         }
         galleryRequestedQuery = gallerySearch.text.trim();
+        galleryRequestedFolder = galleryCustomFolder;
+        galleryRequestedShotsOnly = galleryShotsOnly;
         return run("gallery", [
             "gallery",
             "--page", String(nextPage),
@@ -179,7 +183,9 @@ PanelWindow {
             feedback = "GALLERY // " + galleryFiles.length + "/" + galleryTotal
                        + (galleryScanTruncated ? " // SCAN LIMIT REACHED" : "");
             // If the user typed while scanning, run the newest query next.
-            if (gallerySearch.text.trim() !== galleryRequestedQuery)
+            if (gallerySearch.text.trim() !== galleryRequestedQuery
+                    || galleryCustomFolder !== galleryRequestedFolder
+                    || galleryShotsOnly !== galleryRequestedShotsOnly)
                 gallerySearchDebounce.restart();
         } else if (action === "previewSelected") {
             if (payload.path === selectedPath) {
@@ -262,6 +268,19 @@ PanelWindow {
         onTriggered: {
             if (camera.activeView === "gallery" && !camera.busy)
                 camera.loadGallery(false);
+        }
+    }
+
+    // Scroll through old screenshots continuously. Only fetch the next
+    // bounded page on reaching the end, and keep a visible manual fallback.
+    Timer {
+        id: galleryAutoNext
+        interval: 120
+        repeat: false
+        onTriggered: {
+            if (camera.activeView === "gallery" && !camera.busy
+                    && camera.galleryHasMore)
+                camera.loadGallery(true);
         }
     }
 
@@ -622,6 +641,11 @@ PanelWindow {
                                 clip: true
                                 model: camera.filteredFiles
                                 boundsBehavior: Flickable.StopAtBounds
+                                onAtYEndChanged: {
+                                    if (atYEnd && camera.activeView === "gallery"
+                                            && camera.galleryHasMore && !camera.busy)
+                                        galleryAutoNext.restart();
+                                }
 
                                 delegate: ActionButton {
                                     width: photoList.width

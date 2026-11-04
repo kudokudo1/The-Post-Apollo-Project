@@ -27,6 +27,29 @@ Rectangle {
     property var hoveredEvent: null
     property var lockedEvent: null
 
+    // 24h starts at midnight; narrower views are confined to this civil day.
+    // No source times or rows are changed by a viewport gesture.
+    property int windowHours: 24
+    property real viewStartMinute: 0
+    readonly property int viewSpanMinutes: PlanetPolicy.viewportSpan(windowHours)
+    readonly property var viewTicks: PlanetPolicy.rulerTicks(
+        viewStartMinute, viewSpanMinutes)
+
+    function setWindow(hours, focusMinute) {
+        const nextSpan = PlanetPolicy.viewportSpan(hours);
+        viewStartMinute = PlanetPolicy.zoomStart(
+            viewStartMinute, viewSpanMinutes, nextSpan, focusMinute);
+        windowHours = hours;
+    }
+    function wheelZoom(delta, focusMinute) {
+        if (!delta) return;
+        const nextHours = delta > 0
+            ? (windowHours === 24 ? 12 : 6)
+            : (windowHours === 6 ? 12 : 24);
+        if (nextHours !== windowHours)
+            setWindow(nextHours, focusMinute);
+    }
+
     readonly property var rows: PlanetPolicy.clockRows(
         sourceReady ? providerRows : [], civilDate)
     readonly property var inspectedEvent: PlanetPolicy.selectedEvent(
@@ -36,7 +59,17 @@ Rectangle {
         rows, selectedPlanet, selectedKind)
 
     onProviderRowsChanged: { hoveredEvent = null; lockedEvent = null; }
-    onCivilDateChanged: { hoveredEvent = null; lockedEvent = null; }
+    onCivilDateChanged: {
+        hoveredEvent = null;
+        lockedEvent = null;
+        windowHours = 24;
+        viewStartMinute = 0;
+    }
+    onLockedEventChanged: {
+        if (lockedEvent && lockedEvent.minute !== undefined)
+            viewStartMinute = PlanetPolicy.revealStart(
+                lockedEvent.minute, viewStartMinute, viewSpanMinutes);
+    }
     onSelectedPlanetChanged: { hoveredEvent = null; lockedEvent = null; }
     onSourceReadyChanged: {
         if (!sourceReady) { hoveredEvent = null; lockedEvent = null; }
@@ -80,6 +113,7 @@ Rectangle {
             elide: Text.ElideRight
             text: "USNO MRST // " + (clock.civilDate || "DATE --")
                   + " // " + clock.populatedPlanets + "/5 DATED PLANETS"
+                  + " // " + clock.windowHours + "H WINDOW"
                   + " // " + (clock.sourcePrecision || "PROVIDER TIME")
         }
 
@@ -119,27 +153,45 @@ Rectangle {
             width: parent.width
             height: 22
             spacing: 5
-            QuietText {
+            Row {
+                id: zoomPresetRow
                 width: 80
-                text: "BODY / STATUS"
-                font.pixelSize: 9
-                color: Colors.orange
+                height: 21
+                spacing: 2
+                Repeater {
+                    model: PlanetPolicy.WINDOW_HOURS
+                    delegate: ActionButton {
+                        required property var modelData
+                        width: Math.max(1, (zoomPresetRow.width
+                                               - 2 * zoomPresetRow.spacing) / 3)
+                        height: 21
+                        contentPadding: 0
+                        labelPixelSize: 9
+                        label: modelData + "H"
+                        selected: clock.windowHours === modelData
+                        accentColor: Colors.cyan
+                        onClicked: clock.setWindow(
+                            modelData, clock.viewStartMinute
+                                       + clock.viewSpanMinutes / 2)
+                    }
+                }
             }
             Item {
                 id: clockRuler
                 width: Math.max(0, parent.width - 85)
                 height: 21
                 Repeater {
-                    model: ["00", "06", "12", "18", "24"]
+                    model: clock.viewTicks
                     delegate: GohuText {
                         required property var modelData
                         required property int index
-                        x: index / 4 * (clockRuler.width - width)
+                        x: Math.max(0, Math.min(clockRuler.width - width,
+                             index / 4 * clockRuler.width - width / 2))
                         y: 0
-                        width: 25
+                        width: 42
                         height: 19
-                        text: modelData
-                        font.pixelSize: 10
+                        text: modelData.label
+                        font.pixelSize: 9
                         color: Colors.cyan
                         horizontalAlignment: Text.AlignHCenter
                     }
@@ -197,11 +249,12 @@ Rectangle {
                         clip: true
 
                         Repeater {
-                            model: [0, 360, 720, 1080, 1440]
+                            model: clock.viewTicks
                             delegate: Rectangle {
                                 required property var modelData
+                                required property int index
                                 x: Math.min(lane.width - 1,
-                                            modelData / 1440 * (lane.width - 1))
+                                            index / 4 * (lane.width - 1))
                                 y: 0
                                 width: 1
                                 height: lane.height
@@ -219,18 +272,49 @@ Rectangle {
                             elide: Text.ElideRight
                         }
 
+                        // Blank-lane gestures pan only the read-only viewport.
+                        // Source-event markers remain independent click targets.
+                        MouseArea {
+                            id: lanePanArea
+                            anchors.fill: parent
+                            hoverEnabled: true
+                            acceptedButtons: Qt.LeftButton
+                            preventStealing: true
+                            property real pressX: 0
+                            property real pressStart: 0
+                            onPressed: function(mouse) {
+                                pressX = mouse.x;
+                                pressStart = clock.viewStartMinute;
+                            }
+                            onPositionChanged: function(mouse) {
+                                if (pressed && clock.windowHours < 24) {
+                                    clock.viewStartMinute = PlanetPolicy.panStart(
+                                        pressStart, clock.viewSpanMinutes,
+                                        mouse.x - pressX, lane.width - 22);
+                                }
+                            }
+                            onWheel: function(wheel) {
+                                clock.wheelZoom(wheel.angleDelta.y,
+                                    clock.viewStartMinute
+                                    + (wheel.x / Math.max(1, lane.width))
+                                      * clock.viewSpanMinutes);
+                                wheel.accepted = true;
+                            }
+                        }
+
                         Repeater {
-                            model: PlanetPolicy.eventsFor(
-                                planetRow.modelData, clock.selectedKind)
+                            model: PlanetPolicy.visibleEvents(
+                                planetRow.modelData, clock.selectedKind,
+                                clock.viewStartMinute, clock.viewSpanMinutes)
                             delegate: Rectangle {
                                 id: eventMarker
                                 required property var modelData
                                 width: 20
                                 height: 21
                                 y: 2
-                                x: Math.max(1, Math.min(lane.width - width - 1,
-                                    PlanetPolicy.timeX(modelData.minute,
-                                                      lane.width - width - 2)))
+                                x: PlanetPolicy.viewX(
+                                    modelData.minute, clock.viewStartMinute,
+                                    clock.viewSpanMinutes, lane.width, width)
                                 radius: 2
                                 scale: clock.inspectedEvent
                                        && clock.inspectedEvent.id === modelData.id
@@ -284,6 +368,11 @@ Rectangle {
                                             clock.hoveredEvent = null;
                                     }
                                     onClicked: clock.lockedEvent = eventMarker.modelData
+                                    onWheel: function(wheel) {
+                                        clock.wheelZoom(wheel.angleDelta.y,
+                                            eventMarker.modelData.minute);
+                                        wheel.accepted = true;
+                                    }
                                 }
                             }
                         }
@@ -423,9 +512,9 @@ Rectangle {
             font.pixelSize: 9
             color: Colors.orange
             wrapMode: Text.WordWrap
-            text: "DATED USNO CALCULATIONS, NOT LIVE PLANET TRACKS."
+            text: "WHEEL ZOOM // DRAG LANE PAN // 6H/12H/24H."
                   + " NO MOTION BETWEEN EVENTS; NO ZODIAC OR RETROGRADE INFERENCE."
-                  + " AZIMUTH FROM TRUE NORTH."
+                  + " USNO LOCAL DATE // AZ TRUE NORTH."
         }
     }
 }

@@ -90,7 +90,9 @@ class MotionAndFixtureBridgeContracts(unittest.TestCase):
         self.assertIn("--sample=NEIGHBORHOOD",WORKFLOW)
         self.assertIn("BENCH_FRAME_PACING",WORKFLOW)
         self.assertIn("FIXTURE_MARKERS_ADDED count=3",WORKFLOW)
-        self.assertNotIn("$XDG_DATA_HOME",WORKFLOW)
+        # M12 creates only a disposable fake store under the CI temp root.
+        self.assertIn('export XDG_DATA_HOME="$RUNNER_TEMP/company-owner-test"',WORKFLOW)
+        self.assertNotIn('$HOME/.local/share/post-apollo/company/hubs-v1.json',WORKFLOW)
 
 if __name__=="__main__":
     unittest.main()

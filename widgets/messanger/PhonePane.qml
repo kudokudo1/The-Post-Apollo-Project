@@ -109,7 +109,7 @@ Rectangle {
         id: setupProcess
         stdout: StdioCollector {
             onStreamFinished: {
-                if (!phonePane.visible)
+                if (!phonePane.visible || phonePane.setupState !== "CHECKING")
                     return;
                 try {
                     var report = JSON.parse(String(text || ""));
@@ -132,7 +132,7 @@ Rectangle {
             }
         }
         onExited: function(exitCode) {
-            if (phonePane.visible && exitCode !== 0) {
+            if (phonePane.visible && phonePane.setupState === "CHECKING" && exitCode !== 0) {
                 phonePane.setupReport = ({});
                 phonePane.setupState = "UNAVAILABLE";
             }
@@ -252,11 +252,11 @@ Rectangle {
                       String((phonePane.setupReport.providers || {}).BLUEFERRY
                              ? phonePane.setupReport.providers.BLUEFERRY.state
                              : "UNAVAILABLE") +
-                      "\\nNetwork bridge: " +
+                      "\nNetwork bridge: " +
                       String((phonePane.setupReport.providers || {}).KDECONNECT
                              ? phonePane.setupReport.providers.KDECONNECT.state
                              : "UNAVAILABLE") +
-                      "\\nSocial phone link: NOT VERIFIED"
+                      "\nSocial phone link: NOT VERIFIED"
                 color: Colors.white
                 font.pixelSize: 10
                 wrapMode: Text.WordWrap

@@ -263,6 +263,21 @@ Rectangle {
                                     applyStep()
                                     focus=false
                                 }
+                                onActiveFocusChanged: {
+                                    // TextInput may not emit editingFinished for
+                                    // intermediate/invalid validator text.
+                                    if(!activeFocus)applyStep()
+                                }
+                                Keys.onReturnPressed: function(event) {
+                                    event.accepted=true
+                                    applyStep()
+                                    focus=false
+                                }
+                                Keys.onEnterPressed: function(event) {
+                                    event.accepted=true
+                                    applyStep()
+                                    focus=false
+                                }
                                 Keys.onEscapePressed: function(event) {
                                     // Consume ESC here; do not close the Station.
                                     event.accepted=true

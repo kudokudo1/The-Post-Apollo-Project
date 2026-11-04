@@ -144,6 +144,8 @@ test("V3c QML has real controls and reuses one USNO owner",()=>{
     assert.match(qml,/onClicked: comparisonPane\.planetB=modelData/);
     assert.match(qml,/onClicked: comparisonPane\.eventKind="rise"/);
     assert.match(qml,/onClicked: comparisonPane\.eventKind="set"/);
+    assert.match(qml,/onClicked: comparisonPane\.activeSide = "A"/);
+    assert.match(qml,/onClicked: comparisonPane\.activeSide = "B"/);
     assert.match(qml,/onClicked: comparisonPane\.backToHorizon\(\)/);
     assert.match(qml,/onClicked: comparisonPane\.returnToTimeline\(\)/);
     assert.match(qml,/height: 414/);

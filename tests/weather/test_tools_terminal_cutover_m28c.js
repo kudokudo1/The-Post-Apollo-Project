@@ -20,13 +20,22 @@ const asList=x=>JSON.parse(JSON.stringify(x));
 
 function harness(route,extra={}) {
   const scheduled=[];
-  const calls={launches:0};
+  const calls={launches:0,routes:[]};
   const env={
     menuOpen:true,
     subjectNavigationOpen:true,
     contextTerminalRequested:false,
     subjectTerminalMode:"terminal",
-    subjectNavigator:{indexOpen:false,currentPath:route},
+    subjectNavigator:{
+      indexOpen:false,currentPath:route,
+      chooseRoute:function(next) {
+        calls.routes.push(next);
+        if (next!=="tools/terminal/star-map") return false;
+        this.currentPath=next;
+        this.indexOpen=false;
+        return true;
+      }
+    },
     Qt:{callLater:function(f){scheduled.push(f)}},
     terminalView:{
       terminalState:"IDLE",
@@ -130,6 +139,77 @@ test("queued session cannot start after route, owner or host changes",()=>{
   }
 });
 
+test("SUBJECTS header terminal reuses TOOLS STAR MAP route and exact one Kitty actor",()=>{
+  for(const from of ["home/overview","weather/conditions/current",
+                     "media/news/full","magick/overview",
+                     "tools/terminal/star-map"]) {
+    const h=harness(from);
+    assert.equal(h.env.launchHeaderTerminal(),true,from);
+    assert.deepEqual(h.calls.routes,["tools/terminal/star-map"]);
+    assert.equal(h.env.subjectNavigator.currentPath,"tools/terminal/star-map");
+    assert.equal(h.env.subjectNavigator.indexOpen,false);
+    assert.equal(h.env.contextTerminalRequested,true);
+    assert.equal(h.env.subjectTerminalMode,"terminal");
+    assert.equal(h.scheduled.length,1);
+    assert.equal(h.env.launchHeaderTerminal(),false,"no duplicate header launch");
+    h.scheduled[0]();
+    assert.equal(h.calls.launches,1,"launch from same root controller");
+  }
+  const index=harness("home/overview",{
+    subjectNavigator:{indexOpen:true}
+  });
+  assert.equal(index.env.launchHeaderTerminal(),true);
+  assert.equal(index.env.subjectNavigator.indexOpen,false,
+               "the header exits INDEX through a real subject route");
+});
+
+test("SUBJECTS header terminal rejects unavailable host and invalid navigation",()=>{
+  for(const extra of [
+    {menuOpen:false},{subjectNavigationOpen:false},
+    {contextTerminalRequested:true},
+    {terminalView:{terminalState:"VISIBLE",outputName:"DP-3"}},
+    {terminalView:{terminalState:"IDLE",outputName:""}},
+    {subjectNavigator:{chooseRoute:()=>false}}
+  ]) {
+    const h=harness("home/overview",extra);
+    assert.equal(h.env.launchHeaderTerminal(),false);
+    assert.equal(h.env.contextTerminalRequested,
+                 !!extra.contextTerminalRequested);
+    assert.equal(h.calls.launches,0);
+    assert.equal(h.scheduled.length,0);
+    if(extra.subjectNavigator && extra.subjectNavigator.chooseRoute)
+      assert.equal(h.env.subjectNavigator.currentPath,"home/overview",
+                   "route denial must not overlay an unrelated page");
+  }
+});
+
+test("header terminal deferred start revokes when subject owner changes",()=>{
+  const h=harness("earth/maps/full");
+  assert.equal(h.env.launchHeaderTerminal(),true);
+  assert.equal(h.scheduled.length,1);
+  h.env.subjectNavigator.currentPath="media/news/full";
+  h.scheduled[0]();
+  assert.equal(h.calls.launches,0);
+  assert.equal(h.env.contextTerminalRequested,false);
+});
+
+test("header control occupies former CLOSE slot and switches TERMINAL/CLOSE",()=>{
+  const start=station.indexOf("id: contextTerminalClose");
+  const end=station.indexOf("id: terminalHeaderDivider",start);
+  assert.ok(start>0 && end>start);
+  const button=station.slice(start,end);
+  assert.match(button,/label: terminalSessionActive \? "CLOSE" : "TERMINAL"/);
+  assert.match(button,/width: 88/);
+  assert.match(button,/available: weatherStation\.menuOpen/);
+  assert.match(button,/subjectNavigationOpen[\s\S]*?terminalView\.outputName/);
+  assert.match(button,/destructive: terminalSessionActive/);
+  assert.match(button,/accentColor: terminalSessionActive \? Colors\.red : Colors\.cyan/);
+  assert.match(button,/onLeftClicked: \{[\s\S]*?if \(terminalSessionActive\)[\s\S]*?weatherStation\.closeContextTerminal\(\);[\s\S]*?else[\s\S]*?weatherStation\.launchHeaderTerminal\(\);/);
+  assert.match(station,/function launchHeaderTerminal\(\)/);
+  assert.equal((station.match(/id: contextTerminalClose/g)||[]).length,1);
+  assert.equal((station.match(/StationTerminal\s*\{/g)||[]).length,1);
+});
+
 test("root masking/actor identity still uses the SAME original controller",()=>{
   assert.equal((station.match(/StationTerminal\s*\{/g)||[]).length,1);
   assert.equal((pane.match(/StationTerminal\s*\{/g)||[]).length,0);
@@ -144,7 +224,8 @@ test("root masking/actor identity still uses the SAME original controller",()=>{
   assert.match(station,/terminalMode: weatherStation\.subjectTerminalMode/);
   assert.match(station,/StationChassisCutout\s*\{/);
   assert.match(station,/mask: Region\s*\{/);
-  assert.match(station,/onLeftClicked: weatherStation\.closeContextTerminal\(\)/);
+  assert.match(station,/weatherStation\.closeContextTerminal\(\);/);
+  assert.match(station,/weatherStation\.launchHeaderTerminal\(\);/);
   assert.match(terminal,/onVisibleChanged:[\s\S]*?closeTerminal\(\)/);
 });
 

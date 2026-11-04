@@ -25,6 +25,8 @@ class AngelInterpretationIntegration(unittest.TestCase):
         self.assertIn('visible: pane.activeView === "journal"', JOURNAL)
         self.assertIn('initialDigits: pane.meaningSelection', JOURNAL)
         self.assertIn('!angelPane.editingText', TIMEW)
+        self.assertIn('numberInput.activeFocus || sourceUrlField.activeFocus', MEANING)
+        self.assertIn('id: sourceUrlField', MEANING)
         self.assertIn('|| angelMeaningPane.editingText', JOURNAL)
         self.assertIn('id: angelHistoryList', JOURNAL)
         self.assertIn('id: errMarkButton', JOURNAL)

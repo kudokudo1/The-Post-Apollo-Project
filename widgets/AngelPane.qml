@@ -41,7 +41,9 @@ Item {
         const capture = AngelPolicy.clockCapture(displayEpochMs);
         if (capture === null)
             return false;
-        const localDate = new Date(displayEpochMs);
+        // Preserve the physical zone offset at the true observation instant.
+        // A manual display calibration can cross a DST boundary independently.
+        const localDate = new Date(observedAtMs);
         const zone = String(TimeSettings.hostInfo.timezone || "UNKNOWN");
         return AngelObservationsStore.record(
             inputDigits, {

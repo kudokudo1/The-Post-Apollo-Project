@@ -210,6 +210,21 @@ Item {
                         wrapMode: Text.WordWrap
                     }
 
+                    // Always-visible archive destination, before Search and
+                    // before the long inline editor sections.
+                    IdentityCenterLocalArchiveTray {
+                        id: localArchiveTray
+                        objectName: "orgLocalArchiveTray"
+                        width: parent.width
+                        directoryStore: sections.localDirectoryStore
+                        portfolioStore: sections.localPortfoliosStore
+                        structureStore: sections.localStructureStore
+                        unitLocationStore: sections.localUnitLocationLinksStore
+                        branchLocationStore: sections.localBranchLocationLinksStore
+                        reportingStore: sections.localFunctionalReportingStore
+                        socialLinksStore: sections.localLinksStore
+                    }
+
                     IdentityCenterLocalRecordsSearch {
                         id: localRecordsSearch
                         objectName: "orgLocalSearch"

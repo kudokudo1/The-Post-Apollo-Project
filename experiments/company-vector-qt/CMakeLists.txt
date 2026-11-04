@@ -16,6 +16,7 @@ qt_add_qml_module(company-vector-probe
 )
 target_compile_definitions(company-vector-probe PRIVATE
     COMPANY_PROBE_STYLE_PATH="${CMAKE_CURRENT_SOURCE_DIR}/style-fixture.json"
+    COMPANY_PROBE_ONLINE_STYLE_PATH="${CMAKE_CURRENT_SOURCE_DIR}/style-post-apollo-online.json"
 )
 target_link_libraries(company-vector-probe PRIVATE
     Qt6::Quick Qt6::Location Qt6::Positioning QMapLibre::Location

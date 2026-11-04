@@ -73,14 +73,14 @@ Item {
                         { label: "+1S", delta: 1000 },
                         { label: "+1M", delta: 60000 }
                     ]
-                    ActionButton {
+                    TimeActionButton {
                         required property var modelData
+                        actionRole: modelData.reset ? "cancel" : "time"
                         width: (scroll.width - 8 - 16) / 5
                         height: 32
                         label: modelData.label
                         labelPixelSize: 9
                         contentPadding: 3
-                        accentColor: modelData.reset ? Colors.orange : Colors.cyan
                         available: TimeSettings.canEdit
                         onLeftClicked: {
                             if (modelData.reset)
@@ -155,14 +155,20 @@ Item {
                         { label: "LON", zone: "Europe/London" },
                         { label: "TOK", zone: "Asia/Tokyo" }
                     ]
-                    ActionButton {
+                    TimeActionButton {
                         required property var modelData
+                        actionRole: "time"
+                        // The pending selection is visibly open during APPLY;
+                        // once confirmed/cancelled, only the verified host zone
+                        // remains open. A choice is not mistaken for activation.
+                        selected: TimeSettings.timezoneConfirmRequired
+                                  ? TimeSettings.zoneChoice === modelData.zone
+                                  : TimeSettings.hostInfo.timezone === modelData.zone
                         width: (zonePresetRow.width - 3 * zonePresetRow.spacing) / 4
                         height: 31
                         label: modelData.label
                         labelPixelSize: 10
                         contentPadding: 2
-                        accentColor: Colors.cyan
                         available: !TimeSettings.authSessionActive
                         onLeftClicked: {
                             pane.zonePickerExpanded = false;
@@ -183,6 +189,8 @@ Item {
                                   ? TimeSettings.zoneChoice
                                   : String(TimeSettings.hostInfo.timezone || "UTC")
                     expanded: pane.zonePickerExpanded
+                    openSelectedZone: true
+                    zoneAccentColor: Colors.white
                     catalog: TimeSettings.zoneCatalog
                     countryIndex: TimeSettings.zoneCountryIndex
                     catalogLoading: TimeSettings.zoneCatalogLoading
@@ -238,20 +246,20 @@ Item {
                          && TimeSettings.timezoneConfirmRequired
                 height: visible ? 34 : 0
                 spacing: 5
-                ActionButton {
+                TimeActionButton {
+                    actionRole: "time"
                     width: (parent.width - parent.spacing) / 2
                     height: 32
                     label: "APPLY ZONE"
                     labelPixelSize: 10
-                    accentColor: Colors.orange
                     onLeftClicked: TimeSettings.requestTimezone()
                 }
-                ActionButton {
+                TimeActionButton {
+                    actionRole: "cancel"
                     width: (parent.width - parent.spacing) / 2
                     height: 32
                     label: "CANCEL"
                     labelPixelSize: 10
-                    accentColor: Colors.cyan
                     onLeftClicked: TimeSettings.cancelTimezone()
                 }
             }
@@ -345,18 +353,18 @@ Item {
                     verticalAlignment: Text.AlignVCenter
                     text: "RESYNC // ONE-SHOT REQUEST"
                     font.pixelSize: 12
-                    color: Colors.cyan
+                    color: Colors.yellow
                     elide: Text.ElideRight
                 }
-                ActionButton {
+                TimeActionButton {
                     id: resyncLaunch
+                    actionRole: "sync"
                     visible: pane.showResyncTrigger
                     width: 76
                     height: 30
                     label: "⟳ RESYNC"
                     labelPixelSize: 10
                     contentPadding: 3
-                    accentColor: Colors.cyan
                     available: TimeSettings.resyncStatus !== "working"
                                && !TimeSettings.resyncAuthPending
                     onLeftClicked: TimeSettings.prepareResync()
@@ -376,27 +384,27 @@ Item {
                 wrapMode: Text.WordWrap
                 text: "CONFIRMING CONTACTS CONFIGURED TIME SERVERS. THEY CAN SEE YOUR IP; A CORRECTION CAN CHANGE LOG / FILE TIMES."
                 font.pixelSize: 9
-                color: Colors.orange
+                color: Colors.yellow
             }
             Row {
                 width: parent.width
                 height: TimeSettings.resyncConfirmRequired ? 34 : 0
                 visible: TimeSettings.resyncConfirmRequired
                 spacing: 6
-                ActionButton {
+                TimeActionButton {
+                    actionRole: "sync"
                     width: (parent.width - parent.spacing) / 2
                     height: 33
                     label: "CONFIRM RESYNC"
                     labelPixelSize: 10
-                    accentColor: Colors.orange
                     onLeftClicked: TimeSettings.requestResync()
                 }
-                ActionButton {
+                TimeActionButton {
+                    actionRole: "cancel"
                     width: (parent.width - parent.spacing) / 2
                     height: 33
                     label: "CANCEL"
                     labelPixelSize: 10
-                    accentColor: Colors.cyan
                     onLeftClicked: TimeSettings.cancelResync()
                 }
             }
@@ -405,8 +413,7 @@ Item {
                 wrapMode: Text.WordWrap
                 text: "RESULT // " + TimeSettings.resyncMessage
                 font.pixelSize: 10
-                color: TimeSettings.resyncStatus === "requested"
-                       ? Colors.cyan : Colors.orange
+                color: Colors.yellow
             }
             GohuText {
                 visible: TimeSettings.resyncAuthPath !== "NOT REQUESTED"
@@ -414,7 +421,7 @@ Item {
                 wrapMode: Text.WordWrap
                 text: "AUTH // " + TimeSettings.resyncAuthPath
                 font.pixelSize: 9
-                color: Colors.cyan
+                color: Colors.yellow
             }
             GohuText {
                 width: parent.width
@@ -433,13 +440,13 @@ Item {
                 spacing: 8
                 height: 32
 
-                ActionButton {
+                TimeActionButton {
                     id: resyncDiagnoseButton
+                    actionRole: "sync"
                     width: 96
                     height: 29
                     label: "DIAGNOSE"
                     labelPixelSize: 10
-                    accentColor: Colors.cyan
                     available: !TimeSettings.diagnosticBusy
                     onLeftClicked: TimeSettings.diagnoseResync()
                 }
@@ -460,7 +467,7 @@ Item {
                 wrapMode: Text.WordWrap
                 text: "DIAG // " + TimeSettings.diagnosticMessage
                 font.pixelSize: 10
-                color: Colors.cyan
+                color: Colors.yellow
             }
             GohuText {
                 width: parent.width

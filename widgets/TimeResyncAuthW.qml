@@ -15,6 +15,8 @@ PanelWindow {
 
     implicitWidth: 450
     implicitHeight: 245
+    // Match the current Clock owner screen; stay on the same output as TimeW.
+    screen: Quickshell.screens.find(s => s.name === "DP-5")
     anchors {
         top: true
         right: true

@@ -693,6 +693,8 @@ Rectangle {
                 anchors.margins: 17
                 visible: instrument.mode === "network"
                 graphModel: instrument.graphModel
+                // Existing single M4 on-demand result, not a second provider.
+                spatialPayload: instrument.visualData
                 focusIndex: instrument.focusIndex
                 selectedBody: instrument.selectedBody
                 neonEnabled: instrument.neonEnabled

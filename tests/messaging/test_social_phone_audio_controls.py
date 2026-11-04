@@ -67,28 +67,22 @@ class PhoneAudioUiTests(unittest.TestCase):
     def test_calls_off_stays_clickable_without_ofono_and_shows_explanation(self):
         # The operator's screenshot had a visually present but completely
         # disabled CALLS ON PC: OFF because oFono was not active.
-        match = re.search(
-            r'ActionButton \\{(?P<body>.*?CALLS ON PC: ON.*?'
-            r'onTriggered: phonePane.changePhoneAudio\\((?:.|\\n)*?\\))',
-            self.qml, re.S,
-        )
-        self.assertIsNotNone(match)
-        button = match.group("body")
+        action_label = self.qml.index('label: phonePane.phoneAudioStatus.callsEnabled === true')
+        button_start = self.qml.rfind('ActionButton {', 0, action_label)
+        button_end = self.qml.index('onTriggered: phonePane.changePhoneAudio(', action_label)
+        self.assertGreaterEqual(button_start, 0)
+        button = self.qml[button_start:button_end]
         self.assertIn('interactive: !audioActionProcess.running', button)
         self.assertIn('&& !audioStatusProcess.running', button)
         self.assertIn('&& !phonePane.stageWanted', button)
-        # Missing capabilities are handled by the click, not by a dead button.
+        # Missing capabilities are handled by the click, not a dead button.
         self.assertNotIn('&& phonePane.phoneAudioStatus.ofonoActive === true', button)
         self.assertNotIn('&& phonePane.phoneAudioStatus.callsEnabled !== null', button)
         self.assertNotIn('&& phonePane.phoneAudioStatus.canAdjust === true', button)
 
-        handler = re.search(
-            r'function changePhoneAudio\\(family, selection\\) \\{'
-            r'(?P<body>.*?)\\n    \\}',
-            self.qml, re.S,
-        )
-        self.assertIsNotNone(handler)
-        action = handler.group("body")
+        handler_start = self.qml.index('function changePhoneAudio(family, selection)')
+        handler_end = self.qml.index('function phoneAudioResultText()', handler_start)
+        action = self.qml[handler_start:handler_end]
         self.assertIn('phoneAudioResult = "CALLS_PREREQUISITES_MISSING";', action)
         self.assertIn('phoneAudioResult = "CALLS_UNSUPPORTED";', action)
         self.assertIn('phoneAudioResult = "CALLS_STATUS_UNAVAILABLE";', action)

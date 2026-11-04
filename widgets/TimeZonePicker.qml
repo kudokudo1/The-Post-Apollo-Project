@@ -11,6 +11,10 @@ Item {
     property var catalog: []
     property var countryIndex: ({})
     property string selectedZone: "UTC"
+    // Opt-in: Settings marks the selected IANA zone like an open Clock dock.
+    // Existing CALC/world pickers preserve their previous visuals by default.
+    property bool openSelectedZone: false
+    property color zoneAccentColor: Colors.white
     property bool expanded: false
     property bool catalogLoading: false
     property bool catalogFailed: false
@@ -97,7 +101,9 @@ Item {
                 color: Colors.black
                 border.width: 1
                 border.color: searchInput.activeFocus
-                              ? Colors.magenta : Colors.cyan
+                              ? Colors.magenta
+                              : picker.openSelectedZone ? picker.zoneAccentColor
+                              : Colors.cyan
             }
             onPressed: picker.openRequested()
             onTextEdited: {
@@ -161,6 +167,19 @@ Item {
             interactive: contentHeight > height
 
             delegate: ActionButton {
+                selected: picker.openSelectedZone
+                          && modelData.id === picker.selectedZone
+                accentColor: picker.openSelectedZone
+                             ? picker.zoneAccentColor : Colors.white
+                idleForegroundColor: picker.zoneAccentColor
+                idleBorderColor: picker.zoneAccentColor
+                idleContentGlowColor: picker.zoneAccentColor
+                idleSoftGlowColor: picker.zoneAccentColor
+                selectedFillColor: Colors.yellow
+                selectedForegroundColor: Colors.magenta
+                selectedContentGlowColor: Colors.magenta
+                selectedSoftGlowColor: Colors.magenta
+                selectedBorderColor: Colors.magenta
                 width: zoneResults.width
                 height: 28
                 label: modelData.country

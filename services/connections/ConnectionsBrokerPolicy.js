@@ -65,7 +65,8 @@ function normalizedProbe(value) {
     var status = typeof result.status === "string" ? result.status : "";
     return {status:Object.prototype.hasOwnProperty.call(states,status)
                    ? status : "UNVERIFIED",
-            label:states[status] || "CREDENTIAL SERVICE NOT VERIFIED",
+            label:Object.prototype.hasOwnProperty.call(states,status)
+                  ? states[status] : "CREDENTIAL SERVICE NOT VERIFIED",
             available:status === "SERVICE_ACQUIRED",
             unlocked:false,grantsEnabled:false};
 }

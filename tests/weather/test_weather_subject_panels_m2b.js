@@ -22,10 +22,12 @@ vm.runInContext(navSource.replace(/^\.pragma library\s*$/m, ""), env);
 vm.runInContext(policySource.replace(/^\.pragma library\s*$/m, ""), env);
 const plain = x => JSON.parse(JSON.stringify(x));
 
-test("M2b expands 13 live M2a routes to 30 valid WEATHER-owned paths", () => {
+test("M2b preserves its original 30 routes plus M28-Q full GROUND visual destination", () => {
   const routes = Object.keys(env.ROUTES);
-  assert.equal(routes.length,30);
-  assert.equal(new Set(routes).size,30);
+  assert.equal(routes.length,31);
+  assert.equal(new Set(routes).size,31);
+  assert.equal(routes.filter(x=>x!=="weather/ground/full").length,30,
+    "original M2b 30-route milestone remains intact");
   for (const name of routes) {
     const info = env.findRoute(name);
     assert.ok(info,"missing tree route "+name);

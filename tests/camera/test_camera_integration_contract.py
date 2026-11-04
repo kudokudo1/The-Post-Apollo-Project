@@ -75,32 +75,30 @@ class CameraWidgetContracts(unittest.TestCase):
         self.assertIn('"Post-Apollo"', BACKEND)
         self.assertNotIn("shell=True", BACKEND)
 
-    def test_region_button_opens_persistent_mouse_instructions_before_slurp(self):
-        self.assertIn('property bool regionGuideOpen: false', PANEL)
-        self.assertIn('if (mode === "region") {', PANEL)
-        self.assertIn('regionGuideOpen = true;', PANEL)
-        self.assertIn('function beginRegionSelection()', PANEL)
-        self.assertIn('function cancelRegionSelection()', PANEL)
-        self.assertIn('id: regionGuide', PANEL)
-        self.assertIn('visible: camera.regionGuideOpen && camera.activeView === "capture"', PANEL)
-        self.assertIn('label: "BEGIN SELECTING"', PANEL)
-        self.assertIn('onLeftClicked: camera.beginRegionSelection()', PANEL)
-        self.assertIn('onLeftClicked: camera.cancelRegionSelection()', PANEL)
-        self.assertIn('CLICK  +  DRAG', PANEL)
-        self.assertIn('RELEASE to capture. ESC cancels.', PANEL)
-        # Keeping the instruction panel open is intentional; shutter only
-        # starts after the separate, explicit Begin action.
+    def test_region_button_directly_launches_native_wayland_selector(self):
+        self.assertIn('camera.prepareCapture("region")', PANEL)
+        self.assertIn('property bool nativeRegionSelecting: false', PANEL)
+        self.assertIn('nativeRegionSelecting = true;', PANEL)
+        self.assertIn('visible: !camera.nativeRegionSelecting', PANEL)
+        self.assertNotIn('regionGuideOpen', PANEL)
+        self.assertNotIn('beginRegionSelection', PANEL)
+        self.assertNotIn('label: "BEGIN SELECTING"', PANEL)
         setup = PANEL.split('function prepareCapture(mode)', 1)[1].split(
-            'function beginRegionSelection()', 1)[0]
-        self.assertLess(setup.index('regionGuideOpen = true;'),
-                        setup.index('menuOpen = false;'))
-        start = PANEL.split('function beginRegionSelection()', 1)[1].split(
-            'function cancelRegionSelection()', 1)[0]
-        self.assertIn('menuOpen = false;', start)
-        self.assertIn('shutterDelay.restart();', start)
-        # Normal monitor capture remains a one-click action.
-        self.assertIn('camera.prepareCapture("focused")', PANEL)
-        self.assertIn('camera.prepareCapture("all")', PANEL)
+            'function webcamPhoto()', 1)[0]
+        self.assertIn('captureMode = mode;', setup)
+        self.assertIn('if (mode === "region") {', setup)
+        self.assertIn('menuOpen = false;', setup)
+        self.assertIn('shutterDelay.restart();', setup)
+        self.assertIn('REGION // DRAG TO SELECT', setup)
+        # The Camera layer returns on success, cancel, or an unavailable backend.
+        self.assertIn('if (action === "capture")\n            nativeRegionSelecting = false;', PANEL)
+        self.assertIn('camera.nativeRegionSelecting = false;', PANEL)
+        self.assertIn('label: "ONE SCREEN"', PANEL)
+        self.assertIn('label: "BOTH"', PANEL)
+        # Display guidance belongs to the actual native slurp selection overlay.
+        self.assertIn('stdin=subprocess.DEVNULL', BACKEND)
+        self.assertIn('slurp, "-d"', BACKEND)
+        self.assertIn('"C74EC7FF"', BACKEND)
 
     def test_gallery_is_local_file_based_and_scrollable(self):
         self.assertIn('label: "GALLERY"', PANEL)

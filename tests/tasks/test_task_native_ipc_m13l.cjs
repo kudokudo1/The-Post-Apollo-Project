@@ -94,6 +94,8 @@ test("Bash syntax valid and native runner changes only disposable HOME",()=>{
     assert.match(src,/M13L_NATIVE_DIAGNOSTIC_COMPLETE/);
     assert.match(src,/M13L_OBSERVED_QML_LOADED/);
     assert.match(src,/M13L_QML_INTERNAL_TIMER_EXPIRED/);
+    assert.match(src,/M13L_HOST_ENCRYPT_REFUSED/);
+    assert.match(src,/M13L_HOST_REOPEN_REFUSED/);
     assert.match(src,/M13L_PRIVATE_SECRET_SERVICE_OWNER_UNVERIFIED/);
     assert.match(src,/org\.freedesktop\.DBus\.NameHasOwner/);
     assert.match(src,/owner_verified/);

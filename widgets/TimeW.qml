@@ -1989,7 +1989,9 @@ PanelWindow {
                         anchors.centerIn: parent
                         font.pixelSize: 11
                         color: timew.semanticColor
-                        text: TimeSettings.resyncStatus === "working"
+                        text: TimeSettings.resyncStatus === "auth-preparing"
+                              ? "AUTH..."
+                              : TimeSettings.resyncStatus === "working"
                               ? "SYNC..."
                               : TimeSettings.resyncStatus === "confirm"
                               ? "CONFIRM"
@@ -2015,6 +2017,7 @@ PanelWindow {
                     trackLabelGlowLocally: true
                     accentColor: Colors.cyan
                     available: TimeSettings.resyncStatus !== "working"
+                               && !TimeSettings.resyncAuthPending
                     onLeftClicked: {
                         timew.chooseMode(4);
                         TimeSettings.prepareResync();

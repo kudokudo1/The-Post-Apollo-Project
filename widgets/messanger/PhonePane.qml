@@ -16,6 +16,17 @@ Rectangle {
     property string probeStatus: "NOT CHECKED"
     property var readiness: ({})
 
+    // BlueFerry's GetStatus is a self-report from an already-running daemon.
+    // Active MAP/PBAP sessions do not prove content authorization or ownership.
+    function profileText(key) {
+        if (probeStatus !== "READINESS CHECKED"
+                || readiness.backendObservation !== "REPORTED")
+            return "NOT VERIFIED";
+        return readiness[key] === true ? "ACTIVE (BACKEND REPORT)" :
+               readiness[key] === false ? "INACTIVE (BACKEND REPORT)" :
+               "NOT VERIFIED";
+    }
+
     function refreshReadiness() {
         if (!visible || readinessProcess.running)
             return;
@@ -48,6 +59,19 @@ Rectangle {
                             || next.contentAuthorized !== false
                             || next.phoneLink !== "UNVERIFIED")
                         throw new Error("Unexpected readiness schema");
+                    var states = [
+                        "NOT_RUNNING", "NO_OWNER", "UNAVAILABLE", "REPORTED"
+                    ];
+                    if (states.indexOf(next.backendObservation) < 0)
+                        throw new Error("Unknown backend status");
+                    if (next.backendObservation === "REPORTED") {
+                        if (typeof next.mapSessionActive !== "boolean"
+                                || typeof next.pbapSessionActive !== "boolean")
+                            throw new Error("Invalid profile status");
+                    } else if (next.mapSessionActive !== null
+                               || next.pbapSessionActive !== null) {
+                        throw new Error("Unexpected profile status");
+                    }
                     phonePane.readiness = next;
                     phonePane.probeStatus = "READINESS CHECKED";
                 } catch (error) {
@@ -142,7 +166,11 @@ Rectangle {
                        phonePane.readiness.configurationPresent ? "PRESENT" : "MISSING") +
                       "\nBackend service: " +
                       String(phonePane.readiness.backendService || "UNKNOWN").toUpperCase() +
-                      "\nPhone link: UNVERIFIED"
+                      "\nBlueFerry D-Bus: " +
+                      String(phonePane.readiness.backendObservation || "UNAVAILABLE") +
+                      "\nMAP session: " + phonePane.profileText("mapSessionActive") +
+                      "\nPBAP session: " + phonePane.profileText("pbapSessionActive") +
+                      "\nTrusted phone link: UNVERIFIED"
                 color: Colors.white
                 font.pixelSize: 11
                 wrapMode: Text.WrapAnywhere

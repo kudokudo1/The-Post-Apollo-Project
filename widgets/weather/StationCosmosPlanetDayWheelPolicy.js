@@ -67,7 +67,8 @@ function ringRadius(planet,width,height) {
 }
 
 function timeAngle(minute) {
-    var n=Number(minute);
+    if(typeof minute!=="number")return null;
+    var n=minute;
     if(!isFinite(n)||n<0||n>=1440||Math.floor(n)!==n)return null;
     return n*Math.PI*2/1440;
 }
@@ -121,7 +122,8 @@ function countKind(events,kind) {
 }
 
 function timeLabel(minute) {
-    var n=Number(minute);
+    if(typeof minute!=="number")return "--:--";
+    var n=minute;
     if(!isFinite(n)||n<0||n>1440||Math.floor(n)!==n)return "--:--";
     return String(Math.floor(n/60)).padStart(2,"0")+":"
         +String(n%60).padStart(2,"0");

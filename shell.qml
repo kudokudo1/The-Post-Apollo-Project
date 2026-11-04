@@ -44,8 +44,11 @@ PanelWindow {
     // backend reports authorization failures if the module is unavailable.
     LazyLoader {
         id: timeResyncAuthLoader
-        active: TimeSettings.resyncAuthPending
-                || TimeSettings.resyncStatus === "working"
+        // Remain loaded for the ENTIRE authorization + command lifetime.
+        // Otherwise the registered agent can vanish before pkexec talks to it.
+        active: TimeSettings.authSessionActive
+                || TimeSettings.resyncAuthPending
+                || TimeSettings.timezoneAuthPending
         source: Quickshell.shellPath("widgets/TimeResyncAuthW.qml")
     }
 

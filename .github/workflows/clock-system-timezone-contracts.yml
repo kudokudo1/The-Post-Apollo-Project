@@ -1,0 +1,45 @@
+name: Clock real system timezone and Polkit lifetime
+
+on:
+  pull_request:
+    paths:
+      - "services/time/TimeHostControl.py"
+      - "services/time/TimeSettings.qml"
+      - "widgets/TimeSettingsPane.qml"
+      - "widgets/TimeW.qml"
+      - "widgets/TimeResyncAuthW.qml"
+      - "shell.qml"
+      - "tests/time/test_clock_system_timezone_contract.py"
+      - "tests/time/test_clock_settings_contract.py"
+      - "tests/time/test_clock_polkit_bridge_contract.py"
+      - "tests/cpuplus/test_cpuplus_time_settings_contract.py"
+      - ".github/workflows/clock-system-timezone-contracts.yml"
+  push:
+    paths:
+      - "services/time/TimeHostControl.py"
+      - "services/time/TimeSettings.qml"
+      - "widgets/TimeSettingsPane.qml"
+      - "widgets/TimeW.qml"
+      - "widgets/TimeResyncAuthW.qml"
+      - "shell.qml"
+      - "tests/time/test_clock_system_timezone_contract.py"
+      - "tests/time/test_clock_settings_contract.py"
+      - "tests/time/test_clock_polkit_bridge_contract.py"
+      - "tests/cpuplus/test_cpuplus_time_settings_contract.py"
+      - ".github/workflows/clock-system-timezone-contracts.yml"
+
+jobs:
+  contracts:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate host timezone implementation and syntax
+        run: python3 -m py_compile services/time/TimeHostControl.py
+      - name: Test real host timezone selector without host mutations
+        run: python3 -m unittest discover -s tests/time -p 'test_clock_system_timezone_contract.py' -v
+      - name: Test original Clock calibration and Chrony status
+        run: python3 -m unittest discover -s tests/time -p 'test_clock_settings_contract.py' -v
+      - name: Test Polkit bridge lifecycle
+        run: python3 -m unittest discover -s tests/time -p 'test_clock_polkit_bridge_contract.py' -v
+      - name: Test CPU++ TIME remains a separate view
+        run: python3 -m unittest discover -s tests/cpuplus -p 'test_cpuplus_time_settings_contract.py' -v

@@ -70,16 +70,26 @@ PanelWindow {
         // registered for this session, unless another agent already owns it
         // (handled by TimeSettings' delayed fallback).
         onIsRegisteredChanged: {
-            if (isRegistered)
+            if (isRegistered) {
                 TimeSettings.launchResyncAfterAgentReady(true);
+                TimeSettings.launchTimezoneAfterAgentReady(true);
+            }
         }
         onFlowChanged: {
             authWindow.clearSecret();
+            if (flow) {
+                TimeSettings.authFlowStage = "POLKIT REQUEST RECEIVED";
+                TimeSettings.authActionId = String(flow.actionId || "");
+            } else if (TimeSettings.authSessionActive) {
+                TimeSettings.authFlowStage = "POLKIT REQUEST CLOSED";
+            }
             authWindow.focusPrompt();
         }
         Component.onCompleted: {
-            if (isRegistered)
+            if (isRegistered) {
                 TimeSettings.launchResyncAfterAgentReady(true);
+                TimeSettings.launchTimezoneAfterAgentReady(true);
+            }
         }
     }
 
@@ -88,16 +98,21 @@ PanelWindow {
         ignoreUnknownSignals: true
         function onIsResponseRequiredChanged() {
             authWindow.clearSecret();
+            if (authAgent.flow && authAgent.flow.isResponseRequired)
+                TimeSettings.authFlowStage = "PASSWORD RESPONSE REQUIRED";
             authWindow.focusPrompt();
         }
         function onAuthenticationFailed() {
+            TimeSettings.authFlowStage = "AUTHENTICATION FAILED // RETRY AVAILABLE";
             authWindow.clearSecret();
             authWindow.focusPrompt();
         }
         function onAuthenticationSucceeded() {
+            TimeSettings.authFlowStage = "AUTHENTICATION ACCEPTED";
             authWindow.clearSecret();
         }
         function onAuthenticationRequestCancelled() {
+            TimeSettings.authFlowStage = "AUTHENTICATION REQUEST CANCELLED";
             authWindow.clearSecret();
         }
     }

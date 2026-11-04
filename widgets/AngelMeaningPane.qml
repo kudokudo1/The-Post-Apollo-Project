@@ -16,7 +16,8 @@ Item {
     property string requestState: "idle"
     property string requestMessage: "SOURCE NOT REQUESTED"
     property var sourceResult: null
-    readonly property bool editingText: numberInput.activeFocus
+    readonly property bool editingText:
+        numberInput.activeFocus || sourceUrlField.activeFocus
     readonly property string digits: numberInput.text
     readonly property var arithmetic: Interpret.arithmeticReduction(digits)
     readonly property var patternTags: Journal.patternTags(digits)
@@ -273,6 +274,7 @@ Item {
                         text: "SHORT PUBLISHER EXCERPT // NOT AN ENDORSEMENT OR VERIFIED PREDICTION"
                     }
                     TextField {
+                        id: sourceUrlField
                         visible: meaning.sourceReady
                         width: parent.width
                         height: 32

@@ -62,7 +62,10 @@ Item {
         anchors.fill: parent
         anchors.margins: 3
         clip: true
-        interactive: viewer.zoom > 1.001
+        // A Flickable normally handles wheel deltas as vertical scrolling.
+        // Its content coordinates remain useful for clipping/pan, but pointer
+        // input is exclusively owned by the sibling MouseArea below.
+        interactive: false
         boundsBehavior: Flickable.StopAtBounds
         contentWidth: Math.max(width, photo.width)
         contentHeight: Math.max(height, photo.height)
@@ -80,18 +83,51 @@ Item {
             y: (viewport.contentHeight - height) / 2
         }
 
-        WheelHandler {
-            id: zoomWheel
-            target: null
-            onWheel: function(event) {
-                const amount = event.angleDelta.y !== 0
-                    ? event.angleDelta.y : event.pixelDelta.y;
-                if (amount === 0)
-                    return;
-                viewer.changeZoom(amount > 0 ? 1.25 : 0.8,
-                                  event.x, event.y);
-                event.accepted = true;
-            }
+    }
+
+    // The viewer owns its wheel/drag surface. MouseArea receives wheel input
+    // ahead of the Flickable and deliberately consumes it as zoom, never
+    // allowing a vertical scroll to move the picture or its parent gallery.
+    // Left-drag is the only action that changes pan (contentX/contentY).
+    MouseArea {
+        id: zoomPanMouse
+        anchors.fill: viewport
+        z: 2
+        acceptedButtons: Qt.LeftButton
+        hoverEnabled: true
+        cursorShape: viewer.zoom > 1.001 ? (pressed ? Qt.ClosedHandCursor
+                    : Qt.OpenHandCursor) : Qt.ArrowCursor
+        property real dragStartX: 0
+        property real dragStartY: 0
+        property real panStartX: 0
+        property real panStartY: 0
+
+        onPressed: function(mouse) {
+            dragStartX = mouse.x;
+            dragStartY = mouse.y;
+            panStartX = viewport.contentX;
+            panStartY = viewport.contentY;
+        }
+        onPositionChanged: function(mouse) {
+            if (!pressed || viewer.zoom <= 1.001)
+                return;
+            const maxX = Math.max(0, viewport.contentWidth - viewport.width);
+            const maxY = Math.max(0, viewport.contentHeight - viewport.height);
+            viewport.contentX = Math.max(0, Math.min(
+                maxX, panStartX + dragStartX - mouse.x));
+            viewport.contentY = Math.max(0, Math.min(
+                maxY, panStartY + dragStartY - mouse.y));
+        }
+        onWheel: function(wheel) {
+            // Prevent Flickable's normal wheel-to-scroll fallback even when
+            // an image has not finished decoding or is at a zoom boundary.
+            wheel.accepted = true;
+            const delta = wheel.angleDelta.y !== 0
+                ? wheel.angleDelta.y : wheel.pixelDelta.y;
+            if (delta === 0)
+                return;
+            viewer.changeZoom(delta > 0 ? 1.25 : 0.8,
+                              wheel.x, wheel.y);
         }
     }
 }

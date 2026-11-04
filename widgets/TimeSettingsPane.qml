@@ -215,6 +215,7 @@ Item {
                     contentPadding: 3
                     accentColor: Colors.cyan
                     available: TimeSettings.resyncStatus !== "working"
+                               && !TimeSettings.resyncAuthPending
                     onLeftClicked: TimeSettings.prepareResync()
                 }
             }
@@ -263,6 +264,14 @@ Item {
                 font.pixelSize: 10
                 color: TimeSettings.resyncStatus === "requested"
                        ? Colors.cyan : Colors.orange
+            }
+            GohuText {
+                visible: TimeSettings.resyncAuthPath !== "NOT REQUESTED"
+                width: parent.width
+                wrapMode: Text.WordWrap
+                text: "AUTH // " + TimeSettings.resyncAuthPath
+                font.pixelSize: 9
+                color: Colors.cyan
             }
             Row {
                 width: parent.width

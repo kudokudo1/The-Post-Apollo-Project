@@ -34,6 +34,10 @@ Scope {
     property string hostError: ""
     property string resyncStatus: "idle"
     property bool resyncConfirmRequired: false
+    // Signal to the root-shell LazyLoader to register a temporary, native
+    // Quickshell Polkit authentication agent. Registration must precede pkexec.
+    property bool resyncAuthPending: false
+    property string resyncAuthPath: "NOT REQUESTED"
     property string resyncMessage: "NOT REQUESTED"
     property string resyncErrorCode: ""
     property bool diagnosticBusy: false
@@ -111,7 +115,8 @@ Scope {
     }
 
     function prepareResync() {
-        if (resyncProcess.running)
+        if (resyncProcess.running || resyncAuthPending
+                || resyncStatus === "working")
             return;
         resyncConfirmRequired = true;
         resyncStatus = "confirm";
@@ -126,17 +131,48 @@ Scope {
         resyncMessage = "RESYNC CANCELLED // CLOCK UNCHANGED";
     }
 
+    // The user's CONFIRM click requests auth setup, NOT a direct pkexec.
+    // When the native agent registers, or an existing desktop agent is
+    // expected, launchResyncAfterAgentReady() starts the original fixed argv.
     function requestResync() {
-        if (!resyncConfirmRequired || resyncProcess.running)
+        if (!resyncConfirmRequired || resyncProcess.running
+                || resyncAuthPending)
             return;
         resyncConfirmRequired = false;
+        resyncAuthPending = true;
+        resyncStatus = "auth-preparing";
+        resyncAuthPath = "REGISTERING NATIVE POLKIT";
+        resyncErrorCode = "";
+        resyncMessage = "PREPARING GRAPHICAL POLKIT AUTHORIZATION...";
+        authRegistrationFallback.restart();
+    }
+
+    function launchResyncAfterAgentReady(nativeRegistered) {
+        if (!resyncAuthPending || resyncProcess.running)
+            return;
+        resyncAuthPending = false;
+        authRegistrationFallback.stop();
+        resyncAuthPath = nativeRegistered === true
+            ? "NATIVE POLKIT AGENT REGISTERED"
+            : "EXISTING SESSION AGENT FALLBACK (UNVERIFIED)";
         resyncStatus = "working";
         resyncErrorCode = "";
-        resyncMessage = "REQUESTING FRESH TIME MEASUREMENTS...";
+        resyncMessage = "AUTHENTICATE TO REQUEST ONE-SHOT TIME CORRECTION...";
         resyncProcess.exec([
             "python3", "-B", "-I",
             Quickshell.shellPath("services/time/TimeHostControl.py"), "resync"
         ]);
+    }
+
+    // If another graphical Polkit agent already owns the session, native
+    // registration can fail legitimately. Give it a chance, then let pkexec
+    // use the existing agent. On a broken setup the backend reports a clear
+    // auth error rather than silently retrying or bypassing authorization.
+    Timer {
+        id: authRegistrationFallback
+        interval: 2500
+        repeat: false
+        onTriggered: timeSettings.launchResyncAfterAgentReady(false)
     }
 
     FileView {

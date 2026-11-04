@@ -16,6 +16,7 @@ import "services/system"
 import "services/audio" as AudioOwner
 import qs.services.hub
 import qs.services.location
+import qs.services.time
 import "services/hub/ApolloHubProcessesPolicy.js" as HubProcessesPolicy
 import qs.services.notifications
 
@@ -34,6 +35,18 @@ PanelWindow {
     // explicit process restart instead of in-process hot reload.
     Component.onCompleted: {
         Quickshell.watchFiles = false;
+    }
+
+    // Register an in-shell graphical Polkit agent only during an explicitly
+    // confirmed Clock/CPU++ resync. Keep ordinary shell startup unchanged and
+    // release the authentication surface after the privileged command exits.
+    // Lazy loading isolates optional Quickshell Polkit support; the existing
+    // backend reports authorization failures if the module is unavailable.
+    LazyLoader {
+        id: timeResyncAuthLoader
+        active: TimeSettings.resyncAuthPending
+                || TimeSettings.resyncStatus === "working"
+        source: Quickshell.shellPath("widgets/TimeResyncAuthW.qml")
     }
 
     // Nurse 3c // opt-in only. A missed QML Timer deadline reveals that the

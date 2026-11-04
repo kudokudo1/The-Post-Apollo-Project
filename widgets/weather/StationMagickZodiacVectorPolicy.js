@@ -104,3 +104,23 @@ function strokesFor(index) {
     return typeof index==="number" && Math.floor(index)===index &&
            index>=0 && index<STROKES.length ? STROKES[index] : [];
 }
+
+
+// M5j // Keep ordinary signs legible but visually subordinate. Selection is
+// explicit and source-derived from the focused body's longitude. The chosen
+// sign is rendered LAST so its slight enlargement always sits above peers.
+// Defaults remain comfortably separated in 100px-high compact canvases.
+function appearance(selected) {
+    if(selected) return {
+        chipRadius:10.9,chipOpacity:0.99,
+        edgeOpacity:1.0,edgeWidth:1.8,edgeGlow:16,
+        symbolScale:0.76,outlineWidth:4.7,
+        inkWidth:3.1,inkOpacity:1.0,inkGlow:15
+    };
+    return {
+        chipRadius:8.7,chipOpacity:0.78,
+        edgeOpacity:0.50,edgeWidth:0.9,edgeGlow:3,
+        symbolScale:0.56,outlineWidth:4.0,
+        inkWidth:1.9,inkOpacity:0.73,inkGlow:4
+    };
+}

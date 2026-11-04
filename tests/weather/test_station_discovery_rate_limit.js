@@ -93,11 +93,57 @@ assert.match(ui,/function retryClock\(value\)/);
 assert.match(ui,/EARLIEST RETRY IN/);
 assert.match(ui,/RETRY MAY STILL BE THROTTLED/);
 assert.match(ui,/available: source\.canRetry/);
-assert.match(ui,/state:"ENDPOINT CONFIGURED"/);
+assert.match(ui,/DiscoveryPolicy\\.newsRackState\\(source\\)/);
+assert.match(ui,/DiscoveryPolicy\\.smokeRackState\\(hmsSmokeService\\)/);
+assert.doesNotMatch(ui,/state:"ENDPOINT CONFIGURED"/);
 assert.match(ui,/NEWS CACHED/);
 assert.match(ui,/NEWS RECEIVED/);
 assert.match(shell,/id: weatherContentLoader/);
 assert.match(shell,/newsSourceItem\.feedBadge/);
 assert.match(shell,/newsSourceItem\.feedBadgeColor/);
 assert.match(workflow,/node tests\/weather\/test_station_discovery_rate_limit\.js/);
-console.log("Weather NEWS GDELT 429 and cache contracts: PASS");
+// An operator time correction can move Date.now() backwards by an hour.
+// Preserve the provider's remaining 429 cooldown and the manual-only gate.
+const shiftedCtx={};
+vm.runInNewContext(
+    read("services/weather/StationDiscoveryPolicy.js")
+        .replace(/^\\.pragma library\\s*/m,""),shiftedCtx);
+const start=1780000000000;
+assert.equal(shiftedCtx.reserveNewsRequest(start),true);
+assert.equal(shiftedCtx.recordNewsThrottle(start+1000),300000);
+assert.equal(shiftedCtx.newsWaitMs(start+61000),240000);
+const corrected=start+61000-3600000;
+assert.equal(shiftedCtx.newsWaitMs(corrected),240000,
+    "a one-hour backward correction must not add an hour of cooldown");
+assert.equal(shiftedCtx.newsManualRetryRequired(),true);
+assert.equal(shiftedCtx.newsThrottled(corrected),true);
+assert.equal(shiftedCtx.reserveNewsRequest(corrected+239999),false);
+assert.equal(shiftedCtx.reserveNewsRequest(corrected+240000),true);
+assert.equal(shiftedCtx.newsThrottled(corrected+240000),false);
+
+// The successful 15-minute cache/reuse gate follows the same logic.
+const recovered=corrected+241000;
+shiftedCtx.storeNewsRows([{title:"Recovered headline"}],recovered);
+assert.equal(shiftedCtx.newsWaitMs(recovered+30000),870000);
+const correctedAgain=recovered+30000-3600000;
+assert.equal(shiftedCtx.newsWaitMs(correctedAgain),870000);
+assert.equal(shiftedCtx.reserveNewsRequest(correctedAgain+869999),false);
+assert.equal(shiftedCtx.reserveNewsRequest(correctedAgain+870000),true);
+
+// A configured endpoint does not mean its response has been received.
+assert.equal(ctx.newsRackState({}),"WAITING");
+assert.equal(ctx.newsRackState({retryWaitSeconds:70}),"COOLDOWN");
+assert.equal(ctx.newsRackState({loading:true}),"RECEIVING");
+assert.equal(ctx.newsRackState({failed:true,errorText:"RATE LIMITED"}),"RATE LIMITED");
+assert.equal(ctx.newsRackState({ready:true,rows:[{},{}]}),"ARTICLES 2");
+assert.equal(ctx.newsRackState({ready:true,usingCache:true,rows:[{}]}),"CACHED 1");
+assert.equal(ctx.newsRackState({ready:true,failed:true,rows:[{}],
+                               errorText:"HTTP 500"}),"LAST GOOD 1 // REQUEST FAILED");
+assert.equal(ctx.smokeRackState({}),"MANUAL READY");
+assert.equal(ctx.smokeRackState({loading:true}),"RECEIVING");
+assert.equal(ctx.smokeRackState({failed:true}),"REQUEST FAILED");
+assert.equal(ctx.smokeRackState({ready:true,polygons:[{},{}]}),"PLUMES 2");
+assert.equal(ctx.smokeRackState({ready:true,failed:true,polygons:[{}]}),
+             "LAST GOOD 1 // REQUEST FAILED");
+
+console.log("Weather NEWS GDELT clock-jump and Earth HMS source state: PASS");

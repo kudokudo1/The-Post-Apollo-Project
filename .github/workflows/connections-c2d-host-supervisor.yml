@@ -1,0 +1,52 @@
+name: Connections C2d host supervisor (fake only)
+
+on:
+  pull_request:
+    paths:
+      - "services/connections/experiments/C2dFakeHostSupervisor.py"
+      - "tests/connections/test_connections_c2d_host_supervisor.py"
+      - ".github/workflows/connections-c2d-host-supervisor.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  isolated-host-lifecycle:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Explicit fake host startup, per-process descriptor handoff, consent, crash and cleanup
+        run: timeout 50s python3 -B tests/connections/test_connections_c2d_host_supervisor.py
+      - name: Preserve C2c separate operator and Weather transport contract
+        run: timeout 40s python3 -B tests/connections/test_connections_c2c_descriptor_authority.py
+      - name: Preserve C2b and C2a production deny boundaries
+        run: |
+          node tests/connections/test_connections_c2b_fake_only.cjs
+          node tests/cpuplus/test_connections_broker_c2a.js
+      - name: Check no system activation or real provider network path
+        run: |
+          python3 - <<'PY'
+          import ast
+          from pathlib import Path
+          source=Path("services/connections/experiments/C2dFakeHostSupervisor.py").read_text()
+          tree=ast.parse(source)
+          imported=set()
+          for node in ast.walk(tree):
+              if isinstance(node,ast.Import):
+                  imported.update(alias.name.split(".")[0] for alias in node.names)
+              if isinstance(node,ast.ImportFrom):
+                  imported.add((node.module or "").split(".")[0])
+          assert not imported & {"requests","http","urllib","httpx","ssl"}, imported
+          for bad in (".bind(", ".listen(", "AF_INET", "secret-tool",
+                      "Qt.openUrlExternally", "Quickshell.shellPath",
+                      "POST_APOLLO_FIRMS_MAP_KEY"):
+              assert bad not in source, bad
+          production=Path("services/connections/ConnectionsBroker.qml").read_text()
+          assert "readonly property bool credentialActionsEnabled: false" in production
+          print("C2D_PASS // FAKE_ONLY_NO_PRODUCTION_ACTIVATION")
+          PY

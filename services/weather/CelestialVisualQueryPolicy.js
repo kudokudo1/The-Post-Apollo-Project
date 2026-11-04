@@ -11,6 +11,13 @@ var PAIRS = [
     {id:"uranus-neptune",label:"URA / NEP SYS",bodies:["uranus_barycenter","neptune_barycenter"]},
     {id:"moon-pluto",label:"MOON / PLUTO SYS",bodies:["moon","pluto_barycenter"]}
 ];
+// V4d // Exact NAIF targets. "_barycenter" always means a SYSTEM
+// barycenter, never a planet-center substitute. Sun is the 0-AU origin.
+var SOLAR_BODIES = [
+    "mercury", "venus", "earth", "moon", "mars_barycenter",
+    "jupiter_barycenter", "saturn_barycenter",
+    "uranus_barycenter", "neptune_barycenter", "pluto_barycenter"
+];
 var SPANS = [14,29,90];
 var MAX_DAY_OFFSET = 3650;
 var DAY_MS = 86400000;
@@ -88,7 +95,8 @@ function requestFor(utcDay,offset,pairId,spanDays) {
         include_events:true,
         // V4c: same on-demand kernel invocation, same UTC grid and pair.
         // Adds geometric Sun-origin coordinates; geocentric M4 remains intact.
-        include_heliocentric_spatial:true
+        include_heliocentric_spatial:true,
+        solar_overview_bodies:SOLAR_BODIES.slice()
     };
 }
 function matchesResult(payload,expected) {
@@ -118,6 +126,31 @@ function matchesResult(payload,expected) {
            !Array.isArray(spatial.series) ||
            spatial.series.length!==expected.bodies.length ||
            spatial.sample_count!==payload.sample_count)
+            return false;
+    }
+    if(expected.solar_overview_bodies &&
+       expected.solar_overview_bodies.length>0) {
+        var atlas=payload.solar_overview;
+        if(!atlas || atlas.format!=="post-apollo.weather.solar-overview.v1" ||
+           atlas.origin!=="heliocentric" || atlas.origin_body!=="sun" ||
+           atlas.position_model!=="geometric" ||
+           atlas.frame!=="true-ecliptic-of-date" ||
+           atlas.epoch!=="exact-m4-grid" ||
+           atlas.units!=="AU" ||
+           atlas.source!=="same-JPL-kernel-as-M4" ||
+           !Array.isArray(atlas.times_unix_ms) ||
+           !Array.isArray(atlas.series) ||
+           atlas.sample_count!==payload.sample_count ||
+           atlas.times_unix_ms.length!==payload.sample_count ||
+           atlas.series.length!==expected.solar_overview_bodies.length ||
+           !Array.isArray(payload.query.solar_overview_bodies) ||
+           JSON.stringify(payload.query.solar_overview_bodies)!==
+               JSON.stringify(expected.solar_overview_bodies) ||
+           atlas.series.some(function(item,index) {
+               return !item || item.body!==expected.solar_overview_bodies[index]
+                   || !Array.isArray(item.vectors_au)
+                   || item.vectors_au.length!==atlas.sample_count;
+           }))
             return false;
     }
     if(Date.parse(payload.query.start_utc)!==Date.parse(expected.start_utc) ||

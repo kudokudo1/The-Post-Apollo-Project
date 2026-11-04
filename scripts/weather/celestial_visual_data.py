@@ -24,6 +24,10 @@ from celestial_solver import (
     _digest, _import_skyfield, _kernel_file, _observer, _position, _target,
 )
 from celestial_spatial_data import build_spatial_series
+from celestial_solar_overview import (
+    MAX_SAMPLES as MAX_SOLAR_OVERVIEW_SAMPLES,
+    build_solar_overview, normalize_bodies as solar_bodies,
+)
 
 FORMAT = "post-apollo.weather.celestial-visual-data.v1"
 MAX_BODIES = 4
@@ -33,6 +37,7 @@ QUERY_FIELDS = frozenset((
     "format", "start_utc", "end_utc", "bodies", "step_hours",
     "rate_window_hours", "orb_degrees", "include_events", "detect_tangents",
     "tangent_tolerance_deg", "include_heliocentric_spatial",
+    "solar_overview_bodies",
 ))
 
 
@@ -76,6 +81,11 @@ def normalize_visual_query(raw):
         raw.get("include_heliocentric_spatial", False),
         "include_heliocentric_spatial",
     )
+    overview_bodies = solar_bodies(raw.get("solar_overview_bodies", []))
+    if overview_bodies and not include_spatial:
+        raise ContractError("solar overview requires the geometric spatial opt-in")
+    if overview_bodies and len(grid) > MAX_SOLAR_OVERVIEW_SAMPLES:
+        raise ContractError("solar overview UTC grid exceeds 181 samples")
     detect_tangents = _boolean(raw.get("detect_tangents", False), "detect_tangents")
     tolerance = _finite(raw.get("tangent_tolerance_deg", 0.00001),
                         "tangent_tolerance_deg", 0, 0.01)
@@ -98,6 +108,7 @@ def normalize_visual_query(raw):
         "orb_degrees": orb,
         "include_events": include_events,
         "include_heliocentric_spatial": include_spatial,
+        "solar_overview_bodies": overview_bodies,
         "detect_tangents": detect_tangents,
         "tangent_tolerance_deg": tolerance if detect_tangents else None,
     }
@@ -297,6 +308,29 @@ def compute_visual_data(query, kernel_path):
 
             result["heliocentric_spatial"] = build_spatial_series(
                 normalized["bodies"], moments, heliocentric_xyz,
+            )
+
+        # V4d: a distinct compact multi-body GEOMETRIC coordinate product.
+        # It shares the one source kernel and the exact existing M4 UTC grid.
+        # No extra aspect pairing or event search is performed.
+        if normalized["solar_overview_bodies"]:
+            overview_targets = {
+                body: _target(kernel, body)
+                for body in normalized["solar_overview_bodies"]
+            }
+            origin = _target(kernel, "sun")
+            moments = [
+                _utc(sample["time_utc"])
+                for sample in result["series"][0]["samples"]
+            ]
+
+            def overview_xyz(body, moment):
+                t = ts.from_datetime(moment)
+                p = _position(origin, overview_targets[body], t, "geometric")
+                return tuple(float(value) for value in p.frame_xyz(frame).au)
+
+            result["solar_overview"] = build_solar_overview(
+                normalized["solar_overview_bodies"], moments, overview_xyz,
             )
 
         result["provenance"] = {

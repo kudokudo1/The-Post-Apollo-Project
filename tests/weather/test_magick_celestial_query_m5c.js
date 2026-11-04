@@ -64,6 +64,9 @@ test("14, 29 and 90-day bounded query windows keep original M4 contract",()=>{
         assert.equal(req.step_hours,12);
         assert.equal(req.include_events,true);
         assert.equal(req.include_heliocentric_spatial,true);
+        assert.equal(req.solar_overview_bodies.length,10);
+        assert.ok(req.solar_overview_bodies.includes("earth"));
+        assert.ok(req.solar_overview_bodies.includes("jupiter_barycenter"));
         assert.equal((Date.parse(req.end_utc)-Date.parse(req.start_utc))/86400000,
                      span);
         assert.ok(span*2+1<=721);
@@ -91,7 +94,8 @@ test("result matching rejects stale date/pair/span even with valid-looking SHA",
             start_utc:expected.start_utc.replace(".000Z",".000000Z"),
             end_utc:expected.end_utc.replace(".000Z",".000000Z"),
             step_hours:12,include_events:true,
-            include_heliocentric_spatial:true},
+            include_heliocentric_spatial:true,
+            solar_overview_bodies:expected.solar_overview_bodies.slice()},
         sample_count:2,
         heliocentric_spatial:{
             format:"post-apollo.weather.heliocentric-spatial.v1",
@@ -99,9 +103,26 @@ test("result matching rejects stale date/pair/span even with valid-looking SHA",
             position_model:"geometric",frame:"true-ecliptic-of-date",
             sample_count:2,series:[{},{}]
         },
+        solar_overview:{
+            format:"post-apollo.weather.solar-overview.v1",
+            origin:"heliocentric",origin_body:"sun",
+            position_model:"geometric",frame:"true-ecliptic-of-date",
+            epoch:"exact-m4-grid",units:"AU",
+            source:"same-JPL-kernel-as-M4",
+            sample_count:2,times_unix_ms:[1,2],
+            series:expected.solar_overview_bodies.map(body=>({
+                body,vectors_au:[[1,0,0],[1,0,0]]
+            }))
+        },
         series:[{},{}],relationships:[{}],event_markers:[]
     };
     assert.equal(context.matchesResult(row,expected),true);
+    const noAtlas=JSON.parse(JSON.stringify(row));
+    delete noAtlas.solar_overview;
+    assert.equal(context.matchesResult(noAtlas,expected),false);
+    const wrongAtlas=JSON.parse(JSON.stringify(row));
+    wrongAtlas.solar_overview.series[0].body="fake";
+    assert.equal(context.matchesResult(wrongAtlas,expected),false);
     const noSpatial=JSON.parse(JSON.stringify(row));
     delete noSpatial.heliocentric_spatial;
     assert.equal(context.matchesResult(noSpatial,expected),false);

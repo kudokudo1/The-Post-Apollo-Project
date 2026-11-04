@@ -107,18 +107,20 @@ function layout(width,height,scale) {
     var radius=Math.min(h/2-24,w*0.30)*s;
     return {ready:radius>8,cx:w*0.39,cy:h/2,r:Math.max(0,radius)};
 }
-function position(scene,point,width,height,scale,tilt) {
+function position(scene,point,width,height,scale,tilt,domainAu) {
     if(!scene||!scene.ready||!point)return null;
     var g=layout(width,height,scale);
-    var r=finite(scene.maxAu),x=finite(point.x_au),
-        y=finite(point.y_au),z=finite(point.z_au);
+    // V4d: optional truthful radial window: ALL source bodies or INNER AU.
+    // Data coordinates and actual maxAu remain unchanged.
+    var r=domainAu===undefined?finite(scene.maxAu):finite(domainAu),
+        x=finite(point.x_au),y=finite(point.y_au),z=finite(point.z_au);
     if(!g.ready||r===null||r<=0||x===null||y===null||z===null)
         return null;
     var angle=tilt===true?Math.PI/4:0;
     return {x:g.cx+g.r*y/r,
             y:g.cy-g.r*(x*Math.cos(angle)+z*Math.sin(angle))/r};
 }
-function hit(scene,px,py,w,h,scale,tilt,tolerance) {
+function hit(scene,px,py,w,h,scale,tilt,tolerance,domainAu) {
     if(!scene||!scene.ready)return "";
     var x=finite(px),y=finite(py),tol=finite(tolerance);
     if(x===null||y===null||tol===null||tol<=0||tol>30)return "";
@@ -126,7 +128,7 @@ function hit(scene,px,py,w,h,scale,tilt,tolerance) {
     for(var i=0;i<scene.points.length;i++){
         var point=scene.points[i];
         if(point.origin)continue;
-        var screen=position(scene,point,w,h,scale,tilt);
+        var screen=position(scene,point,w,h,scale,tilt,domainAu);
         if(!screen)continue;
         var d=(screen.x-x)*(screen.x-x)+(screen.y-y)*(screen.y-y);
         if(d<=distance){distance=d;best=point.body;}

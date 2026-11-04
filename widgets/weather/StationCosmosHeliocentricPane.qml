@@ -1,6 +1,7 @@
 import QtQuick
 import "../../components"
 import "StationCosmosHeliocentricPolicy.js" as Helio
+import "StationCosmosSolarOverviewPolicy.js" as Solar
 
 // V4c // True Sun-centered, geometric JPL vector snapshot at one UTC.
 // Neither the earlier apparent Earth-centric plot nor the longitudinal
@@ -16,9 +17,20 @@ Item {
     property bool neonEnabled: true
     property bool tiltView: false
     property real spatialScale: 1.0
+    property string atlasRange: "all"
     property string hoveredBody: ""
-    readonly property var scene: Helio.verifiedScene(
-        visualData,graphModel,verifiedNetwork,focusIndex)
+    // The requested V4d atlas is authoritative. If it is missing or
+    // invalid, refuse to fake a multi-body view using the 2-body positions.
+    // Legacy V4c results (without an atlas request) remain readable.
+    readonly property bool atlasRequested: visualData && visualData.query
+        && Array.isArray(visualData.query.solar_overview_bodies)
+        && visualData.query.solar_overview_bodies.length>0
+    readonly property var scene: atlasRequested
+        ? Solar.scene(visualData,graphModel,verifiedNetwork,focusIndex)
+        : Helio.verifiedScene(visualData,graphModel,verifiedNetwork,focusIndex)
+    readonly property real radialDomainAu: scene.ready
+        ? atlasRange==="inner" ? Math.min(scene.maxAu,4) : scene.maxAu
+        : 0
     readonly property var focusPoint: Helio.byBody(scene,selectedBody)
     signal bodyPicked(string body)
     signal sampleScrubbed(int originIndex,real offsetPixels)
@@ -26,6 +38,7 @@ Item {
     onSceneChanged: spatialCanvas.requestPaint()
     onTiltViewChanged: spatialCanvas.requestPaint()
     onSpatialScaleChanged: spatialCanvas.requestPaint()
+    onAtlasRangeChanged: spatialCanvas.requestPaint()
     onSelectedBodyChanged: spatialCanvas.requestPaint()
     onHoveredBodyChanged: spatialCanvas.requestPaint()
 
@@ -96,7 +109,8 @@ Item {
             const point=spatial.scene.points[i];
             if(point.origin)continue; // sun already drawn at 0 AU
             const p=Helio.position(spatial.scene,point,w,h,
-                                    spatial.spatialScale,spatial.tiltView);
+                                    spatial.spatialScale,spatial.tiltView,
+                                    spatial.radialDomainAu);
             if(!p)continue;
             const focused=point.body===spatial.selectedBody
                 || point.body===spatial.hoveredBody;
@@ -126,7 +140,7 @@ Item {
             ctx.fillStyle=String(point.color);
             ctx.font="9px monospace";
             ctx.textAlign=p.x>=g.cx?"left":"right";
-            ctx.fillText(point.body.toUpperCase(),
+            ctx.fillText(point.label||point.body.toUpperCase(),
                 p.x+(p.x>=g.cx?9:-9),
                 Math.max(10,Math.min(h-10,p.y)));
         }
@@ -167,13 +181,13 @@ Item {
             }
             spatial.hoveredBody=Helio.hit(spatial.scene,
                 mouse.x,mouse.y,width,height,spatial.spatialScale,
-                spatial.tiltView,13);
+                spatial.tiltView,13,spatial.radialDomainAu);
         }
         onClicked: function(mouse) {
             if(didDrag)return;
             const body=Helio.hit(spatial.scene,
                 mouse.x,mouse.y,width,height,spatial.spatialScale,
-                spatial.tiltView,14);
+                spatial.tiltView,14,spatial.radialDomainAu);
             if(body!=="")spatial.bodyPicked(body);
         }
         onCanceled: didDrag=false
@@ -228,6 +242,32 @@ Item {
                 onClicked: spatial.tiltView=true
             }
         }
+        Row {
+            id: rangeControls
+            width: parent.width
+            height: 23
+            spacing: 3
+            ActionButton {
+                width: Math.max(1,(rangeControls.width-rangeControls.spacing)/2)
+                height: 22
+                label: "ALL AU"
+                labelPixelSize: 9
+                contentPadding: 0
+                accentColor: Colors.cyan
+                selected: spatial.atlasRange==="all"
+                onClicked: spatial.atlasRange="all"
+            }
+            ActionButton {
+                width: Math.max(1,(rangeControls.width-rangeControls.spacing)/2)
+                height: 22
+                label: "INNER 4 AU"
+                labelPixelSize: 9
+                contentPadding: 0
+                accentColor: Colors.magenta
+                selected: spatial.atlasRange==="inner"
+                onClicked: spatial.atlasRange="inner"
+            }
+        }
         QuietText {
             width: parent.width
             color: spatial.scene.ready?Colors.cyan:Colors.orange
@@ -275,7 +315,7 @@ Item {
             font.pixelSize: 9
             wrapMode: Text.WordWrap
             text: "SCALE // "+(spatial.scene.ready
-                  ? spatial.scene.maxAu.toFixed(3)+" AU OUTER RING"
+                  ? spatial.radialDomainAu.toFixed(3)+" AU GRID RING"
                   : "UNAVAILABLE")
         }
     }
@@ -289,6 +329,8 @@ Item {
         font.pixelSize: 9
         color: Colors.orange
         elide: Text.ElideRight
-        text: "ONE UTC SNAPSHOT // NO ORBITS // DRAG TIME / WHEEL SCALE"
+        text: spatial.atlasRange==="inner"
+              ? "INNER 4 AU WINDOW // OUTER BODIES MAY BE OFFSCREEN"
+              : "ONE UTC SNAPSHOT // NO ORBITS // DRAG TIME / WHEEL SCALE"
     }
 }

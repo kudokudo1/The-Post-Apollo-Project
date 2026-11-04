@@ -7,6 +7,9 @@ on:
       - 'widgets/weather/StationCosmosCelestialNetworkPolicy.js'
       - 'widgets/weather/StationCosmosHeliocentricPane.qml'
       - 'widgets/weather/StationCosmosHeliocentricPolicy.js'
+      - 'widgets/weather/StationCosmosSolarOverviewPolicy.js'
+      - 'scripts/weather/celestial_solar_overview.py'
+      - 'tests/weather/test_cosmos_solar_overview_v4d.js'
       - 'services/weather/CelestialVisualQueryPolicy.js'
       - 'scripts/weather/celestial_spatial_data.py'
       - 'scripts/weather/celestial_visual_data.py'
@@ -40,6 +43,8 @@ jobs:
         run: |
           node --test tests/weather/test_cosmos_heliocentric_spatial_v4c.js
           node --test tests/weather/test_magick_celestial_query_m5c.js
+      - name: Verify V4d exact ten-body solar atlas and selectable AU rings
+        run: node --test tests/weather/test_cosmos_solar_overview_v4d.js
       - name: Preserve MAGICK M4/M5 sources and interaction behavior
         run: |
           node --test tests/weather/test_magick_celestial_visual_m5.js

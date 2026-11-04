@@ -47,7 +47,7 @@ fi
 # Hashes are the reviewed GitHub blobs, not a trust guarantee for plugins
 # or for executable files outside this narrow test boundary.
 if [[ "$(git hash-object -- "$qml")" != "2f678121aec04f763b0e130f937fec6af0ad2734" ||
-      "$(git hash-object -- "$scene")" != "a96e04e03c11283ca2816e3020a073cb273ac3da" ||
+      "$(git hash-object -- "$scene")" != "52d5228053e15191846f7dbad57a3441bda7033d" ||
       "$(git hash-object -- "$host")" != "40f96104ab48a56267bf4c6aab78bbb4d2a5b41c" ||
       "$(git hash-object -- "$fixture")" != "fe9707077db3e49c6d65edc9c01f9bb6ae2926df" ||
       "$(git hash-object -- "$cipher")" != "ede2a14684c15255244781d8897934472fd7fc2e" ]]; then
@@ -59,7 +59,7 @@ if [[ "$mode" == "--preflight" ]]; then
     exit 0
 fi
 
-for tool in dbus-run-session gnome-keyring-daemon secret-tool node timeout mktemp; do
+for tool in dbus-run-session gnome-keyring-daemon secret-tool node timeout mktemp gdbus; do
     if ! command -v "$tool" >/dev/null 2>&1; then
         printf 'M13L_REFUSED_REQUIRED_TOOL\n'
         exit 2
@@ -127,21 +127,105 @@ timeout --signal=TERM --kill-after=3s 60s \
     "$shell_binary" -p "$scene" >"$log" 2>&1
 native_code=$?
 set -e
-if [[ "$native_code" == "0" ]] &&
-   awk 'index($0,"M13L_NATIVE_QML_IPC_PASS") { found=1 }
-        END { exit !found }' "$log" &&
-   [[ ! -e "$HOME/m13g-disposable/draft.enc" ]] &&
-   ! secret-tool lookup service post-apollo-m13g-ci id M13gSynthetic001 >/dev/null 2>&1; then
+# Prove the *private bus and Secret Service owner* are still alive before
+# interpreting secret-tool's nonzero exit as "item absent". A broken bus may
+# otherwise look like successful cleanup.
+bus_owner="$(gdbus call --session \
+    --dest org.freedesktop.DBus --object-path /org/freedesktop/DBus \
+    --method org.freedesktop.DBus.NameHasOwner \
+    org.freedesktop.secrets 2>/dev/null || true)"
+owner_verified=0
+if [[ "$bus_owner" =~ ^\([[:space:]]*true[[:space:]]*,?[[:space:]]*\)$ ]]; then
+    owner_verified=1
+fi
+native_marker=0
+if awk 'index($0,"M13L_NATIVE_QML_IPC_PASS") { found=1 }
+        END { exit !found }' "$log"; then
+    native_marker=1
+fi
+file_clean=0
+if [[ ! -e "$HOME/m13g-disposable/draft.enc" ]]; then file_clean=1; fi
+key_clean=0
+if [[ "$owner_verified" == "1" ]] &&
+   ! secret-tool lookup service post-apollo-m13g-ci \
+       id M13gSynthetic001 >/dev/null 2>&1; then
+    key_clean=1
+fi
+
+if [[ "$native_code" == "0" &&
+      "$native_marker" == "1" &&
+      "$file_clean" == "1" &&
+      "$key_clean" == "1" ]]; then
     printf 'M13L_NATIVE_QML_IPC_AND_CLEANUP_PASS\n'
 else
     printf 'M13L_NATIVE_TEST_NOT_VERIFIED\n'
-    # Report fixed parser/error categories, not raw local logs or secrets.
-    if awk 'index($0,"is not a type") {found=1} END {exit !found}' "$log"; then
-        printf 'M13L_QML_TYPE_RESOLUTION_FAILURE\n'
-    elif [[ "$native_code" == "124" || "$native_code" == "137" ]]; then
-        printf 'M13L_NATIVE_TIMEOUT\n'
-    else
-        printf 'M13L_NATIVE_HOST_OR_QML_REFUSED\n'
+    printf 'M13L_NATIVE_EXIT_CODE_%s\n' "$native_code"
+    # Do not print raw QML logs; they can contain environmental paths.
+    # Only fixed markers and bounded, literal QML failure categories.
+    awk '
+      index($0,"M13L_PHASE_QML_COMPONENT_LOADED") { loaded=1 }
+      index($0,"M13L_PHASE_START_ATTEMPT") { tried=1 }
+      index($0,"M13L_PHASE_ENV_GATE_DENIED") { envdenied=1 }
+      index($0,"M13L_PHASE_PROCESS_START_REJECTED") { startdenied=1 }
+      index($0,"M13L_PHASE_PROCESS_START_ACCEPTED") { accepted=1 }
+      index($0,"M13L_PHASE_BRIDGE_BUSY") { busy=1 }
+      index($0,"M13L_PHASE_REPLY_PARSED") { parsed=1 }
+      index($0,"M13L_PHASE_BRIDGE_SETTLED") { settled=1 }
+      index($0,"M13L_PHASE_HOST_EXIT_UNVERIFIED") { exitbad=1 }
+      index($0,"M13L_PHASE_HOST_RESPONSE_INVALID") { responsebad=1 }
+      index($0,"M13L_PHASE_HOST_REQUEST_TIMEOUT") { hostrequesttimeout=1 }
+      index($0,"M13L_PHASE_HOST_REQUEST_INVALID") { hostrequestinvalid=1 }
+      index($0,"M13L_PHASE_HOST_PRIVATE_SESSION_REFUSED") { hostsessionrefused=1 }
+      index($0,"M13L_PHASE_HOST_ENCRYPT_REFUSED") { hostencryptrefused=1 }
+      index($0,"M13L_PHASE_HOST_REOPEN_REFUSED") { hostreopenrefused=1 }
+      index($0,"M13L_PHASE_HOST_MISSING_KEY_GATE_REFUSED") { hostmissingkeyrefused=1 }
+      index($0,"M13L_PHASE_HOST_CLEANUP_UNVERIFIED") { hostcleanupbad=1 }
+      index($0,"M13L_PHASE_QML_TIMER_EXPIRED") { qtmtime=1 }
+      index($0,"M13L_NATIVE_QML_IPC_REFUSED") { refused=1 }
+      index($0,"is not a type") { badtype=1 }
+      index($0,"ReferenceError") { badref=1 }
+      index($0,"TypeError") { badjs=1 }
+      index($0,"Failed to load configuration") { badload=1 }
+      END {
+        if(loaded) print "M13L_OBSERVED_QML_LOADED"
+        if(tried) print "M13L_OBSERVED_START_ATTEMPT"
+        if(accepted) print "M13L_OBSERVED_START_ACCEPTED"
+        if(busy) print "M13L_OBSERVED_BRIDGE_BUSY"
+        if(parsed) print "M13L_OBSERVED_REPLY_PARSED"
+        if(settled) print "M13L_OBSERVED_BRIDGE_SETTLED"
+        if(envdenied) print "M13L_QML_PRIVATE_ENV_GATE_DENIED"
+        if(startdenied) print "M13L_QML_START_REFUSED"
+        if(exitbad) print "M13L_QML_HOST_EXIT_UNVERIFIED"
+        if(responsebad) print "M13L_QML_HOST_RESPONSE_INVALID"
+        if(hostrequesttimeout) print "M13L_HOST_REQUEST_TIMEOUT"
+        if(hostrequestinvalid) print "M13L_HOST_REQUEST_INVALID"
+        if(hostsessionrefused) print "M13L_HOST_PRIVATE_SESSION_REFUSED"
+        if(hostencryptrefused) print "M13L_HOST_ENCRYPT_REFUSED"
+        if(hostreopenrefused) print "M13L_HOST_REOPEN_REFUSED"
+        if(hostmissingkeyrefused) print "M13L_HOST_MISSING_KEY_GATE_REFUSED"
+        if(hostcleanupbad) print "M13L_HOST_CLEANUP_UNVERIFIED"
+        if(qtmtime) print "M13L_QML_INTERNAL_TIMER_EXPIRED"
+        if(refused) print "M13L_QML_REFUSAL_OBSERVED"
+        if(badtype) print "M13L_QML_TYPE_RESOLUTION_FAILURE"
+        if(badref) print "M13L_QML_REFERENCE_ERROR"
+        if(badjs) print "M13L_QML_TYPE_ERROR"
+        if(badload) print "M13L_QML_LOAD_FAILED"
+      }' "$log"
+    if [[ "$owner_verified" != "1" ]]; then
+        printf 'M13L_PRIVATE_SECRET_SERVICE_OWNER_UNVERIFIED\n'
     fi
+    if [[ "$file_clean" != "1" ]]; then
+        printf 'M13L_TEST_CIPHERTEXT_CLEANUP_UNVERIFIED\n'
+    fi
+    if [[ "$key_clean" != "1" ]]; then
+        printf 'M13L_TEST_KEY_CLEANUP_UNVERIFIED\n'
+    fi
+    if [[ "$native_marker" != "1" ]]; then
+        printf 'M13L_QML_PASS_MARKER_MISSING\n'
+    fi
+    if [[ "$native_code" == "124" || "$native_code" == "137" ]]; then
+        printf 'M13L_NATIVE_TIMEOUT\n'
+    fi
+    printf 'M13L_NATIVE_DIAGNOSTIC_COMPLETE\n'
     exit 1
 fi

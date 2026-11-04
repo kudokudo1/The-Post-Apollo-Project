@@ -50,8 +50,10 @@ class FakeRequestLifecycle:
         if self._closed:
             return {"ok": False, "reason": "HOST_ALREADY_CLOSED"}
         result = self._host.start()
-        return ({"ok": True, "status": "FAKE_HOST_READY"}
-                if result == "C2D_FAKE_RUNTIME_READY" else NO_HOST.copy())
+        if result != "C2D_FAKE_RUNTIME_READY":
+            self._closed = True
+            return NO_HOST.copy()
+        return {"ok": True, "status": "FAKE_HOST_READY"}
 
     def _reconcile(self) -> None:
         r = self._request
@@ -80,6 +82,7 @@ class FakeRequestLifecycle:
         self._reconcile()
         if self._closed or self._host.state != "READY" or not self._host._live():
             self._host.stop()
+            self._closed = True
             return NO_HOST.copy()
         if type(ttl_ms) is not int or not 10 <= ttl_ms <= 60000:
             return {"ok": False, "reason": "INVALID_REQUEST_TTL"}

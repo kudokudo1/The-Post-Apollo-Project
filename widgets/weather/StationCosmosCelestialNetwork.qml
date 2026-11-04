@@ -13,6 +13,8 @@ Item {
     property string selectedBody: ""
     property bool neonEnabled: true
     property string selectedPairKey: ""
+    // V4b internally linked views; existing M4 sample and focus stay shared.
+    property string displayMode: "chords"
     property string hoverBody: ""
     property string hoverPairKey: ""
     readonly property var scene: Network.network(graphModel,focusIndex)
@@ -151,13 +153,14 @@ Item {
         anchors.margins: 7
         antialiasing: true
         renderTarget: Canvas.Image
+        visible: graph.displayMode === "chords"
         onPaint: graph.render(getContext("2d"))
     }
 
     MouseArea {
         id: hitArea
         anchors.fill: sceneCanvas
-        enabled: graph.scene.ready
+        enabled: graph.scene.ready && graph.displayMode === "chords"
         hoverEnabled: true
         acceptedButtons: Qt.LeftButton
         preventStealing: true
@@ -211,6 +214,26 @@ Item {
         }
     }
 
+    // V4b isolated depth projection. Keeps parent JPL model, source UTC
+    // index and body selection; introduces no additional calculation owner.
+    StationCosmosCelestialDepthPane {
+        id: depthPane
+        anchors.fill: sceneCanvas
+        visible: graph.displayMode === "depth"
+        graphModel: graph.graphModel
+        verifiedScene: graph.scene
+        focusIndex: graph.focusIndex
+        selectedBody: graph.selectedBody
+        neonEnabled: graph.neonEnabled
+        onBodyPicked: function(body) { graph.bodyPicked(body); }
+        onSampleScrubbed: function(originIndex,offsetPixels) {
+            graph.sampleScrubbed(originIndex,offsetPixels);
+        }
+        onZoomRequested: function(direction) {
+            graph.zoomRequested(direction);
+        }
+    }
+
     Column {
         anchors.right: parent.right
         anchors.rightMargin: 5
@@ -222,8 +245,34 @@ Item {
             width: parent.width
             font.pixelSize: 11
             color: Colors.magenta
-            text: "M4 // NETWORK"
+            text: graph.displayMode==="depth" ? "M4 // DEPTH" : "M4 // NETWORK"
             elide: Text.ElideRight
+        }
+        Row {
+            id: depthModes
+            width: parent.width
+            height: 23
+            spacing: 3
+            ActionButton {
+                width: Math.max(1,(depthModes.width-depthModes.spacing)/2)
+                height: 22
+                contentPadding: 0
+                labelPixelSize: 9
+                label: "CHORDS"
+                selected: graph.displayMode==="chords"
+                accentColor: Colors.magenta
+                onClicked: graph.displayMode="chords"
+            }
+            ActionButton {
+                width: Math.max(1,(depthModes.width-depthModes.spacing)/2)
+                height: 22
+                contentPadding: 0
+                labelPixelSize: 9
+                label: "DEPTH"
+                selected: graph.displayMode==="depth"
+                accentColor: Colors.cyan
+                onClicked: graph.displayMode="depth"
+            }
         }
         QuietText {
             width: parent.width
@@ -231,7 +280,9 @@ Item {
             color: graph.scene.ready?Colors.cyan:Colors.orange
             elide: Text.ElideRight
             text: graph.scene.ready
-                ? graph.scene.count+" BODIES // "+graph.scene.edges.length+" PAIRS"
+                ? graph.displayMode==="depth"
+                  ? graph.scene.count+" APPARENT SOURCE RAYS"
+                  : graph.scene.count+" BODIES // "+graph.scene.edges.length+" PAIRS"
                 : "SOURCE UNAVAILABLE"
         }
         QuietText {
@@ -249,16 +300,32 @@ Item {
             font.pixelSize: 9
             color: Colors.magenta
             wrapMode: Text.WordWrap
-            text: Network.pairLabel(graph.activePair)
+            text: graph.displayMode==="depth"
+                  ? depthPane.depthScene.ready
+                    ? "MAX RADIUS "+depthPane.depthScene.maxDistanceAu.toFixed(6)+" AU"
+                    : depthPane.depthScene.reason
+                  : Network.pairLabel(graph.activePair)
         }
         QuietText {
             width: parent.width
             font.pixelSize: 9
             color: Colors.cyan
             wrapMode: Text.WordWrap
-            text: graph.activePair && graph.activePair.aspects.length
-                  ? "M4 TAGS // "+graph.activePair.aspects.join(", ")
-                  : "M4 ASPECT TAGS // NONE"
+            text: graph.displayMode==="depth"
+                  ? depthPane.depthScene.ready
+                    ? "LAT / DISTANCE: "+depthPane.depthScene.count+" VERIFIED"
+                    : "NO APPARENT DISTANCE"
+                  : graph.activePair && graph.activePair.aspects.length
+                    ? "M4 TAGS // "+graph.activePair.aspects.join(", ")
+                    : "M4 ASPECT TAGS // NONE"
+        }
+        QuietText {
+            width: parent.width
+            visible: graph.displayMode==="depth"
+            font.pixelSize: 9
+            color: Colors.yellow
+            wrapMode: Text.WordWrap
+            text: depthPane.focusDetail
         }
         Repeater {
             model: graph.scene.ready?graph.scene.nodes:[]
@@ -269,7 +336,13 @@ Item {
                 contentPadding: 0
                 labelPixelSize: 9
                 label: Celestial.shortBodyName(modelData.body)
-                       +" "+modelData.longitude_deg.toFixed(2)+"°"
+                       +" "+(graph.displayMode==="depth"
+                             && depthPane.depthScene.ready
+                             ? depthPane.depthScene.points.filter(
+                                 function(p){return p.body===modelData.body;})
+                                 .map(function(p){return p.distance_au.toFixed(4)+" AU";})[0]
+                                 || "--"
+                             : modelData.longitude_deg.toFixed(2)+"°")
                 accentColor: Colors.cyan
                 selected: graph.selectedBody===modelData.body
                 onClicked: graph.bodyPicked(modelData.body)
@@ -280,7 +353,9 @@ Item {
             font.pixelSize: 9
             color: Colors.orange
             wrapMode: Text.WordWrap
-            text: "GEOCENTRIC ECLIPTIC LONGITUDES"
+            text: graph.displayMode==="depth"
+                  ? "APPARENT ECLIPTIC // GEOCENTRIC AU"
+                  : "GEOCENTRIC ECLIPTIC LONGITUDES"
         }
     }
 
@@ -292,6 +367,8 @@ Item {
         font.pixelSize: 9
         color: Colors.orange
         elide: Text.ElideRight
-        text: "NOT PHYSICAL ORBITS // DRAG TIME // WHEEL ZOOM TIME"
+        text: graph.displayMode==="depth"
+              ? "APPARENT RAY DISTANCES // NO PHYSICAL ORBITS"
+              : "NOT PHYSICAL ORBITS // DRAG TIME // WHEEL ZOOM TIME"
     }
 }

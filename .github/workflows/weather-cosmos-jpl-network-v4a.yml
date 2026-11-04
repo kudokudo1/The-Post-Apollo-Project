@@ -5,8 +5,11 @@ on:
     paths:
       - 'widgets/weather/StationCosmosCelestialNetwork.qml'
       - 'widgets/weather/StationCosmosCelestialNetworkPolicy.js'
+      - 'widgets/weather/StationCosmosCelestialDepthPane.qml'
+      - 'widgets/weather/StationCosmosCelestialDepthPolicy.js'
       - 'widgets/weather/StationMagickCelestialInstrument.qml'
       - 'tests/weather/test_cosmos_jpl_relationship_network_v4a.js'
+      - 'tests/weather/test_cosmos_apparent_depth_v4b.js'
       - '.github/workflows/weather-cosmos-jpl-network-v4a.yml'
   workflow_dispatch:
 
@@ -24,6 +27,8 @@ jobs:
           node-version: '22'
       - name: Verify V4a source-verified JPL network model and pointer contract
         run: node --test tests/weather/test_cosmos_jpl_relationship_network_v4a.js
+      - name: Verify V4b apparent geocentric AU depth data and shared selection
+        run: node --test tests/weather/test_cosmos_apparent_depth_v4b.js
       - name: Preserve MAGICK M4/M5 sources and interaction behavior
         run: |
           node --test tests/weather/test_magick_celestial_visual_m5.js

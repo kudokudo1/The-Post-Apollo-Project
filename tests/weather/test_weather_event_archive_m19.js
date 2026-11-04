@@ -293,18 +293,13 @@ assert.match(
 
 const station = read("widgets/weather/WeatherStationW.qml");
 assert.match(station, /property var eventArchiveStore: null/);
-assert.match(
-    station,
-    /StationDiscovery\s*\{[\s\S]*?domain: "map"[\s\S]*?eventArchiveStore: weatherStation\.eventArchiveStore/
-);
-const groundStart = station.indexOf("StationGround {");
-const skyStart = station.indexOf("StationSky {");
-const mapStart = station.indexOf("id: mapViewComponent");
-assert.ok(groundStart >= 0 && skyStart > groundStart && mapStart > skyStart);
-assert.doesNotMatch(
-    station.slice(groundStart, mapStart),
-    /eventArchiveStore:/
-);
+const navigator = read("widgets/weather/StationSubjectNavigator.qml");
+const earthPane = read("widgets/weather/StationEarthSubjectPane.qml");
+assert.match(station,/eventArchiveStore: weatherStation\.eventArchiveStore/);
+assert.match(navigator,/eventArchiveStore: browser\.eventArchiveStore/);
+assert.match(earthPane,/eventArchiveStore: earthPane\.eventArchiveStore/);
+assert.match(earthPane,/StationDiscovery\s*\{/);
+assert.ok(!station.includes("id: mapViewComponent"));
 
 const map = read("widgets/weather/StationDiscovery.qml");
 assert.match(map, /property var eventArchiveStore: null/);

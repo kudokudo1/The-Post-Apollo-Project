@@ -181,7 +181,7 @@ Column {
     Text {
         width: parent.width
         text: "SEARCH LOCAL ORGANIZATION RECORDS"
-        color: Colors.cyan
+        color: Colors.blue
         font.pixelSize: 11
         font.bold: true
         wrapMode: Text.WordWrap

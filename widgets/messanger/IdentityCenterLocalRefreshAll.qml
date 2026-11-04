@@ -147,7 +147,7 @@ Column {
     Text {
         width: parent.width
         text: "REFRESH LOCAL ORGANIZATION RECORDS"
-        color: Colors.cyan
+        color: Colors.green
         font.pixelSize: 11
         font.bold: true
         wrapMode: Text.WordWrap
@@ -167,7 +167,11 @@ Column {
         width: parent.width
         text: refreshPanel.displayedResult
         color: refreshPanel.failures.length > 0
-            ? Colors.orange : Colors.white
+            ? Colors.red
+            : refreshPanel.refreshInProgress || refreshPanel.busyCount > 0
+              ? Colors.yellow
+            : refreshPanel.lastRefreshResult.indexOf("REFRESH COMPLETE") === 0
+              ? Colors.green : Colors.white
         font.pixelSize: 10
         wrapMode: Text.WordWrap
     }

@@ -67,7 +67,7 @@ Column {
     Text {
         width: parent.width
         text: "MY STRUCTURE // LOCAL ORGANIZATION UNITS"
-        color: Colors.cyan
+        color: Colors.blue
         font.bold: true
         font.pixelSize: 12
         wrapMode: Text.WordWrap

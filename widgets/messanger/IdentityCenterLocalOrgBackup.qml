@@ -109,7 +109,7 @@ Column {
     Text {
         width: parent.width
         text: "LOCAL ORGANIZATION BACKUP // PRIVATE RECORDS"
-        color: Colors.cyan
+        color: Colors.yellow
         font.pixelSize: 11
         font.bold: true
         wrapMode: Text.WordWrap
@@ -207,7 +207,11 @@ Column {
         objectName: "orgBackupResult"
         width: parent.width
         text: backupPanel.resultText
-        color: backupPanel.resultKind === "error" ? Colors.orange : Colors.white
+        color: backupPanel.resultKind === "error" ? Colors.red
+             : backupPanel.resultKind === "verified" ? Colors.green
+             : backupPanel.resultKind === "saved" ? Colors.yellow
+             : backupPanel.resultKind === "busy" ? Colors.orange
+             : Colors.white
         font.pixelSize: 10
         wrapMode: Text.WordWrap
     }

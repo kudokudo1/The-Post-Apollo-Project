@@ -153,7 +153,7 @@ Column {
     Text {
         width: parent.width
         text: "LOCAL SAVE STATUS // ALL ORGANIZATION RECORDS"
-        color: Colors.cyan
+        color: Colors.yellow
         font.pixelSize: 11
         font.bold: true
         wrapMode: Text.WordWrap
@@ -165,7 +165,11 @@ Column {
         color: feedback.activeFailures.length > 0
                || feedback.lastKind === "error"
                || feedback.lastKind === "conflict"
-               ? Colors.orange : Colors.white
+               ? Colors.red
+               : feedback.savingCount > 0 || feedback.lastKind === "unconfirmed"
+                 || feedback.lastKind === "saving" ? Colors.yellow
+               : feedback.lastKind === "saved" || feedback.lastKind === "loaded"
+                 ? Colors.green : Colors.white
         font.pixelSize: 10
         wrapMode: Text.WordWrap
     }

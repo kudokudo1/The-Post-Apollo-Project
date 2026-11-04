@@ -39,7 +39,7 @@ Column {
     Text {
         width: parent.width
         text: "MY ORGANIZATIONS // LOCAL DIRECTORY"
-        color: Colors.cyan
+        color: Colors.orange
         font.pixelSize: 12
         font.bold: true
     }

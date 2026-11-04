@@ -51,7 +51,7 @@ Column {
     Text {
         width: parent.width
         text: "MY PORTFOLIOS // LOCAL GROUPS"
-        color: Colors.cyan
+        color: Colors.white
         font.bold: true
         font.pixelSize: 12
         wrapMode: Text.WordWrap

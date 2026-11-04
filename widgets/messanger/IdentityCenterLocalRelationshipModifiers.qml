@@ -369,7 +369,7 @@ Column {
         text: "ORGANIZATION LINKS // APPLY MODIFIER"
         font.pixelSize: 12
         font.bold: true
-        color: Colors.cyan
+        color: Colors.orange
         wrapMode: Text.WordWrap
     }
     Text {

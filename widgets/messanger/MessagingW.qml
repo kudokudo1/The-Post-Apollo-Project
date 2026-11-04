@@ -1702,7 +1702,8 @@ PanelWindow {
         // same chassis underneath Discord that X/browser apps already use.
         // The verified PHONE stage bay must be genuinely transparent.
         // Leave every other Social provider's ordinary fill unchanged.
-        fillOpacity: phonePane.stageHoleActive ? 0 : 0.20
+        fillOpacity: 0.20
+        fillVisible: !phonePane.stageHoleActive
         borderVisible: false
         radius: 0
 

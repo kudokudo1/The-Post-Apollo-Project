@@ -51,7 +51,7 @@ class SocialUserSettingsRailContracts(unittest.TestCase):
         self.assertIn("id: settingsPage", SELECTOR)
         self.assertIn("visible: appSelector.settingsOpen", SELECTOR)
         self.assertIn(
-            "bottom: statusMessage.visible ? statusMessage.top : settingsFooter.top",
+            "bottom: statusMessage.visible ? statusMessage.top : phoneFooter.top",
             SELECTOR,
         )
         self.assertIn("anchors.bottom: settingsFooter.top", SELECTOR)
@@ -65,7 +65,7 @@ class SocialUserSettingsRailContracts(unittest.TestCase):
         self.assertIn("Qt.Key_Escape", scope)
         self.assertIn("event.accepted = true", scope)
         self.assertIn("onSettingsOpenChanged:", HOST)
-        self.assertIn("appSelector.settingsOpen = false;\n        setGeometryWatch(menuOpen)", HOST)
+        self.assertIn("appSelector.settingsOpen = false;\n        appSelector.phoneOpen = false;\n        setGeometryWatch(menuOpen)", HOST)
         self.assertIn("const count = appSelector.visibleAppIndices.length;", HOST)
 
     def test_external_input_mask_and_routing_unchanged(self):

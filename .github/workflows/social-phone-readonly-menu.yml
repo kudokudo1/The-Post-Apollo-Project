@@ -1,0 +1,54 @@
+name: Social Phone Read-Only Menu
+
+on:
+  pull_request:
+    paths:
+      - 'services/phone/BlueFerryReadiness.py'
+      - 'widgets/messanger/PhonePane.qml'
+      - 'widgets/messanger/AppSelector.qml'
+      - 'widgets/messanger/MessagingW.qml'
+      - 'tests/phone/test_blueferry_readiness.py'
+      - 'tests/messaging/test_social_phone_menu_readonly.py'
+      - 'tests/messaging/test_social_user_settings_rail.py'
+      - 'tests/messaging/test_social_family_rail.py'
+      - 'tests/messaging/test_social_family_order_visibility.py'
+      - 'tests/messaging/test_social_family_manager.py'
+      - 'MODEL/contracts/social-phone-readonly-menu-v0.md'
+      - '.github/workflows/social-phone-readonly-menu.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'services/phone/BlueFerryReadiness.py'
+      - 'widgets/messanger/PhonePane.qml'
+      - 'widgets/messanger/AppSelector.qml'
+      - 'widgets/messanger/MessagingW.qml'
+      - 'tests/phone/test_blueferry_readiness.py'
+      - 'tests/messaging/test_social_phone_menu_readonly.py'
+      - 'tests/messaging/test_social_user_settings_rail.py'
+      - 'tests/messaging/test_social_family_rail.py'
+      - 'tests/messaging/test_social_family_order_visibility.py'
+      - 'tests/messaging/test_social_family_manager.py'
+      - 'MODEL/contracts/social-phone-readonly-menu-v0.md'
+      - '.github/workflows/social-phone-readonly-menu.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  phone-menu-readonly:
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    steps:
+      - uses: actions/checkout@v4
+      - name: Compile offline Python tests
+        run: python3 -m py_compile services/phone/BlueFerryReadiness.py tests/phone/test_blueferry_readiness.py tests/messaging/test_social_phone_menu_readonly.py
+      - name: Verify no phone-content or pairing operations
+        run: |
+          python3 -m unittest discover -s tests/phone -p 'test_blueferry_readiness.py' -v
+          python3 -m unittest discover -s tests/messaging -p 'test_social_phone_menu_readonly.py' -v
+          python3 -m unittest discover -s tests/messaging -p 'test_social_user_settings_rail.py' -v
+          python3 -m unittest discover -s tests/messaging -p 'test_social_family_rail.py' -v
+          python3 -m unittest discover -s tests/messaging -p 'test_social_family_order_visibility.py' -v
+          python3 -m unittest discover -s tests/messaging -p 'test_social_family_manager.py' -v
+          python3 -m unittest discover -s tests/messaging -p 'test_social_identity_store.py' -v

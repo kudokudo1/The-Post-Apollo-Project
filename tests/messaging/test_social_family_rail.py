@@ -38,8 +38,10 @@ class SocialFamilyRailSource(unittest.TestCase):
         self.assertIn('modelData.kind === "empty"', SELECTOR)
         self.assertIn('text: "NO FAMILIES', SELECTOR)
         self.assertIn("id: settingsFooter", SELECTOR)
+        self.assertIn("id: phoneFooter", SELECTOR)
+        self.assertIn("anchors.bottom: settingsFooter.top", SELECTOR)
         self.assertIn("anchors.bottom: parent.bottom", SELECTOR)
-        self.assertIn("bottom: statusMessage.visible ? statusMessage.top : settingsFooter.top",
+        self.assertIn("bottom: statusMessage.visible ? statusMessage.top : phoneFooter.top",
                       SELECTOR)
         self.assertIn("appSelector.settingsOpen = !appSelector.settingsOpen", SELECTOR)
 

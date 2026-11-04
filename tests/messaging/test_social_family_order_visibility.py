@@ -110,7 +110,7 @@ class SocialFamilyOrderVisibility(unittest.TestCase):
         self.assertEqual(SELECTOR.count("id: settingsFooter"),1)
         self.assertIn('label: "USER // SETTINGS"',SELECTOR)
         self.assertIn("model: appSelector.railRows",SELECTOR)
-        self.assertIn("bottom: statusMessage.visible ? statusMessage.top : settingsFooter.top",
+        self.assertIn("bottom: statusMessage.visible ? statusMessage.top : phoneFooter.top",
                       SELECTOR)
         section=SELECTOR.split('text: "BUTTON FAMILIES"',1)[1]
         for forbidden in ("appActivated(", "activateApp(", "FileView {",

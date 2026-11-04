@@ -22,6 +22,8 @@ Rectangle {
     // Entry-point shell only. Identity storage, credentials and family layouts
     // are deliberately reserved for subsequent operator-reviewed slices.
     property bool settingsOpen: false
+    // UI-only companion pane: not an app index, identity grant or adapter.
+    property bool phoneOpen: false
     // Local UI selection only. Not a sign-in state or authorized organization.
     property string settingsSection: "SOCIAL LAYOUT"
     // Browser identity sessions are explicitly opt-in and live in MessagingW.
@@ -376,6 +378,7 @@ Rectangle {
 
     onSettingsOpenChanged: {
         if (settingsOpen) {
+            phoneOpen = false;
             // Preserve the established editor as the default settings screen.
             settingsSection = "SOCIAL LAYOUT";
             appSelector.refreshAccountForm();
@@ -611,7 +614,7 @@ Rectangle {
             top: parent.top
             left: parent.left
             right: parent.right
-            bottom: statusMessage.visible ? statusMessage.top : settingsFooter.top
+            bottom: statusMessage.visible ? statusMessage.top : phoneFooter.top
         }
         contentWidth: width
         contentHeight: appColumn.height + 20
@@ -828,7 +831,7 @@ Rectangle {
                         MouseArea {
                             id: appMouse
                             // Preview remains visible but cannot switch live accounts.
-                            enabled: !appSelector.settingsOpen
+                            enabled: !appSelector.settingsOpen && !appSelector.phoneOpen
     
                             anchors.fill: parent
     
@@ -2502,6 +2505,27 @@ Rectangle {
         }
     }
 
+    // A companion Phone control, separate from provider app IDs and local
+    // Social identity/family metadata. No phone action executes on this click.
+    ActionButton {
+        id: phoneFooter
+        anchors.horizontalCenter: parent.horizontalCenter
+        anchors.bottom: settingsFooter.top
+        anchors.bottomMargin: 4
+        width: parent.width - 12
+        height: 38
+        label: "PHONE"
+        labelPixelSize: 10
+        contentPadding: 2
+        accentColor: Colors.green
+        selected: appSelector.phoneOpen
+        onTriggered: {
+            const next = !appSelector.phoneOpen;
+            appSelector.settingsOpen = false;
+            appSelector.phoneOpen = next;
+        }
+    }
+
     // This entry point is always visible, independently of app scrolling and
     // status/error text. Its click must never activate a provider app index.
     ActionButton {
@@ -2526,7 +2550,7 @@ Rectangle {
         id: statusMessage
         anchors.left: parent.left
         anchors.right: parent.right
-        anchors.bottom: settingsFooter.top
+        anchors.bottom: phoneFooter.top
         anchors.margins: 6
         visible: appSelector.statusText !== ""
         text: appSelector.statusText

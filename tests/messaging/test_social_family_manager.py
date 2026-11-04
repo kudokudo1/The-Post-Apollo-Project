@@ -45,8 +45,12 @@ class SocialFamilyManagerContracts(unittest.TestCase):
         self.assertIn('label: "↓"', SELECTOR)
         self.assertEqual(SELECTOR.count('id: settingsFooter'), 1)
         self.assertIn('appSelector.settingsOpen = !appSelector.settingsOpen', SELECTOR)
-        self.assertIn('bottom: statusMessage.visible ? statusMessage.top : settingsFooter.top',
+        # PHONE sits above Settings; the existing rail is still scrollable
+        # and preserves both footer entry points within one Social window.
+        self.assertIn('bottom: statusMessage.visible ? statusMessage.top : phoneFooter.top',
                       SELECTOR)
+        self.assertIn('id: phoneFooter', SELECTOR)
+        self.assertIn('anchors.bottom: settingsFooter.top', SELECTOR)
         self.assertIn("enabled: !appSelector.settingsOpen", SELECTOR)
         self.assertNotIn('FloatingWindow {', SELECTOR)
 

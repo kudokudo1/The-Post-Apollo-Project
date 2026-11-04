@@ -249,6 +249,7 @@ Column {
                     onTriggered: tray.restore(archivedRow.modelData)
                 }
                 IdentityCenterLocalActionButton {
+                    objectName: "orgArchiveRemoveAction"
                     role: "danger"
                     width: 153
                     height: 28

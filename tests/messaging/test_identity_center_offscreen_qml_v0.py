@@ -1099,8 +1099,9 @@ class RealQtOrganizationsSettingsPaneSmoke(unittest.TestCase):
 
         # Red removal is a separate action from green Restore; no backend
         # writes were performed with this disposable QML process stub.
-        danger_buttons = [b for b in self.sections.findChildren(QObject)
-                          if b.property("label") == "REMOVE PERMANENTLY"]
+        danger_buttons = [b for b in self._objects()
+                          if b.property("objectName") == "orgArchiveRemoveAction"
+                          and b.property("label") == "REMOVE PERMANENTLY"]
         self.assertGreaterEqual(len(danger_buttons), 1)
         for button in danger_buttons:
             self.assertEqual(button.property("role"), "danger")

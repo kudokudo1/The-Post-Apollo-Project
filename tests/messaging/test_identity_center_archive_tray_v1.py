@@ -30,6 +30,7 @@ class ArchiveTrayV1(unittest.TestCase):
         self.assertIn("ARCHIVE TRAY ABOVE", SEARCH)
 
     def test_explicit_red_removal_and_double_confirmation(self):
+        self.assertIn('objectName: "orgArchiveRemoveAction"', TRAY)
         self.assertIn('role: "danger"', TRAY)
         self.assertIn('role: "refresh"', TRAY)
         self.assertIn('label: "RESTORE"', TRAY)

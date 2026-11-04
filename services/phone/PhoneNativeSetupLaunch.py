@@ -28,15 +28,17 @@ TERMINALS = (
     ("alacritty", ("-e",)),
     ("konsole", ("-e",)),
 )
+STAGE_APP_ID = "post-apollo-social-phone-setup"
 STATUS = frozenset({"OPEN_REQUESTED", "CLIENT_UNAVAILABLE", "LAUNCH_FAILED"})
 
 
-def _result(target: str, status: str) -> dict[str, object]:
+def _result(target: str, status: str, *, stage_candidate: bool = False) -> dict[str, object]:
     return {
         "schema": SCHEMA,
         "execution": "USER_INITIATED_NATIVE_SETUP",
         "target": target,
         "status": status,
+        "stageCandidate": stage_candidate,
         "trustedPhoneLink": "UNVERIFIED",
         "routeEligible": False,
         "contentAccessEnabled": False,
@@ -100,15 +102,20 @@ def open_setup(
                 if type(terminal_path) is not str or not os.path.isabs(terminal_path):
                     continue
                 try:
+                    command = ([terminal_path, "--app-id", STAGE_APP_ID,
+                                *flags, wizard, "pair-setup"]
+                               if terminal == "foot"
+                               else [terminal_path, *flags, wizard, "pair-setup"])
                     launcher(
-                        [terminal_path, *flags, wizard, "pair-setup"],
+                        command,
                         stdin=subprocess.DEVNULL,
                         stdout=subprocess.DEVNULL,
                         stderr=subprocess.DEVNULL,
                         start_new_session=True,
                         close_fds=True,
                     )
-                    return _result(target, "OPEN_REQUESTED")
+                    return _result(target, "OPEN_REQUESTED",
+                                   stage_candidate=terminal == "foot")
                 except Exception:
                     launch_failed = True
     return _result(target, "LAUNCH_FAILED" if launch_failed else "CLIENT_UNAVAILABLE")

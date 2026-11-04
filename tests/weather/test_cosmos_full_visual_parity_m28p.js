@@ -148,7 +148,8 @@ test("full native routes still render through single original panel loader with 
   assert.match(sky,/contentHeight: Math\.max\(height, skyContent\.y \+ skyContent\.implicitHeight \+ 12\)/);
   assert.match(space,/contentHeight: Math\.max\(height, spaceContent\.y \+ spaceContent\.implicitHeight \+ 12\)/);
   assert.match(surface,/StationCosmosSubjectPane\s*\{/);
-  assert.match(rootStation,/active: !weatherStation\.subjectNavigationOpen/);
+  assert.ok(!rootStation.includes("weatherContentLoader"));
+  assert.match(rootStation,/StationSubjectNavigator\s*\{/);
 });
 
 test("partial details retain the original fine-grained source gates, no unrecognized route opens a provider",()=>{

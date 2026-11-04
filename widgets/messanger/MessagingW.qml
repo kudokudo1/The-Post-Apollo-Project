@@ -1717,11 +1717,15 @@ PanelWindow {
                 // The in-rail settings sheet is not an application.
                 // Escape returns to the app rail; other keys must not invisibly
                 // activate apps while their buttons are hidden.
-                if (appSelector.settingsOpen || appSelector.phoneOpen) {
-                    if (event.key === Qt.Key_Escape) {
+                if (appSelector.settingsOpen) {
+                    if (event.key === Qt.Key_Escape)
                         appSelector.settingsOpen = false;
+                    event.accepted = true;
+                    return;
+                }
+                if (appSelector.phoneOpen) {
+                    if (event.key === Qt.Key_Escape)
                         appSelector.phoneOpen = false;
-                    }
                     event.accepted = true;
                     return;
                 }

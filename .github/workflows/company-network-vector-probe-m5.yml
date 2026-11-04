@@ -21,6 +21,7 @@ jobs:
           python3 -m unittest discover -s tests/company -p 'test_company_vector_probe_m5.py' -v
           python3 -m unittest discover -s tests/company -p 'test_company_vector_style_m7.py' -v
           python3 -m unittest discover -s tests/company -p 'test_company_native_online_m8.py' -v
+          python3 -m unittest discover -s tests/company -p 'test_company_vector_locality_m9.py' -v
 
   native-qt:
     # All Qt/MapLibre downloads happen on the disposable GitHub runner.

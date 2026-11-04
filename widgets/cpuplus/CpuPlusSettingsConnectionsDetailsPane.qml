@@ -340,6 +340,50 @@ Item {
                         font.pixelSize: 9
                         wrapMode: Text.WordWrap
                     }
+                    Rectangle {
+                        width: parent.width
+                        height: 1
+                        color: Colors.cyan
+                    }
+                    GohuText {
+                        width: parent.width
+                        text: "LOCAL HOST // UNVERIFIED"
+                        color: Colors.magenta
+                        font.pixelSize: 10
+                        wrapMode: Text.WordWrap
+                    }
+                    ActionButton {
+                        width: Math.min(parent.width, 185)
+                        height: 30
+                        label: ConnectionsHostObservation.checking
+                               ? "CHECKING LOCAL HOST..."
+                               : "INSPECT LOCAL HOST"
+                        labelPixelSize: 10
+                        accentColor: Colors.cyan
+                        available: !ConnectionsHostObservation.checking
+                        onClicked: ConnectionsHostObservation.inspect()
+                    }
+                    QuietText {
+                        width: parent.width
+                        text: ConnectionsHostObservation.observation.label
+                        font.pixelSize: 9
+                        wrapMode: Text.WordWrap
+                    }
+                    QuietText {
+                        visible: ConnectionsHostObservation.observation.state !== ""
+                        width: parent.width
+                        text: ConnectionsHostObservation.observation.stateLabel
+                        color: Colors.orange
+                        font.pixelSize: 9
+                        wrapMode: Text.WordWrap
+                    }
+                    QuietText {
+                        width: parent.width
+                        text: "LOCAL SOCKET OBSERVATION IS NOT HOST AUTHENTICATION. NO KEYS OR PERMISSIONS SHARED."
+                        color: Colors.orange
+                        font.pixelSize: 9
+                        wrapMode: Text.WordWrap
+                    }
                 }
             }
 

@@ -551,6 +551,29 @@ PanelWindow {
                     }
                     Row {
                         width: parent.width
+                        height: 34
+                        spacing: 8
+                        GohuText {
+                            width: 110
+                            height: 32
+                            verticalAlignment: Text.AlignVCenter
+                            color: Colors.cyan
+                            font.pixelSize: 11
+                            text: "CAMERA DEVICE"
+                        }
+                        ComboBox {
+                            id: webcamSelector
+                            width: parent.width - 118
+                            height: 32
+                            model: camera.statusReport && camera.statusReport.videoDevices
+                                   ? camera.statusReport.videoDevices : []
+                            onActivated: function(index) {
+                                camera.webcamDevice = String(webcamSelector.textAt(index));
+                            }
+                        }
+                    }
+                    Row {
+                        width: parent.width
                         height: 43
                         spacing: 8
                         ActionButton {
@@ -611,7 +634,8 @@ PanelWindow {
                         height: 23
                         font.pixelSize: 10
                         color: Colors.cyan
-                        text: "WEBCAM // /dev/video*  ·  SCREEN // wf-recorder  ·  VIDEO // ~/Videos/Post-Apollo"
+                        text: "WEBCAM // FFmpeg " + (camera.statusReport && camera.statusReport.ffmpeg ? "READY" : "MISSING")
+                              + " · SCREEN // " + (camera.statusReport && camera.statusReport.wfRecorder ? "READY" : "MISSING")
                         elide: Text.ElideRight
                     }
                     GohuText {

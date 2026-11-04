@@ -1,0 +1,48 @@
+name: Connections C2b fake-only NASA credential transport
+
+on:
+  pull_request:
+    paths:
+      - "tests/connections/fixtures/C2bFakeBrokerOnly.cjs"
+      - "tests/connections/fixtures/C2bSecretServiceIsolated.sh"
+      - "tests/connections/test_connections_c2b_fake_only.cjs"
+      - ".github/workflows/connections-c2b-fake-nasa-broker.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  static-boundary:
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: No accidental keyring invocation and production grant remains closed
+        run: node tests/connections/test_connections_c2b_fake_only.cjs
+      - name: Preserve C2a and Social account read-only contract
+        run: |
+          node tests/cpuplus/test_connections_broker_c2a.js
+          node tests/cpuplus/test_cpuplus_connections_c1.js
+          python3 tests/cpuplus/test_connections_broker_probe_c2a.py
+
+  real-disposable-keyring:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Install keyring only in isolated GitHub runner
+        run: |
+          sudo apt-get update -qq
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+            dbus dbus-x11 gnome-keyring libsecret-tools libglib2.0-bin
+      - name: Simulated NASA hotspot action using real disposable Secret Service
+        run: dbus-run-session -- bash tests/connections/fixtures/C2bSecretServiceIsolated.sh
+      - name: Preserve Tasks Secret Service separation
+        run: node tests/connections/test_connections_c2b_fake_only.cjs

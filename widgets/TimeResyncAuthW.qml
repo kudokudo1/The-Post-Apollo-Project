@@ -70,7 +70,7 @@ PanelWindow {
         // (handled by TimeSettings' delayed fallback).
         onIsRegisteredChanged: {
             if (isRegistered)
-                TimeSettings.launchResyncAfterAgentReady();
+                TimeSettings.launchResyncAfterAgentReady(true);
         }
         onFlowChanged: {
             authWindow.clearSecret();
@@ -78,7 +78,7 @@ PanelWindow {
         }
         Component.onCompleted: {
             if (isRegistered)
-                TimeSettings.launchResyncAfterAgentReady();
+                TimeSettings.launchResyncAfterAgentReady(true);
         }
     }
 

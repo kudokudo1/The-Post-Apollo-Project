@@ -1,0 +1,34 @@
+name: CPU++ C2a credential broker boundaries
+
+on:
+  pull_request:
+    paths:
+      - "services/connections/ConnectionsBroker*"
+      - "services/connections/ConnectionsSecretServiceProbe.py"
+      - "services/connections/qmldir"
+      - "widgets/cpuplus/CpuPlusSettingsConnectionsDetailsPane.qml"
+      - "tests/cpuplus/test_connections_broker_c2a.js"
+      - "tests/cpuplus/test_connections_broker_probe_c2a.py"
+      - ".github/workflows/cpuplus-connections-broker-c2a.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  security-contracts:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Verify deny-by-default provider scopes and QML boundary
+        run: node tests/cpuplus/test_connections_broker_c2a.js
+      - name: Verify safe D-Bus health probe cannot activate or read secrets
+        run: python3 tests/cpuplus/test_connections_broker_probe_c2a.py
+      - name: Preserve C1 registry and Social metadata boundaries
+        run: |
+          node tests/cpuplus/test_cpuplus_connections_c1.js
+          python3 tests/tasks/test_task_secret_service_probe_m13g.py

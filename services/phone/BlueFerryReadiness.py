@@ -43,7 +43,10 @@ def _service_state(unit: str, *, user: bool = False) -> str:
 
 def readiness() -> dict[str, object]:
     package = _read_command(["rpm", "-q", "blueferry-backend"])
-    adapter = _read_command(["bluetoothctl", "show"])
+    bluetooth_state = _service_state("bluetooth.service")
+    # bluetoothctl may D-Bus-activate bluetoothd on some hosts. Only inspect
+    # the controller if the system service was already active.
+    adapter = _read_command(["bluetoothctl", "show"]) if bluetooth_state == "active" else ""
     powered: bool | None = None
     for line in adapter.splitlines():
         if line.strip() == "Powered: yes":
@@ -56,7 +59,7 @@ def readiness() -> dict[str, object]:
         "schema": SCHEMA,
         "execution": "READ_ONLY",
         "blueferryInstalled": package.startswith("blueferry-backend-"),
-        "bluetoothService": _service_state("bluetooth.service"),
+        "bluetoothService": bluetooth_state,
         "controllerPowered": powered,
         "configurationPresent": (
             Path(os.path.expanduser("~/.config/blueferry/local.env")).is_file()

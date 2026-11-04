@@ -450,8 +450,6 @@ Item {
             Row {
                 width: parent.width
                 spacing: 8
-                height: 32
-
                 visible: pane.showResyncDiagnostics
                 height: visible ? 32 : 0
 

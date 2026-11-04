@@ -15,6 +15,8 @@
 #include <algorithm>
 #include <cmath>
 #include <QFile>
+#include <QProcess>
+#include <QRegularExpression>
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QJsonArray>
@@ -40,6 +42,12 @@ int main(int argc, char **argv) {
     const bool mockHub = args.contains("--mock-hub");
     const bool fixtureHubs = args.contains("--fixture-hubs");
     const bool benchMotion = args.contains("--bench-pan-zoom");
+    // Explicit local owner-only view switch, NOT enterprise authentication.
+    const bool ownerLocalHubs = args.contains("--owner-local-hubs");
+    if (ownerLocalHubs && (mockHub || fixtureHubs)) {
+        qCritical() << "OWNER_VIEW_MUST_NOT_COMBINE_WITH_TEST_HUBS";
+        return 14;
+    }
     if (fixtureHubs && !anyOnline) {
         qCritical() << "FIXTURE_HUBS_REQUIRE_EXPLICIT_ONLINE_MODE";
         return 8;
@@ -146,6 +154,88 @@ int main(int argc, char **argv) {
         qInfo() << "SYNTHETIC_FIXTURE_VALIDATED" << fixtureRecords.size();
     }
 
+    // Explicit one-shot read. No socket, daemon, arbitrary file path,
+    // background refresh, persistence, provider upload or auto-centering.
+    // The projection subprocess itself enforces same-UID/nonroot access.
+    QVariantList ownerRecords;
+    if (ownerLocalHubs) {
+        QProcess ownerReader;
+        ownerReader.setProgram(QStringLiteral("/usr/bin/python3"));
+        ownerReader.setArguments({
+            QStringLiteral(COMPANY_OWNER_MAP_READONLY_SCRIPT),
+            QStringLiteral("--owner-local-view")
+        });
+        ownerReader.start();
+        if (!ownerReader.waitForStarted(1500)
+                || !ownerReader.waitForFinished(4000)) {
+            if (ownerReader.state() != QProcess::NotRunning) {
+                ownerReader.kill();
+                ownerReader.waitForFinished(1000);
+            }
+            qCritical() << "OWNER_LOCAL_PROJECTION_UNAVAILABLE";
+            return 13;
+        }
+        const QByteArray stdoutData = ownerReader.readAllStandardOutput();
+        if (ownerReader.exitStatus()!=QProcess::NormalExit
+                || ownerReader.exitCode()!=0
+                || stdoutData.size()>32768 || stdoutData.isEmpty()) {
+            qCritical() << "OWNER_LOCAL_PROJECTION_REFUSED";
+            return 13;
+        }
+        QJsonParseError parseError;
+        const QJsonDocument output = QJsonDocument::fromJson(stdoutData, &parseError);
+        if (parseError.error != QJsonParseError::NoError || !output.isObject()) {
+            qCritical() << "OWNER_LOCAL_RESPONSE_INVALID";
+            return 13;
+        }
+        const QJsonObject rootDoc=output.object();
+        if (rootDoc.size()!=2 || rootDoc.value("ok")!=QJsonValue(true)
+                || !rootDoc.value("document").isObject()) {
+            qCritical() << "OWNER_LOCAL_RESPONSE_INVALID";
+            return 13;
+        }
+        const QJsonObject result=rootDoc.value("document").toObject();
+        const QJsonArray hubs=result.value("hubs").toArray();
+        if (result.size()!=4
+                || result.value("schema").toString() !=
+                     QStringLiteral("post-apollo.company-map.owner-local-v1")
+                || result.value("authority").toString() !=
+                     QStringLiteral("OWNER_LOCAL_ONLY_NOT_ORGANIZATION_GRANT")
+                || !result.value("revision").isDouble()
+                || !result.value("hubs").isArray()
+                || hubs.size()>150) {
+            qCritical() << "OWNER_LOCAL_SCHEMA_REFUSED";
+            return 13;
+        }
+        QSet<QString> seen;
+        const QRegularExpression hubIdPattern(QStringLiteral("^hub-[1-9][0-9]{0,7}$"));
+        for (const auto &row: hubs) {
+            if (!row.isObject()) return 13;
+            const auto hub=row.toObject();
+            const QString id=hub.value("id").toString();
+            if (hub.size()!=4 || !hubIdPattern.match(id).hasMatch()
+                    || seen.contains(id) || hub.value("reported")!=QJsonValue(true)
+                    || !hub.value("latitude").isDouble()
+                    || !hub.value("longitude").isDouble()) {
+                qCritical() << "OWNER_LOCAL_RECORD_REFUSED";
+                return 13;
+            }
+            const double lat=hub.value("latitude").toDouble();
+            const double lon=hub.value("longitude").toDouble();
+            if (!qIsFinite(lat) || !qIsFinite(lon)
+                    || lat < -85.05112878 || lat > 85.05112878
+                    || lon < -180 || lon > 180) {
+                qCritical() << "OWNER_LOCAL_COORDINATES_REFUSED";
+                return 13;
+            }
+            seen.insert(id);
+            ownerRecords.append(QVariantMap{
+                {"id", id}, {"latitude", lat}, {"longitude", lon}});
+        }
+        // Only count is logged. Never coordinates, Company labels or IDs.
+        qInfo() << "OWNER_LOCAL_PROJECTION_VALIDATED" << ownerRecords.size();
+    }
+
     QQmlApplicationEngine engine;
     engine.rootContext()->setContextProperty("probeStyleUrl", styleUrl.toString());
     engine.rootContext()->setContextProperty("probeOnline", anyOnline);
@@ -153,6 +243,8 @@ int main(int argc, char **argv) {
     engine.rootContext()->setContextProperty("probeSample", sample);
     engine.rootContext()->setContextProperty("probeMockHub", mockHub);
     engine.rootContext()->setContextProperty("probeFixtureHubs", fixtureRecords);
+    engine.rootContext()->setContextProperty("probeOwnerLocalHubs", ownerRecords);
+    engine.rootContext()->setContextProperty("probeOwnerLocalMode", ownerLocalHubs);
     engine.rootContext()->setContextProperty("probeBenchMotion", benchMotion);
     engine.load(QUrl(QStringLiteral("qrc:/CompanyVectorProbe/main.qml")));
     if (engine.rootObjects().isEmpty()) {

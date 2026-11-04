@@ -16,7 +16,7 @@ class NativeSetupUiTests(unittest.TestCase):
         self.assertIn('id: connectPhoneAction', self.ui)
         self.assertIn('label: setupProcess.running ? "CHECKING..." : "CONNECT PHONE"', self.ui)
         self.assertEqual(self.ui.count('id: connectPhoneAction'), 1)
-        self.assertIn('label: "SET UP IPHONE"', self.ui)
+        self.assertIn('? "OPEN IPHONE" : "SET UP IPHONE"', self.ui)
         self.assertIn('label: "SET UP ANDROID"', self.ui)
         self.assertIn('onTriggered: phonePane.openNativeSetup("iphone")', self.ui)
         self.assertIn('onTriggered: phonePane.openNativeSetup("android")', self.ui)

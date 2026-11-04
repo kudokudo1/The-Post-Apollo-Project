@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import json
 import os
+from pathlib import Path
 import shutil
 import subprocess
 import sys
@@ -29,6 +30,12 @@ TERMINALS = (
     ("konsole", ("-e",)),
 )
 STAGE_APP_ID = "post-apollo-social-phone-setup"
+
+
+def _has_blueferry_configuration() -> bool:
+    # BlueFerry owns this file and the OS bond. Never read its identifiers or
+    # create a second phone registry. File presence is NOT proof of pairing.
+    return Path(os.path.expanduser("~/.config/blueferry/local.env")).is_file()
 STATUS = frozenset({"OPEN_REQUESTED", "CLIENT_UNAVAILABLE", "LAUNCH_FAILED"})
 
 
@@ -50,6 +57,7 @@ def open_setup(
     *,
     find_executable: Callable[[str], str | None] = shutil.which,
     launcher: Callable[..., Any] = subprocess.Popen,
+    configured: Callable[[], bool] = _has_blueferry_configuration,
 ) -> dict[str, object]:
     """Launch a known desktop client or explicit native pairing wizard; no shell.
 
@@ -94,6 +102,15 @@ def open_setup(
         except Exception:
             wizard = None
         if type(wizard) is str and os.path.isabs(wizard):
+            try:
+                existing_config = configured() is True
+            except Exception:
+                # Unknown config state must NEVER launch the forget/re-pair
+                # wizard. A normal TUI is the safer client fallback.
+                existing_config = True
+            # A present BlueFerry config is handled by its normal terminal
+            # CLIENT, not by re-running its forget/re-pair wizard.
+            client_command = "tui" if existing_config else "pair-setup"
             for terminal, flags in TERMINALS:
                 try:
                     terminal_path = find_executable(terminal)
@@ -103,9 +120,9 @@ def open_setup(
                     continue
                 try:
                     command = ([terminal_path, "--app-id", STAGE_APP_ID,
-                                *flags, wizard, "pair-setup"]
+                                *flags, wizard, client_command]
                                if terminal == "foot"
-                               else [terminal_path, *flags, wizard, "pair-setup"])
+                               else [terminal_path, *flags, wizard, client_command])
                     launcher(
                         command,
                         stdin=subprocess.DEVNULL,

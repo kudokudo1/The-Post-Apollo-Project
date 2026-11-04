@@ -47,7 +47,7 @@ class UnifiedPhoneLayoutTests(unittest.TestCase):
                       self.phone)
         self.assertIn('onTriggered: phonePane.startSetup()', self.phone)
         self.assertIn('anchors.right: parent.right', self.phone)
-        self.assertIn('label: "SET UP IPHONE"', self.phone)
+        self.assertIn('? "OPEN IPHONE" : "SET UP IPHONE"', self.phone)
         self.assertIn('label: "SET UP ANDROID"', self.phone)
 
     def test_setup_still_requires_explicit_action(self):
@@ -75,7 +75,7 @@ class UnifiedPhoneLayoutTests(unittest.TestCase):
 
     def test_gui_launcher_has_cli_fallback_not_bluez_mutation(self):
         self.assertIn('"blueferry-quickshell"', self.launcher)
-        self.assertIn('[terminal_path, *flags, wizard, "pair-setup"]',
+        self.assertIn('client_command = "tui" if existing_config else "pair-setup"',
                       self.launcher)
         self.assertIn('if target == "iphone":', self.launcher)
         self.assertNotIn('bluetoothctl pair', self.launcher)

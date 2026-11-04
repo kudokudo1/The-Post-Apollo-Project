@@ -21,6 +21,21 @@ Rectangle {
     property bool detailsOpen: false
     property string nativeSetupTarget: ""
     property string nativeSetupStatus: "IDLE"
+    property var savedBridgeState: ({})
+    property string savedBridgeCheck: "NOT CHECKED"
+
+    function refreshSavedBridgeState() {
+        if (!visible || savedBridgeProcess.running)
+            return;
+        savedBridgeCheck = "CHECKING";
+        savedBridgeState = ({});
+        savedBridgeProcess.command = [
+            "python3",
+            Quickshell.shellPath("services/phone/PhoneSavedBridgeState.py"),
+            "--inspect"
+        ];
+        savedBridgeProcess.running = true;
+    }
     property bool stageWanted: false
     property string stageState: "IDLE"
     property int stagePollCount: 0
@@ -59,6 +74,8 @@ Rectangle {
         stageWanted = false;
         stageState = "IDLE";
         stagePollCount = 0;
+        if (visible && selectedSection === "DEVICE")
+            refreshSavedBridgeState();
         if (!stageCloseProcess.running) {
             stageCloseProcess.command = [
                 "python3",
@@ -139,6 +156,7 @@ Rectangle {
         setupReport = ({});
         nativeSetupStatus = "IDLE";
         nativeSetupTarget = "";
+        refreshSavedBridgeState();
         setupProcess.command = [
             "python3",
             Quickshell.shellPath("services/phone/PhoneSetupReadiness.py"),
@@ -171,6 +189,8 @@ Rectangle {
             detailsOpen = false;
             nativeSetupStatus = "IDLE";
             nativeSetupTarget = "";
+            savedBridgeCheck = "NOT CHECKED";
+            savedBridgeState = ({});
             stageWanted = false;
             stageState = "IDLE";
             stagePollCount = 0;
@@ -253,6 +273,57 @@ Rectangle {
     }
 
     Process {
+        id: savedBridgeProcess
+        stdout: StdioCollector {
+            onStreamFinished: {
+                if (!phonePane.visible || phonePane.savedBridgeCheck !== "CHECKING")
+                    return;
+                try {
+                    var next = JSON.parse(String(text || ""));
+                    var states = [
+                        "NO_LOCAL_CONFIGURATION", "CONFIGURATION_PRESENT_BACKEND_INACTIVE",
+                        "CONFIGURATION_PRESENT_BACKEND_UNVERIFIED", "BACKEND_REPORTED",
+                        "UNAVAILABLE"
+                    ];
+                    var backendStates = [
+                        "active", "inactive", "failed", "activating",
+                        "deactivating", "unknown"
+                    ];
+                    var startupStates = [
+                        "enabled", "enabled-runtime", "disabled", "static",
+                        "indirect", "masked", "masked-runtime", "generated",
+                        "linked", "linked-runtime", "transient", "alias", "unknown"
+                    ];
+                    if (next.schema !== "post-apollo.phone.saved-bridge-state.v0"
+                            || next.execution !== "READ_ONLY_LOCAL_LIFECYCLE"
+                            || states.indexOf(next.state) < 0
+                            || next.trustedPhoneLink !== "UNVERIFIED"
+                            || next.contentAccessEnabled !== false
+                            || (next.configurationPresent !== null
+                                && typeof next.configurationPresent !== "boolean")
+                            || backendStates.indexOf(next.backendService) < 0
+                            || startupStates.indexOf(next.startup) < 0
+                            || ["ACTIVE_BACKEND_REPORT", "INACTIVE_BACKEND_REPORT",
+                                "UNVERIFIED"].indexOf(next.messageProfile) < 0
+                            || ["ACTIVE_BACKEND_REPORT", "INACTIVE_BACKEND_REPORT",
+                                "UNVERIFIED"].indexOf(next.contactsProfile) < 0)
+                        throw new Error("Unexpected local lifecycle result");
+                    phonePane.savedBridgeState = next;
+                    phonePane.savedBridgeCheck = "CHECKED";
+                } catch (error) {
+                    phonePane.savedBridgeState = ({});
+                    phonePane.savedBridgeCheck = "UNAVAILABLE";
+                }
+            }
+        }
+        onExited: function(exitCode) {
+            if (phonePane.visible && phonePane.savedBridgeCheck === "CHECKING"
+                    && exitCode !== 0)
+                phonePane.savedBridgeCheck = "UNAVAILABLE";
+        }
+    }
+
+    Process {
         id: nativeSetupProcess
         stdout: StdioCollector {
             onStreamFinished: {
@@ -307,7 +378,14 @@ Rectangle {
                         throw new Error("Invalid Stage Director result");
                     if (result.state === "ALIGNED" && result.verifiedHole === true)
                         phonePane.stageState = "ALIGNED";
-                    else if (result.state === "POSITION_REQUESTED"
+                    else if (result.state === "ACTOR_NOT_FOUND"
+                             && phonePane.stageState === "ALIGNED") {
+                        // The staged terminal exited. That is not evidence of
+                        // phone disconnection. Refresh the local service state.
+                        phonePane.stageWanted = false;
+                        phonePane.stageState = "FINISHED";
+                        phonePane.refreshSavedBridgeState();
+                    } else if (result.state === "POSITION_REQUESTED"
                              || result.state === "ACTOR_NOT_FOUND"
                              || result.state === "HOST_NOT_FOUND")
                         phonePane.stageState = "POSITIONING";
@@ -566,6 +644,39 @@ Rectangle {
 
                 Text {
                     width: parent.width
+                    visible: phonePane.savedBridgeCheck === "CHECKED"
+                    text: phonePane.savedBridgeState.state === "BACKEND_REPORTED"
+                          ? "BlueFerry configuration exists and its background service responds. Message/contacts sessions are reported separately; Social access is not yet linked."
+                          : phonePane.savedBridgeState.state === "CONFIGURATION_PRESENT_BACKEND_INACTIVE"
+                          ? "BlueFerry configuration exists, but its background service is not active. Re-pairing will not fix a stopped service."
+                          : phonePane.savedBridgeState.state === "CONFIGURATION_PRESENT_BACKEND_UNVERIFIED"
+                          ? "BlueFerry has local configuration and a running service, but its active phone sessions could not be verified."
+                          : phonePane.savedBridgeState.state === "NO_LOCAL_CONFIGURATION"
+                          ? "BlueFerry has no local configuration file. Initial setup may be incomplete."
+                          : "BlueFerry's saved setup status could not be verified."
+                    color: Colors.orange
+                    font.pixelSize: 11
+                    wrapMode: Text.WordWrap
+                }
+
+                Text {
+                    width: parent.width
+                    visible: phonePane.savedBridgeCheck === "CHECKED"
+                    text: "Saved BlueFerry config file: " +
+                          (phonePane.savedBridgeState.configurationPresent === true ? "PRESENT" :
+                           phonePane.savedBridgeState.configurationPresent === false ? "NOT FOUND" : "UNKNOWN") +
+                          "\nBackground service: " + String(phonePane.savedBridgeState.backendService || "unknown").toUpperCase() +
+                          "\nStarts with session: " + String(phonePane.savedBridgeState.startup || "unknown").toUpperCase() +
+                          "\nMessages: " + String(phonePane.savedBridgeState.messageProfile || "UNVERIFIED") +
+                          "\nContacts: " + String(phonePane.savedBridgeState.contactsProfile || "UNVERIFIED")
+                    color: Colors.white
+                    font.pixelSize: 11
+                    wrapMode: Text.WordWrap
+                    lineHeight: 1.35
+                }
+
+                Text {
+                    width: parent.width
                     visible: phonePane.setupState === "CHECKED"
                     text: "If setup is needed, choose your phone below. This opens the provider's own setup. BlueFerry may require the iPhone Bluetooth screen during initial pairing only, not permanently."
                     color: Colors.orange
@@ -583,7 +694,8 @@ Rectangle {
                     ActionButton {
                         width: Math.max(75, (nativeSetupChoices.width - 8) / 2)
                         height: 38
-                        label: "SET UP IPHONE"
+                        label: phonePane.savedBridgeState.configurationPresent === true
+                               ? "OPEN IPHONE" : "SET UP IPHONE"
                         labelPixelSize: 9
                         accentColor: Colors.magenta
                         interactive: !nativeSetupProcess.running && !phonePane.stageWanted
@@ -607,7 +719,7 @@ Rectangle {
                     text: phonePane.nativeSetupStatus === "OPENING"
                           ? "Opening your phone setup..."
                           : phonePane.nativeSetupStatus === "OPEN_REQUESTED"
-                          ? "Native phone setup requested. Follow its ordinary prompts only if pairing is needed, then use CONNECT PHONE to recheck. Social messages remain locked."
+                          ? "BlueFerry client requested. Saved configurations open the existing phone session, not the re-pairing wizard. Use CONNECT PHONE to recheck. Social messages remain locked."
                           : phonePane.nativeSetupStatus === "CLIENT_UNAVAILABLE"
                           ? "No supported BlueFerry or KDE Connect setup client could be found on this desktop. The Bluetooth bridge may still be installed or paired. No pairing changes made."
                           : "Could not start the provider setup client. Your phone's pairing has not been changed by Social."
@@ -619,9 +731,11 @@ Rectangle {
                 Text {
                     width: parent.width
                     height: 45 // Stable bay position across stage state changes.
-                    visible: phonePane.stageWanted || phonePane.stageState === "UNAVAILABLE"
+                    visible: phonePane.stageWanted || phonePane.stageState === "UNAVAILABLE" || phonePane.stageState === "FINISHED"
                     text: phonePane.stageState === "ALIGNED"
                           ? "BLUEFERRY SETUP // TERMINAL BELOW"
+                          : phonePane.stageState === "FINISHED"
+                          ? "BlueFerry client closed. Checking saved configuration and background service..."
                           : phonePane.stageState === "UNAVAILABLE"
                           ? "Stage placement could not be verified. Terminal window remains external; no Social phone connection was granted."
                           : "Placing BlueFerry's terminal inside the PHONE workspace..."

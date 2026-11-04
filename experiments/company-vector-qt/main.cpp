@@ -93,7 +93,7 @@ int main(int argc, char **argv) {
         qInfo() << "ONLINE_MAP_PRIVACY: IP and viewed map tiles may reach OpenFreeMap.";
 
     // This is a fixed repo-owned, *synthetic* fixture, not a user-supplied
-    // path and never a read of $XDG_DATA_HOME or CompanyHubDirectory.py.
+    // path and never a read of private Company data.
     // Reject additional/private fields and any malformed coordinates.
     QVariantList fixtureRecords;
     if (fixtureHubs) {

@@ -179,7 +179,8 @@ test("V4a QML changes only presentation, reuses the one on-demand M4 owner",()=>
     assert.match(instrument,/graphModel: instrument\.graphModel/);
     assert.match(instrument,/focusIndex: instrument\.focusIndex/);
     assert.match(instrument,/selectedBody: instrument\.selectedBody/);
-    assert.match(instrument,/enabled: instrument\.graphModel\.ready && instrument\.mode !== "network"/);
+    assert.match(instrument,/enabled: instrument\.graphModel\.ready\s*&& instrument\.mode !== "network"\s*&& instrument\.mode !== "helio"/);
+  assert.match(instrument,/compactMode: instrument\.compactMode/);
     assert.match(instrument,/onSampleScrubbed: function\(originIndex,offsetPixels\)/);
     assert.match(instrument,/Celestial\.wheelDragIndex\(/);
     assert.match(qml,/Network\.network\(graphModel,focusIndex\)/);

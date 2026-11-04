@@ -154,10 +154,19 @@ def main():
         root.chmod(0o700)
         linked = root / h.SUBDIR
         linked.symlink_to("/tmp")
-        with h.ConnectionsHostStatusServer(
-                runtime_directory=root,status_provider=callback) as unused:
+        suspect = h.ConnectionsHostStatusServer(
+            runtime_directory=root, status_provider=callback)
+        try:
+            suspect.start()
+        except ValueError:
             pass
-        # A symlinked directory is deliberately refused rather than traversed.
+        else:
+            raise AssertionError("SYMLINKED_DIRECTORY_ACCEPTED")
+        finally:
+            suspect.close()
+        assert linked.is_symlink()
+        linked.unlink()
+        assert not any(root.iterdir())
     print("C2J_PASS // EXPLICIT_SERVER_C2I_PROTOCOL_UNVERIFIED_STATES_AND_CLEANUP")
 
 

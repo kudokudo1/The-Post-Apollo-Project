@@ -56,7 +56,7 @@ jobs:
           fake_bin="$(mktemp -d /tmp/m13l-fake-refusal-XXXXXXXX)"
           trap 'rm -rf -- "$fake_bin"' EXIT
           printf '%s\n' '#!/bin/sh' \
-            'printf "%s\n" "M13L_PHASE_QML_COMPONENT_LOADED" "M13L_PHASE_START_ATTEMPT" "M13L_PHASE_PROCESS_START_ACCEPTED" "M13L_PHASE_QML_TIMER_EXPIRED" "M13L_NATIVE_QML_IPC_REFUSED"' \
+            'printf "%s\n" "M13L_PHASE_QML_COMPONENT_LOADED" "M13L_PHASE_BOOT_TIMER_FIRED" "M13L_PHASE_START_ATTEMPT" "M13L_PHASE_PRIVATE_GATE_READY" "M13L_PHASE_PROCESS_START_ACCEPTED" "M13L_PHASE_T5_AWAITING_REPLY" "M13L_PHASE_QML_TIMER_EXPIRED" "M13L_NATIVE_QML_IPC_REFUSED"' \
             'exit 0' >"$fake_bin/quickshell"
           chmod 700 "$fake_bin/quickshell"
           set +e
@@ -65,6 +65,9 @@ jobs:
           set -e
           test "$code" = "1"
           printf '%s\n' "$result" | grep -qx 'M13L_OBSERVED_QML_LOADED'
+          printf '%s\n' "$result" | grep -qx 'M13L_OBSERVED_BOOT_TIMER_FIRED'
+          printf '%s\n' "$result" | grep -qx 'M13L_OBSERVED_PRIVATE_GATE_READY'
+          printf '%s\n' "$result" | grep -qx 'M13L_AWAITING_HOST_REPLY'
           printf '%s\n' "$result" | grep -qx 'M13L_QML_INTERNAL_TIMER_EXPIRED'
           printf '%s\n' "$result" | grep -qx 'M13L_QML_PASS_MARKER_MISSING'
           printf '%s\n' "$result" | grep -qx 'M13L_NATIVE_DIAGNOSTIC_COMPLETE'

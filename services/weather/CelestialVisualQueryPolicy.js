@@ -146,12 +146,43 @@ function matchesResult(payload,expected) {
            !Array.isArray(payload.query.solar_overview_bodies) ||
            JSON.stringify(payload.query.solar_overview_bodies)!==
                JSON.stringify(expected.solar_overview_bodies) ||
+           atlas.sample_count<2 || atlas.sample_count>181 ||
            atlas.series.some(function(item,index) {
                return !item || item.body!==expected.solar_overview_bodies[index]
                    || !Array.isArray(item.vectors_au)
                    || item.vectors_au.length!==atlas.sample_count;
            }))
             return false;
+        // V4d gate: do not advertise SOURCE-VERIFIED if the atlas has any
+        // missing UTC sample or invalid vector. The visual policy also
+        // checks this independently before painting.
+        var sourceRows=payload.series[0] && payload.series[0].samples;
+        if(!Array.isArray(sourceRows) ||
+           sourceRows.length!==atlas.sample_count)
+            return false;
+        for(var i=0;i<atlas.sample_count;i++) {
+            var ms=atlas.times_unix_ms[i],source=sourceRows[i];
+            if(typeof ms!=="number" || !isFinite(ms) ||
+               Math.floor(ms)!==ms || !source || source.unix_ms!==ms)
+                return false;
+        }
+        for(var j=0;j<atlas.series.length;j++) {
+            var vectors=atlas.series[j].vectors_au;
+            for(var k=0;k<vectors.length;k++) {
+                var xyz=vectors[k];
+                if(!Array.isArray(xyz) || xyz.length!==3)
+                    return false;
+                var r2=0;
+                for(var axis=0;axis<3;axis++) {
+                    var n=xyz[axis];
+                    if(typeof n!=="number" || !isFinite(n) ||
+                       Math.abs(n)>10000)return false;
+                    r2+=n*n;
+                }
+                if(!isFinite(r2) || r2<=0 || r2>=100000000)
+                    return false;
+            }
+        }
     }
     if(Date.parse(payload.query.start_utc)!==Date.parse(expected.start_utc) ||
        Date.parse(payload.query.end_utc)!==Date.parse(expected.end_utc) ||

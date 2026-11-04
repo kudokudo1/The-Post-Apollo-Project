@@ -26,9 +26,13 @@ on:
       - '.github/workflows/weather-magick-visual-data-m4.yml'
   workflow_dispatch:
 
+permissions:
+  contents: read
+
 jobs:
   offline-contract:
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5

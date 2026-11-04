@@ -33,6 +33,8 @@ jobs:
           python-version: '3.12'
       - name: Verify M5c date and body selection policy
         run: node --test tests/weather/test_magick_celestial_query_m5c.js
+      - name: Verify ten-body HELIO source and circular inspector
+        run: node --test tests/weather/test_cosmos_solar_overview_v4d.js
       - name: Verify existing M5a M5b MAGICK COSMOS HOME contracts
         run: |
           node --test tests/weather/test_magick_celestial_visual_m5.js

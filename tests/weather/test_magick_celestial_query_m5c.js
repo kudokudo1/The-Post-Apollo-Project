@@ -114,7 +114,8 @@ test("result matching rejects stale date/pair/span even with valid-looking SHA",
                 body,vectors_au:[[1,0,0],[1,0,0]]
             }))
         },
-        series:[{},{}],relationships:[{}],event_markers:[]
+        series:[{samples:[{unix_ms:1},{unix_ms:2}]},{}],
+        relationships:[{}],event_markers:[]
     };
     assert.equal(context.matchesResult(row,expected),true);
     const noAtlas=JSON.parse(JSON.stringify(row));
@@ -123,6 +124,18 @@ test("result matching rejects stale date/pair/span even with valid-looking SHA",
     const wrongAtlas=JSON.parse(JSON.stringify(row));
     wrongAtlas.solar_overview.series[0].body="fake";
     assert.equal(context.matchesResult(wrongAtlas,expected),false);
+    const staleUtc=JSON.parse(JSON.stringify(row));
+    staleUtc.solar_overview.times_unix_ms[1]=3;
+    assert.equal(context.matchesResult(staleUtc,expected),false);
+    const malformedXyz=JSON.parse(JSON.stringify(row));
+    malformedXyz.solar_overview.series[9].vectors_au[1]=[null,0,0];
+    assert.equal(context.matchesResult(malformedXyz,expected),false);
+    const zeroVector=JSON.parse(JSON.stringify(row));
+    zeroVector.solar_overview.series[0].vectors_au[0]=[0,0,0];
+    assert.equal(context.matchesResult(zeroVector,expected),false);
+    const missingRow=JSON.parse(JSON.stringify(row));
+    missingRow.solar_overview.series[1].vectors_au.pop();
+    assert.equal(context.matchesResult(missingRow,expected),false);
     const noSpatial=JSON.parse(JSON.stringify(row));
     delete noSpatial.heliocentric_spatial;
     assert.equal(context.matchesResult(noSpatial,expected),false);

@@ -650,6 +650,10 @@ PanelWindow {
             CameraW {
                 id: cameraWindow
                 screen: shellRoot.screen
+                // Expanded Camera stays centered near its dock button;
+                // fullscreen uses Finance's exact full-screen left margin.
+                dockCenterX: shellRoot.margins.left + leftModules.x
+                             + cameraHost.x + cameraDock.width / 2
             }
         }
 

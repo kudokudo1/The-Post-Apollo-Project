@@ -3,6 +3,7 @@ import QtQuick.Controls
 import Quickshell
 import Quickshell.Io
 import Quickshell.Wayland
+import "FinanceChassisPolicy.js" as FinanceChassisPolicy
 import "../components"
 
 // CAMERA M1 // Screenshot shutter + read-only picture gallery + a reversible,
@@ -33,9 +34,37 @@ PanelWindow {
     property var selectedTrashPreview: null
     property string lastTrashReceipt: ""
     property string captureMode: "region"
-    readonly property int frameWidth: 770
-    readonly property int frameHeight: 675
-    readonly property int gutter: 12
+    // Same finance-size policy and top/bottom chrome budget for medium
+    // and fullscreen, while preserving Camera's existing 770x675 compact
+    // frame. One mapped PanelWindow persists across all size changes.
+    property string chassisLevel: "compact"
+    property real dockCenterX: 0
+    readonly property int glowGutter: 12
+    readonly property int frameTopInset: 9
+    readonly property int bottomScreenGap: 8
+    readonly property int viewportWidth:
+        camera.screen && camera.screen.width > 0 ? camera.screen.width : 2560
+    readonly property int viewportHeight:
+        camera.screen && camera.screen.height > 0 ? camera.screen.height : 1440
+    readonly property var financeSize: FinanceChassisPolicy.frame(
+        chassisLevel, viewportWidth, viewportHeight,
+        glowGutter, frameTopInset, bottomScreenGap)
+    readonly property int frameWidth:
+        chassisLevel === "compact"
+        ? Math.max(1, Math.min(770, viewportWidth - 2 * glowGutter))
+        : financeSize.width
+    readonly property int frameHeight:
+        chassisLevel === "compact"
+        ? Math.max(1, Math.min(675, viewportHeight
+                               - frameTopInset - bottomScreenGap))
+        : financeSize.height
+    readonly property int gutter: glowGutter
+    function expandChassis() {
+        chassisLevel = FinanceChassisPolicy.step(chassisLevel, 1);
+    }
+    function collapseChassis() {
+        chassisLevel = FinanceChassisPolicy.step(chassisLevel, -1);
+    }
     // Filename filtering and pagination run against the complete backend
     // inventory, not just the first page of 150 results.
     readonly property var filteredFiles: galleryFiles
@@ -212,10 +241,19 @@ PanelWindow {
         }
     }
 
-    implicitWidth: frameWidth + 2 * gutter
-    implicitHeight: frameHeight + 21
+    implicitWidth: frameWidth + 2 * glowGutter
+    implicitHeight: frameHeight + frameTopInset + bottomScreenGap
     anchors { top: true; bottom: false; left: true; right: false }
-    margins { top: 94; left: 54 }
+    // All three modes' visible frames begin at y=9, matching Finance and
+    // other standard menus rather than the former y=103 Camera position.
+    // Preserve Camera's original compact horizontal position.
+    margins {
+        top: 0
+        left: chassisLevel === "compact"
+              ? Math.max(0, Math.min(54, viewportWidth - implicitWidth))
+              : FinanceChassisPolicy.leftMargin(
+                    chassisLevel, dockCenterX, viewportWidth, implicitWidth)
+    }
     exclusiveZone: 0
     WlrLayershell.layer: WlrLayer.Overlay
     WlrLayershell.keyboardFocus:
@@ -225,8 +263,8 @@ PanelWindow {
     surfaceFormat.opaque: false
     visible: true
     mask: Region {
-        x: camera.gutter
-        y: 9
+        x: camera.glowGutter
+        y: camera.frameTopInset
         width: camera.menuOpen ? camera.frameWidth : 0
         height: camera.menuOpen ? camera.frameHeight : 0
     }
@@ -287,10 +325,10 @@ PanelWindow {
     WindowPanelFrame {
         id: frame
         anchors.fill: parent
-        anchors.leftMargin: camera.gutter
-        anchors.rightMargin: camera.gutter
-        anchors.topMargin: 9
-        anchors.bottomMargin: 12
+        anchors.leftMargin: camera.glowGutter
+        anchors.rightMargin: camera.glowGutter
+        anchors.topMargin: camera.frameTopInset
+        anchors.bottomMargin: camera.bottomScreenGap
         visible: camera.menuOpen
         focus: camera.menuOpen
         fillColor: Colors.black
@@ -318,18 +356,41 @@ PanelWindow {
                 id: cameraHeader
                 width: parent.width
                 height: 37
-                spacing: 12
+                spacing: 8
 
                 GohuText {
-                    width: parent.width - 50
+                    width: parent.width - (30 * 2 + 38 + cameraHeader.spacing * 3)
                     height: parent.height
                     verticalAlignment: Text.AlignVCenter
                     text: "CAMERA // CAPTURE + LIBRARY"
+                          + " [" + camera.chassisLevel.toUpperCase() + "]"
                     font.pixelSize: 18
                     color: Colors.magenta
                     elide: Text.ElideRight
                 }
 
+                // Finance-style ↓/↑ geometry controls: they resize the
+                // existing mapped Camera surface, never create another.
+                ActionButton {
+                    id: cameraCollapseButton
+                    width: 30
+                    height: 30
+                    label: "↓"
+                    labelPixelSize: 17
+                    accentColor: Colors.cyan
+                    available: camera.chassisLevel !== "compact"
+                    onLeftClicked: camera.collapseChassis()
+                }
+                ActionButton {
+                    id: cameraExpandButton
+                    width: 30
+                    height: 30
+                    label: "↑"
+                    labelPixelSize: 17
+                    accentColor: Colors.magenta
+                    available: camera.chassisLevel !== "fullscreen"
+                    onLeftClicked: camera.expandChassis()
+                }
                 ActionButton {
                     width: 38
                     height: 31

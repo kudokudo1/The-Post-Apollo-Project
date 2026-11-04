@@ -8,6 +8,7 @@ on:
       - "components/CameraImageViewer.qml"
       - "components/qmldir"
       - "widgets/CameraW.qml"
+      - "widgets/FinanceChassisPolicy.js"
       - "shell.qml"
       - "scripts/camera/**"
       - "tests/camera/**"
@@ -20,6 +21,7 @@ on:
       - "components/CameraImageViewer.qml"
       - "components/qmldir"
       - "widgets/CameraW.qml"
+      - "widgets/FinanceChassisPolicy.js"
       - "shell.qml"
       - "scripts/camera/**"
       - "tests/camera/**"
@@ -40,6 +42,8 @@ jobs:
         run: python3 -m unittest discover -s tests/camera -p 'test_camera_gallery_m2.py' -v
       - name: Camera M2 registered zoom-pan viewer and paging UI contracts
         run: python3 -m unittest discover -s tests/camera -p 'test_camera_m2_viewer_contract.py' -v
+      - name: Camera M3 Finance geometry and wheel-zoom drag-pan contract
+        run: node --test tests/camera/test_camera_m3_geometry.cjs
       - name: Native line glyph transparency, orbit, lens, stars and dock wiring
         run: python3 -m unittest discover -s tests/camera -p 'test_camera_glyph_contract.py' -v
       - name: Retain existing Company and Clock source contracts

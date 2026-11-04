@@ -101,6 +101,7 @@ Rectangle {
             visible: surface.activeFamily === "home"
                      && surface.homeSection === "magick"
             subjectRoute: "magick/overview"
+            onRouteRequested: function(path) { surface.routeRequested(path); }
             weatherService: surface.weatherService
             runtimeNowMs: surface.runtimeNowMs
         }
@@ -165,6 +166,7 @@ Rectangle {
             anchors.fill: parent
             visible: surface.activeFamily === "magick"
             subjectRoute: surface.currentPath
+            onRouteRequested: function(path) { surface.routeRequested(path); }
             weatherService: surface.weatherService
             runtimeNowMs: surface.runtimeNowMs
         }

@@ -10,6 +10,7 @@ Rectangle {
     color: Colors.black
 
     property string subjectRoute: ""
+    signal routeRequested(string path)
     property var weatherService: null
     // One source owned by the persistent SUBJECTS navigator, not this pane.
     property var celestialSource: null
@@ -47,7 +48,9 @@ Rectangle {
             font.pixelSize: 10
             wrapMode: Text.WordWrap
             color: Colors.yellow
-            text: magickPane.showCelestial
+            text: magickPane.subjectRoute === "magick/overview"
+                  ? "MOON + SUN OBSERVATIONS // SYMBOLIC INTERPRETATION NOT CONNECTED"
+                  : magickPane.showCelestial
                   ? "ASTRONOMY // M4 JPL POSITION SERIES   |   INTERPRETATION // NOT CONNECTED"
                   : magickPane.primaryObservation !== ""
                   ? "OBSERVATION // EXISTING COSMOS DATA   |   INTERPRETATION // NOT CONNECTED"
@@ -56,6 +59,7 @@ Rectangle {
 
         QuietText {
             width: parent.width
+            visible: magickPane.subjectRoute !== "magick/overview"
             wrapMode: Text.WordWrap
             font.pixelSize: 10
             text: MagickPolicy.noteFor(magickPane.subjectRoute)
@@ -414,45 +418,16 @@ Rectangle {
         }
     }
 
-    // One lunar instrument and one solar/twilight instrument in a single
-    // MAGICK overview. No second Moon service is active for the solar bay.
+    // M30-A // One compact overview host with independent panels.
+    // Detailed MAGICK routes keep their existing original SKY instruments.
     Component {
         id: overviewReference
-        Item {
-            id: referenceOverview
-
-            Rectangle {
-                id: lunarBay
-                anchors.top: parent.top
-                anchors.left: parent.left
-                anchors.right: parent.right
-                height: Math.max(0,(referenceOverview.height - 8) / 2)
-                color: Colors.black
-                clip: true
-
-                StationSky {
-                    anchors.fill: parent
-                    subjectRoute: magickPane.primaryObservation
-                    weatherService: magickPane.weatherService
-                    runtimeNowMs: magickPane.runtimeNowMs
-                }
-            }
-
-            Rectangle {
-                anchors.top: lunarBay.bottom
-                anchors.topMargin: 8
-                anchors.left: parent.left
-                anchors.right: parent.right
-                anchors.bottom: parent.bottom
-                color: Colors.black
-                clip: true
-
-                StationSky {
-                    anchors.fill: parent
-                    subjectRoute: magickPane.secondaryObservation
-                    weatherService: magickPane.weatherService
-                    runtimeNowMs: magickPane.runtimeNowMs
-                }
+        StationMagickOverviewPane {
+            weatherService: magickPane.weatherService
+            celestialSource: magickPane.celestialSource
+            runtimeNowMs: magickPane.runtimeNowMs
+            onRouteRequested: function(path) {
+                magickPane.routeRequested(path)
             }
         }
     }

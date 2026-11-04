@@ -502,6 +502,8 @@ PanelWindow {
                         selectedForegroundColor: Colors.magenta
                         selectedBorderColor: Colors.magenta
                         onLeftClicked: {
+                            if (camera.regionGuideOpen)
+                                camera.cancelRegionSelection();
                             if (modelData.id === "gallery")
                                 camera.loadGallery();
                             else
@@ -1251,7 +1253,7 @@ PanelWindow {
                             height: 60
                             wrapMode: Text.WordWrap
                             horizontalAlignment: Text.AlignHCenter
-                            text: "1 // Hold LEFT MOUSE and drag to size your screenshot.\\n"
+                            text: "1 // Hold LEFT MOUSE and drag to size your screenshot.\n"
                                   + "2 // RELEASE to capture. ESC cancels."
                             color: Colors.white
                             font.pixelSize: 12

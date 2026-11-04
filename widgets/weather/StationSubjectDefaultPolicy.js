@@ -8,6 +8,10 @@
 // temporary per-open fallback even while this pilot is enabled.
 var FORMAT = "post-apollo.weather.subject-default.m28n.v1";
 var SUBJECTS_FIRST_PILOT = true;
+// M28-U // DRAFT retirement rehearsal, NOT operator-approved deletion.
+// Flip false to restore the side-by-side CLASSIC comparison control.
+// Original panels, services, source history and Kitty remain untouched.
+var CLASSIC_RETIREMENT_PREVIEW = true;
 
 function preferredView(pilotEnabled) {
     return pilotEnabled === true ? "subjects" : "classic";

@@ -62,6 +62,18 @@ class MotionAndFixtureBridgeContracts(unittest.TestCase):
         self.assertIn("mapView.map.zoomLevel=15.6+0.25*Math.sin(t/2)",QML)
         self.assertIn("QtPositioning.coordinate(",QML)
 
+    def test_motion_completion_is_event_driven_and_lifetime_safe(self):
+        self.assertIn("motionTick",CPP)
+        self.assertIn("QTimer::timeout",CPP)
+        self.assertIn("if (ticks < 150) return;",CPP)
+        self.assertIn("std::make_shared<MotionMetrics>()",CPP)
+        self.assertIn("const int n = metrics->intervals.size()",CPP)
+        self.assertIn('"motion_steps", ticks',CPP)
+        self.assertIn("BENCH_MOTION_TIMEOUT_BEFORE_150_UPDATES",CPP)
+        self.assertNotIn("QTimer::singleShot(14600",CPP)
+        self.assertIn("timeout 40s ./company-vector-probe",WORKFLOW)
+        self.assertIn('r["motion_steps"] == 150',WORKFLOW)
+
     def test_default_offline_and_existing_company_unmodified(self):
         self.assertIn('args.contains("--styled-online")',CPP)
         self.assertIn("QUrl::fromLocalFile(localPath)",CPP)

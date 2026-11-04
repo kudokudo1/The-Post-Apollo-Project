@@ -142,7 +142,7 @@ jobs:
           # Frame swap measurements are host/environment-specific and never
           # treated as a desktop FPS certificate.
           xvfb-run -a -s '-screen 0 1280x900x24' \
-            timeout 28s ./company-vector-probe --styled-online \
+            timeout 40s ./company-vector-probe --styled-online \
               --sample=NEIGHBORHOOD --fixture-hubs \
               --bench-pan-zoom 2>&1 | tee company-m10-bench.log
           grep -q 'SYNTHETIC_FIXTURE_VALIDATED 3' company-m10-bench.log
@@ -158,6 +158,7 @@ jobs:
           assert len(records)==1, "exactly one benchmark record required"
           r=records[0]
           assert r["online"] is True and r["sample"] == "NEIGHBORHOOD"
+          assert r["motion_steps"] == 150, "camera benchmark was not completed"
           assert r["frame_intervals"] >= 10, "insufficient frame samples"
           for k in ("p50_ms","p95_ms","max_ms"):
               assert math.isfinite(r[k]) and r[k] > 0, k

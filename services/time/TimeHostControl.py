@@ -190,13 +190,68 @@ def resync():
 
 
 
-def measure_clock():
-    """Opt-in reference check. -Q never changes the system clock.
+def parse_tracking_measurement(raw, at_utc=None):
+    """Interpret read-only chronyc tracking as a bounded, recent estimate.
 
-    Chrony can emit a valid measured offset even if it later fails to write
-    drift.tmp as an unprivileged user. We use only the explicitly reported
-    numeric measurement, never assume exit status alone proves accuracy.
-    This contacts configured time sources and exposes the host IP to them.
+    The tracking output can exist without a synchronized reference. Require
+    a normal leap state, a real non-local source, recent reference time and
+    usable root-delay/dispersion accuracy bounds before claiming a reading.
+    """
+    import math
+    import re
+    fields = {}
+    for line in raw.splitlines():
+        if ":" in line:
+            key, value = line.split(":", 1)
+            fields[key.strip()] = value.strip()
+    if fields.get("Leap status") != "Normal":
+        return result("unavailable", "CHRONY SOURCE NOT SYNCHRONIZED",
+                      errorCode="TRACKING_UNSYNCED")
+    reference = fields.get("Reference ID", "")
+    if reference.startswith(("00000000", "7F7F0101")):
+        return result("unavailable", "CHRONY HAS NO EXTERNAL REFERENCE",
+                      errorCode="TRACKING_LOCAL")
+    try:
+        stratum = int(fields.get("Stratum", "0"))
+        ref_time = datetime.datetime.strptime(
+            fields["Ref time (UTC)"], "%a %b %d %H:%M:%S %Y"
+        ).replace(tzinfo=datetime.timezone.utc)
+        now = at_utc or datetime.datetime.now(datetime.timezone.utc)
+        sample_age = (now - ref_time).total_seconds()
+        offset = re.fullmatch(
+            r"([+-]?\d+(?:\.\d+)?) seconds (fast|slow) of NTP time",
+            fields["System time"]
+        )
+        delay = float(fields["Root delay"].split()[0])
+        dispersion = float(fields["Root dispersion"].split()[0])
+        if stratum < 1 or stratum > 15 or offset is None:
+            raise ValueError("invalid tracking metadata")
+        if not (0 <= sample_age <= 1800):
+            return result("unavailable", "CHRONY REFERENCE IS STALE",
+                          errorCode="TRACKING_STALE")
+        system_seconds = float(offset.group(1))
+        if offset.group(2) == "slow":
+            system_seconds = -system_seconds
+        bound = dispersion + abs(delay) / 2
+        if (not all(math.isfinite(v) for v in
+                    (system_seconds, bound, delay, dispersion))
+                or bound < 0 or dispersion < 0 or abs(system_seconds) > 86400):
+            raise ValueError("invalid clock sample")
+    except (KeyError, ValueError, OverflowError):
+        return result("unavailable", "CHRONY TRACKING UNVERIFIABLE",
+                      errorCode="TRACKING_INVALID")
+    return result("measured", "RECENT CHRONY TRACKING ESTIMATE // READ ONLY",
+                  offsetMs=int(round(system_seconds * 1000)),
+                  uncertaintyMs=int(math.ceil(bound * 1000)),
+                  source="CHRONY_TRACKING")
+
+
+def measure_clock():
+    """Explicit reference check; never changes the system clock.
+
+    With an active daemon read its latest bounded, recent tracking estimate
+    (no new network request). With a stopped daemon use chronyd -Q to
+    retrieve a fresh reference measurement (configured sources see the IP).
     """
     import re
     chronyd = next((p for p in CHRONYD_PATHS if os.path.isfile(p)), None)
@@ -208,8 +263,17 @@ def measure_clock():
             ["systemctl", "is-active", "chronyd.service"],
             capture_output=True, text=True, timeout=TIMEOUT, check=False)
         if active.returncode == 0 and active.stdout.strip() == "active":
-            return result("unavailable", "DAEMON ACTIVE // USE LIVE CHRONY TRACKING",
-                          errorCode="DAEMON_ACTIVE")
+            if not os.path.isfile(CHRONYC):
+                return result("unavailable", "CHRONY CONTROL CLIENT MISSING",
+                              errorCode="NO_CHRONYC")
+            tracking = subprocess.run(
+                [CHRONYC, "tracking"], capture_output=True, text=True,
+                timeout=TIMEOUT, check=False,
+                env={**os.environ, "LC_ALL": "C"})
+            if tracking.returncode:
+                return result("unavailable", "CHRONY CONTROL SOCKET UNAVAILABLE",
+                              errorCode="TRACKING_SOCKET")
+            return parse_tracking_measurement(tracking.stdout)
         if active.stdout.strip() not in ("inactive", "failed"):
             return result("unavailable", "CHRONY SERVICE STATUS UNKNOWN",
                           errorCode="SERVICE_UNKNOWN")
@@ -228,14 +292,17 @@ def measure_clock():
     if not matched:
         return result("unavailable", "NO TRUSTED OFFSET MEASUREMENT RETURNED",
                       errorCode="REFERENCE_NO_SAMPLE")
-    seconds = float(matched.group(1))
-    if not (-86400 <= seconds <= 86400):
+    try:
+        seconds = float(matched.group(1))
+        if not (-86400 <= seconds <= 86400):
+            raise ValueError("invalid offset")
+    except ValueError:
         return result("unavailable", "REFERENCE OFFSET OUT OF RANGE",
                       errorCode="REFERENCE_INVALID")
-    milliseconds = int(round(seconds * 1000))
     return result("measured", "REFERENCE OFFSET MEASURED // NO CLOCK CHANGE",
-                  offsetMs=milliseconds,
-                  note="REFERENCE SOURCE CONTACTED; CHRONY -Q DID NOT SET TIME")
+                  offsetMs=int(round(seconds * 1000)),
+                  uncertaintyMs=0, source="CHRONYD_ONESHOT",
+                  note="CHRONY -Q READ ONLY; REFERENCE SOURCE CONTACTED")
 
 
 def set_timezone(zone):

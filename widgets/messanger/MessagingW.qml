@@ -1994,6 +1994,12 @@ PanelWindow {
 
         PhonePane {
             id: phonePane
+            // The compositor owns the live Social rect. A move/resize
+            // invalidates a previously aligned foot actor until reverified.
+            stageHostX: messagingWindow.sharedPanelX
+            stageHostY: messagingWindow.sharedPanelY
+            stageHostWidth: messagingWindow.sharedPanelWidth
+            stageHostHeight: messagingWindow.sharedPanelHeight
             x: messagingWindow.appSelectorWidth
             y: 0
             width: Math.max(1, messagingContent.width - x)

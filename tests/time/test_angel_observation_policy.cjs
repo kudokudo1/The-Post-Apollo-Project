@@ -79,7 +79,7 @@ assert.equal(policy.matchesFilter("222", "mirror"), false,
     "repeated digits should not drown out distinct mirror patterns");
 assert.deepEqual(copy(policy.patternTags("347")), ["ADD"]);
 assert.deepEqual(copy(policy.patternTags("321")), ["SEQUENCE", "SUBTRACT"]);
-assert.deepEqual(copy(policy.patternTags("101")), ["MIRROR", "SUBTRACT"]);
+assert.deepEqual(copy(policy.patternTags("101")), ["MIRROR", "ADD", "SUBTRACT"]);
 
 const rows = [
     policy.create(policy.emptyDocument(), "222", context(), 1000)

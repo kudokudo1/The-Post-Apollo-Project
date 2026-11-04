@@ -93,7 +93,8 @@ test("full GROUND shares original five provider admission gates, no extra collec
     for(const name of ["lightning","river"])
         assert.ok(originalRoot.includes('subjectNavigator.currentPath, "'+name+'"'));
     assert.match(originalRoot,/active: weatherStation\.menuOpen/);
-    assert.match(originalRoot,/!weatherStation\.subjectNavigationOpen[\s\S]*?weatherStation\.currentView === "ground"/);
+    assert.match(originalRoot,/active: weatherStation\.menuOpen && weatherStation\.subjectNavigationOpen/);
+    assert.ok(!originalRoot.includes("currentView"));
 });
 
 test("the original recent earthquake cards, provider rack and source fix remain in the same full scroll surface",()=>{

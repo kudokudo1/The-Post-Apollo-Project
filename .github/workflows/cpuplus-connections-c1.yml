@@ -1,0 +1,33 @@
+name: CPU++ C1 shared Connections inventory
+
+on:
+  pull_request:
+    paths:
+      - "services/connections/**"
+      - "widgets/CpuPlusW.qml"
+      - "widgets/cpuplus/CpuPlusSettingsConnections*.qml"
+      - "tests/cpuplus/test_cpuplus_connections_c1.js"
+      - ".github/workflows/cpuplus-connections-c1.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  connections:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Verify read-only Social/Notifications/Weather connection seams
+        run: node tests/cpuplus/test_cpuplus_connections_c1.js
+      - name: Preserve current CPU++ TIME owner and three-bay structure
+        run: |
+          python3 tests/cpuplus/test_cpuplus_time_settings_contract.py
+          python3 tests/cpuplus/test_cpuplus_time_three_bay_contract.py
+      - name: Preserve independent Social writer contracts
+        run: |
+          python3 -m py_compile services/social/SocialAccountDetails.py

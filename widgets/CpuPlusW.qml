@@ -44,6 +44,8 @@ PanelWindow {
     property int thermalSubMode: 0 // 0 = temperature, 1 = fans
     property string systemSubMode: "ALL"
     property string settingsSubMode: "LOCATION"
+    // UI-only selection, not a provider login or permission grant.
+    property string selectedConnectionId: "social"
 
     // A prepared resync is an explicit, view-scoped confirmation request.
     // Closing or leaving this CPU++ TIME surface must not leave it armed.
@@ -82,7 +84,8 @@ PanelWindow {
     // Both surfaces consume existing single-owner services, never new writers.
     readonly property var settingsSubModes: [
         { name: "LOCATION", key: "LOCATION", symbol: "⌖" },
-        { name: "TIME", key: "TIME", symbol: "🕰" }
+        { name: "TIME", key: "TIME", symbol: "🕰" },
+        { name: "CONNECTIONS", key: "CONNECTIONS", symbol: "⛓" }
     ]
 
     // Rail-face animation state, matching AppControl's FAVORITES behavior.
@@ -1070,7 +1073,8 @@ PanelWindow {
                 : cpuPlusWindow.selectedModeIndex === 4
                 ? (cpuPlusWindow.settingsSubMode === "TIME"
                    ? "TIME // BASIC CONTROLS"
-                   : "SETTINGS // OVERVIEW")
+                   : cpuPlusWindow.settingsSubMode === "CONNECTIONS"
+                     ? "CONNECTIONS // OVERVIEW" : "SETTINGS // OVERVIEW")
                 : "SHARED INSTRUMENT"
 
             font.pixelSize: 13
@@ -1369,7 +1373,9 @@ PanelWindow {
                     ? "SYSTEM STATE"
                     : cpuPlusWindow.selectedModeIndex === 4
                     ? (cpuPlusWindow.settingsSubMode === "TIME"
-                       ? "CLOCK // CONTROL" : "SETTINGS STATE")
+                       ? "CLOCK // CONTROL"
+                       : cpuPlusWindow.settingsSubMode === "CONNECTIONS"
+                         ? "SHARED // STATUS" : "SETTINGS STATE")
                     : "INSTRUMENT STATE"
 
                 font.pixelSize: 13
@@ -1418,7 +1424,8 @@ PanelWindow {
             // SETTINGS/TIME owns this left slot with the shared Clock basic
             // control pane, not the inert instrument placeholder.
             visible: !(cpuPlusWindow.selectedModeIndex === 4
-                       && cpuPlusWindow.settingsSubMode === "TIME")
+                       && (cpuPlusWindow.settingsSubMode === "TIME"
+                           || cpuPlusWindow.settingsSubMode === "CONNECTIONS"))
             anchors.left: parent.left
             anchors.right: parent.right
             anchors.top: sharedStateHeader.bottom
@@ -1488,6 +1495,20 @@ PanelWindow {
             visible: sharedInstrumentScroll.visible && scrollable
         }
 
+        CpuPlusSettingsConnectionsOverviewPane {
+            id: settingsConnectionsOverview
+            visible: cpuPlusWindow.selectedModeIndex === 4
+                     && cpuPlusWindow.settingsSubMode === "CONNECTIONS"
+            anchors.left: parent.left
+            anchors.right: parent.right
+            anchors.top: sharedStateHeader.bottom
+            anchors.bottom: parent.bottom
+            anchors.leftMargin: 11
+            anchors.rightMargin: 11
+            anchors.topMargin: 8
+            anchors.bottomMargin: 9
+        }
+
         // One reused Clock pane, not a second calibration or timezone owner.
         // Keep it entirely inside the existing left instrument bay.
         TimeSettingsPane {
@@ -1555,7 +1576,9 @@ PanelWindow {
                 ? "SYSTEM TARGET"
                 : cpuPlusWindow.selectedModeIndex === 4
                 ? (cpuPlusWindow.settingsSubMode === "TIME"
-                   ? "TIME // ACTIVE" : "SETTINGS // CATEGORIES")
+                   ? "TIME // ACTIVE"
+                   : cpuPlusWindow.settingsSubMode === "CONNECTIONS"
+                     ? "CONNECTIONS // SOURCES" : "SETTINGS // CATEGORIES")
                 : "TARGET"
 
             font.pixelSize: 12
@@ -1649,7 +1672,7 @@ PanelWindow {
                             cpuPlusWindow.selectedModeIndex === 2
                             ? (targetSubModeStrip.width - 4) / 2
                             : cpuPlusWindow.selectedModeIndex === 4
-                            ? (targetSubModeStrip.width - 4) / 2
+                             ? (targetSubModeStrip.width - 8) / 3
                             : (targetSubModeStrip.width - 8) / 3
 
                         height:
@@ -1829,7 +1852,7 @@ PanelWindow {
         Column {
             id: settingsCategorySummary
             visible: cpuPlusWindow.selectedModeIndex === 4
-                     && cpuPlusWindow.settingsSubMode !== "TIME"
+                      && cpuPlusWindow.settingsSubMode === "LOCATION"
             anchors.top: targetSubModeStrip.bottom
             anchors.left: parent.left
             anchors.right: parent.right
@@ -1862,6 +1885,24 @@ PanelWindow {
                         : "HOME NOT YET CONFIGURED"
                 font.pixelSize: 10
             }
+        }
+
+        CpuPlusSettingsConnectionsListPane {
+            id: settingsConnectionsList
+            visible: cpuPlusWindow.selectedModeIndex === 4
+                     && cpuPlusWindow.settingsSubMode === "CONNECTIONS"
+            selectedId: cpuPlusWindow.selectedConnectionId
+            onProviderSelected: function(providerId) {
+                cpuPlusWindow.selectedConnectionId = providerId;
+            }
+            anchors.left: parent.left
+            anchors.right: parent.right
+            anchors.top: targetSubModeStrip.bottom
+            anchors.bottom: parent.bottom
+            anchors.leftMargin: 9
+            anchors.rightMargin: 9
+            anchors.topMargin: 8
+            anchors.bottomMargin: 9
         }
 
         CpuPlusSettingsTimeActivePane {
@@ -2273,7 +2314,9 @@ PanelWindow {
 
             text: cpuPlusWindow.selectedModeIndex === 4
                   ? (cpuPlusWindow.settingsSubMode === "TIME"
-                     ? "TIME // ADVANCED" : "LOCATION // SETTINGS")
+                     ? "TIME // ADVANCED"
+                     : cpuPlusWindow.settingsSubMode === "CONNECTIONS"
+                       ? "CONNECTIONS // ACCESS" : "LOCATION // SETTINGS")
                   : "CPU++ ACTUATORS"
 
             font.pixelSize: 12
@@ -2304,6 +2347,21 @@ PanelWindow {
             registry: PlaceRegistry
             visible: cpuPlusWindow.selectedModeIndex === 4
                      && cpuPlusWindow.settingsSubMode === "LOCATION"
+            anchors.left: parent.left
+            anchors.right: parent.right
+            anchors.top: actuatorHeader.bottom
+            anchors.bottom: parent.bottom
+            anchors.leftMargin: 10
+            anchors.rightMargin: 10
+            anchors.topMargin: 20
+            anchors.bottomMargin: 10
+        }
+
+        CpuPlusSettingsConnectionsDetailsPane {
+            id: settingsConnectionsDetails
+            visible: cpuPlusWindow.selectedModeIndex === 4
+                     && cpuPlusWindow.settingsSubMode === "CONNECTIONS"
+            selectedId: cpuPlusWindow.selectedConnectionId
             anchors.left: parent.left
             anchors.right: parent.right
             anchors.top: actuatorHeader.bottom

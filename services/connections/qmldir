@@ -1,0 +1,3 @@
+module qs.services.connections
+
+singleton ConnectionsRegistry 1.0 ConnectionsRegistry.qml

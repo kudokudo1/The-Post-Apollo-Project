@@ -11,6 +11,7 @@ on:
       - 'tests/messaging/test_social_phone_menu_readonly.py'
       - 'tests/messaging/test_social_user_settings_rail.py'
       - 'tests/messaging/test_social_family_rail.py'
+      - 'tests/messaging/test_social_family_order_visibility.py'
       - 'tests/messaging/test_social_family_manager.py'
       - 'MODEL/contracts/social-phone-readonly-menu-v0.md'
       - '.github/workflows/social-phone-readonly-menu.yml'
@@ -25,6 +26,7 @@ on:
       - 'tests/messaging/test_social_phone_menu_readonly.py'
       - 'tests/messaging/test_social_user_settings_rail.py'
       - 'tests/messaging/test_social_family_rail.py'
+      - 'tests/messaging/test_social_family_order_visibility.py'
       - 'tests/messaging/test_social_family_manager.py'
       - 'MODEL/contracts/social-phone-readonly-menu-v0.md'
       - '.github/workflows/social-phone-readonly-menu.yml'
@@ -47,5 +49,6 @@ jobs:
           python3 -m unittest discover -s tests/messaging -p 'test_social_phone_menu_readonly.py' -v
           python3 -m unittest discover -s tests/messaging -p 'test_social_user_settings_rail.py' -v
           python3 -m unittest discover -s tests/messaging -p 'test_social_family_rail.py' -v
+          python3 -m unittest discover -s tests/messaging -p 'test_social_family_order_visibility.py' -v
           python3 -m unittest discover -s tests/messaging -p 'test_social_family_manager.py' -v
           python3 -m unittest discover -s tests/messaging -p 'test_social_identity_store.py' -v

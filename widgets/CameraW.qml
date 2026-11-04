@@ -19,18 +19,24 @@ PanelWindow {
     property var statusReport: null
     property var galleryFiles: []
     property int galleryTotal: 0
+    property int galleryPageIndex: 0
+    property bool galleryHasMore: false
+    property bool galleryScanTruncated: false
+    property bool galleryShotsOnly: false
+    property string galleryCustomFolder: ""
+    property string galleryRequestedQuery: ""
     property string selectedPath: ""
     property var selectedRecord: null
     property var trashPreview: null
+    property var selectedTrashPreview: null
+    property string lastTrashReceipt: ""
     property string captureMode: "region"
     readonly property int frameWidth: 770
     readonly property int frameHeight: 675
     readonly property int gutter: 12
-    readonly property var filteredFiles:
-        galleryFiles.filter(function(row) {
-            const query = gallerySearch.text.toLowerCase().trim();
-            return !query || String(row.name || "").toLowerCase().indexOf(query) >= 0;
-        })
+    // Filename filtering and pagination run against the complete backend
+    // inventory, not just the first page of 150 results.
+    readonly property var filteredFiles: galleryFiles
 
     function toggle() {
         menuOpen = !menuOpen;
@@ -62,11 +68,49 @@ PanelWindow {
         return true;
     }
 
-    function loadGallery() {
+    function loadGallery(append) {
+        if (busy)
+            return false;
         activeView = "gallery";
-        selectedPath = "";
-        selectedRecord = null;
-        return run("gallery", ["gallery"]);
+        const nextPage = append === true ? galleryPageIndex + 1 : 0;
+        if (append !== true) {
+            selectedPath = "";
+            selectedRecord = null;
+            selectedTrashPreview = null;
+            galleryFiles = [];
+        } else if (!galleryHasMore) {
+            return false;
+        }
+        galleryRequestedQuery = gallerySearch.text.trim();
+        return run("gallery", [
+            "gallery",
+            "--page", String(nextPage),
+            "--query", galleryRequestedQuery,
+            "--folder", galleryCustomFolder
+        ].concat(galleryShotsOnly ? ["--shots-only"] : []));
+    }
+
+    function selectImage(record) {
+        selectedRecord = record;
+        selectedPath = String(record && record.path || "");
+        selectedTrashPreview = null;
+        lastTrashReceipt = "";
+        zoomViewer.reset();
+    }
+
+    function previewSelectedTrash() {
+        if (busy || !selectedPath)
+            return false;
+        selectedTrashPreview = null;
+        return run("previewSelected", ["preview-selected", selectedPath]);
+    }
+
+    function confirmSelectedTrash() {
+        const plan = selectedTrashPreview;
+        if (busy || !plan || !plan.planId || plan.path !== selectedPath)
+            return false;
+        selectedTrashPreview = null;
+        return run("trashSelected", ["trash-selected", plan.planId, "MOVE_TO_TRASH"]);
     }
 
     function prepareCapture(mode) {
@@ -124,9 +168,32 @@ PanelWindow {
             activeView = "gallery";
             Qt.callLater(function() { camera.loadGallery(); });
         } else if (action === "gallery") {
-            galleryFiles = payload.files || [];
+            const page = Number(payload.page || 0);
+            galleryFiles = page > 0
+                ? galleryFiles.concat(payload.files || [])
+                : (payload.files || []);
+            galleryPageIndex = page;
             galleryTotal = Number(payload.total || 0);
-            feedback = "GALLERY // " + galleryTotal + " FILES // VIEW ONLY";
+            galleryHasMore = payload.hasMore === true;
+            galleryScanTruncated = payload.truncated === true;
+            feedback = "GALLERY // " + galleryFiles.length + "/" + galleryTotal
+                       + (galleryScanTruncated ? " // SCAN LIMIT REACHED" : "");
+            // If the user typed while scanning, run the newest query next.
+            if (gallerySearch.text.trim() !== galleryRequestedQuery)
+                gallerySearchDebounce.restart();
+        } else if (action === "previewSelected") {
+            if (payload.path === selectedPath) {
+                selectedTrashPreview = payload;
+                feedback = "CONFIRM // MOVE ONE IMAGE TO TRASH";
+            }
+        } else if (action === "trashSelected") {
+            selectedPath = "";
+            selectedRecord = null;
+            selectedTrashPreview = null;
+            lastTrashReceipt = "MOVED TO TRASH // " + payload.name;
+            feedback = lastTrashReceipt;
+            // Always refresh after the confirmed file is moved.
+            Qt.callLater(function() { camera.loadGallery(false); });
         } else if (action === "preview") {
             trashPreview = payload;
             feedback = "PREVIEW // " + payload.count
@@ -186,6 +253,16 @@ PanelWindow {
         interval: 250
         repeat: false
         onTriggered: camera.run("capture", ["capture", camera.captureMode])
+    }
+
+    Timer {
+        id: gallerySearchDebounce
+        interval: 330
+        repeat: false
+        onTriggered: {
+            if (camera.activeView === "gallery" && !camera.busy)
+                camera.loadGallery(false);
+        }
     }
 
     WindowPanelFrame {

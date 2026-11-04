@@ -33,6 +33,12 @@ Rectangle {
     function solarField(value) {
         return twilightReady ? field(value) : "--";
     }
+    function civilOffset() {
+        if (!skySource || skySource.moonCivilOffsetMinutes === null
+                || skySource.moonCivilOffsetMinutes === undefined)
+            return "--";
+        return field(skySource.moonCivilOffsetMinutes) + " M";
+    }
     function lightWindow(start, end) {
         if (!twilightReady) return "--";
         const a = field(start), b = field(end);
@@ -46,14 +52,14 @@ Rectangle {
     ]
     readonly property var moonContext: [
         {label:"SOURCE DATE",value:moonReady ? field(moon.sourceDate) : "--"},
-        {label:"CIVIL OFFSET",value:skySource ? field(skySource.moonCivilOffsetMinutes) + " M" : "--"},
+        {label:"CIVIL OFFSET",value:civilOffset()},
         {label:"OFFSET ORIGIN",value:skySource ? field(skySource.moonCivilOffsetSource) : "--"}
     ]
     readonly property var dawn: [
         {label:"ASTRO DAWN",value:solarField(twilight ? twilight.astronomicalDawn : null)},
         {label:"NAUTICAL",value:solarField(twilight ? twilight.nauticalDawn : null)},
         {label:"CIVIL DAWN",value:solarField(twilight ? twilight.civilDawn : null)},
-        {label:"SOLAR NOON",value:solarField(twilight ? twilight.solarNoon : null)}
+        {label:"SUNRISE",value:astronomy && astronomy.available ? field(astronomy.sunrise) : "--"}
     ]
     readonly property var dusk: [
         {label:"SUNSET",value:astronomy && astronomy.available ? field(astronomy.sunset) : "--"},
@@ -324,12 +330,13 @@ Rectangle {
                 width: parent.width
                 font.pixelSize: 8
                 color: Colors.yellow
-                text: rack.sunNow && rack.sunNow.available
-                    ? "SUN NOW // ALT "
-                      + rack.sunNow.altitudeDegrees.toFixed(1) + "°  AZ "
-                      + rack.sunNow.azimuthDegrees.toFixed(1)
-                      + "° // CALCULATED"
-                    : "SUN NOW // CALIBRATED POSITION NOT AVAILABLE"
+                text: "SOLAR NOON " + rack.solarField(
+                          rack.twilight ? rack.twilight.solarNoon : null)
+                    + (rack.sunNow && rack.sunNow.available
+                       ? " // SUN NOW ALT "
+                         + rack.sunNow.altitudeDegrees.toFixed(1) + "° AZ "
+                         + rack.sunNow.azimuthDegrees.toFixed(1) + "° // MODEL"
+                       : " // SUN NOW // CALIBRATED POSITION NOT AVAILABLE")
                 elide: Text.ElideRight
             }
         }

@@ -2464,6 +2464,118 @@ PanelWindow {
                             }
                         }
 
+                        // Small, persistent WORLD favorites row. The four
+                        // permanent quick presets above remain unchanged.
+                        // A star toggles the currently selected installed zone.
+                        // Saved IDs never alter Linux's actual timezone.
+                        Row {
+                            id: worldFavoritesStrip
+                            width: parent.width
+                            height: 30
+                            spacing: 5
+
+                            GohuText {
+                                id: favoriteCount
+                                width: 66
+                                height: parent.height
+                                verticalAlignment: Text.AlignVCenter
+                                font.pixelSize: 10
+                                color: Colors.white
+                                text: "FAV "
+                                      + TimeSettings.worldFavoriteZones.length
+                                      + "/" + TimeSettings.worldFavoriteLimit
+                            }
+
+                            ActionButton {
+                                id: worldFavoriteToggle
+                                width: 32
+                                height: 29
+                                label: TimeSettings.isWorldFavorite(
+                                           timew.selectedWorldZone) ? "★" : "☆"
+                                labelPixelSize: 16
+                                contentPadding: 2
+                                trackLabelGlowLocally: true
+                                accentColor: Colors.white
+                                selected: TimeSettings.isWorldFavorite(
+                                              timew.selectedWorldZone)
+                                selectedFillColor: Colors.yellow
+                                selectedForegroundColor: Colors.magenta
+                                selectedContentGlowColor: Colors.magenta
+                                selectedBorderColor: Colors.magenta
+                                available: TimeSettings.worldFavoriteCanEdit
+                                           && WorldZoneSearch.contains(
+                                                  timew.worldZoneCatalog,
+                                                  timew.selectedWorldZone)
+                                onLeftClicked: TimeSettings.toggleWorldFavorite(
+                                                   timew.selectedWorldZone,
+                                                   timew.worldZoneCatalog)
+                            }
+
+                            Flickable {
+                                id: favoriteZoneScroll
+                                width: Math.max(0, parent.width
+                                                - favoriteCount.width
+                                                - worldFavoriteToggle.width
+                                                - parent.spacing * 2)
+                                height: parent.height
+                                clip: true
+                                boundsBehavior: Flickable.StopAtBounds
+                                flickableDirection: Flickable.HorizontalFlick
+                                interactive: contentWidth > width
+                                contentWidth: favoriteZoneRow.implicitWidth
+                                contentHeight: height
+
+                                Row {
+                                    id: favoriteZoneRow
+                                    height: parent.height
+                                    spacing: 5
+
+                                    Repeater {
+                                        model: TimeSettings.worldFavoriteZones
+                                        ActionButton {
+                                            width: 101
+                                            height: 29
+                                            label: WorldZoneSearch.cityName(modelData)
+                                            labelPixelSize: 10
+                                            trackLabelGlowLocally: true
+                                            accentColor: Colors.white
+                                            selected: timew.worldModeActive
+                                                      && modelData
+                                                         === timew.selectedWorldZone
+                                            selectedFillColor: Colors.yellow
+                                            selectedForegroundColor: Colors.magenta
+                                            selectedContentGlowColor: Colors.magenta
+                                            selectedBorderColor: Colors.magenta
+                                            available: WorldZoneSearch.contains(
+                                                           timew.worldZoneCatalog,
+                                                           modelData)
+                                            onLeftClicked:
+                                                timew.selectWorldSearchResult(modelData)
+                                        }
+                                    }
+                                }
+
+                                GohuText {
+                                    visible: TimeSettings.worldFavoriteZones.length === 0
+                                    anchors.verticalCenter: parent.verticalCenter
+                                    text: "STAR A ZONE TO SAVE"
+                                    font.pixelSize: 9
+                                    color: Colors.cyan
+                                }
+                            }
+                        }
+
+                        GohuText {
+                            width: parent.width
+                            visible: TimeSettings.worldFavoriteState === "error"
+                                     || TimeSettings.worldFavoriteState === "unsupported"
+                                     || TimeSettings.worldFavoriteState === "loading"
+                            wrapMode: Text.WordWrap
+                            text: "FAVORITES // " + TimeSettings.worldFavoriteMessage
+                            font.pixelSize: 9
+                            color: Colors.orange
+                        }
+
                         GohuText {
                             width: parent.width
                             text: timew.worldTimeSnapshot.readout

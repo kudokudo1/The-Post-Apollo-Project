@@ -4,7 +4,7 @@
 // This is deliberately NOT a secret store, an authenticated session registry,
 // or a new Social account/identity writer. No raw credential may enter rows.
 var IDS = [
-    "social", "notifications", "proton-mail", "nasa-firms",
+    "social", "notifications", "tasks-recovery", "proton-mail", "nasa-firms",
     "bbc-world", "al-jazeera-english", "gdelt"
 ];
 
@@ -25,6 +25,47 @@ function accountNamesCount(document, activeId) {
                : typeof value === "string" && value.trim() ? 1 : 0;
     });
     return safeCount(total);
+}
+
+// M13r-UI: a visible TASKS row sourced only from shared, read-only state.
+// No credential, fake consent, unlock, or checkpoint content is exposed.
+function tasksRecoveryRow(data) {
+    var x = data || {};
+    var status = typeof x.tasksProviderStatus === "string"
+                 ? x.tasksProviderStatus : "";
+    var checking = x.tasksProviderChecking === true;
+    var provider = checking ? "KEYRING // CHECKING"
+                 : status === "SERVICE_ACQUIRED"
+                     ? "KEYRING FOUND // UNLOCK UNKNOWN"
+                 : status === "NOT CHECKED" || status === "NOT_CHECKED"
+                     ? "KEYRING // NOT CHECKED"
+                 : status === "SERVICE_NOT_RUNNING"
+                     ? "KEYRING SERVICE // NOT RUNNING"
+                 : status === "SESSION_BUS_UNAVAILABLE"
+                     ? "KEYRING // SESSION BUS UNAVAILABLE"
+                 : status === "DBUS_PROBE_TOOL_MISSING"
+                     ? "KEYRING // PROBE TOOL MISSING"
+                     : "KEYRING // STATUS UNVERIFIED";
+    var flagsKnownOff = x.tasksBrokerActionsEnabled === false
+            && x.tasksRecoveryEnabled === false
+            && x.tasksRecoveryStorageAuthorized === false
+            && x.tasksRecoveryUnlockAuthorized === false
+            && x.tasksDraftHostEnabled === false
+            && x.tasksDraftHostWriteAuthorized === false;
+    return {
+        id:"tasks-recovery",title:"TASKS // DRAFT RECOVERY",
+        status:flagsKnownOff ? "RECOVERY // OFF"
+                             : "RECOVERY // STATE REQUIRES REVIEW",
+        kind:"local", accent:"orange",
+        detail:provider,
+        context:"CHECKPOINT // NOT INSPECTED // GRANTS CLOSED",
+        consumers:"TASKS // EDITOR / LOCAL RECOVERY",
+        permissions:"ENCRYPTED DRAFT CAPTURE // UNLOCK AND PREVIEW // SCOPED DELETE (DISABLED)",
+        setup:"CPU++ CONNECTIONS SHOWS KEYRING PRESENCE ONLY. "
+            + "OPEN TASKS > SYNC > RECOVERY FOR THE LOCAL STATUS VIEW. "
+            + "NO REAL KEY RELEASE, DRAFT CAPTURE OR RESTORE IS ENABLED.",
+        action:"INSPECT"
+    };
 }
 
 function build(input) {
@@ -62,6 +103,7 @@ function build(input) {
          permissions:"LOCAL NOTIFICATION HISTORY AND LIVE SENDER ACTIONS",
          setup:"EMAIL PREVIEWS CAN ROUTE TO SOCIAL. REPLY, ARCHIVE AND TRASH REQUIRE AN AUTHENTICATED MAIL ADAPTER.",
          action:"INSPECT"},
+        tasksRecoveryRow(data),
         {id:"proton-mail", title:"PROTON // MAIL",
          status:"ADAPTER NOT CONNECTED", kind:"account", accent:"orange",
          detail:"PROTON BROWSER/BRIDGE POLICIES EXIST // RELAY DORMANT",

@@ -128,6 +128,25 @@ ShellRoot {
                            && details.source.setup.indexOf("NASA") < 0) {
                     root.fail("FAKE_READY_SETUP_GUIDE");return;
                 }
+                if (!root.announce(root.button("CHECK KEYRING"),
+                                   "KEYRING_BUTTON"))
+                    return;
+                root.phase = "keyringClicked";
+            } else if (root.phase === "keyringClicked") {
+                if (ConnectionsBroker.status === "NOT CHECKED"
+                        || ConnectionsBroker.status === "CHECKING")
+                    return;
+                if (ConnectionsBroker.credentialActionsEnabled
+                        || ConnectionsBroker.lastCheckedMs <= 0
+                        || ConnectionsBroker.available &&
+                           ConnectionsBroker.authorize({
+                               provider:"nasa-firms",consumer:"weather-earth",
+                               operation:"fires.hotspots.read"
+                           }).allowed) {
+                    root.fail("UNTRUSTED_KEYRING_GRANT"); return;
+                }
+                console.log("C2A_PASS // READONLY_KEYRING_PROBE // "
+                            + ConnectionsBroker.status);
                 if (root.announce(root.providerButton("social"),
                                   "SOCIAL_BUTTON"))
                     root.phase = "socialClicked";

@@ -1,0 +1,52 @@
+name: MAGICK M6-A source event catalogue
+on:
+  pull_request:
+    paths:
+      - 'scripts/weather/celestial_event_catalogue.py'
+      - 'tests/weather/test_celestial_event_catalogue_m6a.py'
+      - '.github/workflows/weather-magick-source-event-catalogue-m6a.yml'
+  push:
+    paths:
+      - 'scripts/weather/celestial_event_catalogue.py'
+      - 'tests/weather/test_celestial_event_catalogue_m6a.py'
+      - '.github/workflows/weather-magick-source-event-catalogue-m6a.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  pure-source-contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Verify M6-A normalized source events and catalogue admission
+        run: python3 -m unittest discover -s tests/weather -p 'test_celestial_event_catalogue_m6a.py' -v
+      - name: Regress original M4 source geometry and numerical M2 events
+        run: |
+          python3 -m unittest discover -s tests/weather -p 'test_celestial_visual_data_m4.py' -v
+          python3 -m unittest discover -s tests/weather -p 'test_celestial_dynamics_m2.py' -v
+      - name: Compile catalogue and confirm no Qt or local settings dependency
+        run: python3 -m py_compile scripts/weather/celestial_event_catalogue.py
+  official-jpl-contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 16
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install Skyfield on disposable runner only
+        run: python3 -m pip install 'skyfield==1.55'
+      - name: Download JPL DE440s into disposable runner storage
+        run: |
+          curl --fail --location --retry 3 --connect-timeout 15 --max-time 180 --silent --show-error \
+            'https://ssd.jpl.nasa.gov/ftp/eph/planets/bsp/de440s.bsp' \
+            --output "$RUNNER_TEMP/de440s.bsp"
+          test "$(stat -c %s "$RUNNER_TEMP/de440s.bsp")" -gt 30000000
+      - name: Validate real Sun/Moon M4 to M6-A event lineage
+        run: |
+          MAGICK_M1_KERNEL="$RUNNER_TEMP/de440s.bsp" \
+          python3 -m unittest discover -s tests/weather -p 'test_celestial_event_catalogue_m6a.py' -v

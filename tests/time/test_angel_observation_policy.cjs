@@ -94,7 +94,7 @@ assert.deepEqual(copy(policy.filter(rows, "", "all").map(x => x.id)),
 assert.deepEqual(copy(policy.filter(rows, "22", "all").map(x => x.digits)),
     ["222"]);
 assert.deepEqual(copy(policy.filter(rows, "", "add").map(x => x.digits)),
-    ["347"]);
+    ["101", "347"]);
 assert.deepEqual(copy(policy.filter(rows, "", "mirror").map(x => x.digits)),
     ["101"]);
 assert.deepEqual(copy(policy.filter(rows, "A", "all")), []);

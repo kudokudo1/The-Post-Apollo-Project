@@ -84,6 +84,23 @@ Item {
         selectedCountryCode = "";
         var next = Geo.view(regionKey,Math.max(zoom,3.5),city[1],city[2]);
         applyView(next);
+        if(streetMode) streetMap.focusAt(city[1],city[2],12);
+    }
+
+    function startStreetView() {
+        var lon=centerLon,lat=centerLat,z=5;
+        if(selectedCity) {
+            lon=selectedCity[1];lat=selectedCity[2];z=12;
+        } else if(selectedHub) {
+            lon=selectedHub.longitude;lat=selectedHub.latitude;z=12;
+        } else if(selectedState) {
+            lon=selectedState[3];lat=selectedState[4];z=11;
+        } else if(selectedCountry) {
+            lon=selectedCountry[3];lat=selectedCountry[4];z=9;
+        }
+        streetMode=true;
+        streetConsentOpen=false;
+        streetMap.focusAt(lon,lat,z);
     }
 
     function visibleCities() {
@@ -109,8 +126,13 @@ Item {
         selectedCode = "";
         selectedCountryCode = "";
         selectedHubId = "";
+        selectedCity = null;
         serviceMenuOpen = false;
         stateSearch.text = "";
+        if(streetMode) {
+            var next=Geo.defaultView(regionKey);
+            streetMap.focusAt(next.centerLon,next.centerLat,5);
+        }
     }
 
     function chooseState(state) {
@@ -225,17 +247,17 @@ Item {
             }
         }
 
-        Row {
+        Flow {
             id: filtersRow
             width: parent.width
-            height: 31
+            height: childrenRect.height
             spacing: 8
             z: 20
 
             Item {
                 id: serviceSelector
                 width: root.compactLayout ? 152 : 190
-                height: filtersRow.height
+                height: 31
 
                 ModeButton {
                     id: serviceButton
@@ -294,7 +316,7 @@ Item {
 
             ModeButton {
                 width: root.compactLayout ? 134 : 174
-                height: filtersRow.height
+                height: 31
                 textOnly: true
                 labelText: "STATUS: " + root.statusFilter
                 labelFontSize: 10
@@ -308,7 +330,7 @@ Item {
 
             ModeButton {
                 width: root.compactLayout ? 94 : 108
-                height: filtersRow.height
+                height: 31
                 textOnly: true
                 labelText: root.hubPlacementArmed ? "PICK MAP" : "+ HUB"
                 labelFontSize: 10
@@ -328,7 +350,7 @@ Item {
 
             ModeButton {
                 width: 83
-                height: filtersRow.height
+                height: 31
                 textOnly: true
                 labelText: root.showCities ? "CITIES ON" : "CITIES OFF"
                 labelFontSize: 10
@@ -339,6 +361,24 @@ Item {
                 hoverPrimaryColor: Colors.yellow
                 perimeterGlowColor: Colors.blue
                 onTriggered: root.showCities = !root.showCities
+            }
+
+            ModeButton {
+                width: 104
+                height: 31
+                textOnly: true
+                labelText: root.streetMode ? "STREETS ON" : "STREETS ▾"
+                labelFontSize: 10
+                bordered: false
+                selected: root.streetMode
+                idlePrimaryColor: Colors.white
+                selectedPrimaryColor: Colors.cyan
+                hoverPrimaryColor: Colors.yellow
+                perimeterGlowColor: Colors.blue
+                onTriggered: {
+                    if(root.streetMode) root.streetMode=false;
+                    else root.streetConsentOpen=true;
+                }
             }
         }
 
@@ -660,11 +700,32 @@ Item {
                     }
                 }
 
+                CompanyStreetMap {
+                    id: streetMap
+                    anchors.fill: mapCanvas
+                    visible: root.streetMode
+                    active: root.streetMode && root.visible
+                    hubRows: root.hubRows
+                    selectedHubId: root.selectedHubId
+                    pickingLocation: root.hubPlacementArmed
+                    z: 5
+                    onLocationPicked: function(lon,lat) {
+                        root.openHubEditor(lon,lat);
+                    }
+                    onHubPicked: function(id) {
+                        root.selectedHubId=id;
+                        root.selectedCode="";
+                        root.selectedCountryCode="";
+                        root.selectedCity=null;
+                    }
+                }
+
                 Column {
                     anchors.top: parent.top
                     anchors.right: parent.right
                     anchors.margins: 10
                     spacing: 5
+                    visible: !root.streetMode
                     z: 2
 
                     ActionButton {
@@ -690,6 +751,7 @@ Item {
                     anchors.leftMargin: 10
                     anchors.bottom: parent.bottom
                     anchors.bottomMargin: 8
+                    visible: !root.streetMode
                     text: root.bounds.label + "  //  " + Math.round(root.zoom*100) + "%"
                     color: Colors.white
                     font.pixelSize: 10
@@ -977,6 +1039,66 @@ Item {
             }
         }
 
+    }
+
+    // Requires a separate deliberate click before requesting remote tiles.
+    Rectangle {
+        id: streetConsent
+        anchors.centerIn: parent
+        z: 65
+        visible: root.streetConsentOpen
+        width: Math.min(parent.width-20,500)
+        height: 225
+        color: Colors.black
+        border.color: Colors.magenta
+        border.width: 2
+
+        Column {
+            anchors.fill: parent
+            anchors.margins: 15
+            spacing: 12
+            GohuText {
+                text: "ENABLE ONLINE STREET DETAIL?"
+                font.pixelSize: 16
+                font.bold: true
+                color: Colors.yellow
+            }
+            GohuText {
+                width: parent.width
+                wrapMode: Text.WordWrap
+                color: Colors.white
+                font.pixelSize: 12
+                text: "Street tiles come from OpenStreetMap. The viewed map "
+                    + "tile coordinates are sent to the provider. No hub names, "
+                    + "employees, clients or organization records are sent. "
+                    + "Tiles are cached locally. Internet required; no business SLA."
+            }
+            GohuText {
+                text: "© OpenStreetMap contributors"
+                color: Colors.cyan
+                font.pixelSize: 11
+            }
+            Row {
+                spacing: 10
+                ModeButton {
+                    width: 175
+                    height: 38
+                    textOnly: true
+                    labelText: "ENABLE STREETS"
+                    bordered: false
+                    selected: true
+                    onTriggered: root.startStreetView()
+                }
+                ModeButton {
+                    width: 90
+                    height: 38
+                    textOnly: true
+                    labelText: "CANCEL"
+                    bordered: false
+                    onTriggered: root.streetConsentOpen=false
+                }
+            }
+        }
     }
 
     // Map-picked hub editor is confined to Company Coverage; it never

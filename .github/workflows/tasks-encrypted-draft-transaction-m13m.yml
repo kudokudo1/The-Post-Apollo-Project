@@ -1,0 +1,47 @@
+name: TASKS M13m disabled encrypted draft transaction model
+
+on:
+  pull_request:
+    paths:
+      - 'tests/tasks/fixtures/TaskEncryptedDraftTransactionM13m.cjs'
+      - 'tests/tasks/test_task_encrypted_draft_transaction_m13m.cjs'
+      - 'docs/tasks-disabled-encrypted-draft-transaction-m13m.md'
+      - '.github/workflows/tasks-encrypted-draft-transaction-m13m.yml'
+      - 'tests/tasks/fixtures/TaskEncryptedRecoveryM13f.cjs'
+      - 'services/hub/ApolloHubTodoStore.qml'
+  push:
+    branches: [main]
+    paths:
+      - 'tests/tasks/fixtures/TaskEncryptedDraftTransactionM13m.cjs'
+      - 'tests/tasks/test_task_encrypted_draft_transaction_m13m.cjs'
+      - '.github/workflows/tasks-encrypted-draft-transaction-m13m.yml'
+permissions:
+  contents: read
+
+jobs:
+  fake-transaction-policy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Fake-only transaction policy, source binding and rejection
+        run: |
+          node --check tests/tasks/fixtures/TaskEncryptedDraftTransactionM13m.cjs
+          node --test tests/tasks/test_task_encrypted_draft_transaction_m13m.cjs
+      - name: Existing synthetic authenticated-encryption regression
+        run: node --test tests/tasks/test_task_encrypted_recovery_m13f.cjs
+      - name: Existing host read-only and production writer inventory
+        run: |
+          node --test tests/tasks/test_task_encrypted_draft_host_m13k.cjs
+          python3 tests/tasks/test_task_writer_gate_inventory_m11d.py
+      - name: No runtime import, secret provider or actual file mutation
+        run: |
+          set -euo pipefail
+          ! grep -q 'TaskEncryptedDraftTransactionM13m' shell.qml
+          ! grep -q 'TaskEncryptedDraftTransactionM13m' services/hub/ApolloHubTodoStore.qml
+          ! grep -Eq 'secret-tool|writeFile|FileView|process\.env' \
+            tests/tasks/fixtures/TaskEncryptedDraftTransactionM13m.cjs
+          printf '%s\n' 'M13M_FAKE_TRANSACTION_ONLY_NO_PRODUCTION_ACTIVATION_PASS'

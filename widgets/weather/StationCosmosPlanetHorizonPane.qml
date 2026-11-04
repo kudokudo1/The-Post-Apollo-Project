@@ -26,6 +26,7 @@ Rectangle {
     signal planetPicked(string name)
     signal returnToTimeline()
     signal compareRequested()
+    signal dayRingRequested()
 
     readonly property var markers: sourceReady
         ? Horizon.markers(datedRows, selectedPlanet) : []
@@ -155,7 +156,7 @@ Rectangle {
             height: 23
             spacing: 5
             GohuText {
-                width: Math.max(0,parent.width-263)
+                width: Math.max(0,parent.width-348)
                 height: 22
                 text: "✦ HORIZON // TRUE NORTH"
                 color: Colors.magenta
@@ -179,6 +180,15 @@ Rectangle {
                 contentPadding: 0
                 accentColor: Colors.magenta
                 onClicked: horizonPane.compareRequested()
+            }
+            ActionButton {
+                width: 80
+                height: 22
+                label: "DAY RING"
+                labelPixelSize: 9
+                contentPadding: 0
+                accentColor: Colors.yellow
+                onClicked: horizonPane.dayRingRequested()
             }
             GohuText {
                 width: 88

@@ -274,6 +274,17 @@ Item {
                         socialLinksStore: sections.localLinksStore
                     }
 
+                    IdentityCenterLocalSessionActivity {
+                        id: localSessionActivity
+                        objectName: "orgLocalSessionActivity"
+                        width: parent.width
+                        recordingEnabled: sections.settingsOpen
+                            && sections.activeSection === "ORGANIZATIONS"
+                        saveFeedback: localSaveFeedback
+                        refreshPanel: localRefreshAll
+                        backupPanel: localOrgBackup
+                    }
+
                     // Shared local record editing context. ALL shows company records;
                     // Structure and Modifiers require an explicit active company.
                     Column {

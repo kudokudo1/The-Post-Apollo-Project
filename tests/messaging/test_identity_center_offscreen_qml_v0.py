@@ -827,6 +827,85 @@ class RealQtOrganizationsSettingsPaneSmoke(unittest.TestCase):
         self.assertIn("BACKUPS LISTED", backup.property("resultText"))
         self.assertFalse(self.sections.property("organizationDisplayReady"))
 
+    def test_current_session_activity_observes_results_only(self):
+        self._open_organizations()
+        activity = self.sections.findChild(QObject, "orgLocalSessionActivity")
+        backup = self.sections.findChild(QObject, "orgLocalBackup")
+        self.assertIsNotNone(activity)
+        self.assertIsNotNone(backup)
+        self.assertTrue(activity.property("recordingEnabled"))
+        self.assertEqual(activity.property("entryCount"), 0)
+
+        def state(value, revision, error=""):
+            payload = {"state": value, "errorCode": error,
+                       "saved": {"revision": revision}}
+            js = self.engine.evaluate("(" + json.dumps(payload) + ")")
+            self.assertFalse(js.isError())
+            self.assertTrue(self.sections.setProperty("localDirectoryStore", js))
+            APP.processEvents()
+
+        # Loading a baseline does not invent an earlier save.
+        state("ready", 3)
+        self.assertEqual(activity.property("entryCount"), 0)
+        state("saving", 3)
+        self.assertEqual(activity.property("entryCount"), 0)
+        state("ready", 4)
+        events = _value(activity.property("entries"))
+        self.assertEqual(len(events), 1, events)
+        self.assertEqual(events[0]["kind"], "saved")
+        self.assertIn("revision 4", events[0]["detail"])
+        self.assertTrue(events[0]["observedAt"])
+
+        state("saving", 4)
+        state("error", 4, "REVISION_CONFLICT")
+        events = _value(activity.property("entries"))
+        self.assertEqual(len(events), 2, events)
+        self.assertEqual(events[0]["kind"], "conflict")
+        self.assertIn("REVISION_CONFLICT", events[0]["detail"])
+
+        state("loading", 4)
+        state("ready", 4)
+        events = _value(activity.property("entries"))
+        self.assertEqual(len(events), 3, events)
+        self.assertEqual(events[0]["kind"], "loaded")
+        self.assertNotIn("SAVED //", events[0]["detail"])
+
+        # A synthetic success response, not a real filesystem backup.
+        backup.setProperty("operation", "list")
+        backup.setProperty("readText", json.dumps({
+            "ok": True, "backups": [], "total": 0,
+            "folder": "organization-backups-v1",
+        }))
+        backup.acceptResponse(0)
+        APP.processEvents()
+        events = _value(activity.property("entries"))
+        self.assertEqual(len(events), 4, events)
+        self.assertEqual(events[0]["kind"], "listing")
+        self.assertEqual(events[0]["source"], "Private Backups")
+
+        # The observer is intentionally bounded and not recording while
+        # a different Settings page is active.
+        for number in range(45):
+            self.assertTrue(activity.appendEvent(
+                "listing", "FICTIONAL", "synthetic-" + str(number)))
+        self.assertEqual(activity.property("entryCount"), 40)
+        self.assertEqual(len(_value(activity.property("visibleEntries"))), 6)
+        activity.setProperty("showAll", True)
+        APP.processEvents()
+        self.assertEqual(len(_value(activity.property("visibleEntries"))), 40)
+
+        self.sections.setProperty("activeSection", "SOCIAL LAYOUT")
+        APP.processEvents()
+        self.assertFalse(activity.property("recordingEnabled"))
+        self.assertFalse(activity.appendEvent("listing", "HIDDEN", "not observed"))
+        self.assertEqual(activity.property("entryCount"), 40)
+
+        # This clears only the in-memory view, no store or backup file.
+        activity.setProperty("entries", [])
+        APP.processEvents()
+        self.assertEqual(activity.property("entryCount"), 0)
+        self.assertFalse(self.sections.property("organizationDisplayReady"))
+
     def test_host_logout_and_failure_are_reflected_in_real_panel(self):
         self._open_organizations()
         self._finish(_body())

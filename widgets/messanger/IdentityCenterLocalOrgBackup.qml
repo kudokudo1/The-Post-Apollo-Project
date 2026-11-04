@@ -22,6 +22,7 @@ Column {
     property var backups: []
     property string resultKind: "neutral"
     property string resultText: "No backup operation has been run."
+    signal activityObserved(string kind, string detail)
     readonly property bool sourcesReady: [
         directoryStore, portfolioStore, structureStore,
         functionLocationStore, branchLocationStore, reportingStore,
@@ -64,6 +65,7 @@ Column {
             resultKind = "error";
             resultText = "BACKUP ERROR // " +
                 (response && response.error ? String(response.error) : "UNAVAILABLE");
+            backupPanel.activityObserved("failure", resultText);
             return;
         }
         if (operation === "list") {
@@ -73,11 +75,13 @@ Column {
             resultKind = "loaded";
             resultText = "BACKUPS LISTED // " + String(response.total)
                 + " private snapshot(s).";
+            backupPanel.activityObserved("listing", resultText);
         } else if (operation === "create") {
             const name = String(response.backup || "");
             if (name === "") {
                 resultKind = "error";
                 resultText = "BACKUP ERROR // MISSING_FILENAME";
+                backupPanel.activityObserved("failure", resultText);
                 return;
             }
             backups = [name].concat(backups.filter(function(item) {
@@ -87,10 +91,12 @@ Column {
             resultKind = "saved";
             resultText = "BACKUP CREATED // " + name +
                 " // All seven local organization record groups snapshotted.";
+            backupPanel.activityObserved("backup", resultText);
         } else if (operation === "verify") {
             resultKind = "verified";
             resultText = "VALID BACKUP // " + String(response.backup) +
                 " // Schema and checksums verified. RESTORE NOT ENABLED.";
+            backupPanel.activityObserved("validation", resultText);
         }
     }
 

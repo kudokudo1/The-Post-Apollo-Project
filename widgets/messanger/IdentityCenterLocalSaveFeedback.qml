@@ -21,6 +21,7 @@ Column {
     property string lastSource: ""
     property string lastKind: "neutral"
     property string lastMessage: ""
+    signal activityObserved(string kind, string source, string detail)
     spacing: 5
 
     function sources() {
@@ -95,6 +96,7 @@ Column {
                 lastKind = code === "REVISION_CONFLICT" ? "conflict" : "error";
                 lastMessage = "SAVE FAILED // " + source.label + ": "
                     + (code || "SAVE_UNAVAILABLE");
+                feedback.activityObserved(lastKind, source.label, lastMessage);
             } else if (state === "ready" && hadWrite) {
                 const baseline = nextInFlight[key];
                 delete nextInFlight[key];
@@ -107,11 +109,13 @@ Column {
                     lastMessage = "NOT CONFIRMED // " + source.label
                         + " returned ready without a newer revision.";
                 }
+                feedback.activityObserved(lastKind, source.label, lastMessage);
             } else if (state === "error" && old.state !== "error") {
                 lastSource = key;
                 lastKind = "error";
                 lastMessage = "LOAD ERROR // " + source.label + ": "
                     + (code || "READ_UNAVAILABLE");
+                feedback.activityObserved("failure", source.label, lastMessage);
             } else if (state === "loading" && old.state === "error"
                        && lastSource === key) {
                 lastKind = "loading";
@@ -121,6 +125,7 @@ Column {
                 lastKind = "loaded";
                 lastMessage = "RELOADED // " + source.label
                     + ". No new write was confirmed.";
+                feedback.activityObserved("loaded", source.label, lastMessage);
             }
             nextObserved[key] = {state:state, revision:rev};
         }

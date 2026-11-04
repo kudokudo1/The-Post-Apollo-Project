@@ -1,6 +1,6 @@
 # Social Organization Manager / Deferred Live UI Acceptance Register v1
 
-STATE: DEFERRED BY OPERATOR, not failed and not approved. Preserve this register for one consolidated manual acceptance pass.
+STATE: MIXED. Controls 1–5 remain operator-deferred; backup create/list/validate were operator-confirmed working on 2026-11-04. Preserve this register for consolidated remaining acceptance.
 PATIENT: kudokudo1/The-Post-Apollo-Project
 
 ## Later operator test session
@@ -14,13 +14,15 @@ Confirm which exact commit is deployed. Use safe fictional/test company records 
 | 3. Record actions | Show/hide archived and restore a safe test record | Archived records display consistently, confirmations clear | DEFERRED |
 | 4. Save feedback | Save a harmless test record and reopen | Saving then revision-confirmed Saved, truthful failures | DEFERRED |
 | 5. Refresh All | Click once and repeatedly while busy | Seven stores reload, busy protects in-progress writes, results remain | DEFERRED |
-| 6a. Backup Now | Press with seven ready stores, then list | One private 0600 seven-store snapshot appears | DEFERRED |
-| 6b. Validate Backup | Select the new snapshot and validate | Schema and SHA checks pass, no original data overwritten | DEFERRED |
+| 6a. Backup Now / List Backups | Operator created a backup and viewed the list in the live UI | Buttons created and listed a backup as observed by operator; private file mode not manually inspected | OPERATOR-PASSED (2026-11-04) |
+| 6b. Validate Backup | Operator selected the backup and validated it in the live UI | UI completed validation successfully; underlying checksum checks covered by automated tests | OPERATOR-PASSED (2026-11-04) |
 | 6c. Restore | Only after separately reviewed crash-safe transaction | Verified rollback/recovery and revision checks | NOT IMPLEMENTED |
-| 7. Activity History | Inspect once built | Local events labeled honestly, no server audit claims | NOT IMPLEMENTED |
+| 7. Current Session Activity | Inspect the inline view after save, refresh and backup operations | New events only; no fabricated prior timeline, actor attribution or server audit claims | NOT YET OPERATOR-TESTED |
 | 8. Semantic color pass | Scan Close, Cancel, Save, Refresh, typing, navigation, focus | Roles distinguishable by color/glow, unchanged geometry | NOT IMPLEMENTED |
 
 ## Status rules
+
+Operator explicitly reported successful live BACK UP NOW, LIST BACKUPS and VALIDATE FOR RESTORE on 2026-11-04. Do not interpret this as a verified data restore, backup decryption, manual Unix-permission inspection, or proof of disaster recovery.
 
 GitHub CI green is technical evidence, not live user acceptance. Do not silently convert a deferred test to accepted. Destructive restore must pass synthetic rollback and collision tests before enabling. Button geometry and pixel normalization remain future independent tasks.
 

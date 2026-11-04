@@ -70,9 +70,18 @@ Scope {
     }
 
     function referenceIsOutOfSync(nowEpochMs) {
+        // Only the portion of the estimate that exceeds its source error
+        // bound can count as evidence that the host clock is wrong.
         return hasFreshReference(nowEpochMs)
-               && (Math.abs(referenceOffsetMs) >= referenceWarningThresholdMs
-                   || referenceUncertaintyMs >= referenceWarningThresholdMs);
+               && Math.abs(referenceOffsetMs) - referenceUncertaintyMs
+                  >= referenceWarningThresholdMs;
+    }
+
+    function referenceIsUncertain(nowEpochMs) {
+        return hasFreshReference(nowEpochMs)
+               && !referenceIsOutOfSync(nowEpochMs)
+               && Math.abs(referenceOffsetMs) + referenceUncertaintyMs
+                  >= referenceWarningThresholdMs;
     }
 
     // The Clock header and dock use identical evidence and expiry. A
@@ -84,6 +93,8 @@ Scope {
             return "checking";
         if (referenceIsOutOfSync(nowEpochMs))
             return "out-of-sync";
+        if (referenceIsUncertain(nowEpochMs))
+            return "uncertain";
         if (dockZoneOffsetMismatch(nowEpochMs))
             return "zone-mismatch";
         if (displayDeviationActive)
@@ -101,6 +112,7 @@ Scope {
         case "syncing": return "SYNCING";
         case "checking": return "CHECKING";
         case "out-of-sync": return "OUT OF SYNC";
+        case "uncertain": return "UNCERTAIN";
         case "zone-mismatch": return "ZONE DIFF";
         case "dirty": return "DIRTY";
         case "in-sync": return "IN SYNC";
@@ -115,6 +127,8 @@ Scope {
             return "CHRONY / AUTH";
         if (state === "checking")
             return "REFERENCE";
+        if (state === "uncertain")
+            return "ERROR BOUND";
         if (state === "out-of-sync" || state === "in-sync") {
             if (referenceSource === "CHRONY_TRACKING")
                 return "TRACKING EST.";

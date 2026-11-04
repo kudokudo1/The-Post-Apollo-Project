@@ -190,6 +190,54 @@ def resync():
 
 
 
+def measure_clock():
+    """Opt-in reference check. -Q never changes the system clock.
+
+    Chrony can emit a valid measured offset even if it later fails to write
+    drift.tmp as an unprivileged user. We use only the explicitly reported
+    numeric measurement, never assume exit status alone proves accuracy.
+    This contacts configured time sources and exposes the host IP to them.
+    """
+    import re
+    chronyd = next((p for p in CHRONYD_PATHS if os.path.isfile(p)), None)
+    if not chronyd:
+        return result("unavailable", "CHRONY REFERENCE CHECK NOT INSTALLED",
+                      errorCode="NO_CHRONYD")
+    try:
+        active = subprocess.run(
+            ["systemctl", "is-active", "chronyd.service"],
+            capture_output=True, text=True, timeout=TIMEOUT, check=False)
+        if active.returncode == 0 and active.stdout.strip() == "active":
+            return result("unavailable", "DAEMON ACTIVE // USE LIVE CHRONY TRACKING",
+                          errorCode="DAEMON_ACTIVE")
+        if active.stdout.strip() not in ("inactive", "failed"):
+            return result("unavailable", "CHRONY SERVICE STATUS UNKNOWN",
+                          errorCode="SERVICE_UNKNOWN")
+        reading = subprocess.run(
+            [chronyd, "-Q", "-t", "15"],
+            capture_output=True, text=True, timeout=22, check=False)
+    except subprocess.TimeoutExpired:
+        return result("unavailable", "REFERENCE TIMEOUT // CLOCK NOT MEASURED",
+                      errorCode="REFERENCE_TIMEOUT")
+    except OSError:
+        return result("unavailable", "REFERENCE PROCESS UNAVAILABLE",
+                      errorCode="REFERENCE_PROCESS")
+    combined = (reading.stdout + "\n" + reading.stderr)
+    matched = re.search(
+        r"System clock wrong by\\s+([+-]?\\d+(?:\\.\\d+)?)\\s+seconds", combined)
+    if not matched:
+        return result("unavailable", "NO TRUSTED OFFSET MEASUREMENT RETURNED",
+                      errorCode="REFERENCE_NO_SAMPLE")
+    seconds = float(matched.group(1))
+    if not (-86400 <= seconds <= 86400):
+        return result("unavailable", "REFERENCE OFFSET OUT OF RANGE",
+                      errorCode="REFERENCE_INVALID")
+    milliseconds = int(round(seconds * 1000))
+    return result("measured", "REFERENCE OFFSET MEASURED // NO CLOCK CHANGE",
+                  offsetMs=milliseconds,
+                  note="REFERENCE SOURCE CONTACTED; CHRONY -Q DID NOT SET TIME")
+
+
 def set_timezone(zone):
     """Set the real host timezone after systemd/Polkit authorization.
 
@@ -241,12 +289,14 @@ def set_timezone(zone):
 
 
 def main():
-    if len(sys.argv) < 2 or (sys.argv[1] == "set-timezone" and len(sys.argv) != 3) or (sys.argv[1] != "set-timezone" and (len(sys.argv) != 2 or sys.argv[1] not in ("status", "resync", "diagnose"))):
+    if len(sys.argv) < 2 or (sys.argv[1] == "set-timezone" and len(sys.argv) != 3) or (sys.argv[1] != "set-timezone" and (len(sys.argv) != 2 or sys.argv[1] not in ("status", "resync", "diagnose", "measure"))):
         data = result("invalid", "EXPECTED STATUS OR RESYNC")
     elif sys.argv[1] == "status":
         data = status()
     elif sys.argv[1] == "diagnose":
         data = diagnose()
+    elif sys.argv[1] == "measure":
+        data = measure_clock()
     elif sys.argv[1] == "set-timezone":
         data = set_timezone(sys.argv[2])
     else:

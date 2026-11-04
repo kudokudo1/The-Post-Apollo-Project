@@ -264,11 +264,12 @@ Rectangle {
                                     focus=false
                                 }
                                 Keys.onEscapePressed: function(event) {
+                                    // Consume ESC here; do not close the Station.
+                                    event.accepted=true
                                     text=magickPane.celestialSource
                                           ? String(magickPane.celestialSource.dateStepDays)
                                           : "5"
                                     focus=false
-                                    event.accepted=true
                                 }
                                 Keys.onUpPressed: function(event) {
                                     applyStep()

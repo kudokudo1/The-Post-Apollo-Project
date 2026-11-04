@@ -676,6 +676,19 @@ PanelWindow {
         return true;
     }
 
+    // Header SHORTCUT to the existing SUBJECTS STAR MAP route. Navigation
+    // must happen first because launchSubjectTerminal guards the owning TOOLS
+    // route; neither a second Kitty actor nor a Classic mode may be created.
+    function launchHeaderTerminal() {
+        if (!menuOpen || !subjectNavigationOpen || contextTerminalRequested
+                || terminalView.terminalState !== "IDLE"
+                || !terminalView.outputName)
+            return false;
+        if (!subjectNavigator.chooseRoute("tools/terminal/star-map"))
+            return false;
+        return launchSubjectTerminal("terminal");
+    }
+
     function closeContextTerminal() {
         terminalView.closeTerminal();
         contextTerminalRequested = false;
@@ -799,27 +812,40 @@ PanelWindow {
                     }
                 }
 
+                // The former inactive CLOSE slot is the persistent
+                // terminal control: launch STAR MAP while idle and CLOSE
+                // the same verified Kitty actor while active. Its right edge
+                // stays in the original header position next to the divider.
                 ActionButton {
                     id: contextTerminalClose
-                    width: 57
+                    readonly property bool terminalSessionActive:
+                        weatherStation.contextTerminalRequested
+                        || terminalView.terminalState !== "IDLE"
+                    width: 88
                     height: 32
-                    label: "CLOSE"
+                    label: terminalSessionActive ? "CLOSE" : "TERMINAL"
                     labelPixelSize: 11
                     contentPadding: 4
-                    accentColor: Colors.red
-                    destructive: true
-                    idleForegroundColor: Colors.red
-                    idleBorderColor: Colors.red
-                    hoverForegroundColor: Colors.red
-                    hoverBorderColor: Colors.red
-                    idleContentGlowColor: Colors.red
-                    hoverContentGlowColor: Colors.red
-                    idleSoftGlowColor: Colors.red
-                    hoverSoftGlowColor: Colors.red
+                    accentColor: terminalSessionActive ? Colors.red : Colors.cyan
+                    destructive: terminalSessionActive
+                    idleForegroundColor: terminalSessionActive ? Colors.red : Colors.cyan
+                    idleBorderColor: terminalSessionActive ? Colors.red : Colors.cyan
+                    hoverForegroundColor: terminalSessionActive ? Colors.red : Colors.orange
+                    hoverBorderColor: terminalSessionActive ? Colors.red : Colors.orange
+                    idleContentGlowColor: terminalSessionActive ? Colors.red : Colors.cyan
+                    hoverContentGlowColor: terminalSessionActive ? Colors.red : Colors.orange
+                    idleSoftGlowColor: terminalSessionActive ? Colors.red : Colors.cyan
+                    hoverSoftGlowColor: terminalSessionActive ? Colors.red : Colors.orange
                     available: weatherStation.menuOpen
-                               && (weatherStation.contextTerminalRequested
-                                   || terminalView.terminalState !== "IDLE")
-                    onLeftClicked: weatherStation.closeContextTerminal()
+                               && (terminalSessionActive
+                                   || (weatherStation.subjectNavigationOpen
+                                       && terminalView.outputName))
+                    onLeftClicked: {
+                        if (terminalSessionActive)
+                            weatherStation.closeContextTerminal();
+                        else
+                            weatherStation.launchHeaderTerminal();
+                    }
                 }
 
                 // Separate the terminal session controls from the live

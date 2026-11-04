@@ -106,10 +106,11 @@ test("city icon and star ornaments share one vertical text-cell frame in dock an
     // Mixed-size Noto glyphs previously used incompatible top/baseline
     // placement. Equal-height text cells with centered line boxes make
     // the stars and city share a common geometric center.
-    const dockMark=dock.split("id: companyMark",2)[1]
-        .split("onLeftClicked: toggleRequested()",1)[0];
-    const headerMark=widget.split("id: headerCity",2)[1]
-        .split("\n            GohuText {",1)[0];
+    const dockStart=dock.indexOf("id: companyMark\n");
+    const headerStart=widget.indexOf("id: headerCity\n");
+    assert.ok(dockStart>=0 && headerStart>=0);
+    const dockMark=dock.slice(dockStart).split("onLeftClicked: toggleRequested()",1)[0];
+    const headerMark=widget.slice(headerStart).split("\n            GohuText {",1)[0];
     for(const [label,mark,id,height] of [
         ["dock",dockMark,"companyMark",30],
         ["header",headerMark,"headerCity",24]
@@ -117,8 +118,8 @@ test("city icon and star ornaments share one vertical text-cell frame in dock an
         assert.match(mark,new RegExp("height: "+height));
         assert.equal((mark.match(/NotoText\s*\{/g)||[]).length,3,
             label+" keeps exactly three art layers");
-        assert.equal((mark.match(new RegExp("height: "+id+"\\.height","g"))||[]).length,3,
-            label+" shares one vertical box across the artwork");
+        assert.equal((mark.match(new RegExp("height: "+id+"\\.height","g"))||[]).length,4,
+            label+" shares one vertical box across three glyphs and the city wrapper");
         assert.equal((mark.match(/verticalAlignment: Text\.AlignVCenter/g)||[]).length,3,
             label+" centers each text line box");
         assert.doesNotMatch(mark,/NotoText\s*\{\s*anchors\.verticalCenter:/,
@@ -138,8 +139,9 @@ test("central yellow city sits 2px below the white ornaments without shifting th
         ["header",source("widgets/CompanyNetworkW.qml"),"headerCity","headerCityGlyphCell","headerCityGlyph",18]
     ];
     for(const [label,sourceText,rowId,cellId,glyphId,fontSize] of cases) {
-        const tail=sourceText.split("id: "+rowId,2)[1];
-        assert.ok(tail,label+" Row still exists");
+        const rowStart=sourceText.indexOf("id: "+rowId+"\n");
+        assert.ok(rowStart>=0,label+" Row still exists");
+        const tail=sourceText.slice(rowStart);
         const row=tail.split(label==="dock"
             ? "onLeftClicked: toggleRequested()"
             : "\n            GohuText {",1)[0];

@@ -1,0 +1,63 @@
+name: CPU++ C1r TASKS Recovery visible Connections field
+
+on:
+  pull_request:
+    paths:
+      - 'services/connections/ConnectionsPolicy.js'
+      - 'services/connections/ConnectionsRegistry.qml'
+      - 'widgets/cpuplus/CpuPlusSettingsConnectionsDetailsPane.qml'
+      - 'tests/cpuplus/test_cpuplus_connections_c1.js'
+      - 'tests/cpuplus/test_connections_tasks_recovery_field_c1r.cjs'
+      - 'docs/connections-tasks-recovery-visible-field-c1r.md'
+      - '.github/workflows/connections-tasks-recovery-field-c1r.yml'
+      - 'services/connections/ConnectionsBroker.qml'
+      - 'services/hub/ApolloHubTodoStore.qml'
+  push:
+    branches: [main]
+    paths:
+      - 'services/connections/ConnectionsPolicy.js'
+      - 'services/connections/ConnectionsRegistry.qml'
+      - 'widgets/cpuplus/CpuPlusSettingsConnectionsDetailsPane.qml'
+      - 'tests/cpuplus/test_cpuplus_connections_c1.js'
+      - 'tests/cpuplus/test_connections_tasks_recovery_field_c1r.cjs'
+      - '.github/workflows/connections-tasks-recovery-field-c1r.yml'
+permissions:
+  contents: read
+
+jobs:
+  connections-tasks-field:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: QML parser validates shared Registry and CPU++ detail bay
+        run: |
+          sudo apt-get update -qq
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends qt6-declarative-dev-tools
+          QT_QPA_PLATFORM=offscreen /usr/lib/qt6/bin/qmlformat services/connections/ConnectionsRegistry.qml >/dev/null
+          QT_QPA_PLATFORM=offscreen /usr/lib/qt6/bin/qmlformat widgets/cpuplus/CpuPlusSettingsConnectionsDetailsPane.qml >/dev/null
+      - name: Standard Connections inventory and same-format TASKS tile
+        run: |
+          node --check tests/cpuplus/test_connections_tasks_recovery_field_c1r.cjs
+          node tests/cpuplus/test_cpuplus_connections_c1.js
+          node --test tests/cpuplus/test_connections_tasks_recovery_field_c1r.cjs
+      - name: Existing C2 broker and C2g status guard
+        run: |
+          node tests/cpuplus/test_connections_broker_c2a.js
+          node tests/cpuplus/test_connections_status_c2g.js
+      - name: Existing TASKS read-only recovery and sole writer
+        run: |
+          node --test tests/tasks/test_task_recovery_status_m13q.cjs
+          python3 tests/tasks/test_task_writer_gate_inventory_m11d.py
+      - name: No new files, key clients, automatic checking, or source writers
+        run: |
+          set -euo pipefail
+          ! grep -Eq 'FileView *\{|Process *\{|secret-tool|OpenSession|setText\(' \
+            services/connections/ConnectionsRegistry.qml
+          ! grep -Eq 'FileView *\{|Process *\{|secret-tool|ConnectionsBroker\.authorize\(' \
+            widgets/cpuplus/CpuPlusSettingsConnectionsDetailsPane.qml
+          test "$(grep -c 'tasksRecoveryRow(data),' services/connections/ConnectionsPolicy.js)" = 1
+          printf '%s\n' 'C1R_TASKS_VISIBLE_FIELD_READ_ONLY_SAME_LAYOUT_PASS'

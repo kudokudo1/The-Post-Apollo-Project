@@ -58,6 +58,16 @@ class ClockVisualCalibrationTests(unittest.TestCase):
         self.assertIn("selectedForegroundColor: Colors.magenta", PICKER)
         self.assertIn('zoneChoice = "";', SERVICE)
 
+    def test_zone_result_delegate_has_single_accent_binding(self):
+        # Repeated QML property assignments make the entire widget type
+        # unavailable at load time, cascading through CPU++ and shell.qml.
+        delegate = PICKER.split("delegate: ActionButton {", 1)[1].split(
+            "\n            }", 1)[0]
+        self.assertEqual(delegate.count("accentColor:"), 1)
+        self.assertIn("accentColor: picker.openSelectedZone", delegate)
+        self.assertNotIn("accentColor: Colors.white", delegate)
+        self.assertIn("selectedFillColor: Colors.yellow", delegate)
+
     def test_time_yellow_cancel_red_with_independent_glows(self):
         self.assertIn('actionRole === "sync" ? Colors.yellow', ACTION)
         self.assertIn('actionRole === "cancel" ? Colors.red', ACTION)

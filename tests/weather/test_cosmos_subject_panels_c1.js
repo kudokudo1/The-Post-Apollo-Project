@@ -181,7 +181,7 @@ test("one shared SpaceService flows through station/browser/COSMOS while Weather
   assert.match(station,/SubjectSourceBadge\.badgeFor\(/);
   assert.match(station,/subjectNavigator\.indexOpen/);
   assert.match(station,/StationTerminal\s*\{/);
-  assert.match(station,/onNewsMapRequested: function\(payload\)/);
+  assert.match(browser,/function showNewsMentionsOnEarth\(payload\)/);
 });
 
 test("COSMOS does not create independent collectors, storage writers or MAGICK calculations", () => {

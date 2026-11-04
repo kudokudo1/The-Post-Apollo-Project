@@ -118,7 +118,7 @@ test("historical model collector is shared and activated only for its explicit s
     assert.equal(env.needsSource(p,"history"),false,p);
   assert.match(station,/WeatherServices\.WeatherHistoryService/);
   assert.match(station,/subjectNavigator\.currentPath, "history"/);
-  assert.match(station,/weatherStation\.currentView === "home"/);
+  assert.match(station,/subjectNavigator\.liveHomeKind !== ""/);
   assert.match(pane,/historyService: weatherPane\.historyService/);
   assert.match(nav,/historyService: browser\.historyService/);
   assert.match(station,/historyService: weatherHistoryService/);
@@ -170,7 +170,7 @@ test("M2b stays read-only across datasets, user records, and other subjects", ()
   assert.match(station,/subjectNavigationOpen: false/);
   assert.match(pane,/active: weatherPane\.visible && weatherPane\.kind !== ""/);
   assert.match(station,/StationTerminal\s*\{/);
-  assert.match(station,/onNewsMapRequested: function\(payload\)/);
+  assert.match(nav,/function showNewsMentionsOnEarth\(payload\)/);
   assert.ok(!pane.includes("WeatherServices."));
   assert.ok(!pane.includes("eventArchiveStore:"));
   assert.ok(!pane.includes("dossierArchiveStore:"));

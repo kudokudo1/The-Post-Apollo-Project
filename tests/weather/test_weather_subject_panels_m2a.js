@@ -109,8 +109,9 @@ test("provider activation matches only relevant routes and preserves old collect
     assert.ok(ground.includes('SubjectPanelPolicy.needsSource(ground.subjectRoute,"'+s+'")'));
   for (const s of ["river","lightning"])
     assert.ok(station.includes('subjectNavigator.currentPath, "'+s+'"'));
-  assert.match(station,/!weatherStation\.subjectNavigationOpen\s*&& \(weatherStation\.currentView === "ground"/);
-  assert.match(station,/weatherStation\.currentView === "home"/);
+  assert.match(station,/active: weatherStation\.menuOpen && weatherStation\.subjectNavigationOpen/);
+  assert.match(station,/subjectNavigator\.liveHomeKind !== ""/);
+  assert.ok(!station.includes("currentView"));
   assert.match(station,/subjectNavigator\.currentPath, "history"/);
   assert.ok(!pane.includes("WeatherServices."));
 });
@@ -155,8 +156,8 @@ test("no premature MAP or MAGICK activation and no new persistence writer", () =
     assert.ok(!policySource.includes(t),"policy "+t);
   assert.ok(!pane.includes("eventArchiveStore"));
   assert.ok(!pane.includes("dossierArchiveStore"));
-  assert.match(station,/weatherStation\.currentView === "map"/);
-  assert.match(nav,/SPEC-ONLY SUBJECTS/);
+  assert.ok(!station.includes("weatherContentLoader"));
+  assert.match(nav,/INDEX \/\/ NATIVE SUBJECTS ROUTES/);
 });
 
 test("route header reveals correct scope without claiming live provider success", () => {
@@ -168,7 +169,7 @@ test("route header reveals correct scope without claiming live provider success"
   assert.match(sky,/text: "☁  WEATHER"/);
   assert.match(station,/SubjectSourceBadge\.badgeFor\(/);
   assert.match(station,/subjectNavigator\.currentPath,subjectNavigator\.indexOpen/);
-  assert.match(station,/if \(subjectNavigationOpen\) \{/);
+  assert.match(station,/sourceStatusDisplay: sourceStatusText/);
   assert.match(station,/subjectNavigator\.liveWeatherKind !== ""/);
   assert.match(station,/!subjectNavigator\.indexOpen/);
   assert.match(station,/return subjectSourceBadge\.text;/);

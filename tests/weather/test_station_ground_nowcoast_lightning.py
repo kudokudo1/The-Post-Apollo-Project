@@ -160,8 +160,10 @@ map_ui = (
 
 assert station.count("WeatherServices.NowcoastLightningService {") == 1
 assert "id: lightningService" in station
-assert 'weatherStation.currentView === "ground"' in station
-assert 'weatherStation.currentView === "map"' in station
+assert 'weatherStation.subjectNavigationOpen' in station
+assert 'SubjectPanelPolicy.needsSource(' in station
+assert 'EarthPanelPolicy.needsSource(' in station
+assert 'currentView' not in station
 assert "lightningSource: lightningService" in station
 assert "WeatherServices.NowcoastLightningService {" not in ground
 assert "property var lightningSource: null" in ground

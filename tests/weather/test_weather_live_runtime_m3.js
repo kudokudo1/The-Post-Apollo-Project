@@ -278,7 +278,9 @@ assert.match(station, /return "CACHE FRESH";/);
 assert.match(station, /return "CACHE AGING";/);
 assert.match(station, /return "CACHE STALE";/);
 assert.match(station, /return "CACHE EXPIRED";/);
-assert.match(station, /return "MAP CACHE";/);
+const nativeBadge = read("widgets/weather/StationSubjectSourceBadgePolicy.js");
+assert.match(station, /SubjectSourceBadge\.badgeFor\(/);
+assert.match(nativeBadge, /if \(cached>0\) return \{label:"CACHE",tone:"blue"\}/);
 assert.doesNotMatch(
     station,
     /"observedAt": weatherService[\s\S]{0,100}localObservationAnchorMs/

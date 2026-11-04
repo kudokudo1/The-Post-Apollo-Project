@@ -140,6 +140,26 @@ def exercise():
         assert host.stop() == "C2D_ALREADY_CLOSED"
         assert host.start() == "REFUSED_C2D_RESTART_INSTANCE"
 
+        # Fault injection: broker starts but Weather process launch fails.
+        # Host must close the inherited control channel and reap the broker.
+        real_spawn = host_code.subprocess.Popen
+        launched = []
+        def second_launch_fails(*args, **kwargs):
+            if launched:
+                raise OSError("simulated Weather launch failure")
+            child = real_spawn(*args, **kwargs)
+            launched.append(child)
+            return child
+        host_code.subprocess.Popen = second_launch_fails
+        partial = host_code.FakeConnectionsHost()
+        try:
+            assert partial.start() == "REFUSED_C2D_START_FAILURE"
+            must_be_reaped(partial)
+            assert len(launched) == 1
+            assert launched[0].poll() is not None, "ORPHAN_AFTER_PARTIAL_LAUNCH"
+        finally:
+            host_code.subprocess.Popen = real_spawn
+
         # A second host starts with zero approvals, even after previous success.
         with host_code.FakeConnectionsHost() as second:
             refused(second.read_fake_hotspots(), "NO_OPERATOR_GRANT")

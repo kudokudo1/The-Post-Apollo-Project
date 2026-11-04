@@ -846,12 +846,34 @@ var _newsCachedRows = [];
 var _newsCachedAtMs = 0;
 var _news429Count = 0;
 var _newsNeedsManualRetry = false;
+var _newsLastObservedClockMs = 0;
 
+// Wall time can jump when the operator corrects an incorrect Linux clock.
+// Move existing deadlines by the same backward jump, preserving the remaining
+// wait rather than stranding NEWS for an extra hour. Never bypass a 429.
+function reconcileNewsClock(nowMs) {
+    const now = Number(nowMs);
+    if (!isFinite(now) || now <= 0)
+        return now;
+    if (_newsLastObservedClockMs > 0
+            && now < _newsLastObservedClockMs - 60000) {
+        const delta = now - _newsLastObservedClockMs;
+        if (_newsNextAllowedMs > 0)
+            _newsNextAllowedMs = Math.max(now, _newsNextAllowedMs + delta);
+        if (_newsThrottleUntilMs > 0)
+            _newsThrottleUntilMs = Math.max(now, _newsThrottleUntilMs + delta);
+    }
+    _newsLastObservedClockMs = now;
+    return now;
+}
 function newsWaitMs(nowMs) {
-    return Math.max(0, _newsNextAllowedMs - Number(nowMs));
+    const now = reconcileNewsClock(nowMs);
+    return isFinite(now) && now > 0
+           ? Math.max(0, _newsNextAllowedMs - now) : 0;
 }
 function newsThrottled(nowMs) {
-    return Number(nowMs) < _newsThrottleUntilMs;
+    const now = reconcileNewsClock(nowMs);
+    return isFinite(now) && now > 0 && now < _newsThrottleUntilMs;
 }
 function newsManualRetryRequired() {
     return _newsNeedsManualRetry;
@@ -869,7 +891,7 @@ function reserveNewsRequest(nowMs) {
     return true;
 }
 function recordNewsThrottle(nowMs) {
-    const now = Number(nowMs);
+    const now = reconcileNewsClock(nowMs);
     if (!isFinite(now) || now <= 0) return 0;
     // The advertised "one request every 5 seconds" is not a guaranteed
     // recovery deadline after 429. Progressively cool down (5m,15m,30m,60m)
@@ -885,6 +907,7 @@ function recordNewsThrottle(nowMs) {
 function storeNewsRows(rows, nowMs) {
     if (!Array.isArray(rows) || !isFinite(nowMs) || Number(nowMs) <= 0)
         return;
+    reconcileNewsClock(nowMs);
     _newsCachedRows = rows.slice(0, 30);
     _newsCachedAtMs = Number(nowMs);
     _newsThrottleUntilMs = 0;
@@ -896,6 +919,34 @@ function storeNewsRows(rows, nowMs) {
 }
 function cachedNewsRows() {
     return {rows: _newsCachedRows.slice(), updatedAtMs: _newsCachedAtMs};
+}
+
+// Source rack states describe observed responses, not merely configured URLs.
+function newsRackState(source) {
+    const s = source || {};
+    const count = Array.isArray(s.rows) ? s.rows.length : 0;
+    if (s.loading) return "RECEIVING";
+    if (s.failed) {
+        if (String(s.errorText || "") === "RATE LIMITED")
+            return "RATE LIMITED";
+        return s.ready ? "LAST GOOD " + count + " // REQUEST FAILED"
+                       : "REQUEST FAILED";
+    }
+    if (s.ready)
+        return (s.usingCache ? "CACHED " : "ARTICLES ") + count;
+    if (Number(s.retryWaitSeconds) > 0)
+        return "COOLDOWN";
+    return "WAITING";
+}
+function smokeRackState(source) {
+    const s = source || {};
+    const count = Array.isArray(s.polygons) ? s.polygons.length : 0;
+    if (s.loading) return "RECEIVING";
+    if (s.failed)
+        return s.ready ? "LAST GOOD " + count + " // REQUEST FAILED"
+                       : "REQUEST FAILED";
+    if (s.ready) return "PLUMES " + count;
+    return "MANUAL READY";
 }
 
 // curl -w adds a status suffix, including on HTTP errors with non-JSON bodies.

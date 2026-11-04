@@ -1181,9 +1181,7 @@ Rectangle {
                         ? "HOTSPOTS " + firmsService.hotspots.length
                         : "MANUAL READY"},
                 {name:"NOAA HMS // SMOKE PLUMES",
-                 state: hmsSmokeService.ready
-                      ? "PLUMES " + hmsSmokeService.polygons.length
-                      : "MANUAL READY"}
+                 state: DiscoveryPolicy.smokeRackState(hmsSmokeService)}
             ];
         if (weatherMapOnly)
             return [
@@ -1194,9 +1192,8 @@ Rectangle {
                 {name:"RAINVIEWER // PAST RADAR FALLBACK", state:rainViewerRadarService.ready
                       ? "FRAME READY" : rainViewerRadarService.loading
                         ? "RECEIVING" : "MANUAL READY"},
-                {name:"NOAA HMS // SMOKE PLUMES", state:hmsSmokeService.ready
-                      ? "PLUMES " + hmsSmokeService.polygons.length
-                      : hmsSmokeService.loading ? "RECEIVING" : "MANUAL READY"}
+                {name:"NOAA HMS // SMOKE PLUMES",
+                 state: DiscoveryPolicy.smokeRackState(hmsSmokeService)}
             ];
         if (domain === "map")
             return [
@@ -1266,9 +1263,7 @@ Rectangle {
                 },
                 {
                     name:"NOAA HMS // SMOKE PLUME POLYGONS",
-                    state: hmsSmokeService.ready
-                           ? "LOADED " + hmsSmokeService.polygons.length
-                           : "MANUAL READY"
+                    state: DiscoveryPolicy.smokeRackState(hmsSmokeService)
                 },
                 {
                     name:"NASA FIRMS // VIIRS NOAA-21 HOTSPOTS",
@@ -1282,7 +1277,8 @@ Rectangle {
             ];
         if (domain === "news")
             return [
-                {name:"GDELT DOC // ARTICLE LIST", state:"ENDPOINT CONFIGURED"},
+                {name:"GDELT DOC // ARTICLE LIST",
+                 state:DiscoveryPolicy.newsRackState(source)},
                 {name:"LOCAL TOPIC FILTER + URL/TITLE DEDUPE", state:"CONNECTED"},
                 {name:"PUBLISHER / SOURCE COUNTRY FILTER", state:"CONNECTED"},
                 {name:"LANGUAGE + TIME WINDOW FILTERS", state:"CONNECTED"},

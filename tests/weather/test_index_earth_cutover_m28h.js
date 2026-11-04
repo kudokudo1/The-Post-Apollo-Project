@@ -69,7 +69,7 @@ test("EARTH has one source-scoped map instance, not second event or archive writ
   assert.match(earthPane,/Loader\s*\{/);
   assert.match(earthPane,/active: earthPane\.visible && earthPane\.kind === "map"/);
   assert.match(earthPane,/sourceComponent: earthMapComponent/);
-  assert.match(earthPane,/earthMapOnly: true/);
+  assert.match(earthPane,/earthMapOnly: !EarthPanelPolicy\.isFullMap\(earthPane\.subjectRoute\)/);
   assert.match(earthPane,/earthMapRoute: earthPane\.subjectRoute/);
   assert.match(earthPane,/newsMentionOverlay: earthPane\.newsMentionOverlay/);
   assert.match(earthPane,/eventArchiveStore: earthPane\.eventArchiveStore/);

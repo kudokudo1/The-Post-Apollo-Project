@@ -19,16 +19,19 @@ const earth = vm.createContext({});
 vm.runInContext(navSource.replace(/^\.pragma library\s*$/m,""),nav);
 vm.runInContext(policySource.replace(/^\.pragma library\s*$/m,""),earth);
 
-test("ten EARTH routes are legitimate canonical descendants and never cross subjects", () => {
+test("original ten EARTH routes plus one full original MAP are canonical descendants", () => {
   assert.equal(earth.FORMAT,"post-apollo.weather.earth-panels.e1.v1");
   const routes = Object.keys(earth.ROUTES);
-  assert.equal(routes.length,10);
+  assert.equal(routes.length,11);
+  assert.equal(routes.filter(route=>!earth.isFullMap(route)).length,10);
+  assert.equal(earth.isFullMap("earth/maps/full"),true);
   for(const route of routes) {
     const match = nav.findRoute(route);
     assert.ok(match,route);
     assert.equal(match.subject,"earth");
     assert.equal(earth.kindForRoute(route),"map");
-    assert.ok(earth.routeLabel(route).startsWith("EARTH //") ||
+    assert.ok(earth.routeLabel(route).startsWith("MAP //") ||
+              earth.routeLabel(route).startsWith("EARTH //") ||
               earth.routeLabel(route).startsWith("GEOLOGY //") ||
               earth.routeLabel(route).startsWith("GEOGRAPHY //") ||
               earth.routeLabel(route).startsWith("NATURAL EVENTS //") ||

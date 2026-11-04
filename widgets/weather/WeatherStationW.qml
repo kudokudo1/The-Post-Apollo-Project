@@ -83,8 +83,10 @@ PanelWindow {
                      && (weatherStation.currentView === "ground"
                          || weatherStation.currentView === "map"))
                     || (weatherStation.subjectNavigationOpen
-                        && SubjectPanelPolicy.needsSource(
-                               subjectNavigator.currentPath, "lightning")))
+                        && (SubjectPanelPolicy.needsSource(
+                               subjectNavigator.currentPath, "lightning")
+                            || EarthPanelPolicy.needsSource(
+                               subjectNavigator.currentPath, "lightning"))))
         latitude: weatherStation.weatherService
                   ? weatherStation.weatherService.latitude : ""
         longitude: weatherStation.weatherService
@@ -99,8 +101,10 @@ PanelWindow {
                      && (weatherStation.currentView === "ground"
                          || weatherStation.currentView === "map"))
                     || (weatherStation.subjectNavigationOpen
-                        && SubjectPanelPolicy.needsSource(
-                               subjectNavigator.currentPath, "river")))
+                        && (SubjectPanelPolicy.needsSource(
+                               subjectNavigator.currentPath, "river")
+                            || EarthPanelPolicy.needsSource(
+                               subjectNavigator.currentPath, "river"))))
         latitude: weatherStation.weatherService
                   ? weatherStation.weatherService.latitude : ""
         longitude: weatherStation.weatherService

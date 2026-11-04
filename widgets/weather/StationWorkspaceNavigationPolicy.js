@@ -49,6 +49,7 @@ var GROUPS = {
         {label:"EVENTS",path:"earth/events/eonet",key:"events"},
         {label:"FIRES",path:"earth/fires/hotspots",key:"fires"},
         {label:"MAPS",path:"earth/maps/overview",key:"maps"},
+        {label:"MAP // ALL",path:"earth/maps/full",key:"map"},
         {label:"DOSSIERS",path:"earth/investigations/context",key:"investigations"}
     ],
     media:[
@@ -106,6 +107,8 @@ function selectedGroup(path) {
             if(groups[j].path===path) return groups[j].key;
     }
     var group=tokens[1]||"overview";
+    // The full original MAP is a distinct bottom tab inside EARTH / MAPS.
+    if(family==="earth" && path==="earth/maps/full") return "map";
     // Keep the PLANETS+STARS deep INDEX subtree associated with the full
     // SKY bottom swap, while its detailed route stays available in INDEX.
     if(family==="cosmos" && group==="planets-stars") return "sky";

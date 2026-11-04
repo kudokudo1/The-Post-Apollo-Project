@@ -72,7 +72,9 @@ var SUBJECTS = [
     {id:"events",label:"NATURAL EVENTS",children:[
       {id:"eonet",label:"NASA EONET"}, {id:"gdacs",label:"GDACS"}]},
     {id:"fires",label:"FIRES",children:[{id:"hotspots",label:"NASA FIRMS HOTSPOTS"}]},
-    {id:"maps",label:"MAPS",children:[{id:"overview",label:"EVENT MAP"}]},
+    {id:"maps",label:"MAPS",children:[
+      {id:"overview",label:"EVENT MAP"},
+      {id:"full",label:"MAP // ALL ORIGINAL INSTRUMENTS"}]},
     {id:"investigations",label:"INVESTIGATIONS",children:[
       {id:"context",label:"EVENT CONTEXT"}, {id:"dossiers",label:"DOSSIERS"},
       {id:"archive",label:"EVENT ARCHIVE"}]}

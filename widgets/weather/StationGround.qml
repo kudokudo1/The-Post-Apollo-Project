@@ -16,6 +16,7 @@ Rectangle {
 
     // Optional WEATHER subject route. Empty keeps the exact CLASSIC page.
     property string subjectRoute: ""
+    signal routeRequested(string path)
     function sectionVisible(section) {
         return SubjectPanelPolicy.visibleFor("ground",subjectRoute,section);
     }
@@ -1004,7 +1005,35 @@ Rectangle {
         StationSectionDivider {
             visible: ground.sectionVisible("rivers")
             width: parent.width
-            title: "RIVER // NOAA NWPS"
+            title: SubjectPanelPolicy.riverTitleFor(ground.subjectRoute)
+        }
+
+        // The four deep RIVERS routes stay directly reachable without
+        // reopening INDEX. All five buttons reuse the same original source.
+        Row {
+            width: parent.width
+            spacing: 6
+            visible: ground.subjectRoute.indexOf("weather/water/rivers") === 0
+            Repeater {
+                model: [
+                    {label:"ALL",path:"weather/water/rivers"},
+                    {label:"GAUGES",path:"weather/water/rivers/gauges"},
+                    {label:"NEARBY",path:"weather/water/rivers/nearby"},
+                    {label:"FLOOD",path:"weather/water/rivers/flood"},
+                    {label:"HYDROGRAPH",path:"weather/water/rivers/hydrograph"}
+                ]
+                delegate: ModeButton {
+                    required property var modelData
+                    width: Math.max(1,(parent.width - 24)/5)
+                    height: 30
+                    bordered: false
+                    textOnly: true
+                    labelFontSize: 10
+                    labelText: modelData.label
+                    selected: ground.subjectRoute === modelData.path
+                    onTriggered: ground.routeRequested(modelData.path)
+                }
+            }
         }
 
         Column {
@@ -1242,6 +1271,8 @@ Rectangle {
             WeatherTrendInspector {
                 width: parent.width
                 visible: riverService.ready && !!riverService.gauge
+                         && SubjectPanelPolicy.riverGroupVisible(
+                             ground.subjectRoute,"hydrograph")
                 title: "LOCAL PRECIP ↔ NWPS OBSERVED STAGE"
                 leftLabel: "PRECIP mm"
                 rightLabel: "STAGE "
@@ -1267,6 +1298,8 @@ Rectangle {
                 spacing: 6
                 visible: riverService.ready
                          && riverService.nearbyGauges.length > 1
+                         && SubjectPanelPolicy.riverGroupVisible(
+                             ground.subjectRoute,"nearby")
 
                 StationSectionDivider {
                     width: parent.width
@@ -1391,10 +1424,22 @@ Rectangle {
                 }
             }
 
+            QuietText {
+                width: parent.width
+                visible: ground.subjectRoute === "weather/water/rivers/nearby"
+                         && riverService.ready && !!riverService.gauge
+                         && riverService.nearbyGauges.length <= 1
+                text: "ONLY ONE NWPS GAUGE RETURNED // NO NEARBY COMPARISON AVAILABLE"
+                color: Colors.orange
+                font.pixelSize: 10
+            }
+
             Column {
                 width: parent.width
                 spacing: 7
                 visible: riverService.ready && !!riverService.gauge
+                         && SubjectPanelPolicy.riverGroupVisible(
+                             ground.subjectRoute,"flood")
 
                 StationSectionDivider {
                     width: parent.width
@@ -1637,6 +1682,8 @@ Rectangle {
                 width: parent.width
                 spacing: 7
                 visible: riverService.ready && !!riverService.gauge
+                         && SubjectPanelPolicy.riverGroupVisible(
+                             ground.subjectRoute,"hydrograph")
 
                 StationSectionDivider {
                     width: parent.width

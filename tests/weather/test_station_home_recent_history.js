@@ -101,10 +101,13 @@ for (const forbidden of [
 const station = read("widgets/weather/WeatherStationW.qml");
 assert.match(station, /import "\.\.\/\.\.\/services\/weather" as WeatherServices/);
 assert.match(station, /WeatherServices\.WeatherHistoryService\s*\{/);
-assert.match(station, /active: weatherStation\.menuOpen[\s\S]*?currentView === "home"/);
+assert.match(station,/active: weatherStation\.menuOpen && weatherStation\.subjectNavigationOpen/);
+assert.match(station,/subjectNavigator\.liveHomeKind !== ""/);
 assert.match(station, /latitude: weatherStation\.weatherService/);
 assert.match(station, /anchorDateTime: weatherStation\.weatherService/);
-assert.match(station, /StationHome\s*\{[\s\S]*?historyService: weatherHistoryService/);
+const workspace=read("widgets/weather/StationWorkspaceSurface.qml");
+assert.match(station,/historyService: weatherHistoryService/);
+assert.match(workspace,/StationHome\s*\{[\s\S]*?historyService: surface\.historyService/);
 
 const home = read("widgets/weather/StationHome.qml");
 assert.match(home, /property var historyService: null/);

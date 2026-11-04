@@ -24,7 +24,7 @@ class NativePolkitClockResyncContracts(unittest.TestCase):
         self.assertIn("resyncAuthPending = true", prepare)
         self.assertIn('resyncStatus = "auth-preparing"', prepare)
         self.assertNotIn("resyncProcess.exec", prepare)
-        launch = SERVICE.split("function launchResyncAfterAgentReady() {", 1)[1].split(
+        launch = SERVICE.split("function launchResyncAfterAgentReady(nativeRegistered) {", 1)[1].split(
             "Timer {", 1)[0]
         self.assertIn("resyncAuthPending = false", launch)
         self.assertIn("resyncProcess.exec([", launch)

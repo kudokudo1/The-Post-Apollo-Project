@@ -64,6 +64,40 @@ class PhoneAudioUiTests(unittest.TestCase):
         self.assertIn('"PREFERENCE_SAVED"', self.qml)
         self.assertIn('No change made.', self.qml)
 
+    def test_calls_off_stays_clickable_without_ofono_and_shows_explanation(self):
+        # The operator's screenshot had a visually present but completely
+        # disabled CALLS ON PC: OFF because oFono was not active.
+        match = re.search(
+            r'ActionButton \\{(?P<body>.*?CALLS ON PC: ON.*?'
+            r'onTriggered: phonePane.changePhoneAudio\\((?:.|\\n)*?\\))',
+            self.qml, re.S,
+        )
+        self.assertIsNotNone(match)
+        button = match.group("body")
+        self.assertIn('interactive: !audioActionProcess.running', button)
+        self.assertIn('&& !audioStatusProcess.running', button)
+        self.assertIn('&& !phonePane.stageWanted', button)
+        # Missing capabilities are handled by the click, not by a dead button.
+        self.assertNotIn('&& phonePane.phoneAudioStatus.ofonoActive === true', button)
+        self.assertNotIn('&& phonePane.phoneAudioStatus.callsEnabled !== null', button)
+        self.assertNotIn('&& phonePane.phoneAudioStatus.canAdjust === true', button)
+
+        handler = re.search(
+            r'function changePhoneAudio\\(family, selection\\) \\{'
+            r'(?P<body>.*?)\\n    \\}',
+            self.qml, re.S,
+        )
+        self.assertIsNotNone(handler)
+        action = handler.group("body")
+        self.assertIn('phoneAudioResult = "CALLS_PREREQUISITES_MISSING";', action)
+        self.assertIn('phoneAudioResult = "CALLS_UNSUPPORTED";', action)
+        self.assertIn('phoneAudioResult = "CALLS_STATUS_UNAVAILABLE";', action)
+        self.assertIn('phoneAudioStatus.ofonoActive !== true', action)
+        self.assertIn('phoneAudioStatus.canAdjust !== true', action)
+        self.assertIn('typeof phoneAudioStatus.callsEnabled !== "boolean"', action)
+        self.assertIn('No change made to your phone or media route.', self.qml)
+        self.assertIn('Tap the call control for the missing hands-free requirement.', self.qml)
+
     def test_audio_controls_do_not_steal_staged_terminal_space(self):
         self.assertIn('id: phoneAudioSettings', self.qml)
         self.assertIn('visible: phonePane.setupState === "CHECKED" && !phonePane.stageWanted', self.qml)

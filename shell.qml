@@ -622,6 +622,10 @@ PanelWindow {
 
         Workspaces {}
 
+        // Tray // Keep immediately after Workspaces; the Camera module now
+        // supplies the white/blue visual identity formerly needed here.
+        Tray {}
+
         // Mediaplayer
 
         Mediaplayer {
@@ -648,10 +652,6 @@ PanelWindow {
                 screen: shellRoot.screen
             }
         }
-
-        // Tray
-
-        Tray {}
 
         // Hospital
 

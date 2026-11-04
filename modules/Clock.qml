@@ -385,6 +385,37 @@ Item {
             }
         }
 
+        // Underline exactly the readout cluster, from the first hour digit
+        // through AM/PM. Never underline the ornamental clock glyphs.
+        // Evidence: manual display calibration, or a fresh opt-in Chrony
+        // reference measurement >= 1s. NTP OFF is not proof of bad time.
+        Rectangle {
+            id: timeDifferenceUnderline
+            x: clockRow.x + clockReadout.x
+            y: clockRow.y + clockReadout.y + clockReadout.height - 1
+            width: clockReadout.width
+            height: 2
+            color: Colors.yellow
+            visible: TimeSettings.dockTimeUnderlined(clock.date.getTime())
+            z: 3
+        }
+        SafeDropShadow {
+            safeSource: timeDifferenceUnderline
+            x: timeDifferenceUnderline.x
+            y: timeDifferenceUnderline.y
+            width: timeDifferenceUnderline.width
+            height: timeDifferenceUnderline.height
+            horizontalOffset: 0
+            verticalOffset: 0
+            radius: 7
+            samples: 15
+            color: Colors.yellow
+            opacity: 0.7
+            requestedVisible: timeDifferenceUnderline.visible
+            transparentBorder: true
+            z: 2
+        }
+
         onRightClicked: {
             clockArea.is24Hour = !clockArea.is24Hour;
         }

@@ -91,37 +91,40 @@ def test_cpu_mode_and_monitor_keys_are_window_local():
     assert 'sequence: "Ctrl+Right"' not in src
 
 
-def test_weather_domains_are_first_class_main_modes():
+def test_weather_domains_are_first_class_subject_families():
     src = read("widgets/weather/WeatherStationW.qml")
-
+    family_rail = read("widgets/weather/StationWorkspaceFamilyRail.qml")
+    index_rail = read("widgets/weather/StationSubjectRail.qml")
+    workspace = read("widgets/weather/StationWorkspaceSurface.qml")
+    policy = read("widgets/weather/StationWorkspaceNavigationPolicy.js")
     for key in ("Tab", "Shift+Tab", "Up", "Down", "Enter", "Return"):
         assert 'sequence: "' + key + '"' in src
-
-    # Domain pages are no longer a HOME-owned top Sub Mode family.
     assert 'sequence: "Shift+Left"' not in src
     assert 'sequence: "Shift+Right"' not in src
     assert "function cycleTopSubMode(direction)" not in src
     assert "property string activeDomain" not in src
 
-    order_match = re.search(
-        r"readonly property var mainModes:\s*\[([^\]]+)\]", src
-    )
-    assert order_match
-    order = re.findall(r'"id":\s*"([^"]+)"', order_match.group(1))
-    assert order == [
-        "home", "ground", "sky", "space",
-        "map", "news", "radio", "terminal",
-    ]
-
+    # M28-V retires the eight original Classic modes in favor of seven real
+    # workspace families. Neither a duplicate loader nor a mode cursor remains.
+    assert 'mainModes:' not in src
+    assert 'id: railColumn' not in src
+    assert 'weatherContentLoader' not in src
+    assert 'StationWorkspaceFamilyRail {' in src
+    assert 'StationSubjectRail {' in src
+    assert src.count("ModeButton {") == 0
+    assert 'model: Workspace.FAMILIES' in family_rail
+    order = re.findall(r'\{id:"(home|weather|cosmos|earth|media|magick|tools)",label:', policy)
+    assert order[:7] == ["home","weather","cosmos","earth","media","magick","tools"]
+    assert family_rail.count("ModeButton {") == 1
+    assert index_rail.count("ModeButton {") == 1
     assert "function cycleMainMode(direction)" in src
     assert "function moveNavigationCursor(direction)" in src
     assert "function activateNavigationCursor()" in src
-    assert "id: mainModeButton" in src
-    assert "keyboardSelected:" in src
-    assert "onPointerMoved:" in src
-    assert "StationGround {" in src
-    assert "StationSky {" in src
-    assert "StationSpace {" in src
+    assert "subjectNavigator.cycleSubjects(direction);" in src
+    assert "subjectNavigator.moveCursor(direction);" in src
+    assert "subjectNavigator.activateCursor();" in src
+    for name in ("Weather","Cosmos","Earth","Media","Magick","Tools"):
+        assert "Station" + name + "SubjectPane {" in workspace
     assert "(!relationshipFocusModeActive || relationshipFocused)" in src
     assert "context: Qt.WindowShortcut" in src
 

@@ -19,7 +19,7 @@ class SharedArchiveAndRecordActions(unittest.TestCase):
         self.assertIn("onTriggered: search.includeArchived = !search.includeArchived", SEARCH)
         self.assertLess(SEARCH.index('objectName: "localShowArchivedRecords"'),
                         SEARCH.index('visible: search.needle.length > 0'))
-        self.assertIn("RECORD ACTIONS // ADD, EDIT NAME + SAVE, ARCHIVE + CONFIRM, RESTORE", SEARCH)
+        self.assertIn("RECORD ACTIONS // ADD, EDIT NAME + SAVE, ARCHIVE, RED X DELETE + CONFIRM, RESTORE", SEARCH)
         self.assertIn("select ALL / NO SELECTION", SEARCH)
         self.assertEqual(PANE.count("useSharedArchiveControl: true"), 3)
         self.assertEqual(PANE.count("localRecordsSearch.includeArchived"), 3)

@@ -152,8 +152,8 @@ Column {
             const code = response && response.error
                 ? String(response.error) : "REMOVE_UNAVAILABLE";
             const instructions = {
-                REMOVE_BRANCHES_FIRST:"Remove archived branches before the company.",
-                REMOVE_UNITS_FIRST:"Remove its archived structure units first.",
+                REMOVE_BRANCHES_FIRST:"Delete the company's child branches first.",
+                REMOVE_UNITS_FIRST:"Delete the company's structure units first.",
                 DETACH_PORTFOLIOS_FIRST:"Detach the company from every portfolio.",
                 UNLINK_ORGANIZATION_FIRST:"Remove its saved relationships and labels.",
                 UNLINK_BRANCH_SOCIAL_FIRST:"Unlink this branch's Social label first.",

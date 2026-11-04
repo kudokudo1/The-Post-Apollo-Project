@@ -8,6 +8,7 @@ Column {
     property var saveFeedback: null
     property var refreshPanel: null
     property var backupPanel: null
+    property bool recordingEnabled: true
 
     property var entries: []
     property int nextSequence: 1
@@ -17,6 +18,8 @@ Column {
     spacing: 6
 
     function appendEvent(kind, source, detail) {
+        if (!recordingEnabled)
+            return false;
         const allowed = ["saved", "failure", "conflict", "unconfirmed",
                          "loaded", "refresh", "backup", "validation", "listing"];
         if (!allowed.includes(kind))

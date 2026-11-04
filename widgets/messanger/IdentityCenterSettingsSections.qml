@@ -278,6 +278,8 @@ Item {
                         id: localSessionActivity
                         objectName: "orgLocalSessionActivity"
                         width: parent.width
+                        recordingEnabled: sections.settingsOpen
+                            && sections.activeSection === "ORGANIZATIONS"
                         saveFeedback: localSaveFeedback
                         refreshPanel: localRefreshAll
                         backupPanel: localOrgBackup

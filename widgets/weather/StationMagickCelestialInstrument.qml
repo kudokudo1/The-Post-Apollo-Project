@@ -1,4 +1,5 @@
 import QtQuick
+import QtQuick.Effects
 import "../../components"
 import "StationMagickCelestialVisualPolicy.js" as Celestial
 
@@ -23,6 +24,8 @@ Rectangle {
     property real zoom: 1.0
     property real panPosition: 0.5
     property int eventOrdinal: -1
+    // Visual-only neon styling; no extra ephemeris calls or animations.
+    property bool neonEnabled: true
 
     readonly property var eventsInView: Celestial.visibleEvents(graphModel,viewWindow)
     readonly property var chosenEvent: Celestial.eventAt(graphModel,viewWindow,eventOrdinal)
@@ -74,6 +77,27 @@ Rectangle {
     onWidthChanged: graphCanvas.requestPaint()
     onHeightChanged: graphCanvas.requestPaint()
 
+    function neonStroke(ctx,color,width,blur) {
+        ctx.save();
+        ctx.strokeStyle=String(color);
+        ctx.lineWidth=width;
+        ctx.shadowColor=String(color);
+        ctx.shadowBlur=instrument.neonEnabled ? blur : 0;
+        ctx.shadowOffsetX=0;
+        ctx.shadowOffsetY=0;
+        ctx.stroke();
+        ctx.restore();
+    }
+    function neonText(ctx,text,x,y,color,blur) {
+        ctx.save();
+        ctx.fillStyle=String(color);
+        ctx.shadowColor=String(color);
+        ctx.shadowBlur=instrument.neonEnabled ? blur : 0;
+        ctx.shadowOffsetX=0;
+        ctx.shadowOffsetY=0;
+        ctx.fillText(text,x,y);
+        ctx.restore();
+    }
     function chartInk(i) {
         return [String(Colors.orange),String(Colors.cyan),
                 String(Colors.magenta),String(Colors.yellow)][i%4];
@@ -88,29 +112,37 @@ Rectangle {
         for (let ring=0;ring<3;ring++){
             ctx.beginPath();
             ctx.arc(cx,cy,radius*(1-ring*0.18),0,2*Math.PI);
-            ctx.stroke();
+            instrument.neonStroke(ctx,
+                ring===0?Colors.cyan:Colors.blue,ring===0?1.5:1,7);
         }
         ctx.font="10px monospace";
         for(let sign=0;sign<12;sign++){
             const theta=sign*Math.PI/6-Math.PI/2;
-            ctx.strokeStyle=String(Colors.cyan);
-            ctx.globalAlpha=0.35;
+            const color=Celestial.zodiacColor(sign);
+            ctx.globalAlpha=0.38;
             ctx.beginPath();
             ctx.moveTo(cx,cy);
             ctx.lineTo(cx+radius*Math.cos(theta),
                        cy+radius*Math.sin(theta));
-            ctx.stroke();
-            ctx.fillStyle=String(Colors.white);
-            ctx.globalAlpha=0.9;
-            const label=Celestial.SIGNS[sign];
-            ctx.fillText(label,cx+(radius+13)*Math.cos(theta)-6,
-                              cy+(radius+13)*Math.sin(theta)+4);
+            instrument.neonStroke(ctx,color,0.8,5);
+            // Actual Unicode zodiac glyphs, not AR/TA/GE abbreviations.
+            // Qt's font fallback resolves the symbols if Noto is absent.
+            ctx.font="18px 'Noto Sans Symbols 2'";
+            ctx.textAlign="center";
+            ctx.textBaseline="middle";
+            ctx.globalAlpha=1;
+            const glyph=Celestial.zodiacGlyph(sign);
+            instrument.neonText(ctx,glyph,
+                cx+(radius+17)*Math.cos(theta),
+                cy+(radius+17)*Math.sin(theta),color,10);
+            ctx.font="10px monospace";
         }
+        ctx.textAlign="start";
+        ctx.textBaseline="alphabetic";
         ctx.globalAlpha=1;
-        ctx.fillStyle=String(Colors.magenta);
-        ctx.fillText("ECLIPTIC",cx-28,cy-7);
-        ctx.fillStyle=String(Colors.cyan);
-        ctx.fillText("0° / AR",cx-21,cy+11);
+        ctx.font="10px monospace";
+        instrument.neonText(ctx,"ECLIPTIC",cx-28,cy-7,Colors.magenta,7);
+        instrument.neonText(ctx,"0° / ♈",cx-21,cy+11,Colors.cyan,6);
         const positions=instrument.wheelPoints;
         const byBody={};
         for(let p=0;p<positions.length;p++)
@@ -127,7 +159,7 @@ Rectangle {
             ctx.lineTo(cx+radius*Math.sin(rb),cy-radius*Math.cos(rb));
             ctx.strokeStyle=String(Colors.magenta);
             ctx.globalAlpha=0.72;
-            ctx.lineWidth=1.5;ctx.stroke();
+            instrument.neonStroke(ctx,Colors.magenta,1.5,9);
         }
         ctx.globalAlpha=1;
         for(let k=0;k<positions.length;k++){
@@ -138,7 +170,10 @@ Rectangle {
             ctx.arc(x,y,point.body===instrument.focusBody?6.5:4.5,
                     0,2*Math.PI);
             ctx.fillStyle=point.color;
+            ctx.shadowColor=point.color;
+            ctx.shadowBlur=instrument.neonEnabled?11:0;
             ctx.fill();
+            ctx.shadowBlur=0;
             ctx.strokeStyle=String(Colors.black);
             ctx.lineWidth=1;ctx.stroke();
             // Marker remains on its true ecliptic angle; text is offset
@@ -153,12 +188,11 @@ Rectangle {
             ctx.lineTo(point.x,point.y-3);
             ctx.strokeStyle=point.color;
             ctx.globalAlpha=0.5;
-            ctx.lineWidth=1;
-            ctx.stroke();
+            instrument.neonStroke(ctx,point.color,1,5);
             ctx.globalAlpha=1;
-            ctx.fillStyle=point.color;
             ctx.font="10px monospace";
-            ctx.fillText(point.label,point.x,point.y);
+            instrument.neonText(ctx,point.label,point.x,point.y,
+                                point.color,6);
         }
         ctx.restore();
     }
@@ -185,8 +219,8 @@ Rectangle {
             if(i===0)ctx.moveTo(p.x,p.y);
             else ctx.lineTo(p.x,p.y);
         }
-        ctx.strokeStyle=String(Colors.blue);
-        ctx.lineWidth=2;ctx.globalAlpha=0.9;ctx.stroke();
+        ctx.globalAlpha=0.9;
+        instrument.neonStroke(ctx,Colors.blue,2,8);
         for(let i=0;i<=60;i++){
             const deg=i*value.separation_deg/60;
             const p=Celestial.relationArcPoint(deg,width,height);
@@ -194,8 +228,8 @@ Rectangle {
             if(i===0)ctx.moveTo(p.x,p.y);
             else ctx.lineTo(p.x,p.y);
         }
-        ctx.strokeStyle=String(Colors.magenta);
-        ctx.lineWidth=3;ctx.globalAlpha=0.95;ctx.stroke();
+        ctx.globalAlpha=0.95;
+        instrument.neonStroke(ctx,Colors.magenta,3,13);
         ctx.font="9px monospace";
         for(let guide of Celestial.ASPECT_GUIDES){
             const p=Celestial.relationArcPoint(guide.angle,width,height);
@@ -203,8 +237,8 @@ Rectangle {
             ctx.beginPath();
             ctx.moveTo(p.x-dx*5,p.y-dy*5);
             ctx.lineTo(p.x+dx*5,p.y+dy*5);
-            ctx.strokeStyle=String(Colors.yellow);
-            ctx.lineWidth=1;ctx.globalAlpha=0.9;ctx.stroke();
+            ctx.globalAlpha=0.9;
+            instrument.neonStroke(ctx,Colors.yellow,1,5);
             ctx.fillStyle=String(Colors.white);
             const px=Celestial.clamp(p.x-10,2,width-32);
             const py=Celestial.clamp(p.y+dy*13,22,height-21);
@@ -212,7 +246,10 @@ Rectangle {
         }
         const marker=Celestial.relationArcPoint(value.separation_deg,width,height);
         ctx.beginPath();ctx.arc(marker.x,marker.y,5,0,2*Math.PI);
-        ctx.fillStyle=String(Colors.magenta);ctx.globalAlpha=1;ctx.fill();
+        ctx.fillStyle=String(Colors.magenta);ctx.globalAlpha=1;
+        ctx.shadowColor=String(Colors.magenta);
+        ctx.shadowBlur=instrument.neonEnabled?12:0;
+        ctx.fill();ctx.shadowBlur=0;
         ctx.strokeStyle=String(Colors.white);ctx.lineWidth=1;ctx.stroke();
         const centerX=width/2,centerY=Math.max(70,height*0.79);
         ctx.fillStyle=String(Colors.white);
@@ -236,7 +273,10 @@ Rectangle {
             {x:second.x,color:value.secondColor,label:value.second}
         ]){
             ctx.beginPath();ctx.arc(node.x,centerY,4,0,2*Math.PI);
-            ctx.fillStyle=node.color;ctx.fill();
+            ctx.fillStyle=node.color;
+            ctx.shadowColor=node.color;
+            ctx.shadowBlur=instrument.neonEnabled?8:0;
+            ctx.fill();ctx.shadowBlur=0;
             ctx.font="10px monospace";
             ctx.fillText(node.label.slice(0,12),
                 Celestial.clamp(node.x-node.label.length*3,2,width-80),
@@ -324,7 +364,8 @@ Rectangle {
                 if(index===view.from)ctx.moveTo(x,y);
                 else ctx.lineTo(x,y);
             }
-            ctx.stroke();
+            instrument.neonStroke(ctx,instrument.chartInk(rowIndex),
+                                  isFocused?2.2:1.5,7);
         }
         const start=instrument.graphModel.times[view.from];
         const end=instrument.graphModel.times[view.to];
@@ -341,7 +382,9 @@ Rectangle {
                 ctx.globalAlpha=selected?1:0.38;
                 ctx.lineWidth=selected?2:1;
                 ctx.beginPath();ctx.moveTo(x,layout.top);
-                ctx.lineTo(x,layout.bottom);ctx.stroke();
+                ctx.lineTo(x,layout.bottom);
+                instrument.neonStroke(ctx,selected?Colors.magenta:Colors.yellow,
+                                      selected?2:1,selected?9:5);
             }
         }
         const focusTime=instrument.graphModel.times[instrument.focusIndex];
@@ -352,7 +395,8 @@ Rectangle {
             ctx.globalAlpha=0.95;
             ctx.lineWidth=1;
             ctx.beginPath();ctx.moveTo(focusX,layout.top);
-            ctx.lineTo(focusX,layout.bottom);ctx.stroke();
+            ctx.lineTo(focusX,layout.bottom);
+            instrument.neonStroke(ctx,Colors.magenta,1,7);
             for(let rowIndex=0;rowIndex<series.length;rowIndex++){
                 const row=series[rowIndex];
                 const sample=instrument.mode==="aspects"
@@ -365,7 +409,9 @@ Rectangle {
                 ctx.beginPath();ctx.arc(focusX,y,3.5,0,2*Math.PI);
                 ctx.fillStyle=instrument.chartInk(rowIndex);
                 ctx.globalAlpha=1;
-                ctx.fill();
+                ctx.shadowColor=instrument.chartInk(rowIndex);
+                ctx.shadowBlur=instrument.neonEnabled?8:0;
+                ctx.fill();ctx.shadowBlur=0;
             }
         }
         ctx.restore();

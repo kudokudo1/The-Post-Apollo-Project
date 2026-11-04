@@ -55,7 +55,9 @@ def inspect(
         and observation.get("phoneLink") == "UNVERIFIED"
         and observation.get("contentAuthorized") is False
         and type(observation.get("configurationPresent")) is bool
+        and type(observation.get("backendService")) is str
         and observation.get("backendService") in BACKEND
+        and type(observation.get("backendObservation")) is str
         and observation.get("backendObservation") in PROFILE
         and (
             (observation.get("backendObservation") == "REPORTED"

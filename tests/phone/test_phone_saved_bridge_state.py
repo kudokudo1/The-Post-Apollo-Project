@@ -133,7 +133,7 @@ class SavedStateTests(unittest.TestCase):
             "unknown")
 
     def test_requires_explicit_flag(self):
-        with mock.patch.object(module, "inspect") as action, mock.patch("builtins.print"):
+        with mock.patch.object(module, "inspect", return_value={"schema":module.SCHEMA}) as action, mock.patch("builtins.print"):
             self.assertEqual(module.main([]), 2)
             action.assert_not_called()
             self.assertEqual(module.main(["--inspect"]), 0)

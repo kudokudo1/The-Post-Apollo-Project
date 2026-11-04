@@ -63,7 +63,8 @@ test("TOOLS terminal routes request one original root Kitty actor without CLASSI
   assert.match(browser,/onTerminalLaunchRequested: function\(mode\)/);
   assert.match(station,/function launchSubjectTerminal\(mode\)/);
   assert.match(station,/weatherStation\.launchSubjectTerminal\(mode\)/);
-  assert.match(station,/function launchContextTerminal\(\)/);
+  assert.ok(!station.includes("function launchContextTerminal()"));
+  assert.match(station,/terminalMode: weatherStation\.subjectTerminalMode/);
   assert.match(terminal,/sessionMode === "terminal" \? "weather-screen"/);
   assert.match(terminal,/kittyActorConfirmed/);
   assert.match(terminal,/function closeTerminal\(\)/);
@@ -216,18 +217,18 @@ test("all previous subject panes, CLASSIC, runtime mask and terminal owner remai
   for(const name of ["Weather","Cosmos","Earth","Media","Magick","Tools"])
     assert.ok(browser.includes("Station"+name+"SubjectPane {"),name);
   assert.match(browser,/visible: browser\.visible && browser\.liveToolsKind !== ""/);
-  assert.match(browser,/onLegacyPageRequested: function\(pageId\)/);
+  assert.ok(!browser.includes("legacyPageRequested"));
   assert.match(browser,/weatherService: browser\.weatherService/);
   assert.match(browser,/spaceService: browser\.spaceService/);
   assert.match(browser,/runtimeNowMs: browser\.runtimeNowMs/);
   assert.match(station,/subjectNavigator\.liveToolsKind !== ""/);
   assert.match(station,/SubjectSourceBadge\.badgeFor\(/);
   assert.match(station,/subjectNavigator\.currentPath,subjectNavigator\.indexOpen/);
-  assert.match(station,/active: !weatherStation\.subjectNavigationOpen/);
+  assert.ok(!station.includes("weatherContentLoader"));
   assert.match(station,/terminalHoleActive:/);
   assert.match(station,/StationTerminal\s*\{/);
-  assert.match(station,/onNewsMapRequested: function\(payload\)/);
-  assert.match(station,/if \(subjectNavigationOpen\) \{/);
+  assert.match(browser,/function showNewsMentionsOnEarth\(payload\)/);
+  assert.match(station,/sourceStatusDisplay: sourceStatusText/);
   assert.match(station,/subjectNavigator\.liveWeatherKind !== ""/);
   assert.match(station,/!subjectNavigator\.indexOpen/);
   assert.match(station,/return subjectSourceBadge\.text;/);

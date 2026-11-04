@@ -55,8 +55,10 @@ if(!expected||!validEnv()){
     if(errs.length>8)child.kill("SIGKILL");
   });
   child.on("error",()=>{errs+="x";});
+  child.stdin.on("error",()=>{errs+="x";});
   child.on("close",code=>{
     clearTimeout(timer);
+    child.stdin.destroy();
     if(done)return;
     done=true;
     let v=null;

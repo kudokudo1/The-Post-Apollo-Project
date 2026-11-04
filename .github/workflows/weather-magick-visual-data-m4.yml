@@ -4,6 +4,8 @@ on:
     paths:
       - 'scripts/weather/celestial_visual_data.py'
       - 'scripts/weather/celestial_spatial_data.py'
+      - 'scripts/weather/celestial_solar_overview.py'
+      - 'tests/weather/test_celestial_solar_overview_v4d.py'
       - 'tests/weather/test_celestial_spatial_v4c.py'
       - 'tests/weather/test_celestial_visual_data_m4.py'
       - 'scripts/weather/celestial_contract.py'
@@ -14,6 +16,8 @@ on:
     paths:
       - 'scripts/weather/celestial_visual_data.py'
       - 'scripts/weather/celestial_spatial_data.py'
+      - 'scripts/weather/celestial_solar_overview.py'
+      - 'tests/weather/test_celestial_solar_overview_v4d.py'
       - 'tests/weather/test_celestial_spatial_v4c.py'
       - 'tests/weather/test_celestial_visual_data_m4.py'
       - 'scripts/weather/celestial_contract.py'
@@ -38,6 +42,7 @@ jobs:
           python3 -m unittest discover -s tests/weather -p 'test_celestial_precision_m3.py' -v
           python3 -m unittest discover -s tests/weather -p 'test_celestial_visual_data_m4.py' -v
           python3 -m unittest discover -s tests/weather -p 'test_celestial_spatial_v4c.py' -v
+          python3 -m unittest discover -s tests/weather -p 'test_celestial_solar_overview_v4d.py' -v
 
   real-jpl-data:
     runs-on: ubuntu-latest
@@ -61,3 +66,4 @@ jobs:
         run: |
           python3 -m unittest discover -s tests/weather -p 'test_celestial_visual_data_m4.py' -v
           python3 -m unittest discover -s tests/weather -p 'test_celestial_spatial_v4c.py' -v
+          python3 -m unittest discover -s tests/weather -p 'test_celestial_solar_overview_v4d.py' -v

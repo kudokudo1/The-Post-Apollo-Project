@@ -14,6 +14,7 @@ const cosmosSource=read("widgets/weather/StationCosmosSubjectPanelPolicy.js");
 const pane=read("widgets/weather/StationMagickSubjectPane.qml");
 const overview=read("widgets/weather/StationMagickOverviewPane.qml");
 const lunarSolar=read("widgets/weather/StationMagickLunarSolarPane.qml");
+const lunarDetails=read("widgets/weather/StationMagickLunarSolarDetails.qml");
 const cosmosVisual=read("widgets/weather/StationCosmosVisualInstruments.qml");
 const instrument=read("widgets/weather/StationMagickCelestialInstrument.qml");
 const network=read("widgets/weather/StationCosmosCelestialNetwork.qml");
@@ -300,4 +301,42 @@ test("M30-D LUNAR + SOLAR uses focused top tabs, no page scroll and no new colle
   assert.match(cosmosVisual,/id: solarPresetRow/);
   assert.match(cosmosVisual,/onClicked: visual\.inspectedPhaseId = modelData\.id/);
   assert.match(cosmosVisual,/visual\.lockedMinute = modelData\.id === "now"/);
+});
+
+
+test("M30-E returns Moon and solar details to the non-scrolling lower viewport", () => {
+  assert.match(lunarSolar,/StationMagickLunarSolarDetails\s*\{/);
+  assert.match(lunarSolar,/id: detailRack/);
+  assert.match(lunarSolar,/anchors\.top: focusedInstrument\.bottom/);
+  assert.match(lunarSolar,/anchors\.bottom: parent\.bottom/);
+  assert.match(lunarSolar,/height: Math\.min\(186,Math\.max\(0,/);
+  assert.match(lunarSolar,/skySource: sourceSky/);
+  assert.match(lunarSolar,/isSolar: lunarSolarPane\.isSolar/);
+  assert.match(lunarSolar,/visible: !lunarSolarPane\.isCalendar/);
+  assert.match(lunarDetails,/moonActor: skySource \? skySource\.moonObservation : null/);
+  assert.match(lunarDetails,/moonReady: !!moonActor && moonActor\.ready/);
+  assert.match(lunarDetails,/moonReady \? field\(moon\.rise\) : "--"/);
+  assert.match(lunarDetails,/moonReady \? field\(moon\.transit\) : "--"/);
+  assert.match(lunarDetails,/moonReady \? field\(moon\.set\) : "--"/);
+  assert.match(lunarDetails,/moonReady \? field\(moon\.sourceDate\) : "--"/);
+  assert.match(lunarDetails,/moon\.noRiseSet/);
+  assert.match(lunarDetails,/NO TIMES INVENTED/);
+  for(const key of [
+    "astronomicalDawn", "nauticalDawn", "civilDawn",
+    "solarNoon", "civilDusk", "nauticalDusk",
+    "astronomicalDusk", "blueMorningStart", "blueMorningEnd",
+    "goldenMorningStart", "goldenMorningEnd",
+    "goldenEveningStart", "goldenEveningEnd",
+    "blueEveningStart", "blueEveningEnd",
+    "altitudeDegrees", "azimuthDegrees"
+  ]) assert.ok(lunarDetails.includes(key),"restored source field missing: "+key);
+  assert.match(lunarDetails,/readonly property bool twilightReady: !!twilight && twilight\.available/);
+  assert.match(lunarDetails,/return twilightReady \? field\(value\) : "--"/);
+  assert.match(lunarDetails,/TWILIGHT \+ PHOTO LIGHT \/\/ LOCAL/);
+  assert.match(lunarDetails,/PHOTO LIGHT \/\/ BLUE \+ GOLDEN WINDOWS/);
+  assert.match(lunarDetails,/SUN NOW \/\/ CALIBRATED POSITION NOT AVAILABLE/);
+  assert.doesNotMatch(lunarDetails,/Flickable\s*\{|ScrollView\s*\{|Process\s*\{|Timer\s*\{|FileView\s*\{/);
+  assert.doesNotMatch(lunarDetails,/XMLHttpRequest|\.refresh\(|writeAdapter\(/);
+  assert.equal((lunarSolar.match(/StationSky\s*\{/g)||[]).length,1);
+  assert.equal((lunarSolar.match(/StationCosmosVisualInstruments\s*\{/g)||[]).length,1);
 });

@@ -484,11 +484,17 @@ PanelWindow {
                 width: parent.width
                 height: frame.height - 169
 
-                Column {
+                Flickable {
                     id: capturePage
                     anchors.fill: parent
                     visible: camera.activeView === "capture"
-                    spacing: 18
+                    clip: true
+                    contentHeight: captureContent.implicitHeight
+                    boundsBehavior: Flickable.StopAtBounds
+                    Column {
+                        id: captureContent
+                        width: capturePage.width
+                        spacing: 10
 
                     GohuText {
                         width: parent.width
@@ -646,6 +652,7 @@ PanelWindow {
                               + " // SWAY " + (camera.statusReport.swaymsg ? "READY" : "MISSING")
                               + " // GIO TRASH " + (camera.statusReport.gio ? "READY" : "MISSING")
                     }
+                    }
                 }
 
                 Row {
@@ -783,13 +790,15 @@ PanelWindow {
                                      {id: "screen-recordings", label: "SCREEN VIDEO"}]
                                 ]
                                 Row {
+                                    id: filterRow
+                                    property var rowItems: modelData
                                     width: galleryPage.width * 0.30
                                     height: 29
                                     spacing: 4
                                     Repeater {
-                                        model: modelData
+                                        model: filterRow.rowItems
                                         ActionButton {
-                                            width: (parent.width - (parent.children.length - 1) * 4) / (parent.children.length || 1)
+                                            width: (filterRow.width - (filterRow.rowItems.length - 1) * filterRow.spacing) / filterRow.rowItems.length
                                             height: 27
                                             label: modelData.label
                                             labelPixelSize: 8

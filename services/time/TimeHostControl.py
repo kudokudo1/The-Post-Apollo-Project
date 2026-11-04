@@ -224,7 +224,7 @@ def measure_clock():
                       errorCode="REFERENCE_PROCESS")
     combined = (reading.stdout + "\n" + reading.stderr)
     matched = re.search(
-        r"System clock wrong by\\s+([+-]?\\d+(?:\\.\\d+)?)\\s+seconds", combined)
+        r"System clock wrong by\s+([+-]?\d+(?:\.\d+)?)\s+seconds", combined)
     if not matched:
         return result("unavailable", "NO TRUSTED OFFSET MEASUREMENT RETURNED",
                       errorCode="REFERENCE_NO_SAMPLE")

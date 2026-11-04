@@ -31,6 +31,13 @@ Window {
         {label:"FLINT",lat:43.0125,lon:-83.6875,zoom:12}
     ]
 
+    Component.onCompleted: {
+        // Run only after QML has instantiated MapView. The public sample
+        // names select regression cameras, not a region-locked data source.
+        if (probeOnline && probeSample !== "")
+            Qt.callLater(function(){ root.goToSample(probeSample); });
+    }
+
     function goToSample(label) {
         for(var i=0;i<sampleViews.length;i++) {
             var p=sampleViews[i];

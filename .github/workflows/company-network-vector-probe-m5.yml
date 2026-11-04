@@ -16,8 +16,11 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
-      - name: Offline and authority contracts
-        run: python3 -m unittest discover -s tests/company -p 'test_company_vector_probe_m5.py' -v
+      - name: Offline, style and real-vector smoke contracts
+        run: |
+          python3 -m unittest discover -s tests/company -p 'test_company_vector_probe_m5.py' -v
+          python3 -m unittest discover -s tests/company -p 'test_company_vector_style_m7.py' -v
+          python3 -m unittest discover -s tests/company -p 'test_company_native_online_m8.py' -v
 
   native-qt:
     # All Qt/MapLibre downloads happen on the disposable GitHub runner.
@@ -111,11 +114,26 @@ jobs:
           xvfb-run -a -s '-screen 0 1280x900x24' \
             timeout 25s ./company-vector-probe --capture
           test -s company-vector-probe.png
-          cp company-vector-probe.png "$GITHUB_WORKSPACE/company-vector-probe.png"
+          cp company-vector-probe.png "$GITHUB_WORKSPACE/company-vector-offline.png"
+
+          # Explicit, bounded public-area network test; no private user
+          # location, hub, provider or worker data is passed to MapLibre.
+          # Each test runs alone and captures only its current visible area.
+          for sample in USA RURAL CANADA; do
+            echo "::group::Post-Apollo styled vector real-map sample: $sample"
+            xvfb-run -a -s '-screen 0 1280x900x24' \
+              timeout 45s ./company-vector-probe --styled-online \
+              "--sample=$sample" --capture 2>&1 | tee "styled-${sample}.log"
+            test -s company-vector-probe.png
+            cp company-vector-probe.png "$GITHUB_WORKSPACE/company-vector-${sample}.png"
+            rm company-vector-probe.png
+            echo "::endgroup::"
+          done
+          echo "Four independent screenshots (offline, USA, RURAL, CANADA) captured"
 
       - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: company-vector-qt-native-capture
-          path: company-vector-probe.png
+          path: company-vector-*.png
           if-no-files-found: ignore

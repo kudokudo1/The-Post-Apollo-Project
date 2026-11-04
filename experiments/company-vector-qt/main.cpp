@@ -11,6 +11,8 @@
 #include <QImage>
 #include <QStringList>
 #include <QDebug>
+#include <QColor>
+#include <algorithm>
 
 int main(int argc, char **argv) {
     // MapLibre Native Qt v3 QML needs OpenGL RHI. This is PROCESS-LOCAL.
@@ -23,6 +25,25 @@ int main(int argc, char **argv) {
     const bool styledOnline = args.contains("--styled-online");
     const bool anyOnline = online || styledOnline;
     const bool capture = args.contains("--capture");
+
+    // Limited public regression viewports only, never private user locations.
+    QString sample;
+    for (const QString &arg : args) {
+        if (arg.startsWith(QStringLiteral("--sample=")))
+            sample = arg.mid(QStringLiteral("--sample=").size());
+    }
+    const QStringList allowedSamples = {
+        QStringLiteral("USA"), QStringLiteral("PACIFIC"),
+        QStringLiteral("MIDWEST"), QStringLiteral("NORTHEAST"),
+        QStringLiteral("RURAL"), QStringLiteral("CANADA"),
+        QStringLiteral("MEXICO"), QStringLiteral("ALASKA"),
+        QStringLiteral("HAWAII"), QStringLiteral("FLINT")
+    };
+    if ((!sample.isEmpty() && !allowedSamples.contains(sample))
+            || (!sample.isEmpty() && !anyOnline)) {
+        qCritical() << "INVALID_OR_OFFLINE_SAMPLE" << sample;
+        return 6;
+    }
     const QString localPath = QStringLiteral(COMPANY_PROBE_STYLE_PATH);
     const QString styledPath = QStringLiteral(COMPANY_PROBE_ONLINE_STYLE_PATH);
     // No online vector source can be selected implicitly or by theme alone.
@@ -51,6 +72,7 @@ int main(int argc, char **argv) {
     engine.rootContext()->setContextProperty("probeStyleUrl", styleUrl.toString());
     engine.rootContext()->setContextProperty("probeOnline", anyOnline);
     engine.rootContext()->setContextProperty("probeStyledOnline", styledOnline);
+    engine.rootContext()->setContextProperty("probeSample", sample);
     engine.load(QUrl(QStringLiteral("qrc:/CompanyVectorProbe/main.qml")));
     if (engine.rootObjects().isEmpty()) {
         qCritical() << "QML_PLUGIN_OR_WINDOW_LOAD_FAILED";
@@ -64,7 +86,10 @@ int main(int argc, char **argv) {
     if (capture) {
         // Screenshot proves only that a Qt scene was captured, not that
         // actual streets or the intended vector layers rendered correctly.
-        QTimer::singleShot(5500, &app, [&app, window]() {
+        // Offline synthetic capture is quick; online vector tiles and glyphs
+        // need additional time before a screenshot can be inspected.
+        const int settleMilliseconds = anyOnline ? 15000 : 5500;
+        QTimer::singleShot(settleMilliseconds, &app, [&app, window, sample, anyOnline]() {
             const QImage screenshot = window->grabWindow();
             const QString out = QStringLiteral("company-vector-probe.png");
             if (screenshot.isNull() || !screenshot.save(out)) {
@@ -72,7 +97,23 @@ int main(int argc, char **argv) {
                 app.exit(5);
                 return;
             }
-            qInfo() << "CAPTURE_CREATED" << out << screenshot.size();
+            qInfo() << "CAPTURE_CREATED" << out << screenshot.size()
+                    << "sample" << sample
+                    << "network_style" << anyOnline;
+            // Diagnostic count only: a screenshot can exist even when map
+            // resources have failed, so humans must inspect the captures.
+            int colorfulPixels = 0;
+            const int top = std::min(screenshot.height() - 1, 70);
+            const int bottom = std::max(top + 1, screenshot.height() - 50);
+            for (int y = top; y < bottom; y += 8) {
+                for (int x = 30; x < screenshot.width() - 100; x += 8) {
+                    const QColor color = screenshot.pixelColor(x, y);
+                    if (color.red() > color.blue() * 1.2
+                            || color.green() > color.blue() * 1.2)
+                        ++colorfulPixels;
+                }
+            }
+            qInfo() << "CAPTURE_DIAGNOSTIC" << "non-purple-samples" << colorfulPixels;
             app.exit(0);
         });
     }

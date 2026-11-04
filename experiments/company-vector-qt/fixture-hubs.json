@@ -1,0 +1,23 @@
+{
+  "schema": "post-apollo.company-hubs.fixture.v1",
+  "records": [
+    {
+      "id": "fixture-1",
+      "label": "DEMO NODE A",
+      "latitude": 43.6552,
+      "longitude": -79.3832
+    },
+    {
+      "id": "fixture-2",
+      "label": "DEMO NODE B",
+      "latitude": 43.6543,
+      "longitude": -79.3871
+    },
+    {
+      "id": "fixture-3",
+      "label": "DEMO NODE C",
+      "latitude": 43.6571,
+      "longitude": -79.3798
+    }
+  ]
+}

@@ -58,10 +58,19 @@ var states = [
 ];
 
 var regions = {
-    lower48: {label:"LOWER 48 + DC",west:-126,east:-66,south:24,north:50},
+    // A wider US context now visibly includes southern Canada, all five
+    // Great Lakes and northern/central Mexico rather than clipping them out.
+    lower48: {label:"USA + NEIGHBORS",west:-130,east:-59,south:17,north:56},
+    northAmerica: {label:"NORTH AMERICA",west:-169,east:-50,south:7,north:84},
     alaska: {label:"ALASKA",west:-171,east:-129,south:51,north:72},
-    hawaii: {label:"HAWAII",west:-162,east:-154,south:18,north:23}
+    hawaii: {label:"HAWAII",west:-162,east:-154,south:18,north:23},
+    global: {label:"GLOBAL",west:-180,east:180,south:-90,north:90}
 };
+// Capital reference points only. These are not service hubs or coverage.
+var countries = [
+    ["CAN","Canada","Ottawa",-75.697,45.421],
+    ["MEX","Mexico","Mexico City",-99.133,19.433]
+];
 var serviceFamilies = [
     "ALL SERVICES", "BENEFITS", "HEALTHCARE", "EDUCATION",
     "EMPLOYMENT", "REINTEGRATION", "HOUSING"
@@ -159,10 +168,40 @@ function visibleStates(region,query) {
     var key=regionKey(region);
     var term=String(query || "").toLowerCase().trim();
     return states.filter(function(row) {
-        return row[5] === key && (!term || row[0].toLowerCase().indexOf(term)>=0
+        return (row[5] === key || key === "northAmerica" || key === "global")
+            && (!term || row[0].toLowerCase().indexOf(term)>=0
             || row[1].toLowerCase().indexOf(term)>=0
             || row[2].toLowerCase().indexOf(term)>=0);
     });
+}
+
+function visibleCountries(region, query) {
+    var key=regionKey(region);
+    if (key==="alaska" || key==="hawaii") return [];
+    var term=String(query || "").toLowerCase().trim();
+    return countries.filter(function(row) {
+        return !term || row[0].toLowerCase().indexOf(term)>=0
+            || row[1].toLowerCase().indexOf(term)>=0
+            || row[2].toLowerCase().indexOf(term)>=0;
+    });
+}
+
+function countryForCode(code) {
+    for(var i=0;i<countries.length;i++)
+        if(countries[i][0]===code) return countries[i];
+    return null;
+}
+
+function nearestCountry(region,x,y,width,height,zoom,centerLon,centerLat,radius) {
+    var list=visibleCountries(region,""), best=null;
+    var closest=Number(radius)*Number(radius);
+    for(var i=0;i<list.length;i++) {
+        var p=project(list[i][3],list[i][4],width,height,region,zoom,centerLon,centerLat);
+        if(!p.visible) continue;
+        var d=(p.x-x)*(p.x-x)+(p.y-y)*(p.y-y);
+        if(d<=closest) {closest=d;best=list[i];}
+    }
+    return best;
 }
 
 function nearestState(region,x,y,width,height,zoom,centerLon,centerLat,radius) {

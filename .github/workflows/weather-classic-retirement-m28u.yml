@@ -1,0 +1,25 @@
+name: Weather CLASSIC retirement preview M28-U
+on:
+  pull_request:
+    paths:
+      - "widgets/weather/WeatherStationW.qml"
+      - "widgets/weather/StationSubjectDefaultPolicy.js"
+      - "widgets/weather/StationSubjectNavigator.qml"
+      - "widgets/weather/StationWorkspaceSurface.qml"
+      - "widgets/weather/Station*SubjectPane.qml"
+      - "widgets/weather/Station*SubjectPanelPolicy.js"
+      - "widgets/weather/StationSubjectNavigationPolicy.js"
+      - "widgets/weather/StationSubjectNavigationPreviewPolicy.js"
+      - "tests/weather/test_classic_retirement_gate_m28u.js"
+      - ".github/workflows/weather-classic-retirement-m28u.yml"
+  workflow_dispatch:
+jobs:
+  source-admission:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: M28-U draft navigation admission and original engines
+        run: node --test tests/weather/test_classic_retirement_gate_m28u.js tests/weather/test_subjects_first_pilot_m28n.js

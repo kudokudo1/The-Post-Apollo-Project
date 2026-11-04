@@ -894,6 +894,9 @@ PanelWindow {
     }
 
     function switchToClassic() {
+        // M28-U: disable manual fallback during the retirement rehearsal.
+        if (SubjectDefaultPolicy.CLASSIC_RETIREMENT_PREVIEW)
+            return false;
         if (!SubjectDefaultPolicy.switchToClassic(
                 subjectNavigationOpen,
                 SubjectDefaultPolicy.canSwitch(
@@ -906,6 +909,9 @@ PanelWindow {
     }
 
     function openLegacyFromSubject(pageId) {
+        // INDEX source records are historic provenance, not active fallback.
+        if (SubjectDefaultPolicy.CLASSIC_RETIREMENT_PREVIEW)
+            return false;
         const index = mainModes.findIndex(function(mode) {
             return mode.id === pageId;
         });
@@ -917,6 +923,11 @@ PanelWindow {
     }
 
     function open() {
+        // A stuck Kitty actor must not accidentally reveal CLASSIC when
+        // SUBJECTS cannot be admitted; keep the Station collapsed instead.
+        if (SubjectDefaultPolicy.CLASSIC_RETIREMENT_PREVIEW
+                && terminalView.terminalState !== "IDLE")
+            return;
         weatherStation.keyboardOwnershipRequested();
         // A previously selected CLASSIC TERMINAL must not sit on top of
         // SUBJECTS as an IDLE transparent overlay. Preserve legacy
@@ -1379,7 +1390,7 @@ PanelWindow {
                 anchors.rightMargin: 9
                 anchors.bottomMargin: 12
                 height: 36
-                visible: true
+                visible: !SubjectDefaultPolicy.CLASSIC_RETIREMENT_PREVIEW
                 label: weatherStation.subjectNavigationOpen
                        ? "CLASSIC" : "SUBJECTS"
                 labelPixelSize: 12

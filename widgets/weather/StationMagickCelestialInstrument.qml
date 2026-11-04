@@ -2,6 +2,7 @@ import QtQuick
 import QtQuick.Effects
 import "../../components"
 import "StationMagickCelestialVisualPolicy.js" as Celestial
+import "StationMagickZodiacVectorPolicy.js" as ZodiacVector
 
 // M5 // Standalone, source-fed celestial instrument. No self-owned provider,
 // ephemeris download, timer, location lookup, journal, or page navigation.
@@ -109,6 +110,61 @@ Rectangle {
         return [String(Colors.orange),String(Colors.cyan),
                 String(Colors.magenta),String(Colors.yellow)][i%4];
     }
+    // M5i // The Canvas cannot be trusted to draw missing-font Unicode
+    // symbols in every Quickshell deployment. These are original 24-unit
+    // vector outlines. They render even with no zodiac font installed.
+    function paintZodiacVector(ctx,sign,x,y,color,isSelected) {
+        const paths=ZodiacVector.strokesFor(sign);
+        if(!paths.length)return;
+        ctx.save();
+        // Dark contrast chip with glowing colored edge. 12 chips fit on the
+        // compact wheel without depending on the desktop font stack.
+        ctx.beginPath();
+        ctx.arc(x,y,9.3,0,2*Math.PI);
+        ctx.fillStyle=String(Colors.dark);
+        ctx.globalAlpha=0.96;
+        ctx.fill();
+        ctx.strokeStyle=String(color);
+        ctx.globalAlpha=isSelected?0.98:0.65;
+        ctx.lineWidth=isSelected?1.5:1;
+        ctx.shadowColor=String(color);
+        ctx.shadowBlur=instrument.neonEnabled?(isSelected?13:7):0;
+        ctx.stroke();
+        ctx.shadowBlur=0;
+        ctx.globalAlpha=1;
+
+        ctx.translate(x,y);
+        const scale=isSelected?0.68:0.61;
+        ctx.scale(scale,scale);
+        ctx.translate(-12,-12);
+        ctx.lineJoin="round";
+        ctx.lineCap="round";
+        for(let path of paths) {
+            ctx.beginPath();
+            for(let command of path) {
+                if(command[0]==="M")ctx.moveTo(command[1],command[2]);
+                else if(command[0]==="L")ctx.lineTo(command[1],command[2]);
+                else if(command[0]==="Q")
+                    ctx.quadraticCurveTo(command[1],command[2],command[3],command[4]);
+                else if(command[0]==="C")
+                    ctx.bezierCurveTo(command[1],command[2],command[3],command[4],
+                                      command[5],command[6]);
+                else if(command[0]==="Z")ctx.closePath();
+            }
+            // Shadow/contrast stroke + bright main stroke give legible signs
+            // even when the wheel is only ~100px high.
+            ctx.strokeStyle=String(Colors.black);
+            ctx.lineWidth=4.3;
+            ctx.shadowBlur=0;
+            ctx.stroke();
+            ctx.strokeStyle=String(color);
+            ctx.lineWidth=isSelected?2.6:2.3;
+            ctx.shadowColor=String(color);
+            ctx.shadowBlur=instrument.neonEnabled?9:0;
+            ctx.stroke();
+        }
+        ctx.restore();
+    }
     function paintWheel(ctx) {
         const cx=graphCanvas.width/2,cy=graphCanvas.height/2;
         const radius=Math.max(30,Math.min(graphCanvas.width,
@@ -122,34 +178,34 @@ Rectangle {
             instrument.neonStroke(ctx,
                 ring===0?Colors.cyan:Colors.blue,ring===0?1.5:1,7);
         }
-        ctx.font="10px monospace";
+        // Sector boundaries are at 0/30/60/... source-longitude degrees.
+        // Symbols are in SECTOR CENTERS, not on boundaries. No font needed.
         for(let sign=0;sign<12;sign++){
             const theta=sign*Math.PI/6-Math.PI/2;
             const color=Celestial.zodiacColor(sign);
-            ctx.globalAlpha=0.38;
+            ctx.globalAlpha=0.35;
             ctx.beginPath();
             ctx.moveTo(cx,cy);
             ctx.lineTo(cx+radius*Math.cos(theta),
                        cy+radius*Math.sin(theta));
             instrument.neonStroke(ctx,color,0.8,5);
-            // Actual Unicode zodiac glyphs, not AR/TA/GE abbreviations.
-            // Qt's font fallback resolves the symbols if Noto is absent.
-            ctx.font="18px 'Noto Sans Symbols 2'";
-            ctx.textAlign="center";
-            ctx.textBaseline="middle";
-            ctx.globalAlpha=1;
-            const glyph=Celestial.zodiacGlyph(sign);
-            instrument.neonText(ctx,glyph,
-                cx+(radius+17)*Math.cos(theta),
-                cy+(radius+17)*Math.sin(theta),color,10);
-            ctx.font="10px monospace";
         }
-        ctx.textAlign="start";
-        ctx.textBaseline="alphabetic";
+        const activePoint=instrument.wheelPoints.find(function(p){
+            return p.body===instrument.focusBody;
+        });
+        const activeSign=activePoint
+            ? Math.floor(activePoint.longitude_deg/30)%12 : -1;
+        for(let sign=0;sign<12;sign++){
+            const at=ZodiacVector.sectorCenter(
+                sign,graphCanvas.width,graphCanvas.height,radius);
+            if(!at)continue;
+            instrument.paintZodiacVector(ctx,sign,at.x,at.y,
+                Celestial.zodiacColor(sign),sign===activeSign);
+        }
         ctx.globalAlpha=1;
         ctx.font="10px monospace";
         instrument.neonText(ctx,"ECLIPTIC",cx-28,cy-7,Colors.magenta,7);
-        instrument.neonText(ctx,"0° / ♈",cx-21,cy+11,Colors.cyan,6);
+        instrument.neonText(ctx,"0° / TROPICAL",cx-36,cy+11,Colors.cyan,6);
         const positions=instrument.wheelPoints;
         const byBody={};
         for(let p=0;p<positions.length;p++)

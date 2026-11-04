@@ -215,6 +215,7 @@ Item {
                     contentPadding: 3
                     accentColor: Colors.cyan
                     available: TimeSettings.resyncStatus !== "working"
+                               && !TimeSettings.resyncAuthPending
                     onLeftClicked: TimeSettings.prepareResync()
                 }
             }

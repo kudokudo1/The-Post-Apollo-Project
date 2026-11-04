@@ -189,13 +189,66 @@ def resync():
         "ONE-SHOT TIME CORRECTION COMPLETED // VERIFY SYSTEM TIME", 45)
 
 
+
+def set_timezone(zone):
+    """Set the real host timezone after systemd/Polkit authorization.
+
+    The zone must be an exact member of the machine's installed tzdata.
+    No shell, no password arguments, no manual /etc/localtime writes.
+    """
+    import re
+    if not isinstance(zone, str) or len(zone) > 100 or not (
+            zone == "UTC" or re.fullmatch(
+                r"[A-Za-z][A-Za-z0-9._+-]*(?:/[A-Za-z0-9._+-]+)+", zone)):
+        return result("invalid", "INVALID TIMEZONE IDENTIFIER",
+                      errorCode="ZONE_INVALID")
+    try:
+        catalog = subprocess.run(
+            ["timedatectl", "list-timezones", "--no-pager"],
+            capture_output=True, text=True, timeout=TIMEOUT, check=False)
+    except (OSError, subprocess.TimeoutExpired):
+        return result("unavailable", "TIMEZONE DIRECTORY UNAVAILABLE",
+                      errorCode="ZONE_DIRECTORY")
+    if catalog.returncode or zone not in catalog.stdout.splitlines():
+        return result("invalid", "TIMEZONE NOT INSTALLED ON HOST",
+                      errorCode="ZONE_NOT_INSTALLED")
+    if system_properties().get("Timezone") == zone:
+        return result("unchanged", "TIMEZONE ALREADY SELECTED",
+                      timezone=zone)
+    try:
+        operation = subprocess.run(
+            ["timedatectl", "set-timezone", zone],
+            capture_output=True, text=True, timeout=60, check=False)
+    except subprocess.TimeoutExpired:
+        return result("failed", "TIMEZONE AUTHORIZATION TIMED OUT",
+                      errorCode="ZONE_TIMEOUT")
+    except OSError:
+        return result("failed", "TIMEZONE SERVICE UNAVAILABLE",
+                      errorCode="ZONE_SERVICE")
+    if operation.returncode:
+        output = (operation.stdout + "\n" + operation.stderr).lower()
+        if "access denied" in output or "interactive authentication" in output or "authentication required" in output:
+            return result("failed", "TIMEZONE AUTHENTICATION UNAVAILABLE",
+                          errorCode="ZONE_AUTH")
+        return result("failed", "HOST REJECTED TIMEZONE CHANGE",
+                      errorCode="ZONE_REJECTED", exitCode=operation.returncode)
+    verified = system_properties().get("Timezone")
+    if verified != zone:
+        return result("failed", "TIMEZONE CHANGE NOT VERIFIED",
+                      errorCode="ZONE_VERIFY")
+    return result("completed", "HOST TIMEZONE VERIFIED // " + zone,
+                  timezone=zone)
+
+
 def main():
-    if len(sys.argv) != 2 or sys.argv[1] not in ("status", "resync", "diagnose"):
+    if len(sys.argv) < 2 or (sys.argv[1] == "set-timezone" and len(sys.argv) != 3) or (sys.argv[1] != "set-timezone" and (len(sys.argv) != 2 or sys.argv[1] not in ("status", "resync", "diagnose"))):
         data = result("invalid", "EXPECTED STATUS OR RESYNC")
     elif sys.argv[1] == "status":
         data = status()
     elif sys.argv[1] == "diagnose":
         data = diagnose()
+    elif sys.argv[1] == "set-timezone":
+        data = set_timezone(sys.argv[2])
     else:
         data = resync()
     print(json.dumps(data, separators=(",", ":"), sort_keys=True))

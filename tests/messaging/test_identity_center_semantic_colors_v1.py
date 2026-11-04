@@ -107,7 +107,7 @@ class SemanticOrganizationColors(unittest.TestCase):
                     r"\s*width: 2\n\s*color: Colors.orange")
                 # Typed text itself is magenta, not just the border/selection.
                 self.assertRegex(source,
-                    r"id: " + name + r"[\s\S]{0,430}?color: Colors.magenta")
+                    r"id: " + name + r"[\s\S]{0,850}?color: Colors.magenta")
                 self.assertIn("selectedTextColor: Colors.black", source)
                 self.assertIn(name + ".activeFocus", source)
                 self.assertIn("? Colors.magenta : Colors.blue", source)

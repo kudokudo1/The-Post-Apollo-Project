@@ -3,6 +3,7 @@ import qs.services.connections
 import qs.services.hub
 import "../../components"
 import "TaskRecoveryStatusPolicyM13q.js" as RecoveryStatusPolicy
+import "TaskDraftPresencePolicyM13s.js" as DraftPresencePolicy
 
 // TASKS M13q // real SHARED C2 keyring presence, read-only recovery readiness.
 // No draft data, user key, file, opt-in/grant, Secret Service caller or TASKS
@@ -10,6 +11,10 @@ import "TaskRecoveryStatusPolicyM13q.js" as RecoveryStatusPolicy
 // presence-only probe; opening this pane never performs any OS operation.
 Item {
     id: recoveryStatus
+
+    // Never contains task text, identifiers, keys or a credential receipt.
+    property var editorSignals: null
+    readonly property var draftReport: DraftPresencePolicy.view(editorSignals)
 
     readonly property var report: RecoveryStatusPolicy.view({
         providerStatus: ConnectionsBroker.status,
@@ -83,6 +88,62 @@ Item {
                 // Read-only C2a NameHasOwner probe, explicitly initiated.
                 // It does not open the keyring, inspect records or grant keys.
                 onLeftClicked: ConnectionsBroker.checkAvailability()
+            }
+
+            Rectangle {
+                width: parent.width
+                height: 1
+                color: Colors.cyan
+                opacity: 0.7
+            }
+
+            GohuText {
+                width: parent.width
+                text: "LOCAL EDITORS // UNSAVED CONTENT STATUS"
+                color: Colors.magenta
+                font.pixelSize: 11
+                font.bold: true
+                wrapMode: Text.WordWrap
+            }
+
+            GohuText {
+                width: parent.width
+                text: recoveryStatus.draftReport.status
+                color: Colors.orange
+                font.pixelSize: 10
+                wrapMode: Text.WordWrap
+            }
+
+            GohuText {
+                width: parent.width
+                text: recoveryStatus.draftReport.sourceStatus
+                color: Colors.cyan
+                font.pixelSize: 10
+                wrapMode: Text.WordWrap
+            }
+
+            GohuText {
+                width: parent.width
+                text: recoveryStatus.draftReport.explanation
+                color: Colors.white
+                font.pixelSize: 10
+                wrapMode: Text.WordWrap
+            }
+
+            GohuText {
+                width: parent.width
+                text: recoveryStatus.draftReport.scope
+                color: Colors.cyan
+                font.pixelSize: 9
+                wrapMode: Text.WordWrap
+            }
+
+            GohuText {
+                width: parent.width
+                text: recoveryStatus.draftReport.otherScope
+                color: Colors.orange
+                font.pixelSize: 9
+                wrapMode: Text.WordWrap
             }
 
             Rectangle {

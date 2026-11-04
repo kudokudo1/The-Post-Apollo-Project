@@ -272,8 +272,8 @@ Column {
         visible: search.includeArchived
         text: "ARCHIVE TRAY ABOVE contains every archived item and red permanent " +
               "removal actions. This button also shows archived entries inside " +
-              "their original editors. To restore a company there, select " +
-              "ALL / NO SELECTION above the Directory row."
+              "their original editors. To restore a company there, " +
+              "select ALL / NO SELECTION above the Directory row."
         color: Colors.orange
         font.pixelSize: 9
         wrapMode: Text.WordWrap

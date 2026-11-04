@@ -141,7 +141,12 @@ class CameraOfflineTests(unittest.TestCase):
                 runner.return_value = Mock(stdout="", returncode=1)
                 result = camera.capture("region")
                 self.assertEqual(result["error"], "REGION_CANCELLED")
-                self.assertEqual(runner.call_args.args[0], ["/fake/slurp"])
+                self.assertEqual(runner.call_args.args[0],
+                                 ["/fake/slurp", "-d", "-b", "1B062399",
+                                  "-c", "C74EC7FF", "-s", "55CFCA44", "-w", "3"])
+                self.assertIs(runner.call_args.kwargs["stdin"],
+                              camera.subprocess.DEVNULL,
+                              "slurp must receive EOF instead of an open Quickshell pipe")
                 runner.return_value = Mock(stdout="100,100 200x300", returncode=0)
                 def simulate(*args, **kwargs):
                     argv = args[0]
@@ -157,6 +162,13 @@ class CameraOfflineTests(unittest.TestCase):
                 self.assertEqual(runner.call_args.args[0][1:3],
                                  ["-g", "100,100 200x300"])
                 self.assertTrue(done["path"].startswith(str(camera.pictures())))
+
+    def test_slurp_selector_timeout_has_explicit_error(self):
+        with patch.object(camera.shutil, "which", side_effect=lambda name: "/fake/" + name):
+            with patch.object(camera.subprocess, "run", side_effect=camera.subprocess.TimeoutExpired("slurp", 120)):
+                result = camera.capture("region")
+        self.assertFalse(result["ok"])
+        self.assertEqual(result["error"], "REGION_SELECTOR_TIMEOUT")
 
     def test_focused_capture_selects_sway_focused_output(self):
         with patch.object(camera, "outputs", return_value=[

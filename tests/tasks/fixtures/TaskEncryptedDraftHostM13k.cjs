@@ -156,14 +156,26 @@ if(process.argv.length!==3||process.argv[2]!=="--single-request"){
     // The Process/QML side must supply exactly one fixed request on stdin.
     const lines=readline.createInterface({input:process.stdin,crlfDelay:Infinity});
     let handled=false;
+    // QML Process keeps its stdin pipe open for future writes even though
+    // this host accepts exactly ONE request. Closing readline alone leaves
+    // the underlying pipe referenced and Node stays alive indefinitely.
+    // Release that handle after the fixed status reply is queued so the
+    // actual Process.exited callback can fire. Never close caller-owned QML.
+    function finishInput() {
+        lines.close();
+        if (typeof process.stdin.unref === "function")
+            process.stdin.unref();
+        else if (typeof process.stdin.destroy === "function")
+            process.stdin.destroy();
+    }
     const alarm=setTimeout(()=>{
         if(!handled){handled=true;emit(response("REFUSED_REQUEST_TIMEOUT"));}
-        lines.close();
+        finishInput();
     },6000);
     lines.on("line",line=>{
         if(handled)return;
         handled=true;clearTimeout(alarm);emit(executeRequest(line));
-        lines.close();
+        finishInput();
     });
     lines.on("close",()=>{
         clearTimeout(alarm);

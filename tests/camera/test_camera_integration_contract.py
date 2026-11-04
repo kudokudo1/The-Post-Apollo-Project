@@ -30,6 +30,31 @@ class CameraWidgetContracts(unittest.TestCase):
         self.assertIn("WlrLayershell.layer: WlrLayer.Overlay", PANEL)
         self.assertIn("exclusiveZone: 0", PANEL)
 
+    def test_left_top_tray_order_launcher_workspaces_tray_music_camera(self):
+        # This tests the real declaration order in the LEFT Row, not a
+        # screenshot-only mock or just the presence of five module names.
+        left = SHELL.split("id: leftModules", 1)[1].split(
+            "// Hospital", 1)[0]
+        ordered = [
+            "Applauncher {",
+            "Workspaces {}",
+            "Tray {}",
+            "Mediaplayer {",
+            "id: cameraHost",
+        ]
+        offsets = [left.index(marker) for marker in ordered]
+        self.assertEqual(offsets, sorted(offsets))
+        self.assertEqual(left.count("Tray {}"), 1)
+        self.assertEqual(left.count("Mediaplayer {"), 1)
+        self.assertEqual(left.count("Screenshot {"), 1)
+        # Preserve the existing left-row spacing and 25px launcher gap.
+        self.assertIn("spacing: 8", left)
+        self.assertIn("id: appControlWorkspaceGap", left)
+        self.assertIn("width: 9", left)
+        # Moving dock declarations never transfers their functional owners.
+        self.assertIn("id: sharedMediaDock", left)
+        self.assertIn("onToggleRequested: cameraWindow.toggle()", left)
+
     def test_capture_modes_and_hidden_panel_before_shutter(self):
         self.assertIn('label: "REGION"', PANEL)
         self.assertIn('label: "ONE SCREEN"', PANEL)

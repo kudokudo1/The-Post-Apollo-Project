@@ -62,6 +62,20 @@ test("host only delegates to established isolated M13g fixture; no real draft so
     assert.doesNotMatch(h,/apollo-hub-todo-v1\.json|Quickshell\.dataDir/);
     assert.doesNotMatch(h,/rmSync\(|rm -rf|setText\(|\.writeTask\(/);
 });
+test("one-shot host releases stdin even when QML keeps writable pipe open",()=>{
+    const h=get(host),p=get("tests/tasks/fixtures/TaskEncryptedDraftHeldStdinM13n.cjs");
+    assert.match(h,/function finishInput\(\)/);
+    assert.match(h,/process\.stdin\.unref\(\)/);
+    assert.match(h,/process\.stdin\.destroy\(\)/);
+    assert.equal((h.match(/finishInput\(\);/g)||[]).length,2);
+    assert.match(p,/cp\.spawn\(process\.execPath/);
+    assert.match(p,/stdio:\["pipe","pipe","pipe"\]/);
+    assert.match(p,/child\.stdin\.write\(request\+"\\n"\)/);
+    assert.doesNotMatch(p,/child\.stdin\.end\(/);
+    assert.match(p,/M13N_HELD_STDIN_ENCRYPTED_CHILD_EXIT_PASS/);
+    assert.match(p,/M13N_HELD_STDIN_MALFORMED_CHILD_EXIT_PASS/);
+    assert.doesNotMatch(h,/\.writeTask\(|apollo-hub-todo-v1\.json/);
+});
 test("QML Process seam requires fake isolated env and never starts on load",()=>{
     assert.match(bridge,/readonly property bool encryptedRecoveryEnabled:\s*false/);
     assert.match(bridge,/readonly property bool productionActivation:\s*false/);

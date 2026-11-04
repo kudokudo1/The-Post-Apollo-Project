@@ -74,7 +74,6 @@ PanelWindow {
                 TimeSettings.launchResyncAfterAgentReady(true);
                 TimeSettings.launchTimezoneAfterAgentReady(true);
             }
-                TimeSettings.launchTimezoneAfterAgentReady(true);
         }
         onFlowChanged: {
             authWindow.clearSecret();
@@ -87,8 +86,10 @@ PanelWindow {
             authWindow.focusPrompt();
         }
         Component.onCompleted: {
-            if (isRegistered)
+            if (isRegistered) {
                 TimeSettings.launchResyncAfterAgentReady(true);
+                TimeSettings.launchTimezoneAfterAgentReady(true);
+            }
         }
     }
 

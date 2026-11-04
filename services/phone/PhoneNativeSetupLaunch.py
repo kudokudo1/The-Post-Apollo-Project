@@ -35,10 +35,7 @@ STAGE_APP_ID = "post-apollo-social-phone-setup"
 def _has_blueferry_configuration() -> bool:
     # BlueFerry owns this file and the OS bond. Never read its identifiers or
     # create a second phone registry. File presence is NOT proof of pairing.
-    try:
-        return Path(os.path.expanduser("~/.config/blueferry/local.env")).is_file()
-    except (OSError, ValueError):
-        return False
+    return Path(os.path.expanduser("~/.config/blueferry/local.env")).is_file()
 STATUS = frozenset({"OPEN_REQUESTED", "CLIENT_UNAVAILABLE", "LAUNCH_FAILED"})
 
 
@@ -108,7 +105,9 @@ def open_setup(
             try:
                 existing_config = configured() is True
             except Exception:
-                existing_config = False
+                # Unknown config state must NEVER launch the forget/re-pair
+                # wizard. A normal TUI is the safer client fallback.
+                existing_config = True
             # A present BlueFerry config is handled by its normal terminal
             # CLIENT, not by re-running its forget/re-pair wizard.
             client_command = "tui" if existing_config else "pair-setup"

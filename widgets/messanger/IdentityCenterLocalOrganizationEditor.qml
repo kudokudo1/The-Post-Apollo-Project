@@ -28,6 +28,7 @@ Column {
     property string newKind: "llc"
     property bool showArchived: false
     property bool useSharedArchiveControl: false
+    property bool useSharedRefreshControl: false
     onShowArchivedChanged: confirmationKey = ""
     property string confirmationKey: ""
     readonly property bool editable: directoryStore !== null && directoryStore.state === "ready"
@@ -64,6 +65,7 @@ Column {
     ActionButton {
         width: 140
         height: 28
+        visible: !editor.useSharedRefreshControl
         label: "RELOAD DIRECTORY"
         labelPixelSize: 9
         interactive: directoryStore !== null && directoryStore.state !== "saving"

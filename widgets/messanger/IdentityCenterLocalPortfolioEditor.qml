@@ -21,6 +21,7 @@ Column {
     }
     property bool showArchived: false
     property bool useSharedArchiveControl: false
+    property bool useSharedRefreshControl: false
     onShowArchivedChanged: confirmationKey = ""
     property string confirmationKey: ""
     readonly property bool editable: portfolioStore !== null
@@ -78,6 +79,7 @@ Column {
     ActionButton {
         width: 152
         height: 28
+        visible: !editor.useSharedRefreshControl
         label: "RELOAD PORTFOLIOS"
         labelPixelSize: 9
         interactive: portfolioStore !== null

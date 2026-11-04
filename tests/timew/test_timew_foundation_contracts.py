@@ -785,7 +785,7 @@ assert "NO SCREENSHOTS OR RESTORATION ACTIVE" in window
 assert "STOPWATCH + TIMERS // NOT CONNECTED" not in window
 assert "COUNTDOWN TIMERS // NEXT DEVELOPMENT STAGE" not in window
 assert "NO AUDIO OR DESKTOP NOTIFICATION // INITIAL SLICE" in window
-assert "FOUNDATION PREVIEW // UI ONLY" in window
+assert "TOOLS // STOPWATCH + COUNTDOWN // MONOTONIC" in window
 for primitive in ("JsonAdapter {", "FileView {", "swaymsg",
                   "grim ", "onTriggered: capture", "kill -",
                   '["sh", "-c"', '["bash", "-c"'):

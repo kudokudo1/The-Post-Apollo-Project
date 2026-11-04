@@ -1980,31 +1980,52 @@ PanelWindow {
 
                 Rectangle {
                     id: stateIndicator
-                    width: 85
+                    width: 99
                     height: 32
                     color: "transparent"
                     border.width: 1
-                    border.color: Colors.cyan
+                    // This header shows measured time health, not a
+                    // main-mode placeholder or an assumed sync success.
+                    readonly property string accuracyState:
+                        TimeSettings.clockAccuracyState(localClock.date.getTime())
+                    readonly property color accuracyColor:
+                        accuracyState === "in-sync" ? Colors.white
+                        : accuracyState === "dirty" ? Colors.magenta
+                        : accuracyState === "out-of-sync"
+                          || accuracyState === "uncertain"
+                          || accuracyState === "syncing"
+                          || accuracyState === "checking" ? Colors.yellow
+                        : accuracyState === "sync-error" ? Colors.orange
+                        : Colors.cyan
+                    border.color: accuracyColor
 
-                    GohuText {
+                    Column {
                         anchors.centerIn: parent
-                        font.pixelSize: 11
-                        color: timew.semanticColor
-                        text: TimeSettings.resyncStatus === "auth-preparing"
-                              ? "AUTH..."
-                              : TimeSettings.resyncStatus === "working"
-                              ? "SYNC..."
-                              : TimeSettings.resyncStatus === "confirm"
-                              ? "CONFIRM"
-                              : TimeSettings.resyncStatus === "completed"
-                              ? "SYNC DONE"
-                              : TimeSettings.resyncStatus === "requested"
-                              ? "SAMPLES"
-                              : TimeSettings.resyncStatus === "failed"
-                                || TimeSettings.resyncStatus === "unavailable"
-                              ? "SYNC ERR"
-                              : timew.selectedMode === "clock"
-                              ? "LOCAL" : "PLANNED"
+                        width: parent.width - 6
+                        spacing: 1
+                        GohuText {
+                            width: parent.width
+                            horizontalAlignment: Text.AlignHCenter
+                            font.pixelSize: 10
+                            fontSizeMode: Text.HorizontalFit
+                            minimumPixelSize: 9
+                            elide: Text.ElideRight
+                            color: stateIndicator.accuracyColor
+                            text: TimeSettings.clockAccuracyLabel(
+                                      localClock.date.getTime())
+                        }
+                        GohuText {
+                            width: parent.width
+                            horizontalAlignment: Text.AlignHCenter
+                            font.pixelSize: 9
+                            fontSizeMode: Text.HorizontalFit
+                            minimumPixelSize: 8
+                            elide: Text.ElideRight
+                            color: Colors.white
+                            opacity: 0.75
+                            text: TimeSettings.clockAccuracyDetail(
+                                      localClock.date.getTime())
+                        }
                     }
                 }
 
@@ -5114,7 +5135,7 @@ PanelWindow {
                               : timew.selectedMode === "settings"
                               ? "SETTINGS // DISPLAY OFFSET + SYSTEM STATUS"
                               : timew.selectedMode === "tools"
-                              ? "FOUNDATION PREVIEW // UI ONLY"
+                              ? "TOOLS // STOPWATCH + COUNTDOWN // MONOTONIC"
                               : "ANGEL // RESERVED FOR LATER"
                         color: Colors.white
                         font.pixelSize: 11

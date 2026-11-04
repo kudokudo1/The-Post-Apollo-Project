@@ -297,7 +297,14 @@ Rectangle {
                     onClicked: function(mouse) {
                         const chosen=Day.pick(
                             dayWheel.events,mouse.x,mouse.y,width,height,8);
-                        if(chosen)dayWheel.lockedEvent=chosen;
+                        if(chosen) {
+                            dayWheel.lockedEvent=chosen;
+                        } else {
+                            const planet=Day.pickRing(
+                                mouse.x,mouse.y,width,height,5);
+                            if(planet!=="")dayWheel.planetPicked(
+                                dayWheel.selectedPlanet===planet?"ALL":planet);
+                        }
                     }
                 }
             }
@@ -342,7 +349,7 @@ Rectangle {
                     font.pixelSize: 9
                     color: Colors.orange
                     wrapMode: Text.WordWrap
-                    text: "INNER → OUTER: MER / VEN / MAR / JUP / SAT"
+                    text: "CLICK A RING TO FILTER // MER / VEN / MAR / JUP / SAT"
                 }
                 QuietText {
                     width: parent.width

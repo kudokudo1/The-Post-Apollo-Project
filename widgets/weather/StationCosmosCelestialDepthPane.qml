@@ -17,6 +17,7 @@ Item {
         graphModel,focusIndex,verifiedScene)
     readonly property var focusPoint: Depth.byBody(
         depthScene,selectedBody)
+    readonly property string focusDetail: Depth.detail(focusPoint)
 
     signal bodyPicked(string body)
     signal sampleScrubbed(int originIndex, real offsetPixels)

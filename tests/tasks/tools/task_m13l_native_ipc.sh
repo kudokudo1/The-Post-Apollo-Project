@@ -47,7 +47,7 @@ fi
 # Hashes are the reviewed GitHub blobs, not a trust guarantee for plugins
 # or for executable files outside this narrow test boundary.
 if [[ "$(git hash-object -- "$qml")" != "2f678121aec04f763b0e130f937fec6af0ad2734" ||
-      "$(git hash-object -- "$scene")" != "52d5228053e15191846f7dbad57a3441bda7033d" ||
+      "$(git hash-object -- "$scene")" != "3b89c4be0ac57ac26624e7ff20cefecb894a484d" ||
       "$(git hash-object -- "$host")" != "40f96104ab48a56267bf4c6aab78bbb4d2a5b41c" ||
       "$(git hash-object -- "$fixture")" != "fe9707077db3e49c6d65edc9c01f9bb6ae2926df" ||
       "$(git hash-object -- "$cipher")" != "ede2a14684c15255244781d8897934472fd7fc2e" ]]; then
@@ -164,6 +164,13 @@ else
     # Only fixed markers and bounded, literal QML failure categories.
     awk '
       index($0,"M13L_PHASE_QML_COMPONENT_LOADED") { loaded=1 }
+      index($0,"M13L_PHASE_BOOT_TIMER_FIRED") { booted=1 }
+      index($0,"M13L_PHASE_PRIVATE_GATE_READY") { gateready=1 }
+      index($0,"M13L_PHASE_T5_BOOT_NOT_DISPATCHED") { noDispatch=1 }
+      index($0,"M13L_PHASE_T5_STDIN_NOT_SENT") { stdinPending=1 }
+      index($0,"M13L_PHASE_T5_REPLY_WAITING_EXIT") { replyPendingExit=1 }
+      index($0,"M13L_PHASE_T5_AWAITING_REPLY") { awaitingReply=1 }
+      index($0,"M13L_PHASE_T5_SETTLED_NO_RESULT") { settledNoResult=1 }
       index($0,"M13L_PHASE_START_ATTEMPT") { tried=1 }
       index($0,"M13L_PHASE_ENV_GATE_DENIED") { envdenied=1 }
       index($0,"M13L_PHASE_PROCESS_START_REJECTED") { startdenied=1 }
@@ -188,6 +195,13 @@ else
       index($0,"Failed to load configuration") { badload=1 }
       END {
         if(loaded) print "M13L_OBSERVED_QML_LOADED"
+        if(booted) print "M13L_OBSERVED_BOOT_TIMER_FIRED"
+        if(gateready) print "M13L_OBSERVED_PRIVATE_GATE_READY"
+        if(noDispatch) print "M13L_BOOT_NOT_DISPATCHED"
+        if(stdinPending) print "M13L_STDIN_NOT_SENT"
+        if(replyPendingExit) print "M13L_REPLY_WAITING_HOST_EXIT"
+        if(awaitingReply) print "M13L_AWAITING_HOST_REPLY"
+        if(settledNoResult) print "M13L_HOST_SETTLED_NO_RESULT"
         if(tried) print "M13L_OBSERVED_START_ATTEMPT"
         if(accepted) print "M13L_OBSERVED_START_ACCEPTED"
         if(busy) print "M13L_OBSERVED_BRIDGE_BUSY"

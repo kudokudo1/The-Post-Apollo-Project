@@ -42,14 +42,14 @@ class TimezoneSettingsContracts(unittest.TestCase):
 
     def test_requires_zone_from_real_host_catalog(self):
         with patch.object(host.subprocess, "run", return_value=proc(
-                [], stdout="UTC\\nEurope/London\\n")) as runner:
+                [], stdout="UTC\nEurope/London\n")) as runner:
             result = host.set_timezone("Asia/Tokyo")
         self.assertEqual(result["errorCode"], "ZONE_NOT_INSTALLED")
         self.assertEqual(runner.call_count, 1)
 
     def test_authenticated_timedated_operation_is_verified(self):
         with patch.object(host.subprocess, "run", side_effect=[
-                proc([], stdout="UTC\\nAmerica/New_York\\n"),
+                proc([], stdout="UTC\nAmerica/New_York\n"),
                 proc(["timedatectl", "set-timezone", "America/New_York"])
                 ]) as runner, patch.object(host, "system_properties",
                     side_effect=[{"Timezone": "UTC"},
@@ -63,7 +63,7 @@ class TimezoneSettingsContracts(unittest.TestCase):
 
     def test_no_false_success_when_service_did_not_apply_zone(self):
         with patch.object(host.subprocess, "run", side_effect=[
-                proc([], stdout="UTC\\nEurope/London\\n"), proc([])
+                proc([], stdout="UTC\nEurope/London\n"), proc([])
                 ]), patch.object(host, "system_properties",
                     side_effect=[{"Timezone": "UTC"}, {"Timezone": "UTC"}]):
             result = host.set_timezone("Europe/London")
@@ -72,7 +72,7 @@ class TimezoneSettingsContracts(unittest.TestCase):
 
     def test_denied_auth_does_not_claim_timezone_change(self):
         with patch.object(host.subprocess, "run", side_effect=[
-                proc([], stdout="UTC\\nEurope/London\\n"),
+                proc([], stdout="UTC\nEurope/London\n"),
                 proc([], code=1, stderr="Interactive authentication required")
                 ]), patch.object(host, "system_properties",
                     return_value={"Timezone": "UTC"}):

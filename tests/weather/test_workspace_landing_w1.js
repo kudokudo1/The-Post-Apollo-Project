@@ -105,25 +105,25 @@ test("left family rail and bottom workspace buttons switch immediate working pan
     assert.ok(workspace.includes("Station"+name+"SubjectPane {"),name);
   assert.ok(!workspace.includes("id: topRail"));
   assert.match(workspace,/id: bottomRail/);
-  assert.match(station,/\? "INDEX"/);
-  assert.match(station,/\? "CLASSIC" : "SUBJECTS"/);
+  assert.match(station,/label: "INDEX"/);
+  assert.ok(!station.includes('id: subjectBrowserToggle'));
   assert.match(browser,/property string currentPath: "home\/overview"/);
   assert.match(browser,/Workspace\.landingFor\(subjectId\)/);
-  assert.match(browser,/id: legacyIndexLayer/);
+  assert.match(browser,/id: indexLayer/);
   assert.match(browser,/if \(indexOpen && !home && candidate\.group\)/);
   assert.match(browser,/function returnToWorkspace\(\)/);
   assert.match(station,/subjectNavigator\.openIndex\(\)/);
-  assert.match(browser,/onLegacyPageRequested: function\(pageId\)/);
+  assert.ok(!browser.includes("legacyPageRequested"));
   assert.match(station,/StationSubjectNavigator\s*\{/);
   assert.match(station,/width: 160/);
 });
 
 test("source owners and 160px CLASSIC terminal geometry remain unchanged",()=>{
   assert.match(browser,/active: browser\.visible/);
-  assert.match(station,/active: !weatherStation\.subjectNavigationOpen/);
+  assert.ok(!station.includes("weatherContentLoader"));
   assert.match(station,/stationRailWidth: modeRail\.width/);
-  assert.match(station,/weatherStation\.openLegacyFromSubject\(pageId\)/);
-  assert.match(station,/onCurrentViewChanged:\s*\{\s*subjectNavigationOpen = false/);
+  assert.match(station,/function openNotificationView\(view\)/);
+  assert.ok(!station.includes("onCurrentViewChanged"));
   assert.match(station,/terminalHoleX: modeRail\.width \+ terminalView\.visibleBayX/);
   assert.match(station,/StationTerminal\s*\{/);
   assert.match(station,/WeatherServices\.SeismicService\s*\{/);

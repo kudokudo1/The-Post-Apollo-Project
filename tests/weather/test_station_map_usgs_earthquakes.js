@@ -107,18 +107,16 @@ assert.equal(
     (station.match(/WeatherServices\.SeismicService\s*\{/g) || []).length,
     1
 );
-assert.match(
-    station,
-    /active: weatherStation\.menuOpen[\s\S]*?currentView === "ground"[\s\S]*?currentView === "map"/
-);
-assert.match(
-    station,
-    /StationGround\s*\{[\s\S]*?seismicSource: seismicService/
-);
-assert.match(
-    station,
-    /StationDiscovery\s*\{[\s\S]*?domain: "map"[\s\S]*?seismicSource: seismicService/
-);
+assert.match(station,/active: weatherStation\.menuOpen && weatherStation\.subjectNavigationOpen/);
+assert.match(station,/EarthPanelPolicy\.needsSource\(/);
+assert.match(station,/SubjectPanelPolicy\.needsSource\(/);
+const weatherPane=read("widgets/weather/StationWeatherSubjectPane.qml");
+const earthPane=read("widgets/weather/StationEarthSubjectPane.qml");
+assert.match(station,/seismicSource: seismicService/);
+assert.match(weatherPane,/seismicSource: weatherPane\.seismicSource/);
+assert.match(earthPane,/seismicSource: earthPane\.seismicSource/);
+assert.match(weatherPane,/StationGround\s*\{/);
+assert.match(earthPane,/StationDiscovery\s*\{/);
 
 const ground = read("widgets/weather/StationGround.qml");
 assert.match(ground, /property var seismicSource: null/);

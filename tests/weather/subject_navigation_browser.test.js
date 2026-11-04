@@ -64,38 +64,34 @@ test("source page normalization is explicit and rejects malformed paths", () => 
   assert.deepEqual(plain(env.sourcePagesForPath("weather", null)), []);
 });
 
-test("browser is opt-in, names preview status, and explicitly links CLASSIC", () => {
+test("SUBJECTS is the only runtime browser and preserves historical source metadata", () => {
   assert.match(stationSource,/property bool subjectNavigationOpen: false/);
   assert.match(stationSource,/StationSubjectNavigator\s*\{/);
   assert.match(stationSource,/visible: weatherStation\.subjectNavigationOpen/);
-  assert.match(stationSource,/onLegacyPageRequested: function\(pageId\)/);
-  assert.match(stationSource,/function openLegacyFromSubject\(pageId\)/);
-  assert.match(stationSource,/if \(subjectNavigationOpen\)\s*\{\s*subjectNavigator\.cycleSubjects/);
+  assert.match(stationSource,/function openNotificationView\(view\)/);
+  assert.match(stationSource,/subjectNavigator\.cycleSubjects\(direction\)/);
   assert.match(stationSource,/subjectNavigator\.moveCursor\(direction\)/);
   assert.match(stationSource,/subjectNavigator\.activateCursor\(\)/);
   assert.match(stationSource,/SubjectSourceBadge\.badgeFor\(/);
-  assert.match(stationSource,/subjectNavigator\.indexOpen/);
   assert.ok(stationSource.includes("StationSubjectRail {"));
-  assert.equal(stationSource.split("ModeButton {").length - 1, 1);
-  assert.equal(railSource.split("ModeButton {").length - 1, 1);
-  assert.match(uiSource,/SPEC-ONLY SUBJECTS/);
-  assert.match(uiSource,/CLASSIC PAGES REMAIN CANONICAL/);
+  assert.equal(stationSource.split("ModeButton {").length-1,0);
+  assert.equal(railSource.split("ModeButton {").length-1,1);
+  assert.match(uiSource,/SOURCE ROUTES \/\/ NATIVE SUBJECTS/);
+  assert.ok(!stationSource.includes("weatherContentLoader"));
+  assert.ok(!uiSource.includes("classicSources"));
 });
 
-test("existing source owners, legacy mode ids and terminal lifecycle stay present", () => {
-  for (const oldId of ["home","ground","sky","space","map","news","radio","terminal"])
-    assert.match(stationSource, new RegExp('\\\"id\\\": \\\"' + oldId + '\\\"'));
+test("one root source and terminal owner survives removal of the Classic UI", () => {
   for (const sourceId of ["WeatherServices.WeatherHistoryService",
                           "WeatherServices.SeismicService",
                           "WeatherServices.NowcoastLightningService",
                           "WeatherServices.NwpsRiverService",
-                          "StationTerminal {",
-                          "onNewsMapRequested: function(payload)"])
-    assert.ok(stationSource.includes(sourceId), sourceId);
+                          "StationTerminal {"])
+    assert.ok(stationSource.includes(sourceId),sourceId);
   assert.match(stationSource,/terminalView\.terminalState !== "IDLE"/);
-  assert.match(stationSource,/if \(currentView === "terminal"\)/);
-  assert.match(stationSource,/if \(!menuOpen \|\| subjectNavigationOpen/);
-  assert.match(stationSource,/onCurrentViewChanged:\s*\{\s*subjectNavigationOpen = false;/);
+  assert.match(stationSource,/if \(!menuOpen \|\| !subjectNavigationOpen/);
+  assert.match(stationSource,/terminalMode: weatherStation\.subjectTerminalMode/);
+  assert.ok(!stationSource.includes("onCurrentViewChanged"));
 });
 
 test("browser has no independent network/process or file IO", () => {

@@ -96,7 +96,13 @@ assert.doesNotMatch(producer, /weatherService|wttr\.in/);
 assert.match(shell, /NwsOfficialAlertNotificationProducer \{[\s\S]*?id: nwsOfficialAlerts[\s\S]*?cacheStore: weatherPersistentCache/);
 assert.match(shell, /nwsAlertSource: nwsOfficialAlerts/);
 assert.match(station, /property var nwsAlertSource: null/);
-assert.match(station, /StationGround \{[\s\S]*?nwsAlertSource: weatherStation\.nwsAlertSource/);
+const read = rel => fs.readFileSync(path.join(root, rel), "utf8");
+const workspace=read("widgets/weather/StationWorkspaceSurface.qml");
+const weatherPane=read("widgets/weather/StationWeatherSubjectPane.qml");
+assert.match(station,/nwsAlertSource: weatherStation\.nwsAlertSource/);
+assert.match(workspace,/nwsAlertSource: surface\.nwsAlertSource/);
+assert.match(weatherPane,/nwsAlertSource: weatherPane\.nwsAlertSource/);
+assert.match(weatherPane,/StationGround\s*\{/);
 
 assert.match(ground, /property var nwsAlertSource: null/);
 assert.match(ground, /title: "OFFICIAL ALERTS \/\/ NWS"/);

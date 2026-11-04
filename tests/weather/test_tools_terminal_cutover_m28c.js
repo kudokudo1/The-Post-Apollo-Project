@@ -26,15 +26,13 @@ function harness(route,extra={}) {
     subjectNavigationOpen:true,
     contextTerminalRequested:false,
     subjectTerminalMode:"terminal",
-    currentView:"ground",
     subjectNavigator:{indexOpen:false,currentPath:route},
     Qt:{callLater:function(f){scheduled.push(f)}},
     terminalView:{
       terminalState:"IDLE",
       outputName:"DP-3",
       openTerminal:function(){calls.launches++;return true;},
-      get terminalMode(){return env.subjectNavigationOpen
-        ?env.subjectTerminalMode:env.currentView;}
+      get terminalMode(){return env.subjectTerminalMode;}
     }
   };
   if(extra.subjectNavigator)
@@ -74,7 +72,7 @@ test("normal SUBJECTS launch remains on TOOLS and requests the sole terminal",()
     assert.equal(h.env.contextTerminalRequested,true);
     assert.equal(h.env.subjectTerminalMode,mode);
     assert.equal(h.env.subjectNavigationOpen,true,"no CLASSIC transfer");
-    assert.equal(h.env.currentView,"ground","CLASSIC currentView unchanged");
+    assert.equal(h.env.subjectNavigator.currentPath,route,"native TOOLS route unchanged");
     assert.equal(h.calls.launches,0,"launch deferred until view visible");
     assert.equal(h.scheduled.length,1);
     h.scheduled[0]();
@@ -142,8 +140,8 @@ test("root masking/actor identity still uses the SAME original controller",()=>{
   assert.match(terminal,/SwayGeometry\.observedContentWindow/);
   assert.match(terminal,/function closeTerminal\(\)/);
   assert.match(terminal,/swaymsg/);
-  assert.match(station,/terminalHoleActive:[\s\S]*?subjectTerminalMode : currentView/);
-  assert.match(station,/terminalMode: weatherStation\.subjectNavigationOpen\s*\? weatherStation\.subjectTerminalMode/);
+  assert.match(station,/terminalHoleActive:[\s\S]*?terminalView\.sessionMode === subjectTerminalMode/);
+  assert.match(station,/terminalMode: weatherStation\.subjectTerminalMode/);
   assert.match(station,/StationChassisCutout\s*\{/);
   assert.match(station,/mask: Region\s*\{/);
   assert.match(station,/onLeftClicked: weatherStation\.closeContextTerminal\(\)/);
@@ -162,8 +160,7 @@ test("TOOLS signal chain never activates a CLASSIC page or a second actor",()=>{
   assert.ok(!pane.includes("legacyPageRequested"),"TOOLS must not jump to CLASSIC");
   assert.ok(!surface.includes("toolsPane.legacyPageRequested"));
   assert.ok(!navigator.includes("toolsLivePane.legacyPageRequested"));
-  assert.match(station,/function openLegacyFromSubject\(pageId\)/,
-    "other legacy routes remain until separately accepted");
+  assert.ok(!station.includes("openLegacyFromSubject"),"legacy root route retired");
   for(const text of [pane,surface,navigator,policyText]){
     for(const forbidden of ["FileView {","Process {","kitty --",
                              "swaymsg","weatherstation-starmap","closeTerminal("])

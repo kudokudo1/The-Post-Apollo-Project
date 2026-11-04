@@ -150,10 +150,17 @@ assert.equal(
 );
 
 const windowSource = read("widgets/weather/WeatherStationW.qml");
-assert.match(
-    windowSource,
-    /id: spaceViewComponent[\s\S]*?StationSpace\s*\{[\s\S]*?spaceService: weatherStation\.spaceService[\s\S]*?weatherService: weatherStation\.weatherService/
-);
+const workspace = read("widgets/weather/StationWorkspaceSurface.qml");
+const cosmosPane = read("widgets/weather/StationCosmosSubjectPane.qml");
+assert.ok(!windowSource.includes("spaceViewComponent"));
+assert.match(windowSource,/spaceService: weatherStation\.spaceService/);
+assert.match(windowSource,/weatherService: weatherStation\.weatherService/);
+assert.match(workspace,/StationCosmosSubjectPane\s*\{/);
+assert.match(workspace,/spaceService: surface\.spaceService/);
+assert.match(workspace,/weatherService: surface\.weatherService/);
+assert.match(cosmosPane,/StationSpace\s*\{/);
+assert.match(cosmosPane,/spaceService: cosmosPane\.spaceService/);
+assert.match(cosmosPane,/weatherService: cosmosPane\.weatherService/);
 
 const space = read("widgets/weather/StationSpace.qml");
 assert.match(space, /property var weatherService: null/);

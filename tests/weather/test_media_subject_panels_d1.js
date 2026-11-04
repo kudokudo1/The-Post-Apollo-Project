@@ -171,11 +171,12 @@ test("CLASSIC MEDIA behavior and NEWS-to-MAP handoff remain available", () => {
   assert.match(browser,/StationEarthSubjectPane\s*\{/);
   assert.match(browser,/StationMediaSubjectPane\s*\{/);
   assert.match(browser,/visible: browser\.visible && browser\.liveMediaKind !== ""/);
-  assert.match(station,/active: !weatherStation\.subjectNavigationOpen/);
-  assert.match(station,/onNewsMapRequested: function\(payload\)/);
-  assert.match(station,/weatherStation\.newsMapOverlay/);
-  assert.match(station,/weatherStation\.switchToClassic\(\)/);
-  assert.match(station,/function openLegacyFromSubject\(pageId\)/);
+  assert.ok(!station.includes("weatherContentLoader"));
+  assert.match(browser,/function showNewsMentionsOnEarth\(payload\)/);
+  assert.match(browser,/newsMentionOverlay = incoming/);
+  assert.match(browser,/chooseRoute\("earth\/maps\/overview"\)/);
+  assert.ok(!station.includes("switchToClassic"));
+  assert.ok(!station.includes("openLegacyFromSubject"));
   assert.match(station,/StationTerminal\s*\{/);
   assert.match(station,/SubjectSourceBadge\.badgeFor\(/);
   assert.match(station,/subjectNavigator\.indexOpen/);

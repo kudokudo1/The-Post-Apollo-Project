@@ -151,6 +151,7 @@ test("later M28-L source racks preserve M28-I six exact source and storage owner
   assert.deepEqual(plain(env.remainingSourcePagesForPath("media/watch",env.PANELS)),[],
     "M28-J classifies the catalog, not video playback");
   assert.match(navigator,/model: browser\.nativeDestinations/);
-  assert.match(navigator,/model: browser\.classicSources/);
+  assert.ok(!navigator.includes("classicSources"));
+  assert.ok(!navigator.includes("legacyPageRequested"));
   assert.deepEqual(plain(env.nativeDestinationsForPath("../tools",env.PANELS)),[]);
 });

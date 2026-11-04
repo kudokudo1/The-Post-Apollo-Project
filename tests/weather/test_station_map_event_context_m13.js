@@ -219,10 +219,10 @@ assert.equal((card.match(/\bFileView\s*\{/g) || []).length, 0);
 assert.doesNotMatch(card, /curl|https:\/\//);
 
 const station = read("widgets/weather/WeatherStationW.qml");
-assert.match(
-    station,
-    /StationDiscovery\s*\{[\s\S]*?domain: "map"[\s\S]*?weatherService: weatherStation\.weatherService/
-);
+const earthPane = read("widgets/weather/StationEarthSubjectPane.qml");
+assert.match(station,/weatherService: weatherStation\.weatherService/);
+assert.match(earthPane,/StationDiscovery\s*\{/);
+assert.match(earthPane,/weatherService: earthPane\.weatherService/);
 
 // M14 promotes nowCOAST to one WeatherStation-level owner. M13 continues
 // to reject a MAP-local duplicate and consumes the shared source only.
@@ -235,9 +235,7 @@ assert.equal(
     (station.match(/WeatherServices\.NowcoastLightningService\s*\{/g) || []).length,
     1
 );
-assert.match(
-    station,
-    /StationDiscovery\s*\{[\s\S]*?domain: "map"[\s\S]*?lightningSource: lightningService/
-);
+assert.match(station,/lightningSource: lightningService/);
+assert.match(earthPane,/lightningSource: earthPane\.lightningSource/);
 
 console.log("Weather M13 cross-domain selected-event context: PASS");

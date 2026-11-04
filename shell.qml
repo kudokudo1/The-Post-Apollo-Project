@@ -182,13 +182,8 @@ PanelWindow {
         }
         if (widget === "weather") {
             const view = String(route.view || "");
-            const index = weatherStationWindow.mainModes.findIndex(
-                function(item) { return item.id === view; });
-            if (index < 0)
+            if (!weatherStationWindow.openNotificationView(view))
                 return false;
-            weatherStationWindow.open();
-            weatherStationWindow.currentView = view;
-            weatherStationWindow.navigationIndex = index;
             shellRoot.requestControlKeyboard("weather", "notification-route");
             return true;
         }

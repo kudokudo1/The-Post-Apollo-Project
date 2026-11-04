@@ -95,15 +95,14 @@ test("native INDEX shortcuts point to known concrete subject panels and deduplic
   }
 });
 
-test("INDEX shows direct SUBJECTS buttons while retaining non-migrated CLASSIC links", () => {
-  assert.match(navigator, /PreviewRoutes\.remainingSourcePagesForPath\(currentPath, SubjectRoutes\.PANELS\)/);
-  assert.match(navigator, /PreviewRoutes\.nativeDestinationsForPath\(currentPath, SubjectRoutes\.PANELS\)/);
-  assert.match(navigator, /model: browser\.nativeDestinations/);
-  assert.match(navigator, /label: "OPEN SUBJECTS \/\/ "/);
-  assert.match(navigator, /onClicked: browser\.chooseRoute\(modelData\.path\)/);
-  assert.match(navigator, /model: browser\.classicSources/);
-  assert.match(navigator, /onClicked: browser\.legacyPageRequested\(modelData\.id\)/);
-  assert.match(navigator, /STILL PENDING \/\/ CLASSIC/);
+test("INDEX offers native SUBJECTS destinations without a Classic fallback",()=>{
+  assert.match(navigator,/PreviewRoutes\.nativeDestinationsForPath\(currentPath, SubjectRoutes\.PANELS\)/);
+  assert.match(navigator,/model: browser\.nativeDestinations/);
+  assert.match(navigator,/label: "OPEN SUBJECTS \/\/ "/);
+  assert.match(navigator,/onClicked: browser\.chooseRoute\(modelData\.path\)/);
+  assert.ok(!navigator.includes("classicSources"));
+  assert.ok(!navigator.includes("legacyPageRequested"));
+  assert.ok(!navigator.includes("STILL PENDING // CLASSIC"));
   assert.ok(!preview.includes("Process {") && !preview.includes("FileView {"));
 });
 

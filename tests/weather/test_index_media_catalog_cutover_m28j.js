@@ -134,7 +134,8 @@ test("catalogue transfer does not create duplicate NEWS writer, web renderer or 
   assert.match(station,/StationTerminal\s*\{/);
   assert.match(navigator,/model: browser\.nativeDestinations/);
   assert.match(navigator,/onClicked: browser\.chooseRoute\(modelData\.path\)/);
-  assert.match(navigator,/model: browser\.classicSources/);
+  assert.ok(!navigator.includes("classicSources"));
+  assert.ok(!navigator.includes("legacyPageRequested"));
 });
 
 test("M28-J seven catalog controls remain exact after HOME is separately reviewed",()=>{

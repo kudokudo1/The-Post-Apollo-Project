@@ -100,17 +100,13 @@ Rectangle {
         currentPath === "home"
         ? [{path:"home",label:"HOME"}]
         : SubjectRoutes.breadcrumbs(currentPath)
-    // Preserve historical source lineage but present only unresolved legacy
-    // shortcuts; exact M28-A/B/C routes are offered as native SUBJECTS links.
-    readonly property var classicSources:
-        PreviewRoutes.remainingSourcePagesForPath(currentPath, SubjectRoutes.PANELS)
+    // M0 retains historical control provenance. INDEX offers native routes.
     readonly property var nativeDestinations:
         PreviewRoutes.nativeDestinationsForPath(currentPath, SubjectRoutes.PANELS)
 
     // MEDIA owns article extraction. EARTH owns map plotting and inspection.
     // This is transient view context, never a source event or archive write.
     property var newsMentionOverlay: null
-    signal legacyPageRequested(string pageId)
     signal terminalLaunchRequested(string mode)
 
     function showNewsMentionsOnEarth(payload) {
@@ -252,8 +248,7 @@ Rectangle {
         chooseRoute(Workspace.landingFor(Workspace.familyFor(currentPath)));
     }
 
-    // Load only when SUBJECTS is visible. CLASSIC therefore never runs
-    // a second hidden HOME watcher or set of source-panel instances.
+    // Load only when the station is open; preserve one persistent HOME.
     Loader {
         id: workspaceLoader
         anchors.fill: parent
@@ -299,9 +294,6 @@ Rectangle {
                 onRouteRequested: function(path) {
                     browser.chooseRoute(path);
                 }
-                onLegacyPageRequested: function(pageId) {
-                    browser.legacyPageRequested(pageId);
-                }
                 onTerminalLaunchRequested: function(mode) {
                     browser.terminalLaunchRequested(mode);
                 }
@@ -314,7 +306,7 @@ Rectangle {
     }
 
     Item {
-        id: legacyIndexLayer
+        id: indexLayer
         anchors.fill: parent
         visible: browser.visible && browser.indexOpen
         enabled: visible
@@ -446,7 +438,7 @@ Rectangle {
                 font.pixelSize: 11
                 text: browser.childrenRoutes.length > 0
                       ? "SUBMODES // SELECT A SUBJECT AREA TO OPEN ITS DEEPER BUCKETS"
-                      : "ROUTE RESERVED // ITS CONTENT HAS NOT BEEN MOVED FROM THE CLASSIC PAGES"
+                      : "ROUTE RESERVED // NO LIVE PANEL IS ASSIGNED YET"
             }
 
             Repeater {
@@ -476,7 +468,7 @@ Rectangle {
             }
 
             GohuText {
-                text: "SOURCE ROUTES // SUBJECTS + CLASSIC"
+                text: "SOURCE ROUTES // NATIVE SUBJECTS"
                 font.pixelSize: 13
                 color: Colors.cyan
             }
@@ -484,7 +476,7 @@ Rectangle {
             QuietText {
                 width: parent.width
                 wrapMode: Text.WordWrap
-                text: "EXACT M28-A/B/C CONTROL CUTOVERS OPEN DIRECTLY IN SUBJECTS. ONLY UNRESOLVED MAPPED CONTROLS STILL OFFER THEIR ORIGINAL CLASSIC PAGE. THIS IS NOT FULL-PARITY ACCEPTANCE."
+                text: "MIGRATED CONTROL DESTINATIONS // SOURCE HISTORY RETAINED IN M0. LIVE FEED AND VIDEO AVAILABILITY ARE VERIFIED SEPARATELY."
                 font.pixelSize: 10
             }
 
@@ -507,37 +499,6 @@ Rectangle {
                 }
             }
 
-            GohuText {
-                visible: browser.classicSources.length > 0
-                text: "STILL PENDING // CLASSIC"
-                font.pixelSize: 13
-                color: Colors.orange
-            }
-
-            Repeater {
-                model: browser.classicSources
-                delegate: ActionButton {
-                    required property var modelData
-                    width: contentColumn.width
-                    height: 32
-                    label: "OPEN " + modelData.label
-                           + " // " + modelData.panels + " MAPPED"
-                    labelPixelSize: 11
-                    onClicked: browser.legacyPageRequested(modelData.id)
-                }
-            }
-
-            QuietText {
-                width: parent.width
-                visible: browser.classicSources.length === 0
-                wrapMode: Text.WordWrap
-                text: browser.currentRoute
-                      && browser.currentRoute.subject === "magick"
-                      ? "MAGICK IS A PLANNED INTERPRETIVE SUBJECT. NO ASTROLOGY OR MAGICK CONTENT IS BEING CLAIMED AS OPERATIONAL."
-                      : browser.nativeDestinations.length > 0
-                        ? "NO REMAINING CLASSIC SHORTCUT FOR TRACKED CUTOVERS AT THIS ROUTE. OPEN THE SUBJECTS CONTROL ABOVE."
-                        : "NO CLASSIC PAGE IS DIRECTLY MAPPED TO THIS ROUTE YET."
-            }
         }
     }
 
@@ -737,7 +698,7 @@ Rectangle {
                   ? "MAGICK // ASTRONOMICAL REFERENCE ONLY // NO CALCULATED READINGS"
                 : browser.liveToolsKind !== ""
                   ? "TOOLS // LIVE SOURCE READBACK // SHARED STORES // SAFE KITTY HANDOFF"
-                : "SPEC-ONLY SUBJECTS // CLASSIC PAGES REMAIN CANONICAL UNTIL PANEL MIGRATION"
+                : "INDEX // NATIVE SUBJECTS ROUTES // RESERVED AREAS MARKED"
     }
     }
 }

@@ -96,7 +96,10 @@ assert.match(hub,/onCloseRequested: stationNewsHub\.closeViewer\(\)/);
 assert.match(hub,/muted: stationNewsHub\.channelMuted/);
 assert.match(hub,/viewerOpen = false;[\s\S]*?channelMuted = true;/);
 assert.doesNotMatch(hub,/label: "VIEW HERE"/);
-assert.match(station,/id: newsViewComponent[\s\S]*?StationNewsHub/);
+const mediaPane=read("widgets/weather/StationMediaSubjectPane.qml");
+assert.match(mediaPane,/StationNewsHub\s*\{/);
+assert.match(station,/StationSubjectNavigator\s*\{/);
+assert.ok(!station.includes("newsViewComponent"));
 // The NEWS launch paths now deliberately cannot create QtWebEngine inside
 // the host. The optional web file remains unreferenced, not "available".
 assert.match(viewer,/READER DISABLED/);

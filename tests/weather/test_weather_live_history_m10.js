@@ -276,23 +276,18 @@ assert.match(
 
 const station = read("widgets/weather/WeatherStationW.qml");
 assert.match(station, /property var liveHistoryStore: null/);
-assert.match(
-    station,
-    /StationHome\s*\{[\s\S]*?liveHistoryStore: weatherStation\.liveHistoryStore/
-);
-assert.match(
-    station,
-    /StationGround\s*\{[\s\S]*?liveHistoryStore: weatherStation\.liveHistoryStore/
-);
-assert.match(
-    station,
-    /StationSpace\s*\{[\s\S]*?liveHistoryStore: weatherStation\.liveHistoryStore/
-);
-const skyStart = station.indexOf("StationSky {");
-const spaceComponentStart = station.indexOf("id: spaceViewComponent", skyStart);
-assert.ok(skyStart >= 0 && spaceComponentStart > skyStart);
-const skyArea = station.slice(skyStart, spaceComponentStart);
-assert.doesNotMatch(skyArea, /liveHistoryStore:/);
+const workspace = read("widgets/weather/StationWorkspaceSurface.qml");
+const weatherPane = read("widgets/weather/StationWeatherSubjectPane.qml");
+const cosmosPane = read("widgets/weather/StationCosmosSubjectPane.qml");
+// All history consumers now mount through SUBJECTS, not duplicate root Components.
+assert.match(workspace,/StationHome\s*\{/);
+assert.match(workspace,/liveHistoryStore: surface\.liveHistoryStore/);
+assert.match(workspace,/StationWeatherSubjectPane\s*\{/);
+assert.match(workspace,/StationCosmosSubjectPane\s*\{/);
+assert.match(weatherPane,/liveHistoryStore: weatherPane\.liveHistoryStore/);
+assert.match(cosmosPane,/liveHistoryStore: cosmosPane\.liveHistoryStore/);
+assert.ok(!station.includes("id: spaceViewComponent"));
+assert.ok(!station.includes("id: homeViewComponent"));
 
 const home = read("widgets/weather/StationHome.qml");
 const ground = read("widgets/weather/StationGround.qml");

@@ -24,8 +24,8 @@ test("seven main family ModeButtons use the original Station left rail",()=>{
   assert.match(station,/navigator: subjectNavigator/);
   assert.match(routes,/\{id:"home",label:"HOME",landing:"home\/overview"\}/);
   assert.match(routes,/\{id:"tools",label:"TOOLS",landing:"tools\/overview"\}/);
-  assert.equal((station.match(/ModeButton\s*\{/g)||[]).length,1,
-    "the original main Mode delegate remains exactly one in root station");
+  assert.equal((station.match(/ModeButton\s*\{/g)||[]).length,0,
+    "root no longer duplicates the native family rails");
 });
 
 test("workspace does not duplicate top family strip and retains bottom submodes",()=>{
@@ -42,36 +42,34 @@ test("workspace does not duplicate top family strip and retains bottom submodes"
 
 test("existing header INDEX takes over old MORE action and toggles detailed index",()=>{
   assert.match(station,/id: contextTerminalLaunch/);
-  assert.match(station,/label: weatherStation\.subjectNavigationOpen\s*\? "INDEX"/);
+  assert.match(station,/label: "INDEX"/);
   assert.match(station,/available: weatherStation\.menuOpen\s*&& terminalView\.terminalState === "IDLE"/);
-  assert.match(station,/if \(weatherStation\.subjectNavigationOpen\)\s*\{/);
   assert.match(station,/if \(subjectNavigator\.indexOpen\)\s*subjectNavigator\.returnToWorkspace\(\);\s*else\s*subjectNavigator\.openIndex\(\);/);
-  assert.match(station,/weatherStation\.launchContextTerminal\(\);/);
   assert.match(navigator,/function openIndex\(\)/);
   assert.match(navigator,/function returnToWorkspace\(\)/);
   assert.ok(!navigator.includes("onIndexRequested:"));
-  assert.match(navigator,/id: legacyIndexLayer/);
+  assert.match(navigator,/id: indexLayer/);
 });
 
-test("CLASSIC toggle remains on left rail, detailed INDEX also retains its own rail",()=>{
+test("CLASSIC toggle is retired and detailed INDEX retains its own rail",()=>{
   assert.match(station,/width: 160/);
-  assert.match(station,/id: subjectBrowserToggle/);
-  assert.match(station,/\? "CLASSIC" : "SUBJECTS"/);
+  assert.ok(!station.includes("subjectBrowserToggle"));
+  assert.ok(!station.includes("railColumn"));
   assert.match(station,/StationSubjectRail\s*\{/);
   assert.match(station,/visible: weatherStation\.subjectNavigationOpen\s*&& subjectNavigator\.indexOpen/);
   assert.match(classicRail,/model: \[\{id:"home",label:"HOME"\}\]\.concat\(SubjectRoutes\.SUBJECTS\)/);
   assert.equal((classicRail.match(/ModeButton\s*\{/g)||[]).length,1,"single deep INDEX rail delegate");
-  assert.match(station,/visible: !weatherStation\.subjectNavigationOpen/);
+  assert.match(station,/subjectNavigationOpen\s*&& !subjectNavigator\.indexOpen/);
 });
 
 test("Kitty and home session lifetimes and source owners remain intact",()=>{
   assert.match(station,/terminalHoleX: modeRail\.width \+ terminalView\.visibleBayX/);
   assert.match(station,/stationRailWidth: modeRail\.width/);
-  assert.match(station,/onCurrentViewChanged:\s*\{\s*subjectNavigationOpen = false/);
-  assert.match(station,/active: !weatherStation\.subjectNavigationOpen/);
+  assert.ok(!station.includes("onCurrentViewChanged"));
+  assert.match(station,/subjectNavigationOpen = false;/);
   assert.match(station,/StationTerminal\s*\{/);
   assert.match(station,/WeatherServices\.WeatherHistoryService\s*\{/);
-  assert.match(station,/onNewsMapRequested: function\(payload\)/);
+  assert.match(navigator,/showNewsMentionsOnEarth\(payload\)/);
   assert.match(navigator,/active: browser\.visible/);
   assert.match(surface,/workspaceSection: surface\.homeSection === "overview"/);
   for(const x of [surface,rail]) {

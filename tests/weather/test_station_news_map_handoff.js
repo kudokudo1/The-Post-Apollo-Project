@@ -44,24 +44,18 @@ assert.match(
     /onNewsMapRequested: function\(payload\)[\s\S]*?stationNewsHub\.newsMapRequested\(payload\)/
 );
 
-// WeatherStationW owns the transient cross-loader snapshot.
-assert.match(station, /property var newsMapOverlay: null/);
-assert.match(
-    station,
-    /onNewsMapRequested: function\(payload\)[\s\S]*?newsMapOverlay[\s\S]*?JSON\.parse\(JSON\.stringify\(payload\)\)/
-);
-assert.match(
-    station,
-    /weatherStation\.currentView = "map"/
-);
-assert.match(
-    station,
-    /StationDiscovery\s*\{[\s\S]*?domain: "map"[\s\S]*?newsMentionOverlay: weatherStation\.newsMapOverlay/
-);
-assert.match(
-    station,
-    /onNewsMapClearRequested:[\s\S]*?weatherStation\.newsMapOverlay = null/
-);
+// SUBJECTS Navigator owns the transient NEWS -> EARTH overlay.
+const navigator = read("widgets/weather/StationSubjectNavigator.qml");
+const earthPane = read("widgets/weather/StationEarthSubjectPane.qml");
+assert.match(navigator,/property var newsMentionOverlay: null/);
+assert.match(navigator,/function showNewsMentionsOnEarth\(payload\)/);
+assert.match(navigator,/MapProjection\.plottable\(payload\.locations\)/);
+assert.match(navigator,/chooseRoute\("earth\/maps\/overview"\)/);
+assert.match(navigator,/newsMentionOverlay = incoming/);
+assert.match(navigator,/function clearNewsMentions\(\)/);
+assert.match(earthPane,/newsMentionOverlay: earthPane\.newsMentionOverlay/);
+assert.ok(!station.includes("newsMapOverlay"));
+assert.ok(!station.includes("currentView"));
 
 // MAP treats GKG mentions as a separate visual/semantic layer.
 assert.match(discovery, /property var newsMentionOverlay: null/);

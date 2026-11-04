@@ -27,7 +27,8 @@ assert station.count('StationWeatherProviderDiagnostics {') == 1
 assert station.index('if (providerDiagnosticsOpen)') < station.index('SubjectDefaultPolicy.escapeAction(')
 assert station.count('weatherStation.handleEscape()') == 2
 assert 'id: sourceStatusIndicator' in station
-assert station.index('if (officialAlertSummary.available)')        < station.index('if (usesWeatherSource)')
+assert station.index('if (officialAlertSummary.available)') >= 0
+assert station.index('if (officialAlertSummary.available)') < station.index('if (!subjectNavigator.indexOpen')
 assert 'id: sourceStatusIndicator' in station
 assert 'width: 150' in station
 assert 'id: headerActions' in station

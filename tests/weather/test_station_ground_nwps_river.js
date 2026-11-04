@@ -183,16 +183,16 @@ assert.equal(
     0
 );
 assert.match(station, /id: riverService/);
-assert.match(station, /weatherStation\.currentView === "ground"/);
-assert.match(station, /weatherStation\.currentView === "map"/);
-assert.match(
-    station,
-    /StationGround\s*\{[\s\S]*?riverSource: riverService/
-);
-assert.match(
-    station,
-    /StationDiscovery\s*\{[\s\S]*?domain: "map"[\s\S]*?riverSource: riverService/
-);
+assert.match(station,/weatherStation\.subjectNavigationOpen/);
+assert.match(station,/SubjectPanelPolicy\.needsSource\(/);
+assert.match(station,/EarthPanelPolicy\.needsSource\(/);
+const weatherPane=read("widgets/weather/StationWeatherSubjectPane.qml");
+const earthPane=read("widgets/weather/StationEarthSubjectPane.qml");
+assert.match(station,/riverSource: riverService/);
+assert.match(weatherPane,/riverSource: weatherPane\.riverSource/);
+assert.match(earthPane,/riverSource: earthPane\.riverSource/);
+assert.match(weatherPane,/StationGround\s*\{/);
+assert.match(earthPane,/StationDiscovery\s*\{/);
 assert.match(ground, /property var riverSource: null/);
 assert.match(ground, /readonly property var riverService: riverSource/);
 assert.match(ground, /title: "RIVER \/\/ NOAA NWPS"/);

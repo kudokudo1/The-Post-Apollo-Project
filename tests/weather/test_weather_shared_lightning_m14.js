@@ -139,19 +139,19 @@ assert.ok(ownerStart >= 0 && ownerEnd > ownerStart);
 const owner = station.slice(ownerStart, ownerEnd);
 assert.match(owner, /id: lightningService/);
 assert.match(owner, /weatherStation\.menuOpen/);
-assert.match(owner, /weatherStation\.currentView === "ground"/);
-assert.match(owner, /weatherStation\.currentView === "map"/);
+assert.match(owner, /weatherStation\.subjectNavigationOpen/);
+assert.match(owner, /SubjectPanelPolicy\.needsSource\(/);
+assert.match(owner, /EarthPanelPolicy\.needsSource\(/);
 assert.match(owner, /weatherStation\.weatherService\.latitude/);
 assert.match(owner, /weatherStation\.weatherService\.longitude/);
 
-assert.match(
-    station,
-    /StationGround\s*\{[\s\S]*?lightningSource: lightningService/
-);
-assert.match(
-    station,
-    /StationDiscovery\s*\{[\s\S]*?domain: "map"[\s\S]*?lightningSource: lightningService/
-);
+const weatherPane=read("widgets/weather/StationWeatherSubjectPane.qml");
+const earthPane=read("widgets/weather/StationEarthSubjectPane.qml");
+assert.match(station,/lightningSource: lightningService/);
+assert.match(weatherPane,/lightningSource: weatherPane\.lightningSource/);
+assert.match(earthPane,/lightningSource: earthPane\.lightningSource/);
+assert.match(weatherPane,/StationGround\s*\{/);
+assert.match(earthPane,/StationDiscovery\s*\{/);
 
 assert.match(ground, /property var lightningSource: null/);
 assert.match(

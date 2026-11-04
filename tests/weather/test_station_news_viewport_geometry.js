@@ -21,13 +21,15 @@ assert.equal(
 assert.match(station,
     /WlrLayershell\.namespace:\s*"post-apollo-weather-station"/);
 assert.match(station, /WlrLayershell\.layer:\s*WlrLayer\.Overlay/);
-assert.match(station, /readonly property rect newsViewerViewportRect:/);
-assert.match(station, /readonly property bool newsViewerGeometryValid:/);
-assert.match(station, /if \(!menuOpen \|\| contextTerminalRequested \|\| !hub \|\| !hub\.viewerOpen\)/);
-assert.match(station, /const bay = hub\.playerViewportRect;/);
-assert.match(station, /hub\.mapToItem\(stationBackground, bay\.x, bay\.y\)/);
-assert.match(station, /newsViewerViewportRect\.x \+ newsViewerViewportRect\.width <= stationBackground\.width/);
-assert.match(station, /newsViewerViewportRect\.y \+ newsViewerViewportRect\.height <= stationBackground\.height/);
+// M28-V retires the inaccessible CLASSIC NEWS loader and its unused
+// station-root player geometry. MEDIA retains the original local viewport,
+// but no browser host is authorized or activated by this source cleanup.
+const media = read("widgets/weather/StationMediaSubjectPane.qml");
+assert.match(station,/StationSubjectNavigator\s*\{/);
+assert.match(media,/StationNewsHub\s*\{/);
+assert.ok(!station.includes("newsViewerViewportRect"));
+assert.ok(!station.includes("newsViewerGeometryValid"));
+assert.ok(!station.includes("newsSourceItem"));
 
 assert.match(hub, /readonly property rect playerViewportRect:/);
 assert.match(hub, /const screen = channelScreenLoader\.item;/);
@@ -55,4 +57,4 @@ assert.doesNotMatch(
     hub + screen,
     /Qt\.rect\(190\s*,\s*132|Qt\.rect\(0\s*,\s*0\s*,\s*824\s*,\s*494/
 );
-console.log("Weather NEWS host namespace and reactive viewport geometry: PASS");
+console.log("Weather NEWS safe-mode native MEDIA viewport geometry: PASS");

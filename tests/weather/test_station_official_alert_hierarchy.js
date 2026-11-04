@@ -86,16 +86,18 @@ assert.match(windowSource, /StationOfficialAlertPolicy\.js" as OfficialAlertPoli
 assert.match(windowSource, /readonly property var officialAlertSummary:/);
 assert.match(
     windowSource,
-    /readonly property string sourceStatusDisplay:\s*\{\s*if \(officialAlertSummary\.available\)\s*return officialAlertSummary\.headerText[\s\S]{0,160}officialAlertUsingPersistentCache/
+    /readonly property string sourceStatusText:\s*\{\s*if \(officialAlertSummary\.available\)\s*return officialAlertSummary\.headerText[\s\S]{0,160}officialAlertUsingPersistentCache/
 );
+assert.match(windowSource,/sourceStatusDisplay: sourceStatusText/);
 assert.match(
     windowSource,
     /readonly property color sourceStatusColor:\s*\{\s*if \(officialAlertSummary\.available\)\s*return officialAlertColor/
 );
-assert.match(
-    windowSource,
-    /StationHome\s*\{[\s\S]*?nwsAlertSource: weatherStation\.nwsAlertSource/
+const workspaceSource = fs.readFileSync(
+    path.join(root, "widgets/weather/StationWorkspaceSurface.qml"), "utf8"
 );
+assert.match(windowSource,/nwsAlertSource: weatherStation\.nwsAlertSource/);
+assert.match(workspaceSource,/StationHome\s*\{[\s\S]*?nwsAlertSource: surface\.nwsAlertSource/);
 assert.match(windowSource, /property var nwsAlertSource: null/);
 
 assert.match(homeSource, /property var nwsAlertSource: null/);

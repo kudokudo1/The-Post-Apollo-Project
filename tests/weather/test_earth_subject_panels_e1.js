@@ -182,7 +182,7 @@ test("CLASSIC, WEATHER, COSMOS, the terminal and data store ownership remain int
   assert.match(station,/eventArchiveStore: weatherStation\.eventArchiveStore/);
   assert.match(station,/dossierArchiveStore: weatherStation\.dossierArchiveStore/);
   assert.match(station,/StationTerminal\s*\{/);
-  assert.match(station,/onNewsMapRequested: function\(payload\)/);
+  assert.match(browser,/function showNewsMentionsOnEarth\(payload\)/);
   assert.match(station,/SubjectSourceBadge\.badgeFor\(/);
   assert.match(station,/subjectNavigator\.indexOpen/);
   assert.ok(!earthPane.includes("WeatherServices."));

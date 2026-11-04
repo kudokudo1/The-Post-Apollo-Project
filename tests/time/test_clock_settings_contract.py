@@ -35,7 +35,8 @@ class ClockTimeSettingsContract(unittest.TestCase):
         self.assertIn("time-settings-v1.json", service)
         self.assertIn("MAX_OFFSET_MS = 300000", policy)
         self.assertIn("adjustDisplayMs", service)
-        self.assertNotIn("set-timezone", service)
+        self.assertIn('"set-timezone", zoneChoice', service)
+        self.assertNotIn("set-timezone", policy)
         self.assertNotIn("set-ntp", service)
 
     def test_status_is_observation_not_actuation(self):

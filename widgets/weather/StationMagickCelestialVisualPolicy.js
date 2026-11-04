@@ -470,6 +470,9 @@ function wheelDragIndex(m,view,startIndex,deltaX) {
        view.to<=view.from || view.from<0 || view.to>=m.sampleCount)
         return -1;
     var origin=clamp(startIndex,view.from,view.to);
-    var offset=Math.round(deltaX/WHEEL_DRAG_PIXELS_PER_SAMPLE);
+    // Symmetric thresholds: moving 6px either direction advances one
+    // sample. Math.round(-0.5) would otherwise stick on the negative side.
+    var steps=Math.floor(Math.abs(deltaX)/WHEEL_DRAG_PIXELS_PER_SAMPLE+0.5);
+    var offset=deltaX<0 ? -steps : steps;
     return clamp(origin+offset,view.from,view.to);
 }

@@ -1,0 +1,39 @@
+name: Clock ANGEL opt-in interpretation lens
+
+on:
+  pull_request:
+    paths:
+      - "widgets/AngelMeaningPane.qml"
+      - "widgets/AngelPane.qml"
+      - "services/time/AngelInterpretationPolicy.js"
+      - "services/time/AngelSourceLookup.py"
+      - "tests/time/test_angel_interpretation_policy.cjs"
+      - "tests/time/test_angel_interpretation_sources.py"
+      - "tests/time/test_angel_interpretation_integration_contract.py"
+      - ".github/workflows/clock-angel-interpretation-lens.yml"
+  push:
+    paths:
+      - "widgets/AngelMeaningPane.qml"
+      - "widgets/AngelPane.qml"
+      - "services/time/AngelInterpretationPolicy.js"
+      - "services/time/AngelSourceLookup.py"
+      - "tests/time/test_angel_interpretation_policy.cjs"
+      - "tests/time/test_angel_interpretation_sources.py"
+      - "tests/time/test_angel_interpretation_integration_contract.py"
+      - ".github/workflows/clock-angel-interpretation-lens.yml"
+
+jobs:
+  source-lens:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Pure source URL, digit reduction and provenance contracts
+        run: node tests/time/test_angel_interpretation_policy.cjs
+      - name: Offline publisher HTML parser and transport security tests
+        run: python3 -m unittest discover -s tests/time -p 'test_angel_interpretation_sources.py' -v
+      - name: ANGEL journal to interpretation UI integration
+        run: python3 -m unittest discover -s tests/time -p 'test_angel_interpretation_integration_contract.py' -v
+      - name: Preserve existing ANGEL journal and ERR filters
+        run: node tests/time/test_angel_observation_policy.cjs
+      - name: Preserve existing ANGEL journal UI contracts
+        run: python3 -m unittest discover -s tests/time -p 'test_angel_journal_integration_contract.py' -v

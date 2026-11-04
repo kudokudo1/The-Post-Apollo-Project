@@ -188,7 +188,6 @@ Item {
                 labelPixelSize: 11
                 labelHorizontalAlignment: Text.AlignLeft
                 trackLabelGlowLocally: true
-                accentColor: Colors.white
                 softGlowEnabled: false
                 onLeftClicked: picker.zoneChosen(modelData.id)
             }

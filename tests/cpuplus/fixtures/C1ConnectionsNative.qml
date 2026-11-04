@@ -109,6 +109,12 @@ ShellRoot {
             canApproveInProduction:false, simulated:true
         };
     }
+    Connections {
+        target: details
+        function onGuideOpenChanged() {
+            console.log("C1_GUIDE_STATE // " + details.guideOpen);
+        }
+    }
     function fail(reason) {
         if (done) return;
         done = true;
@@ -145,8 +151,12 @@ ShellRoot {
                         || details.guideOpen) {
                     root.fail("WRONG_FIRMS_SELECTION");return;
                 }
-                if (root.announce(root.button("SETUP / DETAILS"),
-                                  "GUIDE_BUTTON"))
+                const guide = root.button("SETUP / DETAILS");
+                // The expanded source inventory can make this pane scroll.
+                // Explicitly expose the target inside its Flickable before
+                // deriving native click coordinates.
+                root.revealInDetails(guide);
+                if (root.announce(guide, "GUIDE_BUTTON"))
                     root.phase = "guideClicked";
             } else if (root.phase === "guideClicked") {
                 if (!details.guideOpen) return;

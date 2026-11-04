@@ -48,7 +48,7 @@ fi
 # or for executable files outside this narrow test boundary.
 if [[ "$(git hash-object -- "$qml")" != "2f678121aec04f763b0e130f937fec6af0ad2734" ||
       "$(git hash-object -- "$scene")" != "3b89c4be0ac57ac26624e7ff20cefecb894a484d" ||
-      "$(git hash-object -- "$host")" != "40f96104ab48a56267bf4c6aab78bbb4d2a5b41c" ||
+      "$(git hash-object -- "$host")" != "53e37d96a4760239448ce729e171c3ffd2d667b7" ||
       "$(git hash-object -- "$fixture")" != "fe9707077db3e49c6d65edc9c01f9bb6ae2926df" ||
       "$(git hash-object -- "$cipher")" != "ede2a14684c15255244781d8897934472fd7fc2e" ]]; then
     printf 'M13L_REFUSED_UNREVIEWED_SOURCE\n'

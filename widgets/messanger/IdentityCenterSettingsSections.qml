@@ -248,6 +248,19 @@ Item {
                         socialLinksStore: sections.localLinksStore
                     }
 
+                    IdentityCenterLocalRefreshAll {
+                        id: localRefreshAll
+                        objectName: "orgLocalRefreshAll"
+                        width: parent.width
+                        directoryStore: sections.localDirectoryStore
+                        portfolioStore: sections.localPortfoliosStore
+                        structureStore: sections.localStructureStore
+                        functionLocationStore: sections.localUnitLocationLinksStore
+                        branchLocationStore: sections.localBranchLocationLinksStore
+                        reportingStore: sections.localFunctionalReportingStore
+                        socialLinksStore: sections.localLinksStore
+                    }
+
                     // Shared local record editing context. ALL shows company records;
                     // Structure and Modifiers require an explicit active company.
                     Column {
@@ -314,6 +327,7 @@ Item {
                         focusedOrganizationId: sections.activeLocalEditingOrganizationId
                         searchQuery: localRecordsSearch.searchText
                         useSharedArchiveControl: true
+                        useSharedRefreshControl: true
                         showArchived: localRecordsSearch.includeArchived
                     }
 
@@ -324,6 +338,7 @@ Item {
                         portfolioStore: sections.localPortfoliosStore
                         searchQuery: localRecordsSearch.searchText
                         useSharedArchiveControl: true
+                        useSharedRefreshControl: true
                         showArchived: localRecordsSearch.includeArchived
                     }
 
@@ -336,6 +351,7 @@ Item {
                         selectedOrgId: sections.activeLocalEditingOrganizationId
                         searchQuery: localRecordsSearch.searchText
                         useSharedArchiveControl: true
+                        useSharedRefreshControl: true
                         showArchivedUnits: localRecordsSearch.includeArchived
                     }
 
@@ -344,6 +360,7 @@ Item {
                     IdentityCenterLocalRelationshipModifiers {
                         id: organizationModifiers
                         objectName: "orgModifierForm"
+                        useSharedRefreshControl: true
                         width: parent.width
                         useSharedContext: true
                         selectedOrgId: sections.activeLocalEditingOrganizationId

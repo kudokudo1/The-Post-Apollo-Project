@@ -14,7 +14,7 @@ import unittest
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
-from PySide6.QtCore import QObject, QUrl
+from PySide6.QtCore import QObject, QUrl, QMetaObject
 from PySide6.QtGui import QGuiApplication
 from PySide6.QtQml import QQmlComponent, QQmlEngine
 from PySide6.QtQuick import QQuickItem
@@ -660,6 +660,95 @@ class RealQtOrganizationsSettingsPaneSmoke(unittest.TestCase):
         state("localPortfoliosStore", "ready", 12)
         self.assertEqual(feedback.property("lastKind"), "unconfirmed")
         self.assertIn("NOT CONFIRMED //", feedback.property("displayedStatus"))
+        self.assertFalse(self.sections.property("organizationDisplayReady"))
+
+    def test_one_refresh_button_blocks_saves_and_avoids_duplicate_reads(self):
+        self._open_organizations()
+        refresher = self.sections.findChild(QObject, "orgLocalRefreshAll")
+        button = self.sections.findChild(QObject, "orgRefreshAllButton")
+        self.assertIsNotNone(refresher)
+        self.assertIsNotNone(button)
+        self.assertFalse(refresher.property("canRefresh"))
+
+        sources = (
+            ("localDirectoryStore", "organizations"),
+            ("localPortfoliosStore", "portfolios"),
+            ("localStructureStore", "units"),
+            ("localUnitLocationLinksStore", "links"),
+            ("localBranchLocationLinksStore", "links"),
+            ("localFunctionalReportingStore", "links"),
+            ("localLinksStore", "links"),
+        )
+
+        def inject(name, list_key, status, error="", allow=True):
+            fixture = {"state": status, "errorCode": error,
+                       "saved": {"revision": 3, list_key: []}, "calls": 0}
+            source = ("(function(){var entry = " + json.dumps(fixture) +
+                      "; entry.refresh = function(){this.calls += 1; return " +
+                      ("true" if allow else "false") +
+                      ";}; return entry;})()")
+            value = self.engine.evaluate(source)
+            self.assertFalse(value.isError(), name)
+            self.assertTrue(self.sections.setProperty(name, value), name)
+            APP.processEvents()
+        for name, key in sources:
+            inject(name, key, "ready")
+        self.assertTrue(refresher.property("canRefresh"))
+        self.assertEqual(refresher.property("missingCount"), 0)
+        self.assertTrue(button.property("interactive"))
+
+        # A saving store prevents the whole coordinated refresh rather than
+        # launching partial reads or interrupting the asynchronous writer.
+        inject(sources[0][0], sources[0][1], "saving")
+        self.assertFalse(refresher.property("canRefresh"))
+        self.assertFalse(button.property("interactive"))
+        self.assertTrue(QMetaObject.invokeMethod(refresher, "requestRefresh"))
+        self.assertEqual(refresher.property("acceptedRefreshCount"), 0)
+        self.assertIn("NOT STARTED", refresher.property("lastRefreshResult"))
+
+        inject(sources[0][0], sources[0][1], "ready")
+        self.assertTrue(refresher.property("canRefresh"))
+        self.assertTrue(QMetaObject.invokeMethod(refresher, "requestRefresh"))
+        self.assertEqual(refresher.property("acceptedRefreshCount"), 7)
+        self.assertTrue(refresher.property("refreshInProgress"))
+        self.assertIn("7 local stores", refresher.property("lastRefreshResult"))
+
+        def count_calls(name):
+            value = self.sections.property(name)
+            return value.property("calls").toInt()
+        self.assertEqual([count_calls(name) for name, _ in sources], [1] * 7)
+
+        # Even invoking the QML method a second time directly must not
+        # queue new refreshes while the first is in progress.
+        self.assertTrue(QMetaObject.invokeMethod(refresher, "requestRefresh"))
+        self.assertEqual([count_calls(name) for name, _ in sources], [1] * 7)
+        self.assertFalse(refresher.property("canRefresh"))
+        for name, key in sources:
+            inject(name, key, "loading")
+        self.assertGreater(refresher.property("loadingCount"), 0)
+        self.assertFalse(button.property("interactive"))
+        for name, key in sources:
+            inject(name, key, "ready")
+        self.assertFalse(
+            refresher.property("refreshInProgress"),
+            "inflight=" + str(refresher.property("refreshInProgress"))
+            + " signature=" + str(refresher.property("stateSignature"))
+            + " loading=" + str(refresher.property("loadingCount"))
+            + " result=" + str(refresher.property("lastRefreshResult")))
+        self.assertIn("REFRESH COMPLETE", refresher.property("lastRefreshResult"))
+        self.assertTrue(refresher.property("canRefresh"))
+
+        # Backend refresh/read errors are visible and never called a save.
+        self.assertTrue(QMetaObject.invokeMethod(refresher, "requestRefresh"))
+        for name, key in sources:
+            inject(name, key, "loading")
+        for name, key in sources[:-1]:
+            inject(name, key, "ready")
+        inject(sources[-1][0], sources[-1][1], "error", "READ_UNAVAILABLE")
+        self.assertIn("REFRESH ENDED WITH ERRORS",
+                      refresher.property("lastRefreshResult"))
+        self.assertIn("READ_UNAVAILABLE", refresher.property("lastRefreshResult"))
+        self.assertNotIn("SAVED //", refresher.property("lastRefreshResult"))
         self.assertFalse(self.sections.property("organizationDisplayReady"))
 
     def test_host_logout_and_failure_are_reflected_in_real_panel(self):

@@ -18,6 +18,7 @@ Column {
     property string selectedOrgId: ""
     // Parent page may supply the same local editing focus used by Structure.
     property bool useSharedContext: false
+    property bool useSharedRefreshControl: false
     property string searchQuery: ""
     readonly property string normalizedSearch: searchQuery.trim().toLowerCase()
     property string selectedSourceId: ""
@@ -678,6 +679,7 @@ Column {
         ActionButton {
             width: 150
             height: 28
+            visible: !editor.useSharedRefreshControl
             label: "REFRESH LINKS"
             labelPixelSize: 9
             onTriggered: editor.reloadLinks()

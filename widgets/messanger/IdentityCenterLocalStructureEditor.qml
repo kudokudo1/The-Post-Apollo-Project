@@ -24,6 +24,7 @@ Column {
     property string selectedKind: "division"
     property bool showArchivedUnits: false
     property bool useSharedArchiveControl: false
+    property bool useSharedRefreshControl: false
     onShowArchivedUnitsChanged: confirmationKey = ""
     property bool showArchivedOrganizations: false
     property string confirmationKey: ""
@@ -94,6 +95,7 @@ Column {
     ActionButton {
         width: 149
         height: 28
+        visible: !editor.useSharedRefreshControl
         label: "RELOAD STRUCTURE"
         labelPixelSize: 9
         interactive: structureStore !== null && structureStore.state !== "saving"

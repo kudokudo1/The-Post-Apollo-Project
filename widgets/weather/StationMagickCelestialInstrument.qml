@@ -539,11 +539,12 @@ Rectangle {
                     {id:"wheel",label:"ZODIAC"},
                     {id:"motion",label:"MOTION"},
                     {id:"aspects",label:"ASPECTS"},
-                    {id:"relations",label:"RELATIONS"}
+                    {id:"relations",label:"RELATIONS"},
+                    {id:"network",label:"NETWORK"}
                 ]
                 delegate: ActionButton {
                     required property var modelData
-                    width: Math.max(1,(modeRow.width-15)/4)
+                    width: Math.max(1,(modeRow.width-20)/5)
                     height: 27
                     contentPadding: 3
                     label: modelData.label
@@ -566,6 +567,7 @@ Rectangle {
 
             Canvas {
                 id: graphCanvas
+                visible: instrument.mode !== "network"
                 anchors.fill: parent
                 anchors.margins: 17
                 onPaint: {
@@ -581,7 +583,7 @@ Rectangle {
             MouseArea {
                 id: pointer
                 anchors.fill: graphCanvas
-                enabled: instrument.graphModel.ready
+                enabled: instrument.graphModel.ready && instrument.mode !== "network"
                 hoverEnabled: true
                 preventStealing: true
                 acceptedButtons: Qt.LeftButton
@@ -683,6 +685,37 @@ Rectangle {
                 }
             }
 
+            // V4a read-only consumer of THIS SAME validated M4 JPL model
+            // and sample index. No source lifecycle, request or new ephemeris.
+            StationCosmosCelestialNetwork {
+                id: v4aNetwork
+                anchors.fill: parent
+                anchors.margins: 17
+                visible: instrument.mode === "network"
+                graphModel: instrument.graphModel
+                focusIndex: instrument.focusIndex
+                selectedBody: instrument.selectedBody
+                neonEnabled: instrument.neonEnabled
+                onBodyPicked: function(body) {
+                    instrument.selectedBody=body;
+                    instrument.eventOrdinal=-1;
+                    instrument.lockedIndex=instrument.focusIndex;
+                }
+                onSampleScrubbed: function(originIndex,offsetPixels) {
+                    const next=Celestial.wheelDragIndex(
+                        instrument.graphModel,instrument.viewWindow,
+                        originIndex,offsetPixels);
+                    if(next>=0 && next!==instrument.lockedIndex) {
+                        instrument.eventOrdinal=-1;
+                        instrument.lockedIndex=next;
+                    }
+                }
+                onZoomRequested: function(direction) {
+                    instrument.zoom=Celestial.clamp(
+                        instrument.zoom*(direction>0?1.4:1/1.4),1,8);
+                }
+            }
+
             GohuText {
                 anchors.centerIn: parent
                 width: Math.max(0,parent.width-32)
@@ -700,7 +733,9 @@ Rectangle {
                 anchors.margins: 4
                 font.pixelSize: 9
                 color: Colors.cyan
-                text: instrument.mode==="wheel" || instrument.mode==="relations"
+                text: instrument.mode==="network"
+                    ? "NETWORK // CHORDS ARE LONGITUDE GAPS // NOT ORBITS"
+                    : instrument.mode==="wheel" || instrument.mode==="relations"
                     ? "DRAG // TIME   |   CLICK // BODY   |   SCROLL // ZOOM TIME"
                     : "DRAG // PAN TIME   |   CLICK // LOCK   |   SCROLL // ZOOM"
                 visible: instrument.graphModel.ready

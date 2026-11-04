@@ -43,9 +43,7 @@ Rectangle {
     function changePhoneAudio(family, selection) {
         if (!visible || selectedSection !== "DEVICE"
                 || setupState !== "CHECKED" || stageWanted
-                || audioActionProcess.running || audioStatusProcess.running
-                || phoneAudioCheck !== "CHECKED"
-                || phoneAudioStatus.canAdjust !== true)
+                || audioActionProcess.running || audioStatusProcess.running)
             return;
         if (family === "media" && ["phone", "pc", "auto"].indexOf(selection) < 0)
             return;
@@ -53,9 +51,25 @@ Rectangle {
             return;
         if (family !== "media" && family !== "calls")
             return;
-        if (family === "calls" && selection === "enable"
-                && phoneAudioStatus.ofonoActive !== true) {
-            phoneAudioResult = "CALLS_PREREQUISITES_MISSING";
+
+        // The CALLS button remains clickable even if the HFP backend is not
+        // available. Only an actual supported action reaches the host helper.
+        if (family === "calls") {
+            if (phoneAudioCheck !== "CHECKED"
+                    || phoneAudioStatus.canAdjust !== true) {
+                phoneAudioResult = "CALLS_STATUS_UNAVAILABLE";
+                return;
+            }
+            if (typeof phoneAudioStatus.callsEnabled !== "boolean") {
+                phoneAudioResult = "CALLS_UNSUPPORTED";
+                return;
+            }
+            if (selection === "enable" && phoneAudioStatus.ofonoActive !== true) {
+                phoneAudioResult = "CALLS_PREREQUISITES_MISSING";
+                return;
+            }
+        } else if (phoneAudioCheck !== "CHECKED"
+                   || phoneAudioStatus.canAdjust !== true) {
             return;
         }
         phoneAudioResult = "UPDATING";
@@ -73,7 +87,11 @@ Rectangle {
         if (phoneAudioResult === "PREFERENCE_SAVED")
             return "Preference saved by BlueFerry. Actual playback and call availability depend on the iPhone and audio services.";
         if (phoneAudioResult === "CALLS_PREREQUISITES_MISSING")
-            return "Calls on this computer need oFono/HFP support. No change made. Phone media routing works separately.";
+            return "Calls on this computer need the oFono hands-free service. It is not running or ready. No change made to your phone or media route.";
+        if (phoneAudioResult === "CALLS_UNSUPPORTED")
+            return "The running BlueFerry backend does not report a supported Calls on PC setting. No change made; this requires a compatible phone-call provider.";
+        if (phoneAudioResult === "CALLS_STATUS_UNAVAILABLE")
+            return "Call settings cannot be read from BlueFerry yet. Check the phone connection with CONNECT PHONE. No change made.";
         if (phoneAudioResult === "NOT_CONFIRMED")
             return "Requested, but BlueFerry did not confirm the saved preference.";
         if (phoneAudioResult === "CHANGE_FAILED"
@@ -889,12 +907,9 @@ Rectangle {
                         labelPixelSize: 10
                         accentColor: Colors.magenta
                         selected: phonePane.phoneAudioStatus.callsEnabled === true
-                        interactive: phonePane.phoneAudioCheck === "CHECKED"
-                                     && phonePane.phoneAudioStatus.canAdjust === true
-                                     && phonePane.phoneAudioStatus.callsEnabled !== null
-                                     && (phonePane.phoneAudioStatus.callsEnabled === true
-                                         || phonePane.phoneAudioStatus.ofonoActive === true)
-                                     && !audioActionProcess.running
+                        // Always allow a diagnostic click. The handler blocks
+                        // unsupported changes and explains them in this pane.
+                        interactive: !audioActionProcess.running
                                      && !audioStatusProcess.running
                                      && !phonePane.stageWanted
                         onTriggered: phonePane.changePhoneAudio(
@@ -908,10 +923,10 @@ Rectangle {
                         text: phonePane.phoneAudioStatus.callsEnabled === true
                               ? "Call preference on. HFP status: " + String(phonePane.phoneAudioStatus.callsState || "UNKNOWN") +
                                 ". Actual call audio depends on oFono and the system's hands-free routing."
-                              : "For calls only, choose IPHONE above and enable CALLS ON PC when supported." +
+                              : "For calls only, choose IPHONE above and select CALLS ON PC." +
                                 (phonePane.phoneAudioCheck === "CHECKED"
                                  && phonePane.phoneAudioStatus.ofonoActive !== true
-                                 ? " Calls require an oFono hands-free backend; not ready on this desktop." : "")
+                                 ? " Tap the call control for the missing hands-free requirement." : "")
                         color: Colors.orange
                         font.pixelSize: 10
                         wrapMode: Text.WordWrap

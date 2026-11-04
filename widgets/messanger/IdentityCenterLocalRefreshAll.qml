@@ -73,9 +73,10 @@ Column {
 
     function requestRefresh() {
         if (!canRefresh) {
-            // Button may be clicked repeatedly, but disabled/queued work is
-            // never duplicated, and the existing writers remain authoritative.
-            lastRefreshResult = "REFRESH NOT STARTED // Wait for idle stores.";
+            // Repeated presses during an accepted operation never queue
+            // duplicate reads and must not erase its progress status.
+            if (!refreshInProgress)
+                lastRefreshResult = "REFRESH NOT STARTED // Wait for idle stores.";
             return false;
         }
         const sourcesNow = sources();

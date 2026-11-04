@@ -1,0 +1,61 @@
+name: MAGICK M5j smooth wheel input and selected zodiac
+on:
+  pull_request:
+    paths:
+      - 'widgets/weather/StationMagickCelestialInstrument.qml'
+      - 'widgets/weather/StationMagickCelestialVisualPolicy.js'
+      - 'widgets/weather/StationMagickZodiacVectorPolicy.js'
+      - 'tests/weather/test_magick_wheel_interaction_m5j.js'
+      - 'tests/weather/test_magick_wheel_focus_m5j_pixels.py'
+      - 'tests/weather/test_magick_zodiac_visible_m5i.js'
+      - '.github/workflows/weather-magick-wheel-interaction-m5j.yml'
+  push:
+    paths:
+      - 'widgets/weather/StationMagickCelestialInstrument.qml'
+      - 'widgets/weather/StationMagickCelestialVisualPolicy.js'
+      - 'widgets/weather/StationMagickZodiacVectorPolicy.js'
+      - 'tests/weather/test_magick_wheel_interaction_m5j.js'
+      - 'tests/weather/test_magick_wheel_focus_m5j_pixels.py'
+      - 'tests/weather/test_magick_zodiac_visible_m5i.js'
+      - '.github/workflows/weather-magick-wheel-interaction-m5j.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  wheel-gesture-and-focus:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Verify relative wheel drag, idle hover and active zodiac styling
+        run: node --test tests/weather/test_magick_wheel_interaction_m5j.js
+      - name: Rasterize idle and selected zodiac from same vector glyph
+        run: |
+          python3 -m pip install 'CairoSVG>=2.7,<3' 'Pillow>=10,<13'
+          node tests/weather/test_magick_wheel_interaction_m5j.js \
+            --emit-focus-svg "$RUNNER_TEMP/zodiac-m5j-focus.svg"
+          python3 tests/weather/test_magick_wheel_focus_m5j_pixels.py \
+            "$RUNNER_TEMP/zodiac-m5j-focus.svg"
+      - name: Preserve M5i font-free compact zodiac visibility
+        run: |
+          node --test tests/weather/test_magick_zodiac_visible_m5i.js
+          node tests/weather/test_magick_zodiac_visible_m5i.js \
+            --emit-svg "$RUNNER_TEMP/zodiac-m5i-compact.svg"
+          python3 tests/weather/test_magick_zodiac_visible_m5i_pixels.py \
+            "$RUNNER_TEMP/zodiac-m5i-compact.svg"
+      - name: Preserve MAGICK M5a-M5h and HOME interaction contracts
+        run: |
+          node --test tests/weather/test_magick_neon_scrubber_m5h.js
+          node --test tests/weather/test_magick_relations_timeline_m5g.js
+          node --test tests/weather/test_magick_chart_legibility_m5f.js
+          node --test tests/weather/test_magick_event_inspector_m5d.js
+          node --test tests/weather/test_magick_celestial_visual_m5.js
+          node --test tests/weather/test_magick_celestial_bridge_m5b.js
+          node --test tests/weather/test_magick_celestial_query_m5c.js
+          node --test tests/weather/test_home_deck_w2a.js

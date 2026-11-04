@@ -455,3 +455,24 @@ function timelineHandleX(m,view,index,width) {
     if(fraction===null || w===null || w<0)return null;
     return fraction*w;
 }
+
+
+// M5j // Fine wheel/relationship scrubbing is relative to the sample the
+// gesture STARTED on. Absolute canvas X selects an unrelated timestamp and
+// makes a tiny drag jump across the whole graph. The timeline slider remains
+// the separate coarse/absolute navigation control.
+var WHEEL_DRAG_PIXELS_PER_SAMPLE = 12;
+function wheelDragIndex(m,view,startIndex,deltaX) {
+    if(!m || !m.ready || !view || view.count<2 ||
+       number(startIndex)===null || Math.floor(startIndex)!==startIndex ||
+       number(deltaX)===null ||
+       number(view.from)===null || number(view.to)===null ||
+       view.to<=view.from || view.from<0 || view.to>=m.sampleCount)
+        return -1;
+    var origin=clamp(startIndex,view.from,view.to);
+    // Symmetric thresholds: moving 6px either direction advances one
+    // sample. Math.round(-0.5) would otherwise stick on the negative side.
+    var steps=Math.floor(Math.abs(deltaX)/WHEEL_DRAG_PIXELS_PER_SAMPLE+0.5);
+    var offset=deltaX<0 ? -steps : steps;
+    return clamp(origin+offset,view.from,view.to);
+}

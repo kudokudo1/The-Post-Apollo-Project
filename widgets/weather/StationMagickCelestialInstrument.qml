@@ -71,7 +71,11 @@ Rectangle {
         graphCanvas.requestPaint();
         eventTimelineCanvas.requestPaint();
     }
-    onModeChanged: graphCanvas.requestPaint()
+    onModeChanged: {
+        // A chart hover sample must not follow us into the wheel.
+        instrument.hoveredIndex=-1;
+        graphCanvas.requestPaint();
+    }
     onViewWindowChanged: {
         instrument.eventOrdinal=-1;
         graphCanvas.requestPaint();
@@ -116,26 +120,26 @@ Rectangle {
     function paintZodiacVector(ctx,sign,x,y,color,isSelected) {
         const paths=ZodiacVector.strokesFor(sign);
         if(!paths.length)return;
+        const visual=ZodiacVector.appearance(isSelected);
         ctx.save();
         // Dark contrast chip with glowing colored edge. 12 chips fit on the
         // compact wheel without depending on the desktop font stack.
         ctx.beginPath();
-        ctx.arc(x,y,9.3,0,2*Math.PI);
+        ctx.arc(x,y,visual.chipRadius,0,2*Math.PI);
         ctx.fillStyle=String(Colors.dark);
-        ctx.globalAlpha=0.96;
+        ctx.globalAlpha=visual.chipOpacity;
         ctx.fill();
         ctx.strokeStyle=String(color);
-        ctx.globalAlpha=isSelected?0.98:0.65;
-        ctx.lineWidth=isSelected?1.5:1;
+        ctx.globalAlpha=visual.edgeOpacity;
+        ctx.lineWidth=visual.edgeWidth;
         ctx.shadowColor=String(color);
-        ctx.shadowBlur=instrument.neonEnabled?(isSelected?13:7):0;
+        ctx.shadowBlur=instrument.neonEnabled?visual.edgeGlow:0;
         ctx.stroke();
         ctx.shadowBlur=0;
         ctx.globalAlpha=1;
 
         ctx.translate(x,y);
-        const scale=isSelected?0.68:0.61;
-        ctx.scale(scale,scale);
+        ctx.scale(visual.symbolScale,visual.symbolScale);
         ctx.translate(-12,-12);
         ctx.lineJoin="round";
         ctx.lineCap="round";
@@ -154,13 +158,15 @@ Rectangle {
             // Shadow/contrast stroke + bright main stroke give legible signs
             // even when the wheel is only ~100px high.
             ctx.strokeStyle=String(Colors.black);
-            ctx.lineWidth=4.3;
+            ctx.lineWidth=visual.outlineWidth;
             ctx.shadowBlur=0;
+            ctx.globalAlpha=1;
             ctx.stroke();
             ctx.strokeStyle=String(color);
-            ctx.lineWidth=isSelected?2.6:2.3;
+            ctx.lineWidth=visual.inkWidth;
+            ctx.globalAlpha=visual.inkOpacity;
             ctx.shadowColor=String(color);
-            ctx.shadowBlur=instrument.neonEnabled?9:0;
+            ctx.shadowBlur=instrument.neonEnabled?visual.inkGlow:0;
             ctx.stroke();
         }
         ctx.restore();
@@ -195,12 +201,21 @@ Rectangle {
         });
         const activeSign=activePoint
             ? Math.floor(activePoint.longitude_deg/30)%12 : -1;
+        // Render the dimmer eleven first, then place the slightly
+        // larger, brighter selected sign on top. No geometry is shifted.
         for(let sign=0;sign<12;sign++){
+            if(sign===activeSign)continue;
             const at=ZodiacVector.sectorCenter(
                 sign,graphCanvas.width,graphCanvas.height,radius);
             if(!at)continue;
             instrument.paintZodiacVector(ctx,sign,at.x,at.y,
-                Celestial.zodiacColor(sign),sign===activeSign);
+                Celestial.zodiacColor(sign),false);
+        }
+        if(activeSign>=0){
+            const at=ZodiacVector.sectorCenter(
+                activeSign,graphCanvas.width,graphCanvas.height,radius);
+            if(at)instrument.paintZodiacVector(ctx,activeSign,at.x,at.y,
+                Celestial.zodiacColor(activeSign),true);
         }
         ctx.globalAlpha=1;
         ctx.font="10px monospace";
@@ -573,6 +588,7 @@ Rectangle {
                 cursorShape: Qt.CrossCursor
                 property real previousX: 0
                 property real gestureOriginX: 0
+                property int gestureStartIndex: -1
                 property bool panning: false
                 function sampleFraction(x) {
                     return instrument.mode==="wheel" || instrument.mode==="relations"
@@ -584,6 +600,13 @@ Rectangle {
                     previousX=mouse.x;
                     gestureOriginX=mouse.x;
                     panning=false;
+                    // A wheel drag must start at the CURRENT sample, not
+                    // jump to the timestamp mapped to the canvas's X value.
+                    // Idle hovering over a small wheel must not scrub time.
+                    if(instrument.mode==="wheel" ||
+                       instrument.mode==="relations")
+                        instrument.hoveredIndex=-1;
+                    gestureStartIndex=instrument.focusIndex;
                 }
                 onPositionChanged: function(mouse) {
                     if (!instrument.graphModel.ready)return;
@@ -598,16 +621,26 @@ Rectangle {
                                 0,1);
                         } else if (panning && (instrument.mode==="wheel" ||
                                                  instrument.mode==="relations")) {
-                            instrument.eventOrdinal=-1;
-                            instrument.lockedIndex=Celestial.indexAtFraction(
+                            const next=Celestial.wheelDragIndex(
                                 instrument.graphModel,instrument.viewWindow,
-                                sampleFraction(mouse.x));
+                                gestureStartIndex,mouse.x-gestureOriginX);
+                            // Only update state when a source sample changes.
+                            // Continuous unnecessary repaints cause lag on
+                            // glowing Qt Canvas artwork during pointer moves.
+                            if(next>=0 && next!==instrument.lockedIndex){
+                                instrument.eventOrdinal=-1;
+                                instrument.lockedIndex=next;
+                            }
                         }
                         previousX=mouse.x;
-                    } else if (instrument.lockedIndex<0) {
-                        instrument.hoveredIndex=Celestial.indexAtFraction(
+                    } else if (instrument.lockedIndex<0 &&
+                               instrument.mode!=="wheel" &&
+                               instrument.mode!=="relations") {
+                        const next=Celestial.indexAtFraction(
                             instrument.graphModel,instrument.viewWindow,
                             sampleFraction(mouse.x));
+                        if(next!==instrument.hoveredIndex)
+                            instrument.hoveredIndex=next;
                     }
                 }
                 onClicked: function(mouse) {
@@ -638,7 +671,8 @@ Rectangle {
                     }
                 }
                 onExited: {
-                    if(instrument.lockedIndex<0)instrument.hoveredIndex=-1;
+                    if(!pressed && instrument.lockedIndex<0)
+                        instrument.hoveredIndex=-1;
                 }
                 onWheel: function(wheel) {
                     if(!instrument.graphModel.ready)return;

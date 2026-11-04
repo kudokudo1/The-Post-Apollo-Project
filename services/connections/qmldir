@@ -3,3 +3,4 @@ module qs.services.connections
 singleton ConnectionsRegistry 1.0 ConnectionsRegistry.qml
 singleton ConnectionsBroker 1.0 ConnectionsBroker.qml
 singleton ConnectionsRequestStatus 1.0 ConnectionsRequestStatus.qml
+singleton ConnectionsHostObservation 1.0 ConnectionsHostObservation.qml

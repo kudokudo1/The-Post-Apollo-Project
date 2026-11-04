@@ -244,6 +244,23 @@ ShellRoot {
                         || details.requestStatusView.grantActive) {
                     root.fail("CANCELLED_LEFT_GRANT"); return;
                 }
+                const inspector = root.button("INSPECT LOCAL HOST");
+                root.revealInDetails(inspector);
+                if (root.announce(inspector, "HOST_INSPECT"))
+                    root.phase = "hostInspectClicked";
+            } else if (root.phase === "hostInspectClicked") {
+                if (ConnectionsHostObservation.checking
+                        || ConnectionsHostObservation.observation.status === "NOT_CHECKED")
+                    return;
+                if (ConnectionsHostObservation.observation.status !== "HOST_NOT_FOUND"
+                        || ConnectionsHostObservation.hostAuthenticated
+                        || ConnectionsHostObservation.credentialActionsEnabled
+                        || ConnectionsHostObservation.observation.canApprove
+                        || ConnectionsRequestStatus.hostConnected
+                        || ConnectionsBroker.credentialActionsEnabled) {
+                    root.fail("HOST_INSPECTION_FAKED_TRUST"); return;
+                }
+                console.log("C2I_PASS // NATIVE_INSPECT_LOCAL_HOST_OFFLINE_NO_GRANTS");
                 const closer = root.button("CLOSE REQUEST STATUS");
                 root.revealInDetails(closer);
                 if (root.announce(closer, "STATUS_CLOSE"))

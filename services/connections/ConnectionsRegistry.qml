@@ -4,6 +4,7 @@ import QtQuick
 import Quickshell
 import qs.services.social
 import qs.services.notifications
+import qs.services.hub
 import "../weather/FirmsHotspotPolicy.js" as FirmsPolicy
 import "ConnectionsPolicy.js" as ConnectionPolicy
 
@@ -28,7 +29,20 @@ Scope {
         socialAccountState: SocialAccountDetailsStore.state,
         socialAccounts: socialAccountDocument,
         notificationsReady: NotificationsService.historyReady,
-        firmsKeyPresent: firmsKeyPresent
+        firmsKeyPresent: firmsKeyPresent,
+        // Read only the existing C2 broker and sole TASKS store. These
+        // are status bits, never Secret Service credentials or grants.
+        tasksProviderStatus: ConnectionsBroker.status,
+        tasksProviderChecking: ConnectionsBroker.checking,
+        tasksBrokerActionsEnabled: ConnectionsBroker.credentialActionsEnabled,
+        tasksRecoveryEnabled: ApolloHubTodoStore.encryptedRecoveryEnabled,
+        tasksRecoveryStorageAuthorized:
+            ApolloHubTodoStore.encryptedRecoveryStorageAuthorized,
+        tasksRecoveryUnlockAuthorized:
+            ApolloHubTodoStore.encryptedRecoveryUnlockAuthorized,
+        tasksDraftHostEnabled: ApolloHubTodoStore.encryptedDraftHostEnabled,
+        tasksDraftHostWriteAuthorized:
+            ApolloHubTodoStore.encryptedDraftHostWriteAuthorized
     })
     readonly property var summary: ConnectionPolicy.counters(rows)
 

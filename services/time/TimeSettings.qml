@@ -3,6 +3,7 @@ import QtQuick
 import Quickshell
 import Quickshell.Io
 import "TimeSettingsPolicy.js" as Policy
+import "WorldZoneSearch.js" as ZoneSearch
 
 // Shared time configuration owner. CLOCK is the first consumer; CPU++ can
 // import qs.services.time without borrowing a window or creating another
@@ -43,6 +44,29 @@ Scope {
     property bool diagnosticBusy: false
     property string diagnosticMessage: "NOT CHECKED"
     property string diagnosticDetail: ""
+    // A stable gate for the whole authorization session. Never unload the
+    // Polkit agent in between changing the pending and running properties.
+    property bool authSessionActive: false
+    property string authFlowStage: "NO REQUEST RECEIVED"
+    property string authActionId: ""
+
+    // Clock Settings reuses the same IANA zone search/parser as TimeW WORLD.
+    // All zone data comes from read-only host tzdata; no duplicate writer.
+    property var zoneCatalog: []
+    property bool zoneCatalogLoading: false
+    property bool zoneCatalogLoaded: false
+    property bool zoneCatalogFailed: false
+    property var zoneCountryNames: ({})
+    property string zoneCountryTable: ""
+    readonly property var zoneCountryIndex:
+        ZoneSearch.parseCountryZones(zoneCountryTable, zoneCountryNames)
+
+    property string zoneChoice: ""
+    property bool timezoneConfirmRequired: false
+    property bool timezoneAuthPending: false
+    property string timezoneStatus: "idle"
+    property string timezoneMessage: "NOT REQUESTED"
+    property string timezoneErrorCode: ""
 
     function adjustedEpochMs(epochMs) {
         return Policy.adjustedEpochMs(epochMs, displayOffsetMs);
@@ -115,7 +139,7 @@ Scope {
     }
 
     function prepareResync() {
-        if (resyncProcess.running || resyncAuthPending
+        if (resyncProcess.running || authSessionActive || resyncAuthPending
                 || resyncStatus === "working")
             return;
         resyncConfirmRequired = true;
@@ -136,9 +160,12 @@ Scope {
     // expected, launchResyncAfterAgentReady() starts the original fixed argv.
     function requestResync() {
         if (!resyncConfirmRequired || resyncProcess.running
-                || resyncAuthPending)
+                || resyncAuthPending || authSessionActive)
             return;
         resyncConfirmRequired = false;
+        authSessionActive = true;
+        authFlowStage = "WAITING FOR AUTHENTICATION REQUEST";
+        authActionId = "";
         resyncAuthPending = true;
         resyncStatus = "auth-preparing";
         resyncAuthPath = "REGISTERING NATIVE POLKIT";
@@ -150,12 +177,14 @@ Scope {
     function launchResyncAfterAgentReady(nativeRegistered) {
         if (!resyncAuthPending || resyncProcess.running)
             return;
-        resyncAuthPending = false;
         authRegistrationFallback.stop();
         resyncAuthPath = nativeRegistered === true
             ? "NATIVE POLKIT AGENT REGISTERED"
             : "EXISTING SESSION AGENT FALLBACK (UNVERIFIED)";
+        // Set running before clearing pending; the root loader is held by
+        // authSessionActive until the child process exits.
         resyncStatus = "working";
+        resyncAuthPending = false;
         resyncErrorCode = "";
         resyncMessage = "AUTHENTICATE TO REQUEST ONE-SHOT TIME CORRECTION...";
         resyncProcess.exec([
@@ -172,7 +201,142 @@ Scope {
         id: authRegistrationFallback
         interval: 2500
         repeat: false
-        onTriggered: timeSettings.launchResyncAfterAgentReady(false)
+        onTriggered: {
+            timeSettings.launchResyncAfterAgentReady(false);
+            timeSettings.launchTimezoneAfterAgentReady(false);
+        }
+    }
+
+    function loadZoneCatalog() {
+        if (zoneCatalogLoading || zoneCatalogLoaded)
+            return;
+        zoneCatalogLoading = true;
+        zoneCatalogFailed = false;
+        zoneCatalogProcess.exec(["timedatectl", "list-timezones", "--no-pager"]);
+        countryNamesProcess.exec(["cat", "/usr/share/zoneinfo/iso3166.tab"]);
+        countryZonesProcess.exec(["cat", "/usr/share/zoneinfo/zone.tab"]);
+    }
+
+    function prepareTimezone(zoneId) {
+        if (authSessionActive || timezoneStatus === "working"
+                || !ZoneSearch.contains(zoneCatalog, zoneId))
+            return false;
+        zoneChoice = zoneId;
+        if (zoneId === hostInfo.timezone) {
+            timezoneConfirmRequired = false;
+            timezoneStatus = "unchanged";
+            timezoneMessage = "SYSTEM ALREADY USES " + zoneId;
+            return true;
+        }
+        timezoneConfirmRequired = true;
+        timezoneStatus = "confirm";
+        timezoneMessage = "CONFIRM SYSTEM-WIDE TIMEZONE // " + zoneId;
+        return true;
+    }
+
+    function cancelTimezone() {
+        timezoneConfirmRequired = false;
+        if (timezoneStatus === "confirm") {
+            timezoneStatus = "idle";
+            timezoneMessage = "TIMEZONE CHANGE CANCELLED";
+        }
+    }
+
+    function requestTimezone() {
+        if (!timezoneConfirmRequired || authSessionActive
+                || !ZoneSearch.contains(zoneCatalog, zoneChoice))
+            return;
+        timezoneConfirmRequired = false;
+        authSessionActive = true;
+        authFlowStage = "WAITING FOR AUTHENTICATION REQUEST";
+        authActionId = "";
+        timezoneAuthPending = true;
+        timezoneStatus = "auth-preparing";
+        timezoneErrorCode = "";
+        timezoneMessage = "PREPARING SYSTEM TIMEZONE AUTHORIZATION...";
+        authRegistrationFallback.restart();
+    }
+
+    function launchTimezoneAfterAgentReady(nativeRegistered) {
+        if (!timezoneAuthPending || !authSessionActive
+                || timezoneProcess.running)
+            return;
+        authRegistrationFallback.stop();
+        // Keep the same registered PolkitAgent alive until timedatectl exits.
+        timezoneStatus = "working";
+        timezoneAuthPending = false;
+        timezoneMessage = "AUTHENTICATE TO CHANGE SYSTEM TIMEZONE...";
+        timezoneProcess.exec([
+            "python3", "-B", "-I",
+            Quickshell.shellPath("services/time/TimeHostControl.py"),
+            "set-timezone", zoneChoice
+        ]);
+    }
+
+    Process {
+        id: zoneCatalogProcess
+        running: false
+        stdout: StdioCollector {
+            onStreamFinished: {
+                const zones = ZoneSearch.parseCatalog(this.text);
+                if (zones.length > 0) {
+                    timeSettings.zoneCatalog = zones;
+                    timeSettings.zoneCatalogLoaded = true;
+                    timeSettings.zoneCatalogFailed = false;
+                }
+            }
+        }
+        onExited: function(code, exitStatus) {
+            timeSettings.zoneCatalogLoading = false;
+            if (code !== 0 || !timeSettings.zoneCatalogLoaded)
+                timeSettings.zoneCatalogFailed = true;
+        }
+    }
+    Process {
+        id: countryNamesProcess
+        running: false
+        stdout: StdioCollector {
+            onStreamFinished:
+                timeSettings.zoneCountryNames =
+                    ZoneSearch.parseCountryNames(this.text)
+        }
+    }
+    Process {
+        id: countryZonesProcess
+        running: false
+        stdout: StdioCollector {
+            onStreamFinished: timeSettings.zoneCountryTable = this.text
+        }
+    }
+    Process {
+        id: timezoneProcess
+        running: false
+        stdout: StdioCollector {
+            onStreamFinished: {
+                try {
+                    const output = JSON.parse(this.text);
+                    timeSettings.timezoneStatus =
+                        String(output.status || "failed");
+                    timeSettings.timezoneMessage =
+                        String(output.message || "TIMEZONE RESULT UNAVAILABLE");
+                    timeSettings.timezoneErrorCode =
+                        String(output.errorCode || "");
+                } catch (error) {
+                    timeSettings.timezoneStatus = "failed";
+                    timeSettings.timezoneErrorCode = "ZONE_RESPONSE";
+                    timeSettings.timezoneMessage = "TIMEZONE RESPONSE INVALID";
+                }
+            }
+        }
+        onExited: function(code, exitStatus) {
+            timeSettings.authSessionActive = false;
+            if (code !== 0) {
+                timeSettings.timezoneStatus = "failed";
+                timeSettings.timezoneErrorCode = "ZONE_PROCESS";
+                timeSettings.timezoneMessage = "TIMEZONE PROCESS FAILED";
+            }
+            timeSettings.refreshHostStatus();
+        }
     }
 
     FileView {
@@ -281,6 +445,7 @@ Scope {
             }
         }
         onExited: function(code, exitStatus) {
+            timeSettings.authSessionActive = false;
             if (code !== 0) {
                 timeSettings.resyncStatus = "failed";
                 timeSettings.resyncMessage = "RESYNC PROCESS FAILED";

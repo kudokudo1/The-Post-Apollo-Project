@@ -1,0 +1,29 @@
+name: Weather M9 publisher RSS contracts
+
+on:
+  pull_request:
+    paths:
+      - "scripts/weather/station_publisher_rss.py"
+      - "services/weather/StationPublisherRssPolicy.js"
+      - "services/weather/StationPublisherRssService.qml"
+      - "widgets/weather/StationPublisherFeeds.qml"
+      - "widgets/weather/StationDiscovery.qml"
+      - "tests/weather/test_station_publisher_rss_m9.py"
+      - "tests/weather/test_station_publisher_rss_m9.js"
+      - ".github/workflows/weather-publisher-rss-m9.yml"
+  workflow_dispatch:
+
+jobs:
+  publisher-rss:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate bounded offline RSS parser and fixed host boundaries
+        run: python3 tests/weather/test_station_publisher_rss_m9.py
+      - name: Validate per-publisher cache isolation and Quickshell UI wiring
+        run: node tests/weather/test_station_publisher_rss_m9.js
+      - name: Preserve GDELT rate limits and existing NEWS filters
+        run: |
+          node tests/weather/test_station_discovery_rate_limit.js
+          node tests/weather/test_station_news_language_time.js

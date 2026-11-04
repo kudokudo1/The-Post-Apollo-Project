@@ -68,9 +68,18 @@ ShellRoot {
                 && item.available !== undefined && item.selected !== undefined;
         });
     }
+    function effectivelyVisible(item) {
+        for (let current = item; current; current = current.parent) {
+            if (current.visible === false) return false;
+        }
+        return true;
+    }
     function button(label) {
+        // Multiple providers may have identically named actions. Never
+        // choose a hidden provider's button before the selected one.
         return find(window.contentItem, function(item) {
-            return item.label === label && item.available !== undefined;
+            return item.label === label && item.available !== undefined
+                   && root.effectivelyVisible(item);
         });
     }
     function revealInDetails(item) {
@@ -109,6 +118,12 @@ ShellRoot {
             canApproveInProduction:false, simulated:true
         };
     }
+    Connections {
+        target: details
+        function onGuideOpenChanged() {
+            console.log("C1_GUIDE_STATE // " + details.guideOpen);
+        }
+    }
     function fail(reason) {
         if (done) return;
         done = true;
@@ -123,9 +138,13 @@ ShellRoot {
             if (root.ticks % 60 === 0)
                 console.log("C1_TICK // " + root.phase);
             if (root.phase === "boot") {
-                if (!ConnectionsRegistry.rows
-                        || ConnectionsRegistry.rows.length !== 7
-                        || !inventory.visible || !details.visible)
+                // Source counts grow as new Connections cards land.
+                // Verify the contracted providers, not a historic 7-row list.
+                const providers = ConnectionsRegistry.rows || [];
+                const has = id => providers.some(p => p.id === id);
+                if (!has("nasa-firms") || !has("proton-mail")
+                        || !has("social") || !inventory.visible
+                        || !details.visible)
                     return;
                 if (root.selectedId !== "social"
                         || !details.source
@@ -141,8 +160,12 @@ ShellRoot {
                         || details.guideOpen) {
                     root.fail("WRONG_FIRMS_SELECTION");return;
                 }
-                if (root.announce(root.button("SETUP / DETAILS"),
-                                  "GUIDE_BUTTON"))
+                const guide = root.button("SETUP / DETAILS");
+                // The expanded source inventory can make this pane scroll.
+                // Explicitly expose the target inside its Flickable before
+                // deriving native click coordinates.
+                root.revealInDetails(guide);
+                if (root.announce(guide, "GUIDE_BUTTON"))
                     root.phase = "guideClicked";
             } else if (root.phase === "guideClicked") {
                 if (!details.guideOpen) return;
@@ -151,8 +174,9 @@ ShellRoot {
                            && details.source.setup.indexOf("NASA") < 0) {
                     root.fail("FAKE_READY_SETUP_GUIDE");return;
                 }
-                if (!root.announce(root.button("CHECK KEYRING"),
-                                   "KEYRING_BUTTON"))
+                const keyring = root.button("CHECK KEYRING");
+                root.revealInDetails(keyring);
+                if (!root.announce(keyring, "KEYRING_BUTTON"))
                     return;
                 root.phase = "keyringClicked";
             } else if (root.phase === "keyringClicked") {

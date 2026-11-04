@@ -33,6 +33,7 @@ Item {
                 model: ConnectionsRegistry.rows
 
                 delegate: ActionButton {
+                    id: sourceChoice
                     required property var modelData
                     width: column.width
                     height: 53
@@ -50,17 +51,17 @@ Item {
                         spacing: 4
                         GohuText {
                             width: parent.width
-                            text: modelData.title
-                            color: selected ? Colors.magenta : Colors.white
+                            text: sourceChoice.modelData.title
+                            color: sourceChoice.selected ? Colors.magenta : Colors.white
                             font.pixelSize: 10
                             elide: Text.ElideRight
                         }
                         QuietText {
                             width: parent.width
-                            text: modelData.status
+                            text: sourceChoice.modelData.status
                             font.pixelSize: 9
-                            color: modelData.accent === "orange" ? Colors.orange
-                                   : modelData.accent === "yellow" ? Colors.yellow
+                            color: sourceChoice.modelData.accent === "orange" ? Colors.orange
+                                   : sourceChoice.modelData.accent === "yellow" ? Colors.yellow
                                    : Colors.cyan
                             elide: Text.ElideRight
                         }

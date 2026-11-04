@@ -114,7 +114,9 @@ test("V3c geometry and pointer hitboxes are based on the same azimuth",()=>{
     assert.equal(C.pickSide(m,a.x,a.y,100,100,75,13),"A");
     assert.equal(C.pickSide(m,b.x,b.y,100,100,75,13),"B");
     assert.equal(C.pickSide(m,100,100,100,100,75,13),"");
-    assert.equal(C.pickSide(m,a.x+22,a.y,100,100,75,13),"");
+    // A +22px crosses toward B (whose marker is 26px away), so test
+    // outside the hit radius *away* from both real bearing markers.
+    assert.equal(C.pickSide(m,a.x-22,a.y,100,100,75,13),"");
     assert.equal(C.pickSide(null,a.x,a.y,100,100,75,13),"");
     assert.equal(C.pickSide(m,a.x,a.y,100,100,75,0),"");
     assert.equal(C.point(-1,100,100,75),null);

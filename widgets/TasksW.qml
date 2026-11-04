@@ -446,6 +446,15 @@ PanelWindow {
                 anchors.fill: parent
                 visible: root.menuOpen && root.activeMode.id === "sync"
                 todoSnapshot: ApolloHubTodoStore.snapshot
+                // M13s: live booleans only. No draft plaintext, task ID, key
+                // or editor text leaves either editor component.
+                editorSignals: ({
+                    entryDirty: taskEditor.unsavedLocalEntryDraft,
+                    detailsDirty: taskDetails.dirty,
+                    entrySavePending: taskEditor.pendingWriteKind !== "",
+                    detailsSavePending: taskDetails.pendingWrite,
+                    sourceState: ApolloHubTodoStore.storageState
+                })
                 onOpenGithubProjectsRequested: root.openGithubProjectsRequested()
             }
         }

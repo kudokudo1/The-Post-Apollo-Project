@@ -27,7 +27,7 @@ Item {
     property bool streetConsentOpen: false
     property bool streetMode: false
     property bool vectorConsentOpen: false
-    property string vectorStatus: "NOT INSTALLED / UNVERIFIED"
+    property string vectorStatus: "RUNTIME NOT CHECKED"
     property bool vectorRequestedStop: false
     property string vectorOutput: ""
     property string selectedHubId: ""

@@ -10,6 +10,7 @@ const read = file => fs.readFileSync(path.join(root, file), "utf8");
 const source = read("widgets/weather/StationCosmosPlanetEventPolicy.js");
 const qml = read("widgets/weather/StationCosmosPlanetEventClock.qml");
 const sky = read("widgets/weather/StationSky.qml");
+const plain = value => JSON.parse(JSON.stringify(value));
 const p = vm.createContext({});
 vm.runInContext(source.replace(/^\.pragma library\s*$/m, ""), p);
 

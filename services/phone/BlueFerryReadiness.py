@@ -17,7 +17,7 @@ BLUEFERRY_BUS = "io.weirdware.BlueFerry"
 BLUEFERRY_PATH = "/io/weirdware/BlueFerry"
 BLUEFERRY_IFACE = "io.weirdware.BlueFerry.Messages1"
 # A unique-owner destination cannot D-Bus-activate a stopped backend.
-UNIQUE_OWNER = re.compile(r"^:[0-9]+\\.[0-9]+$")
+UNIQUE_OWNER = re.compile(r"^:[0-9]+\.[0-9]+$")
 
 
 def _read_command(argv: list[str]) -> str:

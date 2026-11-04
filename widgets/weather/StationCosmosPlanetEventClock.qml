@@ -88,7 +88,7 @@ Rectangle {
             spacing: 9
 
             GohuText {
-                width: Math.max(0, parent.width - 246)
+                width: Math.max(0, parent.width - 335)
                 text: "✦ PLANET CLOCK // CIVIL DAY"
                 color: Colors.magenta
                 font.pixelSize: 13
@@ -102,6 +102,15 @@ Rectangle {
                 labelPixelSize: 9
                 accentColor: Colors.magenta
                 onClicked: clock.displayMode = "horizon"
+            }
+            ActionButton {
+                width: 80
+                height: 22
+                contentPadding: 0
+                label: "DAY RING"
+                labelPixelSize: 9
+                accentColor: Colors.yellow
+                onClicked: clock.displayMode = "dayRing"
             }
             GohuText {
                 width: 148
@@ -542,6 +551,7 @@ Rectangle {
         onPlanetPicked: function(name) { clock.selectedPlanet = name; }
         onReturnToTimeline: clock.displayMode = "timeline"
         onCompareRequested: clock.displayMode = "compare"
+        onDayRingRequested: clock.displayMode = "dayRing"
     }
 
     // Shares the exact same validated dated rows. No extra provider or
@@ -555,5 +565,22 @@ Rectangle {
         sourceError: clock.sourceError
         onBackToHorizon: clock.displayMode = "horizon"
         onReturnToTimeline: clock.displayMode = "timeline"
+    }
+
+    // V3d // 24-hour circular event inspector using the same validated,
+    // source-owned USNO rows and shared planet / event-type selectors.
+    StationCosmosPlanetDayWheel {
+        anchors.fill: parent
+        visible: clock.displayMode === "dayRing"
+        datedRows: clock.rows
+        civilDate: clock.civilDate
+        sourceReady: clock.sourceReady
+        sourceError: clock.sourceError
+        selectedPlanet: clock.selectedPlanet
+        selectedKind: clock.selectedKind
+        onPlanetPicked: function(name) { clock.selectedPlanet = name; }
+        onKindPicked: function(kind) { clock.selectedKind = kind; }
+        onReturnToTimeline: clock.displayMode = "timeline"
+        onShowHorizon: clock.displayMode = "horizon"
     }
 }

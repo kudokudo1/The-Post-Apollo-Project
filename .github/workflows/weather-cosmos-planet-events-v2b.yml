@@ -9,6 +9,8 @@ on:
       - 'widgets/weather/StationCosmosPlanetHorizonPolicy.js'
       - 'widgets/weather/StationCosmosBearingComparisonPane.qml'
       - 'widgets/weather/StationCosmosBearingComparisonPolicy.js'
+      - 'widgets/weather/StationCosmosPlanetDayWheel.qml'
+      - 'widgets/weather/StationCosmosPlanetDayWheelPolicy.js'
       - 'widgets/weather/StationSky.qml'
       - 'tests/weather/test_cosmos_planet_event_clock_v2b.js'
       - 'tests/weather/test_cosmos_planet_event_inspector_v2c.js'
@@ -16,6 +18,7 @@ on:
       - 'tests/weather/test_cosmos_planet_horizon_v3a.js'
       - 'tests/weather/test_cosmos_concentric_compass_v3b.js'
       - 'tests/weather/test_cosmos_bearing_comparison_v3c.js'
+      - 'tests/weather/test_cosmos_planet_day_wheel_v3d.js'
       - '.github/workflows/weather-cosmos-planet-events-v2b.yml'
   workflow_dispatch:
 
@@ -39,6 +42,7 @@ jobs:
           node --test tests/weather/test_cosmos_planet_horizon_v3a.js
           node --test tests/weather/test_cosmos_concentric_compass_v3b.js
           node --test tests/weather/test_cosmos_bearing_comparison_v3c.js
+          node --test tests/weather/test_cosmos_planet_day_wheel_v3d.js
           node --test tests/weather/test_cosmos_visual_instruments_v2.js
           node --test tests/weather/test_cosmos_visual_interactions_v2r.js
           node --test tests/weather/test_cosmos_subject_panels_c1.js

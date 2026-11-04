@@ -252,12 +252,26 @@ Item {
         }
     }
 
-    Column {
+    // V4d: scrollable inspector keeps all ten actual bodies reachable
+    // without lengthening the parent MAGICK instrument.
+    Flickable {
+        id: inspectorFlick
         anchors.right: parent.right
         anchors.rightMargin: 5
         anchors.top: parent.top
         anchors.topMargin: 5
+        anchors.bottom: parent.bottom
+        anchors.bottomMargin: 20
         width: Math.max(155,parent.width*0.29)
+        clip: true
+        contentWidth: width
+        contentHeight: inspectorColumn.implicitHeight
+        flickableDirection: Flickable.VerticalFlick
+        boundsBehavior: Flickable.StopAtBounds
+
+        Column {
+        id: inspectorColumn
+        width: inspectorFlick.width
         spacing: 5
         GohuText {
             width: parent.width
@@ -301,6 +315,41 @@ Item {
                 selected: graph.displayMode==="heliocentric"
                 accentColor: Colors.yellow
                 onClicked: graph.displayMode="heliocentric"
+            }
+        }
+        // TOP / TILT changes only orthographic presentation, ALL / INNER
+        // changes the explicitly labelled AU grid domain, never JPL data.
+        Row {
+            id: spatialViewModes
+            visible: graph.displayMode==="heliocentric"
+            width: parent.width
+            height: visible?23:0
+            spacing: 3
+            Repeater {
+                model: [
+                    {id:"top",title:"TOP"},
+                    {id:"tilt",title:"TILT"},
+                    {id:"all",title:"ALL AU"},
+                    {id:"inner",title:"INNER"}
+                ]
+                delegate: ActionButton {
+                    required property var modelData
+                    width: Math.max(1,(spatialViewModes.width-3*spatialViewModes.spacing)/4)
+                    height: 22
+                    contentPadding: 0
+                    labelPixelSize: 9
+                    label: modelData.title
+                    accentColor: modelData.id==="inner"?Colors.magenta:Colors.cyan
+                    selected: modelData.id==="top" ? !heliocentricPane.tiltView
+                        : modelData.id==="tilt" ? heliocentricPane.tiltView
+                        : modelData.id==="all" ? heliocentricPane.atlasRange==="all"
+                        : heliocentricPane.atlasRange==="inner"
+                    onClicked: {
+                        if(modelData.id==="top")heliocentricPane.tiltView=false;
+                        else if(modelData.id==="tilt")heliocentricPane.tiltView=true;
+                        else heliocentricPane.atlasRange=modelData.id;
+                    }
+                }
             }
         }
         QuietText {
@@ -376,22 +425,36 @@ Item {
                 ? "SAMPLED UTC "+heliocentricPane.scene.utc
                 : "MISSING JPL XYZ // NO FALLBACK"
         }
+        QuietText {
+            width: parent.width
+            visible: graph.displayMode==="heliocentric"
+            font.pixelSize: 9
+            color: Colors.magenta
+            wrapMode: Text.WordWrap
+            text: heliocentricPane.focusPoint
+                 ? heliocentricPane.focusPoint.body.toUpperCase()
+                   +" // "+heliocentricPane.focusPoint.distance_au.toFixed(4)
+                   +" AU // XYZ ("
+                   +heliocentricPane.focusPoint.x_au.toFixed(3)+","
+                   +heliocentricPane.focusPoint.y_au.toFixed(3)+","
+                   +heliocentricPane.focusPoint.z_au.toFixed(3)+")"
+                 : "CLICK A JPL BODY TO INSPECT XYZ"
+        }
         Repeater {
-            model: graph.scene.ready?graph.scene.nodes:[]
+            model: graph.displayMode==="heliocentric"
+                   ? (heliocentricPane.scene.ready?heliocentricPane.scene.points:[])
+                   : (graph.scene.ready?graph.scene.nodes:[])
             delegate: ActionButton {
                 required property var modelData
                 width: parent.width
                 height: 20
                 contentPadding: 0
                 labelPixelSize: 9
-                label: Celestial.shortBodyName(modelData.body)
-                       +" "+(graph.displayMode==="heliocentric"
-                             && heliocentricPane.scene.ready
-                             ? heliocentricPane.scene.points.filter(
-                                 function(p){return p.body===modelData.body;})
-                                 .map(function(p){return p.distance_au.toFixed(4)+" AU";})[0]
-                                 || "--"
-                             : graph.displayMode==="depth"
+                label: graph.displayMode==="heliocentric"
+                       ? (modelData.label||modelData.body.toUpperCase())
+                         +" "+modelData.distance_au.toFixed(3)+" AU"
+                       : Celestial.shortBodyName(modelData.body)
+                         +" "+(graph.displayMode==="depth"
                                && depthPane.depthScene.ready
                                ? depthPane.depthScene.points.filter(
                                    function(p){return p.body===modelData.body;})
@@ -414,7 +477,8 @@ Item {
                     ? "APPARENT ECLIPTIC // GEOCENTRIC AU"
                     : "GEOCENTRIC ECLIPTIC LONGITUDES"
         }
-    }
+        } // inspectorColumn
+    } // inspectorFlick
 
     QuietText {
         anchors.left: parent.left

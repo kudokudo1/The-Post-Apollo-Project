@@ -136,6 +136,12 @@ ShellRoot {
                 if (ConnectionsBroker.status === "NOT CHECKED"
                         || ConnectionsBroker.status === "CHECKING")
                     return;
+                const status = ConnectionsBroker.status;
+                if (["SERVICE_ACQUIRED", "SERVICE_NOT_RUNNING",
+                     "DBUS_PROBE_TOOL_MISSING", "SESSION_BUS_UNAVAILABLE",
+                     "UNEXPECTED_DBUS_RESPONSE"].indexOf(status) < 0) {
+                    root.fail("PROBE_RESULT_NOT_PARSED"); return;
+                }
                 if (ConnectionsBroker.credentialActionsEnabled
                         || ConnectionsBroker.lastCheckedMs <= 0
                         || ConnectionsBroker.available &&

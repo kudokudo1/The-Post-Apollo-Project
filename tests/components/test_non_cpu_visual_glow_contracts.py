@@ -19,6 +19,7 @@ SURFACES = {
         "clockMinute",
         "clockPeriodSeparator",
         "clockPeriod",
+        "timeDifferenceUnderline",
     ),
     "modules/Volumebar.qml": (
         "volumebarIcon",
@@ -69,6 +70,7 @@ for source in (
     "clockMinute",
     "clockPeriodSeparator",
     "clockPeriod",
+    "timeDifferenceUnderline",
 ):
     assert f"id: {source}" in clock
     assert f"safeSource: {source}" in clock
@@ -115,3 +117,10 @@ assert "color: Colors.magenta" not in clock
 assert "color: Colors.yellow" not in clock
 
 print("Non-CPU sampled-glow structural contracts: PASS")
+
+# A ninth independent sampled glow serves only the optional dock warning
+# underline. It does not recolor or merge the eight original glyph sources.
+assert 'safeSource: timeDifferenceUnderline' in clock
+assert 'requestedVisible: timeDifferenceUnderline.visible' in clock
+assert 'TimeSettings.dockTimeUnderlined(clock.date.getTime())' in clock
+assert 'width: clockReadout.width' in clock

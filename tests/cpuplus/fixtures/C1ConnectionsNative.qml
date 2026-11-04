@@ -86,6 +86,16 @@ ShellRoot {
                     + " y=" + Math.round(xy.y));
         return true;
     }
+    function c2gSynthetic(state, reason, remaining) {
+        return {
+            ok:true, requestId:"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            state:state, provider:"nasa-firms", consumer:"weather-earth",
+            operation:"fires.hotspots.read", profile:"ci-only-profile",
+            reason:reason, expiresInMs:remaining,
+            credentialPresent:false, realGrantActive:false,
+            canApproveInProduction:false, simulated:true
+        };
+    }
     function fail(reason) {
         if (done) return;
         done = true;
@@ -180,6 +190,59 @@ ShellRoot {
                     root.fail("REVIEW_CREATED_A_GRANT"); return;
                 }
                 console.log("C2E_PASS // NATIVE_ACCESS_REVIEW_DISMISS_NO_GRANT");
+                if (root.announce(root.button("VIEW REQUEST STATUS"),
+                                  "STATUS_OPEN"))
+                    root.phase = "statusOpened";
+            } else if (root.phase === "statusOpened") {
+                if (!details.requestStatusOpen) return;
+                if (details.requestStatusView.state !== "OFFLINE"
+                        || details.requestStatusView.title !== "HOST NOT CONNECTED"
+                        || ConnectionsBroker.credentialActionsEnabled) {
+                    root.fail("STATUS_PRETENDED_CONNECTED"); return;
+                }
+                details.syntheticStatusPreview = root.c2gSynthetic(
+                    "PENDING", "AWAITING_SIMULATED_REVIEW", 15000);
+                root.phase = "statusPending";
+            } else if (root.phase === "statusPending") {
+                if (details.requestStatusView.state !== "PENDING"
+                        || details.requestStatusView.title !== "SIMULATED // PENDING"
+                        || details.requestStatusView.live
+                        || details.requestStatusView.canApprove
+                        || details.requestStatusView.grantActive) {
+                    root.fail("UNSAFE_PENDING_STATUS"); return;
+                }
+                details.syntheticStatusPreview = root.c2gSynthetic(
+                    "APPROVED", "SIMULATED_HOST_APPROVED", 5000);
+                root.phase = "statusApproved";
+            } else if (root.phase === "statusApproved") {
+                if (details.requestStatusView.state !== "APPROVED"
+                        || details.requestStatusView.title !== "SIMULATED // APPROVED"
+                        || details.requestStatusView.grantActive
+                        || details.requestStatusView.canApprove) {
+                    root.fail("FAKE_APPROVED_AS_REAL_GRANT"); return;
+                }
+                details.syntheticStatusPreview = root.c2gSynthetic(
+                    "CANCELLED", "HOST_CANCELLED", 0);
+                root.phase = "statusCancelled";
+            } else if (root.phase === "statusCancelled") {
+                if (details.requestStatusView.state !== "CANCELLED"
+                        || details.requestStatusView.grantActive) {
+                    root.fail("CANCELLED_LEFT_GRANT"); return;
+                }
+                if (root.announce(root.button("CLOSE REQUEST STATUS"),
+                                  "STATUS_CLOSE"))
+                    root.phase = "statusClosed";
+            } else if (root.phase === "statusClosed") {
+                if (details.requestStatusOpen) return;
+                details.syntheticStatusPreview = null;
+                if (details.requestStatusView.state !== "OFFLINE"
+                        || ConnectionsBroker.authorize({
+                           provider:"nasa-firms",consumer:"weather-earth",
+                           operation:"fires.hotspots.read"
+                        }).allowed) {
+                    root.fail("STATUS_CREATED_PERMISSION"); return;
+                }
+                console.log("C2G_PASS // NATIVE_OFFLINE_SIMULATED_STATES_NO_GRANTS");
                 if (root.announce(root.providerButton("social"),
                                   "SOCIAL_BUTTON"))
                     root.phase = "socialClicked";

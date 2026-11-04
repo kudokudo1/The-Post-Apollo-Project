@@ -113,14 +113,14 @@ function strokesFor(index) {
 function appearance(selected) {
     if(selected) return {
         chipRadius:10.9,chipOpacity:0.99,
-        edgeOpacity:1.0,edgeWidth:1.8,edgeGlow:16,
-        symbolScale:0.76,outlineWidth:4.7,
-        inkWidth:3.1,inkOpacity:1.0,inkGlow:15
+        edgeOpacity:1.0,edgeWidth:1.7,edgeGlow:14,
+        symbolScale:0.74,outlineWidth:4.7,
+        inkWidth:2.9,inkOpacity:1.0,inkGlow:14
     };
     return {
-        chipRadius:8.7,chipOpacity:0.78,
-        edgeOpacity:0.50,edgeWidth:0.9,edgeGlow:3,
-        symbolScale:0.56,outlineWidth:4.0,
-        inkWidth:1.9,inkOpacity:0.73,inkGlow:4
+        chipRadius:8.9,chipOpacity:0.86,
+        edgeOpacity:0.60,edgeWidth:1.0,edgeGlow:5,
+        symbolScale:0.58,outlineWidth:4.1,
+        inkWidth:2.1,inkOpacity:0.84,inkGlow:4.5
     };
 }

@@ -49,6 +49,7 @@ def open_setup(
     if type(target) is not str or target not in TARGETS:
         return _result("UNSUPPORTED", "CLIENT_UNAVAILABLE")
 
+    launch_failed = False
     for executable in TARGETS[target]:
         try:
             path = find_executable(executable)
@@ -69,9 +70,10 @@ def open_setup(
             )
             return _result(target, "OPEN_REQUESTED")
         except Exception:
-            # Hide executable paths and environmental errors from Social.
-            return _result(target, "LAUNCH_FAILED")
-    return _result(target, "CLIENT_UNAVAILABLE")
+            # Try another installed GUI client if available, never expose
+            # executable paths or environmental errors to Social.
+            launch_failed = True
+    return _result(target, "LAUNCH_FAILED" if launch_failed else "CLIENT_UNAVAILABLE")
 
 
 def main(argv: list[str] | None = None) -> int:

@@ -179,7 +179,7 @@ class NativeSetupLaunchTests(unittest.TestCase):
             "iphone", find_executable=programs.get,
             launcher=launcher, configured=bad)
         self.assert_locked(result)
-        self.assertEqual(launcher.call_args.args[0][-1], "pair-setup")
+        self.assertEqual(launcher.call_args.args[0][-1], "tui")
         self.assertNotIn("PRIVATE", str(result))
 
     def test_no_terminal_or_cli_means_no_pairing(self):

@@ -86,8 +86,7 @@ class AngelJournalContracts(unittest.TestCase):
         self.assertIn("AngelObservationsStore.total", PANE)
 
     def test_history_deletion_is_confirmed_and_red(self):
-        self.assertIn('label: "CONFIRM ×"', PANE)
-        self.assertIn('label: "DELETE ×"', PANE)
+        self.assertIn('"CONFIRM ×" : "DELETE ×"', PANE)
         self.assertIn('accentColor: Colors.red', PANE)
         self.assertIn('destructive: true', PANE)
         self.assertIn("AngelObservationsStore.deleteObservation(", PANE)

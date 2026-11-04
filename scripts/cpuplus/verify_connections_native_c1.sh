@@ -69,6 +69,9 @@ xdotool windowmove "$wid" 0 0
 click FIRMS_BUTTON
 wait_for "C1_GUIDE_BUTTON_READY // x="
 click GUIDE_BUTTON
+wait_for "C1_KEYRING_BUTTON_READY // x="
+click KEYRING_BUTTON
+wait_for "C2A_PASS // READONLY_KEYRING_PROBE // "
 wait_for "C1_SOCIAL_BUTTON_READY // x="
 click SOCIAL_BUTTON
 wait_for "C1_RELOAD_BUTTON_READY // x="

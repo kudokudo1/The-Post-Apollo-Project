@@ -152,7 +152,8 @@ Column {
         font.bold: true
         wrapMode: Text.WordWrap
     }
-    ActionButton {
+    IdentityCenterLocalActionButton {
+        role: "refresh"
         objectName: "orgRefreshAllButton"
         width: 150
         height: 28

@@ -411,7 +411,8 @@ Column {
         visible: !editor.useSharedContext
         Repeater {
             model: editor.activeOrganizations
-            delegate: ActionButton {
+            delegate: IdentityCenterLocalActionButton {
+                role: "navigate"
                 required property var modelData
                 width: Math.min(200, Math.max(110, editor.width - 10))
                 height: 29
@@ -433,11 +434,16 @@ Column {
     Rectangle {
         width: parent.width
         height: 29
-        color: Colors.black
-        border.color: Colors.cyan
+        color: subjectSearch.activeFocus && subjectSearch.enabled && !subjectSearch.readOnly
+            ? Qt.rgba(Colors.magenta.r, Colors.magenta.g, Colors.magenta.b, 0.12)
+            : Colors.black
+        border.color: subjectSearch.activeFocus && subjectSearch.enabled && !subjectSearch.readOnly
+            ? Colors.magenta : Colors.blue
         visible: editor.selectedOrg !== null
         TextInput {
             id: subjectSearch
+            selectionColor: Colors.magenta
+            selectedTextColor: Colors.black
             anchors.fill: parent
             anchors.margins: 6
             color: Colors.white
@@ -474,7 +480,8 @@ Column {
         visible: editor.selectedOrg !== null
         Repeater {
             model: editor.visibleSubjects
-            delegate: ActionButton {
+            delegate: IdentityCenterLocalActionButton {
+                role: "navigate"
                 required property var modelData
                 width: Math.min(220, Math.max(118, editor.width - 10))
                 height: 29
@@ -504,7 +511,8 @@ Column {
                 {id:"reporting", label:"REPORTS TO"},
                 {id:"social", label:"SOCIAL LABEL"}
             ]
-            delegate: ActionButton {
+            delegate: IdentityCenterLocalActionButton {
+                role: "navigate"
                 required property var modelData
                 width: 140
                 height: 30
@@ -533,7 +541,8 @@ Column {
         visible: editor.selectedSource !== null
         Repeater {
             model: editor.targets
-            delegate: ActionButton {
+            delegate: IdentityCenterLocalActionButton {
+                role: "navigate"
                 required property var modelData
                 width: Math.min(220, Math.max(118, editor.width - 10))
                 height: 29
@@ -571,7 +580,8 @@ Column {
         height: childrenRect.height
         spacing: 5
         visible: editor.modifier === "social" && editor.selectedTargetId !== ""
-        ActionButton {
+        IdentityCenterLocalActionButton {
+            role: "navigate"
             width: 155
             height: 28
             label: "IDENTITY ONLY"
@@ -584,7 +594,8 @@ Column {
         }
         Repeater {
             model: editor.availableServices
-            delegate: ActionButton {
+            delegate: IdentityCenterLocalActionButton {
+                role: "navigate"
                 required property string modelData
                 width: 130
                 height: 28
@@ -607,7 +618,8 @@ Column {
                  && editor.selectedServiceId !== ""
         Repeater {
             model: editor.availableAccounts
-            delegate: ActionButton {
+            delegate: IdentityCenterLocalActionButton {
+                role: "navigate"
                 required property var modelData
                 width: Math.min(200, Math.max(110, editor.width - 10))
                 height: 28
@@ -640,7 +652,8 @@ Column {
         font.pixelSize: 10
         wrapMode: Text.WordWrap
     }
-    ActionButton {
+    IdentityCenterLocalActionButton {
+        role: "primary"
         width: 185
         height: 32
         label: "APPLY MODIFIER"
@@ -666,7 +679,8 @@ Column {
         width: parent.width
         height: childrenRect.height
         spacing: 6
-        ActionButton {
+        IdentityCenterLocalActionButton {
+            role: "navigate"
             width: 155
             height: 28
             label: editor.showAll ? "SHOW SELECTED ORG" : "SHOW ALL ORGS"
@@ -676,7 +690,8 @@ Column {
                 editor.confirmUnlinkKey = "";
             }
         }
-        ActionButton {
+        IdentityCenterLocalActionButton {
+            role: "refresh"
             width: 150
             height: 28
             visible: !editor.useSharedRefreshControl
@@ -727,13 +742,13 @@ Column {
                 font.pixelSize: 9
                 wrapMode: Text.WordWrap
             }
-            ActionButton {
+            IdentityCenterLocalActionButton {
+                role: "danger"
                 width: 162
                 height: 28
                 label: editor.confirmUnlinkKey === itemRow.modelData.key
                     ? "CONFIRM UNLINK" : "UNLINK MODIFIER"
                 labelPixelSize: 9
-                accentColor: Colors.orange
                 interactive: editor.storeFor(itemRow.modelData) !== null
                     && editor.storeFor(itemRow.modelData).state === "ready"
                 onTriggered: {

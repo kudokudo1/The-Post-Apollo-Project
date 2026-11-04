@@ -81,7 +81,8 @@ Column {
         width: parent.width
         height: childrenRect.height
         spacing: 6
-        ActionButton {
+        IdentityCenterLocalActionButton {
+            role: "navigate"
             objectName: "orgSessionShowAll"
             width: 155
             height: 28
@@ -90,7 +91,8 @@ Column {
             interactive: activity.entryCount > 6
             onTriggered: activity.showAll = !activity.showAll
         }
-        ActionButton {
+        IdentityCenterLocalActionButton {
+            role: "danger"
             objectName: "orgSessionClearView"
             width: 151
             height: 28

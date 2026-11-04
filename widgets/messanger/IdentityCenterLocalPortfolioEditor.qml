@@ -76,7 +76,8 @@ Column {
         font.pixelSize: 10
         wrapMode: Text.WordWrap
     }
-    ActionButton {
+    IdentityCenterLocalActionButton {
+        role: "refresh"
         width: 152
         height: 28
         visible: !editor.useSharedRefreshControl
@@ -92,10 +93,15 @@ Column {
         Rectangle {
             width: Math.max(100, parent.width - 148)
             height: 30
-            color: Colors.black
-            border.color: Colors.cyan
+            color: createName.activeFocus && createName.enabled && !createName.readOnly
+                ? Qt.rgba(Colors.magenta.r, Colors.magenta.g, Colors.magenta.b, 0.12)
+                : Colors.black
+            border.color: createName.activeFocus && createName.enabled && !createName.readOnly
+                ? Colors.magenta : Colors.blue
             TextInput {
                 id: createName
+                selectionColor: Colors.magenta
+                selectedTextColor: Colors.black
                 anchors.fill: parent
                 anchors.margins: 6
                 color: Colors.white
@@ -116,7 +122,8 @@ Column {
                 visible: createName.text.length === 0
             }
         }
-        ActionButton {
+        IdentityCenterLocalActionButton {
+            role: "primary"
             width: 136
             height: 30
             label: "+ PORTFOLIO"
@@ -128,7 +135,8 @@ Column {
             }
         }
     }
-    ActionButton {
+    IdentityCenterLocalActionButton {
+        role: "manage"
         width: 170
         height: 28
         visible: !editor.useSharedArchiveControl
@@ -181,10 +189,15 @@ Column {
                 Rectangle {
                     width: Math.max(100, parent.width - 202)
                     height: 30
-                    color: Colors.black
-                    border.color: Colors.cyan
+                    color: portfolioName.activeFocus && portfolioName.enabled && !portfolioName.readOnly
+                        ? Qt.rgba(Colors.magenta.r, Colors.magenta.g, Colors.magenta.b, 0.12)
+                        : Colors.black
+                    border.color: portfolioName.activeFocus && portfolioName.enabled && !portfolioName.readOnly
+                        ? Colors.magenta : Colors.blue
                     TextInput {
                         id: portfolioName
+                        selectionColor: Colors.magenta
+                        selectedTextColor: Colors.black
                         anchors.fill: parent
                         anchors.margins: 6
                         text: portfolioRow.modelData.name
@@ -196,7 +209,8 @@ Column {
                         verticalAlignment: TextInput.AlignVCenter
                     }
                 }
-                ActionButton {
+                IdentityCenterLocalActionButton {
+                    role: "manage"
                     width: 62
                     height: 30
                     label: "SAVE"
@@ -205,14 +219,14 @@ Column {
                     onTriggered: portfolioStore.renamePortfolio(
                         portfolioRow.modelData.id, portfolioName.text)
                 }
-                ActionButton {
+                IdentityCenterLocalActionButton {
+                    role: "manage"
                     width: 128
                     height: 30
                     label: portfolioRow.modelData.archived ? "RESTORE"
                            : editor.confirmationKey === "p:" + portfolioRow.modelData.id
                            ? "CONFIRM ARCHIVE" : "ARCHIVE"
                     labelPixelSize: 8
-                    accentColor: Colors.orange
                     interactive: editor.editable
                     onTriggered: {
                         if (portfolioRow.modelData.archived)
@@ -271,7 +285,8 @@ Column {
                             font.pixelSize: 10
                             elide: Text.ElideRight
                         }
-                        ActionButton {
+                        IdentityCenterLocalActionButton {
+                            role: "danger"
                             width: 132
                             height: 28
                             label: editor.confirmationKey ===
@@ -279,7 +294,6 @@ Column {
                                    ":" + memberRow.modelData
                                    ? "CONFIRM REMOVE" : "REMOVE FROM GROUP"
                             labelPixelSize: 8
-                            accentColor: Colors.orange
                             interactive: editor.editable
                             onTriggered: {
                                 const key = "member:" + portfolioRow.modelData.id +
@@ -308,7 +322,8 @@ Column {
                     height: childrenRect.height
                     Repeater {
                         model: editor.availableToAdd(portfolioRow.modelData)
-                        delegate: ActionButton {
+                        delegate: IdentityCenterLocalActionButton {
+                            role: "primary"
                             required property var modelData
                             width: Math.min(200, Math.max(105, portfolioRow.width - 20))
                             height: 29

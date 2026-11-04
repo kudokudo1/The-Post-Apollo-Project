@@ -200,10 +200,15 @@ Column {
         Rectangle {
             width: Math.max(110, parent.width - 137)
             height: 32
-            color: Colors.black
-            border.color: Colors.cyan
+            color: searchInput.activeFocus && searchInput.enabled && !searchInput.readOnly
+                ? Qt.rgba(Colors.magenta.r, Colors.magenta.g, Colors.magenta.b, 0.12)
+                : Colors.black
+            border.color: searchInput.activeFocus && searchInput.enabled && !searchInput.readOnly
+                ? Colors.magenta : Colors.blue
             TextInput {
                 id: searchInput
+                selectionColor: Colors.magenta
+                selectedTextColor: Colors.black
                 anchors.fill: parent
                 anchors.margins: 7
                 text: search.searchText
@@ -225,7 +230,8 @@ Column {
                 font.pixelSize: 10
             }
         }
-        ActionButton {
+        IdentityCenterLocalActionButton {
+            role: "danger"
             width: 129
             height: 32
             label: "CLEAR SEARCH"
@@ -242,7 +248,8 @@ Column {
         font.bold: true
         wrapMode: Text.WordWrap
     }
-    ActionButton {
+    IdentityCenterLocalActionButton {
+        role: "manage"
         objectName: "localShowArchivedRecords"
         width: 188
         height: 29
@@ -273,7 +280,8 @@ Column {
                 {id:"units", label:"STRUCTURE"},
                 {id:"links", label:"LINKS"}
             ]
-            delegate: ActionButton {
+            delegate: IdentityCenterLocalActionButton {
+                role: "navigate"
                 required property var modelData
                 width: modelData.id === "organizations" ? 142 : 106
                 height: 28
@@ -316,7 +324,8 @@ Column {
                 font.pixelSize: 10
                 wrapMode: Text.WordWrap
             }
-            ActionButton {
+            IdentityCenterLocalActionButton {
+                role: "primary"
                 width: 126
                 height: 28
                 visible: resultRow.modelData.category !== "portfolios"

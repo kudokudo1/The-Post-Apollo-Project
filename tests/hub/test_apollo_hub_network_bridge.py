@@ -53,7 +53,7 @@ for forbidden in (
     assert forbidden not in code_only, f"Extra polling/control prohibited: {forbidden}"
 
 # One existing Network instance supplies both icon UI and its iw speed reading.
-assert len(re.findall(r"(?m)^\\s*Network\\s*\\{", shell)) == 1, (
+assert len(re.findall(r"(?m)^\s*Network\s*\{", shell)) == 1, (
     "Expected one standalone Network instance; CompanyNetwork is distinct"
 )
 assert "id: sharedNetworkDock" in shell

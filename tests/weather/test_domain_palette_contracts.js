@@ -283,22 +283,22 @@ assert.match(homePolicySource, /SUNSET/);
 // CLASSIC status strings. Real NWS alerts retain explicit root precedence.
 const badgePolicySource = read("widgets/weather/StationSubjectSourceBadgePolicy.js");
 const badgeEnv = vm.createContext({Math, Number, String, isFinite});
-vm.runInContext(badgePolicySource.replace(/^\\.pragma library\\s*$/m,""),badgeEnv);
+vm.runInContext(badgePolicySource.replace(/^\.pragma library\s*$/m,""),badgeEnv);
 const plain = value => JSON.parse(JSON.stringify(value));
 const sourceState = availability => ({availability});
 const sourceBadge = (route,weather,space,map={}) =>
     plain(badgeEnv.badgeFor(route,false,sourceState(weather),sourceState(space),map));
 
-assert.match(windowSource, /import "StationSubjectSourceBadgePolicy\\.js" as SubjectSourceBadge/);
+assert.match(windowSource, /import "StationSubjectSourceBadgePolicy\.js" as SubjectSourceBadge/);
 assert.match(windowSource, /readonly property var subjectSourceBadge:/);
-assert.match(windowSource, /SubjectSourceBadge\\.badgeFor\\(/);
-assert.match(windowSource, /subjectNavigator\\.currentPath,subjectNavigator\\.indexOpen/);
+assert.match(windowSource, /SubjectSourceBadge\.badgeFor\(/);
+assert.match(windowSource, /subjectNavigator\.currentPath,subjectNavigator\.indexOpen/);
 assert.match(windowSource, /weatherRuntimeState,spaceRuntimeState,currentPageRuntimeSummary/);
 assert.match(windowSource, /readonly property string sourceStatusDisplay: sourceStatusText/);
-assert.match(windowSource, /if \\(officialAlertSummary\\.available\\)[\\s\\S]*?return officialAlertSummary\\.headerText/);
-assert.match(windowSource, /return weatherDiagnostics\\.header;/);
-assert.match(windowSource, /return subjectSourceBadge\\.text;/);
-assert.match(windowSource, /switch \\(subjectSourceBadge\\.tone\\)/);
+assert.match(windowSource, /if \(officialAlertSummary\.available\)[\s\S]*?return officialAlertSummary\.headerText/);
+assert.match(windowSource, /return weatherDiagnostics\.header;/);
+assert.match(windowSource, /return subjectSourceBadge\.text;/);
+assert.match(windowSource, /switch \(subjectSourceBadge\.tone\)/);
 for (const color of ["red","yellow","orange","blue","green","magenta","cyan"])
     assert.ok(windowSource.includes('case "'+color+'": return Colors.'+color+';'),
         "source badge tone mapping: "+color);

@@ -49,6 +49,7 @@ var GROUPS = {
         {label:"EVENTS",path:"earth/events/eonet",key:"events"},
         {label:"FIRES",path:"earth/fires/hotspots",key:"fires"},
         {label:"MAPS",path:"earth/maps/overview",key:"maps"},
+        {label:"MAP // ALL",path:"earth/maps/full",key:"map"},
         {label:"DOSSIERS",path:"earth/investigations/context",key:"investigations"}
     ],
     media:[

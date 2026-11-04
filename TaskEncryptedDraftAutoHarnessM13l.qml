@@ -40,6 +40,20 @@ Scope {
                 console.warn("M13L_PHASE_HOST_RESPONSE_INVALID");
             else if (bridge.status === "REFUSED_NOT_PRIVATE_TEST")
                 console.warn("M13L_PHASE_PRIVATE_GATE_REFUSED");
+            else if (bridge.status === "REFUSED_REQUEST_TIMEOUT")
+                console.warn("M13L_PHASE_HOST_REQUEST_TIMEOUT");
+            else if (bridge.status === "REFUSED_REQUEST_SHAPE")
+                console.warn("M13L_PHASE_HOST_REQUEST_INVALID");
+            else if (bridge.status === "REFUSED_NOT_DISPOSABLE_SESSION")
+                console.warn("M13L_PHASE_HOST_PRIVATE_SESSION_REFUSED");
+            else if (bridge.status === "REFUSED_SYNTHETIC_ENCRYPT")
+                console.warn("M13L_PHASE_HOST_ENCRYPT_REFUSED");
+            else if (bridge.status === "REFUSED_SYNTHETIC_REOPEN")
+                console.warn("M13L_PHASE_HOST_REOPEN_REFUSED");
+            else if (bridge.status === "REFUSED_SYNTHETIC_MISSING_KEY")
+                console.warn("M13L_PHASE_HOST_MISSING_KEY_GATE_REFUSED");
+            else if (bridge.status === "REFUSED_SYNTHETIC_CLEANUP_UNVERIFIED")
+                console.warn("M13L_PHASE_HOST_CLEANUP_UNVERIFIED");
             if (bridge.status === "M13K_SYNTHETIC_ENCRYPTED_RESTART_PASS"
                     && bridge.syntheticVerified
                     && !bridge.canWriteTaskSource

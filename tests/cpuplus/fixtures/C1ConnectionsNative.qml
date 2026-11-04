@@ -73,6 +73,19 @@ ShellRoot {
             return item.label === label && item.available !== undefined;
         });
     }
+    function revealInDetails(item) {
+        if (!item) return;
+        const scroller = find(details, function(candidate) {
+            return candidate.contentY !== undefined
+                   && candidate.contentHeight !== undefined
+                   && candidate.contentItem !== undefined;
+        });
+        if (!scroller) return;
+        const pt = item.mapToItem(scroller.contentItem, 0, 0);
+        scroller.contentY = Math.max(0, Math.min(
+            Math.max(0, scroller.contentHeight - scroller.height),
+            pt.y - 40));
+    }
     function announce(item, marker) {
         if (!item || !item.visible || item.width < 4 || item.height < 4)
             return false;
@@ -190,8 +203,9 @@ ShellRoot {
                     root.fail("REVIEW_CREATED_A_GRANT"); return;
                 }
                 console.log("C2E_PASS // NATIVE_ACCESS_REVIEW_DISMISS_NO_GRANT");
-                if (root.announce(root.button("VIEW REQUEST STATUS"),
-                                  "STATUS_OPEN"))
+                const opener = root.button("VIEW REQUEST STATUS");
+                root.revealInDetails(opener);
+                if (root.announce(opener, "STATUS_OPEN"))
                     root.phase = "statusOpened";
             } else if (root.phase === "statusOpened") {
                 if (!details.requestStatusOpen) return;
@@ -229,8 +243,9 @@ ShellRoot {
                         || details.requestStatusView.grantActive) {
                     root.fail("CANCELLED_LEFT_GRANT"); return;
                 }
-                if (root.announce(root.button("CLOSE REQUEST STATUS"),
-                                  "STATUS_CLOSE"))
+                const closer = root.button("CLOSE REQUEST STATUS");
+                root.revealInDetails(closer);
+                if (root.announce(closer, "STATUS_CLOSE"))
                     root.phase = "statusClosed";
             } else if (root.phase === "statusClosed") {
                 if (details.requestStatusOpen) return;

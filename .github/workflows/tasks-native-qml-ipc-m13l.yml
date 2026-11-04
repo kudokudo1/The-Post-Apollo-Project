@@ -50,6 +50,26 @@ jobs:
           result="$(PATH="$fake_bin:$PATH" bash tests/tasks/tools/task_m13l_native_ipc.sh --run .)"
           test "$result" = "$(printf 'M13L_REVIEWED_SOURCE_READY\nM13L_STARTING_PRIVATE_NATIVE_TEST\nM13L_REVIEWED_SOURCE_READY\nM13L_NATIVE_QML_IPC_AND_CLEANUP_PASS')"
           printf '%s\n' "M13L_FAKE_SHELL_ISOLATION_ONLY_PASS"
+      - name: Fake shell refusal reports only fixed QML phases and no raw logs
+        run: |
+          set -euo pipefail
+          fake_bin="$(mktemp -d /tmp/m13l-fake-refusal-XXXXXXXX)"
+          trap 'rm -rf -- "$fake_bin"' EXIT
+          printf '%s\n' '#!/bin/sh' \
+            'printf "%s\n" "M13L_PHASE_QML_COMPONENT_LOADED" "M13L_PHASE_START_ATTEMPT" "M13L_PHASE_PROCESS_START_ACCEPTED" "M13L_PHASE_QML_TIMER_EXPIRED" "M13L_NATIVE_QML_IPC_REFUSED"' \
+            'exit 0' >"$fake_bin/quickshell"
+          chmod 700 "$fake_bin/quickshell"
+          set +e
+          result="$(PATH="$fake_bin:$PATH" bash tests/tasks/tools/task_m13l_native_ipc.sh --run .)"
+          code=$?
+          set -e
+          test "$code" = "1"
+          printf '%s\n' "$result" | grep -qx 'M13L_OBSERVED_QML_LOADED'
+          printf '%s\n' "$result" | grep -qx 'M13L_QML_INTERNAL_TIMER_EXPIRED'
+          printf '%s\n' "$result" | grep -qx 'M13L_QML_PASS_MARKER_MISSING'
+          printf '%s\n' "$result" | grep -qx 'M13L_NATIVE_DIAGNOSTIC_COMPLETE'
+          ! printf '%s\n' "$result" | grep -q 'M13L_PHASE_QML_COMPONENT_LOADED'
+          printf '%s\n' "M13L_FAKE_SHELL_DIAGNOSTIC_REFUSAL_PASS"
       - name: Actual Secret Service encrypted synthetic host regression, without QML
         run: dbus-run-session -- bash tests/tasks/fixtures/TaskEncryptedDraftHostPrivateM13k.sh
       - name: Production source one-writer and QML module registration unchanged

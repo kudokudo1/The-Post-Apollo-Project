@@ -160,7 +160,10 @@ class ConnectionsHostStatusServer:
             return
         self._closed = True
         if self._server is not None:
-            self._server.shutdown()
+            # shutdown() blocks until serve_forever has entered its loop;
+            # a failed start() may not have started the thread at all.
+            if self._thread is not None and self._thread.is_alive():
+                self._server.shutdown()
             self._server.server_close()
             self._server = None
         if self._thread is not None:

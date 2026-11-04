@@ -25,6 +25,7 @@ Rectangle {
 
     signal planetPicked(string name)
     signal returnToTimeline()
+    signal compareRequested()
 
     readonly property var markers: sourceReady
         ? Horizon.markers(datedRows, selectedPlanet) : []
@@ -154,7 +155,7 @@ Rectangle {
             height: 23
             spacing: 5
             GohuText {
-                width: Math.max(0,parent.width-178)
+                width: Math.max(0,parent.width-263)
                 height: 22
                 text: "✦ HORIZON // TRUE NORTH"
                 color: Colors.magenta
@@ -169,6 +170,15 @@ Rectangle {
                 contentPadding: 0
                 accentColor: Colors.cyan
                 onClicked: horizonPane.returnToTimeline()
+            }
+            ActionButton {
+                width: 80
+                height: 22
+                label: "COMPARE"
+                labelPixelSize: 9
+                contentPadding: 0
+                accentColor: Colors.magenta
+                onClicked: horizonPane.compareRequested()
             }
             GohuText {
                 width: 88

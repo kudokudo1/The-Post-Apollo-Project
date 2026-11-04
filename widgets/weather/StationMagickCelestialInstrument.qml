@@ -53,15 +53,23 @@ Rectangle {
         instrument.zoom=1.0;
         instrument.panPosition=0.5;
         instrument.eventOrdinal=-1;
+        eventTimelineCanvas.requestPaint();
     }
     onGraphModelChanged: graphCanvas.requestPaint()
-    onFocusIndexChanged: graphCanvas.requestPaint()
+    onFocusIndexChanged: {
+        graphCanvas.requestPaint();
+        eventTimelineCanvas.requestPaint();
+    }
     onModeChanged: graphCanvas.requestPaint()
     onViewWindowChanged: {
         instrument.eventOrdinal=-1;
         graphCanvas.requestPaint();
+        eventTimelineCanvas.requestPaint();
     }
-    onEventOrdinalChanged: graphCanvas.requestPaint()
+    onEventOrdinalChanged: {
+        graphCanvas.requestPaint();
+        eventTimelineCanvas.requestPaint();
+    }
     onSelectedBodyChanged: graphCanvas.requestPaint()
     onWidthChanged: graphCanvas.requestPaint()
     onHeightChanged: graphCanvas.requestPaint()
@@ -151,6 +159,88 @@ Rectangle {
             ctx.fillStyle=point.color;
             ctx.font="10px monospace";
             ctx.fillText(point.label,point.x,point.y);
+        }
+        ctx.restore();
+    }
+    function paintRelations(ctx) {
+        const m=instrument.graphModel;
+        const value=Celestial.relationAt(m,instrument.focusIndex);
+        const width=graphCanvas.width,height=graphCanvas.height;
+        ctx.save();
+        ctx.font="10px monospace";
+        ctx.textBaseline="alphabetic";
+        ctx.fillStyle=String(Colors.magenta);
+        ctx.fillText("RELATIONSHIP // ECLIPTIC LONGITUDE GAP",4,11);
+        if(!value){
+            ctx.fillStyle=String(Colors.orange);
+            ctx.fillText("NO SOURCE PAIR IN THIS M4 DATA",8,height/2);
+            ctx.restore();
+            return;
+        }
+        // This arc is a 0-180° separation gauge, NOT an orbital map.
+        // All reference ticks are traditional aspect angles.
+        for(let i=0;i<=60;i++){
+            const p=Celestial.relationArcPoint(i*3,width,height);
+            if(i===0)ctx.beginPath();
+            if(i===0)ctx.moveTo(p.x,p.y);
+            else ctx.lineTo(p.x,p.y);
+        }
+        ctx.strokeStyle=String(Colors.blue);
+        ctx.lineWidth=2;ctx.globalAlpha=0.9;ctx.stroke();
+        for(let i=0;i<=60;i++){
+            const deg=i*value.separation_deg/60;
+            const p=Celestial.relationArcPoint(deg,width,height);
+            if(i===0)ctx.beginPath();
+            if(i===0)ctx.moveTo(p.x,p.y);
+            else ctx.lineTo(p.x,p.y);
+        }
+        ctx.strokeStyle=String(Colors.magenta);
+        ctx.lineWidth=3;ctx.globalAlpha=0.95;ctx.stroke();
+        ctx.font="9px monospace";
+        for(let guide of Celestial.ASPECT_GUIDES){
+            const p=Celestial.relationArcPoint(guide.angle,width,height);
+            const dx=(p.x-p.cx)/p.radius,dy=(p.y-p.cy)/p.radius;
+            ctx.beginPath();
+            ctx.moveTo(p.x-dx*5,p.y-dy*5);
+            ctx.lineTo(p.x+dx*5,p.y+dy*5);
+            ctx.strokeStyle=String(Colors.yellow);
+            ctx.lineWidth=1;ctx.globalAlpha=0.9;ctx.stroke();
+            ctx.fillStyle=String(Colors.white);
+            const px=Celestial.clamp(p.x-10,2,width-32);
+            const py=Celestial.clamp(p.y+dy*13,22,height-21);
+            ctx.fillText(guide.angle+"°",px,py);
+        }
+        const marker=Celestial.relationArcPoint(value.separation_deg,width,height);
+        ctx.beginPath();ctx.arc(marker.x,marker.y,5,0,2*Math.PI);
+        ctx.fillStyle=String(Colors.magenta);ctx.globalAlpha=1;ctx.fill();
+        ctx.strokeStyle=String(Colors.white);ctx.lineWidth=1;ctx.stroke();
+        const centerX=width/2,centerY=Math.max(70,height*0.79);
+        ctx.fillStyle=String(Colors.white);
+        ctx.font="15px monospace";
+        ctx.fillText(value.separation_deg.toFixed(2)+"°",
+                     centerX-24,centerY-39);
+        ctx.font="9px monospace";
+        ctx.fillStyle=String(Colors.cyan);
+        const aspectText=value.aspects.length
+            ? value.aspects.join(" / ").toUpperCase()
+            : "NO ASPECT IN ORB";
+        ctx.fillText(aspectText.slice(0,27),
+                     Celestial.clamp(centerX-aspectText.length*2.5,4,width-85),
+                     centerY-21);
+        // These dots label the two measured bodies, not their orbital locations.
+        const first=Celestial.relationArcPoint(0,width,height);
+        const second=Celestial.relationArcPoint(180,width,height);
+        ctx.globalAlpha=1;
+        for(let node of [
+            {x:first.x,color:value.firstColor,label:value.first},
+            {x:second.x,color:value.secondColor,label:value.second}
+        ]){
+            ctx.beginPath();ctx.arc(node.x,centerY,4,0,2*Math.PI);
+            ctx.fillStyle=node.color;ctx.fill();
+            ctx.font="10px monospace";
+            ctx.fillText(node.label.slice(0,12),
+                Celestial.clamp(node.x-node.label.length*3,2,width-80),
+                Celestial.clamp(centerY+18,13,height-6));
         }
         ctx.restore();
     }
@@ -322,13 +412,14 @@ Rectangle {
             spacing: 5
             Repeater {
                 model: [
-                    {id:"wheel",label:"ZODIAC WHEEL"},
-                    {id:"motion",label:"MOTION CURVE"},
-                    {id:"aspects",label:"ASPECT GRAPH"}
+                    {id:"wheel",label:"ZODIAC"},
+                    {id:"motion",label:"MOTION"},
+                    {id:"aspects",label:"ASPECTS"},
+                    {id:"relations",label:"RELATIONS"}
                 ]
                 delegate: ActionButton {
                     required property var modelData
-                    width: Math.max(1,(modeRow.width-10)/3)
+                    width: Math.max(1,(modeRow.width-15)/4)
                     height: 27
                     contentPadding: 3
                     label: modelData.label
@@ -343,7 +434,7 @@ Rectangle {
         Rectangle {
             id: chartFrame
             width: parent.width
-            height: Math.max(155,instrument.height-225)
+            height: Math.max(150,instrument.height-254)
             color: Colors.dark
             border.width: 1
             border.color: Colors.cyan
@@ -358,6 +449,7 @@ Rectangle {
                     ctx.clearRect(0,0,width,height);
                     if(!instrument.graphModel.ready)return;
                     if(instrument.mode==="wheel")instrument.paintWheel(ctx);
+                    else if(instrument.mode==="relations")instrument.paintRelations(ctx);
                     else instrument.paintChart(ctx);
                 }
             }
@@ -374,7 +466,7 @@ Rectangle {
                 property real gestureOriginX: 0
                 property bool panning: false
                 function sampleFraction(x) {
-                    return instrument.mode==="wheel"
+                    return instrument.mode==="wheel" || instrument.mode==="relations"
                         ? x/Math.max(1,width)
                         : Celestial.plotFraction(x,width,height);
                 }
@@ -389,13 +481,14 @@ Rectangle {
                     if (pressed) {
                         if (Math.abs(mouse.x-gestureOriginX)>5)panning=true;
                         if (panning && instrument.mode!=="wheel" &&
-                            instrument.zoom>1) {
+                            instrument.mode!=="relations" && instrument.zoom>1) {
                             instrument.panPosition=Celestial.clamp(
                                 instrument.panPosition
                                 -(mouse.x-previousX)
                                 /Math.max(1,Celestial.chartLayout(width,height).width),
                                 0,1);
-                        } else if (panning && instrument.mode==="wheel") {
+                        } else if (panning && (instrument.mode==="wheel" ||
+                                                 instrument.mode==="relations")) {
                             instrument.eventOrdinal=-1;
                             instrument.lockedIndex=Celestial.indexAtFraction(
                                 instrument.graphModel,instrument.viewWindow,
@@ -421,7 +514,14 @@ Rectangle {
                         instrument.selectedBody=body;
                         instrument.eventOrdinal=-1;
                         instrument.lockedIndex=instrument.focusIndex;
-                    }else {
+                    } else if(instrument.mode==="relations"){
+                        const pair=Celestial.relationAt(instrument.graphModel,
+                                                        instrument.focusIndex);
+                        if(!pair)return;
+                        instrument.selectedBody=pair.bodies[mouse.x<width/2?0:1];
+                        instrument.eventOrdinal=-1;
+                        instrument.lockedIndex=instrument.focusIndex;
+                    } else {
                         instrument.eventOrdinal=-1;
                         instrument.lockedIndex=Celestial.indexAtFraction(
                             instrument.graphModel,instrument.viewWindow,
@@ -457,10 +557,86 @@ Rectangle {
                 anchors.margins: 4
                 font.pixelSize: 9
                 color: Colors.cyan
-                text: instrument.mode==="wheel"
+                text: instrument.mode==="wheel" || instrument.mode==="relations"
                     ? "DRAG // TIME   |   CLICK // BODY   |   SCROLL // ZOOM TIME"
                     : "DRAG // PAN TIME   |   CLICK // LOCK   |   SCROLL // ZOOM"
                 visible: instrument.graphModel.ready
+            }
+        }
+
+        // M5g // Clickable timeline is derived exclusively from M4 events.
+        // A click outside an event selects the nearest existing M4 sample.
+        Rectangle {
+            id: eventTimeline
+            width: parent.width
+            height: 21
+            color: Colors.dark
+            border.width: 1
+            border.color: Colors.blue
+            clip: true
+            Canvas {
+                id: eventTimelineCanvas
+                anchors.fill: parent
+                anchors.leftMargin: 7
+                anchors.rightMargin: 7
+                onPaint: {
+                    const ctx=getContext("2d");
+                    ctx.clearRect(0,0,width,height);
+                    if(!instrument.graphModel.ready)return;
+                    const markers=Celestial.timelineMarkers(
+                        instrument.graphModel,instrument.viewWindow);
+                    ctx.strokeStyle=String(Colors.cyan);
+                    ctx.globalAlpha=0.6;
+                    ctx.lineWidth=1;
+                    ctx.beginPath();
+                    ctx.moveTo(0,height/2);ctx.lineTo(width,height/2);
+                    ctx.stroke();
+                    const kindColors={
+                        "crossing":String(Colors.yellow),
+                        "station":String(Colors.magenta),
+                        "candidate":String(Colors.orange)
+                    };
+                    for(let marker of markers){
+                        const px=marker.fraction*width;
+                        const selected=marker.ordinal===instrument.eventOrdinal;
+                        ctx.strokeStyle=kindColors[marker.kind];
+                        ctx.globalAlpha=selected?1:0.8;
+                        ctx.lineWidth=selected?3:2;
+                        ctx.beginPath();
+                        ctx.moveTo(px,selected?1:4);
+                        ctx.lineTo(px,height-3);
+                        ctx.stroke();
+                    }
+                    const t=instrument.graphModel.times[instrument.focusIndex];
+                    const v=instrument.viewWindow;
+                    const start=instrument.graphModel.times[v.from];
+                    const end=instrument.graphModel.times[v.to];
+                    if(t>=start && t<=end){
+                        const px=(t-start)/Math.max(1,end-start)*width;
+                        ctx.globalAlpha=1;
+                        ctx.fillStyle=String(Colors.white);
+                        ctx.beginPath();ctx.arc(px,height/2,2.5,0,Math.PI*2);
+                        ctx.fill();
+                    }
+                }
+            }
+            MouseArea {
+                anchors.fill: eventTimelineCanvas
+                enabled: instrument.graphModel.ready
+                cursorShape: Qt.PointingHandCursor
+                acceptedButtons: Qt.LeftButton
+                onClicked: function(mouse) {
+                    const chosen=Celestial.timelinePick(instrument.graphModel,
+                        instrument.viewWindow,mouse.x,width,10);
+                    if(chosen){
+                        instrument.eventOrdinal=chosen.ordinal;
+                        instrument.lockedIndex=chosen.sampleIndex;
+                    }else{
+                        instrument.eventOrdinal=-1;
+                        instrument.lockedIndex=Celestial.timelineSampleIndex(
+                            instrument.graphModel,instrument.viewWindow,mouse.x,width);
+                    }
+                }
             }
         }
 

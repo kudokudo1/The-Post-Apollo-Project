@@ -4,7 +4,7 @@
 // No provider process, no astronomical computation, no invented sample.
 // A production instrument requires validated source provenance.
 var FORMAT = "post-apollo.weather.celestial-visual-data.v1";
-var MODES = ["wheel", "motion", "aspects"];
+var MODES = ["wheel", "motion", "aspects", "relations"];
 var SIGNS = ["AR", "TA", "GE", "CN", "LE", "VI",
              "LI", "SC", "SG", "CP", "AQ", "PI"];
 var BODY_COLORS = ["#ED981A", "#55CFCA", "#C74EC7", "#F2BE4E"];
@@ -343,4 +343,78 @@ function wheelLabels(m,index,width,height) {
         }
     }
     return labels;
+}
+
+
+// M5g // One pair = one source-measured ecliptic-longitude separation.
+// These angles are traditional aspect REFERENCE targets, not measured
+// influences, local sky angular distances, or ephemeris predictions.
+var ASPECT_GUIDES = [
+    {angle:0,label:"CONJ"},
+    {angle:60,label:"SEXT"},
+    {angle:90,label:"SQR"},
+    {angle:120,label:"TRINE"},
+    {angle:180,label:"OPP"}
+];
+function relationAt(m,index) {
+    if(!m || !m.ready || !m.relationships.length ||
+       typeof index!=="number" || Math.floor(index)!==index ||
+       index<0 || index>=m.sampleCount)return null;
+    var pair=m.relationships[0],sample=pair.samples[index];
+    if(!sample)return null;
+    var a=m.series.find(function(s){return s.body===pair.bodies[0];});
+    var b=m.series.find(function(s){return s.body===pair.bodies[1];});
+    if(!a || !b)return null;
+    return {bodies:pair.bodies.slice(),
+        first:shortBodyName(a.body),second:shortBodyName(b.body),
+        firstColor:a.color,secondColor:b.color,
+        separation_deg:sample.longitude_separation_deg,
+        aspects:sample.aspects.map(function(x){return String(x.name||"");}),
+        sample_utc:sample.time_utc};
+}
+function relationArcPoint(degrees,width,height) {
+    var d=number(degrees),w=number(width),h=number(height);
+    if(d===null || w===null || h===null || w<=0 || h<=0 ||
+       d<0 || d>180)return null;
+    var cx=w/2,cy=Math.max(70,h*0.79);
+    var radius=Math.max(20,Math.min(w*0.39,h*0.64));
+    var theta=Math.PI*(1-d/180);
+    return {x:cx+radius*Math.cos(theta),
+            y:cy-radius*Math.sin(theta),
+            cx:cx,cy:cy,radius:radius};
+}
+// Timelines show ONLY M4 event positions, sorted and confined to the
+// currently viewed M4 sample window. Event timestamps may lie between
+// sample dates. The selected visual body position remains a real sample.
+function timelineMarkers(m,view) {
+    if(!m || !m.ready || !view || view.count<2)return [];
+    var start=m.times[view.from],end=m.times[view.to];
+    if(number(start)===null || number(end)===null || end<=start)return [];
+    return visibleEvents(m,view).map(function(event,ordinal) {
+        var ms=Date.parse(event.time_utc);
+        var kind=event.contact_kind==="tangent_candidate"?"candidate":
+            event.type==="apparent_longitude_station"?"station":"crossing";
+        return {ordinal:ordinal,kind:kind,time_utc:event.time_utc,
+                name:String(event.name||"EVENT"),
+                fraction:(ms-start)/(end-start),
+                sampleIndex:nearestSampleIndex(m,ms)};
+    });
+}
+function timelinePick(m,view,pixelX,width,tolerancePixels) {
+    var x=number(pixelX),w=number(width),t=number(tolerancePixels);
+    if(x===null || w===null || w<=0 || t===null || t<0)return null;
+    var markers=timelineMarkers(m,view),best=null,closest=t;
+    for(var i=0;i<markers.length;i++){
+        var diff=Math.abs(markers[i].fraction*w-x);
+        if(diff<=closest){closest=diff;best=markers[i];}
+    }
+    return best;
+}
+function timelineSampleIndex(m,view,pixelX,width) {
+    if(!m || !m.ready || !view || view.count<2 ||
+       number(pixelX)===null || number(width)===null || width<=0)return -1;
+    var start=m.times[view.from],end=m.times[view.to];
+    var frac=clamp(pixelX/width,0,1);
+    return clamp(nearestSampleIndex(m,start+(end-start)*frac),
+                 view.from,view.to);
 }

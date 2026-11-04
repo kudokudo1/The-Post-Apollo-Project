@@ -9,6 +9,7 @@ import "StationMagickCelestialVisualPolicy.js" as Celestial
 Item {
     id: graph
     property var graphModel: null
+    property var spatialPayload: null
     property int focusIndex: -1
     property string selectedBody: ""
     property bool neonEnabled: true
@@ -234,18 +235,36 @@ Item {
         }
     }
 
+    StationCosmosHeliocentricPane {
+        id: heliocentricPane
+        anchors.fill: sceneCanvas
+        visible: graph.displayMode === "heliocentric"
+        embedded: true
+        visualData: graph.spatialPayload
+        graphModel: graph.graphModel
+        verifiedNetwork: graph.scene
+        focusIndex: graph.focusIndex
+        selectedBody: graph.selectedBody
+        neonEnabled: graph.neonEnabled
+        onBodyPicked: function(body) { graph.bodyPicked(body); }
+        onSampleScrubbed: function(originIndex,offsetPixels) {
+            graph.sampleScrubbed(originIndex,offsetPixels);
+        }
+    }
+
     Column {
         anchors.right: parent.right
         anchors.rightMargin: 5
         anchors.top: parent.top
         anchors.topMargin: 5
-        width: Math.max(110,parent.width*0.25)
+        width: Math.max(155,parent.width*0.29)
         spacing: 5
         GohuText {
             width: parent.width
             font.pixelSize: 11
             color: Colors.magenta
-            text: graph.displayMode==="depth" ? "M4 // DEPTH" : "M4 // NETWORK"
+            text: graph.displayMode==="heliocentric" ? "JPL // HELIO"
+                : graph.displayMode==="depth" ? "M4 // DEPTH" : "M4 // NETWORK"
             elide: Text.ElideRight
         }
         Row {
@@ -254,7 +273,7 @@ Item {
             height: 23
             spacing: 3
             ActionButton {
-                width: Math.max(1,(depthModes.width-depthModes.spacing)/2)
+                width: Math.max(1,(depthModes.width-2*depthModes.spacing)/3)
                 height: 22
                 contentPadding: 0
                 labelPixelSize: 9
@@ -264,7 +283,7 @@ Item {
                 onClicked: graph.displayMode="chords"
             }
             ActionButton {
-                width: Math.max(1,(depthModes.width-depthModes.spacing)/2)
+                width: Math.max(1,(depthModes.width-2*depthModes.spacing)/3)
                 height: 22
                 contentPadding: 0
                 labelPixelSize: 9
@@ -273,17 +292,31 @@ Item {
                 accentColor: Colors.cyan
                 onClicked: graph.displayMode="depth"
             }
+            ActionButton {
+                width: Math.max(1,(depthModes.width-2*depthModes.spacing)/3)
+                height: 22
+                contentPadding: 0
+                labelPixelSize: 9
+                label: "HELIO"
+                selected: graph.displayMode==="heliocentric"
+                accentColor: Colors.yellow
+                onClicked: graph.displayMode="heliocentric"
+            }
         }
         QuietText {
             width: parent.width
             font.pixelSize: 9
             color: graph.scene.ready?Colors.cyan:Colors.orange
             elide: Text.ElideRight
-            text: graph.scene.ready
-                ? graph.displayMode==="depth"
-                  ? graph.scene.count+" APPARENT SOURCE RAYS"
-                  : graph.scene.count+" BODIES // "+graph.scene.edges.length+" PAIRS"
-                : "SOURCE UNAVAILABLE"
+            text: graph.displayMode==="heliocentric"
+                ? heliocentricPane.scene.ready
+                  ? heliocentricPane.scene.count+" TRUE SUN-RELATIVE VECTORS"
+                  : "SUN-RELATIVE SOURCE UNAVAILABLE"
+                : graph.scene.ready
+                  ? graph.displayMode==="depth"
+                    ? graph.scene.count+" APPARENT SOURCE RAYS"
+                    : graph.scene.count+" BODIES // "+graph.scene.edges.length+" PAIRS"
+                  : "SOURCE UNAVAILABLE"
         }
         QuietText {
             width: parent.width
@@ -300,7 +333,11 @@ Item {
             font.pixelSize: 9
             color: Colors.magenta
             wrapMode: Text.WordWrap
-            text: graph.displayMode==="depth"
+            text: graph.displayMode==="heliocentric"
+                ? heliocentricPane.scene.ready
+                  ? "SUN ORIGIN // "+heliocentricPane.scene.maxAu.toFixed(4)+" AU"
+                  : heliocentricPane.scene.reason
+                : graph.displayMode==="depth"
                   ? depthPane.depthScene.ready
                     ? "MAX RADIUS "+depthPane.depthScene.maxDistanceAu.toFixed(6)+" AU"
                     : depthPane.depthScene.reason
@@ -311,7 +348,9 @@ Item {
             font.pixelSize: 9
             color: Colors.cyan
             wrapMode: Text.WordWrap
-            text: graph.displayMode==="depth"
+            text: graph.displayMode==="heliocentric"
+                ? "GEOMETRIC // TRUE ECLIPTIC OF DATE"
+                : graph.displayMode==="depth"
                   ? depthPane.depthScene.ready
                     ? "LAT / DISTANCE: "+depthPane.depthScene.count+" VERIFIED"
                     : "NO APPARENT DISTANCE"
@@ -327,6 +366,19 @@ Item {
             wrapMode: Text.WordWrap
             text: depthPane.focusDetail
         }
+        QuietText {
+            width: parent.width
+            visible: graph.displayMode==="heliocentric"
+            font.pixelSize: 9
+            color: Colors.yellow
+            wrapMode: Text.WordWrap
+            text: HelioSourceSummary()
+            function HelioSourceSummary() {
+                return heliocentricPane.scene.ready
+                    ? "SAMPLED UTC "+heliocentricPane.scene.utc
+                    : "MISSING JPL XYZ // NO FALLBACK";
+            }
+        }
         Repeater {
             model: graph.scene.ready?graph.scene.nodes:[]
             delegate: ActionButton {
@@ -336,13 +388,19 @@ Item {
                 contentPadding: 0
                 labelPixelSize: 9
                 label: Celestial.shortBodyName(modelData.body)
-                       +" "+(graph.displayMode==="depth"
-                             && depthPane.depthScene.ready
-                             ? depthPane.depthScene.points.filter(
+                       +" "+(graph.displayMode==="heliocentric"
+                             && heliocentricPane.scene.ready
+                             ? heliocentricPane.scene.points.filter(
                                  function(p){return p.body===modelData.body;})
                                  .map(function(p){return p.distance_au.toFixed(4)+" AU";})[0]
                                  || "--"
-                             : modelData.longitude_deg.toFixed(2)+"°")
+                             : graph.displayMode==="depth"
+                               && depthPane.depthScene.ready
+                               ? depthPane.depthScene.points.filter(
+                                   function(p){return p.body===modelData.body;})
+                                   .map(function(p){return p.distance_au.toFixed(4)+" AU";})[0]
+                                   || "--"
+                               : modelData.longitude_deg.toFixed(2)+"°")
                 accentColor: Colors.cyan
                 selected: graph.selectedBody===modelData.body
                 onClicked: graph.bodyPicked(modelData.body)
@@ -353,9 +411,11 @@ Item {
             font.pixelSize: 9
             color: Colors.orange
             wrapMode: Text.WordWrap
-            text: graph.displayMode==="depth"
-                  ? "APPARENT ECLIPTIC // GEOCENTRIC AU"
-                  : "GEOCENTRIC ECLIPTIC LONGITUDES"
+            text: graph.displayMode==="heliocentric"
+                  ? "GEOMETRIC HELIOCENTRIC XYZ AU"
+                  : graph.displayMode==="depth"
+                    ? "APPARENT ECLIPTIC // GEOCENTRIC AU"
+                    : "GEOCENTRIC ECLIPTIC LONGITUDES"
         }
     }
 
@@ -367,8 +427,10 @@ Item {
         font.pixelSize: 9
         color: Colors.orange
         elide: Text.ElideRight
-        text: graph.displayMode==="depth"
-              ? "APPARENT RAY DISTANCES // NO PHYSICAL ORBITS"
-              : "NOT PHYSICAL ORBITS // DRAG TIME // WHEEL ZOOM TIME"
+        text: graph.displayMode==="heliocentric"
+              ? "SUN-RELATIVE XYZ // NO INTERPOLATED ORBITS"
+              : graph.displayMode==="depth"
+                ? "APPARENT RAY DISTANCES // NO PHYSICAL ORBITS"
+                : "NOT PHYSICAL ORBITS // DRAG TIME // WHEEL ZOOM TIME"
     }
 }

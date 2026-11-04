@@ -25,16 +25,22 @@ DockButton {
     Row {
         id: cameraMark
         anchors.centerIn: parent
+        height: 42
         spacing: 5
 
-        NotoText {
-            text: "📷︎"
-            textFormat: Text.PlainText
-            font.pixelSize: 25
-            color: cameraDock.menuOpen ? Colors.magenta : Colors.white
+        // Actual Qt vector geometry: no emoji, bitmap, opaque camera body or
+        // opaque lens center. The orbit and stars retain independent strokes.
+        CameraGlyph {
+            width: 58
+            height: cameraMark.height
+            bodyColor: cameraDock.foregroundColor
+            lensColor: cameraDock.menuOpen ? Colors.white
+                       : cameraDock.hovered ? Colors.cyan : Colors.white
+            ornamentColor: cameraDock.menuOpen ? Colors.magenta : Colors.cyan
         }
+
         GohuText {
-            height: 31
+            height: cameraMark.height
             verticalAlignment: Text.AlignVCenter
             text: "CAM"
             font.pixelSize: 13

@@ -34,10 +34,16 @@ DockButton {
     Row {
         id: companyMark
         anchors.centerIn: parent
+        height: 30
         spacing: 1
 
+        // Row owns placement; each glyph is centered in the same-height
+        // text cell. Child anchors inside Row caused differing baselines
+        // for the white ornaments and the yellow city.
+
         NotoText {
-            anchors.verticalCenter: parent.verticalCenter
+            height: companyMark.height
+            verticalAlignment: Text.AlignVCenter
             textFormat: Text.PlainText
             text: ". ݁₊⊹"
             font.pixelSize: 21
@@ -45,7 +51,8 @@ DockButton {
         }
 
         NotoText {
-            anchors.verticalCenter: parent.verticalCenter
+            height: companyMark.height
+            verticalAlignment: Text.AlignVCenter
             textFormat: Text.PlainText
             // U+FE0E requests monochrome text rendering so yellow tint
             // is not silently replaced by a platform color-emoji glyph.
@@ -55,7 +62,8 @@ DockButton {
         }
 
         NotoText {
-            anchors.verticalCenter: parent.verticalCenter
+            height: companyMark.height
+            verticalAlignment: Text.AlignVCenter
             textFormat: Text.PlainText
             text: "๋࣭⭑"
             font.pixelSize: 21

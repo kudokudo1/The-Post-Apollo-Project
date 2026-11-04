@@ -51,7 +51,7 @@ DockButton {
         }
 
         // Keep the stars centered; move only the yellow city artwork
-        // 2px down inside its own equal-height Row cell.
+        // 6px total down inside its own equal-height Row cell.
         Item {
             id: cityGlyphCell
             width: cityGlyph.implicitWidth
@@ -59,7 +59,7 @@ DockButton {
 
             NotoText {
                 id: cityGlyph
-                y: 2
+                y: 6
                 height: companyMark.height
                 verticalAlignment: Text.AlignVCenter
                 textFormat: Text.PlainText

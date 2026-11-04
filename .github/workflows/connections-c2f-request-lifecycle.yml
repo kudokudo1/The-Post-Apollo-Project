@@ -1,0 +1,41 @@
+name: Connections C2f request lifecycle (fake only)
+
+on:
+  pull_request:
+    paths:
+      - "services/connections/experiments/C2fFakeRequestLifecycle.py"
+      - "tests/connections/test_connections_c2f_request_lifecycle.py"
+      - ".github/workflows/connections-c2f-request-lifecycle.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  fake-request-lifecycle:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Host request pending, review, deny, cancel, approve, expire and complete
+        run: timeout 55s python3 -B tests/connections/test_connections_c2f_request_lifecycle.py
+      - name: Recheck real-process C2d host startup and C2c descriptor constraints
+        run: |
+          timeout 55s python3 -B tests/connections/test_connections_c2d_host_supervisor.py
+          timeout 45s python3 -B tests/connections/test_connections_c2c_descriptor_authority.py
+      - name: Existing broker must remain disabled
+        run: |
+          node tests/cpuplus/test_connections_broker_c2a.js
+          node tests/connections/test_connections_c2b_fake_only.cjs
+          python3 - <<'PY'
+          from pathlib import Path
+          qml=Path("services/connections/ConnectionsBroker.qml").read_text()
+          policy=Path("services/connections/ConnectionsBrokerPolicy.js").read_text()
+          assert "readonly property bool credentialActionsEnabled: false" in qml
+          assert 'reason:"TRUSTED_BROKER_NOT_ACTIVATED"' in policy
+          assert not Path("services/connections/ConnectionsLiveConsent.py").exists()
+          print("C2F_PASS // PRODUCTION_PERMISSIONS_STILL_CLOSED")
+          PY

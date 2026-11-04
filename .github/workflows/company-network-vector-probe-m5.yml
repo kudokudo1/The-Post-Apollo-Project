@@ -21,6 +21,7 @@ jobs:
           python3 -m unittest discover -s tests/company -p 'test_company_vector_probe_m5.py' -v
           python3 -m unittest discover -s tests/company -p 'test_company_vector_style_m7.py' -v
           python3 -m unittest discover -s tests/company -p 'test_company_native_online_m8.py' -v
+          python3 -m unittest discover -s tests/company -p 'test_company_vector_locality_m9.py' -v
 
   native-qt:
     # All Qt/MapLibre downloads happen on the disposable GitHub runner.
@@ -119,17 +120,22 @@ jobs:
           # Explicit, bounded public-area network test; no private user
           # location, hub, provider or worker data is passed to MapLibre.
           # Each test runs alone and captures only its current visible area.
-          for sample in USA RURAL CANADA; do
+          for sample in USA RURAL CANADA NEIGHBORHOOD VILLAGE BORDER; do
             echo "::group::Post-Apollo styled vector real-map sample: $sample"
+            mock=()
+            if [ "$sample" = NEIGHBORHOOD ]; then mock+=(--mock-hub); fi
             xvfb-run -a -s '-screen 0 1280x900x24' \
               timeout 45s ./company-vector-probe --styled-online \
-              "--sample=$sample" --capture 2>&1 | tee "styled-${sample}.log"
+              "--sample=$sample" "${mock[@]}" --capture 2>&1 | tee "styled-${sample}.log"
             test -s company-vector-probe.png
+            if [ "$sample" = NEIGHBORHOOD ]; then
+              grep -q 'SYNTHETIC_MARKER_ADDED' "styled-${sample}.log"
+            fi
             cp company-vector-probe.png "$GITHUB_WORKSPACE/company-vector-${sample}.png"
             rm company-vector-probe.png
             echo "::endgroup::"
           done
-          echo "Four independent screenshots (offline, USA, RURAL, CANADA) captured"
+          echo "Seven screenshots: offline, USA, RURAL, CANADA, NEIGHBORHOOD, VILLAGE, BORDER"
 
       - uses: actions/upload-artifact@v4
         if: always()

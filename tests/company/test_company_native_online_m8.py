@@ -36,7 +36,7 @@ class OnlineNativeSmokeTests(unittest.TestCase):
         self.assertIn("git clone --depth 1 --branch v3.0.0",text)
         self.assertIn("-DMLN_QT_WITH_INTERNAL_ICU=ON",text)
         self.assertIn("qmaplibre",text.lower())
-        self.assertIn("for sample in USA RURAL CANADA;",text)
+        self.assertIn("for sample in USA RURAL CANADA NEIGHBORHOOD VILLAGE BORDER;",text)
         self.assertIn("--styled-online",text)
         self.assertIn('timeout 45s ./company-vector-probe',text)
         self.assertIn('cp company-vector-probe.png "$GITHUB_WORKSPACE/company-vector-offline.png"',text)

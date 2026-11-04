@@ -94,6 +94,11 @@ test("Bash syntax valid and native runner changes only disposable HOME",()=>{
     assert.match(src,/M13L_NATIVE_DIAGNOSTIC_COMPLETE/);
     assert.match(src,/M13L_OBSERVED_QML_LOADED/);
     assert.match(src,/M13L_QML_INTERNAL_TIMER_EXPIRED/);
+    for(const status of ["M13L_OBSERVED_BOOT_TIMER_FIRED",
+        "M13L_OBSERVED_PRIVATE_GATE_READY","M13L_BOOT_NOT_DISPATCHED",
+        "M13L_STDIN_NOT_SENT","M13L_AWAITING_HOST_REPLY",
+        "M13L_REPLY_WAITING_HOST_EXIT","M13L_HOST_SETTLED_NO_RESULT"])
+        assert.ok(src.includes(status),"Missing status category: "+status);
     assert.match(src,/M13L_HOST_ENCRYPT_REFUSED/);
     assert.match(src,/M13L_HOST_REOPEN_REFUSED/);
     assert.match(src,/M13L_PRIVATE_SECRET_SERVICE_OWNER_UNVERIFIED/);
@@ -111,6 +116,14 @@ test("standalone QML harness only invokes dormant synthetic IPC; never real TASK
     assert.match(q,/bridge\.startSynthetic\(\)/);
     assert.match(q,/M13L_NATIVE_QML_IPC_PASS/);
     assert.match(q,/Qt\.quit\(\)/);
+    assert.doesNotMatch(q,/Qt\.callLater\(/);
+    assert.match(q,/interval:\s*100\b/);
+    assert.match(q,/interval:\s*5000\b/);
+    assert.match(q,/console\.warn\("M13L_NATIVE_QML_IPC_PASS"\)/);
+    for(const status of ["M13L_PHASE_BOOT_TIMER_FIRED",
+        "M13L_PHASE_PRIVATE_GATE_READY","M13L_PHASE_T5_STDIN_NOT_SENT",
+        "M13L_PHASE_T5_AWAITING_REPLY"])
+        assert.ok(q.includes(status),"Missing QML phase: "+status);
     for(const phase of ["M13L_PHASE_QML_COMPONENT_LOADED",
         "M13L_PHASE_START_ATTEMPT","M13L_PHASE_PROCESS_START_ACCEPTED",
         "M13L_PHASE_REPLY_PARSED","M13L_PHASE_BRIDGE_SETTLED",

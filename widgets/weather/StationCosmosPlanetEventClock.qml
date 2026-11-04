@@ -24,6 +24,7 @@ Rectangle {
 
     property string selectedPlanet: "ALL"
     property string selectedKind: "ALL"
+    property string displayMode: "timeline"
     property var hoveredEvent: null
     property var lockedEvent: null
 
@@ -76,6 +77,7 @@ Rectangle {
     }
 
     Column {
+        visible: clock.displayMode === "timeline"
         anchors.fill: parent
         anchors.margins: 11
         spacing: 5
@@ -86,11 +88,20 @@ Rectangle {
             spacing: 9
 
             GohuText {
-                width: Math.max(0, parent.width - 157)
+                width: Math.max(0, parent.width - 246)
                 text: "✦ PLANET CLOCK // CIVIL DAY"
                 color: Colors.magenta
                 font.pixelSize: 13
                 elide: Text.ElideRight
+            }
+            ActionButton {
+                width: 80
+                height: 22
+                contentPadding: 0
+                label: "HORIZON"
+                labelPixelSize: 9
+                accentColor: Colors.magenta
+                onClicked: clock.displayMode = "horizon"
             }
             GohuText {
                 width: 148
@@ -516,5 +527,19 @@ Rectangle {
                   + " NO MOTION BETWEEN EVENTS; NO ZODIAC OR RETROGRADE INFERENCE."
                   + " USNO LOCAL DATE // AZ TRUE NORTH."
         }
+    }
+
+    // Shares the already validated, dated rows and planet filter.
+    // This adds no source activation or second ephemeris service.
+    StationCosmosPlanetHorizonPane {
+        anchors.fill: parent
+        visible: clock.displayMode === "horizon"
+        datedRows: clock.rows
+        civilDate: clock.civilDate
+        selectedPlanet: clock.selectedPlanet
+        sourceReady: clock.sourceReady
+        sourceError: clock.sourceError
+        onPlanetPicked: function(name) { clock.selectedPlanet = name; }
+        onReturnToTimeline: clock.displayMode = "timeline"
     }
 }

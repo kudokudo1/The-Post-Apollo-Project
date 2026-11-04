@@ -41,13 +41,23 @@ DockButton {
         // text cell. Child anchors inside Row caused differing baselines
         // for the white ornaments and the yellow city.
 
-        NotoText {
+        // Keep Row geometry stable. Move the left ornament's rendered
+        // glyph 2px left, rather than moving its layout cell or the right star.
+        Item {
+            id: leftStarCell
+            width: leftStarGlyph.implicitWidth
             height: companyMark.height
-            verticalAlignment: Text.AlignVCenter
-            textFormat: Text.PlainText
-            text: ". ݁₊⊹"
-            font.pixelSize: 21
-            color: Colors.white
+
+            NotoText {
+                id: leftStarGlyph
+                x: -2
+                height: companyMark.height
+                verticalAlignment: Text.AlignVCenter
+                textFormat: Text.PlainText
+                text: ". ݁₊⊹"
+                font.pixelSize: 21
+                color: Colors.white
+            }
         }
 
         // Keep the stars centered; move only the yellow city artwork
@@ -59,6 +69,7 @@ DockButton {
 
             NotoText {
                 id: cityGlyph
+                x: -2
                 y: 6
                 height: companyMark.height
                 verticalAlignment: Text.AlignVCenter

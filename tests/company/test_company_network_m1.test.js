@@ -118,8 +118,8 @@ test("city icon and star ornaments share one vertical text-cell frame in dock an
         assert.match(mark,new RegExp("height: "+height));
         assert.equal((mark.match(/NotoText\s*\{/g)||[]).length,3,
             label+" keeps exactly three art layers");
-        assert.equal((mark.match(new RegExp("height: "+id+"\\.height","g"))||[]).length,4,
-            label+" shares a vertical box across the three glyphs and the city wrapper");
+        assert.equal((mark.match(new RegExp("height: "+id+"\\.height","g"))||[]).length,5,
+            label+" shares a vertical box across three glyphs and two artwork wrappers");
         assert.equal((mark.match(/verticalAlignment: Text\.AlignVCenter/g)||[]).length,3,
             label+" centers each text line box");
         assert.doesNotMatch(mark,/NotoText\s*\{\s*anchors\.verticalCenter:/,
@@ -151,7 +151,7 @@ test("central yellow city sits 6px below the white ornaments without shifting th
             label+" retains intrinsic city width");
         assert.match(cityBlock,new RegExp("height: "+rowId+"\\.height"),
             label+" leaves shared Row geometry unchanged");
-        assert.match(cityBlock,new RegExp("id: "+glyphId+"\\s+y: 6"),
+        assert.match(cityBlock,new RegExp("id: "+glyphId+"\\s+x: -2\\s+y: 6"),
             label+" lowers only the yellow city 6px");
         assert.match(cityBlock,new RegExp("font\\.pixelSize: "+fontSize),
             label+" preserves city glyph size");
@@ -166,6 +166,42 @@ test("central yellow city sits 6px below the white ornaments without shifting th
             label+" preserves the three-glyph artwork order");
         assert.equal((row.match(/y: 6/g)||[]).length,1,
             label+" applies only one intentional pixel offset");
+    }
+});
+
+test("yellow city and left star shift 2px left while right stars and y6 remain fixed",()=>{
+    const checks=[
+        ["dock",source("modules/CompanyNetwork.qml"),"companyMark",
+         "leftStarCell","leftStarGlyph","cityGlyphCell","cityGlyph"],
+        ["header",source("widgets/CompanyNetworkW.qml"),"headerCity",
+         "headerLeftStarCell","headerLeftStarGlyph","headerCityGlyphCell","headerCityGlyph"]
+    ];
+    for (const [label,qml,rowId,leftCell,leftGlyph,cityCell,cityGlyph] of checks) {
+        const start=qml.indexOf("id: "+rowId+"\n");
+        assert.ok(start>=0,label+" has the requested Row");
+        const row=qml.slice(start).split(label==="dock"
+            ? "onLeftClicked: toggleRequested()"
+            : "\n            GohuText {",1)[0];
+        assert.equal((row.match(/x: -2/g)||[]).length,2,
+            label+" offsets exactly left star and city");
+        for(const [cell,glyph] of [[leftCell,leftGlyph],[cityCell,cityGlyph]]) {
+            const p=row.indexOf("id: "+cell+"\n");
+            assert.ok(p>=0,label+" "+cell+" retains its own layout cell");
+            const block=row.slice(p).split("id: "+glyph+"\n",2);
+            assert.equal(block.length,2,label+" "+glyph+" is nested in its cell");
+            assert.match(block[0],new RegExp("width: "+glyph+"\\.implicitWidth"),
+                label+" wrapper keeps intrinsic Row width");
+            assert.match(block[1],/^\s*x: -2\s*$/m,
+                label+" shifts only glyph artwork left 2px");
+        }
+        const city=row.split("id: "+cityGlyph+"\n",2)[1];
+        assert.match(city,/^\s*y: 6\s*$/m,label+" preserves 6px downward city offset");
+        const right=row.split('text: "๋࣭⭑"',1)[0];
+        assert.ok(right.includes("id: "+cityGlyph),
+            label+" keeps right-hand stars after the city");
+        const rightBlock=row.slice(row.lastIndexOf("NotoText {"));
+        assert.doesNotMatch(rightBlock,/\bx\s*:/,
+            label+" does not nudge the right-hand ornament");
     }
 });
 

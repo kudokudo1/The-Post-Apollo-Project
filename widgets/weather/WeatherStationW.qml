@@ -25,15 +25,16 @@ PanelWindow {
     property var eventArchiveStore: null
     property var dossierArchiveStore: null
 
-    // M5b // Single owner for M4 celestial graphs. Only runs after an
-    // explicit CALCULATE click on a supported MAGICK astronomy route.
+    // M30-B // One owner for M4 celestial graphs, also available on MAGICK
+    // overview for its explicit CALCULATE control. No automatic execution.
     // No polling, automatic download, local write, or extra provider.
     WeatherServices.CelestialVisualService {
         id: celestialVisualService
         active: weatherStation.menuOpen
                 && weatherStation.subjectNavigationOpen
                 && !weatherStation.contextTerminalRequested
-                && MagickPanelPolicy.visualForRoute(subjectNavigator.currentPath)
+                && (MagickPanelPolicy.visualForRoute(subjectNavigator.currentPath)
+                    || subjectNavigator.currentPath === "magick/overview")
         route: subjectNavigator.currentPath
         anchorNowMs: weatherStation.runtimeNowMs
     }

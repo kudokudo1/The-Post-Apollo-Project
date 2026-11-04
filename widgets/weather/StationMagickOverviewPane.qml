@@ -2,11 +2,12 @@ import QtQuick
 import "../../components"
 import "StationCosmosVisualPolicy.js" as CosmosVisual
 import "StationSkyTwilightPolicy.js" as TwilightPolicy
+import "StationMagickCelestialVisualPolicy.js" as CelestialVisual
 
-// M30-A // MAGICK overview is a fixed-viewport dashboard, not two full
-// scrolling SKY screens. The single source-only SKY owns the existing USNO
-// Moon actor; forecast and calibrated solar calculations are read-only.
-// The JPL engine is never automatically started here.
+// M30-B // The overview is a compact astro hero plus lunar/solar instruments.
+// The single source-only SKY owns the existing USNO Moon actor. The solar
+// calculation stays inside SUN, and the root-owned JPL process only runs after
+// the explicit hero CALCULATE click. No invented planetary positions or readings.
 Rectangle {
     id: deck
     color: Colors.black
@@ -25,6 +26,15 @@ Rectangle {
             ? observationOwner.moonObservation.ephemeris : null,
         observationOwner.astronomySummary
     )
+    // Only a provenance-validated M4 payload can place bodies on the ring.
+    // Empty rings are visual framing, never claimed computed positions.
+    readonly property var chartModel: CelestialVisual.model(
+        deck.celestialSource && deck.celestialSource.ready
+        ? deck.celestialSource.visualData : null)
+    readonly property var chartPositions:
+        CelestialVisual.wheelPositions(
+            chartModel, chartModel.ready ? chartModel.sampleCount-1 : -1)
+
     readonly property var solarModel: CosmosVisual.solarArc(
         observationOwner.astronomySummary.date,
         weatherService ? weatherService.latitude : "",
@@ -55,34 +65,55 @@ Rectangle {
         anchors.left: parent.left
         anchors.right: parent.right
         anchors.top: parent.top
-        height: Math.max(72, Math.round(deck.height * 0.38))
+        height: Math.max(0,Math.round(deck.height * 0.59))
         color: Colors.dark
         border.width: 1
         border.color: Colors.magenta
+        clip: true
 
         GohuText {
             anchors.left: parent.left
             anchors.top: parent.top
             anchors.leftMargin: 9
             anchors.topMargin: 6
-            text: "CELESTIAL // SOLAR DAY ARC"
+            width: Math.max(0,parent.width-194)
+            text: "MAGICK // CELESTIAL CHART"
             font.pixelSize: 11
             color: Colors.magenta
+            elide: Text.ElideRight
         }
-        ActionButton {
-            anchors.right: parent.right
+        Row {
             anchors.top: parent.top
-            anchors.rightMargin: 7
-            anchors.topMargin: 5
-            width: 69
-            height: 22
-            label: "CHARTS"
-            labelPixelSize: 9
-            accentColor: Colors.cyan
-            onClicked: deck.routeRequested("magick/astrology/charts")
+            anchors.right: parent.right
+            anchors.topMargin: 4
+            anchors.rightMargin: 6
+            spacing: 5
+            ActionButton {
+                width: 91
+                height: 22
+                label: deck.celestialSource && deck.celestialSource.loading
+                       ? "CALCULATING" : "CALCULATE"
+                labelPixelSize: 9
+                accentColor: Colors.magenta
+                available: !!deck.celestialSource
+                           && deck.celestialSource.active
+                           && deck.celestialSource.configured
+                           && !deck.celestialSource.loading
+                // One root-owned JPL Process. Deliberately no autoplay.
+                onClicked: deck.celestialSource.refresh()
+            }
+            ActionButton {
+                width: 57
+                height: 22
+                label: "CHARTS"
+                labelPixelSize: 9
+                accentColor: Colors.cyan
+                onClicked: deck.routeRequested("magick/astrology/charts")
+            }
         }
-        Canvas {
-            id: solarCanvas
+
+        Row {
+            id: heroInstrument
             anchors.left: parent.left
             anchors.right: parent.right
             anchors.top: parent.top
@@ -90,54 +121,125 @@ Rectangle {
             anchors.leftMargin: 9
             anchors.rightMargin: 9
             anchors.topMargin: 29
-            anchors.bottomMargin: 2
-            onWidthChanged: requestPaint()
-            onHeightChanged: requestPaint()
-            onPaint: {
-                const ctx = getContext("2d");
-                ctx.clearRect(0, 0, width, height);
-                const w = Math.max(1,width-2), h = Math.max(1,height-2);
-                ctx.strokeStyle = String(Colors.cyan);
-                ctx.globalAlpha = 0.35;
-                ctx.beginPath();
-                ctx.moveTo(0, h/2);
-                ctx.lineTo(w, h/2);
-                ctx.stroke();
-                ctx.globalAlpha = 1;
-                if (!deck.solarModel.ready) return;
-                const rows = deck.solarModel.rows;
-                ctx.strokeStyle = String(Colors.orange);
-                ctx.lineWidth = 1.8;
-                ctx.beginPath();
-                for (let i=0; i<rows.length; i++) {
-                    const x = CosmosVisual.positionX(rows[i].minute,w);
-                    const y = CosmosVisual.positionY(rows[i].altitude,h);
-                    if (i===0) ctx.moveTo(x,y);
-                    else ctx.lineTo(x,y);
+            anchors.bottomMargin: 3
+            spacing: 12
+
+            Canvas {
+                id: celestialCanvas
+                width: Math.min(heroInstrument.height,112)
+                height: heroInstrument.height
+                onWidthChanged: requestPaint()
+                onHeightChanged: requestPaint()
+                onPaint: {
+                    const ctx=getContext("2d");
+                    ctx.clearRect(0,0,width,height);
+                    const cx=width/2,cy=height/2;
+                    const radius=Math.max(1,Math.min(width,height)/2-4);
+                    // Rings and cardinal guides are a coordinate framework.
+                    // They never represent fabricated orbital observations.
+                    ctx.strokeStyle=String(Colors.magenta);
+                    ctx.lineWidth=1;
+                    ctx.globalAlpha=0.65;
+                    for (let ring=1;ring<=2;ring++) {
+                        ctx.beginPath();
+                        ctx.arc(cx,cy,radius*ring/2,0,Math.PI*2);
+                        ctx.stroke();
+                    }
+                    ctx.globalAlpha=0.40;
+                    ctx.beginPath();
+                    ctx.moveTo(cx-radius,cy);
+                    ctx.lineTo(cx+radius,cy);
+                    ctx.moveTo(cx,cy-radius);
+                    ctx.lineTo(cx,cy+radius);
+                    ctx.stroke();
+                    ctx.globalAlpha=1;
+                    if (!deck.chartModel.ready)return;
+                    const positions=deck.chartPositions;
+                    for(let i=0;i<positions.length;i++) {
+                        const point=positions[i];
+                        const x=cx+(point.x-0.5)*2.0*radius;
+                        const y=cy+(point.y-0.5)*2.0*radius;
+                        ctx.beginPath();
+                        ctx.arc(x,y,3.5,0,Math.PI*2);
+                        ctx.fillStyle=String(point.color);
+                        ctx.fill();
+                    }
                 }
-                ctx.stroke();
+                Connections {
+                    target: deck
+                    function onChartModelChanged() {
+                        celestialCanvas.requestPaint();
+                    }
+                }
             }
-            Connections {
-                target: deck
-                function onSolarModelChanged() { solarCanvas.requestPaint(); }
+            Column {
+                width: Math.max(0,heroInstrument.width-celestialCanvas.width-12)
+                anchors.verticalCenter: parent.verticalCenter
+                spacing: 5
+                GohuText {
+                    width: parent.width
+                    font.pixelSize: 11
+                    color: deck.chartModel.ready ? Colors.cyan : Colors.yellow
+                    text: deck.chartModel.ready
+                          ? "SOURCE-VERIFIED CELESTIAL POSITIONS"
+                          : "AWAITING CALCULATION"
+                    elide: Text.ElideRight
+                }
+                QuietText {
+                    width: parent.width
+                    font.pixelSize: 9
+                    color: Colors.white
+                    text: deck.celestialSource
+                          ? deck.celestialSource.pairLabel
+                            + " // " + deck.celestialSource.targetDayUtc
+                          : "JPL SOURCE NOT CONNECTED"
+                    elide: Text.ElideRight
+                }
+                QuietText {
+                    width: parent.width
+                    font.pixelSize: 9
+                    color: Colors.orange
+                    text: deck.celestialSource
+                          ? deck.celestialSource.statusText
+                          : "JPL CALCULATION OWNER UNAVAILABLE"
+                    elide: Text.ElideRight
+                }
+                QuietText {
+                    width: parent.width
+                    font.pixelSize: 8
+                    color: Colors.cyan
+                    text: "GEOCENTRIC // TRUE ECLIPTIC"
+                    elide: Text.ElideRight
+                }
             }
         }
-        QuietText {
+
+        Row {
             id: heroFooter
             anchors.left: parent.left
             anchors.right: parent.right
             anchors.bottom: parent.bottom
             anchors.leftMargin: 9
-            anchors.rightMargin: 9
+            anchors.rightMargin: 7
             anchors.bottomMargin: 4
-            height: 12
-            font.pixelSize: 8
-            elide: Text.ElideRight
-            text: deck.solarModel.ready
-                  ? "CALIBRATED LOCAL SOLAR POSITION // "
-                    + deck.solarModel.date
-                  : "SOLAR MODEL WAITING // LOCATION, DATE OR OFFSET UNAVAILABLE"
-            color: deck.solarModel.ready ? Colors.cyan : Colors.yellow
+            height: 22
+            spacing: 6
+            QuietText {
+                width: Math.max(0,parent.width-65)
+                anchors.verticalCenter: parent.verticalCenter
+                font.pixelSize: 8
+                color: Colors.yellow
+                text: "TRADITIONS / CORRESPONDENCES // NOT CONNECTED"
+                elide: Text.ElideRight
+            }
+            ActionButton {
+                width: 59
+                height: 21
+                label: "LENS"
+                labelPixelSize: 9
+                accentColor: Colors.magenta
+                onClicked: deck.routeRequested("magick/planetary/correspondences")
+            }
         }
     }
 
@@ -146,9 +248,8 @@ Rectangle {
         anchors.left: parent.left
         anchors.right: parent.right
         anchors.top: hero.bottom
-        anchors.bottom: interpretation.top
+        anchors.bottom: parent.bottom
         anchors.topMargin: deck.gutter
-        anchors.bottomMargin: deck.gutter
         spacing: deck.gutter
 
         Rectangle {
@@ -286,87 +387,86 @@ Rectangle {
                 accentColor: Colors.orange
                 onClicked: deck.routeRequested("magick/planetary/hours")
             }
-            Column {
+
+            Row {
                 anchors.left: parent.left
                 anchors.right: parent.right
                 anchors.top: parent.top
                 anchors.bottom: parent.bottom
-                anchors.leftMargin: 8
+                anchors.leftMargin: 7
                 anchors.rightMargin: 7
-                anchors.topMargin: 29
+                anchors.topMargin: 26
                 anchors.bottomMargin: 5
-                spacing: 5
-                GohuText {
-                    width: parent.width
-                    text: "RISE " + observationOwner.astronomySummary.sunrise
-                          + "  /  SET " + observationOwner.astronomySummary.sunset
-                    font.pixelSize: 9
-                    color: Colors.white
-                    elide: Text.ElideRight
+                spacing: 6
+
+                Canvas {
+                    id: solarCanvas
+                    width: Math.max(45,parent.width*0.42)
+                    height: parent.height
+                    onWidthChanged: requestPaint()
+                    onHeightChanged: requestPaint()
+                    onPaint: {
+                        const ctx=getContext("2d");
+                        ctx.clearRect(0,0,width,height);
+                        const w=Math.max(1,width-2),h=Math.max(1,height-2);
+                        ctx.strokeStyle=String(Colors.cyan);
+                        ctx.globalAlpha=0.35;
+                        ctx.beginPath();
+                        ctx.moveTo(0,h/2);
+                        ctx.lineTo(w,h/2);
+                        ctx.stroke();
+                        ctx.globalAlpha=1;
+                        if(!deck.solarModel.ready)return;
+                        ctx.strokeStyle=String(Colors.orange);
+                        ctx.lineWidth=1.6;
+                        ctx.beginPath();
+                        const rows=deck.solarModel.rows;
+                        for(let i=0;i<rows.length;i++){
+                            const x=CosmosVisual.positionX(rows[i].minute,w);
+                            const y=CosmosVisual.positionY(rows[i].altitude,h);
+                            if(i===0)ctx.moveTo(x,y);
+                            else ctx.lineTo(x,y);
+                        }
+                        ctx.stroke();
+                    }
+                    Connections {
+                        target: deck
+                        function onSolarModelChanged() {
+                            solarCanvas.requestPaint();
+                        }
+                    }
                 }
-                QuietText {
-                    width: parent.width
-                    text: deck.weatherService && deck.weatherService.ready
-                          ? "WEATHER // " + deck.weatherService.tempF
-                            + "°F  CLOUD " + deck.weatherService.cloudCover + "%"
-                          : "WEATHER CONTEXT // WAITING"
-                    font.pixelSize: 8
-                    elide: Text.ElideRight
-                }
-                QuietText {
-                    width: parent.width
-                    text: deck.solarModel.ready
-                          ? "LOCAL SOLAR ARC // READY"
-                          : "SOLAR ARC // UNAVAILABLE"
-                    font.pixelSize: 8
-                    color: deck.solarModel.ready ? Colors.cyan : Colors.yellow
-                    elide: Text.ElideRight
+
+                Column {
+                    width: Math.max(0,parent.width-solarCanvas.width-6)
+                    anchors.verticalCenter: parent.verticalCenter
+                    spacing: 3
+                    GohuText {
+                        width: parent.width
+                        text: "RISE " + observationOwner.astronomySummary.sunrise
+                        font.pixelSize: 9
+                        color: Colors.white
+                        elide: Text.ElideRight
+                    }
+                    GohuText {
+                        width: parent.width
+                        text: "SET  " + observationOwner.astronomySummary.sunset
+                        font.pixelSize: 9
+                        color: Colors.white
+                        elide: Text.ElideRight
+                    }
+                    QuietText {
+                        width: parent.width
+                        text: deck.solarModel.ready
+                              ? "SOLAR ARC // READY"
+                              : "SOLAR ARC // WAITING"
+                        color: deck.solarModel.ready ? Colors.cyan : Colors.yellow
+                        font.pixelSize: 8
+                        elide: Text.ElideRight
+                    }
                 }
             }
         }
     }
 
-    Rectangle {
-        id: interpretation
-        anchors.left: parent.left
-        anchors.right: parent.right
-        anchors.bottom: parent.bottom
-        height: Math.max(39,Math.round(deck.height*0.17))
-        color: Colors.dark
-        border.width: 1
-        border.color: Colors.magenta
-        clip: true
-
-        GohuText {
-            anchors.left: parent.left
-            anchors.top: parent.top
-            anchors.leftMargin: 8
-            anchors.topMargin: 5
-            text: "MAGICK // INTERPRETIVE CONTEXT"
-            font.pixelSize: 10
-            color: Colors.magenta
-        }
-        QuietText {
-            anchors.left: parent.left
-            anchors.right: parent.right
-            anchors.top: parent.top
-            anchors.leftMargin: 8
-            anchors.rightMargin: 67
-            anchors.topMargin: 22
-            text: "TRADITIONS / CORRESPONDENCES // NOT CONNECTED"
-            font.pixelSize: 8
-            elide: Text.ElideRight
-        }
-        ActionButton {
-            anchors.right: parent.right
-            anchors.verticalCenter: parent.verticalCenter
-            anchors.rightMargin: 6
-            width: 54
-            height: 23
-            label: "OPEN"
-            labelPixelSize: 9
-            accentColor: Colors.magenta
-            onClicked: deck.routeRequested("magick/planetary/correspondences")
-        }
-    }
 }

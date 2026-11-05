@@ -27,9 +27,11 @@ Rectangle {
     readonly property var meteorSource: skyFeed ? skyFeed.meteorObservation : null
     readonly property var eclipseSource: skyFeed ? skyFeed.eclipseObservation : null
     readonly property var issSource: skyFeed ? skyFeed.issObservation : null
+    readonly property string civilDate:
+        skyFeed ? skyFeed.focusedCivilDate : ""
     readonly property var planetRows: ClockPolicy.clockRows(
         planetSource && planetSource.ready ? planetSource.rows : [],
-        astronomy ? astronomy.date : "")
+        civilDate)
     // The clock is still an instrument when USNO is offline. Always show
     // its five lanes, with truthful empty markers instead of blank space.
     readonly property var displayedPlanetRows:
@@ -39,8 +41,14 @@ Rectangle {
             {name:"SATURN",events:[]}
         ]
     readonly property bool sourceConfigured: {
-        if (kind === "solar-path" || kind === "light")
-            return !!astronomy && astronomy.available;
+        if (kind === "solar-path")
+            return !!skyFeed && /^\d{4}-\d{2}-\d{2}$/.test(civilDate)
+                && skyFeed.moonCivilOffsetMinutes !== null
+                && skyFeed.moonCivilOffsetMinutes !== undefined
+                && !!weatherService && weatherService.latitude !== ""
+                && weatherService.longitude !== "";
+        if (kind === "light")
+            return !!twilight && twilight.available;
         if (kind === "planet-clock")
             return !!planetSource && planetSource.configured;
         if (kind === "planets" || kind === "stars")
@@ -62,10 +70,15 @@ Rectangle {
     readonly property string sourceStatus: {
         if (!Modes.usesSky(subjectRoute)) return "";
         if (!skyFeed) return "ASTRONOMY SOURCE HOST NOT LOADED";
-        if (kind === "solar-path" || kind === "light")
-            return astronomy && astronomy.available
-                ? "FORECAST ASTRONOMY READY"
-                : "WEATHER DAILY ASTRONOMY UNAVAILABLE // CHECK WEATHER FEED";
+        if (kind === "solar-path")
+            return sourceConfigured
+                ? (astronomy && astronomy.available
+                   ? "SOLAR MODEL READY // WEATHER FORECAST ANCHOR"
+                   : "SOLAR MODEL READY // OPEN-METEO LOCAL CALENDAR")
+                : "SOLAR MODEL NEEDS LOCAL DATE, LOCATION AND UTC OFFSET";
+        if (kind === "light")
+            return sourceConfigured ? "TWILIGHT MODEL READY"
+                : "TWILIGHT NEEDS WEATHER SUNRISE CALIBRATION";
         if (!selectedProvider)
             return "PROVIDER NOT MOUNTED";
         if (!sourceConfigured)
@@ -299,7 +312,7 @@ Rectangle {
                     ? focus.skyFeed.currentSolarPosition : null
                 providerLocalMinute: focus.skyFeed
                     ? focus.skyFeed.providerLocalMinute : -1
-                solarDate: focus.astronomy ? focus.astronomy.date : ""
+                solarDate: focus.civilDate
                 solarCivilOffsetMinutes: focus.skyFeed
                     ? focus.skyFeed.moonCivilOffsetMinutes : null
                 solarOffsetSource: focus.skyFeed
@@ -437,6 +450,7 @@ Rectangle {
             QuietText {
                 width: parent.width
                 text: focus.sourceStatus
+                    + (focus.civilDate !== "" ? " // "+focus.civilDate : "")
                 visible: focus.sourceStatus !== "SOURCE RECEIVED"
                 color: Colors.orange
                 font.pixelSize: 9

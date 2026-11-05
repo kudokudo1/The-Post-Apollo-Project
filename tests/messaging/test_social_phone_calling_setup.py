@@ -145,7 +145,7 @@ class CallingSetupUiTests(unittest.TestCase):
     def test_fallback_uses_the_same_phone_stage_and_native_approval(self):
         self.assertIn('"TERMINAL_UNAVAILABLE"', self.ui)
         self.assertIn('"PACKAGE_MANAGER_UNAVAILABLE"', self.ui)
-        self.assertIn('Polkit with DNF5', self.ui)
+        self.assertIn('Either PackageKit or BOTH Polkit and DNF5 are required.', self.ui)
         self.assertIn("Fedora's interactive installer runs in the PHONE terminal", self.ui)
         self.assertIn('Review its transaction and confirm or decline;', self.ui)
         self.assertIn('r.packageInstalled !== false', self.ui)

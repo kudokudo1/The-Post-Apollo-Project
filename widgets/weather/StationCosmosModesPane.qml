@@ -416,9 +416,19 @@ Rectangle {
             }
             Repeater {
                 id: clockRepeater
-                model: focus.displayedPlanetRows || []
+                // Qt's Repeater can treat an array returned from imported
+                // JS as an invalid model even though it has length=5.
+                // Numeric model guarantees the five physical lanes.
+                model: 5
                 delegate: Rectangle {
-                    required property var modelData
+                    required property int index
+                    readonly property var planetRow:
+                        focus.displayedPlanetRows
+                        && focus.displayedPlanetRows.length > index
+                        ? focus.displayedPlanetRows[index] : null
+                    readonly property string planetName:
+                        planetRow ? planetRow.name
+                        : ["MERCURY","VENUS","MARS","JUPITER","SATURN"][index]
                     width: parent.width
                     height: Math.max(26,(stage.height-53)/5)
                     color: Colors.dark
@@ -430,7 +440,7 @@ Rectangle {
                         spacing: 7
                         GohuText {
                             width: 65
-                            text: modelData.name
+                            text: planetName
                             color: Colors.orange
                             font.pixelSize: 10
                             elide: Text.ElideRight
@@ -443,15 +453,18 @@ Rectangle {
                             border.width: 1
                             border.color: Colors.magenta
                             Repeater {
-                                model: modelData.events
+                                model: planetRow && planetRow.events
+                                    ? planetRow.events.length : 0
                                 delegate: Rectangle {
-                                    required property var modelData
-                                    x: 2+modelData.minute/1440*Math.max(0,clockLane.width-10)
+                                    required property int index
+                                    readonly property var eventData:
+                                        planetRow.events[index]
+                                    x: 2+eventData.minute/1440*Math.max(0,clockLane.width-10)
                                     y: 2
                                     width: 6
                                     height: 9
-                                    color: modelData.kind==="rise" ? Colors.cyan
-                                        : modelData.kind==="transit" ? Colors.yellow
+                                    color: eventData.kind==="rise" ? Colors.cyan
+                                        : eventData.kind==="transit" ? Colors.yellow
                                         : Colors.magenta
                                 }
                             }

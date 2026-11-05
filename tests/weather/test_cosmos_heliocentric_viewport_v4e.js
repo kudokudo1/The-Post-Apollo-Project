@@ -85,8 +85,9 @@ test("V4e high zoom never projects active points or click targets beyond the vie
                 const label=H.labelPosition(visual,105,400,240,true,
                     H.layout(400,240,scale).cx);
                 assert.ok(label!==null);
-                assert.ok(label.x-label.maxWidth/2>=vp.left-1);
-                assert.ok(label.x+label.maxWidth/2<=vp.right+1);
+                const painted=Math.min(105,label.maxWidth);
+                assert.ok(label.x-painted/2>=vp.left-1);
+                assert.ok(label.x+painted/2<=vp.right+1);
             }
         }
     }

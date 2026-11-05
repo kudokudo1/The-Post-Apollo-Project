@@ -114,13 +114,12 @@ class C2nProtectedPolicyContract(unittest.TestCase):
                 self.assertNotIn("*", str(element.attrib))
         self.assertNotIn("DynamicUser=yes", self.unit)
         self.assertNotIn("User=root", self.unit)
-        self.assertNotIn("allow send_destination=", self.policy_source)
-        # This is a proposal; project code never installs or triggers it.
-        for package in ("services", "widgets", "scripts"):
-            if package == "scripts":
-                continue
-            # Scope checks target known consumers, not a broad repo-wide grep.
-            self.assertIn(package, ("services", "widgets"))
+        self.assertNotIn('send_destination="*"', self.policy_source)
+        self.assertNotIn('own="*"', self.policy_source)
+        self.assertNotIn("org.freedesktop.systemd1", self.policy_source)
+        self.assertEqual(
+            len([p for p in (ROOT / "services/connections").glob("*.qml")
+                 if NAME in p.read_text()]), 0)
 
 
 if __name__ == "__main__":

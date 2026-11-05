@@ -43,7 +43,8 @@ test("COSMOS offers an astronomy-only SKY and complete SPACE as native bottom mo
   assert.equal(nav.findRoute("cosmos/sky").group,true);
   assert.equal(tabs.GROUPS.cosmos.length,6,"no extra cramped 8-column mode bar");
   const main=plain(tabs.tabsFor("cosmos/overview"));
-  assert.ok(main.some(x=>x.label==="ASTRONOMY"&&x.path===SKY&&x.key==="sky"));
+  assert.ok(main.some(x=>x.label==="ASTRONOMY"&&x.path==="cosmos/planets-stars/celestial-fix"&&x.key==="sky"));
+  assert.ok(nav.findRoute(SKY), "full historical astronomy remains under INDEX");
   assert.ok(main.some(x=>x.label==="SPACE // ALL"&&x.path===SPACE&&x.key==="space-weather"));
   assert.equal(tabs.selectedGroup(SKY),"sky");
   assert.equal(tabs.selectedGroup(SPACE),"space-weather");
@@ -59,7 +60,7 @@ test("the mixed CLASSIC SKY sections are partitioned across COSMOS astronomy and
   const sections=sectionNames(sky);
   assert.deepEqual(sections,[
     "astronomy","atmosphere","celestial-fix","current","daily","eclipses",
-    "header","hourly","iss","meteor","moon","planet-clock","runtime","twilight"
+    "header","hourly","iss","meteor","moon","moon-position","planet-clock","runtime","twilight"
   ]);
   const astronomy=new Set([
     "header","astronomy","iss","moon","eclipses",

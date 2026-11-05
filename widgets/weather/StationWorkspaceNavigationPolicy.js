@@ -38,8 +38,8 @@ var GROUPS = {
         {label:"SUN",path:"cosmos/sun/position",key:"sun"},
         {label:"MOON",path:"cosmos/moon/ephemeris",key:"moon"},
         // Observatory only: terrestrial weather belongs to WEATHER.
-        {label:"ASTRONOMY",path:"cosmos/sky/full",key:"sky"},
-        {label:"EVENTS",path:"cosmos/events/iss",key:"events"},
+        {label:"ASTRONOMY",path:"cosmos/planets-stars/celestial-fix",key:"sky"},
+        {label:"EVENTS",path:"cosmos/events/overview",key:"events"},
         {label:"SPACE // ALL",path:"cosmos/space-weather/full",key:"space-weather"}
     ],
     earth:[

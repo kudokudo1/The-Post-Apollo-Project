@@ -34,9 +34,15 @@ const terrestrial={
 
 test("all 14 original SKY sections are partitioned: observatory in COSMOS, terrestrial in WEATHER",()=>{
   const all=sectionNames(sky);
-  assert.equal(all.length,14);
-  assert.deepEqual([...new Set([...astronomy,...Object.keys(terrestrial)])].sort(),all);
-  for(const section of all){
+  assert.equal(all.length,15);
+  assert.ok(all.includes("moon-position"),"new MOON-only celestial fix");
+  const original=all.filter(section=>section!=="moon-position");
+  assert.equal(original.length,14);
+  assert.deepEqual([...new Set([...astronomy,...Object.keys(terrestrial)])].sort(),original);
+  assert.equal(cosmos.visibleFor("sky","cosmos/moon/ephemeris","moon-position"),true);
+  assert.equal(cosmos.visibleFor("sky","cosmos/sky/full","moon-position"),false);
+  assert.equal(weather.visibleFor("sky","weather/forecasts/hourly","moon-position"),false);
+  for(const section of original){
     assert.equal(cosmos.visibleFor("sky","cosmos/sky/full",section),
       astronomy.includes(section),"COSMOS astronomical ownership "+section);
     if(Object.prototype.hasOwnProperty.call(terrestrial,section))
@@ -81,12 +87,20 @@ test("COSMOS is for celestial and space weather, not conditions, air/atmosphere,
   assert.equal(workspace.GROUPS.cosmos.length,6);
   const star=workspace.GROUPS.cosmos.find(x=>x.key==="sky");
   assert.equal(star.label,"ASTRONOMY");
-  assert.equal(star.path,"cosmos/sky/full");
+  assert.equal(star.path,"cosmos/planets-stars/celestial-fix");
   assert.equal(nav.findRoute(star.path).subject,"cosmos");
-  assert.equal(nav.findRoute(star.path).label,"ASTRONOMY // CELESTIAL INSTRUMENTS");
+  assert.equal(nav.findRoute(star.path).label,"CURRENT SKY");
   assert.equal(cosmos.kindForRoute(star.path),"sky");
-  for(const s of ["moon","eclipses","celnav","iss","planets","meteor"])
+  for(const s of ["celnav","planets"])
     assert.equal(cosmos.needsSource(star.path,s),true);
+  for(const s of ["moon","eclipses","iss","meteor"])
+    assert.equal(cosmos.needsSource(star.path,s),false);
+  // INDEX retains the historical complete observatory including event data.
+  assert.equal(cosmos.kindForRoute("cosmos/sky/full"),"sky");
+  for(const s of ["moon","eclipses","celnav","iss","planets","meteor"])
+    assert.equal(cosmos.needsSource("cosmos/sky/full",s),true);
+  assert.equal(workspace.GROUPS.cosmos.find(x=>x.key==="events").path,
+               "cosmos/events/overview");
   for(const s of ["aurora","flares","xray","cycle","scales","kpForecast"])
     assert.equal(cosmos.needsSource(star.path,s),false);
   assert.equal(cosmos.kindForRoute("cosmos/space-weather/full"),"space");
@@ -115,7 +129,7 @@ test("one existing SKY loader per selected native subject and distinct header st
 });
 
 test("no original M0 source mapping, CLASSIC rendering or data-service ownership changed",()=>{
-  assert.equal(Object.keys(nav.PANELS).length,103);
+  assert.equal(Object.keys(nav.PANELS).length,103); // Legacy source mappings are unchanged; new route is a native tree node
   assert.equal(nav.PANELS["sky-hourly-forecast"],"weather/forecasts/hourly");
   assert.equal(nav.PANELS["sky-sun-moon"],"cosmos/overview");
   assert.equal(weather.visibleFor("sky","","current"),true);

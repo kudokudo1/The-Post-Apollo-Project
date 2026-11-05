@@ -592,6 +592,43 @@ Rectangle {
             }
         }
 
+        // The EVENTS landing holds all three real source sections. Jump to
+        // the desired section without adding a second event-data renderer.
+        Row {
+            id: eventsJumpRow
+            width: parent.width
+            height: visible ? 30 : 0
+            spacing: 7
+            visible: sky.subjectRoute === "cosmos/events/overview"
+
+            Repeater {
+                model: [
+                    {label:"METEOR SHOWERS",target:"meteor"},
+                    {label:"ECLIPSES",target:"eclipses"},
+                    {label:"ISS PASSES",target:"iss"}
+                ]
+                delegate: ActionButton {
+                    required property var modelData
+                    width: Math.max(1,(eventsJumpRow.width
+                        - 2*eventsJumpRow.spacing)/3)
+                    height: 27
+                    label: modelData.label
+                    labelPixelSize: 10
+                    accentColor: modelData.target === "meteor"
+                                 ? Colors.magenta : Colors.cyan
+                    onClicked: {
+                        const targetY = modelData.target === "meteor"
+                            ? meteorEventSection.y
+                            : modelData.target === "eclipses"
+                              ? eclipseEventSection.y : issEventSection.y;
+                        skyScroll.contentY = Math.max(0, Math.min(
+                            skyScroll.contentHeight - skyScroll.height,
+                            skyContent.y + targetY - 12));
+                    }
+                }
+            }
+        }
+
         // V2 COSMOS visual astronomy. Reads the same existing Moon
         // response and calibrated Sun calculation as the text instruments.
         // CLASSIC and WEATHER pages keep their original layout unchanged.
@@ -1097,6 +1134,9 @@ Rectangle {
             Column {
                 width: 238
                 spacing: 4
+                // SUN landing keeps only solar metrics; the original full
+                // astronomy report still includes both celestial bodies.
+                visible: sky.subjectRoute !== "cosmos/sun/position"
 
                 SecondaryText {
                     text: "MOON"
@@ -1140,6 +1180,7 @@ Rectangle {
         }
 
         Column {
+            id: issEventSection
             visible: sky.sectionVisible("iss")
             width: parent.width
             spacing: 7
@@ -1491,6 +1532,102 @@ Rectangle {
         }
 
 
+        // Subject-owned lunar current-position instrument. It reads the
+        // existing USNO celestial-navigation service without also showing the
+        // planetary and constellation sections from the complete sky report.
+        StationSectionDivider {
+            visible: sky.subjectRoute !== ""
+                     && sky.sectionVisible("moon-position")
+            width: parent.width
+            title: "MOON // CURRENT POSITION"
+        }
+
+        Column {
+            visible: sky.subjectRoute !== ""
+                     && sky.sectionVisible("moon-position")
+            width: parent.width
+            spacing: 8
+
+            Row {
+                width: parent.width
+                spacing: 12
+                GohuText {
+                    text: !celnavService.configured
+                          ? "LOCATION UNAVAILABLE"
+                          : celnavService.loading
+                            ? "RECEIVING"
+                            : celnavService.failed
+                              ? (celnavService.ready ? "DEGRADED" : "OFFLINE")
+                            : celnavService.ready ? "RECEIVED" : "WAITING"
+                    font.pixelSize: 10
+                    color: celnavService.failed
+                           ? Colors.yellow
+                           : celnavService.ready ? Colors.cyan : Colors.orange
+                }
+                QuietText {
+                    width: Math.max(0,parent.width - 170)
+                    text: celnavService.ready && celnavService.snapshot
+                          ? "USNO CELESTIAL FIX // "
+                            + celnavService.snapshot.date + " "
+                            + celnavService.snapshot.time + " UTC"
+                          : "USNO // CURRENT SKY POSITION"
+                    elide: Text.ElideRight
+                    font.pixelSize: 9
+                }
+            }
+            Row {
+                visible: celnavService.ready && !!celnavService.snapshot
+                width: parent.width
+                spacing: 8
+                Repeater {
+                    model: [
+                        {title:"VISIBILITY",value: celnavService.snapshot
+                            && celnavService.snapshot.moon
+                            ? "ABOVE DISPLAY LIMIT" : "NOT IN USNO LIST"},
+                        {title:"ALTITUDE // HC",value: celnavService.snapshot
+                            && celnavService.snapshot.moon
+                            ? sky.skyAngleText(celnavService.snapshot.moon.altitude)
+                            : "--"},
+                        {title:"AZIMUTH // ZN",value: celnavService.snapshot
+                            && celnavService.snapshot.moon
+                            ? sky.skyAngleText(celnavService.snapshot.moon.azimuth)
+                              + " // " + celnavService.snapshot.moon.direction
+                            : "--"}
+                    ]
+                    delegate: Rectangle {
+                        required property var modelData
+                        width: Math.max(1,(parent.width - 2*parent.spacing)/3)
+                        height: 66
+                        color: Colors.dark
+                        border.width: 1
+                        border.color: Colors.magenta
+                        Column {
+                            anchors.fill: parent
+                            anchors.margins: 8
+                            spacing: 5
+                            SecondaryText {
+                                text: modelData.title
+                                font.pixelSize: 9
+                            }
+                            GohuText {
+                                width: parent.width
+                                text: modelData.value
+                                color: Colors.white
+                                font.pixelSize: 12
+                                elide: Text.ElideRight
+                            }
+                        }
+                    }
+                }
+            }
+            QuietText {
+                width: parent.width
+                text: "USNO CELESTIAL POSITION // MOON MAY BE ABSENT BELOW THE PROVIDER DISPLAY LIMIT"
+                font.pixelSize: 9
+                color: Colors.yellow
+            }
+        }
+
         StationSectionDivider {
             visible: sky.sectionVisible("eclipses")
             width: parent.width
@@ -1498,6 +1635,7 @@ Rectangle {
         }
 
         Column {
+            id: eclipseEventSection
             visible: sky.sectionVisible("eclipses")
             width: parent.width
             spacing: 7
@@ -1784,6 +1922,7 @@ Rectangle {
 
             Rectangle {
                 visible: celnavService.ready
+                         && sky.subjectRoute.indexOf("cosmos/planets-stars/") !== 0
                 width: parent.width
                 height: 66
                 color: Colors.dark
@@ -2310,6 +2449,7 @@ Rectangle {
         }
 
         Column {
+            id: meteorEventSection
             visible: sky.sectionVisible("meteor")
             width: parent.width
             spacing: 7

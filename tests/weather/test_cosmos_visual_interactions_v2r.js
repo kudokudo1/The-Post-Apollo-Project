@@ -98,7 +98,7 @@ test("existing civil-time source allows valid Sun model without sunrise-calibrat
 test("source and CLASSIC ownership stay unchanged",()=>{
   assert.match(sky,/visible: sky\.subjectRoute\.indexOf\("cosmos\/"\) === 0/);
   assert.match(sky,/height: visible \? 304 : 0/);
-  assert.equal((sky.match(/sky\.sectionVisible\("([^"]+)"\)/g)||[]).length,27);
+  assert.equal((sky.match(/sky\.sectionVisible\("([^"]+)"\)/g)||[]).length,29);
   for(const content of [qml,policy]){
     for(const forbidden of ["Process {","FileView {","WeatherServices.","XMLHttpRequest",
       "Timer {","StationTerminal {","swaymsg","Qt.callLater","new WebSocket"]){

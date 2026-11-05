@@ -50,7 +50,8 @@ test("section filtering keeps exact CLASSIC presentation by default", () => {
     assert.match(source,/property string subjectRoute: ""/);
     assert.match(source,/function sectionVisible\(section\)/);
     const keys = [...source.matchAll(/sectionVisible\("([^"]+)"\)/g)].map(x => x[1]);
-    assert.equal(keys.length,name === "ground" ? 32 : 27);
+    // SUN/MOON reorganization adds one Moon-position divider and data bay.
+    assert.equal(keys.length,name === "ground" ? 32 : 29);
     for (const key of keys)
       assert.equal(env.visibleFor(name,"",key),true,name+"/"+key);
   }

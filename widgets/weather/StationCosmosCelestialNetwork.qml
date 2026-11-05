@@ -34,6 +34,9 @@ Item {
     signal bodyPicked(string body)
     signal sampleScrubbed(int originIndex, real offsetPixels)
     signal zoomRequested(int direction)
+    // Compact page owns NETWORK/HELIO routing. This requests only a
+    // CHORDS/DEPTH submode and never overrides the parent's display binding.
+    signal compactNetworkModeRequested(string mode)
 
     onSceneChanged: {
         hoverBody="";
@@ -158,6 +161,7 @@ Item {
         id: sceneCanvas
         anchors.fill: parent
         anchors.margins: 7
+        anchors.topMargin: compactNetworkToolbar.visible ? 29 : 7
         antialiasing: true
         renderTarget: Canvas.Image
         visible: graph.displayMode === "chords"
@@ -259,6 +263,51 @@ Item {
         onBodyPicked: function(body) { graph.bodyPicked(body); }
         onSampleScrubbed: function(originIndex,offsetPixels) {
             graph.sampleScrubbed(originIndex,offsetPixels);
+        }
+    }
+
+    // V4g // The compact layout split HELIO into its own primary tab.
+    // Restore CHORDS and DEPTH within NETWORK without restoring the old
+    // three-way inspector or moving the finished MAGICK menu.
+    Rectangle {
+        id: compactNetworkToolbar
+        visible: graph.compactMode &&
+                 (graph.displayMode === "chords" || graph.displayMode === "depth")
+        z: 4
+        anchors.top: parent.top
+        anchors.left: parent.left
+        anchors.right: parent.right
+        anchors.topMargin: 2
+        anchors.leftMargin: 4
+        anchors.rightMargin: 4
+        height: 23
+        color: Colors.black
+        border.width: 1
+        border.color: Colors.blue
+        Row {
+            id: compactNetworkButtons
+            anchors.fill: parent
+            anchors.margins: 1
+            spacing: 3
+            Repeater {
+                model: [
+                    {id:"chords",label:"CHORDS"},
+                    {id:"depth",label:"DEPTH"}
+                ]
+                delegate: ActionButton {
+                    required property var modelData
+                    width: Math.max(1,(compactNetworkButtons.width-
+                          compactNetworkButtons.spacing)/2)
+                    height: compactNetworkButtons.height
+                    contentPadding: 0
+                    labelPixelSize: 9
+                    label: modelData.label
+                    selected: graph.displayMode===modelData.id
+                    accentColor: modelData.id==="depth"
+                                 ? Colors.cyan : Colors.magenta
+                    onClicked: graph.compactNetworkModeRequested(modelData.id)
+                }
+            }
         }
     }
 

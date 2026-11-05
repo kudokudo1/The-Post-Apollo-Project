@@ -131,7 +131,7 @@ test("the original SPACE's NOAA solar image, model curves, history and bulletins
     "NOAA // WARNING VALIDITY REVIEW",
     "SPACE WEATHER // NOAA BULLETINS"
   ]) assert.ok(space.includes(label),label+" original instrument");
-  assert.match(space,/source: space\.solarImageUrl/);
+  assert.match(space,/source: space\.sourceOnly \? "" : space\.solarImageUrl/);
   assert.match(space,/Image\s*\{/);
 });
 

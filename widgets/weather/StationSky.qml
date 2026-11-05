@@ -7,6 +7,7 @@ import "../../services/weather/WeatherDockPolicy.js" as WeatherDockPolicy
 import "../../services/weather/WeatherCyclePolicy.js" as WeatherCyclePolicy
 import "StationSkyHourlyPolicy.js" as HourlyDetails
 import "StationSkyTwilightPolicy.js" as TwilightPolicy
+import "StationCosmosCivilCalendarPolicy.js" as CosmosCalendar
 import "../../services/weather/WeatherRuntimePolicy.js" as RuntimePolicy
 
 Rectangle {
@@ -268,6 +269,21 @@ Rectangle {
         openMeteoCivilOffsetAvailable
         ? "OPEN-METEO TIMEZONE"
         : "SUNRISE CALIBRATION"
+    // C5 repair: a missing daily weather astronomy payload must not block
+    // independent USNO planetary data when the existing Open-Meteo timezone
+    // and station coordinates are available. Never guess a local UTC offset.
+    // Source-only focused COSMOS uses this; legacy SKY behavior is unchanged.
+    readonly property string focusedCivilDate:
+        CosmosCalendar.focusedDate(
+            astronomySummary.date,
+            runtimeNowMs > 0 ? runtimeNowMs : Date.now(),
+            openMeteoCivilOffsetAvailable
+                ? weatherService.airQualityUtcOffsetMinutes : null,
+            sourceOnly
+        )
+    readonly property string focusedCivilDateSource:
+        sourceOnly && openMeteoCivilOffsetAvailable
+        ? "OPEN-METEO LOCAL CALENDAR" : "WEATHER DAILY ASTRONOMY"
     WeatherServices.UsnoMoonService {
         id: moonService
         active: sky.visible
@@ -276,7 +292,7 @@ Rectangle {
         // Use the same provider forecast date shown by ASTRONOMY.
         // skyCycle.date intentionally clears when the observation anchor is
         // stale, while astronomySummary safely falls back to dailyForecast[0].
-        date: sky.astronomySummary.date
+        date: sky.sourceOnly ? sky.focusedCivilDate : sky.astronomySummary.date
         latitude: sky.weatherService ? sky.weatherService.latitude : ""
         longitude: sky.weatherService ? sky.weatherService.longitude : ""
         offsetMinutes: sky.moonCivilOffsetMinutes
@@ -312,7 +328,7 @@ Rectangle {
         active: sky.visible
                 && (SubjectPanelPolicy.needsSource(sky.subjectRoute,"astronomy")
                     || CosmosPanelPolicy.needsSource(sky.subjectRoute,"planets"))
-        date: sky.astronomySummary.date
+        date: sky.sourceOnly ? sky.focusedCivilDate : sky.astronomySummary.date
         latitude: sky.weatherService ? sky.weatherService.latitude : ""
         longitude: sky.weatherService ? sky.weatherService.longitude : ""
         offsetMinutes: sky.moonCivilOffsetMinutes

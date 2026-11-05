@@ -17,7 +17,14 @@ Rectangle {
     signal routeRequested(string path)
     readonly property string family: Modes.family(subjectRoute)
     readonly property string kind: Modes.kind(subjectRoute)
-    readonly property var modes: Modes.modesFor(subjectRoute)
+    readonly property var modes: Modes.modesFor(subjectRoute) || []
+    readonly property int modeCount: modeRepeater.count
+    readonly property int visibleClockLaneCount:
+        instrumentLoader.item && instrumentLoader.item.renderedRowCount !== undefined
+        ? instrumentLoader.item.renderedRowCount : 0
+    // Read-only native acceptance diagnostics; do not create a separate source.
+    readonly property bool instrumentMounted: instrumentLoader.item !== null
+    readonly property int instrumentLoadState: instrumentLoader.status
     readonly property var skyFeed: skyLoader.item
     readonly property var spaceFeed: spaceSourceLoader.item
     readonly property var astronomy: skyFeed ? skyFeed.astronomySummary : null
@@ -27,9 +34,71 @@ Rectangle {
     readonly property var meteorSource: skyFeed ? skyFeed.meteorObservation : null
     readonly property var eclipseSource: skyFeed ? skyFeed.eclipseObservation : null
     readonly property var issSource: skyFeed ? skyFeed.issObservation : null
+    readonly property string civilDate:
+        skyFeed && typeof skyFeed.focusedCivilDate === "string"
+        ? skyFeed.focusedCivilDate : ""
     readonly property var planetRows: ClockPolicy.clockRows(
         planetSource && planetSource.ready ? planetSource.rows : [],
-        astronomy ? astronomy.date : "")
+        civilDate)
+    // The clock is still an instrument when USNO is offline. Always show
+    // its five lanes, with truthful empty markers instead of blank space.
+    readonly property var displayedPlanetRows:
+        planetRows && planetRows.length === 5 ? planetRows : [
+            {name:"MERCURY",events:[]}, {name:"VENUS",events:[]},
+            {name:"MARS",events:[]}, {name:"JUPITER",events:[]},
+            {name:"SATURN",events:[]}
+        ]
+    readonly property bool sourceConfigured: {
+        if (kind === "solar-path")
+            return !!skyFeed && /^\d{4}-\d{2}-\d{2}$/.test(civilDate)
+                && skyFeed.moonCivilOffsetMinutes !== null
+                && skyFeed.moonCivilOffsetMinutes !== undefined
+                && !!weatherService && weatherService.latitude !== ""
+                && weatherService.longitude !== "";
+        if (kind === "light")
+            return !!twilight && twilight.available;
+        if (kind === "planet-clock")
+            return !!planetSource && planetSource.configured;
+        if (kind === "planets" || kind === "stars")
+            return !!celnav && celnav.configured;
+        if (kind === "meteors")
+            return !!meteorSource && meteorSource.configured;
+        if (kind === "iss")
+            return !!issSource && issSource.configured;
+        if (kind === "eclipses")
+            return !!eclipseSource;
+        return true;
+    }
+    readonly property var selectedProvider:
+        kind === "planet-clock" ? planetSource
+        : kind === "planets" || kind === "stars" ? celnav
+        : kind === "meteors" ? meteorSource
+        : kind === "eclipses" ? eclipseSource
+        : kind === "iss" ? issSource : null
+    readonly property string sourceStatus: {
+        if (!Modes.usesSky(subjectRoute)) return "";
+        if (!skyFeed) return "ASTRONOMY SOURCE HOST NOT LOADED";
+        if (kind === "solar-path")
+            return sourceConfigured
+                ? (astronomy && astronomy.available
+                   ? "SOLAR MODEL READY // WEATHER FORECAST ANCHOR"
+                   : "SOLAR MODEL READY // OPEN-METEO LOCAL CALENDAR")
+                : "SOLAR MODEL NEEDS LOCAL DATE, LOCATION AND UTC OFFSET";
+        if (kind === "light")
+            return sourceConfigured ? "TWILIGHT MODEL READY"
+                : "TWILIGHT NEEDS WEATHER SUNRISE CALIBRATION";
+        if (!selectedProvider)
+            return "PROVIDER NOT MOUNTED";
+        if (!sourceConfigured)
+            return kind === "planet-clock"
+                ? "USNO NEEDS VALID DATE, COORDINATES AND UTC OFFSET"
+                : "LOCATION COORDINATES UNAVAILABLE";
+        if (selectedProvider.loading) return "SOURCE RECEIVING";
+        if (selectedProvider.failed)
+            return selectedProvider.errorText || "SOURCE REQUEST FAILED";
+        if (selectedProvider.ready) return "SOURCE RECEIVED";
+        return "SOURCE WAITING";
+    }
 
     // Normalize source records for the four-card, non-scrolling layouts.
     // This is presentation only, not a fetcher or a new astronomy model.
@@ -85,10 +154,10 @@ Rectangle {
         sourceComponent: Component {
             StationSky {
                 sourceOnly: true
-                subjectRoute: Modes.dataRoute(focus.subjectRoute)
+                subjectRoute: Modes.dataRoute(focus.subjectRoute || "")
                 weatherService: focus.weatherService
                 spaceService: focus.spaceService
-                runtimeNowMs: focus.runtimeNowMs
+                runtimeNowMs: focus.runtimeNowMs || 0
             }
         }
     }
@@ -137,15 +206,16 @@ Rectangle {
         height: 27
         spacing: 4
         Repeater {
-            model: focus.modes
+            id: modeRepeater
+            model: focus.modes || []
             delegate: ActionButton {
                 required property var modelData
                 width: Math.max(1,(modeRail.width
-                    -(focus.modes.length-1)*modeRail.spacing)
-                    /Math.max(1,focus.modes.length))
+                    -(focus.modeCount-1)*modeRail.spacing)
+                    /Math.max(1,focus.modeCount))
                 height: 27
                 label: modelData.label
-                labelPixelSize: focus.modes.length>5 ? 9 : 10
+                labelPixelSize: focus.modeCount>5 ? 9 : 10
                 contentPadding: 1
                 selected: Modes.canonical(focus.subjectRoute) === modelData.route
                 accentColor: Colors.cyan
@@ -173,6 +243,7 @@ Rectangle {
         anchors.margins: 6
         clip: true
         Loader {
+            id: instrumentLoader
             anchors.fill: parent
             active: focus.visible
             sourceComponent: focus.kind === "solar-path" ? sunPath
@@ -181,6 +252,20 @@ Rectangle {
                 : focus.kind === "solar-section" ? solarDetails
                 : focus.kind === "meteors" ? meteorList
                 : subjectCards
+        }
+        // An unavailable solar forecast must not leave a blank graph without
+        // saying which upstream payload is missing.
+        QuietText {
+            anchors.horizontalCenter: parent.horizontalCenter
+            anchors.verticalCenter: parent.verticalCenter
+            width: Math.max(1,stage.width-32)
+            visible: (focus.kind === "solar-path" || focus.kind === "light")
+                && !focus.sourceConfigured
+            text: focus.sourceStatus || "SOURCE WAITING"
+            color: Colors.orange
+            font.pixelSize: 10
+            horizontalAlignment: Text.AlignHCenter
+            wrapMode: Text.WordWrap
         }
     }
     Row {
@@ -237,7 +322,7 @@ Rectangle {
                     ? focus.skyFeed.currentSolarPosition : null
                 providerLocalMinute: focus.skyFeed
                     ? focus.skyFeed.providerLocalMinute : -1
-                solarDate: focus.astronomy ? focus.astronomy.date : ""
+                solarDate: focus.civilDate || ""
                 solarCivilOffsetMinutes: focus.skyFeed
                     ? focus.skyFeed.moonCivilOffsetMinutes : null
                 solarOffsetSource: focus.skyFeed
@@ -319,6 +404,7 @@ Rectangle {
     Component {
         id: planetClock
         Column {
+            readonly property int renderedRowCount: clockRepeater.count
             anchors.fill: parent
             spacing: 5
             GohuText {
@@ -329,9 +415,20 @@ Rectangle {
                 font.pixelSize:11
             }
             Repeater {
-                model: focus.planetRows
+                id: clockRepeater
+                // Qt's Repeater can treat an array returned from imported
+                // JS as an invalid model even though it has length=5.
+                // Numeric model guarantees the five physical lanes.
+                model: 5
                 delegate: Rectangle {
-                    required property var modelData
+                    required property int index
+                    readonly property var planetRow:
+                        focus.displayedPlanetRows
+                        && focus.displayedPlanetRows.length > index
+                        ? focus.displayedPlanetRows[index] : null
+                    readonly property string planetName:
+                        planetRow ? planetRow.name
+                        : ["MERCURY","VENUS","MARS","JUPITER","SATURN"][index]
                     width: parent.width
                     height: Math.max(26,(stage.height-53)/5)
                     color: Colors.dark
@@ -343,7 +440,7 @@ Rectangle {
                         spacing: 7
                         GohuText {
                             width: 65
-                            text: modelData.name
+                            text: planetName
                             color: Colors.orange
                             font.pixelSize: 10
                             elide: Text.ElideRight
@@ -356,21 +453,33 @@ Rectangle {
                             border.width: 1
                             border.color: Colors.magenta
                             Repeater {
-                                model: modelData.events
+                                model: planetRow && planetRow.events
+                                    ? planetRow.events.length : 0
                                 delegate: Rectangle {
-                                    required property var modelData
-                                    x: 2+modelData.minute/1440*Math.max(0,clockLane.width-10)
+                                    required property int index
+                                    readonly property var eventData:
+                                        planetRow.events[index]
+                                    x: 2+eventData.minute/1440*Math.max(0,clockLane.width-10)
                                     y: 2
                                     width: 6
                                     height: 9
-                                    color: modelData.kind==="rise" ? Colors.cyan
-                                        : modelData.kind==="transit" ? Colors.yellow
+                                    color: eventData.kind==="rise" ? Colors.cyan
+                                        : eventData.kind==="transit" ? Colors.yellow
                                         : Colors.magenta
                                 }
                             }
                         }
                     }
                 }
+            }
+            QuietText {
+                width: parent.width
+                text: focus.sourceStatus || "SOURCE WAITING"
+                    + (focus.civilDate !== "" ? " // "+focus.civilDate : "")
+                visible: focus.sourceStatus !== "SOURCE RECEIVED"
+                color: Colors.orange
+                font.pixelSize: 9
+                elide: Text.ElideRight
             }
             QuietText {
                 width:parent.width
@@ -394,15 +503,25 @@ Rectangle {
                 color: Colors.magenta
                 font.pixelSize:11
             }
+            QuietText {
+                width: parent.width
+                visible: !focus.cards || focus.cards.length === 0
+                text: focus.sourceStatus || "SOURCE WAITING"
+                color: Colors.orange
+                font.pixelSize: 10
+                wrapMode: Text.WordWrap
+            }
             Grid {
                 id: cardGrid
                 width: parent.width
                 columns: 2
                 spacing: 7
                 Repeater {
-                    model: focus.cards.slice(0,4)
+                    // Numeric model avoids a QJSValue-array Repeater binding.
+                    model: focus.cards ? Math.min(4,focus.cards.length) : 0
                     delegate: Rectangle {
-                        required property var modelData
+                        required property int index
+                        readonly property var cardData: focus.cards[index]
                         width: Math.max(1,(cardGrid.width-7)/2)
                         height: Math.max(65,(stage.height-53)/2)
                         color: Colors.dark
@@ -414,20 +533,20 @@ Rectangle {
                             spacing: 6
                             GohuText {
                                 width: parent.width
-                                text: modelData.name
+                                text: cardData.name
                                 color: Colors.orange
                                 font.pixelSize: 12
                                 elide: Text.ElideRight
                             }
                             QuietText {
                                 width: parent.width
-                                text: modelData.info
+                                text: cardData.info
                                 font.pixelSize: 10
                                 elide: Text.ElideRight
                             }
                             QuietText {
                                 width: parent.width
-                                text: modelData.detail
+                                text: cardData.detail
                                 font.pixelSize: 9
                                 wrapMode: Text.WordWrap
                             }
@@ -437,7 +556,7 @@ Rectangle {
             }
             QuietText {
                 width:parent.width
-                text:focus.cards.length===0 ? "SOURCE WAITING / NO DATA IN WINDOW"
+                text:(!focus.cards || focus.cards.length===0) ? "SOURCE WAITING / NO DATA IN WINDOW"
                     : focus.kind==="eclipses"
                     ? "GLOBAL EVENT DATE // LOCAL VISIBILITY NOT CALCULATED"
                     : "OBSERVATIONS / PREDICTIONS ARE SOURCE-SCOPED"
@@ -458,6 +577,16 @@ Rectangle {
                 color:Colors.magenta
                 font.pixelSize:12
             }
+            QuietText {
+                width: parent.width
+                visible: !focus.cards || focus.cards.length === 0
+                text: focus.sourceStatus === "SOURCE RECEIVED"
+                    ? "NO ACTIVE OR UPCOMING SHOWER IN THE SOURCE WINDOW"
+                    : (focus.sourceStatus || "SOURCE WAITING")
+                color: Colors.orange
+                font.pixelSize: 10
+                wrapMode: Text.WordWrap
+            }
             Flickable {
                 id: meteorScroll
                 width: parent.width
@@ -471,9 +600,10 @@ Rectangle {
                     width: meteorScroll.width
                     spacing: 5
                     Repeater {
-                        model: focus.cards
+                        model: focus.cards ? focus.cards.length : 0
                         delegate: Rectangle {
-                            required property var modelData
+                            required property int index
+                            readonly property var cardData: focus.cards[index]
                             width: meteorCards.width
                             height: 47
                             color: Colors.dark
@@ -485,13 +615,13 @@ Rectangle {
                                 spacing:4
                                 GohuText {
                                     width:parent.width
-                                    text:modelData.name+" // "+modelData.info
+                                    text:cardData.name+" // "+cardData.info
                                     color:Colors.white
                                     font.pixelSize:10
                                     elide:Text.ElideRight
                                 }
                                 QuietText {
-                                    text:modelData.detail
+                                    text:cardData.detail
                                     color:Colors.cyan
                                     font.pixelSize:9
                                 }

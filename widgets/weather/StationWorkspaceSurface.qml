@@ -150,6 +150,10 @@ Rectangle {
             anchors.fill: parent
             visible: surface.activeFamily === "cosmos"
             subjectRoute: surface.currentPath
+            // C5 regression: forwarding was present in INDEX but missing
+            // from the native SUBJECTS surface. Mode buttons emitted into
+            // a dead end and appeared selectable only on hover.
+            onRouteRequested: function(path) { surface.routeRequested(path); }
             weatherService: surface.weatherService
             spaceService: surface.spaceService
             liveHistoryStore: surface.liveHistoryStore

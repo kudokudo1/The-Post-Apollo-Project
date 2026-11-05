@@ -223,7 +223,7 @@ const sky = read("widgets/weather/StationSky.qml");
 assert.match(sky, /import "\.\.\/\.\.\/services\/weather" as WeatherServices/);
 assert.match(sky, /WeatherServices\.UsnoMoonService\s*\{/);
 assert.match(sky, /active: sky\.visible/);
-assert.match(sky, /date: sky\.astronomySummary\.date/);
+assert.match(sky, /date: sky\.sourceOnly \? sky\.focusedCivilDate : sky\.astronomySummary\.date/);
 assert.doesNotMatch(sky, /date: sky\.skyCycle\.date/);
 assert.match(sky, /readonly property bool openMeteoCivilOffsetAvailable/);
 assert.match(sky, /weatherService\.airQualityUtcOffsetMinutes/);

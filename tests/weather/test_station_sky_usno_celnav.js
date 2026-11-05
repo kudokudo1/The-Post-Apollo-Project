@@ -203,7 +203,7 @@ assert.doesNotMatch(service, /Qt\.openUrlExternally|WebEngine/);
 
 const sky = read("widgets/weather/StationSky.qml");
 assert.match(sky, /WeatherServices\.UsnoCelnavService\s*\{/);
-assert.match(sky, /active: sky\.visible/);
+assert.match(sky, /active: \(sky\.sourceOnly \|\| sky\.visible\)/);
 assert.match(sky, /title: "SKY NOW \/\/ USNO CELESTIAL FIX"/);
 assert.match(sky, /MOON \/\/ CURRENT POSITION/);
 assert.match(sky, /ALTITUDE \/\/ HC/);

@@ -17,6 +17,11 @@ function finite(n) {
     return typeof n === "number" && isFinite(n) && Math.abs(n) <= 10000
         ? n : null;
 }
+// Viewport panning can legitimately exceed 10,000 pixels when a selected
+// distant body is focused at high magnification. This is camera-only state.
+function cameraPixel(n) {
+    return typeof n==="number" && isFinite(n) && Math.abs(n)<=1e7 ? n : null;
+}
 function empty(reason) {
     return {ready:false,reason:reason||"HELIOSPATIAL SOURCE UNAVAILABLE",
         points:[],count:0,source:"",hash:"",timeMs:null,utc:"",
@@ -120,7 +125,7 @@ function layout(width,height,scale) {
 // Camera is an independent pixel transform, not a modification to any
 // heliocentric source position. Start at the original Sun-centered view.
 function cameraOrigin(width,height,scale,panX,panY) {
-    var g=layout(width,height,scale),x=finite(panX),y=finite(panY);
+    var g=layout(width,height,scale),x=cameraPixel(panX),y=cameraPixel(panY);
     if(!g.ready||x===null||y===null)return null;
     return {cx:g.cx+x,cy:g.cy+y,r:g.r};
 }
@@ -129,7 +134,7 @@ function cameraOrigin(width,height,scale,panX,panY) {
 // coordinate after zoom. Mouse-wheel direction is +/-1, no timers required.
 function zoomAt(width,height,scale,panX,panY,mouseX,mouseY,direction) {
     var g=layout(width,height,scale);
-    var px=finite(panX),py=finite(panY),
+    var px=cameraPixel(panX),py=cameraPixel(panY),
         mx=finite(mouseX),my=finite(mouseY);
     if(!g.ready||px===null||py===null||mx===null||my===null||
        (direction!==1&&direction!==-1))return null;
@@ -161,8 +166,8 @@ function position(scene,point,width,height,scale,tilt,domainAu,panX,panY) {
         x=finite(point.x_au),y=finite(point.y_au),z=finite(point.z_au);
     if(!g.ready||r===null||r<=0||x===null||y===null||z===null)
         return null;
-    var px=panX===undefined?0:finite(panX),
-        py=panY===undefined?0:finite(panY);
+    var px=panX===undefined?0:cameraPixel(panX),
+        py=panY===undefined?0:cameraPixel(panY);
     if(px===null||py===null)return null;
     var angle=tilt===true?Math.PI/4:0;
     return {x:g.cx+px+g.r*y/r,

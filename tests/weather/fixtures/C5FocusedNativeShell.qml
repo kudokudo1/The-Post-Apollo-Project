@@ -1,7 +1,7 @@
 import QtQuick
 import QtQuick.Window
 import Quickshell
-import "../../../widgets/weather" as Weather
+import "widgets/weather" as Weather
 
 // Disposable offscreen native QML smoke. No real service or network, no
 // desktop compositor, no user files, and no real Weather Station activation.

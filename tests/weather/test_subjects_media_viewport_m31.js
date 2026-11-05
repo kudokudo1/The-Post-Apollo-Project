@@ -87,7 +87,7 @@ test("ordinary workspace and INDEX cannot publish two overlapping MEDIA players"
   assert.match(navigator,/subjectWorkspaceActive: !browser\.indexOpen/);
   assert.match(navigator,/id: mediaLivePane/);
   assert.match(navigator,/visible: browser\.visible && browser\.indexOpen\s*&& browser\.liveMediaKind !== ""/);
-  assert.match(navigator,/const pane = mode === "index" \? mediaLivePane : workspaceLoader\.item/);
+  assert.match(navigator,/const pane = browser\.indexOpen \? mediaLivePane : workspaceLoader\.item/);
   assert.match(navigator,/pane\.mapToItem\(browser, bay\.x, bay\.y\)/);
   assert.equal((workspace.match(/StationMediaSubjectPane\s*\{/g)||[]).length,1);
   assert.equal((navigator.match(/StationMediaSubjectPane\s*\{/g)||[]).length,1);

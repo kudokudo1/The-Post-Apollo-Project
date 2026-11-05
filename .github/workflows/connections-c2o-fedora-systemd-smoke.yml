@@ -1,0 +1,92 @@
+name: Connections C2o Fedora 44 systemd and D-Bus disposable integration
+
+on:
+  pull_request:
+    paths:
+      - "tests/connections/c2o_fedora/**"
+      - ".github/workflows/connections-c2o-fedora-systemd-smoke.yml"
+      - "docs/connections-c2o-fedora-systemd-smoke.md"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  disposable-fedora-systemd:
+    # Privileged Docker is used only on an ephemeral GitHub-hosted runner,
+    # only for trusted branches in the owning repo. Not allowed on fork PRs.
+    if: github.actor == 'kudokudo1' && (github.event_name == 'workflow_dispatch' || github.event.pull_request.head.repo.full_name == github.repository)
+    runs-on: ubuntu-latest
+    timeout-minutes: 22
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Run established offline C2n unit / policy contract
+        run: |
+          timeout 30s python3 -B tests/connections/test_connections_c2n_policy_contract.py
+      - name: Stage only six fixed test inputs outside checkout
+        shell: bash
+        run: |
+          set -euo pipefail
+          ctx="$RUNNER_TEMP/c2o-f44-build"
+          mkdir -p "$ctx"
+          cp tests/connections/c2o_fedora/Dockerfile "$ctx/Dockerfile"
+          cp tests/connections/c2o_fedora/FakeStatusHost.py "$ctx/FakeStatusHost.py"
+          cp tests/connections/c2o_fedora/BusPolicyClient.py "$ctx/BusPolicyClient.py"
+          cp tests/connections/c2o_fedora/test_inside.sh "$ctx/test_inside.sh"
+          cp services/connections/experiments/c2n_package/postapollo-connections-status.service.template "$ctx/"
+          cp services/connections/experiments/c2n_package/org.postapollo.ConnectionsStatus1.conf.template "$ctx/"
+          find "$ctx" -maxdepth 1 -type f -printf '%f\n' | sort
+          test "$(find "$ctx" -maxdepth 1 -type f | wc -l)" = 6
+      - name: Build throwaway Fedora image with unit and root-owned fake host
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker build --pull --progress=plain -t postapollo-c2o-fedora-test:ci "$RUNNER_TEMP/c2o-f44-build"
+      - name: Boot real systemd and Fedora system bus in disposable container
+        shell: bash
+        run: |
+          set -euo pipefail
+          name=postapollo-c2o-f44
+          cleanup() {
+            rc=$?
+            if [ "$rc" -ne 0 ]; then
+              docker logs "$name" --tail 150 || true
+              docker exec "$name" journalctl --no-pager -n 100 || true
+            fi
+            docker rm -f "$name" >/dev/null 2>&1 || true
+            return "$rc"
+          }
+          trap cleanup EXIT
+          # Highly privileged CI-only boot is not a security isolation proof.
+          # No token mounts, explicit host-file bind mounts or network; note that
+          # --privileged still exposes host devices/kernel powers to test code.
+          docker run -d --name "$name" --privileged --cgroupns=private \
+            --network none --tmpfs /run --tmpfs /run/lock --tmpfs /tmp \
+            postapollo-c2o-fedora-test:ci >/dev/null
+          ready=0
+          for i in $(seq 1 55); do
+            if docker exec "$name" systemctl show --value -p Version >/dev/null 2>&1; then
+              ready=1
+              break
+            fi
+            sleep 1
+          done
+          test "$ready" = 1 || { echo "C2O_BLOCKED // NO_FEDORA_SYSTEMD_MANAGER" >&2; exit 1; }
+          timeout 120s docker exec "$name" /usr/bin/bash /opt/c2o/test_inside.sh
+      - name: Repository production broker still disconnected
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          base=Path("services/connections")
+          for path in [*base.glob("*.qml"), *base.glob("*.js"),base/"qmldir"]:
+              txt=path.read_text()
+              assert "C2oStatusHost" not in txt, path
+              assert "post-apollo.connections.c2o.fedora-fixture.v1" not in txt, path
+          assert "readonly property bool hostAuthenticated: false" in (base/"ConnectionsRequestStatus.qml").read_text()
+          assert "readonly property bool credentialActionsEnabled: false" in (base/"ConnectionsBroker.qml").read_text()
+          print("C2O_PASS // NO_PRODUCTION_BROKER_ACTIVATION")
+          PY

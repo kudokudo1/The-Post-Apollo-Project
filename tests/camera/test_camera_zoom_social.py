@@ -24,9 +24,32 @@ class CameraZoomSocialTests(unittest.TestCase):
         self.assertIn('SocialIdentityStore.snapshot', PANEL)
         self.assertIn('SocialAccountDetailsStore.accountNamesFor(zoomIdentityId, "zoom")', PANEL)
         self.assertIn('onZoomIdentityIdChanged: selectedZoomAccountId = ""', PANEL)
-        self.assertIn('onLeftClicked: camera.launchZoomClient()', PANEL)
+        self.assertIn('camera.launchZoomClient();', PANEL)
         self.assertIn('onLeftClicked: camera.run("zoomStatus", ["zoom-status"])', PANEL)
         self.assertIn('EMBEDDED VIDEO // NOT YET CONNECTED', PANEL)
+
+    def test_missing_zoom_shows_setup_in_same_mode_without_silent_install(self):
+        self.assertIn('property bool zoomSetupVisible: false', PANEL)
+        self.assertIn('zoomSetupVisible = !payload.available;', PANEL)
+        self.assertIn('id: zoomInstallGuide', PANEL)
+        self.assertIn('visible: camera.zoomSetupVisible', PANEL)
+        self.assertIn('label: camera.zoomClientStatus && camera.zoomClientStatus.available', PANEL)
+        self.assertIn('? "OPEN ZOOM CLIENT" : "SET UP ZOOM"', PANEL)
+        self.assertIn('available: !camera.busy', PANEL)
+        self.assertIn('camera.zoomSetupVisible = true;', PANEL)
+        self.assertIn('RECHECK ZOOM AFTER INSTALL', PANEL)
+        self.assertIn('https://zoom.us/download?os=linux', PANEL)
+        self.assertIn('sudo rpm-ostree install ~/Downloads/zoom_x86_64.rpm', PANEL)
+        self.assertIn('flatpak install flathub us.zoom.Zoom', PANEL)
+        self.assertIn('community-maintained and unverified by Zoom', PANEL)
+        self.assertIn('readOnly: true', PANEL)
+        self.assertIn('No installation is automatic', PANEL)
+        # Installation and browser navigation are never triggered by tab entry.
+        entry = PANEL.split('function openZoomMode()', 1)[1].split(
+            'function launchZoomClient()', 1)[0]
+        self.assertNotIn('openUrlExternally', entry)
+        self.assertNotIn('zoom-open', entry)
+        self.assertNotIn('flatpak install', entry)
 
     def test_social_zoom_aliases_reuse_private_store_without_rail_expansion(self):
         self.assertIn('EXTERNAL_ACCOUNT_LABEL_SERVICES = frozenset({"zoom"})', SOCIAL_STORE)

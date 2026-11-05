@@ -97,6 +97,62 @@ class CameraZoomLaunchTests(unittest.TestCase):
         self.assertEqual(run.call_args_list[1].args[0],
                          ["/usr/bin/swaymsg", "-t", "get_tree"])
 
+    def test_direct_open_focuses_existing_exact_zoom_window(self):
+        tree = {"nodes": [
+            {"id": 5, "app_id": "other-app", "name": "Zoom meeting", "nodes": [], "floating_nodes": []},
+            {"id": 203, "app_id": "us.zoom.Zoom", "name": "Private", "nodes": [], "floating_nodes": []}
+        ], "floating_nodes": []}
+        with patch.object(camera, "zoom_client_command",
+                          return_value=["/usr/bin/flatpak", "run", "--system", "us.zoom.Zoom"]):
+            with patch.object(camera.shutil, "which", return_value="/usr/bin/swaymsg"):
+                with patch.object(camera.subprocess, "run", side_effect=[
+                        Mock(returncode=0, stdout=json.dumps(tree).encode()),
+                        Mock(returncode=0)]) as run:
+                    with patch.object(camera, "zoom_client_open") as launch:
+                        result = camera.zoom_activate_client()
+        self.assertTrue(result["ok"])
+        self.assertEqual(result["activation"], "WINDOW_FOCUSED")
+        self.assertTrue(result["windowVerified"])
+        self.assertEqual(run.call_args_list[1].args[0],
+                         ["/usr/bin/swaymsg", "[con_id=203]", "focus"])
+        launch.assert_not_called()
+
+    def test_direct_open_attempts_launch_even_with_background_process(self):
+        with patch.object(camera, "zoom_client_command",
+                          return_value=["/usr/bin/flatpak", "run", "--system", "us.zoom.Zoom"]):
+            with patch.object(camera, "_zoom_native_focus", return_value=False):
+                with patch.object(camera, "zoom_client_open", return_value={
+                        "ok": True, "launchRequested": True, "launchState": "HANDOFF_UNVERIFIED"
+                        }) as launch:
+                    result = camera.zoom_activate_client()
+        self.assertTrue(result["ok"])
+        self.assertEqual(result["activation"], "LAUNCH_REQUESTED_WINDOW_UNVERIFIED")
+        self.assertFalse(result["windowVerified"])
+        launch.assert_called_once_with()
+        self.assertIn('label: "OPEN / FOCUS ZOOM APP"', PANEL)
+        self.assertIn('onLeftClicked: camera.openZoomDirectly()', PANEL)
+
+    def test_direct_open_fails_closed_if_not_installed(self):
+        with patch.object(camera, "zoom_client_command", return_value=None):
+            with patch.object(camera, "zoom_client_open") as launch:
+                result = camera.zoom_activate_client()
+        self.assertFalse(result["ok"])
+        self.assertEqual(result["error"], "ZOOM_CLIENT_NOT_INSTALLED")
+        launch.assert_not_called()
+
+    def test_focus_rejects_window_title_spoofing_and_invalid_con_id(self):
+        tree = {"nodes": [{"id": "12; exec malicious", "app_id": "us.zoom.Zoom",
+                           "nodes": [], "floating_nodes": []},
+                          {"id": 13, "app_id": "unrelated", "name": "Zoom",
+                           "nodes": [], "floating_nodes": []}],
+                "floating_nodes": []}
+        with patch.object(camera.shutil, "which", return_value="/usr/bin/swaymsg"):
+            with patch.object(camera.subprocess, "run",
+                              return_value=Mock(returncode=0, stdout=json.dumps(tree).encode())) as run:
+                self.assertFalse(camera._zoom_native_focus())
+        self.assertEqual(run.call_count, 1)
+        self.assertNotIn("shell", run.call_args.kwargs)
+
     def test_no_sway_probe_is_unknown_not_missing_window(self):
         with patch.object(camera.shutil, "which", return_value=None):
             self.assertEqual(camera._zoom_sway_window_state(), "UNKNOWN")

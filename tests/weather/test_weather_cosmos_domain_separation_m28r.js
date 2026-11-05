@@ -87,12 +87,12 @@ test("COSMOS is for celestial and space weather, not conditions, air/atmosphere,
   assert.equal(workspace.GROUPS.cosmos.length,6);
   const star=workspace.GROUPS.cosmos.find(x=>x.key==="sky");
   assert.equal(star.label,"ASTRONOMY");
-  assert.equal(star.path,"cosmos/planets-stars/celestial-fix");
+  assert.equal(star.path,"cosmos/planets-stars/planet-clock");
   assert.equal(nav.findRoute(star.path).subject,"cosmos");
-  assert.equal(nav.findRoute(star.path).label,"CURRENT SKY");
+  assert.equal(nav.findRoute(star.path).label,"PLANET RISE/SET");
   assert.equal(cosmos.kindForRoute(star.path),"sky");
-  for(const s of ["celnav","planets"])
-    assert.equal(cosmos.needsSource(star.path,s),true);
+  assert.equal(cosmos.needsSource(star.path,"planets"),true);
+  assert.equal(cosmos.needsSource(star.path,"celnav"),false);
   for(const s of ["moon","eclipses","iss","meteor"])
     assert.equal(cosmos.needsSource(star.path,s),false);
   // INDEX retains the historical complete observatory including event data.

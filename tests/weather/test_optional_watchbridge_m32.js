@@ -70,7 +70,7 @@ test("ordinary Weather never imports optional native module or enables browser",
   assert.match(gate,/item\.viewport = Qt\.binding\(function\(\) \{ return gate\.viewport; \}\)/);
   assert.match(gate,/item\.sourceId = Qt\.binding\(function\(\) \{ return gate\.sourceId; \}\)/);
   assert.match(gate,/OPTIONAL_MODULE_UNAVAILABLE/);
-  assert.doesNotMatch(station+gate,/\bimport PostApollo\.StageDirector/);
+  assert.doesNotMatch(station+gate,/^\s*import\s+PostApollo\.StageDirector\b/m);
   assert.doesNotMatch(station+gate,/\bWatchBridge\s*\{/);
   assert.match(adapter,/^import PostApollo\.StageDirector 1\.0$/m);
   assert.match(adapter,/WatchBridge\s*\{/);

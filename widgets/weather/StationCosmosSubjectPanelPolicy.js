@@ -38,8 +38,8 @@ var ROUTES = {
   "cosmos/events/meteors": {page:"sky",sky:["header","meteor"]},
   "cosmos/events/iss": {page:"sky",sky:["header","iss"]},
 
-  "cosmos/space-weather/overview": {page:"space",
-    space:["header","solar","scales","field","aurora"]},
+  // C4: fixed, read-only hub. Detailed providers activate only on click.
+  "cosmos/space-weather/overview": {page:"space",space:[]},
   "cosmos/space-weather/solar-wind": {page:"space",
     space:["header","solar","relation","field"]},
   "cosmos/space-weather/geomagnetic": {page:"space",

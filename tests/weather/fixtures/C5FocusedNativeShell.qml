@@ -82,7 +82,16 @@ ShellRoot {
                     return root.fail("NO_MISSING_SOURCE_STATUS");
                 if (!focused.planetSource || !focused.planetSource.configured
                     || !focused.planetSource.active)
-                    return root.fail("PLANET_PROVIDER_NOT_ACTIVE_OR_CONFIGURED");
+                    return root.fail("PLANET_PROVIDER_NOT_ACTIVE_OR_CONFIGURED"
+                        + " // skyLoaded="+!!focused.skyFeed
+                        + " skyVisible="+(focused.skyFeed ? focused.skyFeed.visible : "NA")
+                        + " sourceOnly="+(focused.skyFeed ? focused.skyFeed.sourceOnly : "NA")
+                        + " active="+(focused.planetSource ? focused.planetSource.active : "NA")
+                        + " configured="+(focused.planetSource ? focused.planetSource.configured : "NA")
+                        + " date="+(focused.planetSource ? focused.planetSource.date : "NA")
+                        + " offset="+(focused.planetSource ? focused.planetSource.offsetMinutes : "NA")
+                        + " lat="+(focused.planetSource ? focused.planetSource.latitude : "NA")
+                        + " status="+focused.sourceStatus);
                 focused.routeRequested("cosmos/planets-stars/celestial-fix");
                 if (root.requestedPath !== "cosmos/planets-stars/celestial-fix")
                     return root.fail("ROUTE_SIGNAL_FAILED");

@@ -127,7 +127,9 @@ function layout(width,height,scale) {
 function cameraOrigin(width,height,scale,panX,panY) {
     var g=layout(width,height,scale),x=cameraPixel(panX),y=cameraPixel(panY);
     if(!g.ready||x===null||y===null)return null;
-    return {cx:g.cx+x,cy:g.cy+y,r:g.r};
+    // Match the layout() readiness contract consumed by the QML Canvas.
+    // Without this flag paint() returns before drawing any objects.
+    return {ready:true,cx:g.cx+x,cy:g.cy+y,r:g.r};
 }
 
 // Keep the exact source position under the wheel pointer at the same screen

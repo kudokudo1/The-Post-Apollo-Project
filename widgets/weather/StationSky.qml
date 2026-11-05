@@ -281,7 +281,7 @@ Rectangle {
             if (isFinite(shifted.getTime()))
                 return shifted.toISOString().slice(0,10);
         }
-        return /^\\d{4}-\\d{2}-\\d{2}$/.test(String(astronomySummary.date))
+        return /^\d{4}-\d{2}-\d{2}$/.test(String(astronomySummary.date))
             ? astronomySummary.date : "";
     }
     readonly property string focusedCivilDateSource:

@@ -269,6 +269,14 @@ PanelWindow {
         return run("zoomLaunchCheck", ["zoom-launch-check"]);
     }
 
+    function openZoomDirectly() {
+        if (busy || !zoomClientStatus || !zoomClientStatus.available)
+            return false;
+        zoomLaunchState = "CHECKING";
+        zoomLaunchMessage = "ZOOM // OPEN OR FOCUS REQUESTED";
+        return run("zoomActivate", ["zoom-activate"]);
+    }
+
     function webcamPhoto() {
         return run("webcamPhoto", ["webcam-photo", "--device", webcamDevice]);
     }
@@ -318,7 +326,7 @@ PanelWindow {
             return;
         }
         if (!payload || payload.ok !== true) {
-            if (action === "zoomOpen") {
+            if (action === "zoomOpen" || action === "zoomActivate") {
                 zoomLaunchCheckTimer.stop();
                 zoomLaunchState = "FAILED";
                 zoomLaunchMessage = payload
@@ -419,6 +427,16 @@ PanelWindow {
             zoomLaunchMessage = "ZOOM // LAUNCH SUBMITTED // WINDOW NOT VERIFIED YET";
             feedback = "ZOOM // START COMMAND ACCEPTED // CHECKING WINDOW";
             zoomLaunchCheckTimer.restart();
+        } else if (action === "zoomActivate") {
+            if (payload.activation === "WINDOW_FOCUSED") {
+                zoomLaunchState = "VISIBLE";
+                zoomLaunchMessage = "ZOOM // EXISTING WINDOW FOCUSED";
+            } else {
+                zoomLaunchState = "UNVERIFIED";
+                zoomLaunchMessage = "ZOOM // OPEN REQUESTED // WINDOW NOT YET CONFIRMED";
+                zoomLaunchCheckTimer.restart();
+            }
+            feedback = zoomLaunchMessage;
         } else if (action === "zoomLaunchCheck") {
             zoomLaunchObservation = payload;
             if (payload.windowState === "VISIBLE") {
@@ -536,18 +554,9 @@ PanelWindow {
 
     // Read-only status check after an explicit launch. No retries or hidden
     // background Zoom starts; the user can click CHECK WINDOW again later.
-    // Live reachability while the Zoom panel is actually open. This sends
-    // two credential-free HTTPS HEAD requests, never triggers another launch.
-    Timer {
-        id: zoomStatusRefreshTimer
-        interval: 90000
-        repeat: true
-        running: camera.menuOpen && camera.activeView === "zoom"
-        onTriggered: {
-            if (!camera.busy)
-                camera.run("zoomConnectivity", ["zoom-connectivity"]);
-        }
-    }
+    // Connectivity is sampled on Zoom entry only. Background HEAD retries
+    // made the indicators oscillate despite a working local desktop.
+    // Another mode-entry performs a new snapshot; no active network poller.
 
     Timer {
         id: zoomLaunchCheckTimer
@@ -1385,8 +1394,8 @@ PanelWindow {
                                     {name: "APP", value: camera.zoomClientStatus === null
                                             ? "CHECKING" : camera.zoomClientStatus.available
                                               ? "INSTALLED" : "MISSING"},
-                                    {name: "INTERNET", value: camera.zoomInternetState},
-                                    {name: "ZOOM HTTPS", value: camera.zoomServiceState},
+                                    {name: "WEB CHECK", value: camera.zoomInternetState},
+                                    {name: "ZOOM CHECK", value: camera.zoomServiceState},
                                     {name: "LOGIN", value: "UNKNOWN"}
                                 ]
                                 Rectangle {
@@ -1416,7 +1425,25 @@ PanelWindow {
                             wrapMode: Text.WordWrap
                             font.pixelSize: 10
                             color: Colors.cyan
-                            text: "AUTOMATIC OPEN ON ENTRY // APP AND HTTPS STATUS ARE NOT PROOF OF ZOOM LOGIN"
+                            text: "ONE WEB CHECK ON ENTRY // FAILED HTTPS PROBES MEAN UNVERIFIED, NOT OFFLINE // ZOOM LOGIN NOT VERIFIED"
+                        }
+
+                        ActionButton {
+                            width: parent.width
+                            height: 48
+                            label: "OPEN / FOCUS ZOOM APP"
+                            labelPixelSize: 14
+                            accentColor: Colors.magenta
+                            available: !camera.busy && camera.zoomClientStatus !== null
+                                       && camera.zoomClientStatus.available
+                            onLeftClicked: camera.openZoomDirectly()
+                        }
+                        GohuText {
+                            width: parent.width
+                            wrapMode: Text.WordWrap
+                            font.pixelSize: 11
+                            color: Colors.white
+                            text: "THEN IN ZOOM: SIGN IN IF NEEDED → NEW MEETING OR JOIN. CAMERA CANNOT START A ZOOM CALL WITHOUT THE PROVIDER'S AUTHENTICATED MEETING CONTROLS."
                         }
 
                         Rectangle {
@@ -1467,7 +1494,7 @@ PanelWindow {
                             wrapMode: Text.WordWrap
                             font.pixelSize: 10
                             color: Colors.orange
-                            text: "ZOOM SIGN-IN // UNVERIFIED. Zoom owns its sign-in screen in the native client. Social identities and saved aliases never block this mode or prove login."
+                            text: "ZOOM SIGN-IN // UNVERIFIED. The native Zoom client owns sign-in and meeting controls. Social identities and aliases never block opening this mode or prove Zoom login."
                         }
 
                         Rectangle {
@@ -1488,21 +1515,8 @@ PanelWindow {
                                     : "ZOOM CLIENT // NOT FOUND"
                         }
 
-                        // A retry is only exposed for exceptional launch failures.
-                        // Normal entry already starts Zoom automatically.
-                        ActionButton {
-                            width: parent.width
-                            height: 38
-                            visible: camera.zoomClientStatus !== null
-                                     && camera.zoomClientStatus.available
-                                     && (camera.zoomLaunchState === "FAILED"
-                                         || camera.zoomLaunchState === "NOT_FOUND")
-                            label: "RETRY OPEN ZOOM"
-                            labelPixelSize: 11
-                            accentColor: Colors.magenta
-                            available: !camera.busy
-                            onLeftClicked: camera.launchZoomClient()
-                        }
+                        // OPEN / FOCUS above also works when Flatpak has a
+                        // background process but no detected window.
 
                         GohuText {
                             width: parent.width

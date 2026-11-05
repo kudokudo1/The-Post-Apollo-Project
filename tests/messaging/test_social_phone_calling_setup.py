@@ -133,7 +133,7 @@ class CallingSetupUiTests(unittest.TestCase):
     def test_fedora_native_approval_and_missing_installer_explained(self):
         self.assertIn("Review PackageKit's approval inside PHONE", self.ui)
         self.assertIn('The embedded installer needs foot, Python and PackageKit available', self.ui)
-        self.assertIn('No installation was confirmed.', self.ui)
+        self.assertIn('No external window was opened or installation confirmed.', self.ui)
         self.assertIn('Only oFono.', self.ui)
         self.assertIn('GUI_UNAVAILABLE', self.ui)
         self.assertIn('GUI_LAUNCH_FAILED', self.ui)

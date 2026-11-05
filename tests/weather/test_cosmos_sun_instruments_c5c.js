@@ -67,5 +67,5 @@ test("C5c SUN presents exactly one fixed, readable source-backed instrument",()=
   assert.doesNotMatch(solarPane,/Flickable\s*\{|ScrollView\s*\{/);
   assert.doesNotMatch(solarPane,/StationSpace\s*\{/);
   assert.match(solarPane,/anchors\.fill: parent/);
-  assert.match(solarPane,/width: Math\.max\(1,\(cycleGrid\.width-7\)\/2\)/);
+  assert.ok(solarPane.includes("width:Math.max(1,(cycleGrid.width-7)/2)"));
 });

@@ -24,7 +24,7 @@ class CameraZoomSocialTests(unittest.TestCase):
         self.assertIn('SocialIdentityStore.snapshot', PANEL)
         self.assertIn('SocialAccountDetailsStore.accountNamesFor(zoomIdentityId, "zoom")', PANEL)
         self.assertIn('onZoomIdentityIdChanged: selectedZoomAccountId = ""', PANEL)
-        self.assertIn('onLeftClicked: camera.launchZoomClient()', PANEL)
+        self.assertIn('onLeftClicked: camera.openZoomDirectly()', PANEL)
         self.assertIn('run("zoomEnter", ["zoom-enter"])', PANEL)
         self.assertIn('onLeftClicked: camera.run("zoomStatus", ["zoom-status"])', PANEL)
         self.assertIn('EMBEDDED VIDEO // NOT YET CONNECTED', PANEL)

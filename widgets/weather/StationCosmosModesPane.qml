@@ -30,6 +30,54 @@ Rectangle {
     readonly property var planetRows: ClockPolicy.clockRows(
         planetSource && planetSource.ready ? planetSource.rows : [],
         astronomy ? astronomy.date : "")
+    // The clock is still an instrument when USNO is offline. Always show
+    // its five lanes, with truthful empty markers instead of blank space.
+    readonly property var displayedPlanetRows:
+        planetRows && planetRows.length === 5 ? planetRows : [
+            {name:"MERCURY",events:[]}, {name:"VENUS",events:[]},
+            {name:"MARS",events:[]}, {name:"JUPITER",events:[]},
+            {name:"SATURN",events:[]}
+        ]
+    readonly property bool sourceConfigured: {
+        if (kind === "solar-path" || kind === "light")
+            return !!astronomy && astronomy.available;
+        if (kind === "planet-clock")
+            return !!planetSource && planetSource.configured;
+        if (kind === "planets" || kind === "stars")
+            return !!celnav && celnav.configured;
+        if (kind === "meteors")
+            return !!meteorSource && meteorSource.configured;
+        if (kind === "iss")
+            return !!issSource && issSource.configured;
+        if (kind === "eclipses")
+            return !!eclipseSource;
+        return true;
+    }
+    readonly property var selectedProvider:
+        kind === "planet-clock" ? planetSource
+        : kind === "planets" || kind === "stars" ? celnav
+        : kind === "meteors" ? meteorSource
+        : kind === "eclipses" ? eclipseSource
+        : kind === "iss" ? issSource : null
+    readonly property string sourceStatus: {
+        if (!Modes.usesSky(subjectRoute)) return "";
+        if (!skyFeed) return "ASTRONOMY SOURCE HOST NOT LOADED";
+        if (kind === "solar-path" || kind === "light")
+            return astronomy && astronomy.available
+                ? "FORECAST ASTRONOMY READY"
+                : "WEATHER DAILY ASTRONOMY UNAVAILABLE // CHECK WEATHER FEED";
+        if (!selectedProvider)
+            return "PROVIDER NOT MOUNTED";
+        if (!sourceConfigured)
+            return kind === "planet-clock"
+                ? "USNO NEEDS VALID DATE, COORDINATES AND UTC OFFSET"
+                : "LOCATION COORDINATES UNAVAILABLE";
+        if (selectedProvider.loading) return "SOURCE RECEIVING";
+        if (selectedProvider.failed)
+            return selectedProvider.errorText || "SOURCE REQUEST FAILED";
+        if (selectedProvider.ready) return "SOURCE RECEIVED";
+        return "SOURCE WAITING";
+    }
 
     // Normalize source records for the four-card, non-scrolling layouts.
     // This is presentation only, not a fetcher or a new astronomy model.
@@ -182,6 +230,20 @@ Rectangle {
                 : focus.kind === "meteors" ? meteorList
                 : subjectCards
         }
+        // An unavailable solar forecast must not leave a blank graph without
+        // saying which upstream payload is missing.
+        QuietText {
+            anchors.horizontalCenter: parent.horizontalCenter
+            anchors.verticalCenter: parent.verticalCenter
+            width: Math.max(1,stage.width-32)
+            visible: (focus.kind === "solar-path" || focus.kind === "light")
+                && !focus.sourceConfigured
+            text: focus.sourceStatus
+            color: Colors.orange
+            font.pixelSize: 10
+            horizontalAlignment: Text.AlignHCenter
+            wrapMode: Text.WordWrap
+        }
     }
     Row {
         id: footer
@@ -329,7 +391,7 @@ Rectangle {
                 font.pixelSize:11
             }
             Repeater {
-                model: focus.planetRows
+                model: focus.displayedPlanetRows
                 delegate: Rectangle {
                     required property var modelData
                     width: parent.width
@@ -373,6 +435,14 @@ Rectangle {
                 }
             }
             QuietText {
+                width: parent.width
+                text: focus.sourceStatus
+                visible: focus.sourceStatus !== "SOURCE RECEIVED"
+                color: Colors.orange
+                font.pixelSize: 9
+                elide: Text.ElideRight
+            }
+            QuietText {
                 width:parent.width
                 text:"CYAN RISE // YELLOW TRANSIT // MAGENTA SET // 24-HOUR CIVIL DAY"
                 color:Colors.cyan
@@ -393,6 +463,14 @@ Rectangle {
                     : "ISS // PREDICTED PASSES"
                 color: Colors.magenta
                 font.pixelSize:11
+            }
+            QuietText {
+                width: parent.width
+                visible: focus.cards.length === 0
+                text: focus.sourceStatus
+                color: Colors.orange
+                font.pixelSize: 10
+                wrapMode: Text.WordWrap
             }
             Grid {
                 id: cardGrid
@@ -457,6 +535,16 @@ Rectangle {
                 text:"METEOR SHOWERS // IAU MDC"
                 color:Colors.magenta
                 font.pixelSize:12
+            }
+            QuietText {
+                width: parent.width
+                visible: focus.cards.length === 0
+                text: focus.sourceStatus === "SOURCE RECEIVED"
+                    ? "NO ACTIVE OR UPCOMING SHOWER IN THE SOURCE WINDOW"
+                    : focus.sourceStatus
+                color: Colors.orange
+                font.pixelSize: 10
+                wrapMode: Text.WordWrap
             }
             Flickable {
                 id: meteorScroll

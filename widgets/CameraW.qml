@@ -47,6 +47,8 @@ PanelWindow {
         SocialAccountDetailsStore.accountNamesFor(zoomIdentityId, "zoom")
     property string selectedZoomAccountId: ""
     property var zoomClientStatus: null
+    // Missing installations must show an actionable setup, not a disabled button.
+    property bool zoomSetupVisible: false
     onZoomIdentityIdChanged: selectedZoomAccountId = ""
     // The native slurp overlay owns the region drag; Camera unmaps while it runs.
     property bool nativeRegionSelecting: false
@@ -251,8 +253,9 @@ PanelWindow {
         }
         if (action === "zoomStatus") {
             zoomClientStatus = payload;
-            feedback = payload.available ? "ZOOM // NATIVE CLIENT DETECTED // LOGIN UNKNOWN"
-                                         : "ZOOM // CLIENT NOT INSTALLED";
+            zoomSetupVisible = !payload.available;
+            feedback = payload.available ? "ZOOM // CLIENT DETECTED // LOGIN UNKNOWN"
+                                         : "ZOOM // NOT INSTALLED // SETUP OPTIONS BELOW";
         } else if (action === "zoomOpen") {
             feedback = "ZOOM // OPEN REQUESTED // SIGN IN THROUGH ZOOM CLIENT";
         } else if (action === "status") {
@@ -1235,13 +1238,17 @@ PanelWindow {
                             ActionButton {
                                 width: parent.width - 160
                                 height: 40
-                                label: "OPEN ZOOM CLIENT"
+                                label: camera.zoomClientStatus && camera.zoomClientStatus.available
+                                       ? "OPEN ZOOM CLIENT" : "SET UP ZOOM"
                                 labelPixelSize: 12
                                 accentColor: Colors.magenta
                                 available: !camera.busy
-                                           && camera.zoomClientStatus !== null
-                                           && camera.zoomClientStatus.available
-                                onLeftClicked: camera.launchZoomClient()
+                                onLeftClicked: {
+                                    if (camera.zoomClientStatus && camera.zoomClientStatus.available)
+                                        camera.launchZoomClient();
+                                    else
+                                        camera.zoomSetupVisible = true;
+                                }
                             }
                         }
 

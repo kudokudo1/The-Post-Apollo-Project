@@ -238,7 +238,6 @@ Rectangle {
                         cursorShape: Qt.PointingHandCursor
                         onClicked: overview.routeRequested(modelData.path)
                     }
-                    }
                 }
             }
         }

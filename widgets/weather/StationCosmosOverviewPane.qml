@@ -91,13 +91,13 @@ Rectangle {
     Column {
         id: dashboard
         anchors.fill: parent
-        anchors.margins: 7
-        spacing: 4
+        anchors.margins: 6
+        spacing: 3
 
         Row {
             id: consoleHeader
             width: parent.width
-            height: 22
+            height: 19
             spacing: 4
 
             GohuText {
@@ -118,7 +118,7 @@ Rectangle {
                 delegate: ActionButton {
                     required property var modelData
                     width: 66
-                    height: 21
+                    height: 18
                     contentPadding: 1
                     label: modelData.label
                     labelPixelSize: 9
@@ -142,7 +142,7 @@ Rectangle {
             StationCosmosVisualInstruments {
                 id: scientificVisuals
                 anchors.fill: parent
-                anchors.margins: 2
+                anchors.margins: 1
                 compactMode: true
                 showMoon: true
                 showSun: true
@@ -167,7 +167,7 @@ Rectangle {
         Row {
             id: spaceHeader
             width: parent.width
-            height: 18
+            height: 15
             spacing: 4
             GohuText {
                 width: Math.max(0,parent.width-120)
@@ -180,9 +180,9 @@ Rectangle {
             }
             ActionButton {
                 width: 116
-                height: 18
+                height: 15
                 label: "SPACE // ALL"
-                labelPixelSize: 9
+                labelPixelSize: 8
                 contentPadding: 0
                 accentColor: Colors.orange
                 onClicked: overview.routeRequested("cosmos/space-weather/full")
@@ -192,7 +192,7 @@ Rectangle {
         Row {
             id: spaceMetricRow
             width: parent.width
-            height: 72
+            height: 48
             spacing: 4
             Repeater {
                 model: overview.liveMetrics
@@ -207,7 +207,7 @@ Rectangle {
                     clip: true
                     Column {
                         anchors.fill: parent
-                        anchors.margins: 4
+                        anchors.margins: 3
                         spacing: 2
                         QuietText {
                             width: parent.width
@@ -230,15 +230,14 @@ Rectangle {
                             text: modelData.state
                             elide: Text.ElideRight
                         }
-                        ActionButton {
-                            width: parent.width
-                            height: 16
-                            contentPadding: 0
-                            label: "DETAILS"
-                            labelPixelSize: 8
-                            accentColor: modelData.color
-                            onClicked: overview.routeRequested(modelData.path)
-                        }
+                    }
+                    // The entire tile is the action, not a tiny extra
+                    // button consuming the space needed for readable data.
+                    MouseArea {
+                        anchors.fill: parent
+                        cursorShape: Qt.PointingHandCursor
+                        onClicked: overview.routeRequested(modelData.path)
+                    }
                     }
                 }
             }

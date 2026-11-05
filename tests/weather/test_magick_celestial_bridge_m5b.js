@@ -49,7 +49,10 @@ test("Weather Station root is sole calculation owner and SUBJECTS only consumes"
   assert.match(surface,/property var celestialSource: null/);
   assert.equal((surface.match(/celestialSource: surface\.celestialSource/g)||[]).length,2);
   assert.match(pane,/property var celestialSource: null/);
-  assert.match(pane,/sourceComponent: magickPane\.showCelestial/);
+  assert.match(pane,/sourceComponent: magickPane\.standaloneAstrology/);
+  assert.match(pane,/\? standaloneAstrologyReference/);
+  assert.match(pane,/magickPane\.showCelestial\s*\? celestialReference/);
+  assert.match(pane,/id: standaloneAstrologyReference[\s\S]*StationMagickAstrologyPane\s*\{/);
   assert.match(pane,/StationMagickCelestialInstrument\s*\{/);
 });
 

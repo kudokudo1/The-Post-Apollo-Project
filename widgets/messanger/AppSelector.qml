@@ -1503,7 +1503,7 @@ Rectangle {
                 Text {
                     width: parent.width
                     visible: appSelector.accountSelectedServiceId === "zoom"
-                    text: "Zoom account names are labels only. Sign in through Zoom; Camera does not share or verify login tokens."
+                    text: "Zoom account names are labels only. Sign in through Zoom. Camera cannot verify account connection."
                     color: Colors.orange
                     font.pixelSize: 9
                     wrapMode: Text.WordWrap

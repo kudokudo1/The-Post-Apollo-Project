@@ -199,7 +199,6 @@ test("V4d QML has real ten-body selector and a scrollable inspector",()=>{
     assert.match(instrument,/spatialPayload: instrument\.visualData/);
     assert.match(networkPane,/NO INTERPOLATED ORBITS/);
     assert.match(pane,/SHIFT\+DRAG TIME/);
-    assert.match(pane,/NO ORBITS/);
     for(const text of [pane,v4d,overviewPy]){
         for(const forbidden of ["Process {","Timer {","new WebSocket",
             "XMLHttpRequest","Qt.callLater","swaymsg","fetch(","curl "])

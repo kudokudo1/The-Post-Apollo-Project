@@ -35,7 +35,7 @@ test("V4g HELIO cameraOrigin returns the ready flag consumed by Canvas.paint",()
     assert.equal(P.cameraOrigin(400,240,1,Infinity,0),null);
     assert.equal(P.cameraOrigin(400,240,1,0,NaN),null);
     assert.match(pane,/const g=Helio\.cameraOrigin\(/);
-    assert.match(pane,/if\(!g\.ready\)return;/);
+    assert.match(pane,/if\(!g \|\| !g\.ready\)return;/);
     assert.match(policy,/return \{ready:true,cx:g\.cx\+x,cy:g\.cy\+y,r:g\.r\}/);
 });
 

@@ -28,6 +28,55 @@ Rectangle {
     property string phoneAudioResult: "IDLE"
     property var callPrerequisiteReport: ({})
     property string callPrerequisiteCheck: "NOT CHECKED"
+    property string callSetupStatus: "IDLE"
+
+    function callingSupportSetup() {
+        if (!visible || selectedSection !== "DEVICE" || setupState !== "CHECKED"
+                || stageWanted || callSetupProcess.running
+                || callPrerequisiteProcess.running || audioActionProcess.running)
+            return;
+        if (callSetupStatus === "GUI_OPEN_REQUESTED") {
+            callSetupStatus = "RECHECKING";
+            diagnoseCallPrerequisites();
+            refreshPhoneAudioControls();
+            return;
+        }
+        if (callPrerequisiteCheck !== "CHECKED"
+                || callPrerequisiteReport.state !== "PACKAGE_NOT_INSTALLED"
+                || callPrerequisiteReport.package !== "NOT_INSTALLED"
+                || callPrerequisiteReport.serviceLoad !== "not-found")
+            return;
+        callSetupStatus = "OPENING";
+        callSetupProcess.command = [
+            "python3",
+            Quickshell.shellPath("services/phone/PhoneCallingSetupHandoff.py"),
+            "--open-ofono"
+        ];
+        callSetupProcess.running = true;
+    }
+
+    function callingSupportSetupText() {
+        if (callSetupStatus === "OPENING")
+            return "Opening Fedora's graphical installer for oFono...";
+        if (callSetupStatus === "GUI_OPEN_REQUESTED")
+            return "Fedora's software installer was requested. Review and approve oFono there if you want it installed, then return here and choose CHECK AGAIN. No package was installed by Social.";
+        if (callSetupStatus === "RECHECKING")
+            return "Checking whether Fedora installed oFono...";
+        if (callSetupStatus === "INSTALL_NOT_CONFIRMED")
+            return "oFono is still reported missing. Complete the installation in the software manager, or retry setup. No audio changes were made by Social.";
+        if (callSetupStatus === "FOLLOWUP_REQUIRED")
+            return "oFono is no longer reported missing. Hands-free service and audio routing still require separate verification.";
+        if (callSetupStatus === "GUI_UNAVAILABLE")
+            return "No supported graphical package installer was found. oFono remains uninstalled. A system-audio integration is still needed.";
+        if (callSetupStatus === "GUI_LAUNCH_FAILED")
+            return "The graphical package installer could not open. No installation was confirmed.";
+        if (callSetupStatus === "UNSUPPORTED_HOST")
+            return "Automatic package selection is currently supported on Fedora only. No changes were made.";
+        if (callSetupStatus === "DIAGNOSIS_UNAVAILABLE"
+                || callSetupStatus === "NOT_APPLICABLE")
+            return "Calling setup could not be started from the current system diagnosis. Check the call prerequisite status again.";
+        return "";
+    }
 
     function diagnoseCallPrerequisites() {
         if (!visible || stageWanted || callPrerequisiteProcess.running)
@@ -317,6 +366,7 @@ Rectangle {
             phoneAudioStatus = ({});
             phoneAudioCheck = "NOT CHECKED";
             phoneAudioResult = "IDLE";
+            callSetupStatus = "IDLE";
             callPrerequisiteReport = ({});
             callPrerequisiteCheck = "NOT CHECKED";
             stageWanted = false;
@@ -518,6 +568,11 @@ Rectangle {
                     phonePane.callPrerequisiteReport = r;
                     phonePane.callPrerequisiteCheck = "CHECKED";
                     phonePane.phoneAudioResult = "CALLS_PREREQUISITES_MISSING";
+                    if (phonePane.callSetupStatus === "RECHECKING") {
+                        phonePane.callSetupStatus = r.state === "PACKAGE_NOT_INSTALLED"
+                                                    ? "INSTALL_NOT_CONFIRMED"
+                                                    : "FOLLOWUP_REQUIRED";
+                    }
                 } catch (error) {
                     phonePane.callPrerequisiteReport = ({});
                     phonePane.callPrerequisiteCheck = "UNAVAILABLE";
@@ -531,6 +586,38 @@ Rectangle {
                 phonePane.callPrerequisiteCheck = "UNAVAILABLE";
                 phonePane.phoneAudioResult = "CALLS_PREREQUISITES_MISSING";
             }
+        }
+    }
+
+    Process {
+        id: callSetupProcess
+        stdout: StdioCollector {
+            onStreamFinished: {
+                if (!phonePane.visible || phonePane.callSetupStatus !== "OPENING")
+                    return;
+                try {
+                    var r = JSON.parse(String(text || ""));
+                    if (r.schema !== "post-apollo.phone.calling-setup-handoff.v0"
+                            || r.execution !== "USER_INITIATED_GUI_HANDOFF"
+                            || r.package !== "ofono"
+                            || ["GUI_OPEN_REQUESTED", "GUI_UNAVAILABLE", "GUI_LAUNCH_FAILED",
+                                "UNSUPPORTED_HOST", "NOT_APPLICABLE",
+                                "DIAGNOSIS_UNAVAILABLE"].indexOf(r.status) < 0
+                            || r.installerOpened !== (r.status === "GUI_OPEN_REQUESTED")
+                            || r.packageInstalled !== false
+                            || r.hfpVerified !== false
+                            || r.trustedPhoneLink !== "UNVERIFIED"
+                            || r.contentAccessEnabled !== false)
+                        throw new Error("Invalid installer handoff");
+                    phonePane.callSetupStatus = r.status;
+                } catch (error) {
+                    phonePane.callSetupStatus = "GUI_LAUNCH_FAILED";
+                }
+            }
+        }
+        onExited: function(code) {
+            if (phonePane.visible && phonePane.callSetupStatus === "OPENING" && code !== 0)
+                phonePane.callSetupStatus = "GUI_LAUNCH_FAILED";
         }
     }
 
@@ -1020,6 +1107,41 @@ Rectangle {
                                 (phonePane.phoneAudioCheck === "CHECKED"
                                  && phonePane.phoneAudioStatus.ofonoActive !== true
                                  ? " Tap the call control for the missing hands-free requirement." : "")
+                        color: Colors.orange
+                        font.pixelSize: 10
+                        wrapMode: Text.WordWrap
+                    }
+
+                    ActionButton {
+                        id: installCallingSupport
+                        width: Math.min(220, phoneAudioSettings.width)
+                        height: 36
+                        visible: phonePane.callPrerequisiteCheck === "CHECKED"
+                                 && phonePane.callPrerequisiteReport.state === "PACKAGE_NOT_INSTALLED"
+                        label: phonePane.callSetupStatus === "GUI_OPEN_REQUESTED"
+                               ? "CHECK AGAIN" : "SET UP CALLING"
+                        labelPixelSize: 10
+                        accentColor: Colors.magenta
+                        interactive: !callSetupProcess.running
+                                     && !callPrerequisiteProcess.running
+                                     && !audioActionProcess.running
+                                     && !phonePane.stageWanted
+                        onTriggered: phonePane.callingSupportSetup()
+                    }
+
+                    Text {
+                        width: parent.width
+                        visible: installCallingSupport.visible
+                        text: "Only oFono. Fedora's software manager handles package review and approval. Social does not change your system automatically."
+                        color: Colors.white
+                        font.pixelSize: 10
+                        wrapMode: Text.WordWrap
+                    }
+
+                    Text {
+                        width: parent.width
+                        visible: phonePane.callingSupportSetupText().length > 0
+                        text: phonePane.callingSupportSetupText()
                         color: Colors.orange
                         font.pixelSize: 10
                         wrapMode: Text.WordWrap

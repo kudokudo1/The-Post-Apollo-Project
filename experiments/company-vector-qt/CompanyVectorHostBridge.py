@@ -56,8 +56,10 @@ def runtime_environment(home: Path) -> dict[str, str]:
         ("QML_IMPORT_PATH", prefix / "qml"),
         ("QML2_IMPORT_PATH", prefix / "qml"),
     ):
-        existing = env.get(variable, "")
-        env[variable] = str(value) + (":" + existing if existing else "")
+        # Do not inherit arbitrary Qt paths from the parent desktop session.
+        # Preserve only the verified MapLibre prefix; system Qt paths remain
+        # available through Qt's default plugin and loader search paths.
+        env[variable] = str(value)
     return env
 
 

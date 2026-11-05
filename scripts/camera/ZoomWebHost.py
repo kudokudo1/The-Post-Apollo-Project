@@ -173,7 +173,6 @@ def _near(node, geometry):
 def status(identity, output, x, y, width, height):
     # Read-only: do not create profiles or launch browser.
     prefix = _social_browser_prefix()
-    profile = _private_profile(prefix, identity) if False else None
     # Derive the prospective location without touching disk.
     if not IDENTITY_PATTERN.fullmatch(identity):
         raise ValueError("INVALID_SOCIAL_IDENTITY")
@@ -209,15 +208,22 @@ def enter(identity, output, x, y, width, height):
         return {"ok": False, "kind": "zoom-web-enter", "error": error or "ACTOR_NOT_READY",
                 "docked": False, "authenticated": "UNKNOWN"}
     criteria = "[con_id=%d]" % actor["id"]
+    if not actor.get("visible"):
+        _sway_command(criteria, "scratchpad", "show")
     _sway_command(criteria, "floating", "enable")
     _sway_command(criteria, "resize", "set", "width", str(geometry[2]), "px",
                   "height", str(geometry[3]), "px")
     _sway_command(criteria, "move", "position", str(geometry[0]), str(geometry[1]))
-    _sway_command(criteria, "scratchpad", "show") if not actor.get("visible") else None
     # Reobserve exact actor PID/class and measured bounds before enabling
     # QML's click-through/transparent bay.
     after, error = _unique_actor(profile)
     docked = bool(after and after["id"] == actor["id"] and _near(after,geometry))
+    if not docked:
+        # A failed dock must not leave an undocked login/profile window
+        # competing with the operator's desktop.
+        verified, _ = _unique_actor(profile)
+        if verified and verified["id"] == actor["id"] and verified.get("visible"):
+            _sway_command("[con_id=%d]" % actor["id"], "move", "scratchpad")
     return {"ok": docked, "kind": "zoom-web-enter", "docked": docked,
             "state": "DOCKED" if docked else "NOT_ALIGNED",
             "error": "" if docked else "GEOMETRY_UNVERIFIED",

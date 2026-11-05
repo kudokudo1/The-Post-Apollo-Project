@@ -157,9 +157,7 @@ Rectangle {
             StationSky {
                 sourceOnly: true
                 subjectRoute: Modes.dataRoute(focus.subjectRoute || "")
-                weatherService: focus.weatherService
-                spaceService: focus.spaceService
-                runtimeNowMs: focus.runtimeNowMs || 0
+                // Service pointers bound by the parent AFTER item creation.
             }
         }
     }
@@ -177,12 +175,55 @@ Rectangle {
             StationSpace {
                 sourceOnly: true
                 subjectRoute: Modes.dataRoute(focus.subjectRoute)
-                spaceService: focus.spaceService
-                weatherService: focus.weatherService
-                liveHistoryStore: focus.liveHistoryStore
-                runtimeNowMs: focus.runtimeNowMs
+                // Service pointers bound by the parent AFTER item creation.
             }
         }
+    }
+
+    // Loader-created components can resolve QObject-valued var bindings
+    // before the outer pane has its service pointers. Parent-level Bindings
+    // keep these live even when the Loader re-creates its source item.
+    Binding {
+        target: skyLoader.item
+        property: "weatherService"
+        value: focus.weatherService
+        when: skyLoader.item !== null
+    }
+    Binding {
+        target: skyLoader.item
+        property: "spaceService"
+        value: focus.spaceService
+        when: skyLoader.item !== null
+    }
+    Binding {
+        target: skyLoader.item
+        property: "runtimeNowMs"
+        value: focus.runtimeNowMs
+        when: skyLoader.item !== null
+    }
+    Binding {
+        target: spaceSourceLoader.item
+        property: "weatherService"
+        value: focus.weatherService
+        when: spaceSourceLoader.item !== null
+    }
+    Binding {
+        target: spaceSourceLoader.item
+        property: "spaceService"
+        value: focus.spaceService
+        when: spaceSourceLoader.item !== null
+    }
+    Binding {
+        target: spaceSourceLoader.item
+        property: "liveHistoryStore"
+        value: focus.liveHistoryStore
+        when: spaceSourceLoader.item !== null
+    }
+    Binding {
+        target: spaceSourceLoader.item
+        property: "runtimeNowMs"
+        value: focus.runtimeNowMs
+        when: spaceSourceLoader.item !== null
     }
 
     GohuText {

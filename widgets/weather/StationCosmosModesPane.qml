@@ -22,6 +22,9 @@ Rectangle {
     readonly property int visibleClockLaneCount:
         instrumentLoader.item && instrumentLoader.item.renderedRowCount !== undefined
         ? instrumentLoader.item.renderedRowCount : 0
+    // Read-only native acceptance diagnostics; do not create a separate source.
+    readonly property bool instrumentMounted: instrumentLoader.item !== null
+    readonly property int instrumentLoadState: instrumentLoader.status
     readonly property var skyFeed: skyLoader.item
     readonly property var spaceFeed: spaceSourceLoader.item
     readonly property var astronomy: skyFeed ? skyFeed.astronomySummary : null

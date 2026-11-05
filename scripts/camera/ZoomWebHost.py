@@ -264,19 +264,24 @@ def enter(identity, output, x, y, width, height):
     measured, error = _unique_actor(profile)
     if not measured or measured["id"] != actor["id"]:
         raise RuntimeError("ACTOR_ORIGIN_UNVERIFIED")
-    left, top, right, bottom = _client_insets(measured)
-    outer_x = geometry[0] - left
-    outer_y = geometry[1] - top
-    outer_w = geometry[2] + left + right
-    outer_h = geometry[3] + top + bottom
-    if any((left, top, right, bottom)):
-        # _target_geometry already bounds the ordinary zero-inset window.
-        # Only an expanded outer container requires an additional output guard.
-        output_rect = _output_rect(output)
-        if (outer_x < output_rect["x"] or outer_y < output_rect["y"]
-                or outer_x + outer_w > output_rect["x"] + output_rect["width"]
-                or outer_y + outer_h > output_rect["y"] + output_rect["height"]):
-            raise RuntimeError("CLIENT_FRAME_OUTSIDE_OUTPUT")
+    try:
+        left, top, right, bottom = _client_insets(measured)
+        outer_x = geometry[0] - left
+        outer_y = geometry[1] - top
+        outer_w = geometry[2] + left + right
+        outer_h = geometry[3] + top + bottom
+        if any((left, top, right, bottom)):
+            # _target_geometry already bounds the ordinary zero-inset window.
+            # Only an expanded outer container requires an output guard.
+            output_rect = _output_rect(output)
+            if (outer_x < output_rect["x"] or outer_y < output_rect["y"]
+                    or outer_x + outer_w > output_rect["x"] + output_rect["width"]
+                    or outer_y + outer_h > output_rect["y"] + output_rect["height"]):
+                raise RuntimeError("CLIENT_FRAME_OUTSIDE_OUTPUT")
+    except (ValueError, RuntimeError):
+        # Never leave an unverified browser floating above the desktop.
+        _sway_command(criteria, "move", "scratchpad")
+        raise
     _sway_command(criteria, "resize", "set", "width", str(outer_w), "px",
                   "height", str(outer_h), "px")
     _sway_command(criteria, "move", "absolute", "position",

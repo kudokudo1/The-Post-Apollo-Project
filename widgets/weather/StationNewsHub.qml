@@ -35,6 +35,11 @@ Rectangle {
     // Channel-only player geometry relative to this NEWS hub. A REPORTS
     // article and a closed channel have no browser viewport. Never hardcode
     // the Station shell, monitor or terminal-bay dimensions here.
+    readonly property string activeWatchSourceId:
+        playerViewportRect.width > 0 && playerViewportRect.height > 0
+        && chosenRecord && (chosenRecord.watchSourceId === "bbc"
+                            || chosenRecord.watchSourceId === "cspan")
+        ? chosenRecord.watchSourceId : ""
     readonly property rect playerViewportRect: {
         const screen = channelScreenLoader.item;
         if (!stationOpen || !viewerOpen || !screen)

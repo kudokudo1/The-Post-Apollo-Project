@@ -1536,13 +1536,15 @@ Rectangle {
         // existing USNO celestial-navigation service without also showing the
         // planetary and constellation sections from the complete sky report.
         StationSectionDivider {
-            visible: sky.sectionVisible("moon-position")
+            visible: sky.subjectRoute !== ""
+                     && sky.sectionVisible("moon-position")
             width: parent.width
             title: "MOON // CURRENT POSITION"
         }
 
         Column {
-            visible: sky.sectionVisible("moon-position")
+            visible: sky.subjectRoute !== ""
+                     && sky.sectionVisible("moon-position")
             width: parent.width
             spacing: 8
 

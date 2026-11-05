@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- C2m noninstalled, fake-only interface contract. NOT a production bus policy. -->
+<node name="/org/postapollo/ConnectionsStatusPilot">
+  <interface name="org.postapollo.ConnectionsStatusPilot1">
+    <method name="GetStatus">
+      <arg name="statusJson" type="s" direction="out"/>
+    </method>
+  </interface>
+</node>

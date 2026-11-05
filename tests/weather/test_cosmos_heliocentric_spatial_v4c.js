@@ -204,7 +204,8 @@ test("V4c shares one on-demand CALCULATE and keeps older modes separate",()=>{
     assert.match(qml,/onClicked: function\(mouse\)/);
     assert.match(qml,/spatial\.sampleScrubbed\(originalIndex,dx\)/);
     assert.match(qml,/spatial\.bodyPicked\(body\)/);
-    assert.match(qml,/ONE UTC SNAPSHOT \/\/ NO ORBITS/);
+    assert.match(networkQml,/NO INTERPOLATED ORBITS/);
+    assert.match(qml,/DRAG PAN/);
     assert.equal((station.match(/WeatherServices\.CelestialVisualService\s*\{/g)||[]).length,1);
     assert.match(service,/function refresh\(\)/);
     assert.match(service,/onCurrentKeyChanged: clearState\(\)/);

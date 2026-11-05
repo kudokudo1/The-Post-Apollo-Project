@@ -15,6 +15,7 @@ on:
       - 'scripts/weather/celestial_visual_data.py'
       - 'tests/weather/test_cosmos_heliocentric_spatial_v4c.js'
       - 'tests/weather/test_cosmos_heliocentric_viewport_v4e.js'
+      - 'tests/weather/test_cosmos_heliocentric_camera_v4f.js'
       - 'tests/weather/test_magick_celestial_query_m5c.js'
       - 'widgets/weather/StationCosmosCelestialDepthPane.qml'
       - 'widgets/weather/StationCosmosCelestialDepthPolicy.js'
@@ -48,6 +49,8 @@ jobs:
         run: node --test tests/weather/test_cosmos_solar_overview_v4d.js
       - name: Verify V4e outer-body viewport and truthful offscreen selection
         run: node --test tests/weather/test_cosmos_heliocentric_viewport_v4e.js
+      - name: Verify V4f free HELIO pan and mouse-anchored extended zoom
+        run: node --test tests/weather/test_cosmos_heliocentric_camera_v4f.js
       - name: Preserve MAGICK M4/M5 sources and interaction behavior
         run: |
           node --test tests/weather/test_magick_celestial_visual_m5.js

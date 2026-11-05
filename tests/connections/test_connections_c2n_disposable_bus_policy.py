@@ -41,6 +41,12 @@ def build_config(path: Path) -> None:
     # An isolated bare system-like bus does not import the standard receive
     # rules. Emulate default unicast receipt while testing our send/own policy.
     ET.SubElement(admission, "allow", receive_sender="*")
+    # In a real system bus, one method return/error is allowed in response
+    # to a requested call. The isolated bare bus needs these baseline rules.
+    ET.SubElement(admission, "allow",
+                  send_type="method_return", send_requested_reply="true")
+    ET.SubElement(admission, "allow",
+                  send_type="error", send_requested_reply="true")
     for policy in list(fragment):
         root.append(policy)
     ET.ElementTree(root).write(path, encoding="utf-8", xml_declaration=True)

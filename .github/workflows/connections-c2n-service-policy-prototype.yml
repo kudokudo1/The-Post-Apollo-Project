@@ -47,7 +47,7 @@ jobs:
       - name: Actual isolated bus owner and reader policies across three OS UIDs
         env:
           POST_APOLLO_C2N_CI_CROSS_UID: "1"
-        run: timeout 90s python3 -B tests/connections/test_connections_c2n_disposable_bus_policy.py
+        run: timeout 90s sudo -n env GITHUB_ACTIONS=true POST_APOLLO_C2N_CI_CROSS_UID=1 "$(which python3)" -B tests/connections/test_connections_c2n_disposable_bus_policy.py
       - name: Previous C2m/C2l/C2k/C2j/C2i regressions
         run: |
           timeout 90s python3 -B tests/connections/test_connections_c2m_private_bus_pilot.py

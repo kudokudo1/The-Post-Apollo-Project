@@ -93,11 +93,13 @@ Rectangle {
             return kind === "planet-clock"
                 ? "USNO NEEDS VALID DATE, COORDINATES AND UTC OFFSET"
                 : "LOCATION COORDINATES UNAVAILABLE";
+        if (!selectedProvider.active)
+            return "SOURCE INACTIVE // ROUTE ACTIVATION FAILED";
         if (selectedProvider.loading) return "SOURCE RECEIVING";
         if (selectedProvider.failed)
             return selectedProvider.errorText || "SOURCE REQUEST FAILED";
         if (selectedProvider.ready) return "SOURCE RECEIVED";
-        return "SOURCE WAITING";
+        return "SOURCE IDLE // USE RETRY";
     }
 
     // Normalize source records for the four-card, non-scrolling layouts.
@@ -277,7 +279,8 @@ Rectangle {
         height: 20
         spacing: 5
         QuietText {
-            width: Math.max(0,footer.width-111)
+            width: Math.max(0,footer.width
+                - 111 - (retrySource.visible ? 83 : 0))
             text: focus.kind === "meteors" ? "IAU MDC // SCROLL MIDDLE ONLY"
                 : focus.kind === "solar-section" ? "NOAA // ONE INSTRUMENT"
                 : "SOURCE-BACKED // FOCUSED VIEW"
@@ -285,6 +288,24 @@ Rectangle {
             font.pixelSize: 8
             verticalAlignment: Text.AlignVCenter
             elide: Text.ElideRight
+        }
+        ActionButton {
+            id: retrySource
+            visible: focus.selectedProvider !== null
+                && focus.sourceConfigured
+                && !focus.selectedProvider.loading
+            width: visible ? 78 : 0
+            height: 19
+            contentPadding: 1
+            label: "RETRY SOURCE"
+            labelPixelSize: 8
+            accentColor: Colors.orange
+            onClicked: {
+                if (focus.selectedProvider
+                    && focus.selectedProvider.active
+                    && focus.selectedProvider.refresh)
+                    focus.selectedProvider.refresh();
+            }
         }
         ActionButton {
             width: 105

@@ -26,6 +26,47 @@ Rectangle {
     property var phoneAudioStatus: ({})
     property string phoneAudioCheck: "NOT CHECKED"
     property string phoneAudioResult: "IDLE"
+    property var callPrerequisiteReport: ({})
+    property string callPrerequisiteCheck: "NOT CHECKED"
+
+    function diagnoseCallPrerequisites() {
+        if (!visible || stageWanted || callPrerequisiteProcess.running)
+            return;
+        callPrerequisiteReport = ({});
+        callPrerequisiteCheck = "CHECKING";
+        phoneAudioResult = "CALLS_DIAGNOSING";
+        callPrerequisiteProcess.command = [
+            "python3",
+            Quickshell.shellPath("services/phone/PhoneCallPrerequisites.py"),
+            "--check"
+        ];
+        callPrerequisiteProcess.running = true;
+    }
+
+    function callPrerequisiteText() {
+        if (callPrerequisiteCheck === "CHECKING")
+            return "Checking the local hands-free calling prerequisites...";
+        if (callPrerequisiteCheck !== "CHECKED")
+            return "oFono hands-free support could not be checked. No audio changes were made.";
+        var state = callPrerequisiteReport.state;
+        if (state === "PACKAGE_NOT_INSTALLED")
+            return "oFono is not installed on this Fedora system. Calling needs a separately approved system setup. No audio changes were made.";
+        if (state === "SERVICE_UNIT_MISSING")
+            return "Fedora cannot find the oFono service unit. Its installation or service registration needs checking. No changes were made.";
+        if (state === "SERVICE_MASKED")
+            return "The oFono service is masked by the system. A separate approved system setup is needed. No changes were made.";
+        if (state === "SERVICE_FAILED")
+            return "The oFono service exists but failed to start. The system audio setup needs repair. No changes were made.";
+        if (state === "SERVICE_STOPPED")
+            return "oFono is installed as a service but is stopped. It must be started through an approved system setup before calls can use this computer.";
+        if (state === "SERVICE_STARTING")
+            return "oFono is changing state. Wait until it is stable and check again. No audio changes were made.";
+        if (state === "DBUS_NAME_MISSING")
+            return "oFono is active, but its system D-Bus connection is not responding. Calls are not verified. No changes were made.";
+        if (state === "AUDIO_PATH_UNVERIFIED")
+            return "oFono appears active. Hands-free routing through WirePlumber and Bluetooth is not yet verified. Use CONNECT PHONE to refresh the call setting.";
+        return "The oFono service state could not be determined. No changes were made.";
+    }
 
     function refreshPhoneAudioControls() {
         if (!visible || audioStatusProcess.running || audioActionProcess.running)
@@ -43,7 +84,8 @@ Rectangle {
     function changePhoneAudio(family, selection) {
         if (!visible || selectedSection !== "DEVICE"
                 || setupState !== "CHECKED" || stageWanted
-                || audioActionProcess.running || audioStatusProcess.running)
+                || audioActionProcess.running || audioStatusProcess.running
+                || callPrerequisiteProcess.running)
             return;
         if (family === "media" && ["phone", "pc", "auto"].indexOf(selection) < 0)
             return;
@@ -66,6 +108,7 @@ Rectangle {
             }
             if (selection === "enable" && phoneAudioStatus.ofonoActive !== true) {
                 phoneAudioResult = "CALLS_PREREQUISITES_MISSING";
+                diagnoseCallPrerequisites();
                 return;
             }
         } else if (phoneAudioCheck !== "CHECKED"
@@ -84,10 +127,12 @@ Rectangle {
     function phoneAudioResultText() {
         if (phoneAudioResult === "UPDATING")
             return "Applying your phone audio preference...";
+        if (phoneAudioResult === "CALLS_DIAGNOSING")
+            return callPrerequisiteText();
         if (phoneAudioResult === "PREFERENCE_SAVED")
             return "Preference saved by BlueFerry. Actual playback and call availability depend on the iPhone and audio services.";
         if (phoneAudioResult === "CALLS_PREREQUISITES_MISSING")
-            return "Calls on this computer need the oFono hands-free service. It is not running or ready. No change made to your phone or media route.";
+            return callPrerequisiteText();
         if (phoneAudioResult === "CALLS_UNSUPPORTED")
             return "The running BlueFerry backend does not report a supported Calls on PC setting. No change made; this requires a compatible phone-call provider.";
         if (phoneAudioResult === "CALLS_STATUS_UNAVAILABLE")
@@ -272,6 +317,8 @@ Rectangle {
             phoneAudioStatus = ({});
             phoneAudioCheck = "NOT CHECKED";
             phoneAudioResult = "IDLE";
+            callPrerequisiteReport = ({});
+            callPrerequisiteCheck = "NOT CHECKED";
             stageWanted = false;
             stageState = "IDLE";
             stagePollCount = 0;
@@ -438,6 +485,51 @@ Rectangle {
             if (phonePane.visible && phonePane.phoneAudioCheck === "CHECKING" && code !== 0) {
                 phonePane.phoneAudioStatus = ({});
                 phonePane.phoneAudioCheck = "UNAVAILABLE";
+            }
+        }
+    }
+
+    Process {
+        id: callPrerequisiteProcess
+        stdout: StdioCollector {
+            onStreamFinished: {
+                if (!phonePane.visible || phonePane.callPrerequisiteCheck !== "CHECKING")
+                    return;
+                try {
+                    var r = JSON.parse(String(text || ""));
+                    var states = [
+                        "PACKAGE_NOT_INSTALLED", "SERVICE_UNIT_MISSING", "SERVICE_MASKED",
+                        "SERVICE_FAILED", "SERVICE_STOPPED", "SERVICE_STARTING",
+                        "DBUS_NAME_MISSING", "AUDIO_PATH_UNVERIFIED",
+                        "INSPECTION_UNAVAILABLE"
+                    ];
+                    if (r.schema !== "post-apollo.phone.calls-prerequisites.v0"
+                            || r.execution !== "READ_ONLY_CALL_DIAGNOSIS"
+                            || states.indexOf(r.state) < 0
+                            || ["INSTALLED", "NOT_INSTALLED", "UNKNOWN"].indexOf(r.package) < 0
+                            || ["loaded", "not-found", "masked", "error", "stub", "unknown"].indexOf(r.serviceLoad) < 0
+                            || ["active", "inactive", "failed", "activating",
+                                "deactivating", "reloading", "unknown"].indexOf(r.serviceActive) < 0
+                            || ["OWNER_PRESENT", "NO_OWNER", "UNKNOWN"].indexOf(r.systemBus) < 0
+                            || r.hfpVerified !== false
+                            || r.trustedPhoneLink !== "UNVERIFIED"
+                            || r.contentAccessEnabled !== false)
+                        throw new Error("Invalid hands-free diagnostic report");
+                    phonePane.callPrerequisiteReport = r;
+                    phonePane.callPrerequisiteCheck = "CHECKED";
+                    phonePane.phoneAudioResult = "CALLS_PREREQUISITES_MISSING";
+                } catch (error) {
+                    phonePane.callPrerequisiteReport = ({});
+                    phonePane.callPrerequisiteCheck = "UNAVAILABLE";
+                    phonePane.phoneAudioResult = "CALLS_PREREQUISITES_MISSING";
+                }
+            }
+        }
+        onExited: function(code) {
+            if (phonePane.visible && phonePane.callPrerequisiteCheck === "CHECKING" && code !== 0) {
+                phonePane.callPrerequisiteReport = ({});
+                phonePane.callPrerequisiteCheck = "UNAVAILABLE";
+                phonePane.phoneAudioResult = "CALLS_PREREQUISITES_MISSING";
             }
         }
     }
@@ -911,6 +1003,7 @@ Rectangle {
                         // unsupported changes and explains them in this pane.
                         interactive: !audioActionProcess.running
                                      && !audioStatusProcess.running
+                                     && !callPrerequisiteProcess.running
                                      && !phonePane.stageWanted
                         onTriggered: phonePane.changePhoneAudio(
                             "calls", phonePane.phoneAudioStatus.callsEnabled === true

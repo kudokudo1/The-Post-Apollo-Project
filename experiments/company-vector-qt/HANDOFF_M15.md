@@ -2,6 +2,7 @@
 
 PATIENT // kudokudo1/The-Post-Apollo-Project
 ROOM // Company Network vector renderer integration
+STAFF ROLE // Nurse 2 (external review / continuation)
 PROVIDER // OPEN AI // CHATGPT
 CONNECTION // External / Hospital-compatible; no live registration
 ASSIGNMENT // Prepare reversible M13 VECTOR VIEW host launch against M14's existing Fedora build

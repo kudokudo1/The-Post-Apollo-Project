@@ -286,7 +286,10 @@ Rectangle {
         ? "OPEN-METEO LOCAL CALENDAR" : "WEATHER DAILY ASTRONOMY"
     WeatherServices.UsnoMoonService {
         id: moonService
-        active: sky.visible
+        // The source-only SKY is deliberately visually hidden by the
+        // focused COSMOS Loader. Its fetchers must follow the Loader's
+        // route lifecycle, not the hidden renderer's effective visibility.
+        active: (sky.sourceOnly || sky.visible)
                 && (SubjectPanelPolicy.needsSource(sky.subjectRoute,"astronomy")
                     || CosmosPanelPolicy.needsSource(sky.subjectRoute,"moon"))
         // Use the same provider forecast date shown by ASTRONOMY.
@@ -300,14 +303,20 @@ Rectangle {
 
     WeatherServices.NasaEclipseService {
         id: eclipseService
-        active: sky.visible
+        // The source-only SKY is deliberately visually hidden by the
+        // focused COSMOS Loader. Its fetchers must follow the Loader's
+        // route lifecycle, not the hidden renderer's effective visibility.
+        active: (sky.sourceOnly || sky.visible)
                 && (SubjectPanelPolicy.needsSource(sky.subjectRoute,"astronomy")
                     || CosmosPanelPolicy.needsSource(sky.subjectRoute,"eclipses"))
     }
 
     WeatherServices.UsnoCelnavService {
         id: celnavService
-        active: sky.visible
+        // The source-only SKY is deliberately visually hidden by the
+        // focused COSMOS Loader. Its fetchers must follow the Loader's
+        // route lifecycle, not the hidden renderer's effective visibility.
+        active: (sky.sourceOnly || sky.visible)
                 && (SubjectPanelPolicy.needsSource(sky.subjectRoute,"astronomy")
                     || CosmosPanelPolicy.needsSource(sky.subjectRoute,"celnav"))
         latitude: sky.weatherService ? sky.weatherService.latitude : ""
@@ -316,7 +325,10 @@ Rectangle {
 
     WeatherServices.IssPassService {
         id: issPassService
-        active: sky.visible
+        // The source-only SKY is deliberately visually hidden by the
+        // focused COSMOS Loader. Its fetchers must follow the Loader's
+        // route lifecycle, not the hidden renderer's effective visibility.
+        active: (sky.sourceOnly || sky.visible)
                 && (SubjectPanelPolicy.needsSource(sky.subjectRoute,"astronomy")
                     || CosmosPanelPolicy.needsSource(sky.subjectRoute,"iss"))
         latitude: sky.weatherService ? sky.weatherService.latitude : ""
@@ -325,7 +337,10 @@ Rectangle {
 
     WeatherServices.UsnoPlanetRiseSetService {
         id: planetRiseSetService
-        active: sky.visible
+        // The source-only SKY is deliberately visually hidden by the
+        // focused COSMOS Loader. Its fetchers must follow the Loader's
+        // route lifecycle, not the hidden renderer's effective visibility.
+        active: (sky.sourceOnly || sky.visible)
                 && (SubjectPanelPolicy.needsSource(sky.subjectRoute,"astronomy")
                     || CosmosPanelPolicy.needsSource(sky.subjectRoute,"planets"))
         date: sky.sourceOnly ? sky.focusedCivilDate : sky.astronomySummary.date
@@ -336,7 +351,10 @@ Rectangle {
 
     WeatherServices.IauMeteorShowerService {
         id: meteorService
-        active: sky.visible
+        // The source-only SKY is deliberately visually hidden by the
+        // focused COSMOS Loader. Its fetchers must follow the Loader's
+        // route lifecycle, not the hidden renderer's effective visibility.
+        active: (sky.sourceOnly || sky.visible)
                 && (SubjectPanelPolicy.needsSource(sky.subjectRoute,"astronomy")
                     || CosmosPanelPolicy.needsSource(sky.subjectRoute,"meteor"))
         latitude: sky.weatherService ? sky.weatherService.latitude : ""

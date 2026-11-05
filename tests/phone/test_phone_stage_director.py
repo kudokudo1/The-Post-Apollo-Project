@@ -119,6 +119,64 @@ class PhoneStageTests(unittest.TestCase):
             self.assertEqual(result["state"], "ACTOR_NOT_FOUND")
         execute.assert_not_called()
 
+    def test_oFono_stage_is_independent_of_blueferry_wizard(self):
+        installer = tree(app_id=stage.INSTALL_APP_ID)
+        out = Mock()
+        result = stage.operation(
+            "sync", local=(390, 330, 470, 290),
+            tree=installer, executable=lambda pid: "foot",
+            execute=out, app_id=stage.INSTALL_APP_ID)
+        self.locked(result)
+        self.assertEqual(result["state"], "POSITION_REQUESTED")
+        out.assert_called_once()
+        old_actor = stage.operation(
+            "sync", local=(390, 330, 470, 290),
+            tree=installer, executable=lambda pid: "foot",
+            execute=Mock(), app_id=stage.STAGE_APP_ID)
+        self.assertEqual(old_actor["state"], "ACTOR_NOT_FOUND")
+        self.assertFalse(old_actor["verifiedHole"])
+
+    def test_never_kill_packagekit_actor_even_when_close_requested(self):
+        execute = Mock()
+        result = stage.operation(
+            "close", tree=tree(app_id=stage.INSTALL_APP_ID),
+            executable=lambda pid: "foot",
+            execute=execute, app_id=stage.INSTALL_APP_ID)
+        self.locked(result)
+        self.assertEqual(result["state"], "REFUSED")
+        execute.assert_not_called()
+
+    def test_installer_cutout_requires_exact_visible_geometry(self):
+        aligned = tree(
+            app_id=stage.INSTALL_APP_ID,
+            actual={"x": 1090, "y": 370, "width": 470, "height": 290})
+        aligned["nodes"][1]["window_rect"] = {
+            "x": 0, "y": 0, "width": 470, "height": 290}
+        execute = Mock()
+        result = stage.operation(
+            "sync", local=(390, 330, 470, 290), tree=aligned,
+            executable=lambda pid: "foot",
+            execute=execute, app_id=stage.INSTALL_APP_ID)
+        self.locked(result)
+        self.assertEqual(result["state"], "ALIGNED")
+        self.assertTrue(result["verifiedHole"])
+        execute.assert_not_called()
+
+    def test_cli_routes_installer_sync_only_to_fixed_second_id(self):
+        from unittest.mock import patch
+        with patch.object(stage, "operation",
+                          return_value=stage._result("ACTOR_NOT_FOUND")) as operation:
+            with patch("builtins.print"):
+                self.assertEqual(stage.main(
+                    ["--sync-installer", "390", "330", "470", "290"]), 0)
+            self.assertEqual(operation.call_args.kwargs["app_id"],
+                             stage.INSTALL_APP_ID)
+        with patch.object(stage, "operation",
+                          return_value=stage._result("REFUSED")) as operation:
+            with patch("builtins.print"):
+                self.assertEqual(stage.main(["--close-installer"]), 2)
+            operation.assert_not_called()
+
     def test_outside_social_window_refuses_to_move(self):
         t = tree()
         execute = Mock()

@@ -156,8 +156,9 @@ function viewportMarker(scene,point,width,height,scale,tilt,domainAu,compact) {
     var box=viewport(width,height,compact);
     var g=layout(width,height,scale);
     if(!raw||!box||!g.ready)return null;
-    var left=box.left+6,right=box.right-6;
-    var top=box.top+6,bottom=box.bottom-6;
+    // Leave room for a highlighted ring and a directional arrowhead.
+    var left=box.left+14,right=box.right-14;
+    var top=box.top+14,bottom=box.bottom-14;
     if(raw.x>=left && raw.x<=right && raw.y>=top && raw.y<=bottom)
         return {x:raw.x,y:raw.y,offscreen:false,angle:0,
                 realX:raw.x,realY:raw.y};
@@ -174,6 +175,25 @@ function viewportMarker(scene,point,width,height,scale,tilt,domainAu,compact) {
             y:Math.max(top,Math.min(bottom,g.cy+dy*t)),
             offscreen:true,angle:Math.atan2(dy,dx),
             realX:raw.x,realY:raw.y};
+}
+
+function labelPosition(marker,labelWidth,width,height,compact,centerX) {
+    if(!marker)return null;
+    var box=viewport(width,height,compact),raw=finite(labelWidth),
+        cx=finite(centerX);
+    if(!box||raw===null||cx===null||raw<0)return null;
+    var maxWidth=Math.max(8,box.right-box.left-12);
+    var actual=Math.min(maxWidth,raw);
+    // Offscreen labels point inward. Onscreen labels favor the free side,
+    // but stay inside the plot area even for long barycenter names.
+    var side=marker.offscreen
+        ? (marker.x>=cx?-1:1)
+        : (marker.x>=cx?1:-1);
+    var preferred=marker.x+side*(10+actual/2);
+    var left=box.left+6+actual/2,right=box.right-6-actual/2;
+    return {x:Math.max(left,Math.min(right,preferred)),
+            y:Math.max(box.top+9,Math.min(box.bottom-9,marker.y)),
+            maxWidth:maxWidth};
 }
 
 function visibleHit(scene,px,py,w,h,scale,tilt,tolerance,domainAu,compact) {

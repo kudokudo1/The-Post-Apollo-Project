@@ -38,6 +38,12 @@ class CallingSetupGuiTests(unittest.TestCase):
         self.assertEqual(result["schema"], gui.SCHEMA)
         self.assertEqual(result["execution"], "USER_INITIATED_INSTALLER_HANDOFF")
         self.assertEqual(result["package"], "ofono")
+        self.assertIs(type(result["missingTools"]), list)
+        self.assertEqual(len(result["missingTools"]),
+                         len(set(result["missingTools"])))
+        self.assertTrue(set(result["missingTools"]).issubset({
+            "FOOT", "PYTHON3", "INSTALLER_HELPER", "PKCON", "PKEXEC", "DNF5",
+        }))
         self.assertFalse(result["packageInstalled"])
         self.assertFalse(result["hfpVerified"])
         self.assertEqual(result["trustedPhoneLink"], "UNVERIFIED")
@@ -46,7 +52,7 @@ class CallingSetupGuiTests(unittest.TestCase):
         self.assertIs(result["stageCandidate"], result["status"] in (
             "STAGED_TERMINAL_REQUESTED", "STAGED_TERMINAL_EXISTING"))
         self.assertEqual(set(result), {
-            "schema", "execution", "status", "package",
+            "schema", "execution", "status", "package", "missingTools",
             "installerOpened", "stageCandidate", "packageInstalled",
             "hfpVerified", "trustedPhoneLink", "contentAccessEnabled",
         })
@@ -97,6 +103,7 @@ class CallingSetupGuiTests(unittest.TestCase):
             find=paths.get, launcher=launcher, already_open=lambda: False)
         self.locked(result)
         self.assertEqual(result["status"], "PACKAGE_MANAGER_UNAVAILABLE")
+        self.assertEqual(result["missingTools"], ["PKCON", "PKEXEC", "DNF5"])
         launcher.assert_not_called()
 
     def test_privileged_binary_from_untrusted_directory_is_never_allowed(self):
@@ -110,6 +117,7 @@ class CallingSetupGuiTests(unittest.TestCase):
             find=paths.get, launcher=launcher, already_open=lambda: False)
         self.locked(result)
         self.assertEqual(result["status"], "PACKAGE_MANAGER_UNAVAILABLE")
+        self.assertEqual(result["missingTools"], ["PKCON", "PKEXEC"])
         launcher.assert_not_called()
 
     def test_same_existing_exact_staged_actor_never_duplicate_installer(self):
@@ -142,8 +150,31 @@ class CallingSetupGuiTests(unittest.TestCase):
             find=p, launcher=launcher, already_open=lambda: False)
         self.locked(result)
         self.assertEqual(result["status"], "TERMINAL_UNAVAILABLE")
+        self.assertEqual(result["missingTools"], ["FOOT"])
         self.assertFalse(result["stageCandidate"])
         launcher.assert_not_called()
+
+    def test_missing_tools_report_exact_names_not_paths(self):
+        launcher = mock.Mock()
+        paths = {"foot": "/usr/bin/foot", "python3": "/usr/bin/python3",
+                 "pkexec": "/usr/bin/pkexec"}
+        result = gui.open_support(
+            prerequisite=lambda: evidence(), is_fedora=lambda: True,
+            find=paths.get, launcher=launcher, already_open=lambda: False)
+        self.locked(result)
+        self.assertEqual(result["status"], "PACKAGE_MANAGER_UNAVAILABLE")
+        self.assertEqual(result["missingTools"], ["PKCON", "DNF5"])
+        self.assertNotIn("/usr/bin", str(result))
+        launcher.assert_not_called()
+
+    def test_installer_success_never_reports_missing_tools(self):
+        launcher = mock.Mock()
+        result = gui.open_support(
+            prerequisite=lambda: evidence(), is_fedora=lambda: True,
+            find=programs(), launcher=launcher, already_open=lambda: False)
+        self.locked(result)
+        self.assertEqual(result["status"], "STAGED_TERMINAL_REQUESTED")
+        self.assertEqual(result["missingTools"], [])
 
     def test_no_supported_client_no_hidden_terminal_fallback(self):
         launcher = mock.Mock()
@@ -152,6 +183,7 @@ class CallingSetupGuiTests(unittest.TestCase):
             find=lambda _: None, launcher=launcher, already_open=lambda: False)
         self.locked(result)
         self.assertEqual(result["status"], "TERMINAL_UNAVAILABLE")
+        self.assertEqual(result["missingTools"], ["FOOT", "PYTHON3"])
         launcher.assert_not_called()
 
     def test_untrusted_resolved_program_is_not_launched(self):
@@ -164,6 +196,7 @@ class CallingSetupGuiTests(unittest.TestCase):
                     launcher=launcher, already_open=lambda: False)
                 self.locked(result)
                 self.assertEqual(result["status"], "TERMINAL_UNAVAILABLE")
+                self.assertEqual(result["missingTools"], ["FOOT", "PYTHON3"])
         launcher.assert_not_called()
 
     def test_foot_launch_failure_does_not_open_external_package_manager(self):

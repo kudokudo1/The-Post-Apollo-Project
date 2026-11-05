@@ -47,6 +47,9 @@ Rectangle {
         : activeFamily === "weather" ? weatherSourcePane.runtimeRows : []
     // MEDIA only: rebase the actual visible NEWS hub into workspace-local
     // coordinates. No duplicate route hub, no static hard-coded viewport.
+    readonly property string activeWatchSourceId:
+        activePlayerViewportRect.width > 0 && mediaWorkspacePane.visible
+        ? mediaWorkspacePane.activeWatchSourceId : ""
     readonly property rect activePlayerViewportRect: {
         if (!subjectWorkspaceActive || !surface.visible
                 || activeFamily !== "media" || !mediaWorkspacePane.visible)

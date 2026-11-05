@@ -1,0 +1,75 @@
+name: Weather M32 optional WATCH v2 bridge and publisher request path
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'widgets/weather/WeatherStationW.qml'
+      - 'widgets/weather/StationNewsCatalogPolicy.js'
+      - 'widgets/weather/StationNewsHub.qml'
+      - 'widgets/weather/StationMediaSubjectPane.qml'
+      - 'widgets/weather/StationWorkspaceSurface.qml'
+      - 'widgets/weather/StationSubjectNavigator.qml'
+      - 'widgets/weather/StationWatchBridgeGate.qml'
+      - 'widgets/weather/StationWatchNativeAdapter.qml'
+      - 'tests/weather/test_optional_watchbridge_m32.js'
+      - 'tests/weather/fixtures/M32*'
+      - 'scripts/weather/verify_optional_watchbridge_m32.sh'
+      - '.github/workflows/weather-optional-watchbridge-m32.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  source-and-retirement:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Pure catalog source identity, optional gate and all previous subjects invariants
+        run: |
+          set -euo pipefail
+          node --test tests/weather/test_optional_watchbridge_m32.js
+          node --test tests/weather/test_subjects_media_viewport_m31.js
+          node --test tests/weather/test_station_news_channel_hub.js
+          node --test tests/weather/test_station_news_viewer.js
+          node --test tests/weather/test_index_media_catalog_cutover_m28j.js
+          node --test tests/weather/test_media_subject_panels_d1.js
+          node --test tests/weather/test_classic_source_retirement_m28v.js
+          node --test tests/weather/test_tools_terminal_cutover_m28c.js
+
+  native-optional-qml:
+    runs-on: ubuntu-latest
+    container:
+      image: fedora:44
+    timeout-minutes: 25
+    steps:
+      - name: Install disposable Fedora Quickshell 0.3 and Xvfb
+        run: |
+          set -euo pipefail
+          dnf install -y --setopt=install_weak_deps=False dnf5-plugins
+          dnf copr enable -y errornointernet/quickshell
+          dnf install -y --setopt=install_weak_deps=False \
+            quickshell qt6-qtdeclarative qt6-qt5compat qt6-qtbase-gui \
+            qt6-qtsvg git nodejs coreutils findutils \
+            xorg-x11-server-Xvfb
+          quickshell --version | grep '0.3.'
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Native QML with module entirely absent, then explicit fake-only WATCH/CLOSE
+        run: |
+          set -euo pipefail
+          bash scripts/weather/verify_optional_watchbridge_m32.sh
+      - name: State release boundary
+        if: always()
+        run: |
+          echo 'Normal Weather is default-off and can load without the optional Stage Director plugin.' >> "$GITHUB_STEP_SUMMARY"
+          echo 'CI-only module mock checks QML bridge lifecycle. The real Wayland plugin was tested independently in SwayPX PR #73.' >> "$GITHUB_STEP_SUMMARY"
+          echo 'No local installation, browser launch, compositor scene/input, or production activation.' >> "$GITHUB_STEP_SUMMARY"

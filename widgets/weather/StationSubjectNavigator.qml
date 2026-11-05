@@ -82,6 +82,16 @@ Rectangle {
 
     // One active NEWS viewport only. Workspace and INDEX intentionally have
     // different MEDIA panes; select by actual presentation ownership.
+    readonly property string activeWatchSourceId: {
+        if (activePlayerViewportRect.width <= 0 || !browser.visible
+                || browser.liveMediaKind === "")
+            return "";
+        const pane = browser.indexOpen ? mediaLivePane : workspaceLoader.item;
+        if (!pane || !pane.visible)
+            return "";
+        const id = pane.activeWatchSourceId;
+        return id === "bbc" || id === "cspan" ? id : "";
+    }
     readonly property rect activePlayerViewportRect: {
         if (!browser.visible || browser.liveMediaKind === "")
             return Qt.rect(0, 0, 0, 0);

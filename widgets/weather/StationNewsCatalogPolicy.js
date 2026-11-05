@@ -54,7 +54,13 @@ function creatorRecord(label, channelId) {
 }
 function toViewerRecord(item) {
     if (!item || !item.title || !/^https:\/\/[^ ]+$/.test(item.url)) return null;
+    // The native WATCH protocol has ONLY these two source tokens. Never
+    // derive permissions from an arbitrary URL, title, or creator record.
+    const canonical = find(item.id);
+    const watchSourceId = canonical && canonical.url === item.url
+        && (canonical.id === "bbc" || canonical.id === "cspan")
+        ? canonical.id : "";
     return {kind:"channel", title:item.title, source:item.source || "SOURCE",
         time:item.access || "ACCESS NOT VERIFIED", detail:item.detail || "",
-        url:item.url, channelId:item.channelId || ""};
+        url:item.url, channelId:item.channelId || "", watchSourceId:watchSourceId};
 }

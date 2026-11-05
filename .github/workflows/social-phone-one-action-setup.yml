@@ -8,6 +8,9 @@ on:
       - 'services/phone/PhoneNativeSetupLaunch.py'
       - 'services/phone/PhoneSavedBridgeState.py'
       - 'services/phone/PhoneAudioControls.py'
+      - 'services/phone/PhoneCallPrerequisites.py'
+      - 'tests/phone/test_phone_call_prerequisites.py'
+      - 'MODEL/contracts/social-phone-ofono-diagnosis-p8b-v0.md'
       - 'tests/phone/test_phone_audio_controls.py'
       - 'tests/messaging/test_social_phone_audio_controls.py'
       - 'MODEL/contracts/social-phone-menu-audio-controls-p8-v0.md'
@@ -36,6 +39,9 @@ on:
       - 'services/phone/PhoneNativeSetupLaunch.py'
       - 'services/phone/PhoneSavedBridgeState.py'
       - 'services/phone/PhoneAudioControls.py'
+      - 'services/phone/PhoneCallPrerequisites.py'
+      - 'tests/phone/test_phone_call_prerequisites.py'
+      - 'MODEL/contracts/social-phone-ofono-diagnosis-p8b-v0.md'
       - 'tests/phone/test_phone_audio_controls.py'
       - 'tests/messaging/test_social_phone_audio_controls.py'
       - 'MODEL/contracts/social-phone-menu-audio-controls-p8-v0.md'
@@ -69,8 +75,8 @@ jobs:
       - uses: actions/checkout@v4
       - name: Compile setup and provider code
         run: |
-          python3 -m py_compile services/phone/PhoneSetupReadiness.py services/phone/PhoneProviderObservation.py services/phone/PhoneNativeSetupLaunch.py services/phone/PhoneStageDirector.py services/phone/PhoneSavedBridgeState.py services/phone/PhoneAudioControls.py
-          python3 -m py_compile tests/phone/test_phone_setup_readiness.py tests/messaging/test_social_phone_connect_flow.py tests/phone/test_phone_native_setup_launch.py tests/messaging/test_social_phone_native_setup_handoff.py tests/messaging/test_social_phone_unified_layout.py tests/phone/test_phone_stage_director.py tests/messaging/test_social_phone_stage_terminal.py tests/phone/test_phone_saved_bridge_state.py tests/messaging/test_social_phone_saved_lifecycle.py tests/phone/test_phone_audio_controls.py tests/messaging/test_social_phone_audio_controls.py
+          python3 -m py_compile services/phone/PhoneSetupReadiness.py services/phone/PhoneProviderObservation.py services/phone/PhoneNativeSetupLaunch.py services/phone/PhoneStageDirector.py services/phone/PhoneSavedBridgeState.py services/phone/PhoneAudioControls.py services/phone/PhoneCallPrerequisites.py
+          python3 -m py_compile tests/phone/test_phone_setup_readiness.py tests/messaging/test_social_phone_connect_flow.py tests/phone/test_phone_native_setup_launch.py tests/messaging/test_social_phone_native_setup_handoff.py tests/messaging/test_social_phone_unified_layout.py tests/phone/test_phone_stage_director.py tests/messaging/test_social_phone_stage_terminal.py tests/phone/test_phone_saved_bridge_state.py tests/messaging/test_social_phone_saved_lifecycle.py tests/phone/test_phone_audio_controls.py tests/messaging/test_social_phone_audio_controls.py tests/phone/test_phone_call_prerequisites.py
       - name: Verify one-action check and existing PHONE surface
         run: |
           python3 -m unittest discover -s tests/phone -p 'test_phone_setup_readiness.py' -v
@@ -78,6 +84,7 @@ jobs:
           python3 -m unittest discover -s tests/phone -p 'test_phone_stage_director.py' -v
           python3 -m unittest discover -s tests/phone -p 'test_phone_saved_bridge_state.py' -v
           python3 -m unittest discover -s tests/phone -p 'test_phone_audio_controls.py' -v
+          python3 -m unittest discover -s tests/phone -p 'test_phone_call_prerequisites.py' -v
           python3 -m unittest discover -s tests/messaging -p 'test_social_phone_audio_controls.py' -v
           python3 -m unittest discover -s tests/messaging -p 'test_social_phone_saved_lifecycle.py' -v
           python3 -m unittest discover -s tests/messaging -p 'test_social_phone_stage_terminal.py' -v

@@ -1589,13 +1589,13 @@ Rectangle {
         }
 
         StationSectionDivider {
-            visible: space.solarImageActive
+            visible: space.sectionVisible("suvi")
             width: parent.width
             title: "SOLAR IMAGER // NOAA SWPC SUVI"
         }
 
         Row {
-            visible: space.solarImageActive
+            visible: space.sectionVisible("suvi")
             width: parent.width
             height: 342
             spacing: 14

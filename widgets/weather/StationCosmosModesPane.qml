@@ -517,9 +517,11 @@ Rectangle {
                 columns: 2
                 spacing: 7
                 Repeater {
-                    model: focus.cards ? focus.cards.slice(0,4) : []
+                    // Numeric model avoids a QJSValue-array Repeater binding.
+                    model: focus.cards ? Math.min(4,focus.cards.length) : 0
                     delegate: Rectangle {
-                        required property var modelData
+                        required property int index
+                        readonly property var cardData: focus.cards[index]
                         width: Math.max(1,(cardGrid.width-7)/2)
                         height: Math.max(65,(stage.height-53)/2)
                         color: Colors.dark
@@ -531,20 +533,20 @@ Rectangle {
                             spacing: 6
                             GohuText {
                                 width: parent.width
-                                text: modelData.name
+                                text: cardData.name
                                 color: Colors.orange
                                 font.pixelSize: 12
                                 elide: Text.ElideRight
                             }
                             QuietText {
                                 width: parent.width
-                                text: modelData.info
+                                text: cardData.info
                                 font.pixelSize: 10
                                 elide: Text.ElideRight
                             }
                             QuietText {
                                 width: parent.width
-                                text: modelData.detail
+                                text: cardData.detail
                                 font.pixelSize: 9
                                 wrapMode: Text.WordWrap
                             }
@@ -598,9 +600,10 @@ Rectangle {
                     width: meteorScroll.width
                     spacing: 5
                     Repeater {
-                        model: focus.cards || []
+                        model: focus.cards ? focus.cards.length : 0
                         delegate: Rectangle {
-                            required property var modelData
+                            required property int index
+                            readonly property var cardData: focus.cards[index]
                             width: meteorCards.width
                             height: 47
                             color: Colors.dark
@@ -612,13 +615,13 @@ Rectangle {
                                 spacing:4
                                 GohuText {
                                     width:parent.width
-                                    text:modelData.name+" // "+modelData.info
+                                    text:cardData.name+" // "+cardData.info
                                     color:Colors.white
                                     font.pixelSize:10
                                     elide:Text.ElideRight
                                 }
                                 QuietText {
-                                    text:modelData.detail
+                                    text:cardData.detail
                                     color:Colors.cyan
                                     font.pixelSize:9
                                 }

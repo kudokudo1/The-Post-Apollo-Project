@@ -259,7 +259,7 @@ class ZoomWebHostTests(unittest.TestCase):
         calls = []
         with patch.object(host, "_target_geometry", return_value=(2600, 150, 650, 420)):
             with patch.object(host, "_output_rect", return_value={
-                    "x": 0, "y": 0, "width": 3200, "height": 1800}):
+                    "x": 0, "y": 0, "width": 4000, "height": 1800}):
                 with patch.object(host, "_social_browser_prefix", return_value=["/usr/bin/chromium"]):
                     with patch.object(host, "_private_profile", return_value=Path("/tmp/camera_fixture")):
                         with patch.object(host, "_unique_actor",

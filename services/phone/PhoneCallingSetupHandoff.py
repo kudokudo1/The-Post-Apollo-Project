@@ -3,8 +3,8 @@
 
 The button opens a supported system package GUI for the official 'ofono'
 package. That GUI owns repository selection, review, authorization, download,
-and installation. This helper never uses sudo, pkexec, DNF, PackageKit
-transactions, shell commands, service mutations or phone identifiers.
+and installation. This helper never executes privileged installation commands,
+package transactions, shell commands, service mutations or phone identifiers.
 """
 from __future__ import annotations
 

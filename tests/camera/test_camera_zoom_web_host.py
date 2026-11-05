@@ -50,6 +50,60 @@ class ZoomWebHostTests(unittest.TestCase):
         self.assertIn('if (camera.activeView === "zoom")',QML)
         self.assertNotIn('WebEngineView',QML)
 
+    def test_zoom_browser_gets_full_real_content_area_not_legacy_footer(self):
+        # Keep the existing Camera header and all four main tabs.
+        for label in ('"CAPTURE"', '"GALLERY"', '"ZOOM"', '"CLEANUP"',
+                      'label: "↓ DOWNLOAD"'):
+            self.assertIn(label, QML)
+        # The old fixed slot top/bottom cut short the Zoom web viewport.
+        self.assertNotIn('readonly property int zoomBayTop: 131', QML)
+        self.assertNotIn('readonly property int zoomBayHeight: Math.max(0, frameHeight - 169)', QML)
+        self.assertIn('cameraPage.y + cameraPage.parent.y', QML)
+        self.assertIn('cameraPage.x + cameraPage.parent.x', QML)
+        self.assertIn('Math.round(cameraPage.width)', QML)
+        self.assertIn('readonly property int zoomBayBottom: 5', QML)
+        self.assertIn('frame.height - zoomBayTop - zoomBayBottom', QML)
+        # Compact is still 675 px tall, but the browser uses the body instead
+        # of leaving the 38px phantom footer: approx 539 vs 506px at y=131.
+        compact_height, page_start, bottom = 675, 131, 5
+        self.assertEqual(compact_height - page_start - bottom, 539)
+        self.assertGreater(compact_height - page_start - bottom,
+                           compact_height - 169)
+
+    def test_zoom_browser_owns_scroll_and_the_footer_cannot_cover_buttons(self):
+        self.assertIn('height: camera.activeView === "zoom" && camera.zoomWebDocked', QML)
+        self.assertIn('? camera.zoomBayHeight : frame.height - 169', QML)
+        self.assertIn('visible: !(camera.activeView === "zoom" && camera.zoomWebDocked)', QML)
+        self.assertIn('visible: camera.activeView === "zoom" && !camera.zoomWebDocked', QML)
+        self.assertIn('intersection: Intersection.Subtract', QML)
+        self.assertIn('width: camera.zoomWebDocked ? camera.zoomBayWidth : 0', QML)
+        self.assertIn('height: camera.zoomWebDocked ? camera.zoomBayHeight : 0', QML)
+        self.assertIn('menuOpen && !zoomWebDocked ? WlrKeyboardFocus.OnDemand', QML)
+        # The fallback instructions are scrollable only when the web actor is
+        # absent. A QML Flickable must not intercept Zoom's native mouse wheel.
+        self.assertIn('id: zoomPage', QML)
+        self.assertIn('visible: camera.activeView === "zoom" && !camera.zoomWebDocked', QML)
+
+    def test_rapid_resize_keeps_clickthrough_closed_until_new_alignment(self):
+        self.assertIn('function scheduleZoomWebRealign()', QML)
+        self.assertIn('zoomWebDocked = false;', QML)
+        self.assertIn('if (zoomWebBusy) {', QML)
+        self.assertIn('zoomWebNeedsRealign = true;', QML)
+        self.assertIn('if (zoomWebNeedsRealign) {', QML)
+        self.assertIn('zoomWebState = "REALIGNING_WEB_APP";', QML)
+        for prop in ('ZoomBayInset', 'ZoomBayTop', 'ZoomBayWidth',
+                     'ZoomBayHeight', 'ZoomWebOutput'):
+            self.assertIn('on' + prop + 'Changed: scheduleZoomWebRealign()', QML)
+        self.assertIn('onDockCenterXChanged: scheduleZoomWebRealign()', QML)
+        self.assertIn('id: zoomWebRealign', QML)
+        self.assertIn('if (camera.zoomWebBusy)', QML)
+        self.assertIn('zoomWebRealign.restart();', QML)
+        # Existing browser is reused through the same private profile.
+        self.assertIn('actor, error = _unique_actor(profile)', path.read_text())
+        self.assertIn('if not actor and error == "ACTOR_MISSING":', path.read_text())
+        self.assertIn('zoomWebHideProcess.exec(zoomWebArgs("hide"))', QML)
+        self.assertNotIn('zoomWebProcess.exec(zoomWebArgs("hide"))', QML)
+
     def test_output_bounds_and_explicit_identity_validation(self):
         with patch.object(host, "_output_rect", return_value={
                 "x":2560,"y":0,"width":1360,"height":768}):

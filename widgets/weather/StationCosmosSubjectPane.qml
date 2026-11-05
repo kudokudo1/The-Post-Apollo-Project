@@ -24,7 +24,9 @@ Rectangle {
         sourceComponent: cosmosPane.kind === "overview"
                          ? overviewComponent : cosmosPane.kind === "sky"
                          ? skyComponent
-                         : (cosmosPane.subjectRoute === "cosmos/space-weather/overview"
+                         : cosmosPane.subjectRoute === "cosmos/space-weather/solar-wind"
+                            ? solarWindComponent
+                          : (cosmosPane.subjectRoute === "cosmos/space-weather/overview"
                             || cosmosPane.subjectRoute === "cosmos/space-weather/history")
                            ? spaceTimelineComponent : spaceComponent
     }
@@ -57,6 +59,19 @@ Rectangle {
             weatherService: cosmosPane.weatherService
             liveHistoryStore: cosmosPane.liveHistoryStore
             runtimeNowMs: cosmosPane.runtimeNowMs
+        }
+    }
+
+    // C3 // Focused solar-wind route, independent of the long SPACE report.
+    Component {
+        id: solarWindComponent
+        StationCosmosSolarWindPane {
+            spaceService: cosmosPane.spaceService
+            liveHistoryStore: cosmosPane.liveHistoryStore
+            runtimeNowMs: cosmosPane.runtimeNowMs
+            onRouteRequested: function(path) {
+                cosmosPane.routeRequested(path)
+            }
         }
     }
 

@@ -10,6 +10,7 @@ import json
 import os
 from pathlib import Path
 import select
+import shutil
 import signal
 import subprocess
 import sys
@@ -53,6 +54,12 @@ class C2nCrossUidPolicySmoke(unittest.TestCase):
         temp = tempfile.TemporaryDirectory(prefix="c2n-systemlike-bus-")
         cls.tmp = temp
         cls.addClassCleanup(temp.cleanup)
+        # GitHub checkout is private to the runner UID. Copy only this fake
+        # fixture into an explicitly world-readable disposable CI directory.
+        os.chmod(temp.name, 0o755)
+        cls.fixture_path = Path(temp.name) / "C2nBusPolicyFixture.py"
+        shutil.copyfile(FIXTURE, cls.fixture_path)
+        os.chmod(cls.fixture_path, 0o644)
         cfg = Path(temp.name) / "config.xml"
         build_config(cfg)
         cls.daemon = subprocess.Popen(
@@ -93,7 +100,7 @@ class C2nCrossUidPolicySmoke(unittest.TestCase):
         return [
             "sudo", "-n", "-u", user, "env",
             f"C2N_TEST_BUS_ADDRESS={cls.address}", f"{FLAG}=1",
-            sys.executable, "-I", "-B", str(FIXTURE), mode,
+            sys.executable, "-I", "-B", str(cls.fixture_path), mode,
         ]
 
     @classmethod

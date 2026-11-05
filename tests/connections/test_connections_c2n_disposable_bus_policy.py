@@ -38,6 +38,9 @@ def build_config(path: Path) -> None:
     admission = ET.SubElement(root, "policy", context="default")
     ET.SubElement(admission, "allow", user="*")
     ET.SubElement(admission, "allow", send_destination="org.freedesktop.DBus")
+    # An isolated bare system-like bus does not import the standard receive
+    # rules. Emulate default unicast receipt while testing our send/own policy.
+    ET.SubElement(admission, "allow", receive_sender="*")
     for policy in list(fragment):
         root.append(policy)
     ET.ElementTree(root).write(path, encoding="utf-8", xml_declaration=True)

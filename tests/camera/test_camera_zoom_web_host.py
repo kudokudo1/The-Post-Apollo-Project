@@ -110,10 +110,12 @@ class ZoomWebHostTests(unittest.TestCase):
                                 result=host.enter("identity-1","HDMI-A-1",40,150,650,420)
         self.assertTrue(result["ok"])
         self.assertTrue(result["docked"])
-        self.assertEqual(len(calls),3)
+        self.assertEqual(len(calls),4)
         self.assertEqual(calls[0],("[con_id=123]","floating","enable"))
-        self.assertEqual(calls[1][1:3],("resize","set"))
-        self.assertEqual(calls[2],("[con_id=123]","move","position","2600","150"))
+        self.assertEqual(calls[1],("[con_id=123]","border","none"))
+        self.assertEqual(calls[2][1:3],("resize","set"))
+        self.assertEqual(calls[3],("[con_id=123]","move","absolute","position",
+                                   "2600","px","150","px"))
 
     def test_failed_alignment_hides_exact_guest_not_other_windows(self):
         actor={"id":123,"pid":333,"visible":True,"window_properties":{"class":host.ZOOM_CLASS},
@@ -126,7 +128,41 @@ class ZoomWebHostTests(unittest.TestCase):
                             with patch.object(host,"_sway_command") as sway:
                                 result=host.enter("identity-1","HDMI-A-1",40,150,650,420)
         self.assertFalse(result["docked"])
+        self.assertEqual(result["rectDelta"],[-2500,50,-50,-20])
         sway.assert_any_call("[con_id=123]","move","scratchpad")
+
+    def test_hidden_actor_never_opens_clickthrough_even_if_rect_matches(self):
+        present = {"id": 123, "pid": 333, "visible": True,
+                   "rect": {"x": 2600, "y": 150, "width": 650, "height": 420}}
+        hidden = dict(present, visible=False)
+        with patch.object(host,"_target_geometry",return_value=(2600,150,650,420)):
+            with patch.object(host,"_social_browser_prefix",return_value=["/usr/bin/chromium"]):
+                with patch.object(host,"_private_profile",return_value=Path("/tmp/testcamera")):
+                    with patch.object(host,"_unique_actor",side_effect=[
+                            (present,"")] + [(hidden,"")]*17):
+                        with patch.object(host.time,"sleep",return_value=None):
+                            with patch.object(host,"_sway_command"):
+                                r = host.enter("identity-1","HDMI-A-1",40,150,650,420)
+        self.assertFalse(r["ok"])
+        self.assertFalse(r["docked"])
+        self.assertEqual(r["error"],"WINDOW_NOT_VISIBLE")
+        self.assertEqual(r["rectDelta"],[0,0,0,0])
+
+    def test_distinct_sway_global_move_coordinates_on_second_output(self):
+        actor={"id":321,"pid":333,"visible":True,
+               "rect":{"x":2600,"y":150,"width":650,"height":420}}
+        calls=[]
+        with patch.object(host,"_target_geometry",return_value=(2600,150,650,420)):
+            with patch.object(host,"_social_browser_prefix",return_value=["/usr/bin/chromium"]):
+                with patch.object(host,"_private_profile",return_value=Path("/tmp/testcamera")):
+                    with patch.object(host,"_unique_actor",return_value=(actor,"")):
+                        with patch.object(host,"_sway_command",side_effect=lambda *x:calls.append(x)):
+                            r = host.enter("identity-1","HDMI-A-1",40,150,650,420)
+        self.assertTrue(r["docked"])
+        self.assertIn(("[con_id=321]","border","none"),calls)
+        self.assertIn(("[con_id=321]","move","absolute","position",
+                       "2600","px","150","px"),calls)
+        self.assertNotIn(("[con_id=321]","move","position","2600","150"),calls)
 
     def test_missing_browser_does_not_lie_about_hosted_login(self):
         with patch.object(host,"_target_geometry",return_value=(100,150,600,400)):

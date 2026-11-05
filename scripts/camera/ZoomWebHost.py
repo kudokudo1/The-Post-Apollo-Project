@@ -182,8 +182,10 @@ def status(identity, output, x, y, width, height):
     profile = root / "post-apollo" / "camera" / "zoom-web" / identity
     geometry = _target_geometry(output, x, y, width, height)
     actor, error = _unique_actor(profile)
-    return {"ok": True, "kind": "zoom-web-status", "docked": bool(actor and _near(actor, geometry)),
-            "state": "DOCKED" if actor and _near(actor, geometry) else error or "MISALIGNED",
+    docked = bool(actor and actor.get("visible") is True
+                  and _near(actor, geometry))
+    return {"ok": True, "kind": "zoom-web-status", "docked": docked,
+            "state": "DOCKED" if docked else error or "MISALIGNED",
             "authenticated": "UNKNOWN"}
 
 
@@ -210,16 +212,24 @@ def enter(identity, output, x, y, width, height):
     criteria = "[con_id=%d]" % actor["id"]
     if not actor.get("visible"):
         _sway_command(criteria, "scratchpad", "show")
+    # Match Social's tested docking recipe. Sway's 'move position' is
+    # workspace-relative, whereas our target rectangle is output-global.
+    # An ordinary Sway titlebar/border also distorts the measured actor rect.
+    # All commands still target ONLY the verified, positive con_id.
     _sway_command(criteria, "floating", "enable")
+    _sway_command(criteria, "border", "none")
     _sway_command(criteria, "resize", "set", "width", str(geometry[2]), "px",
                   "height", str(geometry[3]), "px")
-    _sway_command(criteria, "move", "position", str(geometry[0]), str(geometry[1]))
+    _sway_command(criteria, "move", "absolute", "position",
+                  str(geometry[0]), "px", str(geometry[1]), "px")
     # Reobserve exact actor PID/class and measured bounds before enabling
     # QML's click-through/transparent bay.
     docked = False
     for _ in range(16):
         after, error = _unique_actor(profile)
-        if after and after["id"] == actor["id"] and _near(after, geometry):
+        if (after and after["id"] == actor["id"]
+                and after.get("visible") is True
+                and _near(after, geometry)):
             docked = True
             break
         time.sleep(0.1)
@@ -229,9 +239,21 @@ def enter(identity, output, x, y, width, height):
         verified, _ = _unique_actor(profile)
         if verified and verified["id"] == actor["id"] and verified.get("visible"):
             _sway_command("[con_id=%d]" % actor["id"], "move", "scratchpad")
+    # Keep diagnostics limited to geometry offsets. No titles, URLs, process
+    # command lines, profile paths or Zoom session contents escape this helper.
+    delta = None
+    if not docked and after and after["id"] == actor["id"]:
+        rect = after.get("rect") or {}
+        fields = ("x", "y", "width", "height")
+        if all(type(rect.get(key)) is int for key in fields):
+            delta = [max(-5000, min(5000, rect[key] - expected))
+                     for key, expected in zip(fields, geometry)]
     return {"ok": docked, "kind": "zoom-web-enter", "docked": docked,
             "state": "DOCKED" if docked else "NOT_ALIGNED",
-            "error": "" if docked else "GEOMETRY_UNVERIFIED",
+            "error": "" if docked else (
+                "WINDOW_NOT_VISIBLE" if after and after["id"] == actor["id"]
+                and after.get("visible") is not True else "GEOMETRY_UNVERIFIED"),
+            "rectDelta": delta,
             "authenticated": "UNKNOWN"}
 
 

@@ -56,6 +56,8 @@ PanelWindow {
     property bool zoomWebDocked: false
     property bool zoomWebBusy: false
     property string zoomWebState: "NOT_STARTED"
+    // Typed Sway rectangle deltas only; never expose browser titles or logins.
+    property var zoomWebRectDelta: null
     property string zoomWebIdentity: "identity-1"
     readonly property int zoomBayInset: 18
     readonly property int zoomBayTop: 131
@@ -74,6 +76,7 @@ PanelWindow {
         if (!menuOpen || activeView !== "zoom" || zoomWebBusy)
             return false;
         zoomWebDocked = false;
+        zoomWebRectDelta = null;
         zoomWebBusy = true;
         zoomWebState = "LAUNCHING_WEB_APP";
         zoomWebProcess.exec(zoomWebArgs("enter"));
@@ -94,6 +97,8 @@ PanelWindow {
             return;
         }
         zoomWebDocked = !!(reply && reply.ok === true && reply.docked === true);
+        zoomWebRectDelta = reply && Array.isArray(reply.rectDelta)
+            && reply.rectDelta.length === 4 ? reply.rectDelta : null;
         zoomWebState = zoomWebDocked ? "WEB_APP_DOCKED"
                         : "WEB_HOST_UNAVAILABLE // " + String(reply && (reply.error || reply.state) || "NO_RESULT");
         if (zoomWebDocked)
@@ -1504,6 +1509,20 @@ PanelWindow {
                             text: "ZOOM WEB // " + camera.zoomWebState
                                   + " // Login and Join/New Meeting live in the hosted browser view when docked."
                         }
+                        GohuText {
+                            width: parent.width
+                            visible: camera.zoomWebRectDelta !== null
+                            color: Colors.orange
+                            font.pixelSize: 10
+                            wrapMode: Text.WordWrap
+                            text: camera.zoomWebRectDelta
+                                  ? "DOCK DELTA // X " + camera.zoomWebRectDelta[0]
+                                    + " / Y " + camera.zoomWebRectDelta[1]
+                                    + " / W " + camera.zoomWebRectDelta[2]
+                                    + " / H " + camera.zoomWebRectDelta[3]
+                                  : ""
+                        }
+
                         ActionButton {
                             width: parent.width
                             height: 38

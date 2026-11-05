@@ -109,10 +109,11 @@ class PhoneAudioUiTests(unittest.TestCase):
         self.assertIn('phoneAudioResult === "CALLS_DIAGNOSING"', self.qml)
         self.assertIn('callPrerequisiteCheck = "NOT CHECKED";', self.qml)
         self.assertIn('&& !callPrerequisiteProcess.running', self.qml)
-        block = re.search(r'onVisibleChanged: \\{(.*?)\\n    \\}', self.qml, re.S)
-        self.assertIsNotNone(block)
-        self.assertNotIn('diagnoseCallPrerequisites(', block.group(1))
-        self.assertNotIn('PhoneCallPrerequisites.py', block.group(1))
+        start = self.qml.index('onVisibleChanged: {')
+        end = self.qml.index('\\n    }', start)
+        block = self.qml[start:end]
+        self.assertNotIn('diagnoseCallPrerequisites(', block)
+        self.assertNotIn('PhoneCallPrerequisites.py', block)
         self.assertNotIn('systemctl start', self.qml)
         self.assertNotIn('dnf install', self.qml)
 

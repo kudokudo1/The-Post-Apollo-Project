@@ -129,7 +129,7 @@ test("one existing SKY loader per selected native subject and distinct header st
 });
 
 test("no original M0 source mapping, CLASSIC rendering or data-service ownership changed",()=>{
-  assert.equal(Object.keys(nav.PANELS).length,103);
+  assert.equal(Object.keys(nav.PANELS).length,104); // EVENTS overview added, existing routes preserved
   assert.equal(nav.PANELS["sky-hourly-forecast"],"weather/forecasts/hourly");
   assert.equal(nav.PANELS["sky-sun-moon"],"cosmos/overview");
   assert.equal(weather.visibleFor("sky","","current"),true);

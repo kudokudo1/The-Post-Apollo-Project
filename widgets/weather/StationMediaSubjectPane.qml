@@ -1,4 +1,5 @@
 import QtQuick
+import "../../components"
 import "StationMediaSubjectPanelPolicy.js" as MediaPanelPolicy
 import "StationMediaViewportPolicy.js" as ViewportPolicy
 

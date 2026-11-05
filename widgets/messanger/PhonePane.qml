@@ -66,7 +66,7 @@ Rectangle {
             return "Opening the oFono installer in PHONE...";
         if (callSetupStatus === "STAGED_TERMINAL_REQUESTED"
                 || callSetupStatus === "STAGED_TERMINAL_EXISTING")
-            return "PackageKit runs in the terminal below. Review and confirm its transaction; Social has not assumed installation succeeded.";
+            return "Fedora's interactive installer runs in the PHONE terminal below. Review its transaction and confirm or decline; Social has not assumed installation succeeded.";
         if (callSetupStatus === "GUI_OPEN_REQUESTED")
             return "A native PackageKit installer was requested. Review and approve it there, then choose CHECK AGAIN. No installation was confirmed by Social.";
         if (callSetupStatus === "RECHECKING")
@@ -77,8 +77,12 @@ Rectangle {
             return "Package check completed. The next step is shown below. CHECK AGAIN updates the existing service and call statuses without changing audio.";
         if (callSetupStatus === "STAGE_BAY_TOO_SMALL")
             return "PHONE is too small for an interactive installer. Enlarge the Social panel and try SET UP CALLING again. No external window was opened.";
+        if (callSetupStatus === "TERMINAL_UNAVAILABLE")
+            return "The embedded installer requires foot and Python. The required terminal client or helper is unavailable. No external window was opened.";
+        if (callSetupStatus === "PACKAGE_MANAGER_UNAVAILABLE")
+            return "Neither PackageKit (pkcon) nor Polkit with DNF5 is available. PHONE cannot start an approved Fedora package transaction; no external window was opened.";
         if (callSetupStatus === "GUI_UNAVAILABLE")
-            return "The embedded installer needs foot, Python and PackageKit available on this desktop. No external window was opened or package installed.";
+            return "The embedded package installer is unavailable. No external window was opened or package installed.";
         if (callSetupStatus === "GUI_LAUNCH_FAILED")
             return "PHONE could not start the embedded PackageKit terminal. No external window was opened or installation confirmed.";
         if (callSetupStatus === "UNSUPPORTED_HOST")
@@ -675,6 +679,7 @@ Rectangle {
                             || r.package !== "ofono"
                             || ["STAGED_TERMINAL_REQUESTED", "STAGED_TERMINAL_EXISTING",
                                 "GUI_OPEN_REQUESTED", "GUI_UNAVAILABLE",
+                                "TERMINAL_UNAVAILABLE", "PACKAGE_MANAGER_UNAVAILABLE",
                                 "GUI_LAUNCH_FAILED", "UNSUPPORTED_HOST",
                                 "NOT_APPLICABLE", "DIAGNOSIS_UNAVAILABLE",
                                 "STAGE_UNAVAILABLE"].indexOf(r.status) < 0
@@ -1255,7 +1260,7 @@ Rectangle {
                         width: parent.width
                         visible: installCallingSupport.visible
                                  && phonePane.callPrerequisiteReport.state === "PACKAGE_NOT_INSTALLED"
-                        text: "Only oFono. Review PackageKit's approval inside PHONE (or its native fallback). Social never silently confirms a transaction."
+                        text: "Only oFono. Review and confirm the Fedora package transaction inside PHONE. Social never approves it automatically."
                         color: Colors.white
                         font.pixelSize: 10
                         wrapMode: Text.WordWrap
@@ -1367,7 +1372,7 @@ Rectangle {
                           : phonePane.stageState === "UNAVAILABLE"
                           ? "Stage placement could not be verified. The terminal may remain external; no phone or audio change was made by Social."
                           : phonePane.stagePurpose === "OFONO"
-                          ? "Placing the interactive PackageKit installer inside PHONE. Review its own confirmation."
+                          ? "Placing Fedora's interactive installer inside PHONE. Review its transaction and confirmation."
                           : "Placing BlueFerry's terminal inside the PHONE workspace..."
                     color: Colors.orange
                     font.pixelSize: 10

@@ -68,6 +68,50 @@ class CallingSetupGuiTests(unittest.TestCase):
             stderr=gui.subprocess.DEVNULL,
             start_new_session=True, close_fds=True)
 
+    def test_missing_pkcon_still_stages_with_polkit_and_dnf5(self):
+        launcher = mock.Mock()
+        paths = {
+            "foot": "/usr/bin/foot", "python3": "/usr/bin/python3",
+            "pkexec": "/usr/bin/pkexec", "dnf5": "/usr/bin/dnf5",
+        }
+        result = gui.open_support(
+            prerequisite=lambda: evidence(), is_fedora=lambda: True,
+            find=paths.get, launcher=launcher, already_open=lambda: False)
+        self.locked(result)
+        self.assertEqual(result["status"], "STAGED_TERMINAL_REQUESTED")
+        argv = launcher.call_args.args[0]
+        self.assertEqual(argv[:4], ["/usr/bin/foot", "--app-id", gui.INSTALL_APP_ID, "-e"])
+        self.assertEqual(argv[4], "/usr/bin/python3")
+        self.assertEqual(argv[-1], "--interactive-ofono")
+        self.assertNotIn("pkexec", " ".join(argv))
+        self.assertNotIn("dnf5", " ".join(argv))
+
+    def test_typed_backend_unavailable_if_neither_package_tool_is_present(self):
+        launcher = mock.Mock()
+        paths = {
+            "foot": "/usr/bin/foot", "python3": "/usr/bin/python3",
+            "gpk-install-package-name": "/usr/bin/gpk-install-package-name",
+        }
+        result = gui.open_support(
+            prerequisite=lambda: evidence(), is_fedora=lambda: True,
+            find=paths.get, launcher=launcher, already_open=lambda: False)
+        self.locked(result)
+        self.assertEqual(result["status"], "PACKAGE_MANAGER_UNAVAILABLE")
+        launcher.assert_not_called()
+
+    def test_privileged_binary_from_untrusted_directory_is_never_allowed(self):
+        launcher = mock.Mock()
+        paths = {
+            "foot": "/usr/bin/foot", "python3": "/usr/bin/python3",
+            "pkexec": "/tmp/pkexec", "dnf5": "/usr/bin/dnf5",
+        }
+        result = gui.open_support(
+            prerequisite=lambda: evidence(), is_fedora=lambda: True,
+            find=paths.get, launcher=launcher, already_open=lambda: False)
+        self.locked(result)
+        self.assertEqual(result["status"], "PACKAGE_MANAGER_UNAVAILABLE")
+        launcher.assert_not_called()
+
     def test_same_existing_exact_staged_actor_never_duplicate_installer(self):
         launcher = mock.Mock()
         result = gui.open_support(
@@ -97,7 +141,7 @@ class CallingSetupGuiTests(unittest.TestCase):
             prerequisite=lambda: evidence(), is_fedora=lambda: True,
             find=p, launcher=launcher, already_open=lambda: False)
         self.locked(result)
-        self.assertEqual(result["status"], "GUI_UNAVAILABLE")
+        self.assertEqual(result["status"], "TERMINAL_UNAVAILABLE")
         self.assertFalse(result["stageCandidate"])
         launcher.assert_not_called()
 
@@ -107,7 +151,7 @@ class CallingSetupGuiTests(unittest.TestCase):
             prerequisite=lambda: evidence(), is_fedora=lambda: True,
             find=lambda _: None, launcher=launcher, already_open=lambda: False)
         self.locked(result)
-        self.assertEqual(result["status"], "GUI_UNAVAILABLE")
+        self.assertEqual(result["status"], "TERMINAL_UNAVAILABLE")
         launcher.assert_not_called()
 
     def test_untrusted_resolved_program_is_not_launched(self):
@@ -119,7 +163,7 @@ class CallingSetupGuiTests(unittest.TestCase):
                     find=lambda name: wrong,
                     launcher=launcher, already_open=lambda: False)
                 self.locked(result)
-                self.assertEqual(result["status"], "GUI_UNAVAILABLE")
+                self.assertEqual(result["status"], "TERMINAL_UNAVAILABLE")
         launcher.assert_not_called()
 
     def test_foot_launch_failure_does_not_open_external_package_manager(self):

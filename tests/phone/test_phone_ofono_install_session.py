@@ -37,15 +37,59 @@ class OfonoSessionTests(unittest.TestCase):
         self.assertNotIn("-y", args)
         self.assertNotIn("--allow-untrusted", args)
 
-    def test_missing_or_untrusted_pkcon_fails_without_execution(self):
-        for path in (None, "", "/tmp/not-pkcon", "pkcon", 17):
-            with self.subTest(path=path):
+    def test_no_supported_package_backend_fails_without_execution(self):
+        for paths in ({}, {"pkcon": "pkcon"},
+                      {"pkexec": "/usr/bin/pkexec"},
+                      {"dnf5": "/usr/bin/dnf5"},
+                      {"pkexec": "/tmp/pkexec", "dnf5": "/usr/bin/dnf5"},
+                      {"pkexec": "/usr/bin/pkexec", "dnf5": "/tmp/dnf5"}):
+            with self.subTest(paths=paths):
                 run = mock.Mock()
                 result = session.run_session(
-                    interactive=lambda: True, find=lambda _: path,
+                    interactive=lambda: True,
+                    find=paths.get,
                     runner=run, hold=mock.Mock())
                 self.assertEqual(result, 3)
                 run.assert_not_called()
+
+    def test_dnf5_fallback_with_polkit_requires_independent_authorization(self):
+        run = mock.Mock(return_value=mock.Mock(returncode=0))
+        found = {"pkexec": "/usr/bin/pkexec", "dnf5": "/usr/bin/dnf5"}
+        result = session.run_session(
+            interactive=lambda: True, find=found.get,
+            runner=run, hold=lambda text: "")
+        self.assertEqual(result, 0)
+        run.assert_called_once_with(
+            ["/usr/bin/pkexec", "/usr/bin/dnf5",
+             "--setopt=assumeyes=False", "--setopt=defaultyes=False",
+             "install", "ofono"], check=False)
+        command = run.call_args.args[0]
+        self.assertNotIn("--assumeyes", command)
+        self.assertNotIn("-y", command)
+        self.assertNotIn("--allow-erasing", command)
+        self.assertNotIn("bash", command)
+
+    def test_packagekit_is_preferred_when_both_backends_exist(self):
+        paths = {"pkcon": "/usr/bin/pkcon", "pkexec": "/usr/bin/pkexec",
+                 "dnf5": "/usr/bin/dnf5"}
+        run = mock.Mock(return_value=mock.Mock(returncode=0))
+        result = session.run_session(
+            interactive=lambda: True, find=paths.get,
+            runner=run, hold=lambda text: "")
+        self.assertEqual(result, 0)
+        run.assert_called_once_with(
+            ["/usr/bin/pkcon", "install", "ofono"], check=False)
+
+    def test_failed_packagekit_does_not_automatically_try_root_dnf5(self):
+        paths = {"pkcon": "/usr/bin/pkcon", "pkexec": "/usr/bin/pkexec",
+                 "dnf5": "/usr/bin/dnf5"}
+        run = mock.Mock(return_value=mock.Mock(returncode=126))
+        result = session.run_session(
+            interactive=lambda: True, find=paths.get,
+            runner=run, hold=lambda text: "")
+        self.assertEqual(result, 2)
+        run.assert_called_once_with(
+            ["/usr/bin/pkcon", "install", "ofono"], check=False)
 
     def test_transaction_failure_not_misreported_as_installed(self):
         run = mock.Mock(return_value=mock.Mock(returncode=7))
@@ -76,9 +120,12 @@ class OfonoSessionTests(unittest.TestCase):
 
     def test_no_direct_system_service_or_bluetooth_changes(self):
         content = FILE.read_text()
-        for forbidden in ("sudo ", "pkexec", "dnf install", "systemctl start",
+        self.assertIn('"--setopt=assumeyes=False"', content)
+        self.assertIn('"--setopt=defaultyes=False"', content)
+        for forbidden in ("sudo ", "dnf install", "systemctl start",
                           "systemctl restart", "bluetoothctl", "shell=True",
-                          "os.system(", "sendMessage(", "getContacts("):
+                          "os.system(", "sendMessage(", "getContacts(",
+                          "input_password(", "getMessages("):
             with self.subTest(forbidden=forbidden):
                 self.assertNotIn(forbidden, content)
 

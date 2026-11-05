@@ -131,13 +131,25 @@ class CallingSetupUiTests(unittest.TestCase):
         self.assertIn('CHECK AGAIN updates the existing service and call statuses', self.ui)
 
     def test_fedora_native_approval_and_missing_installer_explained(self):
-        self.assertIn("Review PackageKit's approval inside PHONE", self.ui)
-        self.assertIn('The embedded installer needs foot, Python and PackageKit available', self.ui)
+        self.assertIn("Review and confirm the Fedora package transaction inside PHONE", self.ui)
+        self.assertIn('Neither PackageKit (pkcon) nor Polkit with DNF5 is available.', self.ui)
+        self.assertIn('The embedded installer requires foot and Python.', self.ui)
         self.assertIn('No external window was opened or installation confirmed.', self.ui)
         self.assertIn('Only oFono.', self.ui)
         self.assertIn('GUI_UNAVAILABLE', self.ui)
         self.assertIn('GUI_LAUNCH_FAILED', self.ui)
         self.assertIn('UNSUPPORTED_HOST', self.ui)
+
+    def test_fallback_uses_the_same_phone_stage_and_native_approval(self):
+        self.assertIn('"TERMINAL_UNAVAILABLE"', self.ui)
+        self.assertIn('"PACKAGE_MANAGER_UNAVAILABLE"', self.ui)
+        self.assertIn('Polkit with DNF5', self.ui)
+        self.assertIn("Fedora's interactive installer runs in the PHONE terminal", self.ui)
+        self.assertIn('Review its transaction and confirm or decline;', self.ui)
+        self.assertIn('r.packageInstalled !== false', self.ui)
+        self.assertIn('r.hfpVerified !== false', self.ui)
+        self.assertNotIn('dnf5 install', self.ui)
+        self.assertIn('onTriggered: phonePane.callingSupportSetup()', self.ui)
 
     def test_staged_packagekit_terminal_reuses_verified_phone_cutout(self):
         self.assertIn('property string stagePurpose: "PHONE"', self.ui)
@@ -190,7 +202,10 @@ class CallingSetupUiTests(unittest.TestCase):
         self.assertIn('messages: []', self.ui)
 
     def test_no_installation_or_device_defaults_ever_enter_our_code(self):
-        for forbidden in ("pkexec", "sudo ", "dnf install", "subprocess.run(",
+        self.assertIn('pkexec = installed_program("pkexec")', self.helper)
+        self.assertIn('dnf5 = installed_program("dnf5")', self.helper)
+        self.assertIn('backend_ready = bool(pkcon or (pkexec and dnf5))', self.helper)
+        for forbidden in ("sudo ", "dnf install", "subprocess.run(",
                           "bluetoothctl pair", "systemctl start", "shell=True",
                           "sendMessage(", "getContacts("):
             with self.subTest(forbidden=forbidden):

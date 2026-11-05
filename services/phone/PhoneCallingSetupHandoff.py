@@ -107,16 +107,24 @@ def open_support(
         except Exception:
             return None
         return (p if type(p) is str and os.path.isabs(p)
-                and os.path.basename(p) == name else None)
+                and os.path.basename(p) == name
+                and os.path.dirname(os.path.realpath(p)) in ("/usr/bin", "/bin")
+                else None)
 
     foot = installed_program("foot")
     pkcon = installed_program("pkcon")
+    pkexec = installed_program("pkexec")
+    dnf5 = installed_program("dnf5")
     python = installed_program("python3")
     session_script = Path(__file__).with_name("PhoneOfonoInstallSession.py")
-    if not (foot and pkcon and python and session_script.is_file()):
-        # The requested in-panel installation is not available. Opening an
-        # unrelated external GUI would recreate the operator's dead window.
-        return _result("GUI_UNAVAILABLE")
+    # Fedora minimalist/Sway installs may omit PackageKit's pkcon client.
+    # The alternate is a *user-authorized* Polkit + DNF5 transaction in the
+    # SAME embedded foot terminal, never an automatic installation.
+    backend_ready = bool(pkcon or (pkexec and dnf5))
+    if not (foot and python and session_script.is_file()):
+        return _result("TERMINAL_UNAVAILABLE")
+    if not backend_ready:
+        return _result("PACKAGE_MANAGER_UNAVAILABLE")
     try:
         launcher(
             [foot, "--app-id", INSTALL_APP_ID, "-e", python,

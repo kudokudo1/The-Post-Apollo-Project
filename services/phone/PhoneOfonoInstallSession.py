@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
-"""An explicitly requested, interactive Fedora oFono package session.
+"""Explicit, interactive Fedora oFono package installation inside PHONE.
 
-Runs inside a dedicated foot terminal staged into the Social PHONE panel.
-Only PackageKit's interactive CLI can request the exact 'ofono' package.
-No noninteractive confirmation, root shell, credentials, DNF, auto service
-activation, Bluetooth changes, scripts from network or arbitrary arguments.
+Prefer PackageKit's pkcon when available. Minimal Fedora desktops may instead
+have DNF5 + Polkit, which require the same user's interactive authorization.
+This helper never invokes an installer on import or without a real TTY and
+the exact --interactive-ofono flag. It never auto-answers transaction prompts.
 """
 from __future__ import annotations
 
@@ -13,6 +13,21 @@ import shutil
 import subprocess
 import sys
 from typing import Callable, Any
+
+
+def _program(name: str, find: Callable[[str], str | None]) -> str | None:
+    try:
+        path = find(name)
+    except Exception:
+        return None
+    if type(path) is not str or not os.path.isabs(path):
+        return None
+    # A privileged installer must be an OS binary, not a command planted in
+    # the user's PATH or the directory of a downloaded script.
+    if (os.path.basename(path) != name
+            or os.path.dirname(os.path.realpath(path)) not in ("/usr/bin", "/bin")):
+        return None
+    return path
 
 
 def run_session(
@@ -25,35 +40,51 @@ def run_session(
     if interactive() is not True:
         print("The oFono installer requires an interactive terminal.")
         return 3
-    try:
-        path = find("pkcon")
-    except Exception:
-        path = None
-    if (type(path) is not str or not os.path.isabs(path)
-            or os.path.basename(path) != "pkcon"):
-        print("PackageKit's interactive installer is unavailable.")
-        return 3
+
+    pkcon = _program("pkcon", find)
+    if pkcon:
+        backend = "PackageKit"
+        command = [pkcon, "install", "ofono"]
+    else:
+        pkexec = _program("pkexec", find)
+        dnf5 = _program("dnf5", find)
+        if not (pkexec and dnf5):
+            print("No supported embedded installer: PackageKit's pkcon or "
+                  "both Polkit pkexec and DNF5 must be installed.")
+            return 3
+        backend = "Polkit / DNF5"
+        # Force the interactive no-by-default behavior even when a user's
+        # DNF5 configuration has assumeyes/defaultyes enabled.
+        # pkexec requests normal system authorization; no password or
+        # credential is supplied or handled by Social PHONE.
+        command = [
+            pkexec, dnf5,
+            "--setopt=assumeyes=False",
+            "--setopt=defaultyes=False",
+            "install", "ofono",
+        ]
 
     print("Social PHONE // Fedora oFono calling support")
-    print("Package requested: ofono")
-    print("Review the PackageKit transaction and approve it only if you agree.")
-    print("No phone pairing, audio routing, or system service is changed by Social.")
+    print("Requested package: ofono")
+    print("Installer: " + backend)
+    print("Review the package transaction and approve only if you agree.")
+    print("Your Bluetooth pairing, media preferences and services stay unchanged by Social.")
     print("")
     try:
-        result = runner([path, "install", "ofono"], check=False)
+        result = runner(command, check=False)
         code = getattr(result, "returncode", 1)
     except Exception:
-        print("PackageKit could not complete the installation request.")
+        print("The package installer could not complete the request.")
         code = 1
     print("")
     if code == 0:
-        print("PackageKit reports that its transaction completed.")
-        print("Return to PHONE and use CHECK AGAIN to verify actual installation.")
+        print("The package installer reports its transaction completed.")
+        print("Return to PHONE and use CHECK AGAIN to independently verify oFono.")
     else:
-        print("PackageKit did not confirm a completed installation.")
-        print("No calling or hands-free audio connection has been verified.")
+        print("The package installer did not confirm completion.")
+        print("Hands-free calling remains unverified.")
     try:
-        hold("Press Enter to close this setup terminal and recheck PHONE...")
+        hold("Press Enter to close this terminal and recheck PHONE...")
     except (EOFError, KeyboardInterrupt):
         pass
     return 0 if code == 0 else 2

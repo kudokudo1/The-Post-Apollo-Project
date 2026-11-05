@@ -226,6 +226,7 @@ Rectangle {
         anchors.topMargin: 3
         anchors.bottomMargin: 2
         compactMode: true
+        showCompactHelioControls: true
         neonEnabled: true
         visualData: astrology.calculated
                     ? astrology.celestialSource.visualData : null

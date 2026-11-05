@@ -57,7 +57,12 @@ ShellRoot {
                     return root.fail("WRONG_CLOCK_ROUTE");
                 if (focused.displayedPlanetRows.length !== 5
                         || focused.visibleClockLaneCount !== 5)
-                    return root.fail("EMPTY_PLANET_CLOCK_LANES");
+                    return root.fail("EMPTY_PLANET_CLOCK_LANES // rowdata="
+                        + focused.displayedPlanetRows.length
+                        + " rendered=" + focused.visibleClockLaneCount
+                        + " mounted=" + focused.instrumentMounted
+                        + " state=" + focused.instrumentLoadState
+                        + " mode=" + focused.kind);
                 if (focused.sourceStatus === "")
                     return root.fail("NO_MISSING_SOURCE_STATUS");
                 focused.routeRequested("cosmos/planets-stars/celestial-fix");

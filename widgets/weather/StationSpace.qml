@@ -12,6 +12,12 @@ Rectangle {
 
     // Optional COSMOS detail route. Empty keeps CLASSIC SPACE fully intact.
     property string subjectRoute: ""
+    // C5c // Acquire one route-scoped NOAA source without rendering the old
+    // 2,840-line scrolling report. Off by default for every existing route.
+    property bool sourceOnly: false
+    readonly property var xrayObservation: xrayService
+    readonly property var flareObservation: flareService
+    readonly property var cycleObservation: solarCycleService
     function sectionVisible(section) {
         return CosmosPanelPolicy.visibleFor("space", subjectRoute, section);
     }
@@ -535,6 +541,7 @@ Rectangle {
     // new model forecast extends beyond the station's fixed-height viewport.
     Flickable {
         id: spaceScroll
+        visible: !space.sourceOnly
         anchors.fill: parent
         clip: true
         boundsBehavior: Flickable.StopAtBounds
@@ -1613,7 +1620,9 @@ Rectangle {
                     id: solarImage
                     anchors.fill: parent
                     anchors.margins: 4
-                    source: space.solarImageUrl
+                    // The focused SUVI image gets sole ownership of the
+                    // rendered image; do not download a hidden duplicate.
+                    source: space.sourceOnly ? "" : space.solarImageUrl
                     fillMode: Image.PreserveAspectFit
                     asynchronous: true
                     cache: false

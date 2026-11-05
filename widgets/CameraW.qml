@@ -51,6 +51,68 @@ PanelWindow {
     property string zoomServiceState: "NOT_CHECKED"
     property string zoomLastChecked: ""
     property bool zoomEnterQueued: false
+    // Camera M4d: X/Instagram-style private browser guest in a measured bay.
+    // Only a verified native actor/viewport enables the alpha + input hole.
+    property bool zoomWebDocked: false
+    property bool zoomWebBusy: false
+    property string zoomWebState: "NOT_STARTED"
+    property string zoomWebIdentity: "identity-1"
+    readonly property int zoomBayInset: 18
+    readonly property int zoomBayTop: 131
+    readonly property int zoomBayWidth: Math.max(0, frameWidth - 36)
+    readonly property int zoomBayHeight: Math.max(0, frameHeight - 169)
+    readonly property string zoomWebOutput: camera.screen ? String(camera.screen.name || "") : ""
+    function zoomWebArgs(action) {
+        return ["python3", "-I", "-B", Quickshell.shellPath("scripts/camera/ZoomWebHost.py"),
+                action, "--identity", zoomWebIdentity,
+                "--output", zoomWebOutput,
+                "--x", String(camera.margins.left + camera.glowGutter + zoomBayInset),
+                "--y", String(camera.frameTopInset + zoomBayTop),
+                "--width", String(zoomBayWidth), "--height", String(zoomBayHeight)];
+    }
+    function enterZoomWeb() {
+        if (!menuOpen || activeView !== "zoom" || zoomWebBusy)
+            return false;
+        zoomWebDocked = false;
+        zoomWebBusy = true;
+        zoomWebState = "LAUNCHING_WEB_APP";
+        zoomWebProcess.exec(zoomWebArgs("enter"));
+        return true;
+    }
+    function hideZoomWeb() {
+        zoomWebDocked = false;  // input cutout closes before guest is hidden
+        zoomWebState = "HIDDEN";
+        zoomWebHideProcess.exec(zoomWebArgs("hide"));
+    }
+    function consumeZoomWeb(raw) {
+        zoomWebBusy = false;
+        var reply = null;
+        try { reply = JSON.parse(String(raw || "")); }
+        catch (e) {}
+        if (!menuOpen || activeView !== "zoom") {
+            hideZoomWeb();
+            return;
+        }
+        zoomWebDocked = !!(reply && reply.ok === true && reply.docked === true);
+        zoomWebState = zoomWebDocked ? "WEB_APP_DOCKED"
+                        : "WEB_HOST_UNAVAILABLE // " + String(reply && (reply.error || reply.state) || "NO_RESULT");
+        if (zoomWebDocked)
+            feedback = "ZOOM WEB // PROVIDER LOGIN AND JOIN/START INSIDE CAMERA";
+        else
+            feedback = "ZOOM WEB // " + zoomWebState;
+    }
+    onFrameWidthChanged: {
+        if (zoomWebDocked) {
+            zoomWebDocked = false;
+            zoomWebRealign.restart();
+        }
+    }
+    onFrameHeightChanged: {
+        if (zoomWebDocked) {
+            zoomWebDocked = false;
+            zoomWebRealign.restart();
+        }
+    }
     property var zoomLaunchObservation: null
     property string zoomLaunchState: "NOT_CHECKED"
     property string zoomLaunchMessage: "LAUNCH // NOT CHECKED"
@@ -107,6 +169,8 @@ PanelWindow {
         if (!menuOpen) {
             zoomInstallChoice = "";
             zoomEnterQueued = false;
+            if (activeView === "zoom")
+                hideZoomWeb();
             return;
         }
         if (activeView === "zoom") {
@@ -216,19 +280,11 @@ PanelWindow {
     }
 
     function openZoomMode() {
-        const wasZoom = activeView === "zoom";
         activeView = "zoom";
         zoomInstallChoice = "";
-        if (wasZoom && zoomLaunchState === "CHECKING")
-            return;
-        if (busy) {
-            zoomEnterQueued = true;
-            return;
-        }
-        zoomLaunchState = "CHECKING";
-        zoomLaunchMessage = "ZOOM // DETECTING CLIENT AND STARTING IF NEEDED";
-        // This mode-entry action is the operator's requested launch intent.
-        run("zoomEnter", ["zoom-enter"]);
+        // Zoom Web App is the PRIMARY app surface, as with Social X/Instagram.
+        // It owns its login/calls. Native Zoom is an optional fallback below.
+        enterZoomWeb();
     }
 
     function prepareZoomInstall(choice) {
@@ -540,8 +596,9 @@ PanelWindow {
     exclusiveZone: 0
     WlrLayershell.layer: WlrLayer.Overlay
     WlrLayershell.keyboardFocus:
-        menuOpen ? WlrKeyboardFocus.OnDemand : WlrKeyboardFocus.None
-    focusable: menuOpen
+        menuOpen && !zoomWebDocked ? WlrKeyboardFocus.OnDemand : WlrKeyboardFocus.None
+    // A docked browser receives its own keyboard focus for Zoom login/calls.
+    focusable: menuOpen && !zoomWebDocked
     color: "transparent"
     surfaceFormat.opaque: false
     visible: !camera.nativeRegionSelecting
@@ -550,6 +607,15 @@ PanelWindow {
         y: camera.frameTopInset
         width: camera.menuOpen ? camera.frameWidth : 0
         height: camera.menuOpen ? camera.frameHeight : 0
+        Region {
+            // Coordinates relative to the enclosing frame input region.
+            // No hole until the browser actor and exact bay are confirmed.
+            x: camera.zoomBayInset
+            y: camera.zoomBayTop
+            width: camera.zoomWebDocked ? camera.zoomBayWidth : 0
+            height: camera.zoomWebDocked ? camera.zoomBayHeight : 0
+            intersection: Intersection.Subtract
+        }
     }
 
     // Read-only status check after an explicit launch. No retries or hidden
@@ -566,6 +632,35 @@ PanelWindow {
             if (camera.menuOpen && camera.activeView === "zoom" && !camera.busy)
                 camera.checkZoomWindow();
         }
+    }
+
+    Timer {
+        id: zoomWebRealign
+        interval: 240
+        repeat: false
+        onTriggered: {
+            if (camera.menuOpen && camera.activeView === "zoom"
+                    && !camera.zoomWebBusy)
+                camera.enterZoomWeb();
+        }
+    }
+    Process {
+        id: zoomWebProcess
+        running: false
+        stdout: StdioCollector {
+            onStreamFinished: camera.consumeZoomWeb(this.text)
+        }
+        onExited: function(code, status) {
+            if (camera.zoomWebBusy && code !== 0) {
+                camera.zoomWebBusy = false;
+                camera.zoomWebDocked = false;
+                camera.zoomWebState = "WEB_HOST_PROCESS_FAILED";
+            }
+        }
+    }
+    Process {
+        id: zoomWebHideProcess
+        running: false
     }
 
     Process {
@@ -639,7 +734,8 @@ PanelWindow {
         visible: camera.menuOpen
         focus: camera.menuOpen
         fillColor: Colors.black
-        fillOpacity: 0.97
+        // Expose the web app ONLY through a compositor-measured slot.
+        fillOpacity: camera.zoomWebDocked ? 0.0 : 0.97
         borderColor: Colors.cyan
         borderWidth: 1
         glowVisible: camera.menuOpen
@@ -652,6 +748,24 @@ PanelWindow {
                 camera.menuOpen = false;
             }
             event.accepted = true;
+        }
+
+        Rectangle {
+            // Preserve opaque chrome above and below the live browser bay.
+            x: 0
+            y: 0
+            width: parent.width
+            height: camera.zoomBayTop
+            color: Colors.black
+            visible: camera.zoomWebDocked
+        }
+        Rectangle {
+            x: 0
+            y: camera.zoomBayTop + camera.zoomBayHeight
+            width: parent.width
+            height: Math.max(0, parent.height - y)
+            color: Colors.black
+            visible: camera.zoomWebDocked
         }
 
         Column {
@@ -667,13 +781,33 @@ PanelWindow {
 
                 GohuText {
                     width: parent.width - (30 * 2 + 38 + cameraHeader.spacing * 3)
+                           - (camera.activeView === "zoom" ? 110 : 0)
                     height: parent.height
                     verticalAlignment: Text.AlignVCenter
-                    text: "CAMERA // CAPTURE + LIBRARY"
+                    text: (camera.activeView === "zoom" ? "CAMERA // ZOOM WEB"
+                          : "CAMERA // CAPTURE + LIBRARY")
                           + " [" + camera.chassisLevel.toUpperCase() + "]"
                     font.pixelSize: 18
                     color: Colors.magenta
                     elide: Text.ElideRight
+                }
+
+                // Keep setup available when the live Zoom browser fills its
+                // page and the former in-page download button is hidden.
+                ActionButton {
+                    width: 102
+                    height: 31
+                    visible: camera.activeView === "zoom"
+                    label: "↓ DOWNLOAD"
+                    labelPixelSize: 10
+                    accentColor: Colors.magenta
+                    onLeftClicked: {
+                        if (camera.zoomWebDocked)
+                            camera.hideZoomWeb();
+                        camera.zoomSetupVisible = !camera.zoomSetupVisible;
+                        if (!camera.zoomSetupVisible && camera.activeView === "zoom")
+                            camera.enterZoomWeb();
+                    }
                 }
 
                 // Finance-style ↓/↑ geometry controls: they resize the
@@ -738,8 +872,11 @@ PanelWindow {
                         selectedForegroundColor: Colors.magenta
                         selectedBorderColor: Colors.magenta
                         onLeftClicked: {
-                            if (modelData.id !== "zoom")
+                            if (modelData.id !== "zoom") {
                                 camera.zoomInstallChoice = "";
+                                if (camera.activeView === "zoom")
+                                    camera.hideZoomWeb();
+                            }
                             if (modelData.id === "gallery")
                                 camera.loadGallery();
                             else if (modelData.id === "zoom")
@@ -1345,7 +1482,7 @@ PanelWindow {
                 Flickable {
                     id: zoomPage
                     anchors.fill: parent
-                    visible: camera.activeView === "zoom"
+                    visible: camera.activeView === "zoom" && !camera.zoomWebDocked
                     clip: true
                     contentHeight: zoomContent.implicitHeight
                     boundsBehavior: Flickable.StopAtBounds
@@ -1355,6 +1492,23 @@ PanelWindow {
                         width: zoomPage.width
                         spacing: 12
 
+                        GohuText {
+                            width: parent.width
+                            color: Colors.yellow
+                            font.pixelSize: 11
+                            wrapMode: Text.WordWrap
+                            text: "ZOOM WEB // " + camera.zoomWebState
+                                  + " // Login and Join/New Meeting live in the hosted browser view when docked."
+                        }
+                        ActionButton {
+                            width: parent.width
+                            height: 38
+                            label: "RETRY ZOOM WEB HOST"
+                            labelPixelSize: 11
+                            accentColor: Colors.magenta
+                            available: !camera.zoomWebBusy
+                            onLeftClicked: camera.enterZoomWeb()
+                        }
                         Row {
                             id: zoomHeaderRow
                             width: parent.width
@@ -1372,6 +1526,7 @@ PanelWindow {
                                 width: 128
                                 height: 33
                                 label: "↓ DOWNLOAD"
+                                visible: false // Canonical control is the Camera top-right header.
                                 labelPixelSize: 11
                                 accentColor: Colors.magenta
                                 onLeftClicked: {

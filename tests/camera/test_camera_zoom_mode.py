@@ -17,7 +17,9 @@ class ZoomModeTests(unittest.TestCase):
         self.assertIn('function openZoomMode()', PANEL)
         entry = PANEL.split('function openZoomMode()', 1)[1].split(
             'function prepareZoomInstall(choice)', 1)[0]
-        self.assertIn('run("zoomEnter", ["zoom-enter"])', entry)
+        self.assertIn('enterZoomWeb()', entry)
+        self.assertNotIn('run("zoomEnter", ["zoom-enter"])', entry)
+        self.assertIn('scripts/camera/ZoomWebHost.py', PANEL)
         self.assertIn('camera.openZoomMode();', PANEL)
         self.assertIn('label: "↓ DOWNLOAD"', PANEL)
         self.assertIn('id: zoomStatusRail', PANEL)
@@ -37,8 +39,8 @@ class ZoomModeTests(unittest.TestCase):
         self.assertIn('run("zoomConnectivity", ["zoom-connectivity"])', PANEL)
         self.assertIn('zoomSetupVisible = payload.installed !== true;', PANEL)
         self.assertIn('zoomLaunchState = "NOT_INSTALLED"', PANEL)
-        # The normal mode entry remains the only automatic Zoom launcher.
-        self.assertIn('run("zoomEnter", ["zoom-enter"])', PANEL)
+        # The normal mode entry launches the Zoom Web actor, not native Zoom.
+        self.assertIn('zoomWebProcess.exec(zoomWebArgs("enter"))', PANEL)
 
     def test_missing_client_leaves_mode_open_and_never_spawns(self):
         with patch.object(camera, "zoom_launch_check",

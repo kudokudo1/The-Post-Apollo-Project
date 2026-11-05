@@ -42,6 +42,8 @@ jobs:
         run: python3 -m unittest discover -s tests/camera -p 'test_camera_zoom_launch.py' -v
       - name: Camera Zoom one-click mode entry and reachability status
         run: python3 -m unittest discover -s tests/camera -p 'test_camera_zoom_mode.py' -v
+      - name: Camera Zoom Web guest origin, dock and fail-closed tests
+        run: python3 -m unittest discover -s tests/camera -p 'test_camera_zoom_web_host.py' -v
       - name: Camera Zoom installer confirmation and package safety tests
         run: python3 -m unittest discover -s tests/camera -p 'test_camera_zoom_install.py' -v
       - name: Camera dock, panel and independent-owner source contract

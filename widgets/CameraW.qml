@@ -59,10 +59,31 @@ PanelWindow {
     // Typed Sway rectangle deltas only; never expose browser titles or logins.
     property var zoomWebRectDelta: null
     property string zoomWebIdentity: "identity-1"
-    readonly property int zoomBayInset: 18
-    readonly property int zoomBayTop: 131
-    readonly property int zoomBayWidth: Math.max(0, frameWidth - 36)
-    readonly property int zoomBayHeight: Math.max(0, frameHeight - 169)
+    // The Zoom guest fills the REAL content slot below Camera's header and
+    // mode row. Fixed offsets reserved a phantom footer and clipped Join.
+    // These live QML item positions track layout/size changes reactively.
+    readonly property int zoomBayInset:
+        Math.max(0, Math.round(cameraPage.x + cameraPage.parent.x))
+    readonly property int zoomBayTop:
+        Math.max(0, Math.round(cameraPage.y + cameraPage.parent.y))
+    readonly property int zoomBayBottom: 5
+    readonly property int zoomBayWidth: Math.max(0, Math.round(cameraPage.width))
+    readonly property int zoomBayHeight:
+        Math.max(0, Math.round(frame.height - zoomBayTop - zoomBayBottom))
+    property bool zoomWebNeedsRealign: false
+
+    function scheduleZoomWebRealign() {
+        if (!menuOpen || activeView !== "zoom")
+            return;
+        // Close the input hole *before* moving the browser actor.
+        zoomWebDocked = false;
+        if (zoomWebBusy) {
+            // Never accept a stale geometry verification after a resize.
+            zoomWebNeedsRealign = true;
+            return;
+        }
+        zoomWebRealign.restart();
+    }
     readonly property string zoomWebOutput: camera.screen ? String(camera.screen.name || "") : ""
     function zoomWebArgs(action) {
         return ["python3", "-I", "-B", Quickshell.shellPath("scripts/camera/ZoomWebHost.py"),
@@ -77,6 +98,7 @@ PanelWindow {
             return false;
         zoomWebDocked = false;
         zoomWebRectDelta = null;
+        zoomWebNeedsRealign = false;
         zoomWebBusy = true;
         zoomWebState = "LAUNCHING_WEB_APP";
         zoomWebProcess.exec(zoomWebArgs("enter"));
@@ -96,6 +118,15 @@ PanelWindow {
             hideZoomWeb();
             return;
         }
+        if (zoomWebNeedsRealign) {
+            // Host checked an older rectangle; keep the cutout closed until
+            // its same existing browser window is moved and verified again.
+            zoomWebNeedsRealign = false;
+            zoomWebDocked = false;
+            zoomWebState = "REALIGNING_WEB_APP";
+            zoomWebRealign.restart();
+            return;
+        }
         zoomWebDocked = !!(reply && reply.ok === true && reply.docked === true);
         zoomWebRectDelta = reply && Array.isArray(reply.rectDelta)
             && reply.rectDelta.length === 4 ? reply.rectDelta : null;
@@ -106,18 +137,12 @@ PanelWindow {
         else
             feedback = "ZOOM WEB // " + zoomWebState;
     }
-    onFrameWidthChanged: {
-        if (zoomWebDocked) {
-            zoomWebDocked = false;
-            zoomWebRealign.restart();
-        }
-    }
-    onFrameHeightChanged: {
-        if (zoomWebDocked) {
-            zoomWebDocked = false;
-            zoomWebRealign.restart();
-        }
-    }
+    onZoomBayInsetChanged: scheduleZoomWebRealign()
+    onZoomBayTopChanged: scheduleZoomWebRealign()
+    onZoomBayWidthChanged: scheduleZoomWebRealign()
+    onZoomBayHeightChanged: scheduleZoomWebRealign()
+    onZoomWebOutputChanged: scheduleZoomWebRealign()
+    onDockCenterXChanged: scheduleZoomWebRealign()
     property var zoomLaunchObservation: null
     property string zoomLaunchState: "NOT_CHECKED"
     property string zoomLaunchMessage: "LAUNCH // NOT CHECKED"
@@ -644,9 +669,13 @@ PanelWindow {
         interval: 240
         repeat: false
         onTriggered: {
-            if (camera.menuOpen && camera.activeView === "zoom"
-                    && !camera.zoomWebBusy)
-                camera.enterZoomWeb();
+            if (!camera.menuOpen || camera.activeView !== "zoom")
+                return;
+            if (camera.zoomWebBusy) {
+                zoomWebRealign.restart();
+                return;
+            }
+            camera.enterZoomWeb();
         }
     }
     Process {
@@ -660,9 +689,14 @@ PanelWindow {
             // malformed or absent JSON left the host action busy.
             Qt.callLater(function() {
                 if (camera.zoomWebBusy) {
+                    const retry = camera.zoomWebNeedsRealign;
                     camera.zoomWebBusy = false;
                     camera.zoomWebDocked = false;
-                    camera.zoomWebState = "WEB_HOST_PROCESS_UNVERIFIED";
+                    camera.zoomWebNeedsRealign = false;
+                    camera.zoomWebState = retry ? "REALIGNING_WEB_APP"
+                                               : "WEB_HOST_PROCESS_UNVERIFIED";
+                    if (retry && camera.menuOpen && camera.activeView === "zoom")
+                        zoomWebRealign.restart();
                 }
             });
         }
@@ -900,7 +934,10 @@ PanelWindow {
             Item {
                 id: cameraPage
                 width: parent.width
-                height: frame.height - 169
+                // In Zoom, the browser occupies the entire remaining body,
+                // rather than the smaller Capture/Gallery page height.
+                height: camera.activeView === "zoom" && camera.zoomWebDocked
+                        ? camera.zoomBayHeight : frame.height - 169
 
                 Flickable {
                     id: capturePage
@@ -2042,6 +2079,9 @@ PanelWindow {
 
             GohuText {
                 width: parent.width
+                // During a docked Zoom session the web guest owns the body.
+                // A global status footer would cover browser buttons/scrolling.
+                visible: !(camera.activeView === "zoom" && camera.zoomWebDocked)
                 font.pixelSize: 10
                 color: Colors.yellow
                 elide: Text.ElideRight

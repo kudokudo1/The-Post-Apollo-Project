@@ -116,7 +116,10 @@ test("V4e is a UI-only containment patch retaining original Sun/JPL and MAGICK c
     assert.match(pane,/ctx\.rect\(plotBounds\.left,plotBounds\.top/);
     assert.match(pane,/ctx\.clip\(\)/);
     assert.match(pane,/Helio\.viewportMarker\(/);
-    assert.match(pane,/Helio\.labelPosition\(/);
+    // V5a performs collision-aware visible label placement, while the
+    // original V4e pure labelPosition() helper remains available.
+    assert.match(pane,/Labels\.layout\(/);
+    assert.match(code,/function labelPosition\(/);
     assert.match(pane,/Helio\.visibleHit\(/);
     assert.match(pane,/p\.offscreen\?" \/ OUT":""/);
     assert.match(pane,/ctx\.measureText\(label\)\.width/);

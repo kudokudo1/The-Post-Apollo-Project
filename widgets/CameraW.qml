@@ -49,6 +49,9 @@ PanelWindow {
     property var zoomClientStatus: null
     // Missing installations must show an actionable setup, not a disabled button.
     property bool zoomSetupVisible: false
+    // Explicit two-click installer gate; cleared on closing or changing modes.
+    property string zoomInstallChoice: ""
+    property string zoomInstallNotice: ""
     onZoomIdentityIdChanged: selectedZoomAccountId = ""
     // The native slurp overlay owns the region drag; Camera unmaps while it runs.
     property bool nativeRegionSelecting: false
@@ -94,6 +97,8 @@ PanelWindow {
     }
 
     onMenuOpenChanged: {
+        if (!menuOpen)
+            zoomInstallChoice = "";
         // Read-only tool status on explicit open; no image copies or writes.
         if (menuOpen && statusReport === null && !busy)
             run("status", ["status"]);
@@ -189,8 +194,37 @@ PanelWindow {
 
     function openZoomMode() {
         activeView = "zoom";
+        zoomInstallChoice = "";
         if (!busy)
             run("zoomStatus", ["zoom-status"]);
+    }
+
+    function prepareZoomInstall(choice) {
+        if (busy || (choice !== "official-rpm" && choice !== "community-flatpak"))
+            return false;
+        zoomInstallChoice = choice;
+        zoomInstallNotice = "";
+        Qt.callLater(function() {
+            if (camera.zoomInstallChoice === choice)
+                zoomPage.contentY = Math.max(0, zoomPage.contentHeight - zoomPage.height);
+        });
+        return true;
+    }
+
+    function confirmZoomInstall() {
+        const choice = zoomInstallChoice;
+        if (busy || (choice !== "official-rpm" && choice !== "community-flatpak"))
+            return false;
+        const started = run("zoomInstall", [
+            "zoom-install", choice, "CONFIRM_ZOOM_INSTALL"
+        ]);
+        if (started) {
+            zoomInstallChoice = "";
+            zoomInstallNotice = choice === "community-flatpak"
+                ? "INSTALL IN PROGRESS // USER FLATPAK // KEEP CAMERA RUNNING"
+                : "INSTALL IN PROGRESS // OFFICIAL RPM // AUTH MAY BE REQUIRED";
+        }
+        return started;
     }
 
     function launchZoomClient() {
@@ -246,6 +280,19 @@ PanelWindow {
             return;
         }
         if (!payload || payload.ok !== true) {
+            if (action === "zoomInstall") {
+                const error = String(payload && payload.error || "INSTALL_UNAVAILABLE");
+                zoomInstallChoice = "";
+                zoomSetupVisible = true;
+                zoomInstallNotice = error === "ZOOM_RPM_NOT_DOWNLOADED"
+                    ? "RPM NOT FOUND // DOWNLOAD OFFICIAL FEDORA RPM TO ~/Downloads/"
+                    : error === "ZOOM_RPM_SIGNATURE_UNVERIFIED"
+                      ? "RPM SIGNATURE NOT VERIFIED // IMPORT ZOOM'S OFFICIAL KEY FIRST"
+                      : error === "RPM_INSTALL_TIMEOUT_CHECK_DEPLOYMENT"
+                        || error === "FLATPAK_INSTALL_TIMEOUT_CHECK_STATUS"
+                        ? "INSTALL STATUS UNCERTAIN // RECHECK BEFORE RETRYING"
+                        : "INSTALL FAILED // " + error;
+            }
             if (action === "zoomOpen"
                     && payload && payload.error === "ZOOM_CLIENT_NOT_INSTALLED") {
                 zoomClientStatus = {available: false, client: "none"};
@@ -258,7 +305,20 @@ PanelWindow {
                 menuOpen = true;
             return;
         }
-        if (action === "zoomStatus") {
+        if (action === "zoomInstall") {
+            zoomInstallChoice = "";
+            if (payload.restartRequired) {
+                zoomInstallNotice = "OFFICIAL ZOOM RPM STAGED // REBOOT REQUIRED";
+                feedback = "ZOOM // SYSTEM DEPLOYMENT STAGED // NO AUTOMATIC REBOOT";
+            } else {
+                zoomInstallNotice = "ZOOM FLATPAK INSTALLED // RECHECKING";
+                feedback = "ZOOM // USER FLATPAK INSTALLED";
+                Qt.callLater(function() {
+                    if (!camera.busy && camera.activeView === "zoom")
+                        camera.run("zoomStatus", ["zoom-status"]);
+                });
+            }
+        } else if (action === "zoomStatus") {
             zoomClientStatus = payload;
             zoomSetupVisible = !payload.available;
             feedback = payload.available ? "ZOOM // CLIENT DETECTED // LOGIN UNKNOWN"
@@ -377,6 +437,10 @@ PanelWindow {
                     camera.pendingAction = "";
                     camera.busy = false;
                     camera.feedback = "CAMERA // BACKEND PROCESS UNAVAILABLE";
+                    if (action === "zoomInstall") {
+                        camera.zoomInstallNotice = "INSTALL RESULT UNKNOWN // CHECK ZOOM STATUS";
+                        camera.zoomSetupVisible = true;
+                    }
                     if (action === "capture") {
                         camera.nativeRegionSelecting = false;
                         camera.menuOpen = true;
@@ -527,6 +591,8 @@ PanelWindow {
                         selectedForegroundColor: Colors.magenta
                         selectedBorderColor: Colors.magenta
                         onLeftClicked: {
+                            if (modelData.id !== "zoom")
+                                camera.zoomInstallChoice = "";
                             if (modelData.id === "gallery")
                                 camera.loadGallery();
                             else if (modelData.id === "zoom")
@@ -1332,6 +1398,15 @@ PanelWindow {
                                 color: Colors.orange
                                 text: "Use the actual downloaded RPM filename. The rpm-ostree command stages a new deployment; it does not change the running system until reboot."
                             }
+                            ActionButton {
+                                width: parent.width
+                                height: 38
+                                label: "INSTALL DOWNLOADED OFFICIAL RPM"
+                                labelPixelSize: 11
+                                accentColor: Colors.magenta
+                                available: !camera.busy
+                                onLeftClicked: camera.prepareZoomInstall("official-rpm")
+                            }
 
                             GohuText {
                                 width: parent.width
@@ -1363,12 +1438,82 @@ PanelWindow {
                             ActionButton {
                                 width: parent.width
                                 height: 38
+                                label: "INSTALL COMMUNITY FLATPAK"
+                                labelPixelSize: 11
+                                accentColor: Colors.magenta
+                                available: !camera.busy
+                                onLeftClicked: camera.prepareZoomInstall("community-flatpak")
+                            }
+
+                            Column {
+                                id: zoomInstallConfirm
+                                width: parent.width
+                                spacing: 8
+                                visible: camera.zoomInstallChoice !== ""
+
+                                Rectangle {
+                                    width: parent.width
+                                    height: 2
+                                    color: Colors.yellow
+                                }
+                                GohuText {
+                                    width: parent.width
+                                    height: 22
+                                    font.pixelSize: 12
+                                    color: Colors.yellow
+                                    text: "CONFIRM // INSTALL ZOOM"
+                                }
+                                GohuText {
+                                    width: parent.width
+                                    font.pixelSize: 11
+                                    color: Colors.white
+                                    wrapMode: Text.WordWrap
+                                    text: camera.zoomInstallChoice === "official-rpm"
+                                          ? "Install the signed Zoom RPM already downloaded to ~/Downloads/zoom_x86_64.rpm. May request administrator authorization. Stages a system deployment; reboot is manual."
+                                          : "Install the community-maintained, unverified Zoom Flatpak into your user account. Adds the per-user Flathub repository if needed and downloads dependencies. No system-wide install."
+                                }
+                                Row {
+                                    width: parent.width
+                                    height: 42
+                                    spacing: 9
+                                    ActionButton {
+                                        width: (parent.width - parent.spacing) * 0.62
+                                        height: 40
+                                        label: "CONFIRM INSTALL"
+                                        labelPixelSize: 12
+                                        accentColor: Colors.magenta
+                                        available: !camera.busy
+                                        onLeftClicked: camera.confirmZoomInstall()
+                                    }
+                                    ActionButton {
+                                        width: (parent.width - parent.spacing) * 0.38
+                                        height: 40
+                                        label: "CANCEL"
+                                        labelPixelSize: 11
+                                        accentColor: Colors.cyan
+                                        available: !camera.busy
+                                        onLeftClicked: camera.zoomInstallChoice = ""
+                                    }
+                                }
+                            }
+                            ActionButton {
+                                width: parent.width
+                                height: 38
                                 label: "RECHECK ZOOM AFTER INSTALL"
                                 labelPixelSize: 11
                                 accentColor: Colors.yellow
                                 available: !camera.busy
                                 onLeftClicked: camera.run("zoomStatus", ["zoom-status"])
                             }
+                        }
+
+                        GohuText {
+                            width: parent.width
+                            visible: camera.zoomInstallNotice !== ""
+                            wrapMode: Text.WordWrap
+                            font.pixelSize: 11
+                            color: Colors.yellow
+                            text: camera.zoomInstallNotice
                         }
 
                         GohuText {

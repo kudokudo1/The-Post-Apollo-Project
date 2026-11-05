@@ -764,6 +764,133 @@ def record_stop_action():
 
 
 
+# Installation is never part of status, tab activation or client launch.
+# The only package-writing path is a separate, explicitly confirmed action.
+ZOOM_FLATPAK_ID = "us.zoom.Zoom"
+ZOOM_FLATHUB_REPO = "https://dl.flathub.org/repo/flathub.flatpakrepo"
+ZOOM_INSTALL_CONFIRMATION = "CONFIRM_ZOOM_INSTALL"
+
+
+def _zoom_install_command(argv, timeout):
+    """Fixed argv only; do not expose package-manager output or run a shell."""
+    try:
+        return subprocess.run(argv, stdin=subprocess.DEVNULL,
+                              stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                              timeout=timeout, check=False)
+    except subprocess.TimeoutExpired:
+        return None
+    except OSError:
+        return False
+
+
+def _zoom_official_rpm():
+    """Bound installation to the expected downloaded Fedora x86_64 Zoom RPM."""
+    downloads = home() / "Downloads"
+    if downloads.is_symlink() or not downloads.is_dir():
+        return None, "DOWNLOADS_UNAVAILABLE"
+    target = downloads / "zoom_x86_64.rpm"
+    try:
+        info = target.lstat()
+    except OSError:
+        return None, "ZOOM_RPM_NOT_DOWNLOADED"
+    if (not stat.S_ISREG(info.st_mode) or info.st_uid != os.getuid()
+            or info.st_size < 4096 or info.st_size > 1_000_000_000
+            or info.st_mode & (stat.S_IWOTH | stat.S_IWGRP)):
+        return None, "ZOOM_RPM_UNSAFE_FILE"
+    return target, ""
+
+
+def zoom_install_client(method, confirmation):
+    """Explicit interactive setup action. No installation on passive checks."""
+    if confirmation != ZOOM_INSTALL_CONFIRMATION:
+        return {"ok": False, "kind": "zoom-install", "error": "INSTALL_CONFIRMATION_REQUIRED"}
+    if method not in ("official-rpm", "community-flatpak"):
+        return {"ok": False, "kind": "zoom-install", "error": "INSTALL_METHOD_UNSUPPORTED"}
+    if zoom_client_command():
+        return {"ok": False, "kind": "zoom-install", "error": "ZOOM_ALREADY_INSTALLED"}
+
+    if method == "community-flatpak":
+        flatpak = shutil.which("flatpak")
+        if not flatpak:
+            return {"ok": False, "kind": "zoom-install", "error": "FLATPAK_NOT_AVAILABLE"}
+        # The confirmation UI explicitly discloses addition of a per-user
+        # Flathub remote (if absent); system remotes and packages are untouched.
+        remote = _zoom_install_command([
+            flatpak, "remote-add", "--user", "--if-not-exists",
+            "flathub", ZOOM_FLATHUB_REPO], timeout=45)
+        if remote is None:
+            code = "FLATHUB_REMOTE_TIMEOUT"
+        elif remote is False or remote.returncode:
+            code = "FLATHUB_REMOTE_FAILED"
+        else:
+            code = ""
+        if code:
+            return {"ok": False, "kind": "zoom-install", "error": code}
+        installed = _zoom_install_command([
+            flatpak, "install", "--user", "--noninteractive", "--assumeyes",
+            "flathub", ZOOM_FLATPAK_ID], timeout=900)
+        if installed is None:
+            code = "FLATPAK_INSTALL_TIMEOUT_CHECK_STATUS"
+        elif installed is False or installed.returncode:
+            code = "FLATPAK_INSTALL_FAILED"
+        else:
+            code = ""
+        if code:
+            return {"ok": False, "kind": "zoom-install", "error": code}
+        # Never claim success based only on process exit status.
+        verified = _zoom_install_command([
+            flatpak, "info", "--user", ZOOM_FLATPAK_ID], timeout=15)
+        if verified is None or verified is False or verified.returncode:
+            return {"ok": False, "kind": "zoom-install",
+                    "error": "FLATPAK_INSTALL_NOT_VERIFIED"}
+        return {"ok": True, "kind": "zoom-install", "method": method,
+                "installed": True, "restartRequired": False,
+                "authentication": "UNKNOWN"}
+
+    # Publisher RPM path. Never fetch an arbitrary user-supplied URL or install
+    # an arbitrary RPM. Signed file must already be downloaded explicitly.
+    target, failure = _zoom_official_rpm()
+    if failure:
+        return {"ok": False, "kind": "zoom-install", "error": failure}
+    rpm = shutil.which("rpm")
+    rpmkeys = shutil.which("rpmkeys")
+    ostree = shutil.which("rpm-ostree")
+    if not rpm or not rpmkeys or not ostree:
+        return {"ok": False, "kind": "zoom-install",
+                "error": "RPM_INSTALL_TOOLS_MISSING"}
+    info = _zoom_install_command([
+        rpm, "-qp", "--queryformat", "%{NAME} %{ARCH}", str(target)], timeout=15)
+    if info is None or info is False or info.returncode or info.stdout.strip() != b"zoom x86_64":
+        return {"ok": False, "kind": "zoom-install",
+                "error": "ZOOM_RPM_INVALID_PACKAGE"}
+    signature = _zoom_install_command([
+        rpmkeys, "--checksig", str(target)], timeout=15)
+    if signature is None or signature is False:
+        return {"ok": False, "kind": "zoom-install",
+                "error": "ZOOM_RPM_SIGNATURE_UNVERIFIED"}
+    message = (signature.stdout + signature.stderr).lower()
+    if (signature.returncode or b"nokey" in message or
+            b"not ok" in message or b"signature" not in message or
+            b"ok" not in message):
+        return {"ok": False, "kind": "zoom-install",
+                "error": "ZOOM_RPM_SIGNATURE_UNVERIFIED"}
+    # Polkit is expected to request privileged authorization if needed.
+    # No sudo passwords are read, no automatic reboot, no shell invocation.
+    polkit = shutil.which("pkexec")
+    command = ([polkit, ostree, "install", str(target)] if polkit else
+               [ostree, "install", str(target)])
+    result = _zoom_install_command(command, timeout=900)
+    if result is None:
+        return {"ok": False, "kind": "zoom-install",
+                "error": "RPM_INSTALL_TIMEOUT_CHECK_DEPLOYMENT"}
+    if result is False or result.returncode:
+        return {"ok": False, "kind": "zoom-install",
+                "error": "RPM_INSTALL_FAILED_OR_AUTH_DENIED"}
+    return {"ok": True, "kind": "zoom-install", "method": method,
+            "installed": False, "staged": True,
+            "restartRequired": True, "authentication": "UNKNOWN"}
+
+
 def zoom_client_command():
     """Discover the installed provider-owned Linux client, never browser fallback."""
     native = shutil.which("zoom")
@@ -814,6 +941,9 @@ def main(argv=None):
     command.add_parser("status")
     command.add_parser("zoom-status")
     command.add_parser("zoom-open")
+    zoom_install = command.add_parser("zoom-install")
+    zoom_install.add_argument("method", choices=["official-rpm", "community-flatpak"])
+    zoom_install.add_argument("confirmation")
     gallery_parser = command.add_parser("gallery")
     gallery_parser.add_argument("--page", type=int, default=0)
     gallery_parser.add_argument("--query", default="")
@@ -846,6 +976,8 @@ def main(argv=None):
         result = zoom_client_status()
     elif options.action == "zoom-open":
         result = zoom_client_open()
+    elif options.action == "zoom-install":
+        result = zoom_install_client(options.method, options.confirmation)
     elif options.action == "gallery":
         result = gallery(options.page, options.query,
                          options.folder, options.shots_only, options.media_filter)

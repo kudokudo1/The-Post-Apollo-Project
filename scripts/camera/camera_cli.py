@@ -763,10 +763,57 @@ def record_stop_action():
         return {"ok": False, "kind": "record-stop", "error": "STOP_FAILED"}
 
 
+
+def zoom_client_command():
+    """Discover the installed provider-owned Linux client, never browser fallback."""
+    native = shutil.which("zoom")
+    if native:
+        return [native]
+    flatpak = shutil.which("flatpak")
+    if not flatpak:
+        return None
+    try:
+        check = subprocess.run([flatpak, "info", "us.zoom.Zoom"],
+                               stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
+                               stderr=subprocess.DEVNULL, timeout=8, check=False)
+    except (OSError, subprocess.SubprocessError):
+        return None
+    return [flatpak, "run", "us.zoom.Zoom"] if check.returncode == 0 else None
+
+
+def zoom_client_status():
+    """Installation check only; cannot prove which Zoom account is signed in."""
+    command = zoom_client_command()
+    return {"ok": True, "kind": "zoom-status",
+            "available": bool(command),
+            "client": "native" if command and len(command) == 1 else
+                      "flatpak" if command else "none",
+            "authentication": "UNKNOWN",
+            "embedded": False,
+            "socialAuthShared": False}
+
+
+def zoom_client_open():
+    """Opt-in desktop app launch with no meeting URL or stored credentials."""
+    argv = zoom_client_command()
+    if not argv:
+        return {"ok": False, "kind": "zoom-open", "error": "ZOOM_CLIENT_NOT_INSTALLED"}
+    try:
+        subprocess.Popen(argv, stdin=subprocess.DEVNULL,
+                         stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+                         start_new_session=True, close_fds=True)
+    except (OSError, subprocess.SubprocessError):
+        return {"ok": False, "kind": "zoom-open", "error": "ZOOM_LAUNCH_FAILED"}
+    return {"ok": True, "kind": "zoom-open", "launchRequested": True,
+            "authentication": "UNKNOWN", "embedded": False}
+
+
 def main(argv=None):
     parser = argparse.ArgumentParser()
     command = parser.add_subparsers(dest="action", required=True)
     command.add_parser("status")
+    command.add_parser("zoom-status")
+    command.add_parser("zoom-open")
     gallery_parser = command.add_parser("gallery")
     gallery_parser.add_argument("--page", type=int, default=0)
     gallery_parser.add_argument("--query", default="")
@@ -795,6 +842,10 @@ def main(argv=None):
 
     if options.action == "status":
         result = status()
+    elif options.action == "zoom-status":
+        result = zoom_client_status()
+    elif options.action == "zoom-open":
+        result = zoom_client_open()
     elif options.action == "gallery":
         result = gallery(options.page, options.query,
                          options.folder, options.shots_only, options.media_filter)

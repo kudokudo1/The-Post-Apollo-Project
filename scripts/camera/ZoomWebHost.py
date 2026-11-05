@@ -164,10 +164,50 @@ def _unique_actor(profile):
     return node, ""
 
 
+def _client_insets(node):
+    """Bounded Sway window-content margins, not a guessed browser titlebar.
+
+    Sway's rect is the container; window_rect is the actual client area
+    relative to that rect. The client area, not its decorated container,
+    must fit Camera's visible Zoom bay. Missing window_rect means zero
+    margins; malformed or oversized margins fail closed.
+    """
+    rect = node.get("rect") or {}
+    inner = node.get("window_rect")
+    if inner is None:
+        return (0, 0, 0, 0)
+    keys = ("x", "y", "width", "height")
+    if (not isinstance(inner, dict)
+            or any(type(rect.get(k)) is not int for k in keys)
+            or any(type(inner.get(k)) is not int for k in keys)):
+        raise ValueError("INVALID_CLIENT_RECT")
+    left, top = inner["x"], inner["y"]
+    right = rect["width"] - inner["width"] - left
+    bottom = rect["height"] - inner["height"] - top
+    # Only a top/left window frame may be tucked behind Camera's chrome;
+    # reject layouts that would extend the browser beyond its bottom/right.
+    if not (0 <= left <= 48 and 0 <= top <= 128
+            and 0 <= right <= 8 and 0 <= bottom <= 8
+            and inner["width"] >= 300 and inner["height"] >= 200):
+        raise ValueError("UNSAFE_CLIENT_INSETS")
+    return (left, top, right, bottom)
+
+
+def _client_rect(node):
+    rect = node.get("rect") or {}
+    keys = ("x", "y", "width", "height")
+    if any(type(rect.get(k)) is not int for k in keys):
+        return None
+    left, top, right, bottom = _client_insets(node)
+    return (rect["x"] + left, rect["y"] + top,
+            rect["width"] - left - right,
+            rect["height"] - top - bottom)
+
+
 def _near(node, geometry):
-    r = node.get("rect") or {}
-    return all(type(r.get(k)) is int and abs(r[k] - value) <= TOLERANCE
-               for k,value in zip(("x","y","width","height"), geometry))
+    actual = _client_rect(node)
+    return (actual is not None and all(abs(a - b) <= TOLERANCE
+                                       for a, b in zip(actual, geometry)))
 
 
 def status(identity, output, x, y, width, height):
@@ -218,10 +258,34 @@ def enter(identity, output, x, y, width, height):
     # All commands still target ONLY the verified, positive con_id.
     _sway_command(criteria, "floating", "enable")
     _sway_command(criteria, "border", "none")
-    _sway_command(criteria, "resize", "set", "width", str(geometry[2]), "px",
-                  "height", str(geometry[3]), "px")
+    # Border changes can change the reported client rect. Measure *after*
+    # removing decorations, and fit the browser content rather than its
+    # containing frame. Do not change other windows or Zoom's web page CSS.
+    measured, error = _unique_actor(profile)
+    if not measured or measured["id"] != actor["id"]:
+        raise RuntimeError("ACTOR_ORIGIN_UNVERIFIED")
+    try:
+        left, top, right, bottom = _client_insets(measured)
+        outer_x = geometry[0] - left
+        outer_y = geometry[1] - top
+        outer_w = geometry[2] + left + right
+        outer_h = geometry[3] + top + bottom
+        if any((left, top, right, bottom)):
+            # _target_geometry already bounds the ordinary zero-inset window.
+            # Only an expanded outer container requires an output guard.
+            output_rect = _output_rect(output)
+            if (outer_x < output_rect["x"] or outer_y < output_rect["y"]
+                    or outer_x + outer_w > output_rect["x"] + output_rect["width"]
+                    or outer_y + outer_h > output_rect["y"] + output_rect["height"]):
+                raise RuntimeError("CLIENT_FRAME_OUTSIDE_OUTPUT")
+    except (ValueError, RuntimeError):
+        # Never leave an unverified browser floating above the desktop.
+        _sway_command(criteria, "move", "scratchpad")
+        raise
+    _sway_command(criteria, "resize", "set", "width", str(outer_w), "px",
+                  "height", str(outer_h), "px")
     _sway_command(criteria, "move", "absolute", "position",
-                  str(geometry[0]), "px", str(geometry[1]), "px")
+                  str(outer_x), "px", str(outer_y), "px")
     # Reobserve exact actor PID/class and measured bounds before enabling
     # QML's click-through/transparent bay.
     docked = False
@@ -243,11 +307,10 @@ def enter(identity, output, x, y, width, height):
     # command lines, profile paths or Zoom session contents escape this helper.
     delta = None
     if not docked and after and after["id"] == actor["id"]:
-        rect = after.get("rect") or {}
-        fields = ("x", "y", "width", "height")
-        if all(type(rect.get(key)) is int for key in fields):
-            delta = [max(-5000, min(5000, rect[key] - expected))
-                     for key, expected in zip(fields, geometry)]
+        rect = _client_rect(after)
+        if rect is not None:
+            delta = [max(-5000, min(5000, actual - expected))
+                     for actual, expected in zip(rect, geometry)]
     return {"ok": docked, "kind": "zoom-web-enter", "docked": docked,
             "state": "DOCKED" if docked else "NOT_ALIGNED",
             "error": "" if docked else (

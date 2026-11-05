@@ -61,12 +61,12 @@ class ZoomWebHostTests(unittest.TestCase):
         self.assertIn('cameraPage.y + cameraPage.parent.y', QML)
         self.assertIn('cameraPage.x + cameraPage.parent.x', QML)
         self.assertIn('Math.round(cameraPage.width)', QML)
-        self.assertIn('readonly property int zoomBayBottom: 5', QML)
+        self.assertIn('readonly property int zoomBayBottom: 2', QML)
         self.assertIn('frame.height - zoomBayTop - zoomBayBottom', QML)
         # Compact is still 675 px tall, but the browser uses the body instead
         # of leaving the 38px phantom footer: approx 539 vs 506px at y=131.
-        compact_height, page_start, bottom = 675, 131, 5
-        self.assertEqual(compact_height - page_start - bottom, 539)
+        compact_height, page_start, bottom = 675, 131, 2
+        self.assertEqual(compact_height - page_start - bottom, 542)
         self.assertGreater(compact_height - page_start - bottom,
                            compact_height - 169)
 
@@ -193,7 +193,7 @@ class ZoomWebHostTests(unittest.TestCase):
             with patch.object(host,"_social_browser_prefix",return_value=["/usr/bin/chromium"]):
                 with patch.object(host,"_private_profile",return_value=Path("/tmp/testcamera")):
                     with patch.object(host,"_unique_actor",side_effect=[
-                            (present,"")] + [(hidden,"")]*17):
+                            (present,"")] + [(hidden,"")]*18):
                         with patch.object(host.time,"sleep",return_value=None):
                             with patch.object(host,"_sway_command"):
                                 r = host.enter("identity-1","HDMI-A-1",40,150,650,420)
@@ -235,6 +235,73 @@ class ZoomWebHostTests(unittest.TestCase):
         self.assertIn("--class="+host.ZOOM_CLASS,args)
         self.assertIn("--app="+host.ZOOM_WEB_URL,args)
         self.assertNotIn("shell",launch.call_args.kwargs)
+
+    def test_browser_client_rect_not_just_outer_frame_must_fill_zoom_bay(self):
+        # Sway's window_rect can be smaller than its outer rect. At a 66px
+        # upper chrome inset, fitting the outer rect alone cuts off the page.
+        node = {
+            "id": 123, "pid": 333, "visible": True,
+            "rect": {"x": 2600, "y": 84, "width": 650, "height": 486},
+            "window_rect": {"x": 0, "y": 66, "width": 650, "height": 420}
+        }
+        self.assertEqual(host._client_insets(node), (0, 66, 0, 0))
+        self.assertEqual(host._client_rect(node), (2600, 150, 650, 420))
+        self.assertTrue(host._near(node, (2600, 150, 650, 420)))
+        self.assertFalse(host._near(node, (2600, 84, 650, 486)))
+
+    def test_enter_sizes_client_to_bay_after_measuring_sway_decoration(self):
+        before = {"id": 123, "pid": 333, "visible": True,
+                  "rect": {"x": 2600, "y": 150, "width": 650, "height": 420},
+                  "window_rect": {"x": 0, "y": 66, "width": 650, "height": 354}}
+        after = {"id": 123, "pid": 333, "visible": True,
+                 "rect": {"x": 2600, "y": 84, "width": 650, "height": 486},
+                 "window_rect": {"x": 0, "y": 66, "width": 650, "height": 420}}
+        calls = []
+        with patch.object(host, "_target_geometry", return_value=(2600, 150, 650, 420)):
+            with patch.object(host, "_output_rect", return_value={
+                    "x": 0, "y": 0, "width": 4000, "height": 1800}):
+                with patch.object(host, "_social_browser_prefix", return_value=["/usr/bin/chromium"]):
+                    with patch.object(host, "_private_profile", return_value=Path("/tmp/camera_fixture")):
+                        with patch.object(host, "_unique_actor",
+                                          side_effect=[(before, ""), (before, ""), (after, "")]):
+                            with patch.object(host, "_sway_command",
+                                              side_effect=lambda *args: calls.append(args)):
+                                result = host.enter("identity-1", "DP-5", 40, 150, 650, 420)
+        self.assertTrue(result["docked"])
+        self.assertEqual(result["authenticated"], "UNKNOWN")
+        self.assertIn(("[con_id=123]", "resize", "set", "width", "650", "px",
+                       "height", "486", "px"), calls)
+        self.assertIn(("[con_id=123]", "move", "absolute", "position",
+                       "2600", "px", "84", "px"), calls)
+
+    def test_unknown_or_untrusted_client_geometry_never_counts_as_fit(self):
+        node = {"rect": {"x": 2600, "y": 150, "width": 650, "height": 420},
+                "window_rect": {"x": 0, "y": 500, "width": 650, "height": -80}}
+        with self.assertRaises(ValueError):
+            host._near(node, (2600, 150, 650, 420))
+        with self.assertRaises(ValueError):
+            host._client_insets(node)
+        # Old Sway actors without window_rect keep the existing fit behavior.
+        self.assertTrue(host._near({"rect": {
+            "x":2600, "y":150, "width":650, "height":420}},
+            (2600, 150, 650, 420)))
+
+    def test_browser_frame_must_not_escape_its_output(self):
+        oversized = {"id": 123, "pid": 333, "visible": True,
+                     "rect": {"x": 2600, "y": 50, "width": 650, "height": 420},
+                     "window_rect": {"x": 0, "y": 100, "width": 650, "height": 320}}
+        with patch.object(host, "_target_geometry", return_value=(2600, 50, 650, 420)):
+            with patch.object(host, "_output_rect", return_value={
+                    "x": 0, "y": 0, "width": 3200, "height": 1800}):
+                with patch.object(host, "_social_browser_prefix", return_value=["/usr/bin/chromium"]):
+                    with patch.object(host, "_private_profile", return_value=Path("/tmp/camera_fixture")):
+                        with patch.object(host, "_unique_actor",
+                                          return_value=(oversized, "")):
+                            with patch.object(host, "_sway_command") as move:
+                                with self.assertRaisesRegex(RuntimeError, "CLIENT_FRAME_OUTSIDE_OUTPUT"):
+                                    host.enter("identity-1", "DP-5", 40, 50, 650, 420)
+                                move.assert_any_call("[con_id=123]", "move", "scratchpad")
+                                self.assertNotIn("absolute", [arg for call in move.call_args_list for arg in call.args])
 
     def test_hide_preserves_profile_and_cookies(self):
         with patch.object(host,"_social_browser_prefix",return_value=["/usr/bin/chromium"]):

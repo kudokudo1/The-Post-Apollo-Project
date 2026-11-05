@@ -1210,7 +1210,7 @@ Rectangle {
                         width: parent.width
                         visible: installCallingSupport.visible
                                  && phonePane.callPrerequisiteReport.state === "PACKAGE_NOT_INSTALLED"
-                        text: "Only oFono. Fedora's software manager handles package review and approval. Social does not change your system automatically."
+                        text: "Only oFono. Review PackageKit's approval inside PHONE (or its native fallback). Social never silently confirms a transaction."
                         color: Colors.white
                         font.pixelSize: 10
                         wrapMode: Text.WordWrap

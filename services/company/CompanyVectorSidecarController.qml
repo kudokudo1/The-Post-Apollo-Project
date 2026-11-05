@@ -53,6 +53,12 @@ Item {
                 controller.status="NOT INSTALLED";
             else if (result && result.status==="LAUNCH_FAILED")
                 controller.status="LAUNCH FAILED";
+            else if (result && result.status==="HOST_QT_UNVERIFIED")
+                controller.status="HOST QT UNVERIFIED";
+            else if (result && result.status==="HOST_RUNTIME_UNVERIFIED")
+                controller.status="HOST RUNTIME UNVERIFIED";
+            else if (result && result.status==="REFUSED_IDENTITY")
+                controller.status="RUNTIME IDENTITY REFUSED";
             else
                 controller.status="EXITED / CHECK NATIVE INSTALL";
         }

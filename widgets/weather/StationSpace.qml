@@ -18,6 +18,8 @@ Rectangle {
     onSubjectRouteChanged: {
         if (spaceScroll)
             spaceScroll.contentY = 0;
+        if (space.visible && space.solarImageActive && space.solarImageUrl === "")
+            refreshSolarImage();
     }
 
     property var spaceService: null
@@ -242,6 +244,9 @@ Rectangle {
             runtimeNowMs
         )
     ]
+
+    readonly property bool solarImageActive:
+        CosmosPanelPolicy.visibleFor("space", subjectRoute, "suvi")
 
     property string solarImageMode: "195"
     property string solarImageUrl: ""
@@ -509,18 +514,15 @@ Rectangle {
         repeat: true
         // Only SUN activity / original full SPACE actually display SUVI.
         // Do not refresh images while viewing Kp, aurora or bulletins.
-        running: space.visible && space.sectionVisible("suvi")
+        running: space.visible && space.solarImageActive
         onTriggered: space.refreshSolarImage()
     }
 
     Component.onCompleted: {
-        if (space.sectionVisible("suvi"))
+        if (space.solarImageActive)
             refreshSolarImage();
     }
-    onSubjectRouteChanged: {
-        if (space.sectionVisible("suvi") && space.solarImageUrl === "")
-            refreshSolarImage();
-    }
+
 
     readonly property color meterBorderColor: Colors.cyan
     readonly property color meterFillColor: Colors.magenta
@@ -1587,13 +1589,13 @@ Rectangle {
         }
 
         StationSectionDivider {
-            visible: space.sectionVisible("suvi")
+            visible: space.solarImageActive
             width: parent.width
             title: "SOLAR IMAGER // NOAA SWPC SUVI"
         }
 
         Row {
-            visible: space.sectionVisible("suvi")
+            visible: space.solarImageActive
             width: parent.width
             height: 342
             spacing: 14

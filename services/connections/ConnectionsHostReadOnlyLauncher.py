@@ -10,13 +10,22 @@ arbitrary endpoint argument, user-supplied state, or request execution.
 """
 from __future__ import annotations
 
+import importlib.util
 import os
 from pathlib import Path
 import signal
 import sys
 import threading
 
-from ConnectionsHostStatusServer import ConnectionsHostStatusServer
+# Python -I intentionally excludes the script directory from sys.path.
+# Load only the fixed sibling C2j server file, never a client-supplied module.
+SERVER_SOURCE = Path(__file__).resolve().with_name("ConnectionsHostStatusServer.py")
+_spec = importlib.util.spec_from_file_location("_post_apollo_c2j_status", SERVER_SOURCE)
+if _spec is None or _spec.loader is None:
+    raise ImportError("C2K_MISSING_REVIEWED_STATUS_SERVER")
+_server_module = importlib.util.module_from_spec(_spec)
+_spec.loader.exec_module(_server_module)
+ConnectionsHostStatusServer = _server_module.ConnectionsHostStatusServer
 
 START_FLAG = "--run-readonly"
 REFUSAL = "C2K_REFUSED_NO_APPROVED_RUNTIME_LAUNCH"

@@ -23,13 +23,16 @@ var ROUTES = {
   "cosmos/sun/photo-light": {page:"sky",sky:["header","twilight"]},
   // Physical solar activity is SUN-owned; reuse original NOAA sections.
   "cosmos/sun/activity": {page:"space",space:["header","suvi","xray","flares"]},
+  "cosmos/sun/suvi": {page:"space",space:["suvi"]},
+  "cosmos/sun/xray": {page:"space",space:["xray"]},
+  "cosmos/sun/flares": {page:"space",space:["flares"]},
   "cosmos/sun/cycle": {page:"space",space:["header","cycle"]},
   // The bottom MOON landing pairs USNO ephemeris with its current sky fix.
   "cosmos/moon/ephemeris": {page:"sky",sky:["header","moon","moon-position"]},
   "cosmos/moon/position": {page:"sky",sky:["header","moon-position"]},
   // Native ASTRONOMY landing keeps the planet/constellation instruments;
   // the original comprehensive SKY page remains in INDEX unchanged.
-  "cosmos/planets-stars/celestial-fix": {page:"sky",sky:["header","celestial-fix","planet-clock"]},
+  "cosmos/planets-stars/celestial-fix": {page:"sky",sky:["celestial-fix"]},
   "cosmos/planets-stars/planet-clock": {page:"sky",sky:["header","planet-clock"]},
   "cosmos/planets-stars/constellations": {page:"sky",sky:["header","celestial-fix"]},
   // Native EVENTS landing groups the real ISS, eclipse and meteor instruments.

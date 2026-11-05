@@ -12,6 +12,9 @@ const navSource=read("widgets/weather/StationSubjectNavigationPolicy.js");
 const magickSource=read("widgets/weather/StationMagickSubjectPanelPolicy.js");
 const cosmosSource=read("widgets/weather/StationCosmosSubjectPanelPolicy.js");
 const pane=read("widgets/weather/StationMagickSubjectPane.qml");
+const standaloneAstro=read("widgets/weather/StationMagickAstrologyPane.qml");
+const lensesPane=read("widgets/weather/StationMagickLensesPane.qml");
+const workspacePolicy=read("widgets/weather/StationWorkspaceNavigationPolicy.js");
 const overview=read("widgets/weather/StationMagickOverviewPane.qml");
 const lunarSolar=read("widgets/weather/StationMagickLunarSolarPane.qml");
 const lunarDetails=read("widgets/weather/StationMagickLunarSolarDetails.qml");
@@ -25,8 +28,10 @@ const sky=read("widgets/weather/StationSky.qml");
 const nav=vm.createContext({});
 const magick=vm.createContext({});
 const cosmos=vm.createContext({});
+const wnav=vm.createContext({});
 for(const [src,context] of [[navSource,nav],[magickSource,magick],[cosmosSource,cosmos]])
   vm.runInContext(src.replace(/^\.pragma library\s*$/m,""),context);
+vm.runInContext(workspacePolicy.replace(/^\.pragma library\s*$/m,""),wnav);
 
 test("all 16 MAGICK destinations exist in the canonical subject tree", () => {
   assert.equal(magick.FORMAT,"post-apollo.weather.magick-reference.g1.v1");
@@ -339,4 +344,66 @@ test("M30-E returns Moon and solar details to the non-scrolling lower viewport",
   assert.doesNotMatch(lunarDetails,/XMLHttpRequest|\.refresh\(|writeAdapter\(/);
   assert.equal((lunarSolar.match(/StationSky\s*\{/g)||[]).length,1);
   assert.equal((lunarSolar.match(/StationCosmosVisualInstruments\s*\{/g)||[]).length,1);
+});
+
+
+test("M30-F ASTROLOGY is an independent, non-scrolling, source-owned instrument", () => {
+  assert.match(pane,/readonly property bool standaloneAstrology:\s*subjectRoute === "magick\/astrology\/charts"/);
+  assert.match(pane,/readonly property bool independentScreen:\s*standaloneAstrology \|\| lensesLanding/);
+  assert.match(pane,/sourceComponent: magickPane\.standaloneAstrology\s*\? standaloneAstrologyReference/);
+  assert.match(pane,/id: standaloneAstrologyReference[\s\S]*StationMagickAstrologyPane\s*\{/);
+  assert.match(pane,/visible: !magickPane\.independentScreen/);
+  assert.match(pane,/anchors\.margins: magickPane\.independentScreen \? 0 : 4/);
+  assert.doesNotMatch(standaloneAstro,/Flickable\s*\{|ScrollView\s*\{|Process\s*\{|Timer\s*\{|FileView\s*\{/);
+  assert.match(standaloneAstro,/StationMagickCelestialInstrument\s*\{/);
+  assert.match(standaloneAstro,/compactMode: true/);
+  assert.match(standaloneAstro,/anchors\.top: pairControls\.bottom/);
+  assert.match(standaloneAstro,/anchors\.bottom: eventAndTimeControls\.top/);
+  assert.match(standaloneAstro,/visualData: astrology\.calculated\s*\? astrology\.celestialSource\.visualData : null/);
+  assert.match(standaloneAstro,/label: astrology\.celestialSource && astrology\.celestialSource\.loading\s*\? "CALCULATING" : "CALCULATE"/);
+  assert.match(standaloneAstro,/available: astrology\.chartAvailable/);
+  assert.match(standaloneAstro,/onClicked: astrology\.celestialSource\.refresh\(\)/);
+  for(const control of ["jumpDate(-1)","jumpDate(1)","returnToToday()","adjustDateStepDays(-1)","adjustDateStepDays(1)","cyclePair(-1)","cyclePair(1)","cycleSpan()"])
+    assert.ok(standaloneAstro.includes(control),"missing verified source control "+control);
+  for(const control of ["◀ EVENT","EVENT ▶","◀ TIME","TIME ▶","UNLOCK","RESET"])
+    assert.ok(standaloneAstro.includes(control),"missing chart control "+control);
+  assert.match(standaloneAstro,/instrument\.stepToEvent\(-1\)/);
+  assert.match(standaloneAstro,/instrument\.stepToEvent\(1\)/);
+  assert.match(standaloneAstro,/astrology\.stepSample\(-1\)/);
+  assert.match(standaloneAstro,/astrology\.stepSample\(1\)/);
+  assert.equal((standaloneAstro.match(/StationMagickCelestialInstrument\s*\{/g)||[]).length,1);
+  assert.equal((station.match(/WeatherServices\.CelestialVisualService\s*\{/g)||[]).length,1);
+  // Old detailed deep INDEX modes remain available for step input + timelines.
+  assert.match(pane,/id: celestialReference[\s\S]*Flickable\s*\{/);
+  assert.match(pane,/contentHeight: Math\.max\(height, 620\)/);
+  assert.match(pane,/id: jumpStepInput/);
+  assert.match(pane,/height: 466/);
+});
+
+test("M30-F replaces PLANETARY bottom category with source-honest LENSES", () => {
+  vm.runInContext(workspacePolicy.replace(/^\.pragma library\s*$/m,""),wnav);
+  const modes=JSON.parse(JSON.stringify(wnav.GROUPS.magick));
+  assert.equal(modes.length,6);
+  assert.deepEqual(modes.map(m=>m.label),
+    ["OVERVIEW","LUNAR + SOLAR","LENSES","ASTROLOGY","DIVINATION","GRIMOIRE"]);
+  assert.equal(modes[2].path,"magick/planetary/correspondences");
+  assert.equal(modes[2].key,"lenses");
+  assert.equal(wnav.selectedGroup("magick/planetary/hours"),"lenses");
+  assert.equal(wnav.selectedGroup("magick/planetary/timing"),"lenses");
+  assert.ok(nav.findRoute("magick/planetary/hours"),"historical planetary route removed");
+  assert.match(pane,/readonly property bool lensesLanding:\s*subjectRoute === "magick\/planetary\/correspondences"/);
+  assert.match(pane,/id: lensesReference[\s\S]*StationMagickLensesPane\s*\{/);
+  assert.match(pane,/onRouteRequested: function\(path\)\s*\{\s*magickPane\.routeRequested\(path\)/);
+  assert.match(lensesPane,/signal routeRequested\(string path\)/);
+  for(const route of [
+    "magick/astrology/charts",
+    "magick/lunar-solar/moon",
+    "magick/grimoire/references"
+  ]) {
+    assert.ok(lensesPane.includes('path:"'+route+'"'),route);
+    assert.ok(nav.findRoute(route),route);
+  }
+  assert.match(lensesPane,/LIBRARY NOT CONNECTED/);
+  assert.match(lensesPane,/SCIENTIFIC OBSERVATIONS ARE NOT EVIDENCE OF SYMBOLIC CAUSATION/);
+  assert.doesNotMatch(lensesPane,/Flickable\s*\{|ScrollView\s*\{|Process\s*\{|Timer\s*\{|FileView\s*\{/);
 });

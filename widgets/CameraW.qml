@@ -49,6 +49,9 @@ PanelWindow {
     property var zoomClientStatus: null
     // Missing installations must show an actionable setup, not a disabled button.
     property bool zoomSetupVisible: false
+    // Explicit two-click installer gate; cleared on closing or changing modes.
+    property string zoomInstallChoice: ""
+    property string zoomInstallNotice: ""
     onZoomIdentityIdChanged: selectedZoomAccountId = ""
     // The native slurp overlay owns the region drag; Camera unmaps while it runs.
     property bool nativeRegionSelecting: false
@@ -94,6 +97,8 @@ PanelWindow {
     }
 
     onMenuOpenChanged: {
+        if (!menuOpen)
+            zoomInstallChoice = "";
         // Read-only tool status on explicit open; no image copies or writes.
         if (menuOpen && statusReport === null && !busy)
             run("status", ["status"]);
@@ -189,8 +194,33 @@ PanelWindow {
 
     function openZoomMode() {
         activeView = "zoom";
+        zoomInstallChoice = "";
         if (!busy)
             run("zoomStatus", ["zoom-status"]);
+    }
+
+    function prepareZoomInstall(choice) {
+        if (busy || (choice !== "official-rpm" && choice !== "community-flatpak"))
+            return false;
+        zoomInstallChoice = choice;
+        zoomInstallNotice = "";
+        return true;
+    }
+
+    function confirmZoomInstall() {
+        const choice = zoomInstallChoice;
+        if (busy || (choice !== "official-rpm" && choice !== "community-flatpak"))
+            return false;
+        const started = run("zoomInstall", [
+            "zoom-install", choice, "CONFIRM_ZOOM_INSTALL"
+        ]);
+        if (started) {
+            zoomInstallChoice = "";
+            zoomInstallNotice = choice === "community-flatpak"
+                ? "INSTALL IN PROGRESS // USER FLATPAK // KEEP CAMERA RUNNING"
+                : "INSTALL IN PROGRESS // OFFICIAL RPM // AUTH MAY BE REQUIRED";
+        }
+        return started;
     }
 
     function launchZoomClient() {
@@ -246,6 +276,19 @@ PanelWindow {
             return;
         }
         if (!payload || payload.ok !== true) {
+            if (action === "zoomInstall") {
+                const error = String(payload && payload.error || "INSTALL_UNAVAILABLE");
+                zoomInstallChoice = "";
+                zoomSetupVisible = true;
+                zoomInstallNotice = error === "ZOOM_RPM_NOT_DOWNLOADED"
+                    ? "RPM NOT FOUND // DOWNLOAD OFFICIAL FEDORA RPM TO ~/Downloads/"
+                    : error === "ZOOM_RPM_SIGNATURE_UNVERIFIED"
+                      ? "RPM SIGNATURE NOT VERIFIED // IMPORT ZOOM'S OFFICIAL KEY FIRST"
+                      : error === "RPM_INSTALL_TIMEOUT_CHECK_DEPLOYMENT"
+                        || error === "FLATPAK_INSTALL_TIMEOUT_CHECK_STATUS"
+                        ? "INSTALL STATUS UNCERTAIN // RECHECK BEFORE RETRYING"
+                        : "INSTALL FAILED // " + error;
+            }
             if (action === "zoomOpen"
                     && payload && payload.error === "ZOOM_CLIENT_NOT_INSTALLED") {
                 zoomClientStatus = {available: false, client: "none"};
@@ -258,7 +301,20 @@ PanelWindow {
                 menuOpen = true;
             return;
         }
-        if (action === "zoomStatus") {
+        if (action === "zoomInstall") {
+            zoomInstallChoice = "";
+            if (payload.restartRequired) {
+                zoomInstallNotice = "OFFICIAL ZOOM RPM STAGED // REBOOT REQUIRED";
+                feedback = "ZOOM // SYSTEM DEPLOYMENT STAGED // NO AUTOMATIC REBOOT";
+            } else {
+                zoomInstallNotice = "ZOOM FLATPAK INSTALLED // RECHECKING";
+                feedback = "ZOOM // USER FLATPAK INSTALLED";
+                Qt.callLater(function() {
+                    if (!camera.busy && camera.activeView === "zoom")
+                        camera.run("zoomStatus", ["zoom-status"]);
+                });
+            }
+        } else if (action === "zoomStatus") {
             zoomClientStatus = payload;
             zoomSetupVisible = !payload.available;
             feedback = payload.available ? "ZOOM // CLIENT DETECTED // LOGIN UNKNOWN"
@@ -377,6 +433,10 @@ PanelWindow {
                     camera.pendingAction = "";
                     camera.busy = false;
                     camera.feedback = "CAMERA // BACKEND PROCESS UNAVAILABLE";
+                    if (action === "zoomInstall") {
+                        camera.zoomInstallNotice = "INSTALL RESULT UNKNOWN // CHECK ZOOM STATUS";
+                        camera.zoomSetupVisible = true;
+                    }
                     if (action === "capture") {
                         camera.nativeRegionSelecting = false;
                         camera.menuOpen = true;
@@ -527,6 +587,8 @@ PanelWindow {
                         selectedForegroundColor: Colors.magenta
                         selectedBorderColor: Colors.magenta
                         onLeftClicked: {
+                            if (modelData.id !== "zoom")
+                                camera.zoomInstallChoice = "";
                             if (modelData.id === "gallery")
                                 camera.loadGallery();
                             else if (modelData.id === "zoom")

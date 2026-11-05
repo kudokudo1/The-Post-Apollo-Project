@@ -47,6 +47,10 @@ PanelWindow {
         SocialAccountDetailsStore.accountNamesFor(zoomIdentityId, "zoom")
     property string selectedZoomAccountId: ""
     property var zoomClientStatus: null
+    property string zoomInternetState: "NOT_CHECKED"
+    property string zoomServiceState: "NOT_CHECKED"
+    property string zoomLastChecked: ""
+    property bool zoomEnterQueued: false
     property var zoomLaunchObservation: null
     property string zoomLaunchState: "NOT_CHECKED"
     property string zoomLaunchMessage: "LAUNCH // NOT CHECKED"
@@ -100,11 +104,27 @@ PanelWindow {
     }
 
     onMenuOpenChanged: {
-        if (!menuOpen)
+        if (!menuOpen) {
             zoomInstallChoice = "";
-        // Read-only tool status on explicit open; no image copies or writes.
-        if (menuOpen && statusReport === null && !busy)
+            zoomEnterQueued = false;
+            return;
+        }
+        if (activeView === "zoom") {
+            // Reopening the Camera on Zoom also restores the native experience.
+            openZoomMode();
+        } else if (statusReport === null && !busy) {
             run("status", ["status"]);
+        }
+    }
+
+    onBusyChanged: {
+        if (!busy && zoomEnterQueued && menuOpen && activeView === "zoom") {
+            zoomEnterQueued = false;
+            Qt.callLater(function() {
+                if (!camera.busy && camera.menuOpen && camera.activeView === "zoom")
+                    camera.run("zoomEnter", ["zoom-enter"]);
+            });
+        }
     }
 
     function fileUrl(path) {
@@ -196,10 +216,19 @@ PanelWindow {
     }
 
     function openZoomMode() {
+        const wasZoom = activeView === "zoom";
         activeView = "zoom";
         zoomInstallChoice = "";
-        if (!busy)
-            run("zoomStatus", ["zoom-status"]);
+        if (wasZoom && zoomLaunchState === "CHECKING")
+            return;
+        if (busy) {
+            zoomEnterQueued = true;
+            return;
+        }
+        zoomLaunchState = "CHECKING";
+        zoomLaunchMessage = "ZOOM // DETECTING CLIENT AND STARTING IF NEEDED";
+        // This mode-entry action is the operator's requested launch intent.
+        run("zoomEnter", ["zoom-enter"]);
     }
 
     function prepareZoomInstall(choice) {
@@ -324,7 +353,45 @@ PanelWindow {
                 menuOpen = true;
             return;
         }
-        if (action === "zoomInstall") {
+        if (action === "zoomEnter") {
+            zoomClientStatus = {
+                available: payload.installed === true,
+                client: payload.client || "none",
+                installation: payload.installation || "none"
+            };
+            zoomSetupVisible = payload.installed !== true;
+            if (payload.launch === "NOT_INSTALLED") {
+                zoomLaunchState = "NOT_INSTALLED";
+                zoomLaunchMessage = "ZOOM // NOT INSTALLED // USE DOWNLOAD ABOVE";
+            } else if (payload.launch === "FAILED") {
+                zoomLaunchState = "FAILED";
+                zoomLaunchMessage = "ZOOM // START FAILED // "
+                                  + String(payload.launchError || "UNAVAILABLE");
+            } else if (payload.launch === "ALREADY_RUNNING") {
+                zoomLaunchState = payload.windowState === "VISIBLE"
+                    ? "VISIBLE" : payload.windowState === "OTHER_WORKSPACE"
+                      ? "OTHER_WORKSPACE" : "RUNNING_NO_WINDOW";
+                zoomLaunchMessage = zoomLaunchState === "VISIBLE"
+                    ? "ZOOM // VISIBLE WINDOW FOUND"
+                    : zoomLaunchState === "OTHER_WORKSPACE"
+                      ? "ZOOM // WINDOW ON ANOTHER WORKSPACE"
+                      : "ZOOM // PROCESS RUNNING // NO WINDOW DETECTED";
+            } else {
+                zoomLaunchState = "UNVERIFIED";
+                zoomLaunchMessage = "ZOOM // STARTED REQUEST // VERIFYING WINDOW";
+            }
+            feedback = zoomLaunchMessage;
+            Qt.callLater(function() {
+                if (!camera.busy && camera.menuOpen && camera.activeView === "zoom")
+                    camera.run("zoomConnectivity", ["zoom-connectivity"]);
+            });
+        } else if (action === "zoomConnectivity") {
+            zoomInternetState = payload.internet;
+            zoomServiceState = payload.zoomService;
+            zoomLastChecked = payload.checkedAt || "";
+            if (camera.zoomLaunchState !== "NOT_INSTALLED")
+                zoomLaunchCheckTimer.restart();
+        } else if (action === "zoomInstall") {
             zoomInstallChoice = "";
             if (payload.restartRequired) {
                 zoomInstallNotice = "OFFICIAL ZOOM RPM STAGED // REBOOT REQUIRED";
@@ -340,8 +407,13 @@ PanelWindow {
         } else if (action === "zoomStatus") {
             zoomClientStatus = payload;
             zoomSetupVisible = !payload.available;
-            feedback = payload.available ? "ZOOM // CLIENT DETECTED // LOGIN UNKNOWN"
+            feedback = payload.available ? "ZOOM // CLIENT DETECTED // ACCOUNT UNVERIFIED"
                                          : "ZOOM // NOT INSTALLED // SETUP OPTIONS BELOW";
+            if (payload.available)
+                Qt.callLater(function() {
+                    if (!camera.busy && camera.menuOpen && camera.activeView === "zoom")
+                        camera.run("zoomEnter", ["zoom-enter"]);
+                });
         } else if (action === "zoomOpen") {
             zoomLaunchState = "UNVERIFIED";
             zoomLaunchMessage = "ZOOM // LAUNCH SUBMITTED // WINDOW NOT VERIFIED YET";
@@ -464,6 +536,19 @@ PanelWindow {
 
     // Read-only status check after an explicit launch. No retries or hidden
     // background Zoom starts; the user can click CHECK WINDOW again later.
+    // Live reachability while the Zoom panel is actually open. This sends
+    // two credential-free HTTPS HEAD requests, never triggers another launch.
+    Timer {
+        id: zoomStatusRefreshTimer
+        interval: 90000
+        repeat: true
+        running: camera.menuOpen && camera.activeView === "zoom"
+        onTriggered: {
+            if (!camera.busy)
+                camera.run("zoomConnectivity", ["zoom-connectivity"]);
+        }
+    }
+
     Timer {
         id: zoomLaunchCheckTimer
         interval: 4000

@@ -85,3 +85,12 @@ test("No-source UI retains five planet lanes and shows detailed provider errors"
   assert.match(focus,/sourceOnly: true/);
   for(const src of [calendar,clock,modes]) assert.ok(src);
 });
+
+test("C5 focused hidden astronomy acquisition uses route, not visual geometry",()=>{
+  const gates=sky.match(/active: \(sky\.sourceOnly \|\| sky\.visible\)/g)||[];
+  assert.equal(gates.length,6,"Moon, Eclipse, Celnav, ISS, Planets, Meteor are route-scoped");
+  assert.match(focus,/SOURCE INACTIVE \/\/ ROUTE ACTIVATION FAILED/);
+  assert.match(focus,/SOURCE IDLE \/\/ USE RETRY/);
+  assert.match(focus,/label: "RETRY SOURCE"/);
+  assert.match(focus,/focus\.selectedProvider\.refresh\(\)/);
+});

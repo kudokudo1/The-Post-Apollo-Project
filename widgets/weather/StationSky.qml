@@ -18,6 +18,13 @@ Rectangle {
     // rendering a second complete scroll surface. CLASSIC defaults unchanged.
     property bool sourceOnly: false
     readonly property var moonObservation: moonService
+    // Read-only references for focused COSMOS instruments. StationSky keeps
+    // sole ownership and route-controlled activation of these services.
+    readonly property var planetObservation: planetRiseSetService
+    readonly property var celestialObservation: celnavService
+    readonly property var meteorObservation: meteorService
+    readonly property var eclipseObservation: eclipseService
+    readonly property var issObservation: issPassService
     function sectionVisible(section) {
         return SubjectPanelPolicy.visibleFor("sky",subjectRoute,section)
             || CosmosPanelPolicy.visibleFor("sky",subjectRoute,section);

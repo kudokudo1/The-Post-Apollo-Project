@@ -31,11 +31,11 @@ vm.runInContext(weatherPolicy.replace(/^\.pragma library\s*$/m, ""), weather);
 vm.runInContext(workspaceSource.replace(/^\.pragma library\s*$/m, ""), workspace);
 const plain = obj => JSON.parse(JSON.stringify(obj));
 
-test("COSMOS retains the 23 scoped routes plus two complete original SKY/SPACE views", () => {
+test("COSMOS retains the 26 scoped routes plus two complete original SKY/SPACE views", () => {
   assert.equal(cosmos.FORMAT, "post-apollo.weather.cosmos-panels.c1.v1");
   const keys = Object.keys(cosmos.ROUTES);
-  assert.equal(keys.length, 25);
-  assert.equal(new Set(keys).size, 25);
+  assert.equal(keys.length, 28);
+  assert.equal(new Set(keys).size, 28);
   assert.deepEqual(keys.filter(k=>cosmos.ROUTES[k].full===true).sort(),
     ["cosmos/sky/full","cosmos/space-weather/full"]);
   for (const route of keys) {
@@ -368,7 +368,7 @@ test("COSMOS SUN, MOON and EVENTS bottom landings own their subject data", () =>
   const tab = key => tabs.find(row => row.key === key);
   assert.equal(tab("sun").path, "cosmos/sun/position");
   assert.equal(tab("moon").path, "cosmos/moon/ephemeris");
-  assert.equal(tab("sky").path, "cosmos/planets-stars/celestial-fix");
+  assert.equal(tab("sky").path, "cosmos/planets-stars/planet-clock");
   assert.equal(tab("events").path, "cosmos/events/overview");
   assert.equal(workspace.selectedGroup("cosmos/planets-stars/planet-clock"),"sky");
   assert.equal(workspace.selectedGroup("cosmos/events/meteors"),"events");
@@ -388,9 +388,9 @@ test("COSMOS SUN, MOON and EVENTS bottom landings own their subject data", () =>
   }
   assert.equal(cosmos.visibleFor("sky","cosmos/moon/position","moon-position"),true);
   assert.equal(cosmos.needsSource("cosmos/moon/position","celnav"),true);
-  for (const section of ["celestial-fix","planet-clock"]) {
-    assert.equal(cosmos.visibleFor("sky","cosmos/planets-stars/celestial-fix",section),true);
-  }
+  assert.equal(cosmos.visibleFor("sky","cosmos/planets-stars/celestial-fix","celestial-fix"),true);
+  assert.equal(cosmos.visibleFor("sky","cosmos/planets-stars/celestial-fix","planet-clock"),false);
+  assert.equal(cosmos.visibleFor("sky","cosmos/planets-stars/planet-clock","planet-clock"),true);
   for (const section of ["moon","meteor","eclipses","iss"]) {
     assert.equal(cosmos.visibleFor("sky","cosmos/planets-stars/celestial-fix",section),false);
   }

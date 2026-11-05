@@ -1,5 +1,6 @@
 import QtQuick
 import "StationCosmosSubjectPanelPolicy.js" as CosmosPanelPolicy
+import "StationCosmosModePolicy.js" as Modes
 
 // Reuses existing SKY and SPACE QML instruments. No copied collectors,
 // cache writers or provider ownership. CLASSIC routes keep their own loaders.
@@ -21,7 +22,9 @@ Rectangle {
         id: cosmosLoader
         anchors.fill: parent
         active: cosmosPane.visible && cosmosPane.kind !== ""
-        sourceComponent: cosmosPane.kind === "overview"
+        sourceComponent: Modes.family(cosmosPane.subjectRoute) !== ""
+                         ? focusModesComponent
+                         : cosmosPane.kind === "overview"
                          ? overviewComponent
                          : cosmosPane.kind === "sky" ? skyComponent
                          : cosmosPane.subjectRoute === "cosmos/space-weather/overview"
@@ -53,6 +56,22 @@ Rectangle {
         StationCosmosGeomagneticPane {
             spaceService: cosmosPane.spaceService
             weatherService: cosmosPane.weatherService
+            liveHistoryStore: cosmosPane.liveHistoryStore
+            runtimeNowMs: cosmosPane.runtimeNowMs
+            onRouteRequested: function(path) {
+                cosmosPane.routeRequested(path)
+            }
+        }
+    }
+
+    // C5 // One fixed mode strip owns all SUN/ASTRONOMY/EVENTS switching.
+    // SOURCE-only SKY and route-selected NOAA readers are inside that pane.
+    Component {
+        id: focusModesComponent
+        StationCosmosModesPane {
+            subjectRoute: cosmosPane.subjectRoute
+            weatherService: cosmosPane.weatherService
+            spaceService: cosmosPane.spaceService
             liveHistoryStore: cosmosPane.liveHistoryStore
             runtimeNowMs: cosmosPane.runtimeNowMs
             onRouteRequested: function(path) {

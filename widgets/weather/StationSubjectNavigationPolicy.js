@@ -53,6 +53,7 @@ var SUBJECTS = [
       {id:"planet-clock",label:"PLANET RISE/SET"},
       {id:"constellations",label:"CONSTELLATIONS"}]},
     {id:"events",label:"CELESTIAL EVENTS",children:[
+      {id:"overview",label:"EVENTS // ISS + ECLIPSES + METEORS"},
       {id:"eclipses",label:"ECLIPSES"}, {id:"meteors",label:"METEOR SHOWERS"},
       {id:"iss",label:"ISS PASSES"}]},
     {id:"space-weather",label:"SPACE WEATHER",children:[

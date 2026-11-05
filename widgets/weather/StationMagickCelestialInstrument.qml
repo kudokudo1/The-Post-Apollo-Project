@@ -19,6 +19,8 @@ Rectangle {
     // M4 production JSON; a missing or unverified payload stays unavailable.
     property var visualData: null
     property string mode: "wheel"
+    // V4g // Compact NETWORK retains CHORDS/DEPTH across visits to HELIO.
+    property string networkMode: "chords"
     // M30-C: same verified visual renderer, but hide only the detailed
     // timeline/inspector controls when mounted in the overview hero.
     property bool compactMode: false
@@ -717,7 +719,12 @@ Rectangle {
                 compactMode: instrument.compactMode
                 showCompactHelioControls: instrument.showCompactHelioControls
                 displayMode: instrument.compactMode && instrument.mode === "helio"
-                             ? "heliocentric" : "chords"
+                             ? "heliocentric" : instrument.networkMode
+                onCompactNetworkModeRequested: function(mode) {
+                    if(instrument.compactMode &&
+                       (mode==="chords" || mode==="depth"))
+                        instrument.networkMode=mode;
+                }
                 graphModel: instrument.graphModel
                 // Existing single M4 on-demand result, not a second provider.
                 spatialPayload: instrument.visualData

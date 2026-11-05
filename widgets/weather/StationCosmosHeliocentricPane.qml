@@ -62,7 +62,7 @@ Item {
         ctx.clearRect(0,0,w,h);
         const g=Helio.cameraOrigin(w,h,spatial.spatialScale,
                                    spatial.cameraPanX,spatial.cameraPanY);
-        if(!g.ready)return;
+        if(!g || !g.ready)return;
         ctx.save();
         const plotBounds=Helio.viewport(w,h,spatial.compactPlot);
         if(!plotBounds){ctx.restore();return;}

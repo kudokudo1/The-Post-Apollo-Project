@@ -16,6 +16,7 @@ on:
       - 'tests/weather/test_cosmos_heliocentric_spatial_v4c.js'
       - 'tests/weather/test_cosmos_heliocentric_viewport_v4e.js'
       - 'tests/weather/test_cosmos_heliocentric_camera_v4f.js'
+      - 'tests/weather/test_magick_helio_render_network_modes_v4g.js'
       - 'tests/weather/test_magick_celestial_query_m5c.js'
       - 'widgets/weather/StationCosmosCelestialDepthPane.qml'
       - 'widgets/weather/StationCosmosCelestialDepthPolicy.js'
@@ -51,6 +52,8 @@ jobs:
         run: node --test tests/weather/test_cosmos_heliocentric_viewport_v4e.js
       - name: Verify V4f free HELIO pan and mouse-anchored extended zoom
         run: node --test tests/weather/test_cosmos_heliocentric_camera_v4f.js
+      - name: Verify V4g HELIO render readiness and compact NETWORK mode controls
+        run: node --test tests/weather/test_magick_helio_render_network_modes_v4g.js
       - name: Preserve MAGICK M4/M5 sources and interaction behavior
         run: |
           node --test tests/weather/test_magick_celestial_visual_m5.js

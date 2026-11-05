@@ -10,6 +10,7 @@ import sys
 import tempfile
 import time
 import unittest
+import xml.etree.ElementTree as ET
 
 from dbus_next import Message, MessageType
 from dbus_next.aio import MessageBus
@@ -159,13 +160,24 @@ class C2mPrivateBusTests(unittest.TestCase):
                           "APPROVED", "secretstorage", "ALLOW_REPLACEMENT"):
             self.assertNotIn(forbidden, source)
         self.assertIn('flags=NameFlag.DO_NOT_QUEUE', source)
-        self.assertIn('return denied("OBSERVED_UNVERIFIED")', source.replace(
-            'value = denied("OBSERVED_UNVERIFIED")',
-            'return denied("OBSERVED_UNVERIFIED")'))
+        self.assertIn('value = denied("OBSERVED_UNVERIFIED")', source)
         for name in ("ConnectionsHostObservation.qml", "ConnectionsRequestStatus.qml",
                      "ConnectionsBroker.qml", "qmldir"):
             self.assertNotIn("C2mPrivateBusStatusPilot",
                              (ROOT / "services/connections" / name).read_text())
+
+    def test_08_contract_exposes_only_single_status_method(self):
+        path = ROOT / "services/connections/experiments/C2mConnectionsStatusPilot.xml"
+        node = ET.fromstring(path.read_text())
+        self.assertEqual(node.attrib["name"], OBJ_PATH)
+        interfaces = node.findall("interface")
+        self.assertEqual(len(interfaces), 1)
+        self.assertEqual(interfaces[0].attrib["name"], INTERFACE)
+        methods = interfaces[0].findall("method")
+        self.assertEqual([m.attrib["name"] for m in methods], ["GetStatus"])
+        args = methods[0].findall("arg")
+        self.assertEqual([a.attrib["direction"] for a in args], ["out"])
+        self.assertEqual([a.attrib["type"] for a in args], ["s"])
 
 
 if __name__ == "__main__":

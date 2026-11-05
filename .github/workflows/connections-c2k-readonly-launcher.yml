@@ -53,7 +53,7 @@ jobs:
                   imports.add(node.module)
           assert not forbidden.intersection(imports)
           for snippet in ("secret-tool", "POST_APOLLO_FIRMS_MAP_KEY", "shell=True", "systemctl",
-                          "Popen(", "AF_INET", "os.system(", "APPROVED", "COMPLETED"):
+                          "Popen(", "AF_INET", "os.system(", "COMPLETED"):
               assert snippet not in source, snippet
           assert "C2K_REFUSED_NO_APPROVED_RUNTIME_LAUNCH" in source
           assert 'args != [START_FLAG]' in source

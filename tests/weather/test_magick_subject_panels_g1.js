@@ -223,7 +223,11 @@ test("M30-C compact overview hosts the existing interactive astrology modes", ()
   for(const token of ['id:"wheel"','id:"motion"','id:"aspects"',
                       'id:"relations"','id:"network"','id:"helio"'])
     assert.ok(instrument.includes(token),"mode missing "+token);
-  assert.match(instrument,/displayMode: instrument\.compactMode && instrument\.mode === "helio"\s*\? "heliocentric" : "chords"/);
+  assert.match(instrument,/displayMode: instrument\.compactMode && instrument\.mode === "helio"\s*\? "heliocentric" : instrument\.networkMode/);
+  assert.match(instrument,/property string networkMode: "chords"/);
+  assert.match(instrument,/onCompactNetworkModeRequested: function\(mode\)/);
+  assert.match(network,/id: compactNetworkToolbar/);
+  assert.match(network,/\{id:"depth",label:"DEPTH"\}/);
   assert.match(instrument,/onClicked: instrument\.mode = modelData\.id/);
   assert.match(network,/StationCosmosHeliocentricPane\s*\{/);
   assert.match(network,/visible: !graph\.compactMode/);

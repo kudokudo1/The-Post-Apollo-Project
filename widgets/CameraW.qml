@@ -651,11 +651,15 @@ PanelWindow {
             onStreamFinished: camera.consumeZoomWeb(this.text)
         }
         onExited: function(code, status) {
-            if (camera.zoomWebBusy && code !== 0) {
-                camera.zoomWebBusy = false;
-                camera.zoomWebDocked = false;
-                camera.zoomWebState = "WEB_HOST_PROCESS_FAILED";
-            }
+            // Collector may finish just after process exit. Fall closed if
+            // malformed or absent JSON left the host action busy.
+            Qt.callLater(function() {
+                if (camera.zoomWebBusy) {
+                    camera.zoomWebBusy = false;
+                    camera.zoomWebDocked = false;
+                    camera.zoomWebState = "WEB_HOST_PROCESS_UNVERIFIED";
+                }
+            });
         }
     }
     Process {

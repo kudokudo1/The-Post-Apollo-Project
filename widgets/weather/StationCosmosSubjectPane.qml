@@ -22,13 +22,43 @@ Rectangle {
         anchors.fill: parent
         active: cosmosPane.visible && cosmosPane.kind !== ""
         sourceComponent: cosmosPane.kind === "overview"
-                         ? overviewComponent : cosmosPane.kind === "sky"
-                         ? skyComponent
+                         ? overviewComponent
+                         : cosmosPane.kind === "sky" ? skyComponent
+                         : cosmosPane.subjectRoute === "cosmos/space-weather/overview"
+                           ? spaceHubComponent
+                         : cosmosPane.subjectRoute === "cosmos/space-weather/geomagnetic"
+                           ? geomagneticComponent
                          : cosmosPane.subjectRoute === "cosmos/space-weather/solar-wind"
-                            ? solarWindComponent
-                          : (cosmosPane.subjectRoute === "cosmos/space-weather/overview"
-                            || cosmosPane.subjectRoute === "cosmos/space-weather/history")
-                           ? spaceTimelineComponent : spaceComponent
+                           ? solarWindComponent
+                         : cosmosPane.subjectRoute === "cosmos/space-weather/history"
+                           ? spaceTimelineComponent
+                         : spaceComponent
+    }
+
+    // SPACE bottom tab now opens a compact directory; the full report
+    // stays available through the original INDEX route.
+    Component {
+        id: spaceHubComponent
+        StationCosmosSpaceWeatherHubPane {
+            spaceService: cosmosPane.spaceService
+            runtimeNowMs: cosmosPane.runtimeNowMs
+            onRouteRequested: function(path) {
+                cosmosPane.routeRequested(path)
+            }
+        }
+    }
+
+    Component {
+        id: geomagneticComponent
+        StationCosmosGeomagneticPane {
+            spaceService: cosmosPane.spaceService
+            weatherService: cosmosPane.weatherService
+            liveHistoryStore: cosmosPane.liveHistoryStore
+            runtimeNowMs: cosmosPane.runtimeNowMs
+            onRouteRequested: function(path) {
+                cosmosPane.routeRequested(path)
+            }
+        }
     }
 
     Component {
@@ -36,7 +66,11 @@ Rectangle {
         StationSky {
             subjectRoute: cosmosPane.subjectRoute
             weatherService: cosmosPane.weatherService
+            spaceService: cosmosPane.spaceService
             runtimeNowMs: cosmosPane.runtimeNowMs
+            onRouteRequested: function(path) {
+                cosmosPane.routeRequested(path)
+            }
         }
     }
 

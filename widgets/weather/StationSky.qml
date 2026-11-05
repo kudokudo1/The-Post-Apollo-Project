@@ -592,6 +592,43 @@ Rectangle {
             }
         }
 
+        // The EVENTS landing holds all three real source sections. Jump to
+        // the desired section without adding a second event-data renderer.
+        Row {
+            id: eventsJumpRow
+            width: parent.width
+            height: visible ? 30 : 0
+            spacing: 7
+            visible: sky.subjectRoute === "cosmos/events/overview"
+
+            Repeater {
+                model: [
+                    {label:"METEOR SHOWERS",target:"meteor"},
+                    {label:"ECLIPSES",target:"eclipses"},
+                    {label:"ISS PASSES",target:"iss"}
+                ]
+                delegate: ActionButton {
+                    required property var modelData
+                    width: Math.max(1,(eventsJumpRow.width
+                        - 2*eventsJumpRow.spacing)/3)
+                    height: 27
+                    label: modelData.label
+                    labelPixelSize: 10
+                    accentColor: modelData.target === "meteor"
+                                 ? Colors.magenta : Colors.cyan
+                    onClicked: {
+                        const targetY = modelData.target === "meteor"
+                            ? meteorEventSection.y
+                            : modelData.target === "eclipses"
+                              ? eclipseEventSection.y : issEventSection.y;
+                        skyScroll.contentY = Math.max(0, Math.min(
+                            skyScroll.contentHeight - skyScroll.height,
+                            skyContent.y + targetY - 12));
+                    }
+                }
+            }
+        }
+
         // V2 COSMOS visual astronomy. Reads the same existing Moon
         // response and calibrated Sun calculation as the text instruments.
         // CLASSIC and WEATHER pages keep their original layout unchanged.
@@ -1143,6 +1180,7 @@ Rectangle {
         }
 
         Column {
+            id: issEventSection
             visible: sky.sectionVisible("iss")
             width: parent.width
             spacing: 7
@@ -1595,6 +1633,7 @@ Rectangle {
         }
 
         Column {
+            id: eclipseEventSection
             visible: sky.sectionVisible("eclipses")
             width: parent.width
             spacing: 7
@@ -2408,6 +2447,7 @@ Rectangle {
         }
 
         Column {
+            id: meteorEventSection
             visible: sky.sectionVisible("meteor")
             width: parent.width
             spacing: 7

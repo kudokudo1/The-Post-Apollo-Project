@@ -177,12 +177,11 @@ class SemanticOrganizationColors(unittest.TestCase):
         }
         for path, count in expected_counts.items():
             source = (Q / path).read_text()
-            buttons = re.findall(
-                r'IdentityCenterLocalActionButton \\{\\n\\s*role: "save"'
-                r'(?:(?!IdentityCenterLocalActionButton \\{)[\\s\\S])*?'
-                r'label: "SAVE"', source)
-            self.assertEqual(len(buttons), count, path)
+            self.assertEqual(source.count('label: "SAVE"'), count, path)
             self.assertEqual(source.count('role: "save"'), count, path)
+            for fragment in source.split('label: "SAVE"')[:-1]:
+                button = fragment.rsplit("IdentityCenterLocalActionButton {", 1)[-1]
+                self.assertIn('role: "save"', button, path)
 
 
     def test_no_new_privileged_or_unreviewed_operations(self):

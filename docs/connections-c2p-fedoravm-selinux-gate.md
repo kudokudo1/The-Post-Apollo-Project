@@ -31,6 +31,8 @@ The normal desktop CPU++ → SETTINGS → CONNECTIONS → NASA FIRMS → VIEW RE
 Official Fedora Cloud 44 source: https://www.fedoraproject.org/cloud/download/  
 Official cloud-init QEMU/NoCloud reference: https://docs.cloud-init.io/en/latest/howto/launch_qemu.html
 
+Exact verified head: 1b237f12f5a660d6de497be93e0e65d87bc485e0; GitHub initial CI 3/3 checks passed. Guest SELinux process contexts include system_u:system_r:cloud_init_t:s0 for the probe, but no Post-Apollo service-specific confined domain has been implemented or validated.
+
 ## WATCH OUT FOR
 
 Hosted runners may not provide KVM; that is an environmental blocker, not a successful SELinux verification. A full Fedora VM cannot be simulated with a Docker container when the question is guest-kernel SELinux. A fallback to QEMU TCG is not enabled because it may be prohibitively slow; a supported KVM-equipped runner would be required for this milestone.
@@ -45,7 +47,7 @@ GitHub Actions is authorized to provision ephemeral runner utilities only; the u
 - [x] Add hash-pinned official Fedora 44 image test with NoCloud serial output
 - [x] Add fail-closed /dev/kvm preflight
 - [x] Add read-only enforcing SELinux probe
-- [ ] Verify actual CI KVM availability, VM startup and enforcing kernel
+- [x] CI run 42048451030: KVM available, official Fedora 44 image SHA256 matched, VM kernel 6.19.10-300.fc44.x86_64 booted, SELinux Enforcing and /sys/fs/selinux/enforce=1
 - [ ] Separately prove service startup inside enforcing guest
 - [ ] Independently review SELinux process domain and AVC outcomes
 - [ ] Production package integrity, consent/revocation and operator acceptance

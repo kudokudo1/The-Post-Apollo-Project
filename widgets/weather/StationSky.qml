@@ -605,7 +605,9 @@ Rectangle {
             spacing: 8
 
             Rectangle {
-                width: Math.max(110,parent.width - 2*145 - 2*parent.spacing)
+                id: solarFluxBay
+                width: Math.max(1,(sunSubjectActions.width
+                        - 2*sunSubjectActions.spacing)/3)
                 height: 37
                 color: Colors.dark
                 border.width: 1
@@ -628,7 +630,7 @@ Rectangle {
             }
 
             ActionButton {
-                width: 145
+                width: solarFluxBay.width
                 height: 37
                 label: "SUVI / X-RAY / FLARES"
                 labelPixelSize: 9
@@ -637,7 +639,7 @@ Rectangle {
             }
 
             ActionButton {
-                width: 145
+                width: solarFluxBay.width
                 height: 37
                 label: "SOLAR CYCLE"
                 labelPixelSize: 10

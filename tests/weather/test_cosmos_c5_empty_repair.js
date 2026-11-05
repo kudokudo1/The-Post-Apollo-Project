@@ -67,7 +67,9 @@ test("No-source UI retains five planet lanes and shows detailed provider errors"
   assert.equal(blank.length,5);
   assert.equal(blank.every(r=>!r.available && r.events.length===0),true);
   assert.match(focus,/readonly property var displayedPlanetRows:/);
-  assert.match(focus,/model: focus\.displayedPlanetRows/);
+  assert.match(focus,/id: clockRepeater\s*[\s\S]*?model: 5/);
+  assert.match(focus,/required property int index/);
+  assert.match(focus,/planetRow\.events\.length : 0/);
   for(const planet of ["MERCURY","VENUS","MARS","JUPITER","SATURN"])
     assert.ok(focus.includes('name:"'+planet+'"'),planet);
   for(const signal of [

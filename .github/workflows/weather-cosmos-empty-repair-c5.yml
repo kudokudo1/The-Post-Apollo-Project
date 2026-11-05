@@ -42,7 +42,8 @@ jobs:
           export DEBIAN_FRONTEND=noninteractive
           apt-get update
           apt-get install -y --no-install-recommends \
-            ca-certificates git nodejs quickshell qt6-qpa-plugins coreutils findutils
+            ca-certificates git nodejs quickshell qt6-qpa-plugins \
+            qml6-module-qtquick-effects coreutils findutils
           quickshell --version
       - uses: actions/checkout@v4
       - name: Cold-load SUN / ASTRONOMY / EVENTS without a running desktop

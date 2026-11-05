@@ -407,3 +407,40 @@ test("M30-F replaces PLANETARY bottom category with source-honest LENSES", () =>
   assert.match(lensesPane,/SCIENTIFIC OBSERVATIONS ARE NOT EVIDENCE OF SYMBOLIC CAUSATION/);
   assert.doesNotMatch(lensesPane,/Flickable\s*\{|ScrollView\s*\{|Process\s*\{|Timer\s*\{|FileView\s*\{/);
 });
+
+
+test("M30-G ASTROLOGY restores its inset without changing other MAGICK screens",()=>{
+  assert.match(pane,/anchors\.topMargin: magickPane\.standaloneAstrology \? 7/);
+  assert.match(pane,/anchors\.leftMargin: magickPane\.standaloneAstrology \? 9/);
+  assert.match(pane,/anchors\.rightMargin: magickPane\.standaloneAstrology \? 9/);
+  assert.match(pane,/anchors\.bottomMargin: magickPane\.standaloneAstrology \? 8/);
+  assert.match(pane,/anchors\.margins: magickPane\.standaloneAstrology \? 3/);
+  assert.match(pane,/border\.width: magickPane\.lensesLanding \? 0 : 1/);
+  assert.match(standaloneAstro,/showCompactHelioControls: true/);
+  assert.match(instrument,/property bool showCompactHelioControls: false/);
+  assert.match(instrument,/showCompactHelioControls: instrument\.showCompactHelioControls/);
+  // The small overview does not opt in to these larger view controls.
+  assert.doesNotMatch(overview,/showCompactHelioControls: true/);
+  assert.match(standaloneAstro,/anchors\.bottom: eventAndTimeControls\.top/);
+  assert.doesNotMatch(standaloneAstro,/Flickable\s*\{|ScrollView\s*\{/);
+});
+
+test("M30-G compact HELIO buttons control the real embedded JPL projection",()=>{
+  assert.match(network,/property bool showCompactHelioControls: false/);
+  assert.match(network,/id: compactHelioToolbar/);
+  assert.match(network,/visible: graph\.compactMode && graph\.showCompactHelioControls\s*&& graph\.displayMode === "heliocentric"/);
+  assert.match(network,/anchors\.topMargin: compactHelioToolbar\.visible \? 27 : 0/);
+  assert.match(network,/embedded: true/);
+  for(const label of ["TOP","TILT","ALL AU","INNER 4 AU"])
+    assert.ok(network.includes('label:"'+label+'"'),"missing compact HELIO control "+label);
+  assert.match(network,/heliocentricPane\.tiltView=false/);
+  assert.match(network,/heliocentricPane\.tiltView=true/);
+  assert.match(network,/heliocentricPane\.atlasRange=modelData\.id/);
+  assert.match(network,/selected: modelData\.id==="top"/);
+  assert.match(network,/visible: !graph\.compactMode/); // original inspector unchanged
+  assert.match(network,/visualData: graph\.spatialPayload/);
+  assert.match(network,/graphModel: graph\.graphModel/);
+  assert.match(network,/focusIndex: graph\.focusIndex/);
+  assert.match(network,/selectedBody: graph\.selectedBody/);
+  assert.doesNotMatch(network,/Process\s*\{|Timer\s*\{|FileView\s*\{|XMLHttpRequest/);
+});

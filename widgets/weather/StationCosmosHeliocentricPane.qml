@@ -2,6 +2,7 @@ import QtQuick
 import "../../components"
 import "StationCosmosHeliocentricPolicy.js" as Helio
 import "StationCosmosSolarOverviewPolicy.js" as Solar
+import "StationCosmosHelioLabelPolicy.js" as Labels
 
 // V4c // True Sun-centered, geometric JPL vector snapshot at one UTC.
 // Neither the earlier apparent Earth-centric plot nor the longitudinal
@@ -130,6 +131,10 @@ Item {
             return;
         }
 
+        // V5a: two-pass painting. The first pass draws real source points;
+        // the second makes only noncolliding labels visible at this zoom.
+        // Hovered/selected labels are always prioritized.
+        const labelItems=[];
         for(let i=0;i<spatial.scene.points.length;i++){
             const point=spatial.scene.points[i];
             if(point.origin)continue; // sun already drawn at 0 AU
@@ -175,18 +180,76 @@ Item {
                 ctx.arc(p.x,p.y,10,0,2*Math.PI);
                 ctx.stroke();
             }
-            ctx.fillStyle=String(point.color);
-            ctx.font="9px monospace";
             const label=(point.label||point.body.toUpperCase())
                        +(p.offscreen?" / OUT":"");
-            const placement=Helio.labelPosition(p,
-                ctx.measureText(label).width,w,h,spatial.compactPlot,g.cx);
-            if(placement) {
-                ctx.textAlign="center";
-                ctx.fillText(label,placement.x,placement.y,
-                             placement.maxWidth);
-            }
+            ctx.font="9px monospace";
+            labelItems.push({body:point.body,label:label,
+                x:p.x,y:p.y,offscreen:p.offscreen,
+                color:point.color,width:ctx.measureText(label).width});
         }
+
+        const planned=Labels.layout(labelItems,plotBounds,
+            spatial.selectedBody,spatial.hoveredBody,
+            spatial.focusPoint!==null);
+        for(let j=0;j<planned.length;j++) {
+            const item=planned[j];
+            // Deliberately draw leader lines only for inspected bodies.
+            if(item.focused || item.hovered) {
+                ctx.beginPath();
+                ctx.moveTo(item.anchorX,item.anchorY);
+                ctx.lineTo(item.x,item.y);
+                ctx.strokeStyle=item.focused?String(Colors.yellow):
+                    String(Colors.cyan);
+                ctx.globalAlpha=0.55;
+                ctx.lineWidth=1;
+                ctx.stroke();
+            }
+            ctx.globalAlpha=item.focused?0.95:0.84;
+            ctx.fillStyle=item.focused?
+                "rgba(27,6,35,0.96)":"rgba(14,6,25,0.84)";
+            ctx.fillRect(item.rect.left,item.rect.top,
+                         item.rect.right-item.rect.left,
+                         item.rect.bottom-item.rect.top);
+            ctx.strokeStyle=item.focused?String(Colors.magenta):
+                "rgba(85,207,202,0.28)";
+            ctx.lineWidth=item.focused?1.2:0.65;
+            ctx.strokeRect(item.rect.left,item.rect.top,
+                           item.rect.right-item.rect.left,
+                           item.rect.bottom-item.rect.top);
+            const srcPoint=Helio.byBody(spatial.scene,item.body);
+            ctx.fillStyle=srcPoint?String(srcPoint.color):String(Colors.cyan);
+            ctx.globalAlpha=1;
+            ctx.textAlign="center";
+            ctx.font=item.focused?"bold 9px monospace":"9px monospace";
+            ctx.fillText(item.text,item.x,item.y,item.width);
+        }
+        // A selected target gets a compact, source-verified callout.
+        // All numbers are from the same JPL sample, never camera geometry.
+        const focusedPoint=spatial.focusPoint;
+        const hud=Labels.plaque(plotBounds,focusedPoint!==null);
+        if(hud && focusedPoint) {
+            ctx.globalAlpha=0.95;
+            ctx.fillStyle="rgba(14,6,25,0.94)";
+            ctx.fillRect(hud.left,hud.top,
+                         hud.right-hud.left,hud.bottom-hud.top);
+            ctx.strokeStyle=String(Colors.magenta);
+            ctx.lineWidth=1;
+            ctx.strokeRect(hud.left,hud.top,
+                           hud.right-hud.left,hud.bottom-hud.top);
+            ctx.globalAlpha=1;
+            ctx.textAlign="left";
+            ctx.font="bold 9px monospace";
+            ctx.fillStyle=String(focusedPoint.color||Colors.cyan);
+            ctx.fillText(focusedPoint.label||
+                         focusedPoint.body.toUpperCase(),
+                         hud.left+5,hud.top+11,hud.right-hud.left-10);
+            ctx.font="9px monospace";
+            ctx.fillStyle=String(Colors.yellow);
+            ctx.fillText("JPL // "+focusedPoint.distance_au.toFixed(3)+
+                         " AU // GEOMETRIC",
+                         hud.left+5,hud.top+24,hud.right-hud.left-10);
+        }
+        ctx.globalAlpha=1;
         ctx.restore();
     }
 

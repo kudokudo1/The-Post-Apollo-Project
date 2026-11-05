@@ -135,6 +135,83 @@ function hit(scene,px,py,w,h,scale,tilt,tolerance,domainAu) {
     }
     return best;
 }
+// V4e // Plot bounds belong to the visualization, never to the JPL source.
+// The noncompact view reserves its existing right inspector; the compact
+// layout gives the wheel the full canvas. No shared menu geometry changes.
+function viewport(width,height,compact) {
+    var w=finite(width),h=finite(height);
+    if(w===null||h===null||w<=0||h<=0)return null;
+    var left=12,top=10,right=compact===true?w-12:
+        Math.min(w-12,w*0.70-12),bottom=h-20;
+    if(right-left<35 || bottom-top<35)return null;
+    return {left:left,top:top,right:right,bottom:bottom};
+}
+
+// Return a drawing marker, not an altered astronomical position.
+// Onscreen marker = the exact geometric projection. Offscreen marker =
+// an explicit viewport-edge pointer toward the real, unclipped XYZ point.
+// Keep the original position() result available for numerical inspection.
+function viewportMarker(scene,point,width,height,scale,tilt,domainAu,compact) {
+    var raw=position(scene,point,width,height,scale,tilt,domainAu);
+    var box=viewport(width,height,compact);
+    var g=layout(width,height,scale);
+    if(!raw||!box||!g.ready)return null;
+    // Leave room for a highlighted ring and a directional arrowhead.
+    var left=box.left+14,right=box.right-14;
+    var top=box.top+14,bottom=box.bottom-14;
+    if(raw.x>=left && raw.x<=right && raw.y>=top && raw.y<=bottom)
+        return {x:raw.x,y:raw.y,offscreen:false,angle:0,
+                realX:raw.x,realY:raw.y};
+    var dx=raw.x-g.cx,dy=raw.y-g.cy;
+    if(dx===0 && dy===0)return null;
+    var t=Infinity;
+    if(dx>0)t=Math.min(t,(right-g.cx)/dx);
+    else if(dx<0)t=Math.min(t,(left-g.cx)/dx);
+    if(dy>0)t=Math.min(t,(bottom-g.cy)/dy);
+    else if(dy<0)t=Math.min(t,(top-g.cy)/dy);
+    if(!isFinite(t)||t<0)return null;
+    t=Math.min(1,t);
+    return {x:Math.max(left,Math.min(right,g.cx+dx*t)),
+            y:Math.max(top,Math.min(bottom,g.cy+dy*t)),
+            offscreen:true,angle:Math.atan2(dy,dx),
+            realX:raw.x,realY:raw.y};
+}
+
+function labelPosition(marker,labelWidth,width,height,compact,centerX) {
+    if(!marker)return null;
+    var box=viewport(width,height,compact),raw=finite(labelWidth),
+        cx=finite(centerX);
+    if(!box||raw===null||cx===null||raw<0)return null;
+    var maxWidth=Math.max(8,box.right-box.left-12);
+    var actual=Math.min(maxWidth,raw);
+    // Offscreen labels point inward. Onscreen labels favor the free side,
+    // but stay inside the plot area even for long barycenter names.
+    var side=marker.offscreen
+        ? (marker.x>=cx?-1:1)
+        : (marker.x>=cx?1:-1);
+    var preferred=marker.x+side*(10+actual/2);
+    var left=box.left+6+actual/2,right=box.right-6-actual/2;
+    return {x:Math.max(left,Math.min(right,preferred)),
+            y:Math.max(box.top+9,Math.min(box.bottom-9,marker.y)),
+            maxWidth:maxWidth};
+}
+
+function visibleHit(scene,px,py,w,h,scale,tilt,tolerance,domainAu,compact) {
+    if(!scene||!scene.ready)return "";
+    var x=finite(px),y=finite(py),tol=finite(tolerance);
+    if(x===null||y===null||tol===null||tol<=0||tol>30)return "";
+    var best="",distance=tol*tol;
+    for(var i=0;i<scene.points.length;i++) {
+        var point=scene.points[i];
+        if(point.origin)continue;
+        var mark=viewportMarker(scene,point,w,h,scale,tilt,domainAu,compact);
+        if(!mark)continue;
+        var d=(mark.x-x)*(mark.x-x)+(mark.y-y)*(mark.y-y);
+        if(d<=distance){distance=d;best=point.body;}
+    }
+    return best;
+}
+
 function byBody(scene,body) {
     if(!scene||!scene.ready||typeof body!=="string")return null;
     for(var i=0;i<scene.points.length;i++)

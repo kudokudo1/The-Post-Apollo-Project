@@ -246,6 +246,7 @@ Item {
         anchors.fill: sceneCanvas
         visible: graph.displayMode === "heliocentric"
         embedded: true
+        compactPlot: graph.compactMode
         // The toolbar occupies the upper band; the plot stays clickable,
         // source-verified, and inside the existing fixed chart frame.
         anchors.topMargin: compactHelioToolbar.visible ? 27 : 0

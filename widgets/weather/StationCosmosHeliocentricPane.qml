@@ -10,6 +10,9 @@ Item {
     id: spatial
     property var visualData: null
     property bool embedded: false
+    // The new compact MAGICK layout lets the plot use its full width.
+    // Older noncompact views reserve the existing right-hand inspector.
+    property bool compactPlot: false
     property var graphModel: null
     property var verifiedNetwork: null
     property int focusIndex: -1
@@ -41,6 +44,9 @@ Item {
     onAtlasRangeChanged: spatialCanvas.requestPaint()
     onSelectedBodyChanged: spatialCanvas.requestPaint()
     onHoveredBodyChanged: spatialCanvas.requestPaint()
+    onCompactPlotChanged: spatialCanvas.requestPaint()
+    onWidthChanged: spatialCanvas.requestPaint()
+    onHeightChanged: spatialCanvas.requestPaint()
 
     function paint(ctx) {
         const w=spatialCanvas.width,h=spatialCanvas.height;
@@ -48,6 +54,15 @@ Item {
         const g=Helio.layout(w,h,spatial.spatialScale);
         if(!g.ready)return;
         ctx.save();
+        const plotBounds=Helio.viewport(w,h,spatial.compactPlot);
+        if(!plotBounds){ctx.restore();return;}
+        // Do not let large zooms draw beyond the plot or under the
+        // noncompact inspector. The actual JPL position is unchanged.
+        ctx.beginPath();
+        ctx.rect(plotBounds.left,plotBounds.top,
+                 plotBounds.right-plotBounds.left,
+                 plotBounds.bottom-plotBounds.top);
+        ctx.clip();
         ctx.textAlign="center";
         ctx.textBaseline="middle";
         ctx.lineCap="round";
@@ -108,9 +123,10 @@ Item {
         for(let i=0;i<spatial.scene.points.length;i++){
             const point=spatial.scene.points[i];
             if(point.origin)continue; // sun already drawn at 0 AU
-            const p=Helio.position(spatial.scene,point,w,h,
+            const p=Helio.viewportMarker(spatial.scene,point,w,h,
                                     spatial.spatialScale,spatial.tiltView,
-                                    spatial.radialDomainAu);
+                                    spatial.radialDomainAu,
+                                    spatial.compactPlot);
             if(!p)continue;
             const focused=point.body===spatial.selectedBody
                 || point.body===spatial.hoveredBody;
@@ -127,7 +143,18 @@ Item {
             ctx.shadowColor=String(point.color);
             ctx.shadowBlur=spatial.neonEnabled?(focused?11:4):0;
             ctx.beginPath();
-            ctx.arc(p.x,p.y,focused?7:5,0,Math.PI*2);
+            if(p.offscreen) {
+                // An arrow represents DIRECTION TO the real offscreen
+                // coordinate, never a displaced/fictional planet position.
+                const ux=Math.cos(p.angle),uy=Math.sin(p.angle);
+                const vx=-uy,vy=ux;
+                ctx.moveTo(p.x+ux*6,p.y+uy*6);
+                ctx.lineTo(p.x-ux*4+vx*4,p.y-uy*4+vy*4);
+                ctx.lineTo(p.x-ux*4-vx*4,p.y-uy*4-vy*4);
+                ctx.closePath();
+            } else {
+                ctx.arc(p.x,p.y,focused?7:5,0,Math.PI*2);
+            }
             ctx.fill();
             ctx.shadowBlur=0;
             if(focused){
@@ -139,10 +166,15 @@ Item {
             }
             ctx.fillStyle=String(point.color);
             ctx.font="9px monospace";
-            ctx.textAlign=p.x>=g.cx?"left":"right";
-            ctx.fillText(point.label||point.body.toUpperCase(),
-                p.x+(p.x>=g.cx?9:-9),
-                Math.max(10,Math.min(h-10,p.y)));
+            const label=(point.label||point.body.toUpperCase())
+                       +(p.offscreen?" / OUT":"");
+            const placement=Helio.labelPosition(p,
+                ctx.measureText(label).width,w,h,spatial.compactPlot,g.cx);
+            if(placement) {
+                ctx.textAlign="center";
+                ctx.fillText(label,placement.x,placement.y,
+                             placement.maxWidth);
+            }
         }
         ctx.restore();
     }
@@ -179,15 +211,17 @@ Item {
                     spatial.sampleScrubbed(originalIndex,dx);
                 return;
             }
-            spatial.hoveredBody=Helio.hit(spatial.scene,
+            spatial.hoveredBody=Helio.visibleHit(spatial.scene,
                 mouse.x,mouse.y,width,height,spatial.spatialScale,
-                spatial.tiltView,13,spatial.radialDomainAu);
+                spatial.tiltView,13,spatial.radialDomainAu,
+                spatial.compactPlot);
         }
         onClicked: function(mouse) {
             if(didDrag)return;
-            const body=Helio.hit(spatial.scene,
+            const body=Helio.visibleHit(spatial.scene,
                 mouse.x,mouse.y,width,height,spatial.spatialScale,
-                spatial.tiltView,14,spatial.radialDomainAu);
+                spatial.tiltView,14,spatial.radialDomainAu,
+                spatial.compactPlot);
             if(body!=="")spatial.bodyPicked(body);
         }
         onCanceled: didDrag=false

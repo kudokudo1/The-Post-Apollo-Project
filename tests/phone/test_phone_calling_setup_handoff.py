@@ -150,8 +150,6 @@ class CallingSetupGuiTests(unittest.TestCase):
             find=p, launcher=launcher, already_open=lambda: False)
         self.locked(result)
         self.assertEqual(result["status"], "TERMINAL_UNAVAILABLE")
-                self.assertTrue(result["missingTools"])
-        self.assertEqual(result["missingTools"], ["FOOT", "PYTHON3"])
         self.assertEqual(result["missingTools"], ["FOOT"])
         self.assertFalse(result["stageCandidate"])
         launcher.assert_not_called()
@@ -185,6 +183,7 @@ class CallingSetupGuiTests(unittest.TestCase):
             find=lambda _: None, launcher=launcher, already_open=lambda: False)
         self.locked(result)
         self.assertEqual(result["status"], "TERMINAL_UNAVAILABLE")
+        self.assertEqual(result["missingTools"], ["FOOT", "PYTHON3"])
         launcher.assert_not_called()
 
     def test_untrusted_resolved_program_is_not_launched(self):
@@ -197,6 +196,7 @@ class CallingSetupGuiTests(unittest.TestCase):
                     launcher=launcher, already_open=lambda: False)
                 self.locked(result)
                 self.assertEqual(result["status"], "TERMINAL_UNAVAILABLE")
+                self.assertEqual(result["missingTools"], ["FOOT", "PYTHON3"])
         launcher.assert_not_called()
 
     def test_foot_launch_failure_does_not_open_external_package_manager(self):

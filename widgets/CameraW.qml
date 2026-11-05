@@ -3,6 +3,7 @@ import QtQuick.Controls
 import Quickshell
 import Quickshell.Io
 import Quickshell.Wayland
+import qs.services.social
 import "FinanceChassisPolicy.js" as FinanceChassisPolicy
 import "../components"
 
@@ -39,6 +40,14 @@ PanelWindow {
     property var selectedTrashPreview: null
     property string lastTrashReceipt: ""
     property string captureMode: "region"
+    // Read Social's active identity and provider alias metadata, not login state.
+    readonly property var zoomSocialIdentity: SocialIdentityStore.snapshot
+    readonly property string zoomIdentityId: String(zoomSocialIdentity.activeId || "")
+    readonly property var zoomAccountNames:
+        SocialAccountDetailsStore.accountNamesFor(zoomIdentityId, "zoom")
+    property string selectedZoomAccountId: ""
+    property var zoomClientStatus: null
+    onZoomIdentityIdChanged: selectedZoomAccountId = ""
     // The native slurp overlay owns the region drag; Camera unmaps while it runs.
     property bool nativeRegionSelecting: false
     // Same finance-size policy and top/bottom chrome budget for medium
@@ -176,6 +185,16 @@ PanelWindow {
         return true;
     }
 
+    function openZoomMode() {
+        activeView = "zoom";
+        if (!busy)
+            run("zoomStatus", ["zoom-status"]);
+    }
+
+    function launchZoomClient() {
+        return run("zoomOpen", ["zoom-open"]);
+    }
+
     function webcamPhoto() {
         return run("webcamPhoto", ["webcam-photo", "--device", webcamDevice]);
     }
@@ -230,7 +249,13 @@ PanelWindow {
                 menuOpen = true;
             return;
         }
-        if (action === "status") {
+        if (action === "zoomStatus") {
+            zoomClientStatus = payload;
+            feedback = payload.available ? "ZOOM // NATIVE CLIENT DETECTED // LOGIN UNKNOWN"
+                                         : "ZOOM // CLIENT NOT INSTALLED";
+        } else if (action === "zoomOpen") {
+            feedback = "ZOOM // OPEN REQUESTED // SIGN IN THROUGH ZOOM CLIENT";
+        } else if (action === "status") {
             statusReport = payload;
             recording = payload.recording && payload.recording.recording === true;
             recordingMode = recording ? payload.recording.mode : "";
@@ -478,10 +503,11 @@ PanelWindow {
                     model: [
                         {id: "capture", label: "CAPTURE"},
                         {id: "gallery", label: "GALLERY"},
+                        {id: "zoom", label: "ZOOM"},
                         {id: "cleanup", label: "CLEANUP"}
                     ]
                     ActionButton {
-                        width: (cameraModes.width - 2 * cameraModes.spacing) / 3
+                        width: (cameraModes.width - 3 * cameraModes.spacing) / 4
                         height: 34
                         label: modelData.label
                         labelPixelSize: 12
@@ -493,6 +519,8 @@ PanelWindow {
                         onLeftClicked: {
                             if (modelData.id === "gallery")
                                 camera.loadGallery();
+                            else if (modelData.id === "zoom")
+                                camera.openZoomMode();
                             else
                                 camera.activeView = modelData.id;
                         }
@@ -1087,6 +1115,150 @@ PanelWindow {
                                 : camera.lastTrashReceipt
                                   ? camera.lastTrashReceipt
                                   : "TRASH IS REVERSIBLE // NOT PERMANENT DELETE"
+                        }
+                    }
+                }
+
+                Flickable {
+                    id: zoomPage
+                    anchors.fill: parent
+                    visible: camera.activeView === "zoom"
+                    clip: true
+                    contentHeight: zoomContent.implicitHeight
+                    boundsBehavior: Flickable.StopAtBounds
+
+                    Column {
+                        id: zoomContent
+                        width: zoomPage.width
+                        spacing: 12
+
+                        GohuText {
+                            width: parent.width
+                            height: 31
+                            font.pixelSize: 16
+                            color: Colors.magenta
+                            text: "ZOOM // MEETINGS"
+                        }
+
+                        GohuText {
+                            width: parent.width
+                            wrapMode: Text.WordWrap
+                            font.pixelSize: 11
+                            color: Colors.cyan
+                            text: "CAMERA MODE // NATIVE ZOOM CLIENT + SOCIAL ACCOUNT LABELS"
+                        }
+
+                        Rectangle {
+                            width: parent.width
+                            height: 2
+                            color: Colors.cyan
+                        }
+
+                        GohuText {
+                            width: parent.width
+                            font.pixelSize: 13
+                            color: Colors.white
+                            text: "SOCIAL IDENTITY // " + camera.zoomIdentityId
+                        }
+
+                        GohuText {
+                            width: parent.width
+                            wrapMode: Text.WordWrap
+                            font.pixelSize: 10
+                            color: Colors.cyan
+                            text: "ACCOUNT NAMES LIVE FROM SOCIAL // USER SETTINGS // ACCOUNT NAMES // ZOOM"
+                        }
+
+                        GohuText {
+                            width: parent.width
+                            font.pixelSize: 11
+                            color: Colors.yellow
+                            text: camera.zoomAccountNames.length
+                                  ? "SAVED ZOOM NAMES // " + camera.zoomAccountNames.length
+                                  : "NO ZOOM ACCOUNT NAMES FOR THIS SOCIAL IDENTITY"
+                        }
+
+                        Repeater {
+                            model: camera.zoomAccountNames
+                            ActionButton {
+                                width: zoomContent.width
+                                height: 38
+                                label: modelData.label + " // ALIAS ONLY"
+                                labelPixelSize: 11
+                                accentColor: Colors.white
+                                selected: camera.selectedZoomAccountId === modelData.id
+                                onLeftClicked: camera.selectedZoomAccountId = modelData.id
+                            }
+                        }
+
+                        GohuText {
+                            width: parent.width
+                            wrapMode: Text.WordWrap
+                            font.pixelSize: 10
+                            color: Colors.orange
+                            text: "Account names are display labels, not active Zoom login sessions. Selecting an alias does NOT switch the Zoom client account."
+                        }
+
+                        Rectangle {
+                            width: parent.width
+                            height: 2
+                            color: Colors.cyan
+                        }
+
+                        GohuText {
+                            width: parent.width
+                            font.pixelSize: 12
+                            color: camera.zoomClientStatus && camera.zoomClientStatus.available
+                                   ? Colors.cyan : Colors.orange
+                            text: camera.zoomClientStatus === null
+                                  ? "ZOOM CLIENT // NOT CHECKED"
+                                  : camera.zoomClientStatus.available
+                                    ? "ZOOM CLIENT // INSTALLED (" + camera.zoomClientStatus.client.toUpperCase() + ")"
+                                    : "ZOOM CLIENT // NOT FOUND"
+                        }
+
+                        Row {
+                            width: parent.width
+                            height: 42
+                            spacing: 10
+
+                            ActionButton {
+                                width: 150
+                                height: 40
+                                label: "CHECK ZOOM"
+                                labelPixelSize: 11
+                                accentColor: Colors.cyan
+                                available: !camera.busy
+                                onLeftClicked: camera.run("zoomStatus", ["zoom-status"])
+                            }
+
+                            ActionButton {
+                                width: parent.width - 160
+                                height: 40
+                                label: "OPEN ZOOM CLIENT"
+                                labelPixelSize: 12
+                                accentColor: Colors.magenta
+                                available: !camera.busy
+                                           && camera.zoomClientStatus !== null
+                                           && camera.zoomClientStatus.available
+                                onLeftClicked: camera.launchZoomClient()
+                            }
+                        }
+
+                        GohuText {
+                            width: parent.width
+                            wrapMode: Text.WordWrap
+                            font.pixelSize: 11
+                            color: Colors.white
+                            text: "Zoom opens its official local app. Sign in, start, and join meetings there. No passwords or OAuth tokens are shared with Camera."
+                        }
+
+                        GohuText {
+                            width: parent.width
+                            wrapMode: Text.WordWrap
+                            font.pixelSize: 10
+                            color: Colors.orange
+                            text: "EMBEDDED VIDEO // NOT YET CONNECTED. Requires separately validated Zoom SDK and Stage Director containment."
                         }
                     }
                 }

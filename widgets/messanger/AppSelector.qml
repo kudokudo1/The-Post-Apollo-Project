@@ -1485,6 +1485,29 @@ Rectangle {
                         wrapMode: Text.WordWrap
                     }
                 }
+                // Meeting client aliases belong to the same Social identity
+                // metadata writer, but Zoom is NOT a 33rd messaging rail app.
+                ActionButton {
+                    width: parent.width
+                    height: 34
+                    label: appSelector.accountSelectedServiceId === "zoom"
+                           ? "ZOOM // ACCOUNT NAMES SELECTED"
+                           : "ZOOM // MANAGE ACCOUNT NAMES"
+                    accentColor: Colors.cyan
+                    labelPixelSize: 9
+                    contentPadding: 3
+                    selected: appSelector.accountSelectedServiceId === "zoom"
+                    interactive: appSelector.identitySnapshot.writable
+                    onTriggered: appSelector.selectAccountService("zoom")
+                }
+                Text {
+                    width: parent.width
+                    visible: appSelector.accountSelectedServiceId === "zoom"
+                    text: "Zoom account names are labels only. Sign in through Zoom. Camera cannot verify account connection."
+                    color: Colors.orange
+                    font.pixelSize: 9
+                    wrapMode: Text.WordWrap
+                }
                 Text {
                     width: parent.width
                     visible: appSelector.accountSelectedServiceId !== ""

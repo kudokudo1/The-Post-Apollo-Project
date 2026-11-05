@@ -26,6 +26,11 @@ from typing import Any
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "messaging"))
 from SocialAccountCatalog import ITEM_BY_ID  # noqa: E402
 
+# Provider-owned external meeting client: account labels only, not a Social
+# rail service, session, credential, OAuth grant or managed sign-in.
+EXTERNAL_ACCOUNT_LABEL_SERVICES = frozenset({"zoom"})
+KNOWN_ACCOUNT_LABEL_SERVICES = frozenset(ITEM_BY_ID) | EXTERNAL_ACCOUNT_LABEL_SERVICES
+
 SCHEMA = "post-apollo.social-identity-account-details.v1"
 FILE_NAME = "identity-account-details-v1.json"
 MAX_BYTES = 65536
@@ -134,11 +139,11 @@ def validate_document(document: Any) -> dict[str, Any]:
             raise StoreError("INVALID_DOCUMENT")
         email, phone = validate_contact(values["email"], values["phone"])
         accounts = values["accounts"]
-        if not isinstance(accounts, dict) or len(accounts) > len(ITEM_BY_ID):
+        if not isinstance(accounts, dict) or len(accounts) > len(KNOWN_ACCOUNT_LABEL_SERVICES):
             raise StoreError("INVALID_DOCUMENT")
         labels: dict[str, Any] = {}
         for service_id, value in accounts.items():
-            if service_id not in ITEM_BY_ID:
+            if service_id not in KNOWN_ACCOUNT_LABEL_SERVICES:
                 raise StoreError("INVALID_SERVICE")
             # Preserve original v1 single-label values byte-for-byte in the
             # logical document. Only new explicit account edits write lists.
@@ -227,7 +232,7 @@ def apply(document: dict[str, Any], command: Any) -> dict[str, Any]:
             command["email"], command["phone"])
     else:
         service = command["serviceId"]
-        if not isinstance(service, str) or service not in ITEM_BY_ID:
+        if not isinstance(service, str) or service not in KNOWN_ACCOUNT_LABEL_SERVICES:
             raise StoreError("INVALID_SERVICE")
         values = record["accounts"]
         previous = values.get(service)

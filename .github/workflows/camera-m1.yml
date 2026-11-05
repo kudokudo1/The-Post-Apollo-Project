@@ -36,6 +36,8 @@ jobs:
         run: python3 -m py_compile scripts/camera/camera_cli.py
       - name: Camera gallery, capture argv, preview and Trash offline tests
         run: python3 -m unittest discover -s tests/camera -p 'test_camera_cli.py' -v
+      - name: Camera Zoom mode and Social account-label safety contracts
+        run: python3 -m unittest discover -s tests/camera -p 'test_camera_zoom_social.py' -v
       - name: Camera dock, panel and independent-owner source contract
         run: python3 -m unittest discover -s tests/camera -p 'test_camera_integration_contract.py' -v
       - name: Camera M2 five thousand historical screenshots and reversible single image Trash

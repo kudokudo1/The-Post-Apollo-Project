@@ -1,0 +1,54 @@
+name: Connections C2p Fedora Cloud guest SELinux enforcing gate
+
+on:
+  pull_request:
+    paths:
+      - "tests/connections/c2p_fedora_vm/**"
+      - ".github/workflows/connections-c2p-fedora-vm-selinux.yml"
+      - "docs/connections-c2p-fedoravm-selinux-gate.md"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  guest-kernel-selinux:
+    if: github.actor == 'kudokudo1' && (github.event_name == 'workflow_dispatch' || github.event.pull_request.head.repo.full_name == github.repository)
+    runs-on: ubuntu-latest
+    timeout-minutes: 18
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Fail closed if KVM is unavailable
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ ! -c /dev/kvm ]; then
+            echo "C2P_BLOCKED // THIS_GITHUB_RUNNER_EXPOSES_NO_KVM"
+            exit 2
+          fi
+          sudo chmod a+rw /dev/kvm
+          [ -r /dev/kvm ] && [ -w /dev/kvm ] || exit 2
+          echo "C2P_PREFLIGHT // KVM_AVAILABLE_ON_EPHEMERAL_RUNNER"
+      - name: Install QEMU and ISO maker on GitHub runner only
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends qemu-system-x86 qemu-utils genisoimage
+      - name: Boot hash-verified official Fedora 44 VM and read its kernel SELinux mode
+        shell: bash
+        run: timeout 420s bash tests/connections/c2p_fedora_vm/boot_readonly_vm.sh
+      - name: Existing provider policy remains deny-only
+        run: |
+          python3 -B tests/connections/test_connections_c2n_policy_contract.py
+          python3 - <<'PY'
+          from pathlib import Path
+          root=Path("services/connections")
+          assert "readonly property bool hostAuthenticated: false" in (root/"ConnectionsRequestStatus.qml").read_text()
+          assert "readonly property bool credentialActionsEnabled: false" in (root/"ConnectionsBroker.qml").read_text()
+          for path in [*root.glob("*.qml"), *root.glob("*.js"), root/"qmldir"]:
+              assert "c2p_fedora_vm" not in path.read_text(), path
+          print("C2P_PASS // NO_DESKTOP_ACTIVATION_OR_PROVIDER_GRANTS")
+          PY

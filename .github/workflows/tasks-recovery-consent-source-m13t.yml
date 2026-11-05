@@ -1,0 +1,50 @@
+name: TASKS M13t disposable consent and source-bound review
+
+on:
+  pull_request:
+    paths:
+      - 'tests/tasks/fixtures/TaskRecoveryConsentSourceM13t.cjs'
+      - 'tests/tasks/test_task_recovery_consent_source_m13t.cjs'
+      - 'docs/tasks-recovery-consent-source-m13t.md'
+      - '.github/workflows/tasks-recovery-consent-source-m13t.yml'
+      - 'services/hub/ApolloHubTodoStore.qml'
+      - 'services/connections/ConnectionsBroker.qml'
+  push:
+    branches: [main]
+    paths:
+      - 'tests/tasks/fixtures/TaskRecoveryConsentSourceM13t.cjs'
+      - 'tests/tasks/test_task_recovery_consent_source_m13t.cjs'
+      - '.github/workflows/tasks-recovery-consent-source-m13t.yml'
+permissions:
+  contents: read
+
+jobs:
+  synthetic-consent-source-refusal:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: M13t synthetic opt-in, review, source, expiration and replay
+        run: |
+          node --check tests/tasks/fixtures/TaskRecoveryConsentSourceM13t.cjs
+          node --test tests/tasks/test_task_recovery_consent_source_m13t.cjs
+      - name: Previous M13p bounded permissions and M13s editor presence
+        run: |
+          node --test tests/tasks/test_task_connections_permission_m13p.cjs
+          node --test tests/tasks/test_task_live_draft_presence_m13s.cjs
+      - name: Shared Connections remains a read-only status broker
+        run: node tests/cpuplus/test_connections_broker_c2a.js
+      - name: One authoritative source writer stays disabled for recovery
+        run: python3 tests/tasks/test_task_writer_gate_inventory_m11d.py
+      - name: No production import or OS keyring actuation
+        run: |
+          set -euo pipefail
+          ! grep -q 'TaskRecoveryConsentSourceM13t' services/hub/ApolloHubTodoStore.qml
+          ! grep -q 'TaskRecoveryConsentSourceM13t' services/connections/ConnectionsBroker.qml
+          ! grep -q 'TaskRecoveryConsentSourceM13t' widgets/TasksW.qml
+          ! grep -Eq 'secret-tool|gnome-keyring|writeFileSync|\.setText\(' \
+            tests/tasks/fixtures/TaskRecoveryConsentSourceM13t.cjs
+          printf '%s\n' 'M13T_DISPOSABLE_SOURCE_BOUND_REVIEW_ONLY_NO_PRODUCTION_GRANT_PASS'

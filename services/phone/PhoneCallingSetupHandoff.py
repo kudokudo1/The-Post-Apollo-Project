@@ -30,7 +30,11 @@ def _fedora() -> bool:
     """Read only an OS vendor identifier, never user-controlled device data."""
     try:
         lines = Path("/etc/os-release").read_text(encoding="utf-8").splitlines()
-        return any(line.strip().strip('"') == "ID=fedora" for line in lines)
+        for line in lines:
+            key, sep, value = line.partition("=")
+            if sep and key.strip() == "ID":
+                return value.strip().strip('"') == "fedora"
+        return False
     except (OSError, UnicodeError, ValueError):
         return False
 
@@ -114,7 +118,8 @@ def main(argv: list[str] | None = None) -> int:
         return 2
     value = open_support()
     print(json.dumps(value, sort_keys=True))
-    return 0 if value["status"] == "GUI_OPEN_REQUESTED" else 2
+    # A missing GUI is still a successfully reported diagnosis, not a crash.
+    return 0
 
 
 if __name__ == "__main__":

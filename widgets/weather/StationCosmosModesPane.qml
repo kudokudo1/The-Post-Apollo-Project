@@ -17,7 +17,11 @@ Rectangle {
     signal routeRequested(string path)
     readonly property string family: Modes.family(subjectRoute)
     readonly property string kind: Modes.kind(subjectRoute)
-    readonly property var modes: Modes.modesFor(subjectRoute)
+    readonly property var modes: Modes.modesFor(subjectRoute) || []
+    readonly property int modeCount: modeRepeater.count
+    readonly property int visibleClockLaneCount:
+        instrumentLoader.item && instrumentLoader.item.renderedRowCount !== undefined
+        ? instrumentLoader.item.renderedRowCount : 0
     readonly property var skyFeed: skyLoader.item
     readonly property var spaceFeed: spaceSourceLoader.item
     readonly property var astronomy: skyFeed ? skyFeed.astronomySummary : null
@@ -28,7 +32,8 @@ Rectangle {
     readonly property var eclipseSource: skyFeed ? skyFeed.eclipseObservation : null
     readonly property var issSource: skyFeed ? skyFeed.issObservation : null
     readonly property string civilDate:
-        skyFeed ? skyFeed.focusedCivilDate : ""
+        skyFeed && typeof skyFeed.focusedCivilDate === "string"
+        ? skyFeed.focusedCivilDate : ""
     readonly property var planetRows: ClockPolicy.clockRows(
         planetSource && planetSource.ready ? planetSource.rows : [],
         civilDate)
@@ -146,10 +151,10 @@ Rectangle {
         sourceComponent: Component {
             StationSky {
                 sourceOnly: true
-                subjectRoute: Modes.dataRoute(focus.subjectRoute)
+                subjectRoute: Modes.dataRoute(focus.subjectRoute || "")
                 weatherService: focus.weatherService
                 spaceService: focus.spaceService
-                runtimeNowMs: focus.runtimeNowMs
+                runtimeNowMs: focus.runtimeNowMs || 0
             }
         }
     }
@@ -198,15 +203,16 @@ Rectangle {
         height: 27
         spacing: 4
         Repeater {
-            model: focus.modes
+            id: modeRepeater
+            model: focus.modes || []
             delegate: ActionButton {
                 required property var modelData
                 width: Math.max(1,(modeRail.width
-                    -(focus.modes.length-1)*modeRail.spacing)
-                    /Math.max(1,focus.modes.length))
+                    -(focus.modeCount-1)*modeRail.spacing)
+                    /Math.max(1,focus.modeCount))
                 height: 27
                 label: modelData.label
-                labelPixelSize: focus.modes.length>5 ? 9 : 10
+                labelPixelSize: focus.modeCount>5 ? 9 : 10
                 contentPadding: 1
                 selected: Modes.canonical(focus.subjectRoute) === modelData.route
                 accentColor: Colors.cyan
@@ -234,6 +240,7 @@ Rectangle {
         anchors.margins: 6
         clip: true
         Loader {
+            id: instrumentLoader
             anchors.fill: parent
             active: focus.visible
             sourceComponent: focus.kind === "solar-path" ? sunPath
@@ -312,7 +319,7 @@ Rectangle {
                     ? focus.skyFeed.currentSolarPosition : null
                 providerLocalMinute: focus.skyFeed
                     ? focus.skyFeed.providerLocalMinute : -1
-                solarDate: focus.civilDate
+                solarDate: focus.civilDate || ""
                 solarCivilOffsetMinutes: focus.skyFeed
                     ? focus.skyFeed.moonCivilOffsetMinutes : null
                 solarOffsetSource: focus.skyFeed
@@ -394,6 +401,7 @@ Rectangle {
     Component {
         id: planetClock
         Column {
+            readonly property int renderedRowCount: clockRepeater.count
             anchors.fill: parent
             spacing: 5
             GohuText {
@@ -404,7 +412,8 @@ Rectangle {
                 font.pixelSize:11
             }
             Repeater {
-                model: focus.displayedPlanetRows
+                id: clockRepeater
+                model: focus.displayedPlanetRows || []
                 delegate: Rectangle {
                     required property var modelData
                     width: parent.width
@@ -480,7 +489,7 @@ Rectangle {
             }
             QuietText {
                 width: parent.width
-                visible: focus.cards.length === 0
+                visible: !focus.cards || focus.cards.length === 0
                 text: focus.sourceStatus
                 color: Colors.orange
                 font.pixelSize: 10
@@ -492,7 +501,7 @@ Rectangle {
                 columns: 2
                 spacing: 7
                 Repeater {
-                    model: focus.cards.slice(0,4)
+                    model: focus.cards ? focus.cards.slice(0,4) : []
                     delegate: Rectangle {
                         required property var modelData
                         width: Math.max(1,(cardGrid.width-7)/2)
@@ -529,7 +538,7 @@ Rectangle {
             }
             QuietText {
                 width:parent.width
-                text:focus.cards.length===0 ? "SOURCE WAITING / NO DATA IN WINDOW"
+                text:(!focus.cards || focus.cards.length===0) ? "SOURCE WAITING / NO DATA IN WINDOW"
                     : focus.kind==="eclipses"
                     ? "GLOBAL EVENT DATE // LOCAL VISIBILITY NOT CALCULATED"
                     : "OBSERVATIONS / PREDICTIONS ARE SOURCE-SCOPED"
@@ -573,7 +582,7 @@ Rectangle {
                     width: meteorScroll.width
                     spacing: 5
                     Repeater {
-                        model: focus.cards
+                        model: focus.cards || []
                         delegate: Rectangle {
                             required property var modelData
                             width: meteorCards.width

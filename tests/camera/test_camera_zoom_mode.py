@@ -21,26 +21,24 @@ class ZoomModeTests(unittest.TestCase):
         self.assertIn('camera.openZoomMode();', PANEL)
         self.assertIn('label: "↓ DOWNLOAD"', PANEL)
         self.assertIn('id: zoomStatusRail', PANEL)
-        self.assertIn('ZOOM HTTPS', PANEL)
-        self.assertIn('name: "INTERNET"', PANEL)
+        self.assertIn('name: "ZOOM CHECK"', PANEL)
+        self.assertIn('name: "WEB CHECK"', PANEL)
         self.assertIn('name: "LOGIN", value: "UNKNOWN"', PANEL)
         self.assertIn('ZOOM SIGN-IN // UNVERIFIED', PANEL)
         self.assertIn('visible: camera.zoomLaunchState === "FAILED"', PANEL)
-        self.assertIn('label: "RETRY OPEN ZOOM"', PANEL)
+        self.assertIn('label: "OPEN / FOCUS ZOOM APP"', PANEL)
+        self.assertIn('onLeftClicked: camera.openZoomDirectly()', PANEL)
         self.assertNotIn('label: "CHECK ZOOM"', PANEL)
         self.assertNotIn('label: "OPEN ZOOM CLIENT"', PANEL)
 
-    def test_no_autoinstall_no_auto_zoom_relaunch_during_poll(self):
-        self.assertIn('id: zoomStatusRefreshTimer', PANEL)
-        self.assertIn('interval: 90000', PANEL)
-        self.assertIn('running: camera.menuOpen && camera.activeView === "zoom"', PANEL)
-        timer = PANEL.split('id: zoomStatusRefreshTimer', 1)[1].split(
-            'id: zoomLaunchCheckTimer', 1)[0]
-        self.assertIn('["zoom-connectivity"]', timer)
-        self.assertNotIn('["zoom-enter"]', timer)
-        self.assertNotIn('zoom-install', timer)
+    def test_no_autoinstall_no_background_web_indicator_flickering(self):
+        self.assertNotIn('id: zoomStatusRefreshTimer', PANEL)
+        self.assertNotIn('interval: 90000', PANEL)
+        self.assertIn('run("zoomConnectivity", ["zoom-connectivity"])', PANEL)
         self.assertIn('zoomSetupVisible = payload.installed !== true;', PANEL)
         self.assertIn('zoomLaunchState = "NOT_INSTALLED"', PANEL)
+        # The normal mode entry remains the only automatic Zoom launcher.
+        self.assertIn('run("zoomEnter", ["zoom-enter"])', PANEL)
 
     def test_missing_client_leaves_mode_open_and_never_spawns(self):
         with patch.object(camera, "zoom_launch_check",
@@ -101,7 +99,7 @@ class ZoomModeTests(unittest.TestCase):
                           side_effect=[True, False]) as probe:
             r = camera.zoom_connectivity()
         self.assertEqual(r["internet"], "REACHABLE")
-        self.assertEqual(r["zoomService"], "UNREACHABLE")
+        self.assertEqual(r["zoomService"], "UNVERIFIED")
         self.assertEqual(r["account"], "UNKNOWN")
         self.assertEqual(probe.call_args_list[0].args[0],
                          "https://example.com/")

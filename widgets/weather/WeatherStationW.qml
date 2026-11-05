@@ -149,6 +149,14 @@ PanelWindow {
     readonly property bool activeSubjectPlayerViewportValid:
         activeSubjectPlayerViewportRect.width > 0
         && activeSubjectPlayerViewportRect.height > 0
+    // Source tokens are tied to the SAME visible viewer as the bounded
+    // viewport. Unknown catalog entries can still be inspected in safe mode.
+    readonly property string activeSubjectWatchSourceId: {
+        if (!activeSubjectPlayerViewportValid)
+            return "";
+        const id = subjectNavigator.activeWatchSourceId;
+        return id === "bbc" || id === "cspan" ? id : "";
+    }
 
     // The SAME geometry drives the layer-shell input mask and the actual
     // transparent visual opening. Sway owns Kitty's global positioning.

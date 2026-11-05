@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- C2n noninstalled read-only proposed system bus API. No mutating methods. -->
+<node name="/org/postapollo/ConnectionsStatus1">
+  <interface name="org.postapollo.ConnectionsStatus1">
+    <method name="GetStatus">
+      <arg name="statusJson" type="s" direction="out"/>
+    </method>
+  </interface>
+</node>

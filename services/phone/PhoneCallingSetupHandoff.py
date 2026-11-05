@@ -22,7 +22,7 @@ from PhoneStageDirector import INSTALL_APP_ID, _read_tree, _stage_actor, _exe
 
 SCHEMA = "post-apollo.phone.calling-setup-handoff.v0"
 PACKAGE_NAME = "ofono"
-GUI_CLIENTS = (("gpk-install-package-name", ("ofono",)),)
+# No external fallback: callers explicitly requested the in-PHONE stage.
 
 
 def _fedora() -> bool:
@@ -113,43 +113,23 @@ def open_support(
     pkcon = installed_program("pkcon")
     python = installed_program("python3")
     session_script = Path(__file__).with_name("PhoneOfonoInstallSession.py")
-    if foot and pkcon and python and session_script.is_file():
-        try:
-            launcher(
-                [foot, "--app-id", INSTALL_APP_ID, "-e", python,
-                 str(session_script), "--interactive-ofono"],
-                stdin=subprocess.DEVNULL,
-                stdout=subprocess.DEVNULL,
-                stderr=subprocess.DEVNULL,
-                start_new_session=True,
-                close_fds=True,
-            )
-            return _result("STAGED_TERMINAL_REQUESTED")
-        except Exception:
-            # An exact failed launch may use an installed PackageKit GUI.
-            pass
-
-    # No GNOME Software app-details fallback: the operator demonstrated that
-    # this route fails for ofono on the installed system.
-    failed = False
-    for program, args in GUI_CLIENTS:
-        executable = installed_program(program)
-        if executable is None:
-            continue
-        try:
-            launcher(
-                [executable, *args],
-                stdin=subprocess.DEVNULL,
-                stdout=subprocess.DEVNULL,
-                stderr=subprocess.DEVNULL,
-                start_new_session=True,
-                close_fds=True,
-            )
-            return _result("GUI_OPEN_REQUESTED")
-        except Exception:
-            failed = True
-    return _result("GUI_LAUNCH_FAILED" if failed else "GUI_UNAVAILABLE")
-
+    if not (foot and pkcon and python and session_script.is_file()):
+        # The requested in-panel installation is not available. Opening an
+        # unrelated external GUI would recreate the operator's dead window.
+        return _result("GUI_UNAVAILABLE")
+    try:
+        launcher(
+            [foot, "--app-id", INSTALL_APP_ID, "-e", python,
+             str(session_script), "--interactive-ofono"],
+            stdin=subprocess.DEVNULL,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            start_new_session=True,
+            close_fds=True,
+        )
+        return _result("STAGED_TERMINAL_REQUESTED")
+    except Exception:
+        return _result("GUI_LAUNCH_FAILED")
 
 def main(argv: list[str] | None = None) -> int:
     args = sys.argv[1:] if argv is None else argv

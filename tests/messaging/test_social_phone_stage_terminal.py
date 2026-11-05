@@ -62,8 +62,10 @@ class PhoneStageLayoutTests(unittest.TestCase):
 
     def test_terminal_appears_below_phone_controls_not_over_contact_list(self):
         self.assertIn('phoneChatFeed.x + 10', self.phone)
-        self.assertIn('setupHeader.height + setupColumn.implicitHeight + 24',
-                      self.phone)
+        self.assertIn('phoneChatFeed.y + stageBayTop', self.phone)
+        self.assertIn('phoneChatFeed.height - stageBayTop - 12', self.phone)
+        self.assertNotIn('setupHeader.height + setupColumn.implicitHeight + 24',
+                         self.phone)
         self.assertIn('stageHoleWidth >= 200 && stageHoleHeight >= 120', self.phone)
         self.assertIn('stageHoleX + stageHoleWidth <= width', self.phone)
         self.assertIn('stageHoleY + stageHoleHeight <= height', self.phone)
@@ -78,6 +80,51 @@ class PhoneStageLayoutTests(unittest.TestCase):
         self.assertIn('sendEnabled: false', self.phone)
         self.assertIn('conversations: []', self.phone)
         self.assertIn('messages: []', self.phone)
+
+    def test_terminal_bay_is_independent_of_setup_content_height(self):
+        self.assertIn('readonly property int stageBayTop:', self.phone)
+        self.assertIn('setupHeader.height + 112', self.phone)
+        self.assertIn('phoneChatFeed.height * 0.43', self.phone)
+        self.assertIn('phoneChatFeed.y + stageBayTop', self.phone)
+        self.assertIn('phoneChatFeed.height - stageBayTop - 12', self.phone)
+        self.assertNotIn('stageHoleY: Math.round(\\n        phoneChatFeed.y + setupHeader.height + setupColumn.implicitHeight', self.phone)
+        self.assertIn('phonePane.stageWanted && phonePane.stageHoleValid',
+                      self.phone)
+        self.assertIn('setupOverlay.height -', self.phone)
+        self.assertIn('phonePane.stageBayTop + 8', self.phone)
+        self.assertIn('clip: true', self.phone)
+        self.assertIn('contentHeight: setupColumn.implicitHeight + 24',
+                      self.phone)
+        self.assertIn('stageHoleActive', self.phone)
+        self.assertIn('intersection: Intersection.Subtract', self.social)
+
+    def test_representative_panel_sizes_allow_lower_bay_without_scrolling_content(self):
+        # Mirrors the source's 43% start plus a header safety minimum.
+        for height in (400, 580, 700, 950):
+            with self.subTest(feed_height=height):
+                bay_top = max(60 + 112, round(height * 0.43))
+                hole_height = round(height - bay_top - 12)
+                scroll_height = bay_top - 8 - 60
+                self.assertGreaterEqual(hole_height, 120)
+                self.assertGreaterEqual(scroll_height, 100)
+                self.assertLess(bay_top + hole_height, height)
+        # Small windows are explicitly unsupported; don't render a fake hole.
+        h = 280
+        self.assertLess(h - max(60 + 112, round(h * 0.43)) - 12, 120)
+        self.assertIn('if (!stageHoleValid) {', self.phone)
+        self.assertIn('stageState = "UNAVAILABLE";', self.phone)
+
+    def test_return_action_is_pinned_in_header_not_buried_below_scroll(self):
+        start = self.phone.index('id: setupHeader')
+        stop = self.phone.index('id: setupScroll', start)
+        header = self.phone[start:stop]
+        self.assertIn('id: stagedExitAction', header)
+        self.assertIn('visible: phonePane.stageWanted', header)
+        self.assertIn('? "RETURN TO PHONE" : "CLOSE SETUP"', header)
+        self.assertIn('onTriggered: phonePane.closeStagedSetup()', header)
+        self.assertEqual(self.phone.count('id: stagedExitAction'), 1)
+        self.assertEqual(self.phone.count('onTriggered: phonePane.closeStagedSetup()'), 1)
+        self.assertIn('if (installer) {', self.phone)
 
     def test_no_weather_host_or_shared_router_modifications(self):
         self.assertIn('WeatherStage.StationChassisCutout {', self.phone)

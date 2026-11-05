@@ -132,8 +132,8 @@ class CallingSetupUiTests(unittest.TestCase):
 
     def test_fedora_native_approval_and_missing_installer_explained(self):
         self.assertIn("Review PackageKit's approval inside PHONE", self.ui)
-        self.assertIn('Neither the embedded PackageKit terminal nor a supported package GUI was found.', self.ui)
-        self.assertIn('No installation was confirmed.', self.ui)
+        self.assertIn('The embedded installer needs foot, Python and PackageKit available', self.ui)
+        self.assertIn('No external window was opened or installation confirmed.', self.ui)
         self.assertIn('Only oFono.', self.ui)
         self.assertIn('GUI_UNAVAILABLE', self.ui)
         self.assertIn('GUI_LAUNCH_FAILED', self.ui)
@@ -165,6 +165,17 @@ class CallingSetupUiTests(unittest.TestCase):
         self.assertNotIn('systemctl', cleanup)
         self.assertIn('if (selectedSection !== "DEVICE") closeStagedSetup();', self.ui)
         self.assertIn('if (!visible) closeStagedSetup();', self.ui)
+
+    def test_setup_does_not_open_external_window_if_panel_bay_is_too_small(self):
+        start = self.ui.index('function callingSupportSetup()')
+        end = self.ui.index('function callingSupportSetupText()', start)
+        body = self.ui[start:end]
+        self.assertIn('if (!stageHoleValid) {', body)
+        self.assertIn('callSetupStatus = "STAGE_BAY_TOO_SMALL";', body)
+        self.assertLess(body.index('if (!stageHoleValid) {'),
+                        body.index('callSetupProcess.running = true;'))
+        self.assertIn('Enlarge the Social panel and try SET UP CALLING again.', self.ui)
+        self.assertIn('No external window was opened.', self.ui)
 
     def test_no_silent_setup_from_opening_phone_or_changing_tabs(self):
         start = self.ui.index('onVisibleChanged: {')

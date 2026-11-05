@@ -1,5 +1,6 @@
 import QtQuick
 import "../../components"
+import "../../services/weather/WeatherRuntimePolicy.js" as RuntimePolicy
 
 // COSMOS C2 // A fixed observation console, not two long reports
 // squeezed into halves. All readouts reuse the existing root services.
@@ -34,25 +35,56 @@ Rectangle {
         return Number(value).toFixed(digits) + unit;
     }
 
+    // Live availability is not synonymous with a fresh reading. Reuse
+    // the same timestamp/cache vocabulary as the existing SPACE rack.
+    function availability(sourceId,ready,loading,error,received,observed,cache) {
+        return RuntimePolicy.displayRow(sourceId,{
+            active:true, ready:!!ready, loading:!!loading,
+            errorText:error||"", receivedAt:received,
+            observedAt:observed, usingCache:!!cache
+        },runtimeNowMs).availability.replace(/_/g," ");
+    }
+
     readonly property var liveMetrics: [
         {label:"KP / GEOMAG",value:metric(spaceService && spaceService.kpReady,
-            spaceService ? spaceService.kp : null,1,""),state:spaceService
-            && spaceService.kpReady ? "OBSERVED" : "NO READING",
+            spaceService ? spaceService.kp : null,1,""),
+            state:availability("space-kp",
+                spaceService && spaceService.kpReady,
+                spaceService && spaceService.kpLoading,
+                spaceService ? spaceService.kpErrorText : "",
+                spaceService ? spaceService.kpLastUpdated : null,
+                spaceService ? spaceService.kpTime : null,
+                spaceService && spaceService.usingPersistentKpCache),
             path:"cosmos/space-weather/geomagnetic",color:Colors.cyan},
         {label:"SOLAR WIND",value:metric(spaceService && spaceService.solarWindReady,
             spaceService ? spaceService.solarWindSpeed : null,0," KM/S"),
-            state:spaceService && spaceService.solarWindReady
-                  ? "OBSERVED" : "NO READING",
+            state:availability("space-wind",
+                spaceService && spaceService.solarWindReady,
+                spaceService && spaceService.solarWindLoading,
+                spaceService ? spaceService.solarWindErrorText : "",
+                spaceService ? spaceService.solarWindLastUpdated : null,
+                spaceService ? spaceService.solarWindTime : null,
+                spaceService && spaceService.usingPersistentSolarWindCache),
             path:"cosmos/space-weather/solar-wind",color:Colors.yellow},
         {label:"IMF BZ",value:metric(spaceService && spaceService.magneticFieldReady,
             spaceService ? spaceService.magneticFieldBz : null,1," NT"),
-            state:spaceService && spaceService.magneticFieldReady
-                  ? "OBSERVED" : "NO READING",
+            state:availability("space-imf",
+                spaceService && spaceService.magneticFieldReady,
+                spaceService && spaceService.magneticFieldLoading,
+                spaceService ? spaceService.magneticFieldErrorText : "",
+                spaceService ? spaceService.magneticFieldLastUpdated : null,
+                spaceService ? spaceService.magneticFieldTime : null,
+                spaceService && spaceService.usingPersistentMagneticFieldCache),
             path:"cosmos/space-weather/solar-wind",color:Colors.magenta},
         {label:"F10.7 FLUX",value:metric(spaceService && spaceService.solarFluxReady,
             spaceService ? spaceService.solarFlux : null,0," SFU"),
-            state:spaceService && spaceService.solarFluxReady
-                  ? "OBSERVED" : "NO READING",
+            state:availability("space-flux",
+                spaceService && spaceService.solarFluxReady,
+                spaceService && spaceService.solarFluxLoading,
+                spaceService ? spaceService.solarFluxErrorText : "",
+                spaceService ? spaceService.solarFluxLastUpdated : null,
+                spaceService ? spaceService.solarFluxTime : null,
+                spaceService && spaceService.usingPersistentSolarFluxCache),
             path:"cosmos/space-weather/solar-activity",color:Colors.orange}
     ]
 
@@ -142,7 +174,7 @@ Rectangle {
                 height: parent.height
                 verticalAlignment: Text.AlignVCenter
                 font.pixelSize: 10
-                text: "SPACE WEATHER // CURRENT"
+                text: "SPACE WEATHER // LATEST"
                 color: Colors.magenta
                 elide: Text.ElideRight
             }

@@ -17,14 +17,20 @@ var ROUTES = {
     sky:["header","astronomy","moon","twilight"],
     space:["header","solar"]},
 
-  "cosmos/sun/position": {page:"sky",sky:["header","astronomy"]},
+  // The bottom SUN landing includes all original solar/time/light sections.
+  "cosmos/sun/position": {page:"sky",sky:["header","astronomy","twilight"]},
   "cosmos/sun/twilight": {page:"sky",sky:["header","twilight"]},
   "cosmos/sun/photo-light": {page:"sky",sky:["header","twilight"]},
-  "cosmos/moon/ephemeris": {page:"sky",sky:["header","moon"]},
-  "cosmos/moon/position": {page:"sky",sky:["header","celestial-fix"]},
-  "cosmos/planets-stars/celestial-fix": {page:"sky",sky:["header","celestial-fix"]},
+  // The bottom MOON landing pairs USNO ephemeris with its current sky fix.
+  "cosmos/moon/ephemeris": {page:"sky",sky:["header","moon","moon-position"]},
+  "cosmos/moon/position": {page:"sky",sky:["header","moon-position"]},
+  // Native ASTRONOMY landing keeps the planet/constellation instruments;
+  // the original comprehensive SKY page remains in INDEX unchanged.
+  "cosmos/planets-stars/celestial-fix": {page:"sky",sky:["header","celestial-fix","planet-clock"]},
   "cosmos/planets-stars/planet-clock": {page:"sky",sky:["header","planet-clock"]},
   "cosmos/planets-stars/constellations": {page:"sky",sky:["header","celestial-fix"]},
+  // Native EVENTS landing groups the real ISS, eclipse and meteor instruments.
+  "cosmos/events/overview": {page:"sky",sky:["header","iss","eclipses","meteor"]},
   "cosmos/events/eclipses": {page:"sky",sky:["header","eclipses"]},
   "cosmos/events/meteors": {page:"sky",sky:["header","meteor"]},
   "cosmos/events/iss": {page:"sky",sky:["header","iss"]},
@@ -104,6 +110,10 @@ function needsSource(path,source) {
       return Object.prototype.hasOwnProperty.call(SPACE_SOURCE_SECTION,source);
     return false;
   }
+  // The dedicated Moon position subsection uses the same existing USNO
+  // celestial-navigation source, without activating planetary presentations.
+  if (source === "celnav" && visibleFor("sky",path,"moon-position"))
+    return true;
   var skySection = SKY_SOURCE_SECTION[source];
   if (skySection)
     return visibleFor("sky",path,skySection);

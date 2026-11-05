@@ -246,6 +246,12 @@ test("C2 COSMOS overview shows interactive sky graphics and compact core SPACE r
   assert.equal((pane.match(/StationSpace\s*\{/g)||[]).length,1);
 });
 
+test("C3 QML ids never shadow JavaScript built-ins", () => {
+  assert.match(solarWind, /id: windConsole/);
+  assert.doesNotMatch(solarWind,
+    /\bid:\s*(?:console|Math|JSON|Date|Array|Object|Number|String|Qt)\b/);
+});
+
 test("C3 Solar Wind is a fixed, interactive, source-backed instrument", () => {
   assert.match(pane,/cosmosPane\.subjectRoute === "cosmos\/space-weather\/solar-wind"/);
   assert.match(pane,/id: solarWindComponent[\s\S]*StationCosmosSolarWindPane\s*\{/);

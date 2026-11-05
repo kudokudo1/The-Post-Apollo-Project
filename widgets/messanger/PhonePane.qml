@@ -47,6 +47,11 @@ Rectangle {
                 || callPrerequisiteReport.package !== "NOT_INSTALLED"
                 || callPrerequisiteReport.serviceLoad !== "not-found")
             return;
+        if (!stageHoleValid) {
+            // Never launch a terminal behind an unusably small Social panel.
+            callSetupStatus = "STAGE_BAY_TOO_SMALL";
+            return;
+        }
         callSetupStatus = "OPENING";
         callSetupProcess.command = [
             "python3",
@@ -70,10 +75,12 @@ Rectangle {
             return "oFono is still reported missing. Complete the installation in the software manager, or retry setup. No audio changes were made by Social.";
         if (callSetupStatus === "FOLLOWUP_REQUIRED")
             return "Package check completed. The next step is shown below. CHECK AGAIN updates the existing service and call statuses without changing audio.";
+        if (callSetupStatus === "STAGE_BAY_TOO_SMALL")
+            return "PHONE is too small for an interactive installer. Enlarge the Social panel and try SET UP CALLING again. No external window was opened.";
         if (callSetupStatus === "GUI_UNAVAILABLE")
-            return "Neither the embedded PackageKit terminal nor a supported package GUI was found. No installation was requested.";
+            return "The embedded installer needs foot, Python and PackageKit available on this desktop. No external window was opened or package installed.";
         if (callSetupStatus === "GUI_LAUNCH_FAILED")
-            return "The graphical package installer could not open. No installation was confirmed.";
+            return "PHONE could not start the embedded PackageKit terminal. No external window was opened or installation confirmed.";
         if (callSetupStatus === "UNSUPPORTED_HOST")
             return "Automatic package selection is currently supported on Fedora only. No changes were made.";
         if (callSetupStatus === "DIAGNOSIS_UNAVAILABLE"

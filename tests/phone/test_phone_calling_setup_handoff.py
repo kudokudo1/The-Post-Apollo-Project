@@ -87,19 +87,19 @@ class CallingSetupGuiTests(unittest.TestCase):
         self.assertEqual(result["status"], "STAGE_UNAVAILABLE")
         launcher.assert_not_called()
 
-    def test_when_staged_foot_is_unavailable_try_packagekit_gui_not_gnome_software(self):
+    def test_no_external_package_manager_fallback_when_stage_cannot_open(self):
         launcher = mock.Mock()
-        p = programs(foot=None, **{"gpk-install-package-name": "/usr/bin/gpk-install-package-name",
-                                    "gnome-software": "/usr/bin/gnome-software"})
+        p = programs(foot=None, **{
+            "gpk-install-package-name": "/usr/bin/gpk-install-package-name",
+            "gnome-software": "/usr/bin/gnome-software",
+        })
         result = gui.open_support(
             prerequisite=lambda: evidence(), is_fedora=lambda: True,
             find=p, launcher=launcher, already_open=lambda: False)
         self.locked(result)
-        self.assertEqual(result["status"], "GUI_OPEN_REQUESTED")
+        self.assertEqual(result["status"], "GUI_UNAVAILABLE")
         self.assertFalse(result["stageCandidate"])
-        self.assertEqual(launcher.call_args.args[0],
-                         ["/usr/bin/gpk-install-package-name", "ofono"])
-        self.assertNotIn("gnome-software", str(launcher.call_args.args[0]))
+        launcher.assert_not_called()
 
     def test_no_supported_client_no_hidden_terminal_fallback(self):
         launcher = mock.Mock()
@@ -122,20 +122,19 @@ class CallingSetupGuiTests(unittest.TestCase):
                 self.assertEqual(result["status"], "GUI_UNAVAILABLE")
         launcher.assert_not_called()
 
-    def test_stage_launch_failure_tries_packagekit_gui(self):
-        def find(name):
-            return "/usr/bin/" + name
+    def test_foot_launch_failure_does_not_open_external_package_manager(self):
         launched = []
         def launch(args, **kwargs):
             launched.append(args)
-            if args[0] == "/usr/bin/foot":
-                raise OSError("PRIVATE")
+            raise OSError("PRIVATE")
         result = gui.open_support(
             prerequisite=lambda: evidence(), is_fedora=lambda: True,
-            find=find, launcher=launch, already_open=lambda: False)
+            find=lambda name: "/usr/bin/" + name,
+            launcher=launch, already_open=lambda: False)
         self.locked(result)
-        self.assertEqual(result["status"], "GUI_OPEN_REQUESTED")
-        self.assertEqual(launched[-1], ["/usr/bin/gpk-install-package-name", "ofono"])
+        self.assertEqual(result["status"], "GUI_LAUNCH_FAILED")
+        self.assertEqual(len(launched), 1)
+        self.assertEqual(launched[0][0], "/usr/bin/foot")
 
     def test_all_launches_fail_without_leaking_error(self):
         result = gui.open_support(

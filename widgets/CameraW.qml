@@ -47,6 +47,9 @@ PanelWindow {
         SocialAccountDetailsStore.accountNamesFor(zoomIdentityId, "zoom")
     property string selectedZoomAccountId: ""
     property var zoomClientStatus: null
+    property var zoomLaunchObservation: null
+    property string zoomLaunchState: "NOT_CHECKED"
+    property string zoomLaunchMessage: "LAUNCH // NOT CHECKED"
     // Missing installations must show an actionable setup, not a disabled button.
     property bool zoomSetupVisible: false
     // Explicit two-click installer gate; cleared on closing or changing modes.
@@ -228,7 +231,13 @@ PanelWindow {
     }
 
     function launchZoomClient() {
+        zoomLaunchState = "CHECKING";
+        zoomLaunchMessage = "ZOOM // STARTING CLIENT // VERIFYING WINDOW";
         return run("zoomOpen", ["zoom-open"]);
+    }
+
+    function checkZoomWindow() {
+        return run("zoomLaunchCheck", ["zoom-launch-check"]);
     }
 
     function webcamPhoto() {
@@ -280,6 +289,16 @@ PanelWindow {
             return;
         }
         if (!payload || payload.ok !== true) {
+            if (action === "zoomOpen") {
+                zoomLaunchCheckTimer.stop();
+                zoomLaunchState = "FAILED";
+                zoomLaunchMessage = payload
+                    && payload.error === "ZOOM_START_EXITED_NONZERO"
+                    ? "ZOOM // PROCESS EXITED WITH ERROR "
+                      + String(payload.exitCode || "UNKNOWN")
+                      + " // TRY TERMINAL COMMAND BELOW"
+                    : "ZOOM // LAUNCH FAILED // CHECK TERMINAL DIAGNOSTICS";
+            }
             if (action === "zoomInstall") {
                 const error = String(payload && payload.error || "INSTALL_UNAVAILABLE");
                 zoomInstallChoice = "";
@@ -324,7 +343,29 @@ PanelWindow {
             feedback = payload.available ? "ZOOM // CLIENT DETECTED // LOGIN UNKNOWN"
                                          : "ZOOM // NOT INSTALLED // SETUP OPTIONS BELOW";
         } else if (action === "zoomOpen") {
-            feedback = "ZOOM // OPEN REQUESTED // SIGN IN THROUGH ZOOM CLIENT";
+            zoomLaunchState = "UNVERIFIED";
+            zoomLaunchMessage = "ZOOM // LAUNCH SUBMITTED // WINDOW NOT VERIFIED YET";
+            feedback = "ZOOM // START COMMAND ACCEPTED // CHECKING WINDOW";
+            zoomLaunchCheckTimer.restart();
+        } else if (action === "zoomLaunchCheck") {
+            zoomLaunchObservation = payload;
+            if (payload.windowState === "VISIBLE") {
+                zoomLaunchState = "VISIBLE";
+                zoomLaunchMessage = "ZOOM // WINDOW VISIBLE // READY TO USE";
+            } else if (payload.windowState === "OTHER_WORKSPACE") {
+                zoomLaunchState = "OTHER_WORKSPACE";
+                zoomLaunchMessage = "ZOOM // WINDOW FOUND ON ANOTHER WORKSPACE";
+            } else if (payload.flatpakRunning === true) {
+                zoomLaunchState = "RUNNING_NO_WINDOW";
+                zoomLaunchMessage = "ZOOM // FLATPAK RUNNING // WINDOW NOT DETECTED";
+            } else if (payload.windowState === "UNKNOWN") {
+                zoomLaunchState = "UNKNOWN";
+                zoomLaunchMessage = "ZOOM // COMPOSITOR WINDOW CHECK UNAVAILABLE";
+            } else {
+                zoomLaunchState = "NOT_FOUND";
+                zoomLaunchMessage = "ZOOM // NO WINDOW FOUND // SEE TERMINAL DIAGNOSTICS";
+            }
+            feedback = zoomLaunchMessage;
         } else if (action === "status") {
             statusReport = payload;
             recording = payload.recording && payload.recording.recording === true;
@@ -419,6 +460,18 @@ PanelWindow {
         y: camera.frameTopInset
         width: camera.menuOpen ? camera.frameWidth : 0
         height: camera.menuOpen ? camera.frameHeight : 0
+    }
+
+    // Read-only status check after an explicit launch. No retries or hidden
+    // background Zoom starts; the user can click CHECK WINDOW again later.
+    Timer {
+        id: zoomLaunchCheckTimer
+        interval: 4000
+        repeat: false
+        onTriggered: {
+            if (camera.menuOpen && camera.activeView === "zoom" && !camera.busy)
+                camera.checkZoomWindow();
+        }
     }
 
     Process {
@@ -1323,6 +1376,62 @@ PanelWindow {
                                         camera.launchZoomClient();
                                     else
                                         camera.zoomSetupVisible = !camera.zoomSetupVisible;
+                                }
+                            }
+                        }
+
+                        GohuText {
+                            width: parent.width
+                            wrapMode: Text.WordWrap
+                            font.pixelSize: 11
+                            color: camera.zoomLaunchState === "VISIBLE"
+                                   ? Colors.cyan
+                                   : camera.zoomLaunchState === "FAILED"
+                                     || camera.zoomLaunchState === "NOT_FOUND"
+                                     ? Colors.red : Colors.yellow
+                            text: camera.zoomLaunchMessage
+                        }
+
+                        ActionButton {
+                            width: parent.width
+                            height: 34
+                            label: "CHECK ZOOM WINDOW / PROCESS"
+                            labelPixelSize: 10
+                            accentColor: Colors.cyan
+                            available: !camera.busy
+                            onLeftClicked: camera.checkZoomWindow()
+                        }
+
+                        Column {
+                            width: parent.width
+                            spacing: 5
+                            visible: camera.zoomClientStatus !== null
+                                     && camera.zoomClientStatus.client === "flatpak"
+                                     && (camera.zoomLaunchState === "FAILED"
+                                         || camera.zoomLaunchState === "NOT_FOUND"
+                                         || camera.zoomLaunchState === "RUNNING_NO_WINDOW"
+                                         || camera.zoomLaunchState === "UNKNOWN")
+                            GohuText {
+                                width: parent.width
+                                wrapMode: Text.WordWrap
+                                font.pixelSize: 10
+                                color: Colors.orange
+                                text: "STARTUP DIAGNOSTICS // RUN IN TERMINAL TO SEE ZOOM'S REAL ERROR OUTPUT. NO AUTOMATIC PERMISSION CHANGES."
+                            }
+                            TextField {
+                                width: parent.width
+                                height: 32
+                                readOnly: true
+                                selectByMouse: true
+                                font.pixelSize: 10
+                                color: Colors.white
+                                text: camera.zoomClientStatus.installation === "system"
+                                      ? "flatpak run --system us.zoom.Zoom"
+                                      : "flatpak run --user us.zoom.Zoom"
+                                background: Rectangle {
+                                    color: Colors.black
+                                    border.width: 1
+                                    border.color: Colors.cyan
                                 }
                             }
                         }

@@ -370,7 +370,7 @@ Column {
                     }
                 }
                 IdentityCenterLocalActionButton {
-                    role: "manage"
+                    role: "save"
                     width: 62
                     height: 30
                     label: "SAVE"

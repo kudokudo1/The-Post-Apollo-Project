@@ -9,11 +9,11 @@ ROLE = (Q / "IdentityCenterLocalActionButton.qml").read_text()
 PANE = (Q / "IdentityCenterSettingsSections.qml").read_text()
 FILE_ROLES = {
     "IdentityCenterLocalOrganizationEditor.qml":
-        ["refresh","add","navigate","manage","manage","manage","danger","danger","navigate","manage","manage","danger","danger","navigate","add"],
+        ["refresh","add","navigate","manage","save","manage","danger","danger","navigate","save","manage","danger","danger","navigate","add"],
     "IdentityCenterLocalPortfolioEditor.qml":
-        ["refresh","add","manage","manage","manage","danger","danger","navigate","danger","add"],
+        ["refresh","add","manage","save","manage","danger","danger","navigate","danger","add"],
     "IdentityCenterLocalStructureEditor.qml":
-        ["refresh","navigate","manage","navigate","add","manage","manage","manage","danger","danger","navigate"],
+        ["refresh","navigate","manage","navigate","add","manage","save","manage","danger","danger","navigate"],
     "IdentityCenterLocalRelationshipModifiers.qml":
         ["navigate","navigate","navigate","navigate","navigate","navigate","navigate",
          "primary","navigate","refresh","danger"],
@@ -41,6 +41,7 @@ class SemanticOrganizationColors(unittest.TestCase):
             'property string role: "navigate"',
             'role === "danger" ? Colors.red',
             'role === "refresh" ? Colors.green',
+            'role === "save" ? Colors.green',
             'role === "manage" ? Colors.yellow',
             'role === "primary" ? Colors.orange',
             'role === "add" ? Colors.magenta',
@@ -163,6 +164,25 @@ class SemanticOrganizationColors(unittest.TestCase):
                 previous = src.rfind("IdentityCenterLocalActionButton {", 0, index)
                 self.assertGreater(previous, 0)
                 self.assertIn('role: "add"', src[previous:index])
+
+    def test_four_save_actions_use_standard_green_only(self):
+        # Only record-save actions change. Archive, backup and other manage
+        # actions retain yellow; no change to the shared color singleton.
+        self.assertIn('role === "save" ? Colors.green', ROLE)
+        self.assertNotIn("Colors.omnitrix", ROLE)
+        expected_counts = {
+            "IdentityCenterLocalOrganizationEditor.qml": 2,
+            "IdentityCenterLocalPortfolioEditor.qml": 1,
+            "IdentityCenterLocalStructureEditor.qml": 1,
+        }
+        for path, count in expected_counts.items():
+            source = (Q / path).read_text()
+            self.assertEqual(source.count('label: "SAVE"'), count, path)
+            self.assertEqual(source.count('role: "save"'), count, path)
+            for fragment in source.split('label: "SAVE"')[:-1]:
+                button = fragment.rsplit("IdentityCenterLocalActionButton {", 1)[-1]
+                self.assertIn('role: "save"', button, path)
+
 
     def test_no_new_privileged_or_unreviewed_operations(self):
         for forbidden in (

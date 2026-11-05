@@ -72,3 +72,12 @@ Both the shared `components/ActionButton.qml` and `components/Colors.qml` remain
 **Verification:** dedicated contract checks confirm all five magenta Add buttons, all ten magenta text/orange cursor delegates, no local selected-state override; offscreen Qt tests check instantiated Add role/accent, inherited selected colors, typed text color, cursor delegate existence, and focus. Live visual acceptance is deferred unless separately confirmed by the operator.
 
 **Hospital checkpoint:** Patient `kudokudo1/The-Post-Apollo-Project`, external ChatGPT worker, live Room/Assignment unverified. Preserve the earlier user-confirmed Backup Now / List / Validate passes and all other deferred tests. Merge and desktop update remain operator-owned.
+
+
+---
+
+## REFINEMENT v1.2 // standard green Save controls, 2026-11-05
+
+Operator requested that **record SAVE buttons** on Social → USER → SETTINGS → ORGANIZATIONS display the normal `Colors.green` (`#9ECE6A`), **not** the separate Omnitrix green (`Colors.omnitrix`, `#00F782`). The four existing Save buttons (organization, branch, portfolio, structure unit) now use a new local `save` role, isolated from `manage` so Archive, Show Archived, Backup and other yellow management actions remain yellow. Existing button geometry, labels, interaction, write handlers, selected/open-state behavior and error/result feedback do not change. Shared `components/ActionButton.qml` and `components/Colors.qml` remain untouched.
+
+Static semantic-color regressions guard the four exact Save mappings and absence of the Omnitrix token from the local role component. This is repository-only work. GitHub checks and live visual acceptance are separate; the operator still owns merge and authorized desktop deployment.

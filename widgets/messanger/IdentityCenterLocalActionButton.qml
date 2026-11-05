@@ -11,6 +11,7 @@ ActionButton {
     readonly property color roleColor:
         role === "danger" ? Colors.red
         : role === "refresh" ? Colors.green
+        : role === "save" ? Colors.green
         : role === "manage" ? Colors.yellow
         : role === "add" ? Colors.magenta
         : role === "primary" ? Colors.orange

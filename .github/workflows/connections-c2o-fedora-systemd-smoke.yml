@@ -15,7 +15,7 @@ jobs:
   disposable-fedora-systemd:
     # Privileged Docker is used only on an ephemeral GitHub-hosted runner,
     # only for trusted branches in the owning repo. Not allowed on fork PRs.
-    if: github.event_name == 'workflow_dispatch' || github.event.pull_request.head.repo.full_name == github.repository
+    if: github.actor == 'kudokudo1' && (github.event_name == 'workflow_dispatch' || github.event.pull_request.head.repo.full_name == github.repository)
     runs-on: ubuntu-latest
     timeout-minutes: 22
     steps:
@@ -25,7 +25,7 @@ jobs:
       - name: Run established offline C2n unit / policy contract
         run: |
           timeout 30s python3 -B tests/connections/test_connections_c2n_policy_contract.py
-      - name: Stage only the five fixed test files outside checkout
+      - name: Stage only six fixed test inputs outside checkout
         shell: bash
         run: |
           set -euo pipefail
@@ -60,7 +60,8 @@ jobs:
           }
           trap cleanup EXIT
           # Highly privileged CI-only boot is not a security isolation proof.
-          # No secrets, checkout/token mounts, host files, user devices or network.
+          # No token mounts, explicit host-file bind mounts or network; note that
+          # --privileged still exposes host devices/kernel powers to test code.
           docker run -d --name "$name" --privileged --cgroupns=private \
             --network none --tmpfs /run --tmpfs /run/lock --tmpfs /tmp \
             postapollo-c2o-fedora-test:ci >/dev/null

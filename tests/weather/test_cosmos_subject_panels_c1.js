@@ -434,7 +434,7 @@ test("C5 subject modes are distinct real routes and direct fixed-rail actions", 
   };
   for (const [family,labels] of Object.entries(families)) {
     const rows = focused.MODES[family];
-    assert.deepEqual(rows.map(r=>r.label),labels);
+    assert.deepEqual(plain(rows.map(r=>r.label)),labels);
     for (const entry of rows) {
       assert.ok(nav.findRoute(entry.route),entry.route);
       assert.ok(cosmos.routeInfo(entry.route),entry.route);

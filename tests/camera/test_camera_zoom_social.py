@@ -59,7 +59,7 @@ class CameraZoomSocialTests(unittest.TestCase):
         self.assertIn('EXTERNAL_ACCOUNT_LABEL_SERVICES = frozenset({"zoom"})', SOCIAL_STORE)
         self.assertIn('service not in KNOWN_ACCOUNT_LABEL_SERVICES', SOCIAL_STORE)
         self.assertIn('appSelector.selectAccountService("zoom")', SOCIAL_UI)
-        self.assertIn('Account names are display labels', PANEL)
+        self.assertIn('ZOOM SIGN-IN // UNVERIFIED', PANEL)
         self.assertEqual(CATALOG.count('("zoom", "ZOOM"'), 0)
         self.assertIn('? "▾ CHOOSE APP (32)"', SOCIAL_UI)
         sys.path.insert(0, str(ROOT / "services/social"))

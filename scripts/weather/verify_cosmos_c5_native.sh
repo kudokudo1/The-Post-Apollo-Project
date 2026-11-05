@@ -29,7 +29,8 @@ cat "$work/boot.log"
 if [ "$rc" -ne 0 ] \
    || ! grep -F "C5_NATIVE_PASS // MODES_LOAD_WITHOUT_SOURCES" "$work/boot.log" >/dev/null \
    || grep -F "C5_NATIVE_FAIL" "$work/boot.log" >/dev/null \
-   || grep -F "Failed to load configuration" "$work/boot.log" >/dev/null; then
+   || grep -F "Failed to load configuration" "$work/boot.log" >/dev/null \
+   || grep -E "StationCosmosModesPane.qml.*(TypeError|ReferenceError|Unable to assign)" "$work/boot.log" >/dev/null; then
    echo "C5_NATIVE_FAIL // process_exit=$rc" >&2
    exit 1
 fi

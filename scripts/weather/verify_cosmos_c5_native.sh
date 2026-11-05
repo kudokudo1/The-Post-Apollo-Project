@@ -5,6 +5,14 @@ command -v quickshell >/dev/null || { echo "C5_NATIVE_FAIL // NO_QUICKSHELL"; ex
 work="$(mktemp -d /tmp/cosmos-c5-native.XXXXXXXX)"
 trap 'rm -rf -- "$work"' EXIT
 mkdir -m 700 "$work/home" "$work/runtime" "$work/cache" "$work/config"
+# Quickshell only loads imports inside its config root. Copy just the
+# isolated components and source modules rather than importing outside.
+mkdir -p "$work/config/widgets" "$work/config/services" "$work/config/scripts"
+cp -a "$repo_root/components" "$work/config/components"
+cp -a "$repo_root/widgets/weather" "$work/config/widgets/weather"
+cp -a "$repo_root/services/weather" "$work/config/services/weather"
+cp -a "$repo_root/scripts/weather" "$work/config/scripts/weather"
+cp "$repo_root/tests/weather/fixtures/C5FocusedNativeShell.qml" "$work/config/shell.qml"
 chmod 700 "$work/runtime"
 rc=0
 timeout --signal=TERM --kill-after=3s 20s env \
@@ -13,7 +21,7 @@ timeout --signal=TERM --kill-after=3s 20s env \
   XDG_CACHE_HOME="$work/cache" \
   XDG_CONFIG_HOME="$work/config" \
   QT_QPA_PLATFORM=offscreen \
-  quickshell --no-color -p "$repo_root/tests/weather/fixtures/C5FocusedNativeShell.qml" \
+  quickshell --no-color -p "$work/config/shell.qml" \
   >"$work/boot.log" 2>&1 || rc=$?
 cat "$work/boot.log"
 if [ "$rc" -ne 0 ] \

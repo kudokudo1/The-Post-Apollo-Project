@@ -98,7 +98,7 @@ Rectangle {
     ]
 
     Column {
-        id: console
+        id: windConsole
         anchors.fill: parent
         anchors.margins: 9
         spacing: 7

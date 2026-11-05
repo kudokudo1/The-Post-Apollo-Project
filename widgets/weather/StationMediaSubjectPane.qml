@@ -19,6 +19,13 @@ Rectangle {
     // Only the actually loaded NEWS player may publish host-local geometry.
     // A RADIO route and an unloaded/hidden pane return an empty rectangle.
     // On MEDIA overview the NEWS hub is NESTED inside the overview Item.
+    readonly property string activeWatchSourceId: {
+        if (activePlayerViewportRect.width <= 0 || !mediaLoader.item
+                || mediaPane.kind === "radio")
+            return "";
+        const sourceId = mediaLoader.item.activeWatchSourceId;
+        return sourceId === "bbc" || sourceId === "cspan" ? sourceId : "";
+    }
     readonly property rect activePlayerViewportRect: {
         if (!mediaPane.visible || !mediaLoader.active || !mediaLoader.item
                 || mediaPane.kind === "" || mediaPane.kind === "radio")
@@ -71,6 +78,10 @@ Rectangle {
         id: overviewComponent
         Item {
             id: mediaOverview
+
+            readonly property string activeWatchSourceId:
+                activePlayerViewportRect.width > 0
+                ? overviewNewsHub.activeWatchSourceId : ""
 
             // MEDIA overview wraps its NEWS hub; do not pretend Loader.item
             // is itself a StationNewsHub or add a second player instance.

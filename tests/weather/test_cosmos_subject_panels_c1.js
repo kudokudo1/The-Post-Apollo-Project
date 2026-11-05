@@ -333,8 +333,10 @@ test("COSMOS SUN, MOON and EVENTS bottom landings own their subject data", () =>
   }
   assert.ok(sky.includes('title: "MOON // CURRENT POSITION"'));
   // Native Moon-only blocks must not add a subsection to legacy CLASSIC.
-  assert.equal(sky.split('visible: sky.subjectRoute !== ""\\n'
-    + '                     && sky.sectionVisible("moon-position")').length - 1, 2);
+  const moonOnlyGate = 'visible: sky.subjectRoute !== ""'
+    + String.fromCharCode(10)
+    + '                     && sky.sectionVisible("moon-position")';
+  assert.equal(sky.split(moonOnlyGate).length - 1, 2);
   assert.ok(sky.includes('visible: sky.subjectRoute !== "cosmos/sun/position"'));
   assert.ok(sky.includes("id: eventsJumpRow"));
   assert.ok(sky.includes("id: meteorEventSection"));

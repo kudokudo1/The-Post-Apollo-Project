@@ -269,11 +269,14 @@ def enter(identity, output, x, y, width, height):
     outer_y = geometry[1] - top
     outer_w = geometry[2] + left + right
     outer_h = geometry[3] + top + bottom
-    output_rect = _output_rect(output)
-    if (outer_x < output_rect["x"] or outer_y < output_rect["y"]
-            or outer_x + outer_w > output_rect["x"] + output_rect["width"]
-            or outer_y + outer_h > output_rect["y"] + output_rect["height"]):
-        raise RuntimeError("CLIENT_FRAME_OUTSIDE_OUTPUT")
+    if any((left, top, right, bottom)):
+        # _target_geometry already bounds the ordinary zero-inset window.
+        # Only an expanded outer container requires an additional output guard.
+        output_rect = _output_rect(output)
+        if (outer_x < output_rect["x"] or outer_y < output_rect["y"]
+                or outer_x + outer_w > output_rect["x"] + output_rect["width"]
+                or outer_y + outer_h > output_rect["y"] + output_rect["height"]):
+            raise RuntimeError("CLIENT_FRAME_OUTSIDE_OUTPUT")
     _sway_command(criteria, "resize", "set", "width", str(outer_w), "px",
                   "height", str(outer_h), "px")
     _sway_command(criteria, "move", "absolute", "position",

@@ -16,6 +16,8 @@ const pane = read("widgets/weather/StationCosmosSubjectPane.qml");
 const dashboard = read("widgets/weather/StationCosmosOverviewPane.qml");
 const workspaceSource = read("widgets/weather/StationWorkspaceNavigationPolicy.js");
 const solarWind = read("widgets/weather/StationCosmosSolarWindPane.qml");
+const spaceHub = read("widgets/weather/StationCosmosSpaceWeatherHubPane.qml");
+const geomagneticPane = read("widgets/weather/StationCosmosGeomagneticPane.qml");
 const browser = read("widgets/weather/StationSubjectNavigator.qml");
 const station = read("widgets/weather/WeatherStationW.qml");
 const weatherPolicy = read("widgets/weather/StationWeatherSubjectPanelPolicy.js");
@@ -295,6 +297,39 @@ test("C4 physical SUN activity and SPACE instruments have real native destinatio
   assert.ok(space.includes('readonly property bool solarImageActive:'));
   assert.ok(space.includes('running: space.visible && space.solarImageActive'));
   assert.equal((space.match(/onSubjectRouteChanged:/g)||[]).length,1);
+});
+
+test("C4 SPACE hub is a bounded clickable source-backed directory, not a cloned collector", () => {
+  assert.match(spaceHub,/id: spaceHub/);
+  assert.match(spaceHub,/property var spaceService: null/);
+  assert.match(spaceHub,/RuntimePolicy\.displayRow\(id/);
+  assert.match(spaceHub,/TapHandler\s*\{/);
+  assert.match(spaceHub,/onTapped: spaceHub\.routeRequested\(modelData\.route\)/);
+  assert.match(spaceHub,/columns: 2/);
+  for (const route of [
+    "cosmos/space-weather/solar-wind","cosmos/space-weather/geomagnetic",
+    "cosmos/space-weather/aurora","cosmos/space-weather/forecasts",
+    "cosmos/space-weather/bulletins","cosmos/space-weather/history",
+    "cosmos/space-weather/full","cosmos/sun/activity"
+  ]) {
+    assert.ok(nav.findRoute(route),route);
+    assert.ok(spaceHub.includes('"'+route+'"'),route);
+  }
+  for (const field of ["kpReady","solarWindReady","solarFluxReady",
+                       "kp","solarWindSpeed","solarFlux"]) {
+    assert.ok(spaceHub.includes("spaceService."+field),field);
+  }
+  assert.ok(geomagneticPane.includes('subjectRoute: "cosmos/space-weather/geomagnetic"'));
+  assert.ok(geomagneticPane.includes("geomagnetic.kpReading()"));
+  assert.ok(geomagneticPane.includes("StationSpace {"));
+  assert.ok(geomagneticPane.includes("spaceService: geomagnetic.spaceService"));
+  for (const content of [spaceHub,geomagneticPane]) {
+    for (const forbidden of [
+      "WeatherServices.","Process {","FileView {","XMLHttpRequest",
+      "Timer {","Qt.callLater","swaymsg"
+    ]) assert.ok(!content.includes(forbidden),forbidden);
+    assert.doesNotMatch(content,/\bid:\s*console\b/);
+  }
 });
 
 test("C3 Solar Wind is a fixed, interactive, source-backed instrument", () => {

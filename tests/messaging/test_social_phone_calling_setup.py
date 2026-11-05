@@ -57,8 +57,6 @@ class CallingSetupUiTests(unittest.TestCase):
                       control)
         self.assertIn('|| phonePane.callSetupStatus === "FOLLOWUP_REQUIRED"',
                       control)
-        self.assertIn('|| phonePane.callSetupStatus === "FOLLOWUP_REQUIRED"',
-                      control)
         self.assertIn('? "CHECK AGAIN"', control)
         self.assertIn('? "RETRY SETUP" : "SET UP CALLING"', control)
         self.assertEqual(self.ui.count('id: installCallingSupport'), 1)
@@ -113,8 +111,7 @@ class CallingSetupUiTests(unittest.TestCase):
             '&& phonePane.callPrerequisiteReport.state === "PACKAGE_NOT_INSTALLED"',
             text_block)
         self.assertIn('No package was installed by Social.', self.ui)
-        self.assertIn('no longer reported missing' if False else 'Package check completed.',
-                      self.ui)
+        self.assertIn('Package check completed.', self.ui)
 
     def test_an_installer_request_is_never_reported_as_installed(self):
         self.assertIn('id: callSetupProcess', self.ui)

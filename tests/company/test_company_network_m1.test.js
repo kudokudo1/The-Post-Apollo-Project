@@ -87,16 +87,20 @@ test("smaller screens clamp geometry and placement",()=>{
     assert.ok(chassis.leftMargin("standard",9999,800,800)<=800);
 });
 
-test("decorated dock keeps white stars/yellow city and open magenta halo",()=>{
+test("decorated dock keeps white stars/yellow city closed and fully magenta on yellow when open",()=>{
     const qml=source("modules/CompanyNetwork.qml");
     assert.match(qml,/text: "\. ݁₊⊹"/);
     assert.match(qml,/text: "🏙︎"/);
     assert.match(qml,/text: "๋࣭⭑"/);
     assert.match(qml,/openGlowColor: Colors\.magenta/);
     assert.match(qml,/normalContentGlowColor: Colors\.blue/);
-    assert.match(qml,/openFillColor: Colors\.black/);
-    assert.match(qml,/color: Colors\.white/);
-    assert.match(qml,/color: Colors\.yellow/);
+    assert.match(qml,/openFillColor: Colors\.yellow/);
+    assert.match(qml,/openForegroundColor: Colors\.magenta/);
+    assert.doesNotMatch(qml,/openFillColor: Colors\.black/);
+    assert.match(qml,/color: companyDock\.open \? companyDock\.openForegroundColor : Colors\.white/);
+    assert.match(qml,/color: companyDock\.open \? companyDock\.openForegroundColor : Colors\.yellow/);
+    assert.equal((qml.match(/color: companyDock\.open \? companyDock\.openForegroundColor/g)||[]).length,3,
+        "all three artwork layers must use the open-magenta color");
     assert.match(qml,/onLeftClicked: toggleRequested\(\)/);
 });
 
@@ -126,8 +130,13 @@ test("city icon and star ornaments share one vertical text-cell frame in dock an
             label+" must not anchor child glyphs inside the Row");
         for(const glyph of ['". ݁₊⊹"','"🏙︎"','"๋࣭⭑"'])
             assert.ok(mark.includes("text: "+glyph),label+" preserves icon artwork");
-        assert.match(mark,/color: Colors\.white/);
-        assert.match(mark,/color: Colors\.yellow/);
+        if(label==="dock") {
+            assert.match(mark,/color: companyDock\.open \? companyDock\.openForegroundColor : Colors\.white/);
+            assert.match(mark,/color: companyDock\.open \? companyDock\.openForegroundColor : Colors\.yellow/);
+        } else {
+            assert.match(mark,/color: Colors\.white/);
+            assert.match(mark,/color: Colors\.yellow/);
+        }
     }
     assert.match(dock,/anchors\.centerIn: parent/);
     assert.match(widget,/anchors\.verticalCenter: parent\.verticalCenter/);
@@ -156,7 +165,9 @@ test("central yellow city sits 6px below the white ornaments without shifting th
         assert.match(cityBlock,new RegExp("font\\.pixelSize: "+fontSize),
             label+" preserves city glyph size");
         assert.match(cityBlock,/text: "🏙︎"/);
-        assert.match(cityBlock,/color: Colors\.yellow/);
+        assert.match(cityBlock,label==="dock"
+            ? /color: companyDock\.open \? companyDock\.openForegroundColor : Colors\.yellow/
+            : /color: Colors\.yellow/);
         // Both white ornament glyphs remain direct Row children and
         // preserve their original centered text cells.
         const firstStar=row.indexOf('text: ". ݁₊⊹"');

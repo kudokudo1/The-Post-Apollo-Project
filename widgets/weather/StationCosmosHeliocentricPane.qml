@@ -20,6 +20,13 @@ Item {
     property bool neonEnabled: true
     property bool tiltView: false
     property real spatialScale: 1.0
+    property real cameraPanX: 0
+    property real cameraPanY: 0
+    function resetCamera() {
+        spatial.spatialScale=1.0;
+        spatial.cameraPanX=0;
+        spatial.cameraPanY=0;
+    }
     property string atlasRange: "all"
     property string hoveredBody: ""
     // The requested V4d atlas is authoritative. If it is missing or
@@ -41,6 +48,8 @@ Item {
     onSceneChanged: spatialCanvas.requestPaint()
     onTiltViewChanged: spatialCanvas.requestPaint()
     onSpatialScaleChanged: spatialCanvas.requestPaint()
+    onCameraPanXChanged: spatialCanvas.requestPaint()
+    onCameraPanYChanged: spatialCanvas.requestPaint()
     onAtlasRangeChanged: spatialCanvas.requestPaint()
     onSelectedBodyChanged: spatialCanvas.requestPaint()
     onHoveredBodyChanged: spatialCanvas.requestPaint()
@@ -51,7 +60,8 @@ Item {
     function paint(ctx) {
         const w=spatialCanvas.width,h=spatialCanvas.height;
         ctx.clearRect(0,0,w,h);
-        const g=Helio.layout(w,h,spatial.spatialScale);
+        const g=Helio.cameraOrigin(w,h,spatial.spatialScale,
+                                   spatial.cameraPanX,spatial.cameraPanY);
         if(!g.ready)return;
         ctx.save();
         const plotBounds=Helio.viewport(w,h,spatial.compactPlot);
@@ -126,7 +136,8 @@ Item {
             const p=Helio.viewportMarker(spatial.scene,point,w,h,
                                     spatial.spatialScale,spatial.tiltView,
                                     spatial.radialDomainAu,
-                                    spatial.compactPlot);
+                                    spatial.compactPlot,
+                                    spatial.cameraPanX,spatial.cameraPanY);
             if(!p)continue;
             const focused=point.body===spatial.selectedBody
                 || point.body===spatial.hoveredBody;
@@ -196,40 +207,81 @@ Item {
         acceptedButtons: Qt.LeftButton
         cursorShape: Qt.CrossCursor
         property real pressX: 0
+        property real pressY: 0
+        property real startPanX: 0
+        property real startPanY: 0
         property int originalIndex: -1
+        property bool scrubTime: false
         property bool didDrag: false
         onPressed: function(mouse) {
             pressX=mouse.x;
+            pressY=mouse.y;
+            startPanX=spatial.cameraPanX;
+            startPanY=spatial.cameraPanY;
             originalIndex=spatial.focusIndex;
+            // Shift retains the original time-scrub behavior.
+            // Unmodified left-drag is now actual spatial camera pan.
+            scrubTime=(mouse.modifiers & Qt.ShiftModifier)!==0;
             didDrag=false;
         }
         onPositionChanged: function(mouse) {
             if(pressed) {
-                const dx=mouse.x-pressX;
-                if(Math.abs(dx)>5)didDrag=true;
-                if(didDrag && originalIndex>=0)
-                    spatial.sampleScrubbed(originalIndex,dx);
+                const dx=mouse.x-pressX,dy=mouse.y-pressY;
+                if(Math.hypot(dx,dy)>5)didDrag=true;
+                if(didDrag) {
+                    if(scrubTime) {
+                        if(originalIndex>=0)
+                            spatial.sampleScrubbed(originalIndex,dx);
+                    } else {
+                        spatial.cameraPanX=startPanX+dx;
+                        spatial.cameraPanY=startPanY+dy;
+                    }
+                }
                 return;
             }
             spatial.hoveredBody=Helio.visibleHit(spatial.scene,
                 mouse.x,mouse.y,width,height,spatial.spatialScale,
                 spatial.tiltView,13,spatial.radialDomainAu,
-                spatial.compactPlot);
+                spatial.compactPlot,spatial.cameraPanX,spatial.cameraPanY);
         }
         onClicked: function(mouse) {
             if(didDrag)return;
             const body=Helio.visibleHit(spatial.scene,
                 mouse.x,mouse.y,width,height,spatial.spatialScale,
                 spatial.tiltView,14,spatial.radialDomainAu,
-                spatial.compactPlot);
+                spatial.compactPlot,spatial.cameraPanX,spatial.cameraPanY);
             if(body!=="")spatial.bodyPicked(body);
+        }
+        onDoubleClicked: function(mouse) {
+            const body=Helio.visibleHit(spatial.scene,
+                mouse.x,mouse.y,width,height,spatial.spatialScale,
+                spatial.tiltView,14,spatial.radialDomainAu,
+                spatial.compactPlot,spatial.cameraPanX,spatial.cameraPanY);
+            if(body!=="") {
+                spatial.bodyPicked(body);
+                const target=Helio.focusPan(spatial.scene,body,
+                    width,height,spatial.spatialScale,spatial.tiltView,
+                    spatial.radialDomainAu,spatial.compactPlot);
+                if(target) {
+                    spatial.cameraPanX=target.panX;
+                    spatial.cameraPanY=target.panY;
+                }
+            } else spatial.resetCamera();
+            didDrag=true;
         }
         onCanceled: didDrag=false
         onExited: {if(!pressed)spatial.hoveredBody="";}
         onWheel: function(wheel) {
             if(wheel.angleDelta.y!==0){
-                spatial.spatialScale=Math.max(0.4,Math.min(5,
-                    spatial.spatialScale*(wheel.angleDelta.y>0?1.25:0.8)));
+                const next=Helio.zoomAt(width,height,
+                    spatial.spatialScale,spatial.cameraPanX,
+                    spatial.cameraPanY,wheel.x,wheel.y,
+                    wheel.angleDelta.y>0?1:-1);
+                if(next) {
+                    spatial.spatialScale=next.scale;
+                    spatial.cameraPanX=next.panX;
+                    spatial.cameraPanY=next.panY;
+                }
                 wheel.accepted=true;
             }
         }
@@ -364,7 +416,7 @@ Item {
         color: Colors.orange
         elide: Text.ElideRight
         text: spatial.atlasRange==="inner"
-              ? "INNER 4 AU WINDOW // OUTER BODIES MAY BE OFFSCREEN"
-              : "ONE UTC SNAPSHOT // NO ORBITS // DRAG TIME / WHEEL SCALE"
+              ? "INNER 4 AU // OUT = OFFSCREEN // DRAG PAN / WHEEL ZOOM"
+              : "DRAG PAN // SHIFT+DRAG TIME // WHEEL ZOOM // DOUBLE CLICK FOCUS/RESET"
     }
 }

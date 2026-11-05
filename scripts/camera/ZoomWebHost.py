@@ -216,8 +216,13 @@ def enter(identity, output, x, y, width, height):
     _sway_command(criteria, "move", "position", str(geometry[0]), str(geometry[1]))
     # Reobserve exact actor PID/class and measured bounds before enabling
     # QML's click-through/transparent bay.
-    after, error = _unique_actor(profile)
-    docked = bool(after and after["id"] == actor["id"] and _near(after,geometry))
+    docked = False
+    for _ in range(16):
+        after, error = _unique_actor(profile)
+        if after and after["id"] == actor["id"] and _near(after, geometry):
+            docked = True
+            break
+        time.sleep(0.1)
     if not docked:
         # A failed dock must not leave an undocked login/profile window
         # competing with the operator's desktop.

@@ -66,7 +66,8 @@ PanelWindow {
         Math.max(0, Math.round(cameraPage.x + cameraPage.parent.x))
     readonly property int zoomBayTop:
         Math.max(0, Math.round(cameraPage.y + cameraPage.parent.y))
-    readonly property int zoomBayBottom: 5
+    // Leave only a thin border: the Zoom client content occupies the bay.
+    readonly property int zoomBayBottom: 2
     readonly property int zoomBayWidth: Math.max(0, Math.round(cameraPage.width))
     readonly property int zoomBayHeight:
         Math.max(0, Math.round(frame.height - zoomBayTop - zoomBayBottom))

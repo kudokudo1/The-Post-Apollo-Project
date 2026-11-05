@@ -669,13 +669,12 @@ PanelWindow {
         interval: 240
         repeat: false
         onTriggered: {
-            if (!camera.menuOpen || camera.activeView !== "zoom")
-                return;
-            if (camera.zoomWebBusy) {
-                zoomWebRealign.restart();
-                return;
+            if (camera.menuOpen && camera.activeView === "zoom") {
+                if (camera.zoomWebBusy)
+                    zoomWebRealign.restart();
+                else
+                    camera.enterZoomWeb();
             }
-            camera.enterZoomWeb();
         }
     }
     Process {

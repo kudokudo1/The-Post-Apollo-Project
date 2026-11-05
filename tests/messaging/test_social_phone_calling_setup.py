@@ -47,6 +47,75 @@ class CallingSetupUiTests(unittest.TestCase):
         self.assertNotIn('dnf install', action)
         self.assertNotIn('systemctl start', action)
 
+    def test_check_again_survives_install_and_never_becomes_second_setup_button(self):
+        # The previous P9 view hid the sole action when the package became
+        # installed, leaving the next service/HFP stage without a recheck.
+        start = self.ui.index('id: installCallingSupport')
+        end = self.ui.index('onTriggered: phonePane.callingSupportSetup()', start)
+        control = self.ui[start:end]
+        self.assertIn('callPrerequisiteReport.state === "PACKAGE_NOT_INSTALLED"',
+                      control)
+        self.assertIn('|| phonePane.callSetupStatus === "FOLLOWUP_REQUIRED"',
+                      control)
+        self.assertIn('|| phonePane.callSetupStatus === "FOLLOWUP_REQUIRED"',
+                      control)
+        self.assertIn('? "CHECK AGAIN"', control)
+        self.assertIn('? "RETRY SETUP" : "SET UP CALLING"', control)
+        self.assertEqual(self.ui.count('id: installCallingSupport'), 1)
+        self.assertEqual(self.ui.count('id: connectPhoneAction'), 1)
+
+        begin = self.ui.index('function callingSupportSetup()')
+        finish = self.ui.index('function callingSupportSetupText()', begin)
+        action = self.ui[begin:finish]
+        self.assertIn('callSetupStatus === "GUI_OPEN_REQUESTED"', action)
+        self.assertIn('|| callSetupStatus === "FOLLOWUP_REQUIRED"', action)
+        self.assertIn('callSetupStatus = "RECHECKING";', action)
+        self.assertIn('diagnoseCallPrerequisites();', action)
+        self.assertIn('refreshPhoneAudioControls();', action)
+        self.assertIn('callPrerequisiteReport.state !== "PACKAGE_NOT_INSTALLED"',
+                      action)
+        self.assertIn('callSetupProcess.running = true;', action)
+
+    def test_post_install_status_distinguishes_hfp_states_without_claiming_audio(self):
+        start = self.ui.index('function callProgressText()')
+        finish = self.ui.index('function diagnoseCallPrerequisites()', start)
+        progress = self.ui[start:finish]
+        self.assertIn('callSetupStatus !== "FOLLOWUP_REQUIRED"', progress)
+        for state in ('SERVICE_STOPPED', 'SERVICE_FAILED', 'SERVICE_MASKED',
+                      'SERVICE_UNIT_MISSING', 'DBUS_NAME_MISSING',
+                      'AUDIO_PATH_UNVERIFIED', 'SERVICE_STARTING'):
+            with self.subTest(service=state):
+                self.assertIn('"' + state + '"', progress)
+        for state in ('READY', 'BLUEZ_CONFLICT', 'SEARCHING', 'CONNECTING'):
+            with self.subTest(calls=state):
+                self.assertIn('"' + state + '"', progress)
+        self.assertIn('BlueFerry reports hands-free call control READY.', progress)
+        self.assertIn('still need a real non-emergency test call.', progress)
+        self.assertIn('BlueFerry reports a BlueZ HFP conflict.', progress)
+        self.assertIn('WirePlumber', progress)
+        self.assertIn('phoneAudioStatus.callsEnabled !== true', progress)
+        self.assertIn('phoneAudioStatus.result !== "OBSERVED"', progress)
+        self.assertIn('visible: phonePane.callProgressText().length > 0',
+                      self.ui)
+        self.assertIn('text: phonePane.callProgressText()', self.ui)
+        for forbidden in ('systemctl start', 'systemctl restart',
+                          'bluetoothctl remove', 'sendMessage(',
+                          'setCallsEnabled(', 'dnf install'):
+            with self.subTest(forbidden=forbidden):
+                self.assertNotIn(forbidden, progress)
+
+    def test_package_only_copy_ends_after_install(self):
+        # Fedora package-manager instructions should not persist when the
+        # same control is now being used to recheck an installed service.
+        start = self.ui.index('visible: installCallingSupport.visible')
+        text_block = self.ui[start:start + 270]
+        self.assertIn(
+            '&& phonePane.callPrerequisiteReport.state === "PACKAGE_NOT_INSTALLED"',
+            text_block)
+        self.assertIn('No package was installed by Social.', self.ui)
+        self.assertIn('no longer reported missing' if False else 'Package check completed.',
+                      self.ui)
+
     def test_an_installer_request_is_never_reported_as_installed(self):
         self.assertIn('id: callSetupProcess', self.ui)
         self.assertIn('r.schema !== "post-apollo.phone.calling-setup-handoff.v0"', self.ui)

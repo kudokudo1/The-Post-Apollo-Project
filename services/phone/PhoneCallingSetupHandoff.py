@@ -46,12 +46,22 @@ def _installer_active() -> bool:
         return False
 
 
-def _result(status: str) -> dict[str, object]:
+# Fixed identifiers only: do not return command paths, environment variables,
+# subprocess output, host usernames, or other local system details.
+TOOL_IDS = ("FOOT", "PYTHON3", "INSTALLER_HELPER", "PKCON", "PKEXEC", "DNF5")
+
+
+def _result(status: str, missing: tuple[str, ...] = ()) -> dict[str, object]:
+    if (type(missing) is not tuple
+            or any(x not in TOOL_IDS or type(x) is not str for x in missing)
+            or len(set(missing)) != len(missing)):
+        missing = ()
     return {
         "schema": SCHEMA,
         "execution": "USER_INITIATED_INSTALLER_HANDOFF",
         "status": status,
         "package": PACKAGE_NAME,
+        "missingTools": list(missing),
         "installerOpened": status == "GUI_OPEN_REQUESTED",
         "stageCandidate": status in (
             "STAGED_TERMINAL_REQUESTED", "STAGED_TERMINAL_EXISTING",
@@ -122,9 +132,26 @@ def open_support(
     # SAME embedded foot terminal, never an automatic installation.
     backend_ready = bool(pkcon or (pkexec and dnf5))
     if not (foot and python and session_script.is_file()):
-        return _result("TERMINAL_UNAVAILABLE")
+        absent = tuple(
+            name for name, ready in (
+                ("FOOT", bool(foot)),
+                ("PYTHON3", bool(python)),
+                ("INSTALLER_HELPER", session_script.is_file()),
+            ) if not ready
+        )
+        return _result("TERMINAL_UNAVAILABLE", absent)
     if not backend_ready:
-        return _result("PACKAGE_MANAGER_UNAVAILABLE")
+        # A failed installation should explain which executable paths were
+        # unavailable in the running PHONE environment. Not a package audit:
+        # this is only a sanitized executable-discovery result.
+        absent = tuple(
+            name for name, ready in (
+                ("PKCON", bool(pkcon)),
+                ("PKEXEC", bool(pkexec)),
+                ("DNF5", bool(dnf5)),
+            ) if not ready
+        )
+        return _result("PACKAGE_MANAGER_UNAVAILABLE", absent)
     try:
         launcher(
             [foot, "--app-id", INSTALL_APP_ID, "-e", python,

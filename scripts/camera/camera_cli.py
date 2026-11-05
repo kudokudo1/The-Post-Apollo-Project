@@ -892,46 +892,127 @@ def zoom_install_client(method, confirmation):
 
 
 def zoom_client_command():
-    """Discover the installed provider-owned Linux client, never browser fallback."""
+    """Discover the actual installed Zoom location; never use a browser fallback."""
     native = shutil.which("zoom")
     if native:
         return [native]
     flatpak = shutil.which("flatpak")
     if not flatpak:
         return None
-    try:
-        check = subprocess.run([flatpak, "info", "us.zoom.Zoom"],
-                               stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
-                               stderr=subprocess.DEVNULL, timeout=8, check=False)
-    except (OSError, subprocess.SubprocessError):
-        return None
-    return [flatpak, "run", "us.zoom.Zoom"] if check.returncode == 0 else None
+    # Installation is explicitly per-user in Camera's installer. Avoid relying
+    # on Flatpak's implicit search when user and system installations coexist.
+    for scope in ("--user", "--system"):
+        try:
+            check = subprocess.run(
+                [flatpak, "info", scope, ZOOM_FLATPAK_ID],
+                stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL, timeout=8, check=False)
+        except (OSError, subprocess.SubprocessError):
+            continue
+        if check.returncode == 0:
+            return [flatpak, "run", scope, ZOOM_FLATPAK_ID]
+    return None
 
 
 def zoom_client_status():
-    """Installation check only; cannot prove which Zoom account is signed in."""
+    """Installation is not evidence of a running app or authenticated account."""
     command = zoom_client_command()
     return {"ok": True, "kind": "zoom-status",
             "available": bool(command),
             "client": "native" if command and len(command) == 1 else
                       "flatpak" if command else "none",
+            "installation": command[2].lstrip("-") if command and len(command) == 4 else "none",
             "authentication": "UNKNOWN",
             "embedded": False,
             "socialAuthShared": False}
 
 
+def _zoom_sway_window_state():
+    """Inspect only app ID/class (never titles or content) for visible Zoom windows."""
+    swaymsg = shutil.which("swaymsg")
+    if not swaymsg:
+        return "UNKNOWN"
+    try:
+        response = subprocess.run([swaymsg, "-t", "get_tree"],
+                                  stdin=subprocess.DEVNULL, stdout=subprocess.PIPE,
+                                  stderr=subprocess.DEVNULL, timeout=5, check=False)
+        if response.returncode or len(response.stdout) > 2_000_000:
+            return "UNKNOWN"
+        tree = json.loads(response.stdout)
+    except (OSError, ValueError, subprocess.SubprocessError, TypeError):
+        return "UNKNOWN"
+    pending = [tree]
+    visited = 0
+    found = False
+    exact = {"zoom", "us.zoom.zoom", "zoom workplace", "zoom-client"}
+    while pending and visited < 12000:
+        item = pending.pop()
+        visited += 1
+        if not isinstance(item, dict):
+            continue
+        props = item.get("window_properties") or {}
+        if not isinstance(props, dict):
+            props = {}
+        identities = (item.get("app_id"), props.get("class"), props.get("instance"))
+        if any(isinstance(value, str) and value.strip().casefold() in exact
+               for value in identities):
+            if item.get("visible") is True:
+                return "VISIBLE"
+            found = True
+        for key in ("nodes", "floating_nodes"):
+            nodes = item.get(key)
+            if isinstance(nodes, list):
+                pending.extend(nodes[:12000])
+    return "OTHER_WORKSPACE" if found else "NOT_FOUND"
+
+
+def zoom_launch_check():
+    """Read-only launch inspection, not a claim of authentication or meeting state."""
+    argv = zoom_client_command()
+    if not argv:
+        return {"ok": True, "kind": "zoom-launch-check", "installed": False,
+                "windowState": "NOT_FOUND", "flatpakRunning": False}
+    running = None
+    if len(argv) == 4:
+        try:
+            result = subprocess.run([argv[0], "ps", "--columns=application"],
+                                    stdin=subprocess.DEVNULL, stdout=subprocess.PIPE,
+                                    stderr=subprocess.DEVNULL, timeout=6, check=False)
+            if result.returncode == 0 and len(result.stdout) < 100_000:
+                running = ZOOM_FLATPAK_ID in result.stdout.decode(
+                    "utf-8", "replace").splitlines()
+        except (OSError, subprocess.SubprocessError, TypeError):
+            pass
+    return {"ok": True, "kind": "zoom-launch-check", "installed": True,
+            "windowState": _zoom_sway_window_state(), "flatpakRunning": running}
+
+
 def zoom_client_open():
-    """Opt-in desktop app launch with no meeting URL or stored credentials."""
+    """Check immediate launch failure; a spawned process is not a visible window."""
     argv = zoom_client_command()
     if not argv:
         return {"ok": False, "kind": "zoom-open", "error": "ZOOM_CLIENT_NOT_INSTALLED"}
     try:
-        subprocess.Popen(argv, stdin=subprocess.DEVNULL,
-                         stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
-                         start_new_session=True, close_fds=True)
+        process = subprocess.Popen(argv, stdin=subprocess.DEVNULL,
+                                   stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+                                   start_new_session=True, close_fds=True)
+        # Flatpak may fail immediately (missing runtime, display, session bus).
+        # A short, bounded observation catches a nonzero exit without blocking
+        # until the actual video-call app closes or logging credentials.
+        deadline = time.monotonic() + 1.5
+        exit_code = process.poll()
+        while exit_code is None and time.monotonic() < deadline:
+            time.sleep(0.1)
+            exit_code = process.poll()
     except (OSError, subprocess.SubprocessError):
         return {"ok": False, "kind": "zoom-open", "error": "ZOOM_LAUNCH_FAILED"}
+    if exit_code is not None and exit_code != 0:
+        return {"ok": False, "kind": "zoom-open",
+                "error": "ZOOM_START_EXITED_NONZERO",
+                "exitCode": exit_code if 0 < exit_code < 256 else -1}
     return {"ok": True, "kind": "zoom-open", "launchRequested": True,
+            "launchState": "PROCESS_RUNNING_UNVERIFIED" if exit_code is None
+                           else "HANDOFF_UNVERIFIED",
             "authentication": "UNKNOWN", "embedded": False}
 
 
@@ -941,6 +1022,7 @@ def main(argv=None):
     command.add_parser("status")
     command.add_parser("zoom-status")
     command.add_parser("zoom-open")
+    command.add_parser("zoom-launch-check")
     zoom_install = command.add_parser("zoom-install")
     zoom_install.add_argument("method", choices=["official-rpm", "community-flatpak"])
     zoom_install.add_argument("confirmation")
@@ -976,6 +1058,8 @@ def main(argv=None):
         result = zoom_client_status()
     elif options.action == "zoom-open":
         result = zoom_client_open()
+    elif options.action == "zoom-launch-check":
+        result = zoom_launch_check()
     elif options.action == "zoom-install":
         result = zoom_install_client(options.method, options.confirmation)
     elif options.action == "gallery":

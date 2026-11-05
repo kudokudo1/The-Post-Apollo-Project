@@ -17,7 +17,9 @@ class CallingSetupUiTests(unittest.TestCase):
         self.assertIn('id: phoneAudioSettings', self.ui)
         self.assertIn('id: installCallingSupport', self.ui)
         self.assertIn('label: phonePane.callSetupStatus === "GUI_OPEN_REQUESTED"', self.ui)
-        self.assertIn('? "CHECK AGAIN" : "SET UP CALLING"', self.ui)
+        self.assertIn('|| phonePane.callSetupStatus === "FOLLOWUP_REQUIRED"', self.ui)
+        self.assertIn('? "CHECK AGAIN"', self.ui)
+        self.assertIn('? "RETRY SETUP" : "SET UP CALLING"', self.ui)
         self.assertIn('onTriggered: phonePane.callingSupportSetup()', self.ui)
         self.assertIn('callPrerequisiteReport.state === "PACKAGE_NOT_INSTALLED"', self.ui)
         self.assertIn('id: connectPhoneAction', self.ui)
@@ -57,7 +59,7 @@ class CallingSetupUiTests(unittest.TestCase):
         self.assertIn('r.installerOpened !== (r.status === "GUI_OPEN_REQUESTED")', self.ui)
         self.assertIn('No package was installed by Social.', self.ui)
         self.assertIn('oFono is still reported missing.', self.ui)
-        self.assertIn('Hands-free service and audio routing still require separate verification.', self.ui)
+        self.assertIn('CHECK AGAIN updates the existing service and call statuses', self.ui)
 
     def test_fedora_native_approval_and_missing_installer_explained(self):
         self.assertIn("Fedora's software manager handles package review and approval.", self.ui)

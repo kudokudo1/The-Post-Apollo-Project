@@ -44,7 +44,9 @@ var SUBJECTS = [
       {id:"full",label:"ASTRONOMY // CELESTIAL INSTRUMENTS"}]},
     {id:"sun",label:"SUN",children:[
       {id:"position",label:"POSITION"}, {id:"twilight",label:"TWILIGHT"},
-      {id:"photo-light",label:"PHOTO LIGHT"}]},
+      {id:"photo-light",label:"PHOTO LIGHT"},
+      {id:"activity",label:"SOLAR ACTIVITY // SUVI + XRAY + FLARES"},
+      {id:"cycle",label:"SOLAR CYCLE // NOAA PREDICTION"}]},
     {id:"moon",label:"MOON",children:[
       {id:"ephemeris",label:"PHASE AND RISE/SET"},
       {id:"position",label:"CURRENT POSITION"}]},
@@ -57,7 +59,7 @@ var SUBJECTS = [
       {id:"eclipses",label:"ECLIPSES"}, {id:"meteors",label:"METEOR SHOWERS"},
       {id:"iss",label:"ISS PASSES"}]},
     {id:"space-weather",label:"SPACE WEATHER",children:[
-      {id:"overview",label:"OVERVIEW"},
+      {id:"overview",label:"SPACE WEATHER // INSTRUMENT DIRECTORY"},
       {id:"full",label:"SPACE // ALL ORIGINAL INSTRUMENTS"},
       {id:"solar-wind",label:"SOLAR WIND AND FIELD"},
       {id:"geomagnetic",label:"GEOMAGNETIC"}, {id:"aurora",label:"AURORA"},

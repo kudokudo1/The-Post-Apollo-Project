@@ -34,7 +34,6 @@ class ZoomWebHostTests(unittest.TestCase):
         self.assertIn('intersection: Intersection.Subtract', QML)
         self.assertIn('width: camera.zoomWebDocked ? camera.zoomBayWidth : 0', QML)
         self.assertIn('visible: camera.activeView === "zoom" && !camera.zoomWebDocked', QML)
-        self.assertIn('onLeftClicked: camera.openZoomMode()', QML) if False else None
         self.assertIn('function openZoomMode()', QML)
         entry = QML.split('function openZoomMode()',1)[1].split(
             'function prepareZoomInstall(choice)',1)[0]
@@ -43,6 +42,11 @@ class ZoomWebHostTests(unittest.TestCase):
         self.assertNotIn('zoomClientOpen',entry)
         self.assertIn('scripts/camera/ZoomWebHost.py',QML)
         self.assertIn('zoomWebHideProcess.exec(zoomWebArgs("hide"))',QML)
+        self.assertIn('menuOpen && !zoomWebDocked ? WlrKeyboardFocus.OnDemand : WlrKeyboardFocus.None',QML)
+        self.assertIn('focusable: menuOpen && !zoomWebDocked',QML)
+        self.assertIn('visible: camera.activeView === "zoom"',QML)
+        self.assertIn('label: "↓ DOWNLOAD"',QML)
+        self.assertIn('camera.hideZoomWeb();',QML)
         self.assertIn('if (camera.activeView === "zoom")',QML)
         self.assertNotIn('WebEngineView',QML)
 

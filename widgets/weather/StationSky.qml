@@ -29,7 +29,10 @@ Rectangle {
     }
 
     property var weatherService: null
+    // The shared root SPACE service is read only; SUN uses its solar flux.
+    property var spaceService: null
     property real runtimeNowMs: Date.now()
+    signal routeRequested(string path)
 
     readonly property var runtimeRows: [
         RuntimePolicy.displayRow(
@@ -589,6 +592,57 @@ Rectangle {
                           : "OFFLINE"
                 font.pixelSize: 12
                 color: sky.weatherReady ? Colors.cyan : Colors.orange
+            }
+        }
+
+        // SUN keeps local solar geometry, and offers the physical solar
+        // activity and cycle instruments without mixing them with Kp/wind.
+        Row {
+            id: sunSubjectActions
+            visible: sky.subjectRoute.indexOf("cosmos/sun/") === 0
+            width: parent.width
+            height: visible ? 42 : 0
+            spacing: 8
+
+            Rectangle {
+                width: Math.max(110,parent.width - 2*145 - 2*parent.spacing)
+                height: 37
+                color: Colors.dark
+                border.width: 1
+                border.color: Colors.orange
+                Column {
+                    anchors.fill: parent
+                    anchors.margins: 5
+                    spacing: 2
+                    SecondaryText {
+                        text: "SOLAR RADIO FLUX // F10.7"
+                        font.pixelSize: 9
+                    }
+                    GohuText {
+                        text: sky.spaceService && sky.spaceService.solarFluxReady
+                              ? sky.spaceService.solarFluxText : "-- SFU"
+                        font.pixelSize: 14
+                        color: Colors.white
+                    }
+                }
+            }
+
+            ActionButton {
+                width: 145
+                height: 37
+                label: "SUVI / X-RAY / FLARES"
+                labelPixelSize: 9
+                accentColor: Colors.orange
+                onClicked: sky.routeRequested("cosmos/sun/activity")
+            }
+
+            ActionButton {
+                width: 145
+                height: 37
+                label: "SOLAR CYCLE"
+                labelPixelSize: 10
+                accentColor: Colors.yellow
+                onClicked: sky.routeRequested("cosmos/sun/cycle")
             }
         }
 

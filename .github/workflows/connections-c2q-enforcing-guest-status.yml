@@ -1,0 +1,58 @@
+name: Connections C2q disposable Fedora SELinux-enforcing service
+
+on:
+  pull_request:
+    paths:
+      - "tests/connections/c2q_enforcing_vm/**"
+      - ".github/workflows/connections-c2q-enforcing-guest-status.yml"
+      - "docs/connections-c2q-enforcing-guest-status.md"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  real-fedora-guest-service:
+    if: github.actor == 'kudokudo1' && (github.event_name == 'workflow_dispatch' || github.event.pull_request.head.repo.full_name == github.repository)
+    runs-on: ubuntu-latest
+    timeout-minutes: 17
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Check dedicated KVM capability
+        shell: bash
+        run: |
+          set -euo pipefail
+          [ -c /dev/kvm ] || { echo "C2Q_BLOCKED // HOST_KVM_MISSING"; exit 2; }
+          sudo chmod a+rw /dev/kvm
+          [ -r /dev/kvm ] && [ -w /dev/kvm ] || exit 2
+      - name: Install VM test runner utilities only
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends qemu-system-x86 qemu-utils genisoimage python3-pip
+      - name: Verify shell fixture syntax
+        shell: bash
+        run: |
+          bash -n tests/connections/c2q_enforcing_vm/boot_status_vm.sh
+          bash -n tests/connections/c2q_enforcing_vm/guest_status_smoke.sh
+          python3 -m py_compile tests/connections/c2o_fedora/FakeStatusHost.py
+          python3 -m py_compile tests/connections/c2o_fedora/BusPolicyClient.py
+      - name: Boot offline Fedora 44 guest and start read-only host with SELinux enforcing
+        shell: bash
+        run: timeout 460s bash tests/connections/c2q_enforcing_vm/boot_status_vm.sh
+      - name: Recheck existing C2n and CPU++ denial contracts
+        shell: bash
+        run: |
+          python3 -B tests/connections/test_connections_c2n_policy_contract.py
+          python3 - <<'PY'
+          from pathlib import Path
+          base=Path("services/connections")
+          assert "readonly property bool hostAuthenticated: false" in (base/"ConnectionsRequestStatus.qml").read_text()
+          assert "readonly property bool credentialActionsEnabled: false" in (base/"ConnectionsBroker.qml").read_text()
+          for path in [*base.glob("*.qml"), *base.glob("*.js"), base/"qmldir"]:
+              assert "c2q_enforcing_vm" not in path.read_text(), path
+          print("C2Q_PASS // PRODUCTION_QML_REMAINS_DISCONNECTED")
+          PY

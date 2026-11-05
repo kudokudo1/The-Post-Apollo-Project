@@ -207,7 +207,7 @@ Rectangle {
             spacing: 6
             StationCosmosVisualInstruments {
                 width: parent.width
-                height: Math.max(120,Math.min(204,parent.height-52))
+                height: parent.height >= 270 ? 204 : parent.height
                 compactMode: true
                 showMoon: false
                 showSun: true
@@ -226,6 +226,8 @@ Rectangle {
                 longitude: focus.weatherService ? focus.weatherService.longitude : ""
             }
             Row {
+                visible: parent.height >= 270
+                height: visible ? 40 : 0
                 width: parent.width
                 spacing: 5
                 Repeater {

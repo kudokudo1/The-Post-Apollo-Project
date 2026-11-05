@@ -132,8 +132,10 @@ class CallingSetupUiTests(unittest.TestCase):
 
     def test_fedora_native_approval_and_missing_installer_explained(self):
         self.assertIn("Review and confirm the Fedora package transaction inside PHONE", self.ui)
-        self.assertIn('Neither PackageKit (pkcon) nor Polkit with DNF5 is available.', self.ui)
-        self.assertIn('The embedded installer requires foot and Python.', self.ui)
+        self.assertIn('No supported Fedora package installer is available to PHONE.', self.ui)
+        self.assertIn('The embedded installer cannot start.', self.ui)
+        self.assertIn('callingMissingToolText()', self.ui)
+        self.assertIn('Not available to PHONE:', self.ui)
         self.assertIn('No external window was opened or installation confirmed.', self.ui)
         self.assertIn('Only oFono.', self.ui)
         self.assertIn('GUI_UNAVAILABLE', self.ui)
@@ -150,6 +152,23 @@ class CallingSetupUiTests(unittest.TestCase):
         self.assertIn('r.hfpVerified !== false', self.ui)
         self.assertNotIn('dnf5 install', self.ui)
         self.assertIn('onTriggered: phonePane.callingSupportSetup()', self.ui)
+
+    def test_exact_missing_tools_are_sanitized_and_shown_in_same_menu(self):
+        self.assertIn('property var callSetupMissingTools: ([])', self.ui)
+        self.assertIn('function callingMissingToolText()', self.ui)
+        self.assertIn('r.missingTools.length > 6', self.ui)
+        self.assertIn('!Array.isArray(r.missingTools)', self.ui)
+        self.assertIn('r.missingTools.indexOf(v) !== i;', self.ui)
+        for item in ('FOOT', 'PYTHON3', 'INSTALLER_HELPER',
+                     'PKCON', 'PKEXEC', 'DNF5'):
+            with self.subTest(item=item):
+                self.assertIn('"' + item + '"', self.ui)
+        self.assertIn('phonePane.callSetupMissingTools = r.missingTools;', self.ui)
+        self.assertIn('callSetupMissingTools = ([]);', self.ui)
+        self.assertIn('callingMissingToolText()', self.ui)
+        self.assertIn('No installation was attempted.', self.ui)
+        self.assertNotIn('r.errorMessage', self.ui)
+        self.assertNotIn('r.installerPath', self.ui)
 
     def test_staged_packagekit_terminal_reuses_verified_phone_cutout(self):
         self.assertIn('property string stagePurpose: "PHONE"', self.ui)

@@ -25,7 +25,8 @@ DockButton {
     hoverContentGlowColor: Colors.white
     pressedContentGlowColor: Colors.white
     openGlowColor: Colors.magenta
-    openFillColor: Colors.black
+    // Canonical dock-open surface; camera artwork and halo already turn magenta.
+    openFillColor: Colors.yellow
 
     contentGlowSource: cameraMark
 

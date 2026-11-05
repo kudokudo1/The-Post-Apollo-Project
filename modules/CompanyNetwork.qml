@@ -3,7 +3,7 @@ import Quickshell
 import "../components"
 
 // City identity: white star ornaments, yellow central city.
-// Closed perimeter/artwork halo is blue; open perimeter/artwork halo magenta.
+// Closed perimeter/artwork halo is blue; open fill is yellow and ALL artwork/glow magenta.
 DockButton {
     id: companyDock
 
@@ -17,7 +17,7 @@ DockButton {
     normalForegroundColor: Colors.yellow
     hoverForegroundColor: Colors.yellow
     pressedForegroundColor: Colors.yellow
-    openForegroundColor: Colors.yellow
+    openForegroundColor: Colors.magenta
 
     normalContentGlowColor: Colors.blue
     hoverContentGlowColor: Colors.blue
@@ -27,8 +27,8 @@ DockButton {
     pressedDockGlowColor: Colors.blue
     openGlowColor: Colors.magenta
 
-    // Black selected fill keeps yellow center and white ornaments legible.
-    openFillColor: Colors.black
+    // Inherit the shared DockButton open state: yellow surface, magenta icon/glow.
+    openFillColor: Colors.yellow
     contentGlowSource: companyMark
 
     Row {
@@ -56,7 +56,7 @@ DockButton {
                 textFormat: Text.PlainText
                 text: ". ݁₊⊹"
                 font.pixelSize: 21
-                color: Colors.white
+                color: companyDock.open ? companyDock.openForegroundColor : Colors.white
             }
         }
 
@@ -78,7 +78,7 @@ DockButton {
                 // is not silently replaced by a platform color-emoji glyph.
                 text: "🏙︎"
                 font.pixelSize: 24
-                color: Colors.yellow
+                color: companyDock.open ? companyDock.openForegroundColor : Colors.yellow
             }
         }
 
@@ -88,7 +88,7 @@ DockButton {
             textFormat: Text.PlainText
             text: "๋࣭⭑"
             font.pixelSize: 21
-            color: Colors.white
+            color: companyDock.open ? companyDock.openForegroundColor : Colors.white
         }
     }
 

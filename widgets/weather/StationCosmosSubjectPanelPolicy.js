@@ -21,6 +21,9 @@ var ROUTES = {
   "cosmos/sun/position": {page:"sky",sky:["header","astronomy","twilight"]},
   "cosmos/sun/twilight": {page:"sky",sky:["header","twilight"]},
   "cosmos/sun/photo-light": {page:"sky",sky:["header","twilight"]},
+  // Physical solar activity is SUN-owned; reuse original NOAA sections.
+  "cosmos/sun/activity": {page:"space",space:["header","suvi","xray","flares"]},
+  "cosmos/sun/cycle": {page:"space",space:["header","cycle"]},
   // The bottom MOON landing pairs USNO ephemeris with its current sky fix.
   "cosmos/moon/ephemeris": {page:"sky",sky:["header","moon","moon-position"]},
   "cosmos/moon/position": {page:"sky",sky:["header","moon-position"]},
@@ -40,7 +43,7 @@ var ROUTES = {
   "cosmos/space-weather/solar-wind": {page:"space",
     space:["header","solar","relation","field"]},
   "cosmos/space-weather/geomagnetic": {page:"space",
-    space:["header","solar","scales","kp-history"]},
+    space:["header","scales","kp-history"]},
   "cosmos/space-weather/aurora": {page:"space",
     space:["header","aurora"]},
   "cosmos/space-weather/solar-activity": {page:"space",
@@ -50,7 +53,7 @@ var ROUTES = {
   "cosmos/space-weather/bulletins": {page:"space",
     space:["header","warnings","bulletins"]},
   "cosmos/space-weather/history": {page:"space",
-    space:["header","relation","cycle","kp-history"]}
+    space:["header","relation","kp-history"]}
 };
 
 function routeInfo(path) {

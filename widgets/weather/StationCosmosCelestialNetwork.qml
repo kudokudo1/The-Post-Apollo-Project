@@ -19,6 +19,9 @@ Item {
     // Compact MAGICK overview hosts the real network/HELIO canvas without
     // stealing its limited viewport for the full network inspector.
     property bool compactMode: false
+    // In compact dedicated ASTROLOGY, keep the real HELIO projection
+    // and AU range buttons accessible without the long inspector.
+    property bool showCompactHelioControls: false
     property string hoverBody: ""
     property string hoverPairKey: ""
     readonly property var scene: Network.network(graphModel,focusIndex)
@@ -243,6 +246,9 @@ Item {
         anchors.fill: sceneCanvas
         visible: graph.displayMode === "heliocentric"
         embedded: true
+        // The toolbar occupies the upper band; the plot stays clickable,
+        // source-verified, and inside the existing fixed chart frame.
+        anchors.topMargin: compactHelioToolbar.visible ? 27 : 0
         visualData: graph.spatialPayload
         graphModel: graph.graphModel
         verifiedNetwork: graph.scene
@@ -252,6 +258,64 @@ Item {
         onBodyPicked: function(body) { graph.bodyPicked(body); }
         onSampleScrubbed: function(originIndex,offsetPixels) {
             graph.sampleScrubbed(originIndex,offsetPixels);
+        }
+    }
+
+    // M30-G // The full inspector is intentionally hidden on compact
+    // surfaces, but its HELIO view controls must not disappear with it.
+    // This rack is opt-in for the full ASTROLOGY page and drives the
+    // SAME embedded Sun-centered view as the original inspector.
+    Rectangle {
+        id: compactHelioToolbar
+        visible: graph.compactMode && graph.showCompactHelioControls
+                 && graph.displayMode === "heliocentric"
+        z: 4
+        anchors.top: parent.top
+        anchors.left: parent.left
+        anchors.right: parent.right
+        anchors.topMargin: 2
+        anchors.leftMargin: 4
+        anchors.rightMargin: 4
+        height: 23
+        color: Colors.black
+        border.width: 1
+        border.color: Colors.blue
+        Row {
+            id: compactHelioButtons
+            anchors.fill: parent
+            anchors.margins: 1
+            spacing: 3
+            Repeater {
+                model: [
+                    {id:"top",label:"TOP"},
+                    {id:"tilt",label:"TILT"},
+                    {id:"all",label:"ALL AU"},
+                    {id:"inner",label:"INNER 4 AU"}
+                ]
+                delegate: ActionButton {
+                    required property var modelData
+                    width: Math.max(1,(compactHelioButtons.width
+                          -3*compactHelioButtons.spacing)/4)
+                    height: compactHelioButtons.height
+                    contentPadding: 0
+                    labelPixelSize: 9
+                    label: modelData.label
+                    accentColor: modelData.id==="inner"
+                                 ? Colors.magenta : Colors.cyan
+                    selected: modelData.id==="top"
+                              ? !heliocentricPane.tiltView
+                              : modelData.id==="tilt"
+                              ? heliocentricPane.tiltView
+                              : modelData.id==="all"
+                              ? heliocentricPane.atlasRange==="all"
+                              : heliocentricPane.atlasRange==="inner"
+                    onClicked: {
+                        if(modelData.id==="top")heliocentricPane.tiltView=false;
+                        else if(modelData.id==="tilt")heliocentricPane.tiltView=true;
+                        else heliocentricPane.atlasRange=modelData.id;
+                    }
+                }
+            }
         }
     }
 

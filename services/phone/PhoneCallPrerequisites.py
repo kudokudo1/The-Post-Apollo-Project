@@ -140,7 +140,7 @@ def diagnose(
         "serviceLoad": load,
         "serviceActive": active,
         "systemBus": owner,
-        "hfpReady": False,
+        "hfpVerified": False,
         "trustedPhoneLink": "UNVERIFIED",
         "contentAccessEnabled": False,
     }
@@ -152,7 +152,7 @@ def main(argv: list[str] | None = None) -> int:
         print(json.dumps({
             "schema": SCHEMA, "execution": "READ_ONLY_CALL_DIAGNOSIS",
             "state": "EXPLICIT_ACTION_REQUIRED",
-            "hfpReady": False,
+            "hfpVerified": False,
             "trustedPhoneLink": "UNVERIFIED",
             "contentAccessEnabled": False,
         }, sort_keys=True))

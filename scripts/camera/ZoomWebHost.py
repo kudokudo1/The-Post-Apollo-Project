@@ -182,8 +182,10 @@ def status(identity, output, x, y, width, height):
     profile = root / "post-apollo" / "camera" / "zoom-web" / identity
     geometry = _target_geometry(output, x, y, width, height)
     actor, error = _unique_actor(profile)
-    return {"ok": True, "kind": "zoom-web-status", "docked": bool(actor and _near(actor, geometry)),
-            "state": "DOCKED" if actor and _near(actor, geometry) else error or "MISALIGNED",
+    docked = bool(actor and actor.get("visible") is True
+                  and _near(actor, geometry))
+    return {"ok": True, "kind": "zoom-web-status", "docked": docked,
+            "state": "DOCKED" if docked else error or "MISALIGNED",
             "authenticated": "UNKNOWN"}
 
 

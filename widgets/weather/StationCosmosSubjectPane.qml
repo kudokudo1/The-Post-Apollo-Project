@@ -12,6 +12,7 @@ Rectangle {
     property var spaceService: null
     property var liveHistoryStore: null
     property real runtimeNowMs: Date.now()
+    signal routeRequested(string path)
 
     readonly property string kind:
         CosmosPanelPolicy.kindForRoute(subjectRoute)
@@ -59,47 +60,16 @@ Rectangle {
         }
     }
 
-    // Astronomy and solar weather inhabit ONE COSMOS overview workspace,
-    // using full-width stacked viewports to preserve Gohu instrument widths.
-    // Their original internal star scrollbars allow independent inspection.
+    // C2 // Overview is a single non-scrolling, card-based observation bay.
+    // Existing full SKY and SPACE routes above remain unchanged.
     Component {
         id: overviewComponent
-        Item {
-            id: cosmosOverview
-            Rectangle {
-                id: astronomyBay
-                anchors.left: parent.left
-                anchors.right: parent.right
-                anchors.top: parent.top
-                height: Math.max(0, (cosmosOverview.height - 8) / 2)
-                color: Colors.black
-                clip: true
-
-                StationSky {
-                    anchors.fill: parent
-                    subjectRoute: cosmosPane.subjectRoute
-                    weatherService: cosmosPane.weatherService
-                    runtimeNowMs: cosmosPane.runtimeNowMs
-                }
-            }
-
-            Rectangle {
-                anchors.left: parent.left
-                anchors.right: parent.right
-                anchors.top: astronomyBay.bottom
-                anchors.topMargin: 8
-                anchors.bottom: parent.bottom
-                color: Colors.black
-                clip: true
-
-                StationSpace {
-                    anchors.fill: parent
-                    subjectRoute: cosmosPane.subjectRoute
-                    spaceService: cosmosPane.spaceService
-                    weatherService: cosmosPane.weatherService
-                    liveHistoryStore: cosmosPane.liveHistoryStore
-                    runtimeNowMs: cosmosPane.runtimeNowMs
-                }
+        StationCosmosOverviewPane {
+            weatherService: cosmosPane.weatherService
+            spaceService: cosmosPane.spaceService
+            runtimeNowMs: cosmosPane.runtimeNowMs
+            onRouteRequested: function(path) {
+                cosmosPane.routeRequested(path)
             }
         }
     }

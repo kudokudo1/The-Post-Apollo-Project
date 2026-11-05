@@ -10,9 +10,12 @@ var ROUTES = {
   // conditions, atmosphere, photo light, hourly/daily forecasts.
   "cosmos/sky/full": {page:"sky",full:true},
   "cosmos/space-weather/full": {page:"space",full:true},
+  // C2: Overview shows the existing core spaceService telemetry directly.
+  // Heavy auxiliary feeds (OVATION, NOAA scales, alerts) remain on SPACE
+  // detail routes; opening OVERVIEW does not activate their collectors.
   "cosmos/overview": {page:"overview",
     sky:["header","astronomy","moon","twilight"],
-    space:["header","solar","scales","aurora"]},
+    space:["header","solar"]},
 
   "cosmos/sun/position": {page:"sky",sky:["header","astronomy"]},
   "cosmos/sun/twilight": {page:"sky",sky:["header","twilight"]},

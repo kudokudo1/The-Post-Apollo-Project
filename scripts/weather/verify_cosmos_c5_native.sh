@@ -10,7 +10,9 @@ mkdir -m 700 "$work/home" "$work/runtime" "$work/cache" "$work/config"
 mkdir -p "$work/config/widgets" "$work/config/services" "$work/config/scripts"
 cp -a "$repo_root/components" "$work/config/components"
 cp -a "$repo_root/widgets/weather" "$work/config/widgets/weather"
-cp -a "$repo_root/services/weather" "$work/config/services/weather"
+# StationSpace imports the existing SystemServices.GraphHistory component;
+# use the repository service tree inside the disposable config.
+cp -a "$repo_root/services/." "$work/config/services/"
 cp -a "$repo_root/scripts/weather" "$work/config/scripts/weather"
 cp "$repo_root/tests/weather/fixtures/C5FocusedNativeShell.qml" "$work/config/shell.qml"
 chmod 700 "$work/runtime"

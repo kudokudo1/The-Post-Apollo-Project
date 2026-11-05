@@ -29,6 +29,26 @@ Rectangle {
     property var callPrerequisiteReport: ({})
     property string callPrerequisiteCheck: "NOT CHECKED"
     property string callSetupStatus: "IDLE"
+    // Strict, public tool identifiers only; never paths or process output.
+    property var callSetupMissingTools: ([])
+
+    function callingMissingToolText() {
+        var labels = ({
+            "FOOT": "foot terminal",
+            "PYTHON3": "Python 3",
+            "INSTALLER_HELPER": "PHONE installer script",
+            "PKCON": "PackageKit (pkcon)",
+            "PKEXEC": "Polkit (pkexec)",
+            "DNF5": "DNF5"
+        });
+        var found = [];
+        for (var i = 0; i < callSetupMissingTools.length; ++i) {
+            var tool = callSetupMissingTools[i];
+            if (typeof labels[tool] === "string")
+                found.push(labels[tool]);
+        }
+        return found.length > 0 ? " Not available to PHONE: " + found.join(", ") + "." : "";
+    }
 
     function callingSupportSetup() {
         if (!visible || selectedSection !== "DEVICE" || setupState !== "CHECKED"
@@ -52,6 +72,7 @@ Rectangle {
             callSetupStatus = "STAGE_BAY_TOO_SMALL";
             return;
         }
+        callSetupMissingTools = ([]);
         callSetupStatus = "OPENING";
         callSetupProcess.command = [
             "python3",
@@ -78,9 +99,12 @@ Rectangle {
         if (callSetupStatus === "STAGE_BAY_TOO_SMALL")
             return "PHONE is too small for an interactive installer. Enlarge the Social panel and try SET UP CALLING again. No external window was opened.";
         if (callSetupStatus === "TERMINAL_UNAVAILABLE")
-            return "The embedded installer requires foot and Python. The required terminal client or helper is unavailable. No external window was opened.";
+            return "The embedded installer cannot start." + callingMissingToolText()
+                + " No external window was opened and no package was installed.";
         if (callSetupStatus === "PACKAGE_MANAGER_UNAVAILABLE")
-            return "Neither PackageKit (pkcon) nor Polkit with DNF5 is available. PHONE cannot start an approved Fedora package transaction; no external window was opened.";
+            return "No supported Fedora package installer is available to PHONE."
+                + callingMissingToolText()
+                + " Either PackageKit or BOTH Polkit and DNF5 are required. No installation was attempted.";
         if (callSetupStatus === "GUI_UNAVAILABLE")
             return "The embedded package installer is unavailable. No external window was opened or package installed.";
         if (callSetupStatus === "GUI_LAUNCH_FAILED")
@@ -443,6 +467,7 @@ Rectangle {
             phoneAudioCheck = "NOT CHECKED";
             phoneAudioResult = "IDLE";
             callSetupStatus = "IDLE";
+            callSetupMissingTools = ([]);
             callPrerequisiteReport = ({});
             callPrerequisiteCheck = "NOT CHECKED";
             stageWanted = false;
@@ -677,6 +702,17 @@ Rectangle {
                     if (r.schema !== "post-apollo.phone.calling-setup-handoff.v0"
                             || r.execution !== "USER_INITIATED_INSTALLER_HANDOFF"
                             || r.package !== "ofono"
+                            || !Array.isArray(r.missingTools)
+                            || r.missingTools.length > 6
+                            || r.missingTools.some(function(v, i) {
+                                return typeof v !== "string"
+                                    || ["FOOT", "PYTHON3", "INSTALLER_HELPER",
+                                        "PKCON", "PKEXEC", "DNF5"].indexOf(v) < 0
+                                    || r.missingTools.indexOf(v) !== i;
+                            })
+                            || (r.status !== "TERMINAL_UNAVAILABLE"
+                                && r.status !== "PACKAGE_MANAGER_UNAVAILABLE"
+                                && r.missingTools.length !== 0)
                             || ["STAGED_TERMINAL_REQUESTED", "STAGED_TERMINAL_EXISTING",
                                 "GUI_OPEN_REQUESTED", "GUI_UNAVAILABLE",
                                 "TERMINAL_UNAVAILABLE", "PACKAGE_MANAGER_UNAVAILABLE",
@@ -692,6 +728,7 @@ Rectangle {
                             || r.trustedPhoneLink !== "UNVERIFIED"
                             || r.contentAccessEnabled !== false)
                         throw new Error("Invalid installer handoff");
+                    phonePane.callSetupMissingTools = r.missingTools;
                     phonePane.callSetupStatus = r.status;
                     if (r.stageCandidate === true) {
                         phonePane.stagePurpose = "OFONO";
@@ -700,6 +737,7 @@ Rectangle {
                         phonePane.stagePollCount = 0;
                     }
                 } catch (error) {
+                    phonePane.callSetupMissingTools = ([]);
                     phonePane.callSetupStatus = "GUI_LAUNCH_FAILED";
                 }
             }

@@ -258,7 +258,7 @@ Rectangle {
             width: Math.max(1,stage.width-32)
             visible: (focus.kind === "solar-path" || focus.kind === "light")
                 && !focus.sourceConfigured
-            text: focus.sourceStatus
+            text: focus.sourceStatus || "SOURCE WAITING"
             color: Colors.orange
             font.pixelSize: 10
             horizontalAlignment: Text.AlignHCenter
@@ -458,7 +458,7 @@ Rectangle {
             }
             QuietText {
                 width: parent.width
-                text: focus.sourceStatus
+                text: focus.sourceStatus || "SOURCE WAITING"
                     + (focus.civilDate !== "" ? " // "+focus.civilDate : "")
                 visible: focus.sourceStatus !== "SOURCE RECEIVED"
                 color: Colors.orange
@@ -490,7 +490,7 @@ Rectangle {
             QuietText {
                 width: parent.width
                 visible: !focus.cards || focus.cards.length === 0
-                text: focus.sourceStatus
+                text: focus.sourceStatus || "SOURCE WAITING"
                 color: Colors.orange
                 font.pixelSize: 10
                 wrapMode: Text.WordWrap
@@ -561,10 +561,10 @@ Rectangle {
             }
             QuietText {
                 width: parent.width
-                visible: focus.cards.length === 0
+                visible: !focus.cards || focus.cards.length === 0
                 text: focus.sourceStatus === "SOURCE RECEIVED"
                     ? "NO ACTIVE OR UPCOMING SHOWER IN THE SOURCE WINDOW"
-                    : focus.sourceStatus
+                    : (focus.sourceStatus || "SOURCE WAITING")
                 color: Colors.orange
                 font.pixelSize: 10
                 wrapMode: Text.WordWrap

@@ -53,3 +53,42 @@ The Zoom Linux Meeting SDK is a separate CLI-oriented provider integration and n
 ## DECISIONS
 
 Account alias records do not carry token or login state. User must deliberately open native Zoom. The current source-only implementation does **not** claim Zoom is installed, authenticated, embedded or deployed on Fedora. No local machine writes, Quickshell restart, user login, PR merge or production activation were performed.
+
+---
+
+## HOSPITAL // Camera M4d Zoom Web App guest prototype · 2026-11-05
+
+### IMPLEMENTATION
+- [PR #1320](https://github.com/kudokudo1/The-Post-Apollo-Project/pull/1320) experiments with the same *mechanism* used by Social X/Instagram: a real managed Chromium XWayland app window, not a web view rendered by Quickshell. Here the provider URL is Zoom's official `https://app.zoom.us/wc`, which supplies its own sign-in/Join/New Meeting interface.
+- New `scripts/camera/ZoomWebHost.py` reuses Social's read-only Chromium browser selection policy while keeping a separate Camera-owned, identity-labelled private profile. It checks Sway output bounds, unique WM_CLASS, same-UID process lineage with exact browser-profile argv, and post-move window geometry. Only after an exact dock match does Camera enable a transparent viewport and a nested input-region cutout.
+- Entering Zoom starts the managed Web App instead of native Zoom. Leaving Zoom/closing Camera removes the input hole before requesting scratchpad hide. A manually selected native Zoom option remains a fallback when the experimental web host fails.
+- The Camera header retains DOWNLOAD, size, and close controls while the hosted browser fills the page. Camera relinquishes layer-shell keyboard focus when the browser dock is verified so the browser can receive login/meeting input.
+
+### HOW TO USE
+**Source-only experimental draft. Do not merge or deploy until native acceptance.** After an approved isolated Quickshell/Sway trial, click Camera → Zoom. The Zoom Web App should appear inside Camera's page, offering its actual login or Join/New Meeting controls. Other Camera modes should hide but not log out the browser. Zoom's native Flatpak installation is no longer required for the web path.
+
+### VERIFY
+- Offline GitHub CI includes mock tests for untrusted/ambiguous browser classes, private profiles, output bounds, bounded geometry convergence, Sway scratchpad teardown, closed-by-default input mask, and no forced native Zoom launch.
+- Native SwayPX/Quickshell validation is NOT complete: verify actual panel global coordinates, compositor stacking/alpha, cutout geometry, browser keyboard/focus/popup capture, browser device permissions, and resilience across move/resize/output changes before acceptance.
+
+### WATCH OUT FOR
+- This is compositor-adjacent code in a draft. A matching XWayland class and profile ancestry are not a substitute for Stage Director's future trusted actor-origin/session controls; do not treat the prototype as certified security containment.
+- Zoom Web is a different session from Zoom's installed Flatpak. Browser-managed Zoom login cookies are not copied into Social and Social account aliases do not grant Zoom access.
+- Starting or joining meetings needs provider permission and the operator's deliberate Zoom UI clicks; camera/mic and screen share prompts must not be silently accepted.
+- Avoid browser/Quickshell/Sway installation, permissions or live restarts until separately approved. Existing user's local `main` has uncommitted work.
+
+### CHECKLIST
+- [x] Confirm Social X/Instagram hosting uses Chromium + Sway docking, not QtWebEngine
+- [x] Official Zoom Web App URL and supported login/join/new-meeting path verified
+- [x] Source-only independent browser actor and Camera host prototype
+- [x] Fail-closed geometry and input mask contracts
+- [ ] Exact-head GitHub CI / native preview verification
+- [ ] Sway global position, keyboard focus, popup/resize/multi-monitor acceptance
+- [ ] Central Social/Connections provider authorization and identity switching
+- [ ] Operator acceptance
+
+### NEXT
+After CI, run an isolated native desktop test with temporary browser profile and no production activation; record exact Sway actor identity, rect and Camera bay. If the geometry is not verified, preserve the closed input hole and do not automatically loosen it. Hand off Stage Director's compositor trust boundary to its owning worker.
+
+### DECISIONS
+External Hospital-compatible Camera worker, source-only; no live Hospital registration, repository merge, package install, browser launch on user's actual desktop, Quickshell reload or Sway configuration change.

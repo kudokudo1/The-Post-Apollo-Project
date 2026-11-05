@@ -19,6 +19,7 @@ Rectangle {
     readonly property string kind: Modes.kind(subjectRoute)
     readonly property var modes: Modes.modesFor(subjectRoute)
     readonly property var skyFeed: skyLoader.item
+    readonly property var spaceFeed: spaceSourceLoader.item
     readonly property var astronomy: skyFeed ? skyFeed.astronomySummary : null
     readonly property var twilight: skyFeed ? skyFeed.twilightSummary : null
     readonly property var celnav: skyFeed ? skyFeed.celestialObservation : null
@@ -87,6 +88,27 @@ Rectangle {
                 subjectRoute: Modes.dataRoute(focus.subjectRoute)
                 weatherService: focus.weatherService
                 spaceService: focus.spaceService
+                runtimeNowMs: focus.runtimeNowMs
+            }
+        }
+    }
+
+    // One hidden owner for the selected NOAA source. Rendering it is
+    // disabled, including the original SUVI Image network consumer.
+    Loader {
+        id: spaceSourceLoader
+        active: focus.visible && focus.kind === "solar-section"
+        width: 1
+        height: 1
+        opacity: 0
+        z: -1
+        sourceComponent: Component {
+            StationSpace {
+                sourceOnly: true
+                subjectRoute: Modes.dataRoute(focus.subjectRoute)
+                spaceService: focus.spaceService
+                weatherService: focus.weatherService
+                liveHistoryStore: focus.liveHistoryStore
                 runtimeNowMs: focus.runtimeNowMs
             }
         }
@@ -192,12 +214,10 @@ Rectangle {
 
     Component {
         id: solarDetails
-        StationSpace {
-            subjectRoute: Modes.dataRoute(focus.subjectRoute)
+        StationCosmosSunInstrumentPane {
+            modeRoute: Modes.dataRoute(focus.subjectRoute)
+            sourceSpace: focus.spaceFeed
             spaceService: focus.spaceService
-            weatherService: focus.weatherService
-            liveHistoryStore: focus.liveHistoryStore
-            runtimeNowMs: focus.runtimeNowMs
         }
     }
     Component {

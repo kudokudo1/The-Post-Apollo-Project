@@ -91,7 +91,8 @@ assert.equal((space.match(/onSubjectRouteChanged:/g)||[]).length,1);
 
 assert.match(space, /title: "SOLAR IMAGER \/\/ NOAA SWPC SUVI"/);
 assert.match(space, /id: solarImage/);
-assert.match(space, /source: space\.solarImageUrl/);
+assert.match(space, /property bool sourceOnly: false/);
+assert.match(space, /source: space\.sourceOnly \? "" : space\.solarImageUrl/);
 assert.match(space, /fillMode: Image\.PreserveAspectFit/);
 assert.match(space, /asynchronous: true/);
 assert.match(space, /cache: false/);

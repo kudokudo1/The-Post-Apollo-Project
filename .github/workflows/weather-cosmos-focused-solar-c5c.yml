@@ -1,0 +1,29 @@
+name: Weather COSMOS C5c Focused Solar NOAA Instruments
+
+on:
+  pull_request:
+    paths:
+      - 'widgets/weather/StationSpace.qml'
+      - 'widgets/weather/StationCosmosModesPane.qml'
+      - 'widgets/weather/StationCosmosSunInstrumentPane.qml'
+      - 'tests/weather/test_cosmos_sun_instruments_c5c.js'
+      - '.github/workflows/weather-cosmos-focused-solar-c5c.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  focused-solar:
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Verify one NOAA source and fixed SUN instruments
+        run: |
+          node --test tests/weather/test_cosmos_sun_instruments_c5c.js
+          node --test tests/weather/test_cosmos_subject_panels_c1.js
+          node tests/weather/test_station_space_suvi_image.js

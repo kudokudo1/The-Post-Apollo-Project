@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
-"""Explicit, non-installing Fedora GUI handoff for Social PHONE calling support.
+"""Explicit Fedora oFono installer handoff for Social PHONE.
 
-The button opens a supported system package GUI for the official 'ofono'
-package. That GUI owns repository selection, review, authorization, download,
-and installation. This helper never executes privileged installation commands,
-package transactions, shell commands, service mutations or phone identifiers.
+The GNOME Software app-details route does not reliably show system-only RPMs.
+Prefer an interactive PackageKit transaction in a specially tagged foot window
+that PHONE's existing Stage Director can position inside its own panel.
+PackageKit handles transaction review and any OS authorization. No automatic
+confirmation, system modifications, phone pairing or BlueFerry activation here.
 """
 from __future__ import annotations
 
@@ -17,17 +18,14 @@ import sys
 from typing import Any, Callable
 
 from PhoneCallPrerequisites import diagnose
+from PhoneStageDirector import INSTALL_APP_ID, _read_tree, _stage_actor, _exe
 
 SCHEMA = "post-apollo.phone.calling-setup-handoff.v0"
 PACKAGE_NAME = "ofono"
-GUI_CLIENTS = (
-    ("gnome-software", ("--details-pkg=ofono",)),
-    ("gpk-install-package-name", ("ofono",)),
-)
+GUI_CLIENTS = (("gpk-install-package-name", ("ofono",)),)
 
 
 def _fedora() -> bool:
-    """Read only an OS vendor identifier, never user-controlled device data."""
     try:
         lines = Path("/etc/os-release").read_text(encoding="utf-8").splitlines()
         for line in lines:
@@ -39,13 +37,25 @@ def _fedora() -> bool:
         return False
 
 
+def _installer_active() -> bool:
+    """Already-running exact foot actor, not another user's terminal/window."""
+    try:
+        actor = _stage_actor(_read_tree(), _exe, INSTALL_APP_ID)
+        return actor is not None and actor.get("visible") is True
+    except Exception:
+        return False
+
+
 def _result(status: str) -> dict[str, object]:
     return {
         "schema": SCHEMA,
-        "execution": "USER_INITIATED_GUI_HANDOFF",
+        "execution": "USER_INITIATED_INSTALLER_HANDOFF",
         "status": status,
         "package": PACKAGE_NAME,
         "installerOpened": status == "GUI_OPEN_REQUESTED",
+        "stageCandidate": status in (
+            "STAGED_TERMINAL_REQUESTED", "STAGED_TERMINAL_EXISTING",
+        ),
         "packageInstalled": False,
         "hfpVerified": False,
         "trustedPhoneLink": "UNVERIFIED",
@@ -59,10 +69,9 @@ def open_support(
     is_fedora: Callable[[], bool] = _fedora,
     find: Callable[[str], str | None] = shutil.which,
     launcher: Callable[..., Any] = subprocess.Popen,
+    already_open: Callable[[], bool] = _installer_active,
 ) -> dict[str, object]:
-    # A GUI selection is only offered for the truly missing Fedora package
-    # case. A stopped/failed service must be fixed by the owning audio team,
-    # not "reinstalled" from a phone menu.
+    """Launch only after exact missing-package diagnosis and an explicit click."""
     try:
         evidence = prerequisite()
     except Exception:
@@ -74,10 +83,9 @@ def open_support(
             or evidence.get("contentAccessEnabled") is not False
             or evidence.get("hfpVerified") is not False):
         return _result("DIAGNOSIS_UNAVAILABLE")
-    if evidence.get("state") != "PACKAGE_NOT_INSTALLED" or (
-        evidence.get("package") != "NOT_INSTALLED"
-        or evidence.get("serviceLoad") != "not-found"
-    ):
+    if (evidence.get("state") != "PACKAGE_NOT_INSTALLED"
+            or evidence.get("package") != "NOT_INSTALLED"
+            or evidence.get("serviceLoad") != "not-found"):
         return _result("NOT_APPLICABLE")
     try:
         if is_fedora() is not True:
@@ -85,14 +93,48 @@ def open_support(
     except Exception:
         return _result("UNSUPPORTED_HOST")
 
+    # Never launch a second PackageKit transaction while the original exact
+    # installer actor remains open, including after navigating away from PHONE.
+    try:
+        if already_open() is True:
+            return _result("STAGED_TERMINAL_EXISTING")
+    except Exception:
+        return _result("STAGE_UNAVAILABLE")
+
+    def installed_program(name: str) -> str | None:
+        try:
+            p = find(name)
+        except Exception:
+            return None
+        return (p if type(p) is str and os.path.isabs(p)
+                and os.path.basename(p) == name else None)
+
+    foot = installed_program("foot")
+    pkcon = installed_program("pkcon")
+    python = installed_program("python3")
+    session_script = Path(__file__).with_name("PhoneOfonoInstallSession.py")
+    if foot and pkcon and python and session_script.is_file():
+        try:
+            launcher(
+                [foot, "--app-id", INSTALL_APP_ID, "-e", python,
+                 str(session_script), "--interactive-ofono"],
+                stdin=subprocess.DEVNULL,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+                start_new_session=True,
+                close_fds=True,
+            )
+            return _result("STAGED_TERMINAL_REQUESTED")
+        except Exception:
+            # An exact failed launch may use an installed PackageKit GUI.
+            pass
+
+    # No GNOME Software app-details fallback: the operator demonstrated that
+    # this route fails for ofono on the installed system.
     failed = False
     for program, args in GUI_CLIENTS:
-        try:
-            executable = find(program)
-        except Exception:
-            executable = None
-        if (type(executable) is not str or not os.path.isabs(executable)
-                or os.path.basename(executable) != program):
+        executable = installed_program(program)
+        if executable is None:
             continue
         try:
             launcher(
@@ -103,7 +145,6 @@ def open_support(
                 start_new_session=True,
                 close_fds=True,
             )
-            # A successful Popen does not mean installation happened.
             return _result("GUI_OPEN_REQUESTED")
         except Exception:
             failed = True
@@ -113,12 +154,10 @@ def open_support(
 def main(argv: list[str] | None = None) -> int:
     args = sys.argv[1:] if argv is None else argv
     if args != ["--open-ofono"]:
-        value = _result("EXPLICIT_ACTION_REQUIRED")
-        print(json.dumps(value, sort_keys=True))
+        print(json.dumps(_result("EXPLICIT_ACTION_REQUIRED"), sort_keys=True))
         return 2
-    value = open_support()
-    print(json.dumps(value, sort_keys=True))
-    # A missing GUI is still a successfully reported diagnosis, not a crash.
+    result = open_support()
+    print(json.dumps(result, sort_keys=True))
     return 0
 
 

@@ -16,6 +16,8 @@ const pane = read("widgets/weather/StationCosmosSubjectPane.qml");
 const dashboard = read("widgets/weather/StationCosmosOverviewPane.qml");
 const workspaceSource = read("widgets/weather/StationWorkspaceNavigationPolicy.js");
 const solarWind = read("widgets/weather/StationCosmosSolarWindPane.qml");
+const spaceHub = read("widgets/weather/StationCosmosSpaceWeatherHubPane.qml");
+const geomagneticPane = read("widgets/weather/StationCosmosGeomagneticPane.qml");
 const browser = read("widgets/weather/StationSubjectNavigator.qml");
 const station = read("widgets/weather/WeatherStationW.qml");
 const weatherPolicy = read("widgets/weather/StationWeatherSubjectPanelPolicy.js");
@@ -29,11 +31,11 @@ vm.runInContext(weatherPolicy.replace(/^\.pragma library\s*$/m, ""), weather);
 vm.runInContext(workspaceSource.replace(/^\.pragma library\s*$/m, ""), workspace);
 const plain = obj => JSON.parse(JSON.stringify(obj));
 
-test("COSMOS retains the 21 scoped routes plus two complete original SKY/SPACE views", () => {
+test("COSMOS retains the 23 scoped routes plus two complete original SKY/SPACE views", () => {
   assert.equal(cosmos.FORMAT, "post-apollo.weather.cosmos-panels.c1.v1");
   const keys = Object.keys(cosmos.ROUTES);
-  assert.equal(keys.length, 23);
-  assert.equal(new Set(keys).size, 23);
+  assert.equal(keys.length, 25);
+  assert.equal(new Set(keys).size, 25);
   assert.deepEqual(keys.filter(k=>cosmos.ROUTES[k].full===true).sort(),
     ["cosmos/sky/full","cosmos/space-weather/full"]);
   for (const route of keys) {
@@ -107,14 +109,14 @@ test("Sun, Moon, planets, stars and events reuse the actual SKY modules", () => 
 
 test("SPACE routes partition existing SWPC instruments without changing their original labels", () => {
   const expected = {
-    "cosmos/space-weather/overview":["solar","scales","field","aurora"],
+    "cosmos/space-weather/overview":[],
     "cosmos/space-weather/solar-wind":["solar","relation","field"],
-    "cosmos/space-weather/geomagnetic":["solar","scales","kp-history"],
+    "cosmos/space-weather/geomagnetic":["scales","kp-history"],
     "cosmos/space-weather/aurora":["aurora"],
     "cosmos/space-weather/solar-activity":["suvi","xray","flares"],
     "cosmos/space-weather/forecasts":["kp-forecast","watch"],
     "cosmos/space-weather/bulletins":["warnings","bulletins"],
-    "cosmos/space-weather/history":["relation","cycle","kp-history"]
+    "cosmos/space-weather/history":["relation","kp-history"]
   };
   assert.equal(Object.keys(expected).length,8);
   for(const [route, sections] of Object.entries(expected)) {
@@ -229,7 +231,7 @@ test("C2 COSMOS overview shows interactive sky graphics and compact core SPACE r
     "cosmos/space-weather/overview","cosmos/space-weather/full",
     "cosmos/space-weather/geomagnetic",
     "cosmos/space-weather/solar-wind",
-    "cosmos/space-weather/solar-activity"
+    "cosmos/sun/activity"
   ]) {
     assert.ok(nav.findRoute(route),route);
     assert.ok(dashboard.includes('"'+route+'"'),"missing detail action "+route);
@@ -254,6 +256,80 @@ test("C3 QML ids never shadow JavaScript built-ins", () => {
   assert.match(solarWind, /id: windConsole/);
   assert.doesNotMatch(solarWind,
     /\bid:\s*(?:console|Math|JSON|Date|Array|Object|Number|String|Qt)\b/);
+});
+
+test("C4 physical SUN activity and SPACE instruments have real native destinations", () => {
+  for (const route of ["cosmos/sun/activity","cosmos/sun/cycle"]) {
+    assert.ok(nav.findRoute(route), route);
+    assert.equal(cosmos.kindForRoute(route),"space");
+  }
+  for (const [route,sections] of Object.entries({
+    "cosmos/sun/activity":["suvi","xray","flares"],
+    "cosmos/sun/cycle":["cycle"],
+    "cosmos/space-weather/geomagnetic":["scales","kp-history"],
+    "cosmos/space-weather/history":["relation","kp-history"]
+  })) {
+    for (const section of sections)
+      assert.equal(cosmos.visibleFor("space",route,section),true,route+"/"+section);
+  }
+  assert.equal(cosmos.visibleFor("space","cosmos/sun/activity","solar"),false);
+  assert.equal(cosmos.visibleFor("space","cosmos/space-weather/geomagnetic","solar"),false);
+  assert.equal(cosmos.visibleFor("space","cosmos/space-weather/history","cycle"),false);
+  for (const source of ["aurora","flares","xray","alerts","cycle","scales","kpForecast"])
+    assert.equal(cosmos.needsSource("cosmos/space-weather/overview",source),false,source);
+  for (const source of ["flares","xray"])
+    assert.equal(cosmos.needsSource("cosmos/sun/activity",source),true,source);
+  assert.equal(cosmos.needsSource("cosmos/sun/cycle","cycle"),true);
+  const spaceTab=workspace.GROUPS.cosmos.find(x=>x.key==="space-weather");
+  assert.equal(spaceTab.path,"cosmos/space-weather/overview");
+  assert.equal(spaceTab.label,"SPACE");
+  assert.equal(workspace.selectedGroup("cosmos/space-weather/full"),"space-weather");
+  assert.equal(workspace.selectedGroup("cosmos/sun/activity"),"sun");
+  assert.ok(pane.includes("id: spaceHubComponent"));
+  assert.ok(pane.includes("StationCosmosSpaceWeatherHubPane"));
+  assert.ok(pane.includes("id: geomagneticComponent"));
+  assert.ok(pane.includes("StationCosmosGeomagneticPane"));
+  assert.ok(sky.includes('label: "SUVI / X-RAY / FLARES"'));
+  assert.ok(sky.includes('label: "SOLAR CYCLE"'));
+  assert.ok(sky.includes('property var spaceService: null'));
+  assert.ok(dashboard.includes('path:"cosmos/sun/activity"'));
+  // SUVI is fetched only on source-eligible routes, never every SPACE view.
+  assert.ok(space.includes('readonly property bool solarImageActive:'));
+  assert.ok(space.includes('running: space.visible && space.solarImageActive'));
+  assert.equal((space.match(/onSubjectRouteChanged:/g)||[]).length,1);
+});
+
+test("C4 SPACE hub is a bounded clickable source-backed directory, not a cloned collector", () => {
+  assert.match(spaceHub,/id: spaceHub/);
+  assert.match(spaceHub,/property var spaceService: null/);
+  assert.match(spaceHub,/RuntimePolicy\.displayRow\(id/);
+  assert.match(spaceHub,/TapHandler\s*\{/);
+  assert.match(spaceHub,/onTapped: spaceHub\.routeRequested\(modelData\.route\)/);
+  assert.match(spaceHub,/columns: 2/);
+  for (const route of [
+    "cosmos/space-weather/solar-wind","cosmos/space-weather/geomagnetic",
+    "cosmos/space-weather/aurora","cosmos/space-weather/forecasts",
+    "cosmos/space-weather/bulletins","cosmos/space-weather/history",
+    "cosmos/space-weather/full","cosmos/sun/activity"
+  ]) {
+    assert.ok(nav.findRoute(route),route);
+    assert.ok(spaceHub.includes('"'+route+'"'),route);
+  }
+  for (const field of ["kpReady","solarWindReady","solarFluxReady",
+                       "kp","solarWindSpeed","solarFlux"]) {
+    assert.ok(spaceHub.includes("spaceService."+field),field);
+  }
+  assert.ok(geomagneticPane.includes('subjectRoute: "cosmos/space-weather/geomagnetic"'));
+  assert.ok(geomagneticPane.includes("geomagnetic.kpReading()"));
+  assert.ok(geomagneticPane.includes("StationSpace {"));
+  assert.ok(geomagneticPane.includes("spaceService: geomagnetic.spaceService"));
+  for (const content of [spaceHub,geomagneticPane]) {
+    for (const forbidden of [
+      "WeatherServices.","Process {","FileView {","XMLHttpRequest",
+      "Timer {","Qt.callLater","swaymsg"
+    ]) assert.ok(!content.includes(forbidden),forbidden);
+    assert.doesNotMatch(content,/\bid:\s*console\b/);
+  }
 });
 
 test("C3 Solar Wind is a fixed, interactive, source-backed instrument", () => {

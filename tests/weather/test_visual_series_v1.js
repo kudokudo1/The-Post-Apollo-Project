@@ -176,7 +176,7 @@ test("COSMOS SPACE WX uses existing 48H source reader without changing SPACE",()
   assert.match(cosmos,/id: spaceTimelineComponent/);
   assert.match(cosmos,/cosmos\/space-weather\/overview/);
   assert.match(cosmos,/cosmos\/space-weather\/history/);
-  assert.match(cosmos,/spaceTimelineComponent : spaceComponent/);
+  assert.match(cosmos,/\? spaceTimelineComponent\s*:\s*spaceComponent/);
   assert.match(space,/WeatherTrendInspector\s*\{/);
   assert.match(history,/function samples\(sourceId, scopeKey, nowMs\)/);
   assert.match(historyPolicy,/"space-wind": \{maxSamples:576, maxAgeMs:172800000\}/);

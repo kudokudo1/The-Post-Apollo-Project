@@ -83,8 +83,11 @@ assert.match(space, /SolarImagePolicy\.imageUrl\(/);
 assert.match(space, /function selectSolarImageMode\(mode\)/);
 assert.match(space, /id: solarImageRefreshClock/);
 assert.match(space, /interval: 300000/);
-assert.match(space, /running: space\.visible/);
-assert.match(space, /Component\.onCompleted: refreshSolarImage\(\)/);
+assert.match(space, /readonly property bool solarImageActive:/);
+assert.match(space, /CosmosPanelPolicy\.visibleFor\("space", subjectRoute, "suvi"\)/);
+assert.match(space, /running: space\.visible && space\.solarImageActive/);
+assert.match(space, /Component\.onCompleted:\s*\{\s*if \(space\.solarImageActive\)\s*refreshSolarImage\(\);/);
+assert.equal((space.match(/onSubjectRouteChanged:/g)||[]).length,1);
 
 assert.match(space, /title: "SOLAR IMAGER \/\/ NOAA SWPC SUVI"/);
 assert.match(space, /id: solarImage/);

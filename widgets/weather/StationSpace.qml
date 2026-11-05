@@ -18,6 +18,8 @@ Rectangle {
     onSubjectRouteChanged: {
         if (spaceScroll)
             spaceScroll.contentY = 0;
+        if (space.visible && space.solarImageActive && space.solarImageUrl === "")
+            refreshSolarImage();
     }
 
     property var spaceService: null
@@ -242,6 +244,9 @@ Rectangle {
             runtimeNowMs
         )
     ]
+
+    readonly property bool solarImageActive:
+        CosmosPanelPolicy.visibleFor("space", subjectRoute, "suvi")
 
     property string solarImageMode: "195"
     property string solarImageUrl: ""
@@ -507,11 +512,17 @@ Rectangle {
         id: solarImageRefreshClock
         interval: 300000
         repeat: true
-        running: space.visible
+        // Only SUN activity / original full SPACE actually display SUVI.
+        // Do not refresh images while viewing Kp, aurora or bulletins.
+        running: space.visible && space.solarImageActive
         onTriggered: space.refreshSolarImage()
     }
 
-    Component.onCompleted: refreshSolarImage()
+    Component.onCompleted: {
+        if (space.solarImageActive)
+            refreshSolarImage();
+    }
+
 
     readonly property color meterBorderColor: Colors.cyan
     readonly property color meterFillColor: Colors.magenta

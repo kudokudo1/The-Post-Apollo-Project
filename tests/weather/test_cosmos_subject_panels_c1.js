@@ -225,6 +225,13 @@ test("C2 COSMOS overview shows interactive sky graphics and compact core SPACE r
   }
   assert.match(dashboard,/onClicked: overview\.routeRequested\(modelData\.path\)/);
   assert.match(browser,/id: cosmosLivePane\s*onRouteRequested: function\(path\)\s*\{\s*browser\.chooseRoute\(path\)/);
+  assert.match(dashboard,/RuntimePolicy\.displayRow\(sourceId/);
+  assert.match(dashboard,/receivedAt:received/);
+  assert.match(dashboard,/observedAt:observed/);
+  assert.match(dashboard,/usingCache:!!cache/);
+  for(const id of ["space-kp","space-wind","space-imf","space-flux"])
+    assert.ok(dashboard.includes('availability("'+id+'"'));
+  assert.match(dashboard,/SPACE WEATHER \/\/ LATEST/);
   assert.match(dashboard,/if \(!ready \|\| value===null \|\| value===undefined/);
   assert.match(dashboard,/return "--"/);
   assert.equal((dashboard.match(/StationSky\s*\{/g)||[]).length,1);

@@ -7,6 +7,7 @@ import "../../services/weather/WeatherDockPolicy.js" as WeatherDockPolicy
 import "../../services/weather/WeatherCyclePolicy.js" as WeatherCyclePolicy
 import "StationSkyHourlyPolicy.js" as HourlyDetails
 import "StationSkyTwilightPolicy.js" as TwilightPolicy
+import "StationCosmosCivilCalendarPolicy.js" as CosmosCalendar
 import "../../services/weather/WeatherRuntimePolicy.js" as RuntimePolicy
 
 Rectangle {
@@ -272,18 +273,14 @@ Rectangle {
     // independent USNO planetary data when the existing Open-Meteo timezone
     // and station coordinates are available. Never guess a local UTC offset.
     // Source-only focused COSMOS uses this; legacy SKY behavior is unchanged.
-    readonly property string focusedCivilDate: {
-        if (!sourceOnly) return astronomySummary.date;
-        if (openMeteoCivilOffsetAvailable) {
-            const now = runtimeNowMs > 0 ? Number(runtimeNowMs) : Date.now();
-            const offset = Number(weatherService.airQualityUtcOffsetMinutes);
-            const shifted = new Date(now + offset * 60000);
-            if (isFinite(shifted.getTime()))
-                return shifted.toISOString().slice(0,10);
-        }
-        return /^\d{4}-\d{2}-\d{2}$/.test(String(astronomySummary.date))
-            ? astronomySummary.date : "";
-    }
+    readonly property string focusedCivilDate:
+        CosmosCalendar.focusedDate(
+            astronomySummary.date,
+            runtimeNowMs > 0 ? runtimeNowMs : Date.now(),
+            openMeteoCivilOffsetAvailable
+                ? weatherService.airQualityUtcOffsetMinutes : null,
+            sourceOnly
+        )
     readonly property string focusedCivilDateSource:
         sourceOnly && openMeteoCivilOffsetAvailable
         ? "OPEN-METEO LOCAL CALENDAR" : "WEATHER DAILY ASTRONOMY"

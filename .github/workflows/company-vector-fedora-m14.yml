@@ -1,0 +1,32 @@
+name: Company Network M14 Fedora lab helper contracts
+
+on:
+  pull_request:
+    paths:
+      - 'experiments/company-vector-qt/fedora_lab_m14.sh'
+      - 'experiments/company-vector-qt/HANDOFF_M14.md'
+      - 'tests/company/test_company_vector_fedora_m14.py'
+      - '.github/workflows/company-vector-fedora-m14.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  isolated-helper-contract:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Bash syntax
+        run: bash -n experiments/company-vector-qt/fedora_lab_m14.sh
+      - name: Synthetic Fedora-path and consent tests
+        run: python3 -m unittest discover -s tests/company -p 'test_company_vector_fedora_m14.py' -v
+      - name: Keep native installation and Company runtime separate
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -f experiments/company-vector-qt/style-post-apollo-online.json
+          test -f services/company/CompanyVectorSidecarLaunch.py
+          ! grep -Eq 'cp .*\.local/libexec|sudo|dnf install|git reset' experiments/company-vector-qt/fedora_lab_m14.sh
+          grep -Fq -- '--styled-online' experiments/company-vector-qt/fedora_lab_m14.sh
+          grep -Fq 'M14_PREFLIGHT_PASSED' experiments/company-vector-qt/fedora_lab_m14.sh

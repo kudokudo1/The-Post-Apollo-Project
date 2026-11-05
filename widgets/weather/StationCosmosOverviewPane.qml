@@ -85,7 +85,7 @@ Rectangle {
                 spaceService ? spaceService.solarFluxLastUpdated : null,
                 spaceService ? spaceService.solarFluxTime : null,
                 spaceService && spaceService.usingPersistentSolarFluxCache),
-            path:"cosmos/space-weather/solar-activity",color:Colors.orange}
+            path:"cosmos/sun/activity",color:Colors.orange}
     ]
 
     Column {

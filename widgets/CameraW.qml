@@ -596,8 +596,9 @@ PanelWindow {
     exclusiveZone: 0
     WlrLayershell.layer: WlrLayer.Overlay
     WlrLayershell.keyboardFocus:
-        menuOpen ? WlrKeyboardFocus.OnDemand : WlrKeyboardFocus.None
-    focusable: menuOpen
+        menuOpen && !zoomWebDocked ? WlrKeyboardFocus.OnDemand : WlrKeyboardFocus.None
+    // A docked browser receives its own keyboard focus for Zoom login/calls.
+    focusable: menuOpen && !zoomWebDocked
     color: "transparent"
     surfaceFormat.opaque: false
     visible: !camera.nativeRegionSelecting
@@ -780,6 +781,7 @@ PanelWindow {
 
                 GohuText {
                     width: parent.width - (30 * 2 + 38 + cameraHeader.spacing * 3)
+                           - (camera.activeView === "zoom" ? 110 : 0)
                     height: parent.height
                     verticalAlignment: Text.AlignVCenter
                     text: (camera.activeView === "zoom" ? "CAMERA // ZOOM WEB"
@@ -788,6 +790,24 @@ PanelWindow {
                     font.pixelSize: 18
                     color: Colors.magenta
                     elide: Text.ElideRight
+                }
+
+                // Keep setup available when the live Zoom browser fills its
+                // page and the former in-page download button is hidden.
+                ActionButton {
+                    width: 102
+                    height: 31
+                    visible: camera.activeView === "zoom"
+                    label: "↓ DOWNLOAD"
+                    labelPixelSize: 10
+                    accentColor: Colors.magenta
+                    onLeftClicked: {
+                        if (camera.zoomWebDocked)
+                            camera.hideZoomWeb();
+                        camera.zoomSetupVisible = !camera.zoomSetupVisible;
+                        if (!camera.zoomSetupVisible && camera.activeView === "zoom")
+                            camera.enterZoomWeb();
+                    }
                 }
 
                 // Finance-style ↓/↑ geometry controls: they resize the
@@ -1506,6 +1526,7 @@ PanelWindow {
                                 width: 128
                                 height: 33
                                 label: "↓ DOWNLOAD"
+                                visible: false // Canonical control is the Camera top-right header.
                                 labelPixelSize: 11
                                 accentColor: Colors.magenta
                                 onLeftClicked: {

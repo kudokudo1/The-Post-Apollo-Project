@@ -35,7 +35,7 @@ class C2nProtectedPolicyContract(unittest.TestCase):
         self.assertEqual(service["DynamicUser"], "no")
         self.assertEqual(service["ExecStart"],
                          "/usr/libexec/post-apollo/connections-status-host --read-only")
-        self.assertNotIn("[Install]", self.unit)
+        self.assertNotIn("Install", self.cfg.sections())
         self.assertIn("deliberately absent", self.unit)
         self.assertFalse((ROOT / "usr/libexec/post-apollo/connections-status-host").exists())
 

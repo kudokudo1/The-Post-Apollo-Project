@@ -22,6 +22,9 @@ Rectangle {
     // M30-C: same verified visual renderer, but hide only the detailed
     // timeline/inspector controls when mounted in the overview hero.
     property bool compactMode: false
+    // M30-G // Full HELIO projection controls are opt-in only on the
+    // dedicated ASTROLOGY screen, never in the smaller OVERVIEW preview.
+    property bool showCompactHelioControls: false
     property string selectedBody: ""
     property int lockedIndex: -1
     property int hoveredIndex: -1
@@ -712,6 +715,7 @@ Rectangle {
                 visible: instrument.mode === "network"
                          || (instrument.compactMode && instrument.mode === "helio")
                 compactMode: instrument.compactMode
+                showCompactHelioControls: instrument.showCompactHelioControls
                 displayMode: instrument.compactMode && instrument.mode === "helio"
                              ? "heliocentric" : "chords"
                 graphModel: instrument.graphModel

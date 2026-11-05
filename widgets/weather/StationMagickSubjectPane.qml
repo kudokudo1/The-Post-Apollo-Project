@@ -79,19 +79,26 @@ Rectangle {
         anchors.left: parent.left
         anchors.right: parent.right
         anchors.top: contextHeader.bottom
-        anchors.topMargin: magickPane.independentScreen ? 0 : 9
+        // M30-G // Independent ASTROLOGY keeps the same breathing room as
+        // other MAGICK instruments. LENSES remains deliberately unchanged.
+        anchors.topMargin: magickPane.standaloneAstrology ? 7
+                           : magickPane.lensesLanding ? 0 : 9
         anchors.bottom: parent.bottom
-        anchors.leftMargin: magickPane.independentScreen ? 0 : 13
-        anchors.rightMargin: magickPane.independentScreen ? 0 : 13
-        anchors.bottomMargin: magickPane.independentScreen ? 0 : 8
+        anchors.leftMargin: magickPane.standaloneAstrology ? 9
+                            : magickPane.lensesLanding ? 0 : 13
+        anchors.rightMargin: magickPane.standaloneAstrology ? 9
+                             : magickPane.lensesLanding ? 0 : 13
+        anchors.bottomMargin: magickPane.standaloneAstrology ? 8
+                              : magickPane.lensesLanding ? 0 : 8
         color: Colors.black
-        border.width: magickPane.independentScreen ? 0 : 1
+        border.width: magickPane.lensesLanding ? 0 : 1
         border.color: Colors.magenta
         clip: true
 
         Loader {
             anchors.fill: parent
-            anchors.margins: magickPane.independentScreen ? 0 : 4
+            anchors.margins: magickPane.standaloneAstrology ? 3
+                             : magickPane.lensesLanding ? 0 : 4
             active: magickPane.visible && magickPane.kind === "reference"
             sourceComponent: magickPane.standaloneAstrology
                              ? standaloneAstrologyReference

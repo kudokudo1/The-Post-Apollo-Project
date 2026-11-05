@@ -168,7 +168,7 @@ test("partial details retain the original fine-grained source gates, no unrecogn
     assert.equal(cosmos.needsSource(route,"cycle"),false);
   }
   assert.equal(Object.keys(nav.PANELS).length,103);
-  assert.equal(nav.PANELS["space-suvi-imager"],"cosmos/space-weather/solar-activity",
+  assert.equal(nav.PANELS["space-suvi-imager"],"cosmos/sun/activity",
     "M0 source provenance is unchanged");
   for(const p of [policy,tree,workspace]){
     for(const bad of ["Process {","FileView {","Qt.callLater","XMLHttpRequest","swaymsg"])

@@ -21,6 +21,8 @@ import stat
 import subprocess
 import sys
 import time
+import urllib.error
+import urllib.request
 
 IMAGE_EXTS = {".png", ".jpg", ".jpeg", ".webp"}
 VIDEO_EXTS = {".mp4", ".mkv", ".webm"}
@@ -1016,6 +1018,65 @@ def zoom_client_open():
             "authentication": "UNKNOWN", "embedded": False}
 
 
+# Read-only checks run only while the user is viewing Zoom mode. HTTPS probes
+# disclose the computer's public network address to the fixed destinations;
+# they do not send identity labels, credentials, cookies or meeting data.
+ZOOM_REACHABILITY_URL = "https://zoom.us/"
+INTERNET_REACHABILITY_URL = "https://example.com/"
+
+
+def _camera_https_reachable(url):
+    """Network/TLS path only. Even a response is not Zoom login confirmation."""
+    try:
+        request = urllib.request.Request(
+            url, method="HEAD", headers={"User-Agent": "Post-Apollo-Camera/1"})
+        with urllib.request.urlopen(request, timeout=3) as response:
+            return response.status < 500
+    except urllib.error.HTTPError as error:
+        # The host answered over HTTPS, but a 5xx is not a healthy endpoint.
+        return error.code < 500
+    except (OSError, ValueError, urllib.error.URLError):
+        return False
+
+
+def zoom_connectivity():
+    """Independent external reachability probes, never provider account state."""
+    internet = _camera_https_reachable(INTERNET_REACHABILITY_URL)
+    zoom = _camera_https_reachable(ZOOM_REACHABILITY_URL)
+    return {"ok": True, "kind": "zoom-connectivity",
+            "internet": "REACHABLE" if internet else "UNREACHABLE",
+            "zoomService": "REACHABLE" if zoom else "UNREACHABLE",
+            "account": "UNKNOWN",
+            "checkedAt": dt.datetime.now(dt.timezone.utc).isoformat(timespec="seconds")}
+
+
+def zoom_enter_mode():
+    """User-selected ZOOM mode opens installed client once, without repeat launch."""
+    check = zoom_launch_check()
+    if not check["installed"]:
+        return {"ok": True, "kind": "zoom-enter",
+                "installed": False, "client": "none", "installation": "none",
+                "launch": "NOT_INSTALLED", "windowState": "NOT_FOUND",
+                "account": "UNKNOWN", "embedded": False}
+    argv = zoom_client_command()
+    status = {"ok": True, "kind": "zoom-enter", "installed": True,
+              "client": "native" if len(argv) == 1 else "flatpak",
+              "installation": argv[2].lstrip("-") if len(argv) == 4 else "none",
+              "windowState": check["windowState"],
+              "flatpakRunning": check["flatpakRunning"],
+              "account": "UNKNOWN", "embedded": False}
+    if check["windowState"] in ("VISIBLE", "OTHER_WORKSPACE") or check["flatpakRunning"] is True:
+        status["launch"] = "ALREADY_RUNNING"
+        return status
+    result = zoom_client_open()
+    if result["ok"]:
+        status["launch"] = "SUBMITTED_UNVERIFIED"
+    else:
+        status["launch"] = "FAILED"
+        status["launchError"] = result["error"]
+    return status
+
+
 def main(argv=None):
     parser = argparse.ArgumentParser()
     command = parser.add_subparsers(dest="action", required=True)
@@ -1023,6 +1084,8 @@ def main(argv=None):
     command.add_parser("zoom-status")
     command.add_parser("zoom-open")
     command.add_parser("zoom-launch-check")
+    command.add_parser("zoom-enter")
+    command.add_parser("zoom-connectivity")
     zoom_install = command.add_parser("zoom-install")
     zoom_install.add_argument("method", choices=["official-rpm", "community-flatpak"])
     zoom_install.add_argument("confirmation")
@@ -1060,6 +1123,10 @@ def main(argv=None):
         result = zoom_client_open()
     elif options.action == "zoom-launch-check":
         result = zoom_launch_check()
+    elif options.action == "zoom-enter":
+        result = zoom_enter_mode()
+    elif options.action == "zoom-connectivity":
+        result = zoom_connectivity()
     elif options.action == "zoom-install":
         result = zoom_install_client(options.method, options.confirmation)
     elif options.action == "gallery":

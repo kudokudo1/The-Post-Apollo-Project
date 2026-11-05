@@ -47,6 +47,10 @@ PanelWindow {
         SocialAccountDetailsStore.accountNamesFor(zoomIdentityId, "zoom")
     property string selectedZoomAccountId: ""
     property var zoomClientStatus: null
+    property string zoomInternetState: "NOT_CHECKED"
+    property string zoomServiceState: "NOT_CHECKED"
+    property string zoomLastChecked: ""
+    property bool zoomEnterQueued: false
     property var zoomLaunchObservation: null
     property string zoomLaunchState: "NOT_CHECKED"
     property string zoomLaunchMessage: "LAUNCH // NOT CHECKED"
@@ -100,11 +104,27 @@ PanelWindow {
     }
 
     onMenuOpenChanged: {
-        if (!menuOpen)
+        if (!menuOpen) {
             zoomInstallChoice = "";
-        // Read-only tool status on explicit open; no image copies or writes.
-        if (menuOpen && statusReport === null && !busy)
+            zoomEnterQueued = false;
+            return;
+        }
+        if (activeView === "zoom") {
+            // Reopening the Camera on Zoom also restores the native experience.
+            openZoomMode();
+        } else if (statusReport === null && !busy) {
             run("status", ["status"]);
+        }
+    }
+
+    onBusyChanged: {
+        if (!busy && zoomEnterQueued && menuOpen && activeView === "zoom") {
+            zoomEnterQueued = false;
+            Qt.callLater(function() {
+                if (!camera.busy && camera.menuOpen && camera.activeView === "zoom")
+                    camera.run("zoomEnter", ["zoom-enter"]);
+            });
+        }
     }
 
     function fileUrl(path) {
@@ -196,10 +216,19 @@ PanelWindow {
     }
 
     function openZoomMode() {
+        const wasZoom = activeView === "zoom";
         activeView = "zoom";
         zoomInstallChoice = "";
-        if (!busy)
-            run("zoomStatus", ["zoom-status"]);
+        if (wasZoom && zoomLaunchState === "CHECKING")
+            return;
+        if (busy) {
+            zoomEnterQueued = true;
+            return;
+        }
+        zoomLaunchState = "CHECKING";
+        zoomLaunchMessage = "ZOOM // DETECTING CLIENT AND STARTING IF NEEDED";
+        // This mode-entry action is the operator's requested launch intent.
+        run("zoomEnter", ["zoom-enter"]);
     }
 
     function prepareZoomInstall(choice) {
@@ -324,7 +353,45 @@ PanelWindow {
                 menuOpen = true;
             return;
         }
-        if (action === "zoomInstall") {
+        if (action === "zoomEnter") {
+            zoomClientStatus = {
+                available: payload.installed === true,
+                client: payload.client || "none",
+                installation: payload.installation || "none"
+            };
+            zoomSetupVisible = payload.installed !== true;
+            if (payload.launch === "NOT_INSTALLED") {
+                zoomLaunchState = "NOT_INSTALLED";
+                zoomLaunchMessage = "ZOOM // NOT INSTALLED // USE DOWNLOAD ABOVE";
+            } else if (payload.launch === "FAILED") {
+                zoomLaunchState = "FAILED";
+                zoomLaunchMessage = "ZOOM // START FAILED // "
+                                  + String(payload.launchError || "UNAVAILABLE");
+            } else if (payload.launch === "ALREADY_RUNNING") {
+                zoomLaunchState = payload.windowState === "VISIBLE"
+                    ? "VISIBLE" : payload.windowState === "OTHER_WORKSPACE"
+                      ? "OTHER_WORKSPACE" : "RUNNING_NO_WINDOW";
+                zoomLaunchMessage = zoomLaunchState === "VISIBLE"
+                    ? "ZOOM // VISIBLE WINDOW FOUND"
+                    : zoomLaunchState === "OTHER_WORKSPACE"
+                      ? "ZOOM // WINDOW ON ANOTHER WORKSPACE"
+                      : "ZOOM // PROCESS RUNNING // NO WINDOW DETECTED";
+            } else {
+                zoomLaunchState = "UNVERIFIED";
+                zoomLaunchMessage = "ZOOM // STARTED REQUEST // VERIFYING WINDOW";
+            }
+            feedback = zoomLaunchMessage;
+            Qt.callLater(function() {
+                if (!camera.busy && camera.menuOpen && camera.activeView === "zoom")
+                    camera.run("zoomConnectivity", ["zoom-connectivity"]);
+            });
+        } else if (action === "zoomConnectivity") {
+            zoomInternetState = payload.internet;
+            zoomServiceState = payload.zoomService;
+            zoomLastChecked = payload.checkedAt || "";
+            if (camera.zoomLaunchState !== "NOT_INSTALLED")
+                zoomLaunchCheckTimer.restart();
+        } else if (action === "zoomInstall") {
             zoomInstallChoice = "";
             if (payload.restartRequired) {
                 zoomInstallNotice = "OFFICIAL ZOOM RPM STAGED // REBOOT REQUIRED";
@@ -340,8 +407,13 @@ PanelWindow {
         } else if (action === "zoomStatus") {
             zoomClientStatus = payload;
             zoomSetupVisible = !payload.available;
-            feedback = payload.available ? "ZOOM // CLIENT DETECTED // LOGIN UNKNOWN"
+            feedback = payload.available ? "ZOOM // CLIENT DETECTED // ACCOUNT UNVERIFIED"
                                          : "ZOOM // NOT INSTALLED // SETUP OPTIONS BELOW";
+            if (payload.available)
+                Qt.callLater(function() {
+                    if (!camera.busy && camera.menuOpen && camera.activeView === "zoom")
+                        camera.run("zoomEnter", ["zoom-enter"]);
+                });
         } else if (action === "zoomOpen") {
             zoomLaunchState = "UNVERIFIED";
             zoomLaunchMessage = "ZOOM // LAUNCH SUBMITTED // WINDOW NOT VERIFIED YET";
@@ -464,6 +536,19 @@ PanelWindow {
 
     // Read-only status check after an explicit launch. No retries or hidden
     // background Zoom starts; the user can click CHECK WINDOW again later.
+    // Live reachability while the Zoom panel is actually open. This sends
+    // two credential-free HTTPS HEAD requests, never triggers another launch.
+    Timer {
+        id: zoomStatusRefreshTimer
+        interval: 90000
+        repeat: true
+        running: camera.menuOpen && camera.activeView === "zoom"
+        onTriggered: {
+            if (!camera.busy)
+                camera.run("zoomConnectivity", ["zoom-connectivity"]);
+        }
+    }
+
     Timer {
         id: zoomLaunchCheckTimer
         interval: 4000
@@ -1261,20 +1346,77 @@ PanelWindow {
                         width: zoomPage.width
                         spacing: 12
 
-                        GohuText {
+                        Row {
+                            id: zoomHeaderRow
                             width: parent.width
-                            height: 31
-                            font.pixelSize: 16
-                            color: Colors.magenta
-                            text: "ZOOM // MEETINGS"
+                            height: 35
+                            spacing: 8
+                            GohuText {
+                                width: parent.width - 136
+                                height: 33
+                                font.pixelSize: 16
+                                color: Colors.magenta
+                                verticalAlignment: Text.AlignVCenter
+                                text: "ZOOM // MEETINGS"
+                            }
+                            ActionButton {
+                                width: 128
+                                height: 33
+                                label: "↓ DOWNLOAD"
+                                labelPixelSize: 11
+                                accentColor: Colors.magenta
+                                onLeftClicked: {
+                                    camera.zoomSetupVisible = !camera.zoomSetupVisible;
+                                    if (camera.zoomSetupVisible)
+                                        Qt.callLater(function() {
+                                            zoomPage.contentY = Math.max(0, zoomPage.contentHeight - zoomPage.height);
+                                        });
+                                }
+                            }
                         }
 
+                        Row {
+                            id: zoomStatusRail
+                            width: parent.width
+                            height: 39
+                            spacing: 5
+                            Repeater {
+                                model: [
+                                    {name: "APP", value: camera.zoomClientStatus === null
+                                            ? "CHECKING" : camera.zoomClientStatus.available
+                                              ? "INSTALLED" : "MISSING"},
+                                    {name: "INTERNET", value: camera.zoomInternetState},
+                                    {name: "ZOOM HTTPS", value: camera.zoomServiceState},
+                                    {name: "LOGIN", value: "UNKNOWN"}
+                                ]
+                                Rectangle {
+                                    width: (zoomStatusRail.width - 3 * zoomStatusRail.spacing) / 4
+                                    height: 37
+                                    color: Colors.dark
+                                    border.width: 1
+                                    border.color: modelData.value === "REACHABLE"
+                                                  || modelData.value === "INSTALLED"
+                                                  ? Colors.cyan : modelData.value === "UNREACHABLE"
+                                                    || modelData.value === "MISSING"
+                                                    ? Colors.red : Colors.orange
+                                    GohuText {
+                                        anchors.centerIn: parent
+                                        width: parent.width - 4
+                                        font.pixelSize: 9
+                                        horizontalAlignment: Text.AlignHCenter
+                                        elide: Text.ElideRight
+                                        color: Colors.white
+                                        text: modelData.name + " // " + modelData.value
+                                    }
+                                }
+                            }
+                        }
                         GohuText {
                             width: parent.width
                             wrapMode: Text.WordWrap
-                            font.pixelSize: 11
+                            font.pixelSize: 10
                             color: Colors.cyan
-                            text: "CAMERA MODE // NATIVE ZOOM CLIENT + SOCIAL ACCOUNT LABELS"
+                            text: "AUTOMATIC OPEN ON ENTRY // APP AND HTTPS STATUS ARE NOT PROOF OF ZOOM LOGIN"
                         }
 
                         Rectangle {
@@ -1325,7 +1467,7 @@ PanelWindow {
                             wrapMode: Text.WordWrap
                             font.pixelSize: 10
                             color: Colors.orange
-                            text: "Account names are display labels, not active Zoom login sessions. Selecting an alias does NOT switch the Zoom client account."
+                            text: "ZOOM SIGN-IN // UNVERIFIED. Zoom owns its sign-in screen in the native client. Social identities and saved aliases never block this mode or prove login."
                         }
 
                         Rectangle {
@@ -1346,38 +1488,20 @@ PanelWindow {
                                     : "ZOOM CLIENT // NOT FOUND"
                         }
 
-                        Row {
+                        // A retry is only exposed for exceptional launch failures.
+                        // Normal entry already starts Zoom automatically.
+                        ActionButton {
                             width: parent.width
-                            height: 42
-                            spacing: 10
-
-                            ActionButton {
-                                width: 150
-                                height: 40
-                                label: "CHECK ZOOM"
-                                labelPixelSize: 11
-                                accentColor: Colors.cyan
-                                available: !camera.busy
-                                onLeftClicked: camera.run("zoomStatus", ["zoom-status"])
-                            }
-
-                            ActionButton {
-                                width: parent.width - 160
-                                height: 40
-                                label: camera.zoomClientStatus && camera.zoomClientStatus.available
-                                       ? "OPEN ZOOM CLIENT"
-                                       : camera.zoomSetupVisible ? "HIDE INSTALL STEPS"
-                                       : "SET UP ZOOM"
-                                labelPixelSize: 12
-                                accentColor: Colors.magenta
-                                available: !camera.busy
-                                onLeftClicked: {
-                                    if (camera.zoomClientStatus && camera.zoomClientStatus.available)
-                                        camera.launchZoomClient();
-                                    else
-                                        camera.zoomSetupVisible = !camera.zoomSetupVisible;
-                                }
-                            }
+                            height: 38
+                            visible: camera.zoomClientStatus !== null
+                                     && camera.zoomClientStatus.available
+                                     && (camera.zoomLaunchState === "FAILED"
+                                         || camera.zoomLaunchState === "NOT_FOUND")
+                            label: "RETRY OPEN ZOOM"
+                            labelPixelSize: 11
+                            accentColor: Colors.magenta
+                            available: !camera.busy
+                            onLeftClicked: camera.launchZoomClient()
                         }
 
                         GohuText {
@@ -1395,6 +1519,9 @@ PanelWindow {
                         ActionButton {
                             width: parent.width
                             height: 34
+                            visible: camera.zoomLaunchState === "FAILED"
+                                     || camera.zoomLaunchState === "NOT_FOUND"
+                                     || camera.zoomLaunchState === "RUNNING_NO_WINDOW"
                             label: "CHECK ZOOM WINDOW / PROCESS"
                             labelPixelSize: 10
                             accentColor: Colors.cyan
@@ -1461,7 +1588,7 @@ PanelWindow {
                                 wrapMode: Text.WordWrap
                                 font.pixelSize: 11
                                 color: Colors.white
-                                text: "A Zoom desktop client must be installed first. Camera detects it after CHECK ZOOM. This panel never installs anything automatically."
+                                text: "A Zoom desktop client must be installed to start meetings. The Zoom mode stays available, and no installation starts automatically."
                             }
 
                             GohuText {

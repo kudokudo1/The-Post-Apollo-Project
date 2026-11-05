@@ -91,6 +91,11 @@ ShellRoot {
                         + " date="+(focused.planetSource ? focused.planetSource.date : "NA")
                         + " offset="+(focused.planetSource ? focused.planetSource.offsetMinutes : "NA")
                         + " lat="+(focused.planetSource ? focused.planetSource.latitude : "NA")
+                        + " fakeLat="+fakeWeather.latitude
+                        + " focusWeather="+!!focused.weatherService
+                        + " focusLat="+(focused.weatherService ? focused.weatherService.latitude : "NA")
+                        + " skyWeather="+(focused.skyFeed ? !!focused.skyFeed.weatherService : "NA")
+                        + " skyLat="+(focused.skyFeed && focused.skyFeed.weatherService ? focused.skyFeed.weatherService.latitude : "NA")
                         + " status="+focused.sourceStatus);
                 focused.routeRequested("cosmos/planets-stars/celestial-fix");
                 if (root.requestedPath !== "cosmos/planets-stars/celestial-fix")

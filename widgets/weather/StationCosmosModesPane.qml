@@ -65,10 +65,19 @@ Rectangle {
                 info:row.data ? row.data.event : "NO EVENT IN WINDOW",
                 detail:row.data ? String(row.data.date) : "DATE --"});
         } else if (kind === "meteors" && meteorSource && meteorSource.ready) {
+            var seen = {};
+            for (const entry of meteorSource.activeShowers) {
+                if (!entry || !entry.name || seen[entry.name]) continue;
+                seen[entry.name] = true;
+                rows.push({name:entry.name,info:"ACTIVE NOW",
+                    detail:"IAU ACTIVITY WINDOW // "
+                        +(entry.peakUtc ? "PEAK "+String(entry.peakUtc) : "CURRENT")});
+            }
             for (i=0;i<meteorSource.upcomingShowers.length;i++) {
                 item=meteorSource.upcomingShowers[i];
-                rows.push({name:item.name,
-                    info:item.active ? "ACTIVE NOW" : "UPCOMING",
+                if (!item || !item.name || seen[item.name]) continue;
+                seen[item.name] = true;
+                rows.push({name:item.name,info:"UPCOMING",
                     detail:"PEAK "+String(item.peakUtc)});
             }
         }
@@ -121,10 +130,23 @@ Rectangle {
         anchors.right: parent.right
         anchors.margins: 6
         height: 18
+        anchors.rightMargin: focus.family === "sun" ? 117 : 6
         text: "COSMOS // "+focus.family.toUpperCase()
         color: Colors.magenta
         font.pixelSize: 12
         elide: Text.ElideRight
+    }
+    QuietText {
+        visible: focus.family === "sun"
+        anchors.right: parent.right
+        anchors.rightMargin: 6
+        anchors.top: parent.top
+        anchors.topMargin: 7
+        text: "LIVE F10.7 // "
+            + (focus.spaceService && focus.spaceService.solarFluxReady
+               ? focus.spaceService.solarFluxText : "-- SFU")
+        color: Colors.cyan
+        font.pixelSize: 9
     }
     Row {
         id: modeRail

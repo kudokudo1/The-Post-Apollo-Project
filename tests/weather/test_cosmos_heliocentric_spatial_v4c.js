@@ -193,8 +193,12 @@ test("V4c shares one on-demand CALCULATE and keeps older modes separate",()=>{
     assert.match(networkQml,/onClicked: graph\.displayMode="chords"/);
     assert.match(networkQml,/onClicked: graph\.displayMode="depth"/);
     assert.match(qml,/Helio\.verifiedScene\(\s*visualData,graphModel,verifiedNetwork,focusIndex\)/);
-    assert.match(qml,/Helio\.position\(/);
-    assert.match(qml,/Helio\.hit\(/);
+    // V4e uses a bounded display marker and matching pointer hitbox;
+    // the underlying JPL geometric position/hit functions still exist.
+    assert.match(qml,/Helio\.viewportMarker\(/);
+    assert.match(qml,/Helio\.visibleHit\(/);
+    assert.match(helio,/function position\(/);
+    assert.match(helio,/function hit\(/);
     assert.match(qml,/onClicked: spatial\.tiltView=true/);
     assert.match(qml,/onClicked: spatial\.tiltView=false/);
     assert.match(qml,/onClicked: function\(mouse\)/);

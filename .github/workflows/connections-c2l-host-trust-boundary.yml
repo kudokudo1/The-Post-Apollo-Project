@@ -1,0 +1,56 @@
+name: Connections C2l host trust boundary review only
+
+on:
+  pull_request:
+    paths:
+      - "services/connections/experiments/C2lHostTrustBoundaryModel.py"
+      - "tests/connections/test_connections_c2l_host_trust_boundary.py"
+      - ".github/workflows/connections-c2l-host-trust-boundary.yml"
+      - "docs/connections-c2l-trust-boundary-review.md"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  synthetic-trust-refusal:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Synthetic same-UID, cross-UID, protected proposal and tampered evidence refusal
+        run: |
+          timeout 30s python3 -B tests/connections/test_connections_c2l_host_trust_boundary.py
+      - name: Prior C2k explicit status-only launcher and C2i/C2j regressions
+        run: |
+          timeout 45s python3 -B tests/connections/test_connections_c2k_readonly_launcher.py
+          timeout 35s python3 -B tests/connections/test_connections_c2j_host_status_server.py
+          timeout 40s python3 -B tests/connections/test_connections_c2j_fake_host_socket.py
+          timeout 35s python3 -B tests/connections/test_connections_c2i_host_inspection.py
+      - name: QML cannot authenticate and broker cannot grant credentials
+        run: |
+          node tests/cpuplus/test_connections_host_inspection_c2i.js
+          node tests/cpuplus/test_connections_status_c2g.js
+          node tests/cpuplus/test_connections_broker_c2a.js
+      - name: Review-only model is not mounted in production
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import ast
+          source=Path("services/connections/experiments/C2lHostTrustBoundaryModel.py")
+          tree=ast.parse(source.read_text())
+          assert source.parent.name=="experiments"
+          assert not any(isinstance(n,ast.Call) and isinstance(n.func,ast.Name)
+                         and n.func.id=="exec" for n in ast.walk(tree))
+          for path in Path("services/connections").glob("*.qml"):
+              assert "C2lHostTrustBoundaryModel" not in path.read_text()
+          for path in Path("services/connections").glob("*.js"):
+              assert "C2lHostTrustBoundaryModel" not in path.read_text()
+          print("C2L_PASS // OFFLINE_TOPOLOGY_MODEL_NO_PRODUCTION_TRUST_GRANTS")
+          PY

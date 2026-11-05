@@ -7,6 +7,11 @@ var FORMAT = "post-apollo.weather.heliocentric-spatial.v1";
 var FRAME = "true-ecliptic-of-date";
 var MAX_NODES = 4;
 var MAX_SAMPLES = 721;
+// V4f: explicitly wider than the old fixed 0.4..5 mouse-wheel range.
+// Only the camera scale changes; JPL XYZ and measured AU remain exact.
+var MIN_CAMERA_SCALE = 0.02;
+var MAX_CAMERA_SCALE = 160;
+var WHEEL_FACTOR = 1.32;
 
 function finite(n) {
     return typeof n === "number" && isFinite(n) && Math.abs(n) <= 10000
@@ -103,11 +108,51 @@ function verifiedScene(payload,model,network,index) {
 function layout(width,height,scale) {
     var w=finite(width),h=finite(height),s=finite(scale);
     if(w===null||h===null||s===null || w<=0||h<=0 ||
-       s<0.25||s>8)return {ready:false,cx:0,cy:0,r:0};
-    var radius=Math.min(h/2-24,w*0.30)*s;
-    return {ready:radius>8,cx:w*0.39,cy:h/2,r:Math.max(0,radius)};
+       s<MIN_CAMERA_SCALE||s>MAX_CAMERA_SCALE)
+        return {ready:false,cx:0,cy:0,r:0};
+    var unscaled=Math.min(h/2-24,w*0.30);
+    var radius=unscaled*s;
+    // Even an extreme zoomed-out view remains paintable; using radius>8
+    // as the readiness test was a second, hidden zoom-out limit.
+    return {ready:unscaled>8&&radius>0,cx:w*0.39,cy:h/2,
+            r:Math.max(0,radius)};
 }
-function position(scene,point,width,height,scale,tilt,domainAu) {
+// Camera is an independent pixel transform, not a modification to any
+// heliocentric source position. Start at the original Sun-centered view.
+function cameraOrigin(width,height,scale,panX,panY) {
+    var g=layout(width,height,scale),x=finite(panX),y=finite(panY);
+    if(!g.ready||x===null||y===null)return null;
+    return {cx:g.cx+x,cy:g.cy+y,r:g.r};
+}
+
+// Keep the exact source position under the wheel pointer at the same screen
+// coordinate after zoom. Mouse-wheel direction is +/-1, no timers required.
+function zoomAt(width,height,scale,panX,panY,mouseX,mouseY,direction) {
+    var g=layout(width,height,scale);
+    var px=finite(panX),py=finite(panY),
+        mx=finite(mouseX),my=finite(mouseY);
+    if(!g.ready||px===null||py===null||mx===null||my===null||
+       (direction!==1&&direction!==-1))return null;
+    var next=Math.max(MIN_CAMERA_SCALE,Math.min(MAX_CAMERA_SCALE,
+        scale*(direction===1?WHEEL_FACTOR:1/WHEEL_FACTOR)));
+    var ratio=next/scale;
+    return {scale:next,
+            panX:mx-g.cx-(mx-g.cx-px)*ratio,
+            panY:my-g.cy-(my-g.cy-py)*ratio};
+}
+
+// Double-click a body to move that measured JPL target to the usable plot
+// center. The angular/radial position is still unchanged by the camera.
+function focusPan(scene,body,width,height,scale,tilt,domainAu,compact) {
+    var point=byBody(scene,body),box=viewport(width,height,compact);
+    if(!point||!box)return null;
+    var p=position(scene,point,width,height,scale,tilt,domainAu);
+    if(!p)return null;
+    return {panX:(box.left+box.right)/2-p.x,
+            panY:(box.top+box.bottom)/2-p.y};
+}
+
+function position(scene,point,width,height,scale,tilt,domainAu,panX,panY) {
     if(!scene||!scene.ready||!point)return null;
     var g=layout(width,height,scale);
     // V4d: optional truthful radial window: ALL source bodies or INNER AU.
@@ -116,9 +161,12 @@ function position(scene,point,width,height,scale,tilt,domainAu) {
         x=finite(point.x_au),y=finite(point.y_au),z=finite(point.z_au);
     if(!g.ready||r===null||r<=0||x===null||y===null||z===null)
         return null;
+    var px=panX===undefined?0:finite(panX),
+        py=panY===undefined?0:finite(panY);
+    if(px===null||py===null)return null;
     var angle=tilt===true?Math.PI/4:0;
-    return {x:g.cx+g.r*y/r,
-            y:g.cy-g.r*(x*Math.cos(angle)+z*Math.sin(angle))/r};
+    return {x:g.cx+px+g.r*y/r,
+            y:g.cy+py-g.r*(x*Math.cos(angle)+z*Math.sin(angle))/r};
 }
 function hit(scene,px,py,w,h,scale,tilt,tolerance,domainAu) {
     if(!scene||!scene.ready)return "";
@@ -151,11 +199,13 @@ function viewport(width,height,compact) {
 // Onscreen marker = the exact geometric projection. Offscreen marker =
 // an explicit viewport-edge pointer toward the real, unclipped XYZ point.
 // Keep the original position() result available for numerical inspection.
-function viewportMarker(scene,point,width,height,scale,tilt,domainAu,compact) {
-    var raw=position(scene,point,width,height,scale,tilt,domainAu);
+function viewportMarker(scene,point,width,height,scale,tilt,domainAu,compact,panX,panY) {
+    var raw=position(scene,point,width,height,scale,tilt,domainAu,
+                     panX,panY);
     var box=viewport(width,height,compact);
-    var g=layout(width,height,scale);
-    if(!raw||!box||!g.ready)return null;
+    var g=cameraOrigin(width,height,scale,
+        panX===undefined?0:panX,panY===undefined?0:panY);
+    if(!raw||!box||!g)return null;
     // Leave room for a highlighted ring and a directional arrowhead.
     var left=box.left+14,right=box.right-14;
     var top=box.top+14,bottom=box.bottom-14;
@@ -164,16 +214,27 @@ function viewportMarker(scene,point,width,height,scale,tilt,domainAu,compact) {
                 realX:raw.x,realY:raw.y};
     var dx=raw.x-g.cx,dy=raw.y-g.cy;
     if(dx===0 && dy===0)return null;
-    var t=Infinity;
-    if(dx>0)t=Math.min(t,(right-g.cx)/dx);
-    else if(dx<0)t=Math.min(t,(left-g.cx)/dx);
-    if(dy>0)t=Math.min(t,(bottom-g.cy)/dy);
-    else if(dy<0)t=Math.min(t,(top-g.cy)/dy);
-    if(!isFinite(t)||t<0)return null;
-    t=Math.min(1,t);
-    return {x:Math.max(left,Math.min(right,g.cx+dx*t)),
-            y:Math.max(top,Math.min(bottom,g.cy+dy*t)),
-            offscreen:true,angle:Math.atan2(dy,dx),
+    // When the Sun/camera origin is outside the plot, ray intersection
+    // from that origin could be negative. Clamp only the drawn arrow, never
+    // the JPL coordinate; this also works after arbitrarily large pans.
+    var originInside=g.cx>=left&&g.cx<=right&&g.cy>=top&&g.cy<=bottom;
+    var px=Math.max(left,Math.min(right,raw.x)),
+        py=Math.max(top,Math.min(bottom,raw.y));
+    if(originInside) {
+        var t=Infinity;
+        if(dx>0)t=Math.min(t,(right-g.cx)/dx);
+        else if(dx<0)t=Math.min(t,(left-g.cx)/dx);
+        if(dy>0)t=Math.min(t,(bottom-g.cy)/dy);
+        else if(dy<0)t=Math.min(t,(top-g.cy)/dy);
+        if(isFinite(t)&&t>=0){
+            t=Math.min(1,t);
+            px=Math.max(left,Math.min(right,g.cx+dx*t));
+            py=Math.max(top,Math.min(bottom,g.cy+dy*t));
+        }
+    }
+    var arrowX=raw.x-px,arrowY=raw.y-py;
+    return {x:px,y:py,offscreen:true,
+            angle:Math.atan2(arrowY||dy,arrowX||dx),
             realX:raw.x,realY:raw.y};
 }
 
@@ -196,7 +257,7 @@ function labelPosition(marker,labelWidth,width,height,compact,centerX) {
             maxWidth:maxWidth};
 }
 
-function visibleHit(scene,px,py,w,h,scale,tilt,tolerance,domainAu,compact) {
+function visibleHit(scene,px,py,w,h,scale,tilt,tolerance,domainAu,compact,panX,panY) {
     if(!scene||!scene.ready)return "";
     var x=finite(px),y=finite(py),tol=finite(tolerance);
     if(x===null||y===null||tol===null||tol<=0||tol>30)return "";
@@ -204,7 +265,8 @@ function visibleHit(scene,px,py,w,h,scale,tilt,tolerance,domainAu,compact) {
     for(var i=0;i<scene.points.length;i++) {
         var point=scene.points[i];
         if(point.origin)continue;
-        var mark=viewportMarker(scene,point,w,h,scale,tilt,domainAu,compact);
+        var mark=viewportMarker(scene,point,w,h,scale,tilt,domainAu,compact,
+                                panX,panY);
         if(!mark)continue;
         var d=(mark.x-x)*(mark.x-x)+(mark.y-y)*(mark.y-y);
         if(d<=distance){distance=d;best=point.body;}

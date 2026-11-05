@@ -83,13 +83,10 @@ Rectangle {
     // One active NEWS viewport only. Workspace and INDEX intentionally have
     // different MEDIA panes; select by actual presentation ownership.
     readonly property rect activePlayerViewportRect: {
-        const mode = ViewportPolicy.owner(
-            browser.visible, browser.visible, false,
-            browser.visible, browser.liveMediaKind !== "", browser.indexOpen);
-        if (mode === "none")
+        if (!browser.visible || browser.liveMediaKind === "")
             return Qt.rect(0, 0, 0, 0);
-        const pane = mode === "index" ? mediaLivePane : workspaceLoader.item;
-        if (!pane || !pane.visible || (mode === "index"
+        const pane = browser.indexOpen ? mediaLivePane : workspaceLoader.item;
+        if (!pane || !pane.visible || (browser.indexOpen
                                       ? !mediaLivePane.visible
                                       : !workspaceLoader.visible))
             return Qt.rect(0, 0, 0, 0);

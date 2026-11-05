@@ -266,11 +266,17 @@ Rectangle {
     onStageHostHeightChanged: {
         if (stageWanted) stageState = "POSITIONING";
     }
+    // Reserve a real lower terminal bay independently of the scrollable
+    // setup column. Before this, implicitHeight grew with every new control
+    // and pushed the "hole" below the panel, leaving the terminal behind
+    // an opaque Social window with no reachable keyboard or mouse input.
+    readonly property int stageBayTop: Math.max(
+        setupHeader.height + 112, Math.round(phoneChatFeed.height * 0.43))
     readonly property int stageHoleX: Math.round(phoneChatFeed.x + 10)
-    readonly property int stageHoleY: Math.round(
-        phoneChatFeed.y + setupHeader.height + setupColumn.implicitHeight + 24)
+    readonly property int stageHoleY: Math.round(phoneChatFeed.y + stageBayTop)
     readonly property int stageHoleWidth: Math.round(phoneChatFeed.width - 20)
-    readonly property int stageHoleHeight: Math.round(height - stageHoleY - 12)
+    readonly property int stageHoleHeight: Math.round(
+        phoneChatFeed.height - stageBayTop - 12)
     readonly property bool stageHoleValid:
         stageHoleX >= 0 && stageHoleY >= 0
         && stageHoleWidth >= 200 && stageHoleHeight >= 120
@@ -311,8 +317,15 @@ Rectangle {
 
     function syncStagedSetup() {
         if (!stageWanted || !visible || selectedSection !== "DEVICE"
-                || !stageHoleValid || stageProcess.running)
+                || stageProcess.running)
             return;
+        if (!stageHoleValid) {
+            // Too small to stage: do not promise a transparent/input hole.
+            // The explicitly launched native window remains external.
+            stageWanted = false;
+            stageState = "UNAVAILABLE";
+            return;
+        }
         if (stageState === "ALIGNED") stagePollCount = 0;
         else stagePollCount += 1;
         if (stagePollCount > 40) {
@@ -979,6 +992,25 @@ Rectangle {
                 font.pixelSize: 18
                 font.bold: true
             }
+
+            // Always reachable even when the compact upper setup controls
+            // need scrolling. Installer detach never kills PackageKit.
+            ActionButton {
+                id: stagedExitAction
+                anchors.right: parent.right
+                anchors.rightMargin: 10
+                anchors.verticalCenter: parent.verticalCenter
+                width: Math.min(160, Math.max(100, parent.width * 0.36))
+                height: 32
+                visible: phonePane.stageWanted
+                label: phonePane.stagePurpose === "OFONO"
+                       ? "RETURN TO PHONE" : "CLOSE SETUP"
+                labelPixelSize: 9
+                accentColor: phonePane.stagePurpose === "OFONO"
+                             ? Colors.magenta : Colors.red
+                destructive: phonePane.stagePurpose !== "OFONO"
+                onTriggered: phonePane.closeStagedSetup()
+            }
         }
 
         Flickable {
@@ -987,6 +1019,12 @@ Rectangle {
             anchors.left: parent.left
             anchors.right: parent.right
             anchors.bottom: parent.bottom
+            // Limit the scrolling controls to the space ABOVE the staged
+            // terminal. Without this, their contents still paint over the
+            // compositor cutout even if the stage geometry is valid.
+            anchors.bottomMargin: phonePane.stageWanted && phonePane.stageHoleValid
+                                  ? Math.max(0, setupOverlay.height -
+                                             phonePane.stageBayTop + 8) : 0
             contentWidth: width
             contentHeight: setupColumn.implicitHeight + 24
             boundsBehavior: Flickable.StopAtBounds
@@ -1327,19 +1365,6 @@ Rectangle {
                     color: Colors.orange
                     font.pixelSize: 10
                     wrapMode: Text.WordWrap
-                }
-
-                ActionButton {
-                    width: Math.min(190, setupColumn.width)
-                    height: 32
-                    visible: phonePane.stageWanted
-                    label: phonePane.stagePurpose === "OFONO"
-                           ? "RETURN TO PHONE" : "CLOSE SETUP"
-                    labelPixelSize: 9
-                    accentColor: phonePane.stagePurpose === "OFONO"
-                                 ? Colors.magenta : Colors.red
-                    destructive: phonePane.stagePurpose !== "OFONO"
-                    onTriggered: phonePane.closeStagedSetup()
                 }
 
                 ActionButton {

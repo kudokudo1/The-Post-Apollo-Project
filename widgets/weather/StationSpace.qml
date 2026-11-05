@@ -507,11 +507,20 @@ Rectangle {
         id: solarImageRefreshClock
         interval: 300000
         repeat: true
-        running: space.visible
+        // Only SUN activity / original full SPACE actually display SUVI.
+        // Do not refresh images while viewing Kp, aurora or bulletins.
+        running: space.visible && space.sectionVisible("suvi")
         onTriggered: space.refreshSolarImage()
     }
 
-    Component.onCompleted: refreshSolarImage()
+    Component.onCompleted: {
+        if (space.sectionVisible("suvi"))
+            refreshSolarImage();
+    }
+    onSubjectRouteChanged: {
+        if (space.sectionVisible("suvi") && space.solarImageUrl === "")
+            refreshSolarImage();
+    }
 
     readonly property color meterBorderColor: Colors.cyan
     readonly property color meterFillColor: Colors.magenta

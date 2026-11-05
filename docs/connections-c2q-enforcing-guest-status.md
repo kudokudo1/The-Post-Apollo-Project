@@ -25,9 +25,13 @@ No new application or menu. Existing CPU++ → SETTINGS → CONNECTIONS → NASA
 
 GitHub CI must show real guest kernel Enforcing, the dedicated service UID, root-owned files and SELinux process context, permitted GetStatus, rejected name takeover/unknown method and denied outsider access, clean shutdown, and deny-only CPU++ checks. A green VM job is not evidence of a real production host installation.
 
+### Observed GitHub evidence
+
+GitHub Actions real-fedora-guest-service job 127335785291 reported Fedora release 44, kernel 6.19.10-300.fc44.x86_64, and C2Q_PASS // REAL_GUEST_SELINUX_ENFORCING. The fake host started under the static account and returned the expected read-only D-Bus state; all tests passed. Root-owned host executable was labeled system_u:object_r:bin_t:s0; the systemd unit was system_u:object_r:systemd_unit_file_t:s0; the bus policy was system_u:object_r:usr_t:s0. The observed service process context was system_u:system_r:unconfined_service_t:s0. This outcome is an explicit blocker for a future custom confined SELinux domain claim, not a hidden success.
+
 ## WATCH OUT FOR
 
-**Enforcing mode is not proof of a dedicated confined domain.** Read the actual SELinux service process context. The default Fedora policy may run the fake Python host in a general systemd service domain rather than a custom `postapollo_connections_t` domain. C2q intentionally does not add or load a custom SELinux policy, change SELinux enforcement, or assert process-specific confinement. Any AVC denial is a test failure to investigate, not a reason to use permissive mode.
+**Enforcing mode is not proof of a dedicated confined domain.** Read the actual SELinux service process context. The default Fedora policy may run the fake Python host in a general systemd service domain rather than a custom `postapollo_connections_t` domain. C2q intentionally does not add or load a custom SELinux policy, change SELinux enforcement, or assert process-specific confinement. The actual CI context was unconfined_service_t, confirming this limitation. Any AVC denial is a test failure to investigate, not a reason to use permissive mode.
 
 An unsigned Python script and repo-supplied tests in a disposable VM are **not signed package provenance**. The owner/group D-Bus policy controls transport, not application identity or user consent. The static service is status-only and denies network access, so it cannot fetch NASA data. Production API and credential handling remain explicitly unavailable.
 
@@ -37,8 +41,10 @@ An unsigned Python script and repo-supplied tests in a disposable VM are **not s
 - [x] Add fully disposable C2q guest test and runner workflow
 - [x] Reuse C2n unit and bus policy, C2o fake host/client, C2p Fedora image hash
 - [x] Pin offline dbus-next wheel hash
-- [ ] Verify exact-head CI Fedora guest with enforcing service startup
-- [ ] Review SELinux service context and access denials
+- [x] Initial CI passed 3/3 on commit b527057dab0bb99d011f5c5b7558ff292746b54b (real Fedora guest and enforcing SELinux)
+- [ ] Final report-update commit CI checks
+- [x] Observed service context: system_u:system_r:unconfined_service_t:s0 (therefore **NOT** a dedicated confined domain)
+- [x] D-Bus tests: accepted reader GetStatus; rejected outsider GetStatus/Approve, reader Approve, and unauthorized name claims
 - [ ] Independent code/security review and operator merge decision
 - [ ] Custom SELinux domain, signed install, approval/revocation, service identity
 - [ ] Production CPU++ host activation and actual NASA provider

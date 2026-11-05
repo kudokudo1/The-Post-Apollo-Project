@@ -353,7 +353,7 @@ test("M30-F ASTROLOGY is an independent, non-scrolling, source-owned instrument"
   assert.match(pane,/sourceComponent: magickPane\.standaloneAstrology\s*\? standaloneAstrologyReference/);
   assert.match(pane,/id: standaloneAstrologyReference[\s\S]*StationMagickAstrologyPane\s*\{/);
   assert.match(pane,/visible: !magickPane\.independentScreen/);
-  assert.match(pane,/anchors\.margins: magickPane\.independentScreen \? 0 : 4/);
+  assert.match(pane,/anchors\.margins: magickPane\.standaloneAstrology \? 3/);
   assert.doesNotMatch(standaloneAstro,/Flickable\s*\{|ScrollView\s*\{|Process\s*\{|Timer\s*\{|FileView\s*\{/);
   assert.match(standaloneAstro,/StationMagickCelestialInstrument\s*\{/);
   assert.match(standaloneAstro,/compactMode: true/);

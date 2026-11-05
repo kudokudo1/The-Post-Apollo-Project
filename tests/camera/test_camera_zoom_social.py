@@ -36,7 +36,7 @@ class CameraZoomSocialTests(unittest.TestCase):
         self.assertIn('visible: camera.zoomSetupVisible', PANEL)
         self.assertIn('label: "↓ DOWNLOAD"', PANEL)
         self.assertIn('id: zoomStatusRail', PANEL)
-        self.assertIn('AUTOMATIC OPEN ON ENTRY', PANEL)
+        self.assertIn('ONE WEB CHECK ON ENTRY', PANEL)
         self.assertIn('available: !camera.busy', PANEL)
         self.assertIn('camera.zoomSetupVisible = !camera.zoomSetupVisible;', PANEL)
         self.assertIn('ZOOM_CLIENT_NOT_INSTALLED', PANEL)

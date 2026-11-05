@@ -1,0 +1,27 @@
+<!-- C2n NONINSTALLED review-only system-bus policy FRAGMENT.
+     Not a complete bus config and not appropriate for installation.
+     A root-owned package, static service principal and reviewed policy order
+     would be required before any system-bus integration. -->
+<!DOCTYPE busconfig PUBLIC
+ "-//freedesktop//DTD D-BUS Bus Configuration 1.0//EN"
+ "http://www.freedesktop.org/standards/dbus/1.0/busconfig.dtd">
+<busconfig>
+  <!-- Default-deny this name even when another bus policy allows broad traffic. -->
+  <policy context="default">
+    <deny own="org.postapollo.ConnectionsStatus1"/>
+    <deny send_destination="org.postapollo.ConnectionsStatus1"/>
+  </policy>
+  <!-- Only the separately installed static service principal may own the name. -->
+  <policy user="postapollo-connections">
+    <allow own="org.postapollo.ConnectionsStatus1"/>
+  </policy>
+  <!-- Optional trusted OS group grants read-only status transport, NOT app identity.
+       Other methods remain denied by the default rule above. -->
+  <policy group="postapollo-status-readers">
+    <allow send_destination="org.postapollo.ConnectionsStatus1"
+           send_interface="org.postapollo.ConnectionsStatus1"
+           send_path="/org/postapollo/ConnectionsStatus1"
+           send_member="GetStatus"
+           send_type="method_call"/>
+  </policy>
+</busconfig>

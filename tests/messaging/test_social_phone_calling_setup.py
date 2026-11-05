@@ -110,7 +110,7 @@ class CallingSetupUiTests(unittest.TestCase):
         self.assertIn(
             '&& phonePane.callPrerequisiteReport.state === "PACKAGE_NOT_INSTALLED"',
             text_block)
-        self.assertIn('No package was installed by Social.', self.ui)
+        self.assertIn('No installation was confirmed by Social.', self.ui)
         self.assertIn('Package check completed.', self.ui)
 
     def test_an_installer_request_is_never_reported_as_installed(self):
@@ -126,12 +126,12 @@ class CallingSetupUiTests(unittest.TestCase):
         self.assertIn('r.stageCandidate !== (', self.ui)
         self.assertIn('r.status === "STAGED_TERMINAL_REQUESTED"', self.ui)
         self.assertIn('r.status === "STAGED_TERMINAL_EXISTING"', self.ui)
-        self.assertIn('No package was installed by Social.', self.ui)
+        self.assertIn('No installation was confirmed by Social.', self.ui)
         self.assertIn('oFono is still reported missing.', self.ui)
         self.assertIn('CHECK AGAIN updates the existing service and call statuses', self.ui)
 
     def test_fedora_native_approval_and_missing_installer_explained(self):
-        self.assertIn("Fedora's software manager handles package review and approval.", self.ui)
+        self.assertIn("Review PackageKit's approval inside PHONE", self.ui)
         self.assertIn('Neither the embedded PackageKit terminal nor a supported package GUI was found.', self.ui)
         self.assertIn('No installation was confirmed.', self.ui)
         self.assertIn('Only oFono.', self.ui)

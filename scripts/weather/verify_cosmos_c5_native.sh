@@ -27,7 +27,7 @@ timeout --signal=TERM --kill-after=3s 20s env \
   >"$work/boot.log" 2>&1 || rc=$?
 cat "$work/boot.log"
 if [ "$rc" -ne 0 ] \
-   || ! grep -F "C5_NATIVE_PASS // MODES_LOAD_WITHOUT_SOURCES" "$work/boot.log" >/dev/null \
+   || ! grep -F "C5_NATIVE_PASS // ROUTED_HIDDEN_SOURCES_ACTIVE" "$work/boot.log" >/dev/null \
    || grep -F "C5_NATIVE_FAIL" "$work/boot.log" >/dev/null \
    || grep -F "Failed to load configuration" "$work/boot.log" >/dev/null \
    || grep -E "StationCosmosModesPane.qml.*(TypeError|ReferenceError|Unable to assign)" "$work/boot.log" >/dev/null; then

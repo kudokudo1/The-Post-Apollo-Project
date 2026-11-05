@@ -37,7 +37,10 @@ class PhoneConnectUiTests(unittest.TestCase):
         self.assertNotIn('startSetup()', visibility.group("body"))
         self.assertNotIn('refreshReadiness()', visibility.group("body"))
         self.assertNotIn('KdeConnectDbusProbe.py', self.ui)
-        self.assertEqual(self.ui.count('"--check"'), 1)
+        # Both checks are explicit: one Connect Phone provider check and
+        # one on-click Calls prerequisite diagnosis. Neither runs on open.
+        self.assertEqual(self.ui.count('"--check"'), 2)
+        self.assertIn('PhoneCallPrerequisites.py', self.ui)
 
     def test_projections_require_false_grants_and_unverified_link(self):
         self.assertIn('report.execution !== "READ_ONLY_CHECK"', self.ui)

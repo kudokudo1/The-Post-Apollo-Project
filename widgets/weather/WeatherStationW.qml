@@ -9,6 +9,7 @@ import "StationOfficialAlertPolicy.js" as OfficialAlertPolicy
 import "StationWeatherSubjectPanelPolicy.js" as SubjectPanelPolicy
 import "StationSubjectSourceBadgePolicy.js" as SubjectSourceBadge
 import "StationSubjectDefaultPolicy.js" as SubjectDefaultPolicy
+import "StationMediaViewportPolicy.js" as ViewportPolicy
 import "StationProviderDiagnosticsPolicy.js" as ProviderDiagnostics
 import "StationMagickSubjectPanelPolicy.js" as MagickPanelPolicy
 import "StationEarthSubjectPanelPolicy.js" as EarthPanelPolicy
@@ -122,6 +123,32 @@ PanelWindow {
     // M28-C: subject-native TOOLS launches reuse the ONE root StationTerminal.
     // This is a fixed mode, never a user-supplied shell command.
     property string subjectTerminalMode: "terminal"
+
+    // M31 // Sole SUBJECTS/MEDIA player rectangle for the native Stage
+    // Director WATCH v2 client. Coordinates are relative to the original
+    // 1000x700 Weather chassis, not to a screen or native wl_surface.
+    // This is READ-ONLY and grants no browser, scene, input or popup rights.
+    readonly property rect activeSubjectPlayerViewportRect: {
+        const owner = ViewportPolicy.owner(
+            menuOpen, subjectNavigationOpen, contextTerminalRequested,
+            subjectNavigator.visible, subjectNavigator.liveMediaKind !== "",
+            subjectNavigator.indexOpen);
+        if (owner === "none")
+            return Qt.rect(0, 0, 0, 0);
+        const bay = subjectNavigator.activePlayerViewportRect;
+        if (!ViewportPolicy.within(
+                    bay, subjectNavigator.width, subjectNavigator.height))
+            return Qt.rect(0, 0, 0, 0);
+        const origin = subjectNavigator.mapToItem(
+                           stationBackground, bay.x, bay.y);
+        const mapped = Qt.rect(origin.x, origin.y, bay.width, bay.height);
+        return ViewportPolicy.within(
+                   mapped, stationBackground.width, stationBackground.height)
+               ? mapped : Qt.rect(0, 0, 0, 0);
+    }
+    readonly property bool activeSubjectPlayerViewportValid:
+        activeSubjectPlayerViewportRect.width > 0
+        && activeSubjectPlayerViewportRect.height > 0
 
     // The SAME geometry drives the layer-shell input mask and the actual
     // transparent visual opening. Sway owns Kitty's global positioning.

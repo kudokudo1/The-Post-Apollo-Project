@@ -53,3 +53,42 @@ The Zoom Linux Meeting SDK is a separate CLI-oriented provider integration and n
 ## DECISIONS
 
 Account alias records do not carry token or login state. User must deliberately open native Zoom. The current source-only implementation does **not** claim Zoom is installed, authenticated, embedded or deployed on Fedora. No local machine writes, Quickshell restart, user login, PR merge or production activation were performed.
+
+---
+
+## HOSPITAL // M4c Automatic Zoom Entry (2026-11-05)
+
+### IMPLEMENTATION
+- PR #1299: Clicking Camera → ZOOM once detects an installed client and launches it if it is not already running or visible. The backend does not relaunch Zoom during routine connectivity polling.
+- Zoom header includes a top-right DOWNLOAD control plus APP / INTERNET / ZOOM HTTPS / LOGIN fields. LOGIN remains UNKNOWN until a verified provider authorization path is available.
+- Read-only HTTPS HEAD probes target example.com and zoom.us, on entry and each 90 seconds while the Zoom mode is visible. These destinations see the user's public IP; no account labels, cookies or credentials are included.
+- Launch is an external native Zoom client window, NOT an embedded meeting. Social aliases remain metadata.
+
+### HOW TO USE
+After separately approved native deployment: Camera → ZOOM launches the detected client automatically. The header displays status. Click DOWNLOAD to access installation options, still requiring explicit confirmation. Failed launch surfaces a RETRY action; no routine CHECK/OPEN buttons remain.
+
+### VERIFY
+- Added mocked tests for no duplicate launch, absent client, failing client, independent connectivity, and no fake login. Require exact-head CI.
+- Native Quickshell/Sway render and real Zoom launch remain unverified. A terminal command returning without errors does not prove a visible application window.
+- Stage Director currently has isolated/read-only host custody work; no approved native Zoom embedding support.
+
+### WATCH OUT FOR
+- The full operator goal is in-widget Zoom login and meeting video. M4c does not satisfy this part.
+- Service reachability is not authentication and is not proof every Zoom endpoint works. A network or firewall failure can also make HEAD probes show UNREACHABLE.
+- Social account aliases must never be treated as Zoom sessions or credentials.
+
+### CHECKLIST
+- [x] Autostart upon entering the Zoom mode without duplicate starts when already running
+- [x] Status fields and top-right DOWNLOAD control
+- [x] No Social login gate for mode access
+- [ ] Native Fedora/Quickshell acceptance
+- [ ] Broker-owned Zoom OAuth integration
+- [ ] Stage Director or provider SDK secure embedded conferencing
+
+### NEXT
+1. Verify actual visible Zoom launch on the operator's desktop before claiming readiness.
+2. Integrate Zoom provider authorization only through centrally owned Connections/Identity Center and secure OAuth grant handling.
+3. Prove compositor clipping/input/focus containment or an authorized Linux Zoom SDK/web meeting UI before claiming in-widget conferencing.
+
+### DECISIONS
+Source-only external Hospital-compatible work. No merge, desktop write, package install, restart, login, or production deployment. Operator acceptance remains pending.

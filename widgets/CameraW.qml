@@ -246,6 +246,13 @@ PanelWindow {
             return;
         }
         if (!payload || payload.ok !== true) {
+            if (action === "zoomOpen"
+                    && payload && payload.error === "ZOOM_CLIENT_NOT_INSTALLED") {
+                zoomClientStatus = {available: false, client: "none"};
+                zoomSetupVisible = true;
+                feedback = "ZOOM // CLIENT NOT INSTALLED // SEE SETUP OPTIONS";
+                return;
+            }
             feedback = "CAMERA // " + String(payload && payload.error || "ACTION_FAILED");
             if (action === "capture")
                 menuOpen = true;
@@ -1239,7 +1246,9 @@ PanelWindow {
                                 width: parent.width - 160
                                 height: 40
                                 label: camera.zoomClientStatus && camera.zoomClientStatus.available
-                                       ? "OPEN ZOOM CLIENT" : "SET UP ZOOM"
+                                       ? "OPEN ZOOM CLIENT"
+                                       : camera.zoomSetupVisible ? "HIDE INSTALL STEPS"
+                                       : "SET UP ZOOM"
                                 labelPixelSize: 12
                                 accentColor: Colors.magenta
                                 available: !camera.busy
@@ -1247,7 +1256,7 @@ PanelWindow {
                                     if (camera.zoomClientStatus && camera.zoomClientStatus.available)
                                         camera.launchZoomClient();
                                     else
-                                        camera.zoomSetupVisible = true;
+                                        camera.zoomSetupVisible = !camera.zoomSetupVisible;
                                 }
                             }
                         }

@@ -126,7 +126,7 @@ test("V4e is a UI-only containment patch retaining original Sun/JPL and MAGICK c
     assert.match(network,/StationCosmosHeliocentricPane\s*\{/);
     assert.match(network,/compactHelioToolbar/);
     assert.match(network,/Flickable\s*\{/);
-    assert.match(code,/function position\(scene,point,width,height,scale,tilt,domainAu\)/);
+    assert.match(code,/function position\(scene,point,width,height,scale,tilt,domainAu,panX,panY\)/);
     assert.match(code,/function hit\(scene,px,py,w,h,scale,tilt,tolerance,domainAu\)/);
     for(const s of [code,pane,network]){
         for(const forbidden of ["Process {","XMLHttpRequest","new WebSocket",

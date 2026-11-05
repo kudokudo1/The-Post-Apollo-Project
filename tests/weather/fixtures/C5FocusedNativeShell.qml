@@ -55,7 +55,8 @@ ShellRoot {
                 if (focused.family !== "astronomy"
                         || focused.kind !== "planet-clock")
                     return root.fail("WRONG_CLOCK_ROUTE");
-                if (focused.displayedPlanetRows.length !== 5)
+                if (focused.displayedPlanetRows.length !== 5
+                        || focused.visibleClockLaneCount !== 5)
                     return root.fail("EMPTY_PLANET_CLOCK_LANES");
                 if (focused.sourceStatus === "")
                     return root.fail("NO_MISSING_SOURCE_STATUS");

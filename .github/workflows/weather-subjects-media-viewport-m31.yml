@@ -1,0 +1,72 @@
+name: Weather M31 active SUBJECTS MEDIA viewer viewport
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'widgets/weather/StationMediaViewportPolicy.js'
+      - 'widgets/weather/StationMediaSubjectPane.qml'
+      - 'widgets/weather/StationWorkspaceSurface.qml'
+      - 'widgets/weather/StationSubjectNavigator.qml'
+      - 'widgets/weather/WeatherStationW.qml'
+      - 'tests/weather/test_subjects_media_viewport_m31.js'
+      - 'tests/weather/test_media_subject_panels_d1.js'
+      - 'tests/weather/fixtures/M31MediaViewport.qml'
+      - 'scripts/weather/verify_media_viewport_native_m31.sh'
+      - '.github/workflows/weather-subjects-media-viewport-m31.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  source-and-ownership:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Validate bounded MEDIA geometry, navigation and existing owner contracts
+        run: |
+          set -euo pipefail
+          node --test tests/weather/test_subjects_media_viewport_m31.js
+          node --test tests/weather/test_station_news_viewport_geometry.js
+          node --test tests/weather/test_media_subject_panels_d1.js
+          node --test tests/weather/test_index_media_catalog_cutover_m28j.js
+          node --test tests/weather/test_workspace_landing_w1.js
+          node --test tests/weather/test_workspace_left_rail_w1r.js
+          node --test tests/weather/test_classic_source_retirement_m28v.js
+          node --test tests/weather/test_tools_terminal_cutover_m28c.js
+
+  actual-quickshell-qml:
+    runs-on: ubuntu-latest
+    container:
+      image: fedora:44
+    timeout-minutes: 23
+    steps:
+      - name: Install disposable Fedora Quickshell 0.3 and Xvfb
+        run: |
+          set -euo pipefail
+          dnf install -y --setopt=install_weak_deps=False dnf5-plugins
+          dnf copr enable -y errornointernet/quickshell
+          dnf install -y --setopt=install_weak_deps=False \
+            quickshell qt6-qtdeclarative qt6-qt5compat qt6-qtbase-gui \
+            qt6-qtsvg git nodejs coreutils findutils \
+            xorg-x11-server-Xvfb
+          quickshell --version | grep '0.3.'
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Prove reactive QML MEDIA player geometry on live native QtQuick Loader
+        run: |
+          set -euo pipefail
+          bash scripts/weather/verify_media_viewport_native_m31.sh
+      - name: State boundaries
+        if: always()
+        run: |
+          echo 'Actual Quickshell/QML in isolated Xvfb, no user machine mutation.' >> "$GITHUB_STEP_SUMMARY"
+          echo 'No embedded browser, production Wayland pairing, Kitty launch, or Stage Director input authorization.' >> "$GITHUB_STEP_SUMMARY"

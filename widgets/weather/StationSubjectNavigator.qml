@@ -6,6 +6,7 @@ import "StationWeatherSubjectPanelPolicy.js" as WeatherPanelPolicy
 import "StationCosmosSubjectPanelPolicy.js" as CosmosPanelPolicy
 import "StationEarthSubjectPanelPolicy.js" as EarthPanelPolicy
 import "StationMediaSubjectPanelPolicy.js" as MediaPanelPolicy
+import "StationMediaViewportPolicy.js" as ViewportPolicy
 import "StationMagickSubjectPanelPolicy.js" as MagickPanelPolicy
 import "StationToolsSubjectPanelPolicy.js" as ToolsPanelPolicy
 import "StationWorkspaceNavigationPolicy.js" as Workspace
@@ -78,6 +79,25 @@ Rectangle {
         EarthPanelPolicy.kindForRoute(currentPath)
     readonly property string liveMediaKind:
         MediaPanelPolicy.kindForRoute(currentPath)
+
+    // One active NEWS viewport only. Workspace and INDEX intentionally have
+    // different MEDIA panes; select by actual presentation ownership.
+    readonly property rect activePlayerViewportRect: {
+        if (!browser.visible || browser.liveMediaKind === "")
+            return Qt.rect(0, 0, 0, 0);
+        const pane = browser.indexOpen ? mediaLivePane : workspaceLoader.item;
+        if (!pane || !pane.visible || (browser.indexOpen
+                                      ? !mediaLivePane.visible
+                                      : !workspaceLoader.visible))
+            return Qt.rect(0, 0, 0, 0);
+        const bay = pane.activePlayerViewportRect;
+        if (!ViewportPolicy.within(bay, pane.width, pane.height))
+            return Qt.rect(0, 0, 0, 0);
+        const origin = pane.mapToItem(browser, bay.x, bay.y);
+        const mapped = Qt.rect(origin.x, origin.y, bay.width, bay.height);
+        return ViewportPolicy.within(mapped, browser.width, browser.height)
+               ? mapped : Qt.rect(0, 0, 0, 0);
+    }
     readonly property string liveMagickKind:
         MagickPanelPolicy.kindForRoute(currentPath)
     readonly property string liveToolsKind:
@@ -257,6 +277,7 @@ Rectangle {
         sourceComponent: Component {
             StationWorkspaceSurface {
                 currentPath: browser.currentPath
+                subjectWorkspaceActive: !browser.indexOpen
                 newsMentionOverlay: browser.newsMentionOverlay
                 deckEnabled: browser.homeDeckEnabled
                 deckHeld: browser.homeDeckHeld
@@ -616,7 +637,8 @@ Rectangle {
         anchors.topMargin: liveChildren.visible ? 6 : 14
         anchors.bottom: previewNote.top
         anchors.bottomMargin: 6
-        visible: browser.visible && browser.liveMediaKind !== ""
+        visible: browser.visible && browser.indexOpen
+                 && browser.liveMediaKind !== ""
         subjectRoute: browser.currentPath
         runtimeNowMs: browser.runtimeNowMs
         onNewsMapRequested: function(payload) {

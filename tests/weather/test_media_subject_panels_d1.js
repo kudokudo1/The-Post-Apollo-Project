@@ -170,7 +170,10 @@ test("CLASSIC MEDIA behavior and NEWS-to-MAP handoff remain available", () => {
   assert.match(browser,/StationCosmosSubjectPane\s*\{/);
   assert.match(browser,/StationEarthSubjectPane\s*\{/);
   assert.match(browser,/StationMediaSubjectPane\s*\{/);
-  assert.match(browser,/visible: browser\.visible && browser\.liveMediaKind !== ""/);
+  // INDEX now owns its MEDIA hub only when INDEX is actually open;
+  // the persistent workspace has the visible MEDIA hub otherwise.
+  assert.match(browser,/visible: browser\.visible && browser\.indexOpen\s*&& browser\.liveMediaKind !== ""/);
+  assert.match(browser,/subjectWorkspaceActive: !browser\.indexOpen/);
   assert.ok(!station.includes("weatherContentLoader"));
   assert.match(browser,/function showNewsMentionsOnEarth\(payload\)/);
   assert.match(browser,/newsMentionOverlay = incoming/);

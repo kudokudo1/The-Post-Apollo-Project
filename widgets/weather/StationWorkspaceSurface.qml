@@ -2,6 +2,7 @@ import QtQuick
 import "../../components"
 import "StationWorkspaceNavigationPolicy.js" as Workspace
 import "StationHomeDeckPolicy.js" as HomeDeck
+import "StationMediaViewportPolicy.js" as ViewportPolicy
 
 // W1r // Left family rail and bottom submodes, NOT a new source framework.
 // HOME is one persistent original StationHome instance across all tabs.
@@ -10,6 +11,9 @@ Rectangle {
     id: surface
     color: Colors.black
     property string currentPath: "home/overview"
+    // INDEX remains mounted for persistent HOME, but its own MEDIA viewer
+    // must be dormant when INDEX is active and owns the visible MEDIA player.
+    property bool subjectWorkspaceActive: true
     property var newsMentionOverlay: null
     property var weatherService: null
     property var spaceService: null
@@ -41,6 +45,21 @@ Rectangle {
     readonly property var activeMapRuntimeRows:
         activeFamily === "earth" ? earthSourcePane.runtimeRows
         : activeFamily === "weather" ? weatherSourcePane.runtimeRows : []
+    // MEDIA only: rebase the actual visible NEWS hub into workspace-local
+    // coordinates. No duplicate route hub, no static hard-coded viewport.
+    readonly property rect activePlayerViewportRect: {
+        if (!subjectWorkspaceActive || !surface.visible
+                || activeFamily !== "media" || !mediaWorkspacePane.visible)
+            return Qt.rect(0, 0, 0, 0);
+        const bay = mediaWorkspacePane.activePlayerViewportRect;
+        if (!ViewportPolicy.within(
+                    bay, mediaWorkspacePane.width, mediaWorkspacePane.height))
+            return Qt.rect(0, 0, 0, 0);
+        const origin = mediaWorkspacePane.mapToItem(surface, bay.x, bay.y);
+        const mapped = Qt.rect(origin.x, origin.y, bay.width, bay.height);
+        return ViewportPolicy.within(mapped, surface.width, surface.height)
+               ? mapped : Qt.rect(0, 0, 0, 0);
+    }
     signal routeRequested(string path)
     signal terminalLaunchRequested(string mode)
     signal newsMapRequested(var payload)
@@ -152,8 +171,10 @@ Rectangle {
         }
 
         StationMediaSubjectPane {
+            id: mediaWorkspacePane
             anchors.fill: parent
             visible: surface.activeFamily === "media"
+                     && surface.subjectWorkspaceActive
             subjectRoute: surface.currentPath
             runtimeNowMs: surface.runtimeNowMs
             onNewsMapRequested: function(payload) {

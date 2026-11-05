@@ -30,7 +30,7 @@ class CallingSetupUiTests(unittest.TestCase):
         self.assertNotIn('FloatingWindow {', self.ui)
         self.assertNotIn('PanelWindow {', self.ui)
 
-    def test_click_uses_safe_gui_launcher_not_terminal_installer(self):
+    def test_click_uses_safe_installer_launcher_not_direct_host_install(self):
         start = self.ui.index('function callingSupportSetup()')
         end = self.ui.index('function callingSupportSetupText()', start)
         action = self.ui[start:end]
@@ -110,31 +110,61 @@ class CallingSetupUiTests(unittest.TestCase):
         self.assertIn(
             '&& phonePane.callPrerequisiteReport.state === "PACKAGE_NOT_INSTALLED"',
             text_block)
-        self.assertIn('No package was installed by Social.', self.ui)
+        self.assertIn('No installation was confirmed by Social.', self.ui)
         self.assertIn('Package check completed.', self.ui)
 
     def test_an_installer_request_is_never_reported_as_installed(self):
         self.assertIn('id: callSetupProcess', self.ui)
         self.assertIn('r.schema !== "post-apollo.phone.calling-setup-handoff.v0"', self.ui)
-        self.assertIn('r.execution !== "USER_INITIATED_GUI_HANDOFF"', self.ui)
+        self.assertIn('r.execution !== "USER_INITIATED_INSTALLER_HANDOFF"', self.ui)
         self.assertIn('r.package !== "ofono"', self.ui)
         self.assertIn('r.packageInstalled !== false', self.ui)
         self.assertIn('r.hfpVerified !== false', self.ui)
         self.assertIn('r.trustedPhoneLink !== "UNVERIFIED"', self.ui)
         self.assertIn('r.contentAccessEnabled !== false', self.ui)
         self.assertIn('r.installerOpened !== (r.status === "GUI_OPEN_REQUESTED")', self.ui)
-        self.assertIn('No package was installed by Social.', self.ui)
+        self.assertIn('r.stageCandidate !== (', self.ui)
+        self.assertIn('r.status === "STAGED_TERMINAL_REQUESTED"', self.ui)
+        self.assertIn('r.status === "STAGED_TERMINAL_EXISTING"', self.ui)
+        self.assertIn('No installation was confirmed by Social.', self.ui)
         self.assertIn('oFono is still reported missing.', self.ui)
         self.assertIn('CHECK AGAIN updates the existing service and call statuses', self.ui)
 
     def test_fedora_native_approval_and_missing_installer_explained(self):
-        self.assertIn("Fedora's software manager handles package review and approval.", self.ui)
-        self.assertIn('No supported graphical package installer was found.', self.ui)
+        self.assertIn("Review PackageKit's approval inside PHONE", self.ui)
+        self.assertIn('Neither the embedded PackageKit terminal nor a supported package GUI was found.', self.ui)
         self.assertIn('No installation was confirmed.', self.ui)
         self.assertIn('Only oFono.', self.ui)
         self.assertIn('GUI_UNAVAILABLE', self.ui)
         self.assertIn('GUI_LAUNCH_FAILED', self.ui)
         self.assertIn('UNSUPPORTED_HOST', self.ui)
+
+    def test_staged_packagekit_terminal_reuses_verified_phone_cutout(self):
+        self.assertIn('property string stagePurpose: "PHONE"', self.ui)
+        self.assertIn('phonePane.stagePurpose = "OFONO";', self.ui)
+        self.assertIn('phonePane.stageWanted = true;', self.ui)
+        self.assertIn('stagePurpose === "OFONO" ? "--sync-installer" : "--sync"', self.ui)
+        self.assertIn('WeatherStage.StationChassisCutout {', self.ui)
+        self.assertIn('result.verifiedHole === true', self.ui)
+        self.assertIn('visible: phonePane.stageHoleActive', self.ui)
+        self.assertIn('"OFONO INSTALL // TERMINAL BELOW"', self.ui)
+        self.assertIn('phonePane.callSetupStatus = "RECHECKING";', self.ui)
+        self.assertIn('phonePane.diagnoseCallPrerequisites();', self.ui)
+        self.assertIn('phonePane.refreshPhoneAudioControls();', self.ui)
+        self.assertIn('? "RETURN TO PHONE" : "CLOSE SETUP"', self.ui)
+
+    def test_leaving_phone_never_kills_an_active_package_transaction(self):
+        start = self.ui.index('function closeStagedSetup()')
+        end = self.ui.index('function syncStagedSetup()', start)
+        cleanup = self.ui[start:end]
+        self.assertIn('var installer = stagePurpose === "OFONO";', cleanup)
+        self.assertIn('if (installer) {', cleanup)
+        self.assertIn('return;', cleanup)
+        self.assertLess(cleanup.index('if (installer) {'),
+                        cleanup.index('if (!stageCloseProcess.running)'))
+        self.assertNotIn('systemctl', cleanup)
+        self.assertIn('if (selectedSection !== "DEVICE") closeStagedSetup();', self.ui)
+        self.assertIn('if (!visible) closeStagedSetup();', self.ui)
 
     def test_no_silent_setup_from_opening_phone_or_changing_tabs(self):
         start = self.ui.index('onVisibleChanged: {')

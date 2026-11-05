@@ -56,7 +56,7 @@ class SavedBlueFerryUiTests(unittest.TestCase):
         self.assertIn('phonePane.stageState === "ALIGNED"', self.ui)
         self.assertIn('phonePane.stageState = "FINISHED"', self.ui)
         self.assertIn('phonePane.refreshSavedBridgeState();', self.ui)
-        self.assertIn('BlueFerry client closed.', self.ui)
+        self.assertIn('Terminal closed. Checking the latest provider and package status...', self.ui)
         self.assertNotIn('bluetoothctl remove', self.ui)
         self.assertNotIn('blueferry reconnect', self.ui)
 

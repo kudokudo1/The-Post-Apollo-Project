@@ -58,9 +58,12 @@ Rectangle {
 
     function callingSupportSetupText() {
         if (callSetupStatus === "OPENING")
-            return "Opening Fedora's graphical installer for oFono...";
+            return "Opening the oFono installer in PHONE...";
+        if (callSetupStatus === "STAGED_TERMINAL_REQUESTED"
+                || callSetupStatus === "STAGED_TERMINAL_EXISTING")
+            return "PackageKit runs in the terminal below. Review and confirm its transaction; Social has not assumed installation succeeded.";
         if (callSetupStatus === "GUI_OPEN_REQUESTED")
-            return "Fedora's software installer was requested. Review and approve oFono there if you want it installed, then return here and choose CHECK AGAIN. No package was installed by Social.";
+            return "A native PackageKit installer was requested. Review and approve it there, then choose CHECK AGAIN. No installation was confirmed by Social.";
         if (callSetupStatus === "RECHECKING")
             return "Checking oFono, the system service and BlueFerry call status...";
         if (callSetupStatus === "INSTALL_NOT_CONFIRMED")
@@ -68,7 +71,7 @@ Rectangle {
         if (callSetupStatus === "FOLLOWUP_REQUIRED")
             return "Package check completed. The next step is shown below. CHECK AGAIN updates the existing service and call statuses without changing audio.";
         if (callSetupStatus === "GUI_UNAVAILABLE")
-            return "No supported graphical package installer was found. oFono remains uninstalled. A system-audio integration is still needed.";
+            return "Neither the embedded PackageKit terminal nor a supported package GUI was found. No installation was requested.";
         if (callSetupStatus === "GUI_LAUNCH_FAILED")
             return "The graphical package installer could not open. No installation was confirmed.";
         if (callSetupStatus === "UNSUPPORTED_HOST")
@@ -244,6 +247,7 @@ Rectangle {
         savedBridgeProcess.running = true;
     }
     property bool stageWanted: false
+    property string stagePurpose: "PHONE"
     property string stageState: "IDLE"
     property int stagePollCount: 0
     property int stageHostX: 0
@@ -278,9 +282,21 @@ Rectangle {
 
     function closeStagedSetup() {
         if (!stageWanted) return;
+        var installer = stagePurpose === "OFONO";
         stageWanted = false;
         stageState = "IDLE";
         stagePollCount = 0;
+        stagePurpose = "PHONE";
+        if (installer) {
+            // A running package transaction must never be killed by a
+            // navigation event or by returning from the PHONE panel.
+            if (visible && selectedSection === "DEVICE") {
+                callSetupStatus = "RECHECKING";
+                diagnoseCallPrerequisites();
+                refreshPhoneAudioControls();
+            }
+            return;
+        }
         if (visible && selectedSection === "DEVICE")
             refreshSavedBridgeState();
         if (!stageCloseProcess.running) {
@@ -307,7 +323,7 @@ Rectangle {
         stageProcess.command = [
             "python3",
             Quickshell.shellPath("services/phone/PhoneStageDirector.py"),
-            "--sync",
+            stagePurpose === "OFONO" ? "--sync-installer" : "--sync",
             String(Math.round(x + stageHoleX)),
             String(Math.round(y + stageHoleY)),
             String(stageHoleWidth),
@@ -406,6 +422,7 @@ Rectangle {
             callPrerequisiteReport = ({});
             callPrerequisiteCheck = "NOT CHECKED";
             stageWanted = false;
+            stagePurpose = "PHONE";
             stageState = "IDLE";
             stagePollCount = 0;
             // No pairing or inventory action runs automatically on menu open.
@@ -634,18 +651,29 @@ Rectangle {
                 try {
                     var r = JSON.parse(String(text || ""));
                     if (r.schema !== "post-apollo.phone.calling-setup-handoff.v0"
-                            || r.execution !== "USER_INITIATED_GUI_HANDOFF"
+                            || r.execution !== "USER_INITIATED_INSTALLER_HANDOFF"
                             || r.package !== "ofono"
-                            || ["GUI_OPEN_REQUESTED", "GUI_UNAVAILABLE", "GUI_LAUNCH_FAILED",
-                                "UNSUPPORTED_HOST", "NOT_APPLICABLE",
-                                "DIAGNOSIS_UNAVAILABLE"].indexOf(r.status) < 0
+                            || ["STAGED_TERMINAL_REQUESTED", "STAGED_TERMINAL_EXISTING",
+                                "GUI_OPEN_REQUESTED", "GUI_UNAVAILABLE",
+                                "GUI_LAUNCH_FAILED", "UNSUPPORTED_HOST",
+                                "NOT_APPLICABLE", "DIAGNOSIS_UNAVAILABLE",
+                                "STAGE_UNAVAILABLE"].indexOf(r.status) < 0
                             || r.installerOpened !== (r.status === "GUI_OPEN_REQUESTED")
+                            || r.stageCandidate !== (
+                                r.status === "STAGED_TERMINAL_REQUESTED"
+                                || r.status === "STAGED_TERMINAL_EXISTING")
                             || r.packageInstalled !== false
                             || r.hfpVerified !== false
                             || r.trustedPhoneLink !== "UNVERIFIED"
                             || r.contentAccessEnabled !== false)
                         throw new Error("Invalid installer handoff");
                     phonePane.callSetupStatus = r.status;
+                    if (r.stageCandidate === true) {
+                        phonePane.stagePurpose = "OFONO";
+                        phonePane.stageState = "WAITING";
+                        phonePane.stageWanted = true;
+                        phonePane.stagePollCount = 0;
+                    }
                 } catch (error) {
                     phonePane.callSetupStatus = "GUI_LAUNCH_FAILED";
                 }
@@ -708,6 +736,7 @@ Rectangle {
                     phonePane.nativeSetupStatus = result.status;
                     if (result.status === "OPEN_REQUESTED"
                             && result.stageCandidate && result.target === "iphone") {
+                        phonePane.stagePurpose = "PHONE";
                         phonePane.stageState = "WAITING";
                         phonePane.stageWanted = true;
                         phonePane.stagePollCount = 0;
@@ -747,9 +776,17 @@ Rectangle {
                              && phonePane.stageState === "ALIGNED") {
                         // The staged terminal exited. That is not evidence of
                         // phone disconnection. Refresh the local service state.
+                        var installer = phonePane.stagePurpose === "OFONO";
                         phonePane.stageWanted = false;
+                        phonePane.stagePurpose = "PHONE";
                         phonePane.stageState = "FINISHED";
-                        phonePane.refreshSavedBridgeState();
+                        if (installer) {
+                            phonePane.callSetupStatus = "RECHECKING";
+                            phonePane.diagnoseCallPrerequisites();
+                            phonePane.refreshPhoneAudioControls();
+                        } else {
+                            phonePane.refreshSavedBridgeState();
+                        }
                     } else if (result.state === "POSITION_REQUESTED"
                              || result.state === "ACTOR_NOT_FOUND"
                              || result.state === "HOST_NOT_FOUND")
@@ -1173,7 +1210,7 @@ Rectangle {
                         width: parent.width
                         visible: installCallingSupport.visible
                                  && phonePane.callPrerequisiteReport.state === "PACKAGE_NOT_INSTALLED"
-                        text: "Only oFono. Fedora's software manager handles package review and approval. Social does not change your system automatically."
+                        text: "Only oFono. Review PackageKit's approval inside PHONE (or its native fallback). Social never silently confirms a transaction."
                         color: Colors.white
                         font.pixelSize: 10
                         wrapMode: Text.WordWrap
@@ -1277,11 +1314,15 @@ Rectangle {
                     height: 45 // Stable bay position across stage state changes.
                     visible: phonePane.stageWanted || phonePane.stageState === "UNAVAILABLE" || phonePane.stageState === "FINISHED"
                     text: phonePane.stageState === "ALIGNED"
-                          ? "BLUEFERRY SETUP // TERMINAL BELOW"
+                          ? (phonePane.stagePurpose === "OFONO"
+                             ? "OFONO INSTALL // TERMINAL BELOW"
+                             : "BLUEFERRY SETUP // TERMINAL BELOW")
                           : phonePane.stageState === "FINISHED"
-                          ? "BlueFerry client closed. Checking saved configuration and background service..."
+                          ? "Terminal closed. Checking the latest provider and package status..."
                           : phonePane.stageState === "UNAVAILABLE"
-                          ? "Stage placement could not be verified. Terminal window remains external; no Social phone connection was granted."
+                          ? "Stage placement could not be verified. The terminal may remain external; no phone or audio change was made by Social."
+                          : phonePane.stagePurpose === "OFONO"
+                          ? "Placing the interactive PackageKit installer inside PHONE. Review its own confirmation."
                           : "Placing BlueFerry's terminal inside the PHONE workspace..."
                     color: Colors.orange
                     font.pixelSize: 10
@@ -1292,10 +1333,12 @@ Rectangle {
                     width: Math.min(190, setupColumn.width)
                     height: 32
                     visible: phonePane.stageWanted
-                    label: "CLOSE SETUP"
+                    label: phonePane.stagePurpose === "OFONO"
+                           ? "RETURN TO PHONE" : "CLOSE SETUP"
                     labelPixelSize: 9
-                    accentColor: Colors.red
-                    destructive: true
+                    accentColor: phonePane.stagePurpose === "OFONO"
+                                 ? Colors.magenta : Colors.red
+                    destructive: phonePane.stagePurpose !== "OFONO"
                     onTriggered: phonePane.closeStagedSetup()
                 }
 

@@ -47,6 +47,8 @@ PanelWindow {
         SocialAccountDetailsStore.accountNamesFor(zoomIdentityId, "zoom")
     property string selectedZoomAccountId: ""
     property var zoomClientStatus: null
+    // Missing installations must show an actionable setup, not a disabled button.
+    property bool zoomSetupVisible: false
     onZoomIdentityIdChanged: selectedZoomAccountId = ""
     // The native slurp overlay owns the region drag; Camera unmaps while it runs.
     property bool nativeRegionSelecting: false
@@ -244,6 +246,13 @@ PanelWindow {
             return;
         }
         if (!payload || payload.ok !== true) {
+            if (action === "zoomOpen"
+                    && payload && payload.error === "ZOOM_CLIENT_NOT_INSTALLED") {
+                zoomClientStatus = {available: false, client: "none"};
+                zoomSetupVisible = true;
+                feedback = "ZOOM // CLIENT NOT INSTALLED // SEE SETUP OPTIONS";
+                return;
+            }
             feedback = "CAMERA // " + String(payload && payload.error || "ACTION_FAILED");
             if (action === "capture")
                 menuOpen = true;
@@ -251,8 +260,9 @@ PanelWindow {
         }
         if (action === "zoomStatus") {
             zoomClientStatus = payload;
-            feedback = payload.available ? "ZOOM // NATIVE CLIENT DETECTED // LOGIN UNKNOWN"
-                                         : "ZOOM // CLIENT NOT INSTALLED";
+            zoomSetupVisible = !payload.available;
+            feedback = payload.available ? "ZOOM // CLIENT DETECTED // LOGIN UNKNOWN"
+                                         : "ZOOM // NOT INSTALLED // SETUP OPTIONS BELOW";
         } else if (action === "zoomOpen") {
             feedback = "ZOOM // OPEN REQUESTED // SIGN IN THROUGH ZOOM CLIENT";
         } else if (action === "status") {
@@ -1235,13 +1245,129 @@ PanelWindow {
                             ActionButton {
                                 width: parent.width - 160
                                 height: 40
-                                label: "OPEN ZOOM CLIENT"
+                                label: camera.zoomClientStatus && camera.zoomClientStatus.available
+                                       ? "OPEN ZOOM CLIENT"
+                                       : camera.zoomSetupVisible ? "HIDE INSTALL STEPS"
+                                       : "SET UP ZOOM"
                                 labelPixelSize: 12
                                 accentColor: Colors.magenta
                                 available: !camera.busy
-                                           && camera.zoomClientStatus !== null
-                                           && camera.zoomClientStatus.available
-                                onLeftClicked: camera.launchZoomClient()
+                                onLeftClicked: {
+                                    if (camera.zoomClientStatus && camera.zoomClientStatus.available)
+                                        camera.launchZoomClient();
+                                    else
+                                        camera.zoomSetupVisible = !camera.zoomSetupVisible;
+                                }
+                            }
+                        }
+
+                        // Stay inside Camera: an absent client gets explicit
+                        // local setup guidance rather than a dead launch control.
+                        Column {
+                            id: zoomInstallGuide
+                            width: parent.width
+                            spacing: 10
+                            visible: camera.zoomSetupVisible
+
+                            Rectangle {
+                                width: parent.width
+                                height: 2
+                                color: Colors.magenta
+                            }
+                            GohuText {
+                                width: parent.width
+                                height: 22
+                                font.pixelSize: 13
+                                color: Colors.magenta
+                                text: "ZOOM // INSTALL REQUIRED"
+                            }
+                            GohuText {
+                                width: parent.width
+                                wrapMode: Text.WordWrap
+                                font.pixelSize: 11
+                                color: Colors.white
+                                text: "A Zoom desktop client must be installed first. Camera detects it after CHECK ZOOM. This panel never installs anything automatically."
+                            }
+
+                            GohuText {
+                                width: parent.width
+                                font.pixelSize: 11
+                                color: Colors.cyan
+                                text: "OPTION A // OFFICIAL FEDORA RPM"
+                            }
+                            GohuText {
+                                width: parent.width
+                                wrapMode: Text.WordWrap
+                                font.pixelSize: 10
+                                color: Colors.white
+                                text: "Download Zoom Workplace for Linux (Fedora, 64-bit) from Zoom. On Silverblue, install the saved RPM using rpm-ostree and reboot when ready."
+                            }
+                            ActionButton {
+                                width: parent.width
+                                height: 36
+                                label: "ZOOM OFFICIAL DOWNLOAD // OPENS BROWSER"
+                                labelPixelSize: 10
+                                accentColor: Colors.cyan
+                                // User-clicked navigation only; do not open browser on tab entry.
+                                onLeftClicked: Qt.openUrlExternally("https://zoom.us/download?os=linux")
+                            }
+                            TextField {
+                                width: parent.width
+                                height: 34
+                                readOnly: true
+                                selectByMouse: true
+                                font.pixelSize: 10
+                                color: Colors.white
+                                text: "sudo rpm-ostree install ~/Downloads/zoom_x86_64.rpm"
+                                background: Rectangle {
+                                    color: Colors.black
+                                    border.width: 1
+                                    border.color: Colors.cyan
+                                }
+                            }
+                            GohuText {
+                                width: parent.width
+                                wrapMode: Text.WordWrap
+                                font.pixelSize: 10
+                                color: Colors.orange
+                                text: "Use the actual downloaded RPM filename. The rpm-ostree command stages a new deployment; it does not change the running system until reboot."
+                            }
+
+                            GohuText {
+                                width: parent.width
+                                font.pixelSize: 11
+                                color: Colors.cyan
+                                text: "OPTION B // FLATHUB COMMUNITY PACKAGE"
+                            }
+                            TextField {
+                                width: parent.width
+                                height: 34
+                                readOnly: true
+                                selectByMouse: true
+                                font.pixelSize: 10
+                                color: Colors.white
+                                text: "flatpak install flathub us.zoom.Zoom"
+                                background: Rectangle {
+                                    color: Colors.black
+                                    border.width: 1
+                                    border.color: Colors.cyan
+                                }
+                            }
+                            GohuText {
+                                width: parent.width
+                                wrapMode: Text.WordWrap
+                                font.pixelSize: 10
+                                color: Colors.orange
+                                text: "The Zoom package on Flathub is community-maintained and unverified by Zoom. No installation is automatic."
+                            }
+                            ActionButton {
+                                width: parent.width
+                                height: 38
+                                label: "RECHECK ZOOM AFTER INSTALL"
+                                labelPixelSize: 11
+                                accentColor: Colors.yellow
+                                available: !camera.busy
+                                onLeftClicked: camera.run("zoomStatus", ["zoom-status"])
                             }
                         }
 

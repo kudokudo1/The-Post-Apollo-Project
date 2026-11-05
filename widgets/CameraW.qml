@@ -1119,6 +1119,150 @@ PanelWindow {
                     }
                 }
 
+                Flickable {
+                    id: zoomPage
+                    anchors.fill: parent
+                    visible: camera.activeView === "zoom"
+                    clip: true
+                    contentHeight: zoomContent.implicitHeight
+                    boundsBehavior: Flickable.StopAtBounds
+
+                    Column {
+                        id: zoomContent
+                        width: zoomPage.width
+                        spacing: 12
+
+                        GohuText {
+                            width: parent.width
+                            height: 31
+                            font.pixelSize: 16
+                            color: Colors.magenta
+                            text: "ZOOM // MEETINGS"
+                        }
+
+                        GohuText {
+                            width: parent.width
+                            wrapMode: Text.WordWrap
+                            font.pixelSize: 11
+                            color: Colors.cyan
+                            text: "CAMERA MODE // NATIVE ZOOM CLIENT + SOCIAL ACCOUNT LABELS"
+                        }
+
+                        Rectangle {
+                            width: parent.width
+                            height: 2
+                            color: Colors.cyan
+                        }
+
+                        GohuText {
+                            width: parent.width
+                            font.pixelSize: 13
+                            color: Colors.white
+                            text: "SOCIAL IDENTITY // " + camera.zoomIdentityId
+                        }
+
+                        GohuText {
+                            width: parent.width
+                            wrapMode: Text.WordWrap
+                            font.pixelSize: 10
+                            color: Colors.cyan
+                            text: "ACCOUNT NAMES LIVE FROM SOCIAL // USER SETTINGS // ACCOUNT NAMES // ZOOM"
+                        }
+
+                        GohuText {
+                            width: parent.width
+                            font.pixelSize: 11
+                            color: Colors.yellow
+                            text: camera.zoomAccountNames.length
+                                  ? "SAVED ZOOM NAMES // " + camera.zoomAccountNames.length
+                                  : "NO ZOOM ACCOUNT NAMES FOR THIS SOCIAL IDENTITY"
+                        }
+
+                        Repeater {
+                            model: camera.zoomAccountNames
+                            ActionButton {
+                                width: zoomContent.width
+                                height: 38
+                                label: modelData.label + " // ALIAS ONLY"
+                                labelPixelSize: 11
+                                accentColor: Colors.white
+                                selected: camera.selectedZoomAccountId === modelData.id
+                                onLeftClicked: camera.selectedZoomAccountId = modelData.id
+                            }
+                        }
+
+                        GohuText {
+                            width: parent.width
+                            wrapMode: Text.WordWrap
+                            font.pixelSize: 10
+                            color: Colors.orange
+                            text: "Account names are display labels, not active Zoom login sessions. Selecting an alias does NOT switch the Zoom client account."
+                        }
+
+                        Rectangle {
+                            width: parent.width
+                            height: 2
+                            color: Colors.cyan
+                        }
+
+                        GohuText {
+                            width: parent.width
+                            font.pixelSize: 12
+                            color: camera.zoomClientStatus && camera.zoomClientStatus.available
+                                   ? Colors.cyan : Colors.orange
+                            text: camera.zoomClientStatus === null
+                                  ? "ZOOM CLIENT // NOT CHECKED"
+                                  : camera.zoomClientStatus.available
+                                    ? "ZOOM CLIENT // INSTALLED (" + camera.zoomClientStatus.client.toUpperCase() + ")"
+                                    : "ZOOM CLIENT // NOT FOUND"
+                        }
+
+                        Row {
+                            width: parent.width
+                            height: 42
+                            spacing: 10
+
+                            ActionButton {
+                                width: 150
+                                height: 40
+                                label: "CHECK ZOOM"
+                                labelPixelSize: 11
+                                accentColor: Colors.cyan
+                                available: !camera.busy
+                                onLeftClicked: camera.run("zoomStatus", ["zoom-status"])
+                            }
+
+                            ActionButton {
+                                width: parent.width - 160
+                                height: 40
+                                label: "OPEN ZOOM CLIENT"
+                                labelPixelSize: 12
+                                accentColor: Colors.magenta
+                                available: !camera.busy
+                                           && camera.zoomClientStatus !== null
+                                           && camera.zoomClientStatus.available
+                                onLeftClicked: camera.launchZoomClient()
+                            }
+                        }
+
+                        GohuText {
+                            width: parent.width
+                            wrapMode: Text.WordWrap
+                            font.pixelSize: 11
+                            color: Colors.white
+                            text: "Zoom opens its official local app. Sign in, start, and join meetings there. No passwords or OAuth tokens are shared with Camera."
+                        }
+
+                        GohuText {
+                            width: parent.width
+                            wrapMode: Text.WordWrap
+                            font.pixelSize: 10
+                            color: Colors.orange
+                            text: "EMBEDDED VIDEO // NOT YET CONNECTED. Requires separately validated Zoom SDK and Stage Director containment."
+                        }
+                    }
+                }
+
                 Column {
                     id: cleanupPage
                     anchors.fill: parent

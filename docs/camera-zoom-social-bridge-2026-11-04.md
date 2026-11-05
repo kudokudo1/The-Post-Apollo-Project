@@ -53,3 +53,42 @@ The Zoom Linux Meeting SDK is a separate CLI-oriented provider integration and n
 ## DECISIONS
 
 Account alias records do not carry token or login state. User must deliberately open native Zoom. The current source-only implementation does **not** claim Zoom is installed, authenticated, embedded or deployed on Fedora. No local machine writes, Quickshell restart, user login, PR merge or production activation were performed.
+
+---
+
+## Hospital Camera checkpoint // Zoom direct open + status stabilization (2026-11-05)
+
+### IMPLEMENTATION
+- PR #1302: Native Zoom may be registered as `FLATPAK RUNNING` without a Sway window. Keep automatic launch-on-entry but expose a prominent **OPEN / FOCUS ZOOM APP** action whenever installed, even when the process is present but window absent.
+- Backend `zoom-activate` focuses an exact Sway Zoom window by observed positive numeric container ID, on explicit operator click only; otherwise it requests a native/system/user Flatpak launch. No automatic focus changes on mode entry and no meeting or login is fabricated.
+- Previously the Internet and Zoom HTTPS status fields refreshed every 90 seconds and used `UNREACHABLE` after just one HEAD failure. They now reflect a single entry-time snapshot with neutral `UNVERIFIED` on a failed probe, not a supposed outage. No repeated background network probes.
+- Zoom is still a provider-owned native window. Social aliases and Camera indicators are not Zoom login tokens; the operator must sign in inside Zoom and choose **New Meeting** or **Join**.
+
+### HOW TO USE
+After native deployment: Camera → ZOOM (attempt automatic start). Press **OPEN / FOCUS ZOOM APP** if there is no visible Zoom window, including when Camera says its Flatpak process is running. Complete sign-in and meeting controls in the Zoom client, not the Camera shell. The Internet and Zoom probe status is a one-time snapshot.
+
+### VERIFY
+- Exact-head GitHub CI passed for Camera, Grammar, Tasks on source commit `bf12e8b5b6a5f8cf4d39a380f2a7d8f40ed12042`; mock tests verify precise Sway focus, no title spoofing, explicit launch, missing package handling and neutral connectivity failures.
+- No operator desktop Sway launch/window observation performed; a healthy process or successful `flatpak run` command is not proof of a visible conferencing surface.
+- Historical operator screenshot showed `FLATPAK RUNNING // WINDOW NOT DETECTED` and network indicators oscillating. Public Fedora/Zoom Wayland reports document similar no-window symptoms; no local root cause has been proven.
+
+### WATCH OUT FOR
+- This PR does not embed Zoom, sign the operator in, or issue New Meeting/Join API calls. True in-widget conferencing is gated by Stage Director or supported SDK and central Connections broker authorization. Do not claim M4 complete.
+- Manual focus targets a Sway class/app-ID matched window; compositor window metadata is not an authentication guarantee. Focus is a user-triggered convenience only.
+- One HTTPS failure is classified UNVERIFIED, not offline. Network check is a point-in-time browser-like reachability sample, not a complete health or Zoom API status.
+
+### CHECKLIST
+- [x] Direct open/focus when installed even with background Flatpak but no window
+- [x] Stop periodic internet indicator flicker
+- [x] Preserve Social login-independent Zoom mode and download setup
+- [x] Source CI regression tests
+- [ ] Native window visibility and usability verification on Fedora
+- [ ] Provider-authenticated login and new/join meeting controls
+- [ ] Secure Stage Director / SDK embedded video meeting runtime
+- [ ] Operator final acceptance
+
+### NEXT
+Use a native Fedora session to click OPEN / FOCUS, observe whether a Zoom window becomes visible, and read only targeted application start logs if it remains background-only. Coordinate full meeting and sign-in work with Connections/Identity Center and Stage Director owners.
+
+### DECISIONS
+Source-only draft PR, no merge, Quickshell reload, package change, portal restart, network permission change, Zoom login or live desktop modifications. External Hospital-compatible scope, not live registration.

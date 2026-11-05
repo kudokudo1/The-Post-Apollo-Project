@@ -16,6 +16,10 @@ const pane = read("widgets/weather/StationCosmosSubjectPane.qml");
 const dashboard = read("widgets/weather/StationCosmosOverviewPane.qml");
 const workspaceSource = read("widgets/weather/StationWorkspaceNavigationPolicy.js");
 const solarWind = read("widgets/weather/StationCosmosSolarWindPane.qml");
+const modePolicySource = read("widgets/weather/StationCosmosModePolicy.js");
+const focusPane = read("widgets/weather/StationCosmosModesPane.qml");
+const focused = vm.createContext({});
+vm.runInContext(modePolicySource.replace(/^\.pragma library\s*$/m,""),focused);
 const spaceHub = read("widgets/weather/StationCosmosSpaceWeatherHubPane.qml");
 const geomagneticPane = read("widgets/weather/StationCosmosGeomagneticPane.qml");
 const browser = read("widgets/weather/StationSubjectNavigator.qml");
@@ -420,4 +424,64 @@ test("COSMOS SUN, MOON and EVENTS bottom landings own their subject data", () =>
   assert.ok(sky.includes("id: issEventSection"));
   assert.ok(sky.includes('label:"METEOR SHOWERS"'));
   assert.ok(sky.includes("skyScroll.contentY = Math.max"));
+});
+
+test("C5 subject modes are distinct real routes and direct fixed-rail actions", () => {
+  const families = {
+    sun:["PATH","LIGHT","SUVI","X-RAY","FLARES","CYCLE"],
+    astronomy:["CLOCK","PLANETS","STARS"],
+    events:["METEORS","ECLIPSES","ISS"]
+  };
+  for (const [family,labels] of Object.entries(families)) {
+    const rows = focused.MODES[family];
+    assert.deepEqual(plain(rows.map(r=>r.label)),labels);
+    for (const entry of rows) {
+      assert.ok(nav.findRoute(entry.route),entry.route);
+      assert.ok(cosmos.routeInfo(entry.route),entry.route);
+      assert.equal(focused.family(entry.route),family);
+      assert.equal(focused.canonical(entry.route),entry.route);
+    }
+  }
+  assert.equal(focused.family("cosmos/moon/ephemeris"),"");
+  assert.equal(focused.canonical("cosmos/sun/activity"),"cosmos/sun/suvi");
+  assert.equal(focused.canonical("cosmos/sun/photo-light"),"cosmos/sun/twilight");
+  assert.equal(focused.canonical("cosmos/events/overview"),"cosmos/events/meteors");
+  assert.equal(focused.kind("cosmos/planets-stars/planet-clock"),"planet-clock");
+  assert.equal(focused.kind("cosmos/events/overview"),"meteors");
+  assert.equal(focused.usesInnerScroll("cosmos/events/meteors"),true);
+  assert.equal(focused.usesInnerScroll("cosmos/events/iss"),false);
+  assert.equal(focused.usesInnerScroll("cosmos/sun/suvi"),false);
+  for (const [path,section] of [
+    ["cosmos/sun/suvi","suvi"],["cosmos/sun/xray","xray"],
+    ["cosmos/sun/flares","flares"],["cosmos/sun/cycle","cycle"]
+  ]) {
+    assert.equal(cosmos.kindForRoute(path),"space");
+    assert.equal(cosmos.visibleFor("space",path,section),true);
+  }
+  for(const s of ["suvi","xray","flares"])
+    assert.equal(cosmos.visibleFor("space","cosmos/sun/suvi",s),s==="suvi");
+  assert.equal(workspace.GROUPS.cosmos.length,6);
+  assert.equal(workspace.GROUPS.cosmos.find(x=>x.key==="sky").path,
+               "cosmos/planets-stars/planet-clock");
+  assert.match(pane,/id: focusModesComponent/);
+  assert.match(pane,/StationCosmosModesPane\s*\{/);
+  assert.match(pane,/Modes\.family\(cosmosPane\.subjectRoute\) !== ""/);
+  assert.match(focusPane,/onClicked: focus\.routeRequested\(modelData\.route\)/);
+  assert.match(focusPane,/selected: Modes\.canonical\(focus\.subjectRoute\) === modelData\.route/);
+  assert.match(focusPane,/id: modeRail/);
+  assert.match(focusPane,/id: footer/);
+  assert.match(focusPane,/id: stage/);
+  assert.match(focusPane,/sourceOnly: true/);
+  assert.match(focusPane,/StationCosmosVisualInstruments\s*\{/);
+  assert.match(focusPane,/ClockPolicy\.clockRows\(/);
+  assert.match(focusPane,/id: meteorScroll/);
+  assert.match(focusPane,/contentHeight: meteorCards\.implicitHeight/);
+  assert.match(focusPane,/model: focus\.cards/);
+  for(const src of [modePolicySource,focusPane]) {
+    for(const forbidden of ["WeatherServices.","FileView {","Process {",
+      "XMLHttpRequest","new WebSocket","swaymsg","Timer {","Qt.callLater"]) {
+      assert.ok(!src.includes(forbidden),forbidden);
+    }
+    assert.doesNotMatch(src,/\bid:\s*console\b/);
+  }
 });

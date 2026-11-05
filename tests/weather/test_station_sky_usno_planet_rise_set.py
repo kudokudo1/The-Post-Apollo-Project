@@ -175,7 +175,8 @@ sky = (
     ROOT / "widgets/weather/StationSky.qml"
 ).read_text(encoding="utf-8")
 assert "WeatherServices.UsnoPlanetRiseSetService {" in sky
-assert "date: sky.astronomySummary.date" in sky
+assert "date: sky.sourceOnly ? sky.focusedCivilDate : sky.astronomySummary.date" in sky
+assert "CosmosCalendar.focusedDate(" in sky
 assert "offsetMinutes: sky.moonCivilOffsetMinutes" in sky
 assert 'title: "PLANET CLOCK // USNO RISE + TRANSIT + SET"' in sky
 assert "MERCURY + VENUS + MARS + JUPITER + SATURN" in sky

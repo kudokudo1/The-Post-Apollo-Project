@@ -16,6 +16,7 @@ from typing import Callable, Any
 
 SCHEMA = "post-apollo.phone.stage-director.v0"
 STAGE_APP_ID = "post-apollo-social-phone-setup"
+INSTALL_APP_ID = "post-apollo-social-phone-ofono"
 SOCIAL_TITLE = "QS_SOCIAL_MENU"
 MAX_TREE = 8 * 1024 * 1024
 MAX_COORD = 32768
@@ -52,10 +53,11 @@ def _unique(nodes: list[dict[str, Any]]) -> dict[str, Any] | None:
     return nodes[0] if len(nodes) == 1 else None
 
 
-def _stage_actor(tree: dict, executable: Callable[[int], str]) -> dict | None:
+def _stage_actor(tree: dict, executable: Callable[[int], str],
+                 app_id: str = STAGE_APP_ID) -> dict | None:
     matches = []
     for node in _walk(tree):
-        if node.get("app_id") != STAGE_APP_ID:
+        if node.get("app_id") != app_id:
             continue
         pid, con_id = node.get("pid"), node.get("id")
         if (type(pid) is int and pid > 0 and type(con_id) is int
@@ -128,9 +130,17 @@ def _actual_content(node: dict) -> dict[str, int] | None:
 def operation(action: str, *, local: tuple[int, int, int, int] | None = None,
               tree: dict | None = None,
               executable: Callable[[int], str] = _exe,
-              execute: Callable[[str], None] = _execute) -> dict[str, object]:
+              execute: Callable[[str], None] = _execute,
+              app_id: str = STAGE_APP_ID) -> dict[str, object]:
     """One exact foot actor only. Return a hole ONLY after observed fit."""
     if action not in ("sync", "close"):
+        return _result("REFUSED")
+    # Only the explicitly staged oFono terminal may use the alternate id;
+    # closing a package-manager session is forbidden because it could still
+    # be performing an authorized system transaction.
+    if app_id not in (STAGE_APP_ID, INSTALL_APP_ID):
+        return _result("REFUSED")
+    if action == "close" and app_id == INSTALL_APP_ID:
         return _result("REFUSED")
     if action == "sync":
         if (type(local) is not tuple or len(local) != 4
@@ -146,7 +156,7 @@ def operation(action: str, *, local: tuple[int, int, int, int] | None = None,
         observed = _read_tree() if tree is None else tree
         if type(observed) is not dict:
             return _result("UNAVAILABLE")
-        stage = _stage_actor(observed, executable)
+        stage = _stage_actor(observed, executable, app_id)
         if stage is None:
             return _result("ACTOR_NOT_FOUND")
         selector = f'[con_id={stage["id"]}]'
@@ -186,13 +196,14 @@ def main(argv: list[str] | None = None) -> int:
     args = sys.argv[1:] if argv is None else argv
     if args == ["--close"]:
         result = operation("close")
-    elif len(args) == 5 and args[0] == "--sync":
+    elif len(args) == 5 and args[0] in ("--sync", "--sync-installer"):
         try:
             local = tuple(int(v) for v in args[1:])
         except ValueError:
             result = _result("REFUSED")
         else:
-            result = operation("sync", local=local)
+            app_id = INSTALL_APP_ID if args[0] == "--sync-installer" else STAGE_APP_ID
+            result = operation("sync", local=local, app_id=app_id)
     else:
         result = _result("REFUSED")
     print(json.dumps(result, separators=(",", ":")))

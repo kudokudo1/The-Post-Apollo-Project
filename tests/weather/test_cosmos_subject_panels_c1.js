@@ -14,6 +14,7 @@ const sky = read("widgets/weather/StationSky.qml");
 const space = read("widgets/weather/StationSpace.qml");
 const pane = read("widgets/weather/StationCosmosSubjectPane.qml");
 const dashboard = read("widgets/weather/StationCosmosOverviewPane.qml");
+const solarWind = read("widgets/weather/StationCosmosSolarWindPane.qml");
 const browser = read("widgets/weather/StationSubjectNavigator.qml");
 const station = read("widgets/weather/WeatherStationW.qml");
 const weatherPolicy = read("widgets/weather/StationWeatherSubjectPanelPolicy.js");
@@ -243,4 +244,35 @@ test("C2 COSMOS overview shows interactive sky graphics and compact core SPACE r
   assert.equal((dashboard.match(/StationSky\s*\{/g)||[]).length,1);
   assert.equal((dashboard.match(/StationCosmosVisualInstruments\s*\{/g)||[]).length,1);
   assert.equal((pane.match(/StationSpace\s*\{/g)||[]).length,1);
+});
+
+test("C3 Solar Wind is a fixed, interactive, source-backed instrument", () => {
+  assert.match(pane,/cosmosPane\.subjectRoute === "cosmos\/space-weather\/solar-wind"/);
+  assert.match(pane,/id: solarWindComponent[\s\S]*StationCosmosSolarWindPane\s*\{/);
+  assert.match(pane,/liveHistoryStore: cosmosPane\.liveHistoryStore/);
+  assert.match(pane,/onRouteRequested: function\(path\)/);
+  assert.match(solarWind,/StationInteractiveHistoryChart\s*\{/);
+  assert.match(solarWind,/height: 258/);
+  assert.match(solarWind,/leftField: "solarWindSpeed"/);
+  assert.match(solarWind,/rightField: "bz"/);
+  assert.match(solarWind,/historyRevision/);
+  assert.match(solarWind,/liveHistoryStore\.samples\("space-wind", "global", runtimeNowMs\)/);
+  assert.match(solarWind,/liveHistoryStore\.samples\("space-imf", "global", runtimeNowMs\)/);
+  assert.match(solarWind,/RuntimePolicy\.displayRow\(id/);
+  assert.match(solarWind,/KP IS GEOMAGNETIC CONTEXT/);
+  assert.match(solarWind,/NOAA SWPC/);
+  for (const field of ["solarWindReady", "magneticFieldReady", "kpReady",
+                       "magneticFieldBz", "magneticFieldBt"]) {
+    assert.ok(solarWind.includes(field), field);
+  }
+  for (const route of ["cosmos/space-weather/geomagnetic",
+                       "cosmos/space-weather/full"]) {
+    assert.ok(nav.findRoute(route), route);
+    assert.ok(solarWind.includes('"'+route+'"'), route);
+  }
+  assert.doesNotMatch(solarWind,/Flickable\s*\{|ScrollView\s*\{|StationSpace\s*\{/);
+  for (const forbidden of ["WeatherServices.", "FileView {", "Process {",
+                           "Timer {", "XMLHttpRequest", "Qt.callLater"]) {
+    assert.ok(!solarWind.includes(forbidden), forbidden);
+  }
 });

@@ -144,8 +144,8 @@ test("visual is mounted only on route-eligible COSMOS SKY, not CLASSIC or WEATHE
     assert.match(sky,/twilightSummary: sky\.twilightSummary/);
     assert.match(sky,/providerLocalMinute: sky\.providerLocalMinute/);
     assert.match(sky,/currentSolarPosition: sky\.currentSolarPosition/);
-    assert.equal((sky.match(/sky\.sectionVisible\(\"([^\"]+)\"\)/g)||[]).length,27,
-      "original CLASSIC/WEATHER section visibility calls must not change");
+    assert.equal((sky.match(/sky\.sectionVisible\(\"([^\"]+)\"\)/g)||[]).length,29,
+      "original CLASSIC/WEATHER section visibility calls plus Moon position must remain present");
     assert.equal(n.visibleFor("sky","cosmos/moon/ephemeris","moon"),true);
     assert.equal(n.visibleFor("sky","cosmos/sun/position","astronomy"),true);
     assert.equal(n.visibleFor("sky","cosmos/sun/twilight","twilight"),true);

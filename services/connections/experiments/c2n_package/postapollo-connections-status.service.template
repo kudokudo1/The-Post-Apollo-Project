@@ -1,0 +1,34 @@
+# C2n NONINSTALLABLE reference unit. Do not copy into /usr/lib/systemd/system/.
+# This ExecStart target is deliberately absent: service binary is not built.
+# Static dedicated service account and root-owned files are a future installer gate.
+[Unit]
+Description=Post-Apollo Connections status-only protected host (proposal)
+Documentation=https://github.com/kudokudo1/The-Post-Apollo-Project
+After=dbus.service
+
+[Service]
+Type=dbus
+BusName=org.postapollo.ConnectionsStatus1
+User=postapollo-connections
+Group=postapollo-connections
+DynamicUser=no
+ExecStart=/usr/libexec/post-apollo/connections-status-host --read-only
+Restart=no
+NoNewPrivileges=yes
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectSystem=strict
+ProtectHome=yes
+ProtectControlGroups=yes
+ProtectKernelModules=yes
+ProtectKernelTunables=yes
+RestrictAddressFamilies=AF_UNIX
+IPAddressDeny=any
+CapabilityBoundingSet=
+AmbientCapabilities=
+LockPersonality=yes
+RestrictSUIDSGID=yes
+SystemCallArchitectures=native
+UMask=0077
+
+# Deliberately no [Install] stanza: no enablement or automatic start.

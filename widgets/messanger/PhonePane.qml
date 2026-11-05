@@ -35,7 +35,8 @@ Rectangle {
                 || stageWanted || callSetupProcess.running
                 || callPrerequisiteProcess.running || audioActionProcess.running)
             return;
-        if (callSetupStatus === "GUI_OPEN_REQUESTED") {
+        if (callSetupStatus === "GUI_OPEN_REQUESTED"
+                || callSetupStatus === "FOLLOWUP_REQUIRED") {
             callSetupStatus = "RECHECKING";
             diagnoseCallPrerequisites();
             refreshPhoneAudioControls();
@@ -61,11 +62,11 @@ Rectangle {
         if (callSetupStatus === "GUI_OPEN_REQUESTED")
             return "Fedora's software installer was requested. Review and approve oFono there if you want it installed, then return here and choose CHECK AGAIN. No package was installed by Social.";
         if (callSetupStatus === "RECHECKING")
-            return "Checking whether Fedora installed oFono...";
+            return "Checking oFono, the system service and BlueFerry call status...";
         if (callSetupStatus === "INSTALL_NOT_CONFIRMED")
             return "oFono is still reported missing. Complete the installation in the software manager, or retry setup. No audio changes were made by Social.";
         if (callSetupStatus === "FOLLOWUP_REQUIRED")
-            return "oFono is no longer reported missing. Hands-free service and audio routing still require separate verification.";
+            return "Package check completed. The next step is shown below. CHECK AGAIN updates the existing service and call statuses without changing audio.";
         if (callSetupStatus === "GUI_UNAVAILABLE")
             return "No supported graphical package installer was found. oFono remains uninstalled. A system-audio integration is still needed.";
         if (callSetupStatus === "GUI_LAUNCH_FAILED")
@@ -76,6 +77,41 @@ Rectangle {
                 || callSetupStatus === "NOT_APPLICABLE")
             return "Calling setup could not be started from the current system diagnosis. Check the call prerequisite status again.";
         return "";
+    }
+
+    // Explain the existing sanitized statuses without claiming verified audio.
+    function callProgressText() {
+        if (callSetupStatus !== "FOLLOWUP_REQUIRED"
+                || callPrerequisiteCheck !== "CHECKED")
+            return "";
+        var stage = callPrerequisiteReport.state;
+        if (stage === "SERVICE_STOPPED")
+            return "oFono is installed, but its system service is stopped. It needs separately approved system-audio setup; PHONE will not start it automatically.";
+        if (stage === "SERVICE_FAILED" || stage === "SERVICE_MASKED")
+            return "oFono's service needs system-audio repair before calling. Your existing phone pairing and media settings remain untouched.";
+        if (stage === "SERVICE_UNIT_MISSING" || stage === "INSPECTION_UNAVAILABLE")
+            return "The oFono service could not be verified. Check the system installation before enabling PC calls.";
+        if (stage === "SERVICE_STARTING")
+            return "The oFono service is changing state. Check again when it settles.";
+        if (stage === "DBUS_NAME_MISSING")
+            return "oFono is running without its expected system D-Bus owner. Hands-free call control cannot be verified.";
+        if (stage !== "AUDIO_PATH_UNVERIFIED")
+            return "Calling prerequisites remain unverified.";
+        if (phoneAudioCheck !== "CHECKED"
+                || phoneAudioStatus.result !== "OBSERVED")
+            return "oFono is running, but BlueFerry's call status is unavailable. This is not proof of a connected phone.";
+        if (phoneAudioStatus.callsEnabled !== true)
+            return "oFono is running. Calls on PC is still OFF. Enable it separately when your system's hands-free routing is configured.";
+        var calls = phoneAudioStatus.callsState;
+        if (calls === "READY")
+            return "BlueFerry reports hands-free call control READY. Microphone and speaker routing still need a real non-emergency test call.";
+        if (calls === "BLUEZ_CONFLICT")
+            return "BlueFerry reports a BlueZ HFP conflict. The system-audio owner must check which Bluetooth service owns hands-free calls.";
+        if (calls === "SEARCHING")
+            return "BlueFerry is searching for the iPhone's hands-free link. Check the phone connection and WirePlumber's oFono backend; no reset was attempted.";
+        if (calls === "CONNECTING")
+            return "BlueFerry is negotiating the hands-free link. Check again; call audio is not verified yet.";
+        return "BlueFerry cannot confirm hands-free call readiness. oFono D-Bus access, WirePlumber and BlueZ still require verification.";
     }
 
     function diagnoseCallPrerequisites() {
@@ -1117,9 +1153,13 @@ Rectangle {
                         width: Math.min(220, phoneAudioSettings.width)
                         height: 36
                         visible: phonePane.callPrerequisiteCheck === "CHECKED"
-                                 && phonePane.callPrerequisiteReport.state === "PACKAGE_NOT_INSTALLED"
+                                 && (phonePane.callPrerequisiteReport.state === "PACKAGE_NOT_INSTALLED"
+                                     || phonePane.callSetupStatus === "FOLLOWUP_REQUIRED")
                         label: phonePane.callSetupStatus === "GUI_OPEN_REQUESTED"
-                               ? "CHECK AGAIN" : "SET UP CALLING"
+                               || phonePane.callSetupStatus === "FOLLOWUP_REQUIRED"
+                               ? "CHECK AGAIN"
+                               : phonePane.callSetupStatus === "INSTALL_NOT_CONFIRMED"
+                                 ? "RETRY SETUP" : "SET UP CALLING"
                         labelPixelSize: 10
                         accentColor: Colors.magenta
                         interactive: !callSetupProcess.running
@@ -1132,6 +1172,7 @@ Rectangle {
                     Text {
                         width: parent.width
                         visible: installCallingSupport.visible
+                                 && phonePane.callPrerequisiteReport.state === "PACKAGE_NOT_INSTALLED"
                         text: "Only oFono. Fedora's software manager handles package review and approval. Social does not change your system automatically."
                         color: Colors.white
                         font.pixelSize: 10
@@ -1143,6 +1184,15 @@ Rectangle {
                         visible: phonePane.callingSupportSetupText().length > 0
                         text: phonePane.callingSupportSetupText()
                         color: Colors.orange
+                        font.pixelSize: 10
+                        wrapMode: Text.WordWrap
+                    }
+
+                    Text {
+                        width: parent.width
+                        visible: phonePane.callProgressText().length > 0
+                        text: phonePane.callProgressText()
+                        color: Colors.cyan
                         font.pixelSize: 10
                         wrapMode: Text.WordWrap
                     }

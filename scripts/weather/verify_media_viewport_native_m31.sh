@@ -18,7 +18,10 @@ install -d -m 700 "$work/home" "$work/run" "$work/data" "$work/cache" \
   "$work/config-home" "$work/config/widgets" "$work/config/services"
 cp -a "$repo/components" "$work/config/components"
 cp -a "$repo/widgets/weather" "$work/config/widgets/weather"
-cp -a "$repo/services/weather" "$work/config/services/weather"
+# The real MEDIA pane imports services/media for RADIO, plus NEWS/Weather
+# shared helpers. Even inactive Component source types must resolve at parse.
+# Copy existing services into the isolated fixture, never install anything.
+cp -a "$repo/services/." "$work/config/services/"
 cp "$repo/tests/weather/fixtures/M31MediaViewport.qml" "$work/config/shell.qml"
 
 Xvfb :95 -screen 0 1450x940x24 -nolisten tcp >"$work/xvfb.log" 2>&1 &

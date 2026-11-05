@@ -92,10 +92,12 @@ class CameraZoomSocialTests(unittest.TestCase):
 
     def test_zoom_launch_is_explicit_native_only_no_shell_or_credentials(self):
         with patch.object(backend.shutil, "which", side_effect=lambda n: "/usr/bin/zoom" if n == "zoom" else None):
-            with patch.object(backend.subprocess, "Popen") as launch:
+            with patch.object(backend.subprocess, "Popen",
+                              return_value=Mock(poll=Mock(return_value=0))) as launch:
                 result = backend.zoom_client_open()
         self.assertTrue(result["ok"])
         self.assertTrue(result["launchRequested"])
+        self.assertEqual(result["launchState"], "HANDOFF_UNVERIFIED")
         self.assertEqual(result["authentication"], "UNKNOWN")
         self.assertEqual(launch.call_args.args[0], ["/usr/bin/zoom"])
         self.assertNotIn("shell", launch.call_args.kwargs)
@@ -106,8 +108,8 @@ class CameraZoomSocialTests(unittest.TestCase):
             return "/usr/bin/flatpak" if name == "flatpak" else None
         with patch.object(backend.shutil, "which", side_effect=which):
             with patch.object(backend.subprocess, "run", return_value=Mock(returncode=0)) as run:
-                self.assertEqual(backend.zoom_client_command(), ["/usr/bin/flatpak", "run", "us.zoom.Zoom"])
-                self.assertEqual(run.call_args.args[0], ["/usr/bin/flatpak", "info", "us.zoom.Zoom"])
+                self.assertEqual(backend.zoom_client_command(), ["/usr/bin/flatpak", "run", "--user", "us.zoom.Zoom"])
+                self.assertEqual(run.call_args.args[0], ["/usr/bin/flatpak", "info", "--user", "us.zoom.Zoom"])
                 self.assertIs(run.call_args.kwargs["stdin"], backend.subprocess.DEVNULL)
 
 

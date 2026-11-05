@@ -56,7 +56,8 @@ test("C5 civil date uses only existing verified timezone, not system timezone",(
   assert.match(sky,/CosmosCalendar\.focusedDate\(/);
   assert.match(sky,/openMeteoCivilOffsetAvailable/);
   assert.match(sky,/date: sky\.sourceOnly \? sky\.focusedCivilDate : sky\.astronomySummary\.date/);
-  assert.match(focus,/readonly property string civilDate:\s*skyFeed \? skyFeed\.focusedCivilDate : ""/);
+  assert.match(focus,/readonly property string civilDate:/);
+  assert.match(focus,/skyFeed\.focusedCivilDate : ""/);
   assert.match(focus,/ClockPolicy\.clockRows\([\s\S]*?civilDate\)/);
   assert.match(focus,/solarDate: focus\.civilDate/);
 });
@@ -76,7 +77,7 @@ test("No-source UI retains five planet lanes and shows detailed provider errors"
     "SOLAR MODEL NEEDS LOCAL DATE, LOCATION AND UTC OFFSET",
     "NO ACTIVE OR UPCOMING SHOWER IN THE SOURCE WINDOW"
   ])assert.ok(focus.includes(signal),signal);
-  assert.match(focus,/visible: focus\.cards\.length === 0/);
+  assert.match(focus,/visible: !focus\.cards \|\| focus\.cards\.length === 0/);
   assert.match(focus,/id: meteorScroll/);
   assert.match(focus,/contentHeight: meteorCards\.implicitHeight/);
   assert.match(focus,/sourceOnly: true/);

@@ -35,16 +35,16 @@ const reviewed=[
   ["sky-twilight","cosmos/sun/twilight","sky","twilight"],
   ["sky-photo-light","cosmos/sun/photo-light","sky","twilight"],
   ["sky-current-sun","cosmos/sun/position","sky","astronomy"],
-  ["space-geomagnetic-core","cosmos/space-weather/overview","space","solar"],
+  ["space-geomagnetic-core","cosmos/space-weather/geomagnetic","space","kp-history"],
   ["space-solar-context","cosmos/space-weather/history","space","relation"],
   ["space-noaa-scales","cosmos/space-weather/geomagnetic","space","scales"],
-  ["space-solar-cycle","cosmos/space-weather/history","space","cycle"],
+  ["space-solar-cycle","cosmos/sun/cycle","space","cycle"],
   ["space-kp-history","cosmos/space-weather/history","space","kp-history"],
   ["space-kp-forecast","cosmos/space-weather/forecasts","space","kp-forecast"],
-  ["space-suvi-imager","cosmos/space-weather/solar-activity","space","suvi"],
+  ["space-suvi-imager","cosmos/sun/activity","space","suvi"],
   ["space-aurora","cosmos/space-weather/aurora","space","aurora"],
-  ["space-xray-flux","cosmos/space-weather/solar-activity","space","xray"],
-  ["space-goes-flares","cosmos/space-weather/solar-activity","space","flares"],
+  ["space-xray-flux","cosmos/sun/activity","space","xray"],
+  ["space-goes-flares","cosmos/sun/activity","space","flares"],
   ["space-watch-day","cosmos/space-weather/forecasts","space","watch"],
   ["space-warning-validity","cosmos/space-weather/bulletins","space","warnings"],
   ["space-bulletins","cosmos/space-weather/bulletins","space","bulletins"]
@@ -97,12 +97,12 @@ test("SKY cosmos-only source gates stay separate from WEATHER forecasts",()=>{
 
 test("original SPACE data and source lifetime remain within COSMOS, including chart wrapper",()=>{
   for(const [source,route] of [
-    ["cycle","cosmos/space-weather/history"],
+    ["cycle","cosmos/sun/cycle"],
     ["scales","cosmos/space-weather/geomagnetic"],
     ["kpForecast","cosmos/space-weather/forecasts"],
     ["aurora","cosmos/space-weather/aurora"],
-    ["xray","cosmos/space-weather/solar-activity"],
-    ["flares","cosmos/space-weather/solar-activity"],
+    ["xray","cosmos/sun/activity"],
+    ["flares","cosmos/sun/activity"],
     ["alerts","cosmos/space-weather/bulletins"]
   ]){
     assert.equal(cosmos.needsSource(route,source),true,source+" source enabled");
@@ -135,7 +135,7 @@ test("deep INDEX uses concrete COSMOS leaf links and still preserves unresolved 
   assert.equal(new Set(links.map(x=>x.path)).size,links.length);
   assert.ok(links.every(x=>x.path.startsWith("cosmos/") && !env.findRoute(x.path).group));
   assert.deepEqual(plain(env.nativeDestinationsForPath("cosmos/space-weather/history",env.PANELS)),
-    [{path:"cosmos/space-weather/history",panels:3,milestones:["M28-G"]}]);
+    [{path:"cosmos/space-weather/history",panels:2,milestones:["M28-G"]}]);
   assert.ok(env.sourcePagesForPath("cosmos",env.PANELS)
     .some(x=>x.id==="home"),"M0 original HOME SPACE provenance remains visible");
   assert.deepEqual(plain(env.remainingSourcePagesForPath("cosmos",env.PANELS)),[],

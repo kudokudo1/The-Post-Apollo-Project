@@ -331,12 +331,12 @@ test("COSMOS SUN, MOON and EVENTS bottom landings own their subject data", () =>
   for (const section of ["moon","iss","eclipses","meteor","planet-clock"]) {
     assert.equal(cosmos.visibleFor("sky","cosmos/sky/full",section),true);
   }
-  assert.match(sky,/title: "MOON \\/\\/ CURRENT POSITION"/);
-  assert.match(sky,/visible: sky\\.subjectRoute !== "cosmos\\/sun\\/position"/);
-  assert.match(sky,/id: eventsJumpRow/);
-  assert.match(sky,/id: meteorEventSection/);
-  assert.match(sky,/id: eclipseEventSection/);
-  assert.match(sky,/id: issEventSection/);
-  assert.match(sky,/label:"METEOR SHOWERS"/);
-  assert.match(sky,/skyScroll\\.contentY = Math\\.max/);
+  assert.ok(sky.includes('title: "MOON // CURRENT POSITION"'));
+  assert.ok(sky.includes('visible: sky.subjectRoute !== "cosmos/sun/position"'));
+  assert.ok(sky.includes("id: eventsJumpRow"));
+  assert.ok(sky.includes("id: meteorEventSection"));
+  assert.ok(sky.includes("id: eclipseEventSection"));
+  assert.ok(sky.includes("id: issEventSection"));
+  assert.ok(sky.includes('label:"METEOR SHOWERS"'));
+  assert.ok(sky.includes("skyScroll.contentY = Math.max"));
 });

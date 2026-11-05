@@ -14,6 +14,7 @@ const sky = read("widgets/weather/StationSky.qml");
 const space = read("widgets/weather/StationSpace.qml");
 const pane = read("widgets/weather/StationCosmosSubjectPane.qml");
 const dashboard = read("widgets/weather/StationCosmosOverviewPane.qml");
+const workspaceSource = read("widgets/weather/StationWorkspaceNavigationPolicy.js");
 const solarWind = read("widgets/weather/StationCosmosSolarWindPane.qml");
 const browser = read("widgets/weather/StationSubjectNavigator.qml");
 const station = read("widgets/weather/WeatherStationW.qml");
@@ -21,15 +22,17 @@ const weatherPolicy = read("widgets/weather/StationWeatherSubjectPanelPolicy.js"
 const nav = vm.createContext({});
 const cosmos = vm.createContext({});
 const weather = vm.createContext({});
+const workspace = vm.createContext({});
 vm.runInContext(navSource.replace(/^\.pragma library\s*$/m, ""), nav);
 vm.runInContext(cosmosSource.replace(/^\.pragma library\s*$/m, ""), cosmos);
 vm.runInContext(weatherPolicy.replace(/^\.pragma library\s*$/m, ""), weather);
+vm.runInContext(workspaceSource.replace(/^\.pragma library\s*$/m, ""), workspace);
 const plain = obj => JSON.parse(JSON.stringify(obj));
 
-test("COSMOS retains the 20 scoped routes plus two complete original SKY/SPACE views", () => {
+test("COSMOS retains the 21 scoped routes plus two complete original SKY/SPACE views", () => {
   assert.equal(cosmos.FORMAT, "post-apollo.weather.cosmos-panels.c1.v1");
   const keys = Object.keys(cosmos.ROUTES);
-  assert.equal(keys.length, 22);
+  assert.equal(keys.length, 23);
   assert.equal(new Set(keys).size, 22);
   assert.deepEqual(keys.filter(k=>cosmos.ROUTES[k].full===true).sort(),
     ["cosmos/sky/full","cosmos/space-weather/full"]);
@@ -77,15 +80,16 @@ test("Sun, Moon, planets, stars and events reuse the actual SKY modules", () => 
     "cosmos/sun/twilight":"twilight",
     "cosmos/sun/photo-light":"twilight",
     "cosmos/moon/ephemeris":"moon",
-    "cosmos/moon/position":"celestial-fix",
+    "cosmos/moon/position":"moon-position",
     "cosmos/planets-stars/celestial-fix":"celestial-fix",
     "cosmos/planets-stars/planet-clock":"planet-clock",
     "cosmos/planets-stars/constellations":"celestial-fix",
     "cosmos/events/eclipses":"eclipses",
     "cosmos/events/meteors":"meteor",
+    "cosmos/events/overview":"meteor",
     "cosmos/events/iss":"iss"
   };
-  assert.equal(Object.keys(map).length,11);
+  assert.equal(Object.keys(map).length,12);
   for(const [route, section] of Object.entries(map)) {
     assert.equal(cosmos.kindForRoute(route),"sky");
     assert.ok(cosmos.visibleFor("sky",route,section),route);
@@ -281,4 +285,58 @@ test("C3 Solar Wind is a fixed, interactive, source-backed instrument", () => {
                            "Timer {", "XMLHttpRequest", "Qt.callLater"]) {
     assert.ok(!solarWind.includes(forbidden), forbidden);
   }
+});
+
+test("COSMOS SUN, MOON and EVENTS bottom landings own their subject data", () => {
+  const tabs = workspace.GROUPS.cosmos;
+  const tab = key => tabs.find(row => row.key === key);
+  assert.equal(tab("sun").path, "cosmos/sun/position");
+  assert.equal(tab("moon").path, "cosmos/moon/ephemeris");
+  assert.equal(tab("sky").path, "cosmos/planets-stars/celestial-fix");
+  assert.equal(tab("events").path, "cosmos/events/overview");
+  assert.equal(workspace.selectedGroup("cosmos/planets-stars/planet-clock"),"sky");
+  assert.equal(workspace.selectedGroup("cosmos/events/meteors"),"events");
+  assert.ok(nav.findRoute("cosmos/events/overview"));
+  assert.ok(nav.findRoute("cosmos/sky/full")); // Complete historical reference
+  assert.equal(cosmos.visibleFor("sky","cosmos/sun/position","astronomy"),true);
+  assert.equal(cosmos.visibleFor("sky","cosmos/sun/position","twilight"),true);
+  assert.equal(cosmos.visibleFor("sky","cosmos/sun/position","moon"),false);
+  assert.equal(cosmos.needsSource("cosmos/sun/position","moon"),false);
+  assert.equal(cosmos.visibleFor("sky","cosmos/moon/ephemeris","moon"),true);
+  assert.equal(cosmos.visibleFor("sky","cosmos/moon/ephemeris","moon-position"),true);
+  assert.equal(cosmos.visibleFor("sky","cosmos/moon/ephemeris","celestial-fix"),false);
+  assert.equal(cosmos.needsSource("cosmos/moon/ephemeris","moon"),true);
+  assert.equal(cosmos.needsSource("cosmos/moon/ephemeris","celnav"),true);
+  for (const source of ["planets","iss","meteor","eclipses"]) {
+    assert.equal(cosmos.needsSource("cosmos/moon/ephemeris",source),false,source);
+  }
+  assert.equal(cosmos.visibleFor("sky","cosmos/moon/position","moon-position"),true);
+  assert.equal(cosmos.needsSource("cosmos/moon/position","celnav"),true);
+  for (const section of ["celestial-fix","planet-clock"]) {
+    assert.equal(cosmos.visibleFor("sky","cosmos/planets-stars/celestial-fix",section),true);
+  }
+  for (const section of ["moon","meteor","eclipses","iss"]) {
+    assert.equal(cosmos.visibleFor("sky","cosmos/planets-stars/celestial-fix",section),false);
+  }
+  for (const section of ["iss","eclipses","meteor"]) {
+    assert.equal(cosmos.visibleFor("sky","cosmos/events/overview",section),true);
+  }
+  for (const source of ["iss","eclipses","meteor"]) {
+    assert.equal(cosmos.needsSource("cosmos/events/overview",source),true);
+  }
+  for (const source of ["moon","celnav","planets"]) {
+    assert.equal(cosmos.needsSource("cosmos/events/overview",source),false);
+  }
+  // The original comprehensive route remains intact under INDEX.
+  for (const section of ["moon","iss","eclipses","meteor","planet-clock"]) {
+    assert.equal(cosmos.visibleFor("sky","cosmos/sky/full",section),true);
+  }
+  assert.match(sky,/title: "MOON \\/\\/ CURRENT POSITION"/);
+  assert.match(sky,/visible: sky\\.subjectRoute !== "cosmos\\/sun\\/position"/);
+  assert.match(sky,/id: eventsJumpRow/);
+  assert.match(sky,/id: meteorEventSection/);
+  assert.match(sky,/id: eclipseEventSection/);
+  assert.match(sky,/id: issEventSection/);
+  assert.match(sky,/label:"METEOR SHOWERS"/);
+  assert.match(sky,/skyScroll\\.contentY = Math\\.max/);
 });

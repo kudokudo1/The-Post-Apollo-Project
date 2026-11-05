@@ -1,0 +1,44 @@
+name: Company Network M15 direct host bridge contracts
+
+on:
+  pull_request:
+    paths:
+      - 'experiments/company-vector-qt/CompanyVectorHostBridge.py'
+      - 'experiments/company-vector-qt/install_host_bridge_m15.py'
+      - 'experiments/company-vector-qt/HANDOFF_M15.md'
+      - 'services/company/CompanyVectorSidecarController.qml'
+      - 'tests/company/test_company_vector_host_m15.py'
+      - '.github/workflows/company-vector-host-m15.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  fake-host-bridge:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Python syntax and nine nonroot synthetic security tests
+        run: |
+          python3 -m py_compile \
+            experiments/company-vector-qt/CompanyVectorHostBridge.py \
+            experiments/company-vector-qt/install_host_bridge_m15.py \
+            tests/company/test_company_vector_host_m15.py
+          python3 -m unittest discover -s tests/company \
+            -p 'test_company_vector_host_m15.py' -v
+      - name: Preserve M13 launcher policy and existing map
+        shell: bash
+        run: |
+          set -euo pipefail
+          grep -Fq 'RELATIVE_EXECUTABLE = (".local", "libexec", "post-apollo", "company-vector-probe")' \
+            services/company/CompanyVectorSidecarLaunch.py
+          grep -Fq 'os.execve(' experiments/company-vector-qt/CompanyVectorHostBridge.py
+          if grep -Eq 'toolbox run|startDetached|sudo|rpm-ostree' experiments/company-vector-qt/CompanyVectorHostBridge.py; then
+            echo 'Host bridge must not detach, run a Toolbox process, or mutate host'
+            exit 1
+          fi
+          grep -Fq 'CompanyStreetMap {' widgets/CompanyCoveragePane.qml
+          grep -Fq 'Canvas {' widgets/CompanyCoveragePane.qml
+          grep -Fq 'vectorController.stop()' widgets/CompanyCoveragePane.qml
+          grep -Fq 'HOST QT UNVERIFIED' services/company/CompanyVectorSidecarController.qml

@@ -13,6 +13,7 @@ const cosmosSource = read("widgets/weather/StationCosmosSubjectPanelPolicy.js");
 const sky = read("widgets/weather/StationSky.qml");
 const space = read("widgets/weather/StationSpace.qml");
 const pane = read("widgets/weather/StationCosmosSubjectPane.qml");
+const dashboard = read("widgets/weather/StationCosmosOverviewPane.qml");
 const browser = read("widgets/weather/StationSubjectNavigator.qml");
 const station = read("widgets/weather/WeatherStationW.qml");
 const weatherPolicy = read("widgets/weather/StationWeatherSubjectPanelPolicy.js");
@@ -48,20 +49,25 @@ test("the COSMOS overview shows SKY astronomy and SPACE geomagnetic context toge
   assert.equal(cosmos.kindForRoute("cosmos/overview"),"overview");
   for(const section of ["header","astronomy","moon","twilight"])
     assert.ok(cosmos.visibleFor("sky","cosmos/overview",section),section);
-  for(const section of ["header","solar","scales","aurora"])
+  for(const section of ["header","solar"])
     assert.ok(cosmos.visibleFor("space","cosmos/overview",section),section);
+  for(const section of ["scales","aurora","xray","bulletins"])
+    assert.equal(cosmos.visibleFor("space","cosmos/overview",section),false);
   assert.equal(cosmos.visibleFor("sky","cosmos/overview","hourly"),false);
   assert.equal(cosmos.visibleFor("sky","cosmos/overview","current"),false);
   assert.equal(cosmos.visibleFor("space","cosmos/overview","xray"),false);
   assert.equal(cosmos.needsSource("cosmos/overview","moon"),true);
-  assert.equal(cosmos.needsSource("cosmos/overview","scales"),true);
-  assert.equal(cosmos.needsSource("cosmos/overview","aurora"),true);
+  assert.equal(cosmos.needsSource("cosmos/overview","scales"),false);
+  assert.equal(cosmos.needsSource("cosmos/overview","aurora"),false);
   assert.equal(cosmos.needsSource("cosmos/overview","eclipses"),false);
-  assert.match(pane,/id: astronomyBay/);
-  assert.match(pane,/StationSky\s*\{/);
-  assert.match(pane,/StationSpace\s*\{/);
-  assert.match(pane,/anchors\.top: astronomyBay\.bottom/);
-  assert.match(pane,/height: Math\.max\(0, \(cosmosOverview\.height - 8\) \/ 2\)/);
+  assert.match(pane,/id: overviewComponent[\s\S]*StationCosmosOverviewPane\s*\{/);
+  assert.match(pane,/StationSky\s*\{/); // Original detail page remains
+  assert.match(pane,/StationSpace\s*\{/); // Original full SPACE remains
+  assert.match(pane,/onRouteRequested: function\(path\)/);
+  assert.match(dashboard,/sourceOnly: true/);
+  assert.match(dashboard,/StationCosmosVisualInstruments\s*\{/);
+  assert.match(dashboard,/compactMode: true/);
+  assert.doesNotMatch(dashboard,/Flickable\s*\{|ScrollView\s*\{|StationSpace\s*\{|Process\s*\{|Timer\s*\{/);
 });
 
 test("Sun, Moon, planets, stars and events reuse the actual SKY modules", () => {
@@ -190,4 +196,38 @@ test("COSMOS does not create independent collectors, storage writers or MAGICK c
   for(const forbidden of ["FileView {","Process {","XMLHttpRequest","Qt.callLater","swaymsg","curl "])
     assert.ok(!cosmosSource.includes(forbidden),"COSMOS policy owns forbidden effect: "+forbidden);
   assert.equal(cosmos.kindForRoute("magick/lunar-solar/moon"),"");
+});
+
+
+test("C2 COSMOS overview shows interactive sky graphics and compact core SPACE readings",()=>{
+  assert.match(dashboard,/id: consoleHeader/);
+  assert.match(dashboard,/id: skyInstrumentFrame/);
+  assert.match(dashboard,/id: spaceMetricRow/);
+  assert.match(dashboard,/height: Math\.max\(0,dashboard\.height-consoleHeader\.height/);
+  assert.match(dashboard,/anchors\.fill: parent/);
+  assert.match(dashboard,/moonEphemeris: sourceSky\.moonObservation/);
+  assert.match(dashboard,/currentSolarPosition: sourceSky\.currentSolarPosition/);
+  assert.match(dashboard,/solarCivilOffsetMinutes: sourceSky\.moonCivilOffsetMinutes/);
+  assert.match(dashboard,/moonReady: !!sourceSky\.moonObservation/);
+  for(const field of [
+    "kpReady","solarWindReady","magneticFieldReady","solarFluxReady",
+    "solarWindSpeed","magneticFieldBz","solarFlux"
+  ]) assert.ok(dashboard.includes(field),field);
+  for(const route of [
+    "cosmos/sun/position","cosmos/moon/ephemeris",
+    "cosmos/space-weather/overview","cosmos/space-weather/full",
+    "cosmos/space-weather/geomagnetic",
+    "cosmos/space-weather/solar-wind",
+    "cosmos/space-weather/solar-activity"
+  ]) {
+    assert.ok(nav.findRoute(route),route);
+    assert.ok(dashboard.includes('"'+route+'"'),"missing detail action "+route);
+  }
+  assert.match(dashboard,/onClicked: overview\.routeRequested\(modelData\.path\)/);
+  assert.match(browser,/id: cosmosLivePane\s*onRouteRequested: function\(path\)\s*\{\s*browser\.chooseRoute\(path\)/);
+  assert.match(dashboard,/if \(!ready \|\| value===null \|\| value===undefined/);
+  assert.match(dashboard,/return "--"/);
+  assert.equal((dashboard.match(/StationSky\s*\{/g)||[]).length,1);
+  assert.equal((dashboard.match(/StationCosmosVisualInstruments\s*\{/g)||[]).length,1);
+  assert.equal((pane.match(/StationSpace\s*\{/g)||[]).length,1);
 });

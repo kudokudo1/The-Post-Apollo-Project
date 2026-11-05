@@ -300,7 +300,8 @@ class ZoomWebHostTests(unittest.TestCase):
                             with patch.object(host, "_sway_command") as move:
                                 with self.assertRaisesRegex(RuntimeError, "CLIENT_FRAME_OUTSIDE_OUTPUT"):
                                     host.enter("identity-1", "DP-5", 40, 50, 650, 420)
-                                self.assertNotIn("move", [c.args[1] for c in move.call_args_list])
+                                move.assert_any_call("[con_id=123]", "move", "scratchpad")
+                                self.assertNotIn("absolute", [arg for call in move.call_args_list for arg in call.args])
 
     def test_hide_preserves_profile_and_cookies(self):
         with patch.object(host,"_social_browser_prefix",return_value=["/usr/bin/chromium"]):

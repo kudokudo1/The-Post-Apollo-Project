@@ -65,4 +65,4 @@ Review CI and bounded diff. With operator authorization, deploy and test the one
 
 ## DECISIONS
 
-Use the already accepted PHOTO? No: **PHONE** Stage Director compositor cutout, not an additional installer UI. Replace broken GNOME Software app details with exact interactive PackageKit. Keep approval with Fedora, protect active transactions from kill-on-tab-change, and preserve personal phone and audio state. Repo-only proposal, operator final authority and acceptance. Recovery: close PR, or revert bounded commits after any later merge. No local rollback needed.
+Reuse the accepted **PHONE** Stage Director compositor cutout, not an additional installer UI. Replace broken GNOME Software app details with exact interactive PackageKit. Keep approval with Fedora, protect active transactions from kill-on-tab-change, and preserve personal phone and audio state. Repo-only proposal, operator final authority and acceptance. Recovery: close PR, or revert bounded commits after any later merge. No local rollback needed.

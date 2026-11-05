@@ -120,6 +120,11 @@ PanelWindow {
     // The M28-N pilot selects SUBJECTS only on explicit open(), not at init.
     property bool subjectNavigationOpen: false
     property bool contextTerminalRequested: false
+    // M32 // Operator/deployer-only opt-in for the separately installed
+    // SwayPX QML client. Default OFF keeps ordinary Quickshell independent.
+    property bool stageDirectorWatchOptIn: false
+    readonly property string stageDirectorWatchStatus:
+        stationWatchBridgeGate.bridgeStatus
     // M28-C: subject-native TOOLS launches reuse the ONE root StationTerminal.
     // This is a fixed mode, never a user-supplied shell command.
     property string subjectTerminalMode: "terminal"
@@ -156,6 +161,20 @@ PanelWindow {
             return "";
         const id = subjectNavigator.activeWatchSourceId;
         return id === "bbc" || id === "cspan" ? id : "";
+    }
+
+    // The gate has NO native protocol import. Its optional source file is
+    // evaluated only after an explicit opt-in while SUBJECTS is open.
+    // A viewer CLOSE, route change, INDEX change, or terminal takeover
+    // propagates the empty rectangle/token to the live native adapter.
+    StationWatchBridgeGate {
+        id: stationWatchBridgeGate
+        optIn: weatherStation.stageDirectorWatchOptIn
+        hostOpen: weatherStation.menuOpen
+                  && weatherStation.subjectNavigationOpen
+                  && !weatherStation.contextTerminalRequested
+        viewport: weatherStation.activeSubjectPlayerViewportRect
+        sourceId: weatherStation.activeSubjectWatchSourceId
     }
 
     // The SAME geometry drives the layer-shell input mask and the actual

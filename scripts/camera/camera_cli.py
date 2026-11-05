@@ -989,6 +989,73 @@ def zoom_launch_check():
             "windowState": _zoom_sway_window_state(), "flatpakRunning": running}
 
 
+def _zoom_native_focus():
+    """Focus an existing Zoom app container after an explicit user click.
+
+    Match only exact application IDs/classes, never window titles or user data.
+    No shell, no arbitrary command arguments and no focus on mode entry.
+    """
+    swaymsg = shutil.which("swaymsg")
+    if not swaymsg:
+        return False
+    try:
+        tree_result = subprocess.run([swaymsg, "-t", "get_tree"],
+            stdin=subprocess.DEVNULL, stdout=subprocess.PIPE,
+            stderr=subprocess.DEVNULL, timeout=5, check=False)
+        if tree_result.returncode != 0 or len(tree_result.stdout) > 2_000_000:
+            return False
+        tree = json.loads(tree_result.stdout)
+        todo = [tree]
+        visits = 0
+        exact = {"zoom", "us.zoom.zoom", "zoom workplace", "zoom-client"}
+        while todo and visits < 12000:
+            item = todo.pop()
+            visits += 1
+            if not isinstance(item, dict):
+                continue
+            props = item.get("window_properties") or {}
+            if not isinstance(props, dict):
+                props = {}
+            match = any(isinstance(value, str) and value.strip().casefold() in exact
+                        for value in (item.get("app_id"), props.get("class"),
+                                      props.get("instance")))
+            if match and isinstance(item.get("id"), int) and item["id"] > 0:
+                # Only the exact compositor-owned con_id observed above.
+                result = subprocess.run(
+                    [swaymsg, "[con_id=%d]" % item["id"], "focus"],
+                    stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
+                    stderr=subprocess.DEVNULL, timeout=5, check=False)
+                return result.returncode == 0
+            for key in ("nodes", "floating_nodes"):
+                nodes = item.get(key)
+                if isinstance(nodes, list):
+                    todo.extend(nodes[:12000])
+    except (OSError, ValueError, TypeError, subprocess.SubprocessError):
+        pass
+    return False
+
+
+def zoom_activate_client():
+    """Explicit OPEN ZOOM action: focus its window or request native launch.
+
+    A background Flatpak process by itself must not prevent the user from
+    attempting to open Zoom's actual GUI. No call or login is invented.
+    """
+    if not zoom_client_command():
+        return {"ok": False, "kind": "zoom-activate",
+                "error": "ZOOM_CLIENT_NOT_INSTALLED"}
+    if _zoom_native_focus():
+        return {"ok": True, "kind": "zoom-activate",
+                "activation": "WINDOW_FOCUSED", "windowVerified": True,
+                "authentication": "UNKNOWN"}
+    result = zoom_client_open()
+    result["kind"] = "zoom-activate"
+    if result["ok"]:
+        result["activation"] = "LAUNCH_REQUESTED_WINDOW_UNVERIFIED"
+        result["windowVerified"] = False
+    return result
+
+
 def zoom_client_open():
     """Check immediate launch failure; a spawned process is not a visible window."""
     argv = zoom_client_command()
@@ -1044,8 +1111,10 @@ def zoom_connectivity():
     internet = _camera_https_reachable(INTERNET_REACHABILITY_URL)
     zoom = _camera_https_reachable(ZOOM_REACHABILITY_URL)
     return {"ok": True, "kind": "zoom-connectivity",
-            "internet": "REACHABLE" if internet else "UNREACHABLE",
-            "zoomService": "REACHABLE" if zoom else "UNREACHABLE",
+            # A single HEAD failure cannot prove internet or Zoom is offline.
+            # Do not turn two transient web probes into red offline badges.
+            "internet": "REACHABLE" if internet else "UNVERIFIED",
+            "zoomService": "REACHABLE" if zoom else "UNVERIFIED",
             "account": "UNKNOWN",
             "checkedAt": dt.datetime.now(dt.timezone.utc).isoformat(timespec="seconds")}
 
@@ -1083,6 +1152,7 @@ def main(argv=None):
     command.add_parser("status")
     command.add_parser("zoom-status")
     command.add_parser("zoom-open")
+    command.add_parser("zoom-activate")
     command.add_parser("zoom-launch-check")
     command.add_parser("zoom-enter")
     command.add_parser("zoom-connectivity")
@@ -1121,6 +1191,8 @@ def main(argv=None):
         result = zoom_client_status()
     elif options.action == "zoom-open":
         result = zoom_client_open()
+    elif options.action == "zoom-activate":
+        result = zoom_activate_client()
     elif options.action == "zoom-launch-check":
         result = zoom_launch_check()
     elif options.action == "zoom-enter":

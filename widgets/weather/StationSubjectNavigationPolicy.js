@@ -45,7 +45,9 @@ var SUBJECTS = [
     {id:"sun",label:"SUN",children:[
       {id:"position",label:"POSITION"}, {id:"twilight",label:"TWILIGHT"},
       {id:"photo-light",label:"PHOTO LIGHT"},
-      {id:"activity",label:"SOLAR ACTIVITY // SUVI + XRAY + FLARES"},
+      {id:"activity",label:"SOLAR ACTIVITY // ALL ORIGINAL"},
+      {id:"suvi",label:"SUVI IMAGER"}, {id:"xray",label:"X-RAY FLUX"},
+      {id:"flares",label:"SOLAR FLARES"},
       {id:"cycle",label:"SOLAR CYCLE // NOAA PREDICTION"}]},
     {id:"moon",label:"MOON",children:[
       {id:"ephemeris",label:"PHASE AND RISE/SET"},

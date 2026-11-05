@@ -25,9 +25,9 @@ No change to the operator's desktop. CPU++ → SETTINGS → CONNECTIONS → NASA
 
 ## VERIFY
 
-CI must prove real Fedora systemd and D-Bus integration, privileged test account separation, service shutdown and fail-closed application policy, in addition to C2n's unit contract. Merely copying a protected-looking unit file is not sufficient.
+GitHub Actions run 42036872344 passed 3/3 on C2o commit b7e13816. The disposable Fedora 44 container ran systemd 259.10-1.fc44, and the real start, dedicated UID, root-owned fixture paths, D-Bus owner/read/denial tests, and stop/name-release assertions all succeeded. The production broker remained disconnected. The later CI hardening commit changes only the workflow's actor gate and its explanatory comments; verify checks against the final PR head separately. Merely copying a protected-looking unit file would not have been sufficient.
 
-SELinux enforcement is a **distinct gate**. The Fedora image can contain SELinux userspace packages and report getenforce, but an Ubuntu GitHub-hosted kernel with a privileged Docker container generally cannot prove Fedora SELinux policy enforcing on real Fedora Silverblue. The test emits C2O_SELINUX_NOT_VERIFIED when not enforcing, never claims PASS on that boundary. A Fedora VM or separately approved Fedora system with actual enforcing SELinux is required.
+SELinux enforcement is a **distinct gate**. The run actually reported C2O_SELINUX_NOT_VERIFIED // getenforce=Disabled. The Fedora image contains SELinux userspace, but an Ubuntu GitHub-hosted kernel with a privileged Docker container cannot prove Fedora SELinux policy enforcing on real Fedora Silverblue. The test emits C2O_SELINUX_NOT_VERIFIED when not enforcing, never claims PASS on that boundary. A Fedora VM or separately approved Fedora system with actual enforcing SELinux is required.
 
 ## WATCH OUT FOR
 
@@ -44,7 +44,8 @@ The status-only service intentionally uses AF_UNIX and IPAddressDeny=any; it can
 - [x] Implement fake read-only host and restricted OS client fixture
 - [x] Add explicit systemctl and cross-UID policy test script
 - [x] Add CI workflow with no local workstation changes
-- [ ] Final CI exact-head completion and any needed CI corrections
+- [x] Initial C2o Fedora systemd / system-bus CI passed (3/3, run 42036872344)
+- [ ] Final hardened-workflow exact-head CI verification
 - [ ] Independent review and operator merge/acceptance
 - [ ] SELinux enforcing Fedora host or virtual machine verification
 - [ ] Root-managed signed/verified service package and rollback

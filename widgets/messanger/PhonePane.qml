@@ -1995,7 +1995,8 @@ Rectangle {
                 ? "Select APPROVE READ. Your choice is remembered for this iPhone until you revoke it."
                 : phonePane.personalReadStatus === "NOT_CONSENTED"
                   ? "This tab was not included in your saved approval. Select PERMISSION ON to change it."
-                  : phonePane.personalReadMessage()
+                  : phonePane.personalReadMessage() + "\n"
+                    + phonePane.contentDiagnosticText(phonePane.selectedSection)
         color: Colors.orange
         font.pixelSize: 11
         wrapMode: Text.WordWrap

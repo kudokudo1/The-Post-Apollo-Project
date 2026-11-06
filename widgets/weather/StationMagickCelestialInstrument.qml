@@ -956,7 +956,11 @@ Rectangle {
                     const ctx=getContext("2d");
                     ctx.clearRect(0,0,width,height);
                     if(!instrument.graphModel.ready)return;
-                    if(instrument.mode==="wheel")instrument.paintWheel(ctx);
+                    if(instrument.mode==="wheel") {
+                        if(instrument.zodiacPresentation==="compare")
+                            instrument.paintEpochCompare(ctx);
+                        else instrument.paintWheel(ctx);
+                    }
                     else if(instrument.mode==="relations")instrument.paintRelations(ctx);
                     else if(instrument.mode==="retro")instrument.paintRetrograde(ctx);
                     else if(instrument.mode==="aspects"
@@ -1074,12 +1078,19 @@ Rectangle {
                 onClicked: function(mouse) {
                     if(panning || !instrument.graphModel.ready)return;
                     if(instrument.mode==="wheel"){
-                        const radius=Math.max(30,Math.min(graphCanvas.width,
-                                            graphCanvas.height)*0.36);
-                        const nx=0.5+(mouse.x-graphCanvas.width/2)*0.36/radius;
-                        const ny=0.5+(mouse.y-graphCanvas.height/2)*0.36/radius;
-                        const body=Celestial.nearestWheelBody(
-                            instrument.graphModel,instrument.focusIndex,nx,ny);
+                        let body=null;
+                        if(instrument.zodiacPresentation==="compare") {
+                            const match=Epoch.pick(instrument.epochComparison,
+                                Epoch.geometry(width,height),mouse.x,mouse.y);
+                            body=match?match.body:null;
+                        }else{
+                            const radius=Math.max(30,Math.min(graphCanvas.width,
+                                                graphCanvas.height)*0.36);
+                            const nx=0.5+(mouse.x-graphCanvas.width/2)*0.36/radius;
+                            const ny=0.5+(mouse.y-graphCanvas.height/2)*0.36/radius;
+                            body=Celestial.nearestWheelBody(
+                                instrument.graphModel,instrument.focusIndex,nx,ny);
+                        }
                         if(body===null)return;
                         instrument.selectedBody=body;
                         instrument.eventOrdinal=-1;
@@ -1116,6 +1127,48 @@ Rectangle {
                         instrument.zoom*(wheel.angleDelta.y>0?1.4:1/1.4),
                         1,8);
                     wheel.accepted=true;
+                }
+            }
+
+            // M6c // WHEEL/COMPARE are alternate views of the existing
+            // JPL zodiac instrument, never a new top-level menu tab.
+            Row {
+                id: compareControls
+                anchors.top: parent.top
+                anchors.right: parent.right
+                anchors.topMargin: 3
+                anchors.rightMargin: 4
+                spacing: 3
+                visible: instrument.mode==="wheel"
+                z: 4
+                Repeater {
+                    model: [
+                        {id:"wheel",label:"WHEEL"},
+                        {id:"compare",label:"COMPARE"},
+                        {id:"pin",label:"PIN REF"}
+                    ]
+                    delegate: ActionButton {
+                        required property var modelData
+                        width: modelData.id==="pin"?64:58
+                        height: 20
+                        contentPadding: 1
+                        label: modelData.label
+                        labelPixelSize: 8
+                        selected: modelData.id!=="pin" &&
+                                  instrument.zodiacPresentation===modelData.id
+                        accentColor: modelData.id==="pin" ?
+                            Colors.yellow : selected ? Colors.magenta : Colors.cyan
+                        available: modelData.id!=="pin" || instrument.graphModel.ready
+                        onClicked: {
+                            if(modelData.id==="pin"){
+                                if(instrument.graphModel.ready &&
+                                   instrument.focusIndex>=0) {
+                                    instrument.referenceIndex=instrument.focusIndex;
+                                    instrument.zodiacPresentation="compare";
+                                }
+                            }else instrument.zodiacPresentation=modelData.id;
+                        }
+                    }
                 }
             }
 

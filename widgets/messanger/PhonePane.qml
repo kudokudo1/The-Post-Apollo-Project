@@ -3,6 +3,7 @@ import Quickshell
 import Quickshell.Io
 import "../../components"
 import "../weather" as WeatherStage
+import "../../services/messaging/adapters" as PhoneAdapters
 
 // PHONE stays in Social. CONNECT PHONE performs an explicit read-only check
 // of existing provider observations; no pairing, permission or link is granted.
@@ -14,6 +15,24 @@ Rectangle {
     clip: true
 
     property string selectedSection: "MESSAGES"
+    // Personal-only pilot; explicit terminal consent, not Identity Center auth.
+    property string personalReadStatus: "NOT_STARTED"
+    property string personalReadOperation: ""
+    property int personalReadGeneration: 0
+    property string personalConsentStatus: "IDLE"
+    // The QML tree must exist before lifecycle handlers reference children.
+    property bool personalReadUiReady: false
+    Component.onCompleted: personalReadUiReady = true
+    // A local Social identity is a display selector, never an auth grant.
+    property string activeSocialIdentityId: ""
+    onActiveSocialIdentityIdChanged: {
+        if (!personalReadUiReady) return;
+        personalReadGeneration += 1;
+        if (personalReadProcess.running)
+            personalReadProcess.running = false;
+        phoneReadAdapter.forgetHostView();
+        personalReadStatus = "IDENTITY_CHANGED";
+    }
     property string probeStatus: "NOT CHECKED"
     property var readiness: ({})
     property string setupState: "NOT STARTED"
@@ -498,7 +517,11 @@ Rectangle {
     }
 
     onSelectedSectionChanged: {
+        if (!personalReadUiReady) return;
         if (selectedSection !== "DEVICE") closeStagedSetup();
+        personalReadGeneration += 1;
+        if (personalReadProcess.running)
+            personalReadProcess.running = false;
     }
     onStageHoleXChanged: {
         if (stageWanted) stageState = "POSITIONING";
@@ -572,8 +595,20 @@ Rectangle {
     }
 
     onVisibleChanged: {
+        // Preserve the independent native setup/installer exit behavior.
         if (!visible) closeStagedSetup();
+        if (!personalReadUiReady) return;
+        if (!visible) {
+            personalReadGeneration += 1;
+            if (personalReadProcess.running)
+                personalReadProcess.running = false;
+            phoneReadAdapter.forgetHostView();
+        }
         if (visible) {
+            personalReadStatus = "NOT_STARTED";
+            personalReadOperation = "";
+            personalConsentStatus = "IDLE";
+            phoneReadAdapter.forgetHostView();
             selectedSection = "MESSAGES";
             setupState = "NOT STARTED";
             setupReport = ({});
@@ -604,6 +639,224 @@ Rectangle {
             stageState = "IDLE";
             stagePollCount = 0;
             // No pairing or inventory action runs automatically on menu open.
+        }
+    }
+
+    // This adapter never reads the phone itself. Only a manually started,
+    // short-lived Personal pilot supplies snapshots; no organization grants.
+    PhoneAdapters.BlueFerryAdapter {
+        id: phoneReadAdapter
+        active: phonePane.visible
+    }
+
+    function openPersonalConsent() {
+        if (!visible || personalConsentProcess.running || stageWanted)
+            return;
+        personalConsentStatus = "OPENING";
+        personalConsentProcess.command = [
+            "python3", Quickshell.shellPath("services/phone/PhonePersonalReadPilot.py"),
+            "--open-consent"
+        ];
+        personalConsentProcess.running = true;
+    }
+
+    function loadPersonalSnapshot() {
+        if (!visible || personalReadProcess.running
+                || (selectedSection !== "MESSAGES" && selectedSection !== "CONTACTS"))
+            return;
+        personalReadGeneration += 1;
+        personalReadOperation = selectedSection === "MESSAGES"
+                                ? "messages.read" : "contacts.read";
+        personalReadStatus = "READING";
+        personalReadProcess.requestGeneration = personalReadGeneration;
+        personalReadProcess.requestOperation = personalReadOperation;
+        personalReadProcess.command = [
+            "python3", Quickshell.shellPath("services/phone/PhonePersonalReadPilot.py"),
+            "--client", personalReadOperation
+        ];
+        personalReadProcess.running = true;
+    }
+
+    function revokePersonalAccess() {
+        if (!visible || personalRevokeProcess.running)
+            return;
+        personalReadGeneration += 1;
+        if (personalReadProcess.running)
+            personalReadProcess.running = false;
+        phoneReadAdapter.forgetHostView();
+        personalReadStatus = "REVOKE_REQUESTED";
+        personalRevokeProcess.command = [
+            "python3", Quickshell.shellPath("services/phone/PhonePersonalReadPilot.py"),
+            "--client", "revoke"
+        ];
+        personalRevokeProcess.running = true;
+    }
+
+    function clearPersonalView() {
+        phoneReadAdapter.forgetHostView();
+        personalReadStatus = "VIEW_CLEARED";
+    }
+
+    Process {
+        id: personalConsentProcess
+        stdout: StdioCollector {
+            onStreamFinished: {
+                if (!phonePane.visible) return;
+                try {
+                    var value = JSON.parse(String(text || ""));
+                    if (value.schema !== "post-apollo.phone.personal-local-pilot.v0"
+                            || value.execution !== "EXPLICIT_PERSONAL_LOCAL_PILOT"
+                            || value.ownerKind !== "PERSONAL"
+                            || value.organizationAccess !== false
+                            || value.sendingEnabled !== false
+                            || ["CONSENT_TERMINAL_REQUESTED",
+                                "TERMINAL_UNAVAILABLE"].indexOf(value.state) < 0)
+                        throw new Error("invalid status");
+                    phonePane.personalConsentStatus = value.state;
+                } catch (error) {
+                    phonePane.personalConsentStatus = "TERMINAL_UNAVAILABLE";
+                }
+            }
+        }
+        onExited: function(code) {
+            if (phonePane.visible && code !== 0
+                    && phonePane.personalConsentStatus === "OPENING")
+                phonePane.personalConsentStatus = "TERMINAL_UNAVAILABLE";
+        }
+    }
+
+    Process {
+        id: personalReadProcess
+        property int requestGeneration: 0
+        property string requestOperation: ""
+        stdout: StdioCollector {
+            onStreamFinished: {
+                if (!phonePane.visible
+                        || personalReadProcess.requestGeneration
+                           !== phonePane.personalReadGeneration
+                        || phonePane.personalReadStatus !== "READING"
+                        || ((phonePane.selectedSection === "MESSAGES"
+                             ? "messages.read" : phonePane.selectedSection === "CONTACTS"
+                             ? "contacts.read" : "") !== personalReadProcess.requestOperation))
+                    return;
+                try {
+                    var value = JSON.parse(String(text || ""));
+                    if (value.schema !== "post-apollo.phone.personal-local-pilot.v0"
+                            || value.execution !== "EXPLICIT_PERSONAL_LOCAL_PILOT"
+                            || value.ownerKind !== "PERSONAL"
+                            || value.organizationAccess !== false
+                            || value.sendingEnabled !== false)
+                        throw new Error("invalid host shape");
+                    if (value.state !== "SNAPSHOT") {
+                        phonePane.personalReadStatus =
+                            ["NOT_ACTIVE", "NOT_CONSENTED",
+                             "READ_UNAVAILABLE"].indexOf(value.state) >= 0
+                            ? value.state : "NOT_ACTIVE";
+                        phoneReadAdapter.forgetHostView();
+                        return;
+                    }
+                    if (value.operation !== personalReadProcess.requestOperation
+                            || typeof value.contextKey !== "string"
+                            || typeof value.profileId !== "string"
+                            || typeof value.epoch !== "number"
+                            || typeof value.sequence !== "number"
+                            || !value.projection)
+                        throw new Error("invalid snapshot envelope");
+                    if (phoneReadAdapter._contextKey !== value.contextKey
+                            || phoneReadAdapter._contextEpoch !== value.epoch
+                            || phoneReadAdapter._profileId !== value.profileId) {
+                        phoneReadAdapter.forgetHostView();
+                        if (!phoneReadAdapter.beginHostView(
+                                    value.contextKey, value.profileId, value.epoch))
+                            throw new Error("stale context");
+                    }
+                    if (!phoneReadAdapter.applyHostProjection(
+                                value.contextKey, value.epoch, value.sequence,
+                                value.operation, value.projection))
+                        throw new Error("invalid projection");
+                    phonePane.personalReadStatus = "LOCAL_SNAPSHOT";
+                } catch (error) {
+                    phoneReadAdapter.forgetHostView();
+                    phonePane.personalReadStatus = "READ_UNAVAILABLE";
+                }
+            }
+        }
+        onExited: function(code) {
+            if (phonePane.visible && code !== 0
+                    && requestGeneration === phonePane.personalReadGeneration
+                    && phonePane.personalReadStatus === "READING")
+                phonePane.personalReadStatus = "NOT_ACTIVE";
+        }
+    }
+
+    Process {
+        id: personalRevokeProcess
+        stdout: StdioCollector {
+            onStreamFinished: {
+                if (!phonePane.visible) return;
+                try {
+                    var value = JSON.parse(String(text || ""));
+                    phonePane.personalReadStatus =
+                        value.schema === "post-apollo.phone.personal-local-pilot.v0"
+                        && value.state === "REVOKED"
+                        ? "REVOKED" : "VIEW_CLEARED";
+                } catch (error) {
+                    phonePane.personalReadStatus = "VIEW_CLEARED";
+                }
+            }
+        }
+    }
+
+    Process {
+        id: personalStatusProcess
+        property string requestedContext: ""
+        property int requestedEpoch: 0
+        stdout: StdioCollector {
+            onStreamFinished: {
+                if (!phonePane.visible || phoneReadAdapter._contextKey === ""
+                        || personalStatusProcess.requestedContext !== phoneReadAdapter._contextKey
+                        || personalStatusProcess.requestedEpoch !== phoneReadAdapter._contextEpoch)
+                    return;
+                try {
+                    var value = JSON.parse(String(text || ""));
+                    if (value.schema !== "post-apollo.phone.personal-local-pilot.v0"
+                            || value.execution !== "EXPLICIT_PERSONAL_LOCAL_PILOT"
+                            || value.ownerKind !== "PERSONAL"
+                            || value.organizationAccess !== false
+                            || value.sendingEnabled !== false
+                            || value.state !== "PERSONAL_LOCAL_PILOT_ACTIVE"
+                            || value.contextKey !== phoneReadAdapter._contextKey
+                            || value.epoch !== phoneReadAdapter._contextEpoch)
+                        throw new Error("pilot inactive or replaced");
+                } catch (error) {
+                    phonePane.clearPersonalView();
+                    phonePane.personalReadStatus = "ACCESS_STOPPED";
+                }
+            }
+        }
+        onExited: function(code) {
+            if (code !== 0 && phoneReadAdapter._contextKey !== ""
+                    && requestedContext === phoneReadAdapter._contextKey
+                    && requestedEpoch === phoneReadAdapter._contextEpoch) {
+                phonePane.clearPersonalView();
+                phonePane.personalReadStatus = "ACCESS_STOPPED";
+            }
+        }
+    }
+
+    Timer {
+        interval: 3000
+        repeat: true
+        running: phonePane.visible && phoneReadAdapter._contextKey !== ""
+        onTriggered: {
+            if (personalStatusProcess.running) return;
+            personalStatusProcess.requestedContext = phoneReadAdapter._contextKey;
+            personalStatusProcess.requestedEpoch = phoneReadAdapter._contextEpoch;
+            personalStatusProcess.command = [
+                "python3", Quickshell.shellPath("services/phone/PhonePersonalReadPilot.py"),
+                "--client", "status"
+            ];
+            personalStatusProcess.running = true;
         }
     }
 
@@ -1291,20 +1544,116 @@ Rectangle {
         }
     }
 
+    Rectangle {
+        id: personalReadBar
+        anchors.top: sectionToolbar.bottom
+        anchors.left: parent.left
+        anchors.right: parent.right
+        height: visible ? 44 : 0
+        visible: phonePane.selectedSection === "MESSAGES"
+                 || phonePane.selectedSection === "CONTACTS"
+        color: Colors.dark
+        border.width: 1
+        border.color: Colors.cyan
+        z: 6
+
+        Row {
+            anchors.centerIn: parent
+            spacing: 7
+            ActionButton {
+                width: Math.max(96, Math.min(150,
+                           (personalReadBar.width - 30) / 3))
+                height: 31
+                label: "APPROVE READ"
+                labelPixelSize: 9
+                accentColor: Colors.magenta
+                onTriggered: phonePane.openPersonalConsent()
+            }
+            ActionButton {
+                width: Math.max(96, Math.min(150,
+                           (personalReadBar.width - 30) / 3))
+                height: 31
+                label: phonePane.personalReadStatus === "READING"
+                       ? "LOADING..." : "LOAD PERSONAL"
+                labelPixelSize: 9
+                accentColor: Colors.cyan
+                interactive: !personalReadProcess.running
+                onTriggered: phonePane.loadPersonalSnapshot()
+            }
+            ActionButton {
+                width: Math.max(96, Math.min(150,
+                           (personalReadBar.width - 30) / 3))
+                height: 31
+                label: "STOP ACCESS"
+                labelPixelSize: 9
+                accentColor: Colors.red
+                destructive: true
+                onTriggered: phonePane.revokePersonalAccess()
+            }
+        }
+    }
+
     ContactList {
         id: phoneContactList
-        anchors.top: sectionToolbar.bottom
+        anchors.top: personalReadBar.bottom
         anchors.left: parent.left
         anchors.bottom: parent.bottom
         width: Math.min(200, Math.max(135, phonePane.width * 0.30))
-        conversations: []
+        visible: phonePane.selectedSection !== "CONTACTS"
+        conversations: phonePane.selectedSection === "MESSAGES"
+                       ? phoneReadAdapter.conversations : []
         keyboardFocused: false
+        onContactClicked: {
+            if (selectedConversation && phonePane.selectedSection === "MESSAGES")
+                phoneReadAdapter.loadMessages(String(selectedConversation.id));
+        }
+    }
+
+    // Contact cards are address book rows, not fake conversation threads.
+    ListView {
+        id: phoneAddressBook
+        anchors.fill: phoneContactList
+        visible: phonePane.selectedSection === "CONTACTS"
+        clip: true
+        model: phoneReadAdapter.contactCards
+        delegate: Rectangle {
+            required property var modelData
+            width: phoneAddressBook.width
+            height: 58
+            color: Colors.dark
+            border.width: 1
+            border.color: Colors.cyan
+            Column {
+                anchors.fill: parent
+                anchors.margins: 8
+                spacing: 5
+                Text {
+                    width: parent.width
+                    text: modelData.displayNameInProfile || "Unnamed contact"
+                    textFormat: Text.PlainText
+                    color: Colors.white
+                    font.pixelSize: 11
+                    elide: Text.ElideRight
+                }
+                Text {
+                    width: parent.width
+                    text: modelData.primary || ""
+                    textFormat: Text.PlainText
+                    color: Colors.cyan
+                    font.pixelSize: 9
+                    elide: Text.ElideRight
+                }
+            }
+        }
     }
 
     // No invented people or unapproved phone numbers. The real ContactList
     // remains empty until a different, trusted owner provides scoped data.
     Text {
         id: emptyPhoneContacts
+        visible: phonePane.selectedSection === "CONTACTS"
+                 ? phoneReadAdapter.contactCards.length === 0
+                 : phoneReadAdapter.conversations.length === 0
         anchors.top: phoneContactList.top
         anchors.topMargin: 108
         anchors.left: phoneContactList.left
@@ -1324,19 +1673,25 @@ Rectangle {
 
     ChatFeed {
         id: phoneChatFeed
-        anchors.top: sectionToolbar.bottom
+        anchors.top: personalReadBar.bottom
         anchors.left: phoneContactList.right
         anchors.right: parent.right
         anchors.bottom: parent.bottom
         visible: phonePane.selectedSection !== "DEVICE"
-        conversation: null
-        messages: []
+        conversation: phonePane.selectedSection === "MESSAGES"
+                      ? phoneContactList.selectedConversation : null
+        messages: phonePane.selectedSection === "MESSAGES"
+                  ? phoneReadAdapter.messages : []
         sendEnabled: false
         emptyConversationLabel: phonePane.selectedSection === "CALLS"
                                 ? "PHONE CALLS NOT LINKED"
                                 : phonePane.selectedSection === "CONTACTS"
-                                ? "PHONE CONTACTS NOT LINKED"
-                                : "PHONE NOT LINKED"
+                                ? (phoneReadAdapter.contactCards.length > 0
+                                   ? "IPHONE CONTACTS // READ ONLY"
+                                   : "PHONE CONTACTS NOT LINKED")
+                                : phoneReadAdapter.conversations.length > 0
+                                  ? "SELECT A PHONE CONVERSATION"
+                                  : "PHONE NOT LINKED"
     }
 
     // Informative, content-free status on the existing MESSAGES/CONTACTS pane.
@@ -1350,9 +1705,22 @@ Rectangle {
         anchors.margins: 16
         z: 4
         visible: phonePane.selectedSection === "MESSAGES"
-                 || phonePane.selectedSection === "CONTACTS"
+                 ? phoneReadAdapter.conversations.length === 0
+                 : phonePane.selectedSection === "CONTACTS"
+                   && phoneReadAdapter.contactCards.length === 0
         textFormat: Text.PlainText
-        text: phonePane.contentDiagnosticText(phonePane.selectedSection)
+        text: phonePane.personalReadStatus === "LOCAL_SNAPSHOT"
+              ? "PERSONAL LOCAL SNAPSHOT // No records returned by BlueFerry."
+              : phonePane.personalConsentStatus === "CONSENT_TERMINAL_REQUESTED"
+                ? "Approve access in the new terminal, then select LOAD PERSONAL."
+                : phonePane.personalReadStatus === "NOT_CONSENTED"
+                  ? "This channel was not selected in the Personal consent."
+                  : phonePane.personalReadStatus === "ACCESS_STOPPED"
+                    ? "Personal read access stopped. Local view cleared."
+                    : phonePane.personalReadStatus === "NOT_ACTIVE"
+                      ? "Personal read host is not active. Select APPROVE READ first."
+                      : "PERSONAL READ-ONLY PILOT // "
+                        + phonePane.contentDiagnosticText(phonePane.selectedSection)
         color: Colors.orange
         font.pixelSize: 11
         wrapMode: Text.WordWrap

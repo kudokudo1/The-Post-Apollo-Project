@@ -40,8 +40,8 @@ class PhoneDeviceUiTests(unittest.TestCase):
         self.assertIn("phonePane.refreshDeviceObservation();", self.ui)
 
     def test_no_private_content_or_forged_connection_claim(self):
-        self.assertIn("conversations: []", self.ui)
-        self.assertIn("messages: []", self.ui)
+        self.assertIn("phoneReadAdapter.conversations : []", self.ui)
+        self.assertIn("phoneReadAdapter.messages : []", self.ui)
         self.assertIn("sendEnabled: false", self.ui)
         self.assertNotIn('phonePane.deviceObservation.contentAccessEnabled = true', self.ui)
         self.assertNotIn("bluetoothctl remove", self.ui)

@@ -63,8 +63,8 @@ class SavedBlueFerryUiTests(unittest.TestCase):
     def test_no_new_device_storage_or_permission_grant(self):
         self.assertIn('    ContactList {', self.ui)
         self.assertIn('    ChatFeed {', self.ui)
-        self.assertIn('conversations: []', self.ui)
-        self.assertIn('messages: []', self.ui)
+        self.assertIn('phoneReadAdapter.conversations : []', self.ui)
+        self.assertIn('phoneReadAdapter.messages : []', self.ui)
         self.assertIn('READ-ONLY SETUP PREVIEW', self.ui)
         for forbidden in ("FileView {", "LocalStorage", "SQLite", "sendMessage(",
                           "contacts-sync", "blueferry calls enable"):

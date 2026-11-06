@@ -35,3 +35,27 @@ if [ "$rc" -ne 0 ] \
    exit 1
 fi
 echo "C5_NATIVE_PASS // ISOLATED_QML_LOADING_AND_SOURCE_STATUSES"
+
+# The no-source smoke above only proves loading and provider activation.
+# Now feed bounded synthetic records into the real source objects in the
+# same disposable shell and insist on actual visible markers/cards/solar arc.
+cp "$repo_root/tests/weather/fixtures/C5PopulatedNativeShell.qml" "$work/config/shell.qml"
+rc=0
+timeout --signal=TERM --kill-after=3s 20s env \
+  HOME="$work/home" \
+  XDG_RUNTIME_DIR="$work/runtime" \
+  XDG_CACHE_HOME="$work/cache" \
+  XDG_CONFIG_HOME="$work/config" \
+  QT_QPA_PLATFORM=offscreen \
+  quickshell --no-color -p "$work/config/shell.qml" \
+  >"$work/populated.log" 2>&1 || rc=$?
+cat "$work/populated.log"
+if [ "$rc" -ne 0 ] \
+   || ! grep -F "C5_POPULATED_PASS // SUN_ARC PLANET_EVENTS ISS_TIMES ACTIVE_METEORS" "$work/populated.log" >/dev/null \
+   || grep -F "C5_POPULATED_FAIL" "$work/populated.log" >/dev/null \
+   || grep -F "Failed to load configuration" "$work/populated.log" >/dev/null \
+   || grep -E "StationCosmosModesPane.qml.*(TypeError|ReferenceError|Unable to assign)" "$work/populated.log" >/dev/null; then
+   echo "C5_POPULATED_FAIL // process_exit=$rc" >&2
+   exit 1
+fi
+echo "C5_POPULATED_PASS // NATIVE_SOURCE_TO_VISIBLE_INSTRUMENTS"

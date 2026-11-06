@@ -297,8 +297,10 @@ test("M30-D LUNAR + SOLAR uses focused top tabs, no page scroll and no new colle
   assert.match(lunarSolar,/moonEphemeris: sourceSky\.moonObservation/);
   assert.match(lunarSolar,/currentSolarPosition: sourceSky\.currentSolarPosition/);
   assert.match(lunarSolar,/solarCivilOffsetMinutes: sourceSky\.moonCivilOffsetMinutes/);
-  assert.match(lunarSolar,/PRACTICE CALENDAR \/\/ NOT CONNECTED/);
-  assert.match(lunarSolar,/NO SAVED RITUAL EVENTS|NO SAVED/);
+  // M7a calendar now displays only source-backed forecast rows.
+  assert.match(lunarSolar,/StationMagickForecastCalendarPane\s*\{/);
+  assert.match(lunarSolar,/weatherService: lunarSolarPane\.weatherService/);
+  assert.match(magick.noteFor("magick/lunar-solar/calendar"),/NO PLANNER/);
   assert.doesNotMatch(lunarSolar,/Flickable\s*\{|ScrollView\s*\{|Process\s*\{|FileView\s*\{|Timer\s*\{/);
   assert.doesNotMatch(lunarSolar,/Date\.now\(|XMLHttpRequest|writeAdapter/);
   // The original full COSMOS visual retains its exact default height.

@@ -17,7 +17,7 @@ var SCENARIOS = {
         classification: "RESERVED_SOURCE_MATCHES_EXPECTED_UNACKNOWLEDGED",
         sourcePosition: "EXPECTED",
         pendingStagePresent: true,
-        label: "NEW BYTES / RECEIPT NOT SETTLED",
+        label: "NEW BYTES // UNSETTLED RECEIPT",
         headline: "CHANGE APPEARS, BUT CONFIRMATION IS MISSING",
         explanation: "The simulated source contains expected new bytes. The journal still has a reserved stage, so the editor must not treat this as a confirmed save."
     },

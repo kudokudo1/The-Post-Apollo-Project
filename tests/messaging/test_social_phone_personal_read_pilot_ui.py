@@ -97,7 +97,10 @@ class PersonalReadPilotUiContract(unittest.TestCase):
         self.assertNotIn("loadPersonalSnapshot()", start)
         visible = self.pane.split("    onVisibleChanged: {", 1)[1].split(
             "\n    // The service adapter only displays", 1)[0]
-        self.assertIn("checkPersonalApproval(true, false)", visible)
+        self.assertIn("checkPersonalApproval(!phonePane.personalNeedsExplicitReload, false)", visible)
+        self.assertIn("personalNeedsExplicitReload = true;", self.pane)
+        self.assertIn("if (personalApproved && !personalNeedsExplicitReload)", self.pane)
+        self.assertIn("personalNeedsExplicitReload = false; // User explicitly requested Personal.", self.pane)
         self.assertNotIn("openPersonalConsent()", visible)
         self.assertNotIn("savePersonalApproval(", visible)
         self.assertNotIn('"--approve"', visible)

@@ -22,6 +22,8 @@ Rectangle {
     property string personalConsentStatus: "IDLE"
     property bool personalApproved: false
     property bool personalPermissionOpen: false
+    // A local Social identity change must not auto-display Personal content.
+    property bool personalNeedsExplicitReload: false
     // The QML tree must exist before lifecycle handlers reference children.
     property bool personalReadUiReady: false
     Component.onCompleted: personalReadUiReady = true
@@ -35,7 +37,10 @@ Rectangle {
         phoneReadAdapter.forgetHostView();
         personalApproved = false;
         personalPermissionOpen = false;
+        personalNeedsExplicitReload = true;
         personalReadStatus = "IDENTITY_CHANGED";
+        if (personalStatusProcess.running)
+            personalStatusProcess.running = false;
         if (visible)
             checkPersonalApproval(false, false);
     }
@@ -528,9 +533,11 @@ Rectangle {
         personalReadGeneration += 1;
         if (personalReadProcess.running)
             personalReadProcess.running = false;
+        if (personalStatusProcess.running)
+            personalStatusProcess.running = false;
         if (visible && (selectedSection === "MESSAGES"
                         || selectedSection === "CONTACTS")) {
-            if (personalApproved)
+            if (personalApproved && !personalNeedsExplicitReload)
                 loadPersonalSnapshot();
             else
                 checkPersonalApproval(false, false);
@@ -615,6 +622,8 @@ Rectangle {
             personalReadGeneration += 1;
             if (personalReadProcess.running)
                 personalReadProcess.running = false;
+            if (personalStatusProcess.running)
+                personalStatusProcess.running = false;
             phoneReadAdapter.forgetHostView();
             personalPermissionOpen = false;
             personalApproved = false;
@@ -659,7 +668,7 @@ Rectangle {
             // No pairing, new approval or device configuration on menu open.
             Qt.callLater(function() {
                 if (phonePane.visible)
-                    phonePane.checkPersonalApproval(true, false);
+                    phonePane.checkPersonalApproval(!phonePane.personalNeedsExplicitReload, false);
             });
         }
     }
@@ -748,9 +757,11 @@ Rectangle {
         if (!visible || personalPermissionOpen || personalReadProcess.running
                 || (selectedSection !== "MESSAGES" && selectedSection !== "CONTACTS"))
             return;
+        personalNeedsExplicitReload = false; // User explicitly requested Personal.
         if (!personalApproved) {
             // A click must never appear to do nothing. Restore an existing
             // saved approval or show the in-PHONE permission prompt.
+            personalReadStatus = "CHECKING_PERMISSION";
             checkPersonalApproval(true, true);
             return;
         }
@@ -964,8 +975,11 @@ Rectangle {
                         phonePane.personalApproved = true;
                         if (phonePane.personalReadStatus !== "READING"
                                 && phonePane.personalReadStatus !== "LOCAL_SNAPSHOT")
-                            phonePane.personalReadStatus = "APPROVED";
+                            phonePane.personalReadStatus =
+                                phonePane.personalNeedsExplicitReload
+                                ? "IDENTITY_CHANGED" : "APPROVED";
                         if (personalStatusProcess.wantsAutoRead
+                                && !phonePane.personalNeedsExplicitReload
                                 && (phonePane.selectedSection === "MESSAGES"
                                     || phonePane.selectedSection === "CONTACTS"))
                             Qt.callLater(function() {

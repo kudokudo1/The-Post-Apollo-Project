@@ -29,7 +29,9 @@ echo "C2R_PASS // REAL_GUEST_SELINUX_ENFORCING"
 # Guest-only policy installation. No SELinux mode change and no permissive rule.
 command -v semodule >/dev/null || bad "semodule unavailable in Fedora guest"
 [[ -s /root/c2q/postapollo_connections.pp ]] || bad "missing compiled policy module"
+echo "C2R_POLICY_LOAD_BEGIN // enforcing guest"
 semodule -i /root/c2q/postapollo_connections.pp || bad "SELinux module installation refused"
+echo "C2R_POLICY_LOAD_INSTALLED"
 semodule -l | grep -Fq postapollo_connections || bad "custom policy module not loaded"
 echo "C2R_PASS // CUSTOM_POLICY_MODULE_LOADED_WITH_ENFORCING_KERNEL"
 

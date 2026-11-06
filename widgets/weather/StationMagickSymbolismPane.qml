@@ -12,6 +12,7 @@ Rectangle {
     property string query: ""
     property string chosenTerm: ""
     property string chosenCategory: ""
+    property bool atlasMode: true
     readonly property var sourceModel: Symbols.build(
         Agrippa.PLANETS,Agrippa.CATEGORIES,Agrippa.SOURCE,category,query)
     readonly property var matches: Symbols.associated(
@@ -38,17 +39,31 @@ Rectangle {
             }
         }
     }
+    StationMagickCorrespondenceAtlasPane {
+        anchors.fill:parent
+        anchors.margins:7
+        visible:symbolism.atlasMode
+        onNetworkRequested:symbolism.atlasMode=false
+    }
     Column {
+        visible:!symbolism.atlasMode
         anchors.fill: parent
         anchors.margins: 7
         spacing: 5
-        GohuText {
-            width: parent.width
-            height: 23
-            color: Colors.magenta
-            font.pixelSize: 12
-            elide: Text.ElideRight
-            text: "SYMBOLISM // SOURCE COMPARISON"
+        Row {
+            width:parent.width;height:23;spacing:4
+            GohuText {
+                width:Math.max(20,parent.width-68);height:23
+                color:Colors.magenta;font.pixelSize:12
+                elide:Text.ElideRight
+                text:"SYMBOLISM // SOURCE COMPARISON"
+            }
+            ActionButton {
+                width:64;height:22
+                label:"ATLAS";labelPixelSize:9
+                accentColor:Colors.cyan
+                onClicked:symbolism.atlasMode=true
+            }
         }
         QuietText {
             width: parent.width

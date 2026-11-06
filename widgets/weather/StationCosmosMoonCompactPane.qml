@@ -20,6 +20,9 @@ Rectangle {
     readonly property bool moonReady: !!moonSource && moonSource.ready
         && !!moonSource.ephemeris && moonSource.ephemeris.available
     readonly property var moonEphemeris: moonReady ? moonSource.ephemeris : null
+    readonly property bool hasNoRiseSet: moonEphemeris !== null
+        && moonEphemeris !== undefined
+        && moonEphemeris.noRiseSet === true
     readonly property var positionSnapshot: positionSource && positionSource.ready
         ? positionSource.snapshot : null
     readonly property var moonPosition: positionSnapshot ? positionSnapshot.moon : null
@@ -185,7 +188,7 @@ Rectangle {
             font.pixelSize: 8
             color: moonSource && moonSource.failed ? Colors.orange : Colors.yellow
             elide: Text.ElideRight
-            text: moonPane.moonReady && moonPane.moonEphemeris.noRiseSet
+            text: moonPane.hasNoRiseSet
                 ? "USNO // NO RISE OR SET FOR THIS CIVIL DATE // NO EVENT INVENTED"
                 : moonSource && moonSource.failed
                   ? moonPane.present(moonSource.errorText)

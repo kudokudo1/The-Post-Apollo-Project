@@ -167,7 +167,11 @@ Rectangle {
             color: Colors.yellow
             font.pixelSize: 9
             elide: Text.ElideRight
-            text: "78 CARD IDENTITIES // KIM KRANS // ART NOT DISTRIBUTED"
+            // M6j // No image files are shipped with the card identity deck.
+            // The path syntax alone is not evidence that art exists.
+            text: tarot.localArtworkDirectory.trim()===""
+                ? "NO WILD UNKNOWN IMAGES // SELECT LOCAL ART FOLDER"
+                : "LOCAL ART CHECK // MATCH EACH CARD ID TO PNG/JPG/WEBP"
         }
 
         // M6h // Either the desktop deals, or the operator transcribes
@@ -215,9 +219,12 @@ Rectangle {
                 height: 26
                 color: Colors.dark
                 border.width: 1
-                border.color: Deck.localArtworkUrl(
-                    tarot.localArtworkDirectory,"major-the-fool")!==""
-                    ? Colors.green : Colors.blue
+                // Yellow means folder syntax was accepted, NOT that
+                // the card photos actually exist or were loaded.
+                border.color: tarot.localArtworkDirectory.trim()===""
+                    ? Colors.blue : Deck.localArtworkCandidates(
+                        tarot.localArtworkDirectory,"major-the-fool").length>0
+                    ? Colors.yellow : Colors.orange
                 clip: true
                 TextInput {
                     id: artworkFolderInput
@@ -239,7 +246,7 @@ Rectangle {
                     visible: artworkFolderInput.text.length===0
                     color: Colors.cyan
                     font.pixelSize: 9
-                    text: "OPTIONAL ABSOLUTE LOCAL FOLDER / NO UPLOAD"
+                    text: "ENTER PRIVATE CARD IMAGE FOLDER PATH"
                     elide: Text.ElideRight
                 }
             }
@@ -614,7 +621,10 @@ Rectangle {
             color: Colors.yellow
             font.pixelSize: 9
             elide: Text.ElideRight
-            text: "LOCAL FILES: major-the-fool.png / wands-daughter.png / ... "
+            // Show an exact image filename for the currently inspected ID.
+            text: tarot.viewMode==="catalog" && tarot.inspectedCard
+                ? "IMAGE FILE // "+tarot.inspectedCard.id+".png / .jpg / .webp"
+                : "IMAGE EXAMPLE // major-the-fool.png / wands-daughter.jpg"
         }
         QuietText {
             width: parent.width
@@ -622,7 +632,7 @@ Rectangle {
             color: Colors.orange
             font.pixelSize: 9
             elide: Text.ElideRight
-            text: "PRIVATE READ-ONLY ART // NO BUNDLED IMAGES, NO SAVED READINGS"
+            text: "DECK PHOTOS ARE NOT BUNDLED // READ-ONLY PRIVATE FOLDER"
         }
     }
 
@@ -683,7 +693,12 @@ Rectangle {
                     height: 26
                     label: "CLOSE"
                     labelPixelSize: 9
-                    accentColor: Colors.magenta
+                    destructive: true
+                    accentColor: Colors.red
+                    idleFillColor: Colors.red
+                    idleForegroundColor: Colors.black
+                    hoverFillColor: Colors.orange
+                    hoverForegroundColor: Colors.black
                     onClicked: tarot.inspectedDrawIndex=-1
                 }
             }
@@ -691,6 +706,7 @@ Rectangle {
                 width: parent.width
                 height: Math.max(148,tarot.height-118)
                 StationMagickTarotCard {
+                    id: focusedCardFace
                     anchors.centerIn: parent
                     width: tarot.inspectMetrics
                         ? tarot.inspectMetrics.width : 235
@@ -726,7 +742,10 @@ Rectangle {
                 font.pixelSize: 9
                 horizontalAlignment: Text.AlignHCenter
                 elide: Text.ElideRight
-                text: "ESCAPE VIA CLOSE // ORIGINAL OR USER-LOCAL ART ONLY"
+                text: tarot.inspectedDrawCard
+                    ? tarot.inspectedDrawCard.id+".png // "+
+                      focusedCardFace.artworkStatus
+                    : "NO CARD IMAGE // CLOSE TO RETURN"
             }
         }
     }

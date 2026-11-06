@@ -38,6 +38,7 @@ on:
       - 'widgets/weather/StationMagickTarotPhysicalPolicy.js'
       - 'widgets/weather/StationMagickTarotLayoutPolicy.js'
       - 'tests/weather/test_magick_tarot_presentation_m6i.js'
+      - 'tests/weather/test_magick_tarot_local_art_m6j.js'
       - 'tests/weather/test_magick_tarot_physical_m6h.js'
       - 'widgets/weather/StationMagickTarotPane.qml'
       - 'widgets/weather/StationMagickTarotCard.qml'
@@ -109,6 +110,8 @@ jobs:
         run: node --test tests/weather/test_magick_tarot_physical_m6h.js
       - name: Verify M6i responsive Tarot cards, inspector and explicit physical picker
         run: node --test tests/weather/test_magick_tarot_presentation_m6i.js
+      - name: Verify M6j local-only Tarot images and red CLOSE control
+        run: node --test tests/weather/test_magick_tarot_local_art_m6j.js
       - name: Preserve MAGICK M4/M5 sources and interaction behavior
         run: |
           node --test tests/weather/test_magick_celestial_visual_m5.js

@@ -133,7 +133,7 @@ test("M6h integrates physical picker with existing Wild Unknown draw and INDEX",
  /StationMagickTarotCard\s*\{/
  ])assert.match(qml,re);
  assert.match(subjects,/id: tarotReference\s*StationMagickTarotPane/);
- assert.match(cardQml,/APOLLO ORIGINAL/);
+ assert.match(cardQml,/PHOTO NOT LOADED/);
  for(const src of [physicalSource,qml]){
    for(const forbidden of ["Process {","Timer {","FileView {",
        "XMLHttpRequest","WebEngineView","Qt.openUrlExternally",

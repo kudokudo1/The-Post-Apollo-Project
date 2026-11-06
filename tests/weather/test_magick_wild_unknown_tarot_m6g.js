@@ -151,18 +151,21 @@ test("M6g complete QML deck supports selection, draw, optional reversals and ind
     assert.match(pane,/onTextChanged: tarot\.localArtworkDirectory=text/);
     assert.match(pane,/maximumLength: 1024/);
     assert.match(pane,/NO GUIDEBOOK QUOTES OR PREDICTIONS/);
-    assert.match(pane,/NO BUNDLED IMAGES, NO SAVED READINGS/);
+    assert.match(pane,/DECK PHOTOS ARE NOT BUNDLED \/\/ READ-ONLY PRIVATE FOLDER/);
+    assert.match(pane,/NO WILD UNKNOWN IMAGES \/\/ SELECT LOCAL ART FOLDER/);
 });
 test("M6g card front has original placeholder and OPTIONAL local-only image",()=>{
     assert.match(card,/import "StationMagickTarotDeckPolicy\.js" as Deck/);
     assert.match(card,/readonly property string localSource:/);
-    assert.match(card,/Deck\.localArtworkUrl\(localArtworkDirectory,card\.id\)/);
+    assert.match(card,/Deck\.localArtworkCandidates\(localArtworkDirectory,card\.id\)/);
+    assert.match(card,/onStatusChanged:/);
+    assert.match(card,/NO PHOTO/);
     assert.match(card,/id: decorativeCanvas/);
     assert.match(card,/ctx\.arc\(cx,cy,radius\*/);
     assert.match(card,/source: face\.localSource/);
     assert.match(card,/visible: face\.hasLocalArt/);
     assert.match(card,/angle: face\.reversed \? 180 : 0/);
-    assert.match(card,/APOLLO ORIGINAL/);
+    assert.match(card,/PHOTO NOT LOADED/);
     assert.ok(!card.includes("http://") && !card.includes("https://"));
     assert.ok(!pane.includes("FileDialog") && !pane.includes("FolderDialog"));
     assert.ok(!pane.includes("upload") || pane.includes("NO UPLOAD"));

@@ -24,6 +24,12 @@ C2y now launches the actual `rpm-ostree install --cache-only` in a separate **tr
 Both exact-head runs [42299418948](https://github.com/kudokudo1/The-Post-Apollo-Project/actions/runs/42299418948) and [42299419016](https://github.com/kudokudo1/The-Post-Apollo-Project/actions/runs/42299419016) failed the reboot acceptance gate. The isolated RPM worker successfully reported `Writing rpmdb...done`, `Writing OSTree commit...done`, `Staging deployment...done`, the exact test RPM added, and changes queued for next boot. Independent systemd probes kept ticking and showed sufficient RAM and disk space, while the original first-boot controller again stopped after `C2V_INSTALL_WATCHDOG // attempt=1`. The tests **never rebooted**. The cause of the first-boot controller stall remains unproven; this is not evidence of a system-wide VM freeze, nor a successful rollback.
 
 Latest C2y implementation moves the **pending-deployment verification and reboot decision into its own independently started transient systemd monitor unit**, separate from both the RPM worker and the original first-boot controller. The original controller waits for the monitor's readiness marker, starts the bounded RPM worker, logs `C2V_MONITOR_HANDOFF_COMPLETE`, then exits without polling `rpm-ostreed`. Only the independent monitor may write the persistent `layer_pending` checkpoint or request reboot, and only after `rpm-ostree status --json` confirms an idle transaction, an actual staged/pending default OSTree deployment and the exact fixture package in the requested/local package metadata. On an observed nonzero RPM install exit, missing package, unavailable status, or elapsed bound, it fails and powers off the disposable guest. If the worker exit is missing but staging independently proves complete, it logs the ambiguity, then requires booted package verification followed by booted rollback verification. All guest network and production-credential gates remain unchanged.
+### Independent service-lifetime diagnosis
+
+The next two full tests, [42304618652](https://github.com/kudokudo1/The-Post-Apollo-Project/actions/runs/42304618652) and [42304618654](https://github.com/kudokudo1/The-Post-Apollo-Project/actions/runs/42304618654), **also failed**. Both verified first boot, started a separate monitor with `C2V_MONITOR_READY`, created the RPM worker, and logged `C2V_MONITOR_HANDOFF_COMPLETE`. In both cases only monitor attempt 1 was seen, while the independent guest resource ticker continued; neither `C2V_PENDING_DEPLOYMENT_AUTHORITY` nor either boot verification marker was emitted. A started monitor is not proof that the service stayed alive, and its disappearance could reflect an exit, failure, stop, freeze, or stalled status lookup. **No root cause is yet established.**
+
+The current bounded diagnostic change extends the independent read-only guest resource probe, recording `systemctl show` for original first-boot controller, monitor, worker and rpm-ostreed; cgroup presence, freeze state and events; and `ostree admin status --json` obtained from local OSTree state instead of the rpm-ostree daemon's status API. All new commands have explicit timeouts and run only in the disposable isolated Fedora guest. They are **observations only**, not an authorization to reboot on a log string or to bypass the authoritative pending deployment and actual two-reboot checks. The existing CI safety preflight requires the instrumentation. The next run should establish which units survived and whether local OSTree reports a staged default deployment independently of the daemon.
+
 ## HOW TO USE
 
 None on your desktop. The PR's GitHub runner builds a temporary signed inert RPM, boots an ephemeral Fedora Silverblue 44 guest, and reports diagnostic/reboot status in CI.
@@ -57,7 +63,10 @@ This is a diagnostic boundary fix, not a demonstrated solution to offline rpm-os
 - [x] Reproduce isolated-worker controller stall in two official Silverblue VM runs
 - [x] Split pending-layer verification and reboot authority into independent transient systemd monitor
 - [x] Require monitor readiness before RPM worker starts; original one-shot exits
-- [ ] Verify new exact-head CI results, booted RPM layer and booted rollback
+- [x] Recover both independent-monitor test failures and confirm monitor never reached attempt 2
+- [x] Add bounded read-only service state, cgroup and direct OSTree administrative probes
+- [ ] Verify current exact-head CI and identify the first service lifecycle failure
+- [ ] Verify booted RPM layer and booted rollback with all gates intact
 - [ ] Review any actual offline rpm-ostree failure and independently verify successful rollback
 - [ ] Obtain operator acceptance; no merge or production enablement by this worker
 

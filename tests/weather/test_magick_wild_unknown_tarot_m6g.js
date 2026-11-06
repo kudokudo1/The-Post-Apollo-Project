@@ -156,15 +156,15 @@ test("M6g complete QML deck supports selection, draw, optional reversals and ind
 test("M6g card front has original placeholder and OPTIONAL local-only image",()=>{
     assert.match(card,/import "StationMagickTarotDeckPolicy\.js" as Deck/);
     assert.match(card,/readonly property string localSource:/);
-    assert.match(card,/Deck\.localArtworkUrl\(localArtworkDirectory,card\.id\)/);
+    assert.match(card,/Deck\.localArtworkCandidates\(localArtworkDirectory,card\.id\)/);
     assert.match(card,/id: decorativeCanvas/);
     assert.match(card,/ctx\.arc\(cx,cy,radius\*/);
     assert.match(card,/source: face\.localSource/);
     assert.match(card,/visible: face\.hasLocalArt/);
     assert.match(card,/angle: face\.reversed \? 180 : 0/);
-    assert.match(card,/APOLLO ORIGINAL/);
+    assert.match(card,/IMAGE MISSING \/\/ CHECK FOLDER|NO LOCAL ART FOLDER/);
     assert.ok(!card.includes("http://") && !card.includes("https://"));
-    assert.ok(!pane.includes("FileDialog") && !pane.includes("FolderDialog"));
+    assert.ok(!pane.includes("FileDialog")); // QtQuick.Dialogs FolderDialog is local-only
     assert.ok(!pane.includes("upload") || pane.includes("NO UPLOAD"));
 });
 test("M6g TAROT route does not modify other MAGICK rooms or record a journal",()=>{

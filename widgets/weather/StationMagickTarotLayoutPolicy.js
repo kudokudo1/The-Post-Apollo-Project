@@ -42,7 +42,7 @@ function catalog(width,height) {
 function inspect(width,height) {
     if(!finite(width)||!finite(height)||width<180||height<260)
         return null;
-    var available=Math.max(150,height-105);
+    var available=Math.max(150,height-125);
     var cardWidth=clamp(Math.min(width*0.52,available/1.52),110,300);
     return {format:FORMAT,width:cardWidth,
         height:Math.min(available,cardWidth*1.54)};

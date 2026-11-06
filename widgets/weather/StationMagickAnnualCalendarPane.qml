@@ -178,7 +178,7 @@ Rectangle {
                 annualPane.scopeMode==="year"?"month":"year"
         }
         ActionButton {
-            width:Math.max(55,parent.width-31-38-31-53-43-5*spacing)
+            width:Math.max(55,parent.width-31-38-31-53-43-5*controls.spacing)
             height:23
             label: annualSource.loading?"LOADING":"CALCULATE YEAR"
             labelPixelSize:8

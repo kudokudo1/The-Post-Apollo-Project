@@ -153,6 +153,20 @@ Item {
                 opacity: 0.7
             }
 
+            // M13z // Operator-visible, EXAMPLE-ONLY crash-state review.
+            // The real M13y inspector is not connected to live TASKS.
+            // Reuse M13s above for genuine in-memory unsaved editor status.
+            TaskRecoveryReviewPaneM13z {
+                width: parent.width
+            }
+
+            Rectangle {
+                width: parent.width
+                height: 1
+                color: Colors.cyan
+                opacity: 0.7
+            }
+
             GohuText {
                 width: parent.width
                 text: "RECOVERY PERMISSIONS // NOT ACTIVE"

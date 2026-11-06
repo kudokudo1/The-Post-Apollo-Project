@@ -23,6 +23,8 @@ Rectangle {
     property string nativeSetupStatus: "IDLE"
     property var savedBridgeState: ({})
     property string savedBridgeCheck: "NOT CHECKED"
+    property var contentDiagnostic: ({})
+    property string contentDiagnosticCheck: "NOT CHECKED"
     property var deviceObservation: ({})
     property string deviceObservationCheck: "NOT CHECKED"
     property var phoneNickname: ({})
@@ -296,6 +298,48 @@ Rectangle {
         deviceObservationProcess.running = true;
     }
 
+    // MAP/PBAP availability observations contain no message or contact content.
+    // CONNECT PHONE requests this once. Even a reported active provider
+    // profile is not authorization for Social to read or send anything.
+    function refreshContentDiagnostic() {
+        if (!visible || contentDiagnosticProcess.running)
+            return;
+        contentDiagnosticCheck = "CHECKING";
+        contentDiagnostic = ({});
+        contentDiagnosticProcess.command = [
+            "python3",
+            Quickshell.shellPath("services/phone/PhoneContentDiagnostic.py"),
+            "--inspect"
+        ];
+        contentDiagnosticProcess.running = true;
+    }
+
+    function contentDiagnosticText(section) {
+        if (contentDiagnosticCheck === "CHECKING")
+            return "Checking the iPhone's message and contact channels. No private data is read.";
+        if (contentDiagnosticCheck !== "CHECKED")
+            return "PHONE DATA NOT CHECKED // Use CONNECT PHONE to inspect available channels. Your desktop audio connection is separate.";
+        if (contentDiagnostic.state === "DEVICE_OFFLINE")
+            return "The configured iPhone is paired but not currently connected over Bluetooth. Messages and contacts are not verified.";
+        if (contentDiagnostic.state !== "BACKEND_REPORTED")
+            return "The matching iPhone data channels could not be verified. This does not affect existing audio routing.";
+        if (section === "CONTACTS") {
+            var contacts = contentDiagnostic.contacts || {};
+            if (contacts.state !== "PBAP_ACTIVE_BACKEND_REPORT")
+                return "CONTACTS // PBAP is not reported active. Check iPhone Bluetooth contact-sync permission and BlueFerry. Social is not authorized to read contacts yet.";
+            var amount = contacts.cachedCount;
+            var extra = typeof amount === "number"
+                        ? " BlueFerry reports " + amount + " cached contact cards."
+                        : " Contact cache size is not reported.";
+            return "CONTACTS // PBAP session reported active." + extra
+                   + " Social contact access is still NOT LINKED.";
+        }
+        var messages = contentDiagnostic.messages || {};
+        if (messages.state !== "MAP_ACTIVE_BACKEND_REPORT")
+            return "MESSAGES // Bluetooth MAP is not reported active. Check BlueFerry's message access on the iPhone. Audio working does not mean messages are available.";
+        return "MESSAGES // Bluetooth MAP session reported active. Message history and Social permission are NOT VERIFIED. The trusted data bridge is still required.";
+    }
+
     // A nickname is a local display preference for the physically verified
     // BlueFerry profile. It never names an authorized Social identity or line.
     function refreshPhoneNickname() {
@@ -502,6 +546,7 @@ Rectangle {
         nativeSetupTarget = "";
         refreshSavedBridgeState();
         refreshDeviceObservation();
+        refreshContentDiagnostic();
         refreshPhoneAudioControls();
         setupProcess.command = [
             "python3",
@@ -537,6 +582,8 @@ Rectangle {
             nativeSetupTarget = "";
             savedBridgeCheck = "NOT CHECKED";
             savedBridgeState = ({});
+            contentDiagnosticCheck = "NOT CHECKED";
+            contentDiagnostic = ({});
             deviceObservationCheck = "NOT CHECKED";
             deviceObservation = ({});
             phoneNicknameCheck = "NOT CHECKED";
@@ -631,6 +678,70 @@ Rectangle {
                 phonePane.setupReport = ({});
                 phonePane.setupState = "UNAVAILABLE";
             }
+        }
+    }
+
+    Process {
+        id: contentDiagnosticProcess
+        stdout: StdioCollector {
+            onStreamFinished: {
+                if (!phonePane.visible
+                        || phonePane.contentDiagnosticCheck !== "CHECKING")
+                    return;
+                try {
+                    var result = JSON.parse(String(text || ""));
+                    var states = ["BACKEND_REPORTED", "DEVICE_OFFLINE", "UNAVAILABLE"];
+                    var devices = ["BLUETOOTH_CONNECTED", "PAIRED_OFFLINE", "UNVERIFIED"];
+                    var messageStates = [
+                        "MAP_ACTIVE_BACKEND_REPORT", "MAP_INACTIVE_BACKEND_REPORT",
+                        "UNVERIFIED"
+                    ];
+                    var contactsStates = [
+                        "PBAP_ACTIVE_BACKEND_REPORT", "PBAP_INACTIVE_BACKEND_REPORT",
+                        "UNVERIFIED"
+                    ];
+                    var count = (result.contacts || {}).cachedCount;
+                    var validCount = count === null
+                        || (typeof count === "number" && Number.isInteger(count)
+                            && count >= 0 && count <= 100000);
+                    if (result.schema !== "post-apollo.phone.content-diagnostic.v0"
+                            || result.execution !== "READ_ONLY_PROVIDER_METADATA"
+                            || states.indexOf(result.state) < 0
+                            || devices.indexOf(result.deviceState) < 0
+                            || !result.messages || !result.contacts
+                            || messageStates.indexOf(result.messages.state) < 0
+                            || contactsStates.indexOf(result.contacts.state) < 0
+                            || !validCount
+                            || result.socialLink !== "NOT_AUTHORIZED"
+                            || result.trustedPhoneLink !== "UNVERIFIED"
+                            || result.routeEligible !== false
+                            || result.contentAccessEnabled !== false
+                            || (result.state === "BACKEND_REPORTED"
+                                && (result.deviceState !== "BLUETOOTH_CONNECTED"
+                                    || result.messages.state === "UNVERIFIED"
+                                    || result.contacts.state === "UNVERIFIED"))
+                            || (result.state === "DEVICE_OFFLINE"
+                                && result.deviceState !== "PAIRED_OFFLINE")
+                            || (result.state === "UNAVAILABLE"
+                                && result.deviceState !== "UNVERIFIED")
+                            || (result.state !== "BACKEND_REPORTED"
+                                && (result.messages.state !== "UNVERIFIED"
+                                    || result.contacts.state !== "UNVERIFIED"
+                                    || count !== null)))
+                        throw new Error("Unexpected phone data diagnostic");
+                    phonePane.contentDiagnostic = result;
+                    phonePane.contentDiagnosticCheck = "CHECKED";
+                } catch (error) {
+                    phonePane.contentDiagnostic = ({});
+                    phonePane.contentDiagnosticCheck = "UNAVAILABLE";
+                }
+            }
+        }
+        onExited: function(exitCode) {
+            if (phonePane.visible
+                    && phonePane.contentDiagnosticCheck === "CHECKING"
+                    && exitCode !== 0)
+                phonePane.contentDiagnosticCheck = "UNAVAILABLE";
         }
     }
 
@@ -1065,6 +1176,7 @@ Rectangle {
                         } else {
                             phonePane.refreshSavedBridgeState();
                             phonePane.refreshDeviceObservation();
+                            phonePane.refreshContentDiagnostic();
                         }
                     } else if (result.state === "POSITION_REQUESTED"
                              || result.state === "ACTOR_NOT_FOUND"
@@ -1225,6 +1337,26 @@ Rectangle {
                                 : phonePane.selectedSection === "CONTACTS"
                                 ? "PHONE CONTACTS NOT LINKED"
                                 : "PHONE NOT LINKED"
+    }
+
+    // Informative, content-free status on the existing MESSAGES/CONTACTS pane.
+    // Never substitute MAP/PBAP presence for authenticated phone data.
+    Text {
+        id: phoneDataHint
+        anchors.top: phoneChatFeed.top
+        anchors.topMargin: 93
+        anchors.left: phoneChatFeed.left
+        anchors.right: phoneChatFeed.right
+        anchors.margins: 16
+        z: 4
+        visible: phonePane.selectedSection === "MESSAGES"
+                 || phonePane.selectedSection === "CONTACTS"
+        textFormat: Text.PlainText
+        text: phonePane.contentDiagnosticText(phonePane.selectedSection)
+        color: Colors.orange
+        font.pixelSize: 11
+        wrapMode: Text.WordWrap
+        horizontalAlignment: Text.AlignHCenter
     }
 
     // DEVICE is a contextual overlay in the existing chat-feed column,
@@ -1546,6 +1678,20 @@ Rectangle {
                     font.pixelSize: 11
                     wrapMode: Text.WordWrap
                     lineHeight: 1.35
+                }
+
+                Text {
+                    width: parent.width
+                    textFormat: Text.PlainText
+                    visible: phonePane.setupState === "CHECKED"
+                    text: "IPHONE MESSAGE DATA // "
+                          + phonePane.contentDiagnosticText("MESSAGES")
+                          + "\n\nIPHONE CONTACT DATA // "
+                          + phonePane.contentDiagnosticText("CONTACTS")
+                    color: Colors.orange
+                    font.pixelSize: 11
+                    wrapMode: Text.WordWrap
+                    lineHeight: 1.3
                 }
 
                 Column {

@@ -173,4 +173,40 @@ assert.equal(policy.parse(JSON.stringify({
     }]
 })).ok, false, "reject invalid review field type");
 
+// The date already lives in every v1 record's UTC instant and saved offset.
+// Render the calendar day observed then, not the reader's current timezone,
+// current DST rules or the separate clock-display calibration.
+const justAfterMidnightUtc = Date.UTC(2026, 10, 7, 0, 10);
+const easternRecord = {
+    observedAtMs: justAfterMidnightUtc,
+    utcOffsetMinutes: -300,
+    displayCalibrationMs: 300000
+};
+assert.equal(policy.observedDate(easternRecord), "2026-11-06",
+    "UTC midnight can still be the previous saved local calendar date");
+assert.equal(policy.observedDate({...easternRecord, utcOffsetMinutes: 330}),
+    "2026-11-07", "a recorded positive UTC offset moves the day forward");
+assert.equal(policy.observedDate({...easternRecord, utcOffsetMinutes: -240}),
+    "2026-11-06", "the saved DST offset remains authoritative");
+assert.equal(policy.observedDate({...easternRecord, displayCalibrationMs: 0}),
+    "2026-11-06", "display-only time calibration never changes the saved day");
+assert.equal(policy.observedDate({...easternRecord, utcOffsetMinutes: -999}),
+    "DATE UNKNOWN", "bad offset must not manufacture a date");
+assert.equal(policy.observedDate({observedAtMs: 9000000000000000,
+                                 utcOffsetMinutes: 0}),
+    "DATE UNKNOWN", "out-of-range JS Date must fail safely");
+assert.equal(policy.observedDate(null), "DATE UNKNOWN");
+
+// Date display introduces no new journal field or second writer.
+// Existing observations retain their exact raw instant and UTC offset.
+const dated = policy.create(policy.emptyDocument(), "1212",
+    context("manual", "12:12 AM"), justAfterMidnightUtc);
+assert.equal(dated.ok, true);
+assert.equal(policy.observedDate(dated.document.observations[0]),
+    "2026-11-06");
+const datedRoundTrip = policy.parse(JSON.stringify(dated.document));
+assert.equal(datedRoundTrip.ok, true);
+assert.deepEqual(copy(datedRoundTrip.document), copy(dated.document));
+assert.equal(policy.VERSION, 1);
+
 console.log("ANGEL_OBSERVATION_POLICY_PASS");

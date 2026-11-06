@@ -1,4 +1,5 @@
 import QtQuick
+import QtQuick.Dialogs
 import "../../components"
 import "StationMagickTarotDeckPolicy.js" as Deck
 import "StationMagickTarotPhysicalPolicy.js" as Physical
@@ -11,6 +12,17 @@ Rectangle {
     id: tarot
     color: Colors.black
     clip: true
+
+    // M6k // Explicit user-selected, read-only private image folder.
+    // NO UPLOAD // No automatic scan, copy, saved path or art provider.
+    FolderDialog {
+        id: tarotArtworkFolderPicker
+        title: "Choose your private Wild Unknown card images folder"
+        onAccepted: {
+            const path=Deck.localFolderPath(selectedFolder);
+            if(path!=="")artworkFolderInput.text=path;
+        }
+    }
 
     property string viewMode: "draw"
     property string spreadId: "three"
@@ -215,7 +227,7 @@ Rectangle {
                 text: "LOCAL ART DIR"
             }
             Rectangle {
-                width: Math.max(60,parent.width-97)
+                width: Math.max(60,parent.width-166)
                 height: 26
                 color: Colors.dark
                 border.width: 1
@@ -246,9 +258,17 @@ Rectangle {
                     visible: artworkFolderInput.text.length===0
                     color: Colors.cyan
                     font.pixelSize: 9
-                    text: "ENTER PRIVATE CARD IMAGE FOLDER PATH"
+                    text: "CHOOSE FOLDER OR ENTER PRIVATE PATH"
                     elide: Text.ElideRight
                 }
+            }
+            ActionButton {
+                width: 64
+                height: 26
+                label: "BROWSE"
+                labelPixelSize: 9
+                accentColor: Colors.cyan
+                onClicked: tarotArtworkFolderPicker.open()
             }
         }
 

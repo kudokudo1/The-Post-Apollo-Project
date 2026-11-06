@@ -148,3 +148,29 @@ function localArtworkCandidates(folder,id) {
     var prefix=png.slice(0,-4);
     return [png,prefix+".jpg",prefix+".jpeg",prefix+".webp"];
 }
+
+
+// M6k // QtQuick.Dialogs.FolderDialog.selectedFolder is a file:/// URL.
+// Convert it to the existing localArtworkUrl() contract's absolute path.
+// This does not test file existence, scan folders or grant any write access.
+function localFolderPath(url) {
+    var value=String(url===null || url===undefined?"":url);
+    if(value.slice(0,8)!=="file:///" || /[?#]/.test(value) ||
+       /%2f|%5c/i.test(value))
+        return "";
+    var source=value.slice(8).replace(/\/$/,"");
+    if(!source)return "";
+    var raw=source.split("/"),parts=[];
+    for(var i=0;i<raw.length;i++) {
+        if(!raw[i])return "";
+        try {
+            var part=decodeURIComponent(raw[i]);
+            if(part==="" || part==="." || part===".." ||
+               part.indexOf("/")>=0 || part.indexOf("\\")>=0)
+                return "";
+            parts.push(part);
+        }catch(err){return "";}
+    }
+    var folder="/"+parts.join("/");
+    return localArtworkUrl(folder,"major-the-fool")!==""?folder:"";
+}

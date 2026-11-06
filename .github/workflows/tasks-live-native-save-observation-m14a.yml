@@ -38,10 +38,11 @@ jobs:
           node --test tests/tasks/test_task_operator_save_review_m13z.cjs
           node --test tests/tasks/test_task_recovery_status_m13q.cjs
           node --test tests/tasks/test_task_live_draft_presence_m13s.cjs
-      - name: Prior M13w no-draft-clear and M12o ticket guards
+      - name: Prior M13w no-draft-clear and M12o/M12r ticket-admission guards
         run: |
           node --test tests/tasks/test_task_source_receipt_interface_m13w.cjs
           node --test tests/tasks/test_task_disabled_ticket_api_m12o.cjs
+          node --test tests/tasks/test_task_disabled_admission_m12r.cjs
       - name: Single source writer and shared C2 default deny
         run: |
           python3 tests/tasks/test_task_writer_gate_inventory_m11d.py

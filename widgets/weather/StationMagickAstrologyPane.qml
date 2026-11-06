@@ -11,6 +11,8 @@ Rectangle {
 
     property string subjectRoute: "magick/astrology/charts"
     property var celestialSource: null
+    // M7a // Input readiness only, not a computed full natal chart.
+    property bool eventSetupOpen: false
 
     readonly property bool sourceIdle: !!celestialSource
         && !celestialSource.loading
@@ -46,7 +48,7 @@ Rectangle {
         spacing: 5
 
         GohuText {
-            width: Math.max(0,parent.width-206)
+            width: Math.max(0,parent.width-299)
             height: parent.height
             verticalAlignment: Text.AlignVCenter
             font.pixelSize: 11
@@ -75,6 +77,14 @@ Rectangle {
             available: astrology.chartAvailable
             // The only JPL launch point, controlled by explicit user click.
             onClicked: astrology.celestialSource.refresh()
+        }
+        ActionButton {
+            width: 88
+            height: 25
+            label: "EVENT SETUP"
+            labelPixelSize: 9
+            accentColor: Colors.yellow
+            onClicked: astrology.eventSetupOpen=true
         }
     }
 
@@ -281,5 +291,12 @@ Rectangle {
                 }
             }
         }
+    }
+    // M7a // Explicit ephemeral chart parameters, full-screen overlay.
+    StationMagickEventChartSetupPane {
+        anchors.fill: parent
+        z: 25
+        visible: astrology.eventSetupOpen
+        onCloseRequested: astrology.eventSetupOpen=false
     }
 }

@@ -1,5 +1,6 @@
 import QtQuick
 import "../../components"
+import "StationCosmosSolarDetailPolicy.js" as SolarDetails
 
 // Focused single-viewport NOAA instruments. StationSpace sourceOnly owns
 // ALL fetchers and SUVI URL state; this component only draws their data.
@@ -15,6 +16,22 @@ Rectangle {
     readonly property var xray: sourceSpace ? sourceSpace.xrayObservation : null
     readonly property var flares: sourceSpace ? sourceSpace.flareObservation : null
     readonly property var cycle: sourceSpace ? sourceSpace.cycleObservation : null
+    property int xrayPage: 0
+    property int flareIndex: 0
+    property int flareDataPage: 0
+    property int cyclePage: 0
+    readonly property int flareCount: SolarDetails.flareCount(flares)
+    readonly property var selectedFlare: SolarDetails.flareAt(flares,flareIndex)
+    readonly property var flareFields: SolarDetails.flarePage(selectedFlare,flareDataPage)
+    readonly property var cycleFields: SolarDetails.cyclePage(
+        cycle && cycle.ready ? cycle.summary : null,cyclePage,
+        spaceService ? spaceService.solarFluxText : "")
+    readonly property var xrayFields: SolarDetails.xrayPage(
+        xray && xray.ready ? xray : null,xrayPage)
+    onModeRouteChanged: {xrayPage=0;flareIndex=0;flareDataPage=0;cyclePage=0;}
+    onFlareCountChanged: {
+        if (flareIndex >= flareCount) flareIndex = Math.max(0,flareCount-1);
+    }
 
     function reading(value, digits) {
         return value !== null && value !== undefined

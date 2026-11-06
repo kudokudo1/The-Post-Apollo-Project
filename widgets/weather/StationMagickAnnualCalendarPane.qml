@@ -88,6 +88,7 @@ Rectangle {
 
     Row {
         id: topModes
+        objectName: "magick-m7-annual-subject-tabs"
         visible: annualPane.lockedView === ""
         anchors.left: parent.left
         anchors.right: parent.right
@@ -323,6 +324,7 @@ Rectangle {
     // Main datum wheel, intentionally no whole-page Flickable.
     Canvas {
         id: wheel
+        objectName: "magick-m7-annual-wheel-canvas"
         visible: annualPane.view!=="forecast"
         anchors.top: topModes.bottom
         anchors.topMargin: 1

@@ -333,33 +333,42 @@ Rectangle {
                 }
             }
 
+            // M6i // Cards claim their real viewport budget. Three cards
+            // form one readable row; five form a compact three-plus-two.
             Flow {
                 id: cardFlow
-                width: parent.width
-                spacing: 5
-                // At five cards the third item wraps, keeping each card
-                // legible rather than presenting five tiny thumbnails.
-                readonly property int targetColumns:
-                    tarot.spreadId==="one"?1:
-                    tarot.spreadId==="three"?3:3
+                width: tarot.spreadId==="one" && tarot.spreadMetrics
+                    ? tarot.spreadMetrics.slotWidth : parent.width
+                anchors.horizontalCenter: parent.horizontalCenter
+                spacing: tarot.spreadMetrics ? tarot.spreadMetrics.gap : 7
                 readonly property real slotWidth:
-                    tarot.spreadId==="one"?
-                    Math.min(220,Math.max(100,width*0.46)):
-                    Math.max(72,(width-10)/targetColumns)
+                    tarot.spreadMetrics ? tarot.spreadMetrics.slotWidth : 110
+                readonly property real cardHeight:
+                    tarot.spreadMetrics ? tarot.spreadMetrics.cardHeight : 160
+                height: tarot.reading.ready && tarot.reading.cards &&
+                        tarot.reading.cards.length>0 && tarot.spreadMetrics
+                    ? tarot.spreadMetrics.contentHeight
+                    : Math.min(152,tarot.spreadMetrics
+                        ? tarot.spreadMetrics.contentHeight : 152)
                 Repeater {
                     model: tarot.reading.ready ? tarot.reading.cards : []
-                    delegate: Column {
+                    delegate: Item {
                         required property var modelData
+                        required property int index
                         width: cardFlow.slotWidth
-                        spacing: 3
+                        height: cardFlow.cardHeight
                         StationMagickTarotCard {
-                            width: parent.width
-                            height: tarot.spreadId==="one"?224
-                                : tarot.spreadId==="five"?126:175
+                            anchors.fill: parent
                             card: modelData
                             positionLabel: modelData.position
                             reversed: modelData.reversed
                             localArtworkDirectory: tarot.localArtworkDirectory
+                        }
+                        MouseArea {
+                            anchors.fill: parent
+                            acceptedButtons: Qt.LeftButton
+                            cursorShape: Qt.PointingHandCursor
+                            onClicked: tarot.inspectCard(index)
                         }
                     }
                 }
@@ -377,6 +386,16 @@ Rectangle {
                         ? "HOLD YOUR REAL DECK // CHOOSE CARDS IN INDEX"
                         : "SELECT SPREAD // SHUFFLE + DRAW"
                 }
+            }
+            QuietText {
+                width: parent.width
+                height: tarot.reading.ready && tarot.reading.cards &&
+                        tarot.reading.cards.length>0 ? 17 : 0
+                visible: height>0
+                color: Colors.yellow
+                font.pixelSize: 9
+                elide: Text.ElideRight
+                text: "SELECT A CARD TO INSPECT // CLOSE RETURNS TO SPREAD"
             }
 
             Row {

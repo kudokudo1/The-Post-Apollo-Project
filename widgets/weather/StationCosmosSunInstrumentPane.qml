@@ -1,5 +1,6 @@
 import QtQuick
 import "../../components"
+import "StationCosmosSolarDetailPolicy.js" as SolarDetails
 
 // Focused single-viewport NOAA instruments. StationSpace sourceOnly owns
 // ALL fetchers and SUVI URL state; this component only draws their data.
@@ -15,6 +16,22 @@ Rectangle {
     readonly property var xray: sourceSpace ? sourceSpace.xrayObservation : null
     readonly property var flares: sourceSpace ? sourceSpace.flareObservation : null
     readonly property var cycle: sourceSpace ? sourceSpace.cycleObservation : null
+    property int xrayPage: 0
+    property int flareIndex: 0
+    property int flareDataPage: 0
+    property int cyclePage: 0
+    readonly property int flareCount: SolarDetails.flareCount(flares)
+    readonly property var selectedFlare: SolarDetails.flareAt(flares,flareIndex)
+    readonly property var flareFields: SolarDetails.flarePage(selectedFlare,flareDataPage)
+    readonly property var cycleFields: SolarDetails.cyclePage(
+        cycle && cycle.ready ? cycle.summary : null,cyclePage,
+        spaceService ? spaceService.solarFluxText : "")
+    readonly property var xrayFields: SolarDetails.xrayPage(
+        xray && xray.ready ? xray : null,xrayPage)
+    onModeRouteChanged: {xrayPage=0;flareIndex=0;flareDataPage=0;cyclePage=0;}
+    onFlareCountChanged: {
+        if (flareIndex >= flareCount) flareIndex = Math.max(0,flareCount-1);
+    }
 
     function reading(value, digits) {
         return value !== null && value !== undefined
@@ -93,6 +110,7 @@ Rectangle {
                     border.color: Colors.magenta
                     clip: true
                     Image {
+                        id: focusedSuviImage
                         anchors.fill: parent
                         anchors.margins: 3
                         source: solarFocus.sourceSpace
@@ -141,6 +159,30 @@ Rectangle {
                         color: Colors.cyan
                         font.pixelSize: 9
                         wrapMode: Text.WordWrap
+                    }
+                    QuietText {
+                        width: parent.width
+                        text: solarFocus.sourceSpace
+                            ? "CHANNEL // "
+                              +solarFocus.sourceSpace.solarImageInfo.shortLabel
+                              +" // "+(focusedSuviImage.status === Image.Ready
+                                  ? "IMAGE READY" : "IMAGE WAITING")
+                            : "CHANNEL --"
+                        color: Colors.orange
+                        font.pixelSize: 9
+                        elide: Text.ElideRight
+                    }
+                    QuietText {
+                        width: parent.width
+                        text: solarFocus.sourceSpace
+                            && solarFocus.sourceSpace.solarImageLastLoadedMs > 0
+                            ? "RECEIVED // "
+                              +new Date(solarFocus.sourceSpace.solarImageLastLoadedMs)
+                                  .toISOString().slice(0,16).replace("T"," ")+"Z"
+                            : "RECEIVED // --"
+                        color: Colors.cyan
+                        font.pixelSize: 9
+                        elide: Text.ElideRight
                     }
                 }
             }
@@ -204,10 +246,42 @@ Rectangle {
                 color: Colors.orange
                 font.pixelSize:9
             }
+            Row {
+                id: xrayModeBar
+                width: parent.width
+                height: 23
+                spacing: 5
+                Repeater {
+                    model: [{label:"HISTORY",page:0},{label:"SOURCE",page:1}]
+                    delegate: ActionButton {
+                        required property var modelData
+                        width: Math.max(1,(xrayModeBar.width-82)/2)
+                        height: 23
+                        contentPadding: 1
+                        label: modelData.label
+                        labelPixelSize: 9
+                        selected: solarFocus.xrayPage === modelData.page
+                        accentColor: Colors.magenta
+                        onClicked: solarFocus.xrayPage = modelData.page
+                    }
+                }
+                ActionButton {
+                    width: 70
+                    height: 23
+                    contentPadding: 1
+                    label: "REFRESH"
+                    labelPixelSize: 9
+                    available: !!solarFocus.xray && !solarFocus.xray.loading
+                    onClicked: {
+                        if (solarFocus.xray) solarFocus.xray.refresh()
+                    }
+                }
+            }
             Item {
                 width: parent.width
-                height: Math.max(1,parent.height-140)
+                height: Math.max(1,parent.height-171)
                 Row {
+                    visible: solarFocus.xrayPage === 0
                     anchors.bottom: parent.bottom
                     width: parent.width
                     height: parent.height
@@ -220,6 +294,44 @@ Rectangle {
                             width: Math.max(1,(parent.width-11*parent.spacing)/12)
                             height: Math.max(3,(parent.height-3)*modelData.level)
                             color: solarFocus.flareInk(modelData.classLetter)
+                        }
+                    }
+                }
+                Grid {
+                    id: xraySourceGrid
+                    visible: solarFocus.xrayPage === 1
+                    anchors.fill: parent
+                    columns: 2
+                    spacing: 5
+                    Repeater {
+                        model: xraySourceGrid.visible ? 4 : 0
+                        delegate: Rectangle {
+                            objectName: "cosmos-c6-xray-detail"
+                            required property int index
+                            readonly property var factData: solarFocus.xrayFields[index]
+                            width: Math.max(1,(xraySourceGrid.width-5)/2)
+                            height: Math.max(1,(xraySourceGrid.height-5)/2)
+                            color: Colors.dark
+                            border.width: 1
+                            border.color: Colors.cyan
+                            Column {
+                                anchors.fill: parent
+                                anchors.margins: 5
+                                spacing: 3
+                                SecondaryText {
+                                    width: parent.width
+                                    text: factData ? factData.label : "--"
+                                    font.pixelSize: 9
+                                    elide: Text.ElideRight
+                                }
+                                GohuText {
+                                    width: parent.width
+                                    text: factData ? factData.value : "--"
+                                    color: Colors.white
+                                    font.pixelSize: 11
+                                    elide: Text.ElideRight
+                                }
+                            }
                         }
                     }
                 }
@@ -282,41 +394,106 @@ Rectangle {
                     }
                 }
             }
-            Row {
-                id: flareCards
-                width:parent.width
-                height:Math.max(0,parent.height-116)
-                spacing:6
-                Repeater {
-                    model:solarFocus.flares && solarFocus.flares.ready
-                        ? solarFocus.flares.events : []
-                    delegate: Rectangle {
-                        required property var modelData
-                        width:Math.max(1,(flareCards.width-12)/3)
-                        height:Math.max(1,flareCards.height)
-                        color:Colors.dark
-                        border.width:1
-                        border.color:solarFocus.flareInk(modelData.classLetter)
-                        Column {
-                            anchors.fill:parent
-                            anchors.margins:6
-                            spacing:5
-                            GohuText {
-                                text:modelData.classLabel
-                                font.pixelSize:17
-                                color:solarFocus.flareInk(modelData.classLetter)
-                            }
-                            QuietText {
-                                width:parent.width
-                                text:modelData.satellite
-                                font.pixelSize:9
-                                elide:Text.ElideRight
-                            }
-                            QuietText {
-                                width:parent.width
-                                text:modelData.peakUtc
-                                font.pixelSize:9
-                                wrapMode:Text.WordWrap
+            Column {
+                id: flareInspector
+                width: parent.width
+                height: Math.max(0,parent.height-128)
+                spacing: 4
+                Row {
+                    width: parent.width
+                    height: 23
+                    spacing: 5
+                    ActionButton {
+                        width: 59
+                        height: 22
+                        contentPadding: 1
+                        label: "PREV"
+                        labelPixelSize: 9
+                        available: solarFocus.flareCount > 1
+                        onClicked: solarFocus.flareIndex =
+                            (solarFocus.flareIndex-1+solarFocus.flareCount)
+                            % solarFocus.flareCount
+                    }
+                    ActionButton {
+                        width: 59
+                        height: 22
+                        contentPadding: 1
+                        label: "NEXT"
+                        labelPixelSize: 9
+                        available: solarFocus.flareCount > 1
+                        onClicked: solarFocus.flareIndex =
+                            (solarFocus.flareIndex+1)%solarFocus.flareCount
+                    }
+                    QuietText {
+                        height: 22
+                        width: Math.max(1,parent.width-281)
+                        text: solarFocus.flareCount
+                            ? "EVENT "+(solarFocus.flareIndex+1)+"/"+solarFocus.flareCount
+                            : "NO EVENT IN FEED"
+                        color: Colors.cyan
+                        font.pixelSize: 9
+                        verticalAlignment: Text.AlignVCenter
+                        elide: Text.ElideRight
+                    }
+                    ActionButton {
+                        width: 72
+                        height: 22
+                        contentPadding: 1
+                        label: solarFocus.flareDataPage === 0 ? "TIMES" : "DETAIL"
+                        labelPixelSize: 9
+                        selected: true
+                        accentColor: Colors.magenta
+                        available: solarFocus.flareCount > 0
+                        onClicked: solarFocus.flareDataPage =
+                            solarFocus.flareDataPage === 0 ? 1 : 0
+                    }
+                    ActionButton {
+                        width: 68
+                        height: 22
+                        contentPadding: 1
+                        label: "REFRESH"
+                        labelPixelSize: 9
+                        available: !!solarFocus.flares && !solarFocus.flares.loading
+                        onClicked: {
+                            if (solarFocus.flares) solarFocus.flares.refresh()
+                        }
+                    }
+                }
+                Grid {
+                    id: flareDataGrid
+                    width: parent.width
+                    height: Math.max(0,flareInspector.height-27)
+                    columns: 2
+                    spacing: 5
+                    Repeater {
+                        model: solarFocus.flareCount ? 4 : 0
+                        delegate: Rectangle {
+                            objectName: "cosmos-c6-flare-detail"
+                            required property int index
+                            readonly property var factData:
+                                solarFocus.flareFields[index]
+                            width: Math.max(1,(flareDataGrid.width-5)/2)
+                            height: Math.max(1,(flareDataGrid.height-5)/2)
+                            color: Colors.dark
+                            border.width: 1
+                            border.color: Colors.magenta
+                            Column {
+                                anchors.fill: parent
+                                anchors.margins: 5
+                                spacing: 3
+                                SecondaryText {
+                                    width: parent.width
+                                    text: factData ? factData.label : "--"
+                                    font.pixelSize: 9
+                                    elide: Text.ElideRight
+                                }
+                                GohuText {
+                                    width: parent.width
+                                    text: factData ? factData.value : "--"
+                                    color: Colors.white
+                                    font.pixelSize: 11
+                                    elide: Text.ElideRight
+                                }
                             }
                         }
                     }
@@ -342,49 +519,76 @@ Rectangle {
                 color:Colors.magenta
                 font.pixelSize:12
             }
-            Grid {
-                id: cycleGrid
-                width:parent.width
-                columns:2
-                spacing:7
+            Row {
+                id: cycleModeBar
+                width: parent.width
+                height: 23
+                spacing: 5
                 Repeater {
                     model: [
-                        {name:"MODEL MONTH",
-                         value:solarFocus.cycle && solarFocus.cycle.ready
-                           ? solarFocus.cycle.summary.modelMonth : "--"},
-                        {name:"PREDICTED SUNSPOT NUMBER",
-                         value:solarFocus.cycle && solarFocus.cycle.ready
-                           ? solarFocus.reading(solarFocus.cycle.summary.predictedSsn,1) : "--"},
-                        {name:"PREDICTED F10.7 // SFU",
-                         value:solarFocus.cycle && solarFocus.cycle.ready
-                           ? solarFocus.reading(solarFocus.cycle.summary.predictedFlux,1) : "--"},
-                        {name:"PREDICTED CYCLE PEAK",
-                         value:solarFocus.cycle && solarFocus.cycle.ready
-                           ? solarFocus.cycle.summary.peakMonth : "--"}
+                        {label:"MODEL",page:0},
+                        {label:"RANGES",page:1},
+                        {label:"OUTLOOK",page:2}
                     ]
-                    delegate:Rectangle {
+                    delegate: ActionButton {
                         required property var modelData
-                        width:Math.max(1,(cycleGrid.width-7)/2)
-                        height:Math.max(58,(solarFocus.height-47)/2)
-                        color:Colors.dark
-                        border.width:1
-                        border.color:Colors.yellow
+                        width: Math.max(1,(cycleModeBar.width-80)/3)
+                        height: 23
+                        contentPadding: 1
+                        label: modelData.label
+                        labelPixelSize: 9
+                        selected: solarFocus.cyclePage===modelData.page
+                        accentColor: Colors.magenta
+                        onClicked: solarFocus.cyclePage=modelData.page
+                    }
+                }
+                ActionButton {
+                    width: 65
+                    height: 23
+                    contentPadding: 1
+                    label: "REFRESH"
+                    labelPixelSize: 9
+                    available: !!solarFocus.cycle && !solarFocus.cycle.loading
+                    onClicked: {
+                        if (solarFocus.cycle)
+                            solarFocus.cycle.refresh(true)
+                    }
+                }
+            }
+            Grid {
+                id: cycleGrid
+                width: parent.width
+                height: Math.max(0,parent.height-72)
+                columns: 2
+                spacing: 7
+                Repeater {
+                    model: 4
+                    delegate: Rectangle {
+                        objectName: "cosmos-c6-cycle-detail"
+                        required property int index
+                        readonly property var factData:
+                            solarFocus.cycleFields[index]
+                        width: Math.max(1,(cycleGrid.width-7)/2)
+                        height: Math.max(1,(cycleGrid.height-7)/2)
+                        color: Colors.dark
+                        border.width: 1
+                        border.color: Colors.yellow
                         Column {
-                            anchors.fill:parent
-                            anchors.margins:7
-                            spacing:7
+                            anchors.fill: parent
+                            anchors.margins: 7
+                            spacing: 6
                             SecondaryText {
-                                width:parent.width
-                                text:modelData.name
-                                font.pixelSize:9
-                                elide:Text.ElideRight
+                                width: parent.width
+                                text: factData ? factData.label : "--"
+                                font.pixelSize: 9
+                                elide: Text.ElideRight
                             }
                             GohuText {
-                                width:parent.width
-                                text:modelData.value
-                                color:Colors.white
-                                font.pixelSize:17
-                                elide:Text.ElideRight
+                                width: parent.width
+                                text: factData ? factData.value : "--"
+                                color: Colors.white
+                                font.pixelSize: 14
+                                elide: Text.ElideRight
                             }
                         }
                     }

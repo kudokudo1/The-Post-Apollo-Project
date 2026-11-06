@@ -25,6 +25,12 @@ No desktop action is required. CPU++ → SETTINGS → CONNECTIONS remains its ex
 
 Require Fedora native signed RPMs, verified untrusted-before-import and accepted-after-import state, exact fixed input digests, corrupted-RPM refusal, v0.1 install, v0.2 upgrade, v0.1 rollback, erase, RPM database and file consistency, signer key cleanup, SELinux still Enforcing and guest still offline. Every false claim of 'signed production release' or 'Silverblue compatibility verified' is prohibited.
 
+### Verified CI checkpoint, November 6, 2026
+
+GitHub Actions [run 42180043963](https://github.com/kudokudo1/The-Post-Apollo-Project/actions/runs/42180043963), job 127767292943, passed on commit `d167ba2179efec3945b4c948c6c23eeabd521ea7` with **3/3 checks** (two repository validate checks and the signed-rpm-fedora-transaction job). The Fedora builder produced native GPG-signed RPMs at v0.1 and v0.2, exporting only five public artifacts; its private CI key did not leave the disposable container. The enforcing, offline Fedora 44 guest verified the unknown signer was initially untrusted, detected a changed RPM before any OS write, imported the disposable public key, accepted native OpenPGP signatures for both RPMs, installed v0.1, upgraded to v0.2, downgraded back to v0.1, erased the RPM and restored the guest's preexisting trusted-key set. The known production Connections host and credential gates remained disabled.
+
+The first CI attempt built and signed both RPMs, but the root-owned builder's restrictive 0600 export modes prevented the unprivileged GitHub runner from checking its **public** artifacts. The builder was corrected to grant 0644 only to the two test RPMs, public key, fingerprint and manifest. The private GPG key remains inaccessible outside the short-lived builder.
+
 ## WATCH OUT FOR
 
 **CI signing demonstrates the mechanism, not production trust.** An ephemeral self-signed test key does not establish an OpenAI, Post-Apollo, operator, organization or Fedora trusted signing authority. A checksum bundled beside its own public key is not an independently authenticated release chain. A future packaging decision must cover protected long-lived keys, key rotation, public-key distribution, reproducible builds, SBOM and verification against a separately trusted root.
@@ -39,7 +45,8 @@ The independent TASKS M13t PR #1304 has already merged. A shared-owner coordinat
 - [x] Add inert Fedora RPM spec with no scriptlets or production install paths
 - [x] Add Fedora temporary key and native signing builder
 - [x] Add offline Fedora guest signature and RPM transaction tests
-- [ ] Complete exact-head CI and correct build/test-only failures
+- [x] Verified first exact-head CI: 3/3 checks on d167ba21
+- [ ] Final documentation-update commit checks
 - [ ] Independent security review and operator PR acceptance
 - [ ] Dedicated root-managed package installation path + signed release provenance
 - [ ] Immutable Fedora Silverblue `rpm-ostree` upgrade/reboot/rollback acceptance

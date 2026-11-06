@@ -186,25 +186,45 @@ def main(argv=None):
         if not (os.environ.get("SWAYSOCK") or os.environ.get("I3SOCK")):
             raise RuntimeError("SWAY_IPC_UNAVAILABLE")
         follower = ZoomFollower(profile, ipc)
+        # Social coalesces geometry instead of replaying stale drag samples.
+        # Read all ready NDJSON lines and tick once on the newest revision.
+        pending = b""
+        input_fd = sys.stdin.fileno()
         while True:
-            readable, _, _ = select.select([sys.stdin], [], [], POLL_SECONDS)
+            readable, _, _ = select.select([input_fd], [], [], POLL_SECONDS)
             if readable:
-                line = sys.stdin.readline()
-                if not line:
+                chunk = os.read(input_fd, 65536)
+                if not chunk:  # QML closed the helper's stdin
                     break
-                if len(line) > 2048:
+                pending += chunk
+                if len(pending) > 131072:
+                    pending = b""
                     follower.emit("FAILED")
                     continue
-                try:
-                    message = json.loads(line)
-                    if not isinstance(message, dict):
-                        raise ValueError("INVALID_FOLLOW_MESSAGE")
-                    if message.get("op") == "stop":
-                        break
-                    follower.set_target(message)
-                except (ValueError, TypeError):
+                lines = pending.split(b"\n")
+                pending = lines.pop()
+                if len(pending) > 2048:
+                    pending = b""
                     follower.emit("FAILED")
-                    continue
+                should_stop = False
+                for line in lines:
+                    if not line:
+                        continue
+                    if len(line) > 2048:
+                        follower.emit("FAILED")
+                        continue
+                    try:
+                        message = json.loads(line)
+                        if not isinstance(message, dict):
+                            raise ValueError("INVALID_FOLLOW_MESSAGE")
+                        if message.get("op") == "stop":
+                            should_stop = True
+                            break
+                        follower.set_target(message)
+                    except (ValueError, TypeError):
+                        follower.emit("FAILED")
+                if should_stop:
+                    break
             follower.tick()
     except (OSError, RuntimeError, ValueError):
         print(json.dumps({"kind":"zoom-web-follow", "revision":-1,

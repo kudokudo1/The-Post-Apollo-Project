@@ -233,7 +233,7 @@ Rectangle {
         mode: astrology.subjectRoute === "magick/astrology/aspects"
               ? "aspects"
               : astrology.subjectRoute === "magick/astrology/retrogrades"
-              ? "motion" : "wheel"
+              ? "retro" : "wheel"
     }
 
     Row {

@@ -446,7 +446,7 @@ Rectangle {
                         mode: magickPane.subjectRoute === "magick/astrology/aspects"
                               ? "aspects"
                               : magickPane.subjectRoute === "magick/astrology/retrogrades"
-                              ? "motion" : "wheel"
+                              ? "retro" : "wheel"
                     }
                 }
             }

@@ -127,10 +127,6 @@ function fields(kind, row, context, starsAsNav) {
     }
     return [];
 }
-function page(fieldsList, pageIndex) {
-    return list(fieldsList).slice(Math.max(0,Math.min(2,Number(pageIndex)||0))*4,
-                                  Math.max(0,Math.min(2,Number(pageIndex)||0))*4+4);
-}
 function disclaimer(kind, starsAsNav) {
     if (kind==="planets")
         return "USNO CURRENT SKY // ABOVE-HORIZON CATALOG IS NOT AN OPTICAL VISIBILITY CLAIM";

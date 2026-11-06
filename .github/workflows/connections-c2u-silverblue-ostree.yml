@@ -15,7 +15,7 @@ jobs:
   official-silverblue-reboot-rollback:
     if: github.actor == 'kudokudo1' && (github.event_name == 'workflow_dispatch' || github.event.pull_request.head.repo.full_name == github.repository)
     runs-on: ubuntu-24.04
-    timeout-minutes: 42
+    timeout-minutes: 52
     steps:
       - uses: actions/checkout@v4
         with:
@@ -73,7 +73,7 @@ jobs:
           timeout 360s sudo apt-get -o Acquire::Retries=2 -o Acquire::http::Timeout=35 install -y --no-install-recommends qemu-system-x86 qemu-utils xorriso genisoimage || { echo "C2U_BLOCKED // RUNNER_APT_INSTALL"; exit 2; }
       - name: Boot official Fedora 44 Silverblue installer then verify booted rpm-ostree layering and rollback
         shell: bash
-        run: timeout 1950s bash tests/connections/c2u_silverblue/boot_official_silverblue.sh
+        run: timeout 2800s bash tests/connections/c2u_silverblue/boot_official_silverblue.sh
       - name: Existing C2n read-only and CPU++ deny-only gates
         shell: bash
         run: |

@@ -59,6 +59,16 @@ ShellRoot {
         return count;
     }
 
+    function dumpTree(item, depth, out) {
+        if (!item || depth > 8 || out.length >= 90) return;
+        out.push(depth+":"+(item.objectName || "(unnamed)")
+            +"["+String(item)+"]"
+            +" children="+((item.children || []).length));
+        const children = item.children || [];
+        for(let i=0;i<children.length;i++)
+            dumpTree(children[i],depth+1,out);
+    }
+
     function fail(reason) {
         if (done) return;
         done = true;
@@ -101,8 +111,12 @@ ShellRoot {
                 if (focused.planetRows[0].events.length !== 3)
                     return root.fail("USNO_RECORDS_NOT_MAPPED_TO_EVENT_CLOCK");
                 if (countNamed(focused.instrumentItem,
-                        "cosmos-c5-planet-event-marker") !== 3)
+                        "cosmos-c5-planet-event-marker") !== 3) {
+                    let names = [];
+                    dumpTree(focused.instrumentItem,0,names);
+                    console.log("C5_RENDER_TREE // "+names.join("|"));
                     return root.fail("USNO_EVENT_MARKERS_NOT_RENDERED");
+                }
                 root.phase = 2;
                 root.route = "cosmos/events/iss";
             } else if (root.phase === 2) {

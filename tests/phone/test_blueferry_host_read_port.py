@@ -228,6 +228,12 @@ class DbusiportTests(unittest.TestCase):
     def test_owner_bound_reads_use_expected_blueferry_dbus_methods(self):
         import json
 
+        # dbus-python returns 's' as dbus.String, a subclass of str.
+        # The original fake returned only exact built-in str and concealed
+        # the real Linux wire incompatibility.
+        class DbusString(str):
+            pass
+
         class Session:
             def __init__(self):
                 self.actions=[]
@@ -244,13 +250,13 @@ class DbusiportTests(unittest.TestCase):
         class Interface:
             def GetStatus(self, **kwargs):
                 self.calls.append(("status", kwargs))
-                return json.dumps(status())
+                return DbusString(json.dumps(status()))
             def ListThreads(self, limit, **kwargs):
                 self.calls.append(("threads", limit, kwargs))
-                return json.dumps(threads())
+                return DbusString(json.dumps(threads()))
             def ListContactCards(self, offset, limit, query, **kwargs):
                 self.calls.append(("cards", offset, limit, query, kwargs))
-                return json.dumps(cards())
+                return DbusString(json.dumps(cards()))
 
         iface = Interface()
         iface.calls=[]
@@ -277,6 +283,22 @@ class DbusiportTests(unittest.TestCase):
                 self.assertEqual(action[1], OWNER)
                 self.assertFalse(action[3])
         self.assertNotIn(("get", module.SERVICE, module.OBJECT, False), bus.actions)
+
+    def test_provider_json_must_still_be_bounded_text(self):
+        from BlueFerryHostReadPort import UniqueOwnerBlueFerrySource as Port
+
+        class Nontext:
+            def __str__(self):
+                return '{"daemon":true}'
+
+        for raw in (b'{"daemon":true}', Nontext(), 4, None):
+            with self.subTest(raw_type=type(raw).__name__):
+                with self.assertRaises(ValueError):
+                    Port._json(raw, bound=100, kind=dict)
+        with self.assertRaises(ValueError):
+            Port._json('{"secret":"overlong"}', bound=5, kind=dict)
+        with self.assertRaises(ValueError):
+            Port._json('[1, 2]', bound=100, kind=dict)
 
     def test_unexpected_provider_response_is_rejected(self):
         class Session:

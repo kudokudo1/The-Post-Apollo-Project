@@ -95,7 +95,10 @@ class UniqueOwnerBlueFerrySource:
 
     @staticmethod
     def _json(raw: object, *, bound: int, kind: type) -> Any:
-        if type(raw) is not str or len(raw.encode("utf-8")) > bound:
+        # D-Bus signature 's' returns dbus.String (a str subclass) on Linux,
+        # not necessarily an exact built-in str. Keep strict text-only input
+        # while accepting that legitimate wire representation.
+        if not isinstance(raw, str) or len(raw.encode("utf-8")) > bound:
             raise ValueError("invalid provider response")
         parsed = json.loads(raw)
         if type(parsed) is not kind:

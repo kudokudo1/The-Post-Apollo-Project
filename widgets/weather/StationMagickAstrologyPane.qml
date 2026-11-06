@@ -107,7 +107,8 @@ Rectangle {
         anchors.right: parent.right
         anchors.top: calculationControls.bottom
         anchors.topMargin: 2
-        height: 24
+        visible: !astrology.natalMode
+        height: visible ? 24 : 0
         spacing: 4
 
         ActionButton {
@@ -196,7 +197,8 @@ Rectangle {
         anchors.right: parent.right
         anchors.top: dateControls.bottom
         anchors.topMargin: 2
-        height: 23
+        visible: !astrology.natalMode
+        height: visible ? 23 : 0
         spacing: 4
 
         ActionButton {
@@ -279,7 +281,8 @@ Rectangle {
         anchors.left: parent.left
         anchors.right: parent.right
         anchors.bottom: parent.bottom
-        height: 23
+        visible: !astrology.natalMode
+        height: visible ? 23 : 0
         spacing: 3
 
         Repeater {

@@ -499,10 +499,12 @@ Rectangle {
                 model: 5
                 delegate: Rectangle {
                     required property int index
+                    // Bind directly to the always-five-row source model.
+                    // The intermediary displayedPlanetRows can update without
+                    // notifying a nested Repeater delegate in Qt 6.
                     readonly property var planetRow:
-                        focus.displayedPlanetRows
-                        && focus.displayedPlanetRows.length > index
-                        ? focus.displayedPlanetRows[index] : null
+                        focus.planetRows && focus.planetRows.length > index
+                        ? focus.planetRows[index] : null
                     readonly property string planetName:
                         planetRow ? planetRow.name
                         : ["MERCURY","VENUS","MARS","JUPITER","SATURN"][index]

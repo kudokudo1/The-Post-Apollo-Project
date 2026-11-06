@@ -18,6 +18,7 @@ Rectangle {
     property string localArtworkDirectory: "" // Session-only; no stored path
     property string catalogGroup: "all"
     property int catalogPage: 0
+    property string previewId: ""
     readonly property var catalogEntries: Deck.catalog(catalogGroup)
     readonly property int catalogPageSize: 8
     readonly property int catalogPages: Math.ceil(
@@ -25,11 +26,18 @@ Rectangle {
     readonly property var visibleCatalog: catalogEntries.slice(
         catalogPage*catalogPageSize,
         (catalogPage+1)*catalogPageSize)
-    readonly property var inspectedCard: catalogEntries.length
+    readonly property var inspectedCard: Deck.cardById(previewId) &&
+        catalogEntries.some(function(c){return c.id===previewId;})
+        ? Deck.cardById(previewId)
+        : catalogEntries.length
         ? catalogEntries[Math.min(catalogEntries.length-1,
               Math.max(0,catalogPage*catalogPageSize))] : null
 
-    onCatalogGroupChanged: catalogPage=0
+    onCatalogGroupChanged: {
+        catalogPage=0;
+        previewId="";
+    }
+    onCatalogPageChanged: previewId=""
     onSpreadIdChanged: {
         reading=({ready:false,cards:[]});
         lastError="";

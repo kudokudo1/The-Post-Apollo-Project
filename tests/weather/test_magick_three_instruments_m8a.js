@@ -138,7 +138,7 @@ test("M8a instrument routes and zoomable controls are mounted without side effec
     assert.match(clock,/Dial\.build\(plan\)/);
     assert.match(clock,/Dial\.select\(clock\.model,geometry,p\.x,p\.y\)/);
     assert.match(clock,/onWheel:function\(wheel\)/);
-    assert.match(clock,/onLanesRequested: timing\.clockMode=false/);
+    assert.match(timing,/onLanesRequested: timing\.clockMode=false/);
     assert.match(astro,/StationMagickNatalChartWheelPane\s*\{/);
     assert.match(astro,/chartData: astrology\.fullChartData/);
     assert.match(astro,/property var fullChartData: null/);

@@ -183,7 +183,9 @@ class ZoomWebHostTests(unittest.TestCase):
 
     def test_output_bounds_and_explicit_identity_validation(self):
         with patch.object(host, "_output_rect", return_value={
-                "x":2560,"y":0,"width":1360,"height":768}):
+                "x":2560,"y":0,"width":1360,"height":768}), \
+             patch.object(host, "_sway_json", return_value=[
+                {"output":"HDMI-A-1","visible":True,"rect":{"y":0}}]):
             self.assertEqual(host._target_geometry("HDMI-A-1",20,130,600,500),
                              (2580,130,600,500))
             for x,y,w,h in ((-1,0,600,500),(20,-1,600,500),
@@ -194,6 +196,40 @@ class ZoomWebHostTests(unittest.TestCase):
                         host._target_geometry("HDMI-A-1",x,y,w,h)
         with self.assertRaises(ValueError):
             host._private_profile(["/usr/bin/chromium"], "../other-identity")
+
+    def test_measured_workarea_origin_shifts_only_physical_zoom_actor(self):
+        # Operator's source/live evidence: 84,140 734x542 reported at Sway,
+        # workarea Y=82. Camera's body is visibly ~82px below the actor.
+        output={"x":0,"y":0,"width":2560,"height":1440}
+        workspace=[{"output":"DP-3","visible":True,"rect":{"y":82}}]
+        self.assertEqual(host._workarea_top_offset("DP-3",output,workspace),82)
+        with patch.object(host, "_output_rect", return_value=output), \
+             patch.object(host, "_sway_json", return_value=workspace):
+            self.assertEqual(host._target_geometry("DP-3",84,140,734,542),
+                             (84,222,734,542))
+        # A second monitor without the top workarea inset stays unchanged.
+        second={"x":2560,"y":0,"width":1360,"height":768}
+        ws=[{"output":"HDMI-A-1","visible":True,"rect":{"y":0}}]
+        self.assertEqual(host._workarea_top_offset("HDMI-A-1",second,ws),0)
+
+    def test_untrusted_workarea_fails_closed_without_touching_other_windows(self):
+        output={"x":0,"y":0,"width":2560,"height":1440}
+        for workspaces in ([], None,
+                           [{"output":"DP-3","visible":False,"rect":{"y":82}}],
+                           [{"output":"DP-3","visible":True,"rect":{"y":-10}}],
+                           [{"output":"DP-3","visible":True,"rect":{"y":1000}}],
+                           [{"output":"DP-3","visible":True,"rect":{"y":True}}],
+                           [{"output":"DP-3","visible":True,"rect":{"y":82}}]*2):
+            with self.subTest(workspaces=workspaces):
+                with self.assertRaises(RuntimeError):
+                    host._workarea_top_offset("DP-3",output,workspaces)
+        # Bounds account for the workarea offset, not only panel-local Y.
+        with patch.object(host,"_output_rect",return_value={
+                "x":0,"y":0,"width":1360,"height":768}), \
+             patch.object(host,"_sway_json",return_value=[
+                {"output":"DP-3","visible":True,"rect":{"y":82}}]):
+            with self.assertRaises(ValueError):
+                host._target_geometry("DP-3",84,200,734,542)
 
     def test_profile_is_owner_only_and_is_not_social_or_native_zoom(self):
         with tempfile.TemporaryDirectory() as temp:

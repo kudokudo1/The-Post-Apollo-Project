@@ -31,9 +31,15 @@ Sources: Fedora SELinux independent policy reference (`init_daemon_domain` .te/.
 
 The Fedora module compiles successfully using selinux-policy-devel. An enforcing Fedora 44 guest confirmed that the custom policy module installs and that the executable receives postapollo_connections_exec_t. The service *did not* enter the proposed domain in the first completed guest run: it stayed in init_t and the audit log explicitly denied process2 nnp_transition from init_t to postapollo_connections_t while the systemd unit retained NoNewPrivileges=yes. A narrow rule allowing precisely that transition was added, based on the audited denial. NoNewPrivileges has **not** been disabled. Source rule: allow init_t postapollo_connections_t:process2 nnp_transition.
 
-This rule compiled again. Its actual transition and the negative-access test still require a successful guest rerun. The next GitHub runner's Ubuntu apt-get step was still in progress when checked, before the guest test. The workflow has since been bounded with explicit apt update/install timeouts so dependency delays fail visibly. **Do not claim dedicated confinement until the guest journal reports postapollo_connections_t and the negative dummy-read and D-Bus tests pass together.**
+This rule compiled again. The subsequent GitHub run listed above confirmed both the process transition and the negative-access test. The next GitHub runner's Ubuntu apt-get step was still in progress when checked, before the guest test. The workflow has since been bounded with explicit apt update/install timeouts so dependency delays fail visibly. **This specific dedicated-domain gate is verified, but the module is a test-only candidate and is not a complete least-privilege or signed-deployment security proof.**
 
 Recovery: inspect the latest head of draft PR #1338, check the enforcing-confined-fedora-service job, and search for C2R_SERVICE_SELINUX_CONTEXT and C2R_PASS // DEDICATED_CONFINED_SERVICE_DOMAIN_AND_NEGATIVE_ACCESS_DENIAL. The guest script and boot script now preserve full guest error output and exit codes in the serial log.
+
+### Verified CI checkpoint, November 6
+
+GitHub Actions [run 42172640391](https://github.com/kudokudo1/The-Post-Apollo-Project/actions/runs/42172640391), job 127743795098, on commit `1f34ba231781127b96f85e0c28daa491c8fc73b5`: **3/3 checks passed** (Fedora guest, plus two validate checks). Real Fedora 44 guest SELinux reported Enforcing. The temporary systemd host reported `system_u:system_r:postapollo_connections_t:s0`. The `shadow_t` dummy with Unix mode 0644 was denied by SELinux, with an explicit journal marker. Reader GetStatus was accepted; unauthorized ownership, outsider GetStatus and any Approve request remained refused; stopping the service released its bus name. No provider permissions, credentials, NASA traffic or local desktop changes.
+
+The test discovered and narrowly fixed three separate SELinux denials: `init_t -> postapollo_connections_t:process2 nnp_transition` (preserving systemd NoNewPrivileges), mapping Fedora's Python `bin_t` interpreter, and system bus `acquire_svc` in D-Bus's userspace permission class. The policy declares that class explicitly. None of these grants enable network traffic or read secrets. They should be independently reviewed before any installation.
 
 ## WATCH OUT FOR
 
@@ -48,10 +54,11 @@ SELinux modules in a throwaway Fedora guest do not prove the operator's live SEL
 - [x] Add compiled module builder and enforcing guest CI
 - [x] Add dummy world-readable SELinux denial test
 - [x] Compiled Fedora SELinux module and loaded it into Enforcing Fedora guest
-- [ ] Prove proper dedicated process domain with NNP transition rule in a new completed guest run
-- [ ] Confirm process domain is dedicated and D-Bus remains read-only
-- [ ] Confirm SELinux denial is OS-enforced (not merely DAC)
-- [ ] Complete final-head GitHub CI and independent review
+- [x] Proved process context postapollo_connections_t with NoNewPrivileges preserved
+- [x] Confirmed dedicated process domain and D-Bus remained read-only
+- [x] Confirmed world-readable dummy file labeled shadow_t was denied by SELinux
+- [x] Initial exact-head GitHub CI completed: 3/3 checks passed on 1f34ba23
+- [ ] Final handoff-update commit CI and independent review
 - [ ] Sign and package executable/policy, implement consent and real protected host
 
 ## NEXT

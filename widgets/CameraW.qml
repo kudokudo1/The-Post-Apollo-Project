@@ -68,12 +68,47 @@ PanelWindow {
     readonly property int zoomBayWidth: Math.max(0, Math.round(zoomViewport.width))
     readonly property int zoomBayHeight: Math.max(0, Math.round(zoomViewport.height))
     property bool zoomWebNeedsRealign: false
+    property int zoomFollowRevision: 0
+
+    function sendZoomFollowTarget() {
+        if (!zoomFollowProcess.running || !menuOpen || activeView !== "zoom")
+            return false;
+        zoomFollowRevision++;
+        zoomFollowProcess.write(JSON.stringify({
+            op: "target", revision: zoomFollowRevision,
+            output: zoomWebOutput,
+            x: Math.round(camera.margins.left + camera.glowGutter + zoomBayInset),
+            y: Math.round(camera.frameTopInset + zoomBayTop),
+            width: zoomBayWidth, height: zoomBayHeight
+        }) + "\n");
+        return true;
+    }
+
+    function consumeZoomFollow(raw) {
+        var reply = null;
+        try { reply = JSON.parse(String(raw || "")); } catch (e) {}
+        if (!reply || reply.kind !== "zoom-web-follow"
+                || !menuOpen || activeView !== "zoom"
+                || Number(reply.revision) !== zoomFollowRevision)
+            return;
+        const aligned = reply.aligned === true && reply.state === "ALIGNED";
+        zoomWebDocked = aligned;
+        zoomWebState = aligned ? "WEB_APP_DOCKED"
+                     : "FOLLOWER // " + String(reply.state || "UNVERIFIED");
+    }
 
     function scheduleZoomWebRealign() {
         if (!menuOpen || activeView !== "zoom")
             return;
-        // Close the input hole *before* moving the browser actor.
+        // Camera remains the geometry leader, just as Social is before
+        // its browser's initial dock. The physical Sway actor follows the
+        // latest viewport even when QML geometry did not trigger another
+        // one-shot launch.
         zoomWebDocked = false;
+        if (zoomFollowProcess.running) {
+            sendZoomFollowTarget();
+            return;
+        }
         if (zoomWebBusy) {
             // Never accept a stale geometry verification after a resize.
             zoomWebNeedsRealign = true;
@@ -93,6 +128,10 @@ PanelWindow {
     function enterZoomWeb() {
         if (!menuOpen || activeView !== "zoom" || zoomWebBusy)
             return false;
+        if (zoomFollowProcess.running) {
+            zoomWebDocked = false;
+            return sendZoomFollowTarget();
+        }
         zoomWebDocked = false;
         zoomWebRectDelta = null;
         zoomWebNeedsRealign = false;
@@ -103,6 +142,7 @@ PanelWindow {
     }
     function hideZoomWeb() {
         zoomWebDocked = false;  // input cutout closes before guest is hidden
+        zoomFollowProcess.running = false;
         zoomWebState = "HIDDEN";
         zoomWebHideProcess.exec(zoomWebArgs("hide"));
     }
@@ -124,15 +164,20 @@ PanelWindow {
             zoomWebRealign.restart();
             return;
         }
-        zoomWebDocked = !!(reply && reply.ok === true && reply.docked === true);
+        const initiallyDocked = !!(reply && reply.ok === true && reply.docked === true);
+        zoomWebDocked = false; // follower must verify the current viewport
         zoomWebRectDelta = reply && Array.isArray(reply.rectDelta)
             && reply.rectDelta.length === 4 ? reply.rectDelta : null;
-        zoomWebState = zoomWebDocked ? "WEB_APP_DOCKED"
+        zoomWebState = initiallyDocked ? "FOLLOWER // STARTING"
                         : "WEB_HOST_UNAVAILABLE // " + String(reply && (reply.error || reply.state) || "NO_RESULT");
-        if (zoomWebDocked)
-            feedback = "ZOOM WEB // PROVIDER LOGIN AND JOIN/START INSIDE CAMERA";
-        else
+        if (initiallyDocked) {
+            // Start one persistent Sway IPC session: physical browser geometry
+            // is remeasured and corrected until leaving Zoom mode.
+            zoomFollowProcess.running = true;
+            feedback = "ZOOM WEB // CONTINUOUS SIZE AND POSITION FOLLOW";
+        } else {
             feedback = "ZOOM WEB // " + zoomWebState;
+        }
     }
     onZoomBayInsetChanged: scheduleZoomWebRealign()
     onZoomBayTopChanged: scheduleZoomWebRealign()
@@ -695,6 +740,28 @@ PanelWindow {
                         zoomWebRealign.restart();
                 }
             });
+        }
+    }
+    // The same direct Sway IPC transport used by Social keeps the actual
+    // browser actor in Camera's latest viewport, not just a QML cutout.
+    Process {
+        id: zoomFollowProcess
+        command: ["python3", "-I", "-B",
+                  Quickshell.shellPath("scripts/camera/ZoomWebFollow.py"),
+                  "--identity", camera.zoomWebIdentity]
+        running: false
+        stdinEnabled: true
+        stdout: SplitParser {
+            onRead: function(data) {
+                camera.consumeZoomFollow(String(data || "").trim());
+            }
+        }
+        onStarted: camera.sendZoomFollowTarget()
+        onExited: function(code, status) {
+            if (camera.menuOpen && camera.activeView === "zoom") {
+                camera.zoomWebDocked = false;
+                camera.zoomWebState = "FOLLOWER // EXITED";
+            }
         }
     }
     Process {

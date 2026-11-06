@@ -23,6 +23,8 @@ Rectangle {
     property string nativeSetupStatus: "IDLE"
     property var savedBridgeState: ({})
     property string savedBridgeCheck: "NOT CHECKED"
+    property var deviceObservation: ({})
+    property string deviceObservationCheck: "NOT CHECKED"
     property var phoneAudioStatus: ({})
     property string phoneAudioCheck: "NOT CHECKED"
     property string phoneAudioResult: "IDLE"
@@ -269,6 +271,21 @@ Rectangle {
         return "";
     }
 
+    // Physical BlueZ name and Bluetooth link only. The opaque BlueFerry ID
+    // distinguishes the active profile; neither this nor a name is a grant.
+    function refreshDeviceObservation() {
+        if (!visible || deviceObservationProcess.running)
+            return;
+        deviceObservationCheck = "CHECKING";
+        deviceObservation = ({});
+        deviceObservationProcess.command = [
+            "python3",
+            Quickshell.shellPath("services/phone/PhoneDeviceObservation.py"),
+            "--inspect"
+        ];
+        deviceObservationProcess.running = true;
+    }
+
     function refreshSavedBridgeState() {
         if (!visible || savedBridgeProcess.running)
             return;
@@ -428,6 +445,7 @@ Rectangle {
         nativeSetupStatus = "IDLE";
         nativeSetupTarget = "";
         refreshSavedBridgeState();
+        refreshDeviceObservation();
         refreshPhoneAudioControls();
         setupProcess.command = [
             "python3",
@@ -463,6 +481,8 @@ Rectangle {
             nativeSetupTarget = "";
             savedBridgeCheck = "NOT CHECKED";
             savedBridgeState = ({});
+            deviceObservationCheck = "NOT CHECKED";
+            deviceObservation = ({});
             phoneAudioStatus = ({});
             phoneAudioCheck = "NOT CHECKED";
             phoneAudioResult = "IDLE";
@@ -600,6 +620,59 @@ Rectangle {
             if (phonePane.visible && phonePane.savedBridgeCheck === "CHECKING"
                     && exitCode !== 0)
                 phonePane.savedBridgeCheck = "UNAVAILABLE";
+        }
+    }
+
+    Process {
+        id: deviceObservationProcess
+        stdout: StdioCollector {
+            onStreamFinished: {
+                if (!phonePane.visible || phonePane.deviceObservationCheck !== "CHECKING")
+                    return;
+                try {
+                    var observed = JSON.parse(String(text || ""));
+                    var states = [
+                        "UNAVAILABLE", "PROFILE_ONLY", "PAIRED_OFFLINE",
+                        "BLUETOOTH_CONNECTED"
+                    ];
+                    var links = ["UNVERIFIED", "PAIRED_OFFLINE", "CONNECTED"];
+                    var profile = String(observed.profileId || "");
+                    var validProfile = profile === ""
+                        || /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/.test(profile);
+                    if (observed.schema !== "post-apollo.phone.device-observation.v0"
+                            || observed.execution !== "READ_ONLY_DEVICE_OBSERVATION"
+                            || states.indexOf(observed.state) < 0
+                            || links.indexOf(observed.bluetoothLink) < 0
+                            || observed.trustedPhoneLink !== "UNVERIFIED"
+                            || observed.contentAccessEnabled !== false
+                            || typeof observed.profileId !== "string"
+                            || !validProfile
+                            || typeof observed.displayName !== "string"
+                            || observed.displayName.length > 56
+                            || (observed.state === "UNAVAILABLE"
+                                && (profile !== "" || observed.displayName !== ""
+                                    || observed.bluetoothLink !== "UNVERIFIED"))
+                            || (observed.state !== "UNAVAILABLE"
+                                && (profile === "" || observed.displayName.length === 0))
+                            || (observed.state === "BLUETOOTH_CONNECTED"
+                                && observed.bluetoothLink !== "CONNECTED")
+                            || (observed.state === "PAIRED_OFFLINE"
+                                && observed.bluetoothLink !== "PAIRED_OFFLINE")
+                            || (observed.state === "PROFILE_ONLY"
+                                && observed.bluetoothLink !== "UNVERIFIED"))
+                        throw new Error("Unexpected device observation");
+                    phonePane.deviceObservation = observed;
+                    phonePane.deviceObservationCheck = "CHECKED";
+                } catch (error) {
+                    phonePane.deviceObservation = ({});
+                    phonePane.deviceObservationCheck = "UNAVAILABLE";
+                }
+            }
+        }
+        onExited: function(code) {
+            if (phonePane.visible && phonePane.deviceObservationCheck === "CHECKING"
+                    && code !== 0)
+                phonePane.deviceObservationCheck = "UNAVAILABLE";
         }
     }
 
@@ -849,6 +922,7 @@ Rectangle {
                             phonePane.refreshPhoneAudioControls();
                         } else {
                             phonePane.refreshSavedBridgeState();
+                            phonePane.refreshDeviceObservation();
                         }
                     } else if (result.state === "POSITION_REQUESTED"
                              || result.state === "ACTOR_NOT_FOUND"
@@ -1127,6 +1201,27 @@ Rectangle {
                                  : "UNAVAILABLE") +
                           "\nSocial phone link: NOT VERIFIED"
                     color: Colors.white
+                    font.pixelSize: 11
+                    wrapMode: Text.WordWrap
+                    lineHeight: 1.35
+                }
+
+                // BlueZ's name is scoped to the exact opaque BlueFerry profile
+                // and paired device, not to a Social user or an audio stream.
+                Text {
+                    width: parent.width
+                    visible: phonePane.deviceObservationCheck === "CHECKED"
+                    textFormat: Text.PlainText
+                    text: phonePane.deviceObservation.state === "BLUETOOTH_CONNECTED"
+                          ? "IPHONE // " + phonePane.deviceObservation.displayName
+                            + "\nBluetooth device: CONNECTED. Social messages and contacts: NOT LINKED."
+                          : phonePane.deviceObservation.state === "PAIRED_OFFLINE"
+                          ? "IPHONE // " + phonePane.deviceObservation.displayName
+                            + "\nBluetooth device: PAIRED, NOT CONNECTED. Social data: NOT LINKED."
+                          : phonePane.deviceObservation.state === "PROFILE_ONLY"
+                          ? "IPHONE PROFILE // Name and Bluetooth link not verified. Social data: NOT LINKED."
+                          : "No configured iPhone identity could be verified. Existing audio settings were not changed."
+                    color: Colors.cyan
                     font.pixelSize: 11
                     wrapMode: Text.WordWrap
                     lineHeight: 1.35

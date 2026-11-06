@@ -113,7 +113,8 @@ function visualForRoute(path) {
   return path === "magick/astrology/charts"
       || path === "magick/astrology/zodiac"
       || path === "magick/astrology/aspects"
-      || path === "magick/astrology/retrogrades";
+      || path === "magick/astrology/retrogrades"
+      || path === "magick/astrology/transits";
 }
 function isInterpretationImplemented(path) {
   return false; // No future route silently becomes a real reading.

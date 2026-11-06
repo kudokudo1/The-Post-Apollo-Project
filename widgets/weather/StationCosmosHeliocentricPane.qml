@@ -3,6 +3,7 @@ import "../../components"
 import "StationCosmosHeliocentricPolicy.js" as Helio
 import "StationCosmosSolarOverviewPolicy.js" as Solar
 import "StationCosmosHelioLabelPolicy.js" as Labels
+import "StationCosmosHelioScaleMotionPolicy.js" as Motion
 
 // V4c // True Sun-centered, geometric JPL vector snapshot at one UTC.
 // Neither the earlier apparent Earth-centric plot nor the longitudinal
@@ -47,6 +48,7 @@ Item {
     signal sampleScrubbed(int originIndex,real offsetPixels)
 
     onSceneChanged: spatialCanvas.requestPaint()
+    onFocusIndexChanged: spatialCanvas.requestPaint()
     onTiltViewChanged: spatialCanvas.requestPaint()
     onSpatialScaleChanged: spatialCanvas.requestPaint()
     onCameraPanXChanged: spatialCanvas.requestPaint()
@@ -80,8 +82,10 @@ Item {
         ctx.font="9px monospace";
 
         const flatten=spatial.tiltView?Math.SQRT1_2:1;
-        for(let ring=1;ring<=4;ring++){
-            const r=g.r*ring/4;
+        // Each ring is a real fraction of the active JPL AU domain.
+        const auRings=Motion.rings(spatial.radialDomainAu);
+        for(let ring=1;ring<=auRings.length;ring++){
+            const r=g.r*auRings[ring-1].fraction;
             ctx.save();
             ctx.translate(g.cx,g.cy);
             ctx.scale(1,flatten);
@@ -112,6 +116,21 @@ Item {
         ctx.fillText("180°",g.cx,g.cy+g.r*flatten+14);
         ctx.fillText("270°",g.cx-g.r-17,g.cy);
 
+        // Physical AU graduations follow the same zoom/pan transform as
+        // the source positions; no pixel-derived distance is reported as AU.
+        const auTicks=Motion.ringCallouts(spatial.radialDomainAu,g,
+                                          plotBounds,spatial.tiltView);
+        ctx.font="9px monospace";
+        ctx.textAlign="left";
+        for(let i=0;i<auTicks.length;i++) {
+            const tick=auTicks[i];
+            ctx.globalAlpha=0.78;
+            ctx.fillStyle=String(Colors.cyan);
+            ctx.fillText(tick.label,tick.x+4,tick.y);
+        }
+        ctx.globalAlpha=1;
+        ctx.textAlign="center";
+
         ctx.beginPath();
         ctx.arc(g.cx,g.cy,5,0,Math.PI*2);
         ctx.fillStyle=String(Colors.orange);
@@ -129,6 +148,51 @@ Item {
             ctx.fillText("NO VERIFIED SUN-CENTERED JPL XYZ",g.cx,g.cy-20);
             ctx.restore();
             return;
+        }
+
+        // V5b // Display ONLY a selected body's discrete source samples.
+        // We deliberately draw no line segments or synthetic orbit path.
+        // Adjacent samples can overlap at distant-system scales; preserve
+        // the data but skip redundant near-pixel dots for visual legibility.
+        const samples=Motion.sampleWindow(spatial.visualData,spatial.scene,
+                                          spatial.selectedBody,spatial.focusIndex,12);
+        if(samples.ready) {
+            const current=Helio.byBody(spatial.scene,spatial.selectedBody);
+            const now=current?Helio.position(spatial.scene,current,w,h,
+                                spatial.spatialScale,spatial.tiltView,
+                                spatial.radialDomainAu,
+                                spatial.cameraPanX,spatial.cameraPanY):null;
+            let prior=null;
+            for(let i=0;i<samples.samples.length;i++) {
+                const sample=samples.samples[i];
+                if(sample.kind==="now")continue;
+                const p=Helio.position(spatial.scene,sample,w,h,
+                                      spatial.spatialScale,spatial.tiltView,
+                                      spatial.radialDomainAu,
+                                      spatial.cameraPanX,spatial.cameraPanY);
+                if(!p || p.x<plotBounds.left+4 ||
+                   p.x>plotBounds.right-4 ||
+                   p.y<plotBounds.top+4 ||
+                   p.y>plotBounds.bottom-4)continue;
+                if(now && Math.hypot(p.x-now.x,p.y-now.y)<3)continue;
+                if(prior && Math.hypot(p.x-prior.x,p.y-prior.y)<3)continue;
+                prior=p;
+                ctx.beginPath();
+                ctx.arc(p.x,p.y,2.2,0,Math.PI*2);
+                ctx.fillStyle=String(sample.kind==="past"
+                                    ? Colors.cyan:Colors.magenta);
+                ctx.globalAlpha=0.65;
+                ctx.fill();
+            }
+            ctx.globalAlpha=0.74;
+            ctx.font="9px monospace";
+            ctx.textAlign="right";
+            ctx.fillStyle=String(Colors.cyan);
+            ctx.fillText("JPL UTC SAMPLES // NO INTERPOLATED ORBIT",
+                         plotBounds.right-4,plotBounds.top+10,
+                         Math.max(20,plotBounds.right-plotBounds.left-20));
+            ctx.textAlign="center";
+            ctx.globalAlpha=1;
         }
 
         // V5a: two-pass painting. The first pass draws real source points;

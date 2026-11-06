@@ -28,6 +28,8 @@ Rectangle {
                          ? overviewComponent
                          : cosmosPane.subjectRoute === "cosmos/moon/ephemeris"
                          ? moonCompactComponent
+                         : cosmosPane.subjectRoute === "cosmos/moon/year"
+                         ? moonYearComponent
                          : cosmosPane.kind === "sky" ? skyComponent
                          : cosmosPane.subjectRoute === "cosmos/space-weather/overview"
                            ? spaceHubComponent
@@ -91,6 +93,21 @@ Rectangle {
             weatherService: cosmosPane.weatherService
             spaceService: cosmosPane.spaceService
             runtimeNowMs: cosmosPane.runtimeNowMs
+            onRouteRequested: function(path) {
+                cosmosPane.routeRequested(path)
+            }
+        }
+    }
+
+    Component {
+        id: moonYearComponent
+        StationCosmosAnnualWheelPane {
+            subject: "moon"
+            weatherService: cosmosPane.weatherService
+            runtimeNowMs: cosmosPane.runtimeNowMs
+            onRouteRequested: function(path) {
+                cosmosPane.routeRequested(path)
+            }
         }
     }
 

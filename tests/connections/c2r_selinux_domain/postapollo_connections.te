@@ -19,6 +19,12 @@ miscfiles_read_localization(postapollo_connections_t)
 allow postapollo_connections_t self:unix_stream_socket { create connect read write getattr getopt setopt shutdown };
 allow postapollo_connections_t self:process { signal sigchld };
 dbus_system_bus_client(postapollo_connections_t)
+# The SELinux dbus-broker gate is separate from C2n's restricted name policy.
+# Permit service-name registration only toward the system bus daemon domain.
+gen_require(`
+    type system_dbusd_t;
+')
+allow postapollo_connections_t system_dbusd_t:dbus acquire_svc;
 
 # Fedora systemd has NoNewPrivileges=yes. Permit ONLY init_t -> this confined
 # status-only daemon transition under NNP; never disable NNP or use permissive.

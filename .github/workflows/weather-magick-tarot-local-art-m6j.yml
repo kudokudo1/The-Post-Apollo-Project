@@ -1,0 +1,56 @@
+name: Weather MAGICK M6j private Tarot artwork and red inspect close
+
+on:
+  pull_request:
+    paths:
+      - 'widgets/weather/StationMagickTarotCard.qml'
+      - 'widgets/weather/StationMagickTarotPane.qml'
+      - 'widgets/weather/StationMagickTarotDeckPolicy.js'
+      - 'tests/weather/test_magick_tarot_local_art_m6j.js'
+      - 'tests/weather/test_magick_wild_unknown_tarot_m6g.js'
+      - 'docs/weather-magick-m6j-private-art-red-close-handoff.md'
+      - '.github/workflows/weather-magick-tarot-local-art-m6j.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'widgets/weather/StationMagickTarotCard.qml'
+      - 'widgets/weather/StationMagickTarotPane.qml'
+      - 'widgets/weather/StationMagickTarotDeckPolicy.js'
+      - 'tests/weather/test_magick_tarot_local_art_m6j.js'
+      - '.github/workflows/weather-magick-tarot-local-art-m6j.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  local-art-and-close:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: M6j private art format, folder URL, and red close tests
+        run: node --test tests/weather/test_magick_tarot_local_art_m6j.js
+      - name: Existing M6g Wild Unknown identity and artwork boundary
+        run: node --test tests/weather/test_magick_wild_unknown_tarot_m6g.js
+      - name: Existing M6h physical card entry and M6i visual layouts
+        run: |
+          node --test tests/weather/test_magick_tarot_physical_m6h.js
+          node --test tests/weather/test_magick_tarot_presentation_m6i.js
+      - name: QML syntax validation; no live Quickshell launch
+        run: |
+          sudo apt-get update -qq
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends qt6-declarative-dev-tools
+          QT_QPA_PLATFORM=offscreen /usr/lib/qt6/bin/qmlformat widgets/weather/StationMagickTarotCard.qml >/dev/null
+          QT_QPA_PLATFORM=offscreen /usr/lib/qt6/bin/qmlformat widgets/weather/StationMagickTarotPane.qml >/dev/null
+      - name: No copied copyrighted deck or unauthorized IO
+        run: |
+          set -euo pipefail
+          ! grep -Eq 'XMLHttpRequest|Qt.openUrlExternally|WebEngineView|FileView *\{|Process *\{' \
+            widgets/weather/StationMagickTarotCard.qml \
+            widgets/weather/StationMagickTarotPane.qml \
+            widgets/weather/StationMagickTarotDeckPolicy.js
+          test "$(grep -c 'localArtworkDirectory: tarot.localArtworkDirectory' widgets/weather/StationMagickTarotPane.qml)" = 3
+          printf '%s\n' 'M6J_LOCAL_USER_ART_ONLY_NO_BUNDLED_IMAGES_PASS'

@@ -60,5 +60,10 @@ done
 [[ "$(find /out -maxdepth 1 -type f | wc -l)" == 5 ]] || {
     echo "C2T_FAIL // OUTPUT_SET_NOT_EXACT"; exit 2;
 }
+# The ephemeral root builder writes mode 0600 under umask 077. Only public
+# test artifacts cross to the ordinary CI runner. The secret key is NOT in /out.
+chmod 0644 /out/c2t-0.1.rpm /out/c2t-0.2.rpm \
+    /out/c2t-disposable-public.asc /out/c2t-public-fingerprint.txt \
+    /out/c2t-artifact-manifest.sha256
 echo "C2T_PASS // ONLY_PUBLIC_KEY_TWO_RPMS_AND_MANIFESTS_EXPORTED"
 echo "C2T_LIMITATION // EPHEMERAL_SELF_SIGNED_TEST_KEY_NOT_RELEASE_TRUST"

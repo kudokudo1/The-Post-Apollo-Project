@@ -105,7 +105,7 @@ class PersonalReadPilotUiContract(unittest.TestCase):
         self.assertNotIn("savePersonalApproval(", visible)
         self.assertNotIn('"--approve"', visible)
         self.assertNotIn("Component.onCompleted: openPersonalConsent()", self.pane)
-        self.assertIn("if (personalApproved)", self.pane)
+        self.assertIn("if (personalApproved && !personalNeedsExplicitReload)", self.pane)
         self.assertIn("phonePane.loadPersonalSnapshot();", self.pane)
         self.assertIn('if (value.state === "APPROVAL_REQUIRED"', self.pane)
         self.assertIn("personalStatusProcess.promptIfMissing", self.pane)

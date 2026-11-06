@@ -49,7 +49,7 @@ function select(model,geometry,x,y){
     var angle=(Math.atan2(dy,dx)+Math.PI/2+2*Math.PI)%(2*Math.PI);
     for(var i=0;i<model.sectors.length;i++){
         var start=(model.sectors[i].startAngle+Math.PI/2+2*Math.PI)%(2*Math.PI);
-        var end=(model.sectors[i].endAngle+Math.PI/2+2*Math.PI);
+        var end=(model.sectors[i].endAngle+Math.PI/2+2*Math.PI)%(2*Math.PI);
         if(i===23||angle>=start && angle<end)return i;
     }
     return -1;

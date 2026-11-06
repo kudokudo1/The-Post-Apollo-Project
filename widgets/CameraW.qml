@@ -934,9 +934,11 @@ PanelWindow {
             Item {
                 id: cameraPage
                 width: parent.width
-                // In Zoom, the browser occupies the entire remaining body,
-                // rather than the smaller Capture/Gallery page height.
-                height: camera.activeView === "zoom" && camera.zoomWebDocked
+                // Give Zoom the full body BEFORE hosting starts, not only
+                // after dock verification. One stable page/bay height prevents
+                // the initial short fallback layout becoming an old browser
+                // height during the move/resize handoff.
+                height: camera.activeView === "zoom"
                         ? camera.zoomBayHeight : frame.height - 169
 
                 Flickable {
@@ -2079,9 +2081,9 @@ PanelWindow {
 
             GohuText {
                 width: parent.width
-                // During a docked Zoom session the web guest owns the body.
-                // A global status footer would cover browser buttons/scrolling.
-                visible: !(camera.activeView === "zoom" && camera.zoomWebDocked)
+                // Zoom owns the full body both before and after docking.
+                // Keep Camera's global footer in the other three modes only.
+                visible: camera.activeView !== "zoom"
                 font.pixelSize: 10
                 color: Colors.yellow
                 elide: Text.ElideRight

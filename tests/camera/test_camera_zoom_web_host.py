@@ -71,9 +71,12 @@ class ZoomWebHostTests(unittest.TestCase):
                            compact_height - 169)
 
     def test_zoom_browser_owns_scroll_and_the_footer_cannot_cover_buttons(self):
-        self.assertIn('height: camera.activeView === "zoom" && camera.zoomWebDocked', QML)
+        self.assertIn('height: camera.activeView === "zoom"', QML)
         self.assertIn('? camera.zoomBayHeight : frame.height - 169', QML)
-        self.assertIn('visible: !(camera.activeView === "zoom" && camera.zoomWebDocked)', QML)
+        self.assertIn('One stable page/bay height', QML)
+        self.assertIn('Zoom owns the full body both before and after docking.', QML)
+        self.assertNotIn('height: camera.activeView === "zoom" && camera.zoomWebDocked', QML)
+        self.assertIn('visible: camera.activeView !== "zoom"', QML)
         self.assertIn('visible: camera.activeView === "zoom" && !camera.zoomWebDocked', QML)
         self.assertIn('intersection: Intersection.Subtract', QML)
         self.assertIn('width: camera.zoomWebDocked ? camera.zoomBayWidth : 0', QML)

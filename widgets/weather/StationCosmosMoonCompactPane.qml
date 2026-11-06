@@ -13,6 +13,7 @@ Rectangle {
     property var weatherService: null
     property var spaceService: null
     property real runtimeNowMs: Date.now()
+    signal routeRequested(string path)
     // Match COSMOS Overview/Modes: 6 px between stage boundary and content.
     readonly property int contentInset: 6
     readonly property var sourceSkyHost: sourceSky
@@ -103,7 +104,7 @@ Rectangle {
             elide: Text.ElideRight
         }
         QuietText {
-            width: Math.max(1,titleRail.width-159)
+            width: Math.max(1,titleRail.width-159-54)
             height: parent.height
             text: "USNO "+moonPane.moonStatus+" // SKY "+moonPane.positionStatus
             color: moonPane.moonStatus==="OFFLINE" || moonPane.positionStatus==="OFFLINE"
@@ -112,6 +113,16 @@ Rectangle {
             verticalAlignment: Text.AlignVCenter
             horizontalAlignment: Text.AlignRight
             elide: Text.ElideRight
+        }
+        ActionButton {
+            objectName: "cosmos-c11-open-moon-year"
+            width: 50
+            height: 17
+            label: "YEAR"
+            labelPixelSize: 8
+            contentPadding: 1
+            accentColor: Colors.cyan
+            onClicked: moonPane.routeRequested("cosmos/moon/year")
         }
     }
 

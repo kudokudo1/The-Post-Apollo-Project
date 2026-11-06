@@ -48,10 +48,12 @@ var SUBJECTS = [
       {id:"activity",label:"SOLAR ACTIVITY // ALL ORIGINAL"},
       {id:"suvi",label:"SUVI IMAGER"}, {id:"xray",label:"X-RAY FLUX"},
       {id:"flares",label:"SOLAR FLARES"},
-      {id:"cycle",label:"SOLAR CYCLE // NOAA PREDICTION"}]},
+      {id:"cycle",label:"SOLAR CYCLE // NOAA PREDICTION"},
+      {id:"year",label:"SOLAR YEAR // JPL WHEEL"}]},
     {id:"moon",label:"MOON",children:[
       {id:"ephemeris",label:"PHASE AND RISE/SET"},
-      {id:"position",label:"CURRENT POSITION"}]},
+      {id:"position",label:"CURRENT POSITION"},
+      {id:"year",label:"LUNAR YEAR // JPL WHEEL"}]},
     {id:"planets-stars",label:"PLANETS AND STARS",children:[
       {id:"celestial-fix",label:"CURRENT SKY"},
       {id:"planet-clock",label:"PLANET RISE/SET"},

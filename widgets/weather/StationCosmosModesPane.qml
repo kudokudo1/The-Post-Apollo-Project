@@ -303,7 +303,8 @@ Rectangle {
             id: instrumentLoader
             anchors.fill: parent
             active: cosmosModePane.visible
-            sourceComponent: cosmosModePane.kind === "solar-path" ? sunPath
+            sourceComponent: cosmosModePane.kind === "annual-solar" ? solarYear
+                : cosmosModePane.kind === "solar-path" ? sunPath
                 : cosmosModePane.kind === "light" ? sunLight
                 : cosmosModePane.kind === "planet-clock" ? planetClock
                 : cosmosModePane.kind === "solar-section" ? solarDetails
@@ -336,7 +337,8 @@ Rectangle {
         QuietText {
             width: Math.max(0,footer.width
                 - 111 - (retrySource.visible ? 83 : 0))
-            text: cosmosModePane.kind === "meteors" ? "IAU MDC // SCROLL MIDDLE ONLY"
+            text: cosmosModePane.kind === "annual-solar" ? "JPL // CALCULATE YEAR ON DEMAND"
+                : cosmosModePane.kind === "meteors" ? "IAU MDC // SCROLL MIDDLE ONLY"
                 : cosmosModePane.kind === "solar-section" ? "NOAA // ONE INSTRUMENT"
                 : "SOURCE-BACKED // FOCUSED VIEW"
             color: Colors.cyan
@@ -381,6 +383,15 @@ Rectangle {
             spaceService: cosmosModePane.spaceService
         }
     }
+    Component {
+        id: solarYear
+        StationCosmosAnnualWheelPane {
+            subject: "sun"
+            weatherService: cosmosModePane.weatherService
+            runtimeNowMs: cosmosModePane.runtimeNowMs
+        }
+    }
+
     Component {
         id: sunPath
         Column {

@@ -15,6 +15,10 @@ Rectangle {
     property var weatherService: null
     property real runtimeNowMs: 0
     property string view: "moon"
+    // An embedded COSMOS wheel may lock the subject without changing MAGICK.
+    // Empty preserves the original MOON / SOLAR YEAR / FORECAST selector.
+    property string lockedView: ""
+    readonly property var calendarSource: annualSource
     property string scopeMode: "year"
     property int selectedYear: runtimeNowMs>0
         ? new Date(runtimeNowMs).getUTCFullYear():2026
@@ -84,10 +88,12 @@ Rectangle {
 
     Row {
         id: topModes
+        objectName: "magick-m7-annual-subject-tabs"
+        visible: annualPane.lockedView === ""
         anchors.left: parent.left
         anchors.right: parent.right
         anchors.top: parent.top
-        height: 26
+        height: visible ? 26 : 0
         spacing: 4
         Repeater {
             model: [
@@ -172,7 +178,7 @@ Rectangle {
                 annualPane.scopeMode==="year"?"month":"year"
         }
         ActionButton {
-            width:Math.max(55,parent.width-31-38-31-53-43-5*spacing)
+            width:Math.max(55,parent.width-31-38-31-53-43-5*controls.spacing)
             height:23
             label: annualSource.loading?"LOADING":"CALCULATE YEAR"
             labelPixelSize:8
@@ -318,6 +324,7 @@ Rectangle {
     // Main datum wheel, intentionally no whole-page Flickable.
     Canvas {
         id: wheel
+        objectName: "magick-m7-annual-wheel-canvas"
         visible: annualPane.view!=="forecast"
         anchors.top: topModes.bottom
         anchors.topMargin: 1

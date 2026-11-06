@@ -143,6 +143,33 @@ Rectangle {
             text: "78 CARD IDENTITIES // KIM KRANS // ART NOT DISTRIBUTED"
         }
 
+        // M6h // Either the desktop deals, or the operator transcribes
+        // cards already drawn from the physical deck. No camera or scanner.
+        Row {
+            id: drawMethodRow
+            width: parent.width
+            height: 25
+            spacing: 5
+            ActionButton {
+                width: Math.max(90,(parent.width-8)/2)
+                height: 24
+                label: "DIGITAL SHUFFLE"
+                labelPixelSize: 9
+                selected: tarot.drawMethod==="digital"
+                accentColor: selected ? Colors.magenta : Colors.cyan
+                onClicked: tarot.setDrawMethod("digital")
+            }
+            ActionButton {
+                width: Math.max(90,(parent.width-8)/2)
+                height: 24
+                label: "MY PHYSICAL CARDS"
+                labelPixelSize: 9
+                selected: tarot.drawMethod==="physical"
+                accentColor: selected ? Colors.magenta : Colors.cyan
+                onClicked: tarot.setDrawMethod("physical")
+            }
+        }
+
         Row {
             id: folderRow
             width: parent.width
@@ -225,6 +252,7 @@ Rectangle {
                     width: 87
                     height: 24
                     label: tarot.reversals?"REVERSE ON":"REVERSE OFF"
+                    visible: tarot.drawMethod==="digital"
                     labelPixelSize: 8
                     accentColor: tarot.reversals?Colors.magenta:Colors.blue
                     selected: tarot.reversals
@@ -239,10 +267,15 @@ Rectangle {
                 ActionButton {
                     width: 98
                     height: 27
-                    label: "SHUFFLE + DRAW"
+                    label: tarot.drawMethod==="physical"
+                        ? "CHOOSE CARD" : "SHUFFLE + DRAW"
                     labelPixelSize: 9
                     accentColor: Colors.magenta
-                    onClicked: tarot.drawCards()
+                    onClicked: {
+                        if(tarot.drawMethod==="physical")
+                            tarot.viewMode="catalog";
+                        else tarot.drawCards();
+                    }
                 }
                 ActionButton {
                     width: 60
@@ -251,7 +284,11 @@ Rectangle {
                     labelPixelSize: 9
                     accentColor: Colors.cyan
                     onClicked: {
-                        tarot.reading=({ready:false,cards:[]});
+                        tarot.reading=tarot.drawMethod==="physical"
+                            ? Physical.start(Deck.SPREADS,Deck.DECK.id,
+                                             tarot.spreadId)
+                            : ({ready:false,cards:[]});
+                        tarot.manualMessage="";
                         tarot.lastError="";
                     }
                 }
@@ -262,8 +299,15 @@ Rectangle {
                     font.pixelSize: 9
                     elide: Text.ElideRight
                     color: Colors.yellow
-                    text: tarot.reading.ready ?
-                        tarot.reading.count+" UNIQUE CARDS // NEW SHUFFLE"
+                    text: tarot.drawMethod==="physical"
+                        ? (tarot.reading.ready
+                           ? tarot.reading.count+"/"+tarot.reading.total+
+                             " ENTERED // "+
+                             (tarot.reading.complete?"COMPLETE":
+                              tarot.reading.nextPosition)
+                           : "CHOOSE SPREAD") :
+                        tarot.reading.ready
+                        ? tarot.reading.count+" UNIQUE CARDS // NEW SHUFFLE"
                         : tarot.lastError!=="" ? tarot.lastError
                         : "READY // PSEUDORANDOM IN THIS SESSION"
                 }
@@ -300,17 +344,47 @@ Rectangle {
                     }
                 }
                 QuietText {
-                    visible: !tarot.reading.ready
+                    visible: !tarot.reading.ready ||
+                             !tarot.reading.cards ||
+                             tarot.reading.cards.length===0
                     width: parent.width
                     height: 133
                     verticalAlignment: Text.AlignVCenter
                     horizontalAlignment: Text.AlignHCenter
                     color: Colors.cyan
                     font.pixelSize: 11
-                    text: "SELECT SPREAD // SHUFFLE + DRAW"
+                    text: tarot.drawMethod==="physical"
+                        ? "HOLD YOUR REAL DECK // CHOOSE CARDS IN INDEX"
+                        : "SELECT SPREAD // SHUFFLE + DRAW"
                 }
             }
 
+            Row {
+                width: parent.width
+                height: tarot.drawMethod==="physical"?24:0
+                visible: tarot.drawMethod==="physical"
+                spacing: 5
+                ActionButton {
+                    width: 83
+                    height: 23
+                    label: "UNDO LAST"
+                    labelPixelSize: 9
+                    accentColor: Colors.cyan
+                    available: tarot.reading.ready &&
+                               tarot.reading.count>0
+                    onClicked: tarot.undoPhysicalCard()
+                }
+                QuietText {
+                    width: Math.max(15,parent.width-88)
+                    height: 23
+                    verticalAlignment: Text.AlignVCenter
+                    color: Colors.yellow
+                    font.pixelSize: 9
+                    elide: Text.ElideRight
+                    text: tarot.manualMessage ||
+                        "NO STORAGE // CARDS ENTERED BY YOU"
+                }
+            }
             QuietText {
                 width: parent.width
                 height: 20

@@ -63,7 +63,9 @@ Rectangle {
             ? "--" : sourceSky.moonCivilOffsetMinutes + " M"},
         {label:"OFFSET ORIGIN",value:present(sourceSky.moonCivilOffsetSource)}
     ]
-    readonly property int renderedFactCount: moonFactRepeater.count
+    // Nine original data fields, now arranged by meaning and importance.
+    // Three position instruments, three event readings, three provenance fields.
+    readonly property int renderedFactCount: 9
 
     StationSky {
         id: sourceSky
@@ -78,97 +80,279 @@ Rectangle {
         runtimeNowMs: moonPane.runtimeNowMs
     }
 
-    StationCosmosVisualInstruments {
-        id: moonVisual
-        objectName: "cosmos-c8-moon-phase"
+    Row {
+        id: titleRail
+        objectName: "cosmos-c9-moon-free-header"
         anchors.left: parent.left
         anchors.right: parent.right
         anchors.top: parent.top
-        height: Math.min(166,Math.max(0,moonPane.height-109))
-        compactMode: true
-        showMoon: true
-        showSun: false
-        moonReady: moonPane.moonReady
-        moonEphemeris: moonPane.moonEphemeris
-        astronomySummary: sourceSky.astronomySummary
-        twilightSummary: sourceSky.twilightSummary
-        currentSolarPosition: sourceSky.currentSolarPosition
-        providerLocalMinute: sourceSky.providerLocalMinute
-        latitude: moonPane.weatherService ? moonPane.weatherService.latitude : ""
-        longitude: moonPane.weatherService ? moonPane.weatherService.longitude : ""
-        solarDate: sourceSky.astronomySummary.date
-        solarCivilOffsetMinutes: sourceSky.moonCivilOffsetMinutes
-        solarOffsetSource: sourceSky.moonCivilOffsetSource
+        height: 18
+        spacing: 4
+        GohuText {
+            width: Math.min(155,Math.max(1,titleRail.width*0.38))
+            height: parent.height
+            text: "LUNAR // OBSERVATION"
+            color: Colors.magenta
+            font.pixelSize: 10
+            verticalAlignment: Text.AlignVCenter
+            elide: Text.ElideRight
+        }
+        QuietText {
+            width: Math.max(1,titleRail.width-159)
+            height: parent.height
+            text: "USNO "+moonPane.moonStatus+" // SKY "+moonPane.positionStatus
+            color: moonPane.moonStatus==="OFFLINE" || moonPane.positionStatus==="OFFLINE"
+                ? Colors.orange : Colors.cyan
+            font.pixelSize: 8
+            verticalAlignment: Text.AlignVCenter
+            horizontalAlignment: Text.AlignRight
+            elide: Text.ElideRight
+        }
     }
 
+    Row {
+        id: heroRow
+        objectName: "cosmos-c9-moon-hero-row"
+        anchors.left: parent.left
+        anchors.right: parent.right
+        anchors.top: titleRail.bottom
+        height: Math.min(166,Math.max(0,moonPane.height-112))
+        spacing: 5
+
+        // Identical interactive MAGICK phase instrument, not a duplicated canvas.
+        // Keeping its compact height preserves eight phase selectors and CURRENT.
+        StationCosmosVisualInstruments {
+            id: moonVisual
+            objectName: "cosmos-c8-moon-phase"
+            width: Math.max(1,Math.round((heroRow.width-heroRow.spacing)*0.62))
+            height: heroRow.height
+            compactMode: true
+            showMoon: true
+            showSun: false
+            moonReady: moonPane.moonReady
+            moonEphemeris: moonPane.moonEphemeris
+            astronomySummary: sourceSky.astronomySummary
+            twilightSummary: sourceSky.twilightSummary
+            currentSolarPosition: sourceSky.currentSolarPosition
+            providerLocalMinute: sourceSky.providerLocalMinute
+            latitude: moonPane.weatherService ? moonPane.weatherService.latitude : ""
+            longitude: moonPane.weatherService ? moonPane.weatherService.longitude : ""
+            solarDate: sourceSky.astronomySummary.date
+            solarCivilOffsetMinutes: sourceSky.moonCivilOffsetMinutes
+            solarOffsetSource: sourceSky.moonCivilOffsetSource
+        }
+
+        // Asymmetric vertical current-sky instrument beside the phase artwork.
+        Rectangle {
+            id: positionColumn
+            objectName: "cosmos-c9-moon-tall-position"
+            width: Math.max(1,heroRow.width-moonVisual.width-heroRow.spacing)
+            height: heroRow.height
+            color: Colors.dark
+            border.width: 1
+            border.color: Colors.cyan
+
+            Column {
+                anchors.fill: parent
+                anchors.margins: 4
+                spacing: 3
+                QuietText {
+                    width: parent.width
+                    height: 12
+                    text: "CURRENT SKY // POSITION"
+                    color: Colors.cyan
+                    font.pixelSize: 8
+                    elide: Text.ElideRight
+                }
+                Rectangle {
+                    objectName: "cosmos-c8-moon-fact"
+                    width: parent.width
+                    height: Math.max(20,(positionColumn.height-29)*0.37)
+                    color: Colors.black
+                    border.width: 1
+                    border.color: Colors.cyan
+                    Column {
+                        anchors.fill: parent
+                        anchors.margins: 4
+                        spacing: 1
+                        QuietText {
+                            width: parent.width
+                            text: moonPane.facts[4].label
+                            font.pixelSize: 8
+                            elide: Text.ElideRight
+                        }
+                        GohuText {
+                            width: parent.width
+                            text: moonPane.facts[4].value
+                            font.pixelSize: 20
+                            color: Colors.white
+                            elide: Text.ElideRight
+                        }
+                    }
+                }
+                Rectangle {
+                    objectName: "cosmos-c8-moon-fact"
+                    width: parent.width
+                    height: Math.max(19,(positionColumn.height-29)*0.30)
+                    color: Colors.black
+                    border.width: 1
+                    border.color: Colors.blue
+                    Column {
+                        anchors.fill: parent
+                        anchors.margins: 3
+                        spacing: 2
+                        QuietText {
+                            width: parent.width
+                            text: moonPane.facts[5].label
+                            font.pixelSize: 8
+                            elide: Text.ElideRight
+                        }
+                        GohuText {
+                            width: parent.width
+                            text: moonPane.facts[5].value
+                            font.pixelSize: 11
+                            color: Colors.cyan
+                            elide: Text.ElideRight
+                        }
+                    }
+                }
+                Rectangle {
+                    objectName: "cosmos-c8-moon-fact"
+                    width: parent.width
+                    height: Math.max(18,positionColumn.height-29
+                        -Math.max(20,(positionColumn.height-29)*0.37)
+                        -Math.max(19,(positionColumn.height-29)*0.30)-6)
+                    color: Colors.black
+                    border.width: 1
+                    border.color: Colors.magenta
+                    Column {
+                        anchors.fill: parent
+                        anchors.margins: 3
+                        spacing: 1
+                        QuietText {
+                            width: parent.width
+                            text: moonPane.facts[3].label
+                            font.pixelSize: 8
+                            elide: Text.ElideRight
+                        }
+                        GohuText {
+                            width: parent.width
+                            text: moonPane.facts[3].value
+                            font.pixelSize: 9
+                            color: Colors.white
+                            elide: Text.ElideRight
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // One continuous event ribbon, with a brighter transit reading instead of
+    // three identical cards. The dividers replace three enclosing borders.
     Rectangle {
         id: compactReadings
         objectName: "cosmos-c8-moon-readings"
         anchors.left: parent.left
         anchors.right: parent.right
-        anchors.top: moonVisual.bottom
-        anchors.topMargin: 3
+        anchors.top: heroRow.bottom
+        anchors.topMargin: 4
         anchors.bottom: parent.bottom
-        color: Colors.dark
-        border.width: 1
-        border.color: Colors.cyan
+        color: Colors.black
+        border.width: 0
         clip: true
 
-        GohuText {
-            id: readingsTitle
+        Rectangle {
+            id: eventRibbon
+            objectName: "cosmos-c9-moon-event-ribbon"
             anchors.left: parent.left
             anchors.right: parent.right
             anchors.top: parent.top
-            anchors.margins: 3
-            height: 12
-            font.pixelSize: 9
-            color: Colors.cyan
-            elide: Text.ElideRight
-            text: "MOON // USNO " + moonPane.moonStatus
-                + " // CURRENT POSITION " + moonPane.positionStatus
+            height: Math.min(51,Math.max(1,compactReadings.height-39))
+            color: Colors.dark
+            border.width: 1
+            border.color: Colors.yellow
+            Row {
+                id: eventRow
+                anchors.fill: parent
+                anchors.margins: 3
+                spacing: 0
+                Repeater {
+                    model: 3
+                    delegate: Item {
+                        objectName: "cosmos-c8-moon-fact"
+                        required property int index
+                        readonly property var eventData: moonPane.facts[index]
+                        width: index===1 ? eventRow.width*0.36
+                                         : eventRow.width*0.32
+                        height: eventRow.height
+                        Rectangle {
+                            visible: index>0
+                            width: 1
+                            height: parent.height-4
+                            anchors.verticalCenter: parent.verticalCenter
+                            color: Colors.cyan
+                            opacity: 0.58
+                        }
+                        Column {
+                            anchors.fill: parent
+                            anchors.leftMargin: 7
+                            anchors.topMargin: 3
+                            spacing: 3
+                            QuietText {
+                                width: parent.width
+                                text: eventData ? eventData.label : "--"
+                                font.pixelSize: 8
+                                color: index===1 ? Colors.yellow : Colors.cyan
+                                elide: Text.ElideRight
+                            }
+                            GohuText {
+                                width: parent.width
+                                text: eventData ? eventData.value : "--"
+                                font.pixelSize: index===1 ? 15 : 12
+                                color: index===1 ? Colors.yellow : Colors.white
+                                elide: Text.ElideRight
+                            }
+                        }
+                    }
+                }
+            }
         }
 
-        Grid {
-            id: factGrid
+        // Source details are deliberately unboxed: small provenance annotations
+        // beneath the event group, retaining the original three values.
+        Row {
+            id: provenanceRow
+            objectName: "cosmos-c9-moon-free-provenance"
             anchors.left: parent.left
             anchors.right: parent.right
-            anchors.top: readingsTitle.bottom
-            anchors.topMargin: 1
-            anchors.bottom: sourceNote.top
-            anchors.bottomMargin: 1
-            anchors.leftMargin: 3
-            anchors.rightMargin: 3
-            columns: 3
-            spacing: 2
-
+            anchors.top: eventRibbon.bottom
+            anchors.topMargin: 2
+            height: Math.max(1,compactReadings.height-eventRibbon.height-16)
+            spacing: 4
             Repeater {
-                id: moonFactRepeater
-                model: 9
-                delegate: Rectangle {
+                model: 3
+                delegate: Item {
                     objectName: "cosmos-c8-moon-fact"
                     required property int index
-                    readonly property var factData: moonPane.facts[index]
-                    width: Math.max(1,(factGrid.width-2*factGrid.spacing)/3)
-                    height: Math.max(1,(factGrid.height-2*factGrid.spacing)/3)
-                    color: Colors.black
-                    border.width: 1
-                    border.color: index < 3 ? Colors.magenta
-                        : index < 6 ? Colors.cyan : Colors.orange
+                    readonly property var sourceData: moonPane.facts[index+6]
+                    width: Math.max(1,(provenanceRow.width-8)/3)
+                    height: provenanceRow.height
                     Column {
                         anchors.fill: parent
-                        anchors.margins: 2
-                        spacing: 1
+                        spacing: 0
                         QuietText {
                             width: parent.width
+                            text: sourceData ? sourceData.label : "--"
                             font.pixelSize: 8
-                            text: factData ? factData.label : "--"
+                            color: Colors.orange
                             elide: Text.ElideRight
                         }
                         GohuText {
                             width: parent.width
+                            text: sourceData ? sourceData.value : "--"
                             font.pixelSize: 9
                             color: Colors.white
-                            text: factData ? factData.value : "--"
                             elide: Text.ElideRight
                         }
                     }
@@ -182,8 +366,6 @@ Rectangle {
             anchors.left: parent.left
             anchors.right: parent.right
             anchors.bottom: parent.bottom
-            anchors.leftMargin: 3
-            anchors.rightMargin: 3
             height: 12
             font.pixelSize: 8
             color: moonSource && moonSource.failed ? Colors.orange : Colors.yellow

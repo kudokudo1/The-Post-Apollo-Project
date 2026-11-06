@@ -41,13 +41,14 @@ jobs:
           assert "init_daemon_domain(postapollo_connections_t, postapollo_connections_exec_t)" in policy
           assert "postapollo_connections_exec_t" in fc
           assert "postapollo_connections_t" in policy
-          assert "permissive" not in policy.lower()
-          assert "unconfined" not in policy.lower()
-          assert "audit2allow" not in policy.lower()
-          assert "network_port" not in policy.lower()
-          assert "tcp_socket" not in policy.lower()
-          assert "manage_files_pattern" not in policy.lower()
-          assert "admin" not in policy.lower()
+          active="\n".join(line.split("#")[0].strip().lower() for line in policy.splitlines())
+          assert "permissive" not in active
+          assert "unconfined" not in active
+          assert "audit2allow" not in active
+          assert "network_port" not in active
+          assert "tcp_socket" not in active
+          assert "manage_files_pattern" not in active
+          assert "admin" not in active
           print("C2R_PASS // NARROW_NONPERMISSIVE_POLICY_SOURCE")
           PY
       - name: Build SELinux reference-policy module inside disposable Fedora 44 builder

@@ -625,4 +625,109 @@ Rectangle {
             text: "PRIVATE READ-ONLY ART // NO BUNDLED IMAGES, NO SAVED READINGS"
         }
     }
+
+    // M6i // Enlarged focus view. This is a temporary overlay only:
+    // no new image source, journal entry, reproduction or saved reading.
+    Rectangle {
+        id: tarotCardInspector
+        anchors.fill: parent
+        z: 20
+        visible: tarot.inspectedDrawCard!==null
+        color: Colors.black
+        border.width: 1
+        border.color: Colors.magenta
+        Column {
+            anchors.fill: parent
+            anchors.margins: 9
+            spacing: 6
+            Row {
+                width: parent.width
+                height: 27
+                spacing: 5
+                GohuText {
+                    width: Math.max(30,parent.width-224)
+                    height: parent.height
+                    verticalAlignment: Text.AlignVCenter
+                    color: Colors.magenta
+                    font.pixelSize: 12
+                    elide: Text.ElideRight
+                    text: "CARD // INSPECT"
+                }
+                ActionButton {
+                    width: 68
+                    height: 26
+                    label: "◀ CARD"
+                    labelPixelSize: 9
+                    accentColor: Colors.cyan
+                    available: tarot.reading.ready &&
+                               tarot.reading.cards.length>1
+                    onClicked: tarot.inspectedDrawIndex=
+                        (tarot.inspectedDrawIndex+
+                         tarot.reading.cards.length-1)%
+                        tarot.reading.cards.length
+                }
+                ActionButton {
+                    width: 68
+                    height: 26
+                    label: "CARD ▶"
+                    labelPixelSize: 9
+                    accentColor: Colors.cyan
+                    available: tarot.reading.ready &&
+                               tarot.reading.cards.length>1
+                    onClicked: tarot.inspectedDrawIndex=
+                        (tarot.inspectedDrawIndex+1)%
+                        tarot.reading.cards.length
+                }
+                ActionButton {
+                    width: 70
+                    height: 26
+                    label: "CLOSE"
+                    labelPixelSize: 9
+                    accentColor: Colors.magenta
+                    onClicked: tarot.inspectedDrawIndex=-1
+                }
+            }
+            Item {
+                width: parent.width
+                height: Math.max(148,tarot.height-116)
+                StationMagickTarotCard {
+                    anchors.centerIn: parent
+                    width: tarot.inspectMetrics
+                        ? tarot.inspectMetrics.width : 235
+                    height: tarot.inspectMetrics
+                        ? tarot.inspectMetrics.height : 330
+                    card: tarot.inspectedDrawCard
+                    reversed: tarot.inspectedDrawCard
+                        ? tarot.inspectedDrawCard.reversed : false
+                    positionLabel: tarot.inspectedDrawCard
+                        ? tarot.inspectedDrawCard.position : ""
+                    localArtworkDirectory: tarot.localArtworkDirectory
+                }
+            }
+            QuietText {
+                width: parent.width
+                height: 18
+                color: Colors.yellow
+                font.pixelSize: 11
+                horizontalAlignment: Text.AlignHCenter
+                elide: Text.ElideRight
+                text: tarot.inspectedDrawCard
+                    ? (tarot.inspectedDrawIndex+1)+"/"+
+                       tarot.reading.cards.length+" // "+
+                       tarot.inspectedDrawCard.title.toUpperCase()+
+                       " // "+(tarot.inspectedDrawCard.reversed
+                               ? "REVERSED":"UPRIGHT")
+                    : "NO CARD SELECTED"
+            }
+            QuietText {
+                width: parent.width
+                height: 16
+                color: Colors.cyan
+                font.pixelSize: 9
+                horizontalAlignment: Text.AlignHCenter
+                elide: Text.ElideRight
+                text: "ESCAPE VIA CLOSE // ORIGINAL OR USER-LOCAL ART ONLY"
+            }
+        }
+    }
 }

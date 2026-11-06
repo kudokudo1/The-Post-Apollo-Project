@@ -1,0 +1,47 @@
+name: TASKS M13u disposable durable source revision evidence
+
+on:
+  pull_request:
+    paths:
+      - 'tests/tasks/fixtures/TaskSourceRevisionEvidenceM13u.py'
+      - 'tests/tasks/test_task_source_revision_evidence_m13u.py'
+      - 'docs/tasks-source-revision-evidence-m13u.md'
+      - '.github/workflows/tasks-source-revision-evidence-m13u.yml'
+      - 'tests/tasks/fixtures/TaskStageSourceReceiptM12h.py'
+      - 'services/hub/ApolloHubTodoStore.qml'
+  push:
+    branches: [main]
+    paths:
+      - 'tests/tasks/fixtures/TaskSourceRevisionEvidenceM13u.py'
+      - 'tests/tasks/test_task_source_revision_evidence_m13u.py'
+      - '.github/workflows/tasks-source-revision-evidence-m13u.yml'
+permissions:
+  contents: read
+
+jobs:
+  source-revision-disposable:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - name: New revision inspector: actual SQLite and filesystem
+        run: |
+          python3 -B -m unittest discover -s tests/tasks -p 'test_task_source_revision_evidence_m13u.py' -v
+      - name: Existing stage settlement and adversarial source detection
+        run: |
+          python3 tests/tasks/test_task_stage_source_receipt_m12h.py
+          python3 tests/tasks/test_task_uncooperative_writer_m12k.py
+      - name: Earlier bounded consent and single saved source writer
+        run: |
+          node --test tests/tasks/test_task_recovery_consent_source_m13t.cjs
+          python3 tests/tasks/test_task_writer_gate_inventory_m11d.py
+          node tests/cpuplus/test_connections_broker_c2a.js
+      - name: No production import, source writer change or key authority
+        run: |
+          set -euo pipefail
+          ! grep -q 'TaskSourceRevisionEvidenceM13u' services/hub/ApolloHubTodoStore.qml
+          ! grep -q 'TaskSourceRevisionEvidenceM13u' services/connections/ConnectionsBroker.qml
+          ! grep -Eq 'secret-tool|gnome-keyring|os.replace\(|sqlite3.connect\(' \
+            tests/tasks/fixtures/TaskSourceRevisionEvidenceM13u.py
+          test "$(grep -c 'todoFile.setText(' services/hub/ApolloHubTodoStore.qml)" = 1
+          printf '%s\n' 'M13U_JOURNAL_READBACK_REVISION_NO_REAL_SOURCE_AUTHORITY_PASS'

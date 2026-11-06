@@ -1,0 +1,56 @@
+name: Company M28c attached Quickshell child PID to optional pidfd bridge
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'services/company/CompanyVectorSidecarController.qml'
+      - 'widgets/CompanyCoveragePane.qml'
+      - 'widgets/CompanyNetworkW.qml'
+      - 'widgets/CompanyVectorBridgeLink.qml'
+      - 'tests/company/test_company_vector_attached_pidfd_m28c.test.js'
+      - 'docs/company-m28c-native-pidfd-handoff-20261106.md'
+      - '.github/workflows/company-vector-m28c-pidfd.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  attached-native-child:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Check actual Quickshell.Process.processId and opt-in bridge reporting
+        run: node --test tests/company/test_company_vector_attached_pidfd_m28c.test.js
+      - name: Preserve Company M26 optional plugin and M18 viewport geometry
+        run: |
+          node --test tests/company/test_company_vector_bridge_m26.test.js
+          node --test tests/company/test_company_vector_viewport_m18.test.js
+          node --test tests/company/test_company_layer_namespace_m19b.test.js
+      - name: Preserve original M13 controlled native map launcher and consent
+        run: python3 -m unittest discover -s tests/company -p 'test_company_vector_sidecar_m13.py' -v
+      - name: Confirm no production bridge activation or desktop mutation
+        run: |
+          python3 -B - <<'PY'
+          from pathlib import Path
+          files=[Path(x).read_text() for x in (
+            'widgets/CompanyNetworkW.qml',
+            'widgets/CompanyCoveragePane.qml',
+            'widgets/CompanyVectorBridgeLink.qml',
+            'services/company/CompanyVectorSidecarController.qml')]
+          all_source='\n'.join(files)
+          assert 'property bool vectorBridgeOptIn: false' in all_source
+          assert 'const attachedPid = Number(vectorRunner.processId)' in all_source
+          assert 'Quickshell.processId' not in all_source
+          for bad in ('wl_display_connect(', 'wl_display_disconnect(',
+                      'startDetached(', 'QProcess {', 'swaymsg', 'wlr_scene_node_set_'):
+              assert bad not in all_source, bad
+          print('M28c: inherited standalone launcher, PID from native Process only, no activation')
+          PY

@@ -131,7 +131,9 @@ test("M6g complete QML deck supports selection, draw, optional reversals and ind
     assert.match(pane,/property string spreadId: "three"/);
     assert.match(pane,/property bool reversals: false/);
     assert.match(pane,/Deck\.draw\(spreadId,Math\.random,reversals\)/);
-    assert.match(pane,/label: "SHUFFLE \+ DRAW"/);
+    // M6h keeps the digital shuffle while showing CHOOSE CARD in manual mode.
+    assert.match(pane,/\? "CHOOSE CARD" : "SHUFFLE \+ DRAW"/);
+    assert.match(pane,/Deck\.draw\(spreadId,Math\.random,reversals\)/);
     assert.match(pane,/label: "CLEAR"/);
     assert.match(pane,/label: "INDEX"/);
     assert.match(pane,/label: "DRAW"/);

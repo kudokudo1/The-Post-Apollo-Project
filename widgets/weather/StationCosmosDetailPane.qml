@@ -3,7 +3,7 @@ import "../../components"
 import "StationCosmosDetailPolicy.js" as Details
 
 // C6 // Complete inspectable provider records in one stationary subject bay.
-// Item selection + DATA 1/3..3/3 replace long scrolling reports.
+// Item selection remains; all twelve facts display at once in 3 x 4.
 // Raw SKY/ISS/ECLIPSE sources remain owned by StationSky.
 Rectangle {
     id: detailsPane
@@ -17,7 +17,6 @@ Rectangle {
     property string sourceStatus: "SOURCE WAITING"
     property bool starsAsNav: false
     property int selectedIndex: 0
-    property int factPage: 0
 
     readonly property var snapshot:
         celestialSource && celestialSource.ready ? celestialSource.snapshot : null
@@ -33,13 +32,12 @@ Rectangle {
     readonly property var facts: Details.fields(
         kind, selectedRecord,
         ({snapshot:snapshot, eclipse:eclipseSource}), starsAsNav)
-    readonly property var visibleFacts: Details.page(facts,factPage)
     readonly property string selectedName:
         Details.rowName(kind,selectedRecord,starsAsNav)
     readonly property int renderedFactCount: factGridRepeater.count
 
-    onKindChanged: { selectedIndex=0; factPage=0; starsAsNav=false; }
-    onStarsAsNavChanged: { selectedIndex=0; factPage=0; }
+    onKindChanged: { selectedIndex=0; starsAsNav=false; }
+    onStarsAsNavChanged: { selectedIndex=0; }
     onRecordCountChanged: {
         if (selectedIndex >= recordCount)
             selectedIndex = Math.max(0,recordCount-1);
@@ -96,7 +94,7 @@ Rectangle {
             verticalAlignment: Text.AlignVCenter
             text: detailsPane.recordCount > 0
                 ? (detailsPane.selectedIndex+1)+"/"+detailsPane.recordCount
-                  + " // ALL RECORDS"
+                  + " // "+detailsPane.sourceStatus
                 : "0 RECORDS"
             color: Colors.cyan
             font.pixelSize: 9
@@ -157,82 +155,47 @@ Rectangle {
         id: factGrid
         anchors.top: mainReading.bottom
         anchors.topMargin: 4
-        anchors.bottom: factControls.top
+        anchors.bottom: sourceNote.top
         anchors.bottomMargin: 4
         anchors.left: parent.left
         anchors.right: parent.right
-        columns: 2
-        spacing: 5
+        columns: 3
+        spacing: 3
         Repeater {
             id: factGridRepeater
-            model: detailsPane.recordCount > 0 ? 4 : 0
+            // Numeric model keeps all twelve values visible even when the
+            // provider supplies a QJSValue array instead of a QML ListModel.
+            model: detailsPane.recordCount > 0 ? 12 : 0
             delegate: Rectangle {
                 objectName: "cosmos-c6-observation-cell"
                 required property int index
                 readonly property var factData:
-                    detailsPane.visibleFacts && detailsPane.visibleFacts.length > index
-                    ? detailsPane.visibleFacts[index] : null
-                width: Math.max(1,(factGrid.width-factGrid.spacing)/2)
-                height: Math.max(1,(factGrid.height-factGrid.spacing)/2)
+                    detailsPane.facts && detailsPane.facts.length > index
+                    ? detailsPane.facts[index] : null
+                width: Math.max(1,(factGrid.width-2*factGrid.spacing)/3)
+                height: Math.max(1,(factGrid.height-3*factGrid.spacing)/4)
                 color: Colors.dark
                 border.width: 1
                 border.color: Colors.cyan
                 Column {
                     anchors.fill: parent
-                    anchors.margins: 5
-                    spacing: 4
+                    anchors.margins: 3
+                    spacing: 2
                     SecondaryText {
                         width: parent.width
                         text: factData ? factData.label : "--"
-                        font.pixelSize: 9
+                        font.pixelSize: 8
                         elide: Text.ElideRight
                     }
                     GohuText {
                         width: parent.width
                         text: factData ? factData.value : "--"
                         color: Colors.white
-                        font.pixelSize: 12
+                        font.pixelSize: 10
                         elide: Text.ElideRight
                     }
                 }
             }
-        }
-    }
-    Row {
-        id: factControls
-        anchors.bottom: sourceNote.top
-        anchors.bottomMargin: 3
-        anchors.left: parent.left
-        anchors.right: parent.right
-        height: 23
-        spacing: 4
-        ActionButton {
-            width: 68
-            height: 23
-            contentPadding: 1
-            label: "DATA <"
-            labelPixelSize: 9
-            available: detailsPane.recordCount > 0
-            onClicked: detailsPane.factPage = (detailsPane.factPage+2)%3
-        }
-        ActionButton {
-            width: 68
-            height: 23
-            contentPadding: 1
-            label: "DATA >"
-            labelPixelSize: 9
-            available: detailsPane.recordCount > 0
-            onClicked: detailsPane.factPage = (detailsPane.factPage+1)%3
-        }
-        QuietText {
-            height: 23
-            width: Math.max(1,factControls.width-144)
-            verticalAlignment: Text.AlignVCenter
-            font.pixelSize: 9
-            color: Colors.yellow
-            text: "DETAIL "+(detailsPane.factPage+1)+"/3 // "
-                +(detailsPane.recordCount > 0 ? detailsPane.sourceStatus : "--")
-            elide: Text.ElideRight
         }
     }
     QuietText {

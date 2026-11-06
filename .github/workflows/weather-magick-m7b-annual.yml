@@ -1,0 +1,41 @@
+name: MAGICK M7b annual lunar and solar wheels
+
+on:
+  pull_request:
+    paths:
+      - 'scripts/weather/celestial_annual_calendar.py'
+      - 'services/weather/CelestialAnnualCalendarService.qml'
+      - 'widgets/weather/StationMagickAnnualAtlasPolicy.js'
+      - 'widgets/weather/StationMagickAnnualCalendarPane.qml'
+      - 'widgets/weather/StationMagickLunarSolarPane.qml'
+      - 'widgets/weather/StationMagickSubjectPanelPolicy.js'
+      - 'tests/weather/test_magick_annual_atlas_m7b.py'
+      - 'tests/weather/test_magick_annual_wheels_m7b.js'
+      - 'tests/weather/test_magick_subject_panels_g1.js'
+      - 'tests/weather/test_magick_five_track_foundations_m7a.js'
+      - '.github/workflows/weather-magick-m7b-annual.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  annual-atlas:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Verify synthetic annual atlas contracts (no kernel or network)
+        run: python -m unittest discover -s tests/weather -p 'test_magick_annual_atlas_m7b.py' -v
+      - name: Verify Moon/Sun ring geometry and calendar marker contract
+        run: node --test tests/weather/test_magick_annual_wheels_m7b.js
+      - name: Preserve M7a forecast and MAGICK navigation regressions
+        run: |
+          node --test tests/weather/test_magick_five_track_foundations_m7a.js
+          node --test tests/weather/test_magick_subject_panels_g1.js

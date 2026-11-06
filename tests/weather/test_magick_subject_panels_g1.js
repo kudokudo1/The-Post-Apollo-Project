@@ -298,7 +298,7 @@ test("M30-D LUNAR + SOLAR uses focused top tabs, no page scroll and no new colle
   assert.match(lunarSolar,/currentSolarPosition: sourceSky\.currentSolarPosition/);
   assert.match(lunarSolar,/solarCivilOffsetMinutes: sourceSky\.moonCivilOffsetMinutes/);
   // M7a calendar now displays only source-backed forecast rows.
-  assert.match(lunarSolar,/StationMagickForecastCalendarPane\s*\{/);
+  assert.match(lunarSolar,/StationMagickAnnualCalendarPane\s*\{/);
   assert.match(lunarSolar,/weatherService: lunarSolarPane\.weatherService/);
   assert.match(magick.noteFor("magick/lunar-solar/calendar"),/NO PLANNER/);
   assert.doesNotMatch(lunarSolar,/Flickable\s*\{|ScrollView\s*\{|Process\s*\{|FileView\s*\{|Timer\s*\{/);

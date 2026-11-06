@@ -107,7 +107,8 @@ Rectangle {
     }
 
     // M7a // Existing forecast service, not a synthetic lunar ephemeris.
-    StationMagickForecastCalendarPane {
+    StationMagickAnnualCalendarPane {
+        runtimeNowMs: lunarSolarPane.runtimeNowMs
         anchors.left: parent.left
         anchors.right: parent.right
         anchors.top: focusTabs.bottom

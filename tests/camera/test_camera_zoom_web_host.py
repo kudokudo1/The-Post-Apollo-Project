@@ -32,7 +32,7 @@ class ZoomWebHostTests(unittest.TestCase):
         self.assertIn('zoomWebDocked = !!(reply && reply.ok === true && reply.docked === true)', QML)
         self.assertIn('fillOpacity: camera.zoomWebDocked ? 0.0 : 0.97', QML)
         self.assertIn('intersection: Intersection.Subtract', QML)
-        self.assertIn('width: camera.zoomWebDocked ? camera.zoomBayWidth : 0', QML)
+        self.assertIn('width: camera.zoomWebDocked ? Math.round(zoomViewport.width) : 0', QML)
         self.assertIn('visible: camera.activeView === "zoom" && !camera.zoomWebDocked', QML)
         self.assertIn('function openZoomMode()', QML)
         entry = QML.split('function openZoomMode()',1)[1].split(
@@ -58,11 +58,19 @@ class ZoomWebHostTests(unittest.TestCase):
         # The old fixed slot top/bottom cut short the Zoom web viewport.
         self.assertNotIn('readonly property int zoomBayTop: 131', QML)
         self.assertNotIn('readonly property int zoomBayHeight: Math.max(0, frameHeight - 169)', QML)
-        self.assertIn('cameraPage.y + cameraPage.parent.y', QML)
-        self.assertIn('cameraPage.x + cameraPage.parent.x', QML)
-        self.assertIn('Math.round(cameraPage.width)', QML)
+        self.assertNotIn('cameraPage.y + cameraPage.parent.y', QML)
+        self.assertNotIn('cameraPage.x + cameraPage.parent.x', QML)
+        self.assertNotIn('Math.round(cameraPage.width)', QML)
         self.assertIn('readonly property int zoomBayBottom: 2', QML)
-        self.assertIn('frame.height - zoomBayTop - zoomBayBottom', QML)
+        self.assertIn('id: zoomViewport', QML)
+        self.assertIn('id: cameraBodyColumn', QML)
+        self.assertIn('cameraModes.y', QML)
+        self.assertIn('cameraModes.height + cameraBodyColumn.spacing', QML)
+        self.assertIn('frame.height - y - camera.zoomBayBottom', QML)
+        self.assertIn('Math.round(zoomViewport.x)', QML)
+        self.assertIn('Math.round(zoomViewport.y)', QML)
+        self.assertIn('Math.round(zoomViewport.width)', QML)
+        self.assertIn('Math.round(zoomViewport.height)', QML)
         # Compact is still 675 px tall, but the browser uses the body instead
         # of leaving the 38px phantom footer: approx 539 vs 506px at y=131.
         compact_height, page_start, bottom = 675, 131, 2
@@ -71,20 +79,56 @@ class ZoomWebHostTests(unittest.TestCase):
                            compact_height - 169)
 
     def test_zoom_browser_owns_scroll_and_the_footer_cannot_cover_buttons(self):
-        self.assertIn('height: camera.activeView === "zoom"', QML)
-        self.assertIn('? camera.zoomBayHeight : frame.height - 169', QML)
-        self.assertIn('One stable page/bay height', QML)
-        self.assertIn('Zoom owns the full body both before and after docking.', QML)
+        self.assertIn('visible: camera.activeView !== "zoom"', QML)
+        self.assertIn('height: frame.height - 169', QML)
+        self.assertIn('Zoom is hosted by the sibling zoomViewport instead.', QML)
         self.assertNotIn('height: camera.activeView === "zoom" && camera.zoomWebDocked', QML)
         self.assertIn('visible: camera.activeView !== "zoom"', QML)
         self.assertIn('visible: camera.activeView === "zoom" && !camera.zoomWebDocked', QML)
         self.assertIn('intersection: Intersection.Subtract', QML)
-        self.assertIn('width: camera.zoomWebDocked ? camera.zoomBayWidth : 0', QML)
-        self.assertIn('height: camera.zoomWebDocked ? camera.zoomBayHeight : 0', QML)
+        self.assertIn('width: camera.zoomWebDocked ? Math.round(zoomViewport.width) : 0', QML)
+        self.assertIn('height: camera.zoomWebDocked ? Math.round(zoomViewport.height) : 0', QML)
         self.assertIn('menuOpen && !zoomWebDocked ? WlrKeyboardFocus.OnDemand', QML)
         # The fallback instructions are scrollable only when the web actor is
         # absent. A QML Flickable must not intercept Zoom's native mouse wheel.
         self.assertIn('id: zoomPage', QML)
+        self.assertIn('visible: camera.activeView === "zoom" && !camera.zoomWebDocked', QML)
+
+    def test_zoom_viewport_is_frame_owned_and_fallback_is_not_in_camera_page(self):
+        # A shared Camera Column previously owned the browser rectangle.
+        # The new Zoom page must live directly inside the frame viewport and
+        # the three ordinary Camera modes must keep the old cameraPage.
+        frame_start = QML.index('    WindowPanelFrame {\\n        id: frame'.replace('\\n', '\n'))
+        viewport_start = QML.index('        Item {\n            id: zoomViewport', frame_start)
+        fallback_start = QML.index('            Flickable {\n                id: zoomPage', viewport_start)
+        column_start = QML.index('        Column {\n            id: cameraBodyColumn', fallback_start)
+        page_start = QML.index('            Item {\n                id: cameraPage', column_start)
+        self.assertLess(viewport_start, fallback_start)
+        self.assertLess(fallback_start, column_start)
+        self.assertLess(column_start, page_start)
+        self.assertEqual(QML.count('id: zoomViewport'), 1)
+        self.assertEqual(QML.count('id: zoomPage'), 1)
+        self.assertIn('anchors.fill: parent', QML[fallback_start:column_start])
+        self.assertIn('visible: camera.menuOpen && camera.activeView === "zoom"',
+                      QML[viewport_start:fallback_start])
+        self.assertIn('visible: camera.activeView !== "zoom"',
+                      QML[page_start:page_start + 350])
+        self.assertIn('id: capturePage', QML[page_start:])
+        self.assertIn('id: galleryPage', QML[page_start:])
+        self.assertIn('id: cleanupPage', QML[page_start:])
+        self.assertNotIn('id: zoomPage', QML[page_start:])
+
+    def test_zoom_host_and_input_mask_share_the_exact_frame_viewport(self):
+        self.assertIn('readonly property int zoomBayInset: Math.max(0, Math.round(zoomViewport.x))', QML)
+        self.assertIn('readonly property int zoomBayTop: Math.max(0, Math.round(zoomViewport.y))', QML)
+        self.assertIn('readonly property int zoomBayWidth: Math.max(0, Math.round(zoomViewport.width))', QML)
+        self.assertIn('readonly property int zoomBayHeight: Math.max(0, Math.round(zoomViewport.height))', QML)
+        self.assertIn('zoomWebProcess.exec(zoomWebArgs("enter"))', QML)
+        self.assertIn('"--width", String(zoomBayWidth), "--height", String(zoomBayHeight)', QML)
+        self.assertIn('x: Math.round(zoomViewport.x)', QML)
+        self.assertIn('y: Math.round(zoomViewport.y)', QML)
+        self.assertIn('intersection: Intersection.Subtract', QML)
+        # A verified browser has no overlapping QML fallback controls.
         self.assertIn('visible: camera.activeView === "zoom" && !camera.zoomWebDocked', QML)
 
     def test_rapid_resize_keeps_clickthrough_closed_until_new_alignment(self):

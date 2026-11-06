@@ -1,0 +1,48 @@
+name: TASKS M13v disposable native callback to source receipt handoff
+
+on:
+  pull_request:
+    paths:
+      - 'tests/tasks/fixtures/TaskNativeReceiptHandoffM13v.py'
+      - 'tests/tasks/test_task_native_receipt_handoff_m13v.py'
+      - 'docs/tasks-native-receipt-handoff-m13v.md'
+      - '.github/workflows/tasks-native-receipt-handoff-m13v.yml'
+      - 'tests/tasks/fixtures/TaskSourceRevisionEvidenceM13u.py'
+      - 'tests/tasks/fixtures/TaskStageSourceReceiptM12h.py'
+      - 'services/hub/ApolloHubTodoStore.qml'
+  push:
+    branches: [main]
+    paths:
+      - 'tests/tasks/fixtures/TaskNativeReceiptHandoffM13v.py'
+      - 'tests/tasks/test_task_native_receipt_handoff_m13v.py'
+      - '.github/workflows/tasks-native-receipt-handoff-m13v.yml'
+permissions:
+  contents: read
+
+jobs:
+  synthetic-native-receipt-handoff:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - name: M13v independent source readback and advisory native hints
+        run: python3 -B -m unittest discover -s tests/tasks -p 'test_task_native_receipt_handoff_m13v.py' -v
+      - name: Previous M13u monotonic revision and M12h stage evidence
+        run: |
+          python3 -B -m unittest discover -s tests/tasks -p 'test_task_source_revision_evidence_m13u.py' -v
+          python3 tests/tasks/test_task_stage_source_receipt_m12h.py
+          python3 tests/tasks/test_task_uncooperative_writer_m12k.py
+      - name: Prior recovery consent and sole writer security checks
+        run: |
+          node --test tests/tasks/test_task_recovery_consent_source_m13t.cjs
+          python3 tests/tasks/test_task_writer_gate_inventory_m11d.py
+          node tests/cpuplus/test_connections_broker_c2a.js
+      - name: Explicit no product import or alternative JSON writer
+        run: |
+          set -euo pipefail
+          ! grep -q 'TaskNativeReceiptHandoffM13v' services/hub/ApolloHubTodoStore.qml
+          ! grep -q 'TaskNativeReceiptHandoffM13v' services/connections/ConnectionsBroker.qml
+          ! grep -Eq 'secret-tool|gnome-keyring|os.replace\(|sqlite3.connect\(' \
+            tests/tasks/fixtures/TaskNativeReceiptHandoffM13v.py
+          test "$(grep -c 'todoFile.setText(' services/hub/ApolloHubTodoStore.qml)" = 1
+          printf '%s\n' 'M13V_NATIVE_HINT_NOT_AUTHENTICATED_RECEIPT_SOURCE_OWNER_GATES_CLOSED_PASS'

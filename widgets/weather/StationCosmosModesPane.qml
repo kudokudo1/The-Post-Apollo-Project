@@ -531,6 +531,7 @@ Rectangle {
                                 model: planetRow && planetRow.events
                                     ? planetRow.events.length : 0
                                 delegate: Rectangle {
+                                    objectName: "cosmos-c5-planet-event-marker"
                                     required property int index
                                     readonly property var eventData:
                                         planetRow.events[index]
@@ -595,6 +596,7 @@ Rectangle {
                     // Numeric model avoids a QJSValue-array Repeater binding.
                     model: focus.cards ? Math.min(4,focus.cards.length) : 0
                     delegate: Rectangle {
+                        objectName: "cosmos-c5-source-card"
                         required property int index
                         readonly property var cardData: focus.cards[index]
                         width: Math.max(1,(cardGrid.width-7)/2)
@@ -677,6 +679,7 @@ Rectangle {
                     Repeater {
                         model: focus.cards ? focus.cards.length : 0
                         delegate: Rectangle {
+                            objectName: "cosmos-c5-meteor-card"
                             required property int index
                             readonly property var cardData: focus.cards[index]
                             width: meteorCards.width

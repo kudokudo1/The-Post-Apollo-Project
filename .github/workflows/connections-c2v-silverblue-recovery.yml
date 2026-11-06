@@ -1,0 +1,89 @@
+name: Connections C2v official Silverblue OSTree reboot and rollback gate
+
+on:
+  pull_request:
+    paths:
+      - "tests/connections/c2v_silverblue/**"
+      - ".github/workflows/connections-c2v-silverblue-recovery.yml"
+      - "docs/connections-c2v-offline-rpm-ostree-recovery.md"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  silverblue-offline-ostree-diagnostic:
+    if: github.actor == 'kudokudo1' && (github.event_name == 'workflow_dispatch' || github.event.pull_request.head.repo.full_name == github.repository)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 52
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Preflight supported KVM, disk, and installation boundary
+        shell: bash
+        run: |
+          set -euo pipefail
+          [ -c /dev/kvm ] || { echo "C2V_BLOCKED // NO_HOST_KVM"; exit 2; }
+          sudo chmod a+rw /dev/kvm
+          [ -r /dev/kvm ] && [ -w /dev/kvm ] || exit 2
+          avail="$(df -B1 --output=avail / | tail -n 1)"
+          [ "$avail" -ge 12000000000 ] || { echo "C2V_BLOCKED // EPHEMERAL_RUNNER_DISK_TOO_SMALL"; exit 2; }
+          echo "C2V_PASS // KVM_AND_SPARE_GUEST_DISK_AVAILABLE"
+      - name: Verify no dangerous desktop, credential or production policy changes
+        shell: bash
+        run: |
+          set -euo pipefail
+          bash -n tests/connections/c2v_silverblue/boot_official_silverblue.sh
+          bash -n tests/connections/c2v_silverblue/guest_ostree_reboot_cycle.sh
+          python3 - <<'PY'
+          from pathlib import Path
+          host=Path('tests/connections/c2v_silverblue/boot_official_silverblue.sh').read_text()
+          guest=Path('tests/connections/c2v_silverblue/guest_ostree_reboot_cycle.sh').read_text()
+          assert 'Fedora-Silverblue-ostree-x86_64-44-1.7.iso' in host
+          assert '9ccec9b075a0a4358a7209b2667156aaeeec3a6a3c8d71cada45b57fca9b4682' in host
+          assert '-nic none' in host
+          assert 'rpm-ostree install' in guest and 'rpm-ostree rollback' in guest
+          assert 'REAL_SILVERBLUE_BOOTED_ROLLBACK_REMOVED_LAYER' in guest
+          assert 'REAL_SILVERBLUE_FIRST_BOOT_BASELINE' in guest
+          assert 'LAYER_ACTIVE_ONLY_AFTER_REAL_REBOOT' in guest
+          assert 'C2V_INSTALL_WATCHDOG' in guest
+          assert 'timeout --signal=TERM --kill-after=20s 480s' in guest
+          assert 'unconfined' not in guest.lower()
+          for path in ('services/connections/ConnectionsBroker.qml', 'services/connections/ConnectionsRequestStatus.qml'):
+              data=Path(path).read_text()
+              expected='credentialActionsEnabled: false' if 'Broker' in path else 'hostAuthenticated: false'
+              assert expected in data, path
+          print('C2V_PASS // EXPLICIT_SILVERBLUE_REBOOT_REQUIRED_AND_HOST_DENY_ONLY')
+          PY
+      - name: Build signed inert RPM fixture only inside disposable Fedora container
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/c2t-rpms"
+          docker run --rm \
+            --mount "type=bind,src=$PWD,dst=/src,readonly" \
+            --mount "type=bind,src=$RUNNER_TEMP/c2t-rpms,dst=/out" \
+            fedora:44 /usr/bin/bash /src/tests/connections/c2t_signed_rpm/build_signed_test_rpms.sh
+          (cd "$RUNNER_TEMP/c2t-rpms" && sha256sum -c --status c2t-artifact-manifest.sha256)
+          echo "C2V_PASS // TEST_ONLY_SIGNED_RPM_PREPARED_NO_PRIVATE_KEY_EXPORTED"
+      - name: Install KVM and ISO inspection utilities on GitHub runner only
+        shell: bash
+        run: |
+          set -euo pipefail
+          timeout 120s sudo apt-get -o Acquire::Retries=2 -o Acquire::http::Timeout=35 update || { echo "C2V_BLOCKED // RUNNER_APT_UPDATE"; exit 2; }
+          timeout 360s sudo apt-get -o Acquire::Retries=2 -o Acquire::http::Timeout=35 install -y --no-install-recommends qemu-system-x86 qemu-utils xorriso genisoimage || { echo "C2V_BLOCKED // RUNNER_APT_INSTALL"; exit 2; }
+      - name: Boot Silverblue, collect bounded offline rpm-ostree diagnostics, and verify real reboot rollback
+        shell: bash
+        run: timeout 2800s bash tests/connections/c2v_silverblue/boot_official_silverblue.sh
+      - name: Existing C2n read-only and CPU++ deny-only gates
+        shell: bash
+        run: |
+          python3 -B tests/connections/test_connections_c2n_policy_contract.py
+          python3 - <<'PY'
+          from pathlib import Path
+          root=Path('services/connections')
+          assert 'readonly property bool credentialActionsEnabled: false' in (root/'ConnectionsBroker.qml').read_text()
+          assert 'readonly property bool hostAuthenticated: false' in (root/'ConnectionsRequestStatus.qml').read_text()
+          print('C2V_PASS // PRODUCTION_AUTH_AND_API_GRANTS_REMAIN_CLOSED')
+          PY

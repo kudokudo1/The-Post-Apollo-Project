@@ -138,3 +138,38 @@ function localArtworkUrl(folder,id){
     return "file:///"+path.map(encodeURIComponent).join("/")+
         "/"+encodeURIComponent(id)+".png";
 }
+
+
+// M6j // A private image folder may contain common formats. Never use
+// remote locations, directory traversal, auto-scanning or generated copies.
+// Return candidates in explicit stable order; QML only reads known card IDs.
+function localArtworkCandidates(folder,id){
+    var png=localArtworkUrl(folder,id);
+    if(png==="")return [];
+    var base=png.slice(0,-4);
+    return [png,base+".jpg",base+".jpeg",base+".webp"];
+}
+
+// QtQuick.Dialogs.FolderDialog.selectedFolder is a file:/// URL, while
+// the existing art policy accepts a *local absolute path*. Decode only
+// segment-by-segment so encoded separators/traversal never become paths.
+function localFolderPath(url){
+    var uri=String(url===undefined || url===null?"":url);
+    if(uri.slice(0,8)!=="file:///" || /[?#]/.test(uri) ||
+       /%2f|%5c/i.test(uri))return "";
+    var path=uri.slice(8);
+    if(!path)return "";
+    var raw=path.split("/"),parts=[];
+    for(var i=0;i<raw.length;i++){
+        if(!raw[i])return "";
+        try{
+            var segment=decodeURIComponent(raw[i]);
+            if(!segment || segment==="." || segment===".." ||
+               segment.indexOf("/")>=0 || segment.indexOf("\\")>=0)
+                return "";
+            parts.push(segment);
+        }catch(error){return "";}
+    }
+    var folder="/"+parts.join("/");
+    return localArtworkUrl(folder,"major-the-fool")!==""?folder:"";
+}

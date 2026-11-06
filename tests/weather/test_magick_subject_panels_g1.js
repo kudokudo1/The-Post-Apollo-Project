@@ -408,7 +408,7 @@ test("M30-F replaces PLANETARY bottom category with source-honest LENSES", () =>
     assert.ok(lensesPane.includes('path:"'+route+'"'),route);
     assert.ok(nav.findRoute(route),route);
   }
-  assert.match(lensesPane,/LIBRARY NOT CONNECTED/);
+  assert.match(lensesPane,/AGRIPPA INDEX \/ READ-ONLY/);
   assert.match(lensesPane,/SCIENTIFIC OBSERVATIONS ARE NOT EVIDENCE OF SYMBOLIC CAUSATION/);
   assert.doesNotMatch(lensesPane,/Flickable\s*\{|ScrollView\s*\{|Process\s*\{|Timer\s*\{|FileView\s*\{/);
 });

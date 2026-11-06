@@ -33,6 +33,8 @@ class IPC:
     def request(self, typ, payload=""):
         if typ == 3:
             return output()
+        if typ == 1:
+            return [{"output":"DP-5","visible":True,"rect":{"y":0}}]
         if typ == 4:
             return {"nodes":[self.actor],"floating_nodes":[]}
         if typ == 0:
@@ -156,6 +158,50 @@ class FollowTests(unittest.TestCase):
             f.tick()
         self.assertEqual(f.latest_state,(1,"MISSING",False))
         self.assertEqual(ipc.commands,[])
+
+    def test_follow_uses_same_measured_workarea_origin_as_initial_host(self):
+        # User's real DP-3 geometry, not an invented Y-offset constant.
+        outputs=[{"name":"DP-3","active":True,
+                  "rect":{"x":0,"y":0,"width":2560,"height":1440}}]
+        workspaces=[{"output":"DP-3","visible":True,"rect":{"y":82}}]
+        message={"output":"DP-3","x":84,"y":140,
+                 "width":734,"height":542}
+        geom, output_rect = follow._target_from_outputs(
+            outputs,message,workspaces)
+        self.assertEqual(geom,(84,222,734,542))
+        self.assertIn(
+            "move absolute position 84 px 222 px",
+            follow._sync_command(node(),geom,output_rect,setup=True))
+        self.assertIn("self.ipc.request(1)",HELPER.read_text())
+        # The panel input cutout stays local; the shell should not add 82.
+        self.assertNotIn("WORKAREA_Y",QML)
+
+    def test_follower_tracks_workarea_offset_after_topbar_changes(self):
+        class InsetIPC(IPC):
+            offset = 82
+            def request(self, typ, payload=""):
+                if typ == 1:
+                    return [{"output":"DP-5","visible":True,
+                             "rect":{"y":self.offset}}]
+                return super().request(typ,payload)
+        ipc=InsetIPC()
+        clock=[10.0]
+        follower=follow.ZoomFollower(Path("/test/zoom"),ipc,
+                                     clock=lambda:clock[0])
+        follower.set_target({"op":"target","revision":1,"output":"DP-5",
+                             "x":84,"y":140,"width":734,"height":542})
+        with patch.object(follow.host,"_unique_actor",
+                          side_effect=lambda profile,tree:(ipc.actor,"")):
+            follower.tick()
+            self.assertIn("move absolute position 84 px 222 px",ipc.commands[-1])
+            # A future workarea shift is measured dynamically, not cached.
+            ipc.actor=node(x=84,y=222,w=734,h=542)
+            follower.tick()
+            self.assertEqual(follower.latest_state,(1,"ALIGNED",True))
+            ipc.offset=60
+            clock[0]=11.0
+            follower.tick()
+            self.assertIn("move absolute position 84 px 200 px",ipc.commands[-1])
 
     def test_output_bounds_and_untrusted_outer_insets_rejected(self):
         out=output()[0]["rect"]

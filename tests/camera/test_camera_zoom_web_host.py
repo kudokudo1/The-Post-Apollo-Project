@@ -67,7 +67,8 @@ class ZoomWebHostTests(unittest.TestCase):
         self.assertIn('id: zoomViewport', QML)
         self.assertIn('id: cameraBodyColumn', QML)
         self.assertIn('cameraModes.y', QML)
-        self.assertIn('cameraModes.height + cameraBodyColumn.spacing', QML)
+        self.assertIn('y: cameraBodyColumn.y + cameraModes.y + cameraModes.height', QML)
+        self.assertNotIn('cameraModes.height + cameraBodyColumn.spacing', QML)
         self.assertIn('frame.height - y - camera.zoomBayBottom', QML)
         self.assertIn('Math.round(zoomViewport.x)', QML)
         self.assertIn('Math.round(zoomViewport.y)', QML)
@@ -95,6 +96,29 @@ class ZoomWebHostTests(unittest.TestCase):
         # absent. A QML Flickable must not intercept Zoom's native mouse wheel.
         self.assertIn('id: zoomPage', QML)
         self.assertIn('visible: camera.activeView === "zoom" && !camera.zoomWebDocked', QML)
+
+    def test_zoom_starts_at_mode_row_bottom_without_changing_bottom_edge(self):
+        # After verified live deployment, the last screenshot still showed
+        # ~6 scaled px of empty space between mode row and browser. This was
+        # exactly the 12 logical px shared Column spacing, not Sway resizing.
+        self.assertIn(
+            'y: cameraBodyColumn.y + cameraModes.y + cameraModes.height', QML)
+        self.assertNotIn('cameraModes.height + cameraBodyColumn.spacing', QML)
+        self.assertIn(
+            'height: Math.max(0, frame.height - y - camera.zoomBayBottom)', QML)
+        self.assertIn('readonly property int zoomBayBottom: 2', QML)
+        self.assertIn('x: cameraBodyColumn.x', QML)
+        self.assertIn('width: Math.max(0, cameraBodyColumn.width)', QML)
+        self.assertIn(
+            'readonly property int zoomActorTop: zoomBayTop', QML)
+        self.assertIn(
+            'readonly property int zoomActorHeight: zoomBayHeight', QML)
+        # Fixed bottom: reducing top by 12 grows height by 12. Same at all
+        # sizes, without another synthetic actor offset or new Sway command.
+        for old_top, old_height in ((131, 542), (131, 875), (131, 1200)):
+            new_top = old_top - 12
+            new_height = old_height + 12
+            self.assertEqual(old_top + old_height, new_top + new_height)
 
     def test_zoom_viewport_is_frame_owned_and_fallback_is_not_in_camera_page(self):
         # A shared Camera Column previously owned the browser rectangle.

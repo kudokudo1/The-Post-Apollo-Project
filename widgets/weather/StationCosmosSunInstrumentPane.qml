@@ -221,10 +221,42 @@ Rectangle {
                 color: Colors.orange
                 font.pixelSize:9
             }
+            Row {
+                id: xrayModeBar
+                width: parent.width
+                height: 23
+                spacing: 5
+                Repeater {
+                    model: [{label:"HISTORY",page:0},{label:"SOURCE",page:1}]
+                    delegate: ActionButton {
+                        required property var modelData
+                        width: Math.max(1,(xrayModeBar.width-82)/2)
+                        height: 23
+                        contentPadding: 1
+                        label: modelData.label
+                        labelPixelSize: 9
+                        selected: solarFocus.xrayPage === modelData.page
+                        accentColor: Colors.magenta
+                        onClicked: solarFocus.xrayPage = modelData.page
+                    }
+                }
+                ActionButton {
+                    width: 70
+                    height: 23
+                    contentPadding: 1
+                    label: "REFRESH"
+                    labelPixelSize: 9
+                    available: !!solarFocus.xray && !solarFocus.xray.loading
+                    onClicked: {
+                        if (solarFocus.xray) solarFocus.xray.refresh()
+                    }
+                }
+            }
             Item {
                 width: parent.width
-                height: Math.max(1,parent.height-140)
+                height: Math.max(1,parent.height-171)
                 Row {
+                    visible: solarFocus.xrayPage === 0
                     anchors.bottom: parent.bottom
                     width: parent.width
                     height: parent.height
@@ -237,6 +269,44 @@ Rectangle {
                             width: Math.max(1,(parent.width-11*parent.spacing)/12)
                             height: Math.max(3,(parent.height-3)*modelData.level)
                             color: solarFocus.flareInk(modelData.classLetter)
+                        }
+                    }
+                }
+                Grid {
+                    id: xraySourceGrid
+                    visible: solarFocus.xrayPage === 1
+                    anchors.fill: parent
+                    columns: 2
+                    spacing: 5
+                    Repeater {
+                        model: visible ? 4 : 0
+                        delegate: Rectangle {
+                            objectName: "cosmos-c6-xray-detail"
+                            required property int index
+                            readonly property var factData: solarFocus.xrayFields[index]
+                            width: Math.max(1,(xraySourceGrid.width-5)/2)
+                            height: Math.max(1,(xraySourceGrid.height-5)/2)
+                            color: Colors.dark
+                            border.width: 1
+                            border.color: Colors.cyan
+                            Column {
+                                anchors.fill: parent
+                                anchors.margins: 5
+                                spacing: 3
+                                SecondaryText {
+                                    width: parent.width
+                                    text: factData ? factData.label : "--"
+                                    font.pixelSize: 9
+                                    elide: Text.ElideRight
+                                }
+                                GohuText {
+                                    width: parent.width
+                                    text: factData ? factData.value : "--"
+                                    color: Colors.white
+                                    font.pixelSize: 11
+                                    elide: Text.ElideRight
+                                }
+                            }
                         }
                     }
                 }

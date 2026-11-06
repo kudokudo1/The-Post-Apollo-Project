@@ -54,6 +54,14 @@ jobs:
           assert 'C2V_INSTALL_COMMAND_BEGIN' in guest
           assert 'C2V_GUEST_PROBE_READY' in guest
           assert 'C2V_GUEST_PROBE_TICK' in guest
+          assert 'C2V_INSTALL_WORKER_STARTED_IN_SEPARATE_CGROUP' in guest
+          assert 'C2V_PENDING_DEPLOYMENT_AUTHORITY' in guest
+          assert 'status.get("transaction") is not None' in guest
+          assert 'C2V_PROBE_CGROUP_FIELD' in guest
+          assert 'TimeoutStartSec=1400' in host
+          assert 'C2V_PASS // RPM_OSTREE_LAYER_STAGED_REBOOT_REQUIRED' in guest
+          assert 'C2V_PASS // LAYER_ACTIVE_ONLY_AFTER_REAL_REBOOT' in guest
+          assert 'C2V_PASS // REAL_SILVERBLUE_BOOTED_ROLLBACK_REMOVED_LAYER' in guest
           assert 'systemd-run --quiet --unit=c2v-guest-probe' in guest
           assert 'C2V_HOST_SERIAL_BYTES' in host
           assert 'C2V_HOST_VM_LAST_PROCESS_STATE' in host

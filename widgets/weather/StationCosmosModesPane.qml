@@ -6,7 +6,7 @@ import "StationCosmosPlanetEventPolicy.js" as ClockPolicy
 // Fixed subject rail + one focused instrument. No whole-page scrolling.
 // The IAU shower catalogue alone scrolls inside a bounded middle panel.
 Rectangle {
-    id: focus
+    id: cosmosModePane
     color: Colors.black
     clip: true
     property string subjectRoute: ""
@@ -23,6 +23,7 @@ Rectangle {
         instrumentLoader.item && instrumentLoader.item.renderedRowCount !== undefined
         ? instrumentLoader.item.renderedRowCount : 0
     // Read-only native acceptance diagnostics; do not create a separate source.
+    readonly property var instrumentItem: instrumentLoader.item
     readonly property bool instrumentMounted: instrumentLoader.item !== null
     readonly property int instrumentLoadState: instrumentLoader.status
     readonly property var skyFeed: skyLoader.item
@@ -125,8 +126,8 @@ Rectangle {
                 item=issSource.passes[i];
                 rows.push({name:"ISS PASS "+(i+1),
                     info:Number(item.culminate.degrees).toFixed(0)+"° PEAK",
-                    detail:"RISE "+String(item.rise.time)
-                        +" // PEAK "+String(item.culminate.time)});
+                    detail:"RISE "+String(item.rise.timeUtc)
+                        +" // PEAK "+String(item.culminate.timeUtc)});
             }
         } else if (kind === "eclipses" && eclipseSource && eclipseSource.ready) {
             for (const row of [
@@ -136,11 +137,24 @@ Rectangle {
                 info:row.data ? row.data.event : "NO EVENT IN WINDOW",
                 detail:row.data ? String(row.data.date) : "DATE --"});
         } else if (kind === "meteors" && meteorSource && meteorSource.ready) {
-            for (i=0;i<meteorSource.upcomingShowers.length;i++) {
-                item=meteorSource.upcomingShowers[i];
-                rows.push({name:item.name,
-                    info:item.active ? "ACTIVE NOW" : "UPCOMING",
-                    detail:"PEAK "+String(item.peakUtc)});
+            // The established IAU feed has two separate lists. Render the
+            // active list first, then upcoming; don't hide active showers.
+            var seenShower = {};
+            var activeList = meteorSource.activeShowers || [];
+            var upcomingList = meteorSource.upcomingShowers || [];
+            for (i=0;i<activeList.length;i++) {
+                item=activeList[i];
+                if (!item || !item.name || seenShower[item.name]) continue;
+                seenShower[item.name] = true;
+                rows.push({name:item.name,info:"ACTIVE NOW",
+                    detail:"PEAK "+String(item.peakUtc || "--")});
+            }
+            for (i=0;i<upcomingList.length;i++) {
+                item=upcomingList[i];
+                if (!item || !item.name || seenShower[item.name]) continue;
+                seenShower[item.name] = true;
+                rows.push({name:item.name,info:"UPCOMING",
+                    detail:"PEAK "+String(item.peakUtc || "--")});
             }
         }
         return rows;
@@ -148,7 +162,7 @@ Rectangle {
 
     Loader {
         id: skyLoader
-        active: focus.visible && Modes.usesSky(focus.subjectRoute)
+        active: cosmosModePane.visible && Modes.usesSky(cosmosModePane.subjectRoute)
         width: 1
         height: 1
         opacity: 0
@@ -156,7 +170,7 @@ Rectangle {
         sourceComponent: Component {
             StationSky {
                 sourceOnly: true
-                subjectRoute: Modes.dataRoute(focus.subjectRoute || "")
+                subjectRoute: Modes.dataRoute(cosmosModePane.subjectRoute || "")
                 // Service pointers bound by the parent AFTER item creation.
             }
         }
@@ -166,7 +180,7 @@ Rectangle {
     // disabled, including the original SUVI Image network consumer.
     Loader {
         id: spaceSourceLoader
-        active: focus.visible && focus.kind === "solar-section"
+        active: cosmosModePane.visible && cosmosModePane.kind === "solar-section"
         width: 1
         height: 1
         opacity: 0
@@ -174,7 +188,7 @@ Rectangle {
         sourceComponent: Component {
             StationSpace {
                 sourceOnly: true
-                subjectRoute: Modes.dataRoute(focus.subjectRoute)
+                subjectRoute: Modes.dataRoute(cosmosModePane.subjectRoute)
                 // Service pointers bound by the parent AFTER item creation.
             }
         }
@@ -186,43 +200,43 @@ Rectangle {
     Binding {
         target: skyLoader.item
         property: "weatherService"
-        value: focus.weatherService
+        value: cosmosModePane.weatherService
         when: skyLoader.item !== null
     }
     Binding {
         target: skyLoader.item
         property: "spaceService"
-        value: focus.spaceService
+        value: cosmosModePane.spaceService
         when: skyLoader.item !== null
     }
     Binding {
         target: skyLoader.item
         property: "runtimeNowMs"
-        value: focus.runtimeNowMs
+        value: cosmosModePane.runtimeNowMs
         when: skyLoader.item !== null
     }
     Binding {
         target: spaceSourceLoader.item
         property: "weatherService"
-        value: focus.weatherService
+        value: cosmosModePane.weatherService
         when: spaceSourceLoader.item !== null
     }
     Binding {
         target: spaceSourceLoader.item
         property: "spaceService"
-        value: focus.spaceService
+        value: cosmosModePane.spaceService
         when: spaceSourceLoader.item !== null
     }
     Binding {
         target: spaceSourceLoader.item
         property: "liveHistoryStore"
-        value: focus.liveHistoryStore
+        value: cosmosModePane.liveHistoryStore
         when: spaceSourceLoader.item !== null
     }
     Binding {
         target: spaceSourceLoader.item
         property: "runtimeNowMs"
-        value: focus.runtimeNowMs
+        value: cosmosModePane.runtimeNowMs
         when: spaceSourceLoader.item !== null
     }
 
@@ -233,7 +247,7 @@ Rectangle {
         anchors.right: parent.right
         anchors.margins: 6
         height: 18
-        text: "COSMOS // "+focus.family.toUpperCase()
+        text: "COSMOS // "+cosmosModePane.family.toUpperCase()
         color: Colors.magenta
         font.pixelSize: 12
         elide: Text.ElideRight
@@ -250,19 +264,19 @@ Rectangle {
         spacing: 4
         Repeater {
             id: modeRepeater
-            model: focus.modes || []
+            model: cosmosModePane.modes || []
             delegate: ActionButton {
                 required property var modelData
                 width: Math.max(1,(modeRail.width
-                    -(focus.modeCount-1)*modeRail.spacing)
-                    /Math.max(1,focus.modeCount))
+                    -(cosmosModePane.modeCount-1)*modeRail.spacing)
+                    /Math.max(1,cosmosModePane.modeCount))
                 height: 27
                 label: modelData.label
-                labelPixelSize: focus.modeCount>5 ? 9 : 10
+                labelPixelSize: cosmosModePane.modeCount>5 ? 9 : 10
                 contentPadding: 1
-                selected: Modes.canonical(focus.subjectRoute) === modelData.route
+                selected: Modes.canonical(cosmosModePane.subjectRoute) === modelData.route
                 accentColor: Colors.cyan
-                onClicked: focus.routeRequested(modelData.route)
+                onClicked: cosmosModePane.routeRequested(modelData.route)
             }
         }
     }
@@ -288,12 +302,12 @@ Rectangle {
         Loader {
             id: instrumentLoader
             anchors.fill: parent
-            active: focus.visible
-            sourceComponent: focus.kind === "solar-path" ? sunPath
-                : focus.kind === "light" ? sunLight
-                : focus.kind === "planet-clock" ? planetClock
-                : focus.kind === "solar-section" ? solarDetails
-                : focus.kind === "meteors" ? meteorList
+            active: cosmosModePane.visible
+            sourceComponent: cosmosModePane.kind === "solar-path" ? sunPath
+                : cosmosModePane.kind === "light" ? sunLight
+                : cosmosModePane.kind === "planet-clock" ? planetClock
+                : cosmosModePane.kind === "solar-section" ? solarDetails
+                : cosmosModePane.kind === "meteors" ? meteorList
                 : subjectCards
         }
         // An unavailable solar forecast must not leave a blank graph without
@@ -302,9 +316,9 @@ Rectangle {
             anchors.horizontalCenter: parent.horizontalCenter
             anchors.verticalCenter: parent.verticalCenter
             width: Math.max(1,stage.width-32)
-            visible: (focus.kind === "solar-path" || focus.kind === "light")
-                && !focus.sourceConfigured
-            text: focus.sourceStatus || "SOURCE WAITING"
+            visible: (cosmosModePane.kind === "solar-path" || cosmosModePane.kind === "light")
+                && !cosmosModePane.sourceConfigured
+            text: cosmosModePane.sourceStatus || "SOURCE WAITING"
             color: Colors.orange
             font.pixelSize: 10
             horizontalAlignment: Text.AlignHCenter
@@ -322,8 +336,8 @@ Rectangle {
         QuietText {
             width: Math.max(0,footer.width
                 - 111 - (retrySource.visible ? 83 : 0))
-            text: focus.kind === "meteors" ? "IAU MDC // SCROLL MIDDLE ONLY"
-                : focus.kind === "solar-section" ? "NOAA // ONE INSTRUMENT"
+            text: cosmosModePane.kind === "meteors" ? "IAU MDC // SCROLL MIDDLE ONLY"
+                : cosmosModePane.kind === "solar-section" ? "NOAA // ONE INSTRUMENT"
                 : "SOURCE-BACKED // FOCUSED VIEW"
             color: Colors.cyan
             font.pixelSize: 8
@@ -332,9 +346,9 @@ Rectangle {
         }
         ActionButton {
             id: retrySource
-            visible: focus.selectedProvider !== null
-                && focus.sourceConfigured
-                && !focus.selectedProvider.loading
+            visible: cosmosModePane.selectedProvider !== null
+                && cosmosModePane.sourceConfigured
+                && !cosmosModePane.selectedProvider.loading
             width: visible ? 78 : 0
             height: 19
             contentPadding: 1
@@ -342,10 +356,10 @@ Rectangle {
             labelPixelSize: 8
             accentColor: Colors.orange
             onClicked: {
-                if (focus.selectedProvider
-                    && focus.selectedProvider.active
-                    && focus.selectedProvider.refresh)
-                    focus.selectedProvider.refresh();
+                if (cosmosModePane.selectedProvider
+                    && cosmosModePane.selectedProvider.active
+                    && cosmosModePane.selectedProvider.refresh)
+                    cosmosModePane.selectedProvider.refresh();
             }
         }
         ActionButton {
@@ -355,16 +369,16 @@ Rectangle {
             label: "FULL REFERENCE"
             labelPixelSize: 8
             accentColor: Colors.yellow
-            onClicked: focus.routeRequested(Modes.fullRoute(focus.subjectRoute))
+            onClicked: cosmosModePane.routeRequested(Modes.fullRoute(cosmosModePane.subjectRoute))
         }
     }
 
     Component {
         id: solarDetails
         StationCosmosSunInstrumentPane {
-            modeRoute: Modes.dataRoute(focus.subjectRoute)
-            sourceSpace: focus.spaceFeed
-            spaceService: focus.spaceService
+            modeRoute: Modes.dataRoute(cosmosModePane.subjectRoute)
+            sourceSpace: cosmosModePane.spaceFeed
+            spaceService: cosmosModePane.spaceService
         }
     }
     Component {
@@ -373,24 +387,25 @@ Rectangle {
             anchors.fill: parent
             spacing: 6
             StationCosmosVisualInstruments {
+                objectName: "cosmos-c5-sun-path"
                 width: parent.width
                 height: parent.height >= 270 ? 204 : parent.height
                 compactMode: true
                 showMoon: false
                 showSun: true
-                astronomySummary: focus.astronomy
-                twilightSummary: focus.twilight
-                currentSolarPosition: focus.skyFeed
-                    ? focus.skyFeed.currentSolarPosition : null
-                providerLocalMinute: focus.skyFeed
-                    ? focus.skyFeed.providerLocalMinute : -1
-                solarDate: focus.civilDate || ""
-                solarCivilOffsetMinutes: focus.skyFeed
-                    ? focus.skyFeed.moonCivilOffsetMinutes : null
-                solarOffsetSource: focus.skyFeed
-                    ? focus.skyFeed.moonCivilOffsetSource : "UNKNOWN"
-                latitude: focus.weatherService ? focus.weatherService.latitude : ""
-                longitude: focus.weatherService ? focus.weatherService.longitude : ""
+                astronomySummary: cosmosModePane.astronomy
+                twilightSummary: cosmosModePane.twilight
+                currentSolarPosition: cosmosModePane.skyFeed
+                    ? cosmosModePane.skyFeed.currentSolarPosition : null
+                providerLocalMinute: cosmosModePane.skyFeed
+                    ? cosmosModePane.skyFeed.focusedLocalMinute : -1
+                solarDate: cosmosModePane.civilDate || ""
+                solarCivilOffsetMinutes: cosmosModePane.skyFeed
+                    ? cosmosModePane.skyFeed.moonCivilOffsetMinutes : null
+                solarOffsetSource: cosmosModePane.skyFeed
+                    ? cosmosModePane.skyFeed.moonCivilOffsetSource : "UNKNOWN"
+                latitude: cosmosModePane.weatherService ? cosmosModePane.weatherService.latitude : ""
+                longitude: cosmosModePane.weatherService ? cosmosModePane.weatherService.longitude : ""
             }
             Row {
                 visible: parent.height >= 270
@@ -399,9 +414,9 @@ Rectangle {
                 spacing: 5
                 Repeater {
                     model: [
-                        {name:"SUNRISE",value:focus.astronomy ? focus.astronomy.sunrise : "--"},
-                        {name:"SUNSET",value:focus.astronomy ? focus.astronomy.sunset : "--"},
-                        {name:"DAYLIGHT",value:focus.astronomy ? focus.astronomy.daylightLabel : "--"}
+                        {name:"SUNRISE",value:cosmosModePane.astronomy ? cosmosModePane.astronomy.sunrise : "--"},
+                        {name:"SUNSET",value:cosmosModePane.astronomy ? cosmosModePane.astronomy.sunset : "--"},
+                        {name:"DAYLIGHT",value:cosmosModePane.astronomy ? cosmosModePane.astronomy.daylightLabel : "--"}
                     ]
                     delegate: Rectangle {
                         required property var modelData
@@ -430,14 +445,14 @@ Rectangle {
             spacing: 7
             Repeater {
                 model: [
-                    {name:"ASTRONOMICAL DAWN",value:focus.twilight ? focus.twilight.astronomicalDawn : "--"},
-                    {name:"CIVIL DAWN",value:focus.twilight ? focus.twilight.civilDawn : "--"},
-                    {name:"SOLAR NOON",value:focus.twilight ? focus.twilight.solarNoon : "--"},
-                    {name:"CIVIL DUSK",value:focus.twilight ? focus.twilight.civilDusk : "--"},
-                    {name:"BLUE AM",value:focus.twilight ? focus.twilight.blueMorningStart+" → "+focus.twilight.blueMorningEnd : "--"},
-                    {name:"GOLDEN AM",value:focus.twilight ? focus.twilight.goldenMorningStart+" → "+focus.twilight.goldenMorningEnd : "--"},
-                    {name:"GOLDEN PM",value:focus.twilight ? focus.twilight.goldenEveningStart+" → "+focus.twilight.goldenEveningEnd : "--"},
-                    {name:"BLUE PM",value:focus.twilight ? focus.twilight.blueEveningStart+" → "+focus.twilight.blueEveningEnd : "--"}
+                    {name:"ASTRONOMICAL DAWN",value:cosmosModePane.twilight ? cosmosModePane.twilight.astronomicalDawn : "--"},
+                    {name:"CIVIL DAWN",value:cosmosModePane.twilight ? cosmosModePane.twilight.civilDawn : "--"},
+                    {name:"SOLAR NOON",value:cosmosModePane.twilight ? cosmosModePane.twilight.solarNoon : "--"},
+                    {name:"CIVIL DUSK",value:cosmosModePane.twilight ? cosmosModePane.twilight.civilDusk : "--"},
+                    {name:"BLUE AM",value:cosmosModePane.twilight ? cosmosModePane.twilight.blueMorningStart+" → "+cosmosModePane.twilight.blueMorningEnd : "--"},
+                    {name:"GOLDEN AM",value:cosmosModePane.twilight ? cosmosModePane.twilight.goldenMorningStart+" → "+cosmosModePane.twilight.goldenMorningEnd : "--"},
+                    {name:"GOLDEN PM",value:cosmosModePane.twilight ? cosmosModePane.twilight.goldenEveningStart+" → "+cosmosModePane.twilight.goldenEveningEnd : "--"},
+                    {name:"BLUE PM",value:cosmosModePane.twilight ? cosmosModePane.twilight.blueEveningStart+" → "+cosmosModePane.twilight.blueEveningEnd : "--"}
                 ]
                 delegate: Rectangle {
                     required property var modelData
@@ -484,10 +499,12 @@ Rectangle {
                 model: 5
                 delegate: Rectangle {
                     required property int index
+                    // Bind directly to the always-five-row source model.
+                    // The intermediary displayedPlanetRows can update without
+                    // notifying a nested Repeater delegate in Qt 6.
                     readonly property var planetRow:
-                        focus.displayedPlanetRows
-                        && focus.displayedPlanetRows.length > index
-                        ? focus.displayedPlanetRows[index] : null
+                        cosmosModePane.planetRows && cosmosModePane.planetRows.length > index
+                        ? cosmosModePane.planetRows[index] : null
                     readonly property string planetName:
                         planetRow ? planetRow.name
                         : ["MERCURY","VENUS","MARS","JUPITER","SATURN"][index]
@@ -518,6 +535,7 @@ Rectangle {
                                 model: planetRow && planetRow.events
                                     ? planetRow.events.length : 0
                                 delegate: Rectangle {
+                                    objectName: "cosmos-c5-planet-event-marker"
                                     required property int index
                                     readonly property var eventData:
                                         planetRow.events[index]
@@ -536,9 +554,9 @@ Rectangle {
             }
             QuietText {
                 width: parent.width
-                text: focus.sourceStatus || "SOURCE WAITING"
-                    + (focus.civilDate !== "" ? " // "+focus.civilDate : "")
-                visible: focus.sourceStatus !== "SOURCE RECEIVED"
+                text: cosmosModePane.sourceStatus || "SOURCE WAITING"
+                    + (cosmosModePane.civilDate !== "" ? " // "+cosmosModePane.civilDate : "")
+                visible: cosmosModePane.sourceStatus !== "SOURCE RECEIVED"
                 color: Colors.orange
                 font.pixelSize: 9
                 elide: Text.ElideRight
@@ -558,17 +576,17 @@ Rectangle {
             anchors.fill: parent
             spacing: 8
             GohuText {
-                text: focus.kind==="planets" ? "PLANETS // CURRENT USNO SKY"
-                    : focus.kind==="stars" ? "CONSTELLATION ANCHORS // USNO"
-                    : focus.kind==="eclipses" ? "ECLIPSES // NASA GSFC"
+                text: cosmosModePane.kind==="planets" ? "PLANETS // CURRENT USNO SKY"
+                    : cosmosModePane.kind==="stars" ? "CONSTELLATION ANCHORS // USNO"
+                    : cosmosModePane.kind==="eclipses" ? "ECLIPSES // NASA GSFC"
                     : "ISS // PREDICTED PASSES"
                 color: Colors.magenta
                 font.pixelSize:11
             }
             QuietText {
                 width: parent.width
-                visible: !focus.cards || focus.cards.length === 0
-                text: focus.sourceStatus || "SOURCE WAITING"
+                visible: !cosmosModePane.cards || cosmosModePane.cards.length === 0
+                text: cosmosModePane.sourceStatus || "SOURCE WAITING"
                 color: Colors.orange
                 font.pixelSize: 10
                 wrapMode: Text.WordWrap
@@ -580,10 +598,11 @@ Rectangle {
                 spacing: 7
                 Repeater {
                     // Numeric model avoids a QJSValue-array Repeater binding.
-                    model: focus.cards ? Math.min(4,focus.cards.length) : 0
+                    model: cosmosModePane.cards ? Math.min(4,cosmosModePane.cards.length) : 0
                     delegate: Rectangle {
+                        objectName: "cosmos-c5-source-card"
                         required property int index
-                        readonly property var cardData: focus.cards[index]
+                        readonly property var cardData: cosmosModePane.cards[index]
                         width: Math.max(1,(cardGrid.width-7)/2)
                         height: Math.max(65,(stage.height-53)/2)
                         color: Colors.dark
@@ -618,8 +637,8 @@ Rectangle {
             }
             QuietText {
                 width:parent.width
-                text:(!focus.cards || focus.cards.length===0) ? "SOURCE WAITING / NO DATA IN WINDOW"
-                    : focus.kind==="eclipses"
+                text:(!cosmosModePane.cards || cosmosModePane.cards.length===0) ? "SOURCE WAITING / NO DATA IN WINDOW"
+                    : cosmosModePane.kind==="eclipses"
                     ? "GLOBAL EVENT DATE // LOCAL VISIBILITY NOT CALCULATED"
                     : "OBSERVATIONS / PREDICTIONS ARE SOURCE-SCOPED"
                 color:Colors.cyan
@@ -641,10 +660,10 @@ Rectangle {
             }
             QuietText {
                 width: parent.width
-                visible: !focus.cards || focus.cards.length === 0
-                text: focus.sourceStatus === "SOURCE RECEIVED"
+                visible: !cosmosModePane.cards || cosmosModePane.cards.length === 0
+                text: cosmosModePane.sourceStatus === "SOURCE RECEIVED"
                     ? "NO ACTIVE OR UPCOMING SHOWER IN THE SOURCE WINDOW"
-                    : (focus.sourceStatus || "SOURCE WAITING")
+                    : (cosmosModePane.sourceStatus || "SOURCE WAITING")
                 color: Colors.orange
                 font.pixelSize: 10
                 wrapMode: Text.WordWrap
@@ -662,10 +681,11 @@ Rectangle {
                     width: meteorScroll.width
                     spacing: 5
                     Repeater {
-                        model: focus.cards ? focus.cards.length : 0
+                        model: cosmosModePane.cards ? cosmosModePane.cards.length : 0
                         delegate: Rectangle {
+                            objectName: "cosmos-c5-meteor-card"
                             required property int index
-                            readonly property var cardData: focus.cards[index]
+                            readonly property var cardData: cosmosModePane.cards[index]
                             width: meteorCards.width
                             height: 47
                             color: Colors.dark

@@ -245,13 +245,20 @@ Rectangle {
             weatherService ? weatherService.localObservationDateTime : "",
             weatherService ? weatherService.localObservationAnchorMs : 0
         )
+    readonly property real focusedLocalMinute:
+        sourceOnly && openMeteoCivilOffsetAvailable
+        ? CosmosCalendar.localCivilMinute(
+            runtimeNowMs > 0 ? runtimeNowMs : cycleClockMs,
+            weatherService.airQualityUtcOffsetMinutes)
+        : providerLocalMinute
     readonly property var currentSolarPosition:
         TwilightPolicy.solarPosition(
-            skyCycle.date,
-            providerLocalMinute,
+            sourceOnly ? focusedCivilDate : skyCycle.date,
+            focusedLocalMinute,
             weatherService ? weatherService.latitude : "",
             weatherService ? weatherService.longitude : "",
-            twilightSummary.calibrationOffsetMinutes
+            sourceOnly ? moonCivilOffsetMinutes
+                       : twilightSummary.calibrationOffsetMinutes
         )
     readonly property bool openMeteoCivilOffsetAvailable: {
         if (!weatherService

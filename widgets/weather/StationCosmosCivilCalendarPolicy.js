@@ -13,6 +13,19 @@ function localCivilDate(nowMs, offsetMinutes) {
     return isFinite(date.getTime()) ? date.toISOString().slice(0,10) : "";
 }
 
+// Clock marker in the same verified local civil day as localCivilDate.
+// A missing source offset is not permission to use the host's timezone.
+function localCivilMinute(nowMs, offsetMinutes) {
+    if (offsetMinutes === null || offsetMinutes === undefined
+            || offsetMinutes === "") return -1;
+    var offset = Number(offsetMinutes), now = Number(nowMs);
+    if (!isFinite(offset) || offset < -720 || offset > 840
+            || !isFinite(now) || now <= 0) return -1;
+    var date = new Date(now + Math.round(offset) * 60000);
+    return isFinite(date.getTime())
+        ? date.getUTCHours() * 60 + date.getUTCMinutes() : -1;
+}
+
 function exactDay(value) {
     if (typeof value !== "string"
             || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return "";

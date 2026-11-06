@@ -23,7 +23,7 @@ const sky=read("widgets/weather/StationSky.qml");
 test("C5 native workspace forwards instrument mode clicks into active navigation",()=>{
   assert.match(surface,/StationCosmosSubjectPane\s*\{[\s\S]*?onRouteRequested: function\(path\) \{ surface\.routeRequested\(path\); \}/);
   assert.match(pane,/StationCosmosModesPane\s*\{[\s\S]*?onRouteRequested: function\(path\) \{[\s\S]*?cosmosPane\.routeRequested\(path\)/);
-  assert.match(focus,/onClicked: focus\.routeRequested\(modelData\.route\)/);
+  assert.match(focus,/onClicked: cosmosModePane\.routeRequested\(modelData\.route\)/);
   const routes=[
     "cosmos/sun/position","cosmos/sun/twilight",
     "cosmos/sun/suvi","cosmos/sun/xray","cosmos/sun/flares",
@@ -59,7 +59,7 @@ test("C5 civil date uses only existing verified timezone, not system timezone",(
   assert.match(focus,/readonly property string civilDate:/);
   assert.match(focus,/skyFeed\.focusedCivilDate : ""/);
   assert.match(focus,/ClockPolicy\.clockRows\([\s\S]*?civilDate\)/);
-  assert.match(focus,/solarDate: focus\.civilDate/);
+  assert.match(focus,/solarDate: cosmosModePane\.civilDate/);
 });
 
 test("No-source UI retains five planet lanes and shows detailed provider errors",()=>{
@@ -79,7 +79,7 @@ test("No-source UI retains five planet lanes and shows detailed provider errors"
     "SOLAR MODEL NEEDS LOCAL DATE, LOCATION AND UTC OFFSET",
     "NO ACTIVE OR UPCOMING SHOWER IN THE SOURCE WINDOW"
   ])assert.ok(focus.includes(signal),signal);
-  assert.match(focus,/visible: !focus\.cards \|\| focus\.cards\.length === 0/);
+  assert.match(focus,/visible: !cosmosModePane\.cards \|\| cosmosModePane\.cards\.length === 0/);
   assert.match(focus,/id: meteorScroll/);
   assert.match(focus,/contentHeight: meteorCards\.implicitHeight/);
   assert.match(focus,/sourceOnly: true/);
@@ -92,5 +92,25 @@ test("C5 focused hidden astronomy acquisition uses route, not visual geometry",(
   assert.match(focus,/SOURCE INACTIVE \/\/ ROUTE ACTIVATION FAILED/);
   assert.match(focus,/SOURCE IDLE \/\/ USE RETRY/);
   assert.match(focus,/label: "RETRY SOURCE"/);
-  assert.match(focus,/focus\.selectedProvider\.refresh\(\)/);
+  assert.match(focus,/cosmosModePane\.selectedProvider\.refresh\(\)/);
+});
+
+test("C5 populated source-to-render contracts use actual provider fields",()=>{
+  assert.equal(calendar.localCivilMinute(Date.parse("2026-11-05T03:30:00Z"),-300),1350);
+  assert.equal(calendar.localCivilMinute(Date.parse("2026-11-05T03:30:00Z"),540),750);
+  assert.equal(calendar.localCivilMinute(Date.parse("2026-11-05T03:30:00Z"),null),-1);
+  assert.equal(calendar.localCivilMinute(0,-300),-1);
+  assert.match(sky,/sourceOnly \? focusedCivilDate : skyCycle\.date/);
+  assert.match(sky,/CosmosCalendar\.localCivilMinute\(/);
+  assert.match(focus,/focusedLocalMinute/);
+  assert.match(focus,/item\.rise\.timeUtc/);
+  assert.match(focus,/item\.culminate\.timeUtc/);
+  assert.match(focus,/meteorSource\.activeShowers/);
+  assert.match(focus,/seenShower\[item\.name\]/);
+  for (const anchor of [
+    'objectName: "cosmos-c5-sun-path"',
+    'objectName: "cosmos-c5-planet-event-marker"',
+    'objectName: "cosmos-c5-source-card"',
+    'objectName: "cosmos-c5-meteor-card"'
+  ]) assert.ok(focus.includes(anchor),anchor);
 });

@@ -466,8 +466,8 @@ test("C5 subject modes are distinct real routes and direct fixed-rail actions", 
   assert.match(pane,/id: focusModesComponent/);
   assert.match(pane,/StationCosmosModesPane\s*\{/);
   assert.match(pane,/Modes\.family\(cosmosPane\.subjectRoute\) !== ""/);
-  assert.match(focusPane,/onClicked: focus\.routeRequested\(modelData\.route\)/);
-  assert.match(focusPane,/selected: Modes\.canonical\(focus\.subjectRoute\) === modelData\.route/);
+  assert.match(focusPane,/onClicked: cosmosModePane\.routeRequested\(modelData\.route\)/);
+  assert.match(focusPane,/selected: Modes\.canonical\(cosmosModePane\.subjectRoute\) === modelData\.route/);
   assert.match(focusPane,/id: modeRail/);
   assert.match(focusPane,/id: footer/);
   assert.match(focusPane,/id: stage/);
@@ -476,7 +476,7 @@ test("C5 subject modes are distinct real routes and direct fixed-rail actions", 
   assert.match(focusPane,/ClockPolicy\.clockRows\(/);
   assert.match(focusPane,/id: meteorScroll/);
   assert.match(focusPane,/contentHeight: meteorCards\.implicitHeight/);
-  assert.match(focusPane,/model: focus\.cards/);
+  assert.match(focusPane,/model: cosmosModePane\.cards/);
   for(const src of [modePolicySource,focusPane]) {
     for(const forbidden of ["WeatherServices.","FileView {","Process {",
       "XMLHttpRequest","new WebSocket","swaymsg","Timer {","Qt.callLater"]) {

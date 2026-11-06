@@ -83,7 +83,9 @@ test("M6j art-directory status does not falsely claim photos are loaded",()=>{
     assert.match(pane,/Deck\.localArtworkCandidates\(/);
     assert.match(pane,/artworkFolderInput/);
     assert.match(pane,/onTextChanged: tarot\.localArtworkDirectory=text/);
-    assert.match(pane,/ART FILENAMES: major-the-fool\.png \/ wands-daughter\.jpg/);
+    assert.match(pane,/IMAGE FILE \/\/ /);
+    assert.match(pane,/tarot\.inspectedCard\.id+"\.png \/ \.jpg \/ \.webp"/);
+    assert.match(pane,/IMAGE EXAMPLE \/\/ major-the-fool\.png \/ wands-daughter\.jpg/);
     assert.match(pane,/DECK PHOTOS ARE NOT BUNDLED \/\/ READ-ONLY PRIVATE FOLDER/);
     assert.match(pane,/id: focusedCardFace/);
     assert.match(pane,/focusedCardFace\.artworkStatus/);

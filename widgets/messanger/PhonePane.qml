@@ -20,9 +20,13 @@ Rectangle {
     property string personalReadOperation: ""
     property int personalReadGeneration: 0
     property string personalConsentStatus: "IDLE"
+    // The QML tree must exist before lifecycle handlers reference children.
+    property bool personalReadUiReady: false
+    Component.onCompleted: personalReadUiReady = true
     // A local Social identity is a display selector, never an auth grant.
     property string activeSocialIdentityId: ""
     onActiveSocialIdentityIdChanged: {
+        if (!personalReadUiReady) return;
         personalReadGeneration += 1;
         if (personalReadProcess.running)
             personalReadProcess.running = false;
@@ -513,6 +517,7 @@ Rectangle {
     }
 
     onSelectedSectionChanged: {
+        if (!personalReadUiReady) return;
         if (selectedSection !== "DEVICE") closeStagedSetup();
         personalReadGeneration += 1;
         if (personalReadProcess.running)
@@ -590,6 +595,7 @@ Rectangle {
     }
 
     onVisibleChanged: {
+        if (!personalReadUiReady) return;
         if (!visible) {
             closeStagedSetup();
             personalReadGeneration += 1;

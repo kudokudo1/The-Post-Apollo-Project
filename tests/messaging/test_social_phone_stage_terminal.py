@@ -78,8 +78,8 @@ class PhoneStageLayoutTests(unittest.TestCase):
         self.assertIn('    ContactList {', self.phone)
         self.assertIn('    ChatFeed {', self.phone)
         self.assertIn('sendEnabled: false', self.phone)
-        self.assertIn('conversations: []', self.phone)
-        self.assertIn('messages: []', self.phone)
+        self.assertIn('phoneReadAdapter.conversations : []', self.phone)
+        self.assertIn('phoneReadAdapter.messages : []', self.phone)
 
     def test_terminal_bay_is_independent_of_setup_content_height(self):
         self.assertIn('readonly property int stageBayTop:', self.phone)

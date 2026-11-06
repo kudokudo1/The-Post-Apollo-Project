@@ -429,6 +429,60 @@ Rectangle {
                     }
                 }
             }
+            // M6h // INDEX doubles as an explicit physical card picker.
+            // Selecting an entry previews it; ADD commits it to next slot.
+            Row {
+                id: manualPickRow
+                width: parent.width
+                height: tarot.drawMethod==="physical"?27:0
+                visible: tarot.drawMethod==="physical"
+                spacing: 4
+                ActionButton {
+                    width: 110
+                    height: 26
+                    label: tarot.previewId===""
+                        ? "SELECT A CARD" : "ADD TO SPREAD"
+                    labelPixelSize: 9
+                    accentColor: Colors.magenta
+                    available: tarot.reading.ready &&
+                               !tarot.reading.complete &&
+                               tarot.previewId!=="" &&
+                               !Physical.contains(tarot.reading,
+                                                  tarot.previewId)
+                    onClicked: tarot.addPhysicalCard()
+                }
+                ActionButton {
+                    width: 86
+                    height: 26
+                    label: tarot.manualReversed?"REVERSED":"UPRIGHT"
+                    labelPixelSize: 9
+                    accentColor: tarot.manualReversed
+                        ? Colors.orange : Colors.cyan
+                    selected: tarot.manualReversed
+                    onClicked: tarot.manualReversed=!tarot.manualReversed
+                }
+                QuietText {
+                    width: Math.max(15,parent.width-204)
+                    height: 26
+                    verticalAlignment: Text.AlignVCenter
+                    font.pixelSize: 9
+                    color: Colors.yellow
+                    elide: Text.ElideRight
+                    text: tarot.reading.ready
+                        ? (tarot.reading.complete?"SPREAD COMPLETE":
+                           "NEXT "+tarot.reading.nextPosition)
+                        : "INVALID SPREAD"
+                }
+            }
+            QuietText {
+                width: parent.width
+                height: tarot.drawMethod==="physical"?16:0
+                visible: tarot.drawMethod==="physical"
+                color: Colors.orange
+                font.pixelSize: 9
+                elide: Text.ElideRight
+                text: tarot.manualMessage || "SELECT, SET ORIENTATION, THEN ADD"
+            }
             Row {
                 width: parent.width
                 height: 247

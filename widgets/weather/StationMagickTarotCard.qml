@@ -20,8 +20,12 @@ Rectangle {
     border.color: hasCard ? Colors.magenta : Colors.blue
     clip: true
     radius: 3
+    onCardChanged: decorativeCanvas.requestPaint()
+    onWidthChanged: decorativeCanvas.requestPaint()
+    onHeightChanged: decorativeCanvas.requestPaint()
 
     Canvas {
+        id: decorativeCanvas
         anchors.fill: parent
         visible: !face.hasLocalArt
         onPaint: {

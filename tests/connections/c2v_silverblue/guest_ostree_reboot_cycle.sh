@@ -34,7 +34,13 @@ case "$stage" in
       failure "PACKAGE_ALREADY_PRESENT_AT_BASELINE"
     rpm -q "$pkg" >/dev/null 2>&1 && failure "RPM_ALREADY_INSTALLED"
     mkdir -p "$data"
-    mount -o ro /dev/disk/by-label/C2UCI "$data" ||
+    # Match the guest ISO volume label created by boot_official_silverblue.sh.
+    # A mismatched C2u/C2v identifier previously blocked before rpm-ostree.
+    media_label=C2VCI
+    echo "C2V_OFFLINE_MEDIA_LABEL // $media_label"
+    ls -l /dev/disk/by-label/ || true
+    blkid || true
+    mount -o ro "/dev/disk/by-label/$media_label" "$data" ||
       failure "OFFLINE_RPM_MEDIA_MISSING"
     [[ -f "$data/c2t-0.1.rpm" && -f "$data/c2t-artifact-manifest.sha256" ]] ||
       failure "OFFLINE_ARTIFACTS_MISSING"

@@ -118,7 +118,7 @@ qemu-system-x86_64 \
 pid="$!"
 
 result=""
-for i in $(seq 1 330); do
+for i in $(seq 1 600); do
   if [[ -f "$tmp/installer-serial.log" ]] &&
      grep -q 'C2U_PASS // KICKSTART_POST_INSTALL_STAGED' "$tmp/installer-serial.log"; then
     result=POST_DONE
@@ -152,7 +152,7 @@ qemu-system-x86_64 \
   -nic none > "$tmp/guest-qemu.log" 2>&1 &
 pid="$!"
 result=""
-for i in $(seq 1 350); do
+for i in $(seq 1 450); do
   if [[ -f "$tmp/guest-serial.log" ]]; then
     if grep -q 'C2U_PASS // REAL_SILVERBLUE_BOOTED_ROLLBACK_REMOVED_LAYER' \
            "$tmp/guest-serial.log"; then

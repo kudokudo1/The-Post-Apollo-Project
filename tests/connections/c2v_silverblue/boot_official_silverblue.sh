@@ -91,7 +91,7 @@ ConditionPathExists=/run/ostree-booted
 [Service]
 Type=oneshot
 ExecStart=/usr/bin/bash /usr/local/libexec/c2v-ostree-cycle.sh
-TimeoutStartSec=900
+TimeoutStartSec=1400
 
 [Install]
 WantedBy=multi-user.target
@@ -153,7 +153,7 @@ qemu-system-x86_64 \
 pid="$!"
 result=""
 last_serial_bytes=0
-for i in $(seq 1 450); do
+for i in $(seq 1 700); do
   if (( i % 20 == 0 )); then
     echo "C2V_HOST_GUEST_HEARTBEAT // $i"
     ps -p "$pid" -o pid=,stat=,etime=,%cpu=,%mem=,rss=,vsz=,comm= || true

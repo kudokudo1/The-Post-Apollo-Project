@@ -1,0 +1,98 @@
+name: Connections C2s offline bundle install and rollback in Fedora VM
+
+on:
+  pull_request:
+    paths:
+      - "tests/connections/c2s_bundle_rollback/**"
+      - "tests/connections/c2r_selinux_domain/**"
+      - "tests/connections/c2o_fedora/**"
+      - "services/connections/experiments/c2n_package/**"
+      - ".github/workflows/connections-c2s-bundle-rollback-vm.yml"
+      - "docs/connections-c2s-bundle-rollback.md"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  offline-install-rollback:
+    if: github.actor == 'kudokudo1' && (github.event_name == 'workflow_dispatch' || github.event.pull_request.head.repo.full_name == github.repository)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 23
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Fail-closed disposable runner KVM check
+        shell: bash
+        run: |
+          set -euo pipefail
+          [ -c /dev/kvm ] || { echo "C2R_BLOCKED // NO_KVM"; exit 2; }
+          sudo chmod a+rw /dev/kvm
+          [ -r /dev/kvm ] && [ -w /dev/kvm ] || exit 2
+      - name: Syntax and policy-scope checks
+        shell: bash
+        run: |
+          set -euo pipefail
+          bash -n tests/connections/c2s_bundle_rollback/boot_bundle_vm.sh
+          bash -n tests/connections/c2s_bundle_rollback/guest_install_rollback.sh
+          bash -n tests/connections/c2r_selinux_domain/guest_confined_smoke.sh
+          python3 -m py_compile tests/connections/c2r_selinux_domain/C2rStatusHost.py
+          python3 - <<'PY'
+          from pathlib import Path
+          policy=Path("tests/connections/c2r_selinux_domain/postapollo_connections.te").read_text()
+          fc=Path("tests/connections/c2r_selinux_domain/postapollo_connections.fc").read_text()
+          assert "init_daemon_domain(postapollo_connections_t, postapollo_connections_exec_t)" in policy
+          assert "postapollo_connections_exec_t" in fc
+          assert "postapollo_connections_t" in policy
+          active="\n".join(line.split("#")[0].strip().lower() for line in policy.splitlines())
+          assert "permissive" not in active
+          assert "unconfined" not in active
+          assert "audit2allow" not in active
+          assert "network_port" not in active
+          assert "tcp_socket" not in active
+          assert "manage_files_pattern" not in active
+          assert "admin" not in active
+          print("C2S_PASS // REVIEWED_UNCHANGED_C2R_POLICY_SOURCE")
+          PY
+      - name: Build SELinux reference-policy module inside disposable Fedora 44 builder
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/c2r-policy"
+          docker run --rm \
+            --mount "type=bind,src=$PWD/tests/connections/c2r_selinux_domain,dst=/src,readonly" \
+            --mount "type=bind,src=$RUNNER_TEMP/c2r-policy,dst=/out" \
+            fedora:44 /bin/bash -euc '
+              dnf -y --setopt=install_weak_deps=False install selinux-policy-devel make
+              mkdir -p /tmp/c2r-src
+              cp /src/postapollo_connections.te /src/postapollo_connections.fc /tmp/c2r-src/
+              cd /tmp/c2r-src
+              make -f /usr/share/selinux/devel/Makefile postapollo_connections.pp
+              cp postapollo_connections.pp /out/postapollo_connections.pp
+              test -s /out/postapollo_connections.pp
+            '
+          sha256sum "$RUNNER_TEMP/c2r-policy/postapollo_connections.pp"
+          echo "C2S_PASS // FEDORA_BUILT_SELINUX_MODULE_NOT_INSTALLED_ON_HOST"
+      - name: Install QEMU utilities in disposable GitHub runner only
+        shell: bash
+        run: |
+          set -euo pipefail
+          timeout 120s sudo apt-get -o Acquire::Retries=2 -o Acquire::http::Timeout=35 update || { echo "C2S_BLOCKED // RUNNER_APT_UPDATE"; exit 2; }
+          timeout 360s sudo apt-get -o Acquire::Retries=2 -o Acquire::http::Timeout=35 install -y --no-install-recommends qemu-system-x86 qemu-utils genisoimage python3-pip || { echo "C2S_BLOCKED // RUNNER_APT_INSTALL"; exit 2; }
+      - name: Build/verify bounded bundle then install-test and rollback in enforcing Fedora 44 guest
+        shell: bash
+        run: timeout 570s bash tests/connections/c2s_bundle_rollback/boot_bundle_vm.sh
+      - name: Existing C2n and CPU++ deny-only contracts
+        shell: bash
+        run: |
+          python3 -B tests/connections/test_connections_c2n_policy_contract.py
+          python3 - <<'PY'
+          from pathlib import Path
+          base=Path("services/connections")
+          assert "readonly property bool hostAuthenticated: false" in (base/"ConnectionsRequestStatus.qml").read_text()
+          assert "readonly property bool credentialActionsEnabled: false" in (base/"ConnectionsBroker.qml").read_text()
+          for p in (*base.glob("*.qml"), *base.glob("*.js"), base/"qmldir"):
+              assert "c2r_selinux_domain" not in p.read_text(), p
+          print("C2S_PASS // NO_PRODUCTION_CREDENTIAL_GRANTS_OR_WIDGET_HOOKS")
+          PY

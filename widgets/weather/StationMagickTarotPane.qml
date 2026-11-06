@@ -1,6 +1,7 @@
 import QtQuick
 import "../../components"
 import "StationMagickTarotDeckPolicy.js" as Deck
+import "StationMagickTarotPhysicalPolicy.js" as Physical
 
 // M6g // Symbolic deck workspace. No actual copyrighted illustrations,
 // guidebook readings, journal storage, network, additional provider or
@@ -13,6 +14,10 @@ Rectangle {
     property string viewMode: "draw"
     property string spreadId: "three"
     property bool reversals: false
+    // M6h // Physical-card transcription or digital pseudorandom deal.
+    property string drawMethod: "digital"
+    property bool manualReversed: false
+    property string manualMessage: ""
     property var reading: ({ready:false,cards:[]})
     property string lastError: ""
     property string localArtworkDirectory: "" // Session-only; no stored path
@@ -39,11 +44,48 @@ Rectangle {
     }
     onCatalogPageChanged: previewId=""
     onSpreadIdChanged: {
-        reading=({ready:false,cards:[]});
+        reading=drawMethod==="physical"
+            ? Physical.start(Deck.SPREADS,Deck.DECK.id,spreadId)
+            : ({ready:false,cards:[]});
+        manualMessage="";
         lastError="";
     }
 
+    function setDrawMethod(method) {
+        if(method!=="digital" && method!=="physical")return;
+        if(drawMethod===method)return;
+        drawMethod=method;
+        reading=method==="physical"
+            ? Physical.start(Deck.SPREADS,Deck.DECK.id,spreadId)
+            : ({ready:false,cards:[]});
+        manualReversed=false;
+        manualMessage="";
+        lastError="";
+    }
+    function addPhysicalCard() {
+        if(drawMethod!=="physical" || !inspectedCard)return;
+        const result=Physical.add(Deck.SPREADS,Deck.CARDS,reading,
+                                  inspectedCard.id,manualReversed);
+        if(!result.ok) {
+            manualMessage=result.reason;
+            return;
+        }
+        reading=result.state;
+        manualMessage=result.state.complete?"PHYSICAL SPREAD COMPLETE"
+            :"ENTER "+result.state.nextPosition;
+        manualReversed=false;
+        if(result.state.complete)viewMode="draw";
+    }
+    function undoPhysicalCard() {
+        if(drawMethod!=="physical")return;
+        const result=Physical.undo(Deck.SPREADS,Deck.CARDS,reading);
+        if(result.ok) {
+            reading=result.state;
+            manualMessage="UNDID LAST CARD";
+        }else manualMessage=result.reason;
+    }
     function drawCards() {
+        if(drawMethod!=="digital")return;
         // Math.random is a PRNG supplied by the existing Qt JS runtime.
         // Never claim a cryptographic RNG or guaranteed future prediction.
         const result=Deck.draw(spreadId,Math.random,reversals);

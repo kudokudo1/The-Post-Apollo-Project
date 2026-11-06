@@ -31,7 +31,7 @@ var ROUTES = {
   },
   "magick/astrology/transits": {
     title:"ASTROLOGY // TRANSITS",
-    note:"ASTROLOGICAL TRANSIT ANALYSIS REQUIRES A CHART, AN EPHEMERIS AND A CHOSEN CONVENTION. NOTHING IS CALCULATED HERE."
+    note:"M6C COMPARES TWO ACTUAL JPL GEOCENTRIC APPARENT ECLIPTIC LONGITUDE SNAPSHOTS IN THEIR RESPECTIVE DATE-DEPENDENT FRAMES. REF DEFAULTS TO FIRST SOURCE UTC; PIN REF CHOOSES ANOTHER SAMPLE. NOT A NATAL/HOUSE CHART, CROSS-EPOCH ASPECT ENGINE, INTERPRETATION OR CAUSAL TRANSIT READING."
   },
   "magick/planetary/hours": {
     title:"PLANETARY MAGICK // HOURS",
@@ -113,7 +113,8 @@ function visualForRoute(path) {
   return path === "magick/astrology/charts"
       || path === "magick/astrology/zodiac"
       || path === "magick/astrology/aspects"
-      || path === "magick/astrology/retrogrades";
+      || path === "magick/astrology/retrogrades"
+      || path === "magick/astrology/transits";
 }
 function isInterpretationImplemented(path) {
   return false; // No future route silently becomes a real reading.

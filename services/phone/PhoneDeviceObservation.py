@@ -152,7 +152,8 @@ def observe(*, backend: Callable[[], object] = _running_profile,
             return _result("PROFILE_ONLY", profile_id=profile_id, name="iPhone")
         raw_name = observed.get("alias")
         name = raw_name.strip() if type(raw_name) is str else ""
-        if not name or len(name) > 56 or not name.isprintable():
+        if (not name or len(name) > 56 or not name.isprintable()
+                or (type(raw_name) is str and not raw_name.isprintable())):
             name = "iPhone"
         if connected:
             return _result("BLUETOOTH_CONNECTED", profile_id=profile_id,

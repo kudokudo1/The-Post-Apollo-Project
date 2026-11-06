@@ -18,7 +18,15 @@ SCHEMA = "post-apollo.company-vector-host-bridge.v1"
 EXPECTED_QT_VERSION = "6.11.2"  # Fedora 44 / M14 build checkpoint.
 BUNDLE_PARTS = ("postapollo-vector-lab", "qtlocation-runtime", "lib64", "libQt6Location.so.6")
 MANIFEST_PARTS = ("postapollo-vector-lab", "qtlocation-runtime", "lib64", "qtlocation-m16-manifest.json")
-BUNDLE_SCHEMA = "post-apollo.company.qtlocation-runtime.v1"
+BUNDLE_SCHEMA = "post-apollo.company.qtlocation-runtime.v2"
+QML_BUNDLE_PATHS = (
+    ("postapollo-vector-lab", "qtlocation-runtime", "qml", "QtLocation", "libdeclarative_locationplugin.so"),
+    ("postapollo-vector-lab", "qtlocation-runtime", "qml", "QtLocation", "MapView.qml"),
+    ("postapollo-vector-lab", "qtlocation-runtime", "qml", "QtLocation", "plugins.qmltypes"),
+    ("postapollo-vector-lab", "qtlocation-runtime", "qml", "QtLocation", "qmldir"),
+)
+REQUIRED_HASHES = ("lib64/libQt6Location.so.6",) + tuple(
+    "qml/QtLocation/" + parts[-1] for parts in QML_BUNDLE_PATHS)
 LAB_FILES = (
     ("postapollo-vector-lab", "company-vector-build", "company-vector-probe"),
     ("postapollo-vector-lab", "maplibre-install", "lib64", "libQMapLibre.so.3.0.0"),
@@ -55,6 +63,7 @@ def runtime_environment(home: Path) -> dict[str, str]:
     prefix = home / "postapollo-vector-lab" / "maplibre-install"
     env = os.environ.copy()
     bundle_dir = home.joinpath(*BUNDLE_PARTS[:-1])
+    bundle_qml = home / "postapollo-vector-lab" / "qtlocation-runtime" / "qml"
     for variable, value in (
         ("LD_LIBRARY_PATH", prefix / "lib64"),
         ("QT_PLUGIN_PATH", prefix / "plugins"),
@@ -62,8 +71,11 @@ def runtime_environment(home: Path) -> dict[str, str]:
         ("QML2_IMPORT_PATH", prefix / "qml"),
     ):
         # Never inherit arbitrary Qt paths from the parent desktop session.
-        env[variable] = (str(bundle_dir) + ":" + str(value)
-                         if variable == "LD_LIBRARY_PATH" else str(value))
+        env[variable] = (
+            str(bundle_dir) + ":" + str(value) if variable == "LD_LIBRARY_PATH"
+            else str(bundle_qml) + ":" + str(value)
+                if variable in ("QML_IMPORT_PATH", "QML2_IMPORT_PATH")
+            else str(value))
     return env
 
 
@@ -92,22 +104,46 @@ def _check_host_qt() -> bool:
 def _bundle_valid(home: Path) -> bool:
     library = owned_path(home, BUNDLE_PARTS)
     manifest = owned_path(home, MANIFEST_PARTS)
-    if not library or not manifest:
+    qml_files = [owned_path(home, parts) for parts in QML_BUNDLE_PATHS]
+    if not library or not manifest or any(x is None for x in qml_files):
         return False
+    bundle_root = home / "postapollo-vector-lab" / "qtlocation-runtime"
+    # Do not permit an unverified sibling QML plugin or shared library.
+    expected_tree = {
+        ".": {"lib64", "qml"},
+        "lib64": {BUNDLE_PARTS[-1], MANIFEST_PARTS[-1]},
+        "qml": {"QtLocation"},
+        "qml/QtLocation": {parts[-1] for parts in QML_BUNDLE_PATHS},
+    }
     try:
+        for folder, expected in expected_tree.items():
+            current = bundle_root if folder == "." else bundle_root / folder
+            if {p.name for p in current.iterdir()} != expected:
+                return False
         doc = json.loads(manifest.read_text())
         if (set(doc) != {"schema", "version", "sha256"}
                 or doc["schema"] != BUNDLE_SCHEMA
-                or doc["version"] != EXPECTED_QT_VERSION):
+                or doc["version"] != EXPECTED_QT_VERSION
+                or set(doc["sha256"]) != set(REQUIRED_HASHES)):
             return False
-        hasher = hashlib.sha256()
-        with library.open("rb") as stream:
-            if stream.read(4) != bytes.fromhex("7f454c46"):
+        for relative in REQUIRED_HASHES:
+            data = bundle_root / relative
+            hasher = hashlib.sha256()
+            with data.open("rb") as stream:
+                for block in iter(lambda: stream.read(1 << 20), b""):
+                    hasher.update(block)
+            if hasher.hexdigest() != doc["sha256"][relative]:
                 return False
-            stream.seek(0)
-            for block in iter(lambda: stream.read(1 << 20), b""):
-                hasher.update(block)
-        return hasher.hexdigest() == doc["sha256"]
+        for part in (BUNDLE_PARTS, QML_BUNDLE_PATHS[0]):
+            with home.joinpath(*part).open("rb") as stream:
+                if stream.read(4) != bytes.fromhex("7f454c46"):
+                    return False
+        descriptor = home.joinpath(*QML_BUNDLE_PATHS[-1]).read_text()
+        entries = [line.strip() for line in descriptor.splitlines()]
+        return ("module QtLocation" in entries
+                and "typeinfo plugins.qmltypes" in entries
+                and any(line.startswith("plugin declarative_locationplugin")
+                        for line in entries))
     except (OSError, ValueError, TypeError):
         return False
 
@@ -120,6 +156,7 @@ def _dependencies_resolved(home: Path, env: dict[str, str]) -> bool:
         home.joinpath(*LAB_FILES[2]),
         home.joinpath(*LAB_FILES[4]),
         home.joinpath(*BUNDLE_PARTS),
+        home.joinpath(*QML_BUNDLE_PATHS[0]),
     )
     for artifact in checked:
         try:

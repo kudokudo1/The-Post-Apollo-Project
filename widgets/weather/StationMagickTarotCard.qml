@@ -11,10 +11,26 @@ Rectangle {
     property string localArtworkDirectory: ""
     property string positionLabel: ""
     readonly property bool hasCard: card !== null && card !== undefined
-    readonly property string localSource: hasCard
-        ? Deck.localArtworkUrl(localArtworkDirectory,card.id) : ""
+    // M6j // Only existing deck IDs and explicitly supplied local files.
+    // Try common camera image formats; never make a web request.
+    readonly property var artworkCandidates: hasCard
+        ? Deck.localArtworkCandidates(localArtworkDirectory,card.id) : []
+    property int artworkCandidateIndex: 0
+    readonly property string localSource:
+        artworkCandidateIndex<artworkCandidates.length
+        ? artworkCandidates[artworkCandidateIndex] : ""
     readonly property bool hasLocalArt:
         art.status===Image.Ready && localSource!==""
+    readonly property string artworkStatus: !hasCard
+        ? "NO CARD" : artworkCandidates.length===0
+        ? "NO CARD IMAGES INSTALLED"
+        : hasLocalArt ? "PRIVATE LOCAL ART READY"
+        : art.status===Image.Loading ? "LOADING LOCAL IMAGE"
+        : art.status===Image.Error &&
+          artworkCandidateIndex===artworkCandidates.length-1
+        ? "IMAGE MISSING // CHECK CARD FILE"
+        : "CHECKING LOCAL CARD PHOTO"
+    onArtworkCandidatesChanged: artworkCandidateIndex=0
     color: Colors.black
     border.width: 1
     border.color: hasCard ? Colors.magenta : Colors.blue
@@ -60,9 +76,12 @@ Rectangle {
                      "px monospace";
             ctx.textAlign="center";
             ctx.textBaseline="middle";
-            ctx.fillText(face.hasCard
-                ? String(face.card.index+1).padStart(2,"0") : "78",
-                cx,cy,Math.max(20,w*0.3));
+            // Number-only placeholders looked like real deck artwork.
+            // A labelled original fallback avoids that confusion.
+            ctx.font="bold "+Math.round(Math.max(8,Math.min(15,w*0.095)))+
+                     "px monospace";
+            ctx.fillText("NO PHOTO",cx,cy,
+                         Math.max(20,w*0.65));
             ctx.restore();
         }
     }
@@ -75,6 +94,11 @@ Rectangle {
         cache: false
         fillMode: Image.PreserveAspectFit
         visible: face.hasLocalArt
+        onStatusChanged: {
+            if(status===Image.Error &&
+               face.artworkCandidateIndex+1<face.artworkCandidates.length)
+                face.artworkCandidateIndex++;
+        }
         transform: Rotation {
             origin.x: art.width/2
             origin.y: art.height/2
@@ -123,7 +147,8 @@ Rectangle {
                 horizontalAlignment: Text.AlignHCenter
                 elide: Text.ElideRight
                 text: face.reversed ? "REVERSED"
-                        : face.hasLocalArt ? "LOCAL ART" : "APOLLO ORIGINAL"
+                        : face.hasLocalArt ? "LOCAL PHOTO"
+                        : "PHOTO NOT LOADED"
             }
         }
     }

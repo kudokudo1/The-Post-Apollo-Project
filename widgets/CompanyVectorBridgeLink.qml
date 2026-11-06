@@ -80,6 +80,22 @@ Item {
         return object.requestLaunch(Boolean(online));
     }
 
+    // Quickshell only passes the attached QProcess child PID here. The
+    // optional native C++ bridge opens a genuine kernel pidfd and transfers
+    // it over the existing QPA wl_client. Protocol v1 or missing plugin
+    // returns false without interfering with the standalone native map.
+    function reportChildPid(pid) {
+        const object = bridgeObject;
+        if (!bridgeEnabled || !object || !object.wireBound
+                || typeof object.reportNativeChildPid !== "function")
+            return false;
+        const actual = Number(pid);
+        if (!isFinite(actual) || actual <= 0
+                || actual >= 2147483648 || Math.floor(actual) !== actual)
+            return false;
+        return object.reportNativeChildPid(actual);
+    }
+
     function closeIntent() {
         const object = bridgeObject;
         if (bridgeEnabled && object)

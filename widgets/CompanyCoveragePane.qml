@@ -29,6 +29,7 @@ Item {
     // Explicit user intent and lifecycle notifications for the optional
     // Company M26 Wayland bridge. The M15 launcher remains authoritative.
     signal nativeVectorLaunchRequested(bool online)
+    signal nativeVectorChildStarted(int pid)
     signal nativeVectorClosed()
     property string selectedHubId: ""
     readonly property var hubRows: hubStore.saved && Array.isArray(hubStore.saved.hubs)
@@ -109,6 +110,11 @@ Item {
         // Also clear the candidate when the Qt process exits on its own,
         // not only when CLOSE VECTOR or a mode change stops it.
         onRunningChanged: if (!running) root.nativeVectorClosed()
+        onNativeChildStarted: function(pid) {
+            // The controller originated this from the attached QProcess
+            // rather than a user-entered PID or a detached launcher.
+            root.nativeVectorChildStarted(pid);
+        }
     }
 
     CompanyHubStore {

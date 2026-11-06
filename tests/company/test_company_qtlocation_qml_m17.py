@@ -145,7 +145,7 @@ class BridgeTests(unittest.TestCase):
     stage = BundleTests.stage
 
     def setUp(self):
-        super().setUp()
+        BundleTests.setUp(self)
         for parts in bridge.LAB_FILES:
             p = self.home.joinpath(*parts)
             p.parent.mkdir(parents=True, exist_ok=True)

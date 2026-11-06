@@ -22,6 +22,9 @@ Rectangle {
         subjectRoute === "magick/planetary/correspondences"
     readonly property bool planetaryHoursRoute:
         subjectRoute === "magick/planetary/hours"
+    // M6f // Existing GRIMOIRE reference route gets a source-only atlas.
+    readonly property bool grimoireAtlasRoute:
+        subjectRoute === "magick/grimoire/references"
     readonly property bool independentScreen:
         standaloneAstrology || lensesLanding
     // Supplied by the existing Station root; no independent clock.
@@ -108,6 +111,8 @@ Rectangle {
                              ? lensesReference
                              : magickPane.planetaryHoursRoute
                              ? planetaryHoursReference
+                             : magickPane.grimoireAtlasRoute
+                             ? grimoireAtlasReference
                              : magickPane.showCelestial
                              ? celestialReference
                              : magickPane.subjectRoute.indexOf("magick/lunar-solar/") === 0
@@ -150,6 +155,13 @@ Rectangle {
             onRouteRequested: function(path) {
                 magickPane.routeRequested(path);
             }
+        }
+    }
+
+    // M6f // Read-only fixed-corpus Agrippa reverse index. No data service.
+    Component {
+        id: grimoireAtlasReference
+        StationMagickGrimoireAtlasPane {
         }
     }
 

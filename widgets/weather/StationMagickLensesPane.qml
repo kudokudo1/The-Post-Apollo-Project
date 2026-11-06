@@ -33,7 +33,7 @@ Rectangle {
         {
             title:"SYMBOLIC REFERENCES",
             description:"CULTURAL CORRESPONDENCES / TEXTS",
-            status:"LIBRARY NOT CONNECTED",
+            status:"AGRIPPA INDEX / READ-ONLY",
             path:"magick/grimoire/references",
             color:Colors.magenta
         }

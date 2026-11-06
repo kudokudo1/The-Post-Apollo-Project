@@ -32,6 +32,10 @@ on:
       - 'widgets/weather/StationMagickPlanetaryHoursPane.qml'
       - 'widgets/weather/StationMagickAgrippaCorrespondencePolicy.js'
       - 'widgets/weather/StationMagickAgrippaCorrespondencesPane.qml'
+      - 'widgets/weather/StationMagickGrimoireAtlasPolicy.js'
+      - 'widgets/weather/StationMagickGrimoireAtlasPane.qml'
+      - 'tests/weather/test_magick_grimoire_atlas_m6f.js'
+      - 'tests/weather/test_magick_agrippa_correspondences_m6e.js'
       - 'widgets/weather/StationMagickLensesPane.qml'
       - 'tests/weather/test_magick_agrippa_correspondences_m6e.js'
       - 'tests/weather/test_magick_planetary_hours_m6d.js'
@@ -89,6 +93,8 @@ jobs:
         run: node --test tests/weather/test_magick_planetary_hours_m6d.js
       - name: Verify M6e historical Agrippa provenance and LENSES visual matrix
         run: node --test tests/weather/test_magick_agrippa_correspondences_m6e.js
+      - name: Verify M6f edition-specific GRIMOIRE reverse index and overlap network
+        run: node --test tests/weather/test_magick_grimoire_atlas_m6f.js
       - name: Preserve MAGICK M4/M5 sources and interaction behavior
         run: |
           node --test tests/weather/test_magick_celestial_visual_m5.js

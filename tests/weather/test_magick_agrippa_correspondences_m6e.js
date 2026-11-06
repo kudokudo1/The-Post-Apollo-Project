@@ -135,7 +135,9 @@ test("M6e remains inside accepted LENSES navigation, not an accidental GRIMOIRE 
     assert.match(subject,/id: lensesReference\s*StationMagickLensesPane/);
     assert.match(routes,/M6E ADDS AN AGRIPPA 1651 ENGLISH/);
     assert.match(routes,/"magick\/grimoire\/references": \{/);
-    assert.match(routes,/NO SOURCED, EDITION-AWARE TEXT OR CORRESPONDENCE CATALOGUE/);
+    // M6f now implements the formerly absent source-index route, but does not
+    // replace the existing M6e LENSES page or create a journal.
+    assert.match(routes,/M6F SOURCE ATLAS INDEXES THE EXISTING M6E AGRIPPA/);
     assert.match(m6d,/StationMagickPlanetaryHoursPolicy\.js/);
 });
 test("M6e panel has real WHEEL/MATRIX selection, chapter and reference-only safety label",()=>{

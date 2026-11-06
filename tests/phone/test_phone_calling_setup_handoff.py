@@ -92,6 +92,22 @@ class CallingSetupGuiTests(unittest.TestCase):
         self.assertNotIn("pkexec", " ".join(argv))
         self.assertNotIn("dnf5", " ".join(argv))
 
+    def test_verified_system_dnf_alias_does_not_block_embedded_stage(self):
+        launcher = mock.Mock()
+        paths = {
+            "foot": "/usr/bin/foot", "python3": "/usr/bin/python3",
+            "pkexec": "/usr/bin/pkexec", "dnf": "/usr/bin/dnf",
+        }
+        # Shared discovery verifies this alias resolves specifically to dnf5.
+        with mock.patch.object(gui, "trusted_dnf5", return_value="/usr/bin/dnf"):
+            result = gui.open_support(
+                prerequisite=lambda: evidence(), is_fedora=lambda: True,
+                find=paths.get, launcher=launcher, already_open=lambda: False)
+        self.locked(result)
+        self.assertEqual(result["status"], "STAGED_TERMINAL_REQUESTED")
+        self.assertEqual(result["missingTools"], [])
+        launcher.assert_called_once()
+
     def test_typed_backend_unavailable_if_neither_package_tool_is_present(self):
         launcher = mock.Mock()
         paths = {

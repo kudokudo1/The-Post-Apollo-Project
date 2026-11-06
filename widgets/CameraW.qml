@@ -59,18 +59,14 @@ PanelWindow {
     // Typed Sway rectangle deltas only; never expose browser titles or logins.
     property var zoomWebRectDelta: null
     property string zoomWebIdentity: "identity-1"
-    // The Zoom guest fills the REAL content slot below Camera's header and
-    // mode row. Fixed offsets reserved a phantom footer and clipped Join.
-    // These live QML item positions track layout/size changes reactively.
-    readonly property int zoomBayInset:
-        Math.max(0, Math.round(cameraPage.x + cameraPage.parent.x))
-    readonly property int zoomBayTop:
-        Math.max(0, Math.round(cameraPage.y + cameraPage.parent.y))
-    // Leave only a thin border: the Zoom client content occupies the bay.
+    // Camera's Zoom guest has an independent frame-owned viewport. Do not
+    // derive compositor placement from the shared Capture/Gallery page.
+    // A single measured rectangle feeds host placement and the input hole.
+    readonly property int zoomBayInset: Math.max(0, Math.round(zoomViewport.x))
+    readonly property int zoomBayTop: Math.max(0, Math.round(zoomViewport.y))
     readonly property int zoomBayBottom: 2
-    readonly property int zoomBayWidth: Math.max(0, Math.round(cameraPage.width))
-    readonly property int zoomBayHeight:
-        Math.max(0, Math.round(frame.height - zoomBayTop - zoomBayBottom))
+    readonly property int zoomBayWidth: Math.max(0, Math.round(zoomViewport.width))
+    readonly property int zoomBayHeight: Math.max(0, Math.round(zoomViewport.height))
     property bool zoomWebNeedsRealign: false
 
     function scheduleZoomWebRealign() {
@@ -641,10 +637,10 @@ PanelWindow {
         Region {
             // Coordinates relative to the enclosing frame input region.
             // No hole until the browser actor and exact bay are confirmed.
-            x: camera.zoomBayInset
-            y: camera.zoomBayTop
-            width: camera.zoomWebDocked ? camera.zoomBayWidth : 0
-            height: camera.zoomWebDocked ? camera.zoomBayHeight : 0
+            x: Math.round(zoomViewport.x)
+            y: Math.round(zoomViewport.y)
+            width: camera.zoomWebDocked ? Math.round(zoomViewport.width) : 0
+            height: camera.zoomWebDocked ? Math.round(zoomViewport.height) : 0
             intersection: Intersection.Subtract
         }
     }
@@ -811,7 +807,496 @@ PanelWindow {
             visible: camera.zoomWebDocked
         }
 
+        // One frame-owned viewport for the real web actor, its input mask
+        // and the local fallback UI. It is independent of cameraPage's
+        // size/visibility, so the browser fills the body in every chassis.
+        Item {
+            id: zoomViewport
+            x: cameraBodyColumn.x
+            y: cameraBodyColumn.y + cameraModes.y
+               + cameraModes.height + cameraBodyColumn.spacing
+            width: Math.max(0, cameraBodyColumn.width)
+            height: Math.max(0, frame.height - y - camera.zoomBayBottom)
+            visible: camera.menuOpen && camera.activeView === "zoom"
+
+            Flickable {
+                id: zoomPage
+                anchors.fill: parent
+                visible: camera.activeView === "zoom" && !camera.zoomWebDocked
+                clip: true
+                contentHeight: zoomContent.implicitHeight
+                boundsBehavior: Flickable.StopAtBounds
+
+                Column {
+                    id: zoomContent
+                    width: zoomPage.width
+                    spacing: 12
+
+                    GohuText {
+                        width: parent.width
+                        color: Colors.yellow
+                        font.pixelSize: 11
+                        wrapMode: Text.WordWrap
+                        text: "ZOOM WEB // " + camera.zoomWebState
+                              + " // Login and Join/New Meeting live in the hosted browser view when docked."
+                    }
+                    GohuText {
+                        width: parent.width
+                        visible: camera.zoomWebRectDelta !== null
+                        color: Colors.orange
+                        font.pixelSize: 10
+                        wrapMode: Text.WordWrap
+                        text: camera.zoomWebRectDelta
+                              ? "DOCK DELTA // X " + camera.zoomWebRectDelta[0]
+                                + " / Y " + camera.zoomWebRectDelta[1]
+                                + " / W " + camera.zoomWebRectDelta[2]
+                                + " / H " + camera.zoomWebRectDelta[3]
+                              : ""
+                    }
+
+                    ActionButton {
+                        width: parent.width
+                        height: 38
+                        label: "RETRY ZOOM WEB HOST"
+                        labelPixelSize: 11
+                        accentColor: Colors.magenta
+                        available: !camera.zoomWebBusy
+                        onLeftClicked: camera.enterZoomWeb()
+                    }
+                    Row {
+                        id: zoomHeaderRow
+                        width: parent.width
+                        height: 35
+                        spacing: 8
+                        GohuText {
+                            width: parent.width - 136
+                            height: 33
+                            font.pixelSize: 16
+                            color: Colors.magenta
+                            verticalAlignment: Text.AlignVCenter
+                            text: "ZOOM // MEETINGS"
+                        }
+                        ActionButton {
+                            width: 128
+                            height: 33
+                            label: "↓ DOWNLOAD"
+                            visible: false // Canonical control is the Camera top-right header.
+                            labelPixelSize: 11
+                            accentColor: Colors.magenta
+                            onLeftClicked: {
+                                camera.zoomSetupVisible = !camera.zoomSetupVisible;
+                                if (camera.zoomSetupVisible)
+                                    Qt.callLater(function() {
+                                        zoomPage.contentY = Math.max(0, zoomPage.contentHeight - zoomPage.height);
+                                    });
+                            }
+                        }
+                    }
+
+                    Row {
+                        id: zoomStatusRail
+                        width: parent.width
+                        height: 39
+                        spacing: 5
+                        Repeater {
+                            model: [
+                                {name: "APP", value: camera.zoomClientStatus === null
+                                        ? "CHECKING" : camera.zoomClientStatus.available
+                                          ? "INSTALLED" : "MISSING"},
+                                {name: "WEB CHECK", value: camera.zoomInternetState},
+                                {name: "ZOOM CHECK", value: camera.zoomServiceState},
+                                {name: "LOGIN", value: "UNKNOWN"}
+                            ]
+                            Rectangle {
+                                width: (zoomStatusRail.width - 3 * zoomStatusRail.spacing) / 4
+                                height: 37
+                                color: Colors.dark
+                                border.width: 1
+                                border.color: modelData.value === "REACHABLE"
+                                              || modelData.value === "INSTALLED"
+                                              ? Colors.cyan : modelData.value === "UNREACHABLE"
+                                                || modelData.value === "MISSING"
+                                                ? Colors.red : Colors.orange
+                                GohuText {
+                                    anchors.centerIn: parent
+                                    width: parent.width - 4
+                                    font.pixelSize: 9
+                                    horizontalAlignment: Text.AlignHCenter
+                                    elide: Text.ElideRight
+                                    color: Colors.white
+                                    text: modelData.name + " // " + modelData.value
+                                }
+                            }
+                        }
+                    }
+                    GohuText {
+                        width: parent.width
+                        wrapMode: Text.WordWrap
+                        font.pixelSize: 10
+                        color: Colors.cyan
+                        text: "ONE WEB CHECK ON ENTRY // FAILED HTTPS PROBES MEAN UNVERIFIED, NOT OFFLINE // ZOOM LOGIN NOT VERIFIED"
+                    }
+
+                    ActionButton {
+                        width: parent.width
+                        height: 48
+                        label: "OPEN / FOCUS ZOOM APP"
+                        labelPixelSize: 14
+                        accentColor: Colors.magenta
+                        available: !camera.busy && camera.zoomClientStatus !== null
+                                   && camera.zoomClientStatus.available
+                        onLeftClicked: camera.openZoomDirectly()
+                    }
+                    GohuText {
+                        width: parent.width
+                        wrapMode: Text.WordWrap
+                        font.pixelSize: 11
+                        color: Colors.white
+                        text: "THEN IN ZOOM: SIGN IN IF NEEDED → NEW MEETING OR JOIN. CAMERA CANNOT START A ZOOM CALL WITHOUT THE PROVIDER'S AUTHENTICATED MEETING CONTROLS."
+                    }
+
+                    Rectangle {
+                        width: parent.width
+                        height: 2
+                        color: Colors.cyan
+                    }
+
+                    GohuText {
+                        width: parent.width
+                        font.pixelSize: 13
+                        color: Colors.white
+                        text: "SOCIAL IDENTITY // " + camera.zoomIdentityId
+                    }
+
+                    GohuText {
+                        width: parent.width
+                        wrapMode: Text.WordWrap
+                        font.pixelSize: 10
+                        color: Colors.cyan
+                        text: "ACCOUNT NAMES LIVE FROM SOCIAL // USER SETTINGS // ACCOUNT NAMES // ZOOM"
+                    }
+
+                    GohuText {
+                        width: parent.width
+                        font.pixelSize: 11
+                        color: Colors.yellow
+                        text: camera.zoomAccountNames.length
+                              ? "SAVED ZOOM NAMES // " + camera.zoomAccountNames.length
+                              : "NO ZOOM ACCOUNT NAMES FOR THIS SOCIAL IDENTITY"
+                    }
+
+                    Repeater {
+                        model: camera.zoomAccountNames
+                        ActionButton {
+                            width: zoomContent.width
+                            height: 38
+                            label: modelData.label + " // ALIAS ONLY"
+                            labelPixelSize: 11
+                            accentColor: Colors.white
+                            selected: camera.selectedZoomAccountId === modelData.id
+                            onLeftClicked: camera.selectedZoomAccountId = modelData.id
+                        }
+                    }
+
+                    GohuText {
+                        width: parent.width
+                        wrapMode: Text.WordWrap
+                        font.pixelSize: 10
+                        color: Colors.orange
+                        text: "ZOOM SIGN-IN // UNVERIFIED. The native Zoom client owns sign-in and meeting controls. Social identities and aliases never block opening this mode or prove Zoom login."
+                    }
+
+                    Rectangle {
+                        width: parent.width
+                        height: 2
+                        color: Colors.cyan
+                    }
+
+                    GohuText {
+                        width: parent.width
+                        font.pixelSize: 12
+                        color: camera.zoomClientStatus && camera.zoomClientStatus.available
+                               ? Colors.cyan : Colors.orange
+                        text: camera.zoomClientStatus === null
+                              ? "ZOOM CLIENT // NOT CHECKED"
+                              : camera.zoomClientStatus.available
+                                ? "ZOOM CLIENT // INSTALLED (" + camera.zoomClientStatus.client.toUpperCase() + ")"
+                                : "ZOOM CLIENT // NOT FOUND"
+                    }
+
+                    // OPEN / FOCUS above also works when Flatpak has a
+                    // background process but no detected window.
+
+                    GohuText {
+                        width: parent.width
+                        wrapMode: Text.WordWrap
+                        font.pixelSize: 11
+                        color: camera.zoomLaunchState === "VISIBLE"
+                               ? Colors.cyan
+                               : camera.zoomLaunchState === "FAILED"
+                                 || camera.zoomLaunchState === "NOT_FOUND"
+                                 ? Colors.red : Colors.yellow
+                        text: camera.zoomLaunchMessage
+                    }
+
+                    ActionButton {
+                        width: parent.width
+                        height: 34
+                        visible: camera.zoomLaunchState === "FAILED"
+                                 || camera.zoomLaunchState === "NOT_FOUND"
+                                 || camera.zoomLaunchState === "RUNNING_NO_WINDOW"
+                        label: "CHECK ZOOM WINDOW / PROCESS"
+                        labelPixelSize: 10
+                        accentColor: Colors.cyan
+                        available: !camera.busy
+                        onLeftClicked: camera.checkZoomWindow()
+                    }
+
+                    Column {
+                        width: parent.width
+                        spacing: 5
+                        visible: camera.zoomClientStatus !== null
+                                 && camera.zoomClientStatus.client === "flatpak"
+                                 && (camera.zoomLaunchState === "FAILED"
+                                     || camera.zoomLaunchState === "NOT_FOUND"
+                                     || camera.zoomLaunchState === "RUNNING_NO_WINDOW"
+                                     || camera.zoomLaunchState === "UNKNOWN")
+                        GohuText {
+                            width: parent.width
+                            wrapMode: Text.WordWrap
+                            font.pixelSize: 10
+                            color: Colors.orange
+                            text: "STARTUP DIAGNOSTICS // RUN IN TERMINAL TO SEE ZOOM'S REAL ERROR OUTPUT. NO AUTOMATIC PERMISSION CHANGES."
+                        }
+                        TextField {
+                            width: parent.width
+                            height: 32
+                            readOnly: true
+                            selectByMouse: true
+                            font.pixelSize: 10
+                            color: Colors.white
+                            text: camera.zoomClientStatus.installation === "system"
+                                  ? "flatpak run --system us.zoom.Zoom"
+                                  : "flatpak run --user us.zoom.Zoom"
+                            background: Rectangle {
+                                color: Colors.black
+                                border.width: 1
+                                border.color: Colors.cyan
+                            }
+                        }
+                    }
+
+                    // Stay inside Camera: an absent client gets explicit
+                    // local setup guidance rather than a dead launch control.
+                    Column {
+                        id: zoomInstallGuide
+                        width: parent.width
+                        spacing: 10
+                        visible: camera.zoomSetupVisible
+
+                        Rectangle {
+                            width: parent.width
+                            height: 2
+                            color: Colors.magenta
+                        }
+                        GohuText {
+                            width: parent.width
+                            height: 22
+                            font.pixelSize: 13
+                            color: Colors.magenta
+                            text: "ZOOM // INSTALL REQUIRED"
+                        }
+                        GohuText {
+                            width: parent.width
+                            wrapMode: Text.WordWrap
+                            font.pixelSize: 11
+                            color: Colors.white
+                            text: "A Zoom desktop client must be installed to start meetings. The Zoom mode stays available, and no installation starts automatically."
+                        }
+
+                        GohuText {
+                            width: parent.width
+                            font.pixelSize: 11
+                            color: Colors.cyan
+                            text: "OPTION A // OFFICIAL FEDORA RPM"
+                        }
+                        GohuText {
+                            width: parent.width
+                            wrapMode: Text.WordWrap
+                            font.pixelSize: 10
+                            color: Colors.white
+                            text: "Download Zoom Workplace for Linux (Fedora, 64-bit) from Zoom. On Silverblue, install the saved RPM using rpm-ostree and reboot when ready."
+                        }
+                        ActionButton {
+                            width: parent.width
+                            height: 36
+                            label: "ZOOM OFFICIAL DOWNLOAD // OPENS BROWSER"
+                            labelPixelSize: 10
+                            accentColor: Colors.cyan
+                            // User-clicked navigation only; do not open browser on tab entry.
+                            onLeftClicked: Qt.openUrlExternally("https://zoom.us/download?os=linux")
+                        }
+                        TextField {
+                            width: parent.width
+                            height: 34
+                            readOnly: true
+                            selectByMouse: true
+                            font.pixelSize: 10
+                            color: Colors.white
+                            text: "sudo rpm-ostree install ~/Downloads/zoom_x86_64.rpm"
+                            background: Rectangle {
+                                color: Colors.black
+                                border.width: 1
+                                border.color: Colors.cyan
+                            }
+                        }
+                        GohuText {
+                            width: parent.width
+                            wrapMode: Text.WordWrap
+                            font.pixelSize: 10
+                            color: Colors.orange
+                            text: "Use the actual downloaded RPM filename. The rpm-ostree command stages a new deployment; it does not change the running system until reboot."
+                        }
+                        ActionButton {
+                            width: parent.width
+                            height: 38
+                            label: "INSTALL DOWNLOADED OFFICIAL RPM"
+                            labelPixelSize: 11
+                            accentColor: Colors.magenta
+                            available: !camera.busy
+                            onLeftClicked: camera.prepareZoomInstall("official-rpm")
+                        }
+
+                        GohuText {
+                            width: parent.width
+                            font.pixelSize: 11
+                            color: Colors.cyan
+                            text: "OPTION B // FLATHUB COMMUNITY PACKAGE"
+                        }
+                        TextField {
+                            width: parent.width
+                            height: 34
+                            readOnly: true
+                            selectByMouse: true
+                            font.pixelSize: 10
+                            color: Colors.white
+                            text: "flatpak install flathub us.zoom.Zoom"
+                            background: Rectangle {
+                                color: Colors.black
+                                border.width: 1
+                                border.color: Colors.cyan
+                            }
+                        }
+                        GohuText {
+                            width: parent.width
+                            wrapMode: Text.WordWrap
+                            font.pixelSize: 10
+                            color: Colors.orange
+                            text: "The Zoom package on Flathub is community-maintained and unverified by Zoom. No installation is automatic."
+                        }
+                        ActionButton {
+                            width: parent.width
+                            height: 38
+                            label: "INSTALL COMMUNITY FLATPAK"
+                            labelPixelSize: 11
+                            accentColor: Colors.magenta
+                            available: !camera.busy
+                            onLeftClicked: camera.prepareZoomInstall("community-flatpak")
+                        }
+
+                        Column {
+                            id: zoomInstallConfirm
+                            width: parent.width
+                            spacing: 8
+                            visible: camera.zoomInstallChoice !== ""
+
+                            Rectangle {
+                                width: parent.width
+                                height: 2
+                                color: Colors.yellow
+                            }
+                            GohuText {
+                                width: parent.width
+                                height: 22
+                                font.pixelSize: 12
+                                color: Colors.yellow
+                                text: "CONFIRM // INSTALL ZOOM"
+                            }
+                            GohuText {
+                                width: parent.width
+                                font.pixelSize: 11
+                                color: Colors.white
+                                wrapMode: Text.WordWrap
+                                text: camera.zoomInstallChoice === "official-rpm"
+                                      ? "Install the signed Zoom RPM already downloaded to ~/Downloads/zoom_x86_64.rpm. May request administrator authorization. Stages a system deployment; reboot is manual."
+                                      : "Install the community-maintained, unverified Zoom Flatpak into your user account. Adds the per-user Flathub repository if needed and downloads dependencies. No system-wide install."
+                            }
+                            Row {
+                                width: parent.width
+                                height: 42
+                                spacing: 9
+                                ActionButton {
+                                    width: (parent.width - parent.spacing) * 0.62
+                                    height: 40
+                                    label: "CONFIRM INSTALL"
+                                    labelPixelSize: 12
+                                    accentColor: Colors.magenta
+                                    available: !camera.busy
+                                    onLeftClicked: camera.confirmZoomInstall()
+                                }
+                                ActionButton {
+                                    width: (parent.width - parent.spacing) * 0.38
+                                    height: 40
+                                    label: "CANCEL"
+                                    labelPixelSize: 11
+                                    accentColor: Colors.cyan
+                                    available: !camera.busy
+                                    onLeftClicked: camera.zoomInstallChoice = ""
+                                }
+                            }
+                        }
+                        ActionButton {
+                            width: parent.width
+                            height: 38
+                            label: "RECHECK ZOOM AFTER INSTALL"
+                            labelPixelSize: 11
+                            accentColor: Colors.yellow
+                            available: !camera.busy
+                            onLeftClicked: camera.run("zoomStatus", ["zoom-status"])
+                        }
+                    }
+
+                    GohuText {
+                        width: parent.width
+                        visible: camera.zoomInstallNotice !== ""
+                        wrapMode: Text.WordWrap
+                        font.pixelSize: 11
+                        color: Colors.yellow
+                        text: camera.zoomInstallNotice
+                    }
+
+                    GohuText {
+                        width: parent.width
+                        wrapMode: Text.WordWrap
+                        font.pixelSize: 11
+                        color: Colors.white
+                        text: "Zoom opens its official local app. Sign in, start, and join meetings there. No passwords or OAuth tokens are shared with Camera."
+                    }
+
+                    GohuText {
+                        width: parent.width
+                        wrapMode: Text.WordWrap
+                        font.pixelSize: 10
+                        color: Colors.orange
+                        text: "EMBEDDED VIDEO // NOT YET CONNECTED. Requires separately validated Zoom SDK and Stage Director containment."
+                    }
+                }
+            }
+
+        }
+
         Column {
+            id: cameraBodyColumn
             anchors.fill: parent
             anchors.margins: 18
             spacing: 12
@@ -934,12 +1419,10 @@ PanelWindow {
             Item {
                 id: cameraPage
                 width: parent.width
-                // Give Zoom the full body BEFORE hosting starts, not only
-                // after dock verification. One stable page/bay height prevents
-                // the initial short fallback layout becoming an old browser
-                // height during the move/resize handoff.
-                height: camera.activeView === "zoom"
-                        ? camera.zoomBayHeight : frame.height - 169
+                // Capture, Gallery and Cleanup keep their existing shared
+                // page. Zoom is hosted by the sibling zoomViewport instead.
+                visible: camera.activeView !== "zoom"
+                height: frame.height - 169
 
                 Flickable {
                     id: capturePage
@@ -1523,480 +2006,6 @@ PanelWindow {
                                 : camera.lastTrashReceipt
                                   ? camera.lastTrashReceipt
                                   : "TRASH IS REVERSIBLE // NOT PERMANENT DELETE"
-                        }
-                    }
-                }
-
-                Flickable {
-                    id: zoomPage
-                    anchors.fill: parent
-                    visible: camera.activeView === "zoom" && !camera.zoomWebDocked
-                    clip: true
-                    contentHeight: zoomContent.implicitHeight
-                    boundsBehavior: Flickable.StopAtBounds
-
-                    Column {
-                        id: zoomContent
-                        width: zoomPage.width
-                        spacing: 12
-
-                        GohuText {
-                            width: parent.width
-                            color: Colors.yellow
-                            font.pixelSize: 11
-                            wrapMode: Text.WordWrap
-                            text: "ZOOM WEB // " + camera.zoomWebState
-                                  + " // Login and Join/New Meeting live in the hosted browser view when docked."
-                        }
-                        GohuText {
-                            width: parent.width
-                            visible: camera.zoomWebRectDelta !== null
-                            color: Colors.orange
-                            font.pixelSize: 10
-                            wrapMode: Text.WordWrap
-                            text: camera.zoomWebRectDelta
-                                  ? "DOCK DELTA // X " + camera.zoomWebRectDelta[0]
-                                    + " / Y " + camera.zoomWebRectDelta[1]
-                                    + " / W " + camera.zoomWebRectDelta[2]
-                                    + " / H " + camera.zoomWebRectDelta[3]
-                                  : ""
-                        }
-
-                        ActionButton {
-                            width: parent.width
-                            height: 38
-                            label: "RETRY ZOOM WEB HOST"
-                            labelPixelSize: 11
-                            accentColor: Colors.magenta
-                            available: !camera.zoomWebBusy
-                            onLeftClicked: camera.enterZoomWeb()
-                        }
-                        Row {
-                            id: zoomHeaderRow
-                            width: parent.width
-                            height: 35
-                            spacing: 8
-                            GohuText {
-                                width: parent.width - 136
-                                height: 33
-                                font.pixelSize: 16
-                                color: Colors.magenta
-                                verticalAlignment: Text.AlignVCenter
-                                text: "ZOOM // MEETINGS"
-                            }
-                            ActionButton {
-                                width: 128
-                                height: 33
-                                label: "↓ DOWNLOAD"
-                                visible: false // Canonical control is the Camera top-right header.
-                                labelPixelSize: 11
-                                accentColor: Colors.magenta
-                                onLeftClicked: {
-                                    camera.zoomSetupVisible = !camera.zoomSetupVisible;
-                                    if (camera.zoomSetupVisible)
-                                        Qt.callLater(function() {
-                                            zoomPage.contentY = Math.max(0, zoomPage.contentHeight - zoomPage.height);
-                                        });
-                                }
-                            }
-                        }
-
-                        Row {
-                            id: zoomStatusRail
-                            width: parent.width
-                            height: 39
-                            spacing: 5
-                            Repeater {
-                                model: [
-                                    {name: "APP", value: camera.zoomClientStatus === null
-                                            ? "CHECKING" : camera.zoomClientStatus.available
-                                              ? "INSTALLED" : "MISSING"},
-                                    {name: "WEB CHECK", value: camera.zoomInternetState},
-                                    {name: "ZOOM CHECK", value: camera.zoomServiceState},
-                                    {name: "LOGIN", value: "UNKNOWN"}
-                                ]
-                                Rectangle {
-                                    width: (zoomStatusRail.width - 3 * zoomStatusRail.spacing) / 4
-                                    height: 37
-                                    color: Colors.dark
-                                    border.width: 1
-                                    border.color: modelData.value === "REACHABLE"
-                                                  || modelData.value === "INSTALLED"
-                                                  ? Colors.cyan : modelData.value === "UNREACHABLE"
-                                                    || modelData.value === "MISSING"
-                                                    ? Colors.red : Colors.orange
-                                    GohuText {
-                                        anchors.centerIn: parent
-                                        width: parent.width - 4
-                                        font.pixelSize: 9
-                                        horizontalAlignment: Text.AlignHCenter
-                                        elide: Text.ElideRight
-                                        color: Colors.white
-                                        text: modelData.name + " // " + modelData.value
-                                    }
-                                }
-                            }
-                        }
-                        GohuText {
-                            width: parent.width
-                            wrapMode: Text.WordWrap
-                            font.pixelSize: 10
-                            color: Colors.cyan
-                            text: "ONE WEB CHECK ON ENTRY // FAILED HTTPS PROBES MEAN UNVERIFIED, NOT OFFLINE // ZOOM LOGIN NOT VERIFIED"
-                        }
-
-                        ActionButton {
-                            width: parent.width
-                            height: 48
-                            label: "OPEN / FOCUS ZOOM APP"
-                            labelPixelSize: 14
-                            accentColor: Colors.magenta
-                            available: !camera.busy && camera.zoomClientStatus !== null
-                                       && camera.zoomClientStatus.available
-                            onLeftClicked: camera.openZoomDirectly()
-                        }
-                        GohuText {
-                            width: parent.width
-                            wrapMode: Text.WordWrap
-                            font.pixelSize: 11
-                            color: Colors.white
-                            text: "THEN IN ZOOM: SIGN IN IF NEEDED → NEW MEETING OR JOIN. CAMERA CANNOT START A ZOOM CALL WITHOUT THE PROVIDER'S AUTHENTICATED MEETING CONTROLS."
-                        }
-
-                        Rectangle {
-                            width: parent.width
-                            height: 2
-                            color: Colors.cyan
-                        }
-
-                        GohuText {
-                            width: parent.width
-                            font.pixelSize: 13
-                            color: Colors.white
-                            text: "SOCIAL IDENTITY // " + camera.zoomIdentityId
-                        }
-
-                        GohuText {
-                            width: parent.width
-                            wrapMode: Text.WordWrap
-                            font.pixelSize: 10
-                            color: Colors.cyan
-                            text: "ACCOUNT NAMES LIVE FROM SOCIAL // USER SETTINGS // ACCOUNT NAMES // ZOOM"
-                        }
-
-                        GohuText {
-                            width: parent.width
-                            font.pixelSize: 11
-                            color: Colors.yellow
-                            text: camera.zoomAccountNames.length
-                                  ? "SAVED ZOOM NAMES // " + camera.zoomAccountNames.length
-                                  : "NO ZOOM ACCOUNT NAMES FOR THIS SOCIAL IDENTITY"
-                        }
-
-                        Repeater {
-                            model: camera.zoomAccountNames
-                            ActionButton {
-                                width: zoomContent.width
-                                height: 38
-                                label: modelData.label + " // ALIAS ONLY"
-                                labelPixelSize: 11
-                                accentColor: Colors.white
-                                selected: camera.selectedZoomAccountId === modelData.id
-                                onLeftClicked: camera.selectedZoomAccountId = modelData.id
-                            }
-                        }
-
-                        GohuText {
-                            width: parent.width
-                            wrapMode: Text.WordWrap
-                            font.pixelSize: 10
-                            color: Colors.orange
-                            text: "ZOOM SIGN-IN // UNVERIFIED. The native Zoom client owns sign-in and meeting controls. Social identities and aliases never block opening this mode or prove Zoom login."
-                        }
-
-                        Rectangle {
-                            width: parent.width
-                            height: 2
-                            color: Colors.cyan
-                        }
-
-                        GohuText {
-                            width: parent.width
-                            font.pixelSize: 12
-                            color: camera.zoomClientStatus && camera.zoomClientStatus.available
-                                   ? Colors.cyan : Colors.orange
-                            text: camera.zoomClientStatus === null
-                                  ? "ZOOM CLIENT // NOT CHECKED"
-                                  : camera.zoomClientStatus.available
-                                    ? "ZOOM CLIENT // INSTALLED (" + camera.zoomClientStatus.client.toUpperCase() + ")"
-                                    : "ZOOM CLIENT // NOT FOUND"
-                        }
-
-                        // OPEN / FOCUS above also works when Flatpak has a
-                        // background process but no detected window.
-
-                        GohuText {
-                            width: parent.width
-                            wrapMode: Text.WordWrap
-                            font.pixelSize: 11
-                            color: camera.zoomLaunchState === "VISIBLE"
-                                   ? Colors.cyan
-                                   : camera.zoomLaunchState === "FAILED"
-                                     || camera.zoomLaunchState === "NOT_FOUND"
-                                     ? Colors.red : Colors.yellow
-                            text: camera.zoomLaunchMessage
-                        }
-
-                        ActionButton {
-                            width: parent.width
-                            height: 34
-                            visible: camera.zoomLaunchState === "FAILED"
-                                     || camera.zoomLaunchState === "NOT_FOUND"
-                                     || camera.zoomLaunchState === "RUNNING_NO_WINDOW"
-                            label: "CHECK ZOOM WINDOW / PROCESS"
-                            labelPixelSize: 10
-                            accentColor: Colors.cyan
-                            available: !camera.busy
-                            onLeftClicked: camera.checkZoomWindow()
-                        }
-
-                        Column {
-                            width: parent.width
-                            spacing: 5
-                            visible: camera.zoomClientStatus !== null
-                                     && camera.zoomClientStatus.client === "flatpak"
-                                     && (camera.zoomLaunchState === "FAILED"
-                                         || camera.zoomLaunchState === "NOT_FOUND"
-                                         || camera.zoomLaunchState === "RUNNING_NO_WINDOW"
-                                         || camera.zoomLaunchState === "UNKNOWN")
-                            GohuText {
-                                width: parent.width
-                                wrapMode: Text.WordWrap
-                                font.pixelSize: 10
-                                color: Colors.orange
-                                text: "STARTUP DIAGNOSTICS // RUN IN TERMINAL TO SEE ZOOM'S REAL ERROR OUTPUT. NO AUTOMATIC PERMISSION CHANGES."
-                            }
-                            TextField {
-                                width: parent.width
-                                height: 32
-                                readOnly: true
-                                selectByMouse: true
-                                font.pixelSize: 10
-                                color: Colors.white
-                                text: camera.zoomClientStatus.installation === "system"
-                                      ? "flatpak run --system us.zoom.Zoom"
-                                      : "flatpak run --user us.zoom.Zoom"
-                                background: Rectangle {
-                                    color: Colors.black
-                                    border.width: 1
-                                    border.color: Colors.cyan
-                                }
-                            }
-                        }
-
-                        // Stay inside Camera: an absent client gets explicit
-                        // local setup guidance rather than a dead launch control.
-                        Column {
-                            id: zoomInstallGuide
-                            width: parent.width
-                            spacing: 10
-                            visible: camera.zoomSetupVisible
-
-                            Rectangle {
-                                width: parent.width
-                                height: 2
-                                color: Colors.magenta
-                            }
-                            GohuText {
-                                width: parent.width
-                                height: 22
-                                font.pixelSize: 13
-                                color: Colors.magenta
-                                text: "ZOOM // INSTALL REQUIRED"
-                            }
-                            GohuText {
-                                width: parent.width
-                                wrapMode: Text.WordWrap
-                                font.pixelSize: 11
-                                color: Colors.white
-                                text: "A Zoom desktop client must be installed to start meetings. The Zoom mode stays available, and no installation starts automatically."
-                            }
-
-                            GohuText {
-                                width: parent.width
-                                font.pixelSize: 11
-                                color: Colors.cyan
-                                text: "OPTION A // OFFICIAL FEDORA RPM"
-                            }
-                            GohuText {
-                                width: parent.width
-                                wrapMode: Text.WordWrap
-                                font.pixelSize: 10
-                                color: Colors.white
-                                text: "Download Zoom Workplace for Linux (Fedora, 64-bit) from Zoom. On Silverblue, install the saved RPM using rpm-ostree and reboot when ready."
-                            }
-                            ActionButton {
-                                width: parent.width
-                                height: 36
-                                label: "ZOOM OFFICIAL DOWNLOAD // OPENS BROWSER"
-                                labelPixelSize: 10
-                                accentColor: Colors.cyan
-                                // User-clicked navigation only; do not open browser on tab entry.
-                                onLeftClicked: Qt.openUrlExternally("https://zoom.us/download?os=linux")
-                            }
-                            TextField {
-                                width: parent.width
-                                height: 34
-                                readOnly: true
-                                selectByMouse: true
-                                font.pixelSize: 10
-                                color: Colors.white
-                                text: "sudo rpm-ostree install ~/Downloads/zoom_x86_64.rpm"
-                                background: Rectangle {
-                                    color: Colors.black
-                                    border.width: 1
-                                    border.color: Colors.cyan
-                                }
-                            }
-                            GohuText {
-                                width: parent.width
-                                wrapMode: Text.WordWrap
-                                font.pixelSize: 10
-                                color: Colors.orange
-                                text: "Use the actual downloaded RPM filename. The rpm-ostree command stages a new deployment; it does not change the running system until reboot."
-                            }
-                            ActionButton {
-                                width: parent.width
-                                height: 38
-                                label: "INSTALL DOWNLOADED OFFICIAL RPM"
-                                labelPixelSize: 11
-                                accentColor: Colors.magenta
-                                available: !camera.busy
-                                onLeftClicked: camera.prepareZoomInstall("official-rpm")
-                            }
-
-                            GohuText {
-                                width: parent.width
-                                font.pixelSize: 11
-                                color: Colors.cyan
-                                text: "OPTION B // FLATHUB COMMUNITY PACKAGE"
-                            }
-                            TextField {
-                                width: parent.width
-                                height: 34
-                                readOnly: true
-                                selectByMouse: true
-                                font.pixelSize: 10
-                                color: Colors.white
-                                text: "flatpak install flathub us.zoom.Zoom"
-                                background: Rectangle {
-                                    color: Colors.black
-                                    border.width: 1
-                                    border.color: Colors.cyan
-                                }
-                            }
-                            GohuText {
-                                width: parent.width
-                                wrapMode: Text.WordWrap
-                                font.pixelSize: 10
-                                color: Colors.orange
-                                text: "The Zoom package on Flathub is community-maintained and unverified by Zoom. No installation is automatic."
-                            }
-                            ActionButton {
-                                width: parent.width
-                                height: 38
-                                label: "INSTALL COMMUNITY FLATPAK"
-                                labelPixelSize: 11
-                                accentColor: Colors.magenta
-                                available: !camera.busy
-                                onLeftClicked: camera.prepareZoomInstall("community-flatpak")
-                            }
-
-                            Column {
-                                id: zoomInstallConfirm
-                                width: parent.width
-                                spacing: 8
-                                visible: camera.zoomInstallChoice !== ""
-
-                                Rectangle {
-                                    width: parent.width
-                                    height: 2
-                                    color: Colors.yellow
-                                }
-                                GohuText {
-                                    width: parent.width
-                                    height: 22
-                                    font.pixelSize: 12
-                                    color: Colors.yellow
-                                    text: "CONFIRM // INSTALL ZOOM"
-                                }
-                                GohuText {
-                                    width: parent.width
-                                    font.pixelSize: 11
-                                    color: Colors.white
-                                    wrapMode: Text.WordWrap
-                                    text: camera.zoomInstallChoice === "official-rpm"
-                                          ? "Install the signed Zoom RPM already downloaded to ~/Downloads/zoom_x86_64.rpm. May request administrator authorization. Stages a system deployment; reboot is manual."
-                                          : "Install the community-maintained, unverified Zoom Flatpak into your user account. Adds the per-user Flathub repository if needed and downloads dependencies. No system-wide install."
-                                }
-                                Row {
-                                    width: parent.width
-                                    height: 42
-                                    spacing: 9
-                                    ActionButton {
-                                        width: (parent.width - parent.spacing) * 0.62
-                                        height: 40
-                                        label: "CONFIRM INSTALL"
-                                        labelPixelSize: 12
-                                        accentColor: Colors.magenta
-                                        available: !camera.busy
-                                        onLeftClicked: camera.confirmZoomInstall()
-                                    }
-                                    ActionButton {
-                                        width: (parent.width - parent.spacing) * 0.38
-                                        height: 40
-                                        label: "CANCEL"
-                                        labelPixelSize: 11
-                                        accentColor: Colors.cyan
-                                        available: !camera.busy
-                                        onLeftClicked: camera.zoomInstallChoice = ""
-                                    }
-                                }
-                            }
-                            ActionButton {
-                                width: parent.width
-                                height: 38
-                                label: "RECHECK ZOOM AFTER INSTALL"
-                                labelPixelSize: 11
-                                accentColor: Colors.yellow
-                                available: !camera.busy
-                                onLeftClicked: camera.run("zoomStatus", ["zoom-status"])
-                            }
-                        }
-
-                        GohuText {
-                            width: parent.width
-                            visible: camera.zoomInstallNotice !== ""
-                            wrapMode: Text.WordWrap
-                            font.pixelSize: 11
-                            color: Colors.yellow
-                            text: camera.zoomInstallNotice
-                        }
-
-                        GohuText {
-                            width: parent.width
-                            wrapMode: Text.WordWrap
-                            font.pixelSize: 11
-                            color: Colors.white
-                            text: "Zoom opens its official local app. Sign in, start, and join meetings there. No passwords or OAuth tokens are shared with Camera."
-                        }
-
-                        GohuText {
-                            width: parent.width
-                            wrapMode: Text.WordWrap
-                            font.pixelSize: 10
-                            color: Colors.orange
-                            text: "EMBEDDED VIDEO // NOT YET CONNECTED. Requires separately validated Zoom SDK and Stage Director containment."
                         }
                     }
                 }

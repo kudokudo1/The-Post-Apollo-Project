@@ -1,0 +1,93 @@
+name: Connections C2r confined SELinux status host on Fedora VM
+
+on:
+  pull_request:
+    paths:
+      - "tests/connections/c2r_selinux_domain/**"
+      - ".github/workflows/connections-c2r-confined-vm.yml"
+      - "docs/connections-c2r-confined-status-host.md"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  enforcing-confined-fedora-service:
+    if: github.actor == 'kudokudo1' && (github.event_name == 'workflow_dispatch' || github.event.pull_request.head.repo.full_name == github.repository)
+    runs-on: ubuntu-latest
+    timeout-minutes: 23
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Fail-closed disposable runner KVM check
+        shell: bash
+        run: |
+          set -euo pipefail
+          [ -c /dev/kvm ] || { echo "C2R_BLOCKED // NO_KVM"; exit 2; }
+          sudo chmod a+rw /dev/kvm
+          [ -r /dev/kvm ] && [ -w /dev/kvm ] || exit 2
+      - name: Syntax and policy-scope checks
+        shell: bash
+        run: |
+          set -euo pipefail
+          bash -n tests/connections/c2r_selinux_domain/boot_confined_vm.sh
+          bash -n tests/connections/c2r_selinux_domain/guest_confined_smoke.sh
+          python3 -m py_compile tests/connections/c2r_selinux_domain/C2rStatusHost.py
+          python3 - <<'PY'
+          from pathlib import Path
+          policy=Path("tests/connections/c2r_selinux_domain/postapollo_connections.te").read_text()
+          fc=Path("tests/connections/c2r_selinux_domain/postapollo_connections.fc").read_text()
+          assert "init_daemon_domain(postapollo_connections_t, postapollo_connections_exec_t)" in policy
+          assert "postapollo_connections_exec_t" in fc
+          assert "postapollo_connections_t" in policy
+          assert "permissive" not in policy.lower()
+          assert "unconfined" not in policy.lower()
+          assert "audit2allow" not in policy.lower()
+          assert "network_port" not in policy.lower()
+          assert "tcp_socket" not in policy.lower()
+          assert "manage_files_pattern" not in policy.lower()
+          assert "admin" not in policy.lower()
+          print("C2R_PASS // NARROW_NONPERMISSIVE_POLICY_SOURCE")
+          PY
+      - name: Build SELinux reference-policy module inside disposable Fedora 44 builder
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/c2r-policy"
+          docker run --rm \
+            --mount "type=bind,src=$PWD/tests/connections/c2r_selinux_domain,dst=/src,readonly" \
+            --mount "type=bind,src=$RUNNER_TEMP/c2r-policy,dst=/out" \
+            fedora:44 /bin/bash -euc '
+              dnf -y --setopt=install_weak_deps=False install selinux-policy-devel make
+              mkdir -p /tmp/c2r-src
+              cp /src/postapollo_connections.te /src/postapollo_connections.fc /tmp/c2r-src/
+              cd /tmp/c2r-src
+              make -f /usr/share/selinux/devel/Makefile postapollo_connections.pp
+              cp postapollo_connections.pp /out/postapollo_connections.pp
+              test -s /out/postapollo_connections.pp
+            '
+          sha256sum "$RUNNER_TEMP/c2r-policy/postapollo_connections.pp"
+          echo "C2R_PASS // FEDORA_BUILT_SELINUX_MODULE_NOT_INSTALLED_ON_HOST"
+      - name: Install QEMU utilities in disposable GitHub runner only
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends qemu-system-x86 qemu-utils genisoimage python3-pip
+      - name: Run fake status host inside Fedora 44 enforcing guest with custom SELinux domain
+        shell: bash
+        run: timeout 570s bash tests/connections/c2r_selinux_domain/boot_confined_vm.sh
+      - name: Existing C2n and CPU++ deny-only contracts
+        shell: bash
+        run: |
+          python3 -B tests/connections/test_connections_c2n_policy_contract.py
+          python3 - <<'PY'
+          from pathlib import Path
+          base=Path("services/connections")
+          assert "readonly property bool hostAuthenticated: false" in (base/"ConnectionsRequestStatus.qml").read_text()
+          assert "readonly property bool credentialActionsEnabled: false" in (base/"ConnectionsBroker.qml").read_text()
+          for p in (*base.glob("*.qml"), *base.glob("*.js"), base/"qmldir"):
+              assert "c2r_selinux_domain" not in p.read_text(), p
+          print("C2R_PASS // NO_PRODUCTION_CREDENTIAL_GRANTS_OR_WIDGET_HOOKS")
+          PY

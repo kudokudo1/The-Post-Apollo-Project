@@ -74,15 +74,17 @@ Column {
 
     Rectangle {
         width: parent.width
-        height: 168
+        height: detailBody.implicitHeight + 18
         color: Colors.dark
         border.width: 1
         border.color: Colors.blue
         radius: 3
 
         Column {
-            anchors.fill: parent
-            anchors.margins: 9
+            id: detailBody
+            x: 9
+            y: 9
+            width: parent.width - 18
             spacing: 9
 
             GohuText {

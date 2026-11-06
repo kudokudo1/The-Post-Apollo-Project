@@ -1,0 +1,58 @@
+name: TASKS M13x Linux kernel source-owner feasibility (disposable)
+
+on:
+  pull_request:
+    paths:
+      - 'tests/tasks/test_task_kernel_owner_boundary_m13x.py'
+      - 'docs/tasks-kernel-source-owner-boundary-m13x.md'
+      - '.github/workflows/tasks-kernel-source-owner-m13x.yml'
+      - 'services/hub/ApolloHubTodoStore.qml'
+      - 'tests/tasks/fixtures/TaskNativeReceiptLabM12i.qml'
+  push:
+    branches: [main]
+    paths:
+      - 'tests/tasks/test_task_kernel_owner_boundary_m13x.py'
+      - '.github/workflows/tasks-kernel-source-owner-m13x.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  kernel-uid-custody:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - name: Parse test before privilege-isolated execution
+        run: |
+          python3 - <<'PY'
+          import ast
+          from pathlib import Path
+          ast.parse(Path("tests/tasks/test_task_kernel_owner_boundary_m13x.py").read_text())
+          print("M13X_PYTHON_SYNTAX_PASS")
+          PY
+      - name: Disposable Linux DAC and kernel peer-credential tests
+        run: |
+          # The test creates numeric UIDs by setuid only; never useradd.
+          # Root is available only inside this ephemeral GitHub Ubuntu VM.
+          sudo env GITHUB_ACTIONS=true M13X_DISPOSABLE_CI=1 \
+            python3 -B -m unittest discover -s tests/tasks \
+            -p 'test_task_kernel_owner_boundary_m13x.py' -v
+      - name: Prior native receipt and source revision regressions
+        run: |
+          python3 tests/tasks/test_task_native_receipt_handoff_m13v.py
+          python3 tests/tasks/test_task_source_revision_evidence_m13u.py
+          node --test tests/tasks/test_task_source_receipt_interface_m13w.cjs
+      - name: Single TASKS writer and deny-all shared Connections remain unchanged
+        run: |
+          python3 tests/tasks/test_task_writer_gate_inventory_m11d.py
+          node tests/cpuplus/test_connections_broker_c2a.js
+      - name: No production import, host actuation, or new writer
+        run: |
+          set -euo pipefail
+          ! grep -q 'test_task_kernel_owner_boundary_m13x' services/hub/ApolloHubTodoStore.qml
+          ! grep -q 'test_task_kernel_owner_boundary_m13x' services/connections/ConnectionsBroker.qml
+          test "$(grep -c 'todoFile.setText(' services/hub/ApolloHubTodoStore.qml)" = 1
+          ! grep -Eq 'os\.system\(|subprocess\.run\(.*shell=True|semanage .*--|semodule .*--|secret-tool ' \
+            tests/tasks/test_task_kernel_owner_boundary_m13x.py
+          printf '%s\n' 'M13X_LINUX_UID_BOUNDARY_PROOF_ONLY_NO_PRODUCTION_OWNER_PASS'

@@ -1,7 +1,16 @@
 #!/usr/bin/bash
 # C2q CI only: disposable Fedora Cloud guest with SELinux enforcing.
 # This installs FAKE read-only service fixtures only inside the throwaway VM.
-set -euo pipefail
+set -Eeuo pipefail
+on_exit() {
+  local rc="$?"
+  echo "C2R_GUEST_SCRIPT_EXIT_STATUS // $rc" >&2
+  if [[ "$rc" -ne 0 ]]; then
+    echo "C2R_GUEST_POLICY_STORE // $(semodule -l 2>&1 | grep -F postapollo_connections || true)" >&2
+    journalctl -b --no-pager -n 20 2>&1 | tail -n 20 >&2 || true
+  fi
+}
+trap on_exit EXIT
 unit=postapollo-connections-status.service
 name=org.postapollo.ConnectionsStatus1
 client=/root/c2q/BusPolicyClient.py

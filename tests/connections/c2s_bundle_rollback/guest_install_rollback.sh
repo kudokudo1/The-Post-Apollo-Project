@@ -79,7 +79,10 @@ for u in c2q-reader c2q-outsider postapollo-connections; do
     userdel "$u" || fail "failed to remove disposable $u account"
 done
 for g in c2q-test-clients postapollo-status-readers postapollo-connections; do
-    groupdel "$g" || fail "failed to remove disposable $g group"
+    # Fedora may automatically remove a user's now-empty private group.
+    if getent group "$g" >/dev/null; then
+        groupdel "$g" || fail "failed to remove disposable $g group"
+    fi
 done
 
 [[ ! -e "$host" && ! -e "$unit_path" && ! -e "$policy_path" ]] ||

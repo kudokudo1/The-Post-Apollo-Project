@@ -509,6 +509,89 @@ Rectangle {
         ctx.restore();
     }
 
+    // M6b // A plotted cell is an actual sampled pair closest to a
+    // conventional aspect-reference angle within its UTC bucket.
+    function paintAspectMatrix(ctx) {
+        const w=graphCanvas.width,h=graphCanvas.height;
+        const data=instrument.aspectMatrix;
+        ctx.save();
+        ctx.font="9px monospace";
+        ctx.textAlign="left";
+        ctx.fillStyle=String(Colors.yellow);
+        ctx.fillText("SOURCE PAIR // UTC × ANGLE",3,11,Math.max(20,w-145));
+        if(!data.ready) {
+            ctx.fillStyle=String(Colors.orange);
+            ctx.fillText(data.reason,4,h/2,Math.max(20,w-8));
+            ctx.restore();return;
+        }
+        const g=Matrix.geometry(w,h);
+        if(!g){ctx.restore();return;}
+        ctx.fillStyle=String(Colors.cyan);
+        ctx.fillText(data.pair.map(Celestial.shortBodyName).join(" / ") +
+                     " // ORB "+data.orb+"°",3,23,Math.max(20,w-8));
+        for(let rowIndex=0;rowIndex<data.rows.length;rowIndex++){
+            const row=data.rows[rowIndex];
+            const center=g.top+(rowIndex+0.5)*g.cellHeight;
+            ctx.font="9px monospace";
+            ctx.textAlign="left";
+            ctx.fillStyle=String(Colors.white);
+            ctx.globalAlpha=1;
+            ctx.fillText(row.name,2,center+3,Math.max(20,g.left-6));
+            for(let col=0;col<row.cells.length;col++){
+                const cell=row.cells[col];
+                const rect=Matrix.cellRect(g,col,rowIndex,
+                                           data.columns.length);
+                if(!rect)continue;
+                ctx.globalAlpha=rowIndex%2===0?0.96:0.84;
+                ctx.fillStyle=String(Colors.dark);
+                ctx.fillRect(rect.x+0.5,rect.y+0.5,
+                             Math.max(1,rect.width-1),
+                             Math.max(1,rect.height-1));
+                if(cell.inOrb){
+                    ctx.fillStyle=String(cell.sampleIndex===instrument.focusIndex
+                        ? Colors.yellow:Colors.magenta);
+                    ctx.globalAlpha=cell.sampleIndex===instrument.focusIndex
+                        ? 0.94:0.18+0.72*cell.strength;
+                    ctx.fillRect(rect.x+1,rect.y+1,
+                                 Math.max(1,rect.width-2),
+                                 Math.max(1,rect.height-2));
+                }
+                if(cell.sampleIndex===instrument.focusIndex){
+                    ctx.globalAlpha=0.95;
+                    ctx.strokeStyle=String(Colors.yellow);
+                    ctx.lineWidth=1;
+                    ctx.strokeRect(rect.x+0.6,rect.y+0.6,
+                                   Math.max(1,rect.width-1.2),
+                                   Math.max(1,rect.height-1.2));
+                }
+            }
+        }
+        ctx.globalAlpha=0.8;
+        ctx.strokeStyle=String(Colors.cyan);
+        ctx.lineWidth=0.8;
+        const cursorX=g.left+g.width*
+            (instrument.focusIndex-data.from+0.5)/
+            (data.to-data.from+1);
+        ctx.beginPath();ctx.moveTo(cursorX,g.top);
+        ctx.lineTo(cursorX,g.bottom);ctx.stroke();
+        ctx.globalAlpha=1;
+        ctx.fillStyle=String(Colors.white);
+        ctx.font="9px monospace";
+        ctx.textAlign="center";
+        for(let i=0;i<3;i++){
+            const time=[data.startMs,
+                Math.round((data.startMs+data.endMs)/2),data.endMs][i];
+            ctx.fillText(Celestial.axisText(time).slice(5,16),
+                         g.left+g.width*i/2,g.bottom+11,
+                         Math.max(20,g.width/3-8));
+        }
+        ctx.textAlign="left";
+        ctx.fillStyle=String(Colors.orange);
+        ctx.fillText("NEAREST SOURCE SAMPLE / BIN // NO INTERPOLATION",
+                     3,h-4,Math.max(20,w-6));
+        ctx.restore();
+    }
+
     // M6a // Sampled geocentric APPARENT longitude speed, ° per day.
     // Orange brackets denote uncertain sign-transition windows, not exact
     // astronomical station times. All values come from validated M4 rows.

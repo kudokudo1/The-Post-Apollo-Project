@@ -83,6 +83,8 @@ grep -a -E 'C2R_|cloud-init.*(Error|FAIL)' "$tmp/serial.log" 2>/dev/null \
   | tail -n 65 || true
 if [[ "$result" != PASS ]]; then
   echo "C2R_BLOCKED // GUEST_RESULT=$result"
+  echo "C2R_GUEST_SERIAL_DIAGNOSTIC // last 140 lines"
+  tail -n 140 "$tmp/serial.log" 2>/dev/null || true
   tail -n 40 "$tmp/qemu.log" || true
   exit 1
 fi

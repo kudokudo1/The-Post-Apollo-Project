@@ -99,12 +99,19 @@ function sampleWindow(payload,scene,body,index,halfWindow) {
         series[0].vectors_au.length!==atlas.sample_count)
         return empty("MISSING SOURCE BODY SERIES");
     var row=series[0],result=[],previous=null;
-    // Check the complete source timestamps before using even a small slice.
+    // The original M4 source UTC grid is the independent anchor.
+    // A merely monotonic but shifted atlas timestamp must NOT be drawn.
+    var sourceRows=payload.series && payload.series[0] &&
+                   payload.series[0].samples;
+    if (!Array.isArray(sourceRows) ||
+        sourceRows.length!==atlas.sample_count)
+        return empty("MISSING ORIGINAL M4 UTC GRID");
     for (var t=0;t<atlas.sample_count;t++) {
         var ts=atlas.times_unix_ms[t];
         if (typeof ts!=="number" || !isFinite(ts) ||
-            !Number.isInteger(ts) || (previous!==null && ts<=previous))
-            return empty("INVALID JPL UTC GRID");
+            !Number.isInteger(ts) || (previous!==null && ts<=previous) ||
+            !sourceRows[t] || sourceRows[t].unix_ms!==ts)
+            return empty("ATLAS UTC DIFFERS FROM M4 GRID");
         previous=ts;
     }
     var start=Math.max(0,index-radius),

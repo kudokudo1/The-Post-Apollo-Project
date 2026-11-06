@@ -5,7 +5,7 @@ set -Eeuo pipefail
 exec >/dev/ttyS0 2>&1
 failure() {
   echo "C2V_FAIL // $*"
-  rpm-ostree status 2>&1 | head -n 45 || true
+  timeout --signal=TERM --kill-after=5s 15s rpm-ostree status 2>&1 | head -n 45 || true
   systemctl poweroff --no-block || true
   exit 1
 }
@@ -63,8 +63,23 @@ case "$stage" in
     # fetching remote rpm-md. A local inert RPM has zero RPM dependencies.
     echo "C2V_INSTALL_STAGE_START // $(date --iso-8601=seconds)"
     echo "C2V_RPM_OSTREE_VERSION // $(rpm-ostree --version | head -n 1)"
-    rpm-ostree status --json | head -c 1800 || true
-    echo
+    # This unbounded status --json pipeline was the last observed output in
+    # previous CI: never allow a diagnostic to consume the entire guest budget.
+    echo "C2V_STATUS_JSON_PRECHECK_BEGIN"
+    statuslog=/var/tmp/c2v-preinstall-status.log
+    if timeout --signal=TERM --kill-after=5s 15s \
+        rpm-ostree status --json >"$statuslog" 2>&1; then
+      echo "C2V_STATUS_JSON_PRECHECK_SUCCESS"
+      head -c 600 "$statuslog" || true
+      echo
+    else
+      rc="$?"
+      echo "C2V_STATUS_JSON_PRECHECK_TIMEOUT_OR_ERROR // $rc"
+      tail -n 18 "$statuslog" || true
+      # A diagnostic must never turn a silent hang into a false success.
+      # We still attempt the bounded actual local RPM operation to attribute
+      # an rpm-ostreed failure separately.
+    fi
     log=/var/tmp/c2v-rpm-ostree-install.log
     # Keep a useful progress message even if the process/daemon emits nothing.
     # The watchdog has a *shorter* limit than systemd or the host CI monitor.
@@ -77,6 +92,7 @@ case "$stage" in
       done
     ) &
     monitor_pid="$!"
+    echo "C2V_INSTALL_COMMAND_BEGIN // timeout=480s local RPM only"
     if timeout --signal=TERM --kill-after=20s 480s \
         rpm-ostree install --cache-only "$data/c2t-0.1.rpm" >"$log" 2>&1; then
       kill "$monitor_pid" 2>/dev/null || true

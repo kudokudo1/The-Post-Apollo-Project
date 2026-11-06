@@ -3,6 +3,7 @@ import Quickshell
 import Quickshell.Wayland
 import "../components"
 import "CompanyChassisPolicy.js" as CompanyChassisPolicy
+import "CompanyVectorViewportPolicy.js" as VectorViewportPolicy
 
 // Company Network v0: navigation-only geographic operations chassis.
 // No organization membership, employee directory or client data is loaded.
@@ -41,6 +42,35 @@ PanelWindow {
     ]
     property int selectedMainModeIndex: 0
     readonly property var activeMode: mainModes[selectedMainModeIndex]
+    // M18 // One candidate viewport in Company FRAME-local coordinates,
+    // deliberately NOT native/output-global. Stage Director must separately
+    // authenticate the paired Company layer and validate its output epoch.
+    // Do not import the Weather-only WATCH QML module into this app.
+    readonly property rect activeVectorViewportRect: {
+        if (!root.menuOpen || root.selectedMainModeIndex !== 0
+                || !coverageLoader.active || !coverageLoader.visible
+                || !coverageLoader.item || !coverageLoader.item.visible)
+            return Qt.rect(0, 0, 0, 0);
+        const coverage = coverageLoader.item;
+        const local = coverage.activeVectorViewportRect;
+        if (!VectorViewportPolicy.within(local, coverage.width, coverage.height))
+            return Qt.rect(0, 0, 0, 0);
+        // Make repositioning dependencies explicit; mapToItem supplies the
+        // actual QQuickItem translation, not guessed panel screen offsets.
+        const layout = coverageLoader.x + coverageLoader.y
+                     + contentPane.x + contentPane.y
+                     + companyFrame.x + companyFrame.y;
+        if (!isFinite(layout))
+            return Qt.rect(0, 0, 0, 0);
+        const origin = coverage.mapToItem(companyFrame, local.x, local.y);
+        const candidate = Qt.rect(
+            origin.x, origin.y, local.width, local.height);
+        return VectorViewportPolicy.within(
+                    candidate, companyFrame.width, companyFrame.height)
+            ? candidate : Qt.rect(0, 0, 0, 0);
+    }
+    readonly property bool activeVectorViewportValid:
+        activeVectorViewportRect.width > 0 && activeVectorViewportRect.height > 0
 
     function toggle() {
         menuOpen = !menuOpen;

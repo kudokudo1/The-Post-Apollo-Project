@@ -81,6 +81,29 @@ case "$stage" in
       # an rpm-ostreed failure separately.
     fi
     log=/var/tmp/c2v-rpm-ostree-install.log
+    # Separate periodic diagnostic independent of the calling shell.
+    # If this ticker goes silent, the guest may itself be stalled.
+    echo "C2V_GUEST_PROBE_LAUNCHING"
+    cat > /run/c2v-guest-probe.sh <<'PROBE'
+#!/usr/bin/bash
+set -u
+echo "C2V_GUEST_PROBE_READY // $(date --iso-8601=seconds)" >/dev/ttyS0
+for n in $(seq 1 36); do
+  sleep 20
+  {
+    echo "C2V_GUEST_PROBE_TICK // $n $(date --iso-8601=seconds)"
+    free -m | head -n 3
+    df -h /var | tail -n 1
+    ps -eo pid,stat,%cpu,rss,etime,comm | grep -E '[r]pm-ostree|[r]pm-ostreed|PID' | head -n 9 || true
+    tail -n 6 /var/tmp/c2v-rpm-ostree-install.log 2>/dev/null || true
+  } >/dev/ttyS0 2>&1
+done
+PROBE
+    chmod 0700 /run/c2v-guest-probe.sh
+    systemd-run --quiet --unit=c2v-guest-probe --property=Type=exec \
+      /usr/bin/bash /run/c2v-guest-probe.sh ||
+      echo "C2V_GUEST_PROBE_START_FAILED"
+    echo "C2V_GUEST_PROBE_START_RETURNED"
     # Keep a useful progress message even if the process/daemon emits nothing.
     # The watchdog has a *shorter* limit than systemd or the host CI monitor.
     (

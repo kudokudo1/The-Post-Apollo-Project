@@ -70,8 +70,8 @@ test("M7c QML keeps yearly Moon/Solar data, includes real zoom/pan/focus control
   const host=read("widgets/weather/StationMagickLunarSolarPane.qml");
   const backend=read("scripts/weather/celestial_annual_calendar.py");
   assert.match(host,/StationMagickAnnualCalendarPane\s*\{/);
-  assert.match(qml,/anchors\.top: topModes\.bottom/);
-  assert.match(qml,/id: wheel[\s\S]*anchors\.bottom: parent\.bottom/);
+  assert.match(qml,/id: wheel\\s*\\n[\\s\\S]*?anchors\\.top: topModes\\.bottom[\\s\\S]*?anchors\\.bottom: parent\\.bottom/);
+  assert.match(qml,/id: zoneRow[\\s\\S]*?anchors\\.top: controls\\.bottom/);
   assert.match(qml,/ctx\.translate\(width\/2\+annualPane\.panX,height\/2\+annualPane\.panY\)/);
   assert.match(qml,/ctx\.scale\(annualPane\.wheelZoom,annualPane\.wheelZoom\)/);
   assert.match(qml,/onWheel: function\(wheelEvent\)/);

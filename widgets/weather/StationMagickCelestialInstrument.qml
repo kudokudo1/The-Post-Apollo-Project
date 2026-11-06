@@ -22,6 +22,7 @@ Rectangle {
     property var visualData: null
     property string mode: "wheel"
     property string aspectPresentation: "curve" // M6b secondary ASPECTS view
+    property int inspectedAspectRow: 0
     // V4g // Compact NETWORK retains CHORDS/DEPTH across visits to HELIO.
     property string networkMode: "chords"
     // M30-C: same verified visual renderer, but hide only the detailed
@@ -81,6 +82,7 @@ Rectangle {
     }
     onGraphModelChanged: graphCanvas.requestPaint()
     onAspectPresentationChanged: graphCanvas.requestPaint()
+    onInspectedAspectRowChanged: graphCanvas.requestPaint()
     onFocusIndexChanged: {
         graphCanvas.requestPaint();
         eventTimelineCanvas.requestPaint();
@@ -534,7 +536,8 @@ Rectangle {
             const center=g.top+(rowIndex+0.5)*g.cellHeight;
             ctx.font="9px monospace";
             ctx.textAlign="left";
-            ctx.fillStyle=String(Colors.white);
+            ctx.fillStyle=String(rowIndex===instrument.inspectedAspectRow
+                ? Colors.yellow : Colors.white);
             ctx.globalAlpha=1;
             ctx.fillText(row.name,2,center+3,Math.max(20,g.left-6));
             for(let col=0;col<row.cells.length;col++){
@@ -587,8 +590,15 @@ Rectangle {
         }
         ctx.textAlign="left";
         ctx.fillStyle=String(Colors.orange);
-        ctx.fillText("NEAREST SOURCE SAMPLE / BIN // NO INTERPOLATION",
-                     3,h-4,Math.max(20,w-6));
+        const chosen=data.rows[instrument.inspectedAspectRow] || data.rows[0];
+        const current=instrument.graphModel.relationships[0]
+                           .samples[instrument.focusIndex];
+        const delta=Math.abs(current.longitude_separation_deg-chosen.angle_deg);
+        ctx.fillText(chosen.name+" // GAP "+current.longitude_separation_deg.toFixed(2)
+                     +"°  Δ "+delta.toFixed(2)+"° // SOURCE SAMPLE",
+                     3,h-13,Math.max(20,w-6));
+        ctx.fillText("BUCKET CLOSEST MEASURED SAMPLE // NO INTERPOLATION",
+                     3,h-3,Math.max(20,w-6));
         ctx.restore();
     }
 
@@ -936,6 +946,7 @@ Rectangle {
                             Matrix.geometry(width,height),mouse.x,mouse.y);
                         if(!cell)return;
                         instrument.eventOrdinal=-1;
+                        instrument.inspectedAspectRow=cell.row;
                         instrument.lockedIndex=cell.sampleIndex;
                     } else {
                         instrument.eventOrdinal=-1;

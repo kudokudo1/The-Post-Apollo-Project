@@ -151,7 +151,8 @@ test("M6g complete QML deck supports selection, draw, optional reversals and ind
     assert.match(pane,/onTextChanged: tarot\.localArtworkDirectory=text/);
     assert.match(pane,/maximumLength: 1024/);
     assert.match(pane,/NO GUIDEBOOK QUOTES OR PREDICTIONS/);
-    assert.match(pane,/NO BUNDLED IMAGES, NO SAVED READINGS/);
+    assert.match(pane,/DECK PHOTOS ARE NOT BUNDLED \/\/ READ-ONLY PRIVATE FOLDER/);
+    assert.match(pane,/NO WILD UNKNOWN IMAGES \/\/ SELECT LOCAL ART FOLDER/);
 });
 test("M6g card front has original placeholder and OPTIONAL local-only image",()=>{
     assert.match(card,/import "StationMagickTarotDeckPolicy\.js" as Deck/);

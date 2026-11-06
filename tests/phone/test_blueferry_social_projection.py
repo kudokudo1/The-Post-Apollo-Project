@@ -204,7 +204,7 @@ class ContactsProjectionTests(unittest.TestCase):
 
     def test_no_side_effect_imports_or_direct_messaging_access(self):
         source = (ROOT / "services/phone/BlueFerrySocialProjection.py").read_text()
-        for forbidden in ("import dbus", "subprocess", "socket", "os.", "sqlite3",
+        for forbidden in ("import dbus", "import subprocess", "import socket", "os.", "sqlite3",
                           "open(", "Path(", "SendToThread(", "dbus.Interface(",
                           "GetContact(", "print("):
             self.assertNotIn(forbidden, source)

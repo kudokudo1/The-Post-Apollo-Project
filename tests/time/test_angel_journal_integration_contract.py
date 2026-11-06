@@ -86,6 +86,24 @@ class AngelJournalContracts(unittest.TestCase):
         self.assertIn("selectedObservation", PANE)
         self.assertIn("AngelObservationsStore.total", PANE)
 
+    def test_saved_date_is_visible_without_rewriting_angel_journal(self):
+        # The v1 source already saves a true UTC instant and the captured
+        # offset. Date formatting must be read-only and stable across moves.
+        self.assertIn('function observedDate(row)', POLICY)
+        self.assertIn('row.observedAtMs + row.utcOffsetMinutes * 60000', POLICY)
+        self.assertIn('date.toISOString().slice(0, 10)', POLICY)
+        self.assertIn('AngelPolicy.observedDate(modelData)', PANE)
+        self.assertIn('AngelPolicy.observedDate(pane.selectedObservation)', PANE)
+        self.assertIn('\\nDATE // ', PANE)
+        self.assertIn('modelData.displayTime', PANE)
+        self.assertIn('id: angelHistoryList', PANE)
+        self.assertIn('new Date(pane.selectedObservation.observedAtMs)', PANE)
+        self.assertEqual(STORE.count('FileView {'), 1)
+        self.assertIn('angel-observations-v1.json', STORE)
+        self.assertIn('var VERSION = 1;', POLICY)
+        self.assertNotIn('property string observationDate', STORE)
+        self.assertNotIn('function recordDate', STORE)
+
     def test_err_filter_combines_other_with_explicit_per_entry_review(self):
         self.assertIn('key: "err", label: "ERR"', PANE)
         self.assertIn('case "err":', POLICY)

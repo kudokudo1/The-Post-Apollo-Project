@@ -11,6 +11,7 @@ Rectangle {
     property var weatherService: null
     property string selectedDate: ""
     property int selectedHour: 0
+    property bool clockMode: true
     readonly property var daily: weatherService && weatherService.forecastReady
         ? weatherService.dailyForecast : []
     readonly property var dates: Timing.availableDates(
@@ -37,17 +38,43 @@ Rectangle {
         return Colors.white;
     }
 
+    // M8a // Two complementary views of ONE existing source-backed 24h plan.
+    // This clock owns no sunrise provider, cache or process.
+    StationMagickTraditionalClockPane {
+        anchors.fill: parent
+        anchors.margins: 5
+        visible: timing.clockMode
+        plan: timing.plan
+        selectedHour: timing.selectedHour
+        sourceDates: timing.dates
+        targetDate: timing.targetDate
+        onHourRequested: function(index){ timing.selectedHour=index; }
+        onDayRequested: function(delta){
+            const index=timing.dates.indexOf(timing.targetDate);
+            const next=index+delta;
+            if(index>=0&&next>=0&&next<timing.dates.length)
+                timing.selectedDate=timing.dates[next];
+        }
+        onLanesRequested: timing.clockMode=false
+    }
     Column {
+        visible: !timing.clockMode
         anchors.fill: parent
         anchors.margins: 8
         spacing: 6
-        GohuText {
-            width: parent.width
-            height: 22
-            font.pixelSize: 13
-            color: Colors.magenta
-            elide: Text.ElideRight
-            text: "PLANETARY TIMING // DAY + NIGHT"
+        Row {
+            width: parent.width;height: 22;spacing: 4
+            GohuText {
+                width: Math.max(25,parent.width-69);height:22
+                font.pixelSize:13;color:Colors.magenta
+                elide:Text.ElideRight
+                text:"PLANETARY TIMING // DAY + NIGHT"
+            }
+            ActionButton {
+                width:65;height:22;label:"CLOCK"
+                labelPixelSize:9;accentColor:Colors.cyan
+                onClicked:timing.clockMode=true
+            }
         }
         QuietText {
             width: parent.width

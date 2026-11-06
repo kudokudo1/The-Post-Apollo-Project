@@ -11,6 +11,11 @@ Item {
     property string status: "RUNTIME NOT CHECKED"
     property bool requestedStop: false
     property string output: ""
+    // Quickshell.Io.Process.processId is the PID of the *attached* child.
+    // M15 Python execv + host bridge execve preserve this PID into native Qt.
+    // This value goes only to the opt-in Company QPA bridge, never to shell,
+    // a public URL, a new detached process, or the disk.
+    signal nativeChildStarted(int pid)
 
     function launch(online) {
         if (vectorRunner.running) return false;
@@ -40,7 +45,14 @@ Item {
         stdout: StdioCollector {
             onStreamFinished: controller.output=String(text || "")
         }
-        onStarted: controller.status="STARTED / NATIVE WINDOW UNVERIFIED"
+        onStarted: {
+            controller.status="STARTED / NATIVE WINDOW UNVERIFIED";
+            const attachedPid = Number(vectorRunner.processId);
+            if (isFinite(attachedPid) && attachedPid > 0
+                    && attachedPid < 2147483648
+                    && Math.floor(attachedPid) === attachedPid)
+                controller.nativeChildStarted(attachedPid);
+        }
         onExited: function(code, state) {
             if (controller.requestedStop) {
                 controller.status="CLOSED";

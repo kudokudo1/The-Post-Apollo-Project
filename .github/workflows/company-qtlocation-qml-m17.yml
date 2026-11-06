@@ -1,0 +1,41 @@
+name: Company Network M17 QtLocation QML bundle
+
+on:
+  pull_request:
+    paths:
+      - 'experiments/company-vector-qt/CompanyQtLocationBundleM16.py'
+      - 'experiments/company-vector-qt/CompanyVectorHostBridge.py'
+      - 'experiments/company-vector-qt/HANDOFF_M17.md'
+      - 'tests/company/test_company_qtlocation_qml_m17.py'
+      - 'tests/company/test_company_qtlocation_bundle_m16.py'
+      - '.github/workflows/company-qtlocation-qml-m17.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  five-file-qml-contract:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Syntax
+        run: |
+          python3 -m py_compile             experiments/company-vector-qt/CompanyQtLocationBundleM16.py             experiments/company-vector-qt/CompanyVectorHostBridge.py             tests/company/test_company_qtlocation_qml_m17.py
+      - name: M17 complete library and QML module tests
+        run: python3 -m unittest discover -s tests/company -p 'test_company_qtlocation_qml_m17.py' -v
+      - name: M16 compatibility and M15/M13 regression tests
+        run: |
+          python3 -m unittest discover -s tests/company -p 'test_company_qtlocation_bundle_m16.py' -v
+          python3 -m unittest discover -s tests/company -p 'test_company_vector_host_m15.py' -v
+          python3 -m unittest discover -s tests/company -p 'test_company_vector_sidecar_m13.py' -v
+      - name: Strict fixed-path process and no host system writes
+        shell: bash
+        run: |
+          set -euo pipefail
+          grep -Fq 'QML_IMPORT_PATH' experiments/company-vector-qt/CompanyVectorHostBridge.py
+          grep -Fq 'libdeclarative_locationplugin.so' experiments/company-vector-qt/CompanyQtLocationBundleM16.py
+          grep -Fq 'os.execve(' experiments/company-vector-qt/CompanyVectorHostBridge.py
+          ! grep -E 'sudo|rpm-ostree|dnf install|toolbox run|startDetached' experiments/company-vector-qt/CompanyQtLocationBundleM16.py
+          grep -Fq 'CompanyStreetMap {' widgets/CompanyCoveragePane.qml
+          grep -Fq 'vectorController.stop()' widgets/CompanyCoveragePane.qml

@@ -83,7 +83,7 @@ ShellRoot {
     function succeed() {
         if (done) return;
         done = true;
-        console.log("C5_POPULATED_PASS // SUN_ARC PLANET_EVENTS ISS_TIMES ACTIVE_METEORS C6_DETAILS");
+        console.log("C5_POPULATED_PASS // SUN_ARC PLANET_EVENTS ISS_TIMES ACTIVE_METEORS C6_DETAILS C7_12_TILE_GRID");
         Qt.quit();
     }
 
@@ -152,11 +152,11 @@ ShellRoot {
                         || details.facts[1].value.indexOf("12:04Z") < 0
                         || details.facts[2].value.indexOf("12:07Z") < 0)
                     return root.fail("ISS_FULL_RECORD_FIELDS_NOT_RENDERED");
-                if (countNamed(details,"cosmos-c6-observation-cell") !== 4)
+                if (countNamed(details,"cosmos-c6-observation-cell") !== 12)
                     return root.fail("ISS_DETAIL_CELLS_NOT_IN_VISUAL_TREE");
-                details.factPage = 2;
-                if (details.visibleFacts[1].value !== "7:00")
-                    return root.fail("ISS_DURATION_PAGE_NOT_ACCESSIBLE");
+                if (details.renderedFactCount !== 12
+                        || details.facts[9].value !== "7:00")
+                    return root.fail("ISS_ALL_TWELVE_FACTS_NOT_VISIBLE");
                 root.phase = 4;
                 root.route = "cosmos/events/meteors";
             } else if (root.phase === 4) {
@@ -217,8 +217,8 @@ ShellRoot {
                 details.selectedIndex = 1;
                 if (details.facts[1].value !== "2027-02-20")
                     return root.fail("ECLIPSE_NEXT_ITEM_MISSING");
-                details.factPage = 2;
-                if (details.visibleFacts[0].value !== "NOT CALCULATED")
+                if (details.renderedFactCount !== 12
+                        || details.facts[8].value !== "NOT CALCULATED")
                     return root.fail("ECLIPSE_LOCAL_VISIBILITY_CAVEAT_MISSING");
                 root.phase = 9;
                 root.route = "cosmos/planets-stars/celestial-fix";
@@ -243,8 +243,9 @@ ShellRoot {
             } else if (root.phase === 10) {
                 const details = focused.instrumentItem;
                 if (!details || details.recordCount !== 2
-                        || details.facts[0].value !== "37.5°")
-                    return root.fail("PLANET_CELESTIAL_FIX_MISSING");
+                        || details.facts[0].value !== "37.5°"
+                        || countNamed(details,"cosmos-c6-observation-cell") !== 12)
+                    return root.fail("PLANET_TWELVE_FACTS_MISSING");
                 details.selectedIndex = 1;
                 if (details.facts[1].value !== "125.2°")
                     return root.fail("PLANET_NEXT_ITEM_MISSING");
@@ -253,8 +254,9 @@ ShellRoot {
             } else if (root.phase === 11) {
                 const details = focused.instrumentItem;
                 if (!details || details.recordCount !== 1
-                        || details.facts[0].value !== "SIRIUS")
-                    return root.fail("CONSTELLATION_ANCHOR_MISSING");
+                        || details.facts[0].value !== "SIRIUS"
+                        || countNamed(details,"cosmos-c6-observation-cell") !== 12)
+                    return root.fail("CONSTELLATION_TWELVE_FACTS_MISSING");
                 details.starsAsNav = true;
                 if (details.recordCount !== 1
                         || details.facts[3].value !== "CANIS MAJOR")

@@ -192,8 +192,8 @@ Rectangle {
         id: zoneRow
         visible: controls.visible&&annualPane.zoneEditorOpen
         z: 3
-        anchors.top: topModes.bottom
-        anchors.topMargin: 1
+        anchors.top: controls.bottom
+        anchors.topMargin: 2
         anchors.left: parent.left
         anchors.right: parent.right
         height: visible?24:0
@@ -319,8 +319,8 @@ Rectangle {
     Canvas {
         id: wheel
         visible: annualPane.view!=="forecast"
-        anchors.top: controls.bottom
-        anchors.topMargin: 2
+        anchors.top: topModes.bottom
+        anchors.topMargin: 1
         anchors.left: parent.left
         anchors.right: parent.right
         anchors.bottom: parent.bottom

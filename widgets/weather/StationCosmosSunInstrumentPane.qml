@@ -159,6 +159,30 @@ Rectangle {
                         font.pixelSize: 9
                         wrapMode: Text.WordWrap
                     }
+                    QuietText {
+                        width: parent.width
+                        text: solarFocus.sourceSpace
+                            ? "CHANNEL // "
+                              +solarFocus.sourceSpace.solarImageInfo.shortLabel
+                              +" // "+(solarFocus.sourceSpace.solarImageReady
+                                  ? "IMAGE READY" : "IMAGE WAITING")
+                            : "CHANNEL --"
+                        color: Colors.orange
+                        font.pixelSize: 9
+                        elide: Text.ElideRight
+                    }
+                    QuietText {
+                        width: parent.width
+                        text: solarFocus.sourceSpace
+                            && solarFocus.sourceSpace.solarImageLastLoadedMs > 0
+                            ? "RECEIVED // "
+                              +new Date(solarFocus.sourceSpace.solarImageLastLoadedMs)
+                                  .toISOString().slice(0,16).replace("T"," ")+"Z"
+                            : "RECEIVED // --"
+                        color: Colors.cyan
+                        font.pixelSize: 9
+                        elide: Text.ElideRight
+                    }
                 }
             }
         }
@@ -279,7 +303,7 @@ Rectangle {
                     columns: 2
                     spacing: 5
                     Repeater {
-                        model: visible ? 4 : 0
+                        model: xraySourceGrid.visible ? 4 : 0
                         delegate: Rectangle {
                             objectName: "cosmos-c6-xray-detail"
                             required property int index
@@ -401,7 +425,7 @@ Rectangle {
                     }
                     QuietText {
                         height: 22
-                        width: Math.max(1,parent.width-205)
+                        width: Math.max(1,parent.width-281)
                         text: solarFocus.flareCount
                             ? "EVENT "+(solarFocus.flareIndex+1)+"/"+solarFocus.flareCount
                             : "NO EVENT IN FEED"
@@ -421,6 +445,17 @@ Rectangle {
                         available: solarFocus.flareCount > 0
                         onClicked: solarFocus.flareDataPage =
                             solarFocus.flareDataPage === 0 ? 1 : 0
+                    }
+                    ActionButton {
+                        width: 68
+                        height: 22
+                        contentPadding: 1
+                        label: "REFRESH"
+                        labelPixelSize: 9
+                        available: !!solarFocus.flares && !solarFocus.flares.loading
+                        onClicked: {
+                            if (solarFocus.flares) solarFocus.flares.refresh()
+                        }
                     }
                 }
                 Grid {

@@ -386,6 +386,7 @@ Rectangle {
             anchors.fill: parent
             spacing: 6
             StationCosmosVisualInstruments {
+                objectName: "cosmos-c5-sun-path"
                 width: parent.width
                 height: parent.height >= 270 ? 204 : parent.height
                 compactMode: true

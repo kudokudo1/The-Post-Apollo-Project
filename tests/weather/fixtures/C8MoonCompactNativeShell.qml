@@ -113,6 +113,19 @@ ShellRoot {
                 const positionAt=position.mapToItem(moon,0,0);
                 const ribbonAt=ribbon.mapToItem(moon,0,0);
                 const provenanceAt=provenance.mapToItem(moon,0,0);
+                const header=find(moon,"cosmos-c9-moon-free-header");
+                const headerAt=header ? header.mapToItem(moon,0,0) : null;
+                const inset=moon.contentInset;
+                if(inset!==6 || !headerAt
+                   || headerAt.x<inset || headerAt.y<inset
+                   || headerAt.x+header.width>moon.width-inset+1
+                   || phaseAt.x<inset || positionAt.x+position.width>moon.width-inset+1
+                   || ribbonAt.x<inset || ribbonAt.x+ribbon.width>moon.width-inset+1
+                   || provenanceAt.x<inset
+                   || provenanceAt.x+provenance.width>moon.width-inset+1
+                   || rack.x<inset || rack.x+rack.width>moon.width-inset+1
+                   || rack.y+rack.height>moon.height-inset+1)
+                    return root.fail("MOON_C10_STAGE_GUTTER_NOT_PRESERVED");
                 if(positionAt.x < phaseAt.x+phase.width-1
                     || Math.abs(positionAt.y-phaseAt.y)>1
                     || ribbonAt.y<phaseAt.y+phase.height-1
@@ -150,7 +163,7 @@ ShellRoot {
                    || moon.facts[5].value!=="--")
                     return root.fail("BELOW_DISPLAY_LIMIT_MISREPRESENTED");
                 root.done=true;
-                console.log("C8_MOON_PASS // NINE_FACTS COMPACT_PHASE NO_SCROLL PROVIDER_LIMITS C9_VISUAL_HIERARCHY");
+                console.log("C8_MOON_PASS // NINE_FACTS COMPACT_PHASE NO_SCROLL PROVIDER_LIMITS C9_VISUAL_HIERARCHY C10_6PX_STAGE_GUTTER");
                 Qt.quit();
             }
         }

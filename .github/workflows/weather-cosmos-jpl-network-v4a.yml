@@ -34,6 +34,10 @@ on:
       - 'widgets/weather/StationMagickAgrippaCorrespondencesPane.qml'
       - 'widgets/weather/StationMagickGrimoireAtlasPolicy.js'
       - 'widgets/weather/StationMagickGrimoireAtlasPane.qml'
+      - 'widgets/weather/StationMagickTarotDeckPolicy.js'
+      - 'widgets/weather/StationMagickTarotPane.qml'
+      - 'widgets/weather/StationMagickTarotCard.qml'
+      - 'tests/weather/test_magick_wild_unknown_tarot_m6g.js'
       - 'tests/weather/test_magick_grimoire_atlas_m6f.js'
       - 'tests/weather/test_magick_agrippa_correspondences_m6e.js'
       - 'widgets/weather/StationMagickLensesPane.qml'
@@ -95,6 +99,8 @@ jobs:
         run: node --test tests/weather/test_magick_agrippa_correspondences_m6e.js
       - name: Verify M6f edition-specific GRIMOIRE reverse index and overlap network
         run: node --test tests/weather/test_magick_grimoire_atlas_m6f.js
+      - name: Verify M6g Wild Unknown deck identity, bounded draws and private local art
+        run: node --test tests/weather/test_magick_wild_unknown_tarot_m6g.js
       - name: Preserve MAGICK M4/M5 sources and interaction behavior
         run: |
           node --test tests/weather/test_magick_celestial_visual_m5.js

@@ -234,6 +234,9 @@ Rectangle {
               ? "aspects"
               : astrology.subjectRoute === "magick/astrology/retrogrades"
               ? "retro" : "wheel"
+        // M6c // Transits route currently means two source UTC snapshots.
+        zodiacPresentation: astrology.subjectRoute === "magick/astrology/transits"
+                            ? "compare" : "wheel"
     }
 
     Row {

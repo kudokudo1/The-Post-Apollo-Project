@@ -1,0 +1,88 @@
+name: Connections C2t native RPM signature and Fedora transaction rollback
+
+on:
+  pull_request:
+    paths:
+      - "tests/connections/c2t_signed_rpm/**"
+      - ".github/workflows/connections-c2t-signed-rpm-vm.yml"
+      - "docs/connections-c2t-signed-rpm-transaction.md"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  signed-rpm-fedora-transaction:
+    # Only the operator's owning-repo source may run a signing-key builder
+    # and a KVM guest. Never run privileged CI from fork pull requests.
+    if: github.actor == 'kudokudo1' && (github.event_name == 'workflow_dispatch' || github.event.pull_request.head.repo.full_name == github.repository)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 22
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Fail closed if ephemeral runner lacks KVM
+        shell: bash
+        run: |
+          set -euo pipefail
+          [ -c /dev/kvm ] || { echo "C2T_BLOCKED // HOST_KVM_MISSING"; exit 2; }
+          sudo chmod a+rw /dev/kvm
+          [ -r /dev/kvm ] && [ -w /dev/kvm ] || exit 2
+      - name: Validate isolated package fixture scripts and no activation
+        shell: bash
+        run: |
+          set -euo pipefail
+          bash -n tests/connections/c2t_signed_rpm/build_signed_test_rpms.sh
+          bash -n tests/connections/c2t_signed_rpm/boot_signed_rpm_vm.sh
+          bash -n tests/connections/c2t_signed_rpm/guest_signed_rpm_transactions.sh
+          python3 - <<'PY'
+          from pathlib import Path
+          spec=Path('tests/connections/c2t_signed_rpm/status-fixture.spec.in').read_text()
+          assert 'AutoReqProv:    no' in spec
+          assert '%files' in spec
+          assert 'c2t-fixture' in spec
+          assert 'postapollo-connections-status.service.template' in spec
+          assert '/usr/share/post-apollo/c2t-fixture' in spec
+          for word in ('%post\n','%pre\n','%preun\n','%postun\n','%trigger'):
+              assert word not in spec, word
+          assert '/usr/lib/systemd/system/' not in spec
+          assert '/usr/libexec/post-apollo/' not in spec
+          assert 'postapollo_connections.pp' not in spec
+          print('C2T_PASS // INERT_RPM_SPEC_NO_SERVICE_ACTIVATION')
+          PY
+      - name: Create GPG-signed native RPM v1 and v2 in ephemeral Fedora builder
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/c2t-rpms"
+          docker run --rm \
+            --mount "type=bind,src=$PWD,dst=/src,readonly" \
+            --mount "type=bind,src=$RUNNER_TEMP/c2t-rpms,dst=/out" \
+            fedora:44 /usr/bin/bash /src/tests/connections/c2t_signed_rpm/build_signed_test_rpms.sh
+          test "$(find "$RUNNER_TEMP/c2t-rpms" -maxdepth 1 -type f | wc -l)" -eq 5
+          (cd "$RUNNER_TEMP/c2t-rpms" && sha256sum --check --status c2t-artifact-manifest.sha256)
+          echo "C2T_PASS // NO_PRIVATE_SIGNING_KEY_EXPORTED_TO_RUNNER"
+      - name: Install QEMU only on ephemeral runner
+        shell: bash
+        run: |
+          set -euo pipefail
+          timeout 120s sudo apt-get -o Acquire::Retries=2 -o Acquire::http::Timeout=35 update || { echo "C2T_BLOCKED // APT_UPDATE"; exit 2; }
+          timeout 360s sudo apt-get -o Acquire::Retries=2 -o Acquire::http::Timeout=35 install -y --no-install-recommends qemu-system-x86 qemu-utils genisoimage || { echo "C2T_BLOCKED // APT_INSTALL"; exit 2; }
+      - name: Boot enforcing offline Fedora guest and verify signed RPM install upgrade downgrade erase
+        shell: bash
+        run: timeout 525s bash tests/connections/c2t_signed_rpm/boot_signed_rpm_vm.sh
+      - name: Recheck production Connections remains disconnected
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -B tests/connections/test_connections_c2n_policy_contract.py
+          python3 - <<'PY'
+          from pathlib import Path
+          root=Path('services/connections')
+          assert 'readonly property bool hostAuthenticated: false' in (root/'ConnectionsRequestStatus.qml').read_text()
+          assert 'readonly property bool credentialActionsEnabled: false' in (root/'ConnectionsBroker.qml').read_text()
+          for p in (*root.glob('*.qml'), *root.glob('*.js'), root/'qmldir'):
+              assert 'c2t_signed_rpm' not in p.read_text(), p
+          print('C2T_PASS // NO_PRODUCTION_HOST_AUTH_OR_CREDENTIAL_GRANTS')
+          PY

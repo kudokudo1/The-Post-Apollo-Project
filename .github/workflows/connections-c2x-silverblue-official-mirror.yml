@@ -49,6 +49,10 @@ jobs:
           assert 'LAYER_ACTIVE_ONLY_AFTER_REAL_REBOOT' in guest
           assert 'C2V_INSTALL_WATCHDOG' in guest
           assert 'timeout --signal=TERM --kill-after=20s 480s' in guest
+          assert 'timeout --signal=TERM --kill-after=5s 15s' in guest
+          assert 'C2V_STATUS_JSON_PRECHECK_BEGIN' in guest
+          assert 'C2V_INSTALL_COMMAND_BEGIN' in guest
+          assert guest.index('C2V_STATUS_JSON_PRECHECK_BEGIN') < guest.index('C2V_INSTALL_COMMAND_BEGIN')
           # Verify the volume in QEMU equals the label mounted inside guest.
           volume_lines = [line for line in host.splitlines() if '-volid C2' in line]
           label_lines = [line for line in guest.splitlines() if line.strip().startswith('media_label=C2')]

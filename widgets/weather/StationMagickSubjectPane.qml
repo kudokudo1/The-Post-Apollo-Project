@@ -28,8 +28,16 @@ Rectangle {
     // M6g // Local symbolic draw; no astronomy or journal service.
     readonly property bool tarotRoute:
         subjectRoute === "magick/divination/tarot"
+    // M7a // Bounded new instruments in existing reserved deep routes.
+    readonly property bool timingRoute:
+        subjectRoute === "magick/planetary/timing"
+    readonly property bool symbolismRoute:
+        subjectRoute === "magick/divination/symbolism"
+    readonly property bool journalRoute:
+        subjectRoute === "magick/grimoire/journal"
     readonly property bool independentScreen:
-        standaloneAstrology || lensesLanding || tarotRoute
+        standaloneAstrology || lensesLanding || tarotRoute ||
+        timingRoute || symbolismRoute || journalRoute
     // Supplied by the existing Station root; no independent clock.
     property real runtimeNowMs: 0
 
@@ -118,6 +126,12 @@ Rectangle {
                              ? grimoireAtlasReference
                              : magickPane.tarotRoute
                              ? tarotReference
+                             : magickPane.timingRoute
+                             ? timingReference
+                             : magickPane.symbolismRoute
+                             ? symbolismReference
+                             : magickPane.journalRoute
+                             ? journalDraftReference
                              : magickPane.showCelestial
                              ? celestialReference
                              : magickPane.subjectRoute.indexOf("magick/lunar-solar/") === 0
@@ -174,6 +188,26 @@ Rectangle {
     Component {
         id: tarotReference
         StationMagickTarotPane {}
+    }
+
+    // M7a // Traditional source-local timing outlook; no new solar actor.
+    Component {
+        id: timingReference
+        StationMagickTimingAtlasPane {
+            weatherService: magickPane.weatherService
+        }
+    }
+
+    // M7a // One source-labelled historical symbolism lens.
+    Component {
+        id: symbolismReference
+        StationMagickSymbolismPane {}
+    }
+
+    // M7a // The journal is temporary per viewing session, not a file.
+    Component {
+        id: journalDraftReference
+        StationMagickJournalDraftPane {}
     }
 
     // M5b // The visual host is an on-demand consumer of the SAME

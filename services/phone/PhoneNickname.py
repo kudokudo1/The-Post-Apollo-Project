@@ -70,7 +70,7 @@ def _result(state: str, *, profile: str = "", name: str = "") -> dict[str, objec
 
 
 def _load(path: Path) -> dict[str, str] | None:
-    flags = os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0) | getattr(os, "O_CLOEXEC", 0)
+    flags = os.O_RDONLY | os.O_NOFOLLOW | getattr(os, "O_CLOEXEC", 0)
     try:
         fd = os.open(path, flags)
     except FileNotFoundError:
@@ -167,7 +167,7 @@ def action(args: list[str], *,
         return _result("STORAGE_UNAVAILABLE", profile=profile)
     lock_fd = None
     try:
-        flags = (os.O_RDWR | os.O_CREAT | getattr(os, "O_NOFOLLOW", 0)
+        flags = (os.O_RDWR | os.O_CREAT | os.O_NOFOLLOW
                  | getattr(os, "O_CLOEXEC", 0))
         lock_fd = os.open(str(location) + ".lock", flags, 0o600)
         info = os.fstat(lock_fd)

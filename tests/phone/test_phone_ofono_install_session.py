@@ -6,6 +6,7 @@ import sys
 import unittest
 
 ROOT = Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(ROOT / "services" / "phone"))
 FILE = ROOT / "services/phone/PhoneOfonoInstallSession.py"
 spec = importlib.util.spec_from_file_location("phone_ofono_install_session", FILE)
 session = importlib.util.module_from_spec(spec)
@@ -68,6 +69,21 @@ class OfonoSessionTests(unittest.TestCase):
         self.assertNotIn("-y", command)
         self.assertNotIn("--allow-erasing", command)
         self.assertNotIn("bash", command)
+
+    def test_verified_dnf_alias_uses_same_interactive_transaction(self):
+        run = mock.Mock(return_value=mock.Mock(returncode=0))
+        paths = {"pkexec": "/usr/bin/pkexec", "dnf": "/usr/bin/dnf"}
+        # The shared command-discovery tests prove that this alias is
+        # allowed only when its canonical target really is dnf5.
+        with mock.patch.object(session, "trusted_dnf5", return_value="/usr/bin/dnf"):
+            result = session.run_session(
+                interactive=lambda: True, find=paths.get,
+                runner=run, hold=lambda _: "")
+        self.assertEqual(result, 0)
+        run.assert_called_once_with(
+            ["/usr/bin/pkexec", "/usr/bin/dnf",
+             "--setopt=assumeyes=False", "--setopt=defaultyes=False",
+             "install", "ofono"], check=False)
 
     def test_packagekit_is_preferred_when_both_backends_exist(self):
         paths = {"pkcon": "/usr/bin/pkcon", "pkexec": "/usr/bin/pkexec",

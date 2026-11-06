@@ -14,26 +14,15 @@ import subprocess
 import sys
 from typing import Callable, Any
 
-
-def _program(name: str, find: Callable[[str], str | None]) -> str | None:
-    try:
-        path = find(name)
-    except Exception:
-        return None
-    if type(path) is not str or not os.path.isabs(path):
-        return None
-    # A privileged installer must be an OS binary, not a command planted in
-    # the user's PATH or the directory of a downloaded script.
-    if (os.path.basename(path) != name
-            or os.path.dirname(os.path.realpath(path)) not in ("/usr/bin", "/bin")):
-        return None
-    return path
+from PhoneInstallCommandDiscovery import (
+    find_os_program, trusted_program, trusted_dnf5,
+)
 
 
 def run_session(
     *,
     interactive: Callable[[], bool] = sys.stdin.isatty,
-    find: Callable[[str], str | None] = shutil.which,
+    find: Callable[[str], str | None] = find_os_program,
     runner: Callable[..., Any] = subprocess.run,
     hold: Callable[[str], str] = input,
 ) -> int:
@@ -41,13 +30,13 @@ def run_session(
         print("The oFono installer requires an interactive terminal.")
         return 3
 
-    pkcon = _program("pkcon", find)
+    pkcon = trusted_program("pkcon", find=find)
     if pkcon:
         backend = "PackageKit"
         command = [pkcon, "install", "ofono"]
     else:
-        pkexec = _program("pkexec", find)
-        dnf5 = _program("dnf5", find)
+        pkexec = trusted_program("pkexec", find=find)
+        dnf5 = trusted_dnf5(find=find)
         if not (pkexec and dnf5):
             print("No supported embedded installer: PackageKit's pkcon or "
                   "both Polkit pkexec and DNF5 must be installed.")

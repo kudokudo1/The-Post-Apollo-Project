@@ -221,8 +221,9 @@ class CallingSetupUiTests(unittest.TestCase):
         self.assertIn('messages: []', self.ui)
 
     def test_no_installation_or_device_defaults_ever_enter_our_code(self):
-        self.assertIn('pkexec = installed_program("pkexec")', self.helper)
-        self.assertIn('dnf5 = installed_program("dnf5")', self.helper)
+        self.assertIn('pkexec = trusted_program("pkexec", find=find)', self.helper)
+        self.assertIn('dnf5 = trusted_dnf5(find=find)', self.helper)
+        self.assertIn('from PhoneInstallCommandDiscovery import (', self.helper)
         self.assertIn('backend_ready = bool(pkcon or (pkexec and dnf5))', self.helper)
         for forbidden in ("sudo ", "dnf install", "subprocess.run(",
                           "bluetoothctl pair", "systemctl start", "shell=True",

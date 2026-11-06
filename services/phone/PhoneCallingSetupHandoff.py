@@ -18,6 +18,9 @@ import sys
 from typing import Any, Callable
 
 from PhoneCallPrerequisites import diagnose
+from PhoneInstallCommandDiscovery import (
+    find_os_program, trusted_program, trusted_dnf5,
+)
 from PhoneStageDirector import INSTALL_APP_ID, _read_tree, _stage_actor, _exe
 
 SCHEMA = "post-apollo.phone.calling-setup-handoff.v0"
@@ -77,7 +80,7 @@ def open_support(
     *,
     prerequisite: Callable[[], object] = diagnose,
     is_fedora: Callable[[], bool] = _fedora,
-    find: Callable[[str], str | None] = shutil.which,
+    find: Callable[[str], str | None] = find_os_program,
     launcher: Callable[..., Any] = subprocess.Popen,
     already_open: Callable[[], bool] = _installer_active,
 ) -> dict[str, object]:
@@ -111,21 +114,12 @@ def open_support(
     except Exception:
         return _result("STAGE_UNAVAILABLE")
 
-    def installed_program(name: str) -> str | None:
-        try:
-            p = find(name)
-        except Exception:
-            return None
-        return (p if type(p) is str and os.path.isabs(p)
-                and os.path.basename(p) == name
-                and os.path.dirname(os.path.realpath(p)) in ("/usr/bin", "/bin")
-                else None)
 
-    foot = installed_program("foot")
-    pkcon = installed_program("pkcon")
-    pkexec = installed_program("pkexec")
-    dnf5 = installed_program("dnf5")
-    python = installed_program("python3")
+    foot = trusted_program("foot", find=find)
+    pkcon = trusted_program("pkcon", find=find)
+    pkexec = trusted_program("pkexec", find=find)
+    dnf5 = trusted_dnf5(find=find)
+    python = trusted_program("python3", find=find)
     session_script = Path(__file__).with_name("PhoneOfonoInstallSession.py")
     # Fedora minimalist/Sway installs may omit PackageKit's pkcon client.
     # The alternate is a *user-authorized* Polkit + DNF5 transaction in the

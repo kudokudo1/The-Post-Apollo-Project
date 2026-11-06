@@ -13,6 +13,10 @@ Rectangle {
     property var celestialSource: null
     // M7a // Input readiness only, not a computed full natal chart.
     property bool eventSetupOpen: false
+    property bool natalMode: false
+    // A complete independent chart service will supply this in a later
+    // verified milestone. The existing M4 two-body source is NOT substituted.
+    property var fullChartData: null
 
     readonly property bool sourceIdle: !!celestialSource
         && !celestialSource.loading
@@ -48,7 +52,7 @@ Rectangle {
         spacing: 5
 
         GohuText {
-            width: Math.max(0,parent.width-299)
+            width: Math.max(0,parent.width-365)
             height: parent.height
             verticalAlignment: Text.AlignVCenter
             font.pixelSize: 11
@@ -79,6 +83,15 @@ Rectangle {
             onClicked: astrology.celestialSource.refresh()
         }
         ActionButton {
+            width: 61
+            height: 25
+            label: astrology.natalMode ? "PAIR" : "NATAL"
+            labelPixelSize: 9
+            accentColor: astrology.natalMode ? Colors.magenta : Colors.cyan
+            selected: astrology.natalMode
+            onClicked: astrology.natalMode=!astrology.natalMode
+        }
+        ActionButton {
             width: 88
             height: 25
             label: "EVENT SETUP"
@@ -94,7 +107,8 @@ Rectangle {
         anchors.right: parent.right
         anchors.top: calculationControls.bottom
         anchors.topMargin: 2
-        height: 24
+        visible: !astrology.natalMode
+        height: visible ? 24 : 0
         spacing: 4
 
         ActionButton {
@@ -183,7 +197,8 @@ Rectangle {
         anchors.right: parent.right
         anchors.top: dateControls.bottom
         anchors.topMargin: 2
-        height: 23
+        visible: !astrology.natalMode
+        height: visible ? 23 : 0
         spacing: 4
 
         ActionButton {
@@ -229,6 +244,7 @@ Rectangle {
 
     StationMagickCelestialInstrument {
         id: instrument
+        visible: !astrology.natalMode
         anchors.left: parent.left
         anchors.right: parent.right
         anchors.top: pairControls.bottom
@@ -249,12 +265,24 @@ Rectangle {
                             ? "compare" : "wheel"
     }
 
+    StationMagickNatalChartWheelPane {
+        anchors.left: parent.left
+        anchors.right: parent.right
+        anchors.top: pairControls.bottom
+        anchors.topMargin: 3
+        anchors.bottom: eventAndTimeControls.top
+        anchors.bottomMargin: 2
+        visible: astrology.natalMode
+        chartData: astrology.fullChartData
+    }
+
     Row {
         id: eventAndTimeControls
         anchors.left: parent.left
         anchors.right: parent.right
         anchors.bottom: parent.bottom
-        height: 23
+        visible: !astrology.natalMode
+        height: visible ? 23 : 0
         spacing: 3
 
         Repeater {
@@ -276,7 +304,7 @@ Rectangle {
                 contentPadding: 1
                 accentColor: modelData.id==="reset"
                              ? Colors.orange : Colors.cyan
-                available: instrument.graphModel.ready
+                available: !astrology.natalMode && instrument.graphModel.ready
                     && (modelData.id.indexOf("event")<0
                         || instrument.eventsInView.length>0)
                 onClicked: {

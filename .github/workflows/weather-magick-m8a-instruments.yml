@@ -1,0 +1,35 @@
+name: MAGICK M8a planetary clock and atlas foundations
+
+on:
+  pull_request:
+    paths:
+      - 'widgets/weather/StationMagickTraditionalDialPolicy.js'
+      - 'widgets/weather/StationMagickTraditionalClockPane.qml'
+      - 'widgets/weather/StationMagickNatalWheelPolicy.js'
+      - 'widgets/weather/StationMagickNatalChartWheelPane.qml'
+      - 'widgets/weather/StationMagickCorrespondenceAtlasPane.qml'
+      - 'widgets/weather/StationMagickTimingAtlasPane.qml'
+      - 'widgets/weather/StationMagickAstrologyPane.qml'
+      - 'widgets/weather/StationMagickSymbolismPane.qml'
+      - 'tests/weather/test_magick_three_instruments_m8a.js'
+      - '.github/workflows/weather-magick-m8a-instruments.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  m8a-instruments:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Validate historical planetary-clock source geometry and source-gated natal wheel
+        run: node --test tests/weather/test_magick_three_instruments_m8a.js
+      - name: Preserve existing MAGICK five-track and planetary-hour contracts
+        run: |
+          node --test tests/weather/test_magick_five_track_foundations_m7a.js
+          node --test tests/weather/test_magick_planetary_hours_m6d.js

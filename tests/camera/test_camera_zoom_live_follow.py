@@ -57,9 +57,9 @@ class FollowTests(unittest.TestCase):
         self.assertIn('Number(reply.revision) !== zoomFollowRevision', QML)
         self.assertIn('camera.zoomFollowRevision++', QML) if False else None
         self.assertIn('zoomFollowRevision++;', QML)
-        self.assertIn('camera.frameTopInset + zoomBayTop', QML)
-        self.assertIn('camera.margins.left + camera.glowGutter + zoomBayInset', QML)
-        self.assertIn('width: zoomBayWidth, height: zoomBayHeight', QML)
+        self.assertIn('camera.frameTopInset + zoomActorTop', QML)
+        self.assertIn('camera.margins.left + camera.glowGutter + zoomActorLeft', QML)
+        self.assertIn('width: zoomActorWidth, height: zoomActorHeight', QML)
         self.assertNotIn('id: zoomStatusRefreshTimer', QML)
         self.assertIn('menuOpen && !zoomWebDocked', QML)
 
@@ -68,8 +68,8 @@ class FollowTests(unittest.TestCase):
         self.assertIn('const aligned = reply.aligned === true && reply.state === "ALIGNED"', QML)
         self.assertIn('zoomWebDocked = false;', QML)
         self.assertIn('intersection: Intersection.Subtract', QML)
-        self.assertIn('width: camera.zoomWebDocked ? Math.round(zoomViewport.width) : 0', QML)
-        self.assertIn('height: camera.zoomWebDocked ? Math.round(zoomViewport.height) : 0', QML)
+        self.assertIn('width: camera.zoomWebDocked ? camera.zoomActorWidth : 0', QML)
+        self.assertIn('height: camera.zoomWebDocked ? camera.zoomActorHeight : 0', QML)
         self.assertIn('zoomFollowProcess.running = true;', QML)
 
     def test_direct_ipc_reuses_social_bridge_and_existing_actor_validation(self):

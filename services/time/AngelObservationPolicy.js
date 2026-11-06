@@ -238,6 +238,21 @@ function matchesFilter(digits, kind) {
     }
 }
 
+// Date of the ACTUAL saved observation in its captured UTC offset.
+// The numeric epoch and offset already belong to v1 journal records; this
+// adds no new persistence field, timezone-dependent recomputation or writes.
+// In particular, manual clock-display calibration must not change the date.
+function observedDate(row) {
+    if (!row || !integer(row.observedAtMs, 1, Number.MAX_SAFE_INTEGER)
+            || !integer(row.utcOffsetMinutes, -840, 840))
+        return "DATE UNKNOWN";
+    var localEpochMs = row.observedAtMs + row.utcOffsetMinutes * 60000;
+    var date = new Date(localEpochMs);
+    if (isNaN(date.getTime()))
+        return "DATE UNKNOWN";
+    return date.toISOString().slice(0, 10);
+}
+
 function filter(observations, query, kind) {
     if (!Array.isArray(observations)
             || typeof query !== "string" || query.length > MAX_DIGITS

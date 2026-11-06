@@ -6,8 +6,11 @@ on:
       - 'widgets/weather/StationWorkspaceSurface.qml'
       - 'widgets/weather/StationSky.qml'
       - 'widgets/weather/StationCosmosModesPane.qml'
+      - 'widgets/weather/StationCosmosDetailPane.qml'
+      - 'widgets/weather/StationCosmosDetailPolicy.js'
       - 'widgets/weather/StationCosmosCivilCalendarPolicy.js'
       - 'tests/weather/test_cosmos_c5_empty_repair.js'
+      - 'tests/weather/test_cosmos_c6_details.js'
       - 'tests/weather/fixtures/C5FocusedNativeShell.qml'
       - 'tests/weather/fixtures/C5PopulatedNativeShell.qml'
       - 'scripts/weather/verify_cosmos_c5_native.sh'
@@ -29,6 +32,7 @@ jobs:
       - name: Verify C5 source/date/mode navigation
         run: |
           node --test tests/weather/test_cosmos_c5_empty_repair.js
+          node --test tests/weather/test_cosmos_c6_details.js
           node --test tests/weather/test_cosmos_subject_panels_c1.js
           node --test tests/weather/test_workspace_landing_w1.js
 

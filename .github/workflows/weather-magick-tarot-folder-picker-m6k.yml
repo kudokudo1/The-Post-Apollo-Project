@@ -1,0 +1,52 @@
+name: Weather MAGICK M6k private Tarot art folder picker
+
+on:
+  pull_request:
+    paths:
+      - 'widgets/weather/StationMagickTarotPane.qml'
+      - 'widgets/weather/StationMagickTarotDeckPolicy.js'
+      - 'tests/weather/test_magick_tarot_art_folder_picker_m6k.js'
+      - 'docs/weather-magick-m6k-tarot-folder-picker-handoff.md'
+      - '.github/workflows/weather-magick-tarot-folder-picker-m6k.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'widgets/weather/StationMagickTarotPane.qml'
+      - 'widgets/weather/StationMagickTarotDeckPolicy.js'
+      - 'tests/weather/test_magick_tarot_art_folder_picker_m6k.js'
+      - '.github/workflows/weather-magick-tarot-folder-picker-m6k.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  private-folder-picker:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: M6k selected private folder path tests
+        run: node --test tests/weather/test_magick_tarot_art_folder_picker_m6k.js
+      - name: M6j merged art-loading and red CLOSE regressions
+        run: node --test tests/weather/test_magick_tarot_local_art_m6j.js
+      - name: Earlier M6g M6h M6i reading and layout compatibility
+        run: |
+          node --test tests/weather/test_magick_wild_unknown_tarot_m6g.js
+          node --test tests/weather/test_magick_tarot_physical_m6h.js
+          node --test tests/weather/test_magick_tarot_presentation_m6i.js
+      - name: Qt 6 QML syntax parse without live panel launch
+        run: |
+          sudo apt-get update -qq
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends qt6-declarative-dev-tools
+          QT_QPA_PLATFORM=offscreen /usr/lib/qt6/bin/qmlformat widgets/weather/StationMagickTarotPane.qml >/dev/null
+      - name: No extra image writer or network actor
+        run: |
+          set -euo pipefail
+          ! grep -Eq 'FileView *\{|Process *\{|XMLHttpRequest|Qt.openUrlExternally' \
+            widgets/weather/StationMagickTarotPane.qml widgets/weather/StationMagickTarotDeckPolicy.js
+          grep -q 'FolderDialog {' widgets/weather/StationMagickTarotPane.qml
+          grep -q 'readonly property var artworkCandidates:' widgets/weather/StationMagickTarotCard.qml
+          printf '%s\n' 'M6K_LOCAL_FOLDER_PICKER_ONLY_NO_ARTWORK_MUTATION_PASS'

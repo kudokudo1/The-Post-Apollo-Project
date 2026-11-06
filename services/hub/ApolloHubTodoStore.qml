@@ -189,8 +189,9 @@ Scope {
         errorCode = "";
         // Metadata only. Do not correlate a later callback to this request
         // as a trusted receipt; unrelated native events may interleave.
-        nativeSaveRequestsM14a = Math.min(1000000, nativeSaveRequestsM14a + 1);
-        nativeSaveEventM14a = "WRITE_REQUESTED";
+        todo.nativeSaveRequestsM14a = Math.min(1000000,
+            (todo.nativeSaveRequestsM14a || 0) + 1);
+        todo.nativeSaveEventM14a = "WRITE_REQUESTED";
         // FileView's atomicWrites protects an existing file on failure.
         // Do not publish the pending tasks as saved before onSaved.
         todoFile.setText(JSON.stringify(pendingDocument, null, 2) + "\n");

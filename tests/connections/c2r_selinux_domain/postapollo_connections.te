@@ -17,3 +17,10 @@ miscfiles_read_localization(postapollo_connections_t)
 allow postapollo_connections_t self:unix_stream_socket { create connect read write getattr getopt setopt shutdown };
 allow postapollo_connections_t self:process { signal sigchld };
 dbus_system_bus_client(postapollo_connections_t)
+
+# Fedora systemd has NoNewPrivileges=yes. Permit ONLY init_t -> this confined
+# status-only daemon transition under NNP; never disable NNP or use permissive.
+gen_require(`
+    type init_t;
+')
+allow init_t postapollo_connections_t:process2 nnp_transition;

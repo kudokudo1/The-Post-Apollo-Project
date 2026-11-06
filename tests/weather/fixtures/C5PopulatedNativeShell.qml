@@ -114,6 +114,16 @@ ShellRoot {
                         "cosmos-c5-planet-event-marker") !== 3) {
                     let names = [];
                     dumpTree(focused.instrumentItem,0,names);
+                    const firstLane = focused.instrumentItem.children[1];
+                    const laneRow = firstLane ? firstLane.children[0] : null;
+                    const bar = laneRow ? laneRow.children[1] : null;
+                    const eventRepeater = bar ? bar.children[0] : null;
+                    console.log("C5_RENDER_METRICS // model="
+                      +(focused.planetRows[0].events.length)
+                      +" displayed="+(focused.displayedPlanetRows[0].events.length)
+                      +" delegate="+(firstLane && firstLane.planetRow && firstLane.planetRow.events
+                        ? firstLane.planetRow.events.length : "NONE")
+                      +" repeater="+(eventRepeater ? eventRepeater.count : "NONE"));
                     console.log("C5_RENDER_TREE // "+names.join("|"));
                     return root.fail("USNO_EVENT_MARKERS_NOT_RENDERED");
                 }

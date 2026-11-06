@@ -916,8 +916,9 @@ Rectangle {
                                 instrument.graphModel,instrument.viewWindow,
                                 sampleFraction(mouse.x));
                         }
-                        if(next>=0 && next!==instrument.hoveredIndex)
-                            instrument.hoveredIndex=next;
+                        if(next>=0)
+                            if(next!==instrument.hoveredIndex)
+                                instrument.hoveredIndex=next;
                     }
                 }
                 onClicked: function(mouse) {

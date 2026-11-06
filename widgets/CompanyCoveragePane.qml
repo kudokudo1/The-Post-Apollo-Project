@@ -26,6 +26,10 @@ Item {
     property bool streetConsentOpen: false
     property bool streetMode: false
     property bool vectorConsentOpen: false
+    // Explicit user intent and lifecycle notifications for the optional
+    // Company M26 Wayland bridge. The M15 launcher remains authoritative.
+    signal nativeVectorLaunchRequested(bool online)
+    signal nativeVectorClosed()
     property string selectedHubId: ""
     readonly property var hubRows: hubStore.saved && Array.isArray(hubStore.saved.hubs)
         ? hubStore.saved.hubs : []
@@ -91,13 +95,20 @@ Item {
     function launchVector(online) {
         if (vectorController.running) return;
         vectorConsentOpen=false;
-        vectorController.launch(online);
+        // The existing attached Quickshell Process remains the only launcher.
+        // A private Wayland candidate is reported only after this explicit
+        // OFFLINE TEST / ONLINE STREETS action accepts the launch.
+        if (vectorController.launch(online))
+            root.nativeVectorLaunchRequested(online);
     }
 
     // The Coverage UI is not allowed to own Process or FileView.
     // All native sidecar lifecycle lives with the Company controller.
     CompanyVectorSidecarController {
         id: vectorController
+        // Also clear the candidate when the Qt process exits on its own,
+        // not only when CLOSE VECTOR or a mode change stops it.
+        onRunningChanged: if (!running) root.nativeVectorClosed()
     }
 
     CompanyHubStore {

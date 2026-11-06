@@ -1,0 +1,57 @@
+name: Company M26 optional native Qt Wayland bridge integration
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'widgets/CompanyNetworkW.qml'
+      - 'widgets/CompanyCoveragePane.qml'
+      - 'widgets/CompanyVectorBridgeLink.qml'
+      - 'tests/company/test_company_vector_bridge_m26.test.js'
+      - 'docs/company-m26-vector-bridge-handoff-20261106.md'
+      - '.github/workflows/company-vector-bridge-m26.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  optional-bridge:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Check optional plugin, coordinate transforms and explicit launch signals
+        run: node --test tests/company/test_company_vector_bridge_m26.test.js
+      - name: Preserve M18 real viewport and M19b namespace
+        run: |
+          node --test tests/company/test_company_vector_viewport_m18.test.js
+          node --test tests/company/test_company_layer_namespace_m19b.test.js
+      - name: Preserve M13 native launcher, offline default and consent
+        run: |
+          python3 -m unittest discover -s tests/company -p 'test_company_vector_sidecar_m13.py' -v
+      - name: Verify isolated source did not install/activate optional Qt plugin
+        run: |
+          python3 -B - <<'PY'
+          from pathlib import Path
+          root=Path('widgets/CompanyNetworkW.qml').read_text()
+          link=Path('widgets/CompanyVectorBridgeLink.qml').read_text()
+          coverage=Path('widgets/CompanyCoveragePane.qml').read_text()
+          assert 'property bool vectorBridgeOptIn: false' in root
+          assert 'property bool bridgeEnabled: false' in link
+          assert 'Qt.createQmlObject(' in link
+          assert 'import PostApollo.CompanyVector 1.0' in link
+          assert not any(line.strip().startswith('import PostApollo.CompanyVector')
+                         for line in root.splitlines())
+          assert 'CompanyVectorSidecarController {' in coverage
+          assert 'onRunningChanged: if (!running) root.nativeVectorClosed()' in coverage
+          for bad in ('wl_display_connect', 'wl_display_disconnect',
+                      'wlr_seat_', 'wlr_scene_node_set_', 'swaymsg'):
+              assert bad not in root+link+coverage, bad
+          print('M26: no static plugin dependency, process replacement or compositor activation PASS')
+          PY

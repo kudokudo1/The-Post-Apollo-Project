@@ -49,13 +49,13 @@ jobs:
           assert 'LAYER_ACTIVE_ONLY_AFTER_REAL_REBOOT' in guest
           assert 'C2V_INSTALL_WATCHDOG' in guest
           assert 'timeout --signal=TERM --kill-after=20s 480s' in guest
-          import re
-          # Catch a boot-ISO/guest media mismatch before the expensive
-          # official Silverblue image download and OS installation.
-          volume = re.search(r'-volid\\s+(C2\\w+)', host)
-          guest_label = re.search(r'media_label=(C2\\w+)', guest)
-          assert volume and guest_label and volume.group(1) == guest_label.group(1), \\
-              f'CI volume mismatch: {volume and volume.group(1)} vs {guest_label and guest_label.group(1)}'
+          # Verify the volume in QEMU equals the label mounted inside guest.
+          volume_lines = [line for line in host.splitlines() if '-volid C2' in line]
+          label_lines = [line for line in guest.splitlines() if line.strip().startswith('media_label=C2')]
+          assert len(volume_lines) == 1 and len(label_lines) == 1
+          volume = volume_lines[0].split('-volid ', 1)[1].split()[0]
+          guest_label = label_lines[0].split('=', 1)[1].strip()
+          assert volume == guest_label, f'CI volume mismatch: {volume} vs {guest_label}'
           print('C2V_PASS // OFFLINE_MEDIA_LABELS_MATCH')
           assert 'unconfined' not in guest.lower()
           for path in ('services/connections/ConnectionsBroker.qml', 'services/connections/ConnectionsRequestStatus.qml'):

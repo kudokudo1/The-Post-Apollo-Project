@@ -34,9 +34,13 @@ test("MAGICK compact phase controls and all original USNO source readings remain
     assert.ok(moon.includes(field),field);
  assert.match(magick,/StationCosmosVisualInstruments\s*\{/);
  assert.match(magick,/compactMode: true/);
- assert.match(moon,/model: 9/);
- assert.match(moon,/columns: 3/);
- assert.match(moon,/height: Math\.max\(1,\(factGrid\.height-2\*factGrid\.spacing\)\/3\)/);
+ assert.match(moon,/readonly property int renderedFactCount: 9/);
+ assert.match(moon,/id: heroRow/);
+ assert.match(moon,/id: positionColumn/);
+ assert.match(moon,/id: eventRibbon/);
+ assert.match(moon,/id: provenanceRow/);
+ assert.match(moon,/model: 3/);
+ assert.doesNotMatch(moon,/Grid \\{|model: 9|Flickable \\{/);
 });
 
 test("new Moon pane starts no new services and never scrolls",()=>{

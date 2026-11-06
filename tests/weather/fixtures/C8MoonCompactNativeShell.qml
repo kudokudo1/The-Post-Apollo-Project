@@ -103,13 +103,28 @@ ShellRoot {
                     return root.fail("MOON_EVENT_POSITION_PROVENANCE_DATA_LOST");
                 const phase=find(moon,"cosmos-c8-moon-phase");
                 const rack=find(moon,"cosmos-c8-moon-readings");
-                if(!phase||!rack||!phase.compactMode
-                    || !phase.showMoon || phase.showSun)
-                    return root.fail("MAGICK_COMPACT_PHASE_NOT_REUSED");
-                if(rack.y+rack.height>moon.height+1
-                   || rack.y<phase.y+phase.height-1
-                   || rack.height<70)
-                    return root.fail("COMPACT_VIEWPORT_GEOMETRY_OVERFLOW");
+                const position=find(moon,"cosmos-c9-moon-tall-position");
+                const ribbon=find(moon,"cosmos-c9-moon-event-ribbon");
+                const provenance=find(moon,"cosmos-c9-moon-free-provenance");
+                if(!phase||!rack||!position||!ribbon||!provenance
+                    || !phase.compactMode || !phase.showMoon || phase.showSun)
+                    return root.fail("MAGICK_PHASE_OR_NEW_HIERARCHY_MISSING");
+                const phaseAt=phase.mapToItem(moon,0,0);
+                const positionAt=position.mapToItem(moon,0,0);
+                const ribbonAt=ribbon.mapToItem(moon,0,0);
+                const provenanceAt=provenance.mapToItem(moon,0,0);
+                if(positionAt.x < phaseAt.x+phase.width-1
+                    || Math.abs(positionAt.y-phaseAt.y)>1
+                    || ribbonAt.y<phaseAt.y+phase.height-1
+                    || ribbon.width<position.width*2
+                    || provenanceAt.y<ribbonAt.y+ribbon.height-1
+                    || rack.y+rack.height>moon.height+1
+                    || rack.height<70)
+                    return root.fail("C9_ASYMMETRIC_VIEWPORT_OVERFLOW");
+                if(count(position,"cosmos-c8-moon-fact")!==3
+                   || count(ribbon,"cosmos-c8-moon-fact")!==3
+                   || count(provenance,"cosmos-c8-moon-fact")!==3)
+                    return root.fail("C9_FACT_GROUPING_LOST");
                 root.step=3;
             } else if(root.step===3) {
                 const eph=sky.moonObservation.ephemeris;
@@ -135,7 +150,7 @@ ShellRoot {
                    || moon.facts[5].value!=="--")
                     return root.fail("BELOW_DISPLAY_LIMIT_MISREPRESENTED");
                 root.done=true;
-                console.log("C8_MOON_PASS // NINE_FACTS COMPACT_PHASE NO_SCROLL PROVIDER_LIMITS");
+                console.log("C8_MOON_PASS // NINE_FACTS COMPACT_PHASE NO_SCROLL PROVIDER_LIMITS C9_VISUAL_HIERARCHY");
                 Qt.quit();
             }
         }

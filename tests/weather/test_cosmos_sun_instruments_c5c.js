@@ -9,6 +9,7 @@ const read = name => fs.readFileSync(path.join(root,name),"utf8");
 
 const modePane = read("widgets/weather/StationCosmosModesPane.qml");
 const solarPane = read("widgets/weather/StationCosmosSunInstrumentPane.qml");
+const solarPolicy = read("widgets/weather/StationCosmosSolarDetailPolicy.js");
 const space = read("widgets/weather/StationSpace.qml");
 const cosmosSource = read("widgets/weather/StationCosmosSubjectPanelPolicy.js");
 const cosmos = vm.createContext({});
@@ -56,7 +57,7 @@ test("C5c SUN presents exactly one fixed, readable source-backed instrument",()=
     "classEquivalent.label","sampleUtc","sampleFresh","trend",
     "count24h","cPlus24h","events","predictedSsn","predictedFlux","peakMonth"
   ]) {
-    assert.ok(solarPane.includes(sourceField),sourceField);
+    assert.ok(solarPane.includes(sourceField) || solarPolicy.includes(sourceField),sourceField);
   }
   assert.match(solarPane,/source: solarFocus\.sourceSpace/);
   assert.match(solarPane,/cache: false/);
@@ -67,5 +68,5 @@ test("C5c SUN presents exactly one fixed, readable source-backed instrument",()=
   assert.doesNotMatch(solarPane,/Flickable\s*\{|ScrollView\s*\{/);
   assert.doesNotMatch(solarPane,/StationSpace\s*\{/);
   assert.match(solarPane,/anchors\.fill: parent/);
-  assert.ok(solarPane.includes("width:Math.max(1,(cycleGrid.width-7)/2)"));
+  assert.match(solarPane,/width: Math\.max\(1,\(cycleGrid\.width-7\)\/2\)/);
 });

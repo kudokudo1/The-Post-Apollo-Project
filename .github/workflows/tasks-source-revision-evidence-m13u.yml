@@ -24,7 +24,7 @@ jobs:
     timeout-minutes: 12
     steps:
       - uses: actions/checkout@v4
-      - name: New revision inspector: actual SQLite and filesystem
+      - name: New revision inspector on actual SQLite and filesystem
         run: |
           python3 -B -m unittest discover -s tests/tasks -p 'test_task_source_revision_evidence_m13u.py' -v
       - name: Existing stage settlement and adversarial source detection

@@ -3,6 +3,7 @@ import QtQuick.Effects
 import "../../components"
 import "StationMagickCelestialVisualPolicy.js" as Celestial
 import "StationMagickZodiacVectorPolicy.js" as ZodiacVector
+import "StationMagickRetrogradeLanePolicy.js" as Retrograde
 
 // M5 // Standalone, source-fed celestial instrument. No self-owned provider,
 // ephemeris download, timer, location lookup, journal, or page navigation.
@@ -500,6 +501,116 @@ Rectangle {
                 ctx.fill();ctx.shadowBlur=0;
             }
         }
+        ctx.restore();
+    }
+
+    // M6a // Sampled geocentric APPARENT longitude speed, ° per day.
+    // Orange brackets denote uncertain sign-transition windows, not exact
+    // astronomical station times. All values come from validated M4 rows.
+    function paintRetrograde(ctx) {
+        const w=graphCanvas.width,h=graphCanvas.height;
+        const data=Retrograde.build(instrument.graphModel,
+                                    instrument.viewWindow,instrument.focusIndex);
+        ctx.save();
+        ctx.font="9px monospace";
+        ctx.fillStyle=String(Colors.yellow);
+        ctx.textAlign="left";
+        ctx.fillText("APPARENT LONGITUDE RATE // °/DAY",4,11,Math.max(20,w-8));
+        if(!data.ready) {
+            ctx.fillStyle=String(Colors.orange);
+            ctx.fillText(data.reason,4,h/2,Math.max(20,w-8));
+            ctx.restore();return;
+        }
+        const g=Retrograde.layout(w,h,data.lanes.length);
+        if(!g){ctx.restore();return;}
+        ctx.fillStyle=String(Colors.cyan);
+        ctx.fillText("DIRECT",4,24);
+        ctx.fillStyle=String(Colors.magenta);
+        ctx.fillText("RETRO",54,24);
+        ctx.fillStyle=String(Colors.orange);
+        ctx.fillText("ORANGE // STATION WINDOW",102,24,Math.max(25,w-105));
+        ctx.beginPath();
+        ctx.rect(g.left,g.top,g.width,g.height);
+        ctx.clip();
+        for(let j=0;j<data.lanes.length;j++) {
+            const lane=data.lanes[j];
+            const mid=g.top+(j+0.5)*g.laneHeight;
+            if(j%2===0){
+                ctx.globalAlpha=0.4;
+                ctx.fillStyle=String(Colors.dark);
+                ctx.fillRect(g.left,g.top+j*g.laneHeight,g.width,g.laneHeight);
+            }
+            ctx.globalAlpha=0.5;
+            ctx.strokeStyle=String(Colors.cyan);
+            ctx.lineWidth=0.8;
+            ctx.beginPath();ctx.moveTo(g.left,mid);ctx.lineTo(g.right,mid);
+            ctx.stroke();
+            for(let k=0;k<lane.points.length;k++){
+                const sample=lane.points[k];
+                const p=Retrograde.samplePoint(sample,lane,g,j);
+                if(!p)continue;
+                ctx.strokeStyle=String(sample.motion==="retrograde"
+                    ? Colors.magenta : sample.motion==="direct"
+                    ? Colors.cyan : Colors.yellow);
+                ctx.lineWidth=sample.index===instrument.focusIndex?2.3:1.5;
+                ctx.globalAlpha=sample.index===instrument.focusIndex?1:0.72;
+                ctx.beginPath();ctx.moveTo(p.x,p.cy);ctx.lineTo(p.x,p.y);
+                ctx.stroke();
+            }
+        }
+        for(let i=0;i<data.boundaries.length;i++){
+            const b=data.boundaries[i];
+            const laneIndex=data.lanes.findIndex(x=>x.body===b.body);
+            if(laneIndex<0)continue;
+            const x1=g.left+g.width*b.fromFraction;
+            const x2=g.left+g.width*b.toFraction;
+            const y=g.top+laneIndex*g.laneHeight+4;
+            ctx.globalAlpha=0.95;
+            ctx.strokeStyle=String(Colors.orange);
+            ctx.lineWidth=1;
+            ctx.beginPath();
+            ctx.moveTo(x1,y+4);ctx.lineTo(x1,y);
+            ctx.lineTo(x2,y);ctx.lineTo(x2,y+4);ctx.stroke();
+        }
+        const cursor=Retrograde.fraction(data.focusMs,data.startMs,data.endMs);
+        ctx.globalAlpha=0.85;
+        ctx.strokeStyle=String(Colors.yellow);
+        ctx.lineWidth=1;
+        ctx.beginPath();
+        ctx.moveTo(g.left+g.width*cursor,g.top);
+        ctx.lineTo(g.left+g.width*cursor,g.bottom);
+        ctx.stroke();
+        ctx.restore();
+        ctx.save();
+        ctx.font="9px monospace";
+        for(let j=0;j<data.lanes.length;j++){
+            const lane=data.lanes[j],cy=g.top+(j+0.5)*g.laneHeight;
+            ctx.fillStyle=String(Colors.white);
+            ctx.textAlign="left";
+            ctx.fillText(Celestial.shortBodyName(lane.body),2,cy+3,
+                         Math.max(10,g.left-5));
+            ctx.fillStyle=String(lane.focusMotion==="retrograde"
+                ? Colors.magenta : lane.focusMotion==="direct"
+                ? Colors.cyan : Colors.yellow);
+            ctx.textAlign="right";
+            ctx.fillText(lane.focusRate.toFixed(3)+"°/D",
+                         g.right-3,cy-g.laneHeight*0.3,
+                         Math.max(25,g.width*0.28));
+        }
+        ctx.fillStyle=String(Colors.white);
+        ctx.textAlign="center";
+        for(let i=0;i<3;i++){
+            const t=[data.startMs,
+                     Math.round((data.startMs+data.endMs)/2),
+                     data.endMs][i];
+            ctx.fillText(Celestial.axisText(t).slice(5,16),
+                         g.left+g.width*i/2,g.bottom+11,
+                         Math.max(20,g.width/3-8));
+        }
+        ctx.fillStyle=String(Colors.orange);
+        ctx.textAlign="left";
+        ctx.fillText("SAMPLED JPL RATES // EXACT STATION UTC UNKNOWN",
+                     3,h-4,Math.max(20,w-6));
         ctx.restore();
     }
 

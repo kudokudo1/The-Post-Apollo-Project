@@ -100,7 +100,7 @@ ShellRoot {
             } else if (root.phase === 1) {
                 if (focused.planetRows[0].events.length !== 3)
                     return root.fail("USNO_RECORDS_NOT_MAPPED_TO_EVENT_CLOCK");
-                if (countNamed(focused.instrumentLoader.item,
+                if (countNamed(focused.instrumentItem,
                         "cosmos-c5-planet-event-marker") !== 3)
                     return root.fail("USNO_EVENT_MARKERS_NOT_RENDERED");
                 root.phase = 2;
@@ -120,7 +120,7 @@ ShellRoot {
                         || focused.cards[0].detail.indexOf("12:04Z") < 0
                         || focused.cards[0].detail.indexOf("undefined") >= 0)
                     return root.fail("ISS_RECORD_FIELDS_NOT_RENDERED");
-                if (countNamed(focused.instrumentLoader.item,
+                if (countNamed(focused.instrumentItem,
                         "cosmos-c5-source-card") !== 1)
                     return root.fail("ISS_CARD_NOT_IN_VISUAL_TREE");
                 root.phase = 4;
@@ -144,13 +144,13 @@ ShellRoot {
                         || focused.cards[0].info !== "ACTIVE NOW"
                         || focused.cards[1].info !== "UPCOMING")
                     return root.fail("ACTIVE_IAU_RECORDS_MISSING");
-                if (countNamed(focused.instrumentLoader.item,
+                if (countNamed(focused.instrumentItem,
                         "cosmos-c5-meteor-card") !== 2)
                     return root.fail("IAU_CARDS_NOT_RENDERED");
                 root.phase = 6;
                 root.route = "cosmos/sun/position";
             } else if (root.phase === 6) {
-                const sun = findNamed(focused.instrumentLoader.item,
+                const sun = findNamed(focused.instrumentItem,
                     "cosmos-c5-sun-path");
                 if (!sun || !sun.solarData || !sun.solarData.ready
                         || sun.solarData.rows.length < 60)

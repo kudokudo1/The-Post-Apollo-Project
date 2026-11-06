@@ -11,10 +11,17 @@ Rectangle {
     property string localArtworkDirectory: ""
     property string positionLabel: ""
     readonly property bool hasCard: card !== null && card !== undefined
-    readonly property string localSource: hasCard
-        ? Deck.localArtworkUrl(localArtworkDirectory,card.id) : ""
+    // M6j // Try private PNG, JPG, JPEG then WebP in the selected folder.
+    // This does not fetch or distribute any Wild Unknown artwork.
+    readonly property var localSources: hasCard
+        ? Deck.localArtworkCandidates(localArtworkDirectory,card.id) : []
+    property int artworkAttempt: 0
+    readonly property string localSource:
+        artworkAttempt < localSources.length
+        ? localSources[artworkAttempt] : ""
     readonly property bool hasLocalArt:
         art.status===Image.Ready && localSource!==""
+    onLocalSourcesChanged: artworkAttempt=0
     color: Colors.black
     border.width: 1
     border.color: hasCard ? Colors.magenta : Colors.blue
@@ -75,6 +82,12 @@ Rectangle {
         cache: false
         fillMode: Image.PreserveAspectFit
         visible: face.hasLocalArt
+        // A missing .png must not hide a perfectly valid .jpg/.webp.
+        onStatusChanged: {
+            if(status===Image.Error &&
+               face.artworkAttempt+1<face.localSources.length)
+                face.artworkAttempt++;
+        }
         transform: Rotation {
             origin.x: art.width/2
             origin.y: art.height/2
@@ -122,8 +135,11 @@ Rectangle {
                 color: face.reversed ? Colors.orange : Colors.yellow
                 horizontalAlignment: Text.AlignHCenter
                 elide: Text.ElideRight
-                text: face.reversed ? "REVERSED"
-                        : face.hasLocalArt ? "LOCAL ART" : "APOLLO ORIGINAL"
+                text: face.hasLocalArt
+                        ? (face.reversed?"REVERSED // LOCAL ART":"LOCAL ART")
+                        : face.localSources.length>0
+                        ? "IMAGE MISSING // CHECK FOLDER"
+                        : "NO LOCAL ART FOLDER"
             }
         }
     }

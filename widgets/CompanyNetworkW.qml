@@ -116,6 +116,10 @@ PanelWindow {
 
     exclusiveZone: 0
     WlrLayershell.layer: WlrLayer.Overlay
+    // M19b: stable Company layer-shell discovery label for Stage Director.
+    // This string is NOT authentication. SwayPX must pair the real native
+    // wl_client/layer and attested map process before accepting geometry.
+    WlrLayershell.namespace: "post-apollo-company-network"
     WlrLayershell.keyboardFocus:
         menuOpen ? WlrKeyboardFocus.OnDemand : WlrKeyboardFocus.None
     focusable: menuOpen

@@ -67,16 +67,16 @@ PanelWindow {
     readonly property int zoomBayBottom: 2
     readonly property int zoomBayWidth: Math.max(0, Math.round(zoomViewport.width))
     readonly property int zoomBayHeight: Math.max(0, Math.round(zoomViewport.height))
-    // Calibrate the ACTUAL browser actor, not the Camera viewport. The
-    // requested adjustment is narrower, shorter and higher. One rectangle
-    // is shared by the initial host, live Sway follower and input cutout.
-    readonly property int zoomActorRise: 14
-    readonly property int zoomActorWidthTrim: 16
-    readonly property int zoomActorHeightTrim: 28
-    readonly property int zoomActorLeft: zoomBayInset + Math.floor(zoomActorWidthTrim / 2)
-    readonly property int zoomActorTop: Math.max(0, zoomBayTop - zoomActorRise)
-    readonly property int zoomActorWidth: Math.max(0, zoomBayWidth - zoomActorWidthTrim)
-    readonly property int zoomActorHeight: Math.max(0, zoomBayHeight - zoomActorHeightTrim)
+    // Sway measured the browser at 92,126 718x514, exactly the old
+    // 8px right / 14px up / 16px narrower / 28px shorter adjustment.
+    // Those trims, not workspace offset, caused the visible gap.
+    // The launcher, live follower and input cutout share this untrimmed
+    // viewport rectangle. Host coordinates remain output-relative until
+    // converted to absolute Sway coordinates by the existing host.
+    readonly property int zoomActorLeft: zoomBayInset
+    readonly property int zoomActorTop: zoomBayTop
+    readonly property int zoomActorWidth: zoomBayWidth
+    readonly property int zoomActorHeight: zoomBayHeight
     property bool zoomWebNeedsRealign: false
     property int zoomFollowRevision: 0
 

@@ -74,7 +74,7 @@ clearpart --all --initlabel --drives=vda
 autopart --type=plain
 bootloader --append="console=ttyS0,115200 console=tty0"
 cdrom
-ostreesetup --osname=fedora --remote=fedora --url=file:///run/install/repo/ostree/repo --ref=fedora/44/x86_64/silverblue --nogpg
+ostreesetup --osname=fedora --remote=fedora --url=file:///ostree/repo --ref=fedora/44/x86_64/silverblue --nogpg
 %post --erroronfail --log=/root/c2u-post.log
 mkdir -p /usr/local/libexec /etc/systemd/system /var/lib
 echo initial > /var/lib/c2u-transaction-stage

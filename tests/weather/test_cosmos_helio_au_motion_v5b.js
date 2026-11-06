@@ -30,7 +30,8 @@ function fixture(index=15) {
     const payload={
         solar_overview:atlas,
         provenance:{ephemeris_id:"de440s.bsp",ephemeris_sha256:sha},
-        query:{solar_overview_bodies:[body]}
+        query:{solar_overview_bodies:[body]},
+        series:[{samples:times.map(unix_ms=>({unix_ms}))}]
     };
     const scene={
         ready:true,atlas:true,origin:"sun",
@@ -46,8 +47,8 @@ test("V5b AU rings are calibrated to real radial domain, not screen pixels",()=>
     const four=JSON.parse(JSON.stringify(M.rings(4)));
     assert.deepEqual(four.map(x=>x.au),[1,2,3,4]);
     assert.deepEqual(four.map(x=>x.fraction),[0.25,0.5,0.75,1]);
-    assert.deepEqual(M.rings(40).map(x=>x.au),[10,20,30,40]);
-    assert.deepEqual(M.rings(0.05).map(x=>x.label),[
+    assert.deepEqual(Array.from(M.rings(40),x=>x.au),[10,20,30,40]);
+    assert.deepEqual(Array.from(M.rings(0.05),x=>x.label),[
         "0.013 AU","0.025 AU","0.038 AU","0.050 AU"
     ]);
     assert.equal(M.rings(0).length,0);

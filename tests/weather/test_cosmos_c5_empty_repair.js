@@ -18,6 +18,8 @@ const cosmos=run("widgets/weather/StationCosmosSubjectPanelPolicy.js");
 const surface=read("widgets/weather/StationWorkspaceSurface.qml");
 const pane=read("widgets/weather/StationCosmosSubjectPane.qml");
 const focus=read("widgets/weather/StationCosmosModesPane.qml");
+const compactClock=read("widgets/weather/StationCosmosClockCompactPane.qml");
+const lightDetail=read("widgets/weather/StationCosmosLightDetailPane.qml");
 const sky=read("widgets/weather/StationSky.qml");
 
 test("C5 native workspace forwards instrument mode clicks into active navigation",()=>{
@@ -67,9 +69,9 @@ test("No-source UI retains five planet lanes and shows detailed provider errors"
   assert.equal(blank.length,5);
   assert.equal(blank.every(r=>!r.available && r.events.length===0),true);
   assert.match(focus,/readonly property var displayedPlanetRows:/);
-  assert.match(focus,/id: clockRepeater\s*[\s\S]*?model: 5/);
+  assert.match(compactClock,/id: laneRepeater\s*[\s\S]*?model: 5/);
   assert.match(focus,/required property int index/);
-  assert.match(focus,/planetRow\.events\.length : 0/);
+  assert.match(compactClock,/planetRow\.events\.length : 0/);
   for(const planet of ["MERCURY","VENUS","MARS","JUPITER","SATURN"])
     assert.ok(focus.includes('name:"'+planet+'"'),planet);
   for(const signal of [
@@ -109,9 +111,13 @@ test("C5 populated source-to-render contracts use actual provider fields",()=>{
   assert.match(focus,/seenShower\[item\.name\]/);
   for (const anchor of [
     'objectName: "cosmos-c5-sun-path"',
-    'objectName: "cosmos-c5-planet-event-marker"',
+    'id: planetClock',
     'id: subjectCards',
     'objectName: "cosmos-c5-meteor-card"'
   ]) assert.ok(focus.includes(anchor),anchor);
   assert.match(focus,/StationCosmosDetailPane\s*\{/);
+  assert.match(focus,/StationCosmosClockCompactPane\s*\{/);
+  assert.match(focus,/StationCosmosLightDetailPane\s*\{/);
+  assert.match(compactClock,/cosmos-c5-planet-event-marker/);
+  assert.match(lightDetail,/cosmos-c6-light-field/);
 });

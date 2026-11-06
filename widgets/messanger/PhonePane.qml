@@ -595,9 +595,10 @@ Rectangle {
     }
 
     onVisibleChanged: {
+        // Preserve the independent native setup/installer exit behavior.
+        if (!visible) closeStagedSetup();
         if (!personalReadUiReady) return;
         if (!visible) {
-            closeStagedSetup();
             personalReadGeneration += 1;
             if (personalReadProcess.running)
                 personalReadProcess.running = false;

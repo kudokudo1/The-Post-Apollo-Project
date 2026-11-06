@@ -447,6 +447,9 @@ Rectangle {
                               ? "aspects"
                               : magickPane.subjectRoute === "magick/astrology/retrogrades"
                               ? "retro" : "wheel"
+                        zodiacPresentation:
+                            magickPane.subjectRoute === "magick/astrology/transits"
+                            ? "compare" : "wheel"
                     }
                 }
             }

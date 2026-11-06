@@ -25,6 +25,10 @@ No new desktop application or menu step. Existing CPU++ SETTINGS → CONNECTIONS
 
 The required CI evidence is: clean VM baseline, official Fedora image and `dbus-next` checksums, custom SELinux module build and Enforcing kernel, exact archive manifest, tampered archive refused before installation, C2r confined-service/denial regression, static unit not automatically enabled, explicit start/stop, and successful rollback with no residual service/policy/user/bus name. No production QML credential grant may be opened.
 
+### Verified CI checkpoint
+
+[GitHub run 42175207697](https://github.com/kudokudo1/The-Post-Apollo-Project/actions/runs/42175207697), job 127751974750, verified on commit `90070a77d2433040ac72a690e5b3311472776ec3`: **3/3 checks passed**. Fedora Cloud 44 SHA-256 pin, offline dbus-next wheel SHA-256, allowlisted tar bundle and manifest, and deliberate tamper rejection all passed. The reused C2r guest checks confirmed dedicated `postapollo_connections_t`, read-only GetStatus, unauthorized read refusal, and explicit stop. C2s then confirmed that rollback removed all known service files, custom SELinux module, disposable users/groups and the system D-Bus name. The guest remained offline and SELinux Enforcing. The first C2s run failed in Ubuntu's apt mirror before the Fedora VM; pinning the ephemeral runner to Ubuntu 24.04 and bounding retries resolved that. A subsequent guest run found that Fedora automatically removed the matching primary group during userdel; cleanup was corrected to accept an already-absent private group while still checking the final absence of **all** test accounts/groups. The passed run verifies those corrections.
+
 ## WATCH OUT FOR
 
 **A SHA-256 manifest is integrity detection, not source authentication or package signing.** This test intentionally does not create or sign an RPM or register an RPM package transaction, and therefore does not establish rpm-ostree/Fedora Silverblue compatibility, trusted repository metadata, automatic transaction rollback, signed provenance, or safe upgrades. It verifies a temporary install/cleanup sequence only inside a disposable VM. The guest starts a FAKE STATUS host, not an authenticated API broker.
@@ -39,7 +43,8 @@ Cross-room coordination: merged TASKS M13t PR #1304 contains an independent sour
 - [x] Record shared-owner TASKS consent contract without touching TASKS code
 - [x] Add integrity manifest and tampered-package refusal
 - [x] Add SELinux-enforcing Fedora VM install/rollback test
-- [ ] Verify exact-head GitHub CI and fix test-only issues
+- [x] Initial exact-head GitHub CI 3/3 passed on commit 90070a77 (run 42175207697)
+- [ ] Final documentation-update commit CI checks
 - [ ] Independently review confined policy grants and installation paths
 - [ ] Build signed OS-native package / rpm-ostree-compatible deployment and uninstall contract
 - [ ] Complete actual operator/host authentication and consent review

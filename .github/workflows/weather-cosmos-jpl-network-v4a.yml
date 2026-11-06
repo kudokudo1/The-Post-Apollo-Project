@@ -26,6 +26,8 @@ on:
       - 'widgets/weather/StationCosmosCelestialDepthPolicy.js'
       - 'widgets/weather/StationMagickCelestialInstrument.qml'
       - 'widgets/weather/StationMagickRetrogradeLanePolicy.js'
+      - 'widgets/weather/StationMagickAspectMatrixPolicy.js'
+      - 'tests/weather/test_magick_aspect_matrix_m6b.js'
       - 'widgets/weather/StationMagickAstrologyPane.qml'
       - 'widgets/weather/StationMagickSubjectPane.qml'
       - 'tests/weather/test_magick_retrograde_lanes_m6a.js'
@@ -68,6 +70,8 @@ jobs:
         run: node --test tests/weather/test_cosmos_helio_au_motion_v5b.js
       - name: Verify M6a source-true retrograde rate lanes and station windows
         run: node --test tests/weather/test_magick_retrograde_lanes_m6a.js
+      - name: Verify M6b source-pair aspects matrix and real sample inspection
+        run: node --test tests/weather/test_magick_aspect_matrix_m6b.js
       - name: Preserve MAGICK M4/M5 sources and interaction behavior
         run: |
           node --test tests/weather/test_magick_celestial_visual_m5.js

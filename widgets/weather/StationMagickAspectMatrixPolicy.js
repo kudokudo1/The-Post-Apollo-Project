@@ -43,10 +43,15 @@ function build(model,raw,view,focus,maximumColumns) {
        !rel.bodies.every(function(b){return raw.query.bodies.indexOf(b)>=0;}) ||
        !Array.isArray(rel.samples) || rel.samples.length!==model.sampleCount)
         return unavailable("INCONSISTENT M4 RELATIONSHIP");
+    // The heat grid uses equally wide sample buckets, so only plot a
+    // uniform UTC cadence. Irregular samples require a time-width chart.
+    var cadence=times[1]-times[0];
+    if(!finite(cadence) || cadence<=0)
+        return unavailable("UNVERIFIED SOURCE UTC CADENCE");
     for(var i=0;i<model.sampleCount;i++){
         var t=times[i],s=rel.samples[i];
         if(!finite(t) || !Number.isInteger(t) ||
-           (i>0 && t<=times[i-1]) ||
+           (i>0 && t-times[i-1]!==cadence) ||
            !s || s.unix_ms!==t ||
            !finite(s.longitude_separation_deg) ||
            s.longitude_separation_deg<0 || s.longitude_separation_deg>180)

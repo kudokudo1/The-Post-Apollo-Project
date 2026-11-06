@@ -67,6 +67,16 @@ PanelWindow {
     readonly property int zoomBayBottom: 2
     readonly property int zoomBayWidth: Math.max(0, Math.round(zoomViewport.width))
     readonly property int zoomBayHeight: Math.max(0, Math.round(zoomViewport.height))
+    // Calibrate the ACTUAL browser actor, not the Camera viewport. The
+    // requested adjustment is narrower, shorter and higher. One rectangle
+    // is shared by the initial host, live Sway follower and input cutout.
+    readonly property int zoomActorRise: 14
+    readonly property int zoomActorWidthTrim: 16
+    readonly property int zoomActorHeightTrim: 28
+    readonly property int zoomActorLeft: zoomBayInset + Math.floor(zoomActorWidthTrim / 2)
+    readonly property int zoomActorTop: Math.max(0, zoomBayTop - zoomActorRise)
+    readonly property int zoomActorWidth: Math.max(0, zoomBayWidth - zoomActorWidthTrim)
+    readonly property int zoomActorHeight: Math.max(0, zoomBayHeight - zoomActorHeightTrim)
     property bool zoomWebNeedsRealign: false
     property int zoomFollowRevision: 0
 
@@ -77,9 +87,9 @@ PanelWindow {
         zoomFollowProcess.write(JSON.stringify({
             op: "target", revision: zoomFollowRevision,
             output: zoomWebOutput,
-            x: Math.round(camera.margins.left + camera.glowGutter + zoomBayInset),
-            y: Math.round(camera.frameTopInset + zoomBayTop),
-            width: zoomBayWidth, height: zoomBayHeight
+            x: Math.round(camera.margins.left + camera.glowGutter + zoomActorLeft),
+            y: Math.round(camera.frameTopInset + zoomActorTop),
+            width: zoomActorWidth, height: zoomActorHeight
         }) + "\n");
         return true;
     }
@@ -121,9 +131,9 @@ PanelWindow {
         return ["python3", "-I", "-B", Quickshell.shellPath("scripts/camera/ZoomWebHost.py"),
                 action, "--identity", zoomWebIdentity,
                 "--output", zoomWebOutput,
-                "--x", String(camera.margins.left + camera.glowGutter + zoomBayInset),
-                "--y", String(camera.frameTopInset + zoomBayTop),
-                "--width", String(zoomBayWidth), "--height", String(zoomBayHeight)];
+                "--x", String(camera.margins.left + camera.glowGutter + zoomActorLeft),
+                "--y", String(camera.frameTopInset + zoomActorTop),
+                "--width", String(zoomActorWidth), "--height", String(zoomActorHeight)];
     }
     function enterZoomWeb() {
         if (!menuOpen || activeView !== "zoom" || zoomWebBusy)
@@ -179,10 +189,10 @@ PanelWindow {
             feedback = "ZOOM WEB // " + zoomWebState;
         }
     }
-    onZoomBayInsetChanged: scheduleZoomWebRealign()
-    onZoomBayTopChanged: scheduleZoomWebRealign()
-    onZoomBayWidthChanged: scheduleZoomWebRealign()
-    onZoomBayHeightChanged: scheduleZoomWebRealign()
+    onZoomActorLeftChanged: scheduleZoomWebRealign()
+    onZoomActorTopChanged: scheduleZoomWebRealign()
+    onZoomActorWidthChanged: scheduleZoomWebRealign()
+    onZoomActorHeightChanged: scheduleZoomWebRealign()
     onZoomWebOutputChanged: scheduleZoomWebRealign()
     onDockCenterXChanged: scheduleZoomWebRealign()
     property var zoomLaunchObservation: null
@@ -682,10 +692,10 @@ PanelWindow {
         Region {
             // Coordinates relative to the enclosing frame input region.
             // No hole until the browser actor and exact bay are confirmed.
-            x: Math.round(zoomViewport.x)
-            y: Math.round(zoomViewport.y)
-            width: camera.zoomWebDocked ? Math.round(zoomViewport.width) : 0
-            height: camera.zoomWebDocked ? Math.round(zoomViewport.height) : 0
+            x: camera.zoomActorLeft
+            y: camera.zoomActorTop
+            width: camera.zoomWebDocked ? camera.zoomActorWidth : 0
+            height: camera.zoomWebDocked ? camera.zoomActorHeight : 0
             intersection: Intersection.Subtract
         }
     }
@@ -861,13 +871,13 @@ PanelWindow {
             x: 0
             y: 0
             width: parent.width
-            height: camera.zoomBayTop
+            height: camera.zoomActorTop
             color: Colors.black
             visible: camera.zoomWebDocked
         }
         Rectangle {
             x: 0
-            y: camera.zoomBayTop + camera.zoomBayHeight
+            y: camera.zoomActorTop + camera.zoomActorHeight
             width: parent.width
             height: Math.max(0, parent.height - y)
             color: Colors.black

@@ -42,10 +42,20 @@ case "$stage" in
       failure "SIGNED_TEST_ARTIFACT_CHECKSUM"
     echo "C2U_PASS // REAL_SILVERBLUE_FIRST_BOOT_BASELINE"
     echo staged > "$stagefile"
-    # rpm-ostree performs a new *pending OSTree deployment*, not an rpm -Uvh.
-    # With no network in this guest, any missing metadata/dependencies fail
-    # closed instead of reaching out to an external provider.
-    rpm-ostree install "$data/c2t-0.1.rpm" ||
+    # No guest network exists. Fedora's standard repos point to a metalink,
+    # so prevent any metadata refresh by disabling them in this disposable VM.
+    # Keep exact originals in /var and restore after the rebooted rollback.
+    backup=/var/lib/c2u-original-yum-repos
+    mkdir -p "$backup"
+    shopt -s nullglob
+    for file in /etc/yum.repos.d/*.repo; do
+      cp -a "$file" "$backup/$(basename "$file")"
+      sed -i -E 's/^[[:space:]]*enabled[[:space:]]*=[[:space:]]*[01][[:space:]]*$/enabled=0/' "$file"
+    done
+    echo "C2U_PASS // NO_REMOTE_RPM_REPOSITORIES_ENABLED_IN_OFFLINE_GUEST"
+    # rpm-ostree must stage a new *pending* OSTree deployment without
+    # fetching remote rpm-md. A local inert RPM has zero RPM dependencies.
+    rpm-ostree install --cache-only "$data/c2t-0.1.rpm" ||
       failure "OFFLINE_RPM_OSTREE_INSTALL_FAILED"
     echo "C2U_OSTREE_STATUS_AFTER_STAGE"
     rpm-ostree status | head -n 28
@@ -75,6 +85,12 @@ case "$stage" in
       failure "HOST_EXE_INSTALLED_BY_INERT_PACKAGE"
     [[ ! -e /usr/lib/systemd/system/postapollo-connections-status.service ]] ||
       failure "PRODUCTION_SERVICE_INSTALLED_BY_INERT_PACKAGE"
+    # Restore repo config only in this disposable guest before discarding it.
+    for original in /var/lib/c2u-original-yum-repos/*.repo; do
+      [[ -f "$original" ]] || continue
+      cp -a "$original" "/etc/yum.repos.d/$(basename "$original")"
+    done
+    echo "C2U_PASS // OFFLINE_REPO_CONFIG_RESTORED_AFTER_ROLLBACK"
     echo "C2U_PASS // REAL_SILVERBLUE_BOOTED_ROLLBACK_REMOVED_LAYER"
     echo "C2U_PASS // NO_CONNECTIONS_SERVICE_OR_CREDENTIALS_ACTIVATED"
     echo complete > "$stagefile"

@@ -138,3 +138,13 @@ function localArtworkUrl(folder,id){
     return "file:///"+path.map(encodeURIComponent).join("/")+
         "/"+encodeURIComponent(id)+".png";
 }
+
+// The same known card can be provided as PNG, JPEG or WebP. There is no
+// folder scan or network lookup: QML only tries these exact local names.
+// If none is readable it must explicitly show an artwork-unavailable status.
+function localArtworkCandidates(folder,id) {
+    var png=localArtworkUrl(folder,id);
+    if(!png)return [];
+    var prefix=png.slice(0,-4);
+    return [png,prefix+".jpg",prefix+".jpeg",prefix+".webp"];
+}

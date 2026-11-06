@@ -406,6 +406,11 @@ PanelWindow {
                 function onNativeVectorLaunchRequested(online) {
                     vectorBridgeLink.requestIntent(online);
                 }
+                function onNativeVectorChildStarted(pid) {
+                    // The Process itself supplied this PID. The optional
+                    // M28b QPA bridge converts it to a real kernel pidfd.
+                    vectorBridgeLink.reportChildPid(pid);
+                }
                 function onNativeVectorClosed() {
                     vectorBridgeLink.closeIntent();
                 }

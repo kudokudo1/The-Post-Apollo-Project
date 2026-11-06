@@ -85,7 +85,7 @@ chmod 0755 /usr/local/libexec/c2u-ostree-cycle.sh
 cat > /etc/systemd/system/c2u-ostree-cycle.service <<'C2U_UNIT'
 [Unit]
 Description=Disposable C2u Silverblue ostree reboot test
-After=multi-user.target
+After=local-fs.target
 ConditionPathExists=/run/ostree-booted
 
 [Service]

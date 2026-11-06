@@ -167,7 +167,10 @@ test("M6g card front has original placeholder and OPTIONAL local-only image",()=
     assert.match(card,/angle: face\.reversed \? 180 : 0/);
     assert.match(card,/PHOTO NOT LOADED/);
     assert.ok(!card.includes("http://") && !card.includes("https://"));
-    assert.ok(!pane.includes("FileDialog") && !pane.includes("FolderDialog"));
+    // M6k permits a deliberate local-only folder chooser, not a general
+    // file importer, scanner, downloader or artwork writer.
+    assert.ok(!pane.includes("FileDialog"));
+    assert.match(pane,/FolderDialog\s*\{\s*id: tarotArtworkFolderPicker/);
     assert.ok(!pane.includes("upload") || pane.includes("NO UPLOAD"));
 });
 test("M6g TAROT route does not modify other MAGICK rooms or record a journal",()=>{

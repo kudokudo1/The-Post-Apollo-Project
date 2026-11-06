@@ -88,7 +88,7 @@ case "$stage" in
 #!/usr/bin/bash
 set -u
 echo "C2V_GUEST_PROBE_READY // $(date --iso-8601=seconds)" >/dev/ttyS0
-for n in $(seq 1 36); do
+for n in $(seq 1 72); do
   sleep 20
   {
     echo "C2V_GUEST_PROBE_TICK // $n $(date --iso-8601=seconds)"
@@ -111,6 +111,39 @@ for n in $(seq 1 36); do
       esac
     done
     tail -n 6 /var/tmp/c2v-rpm-ostree-install.log 2>/dev/null || true
+    # The last two CI runs showed both transient units disappear or stop
+    # reporting while this separate resource probe stayed active. Capture
+    # actual systemd unit lifetime and read-only libostree state, without
+    # scheduling any reboots or weakening the acceptance gate.
+    if (( n <= 12 || n % 6 == 0 )); then
+      for unit in c2v-ostree-cycle.service c2v-rpm-layer-monitor.service c2v-rpm-layer-worker.service rpm-ostreed.service; do
+        echo "C2V_PROBE_UNIT_STATE_BEGIN // $unit"
+        timeout --signal=TERM --kill-after=2s 5s systemctl show "$unit" \
+          --property=ActiveState --property=SubState --property=Result \
+          --property=MainPID --property=ExecMainStatus --no-pager 2>&1 ||
+          echo "C2V_PROBE_UNIT_STATE_QUERY_BLOCKED // $unit"
+        cg="/sys/fs/cgroup/system.slice/$unit"
+        if [[ -r "$cg/cgroup.events" ]]; then
+          echo "C2V_PROBE_CGROUP_EVENTS // $unit"
+          head -n 5 "$cg/cgroup.events" || true
+          if [[ -r "$cg/cgroup.freeze" ]]; then
+            echo "C2V_PROBE_CGROUP_FREEZE // $unit $(cat "$cg/cgroup.freeze")"
+          fi
+        else
+          echo "C2V_PROBE_CGROUP_ABSENT // $unit"
+        fi
+      done
+      echo "C2V_PROBE_OSTREE_ADMIN_STATUS_BEGIN"
+      if timeout --signal=TERM --kill-after=2s 6s \
+          ostree admin status --json > /run/c2v-probe-ostree-status.json 2>&1; then
+        echo "C2V_PROBE_OSTREE_ADMIN_STATUS_SUCCESS"
+        head -c 700 /run/c2v-probe-ostree-status.json || true
+        echo
+      else
+        echo "C2V_PROBE_OSTREE_ADMIN_STATUS_TIMEOUT_OR_ERROR"
+        tail -n 8 /run/c2v-probe-ostree-status.json || true
+      fi
+    fi
   } >/dev/ttyS0 2>&1
 done
 PROBE

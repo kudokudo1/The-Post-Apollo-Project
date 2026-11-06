@@ -35,6 +35,8 @@ on:
       - 'widgets/weather/StationMagickGrimoireAtlasPolicy.js'
       - 'widgets/weather/StationMagickGrimoireAtlasPane.qml'
       - 'widgets/weather/StationMagickTarotDeckPolicy.js'
+      - 'widgets/weather/StationMagickTarotPhysicalPolicy.js'
+      - 'tests/weather/test_magick_tarot_physical_m6h.js'
       - 'widgets/weather/StationMagickTarotPane.qml'
       - 'widgets/weather/StationMagickTarotCard.qml'
       - 'tests/weather/test_magick_wild_unknown_tarot_m6g.js'
@@ -101,6 +103,8 @@ jobs:
         run: node --test tests/weather/test_magick_grimoire_atlas_m6f.js
       - name: Verify M6g Wild Unknown deck identity, bounded draws and private local art
         run: node --test tests/weather/test_magick_wild_unknown_tarot_m6g.js
+      - name: Verify M6h manual physical Tarot spread card transcription and existing digital deal
+        run: node --test tests/weather/test_magick_tarot_physical_m6h.js
       - name: Preserve MAGICK M4/M5 sources and interaction behavior
         run: |
           node --test tests/weather/test_magick_celestial_visual_m5.js

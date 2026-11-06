@@ -1,0 +1,31 @@
+name: Company M19b Stage Director native layer discovery
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'widgets/CompanyNetworkW.qml'
+      - 'tests/company/test_company_layer_namespace_m19b.test.js'
+      - 'docs/company-stage-director-layer-m19b-20261106.md'
+      - '.github/workflows/company-stage-director-layer-m19b.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  discovery-not-authority:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Validate stable Company native layer identity and no authority
+        run: node --test tests/company/test_company_layer_namespace_m19b.test.js
+      - name: Preserve M18 resize and viewport source contract
+        run: node --test tests/company/test_company_vector_viewport_m18.test.js
+      - name: Preserve M13 Quickshell native process and consent
+        run: python3 -m unittest discover -s tests/company -p 'test_company_vector_sidecar_m13.py' -v

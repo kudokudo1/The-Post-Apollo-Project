@@ -1,0 +1,39 @@
+Name:           postapollo-connections-c2t-fixture
+Version:        @VERSION@
+Release:        1%{?dist}
+Summary:        Disposable Post-Apollo status host RPM transaction fixture
+License:        LicenseRef-PostApollo-Test-Only
+BuildArch:      noarch
+AutoReqProv:    no
+
+%description
+Uninstalled, inert source + unit + policy fixtures for Fedora packaging and
+rollback verification. No privileged host or credential operations.
+
+%prep
+# No remote source or build script.
+
+%build
+# Content fixed by version-controlled GitHub fixtures.
+
+%install
+install -d -m 0755 %{buildroot}/usr/share/post-apollo/c2t-fixture
+install -m 0644 %{_sourcedir}/C2rStatusHost.py %{buildroot}/usr/share/post-apollo/c2t-fixture/status-host.py
+install -m 0644 %{_sourcedir}/postapollo-connections-status.service.template %{buildroot}/usr/share/post-apollo/c2t-fixture/status-unit.template
+install -m 0644 %{_sourcedir}/org.postapollo.ConnectionsStatus1.conf.template %{buildroot}/usr/share/post-apollo/c2t-fixture/status-dbus.conf.template
+install -m 0644 %{_sourcedir}/postapollo_connections.te %{buildroot}/usr/share/post-apollo/c2t-fixture/postapollo_connections.te
+install -m 0644 %{_sourcedir}/postapollo_connections.fc %{buildroot}/usr/share/post-apollo/c2t-fixture/postapollo_connections.fc
+printf '%s\n' '%{version}' > %{buildroot}/usr/share/post-apollo/c2t-fixture/fixture-version.txt
+
+%files
+%dir /usr/share/post-apollo
+%dir /usr/share/post-apollo/c2t-fixture
+/usr/share/post-apollo/c2t-fixture/status-host.py
+/usr/share/post-apollo/c2t-fixture/status-unit.template
+/usr/share/post-apollo/c2t-fixture/status-dbus.conf.template
+/usr/share/post-apollo/c2t-fixture/postapollo_connections.te
+/usr/share/post-apollo/c2t-fixture/postapollo_connections.fc
+/usr/share/post-apollo/c2t-fixture/fixture-version.txt
+
+# Intentionally no %pre, %post, %preun, %postun, triggers, %systemd_* or
+# %selinux_* macros. This package must never activate a real service.

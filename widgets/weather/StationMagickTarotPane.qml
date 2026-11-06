@@ -2,6 +2,7 @@ import QtQuick
 import "../../components"
 import "StationMagickTarotDeckPolicy.js" as Deck
 import "StationMagickTarotPhysicalPolicy.js" as Physical
+import "StationMagickTarotLayoutPolicy.js" as Layout
 
 // M6g // Symbolic deck workspace. No actual copyrighted illustrations,
 // guidebook readings, journal storage, network, additional provider or
@@ -24,25 +25,42 @@ Rectangle {
     property string catalogGroup: "all"
     property int catalogPage: 0
     property string previewId: ""
+    // M6i // Responsive viewport geometry and explicit visual inspection.
+    property int inspectedDrawIndex: -1
+    readonly property var inspectedDrawCard:
+        Layout.selectedCard(reading,inspectedDrawIndex)
+    readonly property var spreadMetrics:
+        Layout.spread(Math.max(180,width-14),height,spreadId)
+    readonly property var catalogMetrics:
+        Layout.catalog(Math.max(180,width-14),height)
+    readonly property var inspectMetrics:
+        Layout.inspect(Math.max(180,width-14),height)
     readonly property var catalogEntries: Deck.catalog(catalogGroup)
-    readonly property int catalogPageSize: 8
+    readonly property int catalogPageSize:
+        catalogMetrics ? catalogMetrics.pageSize : 6
     readonly property int catalogPages: Math.ceil(
         catalogEntries.length/catalogPageSize)
     readonly property var visibleCatalog: catalogEntries.slice(
         catalogPage*catalogPageSize,
         (catalogPage+1)*catalogPageSize)
-    readonly property var inspectedCard: Deck.cardById(previewId) &&
-        catalogEntries.some(function(c){return c.id===previewId;})
-        ? Deck.cardById(previewId)
-        : catalogEntries.length
+    readonly property var explicitlyPreviewedCard:
+        Layout.previewByClick(catalogEntries,previewId)
+    readonly property var inspectedCard: explicitlyPreviewedCard ||
+        (catalogEntries.length
         ? catalogEntries[Math.min(catalogEntries.length-1,
-              Math.max(0,catalogPage*catalogPageSize))] : null
+              Math.max(0,catalogPage*catalogPageSize))] : null)
 
     onCatalogGroupChanged: {
         catalogPage=0;
         previewId="";
     }
     onCatalogPageChanged: previewId=""
+    onCatalogPagesChanged: {
+        if(catalogPage>=catalogPages)
+            catalogPage=Math.max(0,catalogPages-1);
+    }
+    onReadingChanged: inspectedDrawIndex=-1
+    onViewModeChanged: inspectedDrawIndex=-1
     onSpreadIdChanged: {
         reading=drawMethod==="physical"
             ? Physical.start(Deck.SPREADS,Deck.DECK.id,spreadId)
@@ -59,13 +77,15 @@ Rectangle {
             ? Physical.start(Deck.SPREADS,Deck.DECK.id,spreadId)
             : ({ready:false,cards:[]});
         manualReversed=false;
+        previewId="";
         manualMessage="";
         lastError="";
     }
     function addPhysicalCard() {
-        if(drawMethod!=="physical" || !inspectedCard)return;
+        // A shown default preview is NOT consent to enter that card.
+        if(drawMethod!=="physical" || !explicitlyPreviewedCard)return;
         const result=Physical.add(Deck.SPREADS,Deck.CARDS,reading,
-                                  inspectedCard.id,manualReversed);
+                                  explicitlyPreviewedCard.id,manualReversed);
         if(!result.ok) {
             manualMessage=result.reason;
             return;
@@ -74,6 +94,8 @@ Rectangle {
         manualMessage=result.state.complete?"PHYSICAL SPREAD COMPLETE"
             :"ENTER "+result.state.nextPosition;
         manualReversed=false;
+        // Require another deliberate row click for the next physical card.
+        previewId="";
         if(result.state.complete)viewMode="draw";
     }
     function undoPhysicalCard() {
@@ -94,6 +116,11 @@ Rectangle {
     }
     function setPage(delta) {
         catalogPage=Math.max(0,Math.min(catalogPages-1,catalogPage+delta));
+    }
+    function inspectCard(index) {
+        const chosen=Layout.selectedCard(reading,index);
+        if(!chosen || viewMode!=="draw")return;
+        inspectedDrawIndex=index;
     }
 
     Column {
@@ -313,33 +340,42 @@ Rectangle {
                 }
             }
 
+            // M6i // Cards claim their real viewport budget. Three cards
+            // form one readable row; five form a compact three-plus-two.
             Flow {
                 id: cardFlow
-                width: parent.width
-                spacing: 5
-                // At five cards the third item wraps, keeping each card
-                // legible rather than presenting five tiny thumbnails.
-                readonly property int targetColumns:
-                    tarot.spreadId==="one"?1:
-                    tarot.spreadId==="three"?3:3
+                width: tarot.spreadId==="one" && tarot.spreadMetrics
+                    ? tarot.spreadMetrics.slotWidth : parent.width
+                anchors.horizontalCenter: parent.horizontalCenter
+                spacing: tarot.spreadMetrics ? tarot.spreadMetrics.gap : 7
                 readonly property real slotWidth:
-                    tarot.spreadId==="one"?
-                    Math.min(220,Math.max(100,width*0.46)):
-                    Math.max(72,(width-10)/targetColumns)
+                    tarot.spreadMetrics ? tarot.spreadMetrics.slotWidth : 110
+                readonly property real cardHeight:
+                    tarot.spreadMetrics ? tarot.spreadMetrics.cardHeight : 160
+                height: tarot.reading.ready && tarot.reading.cards &&
+                        tarot.reading.cards.length>0 && tarot.spreadMetrics
+                    ? tarot.spreadMetrics.contentHeight
+                    : Math.min(152,tarot.spreadMetrics
+                        ? tarot.spreadMetrics.contentHeight : 152)
                 Repeater {
                     model: tarot.reading.ready ? tarot.reading.cards : []
-                    delegate: Column {
+                    delegate: Item {
                         required property var modelData
+                        required property int index
                         width: cardFlow.slotWidth
-                        spacing: 3
+                        height: cardFlow.cardHeight
                         StationMagickTarotCard {
-                            width: parent.width
-                            height: tarot.spreadId==="one"?224
-                                : tarot.spreadId==="five"?126:175
+                            anchors.fill: parent
                             card: modelData
                             positionLabel: modelData.position
                             reversed: modelData.reversed
                             localArtworkDirectory: tarot.localArtworkDirectory
+                        }
+                        MouseArea {
+                            anchors.fill: parent
+                            acceptedButtons: Qt.LeftButton
+                            cursorShape: Qt.PointingHandCursor
+                            onClicked: tarot.inspectCard(index)
                         }
                     }
                 }
@@ -357,6 +393,16 @@ Rectangle {
                         ? "HOLD YOUR REAL DECK // CHOOSE CARDS IN INDEX"
                         : "SELECT SPREAD // SHUFFLE + DRAW"
                 }
+            }
+            QuietText {
+                width: parent.width
+                height: tarot.reading.ready && tarot.reading.cards &&
+                        tarot.reading.cards.length>0 ? 17 : 0
+                visible: height>0
+                color: Colors.yellow
+                font.pixelSize: 9
+                elide: Text.ElideRight
+                text: "SELECT A CARD TO INSPECT // CLOSE RETURNS TO SPREAD"
             }
 
             Row {
@@ -446,7 +492,7 @@ Rectangle {
                     accentColor: Colors.magenta
                     available: tarot.reading.ready &&
                                !tarot.reading.complete &&
-                               tarot.previewId!=="" &&
+                               tarot.explicitlyPreviewedCard!==null &&
                                !Physical.contains(tarot.reading,
                                                   tarot.previewId)
                     onClicked: tarot.addPhysicalCard()
@@ -481,36 +527,42 @@ Rectangle {
                 color: Colors.orange
                 font.pixelSize: 9
                 elide: Text.ElideRight
-                text: tarot.manualMessage || "SELECT, SET ORIENTATION, THEN ADD"
+                text: tarot.explicitlyPreviewedCard
+                    ? "SELECTED // "+tarot.explicitlyPreviewedCard.title.toUpperCase()
+                    : "PREVIEW ONLY // CLICK CARD ROW TO SELECT"
             }
             Row {
                 width: parent.width
-                height: 247
-                spacing: 7
+                height: tarot.catalogMetrics
+                    ? tarot.catalogMetrics.previewHeight : 240
+                spacing: tarot.catalogMetrics
+                    ? tarot.catalogMetrics.gap : 7
                 StationMagickTarotCard {
-                    width: Math.max(105,Math.min(175,parent.width*0.36))
-                    height: 240
+                    width: tarot.catalogMetrics
+                        ? tarot.catalogMetrics.previewWidth : 175
+                    height: parent.height
                     card: tarot.inspectedCard
                     localArtworkDirectory: tarot.localArtworkDirectory
-                    positionLabel: "CATALOG // NO DRAW"
+                    positionLabel: tarot.explicitlyPreviewedCard
+                        ? "SELECTED // PREVIEW" : "INDEX // PREVIEW ONLY"
                 }
                 Column {
-                    width: Math.max(50,parent.width-
-                        Math.max(105,Math.min(175,parent.width*0.36))-7)
+                    width: tarot.catalogMetrics
+                        ? tarot.catalogMetrics.listWidth : Math.max(50,parent.width-182)
                     spacing: 3
                     Repeater {
                         model: tarot.visibleCatalog
                         delegate: ActionButton {
                             required property var modelData
                             width: parent.width
-                            height: 26
+                            height: tarot.catalogMetrics
+                                ? tarot.catalogMetrics.rowHeight : 26
                             label: (modelData.index+1)+
                                 " // "+modelData.title.toUpperCase()
                             labelPixelSize: 9
-                            accentColor: modelData.id===
-                                (tarot.inspectedCard?
-                                 tarot.inspectedCard.id:"")
-                                ? Colors.magenta:Colors.cyan
+                            // First-row default preview is NOT a selection.
+                            selected: tarot.previewId===modelData.id
+                            accentColor: selected ? Colors.magenta:Colors.cyan
                             onClicked: {
                                 // Choose a catalogue page/preview by
                                 // clicking its original card index.
@@ -571,6 +623,111 @@ Rectangle {
             font.pixelSize: 9
             elide: Text.ElideRight
             text: "PRIVATE READ-ONLY ART // NO BUNDLED IMAGES, NO SAVED READINGS"
+        }
+    }
+
+    // M6i // Enlarged focus view. This is a temporary overlay only:
+    // no new image source, journal entry, reproduction or saved reading.
+    Rectangle {
+        id: tarotCardInspector
+        anchors.fill: parent
+        z: 20
+        visible: tarot.inspectedDrawCard!==null
+        color: Colors.black
+        border.width: 1
+        border.color: Colors.magenta
+        Column {
+            anchors.fill: parent
+            anchors.margins: 9
+            spacing: 6
+            Row {
+                width: parent.width
+                height: 27
+                spacing: 5
+                GohuText {
+                    width: Math.max(30,parent.width-224)
+                    height: parent.height
+                    verticalAlignment: Text.AlignVCenter
+                    color: Colors.magenta
+                    font.pixelSize: 12
+                    elide: Text.ElideRight
+                    text: "CARD // INSPECT"
+                }
+                ActionButton {
+                    width: 68
+                    height: 26
+                    label: "◀ CARD"
+                    labelPixelSize: 9
+                    accentColor: Colors.cyan
+                    available: tarot.reading.ready &&
+                               tarot.reading.cards.length>1
+                    onClicked: tarot.inspectedDrawIndex=
+                        (tarot.inspectedDrawIndex+
+                         tarot.reading.cards.length-1)%
+                        tarot.reading.cards.length
+                }
+                ActionButton {
+                    width: 68
+                    height: 26
+                    label: "CARD ▶"
+                    labelPixelSize: 9
+                    accentColor: Colors.cyan
+                    available: tarot.reading.ready &&
+                               tarot.reading.cards.length>1
+                    onClicked: tarot.inspectedDrawIndex=
+                        (tarot.inspectedDrawIndex+1)%
+                        tarot.reading.cards.length
+                }
+                ActionButton {
+                    width: 70
+                    height: 26
+                    label: "CLOSE"
+                    labelPixelSize: 9
+                    accentColor: Colors.magenta
+                    onClicked: tarot.inspectedDrawIndex=-1
+                }
+            }
+            Item {
+                width: parent.width
+                height: Math.max(148,tarot.height-118)
+                StationMagickTarotCard {
+                    anchors.centerIn: parent
+                    width: tarot.inspectMetrics
+                        ? tarot.inspectMetrics.width : 235
+                    height: tarot.inspectMetrics
+                        ? tarot.inspectMetrics.height : 330
+                    card: tarot.inspectedDrawCard
+                    reversed: tarot.inspectedDrawCard
+                        ? tarot.inspectedDrawCard.reversed : false
+                    positionLabel: tarot.inspectedDrawCard
+                        ? tarot.inspectedDrawCard.position : ""
+                    localArtworkDirectory: tarot.localArtworkDirectory
+                }
+            }
+            QuietText {
+                width: parent.width
+                height: 18
+                color: Colors.yellow
+                font.pixelSize: 11
+                horizontalAlignment: Text.AlignHCenter
+                elide: Text.ElideRight
+                text: tarot.inspectedDrawCard
+                    ? (tarot.inspectedDrawIndex+1)+"/"+
+                       tarot.reading.cards.length+" // "+
+                       tarot.inspectedDrawCard.title.toUpperCase()+
+                       " // "+(tarot.inspectedDrawCard.reversed
+                               ? "REVERSED":"UPRIGHT")
+                    : "NO CARD SELECTED"
+            }
+            QuietText {
+                width: parent.width
+                height: 16
+                color: Colors.cyan
+                font.pixelSize: 9
+                horizontalAlignment: Text.AlignHCenter
+                elide: Text.ElideRight
+                text: "ESCAPE VIA CLOSE // ORIGINAL OR USER-LOCAL ART ONLY"
+            }
         }
     }
 }

@@ -56,7 +56,8 @@ Rectangle {
             }
             ctx.globalAlpha=0.95;
             ctx.fillStyle=String(Colors.yellow);
-            ctx.font="12px monospace";
+            ctx.font="bold "+Math.round(Math.max(12,Math.min(24,w*0.14)))+
+                     "px monospace";
             ctx.textAlign="center";
             ctx.textBaseline="middle";
             ctx.fillText(face.hasCard
@@ -84,7 +85,8 @@ Rectangle {
         anchors.left: parent.left
         anchors.right: parent.right
         anchors.bottom: parent.bottom
-        height: Math.max(35,Math.min(58,parent.height*0.28))
+        // M6i // Readable labels at both five-card and focus sizes.
+        height: Math.max(51,Math.min(64,parent.height*0.29))
         color: Colors.dark
         border.color: Colors.blue
         border.width: 1
@@ -94,8 +96,8 @@ Rectangle {
             spacing: 2
             QuietText {
                 width: parent.width
-                height: 12
-                font.pixelSize: 8
+                height: 14
+                font.pixelSize: 10
                 color: Colors.cyan
                 horizontalAlignment: Text.AlignHCenter
                 elide: Text.ElideRight
@@ -105,8 +107,8 @@ Rectangle {
             }
             GohuText {
                 width: parent.width
-                height: 14
-                font.pixelSize: 9
+                height: 18
+                font.pixelSize: 11
                 color: Colors.white
                 horizontalAlignment: Text.AlignHCenter
                 elide: Text.ElideRight
@@ -115,8 +117,8 @@ Rectangle {
             }
             QuietText {
                 width: parent.width
-                height: 11
-                font.pixelSize: 8
+                height: 13
+                font.pixelSize: 9
                 color: face.reversed ? Colors.orange : Colors.yellow
                 horizontalAlignment: Text.AlignHCenter
                 elide: Text.ElideRight

@@ -1,9 +1,11 @@
 import QtQuick
 import Quickshell
+import Quickshell.Wayland
 import "../components"
 import qs.services.notifications
 import "../services/notifications/NotificationFacets.js" as NotificationFacets
 import "../services/notifications/BrowserSiteIdentity.js" as BrowserSiteIdentity
+import "../services/notifications/NotificationPopupInteraction.js" as PopupInteraction
 
 PanelWindow {
     id: notificationsWindow
@@ -54,11 +56,49 @@ PanelWindow {
 
     exclusiveZone: 0
 
+    // The popup is informational, never a keyboard owner. Sway/Wayland
+    // retains the focused application while notifications appear.
+    focusable: false
+    WlrLayershell.keyboardFocus: WlrKeyboardFocus.None
+
     color: "transparent"
 
     surfaceFormat.opaque: false
 
     visible: NotificationsService.activeNotifications.count > 0
+
+    // New popups are pointer-click-through for their first 750ms, avoiding
+    // immediate interception of a click in progress beneath their position.
+    // After the grace period the card receives deliberate pointer input.
+    // Glow gutters remain click-through at all times.
+    property bool popupPointerReady: false
+    readonly property string displayedNotificationId:
+        NotificationsService.notificationsRevision >= 0
+        && NotificationsService.activeNotifications.count > 0
+        ? String(NotificationsService.activeNotifications.get(
+            NotificationsService.activeNotifications.count - 1).id || "")
+        : ""
+
+    mask: Region {
+        x: notificationContainer.x
+        y: notificationContainer.y
+        width: notificationsWindow.popupPointerReady ? notificationContainer.width : 0
+        height: notificationsWindow.popupPointerReady ? notificationContainer.height : 0
+    }
+
+    Timer {
+        id: popupPointerGraceTimer
+        interval: 750
+        repeat: false
+        onTriggered: notificationsWindow.popupPointerReady = true
+    }
+
+    onDisplayedNotificationIdChanged: {
+        popupPointerReady = false;
+        popupPointerGraceTimer.stop();
+        if (displayedNotificationId !== "")
+            popupPointerGraceTimer.start();
+    }
 
     //Component.onCompleted: {
     //  NotificationsService.push("TEST", "META APOLLO", "The notification frontend is connected.");
@@ -142,6 +182,44 @@ PanelWindow {
                 required property double updatedAt
                 required property var context
 
+                // One click arms exactly one destination. Only a second
+                // matching click within 3s may invoke an opening action.
+                property string pendingOpenIntent: ""
+                property double pendingOpenAtMs: 0
+
+                function clearOpenIntent() {
+                    pendingOpenIntent = "";
+                    pendingOpenAtMs = 0;
+                    popupOpenIntentTimer.stop();
+                }
+
+                function confirmOpenIntent(intent) {
+                    const result = PopupInteraction.nextOpenIntent(
+                        pendingOpenIntent, pendingOpenAtMs, intent, Date.now(), 3000);
+                    pendingOpenIntent = result.pendingIntent;
+                    pendingOpenAtMs = result.armedAtMs;
+                    if (result.confirmed) {
+                        popupOpenIntentTimer.stop();
+                        return true;
+                    }
+                    if (pendingOpenIntent !== "")
+                        popupOpenIntentTimer.restart();
+                    return false;
+                }
+
+                Timer {
+                    id: popupOpenIntentTimer
+                    interval: 3000
+                    repeat: false
+                    onTriggered: notificationCard.clearOpenIntent()
+                }
+
+                onVisibleChanged: {
+                    if (!visible)
+                        clearOpenIntent();
+                }
+                onNotificationIdChanged: Qt.callLater(notificationCard.clearOpenIntent)
+
                 // The popup chassis reflects the originating organization,
                 // not a mutually exclusive domain or warning severity.
                 // One Apollo SYSTEM warning is still an orange Apollo popup.
@@ -192,11 +270,27 @@ PanelWindow {
                             && NotificationsService.hasApolloDestination(notificationCard.notificationId))
                     cursorShape: enabled ? Qt.PointingHandCursor : Qt.ArrowCursor
                     onClicked: {
+                        if (!notificationCard.confirmOpenIntent("destination"))
+                            return;
                         if (!NotificationsService.invokeExternalDefaultAction(
                                 notificationCard.notificationId))
                             NotificationsService.requestApolloDestination(
                                 notificationCard.notificationId);
                     }
+                }
+
+                // Show the armed state without changing the 420x150 geometry
+                // or obscuring the notification's original timestamp.
+                GohuText {
+                    anchors.right: parent.right
+                    anchors.top: parent.top
+                    anchors.rightMargin: 15
+                    anchors.topMargin: 8
+                    text: "CLICK AGAIN TO OPEN"
+                    font.pixelSize: 10
+                    color: Colors.magenta
+                    visible: notificationCard.pendingOpenIntent !== ""
+                    z: 5
                 }
 
                 // ===== APP ICON ================================
@@ -382,13 +476,35 @@ PanelWindow {
                                 hoverEnabled: true
                                 cursorShape: Qt.PointingHandCursor
                                 onClicked: {
+                                    const identifier = String(nativeActionButton.modelData.identifier || "");
+                                    const label = String(nativeActionButton.modelData.label || "");
+                                    if (PopupInteraction.opensDestination(identifier, label)) {
+                                        const intent = identifier === "default"
+                                            ? "destination" : "native:" + identifier;
+                                        if (!notificationCard.confirmOpenIntent(intent))
+                                            return;
+                                    } else {
+                                        notificationCard.clearOpenIntent();
+                                    }
                                     NotificationsService.invokeExternalAction(
-                                        notificationCard.notificationId,
-                                        nativeActionButton.modelData.identifier
+                                        notificationCard.notificationId, identifier
                                     );
                                 }
                             }
                         }
+                    }
+                }
+
+                // Always-on right-click dismissal over the entire card,
+                // including native action buttons. Left-click events pass to
+                // the existing button/default handlers below.
+                MouseArea {
+                    anchors.fill: parent
+                    z: 20
+                    acceptedButtons: Qt.RightButton
+                    onClicked: {
+                        notificationCard.clearOpenIntent();
+                        NotificationsService.dismissPopup(notificationCard.notificationId);
                     }
                 }
 

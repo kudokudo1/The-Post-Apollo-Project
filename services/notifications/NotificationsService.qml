@@ -429,6 +429,28 @@ Singleton {
         // Do not remove the retained history item.
     }
 
+    // User-explicit dismissal of a transient popup. Preserve the retained
+    // history entry and do not invoke any native default or mailbox action.
+    // For live native senders, dismiss() sends the proper user-closed
+    // acknowledgement rather than lying that the timeout elapsed.
+    function dismissPopup(eventId) {
+        const id = String(eventId || "");
+        const activeIndex = indexOfNotification(activeNotifications, id);
+        if (id === "" || activeIndex === -1)
+            return false;
+
+        const live = liveExternalNotifications[id];
+        if (live && live.notification) {
+            // Forget sender-owned Qt objects first. The synchronous closed
+            // signal may call releaseExternalNotification a second time.
+            releaseExternalNotification(id);
+            live.notification.dismiss();
+        } else {
+            activeNotifications.remove(activeIndex);
+        }
+        return true;
+    }
+
     function externalActionsFor(eventId) {
         const live = liveExternalNotifications[String(eventId || "")];
         if (!live || live.expiresAt <= Date.now())

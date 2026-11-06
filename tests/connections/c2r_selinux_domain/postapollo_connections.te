@@ -1,0 +1,19 @@
+# C2r CI-only candidate SELinux module. NOT for desktop installation.
+# No permissive domain, network, credential/keyring or general write access.
+policy_module(postapollo_connections, 1.0.0)
+
+type postapollo_connections_t;
+type postapollo_connections_exec_t;
+init_daemon_domain(postapollo_connections_t, postapollo_connections_exec_t)
+
+# Status-only Python program runtime: dynamic libs and OS configuration.
+libs_use_ld_so(postapollo_connections_t)
+libs_use_shared_libs(postapollo_connections_t)
+files_read_usr_files(postapollo_connections_t)
+files_read_etc_files(postapollo_connections_t)
+miscfiles_read_localization(postapollo_connections_t)
+
+# A system-bus D-Bus client/server using AF_UNIX, never network sockets.
+allow postapollo_connections_t self:unix_stream_socket { create connect read write getattr getopt setopt shutdown };
+allow postapollo_connections_t self:process { signal sigchld };
+dbus_system_bus_client(postapollo_connections_t)

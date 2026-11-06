@@ -658,6 +658,7 @@ Rectangle {
                 model: instrument.compactMode ? [
                     {id:"wheel",label:"ZODIAC"},
                     {id:"motion",label:"MOTION"},
+                    {id:"retro",label:"RETRO"},
                     {id:"aspects",label:"ASPECTS"},
                     {id:"relations",label:"RELATIONS"},
                     {id:"network",label:"NETWORK"},
@@ -665,6 +666,7 @@ Rectangle {
                 ] : [
                     {id:"wheel",label:"ZODIAC"},
                     {id:"motion",label:"MOTION"},
+                    {id:"retro",label:"RETRO"},
                     {id:"aspects",label:"ASPECTS"},
                     {id:"relations",label:"RELATIONS"},
                     {id:"network",label:"NETWORK"}
@@ -672,8 +674,8 @@ Rectangle {
                 delegate: ActionButton {
                     required property var modelData
                     width: Math.max(1,(modeRow.width-modeRow.spacing*
-                        (instrument.compactMode ? 5 : 4))/
-                        (instrument.compactMode ? 6 : 5))
+                        (instrument.compactMode ? 6 : 5))/
+                        (instrument.compactMode ? 7 : 6))
                     height: modeRow.height
                     contentPadding: instrument.compactMode ? 1 : 3
                     label: modelData.label
@@ -708,6 +710,7 @@ Rectangle {
                     if(!instrument.graphModel.ready)return;
                     if(instrument.mode==="wheel")instrument.paintWheel(ctx);
                     else if(instrument.mode==="relations")instrument.paintRelations(ctx);
+                    else if(instrument.mode==="retro")instrument.paintRetrograde(ctx);
                     else instrument.paintChart(ctx);
                 }
             }

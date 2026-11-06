@@ -5,6 +5,7 @@ import "StationMagickCelestialVisualPolicy.js" as Celestial
 import "StationMagickZodiacVectorPolicy.js" as ZodiacVector
 import "StationMagickRetrogradeLanePolicy.js" as Retrograde
 import "StationMagickAspectMatrixPolicy.js" as Matrix
+import "StationMagickEpochComparePolicy.js" as Epoch
 
 // M5 // Standalone, source-fed celestial instrument. No self-owned provider,
 // ephemeris download, timer, location lookup, journal, or page navigation.
@@ -22,6 +23,11 @@ Rectangle {
     property var visualData: null
     property string mode: "wheel"
     property string aspectPresentation: "curve" // M6b secondary ASPECTS view
+    // M6c // Two measured source timestamps, not a natal event or stored chart.
+    property string zodiacPresentation: "wheel"
+    property int referenceIndex: -1 // -1 = first source UTC sample
+    readonly property var epochComparison: Epoch.build(
+        graphModel,visualData,referenceIndex,focusIndex)
     property int inspectedAspectRow: 0
     // V4g // Compact NETWORK retains CHORDS/DEPTH across visits to HELIO.
     property string networkMode: "chords"
@@ -78,10 +84,13 @@ Rectangle {
         instrument.zoom=1.0;
         instrument.panPosition=0.5;
         instrument.eventOrdinal=-1;
+        instrument.referenceIndex=-1;
         eventTimelineCanvas.requestPaint();
     }
     onGraphModelChanged: graphCanvas.requestPaint()
     onAspectPresentationChanged: graphCanvas.requestPaint()
+    onZodiacPresentationChanged: graphCanvas.requestPaint()
+    onReferenceIndexChanged: graphCanvas.requestPaint()
     onInspectedAspectRowChanged: graphCanvas.requestPaint()
     onFocusIndexChanged: {
         graphCanvas.requestPaint();
@@ -187,6 +196,147 @@ Rectangle {
         }
         ctx.restore();
     }
+    // M6c // Dual rings show separate, source-verified JPL samples at
+    // two actual UTC epochs. Connectors merely pair the same body, they
+    // are NOT trajectories or cross-epoch astrological aspects.
+    function paintEpochCompare(ctx) {
+        const w=graphCanvas.width,h=graphCanvas.height;
+        const data=instrument.epochComparison;
+        ctx.save();
+        ctx.font="9px monospace";
+        ctx.textAlign="left";
+        ctx.fillStyle=String(Colors.yellow);
+        ctx.fillText("TWO JPL UTC SNAPSHOTS // NOT NATAL",4,11,
+                     Math.max(20,w-194));
+        if(!data.ready){
+            ctx.fillStyle=String(Colors.orange);
+            ctx.fillText(data.reason,5,h/2,Math.max(20,w-10));
+            ctx.restore();return;
+        }
+        const g=Epoch.geometry(w,h);
+        if(!g){ctx.restore();return;}
+        const refTime=Celestial.axisText(data.refMs);
+        const nowTime=Celestial.axisText(data.nowMs);
+        ctx.fillStyle=String(Colors.cyan);
+        ctx.fillText("REF / OUTER",4,23);
+        ctx.fillStyle=String(Colors.magenta);
+        ctx.fillText("NOW / INNER",78,23);
+        ctx.globalAlpha=0.6;
+        ctx.strokeStyle=String(Colors.blue);
+        ctx.lineWidth=1;
+        for(let sign=0;sign<12;sign++){
+            const radians=sign*Math.PI/6;
+            const x1=g.cx+g.outer*Math.sin(radians);
+            const y1=g.cy-g.outer*Math.cos(radians);
+            ctx.beginPath();
+            ctx.moveTo(g.cx,g.cy);
+            ctx.lineTo(x1,y1);
+            ctx.stroke();
+        }
+        for(const ring of [
+            {r:g.outer,color:Colors.blue,width:1.4},
+            {r:g.referenceRadius,color:Colors.cyan,width:1.4},
+            {r:g.currentRadius,color:Colors.magenta,width:1.8}
+        ]){
+            ctx.beginPath();
+            ctx.arc(g.cx,g.cy,ring.r,0,Math.PI*2);
+            ctx.strokeStyle=String(ring.color);
+            ctx.lineWidth=ring.width;
+            ctx.globalAlpha=ring.r===g.outer?0.55:0.85;
+            ctx.stroke();
+        }
+        // Use the existing font-independent zodiac vector glyphs.
+        for(let sign=0;sign<12;sign++){
+            const radians=(sign*30+15)*Math.PI/180;
+            const radius=g.outer*1.12;
+            const px=g.cx+radius*Math.sin(radians);
+            const py=g.cy-radius*Math.cos(radians);
+            const highlight=instrument.focusBody!=="" &&
+                data.bodies.some(function(b){
+                    return b.body===instrument.focusBody &&
+                        Math.floor(b.nowLongitude/30)===sign;
+                });
+            instrument.paintZodiacVector(ctx,sign,px,py,
+                Celestial.zodiacColor(sign),highlight);
+        }
+        for(let i=0;i<data.bodies.length;i++){
+            const body=data.bodies[i];
+            const ref=Epoch.point(body.refLongitude,g.cx,g.cy,
+                                  g.referenceRadius);
+            const now=Epoch.point(body.nowLongitude,g.cx,g.cy,
+                                  g.currentRadius);
+            if(!ref||!now)continue;
+            const active=body.body===instrument.focusBody;
+            const ink=String(body.color||Colors.cyan);
+            ctx.beginPath();ctx.moveTo(ref.x,ref.y);
+            ctx.lineTo(now.x,now.y);
+            ctx.lineWidth=active?1.8:1;
+            ctx.strokeStyle=ink;
+            ctx.globalAlpha=active?0.8:0.38;
+            ctx.stroke();
+            // REF = hollow / NOW = filled. Both are actual source angles.
+            ctx.beginPath();ctx.arc(ref.x,ref.y,active?5.7:4.7,
+                                    0,Math.PI*2);
+            ctx.fillStyle=String(Colors.dark);
+            ctx.globalAlpha=1;
+            ctx.fill();
+            ctx.strokeStyle=ink;
+            ctx.lineWidth=active?2.3:1.7;
+            ctx.stroke();
+            ctx.beginPath();ctx.arc(now.x,now.y,active?5.8:4.3,
+                                    0,Math.PI*2);
+            ctx.fillStyle=ink;
+            ctx.globalAlpha=active?1:0.82;
+            ctx.fill();
+        }
+        ctx.globalAlpha=1;
+        ctx.font="9px monospace";
+        if(g.spacious){
+            const tx=g.inspectorX,available=Math.max(25,w-tx-6);
+            ctx.fillStyle=String(Colors.cyan);
+            ctx.fillText("REF "+refTime,tx,42,available);
+            ctx.fillStyle=String(Colors.magenta);
+            ctx.fillText("NOW "+nowTime,tx,56,available);
+            ctx.fillStyle=String(Colors.yellow);
+            ctx.fillText(data.refKind,tx,70,available);
+            let y=86;
+            const step=h>=180?27:19;
+            for(let i=0;i<data.bodies.length;i++){
+                if(y+step>h-26)break;
+                const body=data.bodies[i];
+                ctx.fillStyle=String(body.color||Colors.cyan);
+                ctx.fillText(Celestial.shortBodyName(body.body),
+                             tx,y,available);
+                ctx.fillStyle=String(Colors.white);
+                const sign=body.delta>0?"+":"";
+                ctx.fillText("Δ REPORTED "+sign+body.delta.toFixed(2)+"°",
+                             tx,y+11,available);
+                y+=step;
+            }
+            if(data.pair && y+18<h-13){
+                ctx.fillStyle=String(Colors.yellow);
+                ctx.fillText("PAIR GAP: "+data.pair.refSeparation.toFixed(1)+
+                    "° > "+data.pair.nowSeparation.toFixed(1)+"°",
+                    tx,y+4,available);
+            }
+        }else{
+            const body=data.bodies.find(function(item){
+                return item.body===instrument.focusBody;
+            })||data.bodies[0];
+            ctx.textAlign="center";
+            ctx.fillStyle=String(Colors.white);
+            ctx.fillText(Celestial.shortBodyName(body.body)+
+                " Δ "+(body.delta>0?"+":"")+body.delta.toFixed(2)+"°",
+                g.cx,h-9,Math.max(20,w-10));
+        }
+        ctx.textAlign="left";
+        ctx.font="9px monospace";
+        ctx.fillStyle=String(Colors.orange);
+        ctx.fillText("EPOCH FRAMES DIFFER // SNAPSHOT LINKS NOT ORBITS",
+                     4,h-3,Math.max(20,w-8));
+        ctx.restore();
+    }
+
     function paintWheel(ctx) {
         const cx=graphCanvas.width/2,cy=graphCanvas.height/2;
         const radius=Math.max(30,Math.min(graphCanvas.width,

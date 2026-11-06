@@ -56,10 +56,13 @@ test("M6f indexes the original M6e source once, without copying or mutating it",
 test("M6f category and in-memory search do not invent synonyms or meanings",()=>{
     const silver=build("silver","metals");
     assert.equal(silver.ready,true);
-    assert.equal(silver.visible,3);
+    // Literal substring search intentionally includes "quicksilver",
+    // but an exact-term overlap must not connect it to "silver".
+    assert.equal(silver.visible,4);
     assert.deepEqual(plain(silver.rows.map(x=>x.planet)),
-        ["jupiter","venus","moon"]);
-    assert.ok(silver.rows.every(x=>x.term==="silver"));
+        ["jupiter","venus","mercury","moon"]);
+    assert.equal(silver.rows.filter(x=>x.term==="silver").length,3);
+    assert.equal(silver.rows.filter(x=>x.term==="quicksilver").length,1);
     assert.equal(silver.overlaps,3);
     assert.deepEqual(plain(silver.links.map(x=>[x.from,x.to]).sort()),
         [["jupiter","venus"],["jupiter","moon"],["venus","moon"]].sort());

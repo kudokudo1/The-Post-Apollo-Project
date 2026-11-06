@@ -1,0 +1,178 @@
+#!/usr/bin/env bash
+# C2u runs ONLY on a fresh ephemeral GitHub Actions runner. ISO is official
+# Fedora Silverblue 44, not Fedora Cloud and not a Docker replacement.
+set -Eeuo pipefail
+[[ "$GITHUB_ACTIONS" == true && "$GITHUB_ACTOR" == kudokudo1 ]] ||
+  { echo "C2U_REFUSED_OUTSIDE_OPERATOR_GITHUB_CI"; exit 2; }
+[[ -c /dev/kvm && -r /dev/kvm && -w /dev/kvm ]] ||
+  { echo "C2U_BLOCKED // HOST_NO_KVM"; exit 2; }
+repo="$(cd "$(dirname "$0")/../../.." && pwd)"
+tmp="$(mktemp -d "$RUNNER_TEMP/c2u-silverblue-XXXXXX")"
+pid=""
+cleanup() {
+  if [[ -n "$pid" ]]; then
+    kill "$pid" 2>/dev/null || true
+    wait "$pid" 2>/dev/null || true
+  fi
+  rm -rf "$tmp"
+}
+trap cleanup EXIT
+iso="Fedora-Silverblue-ostree-x86_64-44-1.7.iso"
+iso_sha=9ccec9b075a0a4358a7209b2667156aaeeec3a6a3c8d71cada45b57fca9b4682
+echo "C2U_OFFICIAL_SOURCE // Fedora Silverblue 44 OSTree ISO"
+
+# The official Fedora download page publishes this exact x86_64 SHA256.
+# A mismatch is a hard failure; NEVER fallback to Cloud Base or a container.
+curl --fail --location --retry 2 --connect-timeout 20 --max-time 660 \
+  "https://download.fedoraproject.org/pub/fedora/linux/releases/44/Silverblue/x86_64/iso/$iso" \
+  -o "$tmp/$iso"
+echo "$iso_sha  $tmp/$iso" | sha256sum --check --status ||
+  { echo "C2U_BLOCKED // OFFICIAL_SILVERBLUE_ISO_SHA256_MISMATCH"; exit 2; }
+echo "C2U_PASS // OFFICIAL_FEDORA_SILVERBLUE_44_ISO_SHA256"
+du -h "$tmp/$iso"
+
+# Installer image is an OSTree installer, with its own kernel/initrd and repo.
+mkdir -p "$tmp/boot"
+xorriso -osirrox on -indev "$tmp/$iso" \
+  -extract /images/pxeboot/vmlinuz "$tmp/boot/vmlinuz" \
+  -extract /images/pxeboot/initrd.img "$tmp/boot/initrd.img" \
+  > "$tmp/iso-extract.log" 2>&1 ||
+  { cat "$tmp/iso-extract.log"; echo "C2U_BLOCKED // SILVERBLUE_INSTALLER_PXE_KERNEL_MISSING"; exit 2; }
+test -s "$tmp/boot/vmlinuz" && test -s "$tmp/boot/initrd.img" ||
+  { echo "C2U_BLOCKED // EMPTY_INSTALLER_KERNEL"; exit 2; }
+echo "C2U_PASS // INSTALLER_KERNEL_AND_INITRD_PRESENT"
+
+# Build a separate read-only ISO with a single Kickstart file and the already
+# tested inert C2t RPM. No passwords, SSH keys, network or test CI private key.
+p="$RUNNER_TEMP/c2t-rpms"
+seed="$tmp/seed"
+mkdir -p "$seed"
+for name in c2t-0.1.rpm c2t-0.2.rpm c2t-disposable-public.asc \
+            c2t-public-fingerprint.txt c2t-artifact-manifest.sha256; do
+  test -s "$p/$name" ||
+    { echo "C2U_BLOCKED // TEST_RPM_ARTIFACT_MISSING_$name"; exit 2; }
+  cp "$p/$name" "$seed/$name"
+done
+(cd "$seed" && sha256sum --check --status c2t-artifact-manifest.sha256) ||
+  { echo "C2U_BLOCKED // BAD_TEST_RPM_CHECKSUM"; exit 2; }
+
+payload="$(base64 -w0 "$repo/tests/connections/c2u_silverblue/guest_ostree_reboot_cycle.sh")"
+cat > "$seed/ks.cfg" <<EOF
+# C2u fully disposable, offline Fedora Silverblue 44 VM only.
+cmdline
+lang en_US.UTF-8
+keyboard --xlayouts=us
+timezone Etc/UTC --utc
+shutdown
+eula --agreed
+rootpw --lock
+firstboot --disable
+selinux --enforcing
+zerombr
+ignoredisk --only-use=vda
+clearpart --all --initlabel --drives=vda
+autopart --type=plain
+bootloader --append="console=ttyS0,115200 console=tty0"
+cdrom
+ostreesetup --osname=fedora --remote=fedora --url=file:///ostree/repo --ref=fedora/44/x86_64/silverblue --nogpg
+%post --erroronfail --log=/root/c2u-post.log
+mkdir -p /usr/local/libexec /etc/systemd/system /var/lib
+echo initial > /var/lib/c2u-transaction-stage
+base64 -d > /usr/local/libexec/c2u-ostree-cycle.sh <<'C2U_SCRIPT_ENCODED'
+$payload
+C2U_SCRIPT_ENCODED
+chmod 0755 /usr/local/libexec/c2u-ostree-cycle.sh
+cat > /etc/systemd/system/c2u-ostree-cycle.service <<'C2U_UNIT'
+[Unit]
+Description=Disposable C2u Silverblue ostree reboot test
+After=local-fs.target
+ConditionPathExists=/run/ostree-booted
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/bash /usr/local/libexec/c2u-ostree-cycle.sh
+TimeoutStartSec=900
+
+[Install]
+WantedBy=multi-user.target
+C2U_UNIT
+systemctl enable c2u-ostree-cycle.service
+echo C2U_PASS // KICKSTART_POST_INSTALL_STAGED >/dev/ttyS0
+%end
+EOF
+genisoimage -quiet -volid C2UCI -joliet -rock -o "$tmp/c2u-seed.iso" "$seed"/*
+qemu-img create -q -f qcow2 "$tmp/silverblue.qcow2" 40G
+echo "C2U_PASS // ISOLATED_SPARSE_DISK_CREATED"
+
+# The official Fedora installer boots with QEMU's direct kernel loader and
+# gets both the installation payload and Kickstart from separate CD-ROMs.
+qemu-system-x86_64 \
+  -machine accel=kvm -m 4096 -smp 3 -display none -monitor none \
+  -kernel "$tmp/boot/vmlinuz" -initrd "$tmp/boot/initrd.img" \
+  -append "console=ttyS0,115200 inst.repo=cdrom inst.ks=hd:LABEL=C2UCI:/ks.cfg inst.cmdline rd.neednet=0" \
+  -serial "file:$tmp/installer-serial.log" \
+  -drive "file=$tmp/silverblue.qcow2,if=virtio,format=qcow2" \
+  -drive "file=$tmp/$iso,if=ide,media=cdrom,readonly=on,index=0" \
+  -drive "file=$tmp/c2u-seed.iso,if=ide,media=cdrom,readonly=on,index=1" \
+  -nic none -no-reboot > "$tmp/installer-qemu.log" 2>&1 &
+pid="$!"
+
+result=""
+for i in $(seq 1 600); do
+  if [[ -f "$tmp/installer-serial.log" ]] &&
+     grep -q 'C2U_PASS // KICKSTART_POST_INSTALL_STAGED' "$tmp/installer-serial.log"; then
+    result=POST_DONE
+  fi
+  if ! kill -0 "$pid" 2>/dev/null; then break; fi
+  sleep 2
+done
+echo "C2U_INSTALLER_EVIDENCE // $result"
+grep -a -E 'C2U_|Kickstart|anaconda.*(error|failed)|No such file' \
+  "$tmp/installer-serial.log" 2>/dev/null | tail -n 55 || true
+if [[ "$result" != POST_DONE ]]; then
+  echo "C2U_BLOCKED // OFFICIAL_SILVERBLUE_INSTALLER_DID_NOT_COMPLETE"
+  tail -n 110 "$tmp/installer-serial.log" 2>/dev/null || true
+  tail -n 50 "$tmp/installer-qemu.log" || true
+  exit 1
+fi
+
+kill "$pid" 2>/dev/null || true
+wait "$pid" 2>/dev/null || true
+pid=""
+echo "C2U_PASS // OFFLINE_SILVERBLUE_INSTALLER_POST_STEP"
+
+# A real persistent disk boot, not a container and not just a staged tree.
+# The guest itself will perform: baseline boot -> rpm-ostree layer -> reboot
+# -> validate booted layer -> rollback -> reboot -> validate absence -> off.
+qemu-system-x86_64 \
+  -machine accel=kvm -m 4096 -smp 3 -display none -monitor none \
+  -serial "file:$tmp/guest-serial.log" \
+  -drive "file=$tmp/silverblue.qcow2,if=virtio,format=qcow2" \
+  -drive "file=$tmp/c2u-seed.iso,if=ide,media=cdrom,readonly=on,index=1" \
+  -nic none > "$tmp/guest-qemu.log" 2>&1 &
+pid="$!"
+result=""
+for i in $(seq 1 450); do
+  if [[ -f "$tmp/guest-serial.log" ]]; then
+    if grep -q 'C2U_PASS // REAL_SILVERBLUE_BOOTED_ROLLBACK_REMOVED_LAYER' \
+           "$tmp/guest-serial.log"; then
+      result=PASS; break
+    fi
+    if grep -q 'C2U_FAIL' "$tmp/guest-serial.log"; then
+      result=FAIL; break
+    fi
+  fi
+  if ! kill -0 "$pid" 2>/dev/null; then
+    result=VM_EXITED; break
+  fi
+  sleep 2
+done
+grep -a 'C2U_' "$tmp/guest-serial.log" 2>/dev/null | tail -n 70 || true
+if [[ "$result" != PASS ]]; then
+  echo "C2U_BLOCKED // SILVERBLUE_LAYER_REBOOT_ROLLBACK_RESULT=$result"
+  tail -n 130 "$tmp/guest-serial.log" 2>/dev/null || true
+  tail -n 45 "$tmp/guest-qemu.log" || true
+  exit 1
+fi
+echo "C2U_PASS // ACTUAL_SILVERBLUE_BOOTED_LAYER_AND_ROLLBACK_SEQUENCE"
+echo "C2U_LIMITATION // EPHEMERAL_SELF_SIGNED_INERT_PACKAGE_NOT_PRODUCTION"

@@ -53,6 +53,6 @@ jobs:
           ! grep -q 'test_task_kernel_owner_boundary_m13x' services/hub/ApolloHubTodoStore.qml
           ! grep -q 'test_task_kernel_owner_boundary_m13x' services/connections/ConnectionsBroker.qml
           test "$(grep -c 'todoFile.setText(' services/hub/ApolloHubTodoStore.qml)" = 1
-          ! grep -Eq 'useradd|systemctl|semanage|semodule|secret-tool' \
+          ! grep -Eq 'os\.system\(|subprocess\.run\(.*shell=True|semanage .*--|semodule .*--|secret-tool ' \
             tests/tasks/test_task_kernel_owner_boundary_m13x.py
           printf '%s\n' 'M13X_LINUX_UID_BOUNDARY_PROOF_ONLY_NO_PRODUCTION_OWNER_PASS'

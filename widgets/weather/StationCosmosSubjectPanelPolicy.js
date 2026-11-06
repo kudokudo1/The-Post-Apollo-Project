@@ -27,8 +27,12 @@ var ROUTES = {
   "cosmos/sun/xray": {page:"space",space:["xray"]},
   "cosmos/sun/flares": {page:"space",space:["flares"]},
   "cosmos/sun/cycle": {page:"space",space:["header","cycle"]},
+  // Annual instruments reuse the existing on-demand JPL calendar service.
+  // Empty sky sections ensure no USNO/NOAA fetchers activate.
+  "cosmos/sun/year": {page:"sky",sky:[]},
   // The bottom MOON landing pairs USNO ephemeris with its current sky fix.
   "cosmos/moon/ephemeris": {page:"sky",sky:["header","moon","moon-position"]},
+  "cosmos/moon/year": {page:"sky",sky:[]},
   "cosmos/moon/position": {page:"sky",sky:["header","moon-position"]},
   // Native ASTRONOMY landing keeps the planet/constellation instruments;
   // the original comprehensive SKY page remains in INDEX unchanged.

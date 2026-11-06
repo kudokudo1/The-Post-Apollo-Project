@@ -110,7 +110,8 @@ test("C5 populated source-to-render contracts use actual provider fields",()=>{
   for (const anchor of [
     'objectName: "cosmos-c5-sun-path"',
     'objectName: "cosmos-c5-planet-event-marker"',
-    'objectName: "cosmos-c5-source-card"',
+    'id: subjectCards',
     'objectName: "cosmos-c5-meteor-card"'
   ]) assert.ok(focus.includes(anchor),anchor);
+  assert.match(focus,/StationCosmosDetailPane\s*\{/);
 });

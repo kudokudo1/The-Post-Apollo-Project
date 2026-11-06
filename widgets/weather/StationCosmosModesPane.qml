@@ -572,79 +572,12 @@ Rectangle {
     }
     Component {
         id: subjectCards
-        Column {
-            anchors.fill: parent
-            spacing: 8
-            GohuText {
-                text: cosmosModePane.kind==="planets" ? "PLANETS // CURRENT USNO SKY"
-                    : cosmosModePane.kind==="stars" ? "CONSTELLATION ANCHORS // USNO"
-                    : cosmosModePane.kind==="eclipses" ? "ECLIPSES // NASA GSFC"
-                    : "ISS // PREDICTED PASSES"
-                color: Colors.magenta
-                font.pixelSize:11
-            }
-            QuietText {
-                width: parent.width
-                visible: !cosmosModePane.cards || cosmosModePane.cards.length === 0
-                text: cosmosModePane.sourceStatus || "SOURCE WAITING"
-                color: Colors.orange
-                font.pixelSize: 10
-                wrapMode: Text.WordWrap
-            }
-            Grid {
-                id: cardGrid
-                width: parent.width
-                columns: 2
-                spacing: 7
-                Repeater {
-                    // Numeric model avoids a QJSValue-array Repeater binding.
-                    model: cosmosModePane.cards ? Math.min(4,cosmosModePane.cards.length) : 0
-                    delegate: Rectangle {
-                        objectName: "cosmos-c5-source-card"
-                        required property int index
-                        readonly property var cardData: cosmosModePane.cards[index]
-                        width: Math.max(1,(cardGrid.width-7)/2)
-                        height: Math.max(65,(stage.height-53)/2)
-                        color: Colors.dark
-                        border.width: 1
-                        border.color: Colors.cyan
-                        Column {
-                            anchors.fill: parent
-                            anchors.margins: 8
-                            spacing: 6
-                            GohuText {
-                                width: parent.width
-                                text: cardData.name
-                                color: Colors.orange
-                                font.pixelSize: 12
-                                elide: Text.ElideRight
-                            }
-                            QuietText {
-                                width: parent.width
-                                text: cardData.info
-                                font.pixelSize: 10
-                                elide: Text.ElideRight
-                            }
-                            QuietText {
-                                width: parent.width
-                                text: cardData.detail
-                                font.pixelSize: 9
-                                wrapMode: Text.WordWrap
-                            }
-                        }
-                    }
-                }
-            }
-            QuietText {
-                width:parent.width
-                text:(!cosmosModePane.cards || cosmosModePane.cards.length===0) ? "SOURCE WAITING / NO DATA IN WINDOW"
-                    : cosmosModePane.kind==="eclipses"
-                    ? "GLOBAL EVENT DATE // LOCAL VISIBILITY NOT CALCULATED"
-                    : "OBSERVATIONS / PREDICTIONS ARE SOURCE-SCOPED"
-                color:Colors.cyan
-                font.pixelSize:9
-                elide:Text.ElideRight
-            }
+        StationCosmosDetailPane {
+            kind: cosmosModePane.kind
+            celestialSource: cosmosModePane.celnav
+            issSource: cosmosModePane.issSource
+            eclipseSource: cosmosModePane.eclipseSource
+            sourceStatus: cosmosModePane.sourceStatus
         }
     }
     Component {

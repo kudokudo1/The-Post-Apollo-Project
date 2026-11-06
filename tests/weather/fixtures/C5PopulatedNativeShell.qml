@@ -83,7 +83,7 @@ ShellRoot {
     function succeed() {
         if (done) return;
         done = true;
-        console.log("C5_POPULATED_PASS // SUN_ARC PLANET_EVENTS ISS_TIMES ACTIVE_METEORS");
+        console.log("C5_POPULATED_PASS // SUN_ARC PLANET_EVENTS ISS_TIMES ACTIVE_METEORS C6_DETAILS");
         Qt.quit();
     }
 
@@ -137,19 +137,26 @@ ShellRoot {
                     return root.fail("ISS_LOCATION_NOT_CONFIGURED");
                 focused.issSource.active = false;
                 focused.issSource.passes = [{
-                    rise:{timeUtc:"2026-11-05 12:00Z"},
-                    culminate:{degrees:42.3,timeUtc:"2026-11-05 12:04Z"}
+                    rise:{timeUtc:"2026-11-05 12:00Z",direction:"W",azimuth:268},
+                    culminate:{degrees:42.3,timeUtc:"2026-11-05 12:04Z",
+                        direction:"N",azimuth:15},
+                    set:{timeUtc:"2026-11-05 12:07Z",direction:"E",azimuth:74},
+                    durationLabel:"7:00",minutesUntilRise:22
                 }];
                 focused.issSource.ready = true;
                 root.phase = 3;
             } else if (root.phase === 3) {
-                if (!focused.cards || focused.cards.length !== 1
-                        || focused.cards[0].detail.indexOf("12:04Z") < 0
-                        || focused.cards[0].detail.indexOf("undefined") >= 0)
-                    return root.fail("ISS_RECORD_FIELDS_NOT_RENDERED");
-                if (countNamed(focused.instrumentItem,
-                        "cosmos-c5-source-card") !== 1)
-                    return root.fail("ISS_CARD_NOT_IN_VISUAL_TREE");
+                const details = focused.instrumentItem;
+                if (!details || details.recordCount !== 1
+                        || details.facts.length !== 12
+                        || details.facts[1].value.indexOf("12:04Z") < 0
+                        || details.facts[2].value.indexOf("12:07Z") < 0)
+                    return root.fail("ISS_FULL_RECORD_FIELDS_NOT_RENDERED");
+                if (countNamed(details,"cosmos-c6-observation-cell") !== 4)
+                    return root.fail("ISS_DETAIL_CELLS_NOT_IN_VISUAL_TREE");
+                details.factPage = 2;
+                if (details.visibleFacts[1].value !== "7:00")
+                    return root.fail("ISS_DURATION_PAGE_NOT_ACCESSIBLE");
                 root.phase = 4;
                 root.route = "cosmos/events/meteors";
             } else if (root.phase === 4) {
@@ -184,6 +191,74 @@ ShellRoot {
                     return root.fail("SOURCE_BACKED_SOLAR_ARC_NOT_RENDERED");
                 if (!focused.skyFeed || focused.skyFeed.focusedLocalMinute < 0)
                     return root.fail("VERIFIED_LOCAL_MINUTE_MISSING");
+                root.phase = 7;
+                root.route = "cosmos/events/eclipses";
+            } else if (root.phase === 7) {
+                if (!focused.eclipseSource)
+                    return root.fail("NASA_SOURCE_NOT_MOUNTED");
+                focused.eclipseSource.active = false;
+                focused.eclipseSource.sourceName = "NASA GSFC";
+                focused.eclipseSource.dateScope = "2026-2028";
+                focused.eclipseSource.events = [{
+                    event:"TOTAL SOLAR ECLIPSE",date:"2027-08-02",
+                    body:"SOLAR",phase:"TOTAL",daysUntil:270
+                },{
+                    event:"PENUMBRAL LUNAR ECLIPSE",date:"2027-02-20",
+                    body:"LUNAR",phase:"PENUMBRAL",daysUntil:106
+                }];
+                focused.eclipseSource.eventCount = 2;
+                focused.eclipseSource.ready = true;
+                root.phase = 8;
+            } else if (root.phase === 8) {
+                const details = focused.instrumentItem;
+                if (!details || details.recordCount !== 2
+                        || details.facts[1].value !== "2027-08-02")
+                    return root.fail("ECLIPSE_FULL_CALENDAR_MISSING");
+                details.selectedIndex = 1;
+                if (details.facts[1].value !== "2027-02-20")
+                    return root.fail("ECLIPSE_NEXT_ITEM_MISSING");
+                details.factPage = 2;
+                if (details.visibleFacts[0].value !== "NOT CALCULATED")
+                    return root.fail("ECLIPSE_LOCAL_VISIBILITY_CAVEAT_MISSING");
+                root.phase = 9;
+                root.route = "cosmos/planets-stars/celestial-fix";
+            } else if (root.phase === 9) {
+                if (!focused.celnav)
+                    return root.fail("CELESTIAL_SOURCE_NOT_MOUNTED");
+                focused.celnav.active = false;
+                focused.celnav.snapshot = {
+                    date:"2026-11-05",time:"13:00",planets:[
+                       {name:"MARS",altitude:37.5,azimuth:203.4,direction:"SSW"},
+                       {name:"JUPITER",altitude:18.2,azimuth:125.2,direction:"SE"}
+                    ],
+                    stars:[{name:"SIRIUS",altitude:42.1,azimuth:177.9,
+                        direction:"S",constellation:"CANIS MAJOR",navStarNumber:19}],
+                    constellations:[{name:"CANIS MAJOR",count:1,
+                        anchorStar:"SIRIUS",anchorAltitude:42.1,
+                        anchorAzimuth:177.9,anchorDirection:"S",
+                        starNames:["SIRIUS"],directions:["S"]}]
+                };
+                focused.celnav.ready = true;
+                root.phase = 10;
+            } else if (root.phase === 10) {
+                const details = focused.instrumentItem;
+                if (!details || details.recordCount !== 2
+                        || details.facts[0].value !== "37.5°")
+                    return root.fail("PLANET_CELESTIAL_FIX_MISSING");
+                details.selectedIndex = 1;
+                if (details.facts[1].value !== "125.2°")
+                    return root.fail("PLANET_NEXT_ITEM_MISSING");
+                root.phase = 11;
+                root.route = "cosmos/planets-stars/constellations";
+            } else if (root.phase === 11) {
+                const details = focused.instrumentItem;
+                if (!details || details.recordCount !== 1
+                        || details.facts[0].value !== "SIRIUS")
+                    return root.fail("CONSTELLATION_ANCHOR_MISSING");
+                details.starsAsNav = true;
+                if (details.recordCount !== 1
+                        || details.facts[3].value !== "CANIS MAJOR")
+                    return root.fail("STAR_NAVIGATION_DETAILS_MISSING");
                 root.succeed();
             }
         }

@@ -105,8 +105,10 @@ def _target_geometry(output_name, x, y, w, h):
     return (output["x"]+x, output["y"]+y, w, h)
 
 
-def _actor_windows():
-    root = _sway_json("-t", "get_tree")
+def _actor_windows(tree=None):
+    # Social-style persistent followers can pass a direct Sway IPC snapshot.
+    # The legacy one-shot enter/hide path keeps its existing swaymsg probe.
+    root = tree if tree is not None else _sway_json("-t", "get_tree")
     pending = [root]
     matches = []
     seen = 0
@@ -154,8 +156,8 @@ def _verified_process_profile(pid, profile):
     return False
 
 
-def _unique_actor(profile):
-    matches = _actor_windows()
+def _unique_actor(profile, tree=None):
+    matches = _actor_windows(tree=tree)
     if len(matches) != 1:
         return None, "ACTOR_MISSING" if not matches else "AMBIGUOUS_ACTOR"
     node = matches[0]

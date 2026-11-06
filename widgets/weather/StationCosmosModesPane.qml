@@ -439,135 +439,22 @@ Rectangle {
     }
     Component {
         id: sunLight
-        Grid {
-            anchors.fill: parent
-            columns: 2
-            spacing: 7
-            Repeater {
-                model: [
-                    {name:"ASTRONOMICAL DAWN",value:cosmosModePane.twilight ? cosmosModePane.twilight.astronomicalDawn : "--"},
-                    {name:"CIVIL DAWN",value:cosmosModePane.twilight ? cosmosModePane.twilight.civilDawn : "--"},
-                    {name:"SOLAR NOON",value:cosmosModePane.twilight ? cosmosModePane.twilight.solarNoon : "--"},
-                    {name:"CIVIL DUSK",value:cosmosModePane.twilight ? cosmosModePane.twilight.civilDusk : "--"},
-                    {name:"BLUE AM",value:cosmosModePane.twilight ? cosmosModePane.twilight.blueMorningStart+" → "+cosmosModePane.twilight.blueMorningEnd : "--"},
-                    {name:"GOLDEN AM",value:cosmosModePane.twilight ? cosmosModePane.twilight.goldenMorningStart+" → "+cosmosModePane.twilight.goldenMorningEnd : "--"},
-                    {name:"GOLDEN PM",value:cosmosModePane.twilight ? cosmosModePane.twilight.goldenEveningStart+" → "+cosmosModePane.twilight.goldenEveningEnd : "--"},
-                    {name:"BLUE PM",value:cosmosModePane.twilight ? cosmosModePane.twilight.blueEveningStart+" → "+cosmosModePane.twilight.blueEveningEnd : "--"}
-                ]
-                delegate: Rectangle {
-                    required property var modelData
-                    width: Math.max(1,(stage.width-7)/2)
-                    height: Math.max(35,(stage.height-21)/4)
-                    color: Colors.dark
-                    border.width: 1
-                    border.color: Colors.orange
-                    Column {
-                        anchors.fill: parent
-                        anchors.margins: 6
-                        spacing: 6
-                        SecondaryText {text:modelData.name;font.pixelSize:9}
-                        GohuText {
-                            width: parent.width
-                            text:modelData.value
-                            color: Colors.white
-                            font.pixelSize:11
-                            elide:Text.ElideRight
-                        }
-                    }
-                }
-            }
+        StationCosmosLightDetailPane {
+            twilight: cosmosModePane.twilight
+            astronomy: cosmosModePane.astronomy
+            sourceStatus: cosmosModePane.sourceStatus
         }
     }
     Component {
         id: planetClock
-        Column {
-            readonly property int renderedRowCount: clockRepeater.count
-            anchors.fill: parent
-            spacing: 5
-            GohuText {
-                width: parent.width
-                height: 19
-                text: "PLANET CLOCK // USNO RISE / TRANSIT / SET"
-                color: Colors.magenta
-                font.pixelSize:11
-            }
-            Repeater {
-                id: clockRepeater
-                // Qt's Repeater can treat an array returned from imported
-                // JS as an invalid model even though it has length=5.
-                // Numeric model guarantees the five physical lanes.
-                model: 5
-                delegate: Rectangle {
-                    required property int index
-                    // Bind directly to the always-five-row source model.
-                    // The intermediary displayedPlanetRows can update without
-                    // notifying a nested Repeater delegate in Qt 6.
-                    readonly property var planetRow:
-                        cosmosModePane.planetRows && cosmosModePane.planetRows.length > index
-                        ? cosmosModePane.planetRows[index] : null
-                    readonly property string planetName:
-                        planetRow ? planetRow.name
-                        : ["MERCURY","VENUS","MARS","JUPITER","SATURN"][index]
-                    width: parent.width
-                    height: Math.max(26,(stage.height-53)/5)
-                    color: Colors.dark
-                    border.width: 1
-                    border.color: Colors.cyan
-                    Row {
-                        anchors.fill: parent
-                        anchors.margins: 5
-                        spacing: 7
-                        GohuText {
-                            width: 65
-                            text: planetName
-                            color: Colors.orange
-                            font.pixelSize: 10
-                            elide: Text.ElideRight
-                        }
-                        Rectangle {
-                            id: clockLane
-                            width: Math.max(1,parent.width-77)
-                            height: 15
-                            color: Colors.black
-                            border.width: 1
-                            border.color: Colors.magenta
-                            Repeater {
-                                model: planetRow && planetRow.events
-                                    ? planetRow.events.length : 0
-                                delegate: Rectangle {
-                                    objectName: "cosmos-c5-planet-event-marker"
-                                    required property int index
-                                    readonly property var eventData:
-                                        planetRow.events[index]
-                                    x: 2+eventData.minute/1440*Math.max(0,clockLane.width-10)
-                                    y: 2
-                                    width: 6
-                                    height: 9
-                                    color: eventData.kind==="rise" ? Colors.cyan
-                                        : eventData.kind==="transit" ? Colors.yellow
-                                        : Colors.magenta
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-            QuietText {
-                width: parent.width
-                text: cosmosModePane.sourceStatus || "SOURCE WAITING"
-                    + (cosmosModePane.civilDate !== "" ? " // "+cosmosModePane.civilDate : "")
-                visible: cosmosModePane.sourceStatus !== "SOURCE RECEIVED"
-                color: Colors.orange
-                font.pixelSize: 9
-                elide: Text.ElideRight
-            }
-            QuietText {
-                width:parent.width
-                text:"CYAN RISE // YELLOW TRANSIT // MAGENTA SET // 24-HOUR CIVIL DAY"
-                color:Colors.cyan
-                font.pixelSize:9
-                elide:Text.ElideRight
-            }
+        StationCosmosClockCompactPane {
+            clockRows: cosmosModePane.planetRows
+            civilDate: cosmosModePane.civilDate
+            sourceStatus: cosmosModePane.sourceStatus
+            sourcePrecision: cosmosModePane.planetSource
+                ? cosmosModePane.planetSource.precision : ""
+            azimuthReference: cosmosModePane.planetSource
+                ? cosmosModePane.planetSource.azimuthReference : ""
         }
     }
     Component {

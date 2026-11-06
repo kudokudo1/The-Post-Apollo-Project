@@ -34,7 +34,7 @@ class ZoomWebHostTests(unittest.TestCase):
         self.assertIn('zoomWebDocked = aligned;', QML)
         self.assertIn('fillOpacity: camera.zoomWebDocked ? 0.0 : 0.97', QML)
         self.assertIn('intersection: Intersection.Subtract', QML)
-        self.assertIn('width: camera.zoomWebDocked ? Math.round(zoomViewport.width) : 0', QML)
+        self.assertIn('width: camera.zoomWebDocked ? camera.zoomActorWidth : 0', QML)
         self.assertIn('visible: camera.activeView === "zoom" && !camera.zoomWebDocked', QML)
         self.assertIn('function openZoomMode()', QML)
         entry = QML.split('function openZoomMode()',1)[1].split(
@@ -88,8 +88,8 @@ class ZoomWebHostTests(unittest.TestCase):
         self.assertIn('visible: camera.activeView !== "zoom"', QML)
         self.assertIn('visible: camera.activeView === "zoom" && !camera.zoomWebDocked', QML)
         self.assertIn('intersection: Intersection.Subtract', QML)
-        self.assertIn('width: camera.zoomWebDocked ? Math.round(zoomViewport.width) : 0', QML)
-        self.assertIn('height: camera.zoomWebDocked ? Math.round(zoomViewport.height) : 0', QML)
+        self.assertIn('width: camera.zoomWebDocked ? camera.zoomActorWidth : 0', QML)
+        self.assertIn('height: camera.zoomWebDocked ? camera.zoomActorHeight : 0', QML)
         self.assertIn('menuOpen && !zoomWebDocked ? WlrKeyboardFocus.OnDemand', QML)
         # The fallback instructions are scrollable only when the web actor is
         # absent. A QML Flickable must not intercept Zoom's native mouse wheel.
@@ -126,12 +126,44 @@ class ZoomWebHostTests(unittest.TestCase):
         self.assertIn('readonly property int zoomBayWidth: Math.max(0, Math.round(zoomViewport.width))', QML)
         self.assertIn('readonly property int zoomBayHeight: Math.max(0, Math.round(zoomViewport.height))', QML)
         self.assertIn('zoomWebProcess.exec(zoomWebArgs("enter"))', QML)
-        self.assertIn('"--width", String(zoomBayWidth), "--height", String(zoomBayHeight)', QML)
-        self.assertIn('x: Math.round(zoomViewport.x)', QML)
-        self.assertIn('y: Math.round(zoomViewport.y)', QML)
+        self.assertIn('"--width", String(zoomActorWidth), "--height", String(zoomActorHeight)', QML)
+        self.assertIn('x: camera.zoomActorLeft', QML)
+        self.assertIn('y: camera.zoomActorTop', QML)
         self.assertIn('intersection: Intersection.Subtract', QML)
         # A verified browser has no overlapping QML fallback controls.
         self.assertIn('visible: camera.activeView === "zoom" && !camera.zoomWebDocked', QML)
+
+    def test_requested_actor_is_smaller_and_higher_than_camera_viewport(self):
+        # A calibrated *physical Sway browser* rectangle, not another QML
+        # viewport resize or browser CSS zoom. The same actor rectangle is
+        # used by the launcher, follower, mask and opaque frame chrome.
+        self.assertIn('readonly property int zoomActorRise: 14', QML)
+        self.assertIn('readonly property int zoomActorWidthTrim: 16', QML)
+        self.assertIn('readonly property int zoomActorHeightTrim: 28', QML)
+        self.assertIn('zoomBayInset + Math.floor(zoomActorWidthTrim / 2)', QML)
+        self.assertIn('zoomActorTop: Math.max(0, zoomBayTop - zoomActorRise)', QML)
+        self.assertIn('zoomActorWidth: Math.max(0, zoomBayWidth - zoomActorWidthTrim)', QML)
+        self.assertIn('zoomActorHeight: Math.max(0, zoomBayHeight - zoomActorHeightTrim)', QML)
+        self.assertIn('camera.frameTopInset + zoomActorTop', QML)
+        self.assertIn('camera.margins.left + camera.glowGutter + zoomActorLeft', QML)
+        self.assertIn('"--width", String(zoomActorWidth), "--height", String(zoomActorHeight)', QML)
+        self.assertIn('width: zoomActorWidth, height: zoomActorHeight', QML)
+        self.assertIn('x: camera.zoomActorLeft', QML)
+        self.assertIn('y: camera.zoomActorTop', QML)
+        self.assertIn('width: camera.zoomWebDocked ? camera.zoomActorWidth : 0', QML)
+        self.assertIn('height: camera.zoomWebDocked ? camera.zoomActorHeight : 0', QML)
+        self.assertIn('y: camera.zoomActorTop + camera.zoomActorHeight', QML)
+        # All three sizes keep the same offset relative to Camera's viewport.
+        for bay_left, bay_top, width, height in (
+                (18,131,734,542),(18,131,1080,660),(18,131,2000,950)):
+            actor_left = bay_left + 8
+            actor_top = max(0,bay_top - 14)
+            actor_width = width - 16
+            actor_height = height - 28
+            self.assertGreater(actor_left,bay_left)
+            self.assertLess(actor_top,bay_top)
+            self.assertLess(actor_width,width)
+            self.assertLess(actor_height,height)
 
     def test_rapid_resize_keeps_clickthrough_closed_until_new_alignment(self):
         self.assertIn('function scheduleZoomWebRealign()', QML)
@@ -140,8 +172,8 @@ class ZoomWebHostTests(unittest.TestCase):
         self.assertIn('zoomWebNeedsRealign = true;', QML)
         self.assertIn('if (zoomWebNeedsRealign) {', QML)
         self.assertIn('zoomWebState = "REALIGNING_WEB_APP";', QML)
-        for prop in ('ZoomBayInset', 'ZoomBayTop', 'ZoomBayWidth',
-                     'ZoomBayHeight', 'ZoomWebOutput'):
+        for prop in ('ZoomActorLeft', 'ZoomActorTop', 'ZoomActorWidth',
+                     'ZoomActorHeight', 'ZoomWebOutput'):
             self.assertIn('on' + prop + 'Changed: scheduleZoomWebRealign()', QML)
         self.assertIn('onDockCenterXChanged: scheduleZoomWebRealign()', QML)
         self.assertIn('id: zoomWebRealign', QML)

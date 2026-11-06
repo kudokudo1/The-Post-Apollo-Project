@@ -10,6 +10,10 @@ var MAX_SAMPLES = 181;
 function validNumber(n) {
     return typeof n === "number" && isFinite(n) && Math.abs(n) <= 10000;
 }
+// Camera values can legitimately exceed 10,000 px at extreme zoom.
+function pixelNumber(n) {
+    return typeof n === "number" && isFinite(n) && Math.abs(n) <= 1e7;
+}
 function auLabel(au) {
     if (!validNumber(au) || au <= 0) return "";
     return au < 0.1 ? au.toFixed(3) + " AU"
@@ -34,10 +38,10 @@ function rings(domainAu) {
 // Use the right-hand top quadrant to keep numeric ticks away from the SUN.
 function ringCallouts(domainAu,origin,bounds,tilt) {
     if (!origin || !bounds || !validNumber(domainAu) ||
-        !validNumber(origin.cx) || !validNumber(origin.cy) ||
-        !validNumber(origin.r) || origin.r <= 0 ||
+        !pixelNumber(origin.cx) || !pixelNumber(origin.cy) ||
+        !pixelNumber(origin.r) || origin.r <= 0 ||
         ![bounds.left,bounds.top,bounds.right,bounds.bottom].every(
-            function(v){return validNumber(v);}))
+            function(v){return pixelNumber(v);}))
         return [];
     var flattened = tilt === true ? Math.SQRT1_2 : 1;
     var candidates = rings(domainAu),output=[],last = null;

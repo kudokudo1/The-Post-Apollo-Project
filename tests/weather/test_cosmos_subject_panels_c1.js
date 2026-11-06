@@ -476,7 +476,10 @@ test("C5 subject modes are distinct real routes and direct fixed-rail actions", 
   assert.match(focusPane,/ClockPolicy\.clockRows\(/);
   assert.match(focusPane,/id: meteorScroll/);
   assert.match(focusPane,/contentHeight: meteorCards\.implicitHeight/);
-  assert.match(focusPane,/model: cosmosModePane\.cards/);
+  assert.match(focusPane,/StationCosmosDetailPane\s*\{/);
+  assert.match(focusPane,/celestialSource: cosmosModePane\.celnav/);
+  assert.match(focusPane,/issSource: cosmosModePane\.issSource/);
+  assert.match(focusPane,/eclipseSource: cosmosModePane\.eclipseSource/);
   for(const src of [modePolicySource,focusPane]) {
     for(const forbidden of ["WeatherServices.","FileView {","Process {",
       "XMLHttpRequest","new WebSocket","swaymsg","Timer {","Qt.callLater"]) {

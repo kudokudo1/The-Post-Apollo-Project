@@ -413,49 +413,76 @@ Rectangle {
                 color:Colors.magenta
                 font.pixelSize:12
             }
-            Grid {
-                id: cycleGrid
-                width:parent.width
-                columns:2
-                spacing:7
+            Row {
+                id: cycleModeBar
+                width: parent.width
+                height: 23
+                spacing: 5
                 Repeater {
                     model: [
-                        {name:"MODEL MONTH",
-                         value:solarFocus.cycle && solarFocus.cycle.ready
-                           ? solarFocus.cycle.summary.modelMonth : "--"},
-                        {name:"PREDICTED SUNSPOT NUMBER",
-                         value:solarFocus.cycle && solarFocus.cycle.ready
-                           ? solarFocus.reading(solarFocus.cycle.summary.predictedSsn,1) : "--"},
-                        {name:"PREDICTED F10.7 // SFU",
-                         value:solarFocus.cycle && solarFocus.cycle.ready
-                           ? solarFocus.reading(solarFocus.cycle.summary.predictedFlux,1) : "--"},
-                        {name:"PREDICTED CYCLE PEAK",
-                         value:solarFocus.cycle && solarFocus.cycle.ready
-                           ? solarFocus.cycle.summary.peakMonth : "--"}
+                        {label:"MODEL",page:0},
+                        {label:"RANGES",page:1},
+                        {label:"OUTLOOK",page:2}
                     ]
-                    delegate:Rectangle {
+                    delegate: ActionButton {
                         required property var modelData
-                        width:Math.max(1,(cycleGrid.width-7)/2)
-                        height:Math.max(58,(solarFocus.height-47)/2)
-                        color:Colors.dark
-                        border.width:1
-                        border.color:Colors.yellow
+                        width: Math.max(1,(cycleModeBar.width-80)/3)
+                        height: 23
+                        contentPadding: 1
+                        label: modelData.label
+                        labelPixelSize: 9
+                        selected: solarFocus.cyclePage===modelData.page
+                        accentColor: Colors.magenta
+                        onClicked: solarFocus.cyclePage=modelData.page
+                    }
+                }
+                ActionButton {
+                    width: 65
+                    height: 23
+                    contentPadding: 1
+                    label: "REFRESH"
+                    labelPixelSize: 9
+                    available: !!solarFocus.cycle && !solarFocus.cycle.loading
+                    onClicked: {
+                        if (solarFocus.cycle)
+                            solarFocus.cycle.refresh(true)
+                    }
+                }
+            }
+            Grid {
+                id: cycleGrid
+                width: parent.width
+                height: Math.max(0,parent.height-72)
+                columns: 2
+                spacing: 7
+                Repeater {
+                    model: 4
+                    delegate: Rectangle {
+                        objectName: "cosmos-c6-cycle-detail"
+                        required property int index
+                        readonly property var factData:
+                            solarFocus.cycleFields[index]
+                        width: Math.max(1,(cycleGrid.width-7)/2)
+                        height: Math.max(1,(cycleGrid.height-7)/2)
+                        color: Colors.dark
+                        border.width: 1
+                        border.color: Colors.yellow
                         Column {
-                            anchors.fill:parent
-                            anchors.margins:7
-                            spacing:7
+                            anchors.fill: parent
+                            anchors.margins: 7
+                            spacing: 6
                             SecondaryText {
-                                width:parent.width
-                                text:modelData.name
-                                font.pixelSize:9
-                                elide:Text.ElideRight
+                                width: parent.width
+                                text: factData ? factData.label : "--"
+                                font.pixelSize: 9
+                                elide: Text.ElideRight
                             }
                             GohuText {
-                                width:parent.width
-                                text:modelData.value
-                                color:Colors.white
-                                font.pixelSize:17
-                                elide:Text.ElideRight
+                                width: parent.width
+                                text: factData ? factData.value : "--"
+                                color: Colors.white
+                                font.pixelSize: 14
+                                elide: Text.ElideRight
                             }
                         }
                     }

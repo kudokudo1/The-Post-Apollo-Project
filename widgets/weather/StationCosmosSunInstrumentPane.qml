@@ -299,41 +299,95 @@ Rectangle {
                     }
                 }
             }
-            Row {
-                id: flareCards
-                width:parent.width
-                height:Math.max(0,parent.height-116)
-                spacing:6
-                Repeater {
-                    model:solarFocus.flares && solarFocus.flares.ready
-                        ? solarFocus.flares.events : []
-                    delegate: Rectangle {
-                        required property var modelData
-                        width:Math.max(1,(flareCards.width-12)/3)
-                        height:Math.max(1,flareCards.height)
-                        color:Colors.dark
-                        border.width:1
-                        border.color:solarFocus.flareInk(modelData.classLetter)
-                        Column {
-                            anchors.fill:parent
-                            anchors.margins:6
-                            spacing:5
-                            GohuText {
-                                text:modelData.classLabel
-                                font.pixelSize:17
-                                color:solarFocus.flareInk(modelData.classLetter)
-                            }
-                            QuietText {
-                                width:parent.width
-                                text:modelData.satellite
-                                font.pixelSize:9
-                                elide:Text.ElideRight
-                            }
-                            QuietText {
-                                width:parent.width
-                                text:modelData.peakUtc
-                                font.pixelSize:9
-                                wrapMode:Text.WordWrap
+            Column {
+                id: flareInspector
+                width: parent.width
+                height: Math.max(0,parent.height-128)
+                spacing: 4
+                Row {
+                    width: parent.width
+                    height: 23
+                    spacing: 5
+                    ActionButton {
+                        width: 59
+                        height: 22
+                        contentPadding: 1
+                        label: "PREV"
+                        labelPixelSize: 9
+                        available: solarFocus.flareCount > 1
+                        onClicked: solarFocus.flareIndex =
+                            (solarFocus.flareIndex-1+solarFocus.flareCount)
+                            % solarFocus.flareCount
+                    }
+                    ActionButton {
+                        width: 59
+                        height: 22
+                        contentPadding: 1
+                        label: "NEXT"
+                        labelPixelSize: 9
+                        available: solarFocus.flareCount > 1
+                        onClicked: solarFocus.flareIndex =
+                            (solarFocus.flareIndex+1)%solarFocus.flareCount
+                    }
+                    QuietText {
+                        height: 22
+                        width: Math.max(1,parent.width-205)
+                        text: solarFocus.flareCount
+                            ? "EVENT "+(solarFocus.flareIndex+1)+"/"+solarFocus.flareCount
+                            : "NO EVENT IN FEED"
+                        color: Colors.cyan
+                        font.pixelSize: 9
+                        verticalAlignment: Text.AlignVCenter
+                        elide: Text.ElideRight
+                    }
+                    ActionButton {
+                        width: 72
+                        height: 22
+                        contentPadding: 1
+                        label: solarFocus.flareDataPage === 0 ? "TIMES" : "DETAIL"
+                        labelPixelSize: 9
+                        selected: true
+                        accentColor: Colors.magenta
+                        available: solarFocus.flareCount > 0
+                        onClicked: solarFocus.flareDataPage =
+                            solarFocus.flareDataPage === 0 ? 1 : 0
+                    }
+                }
+                Grid {
+                    id: flareDataGrid
+                    width: parent.width
+                    height: Math.max(0,flareInspector.height-27)
+                    columns: 2
+                    spacing: 5
+                    Repeater {
+                        model: solarFocus.flareCount ? 4 : 0
+                        delegate: Rectangle {
+                            objectName: "cosmos-c6-flare-detail"
+                            required property int index
+                            readonly property var factData:
+                                solarFocus.flareFields[index]
+                            width: Math.max(1,(flareDataGrid.width-5)/2)
+                            height: Math.max(1,(flareDataGrid.height-5)/2)
+                            color: Colors.dark
+                            border.width: 1
+                            border.color: Colors.magenta
+                            Column {
+                                anchors.fill: parent
+                                anchors.margins: 5
+                                spacing: 3
+                                SecondaryText {
+                                    width: parent.width
+                                    text: factData ? factData.label : "--"
+                                    font.pixelSize: 9
+                                    elide: Text.ElideRight
+                                }
+                                GohuText {
+                                    width: parent.width
+                                    text: factData ? factData.value : "--"
+                                    color: Colors.white
+                                    font.pixelSize: 11
+                                    elide: Text.ElideRight
+                                }
                             }
                         }
                     }

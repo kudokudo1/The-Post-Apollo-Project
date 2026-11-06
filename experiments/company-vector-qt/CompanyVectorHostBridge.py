@@ -6,6 +6,7 @@ operator approval. M13's trusted_executable gate checks this entry point.
 """
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 from pathlib import Path
@@ -15,6 +16,9 @@ import sys
 
 SCHEMA = "post-apollo.company-vector-host-bridge.v1"
 EXPECTED_QT_VERSION = "6.11.2"  # Fedora 44 / M14 build checkpoint.
+BUNDLE_PARTS = ("postapollo-vector-lab", "qtlocation-runtime", "lib64", "libQt6Location.so.6")
+MANIFEST_PARTS = ("postapollo-vector-lab", "qtlocation-runtime", "lib64", "qtlocation-m16-manifest.json")
+BUNDLE_SCHEMA = "post-apollo.company.qtlocation-runtime.v1"
 LAB_FILES = (
     ("postapollo-vector-lab", "company-vector-build", "company-vector-probe"),
     ("postapollo-vector-lab", "maplibre-install", "lib64", "libQMapLibre.so.3.0.0"),
@@ -50,24 +54,24 @@ def owned_path(home: Path, parts: tuple[str, ...], executable: bool = False) -> 
 def runtime_environment(home: Path) -> dict[str, str]:
     prefix = home / "postapollo-vector-lab" / "maplibre-install"
     env = os.environ.copy()
+    bundle_dir = home.joinpath(*BUNDLE_PARTS[:-1])
     for variable, value in (
         ("LD_LIBRARY_PATH", prefix / "lib64"),
         ("QT_PLUGIN_PATH", prefix / "plugins"),
         ("QML_IMPORT_PATH", prefix / "qml"),
         ("QML2_IMPORT_PATH", prefix / "qml"),
     ):
-        # Do not inherit arbitrary Qt paths from the parent desktop session.
-        # Preserve only the verified MapLibre prefix; system Qt paths remain
-        # available through Qt's default plugin and loader search paths.
-        env[variable] = str(value)
+        # Never inherit arbitrary Qt paths from the parent desktop session.
+        env[variable] = (str(bundle_dir) + ":" + str(value)
+                         if variable == "LD_LIBRARY_PATH" else str(value))
     return env
 
 
 def _check_host_qt() -> bool:
-    """Conservative ABI gate: refuse rather than guess at host Qt compatibility."""
+    """Check actual host Qt modules; no assumption about -devel metadata."""
     if not Path("/usr/bin/pkg-config").is_file():
         return False
-    for module in ("Qt6Core", "Qt6Quick", "Qt6Location", "Qt6Positioning"):
+    for module in ("Qt6Core", "Qt6Quick"):
         try:
             result = subprocess.run(
                 ["/usr/bin/pkg-config", "--modversion", module],
@@ -77,8 +81,61 @@ def _check_host_qt() -> bool:
             return False
         if result.returncode != 0 or result.stdout.strip() != EXPECTED_QT_VERSION:
             return False
-    return True
+    positioning = Path("/usr/lib64/libQt6Positioning.so.6")
+    try:
+        return positioning.resolve(strict=True).name == (
+            "libQt6Positioning.so." + EXPECTED_QT_VERSION)
+    except (OSError, RuntimeError):
+        return False
 
+
+def _bundle_valid(home: Path) -> bool:
+    library = owned_path(home, BUNDLE_PARTS)
+    manifest = owned_path(home, MANIFEST_PARTS)
+    if not library or not manifest:
+        return False
+    try:
+        doc = json.loads(manifest.read_text())
+        if (set(doc) != {"schema", "version", "sha256"}
+                or doc["schema"] != BUNDLE_SCHEMA
+                or doc["version"] != EXPECTED_QT_VERSION):
+            return False
+        hasher = hashlib.sha256()
+        with library.open("rb") as stream:
+            if stream.read(4) != bytes.fromhex("7f454c46"):
+                return False
+            stream.seek(0)
+            for block in iter(lambda: stream.read(1 << 20), b""):
+                hasher.update(block)
+        return hasher.hexdigest() == doc["sha256"]
+    except (OSError, ValueError, TypeError):
+        return False
+
+
+def _dependencies_resolved(home: Path, env: dict[str, str]) -> bool:
+    """Require linked QtLocation to resolve inside the verified bundle."""
+    bundled = str(home.joinpath(*BUNDLE_PARTS))
+    checked = (
+        home.joinpath(*LAB_FILES[0]),
+        home.joinpath(*LAB_FILES[2]),
+        home.joinpath(*LAB_FILES[4]),
+        home.joinpath(*BUNDLE_PARTS),
+    )
+    for artifact in checked:
+        try:
+            result = subprocess.run(
+                ["/usr/bin/ldd", str(artifact)], env=env,
+                capture_output=True, text=True, timeout=4, check=False,
+            )
+        except (OSError, subprocess.TimeoutExpired):
+            return False
+        output = result.stdout + result.stderr
+        if result.returncode != 0 or "not found" in output:
+            return False
+        if "libQt6Location.so.6 =>" in output and (
+                "libQt6Location.so.6 => " + bundled + " ") not in output:
+            return False
+    return True
 
 def probe(home: Path | None = None) -> dict[str, str]:
     home = home if home is not None else Path.home()
@@ -93,15 +150,10 @@ def probe(home: Path | None = None) -> dict[str, str]:
             binary = path
     if not _check_host_qt():
         return {"schema": SCHEMA, "status": "HOST_QT_UNVERIFIED"}
+    if not _bundle_valid(home):
+        return {"schema": SCHEMA, "status": "QTLOCATION_BUNDLE_UNVERIFIED"}
     env = runtime_environment(home)
-    try:
-        result = subprocess.run(
-            ["/usr/bin/ldd", str(binary)], env=env,
-            capture_output=True, text=True, timeout=4, check=False,
-        )
-    except (OSError, subprocess.TimeoutExpired):
-        return {"schema": SCHEMA, "status": "HOST_RUNTIME_UNVERIFIED"}
-    if result.returncode != 0 or "not found" in (result.stdout + result.stderr):
+    if not _dependencies_resolved(home, env):
         return {"schema": SCHEMA, "status": "HOST_RUNTIME_UNVERIFIED"}
     return {"schema": SCHEMA, "status": "READY"}
 

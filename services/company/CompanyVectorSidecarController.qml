@@ -55,6 +55,8 @@ Item {
                 controller.status="LAUNCH FAILED";
             else if (result && result.status==="HOST_QT_UNVERIFIED")
                 controller.status="HOST QT UNVERIFIED";
+            else if (result && result.status==="QTLOCATION_BUNDLE_UNVERIFIED")
+                controller.status="QTLOCATION BUNDLE UNVERIFIED";
             else if (result && result.status==="HOST_RUNTIME_UNVERIFIED")
                 controller.status="HOST RUNTIME UNVERIFIED";
             else if (result && result.status==="REFUSED_IDENTITY")

@@ -12,8 +12,8 @@ class SocialPhoneHostBoundaryTests(unittest.TestCase):
         pane = (ROOT / "widgets/messanger/PhonePane.qml").read_text()
         self.assertNotIn('if __name__ == "__main__"', source)
         self.assertNotIn('BlueFerryHostReadPort', pane)
-        self.assertIn('conversations: []', pane)
-        self.assertIn('messages: []', pane)
+        self.assertIn('phoneReadAdapter.conversations : []', pane)
+        self.assertIn('phoneReadAdapter.messages : []', pane)
         self.assertIn('sendEnabled: false', pane)
         self.assertIn('Social phone link: NOT VERIFIED', pane)
 

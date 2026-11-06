@@ -1995,6 +1995,9 @@ PanelWindow {
 
         PhonePane {
             id: phonePane
+            // A local organization/identity selector never grants phone data.
+            // Clear the Personal pilot when the selected Social identity changes.
+            activeSocialIdentityId: String(appSelector.identitySnapshot.activeId || "")
             // The compositor owns the live Social rect. A move/resize
             // invalidates a previously aligned foot actor until reverified.
             stageHostX: messagingWindow.sharedPanelX

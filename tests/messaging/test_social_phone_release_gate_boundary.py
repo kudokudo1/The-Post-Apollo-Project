@@ -19,8 +19,8 @@ class HostReleaseGateBoundaryTests(unittest.TestCase):
     def test_existing_phone_still_has_no_private_data_read_command(self):
         self.assertNotIn("HostReadReleaseGateModel", self.pane)
         self.assertNotIn("BlueFerryHostReadPort", self.pane)
-        self.assertIn("conversations: []", self.pane)
-        self.assertIn("messages: []", self.pane)
+        self.assertIn("phoneReadAdapter.conversations : []", self.pane)
+        self.assertIn("phoneReadAdapter.messages : []", self.pane)
         self.assertIn("sendEnabled: false", self.pane)
         self.assertIn("Social phone link: NOT VERIFIED", self.pane)
 

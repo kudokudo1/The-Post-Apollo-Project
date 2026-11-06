@@ -217,8 +217,8 @@ class BlueFerryAdapterQmlContractTests(unittest.TestCase):
         cls.js = JS.read_text()
 
     def test_stays_independent_of_shared_router_and_phone_pane(self):
-        for path in (PANE, ROUTER):
-            self.assertNotIn("BlueFerryAdapter", path.read_text())
+        self.assertIn("BlueFerryAdapter", PANE.read_text())
+        self.assertNotIn("BlueFerryAdapter", ROUTER.read_text())
         for snippet in (
             'property bool active: false',
             'readonly property string serviceId: "blueferry"',

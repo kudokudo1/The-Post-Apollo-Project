@@ -9,6 +9,7 @@ hints for an operator. It is NOT mounted in Quickshell or usable on real tasks.
 from __future__ import annotations
 
 import argparse
+from contextlib import closing
 import fcntl
 import hashlib
 import importlib.util
@@ -72,7 +73,7 @@ def strict_file(path):
 
 def inspect(db: Path):
     """No constructor accepting a caller assertion of native/auth ownership."""
-    if (type(db) is not Path or not db.is_absolute()
+    if (not isinstance(db, Path) or not db.is_absolute()
             or db.name != "handoff-test.db"
             or db.parent.name != "m11e-fileview-test"):
         return report("REFUSED_NOT_DISPOSABLE_M12H_PATH")
@@ -101,7 +102,7 @@ def inspect(db: Path):
             # SQLite ro/query_only perform no explicit application updates.
             # WAL mode may still manage transient -shm state internally.
             uri = "file:" + quote(str(db), safe="/") + "?mode=ro"
-            with sqlite3.connect(uri, uri=True, timeout=0.2) as con:
+            with closing(sqlite3.connect(uri, uri=True, timeout=0.2)) as con:
                 con.row_factory = sqlite3.Row
                 con.execute("PRAGMA query_only=ON")
                 con.execute("PRAGMA trusted_schema=OFF")

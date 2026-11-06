@@ -361,10 +361,13 @@ Item {
                     readonly property bool isMarkedErr:
                         modelData.errMarked === true
                     width: angelHistoryList.width
-                    height: 41
+                    // Two compact lines preserve pattern information while
+                    // making the recorded calendar date easy to scan.
+                    height: 47
                     label: (isMarkedErr ? "ERR* // " : "")
                            + modelData.digits + " // "
                            + AngelPolicy.patternTags(modelData.digits).join("+")
+                           + "\nDATE // " + AngelPolicy.observedDate(modelData)
                            + " // " + modelData.displayTime
                     labelPixelSize: 10
                     labelHorizontalAlignment: Text.AlignLeft
@@ -441,7 +444,10 @@ Item {
                 color: Colors.white
                 elide: Text.ElideMiddle
                 text: pane.selectedObservation
-                      ? pane.selectedObservation.zoneId + " // "
+                      ? "DATE // "
+                        + AngelPolicy.observedDate(pane.selectedObservation)
+                        + " // " + pane.selectedObservation.zoneId
+                        + " // UTC "
                         + new Date(pane.selectedObservation.observedAtMs)
                               .toISOString()
                       : "SELECT HISTORY ROW FOR DETAIL"

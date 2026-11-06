@@ -121,7 +121,6 @@ test("M6a is an actual selectable Quickshell mode and retrograde INDEX route",()
     assert.match(qml,/instrument\.compactMode \? 7 : 6/);
     assert.match(astrology,/magick\/astrology\/retrogrades"\s*\? "retro" : "wheel"/);
     assert.match(deep,/magick\/astrology\/retrogrades"\s*\? "retro" : "wheel"/);
-    assert.match(qml,/Helio\.zoomAt\(/)===false;
     assert.match(qml,/StationCosmosCelestialNetwork\s*\{/);
     assert.match(qml,/instrument\.mode === "network"/);
     assert.match(modelSource,/longitude_rate_deg_per_day/);

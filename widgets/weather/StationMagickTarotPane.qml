@@ -1,4 +1,5 @@
 import QtQuick
+import QtQuick.Dialogs
 import "../../components"
 import "StationMagickTarotDeckPolicy.js" as Deck
 import "StationMagickTarotPhysicalPolicy.js" as Physical
@@ -11,6 +12,17 @@ Rectangle {
     id: tarot
     color: Colors.black
     clip: true
+
+    // M6j // Explicit private-local folder picker. No copying, uploading,
+    // scanning or runtime path persistence; the user must provide the images.
+    FolderDialog {
+        id: tarotArtworkPicker
+        title: "Choose your private Wild Unknown card images folder"
+        onAccepted: {
+            const folder=Deck.localFolderPath(selectedFolder);
+            if(folder!=="")artworkFolderInput.text=folder;
+        }
+    }
 
     property string viewMode: "draw"
     property string spreadId: "three"
@@ -211,7 +223,7 @@ Rectangle {
                 text: "LOCAL ART DIR"
             }
             Rectangle {
-                width: Math.max(60,parent.width-97)
+                width: Math.max(60,parent.width-166)
                 height: 26
                 color: Colors.dark
                 border.width: 1
@@ -239,9 +251,17 @@ Rectangle {
                     visible: artworkFolderInput.text.length===0
                     color: Colors.cyan
                     font.pixelSize: 9
-                    text: "OPTIONAL ABSOLUTE LOCAL FOLDER / NO UPLOAD"
+                    text: "CHOOSE FOLDER OR ENTER ABSOLUTE PATH"
                     elide: Text.ElideRight
                 }
+            }
+            ActionButton {
+                width: 64
+                height: 26
+                label: "BROWSE"
+                labelPixelSize: 9
+                accentColor: Colors.cyan
+                onClicked: tarotArtworkPicker.open()
             }
         }
 
@@ -614,7 +634,9 @@ Rectangle {
             color: Colors.yellow
             font.pixelSize: 9
             elide: Text.ElideRight
-            text: "LOCAL FILES: major-the-fool.png / wands-daughter.png / ... "
+            text: tarot.localArtworkDirectory===""
+                ? "NO CARD IMAGES // BROWSE YOUR PRIVATE ART FOLDER"
+                : "LOCAL ART // major-the-fool.png / wands-daughter.jpg / ..."
         }
         QuietText {
             width: parent.width
@@ -683,7 +705,17 @@ Rectangle {
                     height: 26
                     label: "CLOSE"
                     labelPixelSize: 9
-                    accentColor: Colors.magenta
+                    // M6j // Large inspector close is visibly red, not just
+                    // a magenta text accent on a dark background.
+                    accentColor: Colors.red
+                    idleFillColor: Colors.red
+                    hoverFillColor: Colors.red
+                    pressedFillColor: Colors.red
+                    idleForegroundColor: Colors.black
+                    hoverForegroundColor: Colors.black
+                    pressedForegroundColor: Colors.black
+                    idleBorderColor: Colors.red
+                    hoverBorderColor: Colors.red
                     onClicked: tarot.inspectedDrawIndex=-1
                 }
             }
@@ -726,7 +758,9 @@ Rectangle {
                 font.pixelSize: 9
                 horizontalAlignment: Text.AlignHCenter
                 elide: Text.ElideRight
-                text: "ESCAPE VIA CLOSE // ORIGINAL OR USER-LOCAL ART ONLY"
+                text: tarot.localArtworkDirectory===""
+                    ? "NO WILD UNKNOWN ART INSTALLED // BROWSE A PRIVATE FOLDER"
+                    : "CLOSE RETURNS TO SPREAD // ART LOADS FROM YOUR FOLDER"
             }
         }
     }

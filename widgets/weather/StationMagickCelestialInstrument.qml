@@ -4,6 +4,7 @@ import "../../components"
 import "StationMagickCelestialVisualPolicy.js" as Celestial
 import "StationMagickZodiacVectorPolicy.js" as ZodiacVector
 import "StationMagickRetrogradeLanePolicy.js" as Retrograde
+import "StationMagickAspectMatrixPolicy.js" as Matrix
 
 // M5 // Standalone, source-fed celestial instrument. No self-owned provider,
 // ephemeris download, timer, location lookup, journal, or page navigation.
@@ -20,6 +21,7 @@ Rectangle {
     // M4 production JSON; a missing or unverified payload stays unavailable.
     property var visualData: null
     property string mode: "wheel"
+    property string aspectPresentation: "curve" // M6b secondary ASPECTS view
     // V4g // Compact NETWORK retains CHORDS/DEPTH across visits to HELIO.
     property string networkMode: "chords"
     // M30-C: same verified visual renderer, but hide only the detailed
@@ -53,6 +55,8 @@ Rectangle {
     readonly property var graphModel: Celestial.model(visualData)
     readonly property var viewWindow: Celestial.windowFor(
         graphModel,zoom,panPosition)
+    readonly property var aspectMatrix: Matrix.build(graphModel,visualData,
+        viewWindow,focusIndex,48)
     // The thumb and inspector always refer to a sample in the current
     // zoom/pan window, even when an earlier lock has moved off screen.
     readonly property int focusIndex: graphModel.ready
@@ -76,6 +80,7 @@ Rectangle {
         eventTimelineCanvas.requestPaint();
     }
     onGraphModelChanged: graphCanvas.requestPaint()
+    onAspectPresentationChanged: graphCanvas.requestPaint()
     onFocusIndexChanged: {
         graphCanvas.requestPaint();
         eventTimelineCanvas.requestPaint();

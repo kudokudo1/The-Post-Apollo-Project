@@ -1,0 +1,29 @@
+name: MAGICK M7c calendar wheel zoom and pan
+
+on:
+  pull_request:
+    paths:
+      - 'widgets/weather/StationMagickAnnualCalendarPane.qml'
+      - 'widgets/weather/StationMagickWheelViewportPolicy.js'
+      - 'tests/weather/test_magick_calendar_viewport_m7c.js'
+      - '.github/workflows/weather-magick-m7c-viewport.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  viewport:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Verify interactive zoom, pan, inverse picking and full canvas
+        run: node --test tests/weather/test_magick_calendar_viewport_m7c.js
+      - name: Preserve annual MAGICK Moon/Sun source and navigation contracts
+        run: |
+          node --test tests/weather/test_magick_annual_wheels_m7b.js
+          node --test tests/weather/test_magick_five_track_foundations_m7a.js

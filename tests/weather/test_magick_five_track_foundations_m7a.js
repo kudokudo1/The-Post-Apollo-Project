@@ -137,13 +137,13 @@ test("M7a new routes, chart controls and privacy ownership are wired without new
  const lunar=read("widgets/weather/StationMagickLunarSolarPane.qml");
  const astro=read("widgets/weather/StationMagickAstrologyPane.qml");
  const sources=[
- "widgets/weather/StationMagickForecastCalendarPane.qml",
+ "widgets/weather/StationMagickAnnualCalendarPane.qml",
  "widgets/weather/StationMagickTimingAtlasPane.qml",
  "widgets/weather/StationMagickEventChartSetupPane.qml",
  "widgets/weather/StationMagickSymbolismPane.qml",
  "widgets/weather/StationMagickJournalDraftPane.qml"];
  const uis=sources.map(read);
- assert.match(lunar,/StationMagickForecastCalendarPane\s*\{/);
+ assert.match(lunar,/StationMagickAnnualCalendarPane\s*\{/);
  assert.match(lunar,/weatherService: lunarSolarPane\.weatherService/);
  assert.match(astro,/label: "EVENT SETUP"/);
  assert.match(astro,/StationMagickEventChartSetupPane\s*\{/);

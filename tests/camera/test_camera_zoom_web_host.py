@@ -133,37 +133,33 @@ class ZoomWebHostTests(unittest.TestCase):
         # A verified browser has no overlapping QML fallback controls.
         self.assertIn('visible: camera.activeView === "zoom" && !camera.zoomWebDocked', QML)
 
-    def test_requested_actor_is_smaller_and_higher_than_camera_viewport(self):
-        # A calibrated *physical Sway browser* rectangle, not another QML
-        # viewport resize or browser CSS zoom. The same actor rectangle is
-        # used by the launcher, follower, mask and opaque frame chrome.
-        self.assertIn('readonly property int zoomActorRise: 14', QML)
-        self.assertIn('readonly property int zoomActorWidthTrim: 16', QML)
-        self.assertIn('readonly property int zoomActorHeightTrim: 28', QML)
-        self.assertIn('zoomBayInset + Math.floor(zoomActorWidthTrim / 2)', QML)
-        self.assertIn('zoomActorTop: Math.max(0, zoomBayTop - zoomActorRise)', QML)
-        self.assertIn('zoomActorWidth: Math.max(0, zoomBayWidth - zoomActorWidthTrim)', QML)
-        self.assertIn('zoomActorHeight: Math.max(0, zoomBayHeight - zoomActorHeightTrim)', QML)
-        self.assertIn('camera.frameTopInset + zoomActorTop', QML)
-        self.assertIn('camera.margins.left + camera.glowGutter + zoomActorLeft', QML)
-        self.assertIn('"--width", String(zoomActorWidth), "--height", String(zoomActorHeight)', QML)
-        self.assertIn('width: zoomActorWidth, height: zoomActorHeight', QML)
-        self.assertIn('x: camera.zoomActorLeft', QML)
-        self.assertIn('y: camera.zoomActorTop', QML)
-        self.assertIn('width: camera.zoomWebDocked ? camera.zoomActorWidth : 0', QML)
-        self.assertIn('height: camera.zoomWebDocked ? camera.zoomActorHeight : 0', QML)
-        self.assertIn('y: camera.zoomActorTop + camera.zoomActorHeight', QML)
-        # All three sizes keep the same offset relative to Camera's viewport.
-        for bay_left, bay_top, width, height in (
-                (18,131,734,542),(18,131,1080,660),(18,131,2000,950)):
-            actor_left = bay_left + 8
-            actor_top = max(0,bay_top - 14)
-            actor_width = width - 16
-            actor_height = height - 28
-            self.assertGreater(actor_left,bay_left)
-            self.assertLess(actor_top,bay_top)
-            self.assertLess(actor_width,width)
-            self.assertLess(actor_height,height)
+    def test_actor_matches_camera_viewport_without_old_arbitrary_trims(self):
+        # Operator Sway measurement: actual Zoom 92,126 718x514 exactly
+        # reflected 8px horizontal, 14px rise and 16x28 size trims.
+        # The new physical browser rectangle MUST match the viewport.
+        self.assertNotIn('zoomActorRise: 14', QML)
+        self.assertNotIn('zoomActorWidthTrim: 16', QML)
+        self.assertNotIn('zoomActorHeightTrim: 28', QML)
+        for expr in (
+            'readonly property int zoomActorLeft: zoomBayInset',
+            'readonly property int zoomActorTop: zoomBayTop',
+            'readonly property int zoomActorWidth: zoomBayWidth',
+            'readonly property int zoomActorHeight: zoomBayHeight',
+            'camera.frameTopInset + zoomActorTop',
+            'camera.margins.left + camera.glowGutter + zoomActorLeft',
+            '"--width", String(zoomActorWidth), "--height", String(zoomActorHeight)',
+            'width: zoomActorWidth, height: zoomActorHeight',
+            'x: camera.zoomActorLeft',
+            'y: camera.zoomActorTop',
+            'width: camera.zoomWebDocked ? camera.zoomActorWidth : 0',
+            'height: camera.zoomWebDocked ? camera.zoomActorHeight : 0'
+        ):
+            self.assertIn(expr, QML)
+        # Current code/measurement arithmetic, not a new Sway offset.
+        x, y, width, height = 92, 126, 718, 514
+        self.assertEqual((x - 8, y + 14, width + 16, height + 28),
+                         (84, 140, 734, 542))
+        self.assertNotIn('WORKAREA_Y', QML)
 
     def test_rapid_resize_keeps_clickthrough_closed_until_new_alignment(self):
         self.assertIn('function scheduleZoomWebRealign()', QML)

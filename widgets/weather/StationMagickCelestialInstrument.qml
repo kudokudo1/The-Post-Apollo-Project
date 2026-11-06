@@ -799,7 +799,39 @@ Rectangle {
                     if(instrument.mode==="wheel")instrument.paintWheel(ctx);
                     else if(instrument.mode==="relations")instrument.paintRelations(ctx);
                     else if(instrument.mode==="retro")instrument.paintRetrograde(ctx);
+                    else if(instrument.mode==="aspects"
+                            && instrument.aspectPresentation==="matrix")
+                        instrument.paintAspectMatrix(ctx);
                     else instrument.paintChart(ctx);
+                }
+            }
+
+            // M6b // Second-level ASPECTS selection, not an eighth main tab.
+            Row {
+                id: aspectViewControls
+                anchors.top: parent.top
+                anchors.right: parent.right
+                anchors.topMargin: 3
+                anchors.rightMargin: 4
+                spacing: 3
+                visible: instrument.mode==="aspects"
+                z: 4
+                Repeater {
+                    model: [
+                        {id:"curve",label:"CURVE"},
+                        {id:"matrix",label:"MATRIX"}
+                    ]
+                    delegate: ActionButton {
+                        required property var modelData
+                        width: 58
+                        height: 20
+                        label: modelData.label
+                        labelPixelSize: 8
+                        contentPadding: 1
+                        selected: instrument.aspectPresentation===modelData.id
+                        accentColor: selected ? Colors.magenta : Colors.cyan
+                        onClicked: instrument.aspectPresentation=modelData.id
+                    }
                 }
             }
 

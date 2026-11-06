@@ -6,6 +6,7 @@ on:
       - 'widgets/weather/StationMagickTarotPane.qml'
       - 'widgets/weather/StationMagickTarotDeckPolicy.js'
       - 'tests/weather/test_magick_tarot_art_folder_picker_m6k.js'
+      - 'tests/weather/test_magick_wild_unknown_tarot_m6g.js'
       - 'docs/weather-magick-m6k-tarot-folder-picker-handoff.md'
       - '.github/workflows/weather-magick-tarot-folder-picker-m6k.yml'
   push:
@@ -14,6 +15,7 @@ on:
       - 'widgets/weather/StationMagickTarotPane.qml'
       - 'widgets/weather/StationMagickTarotDeckPolicy.js'
       - 'tests/weather/test_magick_tarot_art_folder_picker_m6k.js'
+      - 'tests/weather/test_magick_wild_unknown_tarot_m6g.js'
       - '.github/workflows/weather-magick-tarot-folder-picker-m6k.yml'
 
 permissions:

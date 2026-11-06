@@ -56,7 +56,7 @@ add_file "$wheel" "dbus_next.whl"
 add_file "$RUNNER_TEMP/c2r-policy/postapollo_connections.pp" "postapollo_connections.pp"
 cat >> "$tmp/user-data" <<'EOF'
 runcmd:
-  - ["/usr/bin/bash", "-lc", "/usr/bin/bash /root/c2q/guest_status_smoke.sh >/dev/ttyS0 2>&1; rc=$?; if [ $rc -eq 0 ]; then echo C2R_VM_PASS >/dev/ttyS0; else echo C2R_VM_FAIL >/dev/ttyS0; fi; exit $rc"]
+  - ["/usr/bin/bash", "-lc", "/usr/bin/bash /root/c2q/guest_status_smoke.sh >/dev/ttyS0 2>&1; rc=$?; echo C2R_VM_GUEST_SCRIPT_EXIT_CODE=$rc >/dev/ttyS0; if [ $rc -eq 0 ]; then echo C2R_VM_PASS >/dev/ttyS0; else echo C2R_VM_FAIL >/dev/ttyS0; fi; exit $rc"]
 EOF
 printf '%s\n' 'instance-id: c2r-ci-disposable-20261106' \
   'local-hostname: c2r-fedora-test' > "$tmp/meta-data"

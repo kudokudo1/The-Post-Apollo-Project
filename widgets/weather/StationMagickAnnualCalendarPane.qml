@@ -2,6 +2,7 @@ import QtQuick
 import "../../components"
 import "../../services/weather" as WeatherServices
 import "StationMagickAnnualAtlasPolicy.js" as Atlas
+import "StationMagickWheelViewportPolicy.js" as Viewport
 
 // M7b // Interactive radial representations of explicit JPL year data.
 // The year wheel compresses daily illumination into 365/366 tick marks;
@@ -23,43 +24,31 @@ Rectangle {
     property string selectedSolar: ""
     // M7c // A true inspectable viewport. FIT is 1.0; the opening 1.6x
     // magnification makes the dense annual dial visible in the compact shell.
-    property real wheelZoom: 1.6
+    property real wheelZoom: Viewport.DEFAULT_ZOOM
     property real panX: 0
     property real panY: 0
     property bool focusMode: false
     property bool zoneEditorOpen: false
-    readonly property real fitRadius:
-        Math.max(5, Math.min(wheel.width-8, wheel.height-8)*0.47)
-    readonly property real minZoom: 1.0
-    readonly property real maxZoom: 8.0
+    readonly property real fitRadius: Viewport.fitRadius(wheel.width,wheel.height)
+    readonly property real minZoom: Viewport.MIN_ZOOM
+    readonly property real maxZoom: Viewport.MAX_ZOOM
 
-    function clamp(value,low,high){return Math.max(low,Math.min(high,value));}
     function clampPan(){
-        const limit=Math.max(0,fitRadius*(wheelZoom-1)+8);
-        panX=clamp(panX,-limit,limit);
-        panY=clamp(panY,-limit,limit);
+        const p=Viewport.boundedPan(panX,panY,fitRadius,wheelZoom);
+        panX=p.x;panY=p.y;
     }
     function panBy(dx,dy){
         if(!isFinite(dx)||!isFinite(dy))return;
-        panX+=dx;
-        panY+=dy;
-        clampPan();
+        panX+=dx;panY+=dy;clampPan();
     }
     function zoomAt(factor,x,y){
-        if(!isFinite(factor)||factor<=0)return;
-        const next=clamp(wheelZoom*factor,minZoom,maxZoom);
-        if(next===wheelZoom)return;
-        // Keep the point under the cursor stationary as the scale changes.
-        const pointerX=isFinite(x)?x:wheel.width/2;
-        const pointerY=isFinite(y)?y:wheel.height/2;
-        const ratio=next/wheelZoom;
-        panX=(pointerX-wheel.width/2)*(1-ratio)+panX*ratio;
-        panY=(pointerY-wheel.height/2)*(1-ratio)+panY*ratio;
-        wheelZoom=next;
-        clampPan();
+        const next=Viewport.zoomAt(wheelZoom,panX,panY,factor,
+                                   x,y,wheel.width,wheel.height,fitRadius);
+        if(!next)return;
+        wheelZoom=next.zoom;panX=next.panX;panY=next.panY;
     }
     function fitWheel(){wheelZoom=1;panX=0;panY=0;}
-    function resetView(){wheelZoom=1.6;panX=0;panY=0;}
+    function resetView(){wheelZoom=Viewport.DEFAULT_ZOOM;panX=0;panY=0;}
     readonly property var model: annualSource.atlas
     readonly property var focusedDay:
         Atlas.selectedDay(model,selectedIndex)
@@ -503,10 +492,11 @@ Rectangle {
                 if(!model.ready)return;
                 // Inverse of painter translate + scale for correct wheel hits
                 // after zoom/pan. The angle always maps to true dated entries.
-                const dx=(mouse.x-wheel.width/2-annualPane.panX)
-                         /annualPane.wheelZoom;
-                const dy=(mouse.y-wheel.height/2-annualPane.panY)
-                         /annualPane.wheelZoom;
+                const pos=Viewport.inversePoint(mouse.x,mouse.y,
+                    wheel.width,wheel.height,annualPane.panX,
+                    annualPane.panY,annualPane.wheelZoom);
+                if(!pos)return;
+                const dx=pos.x,dy=pos.y;
                 const r=annualPane.fitRadius;
                 const dist=Math.hypot(dx,dy);
                 if(dist>r||dist<r*0.24)return;

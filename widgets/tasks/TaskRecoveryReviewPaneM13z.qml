@@ -1,6 +1,7 @@
 import QtQuick
 import "../../components"
 import "TaskRecoveryReviewPolicyM13z.js" as ReviewPolicy
+import "TaskLiveNativeSavePolicyM14a.js" as NativeSavePolicy
 
 // TASKS M13z // operator-visible, read-only source-review EXAMPLES.
 // The real M13y inspector is test-only and no live journal provider exists.
@@ -12,6 +13,10 @@ Column {
     spacing: 8
 
     readonly property bool liveSourceInspectionConnected: false
+    // M14a // Metadata from the real existing FileView lifecycle only.
+    // It is not an independent source readback or a trusted save receipt.
+    property var nativeSaveSignals: null
+    readonly property var nativeSaveReport: NativeSavePolicy.view(nativeSaveSignals)
     property string selectedExample: "baseline"
     readonly property var liveReview: ReviewPolicy.current()
     readonly property var exampleReview: ReviewPolicy.example(selectedExample)
@@ -46,6 +51,72 @@ Column {
               + "would be presented after independent verification."
         color: Colors.white
         font.pixelSize: 10
+        wrapMode: Text.WordWrap
+    }
+
+    Rectangle {
+        width: parent.width
+        height: nativeSignalBody.implicitHeight + 18
+        color: Colors.dark
+        border.width: 1
+        border.color: Colors.cyan
+        radius: 3
+
+        Column {
+            id: nativeSignalBody
+            x: 9
+            y: 9
+            width: parent.width - 18
+            spacing: 7
+
+            GohuText {
+                width: parent.width
+                text: "LIVE // NATIVE SAVE SIGNAL"
+                font.pixelSize: 10
+                font.bold: true
+                color: Colors.magenta
+            }
+
+            GohuText {
+                width: parent.width
+                text: review.nativeSaveReport.status
+                font.pixelSize: 10
+                color: Colors.yellow
+                wrapMode: Text.WordWrap
+            }
+
+            GohuText {
+                width: parent.width
+                text: review.nativeSaveReport.sourceStatus
+                font.pixelSize: 9
+                color: Colors.cyan
+                wrapMode: Text.WordWrap
+            }
+
+            GohuText {
+                width: parent.width
+                text: review.nativeSaveReport.explanation
+                font.pixelSize: 9
+                color: Colors.white
+                wrapMode: Text.WordWrap
+            }
+
+            GohuText {
+                width: parent.width
+                text: review.nativeSaveReport.proof
+                font.pixelSize: 9
+                color: Colors.orange
+                wrapMode: Text.WordWrap
+            }
+        }
+    }
+
+    GohuText {
+        width: parent.width
+        text: "POST-CRASH SCENARIOS // EXAMPLES ONLY"
+        color: Colors.magenta
+        font.pixelSize: 10
+        font.bold: true
         wrapMode: Text.WordWrap
     }
 

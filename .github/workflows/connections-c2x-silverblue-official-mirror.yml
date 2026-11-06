@@ -54,6 +54,11 @@ jobs:
           assert 'C2V_INSTALL_COMMAND_BEGIN' in guest
           assert 'C2V_GUEST_PROBE_READY' in guest
           assert 'C2V_GUEST_PROBE_TICK' in guest
+          assert 'C2V_PROBE_UNIT_STATE_BEGIN' in guest
+          assert 'C2V_PROBE_CGROUP_ABSENT' in guest
+          assert 'C2V_PROBE_OSTREE_ADMIN_STATUS_BEGIN' in guest
+          assert 'ostree admin status --json' in guest
+          assert 'timeout --signal=TERM --kill-after=2s 6s' in guest
           assert 'C2V_INSTALL_WORKER_STARTED_IN_SEPARATE_CGROUP' in guest
           assert 'C2V_MONITOR_STARTED_IN_SEPARATE_CGROUP' in guest
           assert 'C2V_MONITOR_HANDOFF_COMPLETE' in guest

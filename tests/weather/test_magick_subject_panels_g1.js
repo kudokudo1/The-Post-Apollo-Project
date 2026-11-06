@@ -101,7 +101,8 @@ test("all interpretive-only routes explicitly refuse invented live output", () =
   }
   assert.match(magick.noteFor("magick/astrology/retrogrades"),/TIME SERIES/);
   assert.match(magick.noteFor("magick/astrology/charts"),/NOTHING|NONE OF WHICH/);
-  assert.match(magick.noteFor("magick/planetary/hours"),/NO TRADITIONAL PLANETARY-HOUR/);
+  assert.match(magick.noteFor("magick/planetary/hours"),/CHALDEAN-ORDER PLANETARY HOURS/);
+  assert.match(magick.noteFor("magick/planetary/hours"),/DST-TRANSITION ELAPSED DURATIONS ARE UNVERIFIED/);
   assert.match(magick.noteFor("magick/lunar-solar/calendar"),/NO PLANNER/);
   assert.match(magick.noteFor("magick/grimoire/journal"),/NEVER WRITES/);
 });

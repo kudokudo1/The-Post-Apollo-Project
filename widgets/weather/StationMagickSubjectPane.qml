@@ -25,8 +25,11 @@ Rectangle {
     // M6f // Existing GRIMOIRE reference route gets a source-only atlas.
     readonly property bool grimoireAtlasRoute:
         subjectRoute === "magick/grimoire/references"
+    // M6g // Local symbolic draw; no astronomy or journal service.
+    readonly property bool tarotRoute:
+        subjectRoute === "magick/divination/tarot"
     readonly property bool independentScreen:
-        standaloneAstrology || lensesLanding
+        standaloneAstrology || lensesLanding || tarotRoute
     // Supplied by the existing Station root; no independent clock.
     property real runtimeNowMs: 0
 
@@ -113,6 +116,8 @@ Rectangle {
                              ? planetaryHoursReference
                              : magickPane.grimoireAtlasRoute
                              ? grimoireAtlasReference
+                             : magickPane.tarotRoute
+                             ? tarotReference
                              : magickPane.showCelestial
                              ? celestialReference
                              : magickPane.subjectRoute.indexOf("magick/lunar-solar/") === 0
@@ -163,6 +168,12 @@ Rectangle {
         id: grimoireAtlasReference
         StationMagickGrimoireAtlasPane {
         }
+    }
+
+    // M6g // Route-local symbolic 78-card deck; no file write or provider.
+    Component {
+        id: tarotReference
+        StationMagickTarotPane {}
     }
 
     // M5b // The visual host is an on-demand consumer of the SAME

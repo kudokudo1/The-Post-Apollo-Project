@@ -689,7 +689,7 @@ Rectangle {
             }
             Item {
                 width: parent.width
-                height: Math.max(148,tarot.height-116)
+                height: Math.max(148,tarot.height-118)
                 StationMagickTarotCard {
                     anchors.centerIn: parent
                     width: tarot.inspectMetrics

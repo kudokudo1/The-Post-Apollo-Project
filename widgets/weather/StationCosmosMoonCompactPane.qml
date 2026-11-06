@@ -175,6 +175,7 @@ Rectangle {
 
         QuietText {
             id: sourceNote
+            objectName: "cosmos-c8-moon-source-note"
             anchors.left: parent.left
             anchors.right: parent.right
             anchors.bottom: parent.bottom

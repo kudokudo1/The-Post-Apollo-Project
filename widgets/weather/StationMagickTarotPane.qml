@@ -621,7 +621,10 @@ Rectangle {
             color: Colors.yellow
             font.pixelSize: 9
             elide: Text.ElideRight
-            text: "ART FILENAMES: major-the-fool.png / wands-daughter.jpg"
+            // Show an exact image filename for the currently inspected ID.
+            text: tarot.viewMode==="catalog" && tarot.inspectedCard
+                ? "IMAGE FILE // "+tarot.inspectedCard.id+".png / .jpg / .webp"
+                : "IMAGE EXAMPLE // major-the-fool.png / wands-daughter.jpg"
         }
         QuietText {
             width: parent.width
@@ -739,7 +742,10 @@ Rectangle {
                 font.pixelSize: 9
                 horizontalAlignment: Text.AlignHCenter
                 elide: Text.ElideRight
-                text: focusedCardFace.artworkStatus+" // CLOSE TO RETURN"
+                text: tarot.inspectedDrawCard
+                    ? tarot.inspectedDrawCard.id+".png // "+
+                      focusedCardFace.artworkStatus
+                    : "NO CARD IMAGE // CLOSE TO RETURN"
             }
         }
     }

@@ -1,0 +1,117 @@
+name: Connections C2x Silverblue OSTree recovery via official Ubuntu apt
+
+on:
+  pull_request:
+    paths:
+      - "tests/connections/c2v_silverblue/**"
+      - ".github/workflows/connections-c2x-silverblue-official-mirror.yml"
+      - "docs/connections-c2x-runner-mirror-recovery.md"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  silverblue-ostree-c2x:
+    if: github.actor == 'kudokudo1' && (github.event_name == 'workflow_dispatch' || github.event.pull_request.head.repo.full_name == github.repository)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 52
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Preflight supported KVM, disk, and installation boundary
+        shell: bash
+        run: |
+          set -euo pipefail
+          [ -c /dev/kvm ] || { echo "C2V_BLOCKED // NO_HOST_KVM"; exit 2; }
+          sudo chmod a+rw /dev/kvm
+          [ -r /dev/kvm ] && [ -w /dev/kvm ] || exit 2
+          avail="$(df -B1 --output=avail / | tail -n 1)"
+          [ "$avail" -ge 12000000000 ] || { echo "C2V_BLOCKED // EPHEMERAL_RUNNER_DISK_TOO_SMALL"; exit 2; }
+          echo "C2V_PASS // KVM_AND_SPARE_GUEST_DISK_AVAILABLE"
+      - name: Verify no dangerous desktop, credential or production policy changes
+        shell: bash
+        run: |
+          set -euo pipefail
+          bash -n tests/connections/c2v_silverblue/boot_official_silverblue.sh
+          bash -n tests/connections/c2v_silverblue/guest_ostree_reboot_cycle.sh
+          python3 - <<'PY'
+          from pathlib import Path
+          host=Path('tests/connections/c2v_silverblue/boot_official_silverblue.sh').read_text()
+          guest=Path('tests/connections/c2v_silverblue/guest_ostree_reboot_cycle.sh').read_text()
+          assert 'Fedora-Silverblue-ostree-x86_64-44-1.7.iso' in host
+          assert '9ccec9b075a0a4358a7209b2667156aaeeec3a6a3c8d71cada45b57fca9b4682' in host
+          assert '-nic none' in host
+          assert 'rpm-ostree install' in guest and 'rpm-ostree rollback' in guest
+          assert 'REAL_SILVERBLUE_BOOTED_ROLLBACK_REMOVED_LAYER' in guest
+          assert 'REAL_SILVERBLUE_FIRST_BOOT_BASELINE' in guest
+          assert 'LAYER_ACTIVE_ONLY_AFTER_REAL_REBOOT' in guest
+          assert 'C2V_INSTALL_WATCHDOG' in guest
+          assert 'timeout --signal=TERM --kill-after=20s 480s' in guest
+          # Verify the volume in QEMU equals the label mounted inside guest.
+          volume_lines = [line for line in host.splitlines() if '-volid C2' in line]
+          label_lines = [line for line in guest.splitlines() if line.strip().startswith('media_label=C2')]
+          assert len(volume_lines) == 1 and len(label_lines) == 1
+          volume = volume_lines[0].split('-volid ', 1)[1].split()[0]
+          guest_label = label_lines[0].split('=', 1)[1].strip()
+          assert volume == guest_label, f'CI volume mismatch: {volume} vs {guest_label}'
+          print('C2V_PASS // OFFLINE_MEDIA_LABELS_MATCH')
+          assert 'unconfined' not in guest.lower()
+          for path in ('services/connections/ConnectionsBroker.qml', 'services/connections/ConnectionsRequestStatus.qml'):
+              data=Path(path).read_text()
+              expected='credentialActionsEnabled: false' if 'Broker' in path else 'hostAuthenticated: false'
+              assert expected in data, path
+          print('C2V_PASS // EXPLICIT_SILVERBLUE_REBOOT_REQUIRED_AND_HOST_DENY_ONLY')
+          PY
+      - name: Build signed inert RPM fixture only inside disposable Fedora container
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/c2t-rpms"
+          docker run --rm \
+            --mount "type=bind,src=$PWD,dst=/src,readonly" \
+            --mount "type=bind,src=$RUNNER_TEMP/c2t-rpms,dst=/out" \
+            fedora:44 /usr/bin/bash /src/tests/connections/c2t_signed_rpm/build_signed_test_rpms.sh
+          (cd "$RUNNER_TEMP/c2t-rpms" && sha256sum -c --status c2t-artifact-manifest.sha256)
+          echo "C2V_PASS // TEST_ONLY_SIGNED_RPM_PREPARED_NO_PRIVATE_KEY_EXPORTED"
+      - name: Provision QEMU from signed official Ubuntu archives on disposable runner
+        shell: bash
+        run: |
+          set -euo pipefail
+          # C2w Azure mirror stalled until the old 360s installation limit.
+          # Only a temporary GitHub Ubuntu runner is modified, not Silverblue.
+          sources="$RUNNER_TEMP/c2x-ubuntu-archive.list"
+          cat > "$sources" <<'APT_SOURCES'
+          deb [signed-by=/usr/share/keyrings/ubuntu-archive-keyring.gpg] http://archive.ubuntu.com/ubuntu noble main universe
+          deb [signed-by=/usr/share/keyrings/ubuntu-archive-keyring.gpg] http://archive.ubuntu.com/ubuntu noble-updates main universe
+          deb [signed-by=/usr/share/keyrings/ubuntu-archive-keyring.gpg] http://security.ubuntu.com/ubuntu noble-security main universe
+          APT_SOURCES
+          test -r /usr/share/keyrings/ubuntu-archive-keyring.gpg ||
+            { echo "C2X_BLOCKED // OFFICIAL_APT_KEYRING_MISSING"; exit 2; }
+          apt_opts=(-o "Dir::Etc::sourcelist=$sources" -o "Dir::Etc::sourceparts=-"
+                    -o "Acquire::Retries=2" -o "Acquire::http::Timeout=35")
+          echo "C2X_PREFLIGHT // OFFICIAL_UBUNTU_SOURCES_CI_RUNNER_ONLY"
+          timeout 150s sudo apt-get "${apt_opts[@]}" update ||
+            { echo "C2X_BLOCKED // OFFICIAL_APT_UPDATE"; exit 2; }
+          timeout 690s sudo env DEBIAN_FRONTEND=noninteractive apt-get "${apt_opts[@]}" install -y --no-install-recommends \
+            qemu-system-x86 qemu-utils xorriso genisoimage ||
+            { echo "C2X_BLOCKED // OFFICIAL_APT_INSTALL"; exit 2; }
+          for binary in qemu-system-x86_64 qemu-img xorriso genisoimage; do
+            command -v "$binary" >/dev/null || { echo "C2X_FAIL // MISSING_UTILITY_$binary"; exit 2; }
+          done
+          echo "C2X_PASS // SIGNED_OFFICIAL_QEMU_SETUP_COMPLETE"
+      - name: Boot Silverblue, collect bounded offline rpm-ostree diagnostics, and verify real reboot rollback
+        shell: bash
+        run: timeout 2800s bash tests/connections/c2v_silverblue/boot_official_silverblue.sh
+      - name: Existing C2n read-only and CPU++ deny-only gates
+        shell: bash
+        run: |
+          python3 -B tests/connections/test_connections_c2n_policy_contract.py
+          python3 - <<'PY'
+          from pathlib import Path
+          root=Path('services/connections')
+          assert 'readonly property bool credentialActionsEnabled: false' in (root/'ConnectionsBroker.qml').read_text()
+          assert 'readonly property bool hostAuthenticated: false' in (root/'ConnectionsRequestStatus.qml').read_text()
+          print('C2V_PASS // PRODUCTION_AUTH_AND_API_GRANTS_REMAIN_CLOSED')
+          PY

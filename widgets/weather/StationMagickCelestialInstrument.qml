@@ -895,10 +895,18 @@ Rectangle {
                     } else if (instrument.lockedIndex<0 &&
                                instrument.mode!=="wheel" &&
                                instrument.mode!=="relations") {
-                        const next=Celestial.indexAtFraction(
-                            instrument.graphModel,instrument.viewWindow,
-                            sampleFraction(mouse.x));
-                        if(next!==instrument.hoveredIndex)
+                        let next=-1;
+                        if(instrument.mode==="aspects" &&
+                           instrument.aspectPresentation==="matrix"){
+                            const cell=Matrix.pick(instrument.aspectMatrix,
+                                Matrix.geometry(width,height),mouse.x,mouse.y);
+                            next=cell?cell.sampleIndex:-1;
+                        } else {
+                            next=Celestial.indexAtFraction(
+                                instrument.graphModel,instrument.viewWindow,
+                                sampleFraction(mouse.x));
+                        }
+                        if(next>=0 && next!==instrument.hoveredIndex)
                             instrument.hoveredIndex=next;
                     }
                 }
@@ -922,6 +930,13 @@ Rectangle {
                         instrument.selectedBody=pair.bodies[mouse.x<width/2?0:1];
                         instrument.eventOrdinal=-1;
                         instrument.lockedIndex=instrument.focusIndex;
+                    } else if(instrument.mode==="aspects" &&
+                              instrument.aspectPresentation==="matrix"){
+                        const cell=Matrix.pick(instrument.aspectMatrix,
+                            Matrix.geometry(width,height),mouse.x,mouse.y);
+                        if(!cell)return;
+                        instrument.eventOrdinal=-1;
+                        instrument.lockedIndex=cell.sampleIndex;
                     } else {
                         instrument.eventOrdinal=-1;
                         instrument.lockedIndex=Celestial.indexAtFraction(

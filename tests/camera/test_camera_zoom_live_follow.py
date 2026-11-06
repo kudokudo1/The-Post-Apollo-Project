@@ -116,6 +116,16 @@ class FollowTests(unittest.TestCase):
             f.tick()
             self.assertEqual(f.latest_state,(2,"ALIGNED",True))
 
+    def test_runtime_coalesces_pending_resize_lines_before_sway_tick(self):
+        source = HELPER.read_text()
+        self.assertIn('chunk = os.read(input_fd, 65536)', source)
+        self.assertIn('lines = pending.split(b"\\n")', source)
+        self.assertIn('pending = lines.pop()', source)
+        self.assertIn('follower.set_target(message)', source)
+        self.assertIn('            follower.tick()', source)
+        self.assertIn('if len(pending) > 131072:', source)
+        self.assertIn('if len(line) > 2048:', source)
+
     def test_revision_and_last_geometry_win(self):
         ipc=IPC()
         f=follow.ZoomFollower(Path("/test/zoom"),ipc)

@@ -55,6 +55,10 @@ Rectangle {
         previewId="";
     }
     onCatalogPageChanged: previewId=""
+    onCatalogPagesChanged: {
+        if(catalogPage>=catalogPages)
+            catalogPage=Math.max(0,catalogPages-1);
+    }
     onReadingChanged: inspectedDrawIndex=-1
     onViewModeChanged: inspectedDrawIndex=-1
     onSpreadIdChanged: {
@@ -73,6 +77,7 @@ Rectangle {
             ? Physical.start(Deck.SPREADS,Deck.DECK.id,spreadId)
             : ({ready:false,cards:[]});
         manualReversed=false;
+        previewId="";
         manualMessage="";
         lastError="";
     }
@@ -89,6 +94,8 @@ Rectangle {
         manualMessage=result.state.complete?"PHYSICAL SPREAD COMPLETE"
             :"ENTER "+result.state.nextPosition;
         manualReversed=false;
+        // Require another deliberate row click for the next physical card.
+        previewId="";
         if(result.state.complete)viewMode="draw";
     }
     function undoPhysicalCard() {
@@ -485,7 +492,7 @@ Rectangle {
                     accentColor: Colors.magenta
                     available: tarot.reading.ready &&
                                !tarot.reading.complete &&
-                               tarot.previewId!=="" &&
+                               tarot.explicitlyPreviewedCard!==null &&
                                !Physical.contains(tarot.reading,
                                                   tarot.previewId)
                     onClicked: tarot.addPhysicalCard()
@@ -520,36 +527,42 @@ Rectangle {
                 color: Colors.orange
                 font.pixelSize: 9
                 elide: Text.ElideRight
-                text: tarot.manualMessage || "SELECT, SET ORIENTATION, THEN ADD"
+                text: tarot.explicitlyPreviewedCard
+                    ? "SELECTED // "+tarot.explicitlyPreviewedCard.title.toUpperCase()
+                    : "PREVIEW ONLY // CLICK CARD ROW TO SELECT"
             }
             Row {
                 width: parent.width
-                height: 247
-                spacing: 7
+                height: tarot.catalogMetrics
+                    ? tarot.catalogMetrics.previewHeight : 240
+                spacing: tarot.catalogMetrics
+                    ? tarot.catalogMetrics.gap : 7
                 StationMagickTarotCard {
-                    width: Math.max(105,Math.min(175,parent.width*0.36))
-                    height: 240
+                    width: tarot.catalogMetrics
+                        ? tarot.catalogMetrics.previewWidth : 175
+                    height: parent.height
                     card: tarot.inspectedCard
                     localArtworkDirectory: tarot.localArtworkDirectory
-                    positionLabel: "CATALOG // NO DRAW"
+                    positionLabel: tarot.explicitlyPreviewedCard
+                        ? "SELECTED // PREVIEW" : "INDEX // PREVIEW ONLY"
                 }
                 Column {
-                    width: Math.max(50,parent.width-
-                        Math.max(105,Math.min(175,parent.width*0.36))-7)
+                    width: tarot.catalogMetrics
+                        ? tarot.catalogMetrics.listWidth : Math.max(50,parent.width-182)
                     spacing: 3
                     Repeater {
                         model: tarot.visibleCatalog
                         delegate: ActionButton {
                             required property var modelData
                             width: parent.width
-                            height: 26
+                            height: tarot.catalogMetrics
+                                ? tarot.catalogMetrics.rowHeight : 26
                             label: (modelData.index+1)+
                                 " // "+modelData.title.toUpperCase()
                             labelPixelSize: 9
-                            accentColor: modelData.id===
-                                (tarot.inspectedCard?
-                                 tarot.inspectedCard.id:"")
-                                ? Colors.magenta:Colors.cyan
+                            // First-row default preview is NOT a selection.
+                            selected: tarot.previewId===modelData.id
+                            accentColor: selected ? Colors.magenta:Colors.cyan
                             onClicked: {
                                 // Choose a catalogue page/preview by
                                 // clicking its original card index.

@@ -20,7 +20,8 @@ class PersonalReadPilotUiContract(unittest.TestCase):
         self.assertIn('label: "APPROVE READ"', self.pane)
         self.assertIn('label: "STOP ACCESS"', self.pane)
         self.assertIn("destructive: true", self.pane)
-        self.assertIn('label: "LOAD PERSONAL"', self.pane)
+        self.assertIn('"LOAD PERSONAL"', self.pane)
+        self.assertIn('label: phonePane.personalReadStatus === "READING"', self.pane)
         self.assertIn('id: personalConsentProcess', self.pane)
         self.assertIn('id: personalReadProcess', self.pane)
         self.assertIn('id: personalRevokeProcess', self.pane)
@@ -61,7 +62,7 @@ class PersonalReadPilotUiContract(unittest.TestCase):
             'id: personalStatusProcess',
             'interval: 3000',
             '"--client", "status"',
-            "requestGeneration !== phonePane.personalReadGeneration",
+            "!== phonePane.personalReadGeneration",
         ):
             with self.subTest(marker=marker):
                 self.assertIn(marker, self.pane)
@@ -77,7 +78,7 @@ class PersonalReadPilotUiContract(unittest.TestCase):
         self.assertNotIn("loadPersonalSnapshot", start)
         self.assertNotIn("PhonePersonalReadPilot.py", start)
         visible = self.pane.split("    onVisibleChanged: {", 1)[1].split(
-            "\n    Process {", 1)[0]
+            "\n    // This adapter never reads the phone itself.", 1)[0]
         self.assertNotIn("openPersonalConsent()", visible)
         self.assertNotIn("loadPersonalSnapshot()", visible)
         self.assertNotIn('Component.onCompleted: openPersonalConsent()', self.pane)

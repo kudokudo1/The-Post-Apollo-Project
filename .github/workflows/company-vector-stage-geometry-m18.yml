@@ -1,0 +1,44 @@
+name: Company Network M18 Stage Director viewport candidate
+
+on:
+  pull_request:
+    paths:
+      - 'widgets/CompanyCoveragePane.qml'
+      - 'widgets/CompanyNetworkW.qml'
+      - 'widgets/CompanyVectorViewportPolicy.js'
+      - 'tests/company/test_company_vector_viewport_m18.test.js'
+      - 'experiments/company-vector-qt/HANDOFF_M18.md'
+      - '.github/workflows/company-vector-stage-geometry-m18.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  candidate-geometry:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Validate M18 reactive viewport source and pure geometry policy
+        run: node --test tests/company/test_company_vector_viewport_m18.test.js
+      - name: Preserve Company chassis and geographic regressions
+        run: |
+          node --test tests/company/test_company_network_m1.test.js
+          node --test tests/company/test_company_network_m2.test.js
+      - name: Preserve M13 native process and explicit online consent
+        run: python3 -m unittest discover -s tests/company -p 'test_company_vector_sidecar_m13.py' -v
+      - name: Check no unauthenticated Stage Director or direct window control
+        shell: bash
+        run: |
+          set -euo pipefail
+          grep -Fq 'activeVectorViewportRect' widgets/CompanyNetworkW.qml
+          grep -Fq 'mapCanvas.mapToItem(root, 0, 0)' widgets/CompanyCoveragePane.qml
+          ! grep -Eq 'WatchBridge|wl_display_connect|startDetached|swaymsg' widgets/CompanyVectorViewportPolicy.js
+          grep -Fq 'vectorController.stop()' widgets/CompanyCoveragePane.qml
+          grep -Fq 'CompanyStreetMap {' widgets/CompanyCoveragePane.qml
+          grep -Fq 'Canvas {' widgets/CompanyCoveragePane.qml

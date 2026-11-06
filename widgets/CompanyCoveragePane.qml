@@ -2,6 +2,7 @@ import QtQuick
 import "../components"
 import "../services/company"
 import "CompanyCoveragePolicy.js" as Geo
+import "CompanyVectorViewportPolicy.js" as VectorViewportPolicy
 import "weather/StationNaturalEarthLand110.js" as Land
 import "weather/StationNaturalEarthContext110.js" as Context
 import "CompanyNaturalEarthLakes110.js" as Lakes
@@ -45,6 +46,34 @@ Item {
     readonly property var selectedState: Geo.stateForCode(selectedCode)
     readonly property var selectedCountry: Geo.countryForCode(selectedCountryCode)
     readonly property var bounds: Geo.regions[Geo.regionKey(regionKey)]
+    // M18 candidate-only viewport of the real mapCanvas in Coverage-local
+    // logical coordinates. No SwayPX registration, native actor or input grant.
+    // Invalid/hidden/mutually-exclusive views publish a zero rectangle.
+    readonly property rect activeVectorViewportRect: {
+        if (VectorViewportPolicy.owner(
+                    root.visible, vectorController.running, vectorConsentOpen,
+                    hubEditorOpen, streetMode, hubPlacementArmed,
+                    streetConsentOpen) !== "native"
+                || !mapRow.visible || !mapSurface.visible || !mapCanvas.visible)
+            return Qt.rect(0, 0, 0, 0);
+        // Read ancestor positions explicitly so a row move also invalidates
+        // the binding. mapToItem performs the real QQuickItem translation.
+        const layout = mapCanvas.x + mapCanvas.y
+                     + mapSurface.x + mapSurface.y
+                     + mapRow.x + mapRow.y + column.x + column.y;
+        if (!isFinite(layout)
+                || !VectorViewportPolicy.within(
+                    Qt.rect(0, 0, mapCanvas.width, mapCanvas.height),
+                    mapSurface.width, mapSurface.height))
+            return Qt.rect(0, 0, 0, 0);
+        const origin = mapCanvas.mapToItem(root, 0, 0);
+        const candidate = Qt.rect(
+            origin.x, origin.y, mapCanvas.width, mapCanvas.height);
+        return VectorViewportPolicy.within(candidate, root.width, root.height)
+            ? candidate : Qt.rect(0, 0, 0, 0);
+    }
+    readonly property bool activeVectorViewportValid:
+        activeVectorViewportRect.width > 0 && activeVectorViewportRect.height > 0
     onVisibleChanged: if (!visible) {
         serviceMenuOpen=false;
         hubPlacementArmed=false;

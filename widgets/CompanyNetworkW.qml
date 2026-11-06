@@ -19,6 +19,9 @@ PanelWindow {
     // exactly (1000 × 700) on a sufficiently large display.
     property string chassisLevel: "standard"
     property bool coverageLoaded: false
+    // M26 opt-in must be enabled explicitly by a future approved integration.
+    // The M25 QML plugin is optional; normal Company requires no new modules.
+    property bool vectorBridgeOptIn: false
     readonly property int glowGutter: 12
     readonly property int frameTopInset: 9
     readonly property int bottomScreenGap: 12
@@ -71,6 +74,20 @@ PanelWindow {
     }
     readonly property bool activeVectorViewportValid:
         activeVectorViewportRect.width > 0 && activeVectorViewportRect.height > 0
+    // M23's frame_in_host is relative to the actual Quickshell PanelWindow,
+    // NOT the screen or the M18 companyFrame-local map rectangle. We compute
+    // from QQuickItem coordinates on every chassis resize/reposition.
+    readonly property rect activeVectorFrameInHostRect: {
+        if (!root.menuOpen || !companyFrame.visible)
+            return Qt.rect(0, 0, 0, 0);
+        const origin = companyFrame.mapToItem(root, 0, 0);
+        const candidate = Qt.rect(origin.x, origin.y,
+                                  companyFrame.width, companyFrame.height);
+        return VectorViewportPolicy.within(candidate, root.width, root.height)
+            ? candidate : Qt.rect(0, 0, 0, 0);
+    }
+    readonly property string vectorBridgeStatus: vectorBridgeLink.status
+    readonly property bool vectorBridgeWireBound: vectorBridgeLink.wireBound
 
     function toggle() {
         menuOpen = !menuOpen;
@@ -131,6 +148,15 @@ PanelWindow {
         y: root.frameTopInset
         width: root.menuOpen ? root.frameWidth : 0
         height: root.menuOpen ? root.frameHeight : 0
+    }
+
+    // No static import of PostApollo.CompanyVector: the M25 module is
+    // separately installed, disabled by default and optional at runtime.
+    CompanyVectorBridgeLink {
+        id: vectorBridgeLink
+        bridgeEnabled: root.vectorBridgeOptIn
+        frameRect: root.activeVectorFrameInHostRect
+        mapRect: root.activeVectorViewportRect
     }
 
     WindowPanelFrame {
@@ -369,6 +395,19 @@ PanelWindow {
                 visible: root.selectedMainModeIndex === 0
                 sourceComponent: Component {
                     CompanyCoveragePane { }
+                }
+            }
+
+            // Reuse the existing explicit user buttons. Sending a candidate
+            // intent must never block or replace the attached M15 launcher.
+            Connections {
+                target: coverageLoader.item
+                ignoreUnknownSignals: true
+                function onNativeVectorLaunchRequested(online) {
+                    vectorBridgeLink.requestIntent(online);
+                }
+                function onNativeVectorClosed() {
+                    vectorBridgeLink.closeIntent();
                 }
             }
 

@@ -125,8 +125,8 @@ Rectangle {
                 item=issSource.passes[i];
                 rows.push({name:"ISS PASS "+(i+1),
                     info:Number(item.culminate.degrees).toFixed(0)+"° PEAK",
-                    detail:"RISE "+String(item.rise.time)
-                        +" // PEAK "+String(item.culminate.time)});
+                    detail:"RISE "+String(item.rise.timeUtc)
+                        +" // PEAK "+String(item.culminate.timeUtc)});
             }
         } else if (kind === "eclipses" && eclipseSource && eclipseSource.ready) {
             for (const row of [
@@ -136,11 +136,24 @@ Rectangle {
                 info:row.data ? row.data.event : "NO EVENT IN WINDOW",
                 detail:row.data ? String(row.data.date) : "DATE --"});
         } else if (kind === "meteors" && meteorSource && meteorSource.ready) {
-            for (i=0;i<meteorSource.upcomingShowers.length;i++) {
-                item=meteorSource.upcomingShowers[i];
-                rows.push({name:item.name,
-                    info:item.active ? "ACTIVE NOW" : "UPCOMING",
-                    detail:"PEAK "+String(item.peakUtc)});
+            // The established IAU feed has two separate lists. Render the
+            // active list first, then upcoming; don't hide active showers.
+            var seenShower = {};
+            var activeList = meteorSource.activeShowers || [];
+            var upcomingList = meteorSource.upcomingShowers || [];
+            for (i=0;i<activeList.length;i++) {
+                item=activeList[i];
+                if (!item || !item.name || seenShower[item.name]) continue;
+                seenShower[item.name] = true;
+                rows.push({name:item.name,info:"ACTIVE NOW",
+                    detail:"PEAK "+String(item.peakUtc || "--")});
+            }
+            for (i=0;i<upcomingList.length;i++) {
+                item=upcomingList[i];
+                if (!item || !item.name || seenShower[item.name]) continue;
+                seenShower[item.name] = true;
+                rows.push({name:item.name,info:"UPCOMING",
+                    detail:"PEAK "+String(item.peakUtc || "--")});
             }
         }
         return rows;

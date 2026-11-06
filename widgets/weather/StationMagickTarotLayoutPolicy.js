@@ -17,7 +17,7 @@ function spread(width,height,id) {
         : (width-gap*(columns-1))/columns;
     var ratioHeight=slotWidth*1.58;
     var cardHeight=count===5
-        ? Math.max(76,Math.min(194,ratioHeight,
+        ? Math.max(68,Math.min(194,ratioHeight,
                                 (usableHeight-gap)/2))
         : Math.max(126,Math.min(count===1?365:304,
                                 ratioHeight,usableHeight));

@@ -92,6 +92,20 @@ function build(model,payload,requestedReference,nowIndex){
            !finite(current.longitude_separation_deg) ||
            !Array.isArray(old.aspects) || !Array.isArray(current.aspects))
             return unavailable("M4 PAIR SAMPLE MISMATCH");
+        // Assert both reported gap values match the real same-epoch
+        // longitude pairs, not a corrupted/mismatched relationship payload.
+        var a=entries.filter(function(p){return p.body===rel.bodies[0];})[0];
+        var b=entries.filter(function(p){return p.body===rel.bodies[1];})[0];
+        var gap=function(x,y){return Math.abs(((x-y+540)%360)-180);};
+        if(!a||!b||old.longitude_separation_deg<0 ||
+           current.longitude_separation_deg<0 ||
+           old.longitude_separation_deg>180 ||
+           current.longitude_separation_deg>180 ||
+           Math.abs(gap(a.refLongitude,b.refLongitude)
+                    -old.longitude_separation_deg)>0.00001 ||
+           Math.abs(gap(a.nowLongitude,b.nowLongitude)
+                    -current.longitude_separation_deg)>0.00001)
+            return unavailable("M4 PAIR GAP AND LONGITUDE DISAGREE");
         pair={bodies:rel.bodies.slice(),
             refSeparation:old.longitude_separation_deg,
             nowSeparation:current.longitude_separation_deg,

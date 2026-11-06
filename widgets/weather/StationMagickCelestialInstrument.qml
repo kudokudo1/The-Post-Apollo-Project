@@ -56,7 +56,7 @@ Rectangle {
     readonly property var viewWindow: Celestial.windowFor(
         graphModel,zoom,panPosition)
     readonly property var aspectMatrix: Matrix.build(graphModel,visualData,
-        viewWindow,focusIndex,48)
+        viewWindow,focusIndex,compactMode ? 24 : 40)
     // The thumb and inspector always refer to a sample in the current
     // zoom/pan window, even when an earlier lock has moved off screen.
     readonly property int focusIndex: graphModel.ready

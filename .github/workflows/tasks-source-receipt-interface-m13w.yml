@@ -1,0 +1,59 @@
+name: TASKS M13w disabled source receipt review interface
+
+on:
+  pull_request:
+    paths:
+      - 'services/hub/TaskSourceReceiptReviewPolicyM13w.js'
+      - 'services/hub/TaskSourceReceiptFacadeM13w.qml'
+      - 'tests/tasks/test_task_source_receipt_interface_m13w.cjs'
+      - 'docs/tasks-source-receipt-interface-m13w.md'
+      - '.github/workflows/tasks-source-receipt-interface-m13w.yml'
+      - 'services/hub/TaskSaveTicketContractM12o.js'
+      - 'services/hub/ApolloHubTodoStore.qml'
+  push:
+    branches: [main]
+    paths:
+      - 'services/hub/TaskSourceReceiptReviewPolicyM13w.js'
+      - 'services/hub/TaskSourceReceiptFacadeM13w.qml'
+      - 'tests/tasks/test_task_source_receipt_interface_m13w.cjs'
+      - '.github/workflows/tasks-source-receipt-interface-m13w.yml'
+permissions:
+  contents: read
+
+jobs:
+  fail-closed-review:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: M13w all consumer receipts always keep the draft
+        run: node --test tests/tasks/test_task_source_receipt_interface_m13w.cjs
+      - name: Existing ticket, presenter and native journal regression
+        run: |
+          node --test tests/tasks/test_task_disabled_ticket_api_m12o.cjs
+          node --test tests/tasks/test_task_hub_ticket_presenter_m12p.cjs
+          python3 tests/tasks/test_task_native_receipt_handoff_m13v.py
+          python3 tests/tasks/test_task_source_revision_evidence_m13u.py
+      - name: Writer boundary and shared Connections remain closed
+        run: |
+          python3 tests/tasks/test_task_writer_gate_inventory_m11d.py
+          node tests/cpuplus/test_connections_broker_c2a.js
+      - name: QML facade syntax only, no mounting or runtime activation
+        run: |
+          sudo apt-get update -qq
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends qt6-declarative-dev-tools
+          QT_QPA_PLATFORM=offscreen /usr/lib/qt6/bin/qmlformat \
+            services/hub/TaskSourceReceiptFacadeM13w.qml >/dev/null
+      - name: No production import and no new task source writer
+        run: |
+          set -euo pipefail
+          ! grep -q 'TaskSourceReceiptFacadeM13w' services/hub/ApolloHubTodoStore.qml
+          ! grep -q 'TaskSourceReceiptFacadeM13w' shell.qml
+          ! grep -Eq 'FileView *\{|Process *\{|secret-tool|gnome-keyring|\.setText\(' \
+            services/hub/TaskSourceReceiptFacadeM13w.qml \
+            services/hub/TaskSourceReceiptReviewPolicyM13w.js
+          test "$(grep -c 'todoFile.setText(' services/hub/ApolloHubTodoStore.qml)" = 1
+          printf '%s\n' 'M13W_DISABLED_SOURCE_RECEIPT_KEEP_DRAFT_NO_AUTHORITY_PASS'

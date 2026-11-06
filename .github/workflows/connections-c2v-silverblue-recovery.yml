@@ -51,6 +51,11 @@ jobs:
           assert 'C2V_GUEST_PROBE_READY' in guest
           assert 'C2V_GUEST_PROBE_TICK' in guest
           assert 'C2V_INSTALL_WORKER_STARTED_IN_SEPARATE_CGROUP' in guest
+          assert 'C2V_MONITOR_STARTED_IN_SEPARATE_CGROUP' in guest
+          assert 'C2V_MONITOR_HANDOFF_COMPLETE' in guest
+          assert 'C2V_MONITOR_REBOOT_REQUESTED' in guest
+          assert '--unit=c2v-rpm-layer-monitor' in guest
+          assert '[[ "$monitor_ready" == 1 ]]' in guest
           assert 'C2V_PENDING_DEPLOYMENT_AUTHORITY' in guest
           assert 'status.get("transaction") is not None' in guest
           assert 'C2V_PROBE_CGROUP_FIELD' in guest

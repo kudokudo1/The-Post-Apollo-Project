@@ -890,8 +890,12 @@ PanelWindow {
         Item {
             id: zoomViewport
             x: cameraBodyColumn.x
-            y: cameraBodyColumn.y + cameraModes.y
-               + cameraModes.height + cameraBodyColumn.spacing
+            // Zoom's guest starts immediately below the MODE row. The
+            // shared Column's 12px spacing was leaving a visible gap above
+            // this separately hosted browser, even though its bottom fitted.
+            // The existing height binding extends the guest upward without
+            // moving the viewport's bottom or changing left/right margins.
+            y: cameraBodyColumn.y + cameraModes.y + cameraModes.height
             width: Math.max(0, cameraBodyColumn.width)
             height: Math.max(0, frame.height - y - camera.zoomBayBottom)
             visible: camera.menuOpen && camera.activeView === "zoom"

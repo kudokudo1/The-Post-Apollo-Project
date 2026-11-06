@@ -396,7 +396,7 @@ Rectangle {
                 currentSolarPosition: focus.skyFeed
                     ? focus.skyFeed.currentSolarPosition : null
                 providerLocalMinute: focus.skyFeed
-                    ? focus.skyFeed.providerLocalMinute : -1
+                    ? focus.skyFeed.focusedLocalMinute : -1
                 solarDate: focus.civilDate || ""
                 solarCivilOffsetMinutes: focus.skyFeed
                     ? focus.skyFeed.moonCivilOffsetMinutes : null

@@ -125,6 +125,89 @@ PROBE
     # alone. A pending deployment plus a booted-layer check are required.
     worker=/run/c2v-rpm-layer-worker.sh
     resultfile=/run/c2v-rpm-layer-worker-exit
+    monitor=/run/c2v-rpm-layer-monitor.sh
+    cat > "$monitor" <<'C2V_MONITOR'
+#!/usr/bin/bash
+set -Eeuo pipefail
+exec >/dev/ttyS0 2>&1
+echo "C2V_MONITOR_READY // $(date --iso-8601=seconds)"
+echo ready > /run/c2v-monitor-ready
+pkg=postapollo-connections-c2t-fixture
+log=/var/tmp/c2v-rpm-ostree-install.log
+resultfile=/run/c2v-rpm-layer-worker-exit
+staged_json=/run/c2v-ostree-pending.json
+fail() {
+  echo "C2V_FAIL // INDEPENDENT_MONITOR_$*"
+  tail -n 45 "$log" 2>/dev/null || true
+  timeout --signal=TERM --kill-after=5s 15s rpm-ostree status || true
+  systemctl poweroff --no-block || true
+  exit 1
+}
+# Run in a separate transient systemd service, never in the original
+# first-boot oneshot cgroup, which did not resume after staging the RPM.
+for attempt in $(seq 1 50); do
+  echo "C2V_INSTALL_WATCHDOG // independent-monitor-attempt=$attempt"
+  tail -n 5 "$log" 2>/dev/null || true
+  if timeout --signal=TERM --kill-after=5s 12s rpm-ostree status --json > "$staged_json" 2>/dev/null; then
+    if python3 - "$staged_json" "$pkg" <<'C2V_PENDING_CHECK'
+import json,sys
+with open(sys.argv[1],encoding="utf-8") as fp:
+    status=json.load(fp)
+ds=status.get("deployments") or []
+if len(ds)<2 or status.get("transaction") is not None:
+    sys.exit(1)
+d=ds[0]
+pending=bool(d.get("staged") or d.get("pending")) or d.get("booted") is False
+package_refs=json.dumps({"requested-local-packages":d.get("requested-local-packages",[]),"packages":d.get("packages",[])})
+if not (pending and sys.argv[2] in package_refs):
+    sys.exit(1)
+print("C2V_PENDING_DEPLOYMENT_AUTHORITY // staged-or-pending, idle transaction, exact test RPM")
+C2V_PENDING_CHECK
+    then
+      if [[ -e "$resultfile" ]]; then
+        rc="$(cat "$resultfile")"
+        [[ "$rc" == 0 ]] || fail "WORKER_REPORTED_NONZERO_INSTALL_EXIT_$rc"
+        echo "C2V_INSTALL_RETURNED_SUCCESS"
+      else
+        echo "C2V_INSTALL_WORKER_EXIT_UNOBSERVED // pending deployment independently verified"
+      fi
+      echo "C2V_PASS // RPM_OSTREE_LAYER_STAGED_REBOOT_REQUIRED"
+      echo layer_pending > /var/lib/c2v-transaction-stage
+      sync
+      echo "C2V_MONITOR_REBOOT_REQUESTED // verified pending deployment"
+      systemctl reboot --no-block || fail "REBOOT_REQUEST_FAILED"
+      exit 0
+    fi
+  fi
+  if [[ -e "$resultfile" ]]; then
+    rc="$(cat "$resultfile")"
+    if [[ "$rc" != 0 ]]; then
+      echo "C2V_INSTALL_FAILED_EXIT // $rc"
+      journalctl -b -u rpm-ostreed.service --no-pager -n 45 || true
+      fail "OFFLINE_RPM_OSTREE_INSTALL_FAILED_$rc"
+    fi
+  fi
+  sleep 15
+done
+echo "C2V_INSTALL_PENDING_CHECK_TIMED_OUT"
+journalctl -b -u rpm-ostreed.service --no-pager -n 65 || true
+fail "NO_VERIFIED_PENDING_DEPLOYMENT_AFTER_INSTALL_WORKER"
+C2V_MONITOR
+    chmod 0700 "$monitor"
+    echo "C2V_MONITOR_LAUNCHING // separate transient cgroup"
+    timeout --signal=TERM --kill-after=5s 25s systemd-run --quiet \
+      --unit=c2v-rpm-layer-monitor --property=Type=exec \
+      --property=TimeoutStartSec=1120 /usr/bin/bash "$monitor" ||
+      failure "MONITOR_UNIT_START_FAILED"
+    # Do not initiate an RPM transaction until the independent monitor
+    # confirms it is actually running, not merely accepted by systemd.
+    monitor_ready=0
+    for _ in $(seq 1 15); do
+      if [[ -f /run/c2v-monitor-ready ]]; then monitor_ready=1; break; fi
+      sleep 1
+    done
+    [[ "$monitor_ready" == 1 ]] || failure "MONITOR_DID_NOT_START"
+    echo "C2V_MONITOR_STARTED_IN_SEPARATE_CGROUP"
     cat > "$worker" <<'C2V_WORKER'
 #!/usr/bin/bash
 set -u
@@ -143,58 +226,10 @@ C2V_WORKER
       --property=TimeoutStartSec=600 /usr/bin/bash "$worker" ||
       failure "DETACHED_RPM_INSTALL_WORKER_START_FAILED"
     echo "C2V_INSTALL_WORKER_STARTED_IN_SEPARATE_CGROUP"
-    staged_json=/run/c2v-ostree-pending.json
-    # The rpm-ostree client may not return from its cgroup after an OSTree
-    # staged deployment. Poll the independent rpm-ostreed state for a
-    # no-transaction pending layer with our EXACT fixture package.
-    for attempt in $(seq 1 36); do
-      echo "C2V_INSTALL_WATCHDOG // attempt=$attempt"
-      tail -n 8 "$log" 2>/dev/null || true
-      if timeout --signal=TERM --kill-after=5s 12s rpm-ostree status --json > "$staged_json" 2>/dev/null; then
-        if python3 - "$staged_json" "$pkg" <<'C2V_PENDING_CHECK'
-import json,sys
-with open(sys.argv[1],encoding="utf-8") as fp:
-    status=json.load(fp)
-ds=status.get("deployments") or []
-if len(ds)<2 or status.get("transaction") is not None:
-    sys.exit(1)
-d=ds[0]
-pending=bool(d.get("staged") or d.get("pending")) or d.get("booted") is False
-package_refs=json.dumps({"requested-local-packages":d.get("requested-local-packages",[]),"packages":d.get("packages",[])})
-if not (pending and sys.argv[2] in package_refs):
-    sys.exit(1)
-print("C2V_PENDING_DEPLOYMENT_AUTHORITY // staged-or-pending, idle transaction, exact test RPM")
-C2V_PENDING_CHECK
-        then
-          if [[ -e "$resultfile" ]]; then
-            rc="$(cat "$resultfile")"
-            [[ "$rc" == 0 ]] || failure "WORKER_REPORTED_NONZERO_INSTALL_EXIT_$rc"
-            echo "C2V_INSTALL_RETURNED_SUCCESS"
-          else
-            echo "C2V_INSTALL_WORKER_EXIT_UNOBSERVED // pending deployment independently verified"
-          fi
-          echo "C2V_PASS // RPM_OSTREE_LAYER_STAGED_REBOOT_REQUIRED"
-          echo layer_pending > "$stagefile"
-          sync
-          systemctl reboot --no-block
-          exit 0
-        fi
-      fi
-      if [[ -e "$resultfile" ]]; then
-        rc="$(cat "$resultfile")"
-        if [[ "$rc" != 0 ]]; then
-          echo "C2V_INSTALL_FAILED_EXIT // $rc"
-          tail -n 65 "$log" || true
-          journalctl -b -u rpm-ostreed.service --no-pager -n 45 || true
-          failure "OFFLINE_RPM_OSTREE_INSTALL_FAILED_$rc"
-        fi
-      fi
-      sleep 15
-    done
-    echo "C2V_INSTALL_PENDING_CHECK_TIMED_OUT"
-    tail -n 70 "$log" || true
-    journalctl -b -u rpm-ostreed.service --no-pager -n 65 || true
-    failure "NO_VERIFIED_PENDING_DEPLOYMENT_AFTER_INSTALL_WORKER"
+    # Important: the original one-shot service must EXIT instead of polling
+    # rpm-ostreed. The independently running monitor is the sole owner of
+    # pending-deployment verification, /var checkpoint and guest reboot.
+    echo "C2V_MONITOR_HANDOFF_COMPLETE // first-boot controller exiting"
     ;;
   layer_pending)
     [[ "$(rpm -q --qf '%{VERSION}' "$pkg" 2>/dev/null || true)" == 0.1 ]] ||

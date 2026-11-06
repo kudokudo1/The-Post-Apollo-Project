@@ -1,0 +1,41 @@
+name: Company Network M16 isolated QtLocation runtime
+
+on:
+  pull_request:
+    paths:
+      - 'experiments/company-vector-qt/CompanyQtLocationBundleM16.py'
+      - 'experiments/company-vector-qt/CompanyVectorHostBridge.py'
+      - 'experiments/company-vector-qt/HANDOFF_M16.md'
+      - 'services/company/CompanyVectorSidecarController.qml'
+      - 'tests/company/test_company_qtlocation_bundle_m16.py'
+      - '.github/workflows/company-qtlocation-runtime-m16.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  isolated-bundle-contract:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Python syntax
+        run: |
+          python3 -m py_compile \
+            experiments/company-vector-qt/CompanyQtLocationBundleM16.py \
+            experiments/company-vector-qt/CompanyVectorHostBridge.py \
+            tests/company/test_company_qtlocation_bundle_m16.py
+      - name: M16 offline synthetic integrity and rollback tests
+        run: python3 -m unittest discover -s tests/company -p 'test_company_qtlocation_bundle_m16.py' -v
+      - name: Preserve existing M15/M13 launcher security contracts
+        run: |
+          python3 -m unittest discover -s tests/company -p 'test_company_vector_host_m15.py' -v
+          python3 -m unittest discover -s tests/company -p 'test_company_vector_sidecar_m13.py' -v
+      - name: Assert no implicit host installations or Company map replacement
+        shell: bash
+        run: |
+          set -euo pipefail
+          ! grep -E 'sudo|rpm-ostree|dnf install|toolbox run|startDetached' experiments/company-vector-qt/CompanyQtLocationBundleM16.py
+          grep -Fq 'os.execve(' experiments/company-vector-qt/CompanyVectorHostBridge.py
+          grep -Fq 'vectorController.stop()' widgets/CompanyCoveragePane.qml
+          grep -Fq 'CompanyStreetMap {' widgets/CompanyCoveragePane.qml

@@ -13,6 +13,8 @@ Rectangle {
     property var weatherService: null
     property var spaceService: null
     property real runtimeNowMs: Date.now()
+    // Match COSMOS Overview/Modes: 6 px between stage boundary and content.
+    readonly property int contentInset: 6
     readonly property var sourceSkyHost: sourceSky
     readonly property var phaseInstrument: moonVisual
     readonly property var moonSource: sourceSky.moonObservation
@@ -86,6 +88,9 @@ Rectangle {
         anchors.left: parent.left
         anchors.right: parent.right
         anchors.top: parent.top
+        anchors.leftMargin: moonPane.contentInset
+        anchors.rightMargin: moonPane.contentInset
+        anchors.topMargin: moonPane.contentInset
         height: 18
         spacing: 4
         GohuText {
@@ -115,6 +120,8 @@ Rectangle {
         objectName: "cosmos-c9-moon-hero-row"
         anchors.left: parent.left
         anchors.right: parent.right
+        anchors.leftMargin: moonPane.contentInset
+        anchors.rightMargin: moonPane.contentInset
         anchors.top: titleRail.bottom
         height: Math.min(166,Math.max(0,moonPane.height-112))
         spacing: 5
@@ -255,9 +262,12 @@ Rectangle {
         objectName: "cosmos-c8-moon-readings"
         anchors.left: parent.left
         anchors.right: parent.right
+        anchors.leftMargin: moonPane.contentInset
+        anchors.rightMargin: moonPane.contentInset
         anchors.top: heroRow.bottom
         anchors.topMargin: 4
         anchors.bottom: parent.bottom
+        anchors.bottomMargin: moonPane.contentInset
         color: Colors.black
         border.width: 0
         clip: true

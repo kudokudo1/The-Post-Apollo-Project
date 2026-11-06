@@ -20,6 +20,8 @@ Rectangle {
         subjectRoute === "magick/astrology/charts"
     readonly property bool lensesLanding:
         subjectRoute === "magick/planetary/correspondences"
+    readonly property bool planetaryHoursRoute:
+        subjectRoute === "magick/planetary/hours"
     readonly property bool independentScreen:
         standaloneAstrology || lensesLanding
     // Supplied by the existing Station root; no independent clock.
@@ -104,6 +106,8 @@ Rectangle {
                              ? standaloneAstrologyReference
                              : magickPane.lensesLanding
                              ? lensesReference
+                             : magickPane.planetaryHoursRoute
+                             ? planetaryHoursReference
                              : magickPane.showCelestial
                              ? celestialReference
                              : magickPane.subjectRoute.indexOf("magick/lunar-solar/") === 0
@@ -134,6 +138,17 @@ Rectangle {
             celestialSource: magickPane.celestialSource
             onRouteRequested: function(path) {
                 magickPane.routeRequested(path)
+            }
+        }
+    }
+
+    // M6d // Read-only use of existing WeatherService forecast.
+    Component {
+        id: planetaryHoursReference
+        StationMagickPlanetaryHoursPane {
+            weatherService: magickPane.weatherService
+            onRouteRequested: function(path) {
+                magickPane.routeRequested(path);
             }
         }
     }

@@ -9,6 +9,7 @@ on:
       - 'widgets/weather/StationCosmosCivilCalendarPolicy.js'
       - 'tests/weather/test_cosmos_c5_empty_repair.js'
       - 'tests/weather/fixtures/C5FocusedNativeShell.qml'
+      - 'tests/weather/fixtures/C5PopulatedNativeShell.qml'
       - 'scripts/weather/verify_cosmos_c5_native.sh'
       - '.github/workflows/weather-cosmos-empty-repair-c5.yml'
   workflow_dispatch:

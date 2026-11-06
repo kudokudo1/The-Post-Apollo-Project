@@ -121,6 +121,9 @@ ShellRoot {
                     console.log("C5_RENDER_METRICS // model="
                       +(focused.planetRows[0].events.length)
                       +" displayed="+(focused.displayedPlanetRows[0].events.length)
+                      +" delegateIndex="+(firstLane ? firstLane.index : "NONE")
+                      +" delegateType="+(firstLane ? typeof firstLane.planetRow : "NONE")
+                      +" delegateRaw="+(firstLane ? String(firstLane.planetRow) : "NONE")
                       +" delegate="+(firstLane && firstLane.planetRow && firstLane.planetRow.events
                         ? firstLane.planetRow.events.length : "NONE")
                       +" repeater="+(eventRepeater ? eventRepeater.count : "NONE"));

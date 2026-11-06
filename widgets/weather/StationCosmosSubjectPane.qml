@@ -26,6 +26,8 @@ Rectangle {
                          ? focusModesComponent
                          : cosmosPane.kind === "overview"
                          ? overviewComponent
+                         : cosmosPane.subjectRoute === "cosmos/moon/ephemeris"
+                         ? moonCompactComponent
                          : cosmosPane.kind === "sky" ? skyComponent
                          : cosmosPane.subjectRoute === "cosmos/space-weather/overview"
                            ? spaceHubComponent
@@ -77,6 +79,18 @@ Rectangle {
             onRouteRequested: function(path) {
                 cosmosPane.routeRequested(path)
             }
+        }
+    }
+
+    // C8 // The MOON landing uses the existing compact MAGICK-derived
+    // instrument and the original source-only SKY collectors. No scroll.
+    // The INDEX/full SKY and explicit moon-position routes remain untouched.
+    Component {
+        id: moonCompactComponent
+        StationCosmosMoonCompactPane {
+            weatherService: cosmosPane.weatherService
+            spaceService: cosmosPane.spaceService
+            runtimeNowMs: cosmosPane.runtimeNowMs
         }
     }
 

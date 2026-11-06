@@ -135,6 +135,7 @@ ShellRoot {
                 ml.zoomAt(1.25,200,120);
                 root.phase=3;
             } else if(root.phase===3){
+                console.log("C11_ZOOM_DIAG // moon="+ml.wheelZoom+" sun="+sl.wheelZoom+" days="+ml.moonMonth.length);
                 if(ml.wheelZoom!==1.25 || sl.wheelZoom!==1
                     || ml.moonMonth.length!==28)
                     return root.fail("ANNUAL_ZOOM_OR_MONTH_VIEW_BROKEN");
@@ -142,7 +143,7 @@ ShellRoot {
                 ml.resetView();
                 const back=find(moon,"cosmos-c11-back-to-moon");
                 if(!back) return root.fail("PHASE_BACK_BUTTON_MISSING");
-                back.clicked();
+                back.clicked(null);
                 root.phase=4;
             } else if(root.phase===4){
                 if(root.lastMoonRoute!=="cosmos/moon/ephemeris"

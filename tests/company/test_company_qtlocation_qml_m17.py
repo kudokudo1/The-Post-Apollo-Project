@@ -140,7 +140,10 @@ class BundleTests(unittest.TestCase):
         self.assertEqual(bundle.operation("install", self.home)["status"], "INVALID_ACTION")
 
 
-class BridgeTests(BundleTests):
+class BridgeTests(unittest.TestCase):
+    lab = BundleTests.lab
+    stage = BundleTests.stage
+
     def setUp(self):
         super().setUp()
         for parts in bridge.LAB_FILES:

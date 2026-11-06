@@ -4,6 +4,7 @@ import "../../components"
 import "StationMagickCelestialVisualPolicy.js" as Celestial
 import "StationMagickZodiacVectorPolicy.js" as ZodiacVector
 import "StationMagickRetrogradeLanePolicy.js" as Retrograde
+import "StationMagickAspectMatrixPolicy.js" as Matrix
 
 // M5 // Standalone, source-fed celestial instrument. No self-owned provider,
 // ephemeris download, timer, location lookup, journal, or page navigation.
@@ -20,6 +21,8 @@ Rectangle {
     // M4 production JSON; a missing or unverified payload stays unavailable.
     property var visualData: null
     property string mode: "wheel"
+    property string aspectPresentation: "curve" // M6b secondary ASPECTS view
+    property int inspectedAspectRow: 0
     // V4g // Compact NETWORK retains CHORDS/DEPTH across visits to HELIO.
     property string networkMode: "chords"
     // M30-C: same verified visual renderer, but hide only the detailed
@@ -53,6 +56,8 @@ Rectangle {
     readonly property var graphModel: Celestial.model(visualData)
     readonly property var viewWindow: Celestial.windowFor(
         graphModel,zoom,panPosition)
+    readonly property var aspectMatrix: Matrix.build(graphModel,visualData,
+        viewWindow,focusIndex,compactMode ? 24 : 40)
     // The thumb and inspector always refer to a sample in the current
     // zoom/pan window, even when an earlier lock has moved off screen.
     readonly property int focusIndex: graphModel.ready
@@ -76,6 +81,8 @@ Rectangle {
         eventTimelineCanvas.requestPaint();
     }
     onGraphModelChanged: graphCanvas.requestPaint()
+    onAspectPresentationChanged: graphCanvas.requestPaint()
+    onInspectedAspectRowChanged: graphCanvas.requestPaint()
     onFocusIndexChanged: {
         graphCanvas.requestPaint();
         eventTimelineCanvas.requestPaint();
@@ -504,6 +511,97 @@ Rectangle {
         ctx.restore();
     }
 
+    // M6b // A plotted cell is an actual sampled pair closest to a
+    // conventional aspect-reference angle within its UTC bucket.
+    function paintAspectMatrix(ctx) {
+        const w=graphCanvas.width,h=graphCanvas.height;
+        const data=instrument.aspectMatrix;
+        ctx.save();
+        ctx.font="9px monospace";
+        ctx.textAlign="left";
+        ctx.fillStyle=String(Colors.yellow);
+        ctx.fillText("SOURCE PAIR // UTC × ANGLE",3,11,Math.max(20,w-145));
+        if(!data.ready) {
+            ctx.fillStyle=String(Colors.orange);
+            ctx.fillText(data.reason,4,h/2,Math.max(20,w-8));
+            ctx.restore();return;
+        }
+        const g=Matrix.geometry(w,h);
+        if(!g){ctx.restore();return;}
+        ctx.fillStyle=String(Colors.cyan);
+        ctx.fillText(data.pair.map(Celestial.shortBodyName).join(" / ") +
+                     " // ORB "+data.orb+"°",3,23,Math.max(20,w-8));
+        for(let rowIndex=0;rowIndex<data.rows.length;rowIndex++){
+            const row=data.rows[rowIndex];
+            const center=g.top+(rowIndex+0.5)*g.cellHeight;
+            ctx.font="9px monospace";
+            ctx.textAlign="left";
+            ctx.fillStyle=String(rowIndex===instrument.inspectedAspectRow
+                ? Colors.yellow : Colors.white);
+            ctx.globalAlpha=1;
+            ctx.fillText(row.name,2,center+3,Math.max(20,g.left-6));
+            for(let col=0;col<row.cells.length;col++){
+                const cell=row.cells[col];
+                const rect=Matrix.cellRect(g,col,rowIndex,
+                                           data.columns.length);
+                if(!rect)continue;
+                ctx.globalAlpha=rowIndex%2===0?0.96:0.84;
+                ctx.fillStyle=String(Colors.dark);
+                ctx.fillRect(rect.x+0.5,rect.y+0.5,
+                             Math.max(1,rect.width-1),
+                             Math.max(1,rect.height-1));
+                if(cell.inOrb){
+                    ctx.fillStyle=String(cell.sampleIndex===instrument.focusIndex
+                        ? Colors.yellow:Colors.magenta);
+                    ctx.globalAlpha=cell.sampleIndex===instrument.focusIndex
+                        ? 0.94:0.18+0.72*cell.strength;
+                    ctx.fillRect(rect.x+1,rect.y+1,
+                                 Math.max(1,rect.width-2),
+                                 Math.max(1,rect.height-2));
+                }
+                if(cell.sampleIndex===instrument.focusIndex){
+                    ctx.globalAlpha=0.95;
+                    ctx.strokeStyle=String(Colors.yellow);
+                    ctx.lineWidth=1;
+                    ctx.strokeRect(rect.x+0.6,rect.y+0.6,
+                                   Math.max(1,rect.width-1.2),
+                                   Math.max(1,rect.height-1.2));
+                }
+            }
+        }
+        ctx.globalAlpha=0.8;
+        ctx.strokeStyle=String(Colors.cyan);
+        ctx.lineWidth=0.8;
+        const cursorX=g.left+g.width*
+            (instrument.focusIndex-data.from+0.5)/
+            (data.to-data.from+1);
+        ctx.beginPath();ctx.moveTo(cursorX,g.top);
+        ctx.lineTo(cursorX,g.bottom);ctx.stroke();
+        ctx.globalAlpha=1;
+        ctx.fillStyle=String(Colors.white);
+        ctx.font="9px monospace";
+        ctx.textAlign="center";
+        for(let i=0;i<3;i++){
+            const time=[data.startMs,
+                Math.round((data.startMs+data.endMs)/2),data.endMs][i];
+            ctx.fillText(Celestial.axisText(time).slice(5,16),
+                         g.left+g.width*i/2,g.bottom+11,
+                         Math.max(20,g.width/3-8));
+        }
+        ctx.textAlign="left";
+        ctx.fillStyle=String(Colors.orange);
+        const chosen=data.rows[instrument.inspectedAspectRow] || data.rows[0];
+        const current=instrument.graphModel.relationships[0]
+                           .samples[instrument.focusIndex];
+        const delta=Math.abs(current.longitude_separation_deg-chosen.angle_deg);
+        ctx.fillText(chosen.name+" // GAP "+current.longitude_separation_deg.toFixed(2)
+                     +"°  Δ "+delta.toFixed(2)+"° // SOURCE SAMPLE",
+                     3,h-13,Math.max(20,w-6));
+        ctx.fillText("BUCKET CLOSEST MEASURED SAMPLE // NO INTERPOLATION",
+                     3,h-3,Math.max(20,w-6));
+        ctx.restore();
+    }
+
     // M6a // Sampled geocentric APPARENT longitude speed, ° per day.
     // Orange brackets denote uncertain sign-transition windows, not exact
     // astronomical station times. All values come from validated M4 rows.
@@ -711,7 +809,39 @@ Rectangle {
                     if(instrument.mode==="wheel")instrument.paintWheel(ctx);
                     else if(instrument.mode==="relations")instrument.paintRelations(ctx);
                     else if(instrument.mode==="retro")instrument.paintRetrograde(ctx);
+                    else if(instrument.mode==="aspects"
+                            && instrument.aspectPresentation==="matrix")
+                        instrument.paintAspectMatrix(ctx);
                     else instrument.paintChart(ctx);
+                }
+            }
+
+            // M6b // Second-level ASPECTS selection, not an eighth main tab.
+            Row {
+                id: aspectViewControls
+                anchors.top: parent.top
+                anchors.right: parent.right
+                anchors.topMargin: 3
+                anchors.rightMargin: 4
+                spacing: 3
+                visible: instrument.mode==="aspects"
+                z: 4
+                Repeater {
+                    model: [
+                        {id:"curve",label:"CURVE"},
+                        {id:"matrix",label:"MATRIX"}
+                    ]
+                    delegate: ActionButton {
+                        required property var modelData
+                        width: 58
+                        height: 20
+                        label: modelData.label
+                        labelPixelSize: 8
+                        contentPadding: 1
+                        selected: instrument.aspectPresentation===modelData.id
+                        accentColor: selected ? Colors.magenta : Colors.cyan
+                        onClicked: instrument.aspectPresentation=modelData.id
+                    }
                 }
             }
 
@@ -775,11 +905,20 @@ Rectangle {
                     } else if (instrument.lockedIndex<0 &&
                                instrument.mode!=="wheel" &&
                                instrument.mode!=="relations") {
-                        const next=Celestial.indexAtFraction(
-                            instrument.graphModel,instrument.viewWindow,
-                            sampleFraction(mouse.x));
-                        if(next!==instrument.hoveredIndex)
-                            instrument.hoveredIndex=next;
+                        let next=-1;
+                        if(instrument.mode==="aspects" &&
+                           instrument.aspectPresentation==="matrix"){
+                            const cell=Matrix.pick(instrument.aspectMatrix,
+                                Matrix.geometry(width,height),mouse.x,mouse.y);
+                            next=cell?cell.sampleIndex:-1;
+                        } else {
+                            next=Celestial.indexAtFraction(
+                                instrument.graphModel,instrument.viewWindow,
+                                sampleFraction(mouse.x));
+                        }
+                        if(next>=0)
+                            if(next!==instrument.hoveredIndex)
+                                instrument.hoveredIndex=next;
                     }
                 }
                 onClicked: function(mouse) {
@@ -802,6 +941,14 @@ Rectangle {
                         instrument.selectedBody=pair.bodies[mouse.x<width/2?0:1];
                         instrument.eventOrdinal=-1;
                         instrument.lockedIndex=instrument.focusIndex;
+                    } else if(instrument.mode==="aspects" &&
+                              instrument.aspectPresentation==="matrix"){
+                        const cell=Matrix.pick(instrument.aspectMatrix,
+                            Matrix.geometry(width,height),mouse.x,mouse.y);
+                        if(!cell)return;
+                        instrument.eventOrdinal=-1;
+                        instrument.inspectedAspectRow=cell.row;
+                        instrument.lockedIndex=cell.sampleIndex;
                     } else {
                         instrument.eventOrdinal=-1;
                         instrument.lockedIndex=Celestial.indexAtFraction(

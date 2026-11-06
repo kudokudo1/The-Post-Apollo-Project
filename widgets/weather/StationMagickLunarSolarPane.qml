@@ -106,56 +106,14 @@ Rectangle {
         skySource: sourceSky
     }
 
-    Rectangle {
+    // M7a // Existing forecast service, not a synthetic lunar ephemeris.
+    StationMagickForecastCalendarPane {
         anchors.left: parent.left
         anchors.right: parent.right
         anchors.top: focusTabs.bottom
         anchors.bottom: parent.bottom
         anchors.topMargin: 4
         visible: lunarSolarPane.isCalendar
-        color: Colors.dark
-        border.width: 1
-        border.color: Colors.magenta
-
-        Column {
-            anchors.centerIn: parent
-            width: Math.max(0,parent.width-28)
-            spacing: 8
-            GohuText {
-                width: parent.width
-                font.pixelSize: 13
-                color: Colors.orange
-                text: "PRACTICE CALENDAR // NOT CONNECTED"
-                horizontalAlignment: Text.AlignHCenter
-            }
-            QuietText {
-                width: parent.width
-                font.pixelSize: 10
-                color: Colors.cyan
-                wrapMode: Text.WordWrap
-                text: "CURRENT LUNAR AND SOLAR OBSERVATIONS ARE AVAILABLE UNDER THE OTHER TABS. NO SAVED RITUAL EVENTS, REMINDERS OR HISTORICAL CALENDAR DATA ARE GENERATED HERE."
-                horizontalAlignment: Text.AlignHCenter
-            }
-            Row {
-                anchors.horizontalCenter: parent.horizontalCenter
-                spacing: 8
-                ActionButton {
-                    width: 100
-                    height: 26
-                    label: "VIEW MOON"
-                    labelPixelSize: 9
-                    accentColor: Colors.cyan
-                    onClicked: lunarSolarPane.routeRequested("magick/lunar-solar/moon")
-                }
-                ActionButton {
-                    width: 100
-                    height: 26
-                    label: "VIEW SOLAR"
-                    labelPixelSize: 9
-                    accentColor: Colors.orange
-                    onClicked: lunarSolarPane.routeRequested("magick/lunar-solar/seasons")
-                }
-            }
-        }
+        weatherService: lunarSolarPane.weatherService
     }
 }

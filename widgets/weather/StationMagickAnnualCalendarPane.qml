@@ -21,6 +21,45 @@ Rectangle {
     property int selectedMonth: 1
     property int selectedIndex: -1
     property string selectedSolar: ""
+    // M7c // A true inspectable viewport. FIT is 1.0; the opening 1.6x
+    // magnification makes the dense annual dial visible in the compact shell.
+    property real wheelZoom: 1.6
+    property real panX: 0
+    property real panY: 0
+    property bool focusMode: false
+    property bool zoneEditorOpen: false
+    readonly property real fitRadius:
+        Math.max(5, Math.min(wheel.width-8, wheel.height-8)*0.47)
+    readonly property real minZoom: 1.0
+    readonly property real maxZoom: 8.0
+
+    function clamp(value,low,high){return Math.max(low,Math.min(high,value));}
+    function clampPan(){
+        const limit=Math.max(0,fitRadius*(wheelZoom-1)+8);
+        panX=clamp(panX,-limit,limit);
+        panY=clamp(panY,-limit,limit);
+    }
+    function panBy(dx,dy){
+        if(!isFinite(dx)||!isFinite(dy))return;
+        panX+=dx;
+        panY+=dy;
+        clampPan();
+    }
+    function zoomAt(factor,x,y){
+        if(!isFinite(factor)||factor<=0)return;
+        const next=clamp(wheelZoom*factor,minZoom,maxZoom);
+        if(next===wheelZoom)return;
+        // Keep the point under the cursor stationary as the scale changes.
+        const pointerX=isFinite(x)?x:wheel.width/2;
+        const pointerY=isFinite(y)?y:wheel.height/2;
+        const ratio=next/wheelZoom;
+        panX=(pointerX-wheel.width/2)*(1-ratio)+panX*ratio;
+        panY=(pointerY-wheel.height/2)*(1-ratio)+panY*ratio;
+        wheelZoom=next;
+        clampPan();
+    }
+    function fitWheel(){wheelZoom=1;panX=0;panY=0;}
+    function resetView(){wheelZoom=1.6;panX=0;panY=0;}
     readonly property var model: annualSource.atlas
     readonly property var focusedDay:
         Atlas.selectedDay(model,selectedIndex)
@@ -38,13 +77,19 @@ Rectangle {
     }
 
     onModelChanged: wheel.requestPaint()
+    onWheelZoomChanged: wheel.requestPaint()
+    onPanXChanged: wheel.requestPaint()
+    onPanYChanged: wheel.requestPaint()
+    onFitRadiusChanged: clampPan()
     onSelectedMonthChanged: wheel.requestPaint()
     onSelectedIndexChanged: wheel.requestPaint()
     onSelectedSolarChanged: wheel.requestPaint()
-    onScopeModeChanged: wheel.requestPaint()
+    onScopeModeChanged: { panX=0;panY=0;wheel.requestPaint(); }
     onViewChanged: {
         annualPane.selectedIndex=-1;
         annualPane.selectedSolar="";
+        annualPane.focusMode=false;
+        annualPane.resetView();
         wheel.requestPaint();
     }
 
@@ -85,118 +130,199 @@ Rectangle {
         weatherService: annualPane.weatherService
     }
 
-    Column {
-        id: controls
-        visible: annualPane.view!=="forecast"
-        anchors.top: topModes.bottom
-        anchors.topMargin: 4
+    // Keep the actual Canvas full height. These compact controls float
+    // above it and can be hidden in FOCUS, avoiding the old 100-pixel dial.
+    Rectangle {
+        id: controlBackground
+        visible: controls.visible
         anchors.left: parent.left
         anchors.right: parent.right
+        anchors.top: topModes.bottom
+        height: controls.height+statusLine.height+4
+                +(zoneRow.visible?zoneRow.height+2:0)
+        color: Colors.black
+        opacity: 0.93
+        z: 2
+    }
+    Row {
+        id: controls
+        visible: annualPane.view!=="forecast" && !annualPane.focusMode
+        z: 3
+        anchors.top: topModes.bottom
+        anchors.topMargin: 3
+        anchors.left: parent.left
+        anchors.right: parent.right
+        height: 24
         spacing: 3
-
-        Row {
-            width: parent.width
-            height: 26
-            spacing: 3
-            ActionButton {
-                width: 39; height: 24
-                label: "◀ YR"
-                labelPixelSize: 8
-                accentColor: Colors.cyan
-                available: annualPane.selectedYear>1901
-                onClicked: annualPane.selectedYear--
-            }
-            QuietText {
-                width: 40; height: 24
-                verticalAlignment: Text.AlignVCenter
-                horizontalAlignment: Text.AlignHCenter
-                font.pixelSize: 11
-                color: Colors.yellow
-                text: String(annualPane.selectedYear)
-            }
-            ActionButton {
-                width: 39; height: 24
-                label: "YR ▶"
-                labelPixelSize: 8
-                accentColor: Colors.cyan
-                available: annualPane.selectedYear<2099
-                onClicked: annualPane.selectedYear++
-            }
-            ActionButton {
-                width: 53; height: 24
-                label: "YEAR"
-                labelPixelSize: 8
-                selected: annualPane.scopeMode==="year"
-                accentColor: selected?Colors.magenta:Colors.cyan
-                onClicked: annualPane.scopeMode="year"
-            }
-            ActionButton {
-                width: 58; height: 24
-                label: "MONTH"
-                labelPixelSize: 8
-                available: annualPane.view==="moon"
-                selected: annualPane.scopeMode==="month"
-                accentColor: selected?Colors.magenta:Colors.cyan
-                onClicked: annualPane.scopeMode="month"
-            }
-            ActionButton {
-                width: Math.max(25,parent.width-39-40-39-53-58-5*spacing)
-                height: 24
-                label: annualSource.loading?"LOADING":"CALCULATE YEAR"
-                labelPixelSize: 8
-                accentColor: Colors.orange
-                available: annualSource.configured && !annualSource.loading
-                onClicked: annualSource.calculate()
-            }
-        }
-        Row {
-            width: parent.width
-            height: 24
-            spacing: 4
-            QuietText {
-                width: 75; height: 23
-                text: "IANA ZONE"
-                color: Colors.cyan
-                verticalAlignment: Text.AlignVCenter
-                font.pixelSize: 9
-            }
-            Rectangle {
-                width: Math.max(80,parent.width-75-58-2*4)
-                height: 23
-                border.width: 1
-                border.color: Colors.blue
-                color: Colors.dark
-                TextInput {
-                    id: zoneInput
-                    anchors.fill: parent
-                    anchors.margins: 3
-                    text: annualPane.zoneId
-                    color: Colors.white
-                    font.family: "monospace"
-                    font.pixelSize: 10
-                    selectByMouse: true
-                    maximumLength: 64
-                    onEditingFinished: {
-                        annualPane.zoneId=text.trim();
-                        focus=false;
-                    }
-                }
-            }
-            ActionButton {
-                width: 58; height: 23
-                label: "SET ZONE"
-                labelPixelSize: 8
-                accentColor: Colors.yellow
-                onClicked: {annualPane.zoneId=zoneInput.text.trim();zoneInput.focus=false;}
-            }
+        ActionButton {
+            width: 31;height: 23;label: "◀ YR";labelPixelSize: 8
+            accentColor: Colors.cyan
+            available: annualPane.selectedYear>1901
+            onClicked: annualPane.selectedYear--
         }
         QuietText {
-            width: parent.width
-            height: 17
-            font.pixelSize: 9
-            color: annualSource.ready?Colors.cyan:Colors.orange
-            text: annualSource.statusText+" // "+annualPane.zoneId
-            elide: Text.ElideRight
+            width: 38;height:23
+            verticalAlignment: Text.AlignVCenter
+            horizontalAlignment: Text.AlignHCenter
+            font.pixelSize: 11;color: Colors.yellow
+            text: String(annualPane.selectedYear)
+        }
+        ActionButton {
+            width:31;height:23;label:"YR ▶";labelPixelSize:8
+            accentColor:Colors.cyan
+            available:annualPane.selectedYear<2099
+            onClicked: annualPane.selectedYear++
+        }
+        ActionButton {
+            width: 53;height:23
+            label: annualPane.scopeMode==="year"?"MONTH":"YEAR"
+            labelPixelSize: 8
+            available: annualPane.view==="moon"
+            accentColor:Colors.magenta
+            onClicked: annualPane.scopeMode=
+                annualPane.scopeMode==="year"?"month":"year"
+        }
+        ActionButton {
+            width:Math.max(55,parent.width-31-38-31-53-43-5*spacing)
+            height:23
+            label: annualSource.loading?"LOADING":"CALCULATE YEAR"
+            labelPixelSize:8
+            accentColor:Colors.orange
+            available: annualSource.configured&&!annualSource.loading
+            onClicked: annualSource.calculate()
+        }
+        ActionButton {
+            width:43;height:23;label:"ZONE"
+            labelPixelSize:8
+            accentColor: annualPane.zoneEditorOpen?Colors.magenta:Colors.cyan
+            selected: annualPane.zoneEditorOpen
+            onClicked: annualPane.zoneEditorOpen=!annualPane.zoneEditorOpen
+        }
+    }
+    Row {
+        id: zoneRow
+        visible: controls.visible&&annualPane.zoneEditorOpen
+        z: 3
+        anchors.top: topModes.bottom
+        anchors.topMargin: 1
+        anchors.left: parent.left
+        anchors.right: parent.right
+        height: visible?24:0
+        spacing:4
+        QuietText {
+            width: 65;height:23
+            text:"IANA ZONE"
+            color:Colors.cyan
+            verticalAlignment:Text.AlignVCenter
+            font.pixelSize:9
+        }
+        Rectangle {
+            width:Math.max(90,parent.width-65-58-8)
+            height:23
+            color:Colors.dark
+            border.width:1;border.color:Colors.blue
+            TextInput {
+                id:zoneInput
+                anchors.fill:parent
+                anchors.margins:3
+                text:annualPane.zoneId
+                color:Colors.white
+                font.family:"monospace"
+                font.pixelSize:10
+                selectByMouse:true
+                maximumLength:64
+                onEditingFinished: {
+                    annualPane.zoneId=text.trim();
+                    focus=false;
+                }
+            }
+        }
+        ActionButton {
+            width:58;height:23
+            label:"SET ZONE";labelPixelSize:8
+            accentColor:Colors.yellow
+            onClicked: {
+                annualPane.zoneId=zoneInput.text.trim();
+                zoneInput.focus=false;
+                annualPane.zoneEditorOpen=false;
+            }
+        }
+    }
+    QuietText {
+        id: statusLine
+        visible: controls.visible
+        z: 3
+        anchors.top: zoneRow.visible?zoneRow.bottom:controls.bottom
+        anchors.topMargin:2
+        anchors.left:parent.left
+        anchors.right:parent.right
+        height:visible?14:0
+        font.pixelSize:9
+        color:annualSource.ready?Colors.cyan:Colors.orange
+        elide:Text.ElideRight
+        text:annualSource.statusText+" // "+annualPane.zoneId
+    }
+
+    // These remain visible in focus mode so zoom never becomes a trap.
+    Rectangle {
+        id: zoomBackground
+        visible: zoomToolbar.visible
+        anchors.centerIn: zoomToolbar
+        width: zoomToolbar.width+6
+        height: zoomToolbar.height+3
+        color: Colors.black
+        opacity:0.92
+        z:3
+    }
+    Row {
+        id: zoomToolbar
+        visible:annualPane.view!=="forecast"
+        z:4
+        height:25
+        spacing:3
+        anchors.horizontalCenter:parent.horizontalCenter
+        anchors.bottom: detailRack.visible?detailRack.top:parent.bottom
+        anchors.bottomMargin: detailRack.visible?2:5
+        ActionButton {
+            width:35;height:24;label:"−"
+            labelPixelSize:13
+            accentColor:Colors.cyan
+            available:annualPane.wheelZoom>annualPane.minZoom
+            onClicked: annualPane.zoomAt(1/1.25,wheel.width/2,wheel.height/2)
+        }
+        QuietText {
+            width:50;height:24
+            text:Math.round(annualPane.wheelZoom*100)+"%"
+            color:Colors.yellow;font.pixelSize:11
+            verticalAlignment:Text.AlignVCenter
+            horizontalAlignment:Text.AlignHCenter
+        }
+        ActionButton {
+            width:35;height:24;label:"+"
+            labelPixelSize:13
+            accentColor:Colors.cyan
+            available:annualPane.wheelZoom<annualPane.maxZoom
+            onClicked: annualPane.zoomAt(1.25,wheel.width/2,wheel.height/2)
+        }
+        ActionButton {
+            width:44;height:24;label:"FIT"
+            labelPixelSize:9
+            accentColor:Colors.orange
+            onClicked:annualPane.fitWheel()
+        }
+        ActionButton {
+            width:48;height:24;label:"RESET"
+            labelPixelSize:9
+            accentColor:Colors.orange
+            onClicked:annualPane.resetView()
+        }
+        ActionButton {
+            width:52;height:24
+            label:annualPane.focusMode?"BACK":"FOCUS"
+            labelPixelSize:9
+            accentColor:annualPane.focusMode?Colors.magenta:Colors.cyan
+            selected: annualPane.focusMode
+            onClicked: annualPane.focusMode=!annualPane.focusMode
         }
     }
 
@@ -208,19 +334,20 @@ Rectangle {
         anchors.topMargin: 2
         anchors.left: parent.left
         anchors.right: parent.right
-        anchors.bottom: detailRack.top
-        anchors.bottomMargin: 2
+        anchors.bottom: parent.bottom
+        anchors.bottomMargin: 0
         onWidthChanged: requestPaint()
         onHeightChanged: requestPaint()
         onPaint: {
             const ctx=getContext("2d");
             ctx.clearRect(0,0,width,height);
-            const cx=width/2,cy=height/2,r=Math.max(5,Math.min(
-                width-6,height-4)*0.48);
+            const cx=0,cy=0,r=annualPane.fitRadius;
             const data=annualPane.model,valid=data.ready;
             const isMoon=annualPane.view==="moon";
             const monthMode=isMoon&&annualPane.scopeMode==="month";
             ctx.save();
+            ctx.translate(width/2+annualPane.panX,height/2+annualPane.panY);
+            ctx.scale(annualPane.wheelZoom,annualPane.wheelZoom);
             ctx.lineWidth=1;
             ctx.textAlign="center";
             ctx.textBaseline="middle";
@@ -340,22 +467,55 @@ Rectangle {
             ctx.restore();
         }
         MouseArea {
+            id: wheelMouse
             anchors.fill: parent
-            cursorShape: Qt.PointingHandCursor
+            acceptedButtons: Qt.LeftButton
+            hoverEnabled: true
+            cursorShape: wheelMouse.pressed?Qt.ClosedHandCursor:Qt.OpenHandCursor
+            property real pressX: 0
+            property real pressY: 0
+            property real lastX: 0
+            property real lastY: 0
+            property bool dragged: false
+            onPressed: function(mouse) {
+                pressX=lastX=mouse.x;
+                pressY=lastY=mouse.y;
+                dragged=false;
+            }
+            onPositionChanged: function(mouse) {
+                if(!wheelMouse.pressed)return;
+                if(Math.hypot(mouse.x-pressX,mouse.y-pressY)>5)
+                    dragged=true;
+                if(dragged)annualPane.panBy(mouse.x-lastX,mouse.y-lastY);
+                lastX=mouse.x;lastY=mouse.y;
+            }
+            onWheel: function(wheelEvent) {
+                if(wheelEvent.angleDelta.y!==0) {
+                    annualPane.zoomAt(wheelEvent.angleDelta.y>0?1.2:1/1.2,
+                                      wheelEvent.x,wheelEvent.y);
+                    wheelEvent.accepted=true;
+                }
+            }
+            onDoubleClicked: annualPane.fitWheel()
             onClicked: function(mouse) {
+                if(dragged)return;
                 const model=annualPane.model;
                 if(!model.ready)return;
-                const cx=wheel.width/2,cy=wheel.height/2;
-                const r=Math.max(5,Math.min(wheel.width-6,wheel.height-4)*0.48);
-                const dist=Math.hypot(mouse.x-cx,mouse.y-cy);
+                // Inverse of painter translate + scale for correct wheel hits
+                // after zoom/pan. The angle always maps to true dated entries.
+                const dx=(mouse.x-wheel.width/2-annualPane.panX)
+                         /annualPane.wheelZoom;
+                const dy=(mouse.y-wheel.height/2-annualPane.panY)
+                         /annualPane.wheelZoom;
+                const r=annualPane.fitRadius;
+                const dist=Math.hypot(dx,dy);
                 if(dist>r||dist<r*0.24)return;
                 if(annualPane.view==="moon"&&annualPane.scopeMode==="month"){
                     const rows=annualPane.moonMonth;
-                    const i=Atlas.indexAtAngle(mouse.x,mouse.y,cx,cy,rows.length);
+                    const i=Atlas.indexAtAngle(dx,dy,0,0,rows.length);
                     if(i>=0)annualPane.selectedIndex=rows[i].day_index;
                 } else {
-                    const i=Atlas.indexAtAngle(mouse.x,mouse.y,cx,cy,
-                                               model.days.length);
+                    const i=Atlas.indexAtAngle(dx,dy,0,0,model.days.length);
                     if(i<0)return;
                     if(annualPane.view==="moon"){
                         annualPane.selectedIndex=i;
@@ -380,10 +540,12 @@ Rectangle {
 
     Column {
         id: detailRack
-        visible: annualPane.view!=="forecast"
+        visible: annualPane.view!=="forecast" && !annualPane.focusMode
+        z: 3
         anchors.bottom: parent.bottom
         anchors.left: parent.left
         anchors.right: parent.right
+        height: visible?implicitHeight:0
         spacing: 2
         Row {
             visible: annualPane.view==="moon"&&annualPane.scopeMode==="month"

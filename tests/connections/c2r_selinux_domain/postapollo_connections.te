@@ -23,6 +23,7 @@ dbus_system_bus_client(postapollo_connections_t)
 # Permit service-name registration only toward the system bus daemon domain.
 gen_require(`
     type system_dbusd_t;
+    class dbus acquire_svc;
 ')
 allow postapollo_connections_t system_dbusd_t:dbus acquire_svc;
 

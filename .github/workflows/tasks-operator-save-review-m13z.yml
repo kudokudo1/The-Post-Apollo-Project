@@ -1,0 +1,64 @@
+name: TASKS M13z operator-visible save review (read only)
+
+on:
+  pull_request:
+    paths:
+      - 'widgets/tasks/TaskRecoveryReviewPolicyM13z.js'
+      - 'widgets/tasks/TaskRecoveryReviewPaneM13z.qml'
+      - 'widgets/tasks/TaskRecoveryStatusPaneM13q.qml'
+      - 'tests/tasks/test_task_operator_save_review_m13z.cjs'
+      - 'docs/tasks-operator-save-review-m13z.md'
+      - '.github/workflows/tasks-operator-save-review-m13z.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'widgets/tasks/TaskRecoveryReviewPolicyM13z.js'
+      - 'widgets/tasks/TaskRecoveryReviewPaneM13z.qml'
+      - 'widgets/tasks/TaskRecoveryStatusPaneM13q.qml'
+      - 'tests/tasks/test_task_operator_save_review_m13z.cjs'
+      - '.github/workflows/tasks-operator-save-review-m13z.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  synthetic-operator-review:
+    runs-on: ubuntu-latest
+    timeout-minutes: 14
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: M13z three scenarios and no-draft-clear display-only policy
+        run: node --test tests/tasks/test_task_operator_save_review_m13z.cjs
+      - name: Existing M13q recovery and M13s unsaved editor metadata
+        run: |
+          node --test tests/tasks/test_task_recovery_status_m13q.cjs
+          node --test tests/tasks/test_task_live_draft_presence_m13s.cjs
+      - name: Original M13y independent post-crash source inspection
+        run: |
+          python3 -B -m unittest discover -s tests/tasks \
+            -p 'test_task_postcrash_source_review_m13y.py' -v
+      - name: M13w synthetic receipt never clears a draft
+        run: |
+          node --test tests/tasks/test_task_source_receipt_interface_m13w.cjs
+      - name: Production sole writer and shared Connections stay disabled
+        run: |
+          python3 tests/tasks/test_task_writer_gate_inventory_m11d.py
+          node tests/cpuplus/test_connections_broker_c2a.js
+      - name: Parse mounted read-only QML without desktop launch
+        run: |
+          sudo apt-get update -qq
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends qt6-declarative-dev-tools
+          QT_QPA_PLATFORM=offscreen /usr/lib/qt6/bin/qmlformat widgets/tasks/TaskRecoveryReviewPaneM13z.qml >/dev/null
+          QT_QPA_PLATFORM=offscreen /usr/lib/qt6/bin/qmlformat widgets/tasks/TaskRecoveryStatusPaneM13q.qml >/dev/null
+      - name: No new task source writer, live inspector or keyring actor
+        run: |
+          set -euo pipefail
+          ! grep -Eq 'FileView *\{|Process *\{|XMLHttpRequest|secret-tool|Qt.openUrlExternally|ApolloHubTodoStore\.' \
+            widgets/tasks/TaskRecoveryReviewPaneM13z.qml \
+            widgets/tasks/TaskRecoveryReviewPolicyM13z.js
+          ! grep -q 'TaskPostCrashSourceReviewM13y' widgets/tasks/TaskRecoveryStatusPaneM13q.qml
+          test "$(grep -c 'todoFile.setText(' services/hub/ApolloHubTodoStore.qml)" = 1
+          printf '%s\n' 'M13Z_OPERATOR_REVIEW_EXAMPLES_NO_SOURCE_WRITE_NO_ACK_PASS'

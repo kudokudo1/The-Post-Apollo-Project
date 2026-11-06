@@ -103,9 +103,9 @@ class AnnualAtlasTest(unittest.TestCase):
 
     def test_dst_local_calendar_dates_use_explicit_iana_zone(self):
         data, moon, sun, source = fixture()
-        # Synthetic 2026-11-01 01:00 UTC is still October 31 in New York.
-        moon[43]["time_utc"]="2026-11-01T01:00:00Z"
-        # This deliberately makes events nonmonotonic and must fail.
+        # 2026-01-01 01:00Z is still Dec 31 locally and is excluded.
+        moon[0]["time_utc"]="2026-01-01T01:00:00Z"
+        # Even though UTC is in the year, the local calendar date is not.
         with self.assertRaises(atlas.ContractError):
             atlas.assemble(2026,"America/New_York",data,moon,sun,source)
         self.assertEqual(

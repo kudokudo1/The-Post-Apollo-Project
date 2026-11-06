@@ -135,7 +135,7 @@ test("M6b GUI adds secondary CURVE/MATRIX without eighth main mode or provider",
     assert.match(qml,/onClicked: instrument\.aspectPresentation=modelData\.id/);
     assert.match(qml,/Matrix\.pick\(instrument\.aspectMatrix,/);
     assert.match(qml,/instrument\.lockedIndex=cell\.sampleIndex/);
-    assert.match(qml,/NEAREST SOURCE SAMPLE \/ BIN \/\/ NO INTERPOLATION/);
+    assert.match(qml,/BUCKET CLOSEST MEASURED SAMPLE \/\/ NO INTERPOLATION/);
     assert.match(qml,/function paintRetrograde\(ctx\)/);
     assert.match(qml,/id:"retro",label:"RETRO"/);
     assert.match(qml,/StationCosmosCelestialNetwork\s*\{/);

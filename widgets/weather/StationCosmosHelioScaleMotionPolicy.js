@@ -69,7 +69,11 @@ function sampleWindow(payload,scene,body,index,halfWindow) {
     if (!payload || !scene || scene.ready !== true || scene.atlas !== true ||
         typeof body !== "string" || !body || !Array.isArray(scene.points) ||
         !scene.points.some(function(p){return p && p.body === body;}) ||
-        !payload.provenance || !payload.solar_overview)
+        scene.frame !== FRAME || scene.positionModel !== "geometric" ||
+        scene.origin !== "sun" ||
+        !payload.provenance || !payload.solar_overview ||
+        !payload.query || !Array.isArray(payload.query.solar_overview_bodies) ||
+        payload.query.solar_overview_bodies.indexOf(body) < 0)
         return empty("NO SELECTED VERIFIED JPL BODY");
     var atlas = payload.solar_overview,provenance=payload.provenance;
     if (atlas.format !== ATLAS_FORMAT || atlas.origin !== "heliocentric" ||

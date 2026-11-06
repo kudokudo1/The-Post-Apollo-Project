@@ -110,6 +110,7 @@ Rectangle {
                     border.color: Colors.magenta
                     clip: true
                     Image {
+                        id: focusedSuviImage
                         anchors.fill: parent
                         anchors.margins: 3
                         source: solarFocus.sourceSpace
@@ -164,7 +165,7 @@ Rectangle {
                         text: solarFocus.sourceSpace
                             ? "CHANNEL // "
                               +solarFocus.sourceSpace.solarImageInfo.shortLabel
-                              +" // "+(solarFocus.sourceSpace.solarImageReady
+                              +" // "+(focusedSuviImage.status === Image.Ready
                                   ? "IMAGE READY" : "IMAGE WAITING")
                             : "CHANNEL --"
                         color: Colors.orange

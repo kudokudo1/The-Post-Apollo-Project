@@ -94,3 +94,23 @@ test("C5 focused hidden astronomy acquisition uses route, not visual geometry",(
   assert.match(focus,/label: "RETRY SOURCE"/);
   assert.match(focus,/focus\.selectedProvider\.refresh\(\)/);
 });
+
+test("C5 populated source-to-render contracts use actual provider fields",()=>{
+  assert.equal(calendar.localCivilMinute(Date.parse("2026-11-05T03:30:00Z"),-300),1350);
+  assert.equal(calendar.localCivilMinute(Date.parse("2026-11-05T03:30:00Z"),540),750);
+  assert.equal(calendar.localCivilMinute(Date.parse("2026-11-05T03:30:00Z"),null),-1);
+  assert.equal(calendar.localCivilMinute(0,-300),-1);
+  assert.match(sky,/sourceOnly \? focusedCivilDate : skyCycle\.date/);
+  assert.match(sky,/CosmosCalendar\.localCivilMinute\(/);
+  assert.match(focus,/focusedLocalMinute/);
+  assert.match(focus,/item\.rise\.timeUtc/);
+  assert.match(focus,/item\.culminate\.timeUtc/);
+  assert.match(focus,/meteorSource\.activeShowers/);
+  assert.match(focus,/seenShower\[item\.name\]/);
+  for (const anchor of [
+    'objectName: "cosmos-c5-sun-path"',
+    'objectName: "cosmos-c5-planet-event-marker"',
+    'objectName: "cosmos-c5-source-card"',
+    'objectName: "cosmos-c5-meteor-card"'
+  ]) assert.ok(focus.includes(anchor),anchor);
+});

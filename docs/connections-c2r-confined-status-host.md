@@ -27,6 +27,14 @@ A valid passing CI run must establish the *same* Fedora kernel is Enforcing, mod
 
 Sources: Fedora SELinux independent policy reference (`init_daemon_domain` .te/.fc workflow), https://fedoraproject.org/wiki/SELinux/IndependentPolicy ; Red Hat reference policy quick-start https://access.redhat.com/articles/6999267.
 
+### C2r evidence checkpoint, November 6
+
+The Fedora module compiles successfully using selinux-policy-devel. An enforcing Fedora 44 guest confirmed that the custom policy module installs and that the executable receives postapollo_connections_exec_t. The service *did not* enter the proposed domain in the first completed guest run: it stayed in init_t and the audit log explicitly denied process2 nnp_transition from init_t to postapollo_connections_t while the systemd unit retained NoNewPrivileges=yes. A narrow rule allowing precisely that transition was added, based on the audited denial. NoNewPrivileges has **not** been disabled. Source rule: allow init_t postapollo_connections_t:process2 nnp_transition.
+
+This rule compiled again. Its actual transition and the negative-access test still require a successful guest rerun. The next GitHub runner's Ubuntu apt-get step was still in progress when checked, before the guest test. The workflow has since been bounded with explicit apt update/install timeouts so dependency delays fail visibly. **Do not claim dedicated confinement until the guest journal reports postapollo_connections_t and the negative dummy-read and D-Bus tests pass together.**
+
+Recovery: inspect the latest head of draft PR #1338, check the enforcing-confined-fedora-service job, and search for C2R_SERVICE_SELINUX_CONTEXT and C2R_PASS // DEDICATED_CONFINED_SERVICE_DOMAIN_AND_NEGATIVE_ACCESS_DENIAL. The guest script and boot script now preserve full guest error output and exit codes in the serial log.
+
 ## WATCH OUT FOR
 
 The module and package are unsigned temporary test inputs, not an installable production service. A newly defined domain is not automatically a proven complete least-privilege policy. Missing runtime permissions must be fixed with specific reviewed interfaces; do not add `permissive postapollo_connections_t`, domain-wide unconfined access, arbitrary syscalls, credential read, network access or use `audit2allow` blindly. Even a passing negative check covers **only** the particular denied file type tested.
@@ -39,7 +47,8 @@ SELinux modules in a throwaway Fedora guest do not prove the operator's live SEL
 - [x] Add custom type + exact executable file-context proposal
 - [x] Add compiled module builder and enforcing guest CI
 - [x] Add dummy world-readable SELinux denial test
-- [ ] Compile and install module in isolated Fedora CI successfully
+- [x] Compiled Fedora SELinux module and loaded it into Enforcing Fedora guest
+- [ ] Prove proper dedicated process domain with NNP transition rule in a new completed guest run
 - [ ] Confirm process domain is dedicated and D-Bus remains read-only
 - [ ] Confirm SELinux denial is OS-enforced (not merely DAC)
 - [ ] Complete final-head GitHub CI and independent review

@@ -15,11 +15,13 @@ Rectangle {
     clip: true
 
     property string selectedSection: "MESSAGES"
-    // Personal-only pilot; explicit terminal consent, not Identity Center auth.
+    // Remembered Personal preference, not Identity Center authorization.
     property string personalReadStatus: "NOT_STARTED"
     property string personalReadOperation: ""
     property int personalReadGeneration: 0
     property string personalConsentStatus: "IDLE"
+    property bool personalApproved: false
+    property bool personalPermissionOpen: false
     // The QML tree must exist before lifecycle handlers reference children.
     property bool personalReadUiReady: false
     Component.onCompleted: personalReadUiReady = true
@@ -31,7 +33,11 @@ Rectangle {
         if (personalReadProcess.running)
             personalReadProcess.running = false;
         phoneReadAdapter.forgetHostView();
+        personalApproved = false;
+        personalPermissionOpen = false;
         personalReadStatus = "IDENTITY_CHANGED";
+        if (visible)
+            checkPersonalApproval(false, false);
     }
     property string probeStatus: "NOT CHECKED"
     property var readiness: ({})
@@ -522,6 +528,13 @@ Rectangle {
         personalReadGeneration += 1;
         if (personalReadProcess.running)
             personalReadProcess.running = false;
+        if (visible && (selectedSection === "MESSAGES"
+                        || selectedSection === "CONTACTS")) {
+            if (personalApproved)
+                loadPersonalSnapshot();
+            else
+                checkPersonalApproval(false, false);
+        }
     }
     onStageHoleXChanged: {
         if (stageWanted) stageState = "POSITIONING";
@@ -603,11 +616,15 @@ Rectangle {
             if (personalReadProcess.running)
                 personalReadProcess.running = false;
             phoneReadAdapter.forgetHostView();
+            personalPermissionOpen = false;
+            personalApproved = false;
         }
         if (visible) {
-            personalReadStatus = "NOT_STARTED";
+            personalReadStatus = "CHECKING_PERMISSION";
             personalReadOperation = "";
             personalConsentStatus = "IDLE";
+            personalPermissionOpen = false;
+            personalApproved = false;
             phoneReadAdapter.forgetHostView();
             selectedSection = "MESSAGES";
             setupState = "NOT STARTED";
@@ -638,32 +655,105 @@ Rectangle {
             stagePurpose = "PHONE";
             stageState = "IDLE";
             stagePollCount = 0;
-            // No pairing or inventory action runs automatically on menu open.
+            // Only a previously remembered Personal consent may auto-read.
+            // No pairing, new approval or device configuration on menu open.
+            Qt.callLater(function() {
+                if (phonePane.visible)
+                    phonePane.checkPersonalApproval(true, false);
+            });
         }
     }
 
-    // This adapter never reads the phone itself. Only a manually started,
-    // short-lived Personal pilot supplies snapshots; no organization grants.
+    // The service adapter only displays already-released projections.
+    // A user-private saved preference, not app/process authentication, allows
+    // Personal one-shot reads without opening a terminal or persistent socket.
     PhoneAdapters.BlueFerryAdapter {
         id: phoneReadAdapter
         active: phonePane.visible
     }
 
+    function personalReadMessage() {
+        switch (personalReadStatus) {
+        case "READING": return "READING IPHONE // Checking the selected device and BlueFerry...";
+        case "CHECKING_PERMISSION": return "CHECKING SAVED PERSONAL APPROVAL...";
+        case "SAVING_APPROVAL": return "SAVING PERSONAL READ PREFERENCE...";
+        case "LOCAL_SNAPSHOT":
+            return selectedSection === "CONTACTS"
+                ? "PERSONAL CONTACTS // " + phoneReadAdapter.contactCards.length
+                  + " cards received. READ ONLY."
+                : "PERSONAL MESSAGES // " + phoneReadAdapter.conversations.length
+                  + " threads received. READ ONLY.";
+        case "APPROVAL_REQUIRED": return "PERMISSION REQUIRED // Select APPROVE READ once.";
+        case "APPROVED": return "PERSONAL READ APPROVED // Loading or select REFRESH.";
+        case "NOT_CONSENTED": return "THIS TAB IS NOT APPROVED // Select APPROVE READ to change access.";
+        case "DEVICE_UNAVAILABLE": return "IPHONE OFFLINE OR DIFFERENT DEVICE // Reconnect the saved phone.";
+        case "PROVIDER_UNAVAILABLE": return "BLUEFERRY READ SERVICE UNAVAILABLE // Check DEVICE status.";
+        case "READ_UNAVAILABLE": return "READ FAILED // BlueFerry did not return a usable snapshot.";
+        case "STORAGE_UNAVAILABLE": return "SAVED PERMISSION UNAVAILABLE // Check local state permissions.";
+        case "REVOKED": return "PERSONAL READ APPROVAL REVOKED // No private data displayed.";
+        case "REVOKE_FAILED": return "WARNING // View cleared, saved approval could NOT be revoked.";
+        case "IDENTITY_CHANGED": return "SOCIAL IDENTITY CHANGED // Personal data hidden.";
+        case "VIEW_CLEARED": return "LOCAL PHONE VIEW CLEARED.";
+        case "STATUS_UNAVAILABLE": return "PHONE STATUS CHECK FAILED // Local data hidden.";
+        case "BRIDGE_UNAVAILABLE": return "PHONE READ COMMAND FAILED // The bridge did not start.";
+        case "APPROVAL_FAILED": return "COULD NOT SAVE APPROVAL // Check phone connection and storage.";
+        default: return "PERSONAL READ ONLY // Approval is remembered until revoked.";
+        }
+    }
+
     function openPersonalConsent() {
-        if (!visible || personalConsentProcess.running || stageWanted)
+        if (!visible || stageWanted || personalConsentProcess.running)
             return;
-        personalConsentStatus = "OPENING";
+        personalPermissionOpen = true;
+        personalReadStatus = "APPROVAL_REQUIRED";
+    }
+
+    function savePersonalApproval(choice) {
+        if (!visible || !personalPermissionOpen || personalConsentProcess.running
+                || ["m", "c", "b"].indexOf(choice) < 0)
+            return;
+        personalConsentStatus = "SAVING";
+        personalReadStatus = "SAVING_APPROVAL";
+        personalConsentProcess.requestGeneration = personalReadGeneration;
         personalConsentProcess.command = [
-            "python3", Quickshell.shellPath("services/phone/PhonePersonalReadPilot.py"),
-            "--open-consent"
+            "python3", Quickshell.shellPath("services/phone/PhoneRememberedRead.py"),
+            "--approve", choice
         ];
         personalConsentProcess.running = true;
     }
 
+    function checkPersonalApproval(autoRead, promptIfMissing) {
+        if (!visible || !personalReadUiReady)
+            return;
+        if (personalStatusProcess.running) {
+            personalStatusProcess.wantsAutoRead = personalStatusProcess.wantsAutoRead
+                                                  || autoRead;
+            personalStatusProcess.promptIfMissing = personalStatusProcess.promptIfMissing
+                                                     || promptIfMissing;
+            return;
+        }
+        personalStatusProcess.requestGeneration = personalReadGeneration;
+        personalStatusProcess.requestedContext = phoneReadAdapter._contextKey;
+        personalStatusProcess.requestedEpoch = phoneReadAdapter._contextEpoch;
+        personalStatusProcess.wantsAutoRead = autoRead;
+        personalStatusProcess.promptIfMissing = promptIfMissing;
+        personalStatusProcess.command = [
+            "python3", Quickshell.shellPath("services/phone/PhoneRememberedRead.py"),
+            "--status"
+        ];
+        personalStatusProcess.running = true;
+    }
+
     function loadPersonalSnapshot() {
-        if (!visible || personalReadProcess.running
+        if (!visible || personalPermissionOpen || personalReadProcess.running
                 || (selectedSection !== "MESSAGES" && selectedSection !== "CONTACTS"))
             return;
+        if (!personalApproved) {
+            // A click must never appear to do nothing. Restore an existing
+            // saved approval or show the in-PHONE permission prompt.
+            checkPersonalApproval(true, true);
+            return;
+        }
         personalReadGeneration += 1;
         personalReadOperation = selectedSection === "MESSAGES"
                                 ? "messages.read" : "contacts.read";
@@ -671,8 +761,8 @@ Rectangle {
         personalReadProcess.requestGeneration = personalReadGeneration;
         personalReadProcess.requestOperation = personalReadOperation;
         personalReadProcess.command = [
-            "python3", Quickshell.shellPath("services/phone/PhonePersonalReadPilot.py"),
-            "--client", personalReadOperation
+            "python3", Quickshell.shellPath("services/phone/PhoneRememberedRead.py"),
+            "--read", personalReadOperation
         ];
         personalReadProcess.running = true;
     }
@@ -684,10 +774,12 @@ Rectangle {
         if (personalReadProcess.running)
             personalReadProcess.running = false;
         phoneReadAdapter.forgetHostView();
-        personalReadStatus = "REVOKE_REQUESTED";
+        personalApproved = false;
+        personalPermissionOpen = false;
+        personalReadStatus = "VIEW_CLEARED";
         personalRevokeProcess.command = [
-            "python3", Quickshell.shellPath("services/phone/PhonePersonalReadPilot.py"),
-            "--client", "revoke"
+            "python3", Quickshell.shellPath("services/phone/PhoneRememberedRead.py"),
+            "--revoke"
         ];
         personalRevokeProcess.running = true;
     }
@@ -699,29 +791,47 @@ Rectangle {
 
     Process {
         id: personalConsentProcess
+        property int requestGeneration: 0
         stdout: StdioCollector {
             onStreamFinished: {
-                if (!phonePane.visible) return;
+                if (!phonePane.visible
+                        || personalConsentProcess.requestGeneration
+                           !== phonePane.personalReadGeneration)
+                    return;
                 try {
-                    var value = JSON.parse(String(text || ""));
-                    if (value.schema !== "post-apollo.phone.personal-local-pilot.v0"
-                            || value.execution !== "EXPLICIT_PERSONAL_LOCAL_PILOT"
-                            || value.ownerKind !== "PERSONAL"
-                            || value.organizationAccess !== false
-                            || value.sendingEnabled !== false
-                            || ["CONSENT_TERMINAL_REQUESTED",
-                                "TERMINAL_UNAVAILABLE"].indexOf(value.state) < 0)
-                        throw new Error("invalid status");
-                    phonePane.personalConsentStatus = value.state;
+                    var result = JSON.parse(String(text || ""));
+                    if (result.schema !== "post-apollo.phone.personal-remembered-read.v0"
+                            || result.execution !== "LOCAL_USER_PREFERENCE_NOT_AUTHORITY"
+                            || result.ownerKind !== "PERSONAL"
+                            || result.organizationAccess !== false
+                            || result.sendingEnabled !== false)
+                        throw new Error("invalid Personal preference response");
+                    if (result.state !== "APPROVED") {
+                        phonePane.personalReadStatus =
+                            result.state === "STORAGE_UNAVAILABLE" ? result.state
+                            : result.state === "DEVICE_UNAVAILABLE" ? result.state
+                            : result.state === "PROVIDER_UNAVAILABLE" ? result.state
+                            : "APPROVAL_FAILED";
+                        return;
+                    }
+                    phonePane.personalApproved = true;
+                    phonePane.personalPermissionOpen = false;
+                    phonePane.personalConsentStatus = "SAVED";
+                    phonePane.personalReadStatus = "APPROVED";
+                    Qt.callLater(function() {
+                        if (phonePane.visible)
+                            phonePane.loadPersonalSnapshot();
+                    });
                 } catch (error) {
-                    phonePane.personalConsentStatus = "TERMINAL_UNAVAILABLE";
+                    phonePane.personalReadStatus = "APPROVAL_FAILED";
                 }
             }
         }
         onExited: function(code) {
             if (phonePane.visible && code !== 0
-                    && phonePane.personalConsentStatus === "OPENING")
-                phonePane.personalConsentStatus = "TERMINAL_UNAVAILABLE";
+                    && requestGeneration === phonePane.personalReadGeneration
+                    && phonePane.personalReadStatus === "SAVING_APPROVAL")
+                phonePane.personalReadStatus = "APPROVAL_FAILED";
         }
     }
 
@@ -741,18 +851,23 @@ Rectangle {
                     return;
                 try {
                     var value = JSON.parse(String(text || ""));
-                    if (value.schema !== "post-apollo.phone.personal-local-pilot.v0"
-                            || value.execution !== "EXPLICIT_PERSONAL_LOCAL_PILOT"
+                    if (value.schema !== "post-apollo.phone.personal-remembered-read.v0"
+                            || value.execution !== "LOCAL_USER_PREFERENCE_NOT_AUTHORITY"
                             || value.ownerKind !== "PERSONAL"
                             || value.organizationAccess !== false
                             || value.sendingEnabled !== false)
-                        throw new Error("invalid host shape");
+                        throw new Error("unexpected read response");
                     if (value.state !== "SNAPSHOT") {
-                        phonePane.personalReadStatus =
-                            ["NOT_ACTIVE", "NOT_CONSENTED",
-                             "READ_UNAVAILABLE"].indexOf(value.state) >= 0
-                            ? value.state : "NOT_ACTIVE";
                         phoneReadAdapter.forgetHostView();
+                        phonePane.personalReadStatus =
+                            ["APPROVAL_REQUIRED", "NOT_CONSENTED",
+                             "DEVICE_UNAVAILABLE", "PROVIDER_UNAVAILABLE",
+                             "READ_UNAVAILABLE", "STORAGE_UNAVAILABLE"].indexOf(value.state) >= 0
+                            ? value.state : "BRIDGE_UNAVAILABLE";
+                        if (value.state === "APPROVAL_REQUIRED") {
+                            phonePane.personalApproved = false;
+                            phonePane.openPersonalConsent();
+                        }
                         return;
                     }
                     if (value.operation !== personalReadProcess.requestOperation
@@ -761,19 +876,19 @@ Rectangle {
                             || typeof value.epoch !== "number"
                             || typeof value.sequence !== "number"
                             || !value.projection)
-                        throw new Error("invalid snapshot envelope");
+                        throw new Error("invalid projection envelope");
                     if (phoneReadAdapter._contextKey !== value.contextKey
                             || phoneReadAdapter._contextEpoch !== value.epoch
                             || phoneReadAdapter._profileId !== value.profileId) {
                         phoneReadAdapter.forgetHostView();
                         if (!phoneReadAdapter.beginHostView(
-                                    value.contextKey, value.profileId, value.epoch))
-                            throw new Error("stale context");
+                                value.contextKey, value.profileId, value.epoch))
+                            throw new Error("stale or invalid context");
                     }
                     if (!phoneReadAdapter.applyHostProjection(
                                 value.contextKey, value.epoch, value.sequence,
                                 value.operation, value.projection))
-                        throw new Error("invalid projection");
+                        throw new Error("rejected projection");
                     phonePane.personalReadStatus = "LOCAL_SNAPSHOT";
                 } catch (error) {
                     phoneReadAdapter.forgetHostView();
@@ -785,7 +900,7 @@ Rectangle {
             if (phonePane.visible && code !== 0
                     && requestGeneration === phonePane.personalReadGeneration
                     && phonePane.personalReadStatus === "READING")
-                phonePane.personalReadStatus = "NOT_ACTIVE";
+                phonePane.personalReadStatus = "BRIDGE_UNAVAILABLE";
         }
     }
 
@@ -795,69 +910,104 @@ Rectangle {
             onStreamFinished: {
                 if (!phonePane.visible) return;
                 try {
-                    var value = JSON.parse(String(text || ""));
+                    var result = JSON.parse(String(text || ""));
                     phonePane.personalReadStatus =
-                        value.schema === "post-apollo.phone.personal-local-pilot.v0"
-                        && value.state === "REVOKED"
-                        ? "REVOKED" : "VIEW_CLEARED";
+                        result.schema === "post-apollo.phone.personal-remembered-read.v0"
+                        && result.execution === "LOCAL_USER_PREFERENCE_NOT_AUTHORITY"
+                        && result.ownerKind === "PERSONAL"
+                        && result.organizationAccess === false
+                        && result.sendingEnabled === false
+                        && result.state === "REVOKED"
+                        ? "REVOKED" : "REVOKE_FAILED";
                 } catch (error) {
-                    phonePane.personalReadStatus = "VIEW_CLEARED";
+                    phonePane.personalReadStatus = "REVOKE_FAILED";
                 }
             }
+        }
+        onExited: function(code) {
+            if (phonePane.visible && code !== 0
+                    && phonePane.personalReadStatus === "VIEW_CLEARED")
+                phonePane.personalReadStatus = "REVOKE_FAILED";
         }
     }
 
     Process {
         id: personalStatusProcess
+        property int requestGeneration: 0
         property string requestedContext: ""
         property int requestedEpoch: 0
+        property bool wantsAutoRead: false
+        property bool promptIfMissing: false
         stdout: StdioCollector {
             onStreamFinished: {
-                if (!phonePane.visible || phoneReadAdapter._contextKey === ""
-                        || personalStatusProcess.requestedContext !== phoneReadAdapter._contextKey
-                        || personalStatusProcess.requestedEpoch !== phoneReadAdapter._contextEpoch)
+                if (!phonePane.visible
+                        || personalStatusProcess.requestGeneration
+                           !== phonePane.personalReadGeneration
+                        || (personalStatusProcess.requestedContext !== ""
+                            && personalStatusProcess.requestedContext
+                               !== phoneReadAdapter._contextKey))
                     return;
                 try {
                     var value = JSON.parse(String(text || ""));
-                    if (value.schema !== "post-apollo.phone.personal-local-pilot.v0"
-                            || value.execution !== "EXPLICIT_PERSONAL_LOCAL_PILOT"
+                    if (value.schema !== "post-apollo.phone.personal-remembered-read.v0"
+                            || value.execution !== "LOCAL_USER_PREFERENCE_NOT_AUTHORITY"
                             || value.ownerKind !== "PERSONAL"
                             || value.organizationAccess !== false
-                            || value.sendingEnabled !== false
-                            || value.state !== "PERSONAL_LOCAL_PILOT_ACTIVE"
-                            || value.contextKey !== phoneReadAdapter._contextKey
-                            || value.epoch !== phoneReadAdapter._contextEpoch)
-                        throw new Error("pilot inactive or replaced");
+                            || value.sendingEnabled !== false)
+                        throw new Error("invalid permission status");
+                    if (value.state === "APPROVED") {
+                        if (phoneReadAdapter._contextKey !== ""
+                                && (value.contextKey !== phoneReadAdapter._contextKey
+                                    || value.epoch !== phoneReadAdapter._contextEpoch)) {
+                            phonePane.clearPersonalView();
+                        }
+                        phonePane.personalApproved = true;
+                        if (phonePane.personalReadStatus !== "READING"
+                                && phonePane.personalReadStatus !== "LOCAL_SNAPSHOT")
+                            phonePane.personalReadStatus = "APPROVED";
+                        if (personalStatusProcess.wantsAutoRead
+                                && (phonePane.selectedSection === "MESSAGES"
+                                    || phonePane.selectedSection === "CONTACTS"))
+                            Qt.callLater(function() {
+                                if (phonePane.visible)
+                                    phonePane.loadPersonalSnapshot();
+                            });
+                    } else {
+                        phonePane.personalApproved = false;
+                        if (phoneReadAdapter._contextKey !== "")
+                            phonePane.clearPersonalView();
+                        phonePane.personalReadStatus =
+                            ["APPROVAL_REQUIRED", "DEVICE_UNAVAILABLE",
+                             "STORAGE_UNAVAILABLE"].indexOf(value.state) >= 0
+                            ? value.state : "STATUS_UNAVAILABLE";
+                        if (value.state === "APPROVAL_REQUIRED"
+                                && personalStatusProcess.promptIfMissing)
+                            phonePane.openPersonalConsent();
+                    }
                 } catch (error) {
+                    phonePane.personalApproved = false;
                     phonePane.clearPersonalView();
-                    phonePane.personalReadStatus = "ACCESS_STOPPED";
+                    phonePane.personalReadStatus = "STATUS_UNAVAILABLE";
                 }
             }
         }
         onExited: function(code) {
-            if (code !== 0 && phoneReadAdapter._contextKey !== ""
-                    && requestedContext === phoneReadAdapter._contextKey
-                    && requestedEpoch === phoneReadAdapter._contextEpoch) {
+            if (code !== 0 && phonePane.visible
+                    && requestGeneration === phonePane.personalReadGeneration) {
+                phonePane.personalApproved = false;
                 phonePane.clearPersonalView();
-                phonePane.personalReadStatus = "ACCESS_STOPPED";
+                phonePane.personalReadStatus = "STATUS_UNAVAILABLE";
             }
         }
     }
 
     Timer {
-        interval: 3000
+        interval: 8000
         repeat: true
-        running: phonePane.visible && phoneReadAdapter._contextKey !== ""
-        onTriggered: {
-            if (personalStatusProcess.running) return;
-            personalStatusProcess.requestedContext = phoneReadAdapter._contextKey;
-            personalStatusProcess.requestedEpoch = phoneReadAdapter._contextEpoch;
-            personalStatusProcess.command = [
-                "python3", Quickshell.shellPath("services/phone/PhonePersonalReadPilot.py"),
-                "--client", "status"
-            ];
-            personalStatusProcess.running = true;
-        }
+        running: phonePane.visible && phonePane.personalApproved
+                 && (phonePane.selectedSection === "MESSAGES"
+                     || phonePane.selectedSection === "CONTACTS")
+        onTriggered: phonePane.checkPersonalApproval(false, false)
     }
 
     Process {
@@ -1564,7 +1714,7 @@ Rectangle {
                 width: Math.max(96, Math.min(150,
                            (personalReadBar.width - 30) / 3))
                 height: 31
-                label: "APPROVE READ"
+                label: phonePane.personalApproved ? "PERMISSION ON" : "APPROVE READ"
                 labelPixelSize: 9
                 accentColor: Colors.magenta
                 onTriggered: phonePane.openPersonalConsent()
@@ -1574,10 +1724,12 @@ Rectangle {
                            (personalReadBar.width - 30) / 3))
                 height: 31
                 label: phonePane.personalReadStatus === "READING"
-                       ? "LOADING..." : "LOAD PERSONAL"
+                       ? "LOADING..." : phonePane.personalApproved
+                         ? "REFRESH" : "LOAD PERSONAL"
                 labelPixelSize: 9
                 accentColor: Colors.cyan
                 interactive: !personalReadProcess.running
+                             && !personalConsentProcess.running
                 onTriggered: phonePane.loadPersonalSnapshot()
             }
             ActionButton {
@@ -1589,6 +1741,130 @@ Rectangle {
                 accentColor: Colors.red
                 destructive: true
                 onTriggered: phonePane.revokePersonalAccess()
+            }
+        }
+    }
+
+    // This always-visible strip explains *why* a read has not completed.
+    // No exception text, SMS content, profile UUIDs or tokens shown here.
+    Rectangle {
+        id: personalReadFeedback
+        anchors.top: personalReadBar.bottom
+        anchors.left: phoneContactList.right
+        anchors.right: parent.right
+        height: visible ? 29 : 0
+        visible: phonePane.selectedSection === "MESSAGES"
+                 || phonePane.selectedSection === "CONTACTS"
+        color: Colors.dark
+        border.width: 1
+        border.color: phonePane.personalReadStatus === "LOCAL_SNAPSHOT"
+                      ? Colors.green : Colors.orange
+        z: 7
+        Text {
+            anchors.fill: parent
+            anchors.leftMargin: 8
+            anchors.rightMargin: 8
+            text: phonePane.personalReadMessage()
+            textFormat: Text.PlainText
+            color: phonePane.personalReadStatus === "LOCAL_SNAPSHOT"
+                   ? Colors.green : Colors.orange
+            font.pixelSize: 10
+            verticalAlignment: Text.AlignVCenter
+            elide: Text.ElideRight
+        }
+    }
+
+    // A genuine on-screen, explicit one-time preference choice.
+    // This is NOT an OS camera-style per-app sandbox authorization.
+    Rectangle {
+        id: personalPermissionOverlay
+        anchors.fill: parent
+        z: 100
+        visible: phonePane.personalPermissionOpen
+        color: "#ef090315"
+        border.color: Colors.magenta
+        border.width: 2
+        MouseArea {
+            anchors.fill: parent
+            onClicked: {} // Block clicks into PHONE while the choice is shown.
+        }
+        Column {
+            anchors.centerIn: parent
+            width: Math.max(240, Math.min(420, parent.width - 40))
+            spacing: 12
+
+            Text {
+                width: parent.width
+                text: "PERSONAL IPHONE // READ PERMISSION"
+                textFormat: Text.PlainText
+                color: Colors.magenta
+                font.bold: true
+                font.pixelSize: 15
+                wrapMode: Text.WordWrap
+            }
+            Text {
+                width: parent.width
+                text: "Allow Social PHONE to read the selected iPhone's messages and/or contact cards? Your choice is remembered until you select STOP ACCESS. You do not need to approve again each time you open PHONE."
+                textFormat: Text.PlainText
+                color: Colors.white
+                font.pixelSize: 11
+                wrapMode: Text.WordWrap
+            }
+            Text {
+                width: parent.width
+                text: "PERSONAL LINUX-USER PREFERENCE ONLY. Other apps running as your Linux user may access BlueFerry independently. This does not authenticate an LLC/nonprofit or permit sending messages."
+                textFormat: Text.PlainText
+                color: Colors.orange
+                font.pixelSize: 10
+                wrapMode: Text.WordWrap
+            }
+            ActionButton {
+                width: parent.width
+                height: 38
+                label: "ALLOW BOTH // REMEMBER"
+                labelPixelSize: 10
+                accentColor: Colors.magenta
+                interactive: !personalConsentProcess.running
+                onTriggered: phonePane.savePersonalApproval("b")
+            }
+            ActionButton {
+                width: parent.width
+                height: 34
+                label: "MESSAGES ONLY // REMEMBER"
+                labelPixelSize: 9
+                accentColor: Colors.cyan
+                interactive: !personalConsentProcess.running
+                onTriggered: phonePane.savePersonalApproval("m")
+            }
+            ActionButton {
+                width: parent.width
+                height: 34
+                label: "CONTACTS ONLY // REMEMBER"
+                labelPixelSize: 9
+                accentColor: Colors.cyan
+                interactive: !personalConsentProcess.running
+                onTriggered: phonePane.savePersonalApproval("c")
+            }
+            ActionButton {
+                width: parent.width
+                height: 34
+                label: "NOT NOW"
+                labelPixelSize: 10
+                accentColor: Colors.orange
+                interactive: !personalConsentProcess.running
+                onTriggered: phonePane.personalPermissionOpen = false
+            }
+            Text {
+                width: parent.width
+                visible: phonePane.personalReadStatus === "STORAGE_UNAVAILABLE"
+                         || phonePane.personalReadStatus === "PROVIDER_UNAVAILABLE"
+                         || phonePane.personalReadStatus === "DEVICE_UNAVAILABLE"
+                         || phonePane.personalReadStatus === "APPROVAL_FAILED"
+                text: phonePane.personalReadMessage()
+                textFormat: Text.PlainText
+                color: Colors.orange
+                font.pixelSize: 10
+                wrapMode: Text.WordWrap
             }
         }
     }
@@ -1661,8 +1937,12 @@ Rectangle {
         anchors.margins: 10
         z: 4
         text: phonePane.selectedSection === "CONTACTS"
-              ? "NO PHONE CONTACTS\nSYNC NOT AUTHORIZED"
-              : "NO PHONE CHATS YET"
+              ? (phonePane.personalReadStatus === "LOCAL_SNAPSHOT"
+                 ? "NO CONTACT CARDS RETURNED"
+                 : "NO PHONE CONTACTS YET")
+              : (phonePane.personalReadStatus === "LOCAL_SNAPSHOT"
+                 ? "NO CONVERSATIONS RETURNED"
+                 : "NO PHONE CHATS YET")
         color: Colors.white
         opacity: 0.8
         font.family: "GohuFont 11 Nerd Font Mono"
@@ -1673,7 +1953,7 @@ Rectangle {
 
     ChatFeed {
         id: phoneChatFeed
-        anchors.top: personalReadBar.bottom
+        anchors.top: personalReadFeedback.bottom
         anchors.left: phoneContactList.right
         anchors.right: parent.right
         anchors.bottom: parent.bottom
@@ -1710,17 +1990,12 @@ Rectangle {
                    && phoneReadAdapter.contactCards.length === 0
         textFormat: Text.PlainText
         text: phonePane.personalReadStatus === "LOCAL_SNAPSHOT"
-              ? "PERSONAL LOCAL SNAPSHOT // No records returned by BlueFerry."
-              : phonePane.personalConsentStatus === "CONSENT_TERMINAL_REQUESTED"
-                ? "Approve access in the new terminal, then select LOAD PERSONAL."
+              ? "BlueFerry returned an empty snapshot. SMS notifications do not imply saved message history or cached contact cards."
+              : phonePane.personalReadStatus === "APPROVAL_REQUIRED"
+                ? "Select APPROVE READ. Your choice is remembered for this iPhone until you revoke it."
                 : phonePane.personalReadStatus === "NOT_CONSENTED"
-                  ? "This channel was not selected in the Personal consent."
-                  : phonePane.personalReadStatus === "ACCESS_STOPPED"
-                    ? "Personal read access stopped. Local view cleared."
-                    : phonePane.personalReadStatus === "NOT_ACTIVE"
-                      ? "Personal read host is not active. Select APPROVE READ first."
-                      : "PERSONAL READ-ONLY PILOT // "
-                        + phonePane.contentDiagnosticText(phonePane.selectedSection)
+                  ? "This tab was not included in your saved approval. Select PERMISSION ON to change it."
+                  : phonePane.personalReadMessage()
         color: Colors.orange
         font.pixelSize: 11
         wrapMode: Text.WordWrap

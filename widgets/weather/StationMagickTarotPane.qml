@@ -2,6 +2,7 @@ import QtQuick
 import "../../components"
 import "StationMagickTarotDeckPolicy.js" as Deck
 import "StationMagickTarotPhysicalPolicy.js" as Physical
+import "StationMagickTarotLayoutPolicy.js" as Layout
 
 // M6g // Symbolic deck workspace. No actual copyrighted illustrations,
 // guidebook readings, journal storage, network, additional provider or
@@ -24,25 +25,38 @@ Rectangle {
     property string catalogGroup: "all"
     property int catalogPage: 0
     property string previewId: ""
+    // M6i // Responsive viewport geometry and explicit visual inspection.
+    property int inspectedDrawIndex: -1
+    readonly property var inspectedDrawCard:
+        Layout.selectedCard(reading,inspectedDrawIndex)
+    readonly property var spreadMetrics:
+        Layout.spread(Math.max(180,width-14),height,spreadId)
+    readonly property var catalogMetrics:
+        Layout.catalog(Math.max(180,width-14),height)
+    readonly property var inspectMetrics:
+        Layout.inspect(Math.max(180,width-14),height)
     readonly property var catalogEntries: Deck.catalog(catalogGroup)
-    readonly property int catalogPageSize: 8
+    readonly property int catalogPageSize:
+        catalogMetrics ? catalogMetrics.pageSize : 6
     readonly property int catalogPages: Math.ceil(
         catalogEntries.length/catalogPageSize)
     readonly property var visibleCatalog: catalogEntries.slice(
         catalogPage*catalogPageSize,
         (catalogPage+1)*catalogPageSize)
-    readonly property var inspectedCard: Deck.cardById(previewId) &&
-        catalogEntries.some(function(c){return c.id===previewId;})
-        ? Deck.cardById(previewId)
-        : catalogEntries.length
+    readonly property var explicitlyPreviewedCard:
+        Layout.previewByClick(catalogEntries,previewId)
+    readonly property var inspectedCard: explicitlyPreviewedCard ||
+        (catalogEntries.length
         ? catalogEntries[Math.min(catalogEntries.length-1,
-              Math.max(0,catalogPage*catalogPageSize))] : null
+              Math.max(0,catalogPage*catalogPageSize))] : null)
 
     onCatalogGroupChanged: {
         catalogPage=0;
         previewId="";
     }
     onCatalogPageChanged: previewId=""
+    onReadingChanged: inspectedDrawIndex=-1
+    onViewModeChanged: inspectedDrawIndex=-1
     onSpreadIdChanged: {
         reading=drawMethod==="physical"
             ? Physical.start(Deck.SPREADS,Deck.DECK.id,spreadId)
@@ -63,9 +77,10 @@ Rectangle {
         lastError="";
     }
     function addPhysicalCard() {
-        if(drawMethod!=="physical" || !inspectedCard)return;
+        // A shown default preview is NOT consent to enter that card.
+        if(drawMethod!=="physical" || !explicitlyPreviewedCard)return;
         const result=Physical.add(Deck.SPREADS,Deck.CARDS,reading,
-                                  inspectedCard.id,manualReversed);
+                                  explicitlyPreviewedCard.id,manualReversed);
         if(!result.ok) {
             manualMessage=result.reason;
             return;
@@ -94,6 +109,11 @@ Rectangle {
     }
     function setPage(delta) {
         catalogPage=Math.max(0,Math.min(catalogPages-1,catalogPage+delta));
+    }
+    function inspectCard(index) {
+        const chosen=Layout.selectedCard(reading,index);
+        if(!chosen || viewMode!=="draw")return;
+        inspectedDrawIndex=index;
     }
 
     Column {

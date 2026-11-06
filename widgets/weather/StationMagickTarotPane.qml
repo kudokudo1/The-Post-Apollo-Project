@@ -14,7 +14,7 @@ Rectangle {
     clip: true
 
     // M6k // Explicit user-selected, read-only private image folder.
-    // No automatic scan, upload, copy, saved path or new artwork provider.
+    // NO UPLOAD // No automatic scan, copy, saved path or art provider.
     FolderDialog {
         id: tarotArtworkFolderPicker
         title: "Choose your private Wild Unknown card images folder"

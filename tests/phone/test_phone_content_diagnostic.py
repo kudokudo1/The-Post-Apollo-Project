@@ -12,6 +12,7 @@ sys.path.insert(0, str(ROOT / "services" / "phone"))
 module = importlib.import_module("PhoneContentDiagnostic")
 PROFILE = "123e4567-e89b-42d3-a456-426614174000"
 OTHER = "223e4567-e89b-42d3-a456-426614174000"
+_NOT_SUPPLIED = object()
 
 
 def device(**changes):
@@ -42,10 +43,10 @@ def status(**changes):
 
 
 class ContentDiagnosticTests(unittest.TestCase):
-    def check(self, *, obs=None, backend=None):
-        if obs is None:
+    def check(self, *, obs=_NOT_SUPPLIED, backend=_NOT_SUPPLIED):
+        if obs is _NOT_SUPPLIED:
             obs = device()
-        if backend is None:
+        if backend is _NOT_SUPPLIED:
             backend = status()
         return module.inspect(device_reader=lambda: obs,
                               status_reader=lambda: backend)

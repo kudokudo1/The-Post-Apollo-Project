@@ -13,6 +13,12 @@ C2x PR #1383 merged on November 6, 2026, while its Silverblue full test remained
 
 C2y copies only the unmerged diagnostic corrections from the old branch into a new branch based on the verified main after #1383 merged. A former unbounded pre-install rpm-ostree status --json pipeline is replaced with a 15-second, kill-after-5-second diagnostic; it records success/error/timeout markers and a bounded excerpt rather than blocking indefinitely. Failure-time status inspection also gets a timeout. C2V_INSTALL_COMMAND_BEGIN is now emitted immediately before the original 480-second real local RPM install. GitHub CI statically checks these markers and bounds. All upstream tests, the official Fedora ISO pinned hash, no guest network, SELinux Enforcing, and two actual reboot proof conditions remain required.
 
+### Resource evidence and isolated worker recovery
+
+The latest [run 42293464020](https://github.com/kudokudo1/The-Post-Apollo-Project/actions/runs/42293464020) and [run 42293463880](https://github.com/kudokudo1/The-Post-Apollo-Project/actions/runs/42293463880) (both FAILED) narrowed the issue. The independent guest systemd probe continued ticking throughout the installation phase; Fedora guest memory was about 3.9 GiB total with approximately 3.3 GiB available and its /var filesystem used 7.6 GiB of 38 GiB. Host QEMU process was alive. Crucially the install log reported "Writing rpmdb...done", "Writing OSTree commit...done", "Staging deployment...done", and the exact `postapollo-connections-c2t-fixture-0.1-1.fc44.noarch` added, with changes queued for next boot. **An OSTree deployment was composed and staged, but the original systemd oneshot controller and its in-cgroup watchdog never resumed to verify it, trigger reboot or return a CLI exit code.** The reason that caller stopped progressing is not yet verified; cgroup freeze/units is one plausible explanation, not established fact.
+
+C2y now launches the actual `rpm-ostree install --cache-only` in a separate **transient systemd worker cgroup** and monitors it from the existing guest controller. It requires **independent authoritative `rpm-ostree status --json`** before reboot: at least two deployments, a non-booted staged/pending default, the exact test package in the default deployment's local package metadata, and no active transaction. It accepts an observed worker exit of 0, or explicitly records `C2V_INSTALL_WORKER_EXIT_UNOBSERVED` if the CLI return remains blocked despite complete and verified staging. The *next boot* must then prove the fixture package genuinely exists in the booted RPM database and /usr, followed by a **second boot** after `rpm-ostree rollback --reboot` proving absence. An unverified stage alone is still NOT acceptance. The independent guest probe now reports relevant systemd cgroup.freeze/cgroup.events state, and the GitHub VM guest control unit has a bounded 1400-second deadline to accommodate two real boots. No production service activation, network, credentials or workstation operations.
+
 ## HOW TO USE
 
 None on your desktop. The PR's GitHub runner builds a temporary signed inert RPM, boots an ephemeral Fedora Silverblue 44 guest, and reports diagnostic/reboot status in CI.
@@ -40,13 +46,16 @@ This is a diagnostic boundary fix, not a demonstrated solution to offline rpm-os
 - [x] Preserve strict two-reboot rollback assertions and add CI regression checks
 - [x] Recover two failures after bounded status precheck and installation entry
 - [x] Add independent systemd guest probe and host-side QEMU/RAM/serial visibility
-- [ ] Verify full CI on exact new head and isolate first actual stall
+- [x] Establish guest remained responsive, resource-healthy and composed pending OSTree commit
+- [x] Separate rpm-ostree worker into its own transient systemd cgroup
+- [x] Require exact pending staged deployment with no active rpm-ostree transaction before reboot
+- [ ] Verify exact latest CI head and observe first layered reboot, then rollback reboot
 - [ ] Review any actual offline rpm-ostree failure and independently verify successful rollback
 - [ ] Obtain operator acceptance; no merge or production enablement by this worker
 
 ## NEXT
 
-If new CI fails, identify its first failed guest marker and inspect rpm-ostreed journal before changing the solver, offline metadata, test-media provenance, or deployment layer. Keep ownership and recovery pointers in this PR.
+If new CI fails, identify whether the detached worker completed or froze, whether the pending deployment's JSON contains the exact fixture, and whether the separate controller is live. Do not treat a working staged image as a completed rollback. Keep recovery pointers and exact CI logs here.
 
 ## DECISIONS
 

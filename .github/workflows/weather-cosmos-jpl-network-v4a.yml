@@ -28,6 +28,10 @@ on:
       - 'widgets/weather/StationMagickRetrogradeLanePolicy.js'
       - 'widgets/weather/StationMagickAspectMatrixPolicy.js'
       - 'widgets/weather/StationMagickEpochComparePolicy.js'
+      - 'widgets/weather/StationMagickPlanetaryHoursPolicy.js'
+      - 'widgets/weather/StationMagickPlanetaryHoursPane.qml'
+      - 'tests/weather/test_magick_planetary_hours_m6d.js'
+      - 'tests/weather/test_magick_subject_panels_g1.js'
       - 'widgets/weather/StationMagickSubjectPanelPolicy.js'
       - 'tests/weather/test_magick_epoch_compare_m6c.js'
       - 'tests/weather/test_magick_aspect_matrix_m6b.js'
@@ -77,6 +81,8 @@ jobs:
         run: node --test tests/weather/test_magick_aspect_matrix_m6b.js
       - name: Verify M6c dual-epoch JPL comparison and real Transits route
         run: node --test tests/weather/test_magick_epoch_compare_m6c.js
+      - name: Verify M6d Chaldean planetary hours from real provider-local solar events
+        run: node --test tests/weather/test_magick_planetary_hours_m6d.js
       - name: Preserve MAGICK M4/M5 sources and interaction behavior
         run: |
           node --test tests/weather/test_magick_celestial_visual_m5.js

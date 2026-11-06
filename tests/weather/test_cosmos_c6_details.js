@@ -46,7 +46,7 @@ test("ISS displays full rise peak set and source-limited interpretation",()=>{
  assert.equal(facts[3].value,"53.6°");
  assert.equal(facts[9].value,"10:00");
  assert.equal(facts[11].value,"GEOMETRIC ONLY");
- assert.equal(ctx.page(facts,2).length,4);
+ assert.equal(facts.slice(8).length,4);
  assert.equal(ctx.disclaimer("iss",false).includes("NOT OPTICAL VISIBILITY"),true);
 });
 
@@ -76,14 +76,18 @@ test("NASA is global date-only and USNO exposes both anchors and nav stars",()=>
  assert.equal(anchor[5].value,"SIRIUS");
 });
 
-test("focused detail UI has bounded page navigation, no main scroll, and no second provider",()=>{
+test("focused detail UI shows all twelve fields without paging, main scroll or extra providers",()=>{
  assert.match(modes,/id: subjectCards\s*StationCosmosDetailPane\s*\{/);
  assert.match(modes,/celestialSource: cosmosModePane\.celnav/);
  assert.match(modes,/issSource: cosmosModePane\.issSource/);
  assert.match(modes,/eclipseSource: cosmosModePane\.eclipseSource/);
- assert.match(detail,/readonly property var visibleFacts:/);
+ assert.match(detail,/readonly property var facts:/);
  assert.match(detail,/renderedFactCount: factGridRepeater\.count/);
- assert.match(detail,/onClicked: detailsPane\.factPage = \(detailsPane\.factPage\+1\)%3/);
+ assert.match(detail,/columns: 3/);
+ assert.match(detail,/model: detailsPane\.recordCount > 0 \? 12 : 0/);
+ assert.match(detail,/height: Math\.max\(1,\(factGrid\.height-3\*factGrid\.spacing\)\/4\)/);
+ assert.match(detail,/detailsPane\.facts\[index\]/);
+ assert.doesNotMatch(detail,/factPage|visibleFacts|id: factControls|label: "DATA [<>]"/);
  assert.match(detail,/detailsPane\.selectedIndex = \(detailsPane\.selectedIndex/);
  assert.match(detail,/detailsPane\.starsAsNav = !detailsPane\.starsAsNav/);
  for(const forbidden of ["Process {","FileView {","Flickable {","XMLHttpRequest","Timer {"])

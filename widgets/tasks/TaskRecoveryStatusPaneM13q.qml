@@ -158,6 +158,9 @@ Item {
             // Reuse M13s above for genuine in-memory unsaved editor status.
             TaskRecoveryReviewPaneM13z {
                 width: parent.width
+                // M14a // Live, bounded callback state from the already-owned
+                // singleton, never raw draft/task/source bytes.
+                nativeSaveSignals: ApolloHubTodoStore.nativeSaveObservationM14a
             }
 
             Rectangle {

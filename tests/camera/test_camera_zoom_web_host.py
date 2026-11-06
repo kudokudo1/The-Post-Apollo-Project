@@ -29,7 +29,9 @@ class ZoomWebHostTests(unittest.TestCase):
 
     def test_qml_hole_is_closed_by_default_and_only_after_verified_dock(self):
         self.assertIn('property bool zoomWebDocked: false', QML)
-        self.assertIn('zoomWebDocked = !!(reply && reply.ok === true && reply.docked === true)', QML)
+        self.assertIn('const initiallyDocked = !!(reply && reply.ok === true && reply.docked === true)', QML)
+        self.assertIn('zoomFollowProcess.running = true;', QML)
+        self.assertIn('zoomWebDocked = aligned;', QML)
         self.assertIn('fillOpacity: camera.zoomWebDocked ? 0.0 : 0.97', QML)
         self.assertIn('intersection: Intersection.Subtract', QML)
         self.assertIn('width: camera.zoomWebDocked ? Math.round(zoomViewport.width) : 0', QML)

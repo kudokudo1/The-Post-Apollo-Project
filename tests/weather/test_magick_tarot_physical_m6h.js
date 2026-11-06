@@ -126,13 +126,13 @@ test("M6h integrates physical picker with existing Wild Unknown draw and INDEX",
  /tarot\.previewId!==""/,
  /Physical\.contains\(tarot\.reading,/,
  /tarot\.addPhysicalCard\(\)/,
- /tarot\.manualReversed=false/,
+ /manualReversed=false;/,
  /HOLD YOUR REAL DECK \/\/ CHOOSE CARDS IN INDEX/,
  /NO STORAGE \/\/ CARDS ENTERED BY YOU/,
  /Deck\.draw\(spreadId,Math\.random,reversals\)/,
  /StationMagickTarotCard\s*\{/
  ])assert.match(qml,re);
- assert.match(subject,/id: tarotReference\s*StationMagickTarotPane/);
+ assert.match(subjects,/id: tarotReference\s*StationMagickTarotPane/);
  assert.match(cardQml,/APOLLO ORIGINAL/);
  for(const src of [physicalSource,qml]){
    for(const forbidden of ["Process {","Timer {","FileView {",

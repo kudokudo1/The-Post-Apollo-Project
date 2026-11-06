@@ -11,6 +11,8 @@ Rectangle {
 
     property var celestialSource: null
     signal routeRequested(string path)
+    // M6e // Preserve the complete original LENSES landing.
+    property string lensView: "index"
 
     readonly property var entries: [
         {
@@ -41,6 +43,7 @@ Rectangle {
         anchors.fill: parent
         anchors.margins: 7
         spacing: 5
+        visible: lenses.lensView==="index"
 
         Row {
             width: parent.width
@@ -53,12 +56,20 @@ Rectangle {
                 text: "MAGICK // LENSES"
             }
             QuietText {
-                width: Math.max(0,parent.width-150)
+                width: Math.max(0,parent.width-235)
                 font.pixelSize: 9
                 color: Colors.yellow
                 text: "INTERPRETATION NOT CONNECTED"
                 elide: Text.ElideRight
                 horizontalAlignment: Text.AlignRight
+            }
+            ActionButton {
+                width: 78
+                height: 19
+                label: "AGRIPPA"
+                labelPixelSize: 9
+                accentColor: Colors.magenta
+                onClicked: lenses.lensView="agrippa"
             }
         }
 
@@ -120,5 +131,12 @@ Rectangle {
             text: "SCIENTIFIC OBSERVATIONS ARE NOT EVIDENCE OF SYMBOLIC CAUSATION"
             elide: Text.ElideRight
         }
+    }
+    // Source-labelled viewer nested within LENSES. The separate GRIMOIRE
+    // reference route is still pending and must not be silently replaced.
+    StationMagickAgrippaCorrespondencesPane {
+        anchors.fill: parent
+        visible: lenses.lensView==="agrippa"
+        onBackRequested: lenses.lensView="index"
     }
 }

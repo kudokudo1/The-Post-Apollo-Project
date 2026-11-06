@@ -48,6 +48,11 @@ jobs:
           assert 'REAL_SILVERBLUE_FIRST_BOOT_BASELINE' in guest
           assert 'LAYER_ACTIVE_ONLY_AFTER_REAL_REBOOT' in guest
           assert 'C2V_INSTALL_WATCHDOG' in guest
+          assert 'C2V_GUEST_PROBE_READY' in guest
+          assert 'C2V_GUEST_PROBE_TICK' in guest
+          assert 'systemd-run --quiet --unit=c2v-guest-probe' in guest
+          assert 'C2V_HOST_SERIAL_BYTES' in host
+          assert 'C2V_HOST_VM_LAST_PROCESS_STATE' in host
           assert 'timeout --signal=TERM --kill-after=20s 480s' in guest
           # Verify the volume in QEMU equals the label mounted inside guest.
           volume_lines = [line for line in host.splitlines() if '-volid C2' in line]

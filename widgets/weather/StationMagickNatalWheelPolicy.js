@@ -9,6 +9,9 @@ var SIGNS=["ARIES","TAURUS","GEMINI","CANCER","LEO","VIRGO",
 var TARGETS=["sun","moon","mercury","venus","mars_barycenter",
              "jupiter_barycenter","saturn_barycenter",
              "uranus_barycenter","neptune_barycenter","pluto_barycenter"];
+var EXACT_NAIF={sun:10,moon:301,mercury:199,venus:299,
+    mars_barycenter:4,jupiter_barycenter:5,saturn_barycenter:6,
+    uranus_barycenter:7,neptune_barycenter:8,pluto_barycenter:9};
 function fail(reason){return {ready:false,reason:reason||"FULL NATAL SOURCE NOT CONNECTED",
     planets:[],cusps:[],aspects:[],ascendant_deg:null,mc_deg:null};}
 function degree(x){return typeof x==="number"&&isFinite(x)&&x>=0&&x<360;}
@@ -53,7 +56,7 @@ function validate(payload){
     for(var i=0;i<payload.positions.length;i++){
         var p=payload.positions[i];
         if(!p||TARGETS.indexOf(p.id)<0||planetNames[p.id]||
-           !degree(p.longitude_deg)||!Number.isInteger(p.naif_id))
+           !degree(p.longitude_deg)||p.naif_id!==EXACT_NAIF[p.id])
            return fail("MISSING/UNVERIFIED PLANETARY PLACEMENTS");
         planetNames[p.id]=true;
     }

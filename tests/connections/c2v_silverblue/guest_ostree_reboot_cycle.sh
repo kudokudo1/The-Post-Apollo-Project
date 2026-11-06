@@ -95,6 +95,21 @@ for n in $(seq 1 36); do
     free -m | head -n 3
     df -h /var | tail -n 1
     ps -eo pid,stat,%cpu,rss,etime,comm | grep -E '[r]pm-ostree|[r]pm-ostreed|PID' | head -n 9 || true
+    # Distinguish service cgroup freeze from CPU/RAM pressure.
+    for unit in c2v-ostree-cycle.service c2v-rpm-layer-worker.service; do
+      cg="$(systemctl show "$unit" --property=ControlGroup --value 2>/dev/null || true)"
+      case "$cg" in
+        /system.slice/*)
+          echo "C2V_PROBE_UNIT_CGROUP // $unit $cg"
+          for field in cgroup.freeze cgroup.events; do
+            if [[ -r "/sys/fs/cgroup$cg/$field" ]]; then
+              echo "C2V_PROBE_CGROUP_FIELD // $unit $field"
+              head -n 4 "/sys/fs/cgroup$cg/$field" || true
+            fi
+          done
+        ;;
+      esac
+    done
     tail -n 6 /var/tmp/c2v-rpm-ostree-install.log 2>/dev/null || true
   } >/dev/ttyS0 2>&1
 done

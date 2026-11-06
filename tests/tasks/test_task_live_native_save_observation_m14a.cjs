@@ -91,9 +91,9 @@ test("production writer increments attempt in existing stage and observes callba
     assert.match(store,/phase: nativeSaveEventM14a/);
     assert.match(store,/requestCount: nativeSaveRequestsM14a/);
     assert.match(store,/sourceState: storageState/);
-    const marker="nativeSaveRequestsM14a = Math.min(1000000, nativeSaveRequestsM14a + 1)";
+    const marker="todo.nativeSaveRequestsM14a = Math.min(1000000,";
     assert.equal(store.split(marker).length-1,1);
-    assert.match(store,/nativeSaveEventM14a = "WRITE_REQUESTED"/);
+    assert.match(store,/todo\.nativeSaveEventM14a = "WRITE_REQUESTED"/);
     assert.match(store,/onSaved: \{[\s\S]*?nativeSaveEventM14a = todo\.storageState === "saving"/);
     assert.match(store,/\? "FILEVIEW_SAVED_HINT" : "UNATTRIBUTED_SAVED_HINT"/);
     assert.match(store,/onSaveFailed: function\(error\) \{[\s\S]*?nativeSaveEventM14a = "FILEVIEW_SAVE_FAILED"/);

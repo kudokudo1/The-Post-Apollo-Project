@@ -25,6 +25,12 @@ Rectangle {
     property string savedBridgeCheck: "NOT CHECKED"
     property var deviceObservation: ({})
     property string deviceObservationCheck: "NOT CHECKED"
+    property var phoneNickname: ({})
+    property string phoneNicknameCheck: "NOT CHECKED"
+    property bool nicknameEditorOpen: false
+    property string nicknameActionStatus: "IDLE"
+    property string nicknameWriteProfile: ""
+    property string nicknameWriteIntent: ""
     property var phoneAudioStatus: ({})
     property string phoneAudioCheck: "NOT CHECKED"
     property string phoneAudioResult: "IDLE"
@@ -278,12 +284,62 @@ Rectangle {
             return;
         deviceObservationCheck = "CHECKING";
         deviceObservation = ({});
+        nicknameEditorOpen = false;
+        phoneNicknameCheck = "NOT CHECKED";
+        phoneNickname = ({});
+        nicknameActionStatus = "IDLE";
         deviceObservationProcess.command = [
             "python3",
             Quickshell.shellPath("services/phone/PhoneDeviceObservation.py"),
             "--inspect"
         ];
         deviceObservationProcess.running = true;
+    }
+
+    // A nickname is a local display preference for the physically verified
+    // BlueFerry profile. It never names an authorized Social identity or line.
+    function refreshPhoneNickname() {
+        if (!visible || nicknameReadProcess.running || nicknameWriteProcess.running
+                || deviceObservationCheck !== "CHECKED"
+                || (deviceObservation.state !== "BLUETOOTH_CONNECTED"
+                    && deviceObservation.state !== "PAIRED_OFFLINE"))
+            return;
+        phoneNicknameCheck = "CHECKING";
+        phoneNickname = ({});
+        nicknameReadProcess.command = [
+            "python3",
+            Quickshell.shellPath("services/phone/PhoneNickname.py"),
+            "--read", deviceObservation.profileId
+        ];
+        nicknameReadProcess.running = true;
+    }
+
+    function changePhoneNickname(action) {
+        if (!visible || !nicknameEditorOpen || stageWanted
+                || nicknameWriteProcess.running || nicknameReadProcess.running
+                || deviceObservationCheck !== "CHECKED"
+                || (deviceObservation.state !== "BLUETOOTH_CONNECTED"
+                    && deviceObservation.state !== "PAIRED_OFFLINE")
+                || (action !== "save" && action !== "clear"))
+            return;
+        var name = phoneNicknameInput.text.trim();
+        if (action === "save" && (name.length < 1 || name.length > 40)) {
+            nicknameActionStatus = "INVALID_NICKNAME";
+            return;
+        }
+        nicknameWriteProfile = deviceObservation.profileId;
+        nicknameWriteIntent = action;
+        nicknameActionStatus = "WORKING";
+        nicknameWriteProcess.command = [
+            "python3",
+            Quickshell.shellPath("services/phone/PhoneNickname.py"),
+            action === "save" ? "--save" : "--clear",
+            nicknameWriteProfile
+        ];
+        if (action === "save")
+            nicknameWriteProcess.command =
+                nicknameWriteProcess.command.concat([name]);
+        nicknameWriteProcess.running = true;
     }
 
     function refreshSavedBridgeState() {
@@ -483,6 +539,12 @@ Rectangle {
             savedBridgeState = ({});
             deviceObservationCheck = "NOT CHECKED";
             deviceObservation = ({});
+            phoneNicknameCheck = "NOT CHECKED";
+            phoneNickname = ({});
+            nicknameEditorOpen = false;
+            nicknameActionStatus = "IDLE";
+            nicknameWriteProfile = "";
+            nicknameWriteIntent = "";
             phoneAudioStatus = ({});
             phoneAudioCheck = "NOT CHECKED";
             phoneAudioResult = "IDLE";
@@ -663,6 +725,7 @@ Rectangle {
                         throw new Error("Unexpected device observation");
                     phonePane.deviceObservation = observed;
                     phonePane.deviceObservationCheck = "CHECKED";
+                    phonePane.refreshPhoneNickname();
                 } catch (error) {
                     phonePane.deviceObservation = ({});
                     phonePane.deviceObservationCheck = "UNAVAILABLE";
@@ -673,6 +736,85 @@ Rectangle {
             if (phonePane.visible && phonePane.deviceObservationCheck === "CHECKING"
                     && code !== 0)
                 phonePane.deviceObservationCheck = "UNAVAILABLE";
+        }
+    }
+
+    Process {
+        id: nicknameReadProcess
+        stdout: StdioCollector {
+            onStreamFinished: {
+                if (!phonePane.visible || phonePane.phoneNicknameCheck !== "CHECKING")
+                    return;
+                try {
+                    var result = JSON.parse(String(text || ""));
+                    if (result.schema !== "post-apollo.phone.nickname-action.v0"
+                            || result.execution !== "LOCAL_DISPLAY_METADATA"
+                            || result.profileId !== phonePane.deviceObservation.profileId
+                            || result.trustedPhoneLink !== "UNVERIFIED"
+                            || result.contentAccessEnabled !== false
+                            || ["PRESENT", "EMPTY"].indexOf(result.state) < 0
+                            || typeof result.nickname !== "string"
+                            || result.nickname.length > 40
+                            || (result.state === "EMPTY" && result.nickname !== "")
+                            || (result.state === "PRESENT"
+                                && (!result.nickname
+                                    || result.nickname !== result.nickname.trim()
+                                    || /[\x00-\x1f\x7f]/.test(result.nickname))))
+                        throw new Error("Invalid nickname result");
+                    phonePane.phoneNickname = result;
+                    phonePane.phoneNicknameCheck = "CHECKED";
+                } catch (error) {
+                    phonePane.phoneNickname = ({});
+                    phonePane.phoneNicknameCheck = "UNAVAILABLE";
+                }
+            }
+        }
+        onExited: function(code) {
+            if (phonePane.visible && phonePane.phoneNicknameCheck === "CHECKING"
+                    && code !== 0)
+                phonePane.phoneNicknameCheck = "UNAVAILABLE";
+        }
+    }
+
+    Process {
+        id: nicknameWriteProcess
+        stdout: StdioCollector {
+            onStreamFinished: {
+                if (!phonePane.visible || phonePane.nicknameActionStatus !== "WORKING")
+                    return;
+                try {
+                    var next = JSON.parse(String(text || ""));
+                    var expected = phonePane.nicknameWriteIntent === "save"
+                                   ? "SAVED" : "CLEARED";
+                    if (next.schema !== "post-apollo.phone.nickname-action.v0"
+                            || next.execution !== "LOCAL_DISPLAY_METADATA"
+                            || next.profileId !== phonePane.nicknameWriteProfile
+                            || next.profileId !== phonePane.deviceObservation.profileId
+                            || next.trustedPhoneLink !== "UNVERIFIED"
+                            || next.contentAccessEnabled !== false
+                            || next.state !== expected
+                            || typeof next.nickname !== "string"
+                            || next.nickname.length > 40
+                            || (expected === "CLEARED" && next.nickname !== "")
+                            || (expected === "SAVED"
+                                && (!next.nickname
+                                    || next.nickname !== next.nickname.trim()
+                                    || /[\x00-\x1f\x7f]/.test(next.nickname))))
+                        throw new Error("Invalid nickname write response");
+                    phonePane.phoneNickname = ({
+                        "state": expected === "SAVED" ? "PRESENT" : "EMPTY",
+                        "nickname": next.nickname
+                    });
+                    phonePane.phoneNicknameCheck = "CHECKED";
+                    phonePane.nicknameActionStatus = expected;
+                } catch (error) {
+                    phonePane.nicknameActionStatus = "NOT_CONFIRMED";
+                }
+            }
+        }
+        onExited: function(code) {
+            if (phonePane.visible && phonePane.nicknameActionStatus === "WORKING")
+                phonePane.nicknameActionStatus = "NOT_CONFIRMED";
         }
     }
 
@@ -1225,6 +1367,152 @@ Rectangle {
                     font.pixelSize: 11
                     wrapMode: Text.WordWrap
                     lineHeight: 1.35
+                }
+
+                // Local nickname management never changes pairing, audio,
+                // BlueFerry's selected profile or Social authorization.
+                Column {
+                    id: phoneNicknameManager
+                    width: setupColumn.width
+                    spacing: 8
+                    visible: phonePane.deviceObservationCheck === "CHECKED"
+                             && (phonePane.deviceObservation.state === "BLUETOOTH_CONNECTED"
+                                 || phonePane.deviceObservation.state === "PAIRED_OFFLINE")
+                             && !phonePane.stageWanted
+
+                    Text {
+                        width: parent.width
+                        textFormat: Text.PlainText
+                        text: "PERSONAL DEVICE LABEL // "
+                              + (phonePane.phoneNicknameCheck === "CHECKING"
+                                 ? "CHECKING"
+                                 : phonePane.phoneNicknameCheck === "CHECKED"
+                                   && phonePane.phoneNickname.state === "PRESENT"
+                                 ? phonePane.phoneNickname.nickname
+                                 : "NOT SET")
+                        color: Colors.magenta
+                        font.pixelSize: 12
+                        wrapMode: Text.WordWrap
+                    }
+
+                    ActionButton {
+                        id: managePhoneNickname
+                        width: Math.min(208, phoneNicknameManager.width)
+                        height: 34
+                        label: phonePane.nicknameEditorOpen ? "CLOSE NAME EDITOR"
+                                                            : "MANAGE PHONE NAME"
+                        labelPixelSize: 9
+                        accentColor: Colors.cyan
+                        interactive: !nicknameReadProcess.running
+                                     && !nicknameWriteProcess.running
+                        onTriggered: {
+                            phonePane.nicknameEditorOpen = !phonePane.nicknameEditorOpen;
+                            if (phonePane.nicknameEditorOpen) {
+                                phoneNicknameInput.text =
+                                    phonePane.phoneNicknameCheck === "CHECKED"
+                                    && phonePane.phoneNickname.state === "PRESENT"
+                                    ? phonePane.phoneNickname.nickname : "";
+                                phonePane.nicknameActionStatus = "IDLE";
+                            }
+                        }
+                    }
+
+                    Column {
+                        width: phoneNicknameManager.width
+                        spacing: 8
+                        visible: phonePane.nicknameEditorOpen
+
+                        Text {
+                            width: parent.width
+                            text: "Rename this iPhone in Social only. Bluetooth name, pairing and audio stay unchanged."
+                            color: Colors.white
+                            font.pixelSize: 10
+                            wrapMode: Text.WordWrap
+                        }
+
+                        Rectangle {
+                            width: parent.width
+                            height: 36
+                            color: Colors.black
+                            border.width: 1
+                            border.color: Colors.magenta
+                            clip: true
+
+                            TextInput {
+                                id: phoneNicknameInput
+                                anchors.fill: parent
+                                anchors.margins: 8
+                                color: Colors.magenta
+                                selectionColor: Colors.yellow
+                                selectedTextColor: Colors.black
+                                font.pixelSize: 12
+                                maximumLength: 40
+                                clip: true
+                                cursorDelegate: Rectangle {
+                                    width: 2
+                                    height: phoneNicknameInput.font.pixelSize + 2
+                                    color: Colors.orange
+                                }
+                            }
+
+                            Text {
+                                anchors.fill: phoneNicknameInput
+                                visible: phoneNicknameInput.text.length === 0
+                                         && !phoneNicknameInput.activeFocus
+                                text: "Personal iPhone label"
+                                color: Colors.white
+                                opacity: 0.58
+                                font.pixelSize: 12
+                                verticalAlignment: Text.AlignVCenter
+                            }
+                        }
+
+                        Row {
+                            width: parent.width
+                            spacing: 8
+
+                            ActionButton {
+                                width: Math.max(78, (phoneNicknameManager.width - 8) / 2)
+                                height: 34
+                                label: "SAVE NAME"
+                                labelPixelSize: 9
+                                accentColor: Colors.green
+                                interactive: !nicknameReadProcess.running
+                                             && !nicknameWriteProcess.running
+                                onTriggered: phonePane.changePhoneNickname("save")
+                            }
+
+                            ActionButton {
+                                width: Math.max(78, (phoneNicknameManager.width - 8) / 2)
+                                height: 34
+                                visible: phonePane.phoneNicknameCheck === "CHECKED"
+                                         && phonePane.phoneNickname.state === "PRESENT"
+                                label: "CLEAR NAME"
+                                labelPixelSize: 9
+                                destructive: true
+                                accentColor: Colors.red
+                                interactive: !nicknameReadProcess.running
+                                             && !nicknameWriteProcess.running
+                                onTriggered: phonePane.changePhoneNickname("clear")
+                            }
+                        }
+
+                        Text {
+                            width: parent.width
+                            text: phonePane.nicknameActionStatus === "SAVED"
+                                  ? "Local phone label saved."
+                                  : phonePane.nicknameActionStatus === "CLEARED"
+                                  ? "Local phone label cleared. iPhone pairing remains."
+                                  : phonePane.nicknameActionStatus === "INVALID_NICKNAME"
+                                  ? "Use a printable name of 1 to 40 characters."
+                                  : phonePane.nicknameActionStatus === "NOT_CONFIRMED"
+                                  ? "Could not confirm the local label change."
+                                  : "PERSONAL DISPLAY ONLY // Not an account, company or phone-content permission."
+                            color: Colors.orange
+                            font.pixelSize: 10
+                            wrapMode: Text.WordWrap
+                        }
+                    }
                 }
 
                 Text {

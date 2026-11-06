@@ -58,6 +58,18 @@ Scope {
     property var pendingTicket: null
     signal ticketEvent(var event)
 
+    // M14a // Passive, in-memory observation of the already-existing
+    // FileView lifecycle. This is NOT a save receipt, source readback,
+    // trusted process identity, durable journal, or permission to clear drafts.
+    // The only side effects are bounded metadata fields in this Scope.
+    property string nativeSaveEventM14a: "NOT_OBSERVED"
+    property int nativeSaveRequestsM14a: 0
+    readonly property var nativeSaveObservationM14a: ({
+        phase: nativeSaveEventM14a,
+        requestCount: nativeSaveRequestsM14a,
+        sourceState: storageState
+    })
+
     property string storageState: "loading"
     property string errorCode: ""
     property var document: TodoPolicy.emptyDocument()
@@ -175,6 +187,11 @@ Scope {
         pendingDocument = result.document;
         storageState = "saving";
         errorCode = "";
+        // Metadata only. Do not correlate a later callback to this request
+        // as a trusted receipt; unrelated native events may interleave.
+        todo.nativeSaveRequestsM14a = Math.min(1000000,
+            (todo.nativeSaveRequestsM14a || 0) + 1);
+        todo.nativeSaveEventM14a = "WRITE_REQUESTED";
         // FileView's atomicWrites protects an existing file on failure.
         // Do not publish the pending tasks as saved before onSaved.
         todoFile.setText(JSON.stringify(pendingDocument, null, 2) + "\n");
@@ -254,6 +271,11 @@ Scope {
             }
         }
         onSaved: {
+            // The real Quickshell callback is observed here, but the sender,
+            // saved bytes and cross-process durability are NOT authenticated.
+            // This changes no write, reload, callback ordering or ACK logic.
+            todo.nativeSaveEventM14a = todo.storageState === "saving"
+                ? "FILEVIEW_SAVED_HINT" : "UNATTRIBUTED_SAVED_HINT";
             if (todo.ticketProducerEnabled) {
                 if (!todo.pendingTicket || todo.pendingTicket.state !== "WRITING") {
                     todo.ticketReview("UNEXPECTED_SAVED_HINT");
@@ -284,6 +306,9 @@ Scope {
             todo.errorCode = "";
         }
         onSaveFailed: function(error) {
+            // Do not leak the native error argument or treat callback as an
+            // authenticated source-owner report.
+            todo.nativeSaveEventM14a = "FILEVIEW_SAVE_FAILED";
             if (todo.ticketProducerEnabled && todo.pendingTicket) {
                 todo.ticketReview("FILE_SAVE_FAILED");
                 return;

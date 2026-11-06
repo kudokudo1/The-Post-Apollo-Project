@@ -1,0 +1,65 @@
+name: TASKS M14a live native FileView observation (non-authoritative)
+
+on:
+  pull_request:
+    paths:
+      - 'services/hub/ApolloHubTodoStore.qml'
+      - 'widgets/tasks/TaskLiveNativeSavePolicyM14a.js'
+      - 'widgets/tasks/TaskRecoveryReviewPaneM13z.qml'
+      - 'widgets/tasks/TaskRecoveryStatusPaneM13q.qml'
+      - 'tests/tasks/test_task_live_native_save_observation_m14a.cjs'
+      - 'docs/tasks-live-native-save-observation-m14a.md'
+      - '.github/workflows/tasks-live-native-save-observation-m14a.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'services/hub/ApolloHubTodoStore.qml'
+      - 'widgets/tasks/TaskLiveNativeSavePolicyM14a.js'
+      - 'widgets/tasks/TaskRecoveryReviewPaneM13z.qml'
+      - 'widgets/tasks/TaskRecoveryStatusPaneM13q.qml'
+      - 'tests/tasks/test_task_live_native_save_observation_m14a.cjs'
+      - '.github/workflows/tasks-live-native-save-observation-m14a.yml'
+permissions:
+  contents: read
+
+jobs:
+  live-hint-not-receipt:
+    runs-on: ubuntu-latest
+    timeout-minutes: 14
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: M14a real callback metadata is not authenticated source evidence
+        run: node --test tests/tasks/test_task_live_native_save_observation_m14a.cjs
+      - name: Existing M13z operator review and M13q/M13s live presence
+        run: |
+          node --test tests/tasks/test_task_operator_save_review_m13z.cjs
+          node --test tests/tasks/test_task_recovery_status_m13q.cjs
+          node --test tests/tasks/test_task_live_draft_presence_m13s.cjs
+      - name: Prior M13w no-draft-clear and M12o/M12r ticket-admission guards
+        run: |
+          node --test tests/tasks/test_task_source_receipt_interface_m13w.cjs
+          node --test tests/tasks/test_task_disabled_ticket_api_m12o.cjs
+          node --test tests/tasks/test_task_disabled_admission_m12r.cjs
+      - name: Single source writer and shared C2 default deny
+        run: |
+          python3 tests/tasks/test_task_writer_gate_inventory_m11d.py
+          node tests/cpuplus/test_connections_broker_c2a.js
+      - name: QML syntax for existing single writer and visible recovery panes
+        run: |
+          sudo apt-get update -qq
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends qt6-declarative-dev-tools
+          QT_QPA_PLATFORM=offscreen /usr/lib/qt6/bin/qmlformat services/hub/ApolloHubTodoStore.qml >/dev/null
+          QT_QPA_PLATFORM=offscreen /usr/lib/qt6/bin/qmlformat widgets/tasks/TaskRecoveryReviewPaneM13z.qml >/dev/null
+          QT_QPA_PLATFORM=offscreen /usr/lib/qt6/bin/qmlformat widgets/tasks/TaskRecoveryStatusPaneM13q.qml >/dev/null
+      - name: No new process, writer or real source receipt authority
+        run: |
+          set -euo pipefail
+          test "$(grep -c 'todoFile.setText(' services/hub/ApolloHubTodoStore.qml)" = 1
+          test "$(grep -Ec '^[[:space:]]*FileView[[:space:]]*\{' services/hub/ApolloHubTodoStore.qml)" = 1
+          ! grep -Eq 'FileView *\{|Process *\{|secret-tool|XMLHttpRequest|Qt.openUrlExternally|ApolloHubTodoStore\.' \
+            widgets/tasks/TaskLiveNativeSavePolicyM14a.js widgets/tasks/TaskRecoveryReviewPaneM13z.qml
+          ! grep -q 'TaskPostCrashSourceReviewM13y' services/hub/ApolloHubTodoStore.qml
+          printf '%s\n' 'M14A_NATIVE_CALLBACK_METADATA_ONLY_KEEP_DRAFT_NO_AUTHORITY_PASS'

@@ -1,0 +1,52 @@
+name: TASKS M13y postcrash source and journal review (disposable)
+
+on:
+  pull_request:
+    paths:
+      - 'tests/tasks/fixtures/TaskPostCrashSourceReviewM13y.py'
+      - 'tests/tasks/test_task_postcrash_source_review_m13y.py'
+      - 'docs/tasks-postcrash-source-review-m13y.md'
+      - '.github/workflows/tasks-postcrash-source-review-m13y.yml'
+      - 'services/hub/ApolloHubTodoStore.qml'
+      - 'tests/tasks/fixtures/TaskStageSourceReceiptM12h.py'
+  push:
+    branches: [main]
+    paths:
+      - 'tests/tasks/fixtures/TaskPostCrashSourceReviewM13y.py'
+      - 'tests/tasks/test_task_postcrash_source_review_m13y.py'
+      - '.github/workflows/tasks-postcrash-source-review-m13y.yml'
+permissions:
+  contents: read
+
+jobs:
+  read-only-postcrash:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - name: New M13y independent process and SQLite WAL crash scenarios
+        run: |
+          python3 -B -m unittest discover -s tests/tasks \
+            -p 'test_task_postcrash_source_review_m13y.py' -v
+      - name: Original M12h journal and M13u/M13v source revision regression
+        run: |
+          python3 tests/tasks/test_task_stage_source_receipt_m12h.py
+          python3 tests/tasks/test_task_source_revision_evidence_m13u.py
+          python3 tests/tasks/test_task_native_receipt_handoff_m13v.py
+      - name: Native FileView host protocol and M13w strict KEEP_DRAFT consumer policy
+        run: |
+          python3 tests/tasks/test_task_native_receipt_host_m12i.py
+          node --test tests/tasks/test_task_source_receipt_interface_m13w.cjs
+      - name: Real TASKS writer remains sole owner and Connections is deny-all
+        run: |
+          python3 tests/tasks/test_task_writer_gate_inventory_m11d.py
+          node tests/cpuplus/test_connections_broker_c2a.js
+      - name: Read-only inspector has no real task path or JSON writer
+        run: |
+          set -euo pipefail
+          ! grep -q 'TaskPostCrashSourceReviewM13y' services/hub/ApolloHubTodoStore.qml
+          ! grep -q 'TaskPostCrashSourceReviewM13y' shell.qml
+          ! grep -Eq 'os\.replace\(|os\.unlink\(|os\.remove\(|\.setText\(' \
+            tests/tasks/fixtures/TaskPostCrashSourceReviewM13y.py
+          test "$(grep -c 'todoFile.setText(' services/hub/ApolloHubTodoStore.qml)" = 1
+          printf '%s\n' 'M13Y_POSTCRASH_READ_ONLY_NO_SAVE_ACK_PASS'

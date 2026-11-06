@@ -9,7 +9,8 @@ var MODES = {
         {label:"SUVI", route:"cosmos/sun/suvi", kind:"solar-section"},
         {label:"X-RAY", route:"cosmos/sun/xray", kind:"solar-section"},
         {label:"FLARES", route:"cosmos/sun/flares", kind:"solar-section"},
-        {label:"CYCLE", route:"cosmos/sun/cycle", kind:"solar-section"}
+        {label:"CYCLE", route:"cosmos/sun/cycle", kind:"solar-section"},
+        {label:"YEAR", route:"cosmos/sun/year", kind:"annual-solar"}
     ],
     astronomy: [
         {label:"CLOCK", route:"cosmos/planets-stars/planet-clock", kind:"planet-clock"},
@@ -68,7 +69,8 @@ function dataRoute(path) {
 function usesSky(path) {
     var key = family(path);
     return key === "astronomy" || key === "events"
-        || (key === "sun" && kind(path) !== "solar-section");
+        || (key === "sun" && kind(path) !== "solar-section"
+            && kind(path) !== "annual-solar");
 }
 
 function usesInnerScroll(path) {

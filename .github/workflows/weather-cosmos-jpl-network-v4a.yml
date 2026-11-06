@@ -27,6 +27,9 @@ on:
       - 'widgets/weather/StationMagickCelestialInstrument.qml'
       - 'widgets/weather/StationMagickRetrogradeLanePolicy.js'
       - 'widgets/weather/StationMagickAspectMatrixPolicy.js'
+      - 'widgets/weather/StationMagickEpochComparePolicy.js'
+      - 'widgets/weather/StationMagickSubjectPanelPolicy.js'
+      - 'tests/weather/test_magick_epoch_compare_m6c.js'
       - 'tests/weather/test_magick_aspect_matrix_m6b.js'
       - 'widgets/weather/StationMagickAstrologyPane.qml'
       - 'widgets/weather/StationMagickSubjectPane.qml'
@@ -72,6 +75,8 @@ jobs:
         run: node --test tests/weather/test_magick_retrograde_lanes_m6a.js
       - name: Verify M6b source-pair aspects matrix and real sample inspection
         run: node --test tests/weather/test_magick_aspect_matrix_m6b.js
+      - name: Verify M6c dual-epoch JPL comparison and real Transits route
+        run: node --test tests/weather/test_magick_epoch_compare_m6c.js
       - name: Preserve MAGICK M4/M5 sources and interaction behavior
         run: |
           node --test tests/weather/test_magick_celestial_visual_m5.js

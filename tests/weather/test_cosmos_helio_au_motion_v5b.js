@@ -151,7 +151,7 @@ test("V5b QML uses only discrete exact JPL samples and existing camera transform
     assert.match(qml,/Labels\.plaque\(/);
     assert.match(network,/id: compactNetworkToolbar/);
     assert.match(helioSource,/function cameraOrigin\(/);
-    assert.match(atlasSource,/source:"same-JPL-kernel-as-M4"/);
+    assert.match(atlasSource,/raw\.source!=="same-JPL-kernel-as-M4"/);
     for(const src of [policySource,qml]){
         for(const invalid of ["Process {","Timer {","XMLHttpRequest",
             "new WebSocket","Qt.callLater","curl ","fetch("])

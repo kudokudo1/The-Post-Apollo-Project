@@ -47,7 +47,7 @@ class PhoneNicknameUiTests(unittest.TestCase):
         self.assertIn('accentColor: Colors.green', self.ui)
         self.assertIn('destructive: true', self.ui)
         self.assertIn('accentColor: Colors.red', self.ui)
-        self.assertIn('text: "PERSONAL DISPLAY ONLY', self.ui)
+        self.assertIn('"PERSONAL DISPLAY ONLY // Not an account', self.ui)
 
     def test_still_no_automatic_phone_pairing_or_private_content(self):
         self.assertIn("conversations: []", self.ui)

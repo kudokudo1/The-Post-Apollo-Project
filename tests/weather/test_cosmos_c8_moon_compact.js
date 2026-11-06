@@ -64,3 +64,24 @@ test("source status remains visible and unavailable facts do not invent readings
  assert.match(moon,/if \(value === null \|\| value === undefined/);
  assert.match(moon,/!isFinite\(Number\(value\)\)/);
 });
+
+test("Moon C10 matches the six-pixel COSMOS overview and mode-page stage gutter",()=>{
+ const overview=read("widgets/weather/StationCosmosOverviewPane.qml");
+ const modes=read("widgets/weather/StationCosmosModesPane.qml");
+ assert.match(overview,/anchors\\.margins: 6/);
+ assert.match(modes,/anchors\\.margins: 6/);
+ assert.match(moon,/readonly property int contentInset: 6/);
+ for(const objectName of [
+   "cosmos-c9-moon-free-header",
+   "cosmos-c9-moon-hero-row",
+   "cosmos-c8-moon-readings"
+ ]) {
+   const start=moon.indexOf('objectName: "'+objectName+'"');
+   assert.ok(start>0,objectName);
+   const next=moon.slice(start,start+450);
+   assert.match(next,/anchors\\.leftMargin: moonPane\\.contentInset/);
+   assert.match(next,/anchors\\.rightMargin: moonPane\\.contentInset/);
+ }
+ assert.match(moon,/anchors\\.topMargin: moonPane\\.contentInset/);
+ assert.match(moon,/anchors\\.bottomMargin: moonPane\\.contentInset/);
+});

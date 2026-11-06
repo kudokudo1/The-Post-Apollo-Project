@@ -42,7 +42,7 @@ COMMAND_COOLDOWN_SECONDS = 0.25
 MAX_COMMANDS_PER_TARGET = 120
 
 
-def _target_from_outputs(outputs, message):
+def _target_from_outputs(outputs, message, workspaces=None):
     output_name = message.get("output")
     if not isinstance(output_name, str) or not host.re.fullmatch(
             r"[A-Za-z0-9_.-]{1,48}", output_name):
@@ -64,7 +64,13 @@ def _target_from_outputs(outputs, message):
             and x + width <= output["width"]
             and y + height <= output["height"]):
         raise ValueError("INVALID_VIEWPORT")
-    return ((output["x"] + x, output["y"] + y, width, height), output)
+    # The live follower must use the SAME output-to-workarea transform
+    # as the one-shot host. Never add a guessed/static 82px in QML.
+    top = (host._workarea_top_offset(output_name, output, workspaces)
+           if workspaces is not None else 0)
+    if y + top + height > output["height"]:
+        raise ValueError("VIEWPORT_OUTSIDE_WORKAREA")
+    return ((output["x"] + x, output["y"] + y + top, width, height), output)
 
 
 def _sync_command(node, geometry, output_rect, setup):
@@ -133,7 +139,9 @@ class ZoomFollower:
             return
         try:
             outputs = self.ipc.request(3)
-            geometry, output = _target_from_outputs(outputs, self.message)
+            workspaces = self.ipc.request(1)  # Sway GET_WORKSPACES
+            geometry, output = _target_from_outputs(
+                outputs, self.message, workspaces)
             tree = self.ipc.request(4)
             actor, error = host._unique_actor(self.profile, tree=tree)
             if actor is None:

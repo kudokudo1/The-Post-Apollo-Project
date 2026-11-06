@@ -96,13 +96,45 @@ def _output_rect(output_name):
     return rect
 
 
+def _workarea_top_offset(output_name, output, workspaces):
+    """Measure the actual workarea origin for Camera's layer-shell panel.
+
+    Camera's QML frame is positioned relative to the visible Sway workarea.
+    The window actor is positioned using Sway's absolute output coordinates.
+    On the operator's DP-3, workarea.y=82 and output.y=0; not applying
+    this delta placed 82 logical pixels of Zoom behind Camera's header.
+    Never infer the offset from the panel theme, screen size, or a constant.
+    """
+    if not isinstance(workspaces, list):
+        raise RuntimeError("WORKAREA_UNAVAILABLE")
+    candidates = [item for item in workspaces
+                  if isinstance(item, dict)
+                  and item.get("output") == output_name
+                  and item.get("visible") is True]
+    if len(candidates) != 1:
+        raise RuntimeError("WORKAREA_UNAVAILABLE")
+    rect = candidates[0].get("rect") or {}
+    if type(rect.get("y")) is not int:
+        raise RuntimeError("WORKAREA_GEOMETRY_INVALID")
+    offset = rect["y"] - output["y"]
+    if not (0 <= offset <= min(512, output["height"] // 2)):
+        raise RuntimeError("WORKAREA_OFFSET_INVALID")
+    return offset
+
+
 def _target_geometry(output_name, x, y, w, h):
     output = _output_rect(output_name)
     if not (w >= 480 and h >= 300 and w <= 4000 and h <= 2500
             and x >= 0 and y >= 0 and x + w <= output["width"]
             and y + h <= output["height"]):
         raise ValueError("INVALID_VIEWPORT")
-    return (output["x"]+x, output["y"]+y, w, h)
+    # Apply the measured workarea origin once, at the Sway IPC boundary.
+    # QML input-hole geometry stays frame-local and must not be shifted.
+    top = _workarea_top_offset(
+        output_name, output, _sway_json("-t", "get_workspaces"))
+    if y + top + h > output["height"]:
+        raise ValueError("VIEWPORT_OUTSIDE_WORKAREA")
+    return (output["x"] + x, output["y"] + y + top, w, h)
 
 
 def _actor_windows(tree=None):

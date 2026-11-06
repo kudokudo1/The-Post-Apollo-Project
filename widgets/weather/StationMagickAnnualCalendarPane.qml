@@ -15,6 +15,10 @@ Rectangle {
     property var weatherService: null
     property real runtimeNowMs: 0
     property string view: "moon"
+    // An embedded COSMOS wheel may lock the subject without changing MAGICK.
+    // Empty preserves the original MOON / SOLAR YEAR / FORECAST selector.
+    property string lockedView: ""
+    readonly property var calendarSource: annualSource
     property string scopeMode: "year"
     property int selectedYear: runtimeNowMs>0
         ? new Date(runtimeNowMs).getUTCFullYear():2026
@@ -84,10 +88,11 @@ Rectangle {
 
     Row {
         id: topModes
+        visible: annualPane.lockedView === ""
         anchors.left: parent.left
         anchors.right: parent.right
         anchors.top: parent.top
-        height: 26
+        height: visible ? 26 : 0
         spacing: 4
         Repeater {
             model: [

@@ -1489,7 +1489,7 @@ Rectangle {
             anchors.left: parent.left
             anchors.leftMargin: 16
             anchors.verticalCenter: parent.verticalCenter
-            text: "PERSONAL PHONE // CONNECT"
+            text: "PHONE // CONNECT"
             color: Colors.cyan
             font.family: "GohuFont 11 Nerd Font Mono"
             font.pixelSize: 16

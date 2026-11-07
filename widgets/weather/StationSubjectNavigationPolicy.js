@@ -43,10 +43,11 @@ var SUBJECTS = [
     {id:"sky",label:"ASTRONOMY",children:[
       {id:"full",label:"ASTRONOMY // CELESTIAL INSTRUMENTS"}]},
     {id:"sun",label:"SUN",children:[
-      {id:"live",label:"LIVE // SUVI + X-RAY + FLARES"},
-      {id:"position",label:"POSITION + LIGHT // SKY + TWILIGHT"},
+      {id:"observation",label:"OBSERVATION // SUVI + SUN ARC + LIGHT"},
       {id:"activity",label:"ACTIVITY // X-RAY + FLARES + CYCLE"},
       {id:"year",label:"YEAR // JPL SOLAR WHEEL"},
+      {id:"live",label:"INSPECT // LIVE SUVI + GOES"},
+      {id:"position",label:"INSPECT // SOLAR POSITION + LIGHT"},
       // Specialist source inspectors stay deep-linkable for old bookmarks and
       // INDEX references, but no longer occupy the compact SUN mode rail.
       {id:"twilight",label:"INSPECT // TWILIGHT"},

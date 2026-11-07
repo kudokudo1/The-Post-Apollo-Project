@@ -35,11 +35,11 @@ vm.runInContext(weatherPolicy.replace(/^\.pragma library\s*$/m, ""), weather);
 vm.runInContext(workspaceSource.replace(/^\.pragma library\s*$/m, ""), workspace);
 const plain = obj => JSON.parse(JSON.stringify(obj));
 
-test("COSMOS retains 29 scoped routes plus two complete original SKY/SPACE views", () => {
+test("COSMOS retains 30 scoped routes plus two complete original SKY/SPACE views", () => {
   assert.equal(cosmos.FORMAT, "post-apollo.weather.cosmos-panels.c1.v1");
   const keys = Object.keys(cosmos.ROUTES);
-  assert.equal(keys.length, 31);
-  assert.equal(new Set(keys).size, 31);
+  assert.equal(keys.length, 32);
+  assert.equal(new Set(keys).size, 32);
   assert.deepEqual(keys.filter(k=>cosmos.ROUTES[k].full===true).sort(),
     ["cosmos/sky/full","cosmos/space-weather/full"]);
   for (const route of keys) {
@@ -429,7 +429,7 @@ test("COSMOS SUN, MOON and EVENTS bottom landings own their subject data", () =>
 
 test("C5 subject modes are distinct real routes and direct fixed-rail actions", () => {
   const families = {
-    sun:["LIVE","POSITION + LIGHT","ACTIVITY","YEAR"],
+    sun:["OBSERVATION","ACTIVITY","YEAR"],
     astronomy:["CLOCK","PLANETS","STARS"],
     events:["METEORS","ECLIPSES","ISS"]
   };

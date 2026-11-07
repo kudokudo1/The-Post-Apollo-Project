@@ -181,6 +181,7 @@ Rectangle {
     Loader {
         id: spaceSourceLoader
         active: cosmosModePane.visible && (cosmosModePane.kind === "solar-section"
+            || cosmosModePane.kind === "sun-observation"
             || cosmosModePane.kind === "sun-live" || cosmosModePane.kind === "sun-activity")
         width: 1
         height: 1
@@ -304,7 +305,8 @@ Rectangle {
             id: instrumentLoader
             anchors.fill: parent
             active: cosmosModePane.visible
-            sourceComponent: cosmosModePane.kind === "sun-position"
+            sourceComponent: cosmosModePane.kind === "sun-observation"
+                || cosmosModePane.kind === "sun-position"
                 || cosmosModePane.kind === "sun-live" || cosmosModePane.kind === "sun-activity"
                     ? sunTerminalBoard
                 : cosmosModePane.kind === "annual-solar" ? solarYear
@@ -342,7 +344,9 @@ Rectangle {
         QuietText {
             width: Math.max(0,footer.width
                 - 111 - (retrySource.visible ? 83 : 0))
-            text: cosmosModePane.kind === "sun-position" ? "LOCAL SUN // SOLAR ARC + TWILIGHT"
+            text: cosmosModePane.kind === "sun-observation"
+                ? "SOLAR OBSERVATION // SUVI + ARC + LIGHT + GOES"
+                : cosmosModePane.kind === "sun-position" ? "LOCAL SUN // SOLAR ARC + TWILIGHT"
                 : cosmosModePane.kind === "sun-live" ? "NOAA // SUVI + XRS + FLARES"
                 : cosmosModePane.kind === "sun-activity" ? "NOAA // XRS + FLARES + CYCLE"
                 : cosmosModePane.kind === "annual-solar" ? "JPL // CALCULATE YEAR ON DEMAND"
@@ -386,7 +390,8 @@ Rectangle {
     Component {
         id: sunTerminalBoard
         StationCosmosSunTerminalPane {
-            terminalMode: cosmosModePane.kind === "sun-position" ? "position"
+            terminalMode: cosmosModePane.kind === "sun-observation" ? "observation"
+                : cosmosModePane.kind === "sun-position" ? "position"
                 : cosmosModePane.kind === "sun-activity" ? "activity" : "live"
             weatherService: cosmosModePane.weatherService
             spaceService: cosmosModePane.spaceService

@@ -18,8 +18,7 @@ const old=read("widgets/weather/StationCosmosSunInstrumentPane.qml");
 
 test("C12 primary SUN rail has four composite destinations while old routes still work",()=>{
  const expected=[
-   ["LIVE","cosmos/sun/live","sun-live"],
-   ["POSITION + LIGHT","cosmos/sun/position","sun-position"],
+   ["OBSERVATION","cosmos/sun/observation","sun-observation"],
    ["ACTIVITY","cosmos/sun/activity","sun-activity"],
    ["YEAR","cosmos/sun/year","annual-solar"]
  ];
@@ -30,16 +29,19 @@ test("C12 primary SUN rail has four composite destinations while old routes stil
    assert.ok(nav.findRoute(route),label);
  }
  for(const path of [
+   "cosmos/sun/live","cosmos/sun/position",
    "cosmos/sun/twilight","cosmos/sun/suvi","cosmos/sun/xray",
    "cosmos/sun/flares","cosmos/sun/cycle"
  ]){
    assert.equal(modes.family(path),"sun",path);
-   assert.equal(modes.kind(path),path==="cosmos/sun/twilight"
-     ? "light" : "solar-section",path);
+   assert.equal(modes.kind(path),path==="cosmos/sun/live" ? "sun-live"
+     : path==="cosmos/sun/position" ? "sun-position"
+     : path==="cosmos/sun/twilight" ? "light" : "solar-section",path);
    assert.ok(nav.findRoute(path),path);
  }
  assert.equal(modes.canonical("cosmos/sun/photo-light"),"cosmos/sun/twilight");
  assert.equal(modes.canonical("cosmos/sun/activity"),"cosmos/sun/activity");
+ assert.equal(modes.usesSky("cosmos/sun/observation"),true);
  assert.equal(modes.usesSky("cosmos/sun/position"),true);
  assert.equal(modes.usesSky("cosmos/sun/live"),false);
  assert.equal(modes.usesSky("cosmos/sun/activity"),false);
@@ -48,6 +50,7 @@ test("C12 primary SUN rail has four composite destinations while old routes stil
 
 test("C12 source selectors use only existing owners and do not prefetch hidden panels",()=>{
  const cases=[
+   ["cosmos/sun/observation",["flares","xray"],["cycle","alerts","kpForecast","aurora"]],
    ["cosmos/sun/live",["flares","xray"],["cycle","alerts","kpForecast","aurora"]],
    ["cosmos/sun/activity",["flares","xray","cycle"],["aurora","alerts","kpForecast"]],
    ["cosmos/sun/year",[],["flares","xray","cycle","aurora","alerts","kpForecast"]]
@@ -56,16 +59,33 @@ test("C12 source selectors use only existing owners and do not prefetch hidden p
    for(const source of on) assert.equal(panels.needsSource(route,source),true,route+"/"+source);
    for(const source of off) assert.equal(panels.needsSource(route,source),false,route+"/"+source);
  }
+ assert.equal(panels.visibleFor("space","cosmos/sun/observation","suvi"),true);
+ assert.equal(panels.visibleFor("sky","cosmos/sun/observation","astronomy"),true);
+ assert.equal(panels.visibleFor("sky","cosmos/sun/observation","twilight"),true);
  assert.equal(panels.visibleFor("space","cosmos/sun/live","suvi"),true);
  assert.equal(panels.visibleFor("space","cosmos/sun/activity","suvi"),false);
  assert.equal(panels.visibleFor("sky","cosmos/sun/position","twilight"),true);
  assert.equal(panels.visibleFor("sky","cosmos/sun/position","astronomy"),true);
  assert.match(focus,/active: cosmosModePane\.visible && \(cosmosModePane\.kind === "solar-section"/);
+ assert.match(focus,/cosmosModePane\.kind === "sun-observation"/);
  assert.match(focus,/cosmosModePane\.kind === "sun-live" \|\| cosmosModePane\.kind === "sun-activity"/);
  assert.match(focus,/id: sunTerminalBoard\s*StationCosmosSunTerminalPane/);
  assert.match(focus,/skyFeed: cosmosModePane\.skyFeed/);
  assert.match(focus,/sourceSpace: cosmosModePane\.spaceFeed/);
  assert.doesNotMatch(terminal,/StationSky\s*\{|StationSpace\s*\{|Process\s*\{|FileView\s*\{|XMLHttpRequest|new WebSocket|Timer\s*\{|ScrollView\s*\{|Flickable\s*\{/);
+});
+
+test("C14 OBSERVATION shows interactive SUVI, solar arc, GOES and twilight together",()=>{
+ for(const name of ["cosmos-c14-observation-board","cosmos-c14-observation-heroes",
+   "cosmos-c14-suvi-hero","cosmos-c14-sun-path-hero",
+   "cosmos-c14-live-telemetry","cosmos-c14-position-live-strip",
+   "cosmos-c14-twilight-ledger"])
+   assert.ok(terminal.includes(name),name);
+ assert.match(terminal,/sourceComponent: sunTerminal\.terminalMode==="observation" \? observationBoard/);
+ assert.match(focus,/terminalMode: cosmosModePane\.kind === "sun-observation" \? "observation"/);
+ assert.equal(nav.findRoute("cosmos/sun/observation").label,
+              "OBSERVATION // SUVI + SUN ARC + LIGHT");
+ assert.doesNotMatch(terminal,/Flickable\s*\{|ScrollView\s*\{/);
 });
 
 test("C12 POSITION keeps sun arc hover controls, eight twilight readings and current sky strip",()=>{
@@ -97,21 +117,23 @@ test("C12 LIVE shares complete interactive SUVI imager and displays GOES source 
  assert.match(old,/source: solarFocus\.sourceSpace[\s\S]*?solarImageUrl/);
 });
 
-test("C12 ACTIVITY keeps xray history/source, flare event paging and cycle three-page model",()=>{
+test("C13 ACTIVITY renders xray, flare and cycle in one non-scrolling instrument cluster",()=>{
  for(const name of [
-   "cosmos-c12-activity-metrics","cosmos-c12-activity-inner-modes",
+   "cosmos-c12-activity-metrics","cosmos-c13-simultaneous-instruments",
+   "cosmos-c13-xray-bay","cosmos-c13-flare-bay","cosmos-c13-cycle-bay",
    "cosmos-c12-xray-trend","cosmos-c12-xray-facts",
    "cosmos-c12-flare-facts","cosmos-c12-cycle-facts"
  ]) assert.ok(terminal.includes(name),name);
- for(const key of [
-   "flareCount","flareAt","flarePage","cyclePage","xrayPage",
-   "selectedFlareIndex","flareDetailPage","cycleDetailPage","xraySourcePage"
- ]) assert.ok(terminal.includes(key),key);
+ for(const source of ["flareAt","flarePage","cyclePage","xrayPage",
+                       "selectedFlareIndex","SolarDetails.flarePage(selectedFlare, 1)"])
+   assert.ok(terminal.includes(source),source);
  assert.match(terminal,/cycle\.refresh\(true\)/);
  assert.match(terminal,/flares\.refresh\(\)/);
  assert.match(terminal,/xray\.refresh\(\)/);
  assert.match(terminal,/NOAA SOLAR CYCLE \/\/ MONTHLY PREDICTION, NOT LIVE FLUX/);
  assert.match(terminal,/OBSERVED EVENT PEAKS, NOT ALERTS/);
+ assert.doesNotMatch(terminal,/id: activityTabs\b|id: activityInstrument\b/);
+ assert.doesNotMatch(terminal,/activityFocus===|cycleDetailPage|flareDetailPage|xraySourcePage/);
  assert.match(focus,/id: solarDetails\s*StationCosmosSunInstrumentPane\s*\{/);
  assert.match(focus,/id: solarYear\s*StationCosmosAnnualWheelPane\s*\{/);
 });

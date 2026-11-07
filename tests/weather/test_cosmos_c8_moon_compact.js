@@ -119,7 +119,7 @@ test("C20 instrument-first Moon overview has separate visual, forecast and event
    "cosmos-c9-moon-tall-position","cosmos-c9-moon-free-provenance",
    "cosmos-c20-moon-event-ledger","cosmos-c8-moon-source-note"])
    assert.ok(moon.includes(name),name);
- assert.match(moon,/moonMain\.height-positionColumn\.height/);
+ assert.match(moon,/moonMain\.height-2\*moonMain\.spacing\)\*0\.62/);
  assert.match(moon,/compactReadings\.height-2\*compactReadings\.spacing\)\*0\.65/);
  assert.match(strip,/property bool verticalMode: false/);
  assert.match(strip,/objectName: "cosmos-c20-moon-vertical-forecast"/);
@@ -138,13 +138,14 @@ test("C21 only COSMOS Moon overview magnifies the actual disk, not merely its co
  const visual=read("widgets/weather/StationCosmosVisualInstruments.qml");
  assert.match(moon,/\(heroRow\.width-heroRow\.spacing\)\*0\.65/);
  assert.match(moon,/prominentMoon: true/);
- assert.match(moon,/moonMain\.height-positionColumn\.height/);
- assert.match(moon,/height: Math\.max\(23,Math\.min\(30,/);
+ assert.match(moon,/moonMain\.height-2\*moonMain\.spacing\)\*0\.62/);
+ assert.match(moon,/height: Math\.max\(41,Math\.round\(/);
+ assert.match(moon,/height: Math\.max\(1,moonMain\.height-moonVisual\.height/);
  assert.match(visual,/property bool prominentMoon: false/);
  assert.match(visual,/objectName: "cosmos-c21-moon-hero-disk"/);
  assert.match(visual,/id: moonHeroRow/);
- assert.match(visual,/width: visual\.prominentMoon[\s\S]*?Math\.min\(180,moonHeroRow\.height/);
- assert.match(visual,/height: visual\.prominentMoon[\s\S]*?moonBay\.height/);
+ assert.match(visual,/width: visual\.prominentMoon[\s\S]*?moonBay\.heroDiskSize/);
+ assert.match(visual,/height: visual\.prominentMoon[\s\S]*?moonBay\.heroDiskSize/);
  assert.match(visual,/visible: !visual\.prominentMoon/);
  assert.match(visual,/onHeightChanged: moonCanvas\.requestPaint\(\)/);
  assert.match(visual,/onProminentMoonChanged: moonCanvas\.requestPaint\(\)/);
@@ -157,4 +158,24 @@ test("C21 only COSMOS Moon overview magnifies the actual disk, not merely its co
  assert.match(moon,/verticalMode: true/);
  assert.match(forecast,/objectName: "cosmos-c20-moon-vertical-forecast"/);
  assert.doesNotMatch(moon,/Flickable\s*\{|ScrollView\s*\{/);
+});
+
+test("C22 keeps the enlarged Moon but restores lower source boxes and phase-control proximity",()=>{
+ const visual=read("widgets/weather/StationCosmosVisualInstruments.qml");
+ assert.match(moon,/id: moonVisual[\s\S]*?height: Math\.max\(90,Math\.round\([\s\S]*?0\.62\)\)/);
+ assert.match(moon,/id: positionColumn[\s\S]*?height: Math\.max\(41,Math\.round\([\s\S]*?0\.23\)\)/);
+ assert.match(moon,/id: provenanceRow[\s\S]*?height: Math\.max\(1,moonMain\.height-moonVisual\.height/);
+ assert.match(moon,/id: currentSkyTitle[\s\S]*?height: 11/);
+ assert.match(moon,/anchors\.top: currentSkyTitle\.bottom/);
+ assert.match(visual,/readonly property real heroDiskSize:/);
+ assert.match(visual,/id: moonHeroRow[\s\S]*?height: visual\.prominentMoon\s*\? moonBay\.heroDiskSize/);
+ assert.match(visual,/objectName: "cosmos-c22-moon-phase-buttons"/);
+ assert.match(visual,/height: visual\.prominentMoon \? 21/);
+ assert.match(visual,/model: VisualPolicy\.PHASES/);
+ assert.doesNotMatch(visual,/anchors\.fill: moonCanvas/);
+ assert.match(visual,/onClicked: visual\.inspectedPhaseId = modelData\.id/);
+ assert.match(moon,/prominentMoon: true/);
+ assert.match(moon,/\(heroRow\.width-heroRow\.spacing\)\*0\.65/);
+ assert.match(read("widgets/weather/StationCosmosMoonForecastStrip.qml"),
+     /objectName: "cosmos-c20-moon-vertical-forecast"/);
 });

@@ -2163,7 +2163,9 @@ PanelWindow {
         // a failed/stalled scan must not suppress the next available scan.
         if (SurgeryStartupPolicy.canReuseAudit(
                 last, now, openAuditStaleInterval,
-                auditService.available, auditService.lastError)) {
+                auditService.available, auditService.lastError,
+                auditService.snapshotFloorKey === key
+                    && auditService.snapshotRepository === repo)) {
             openAuditPending = false;
             return;
         }
@@ -2575,6 +2577,7 @@ PanelWindow {
     HospitalAuditService {
         id: auditService
         repository: githubService.repoSlug
+        floorKey: floorService.floorId
     }
 
     HospitalRoomService {

@@ -210,6 +210,17 @@ Item {
             height: 1
             color: Colors.cyan
         }
+        CpuPlusIdOrganizationLinksEditor {
+            id: organizationLinks
+            width: parent.width
+            height: implicitHeight
+            identityId: detailsEditor.identityId
+        }
+        Rectangle {
+            width: parent.width
+            height: 1
+            color: Colors.cyan
+        }
         GohuText {
             width: parent.width
             text: "CONTACT DEFAULTS"

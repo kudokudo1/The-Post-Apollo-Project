@@ -6,6 +6,11 @@ on:
       - 'widgets/CpuPlusW.qml'
       - 'widgets/cpuplus/CpuPlusIdManagementPane.qml'
       - 'widgets/cpuplus/CpuPlusIdDetailsEditor.qml'
+      - 'widgets/cpuplus/CpuPlusIdOrganizationLinksEditor.qml'
+      - 'tests/cpuplus/test_cpuplus_id_organization_links.py'
+      - 'services/social/SocialOrganizationDirectoryStore.qml'
+      - 'services/social/SocialOrganizationLinksStore.qml'
+      - 'tests/messaging/test_social_org_links_v1.py'
       - 'widgets/cpuplus/CpuPlusIdAccountEditor.qml'
       - 'widgets/cpuplus/CpuPlusIdField.qml'
       - 'services/social/SocialIdentityPolicy.js'
@@ -23,6 +28,11 @@ on:
       - 'widgets/CpuPlusW.qml'
       - 'widgets/cpuplus/CpuPlusIdManagementPane.qml'
       - 'widgets/cpuplus/CpuPlusIdDetailsEditor.qml'
+      - 'widgets/cpuplus/CpuPlusIdOrganizationLinksEditor.qml'
+      - 'tests/cpuplus/test_cpuplus_id_organization_links.py'
+      - 'services/social/SocialOrganizationDirectoryStore.qml'
+      - 'services/social/SocialOrganizationLinksStore.qml'
+      - 'tests/messaging/test_social_org_links_v1.py'
       - 'widgets/cpuplus/CpuPlusIdAccountEditor.qml'
       - 'widgets/cpuplus/CpuPlusIdField.qml'
       - 'services/social/SocialIdentityPolicy.js'
@@ -49,6 +59,8 @@ jobs:
         run: |
           python3 -m unittest discover -s tests/cpuplus -p 'test_cpuplus_id_management_main_mode.py' -v
           python3 -m unittest discover -s tests/cpuplus -p 'test_cpuplus_id_management_editor.py' -v
+          python3 -m unittest discover -s tests/cpuplus -p 'test_cpuplus_id_organization_links.py' -v
+          python3 -m unittest discover -s tests/messaging -p 'test_social_org_links_v1.py' -v
           node tests/messaging/test_social_identity_policy.cjs
           python3 -m unittest discover -s tests/messaging -p 'test_social_identity_store.py' -v
           python3 -m unittest discover -s tests/messaging -p 'test_social_account_details.py' -v

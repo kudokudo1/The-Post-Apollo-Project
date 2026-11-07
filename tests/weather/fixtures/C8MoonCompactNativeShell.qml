@@ -134,12 +134,16 @@ ShellRoot {
                     || !phase.compactMode || !phase.showMoon || phase.showSun)
                     return root.fail("MAGICK_PHASE_OR_NEW_HIERARCHY_MISSING");
                 const disk=find(phase,"cosmos-c21-moon-hero-disk");
-                if(!disk || !phase.prominentMoon
-                    || disk.width<100 || phase.width<275)
-                    return root.fail("C21_ACTUAL_MOON_DISK_NOT_ENLARGED");
+                const phaseButtons=find(phase,"cosmos-c22-moon-phase-buttons");
+                if(!disk || !phaseButtons || !phase.prominentMoon
+                    || disk.width<98 || phase.width<275
+                    || count(phase,"cosmos-c22-moon-phase-choice")!==8)
+                    return root.fail("C22_MOON_DISK_OR_EIGHT_PHASE_BUTTONS_MISSING");
                 root.compactMoonDiskWidth=disk.width;
                 root.compactMoonHeroWidth=phase.width;
                 const phaseAt=phase.mapToItem(moon,0,0);
+                const diskAt=disk.mapToItem(moon,0,0);
+                const phaseButtonsAt=phaseButtons.mapToItem(moon,0,0);
                 const positionAt=position.mapToItem(moon,0,0);
                 const ribbonAt=ribbon.mapToItem(moon,0,0);
                 const provenanceAt=provenance.mapToItem(moon,0,0);
@@ -184,9 +188,14 @@ ShellRoot {
                     || !phaseTab.selected
                     || phase.height<125
                     || phase.height<=position.height
-                    || position.height<20 || position.height>30
-                    || provenance.height<20 || provenance.height>30
-                    || phase.height<155
+                    // Restore C20-size lower readouts, not C21's 23px rack.
+                    || position.height<41 || position.height>65
+                    || provenance.height<25 || provenance.height>60
+                    // Phase buttons should immediately follow the disk.
+                    || phaseButtons.height!==21
+                    || phaseButtonsAt.y<diskAt.y+disk.height-1
+                    || phaseButtonsAt.y>diskAt.y+disk.height+5
+                    || phaseButtonsAt.y+phaseButtons.height>positionAt.y+1
                     || provenanceAt.y<positionAt.y+position.height-1
                     || provenanceAt.y+provenance.height>moon.height-inset+1
                     || forecastAt.y<railAt.y+rail.height
@@ -261,7 +270,7 @@ ShellRoot {
                     || count(moon,"cosmos-c8-moon-fact")!==9)
                     return root.fail("C21_LARGE_SIZE_MOON_SCALE_OR_SOURCE_LOSS");
                 root.done=true;
-                console.log("C8_MOON_PASS // NINE_FACTS COMPACT_PHASE NO_SCROLL PROVIDER_LIMITS C9_VISUAL_HIERARCHY C10_6PX_STAGE_GUTTER C21_LARGE_DISK COMPACT+LARGE SOURCE_PRESERVED");
+                console.log("C8_MOON_PASS // NINE_FACTS COMPACT_PHASE NO_SCROLL PROVIDER_LIMITS C9_VISUAL_HIERARCHY C10_6PX_STAGE_GUTTER C22_PHASE_BUTTONS C20_LOWER_BOXES C21_LARGE_DISK SOURCE_PRESERVED");
                 Qt.quit();
             }
         }

@@ -97,21 +97,23 @@ test("C12 LIVE shares complete interactive SUVI imager and displays GOES source 
  assert.match(old,/source: solarFocus\.sourceSpace[\s\S]*?solarImageUrl/);
 });
 
-test("C12 ACTIVITY keeps xray history/source, flare event paging and cycle three-page model",()=>{
+test("C13 ACTIVITY renders xray, flare and cycle in one non-scrolling instrument cluster",()=>{
  for(const name of [
-   "cosmos-c12-activity-metrics","cosmos-c12-activity-inner-modes",
+   "cosmos-c12-activity-metrics","cosmos-c13-simultaneous-instruments",
+   "cosmos-c13-xray-bay","cosmos-c13-flare-bay","cosmos-c13-cycle-bay",
    "cosmos-c12-xray-trend","cosmos-c12-xray-facts",
    "cosmos-c12-flare-facts","cosmos-c12-cycle-facts"
  ]) assert.ok(terminal.includes(name),name);
- for(const key of [
-   "flareCount","flareAt","flarePage","cyclePage","xrayPage",
-   "selectedFlareIndex","flareDetailPage","cycleDetailPage","xraySourcePage"
- ]) assert.ok(terminal.includes(key),key);
+ for(const source of ["flareAt","flarePage","cyclePage","xrayPage",
+                       "selectedFlareIndex","SolarDetails.flarePage(selectedFlare, 1)"])
+   assert.ok(terminal.includes(source),source);
  assert.match(terminal,/cycle\.refresh\(true\)/);
  assert.match(terminal,/flares\.refresh\(\)/);
  assert.match(terminal,/xray\.refresh\(\)/);
  assert.match(terminal,/NOAA SOLAR CYCLE \/\/ MONTHLY PREDICTION, NOT LIVE FLUX/);
  assert.match(terminal,/OBSERVED EVENT PEAKS, NOT ALERTS/);
+ assert.doesNotMatch(terminal,/id: activityTabs\b|id: activityInstrument\b/);
+ assert.doesNotMatch(terminal,/activityFocus===|cycleDetailPage|flareDetailPage|xraySourcePage/);
  assert.match(focus,/id: solarDetails\s*StationCosmosSunInstrumentPane\s*\{/);
  assert.match(focus,/id: solarYear\s*StationCosmosAnnualWheelPane\s*\{/);
 });

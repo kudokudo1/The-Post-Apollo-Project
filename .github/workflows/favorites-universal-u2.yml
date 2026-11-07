@@ -1,0 +1,59 @@
+name: Favorites++ U2 shared read-only catalog
+
+on:
+  pull_request:
+    paths:
+      - "services/favorites/**"
+      - "components/FavoritesUnifiedPreview.qml"
+      - "components/qmldir"
+      - "widgets/TimeW.qml"
+      - "tests/favorites/**"
+      - "scripts/favorites/**"
+      - ".github/workflows/favorites-universal-u2.yml"
+  push:
+    paths:
+      - "services/favorites/**"
+      - "components/FavoritesUnifiedPreview.qml"
+      - "components/qmldir"
+      - "widgets/TimeW.qml"
+      - "tests/favorites/**"
+      - "scripts/favorites/**"
+      - ".github/workflows/favorites-universal-u2.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  source-contracts:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: U0 and U1 compatibility contracts
+        run: |
+          node --test tests/favorites/test_favorites_universal_u0.cjs
+          node --test tests/favorites/test_favorites_universal_u1.cjs
+      - name: U2 cross-owner projection, redaction and Clock source contracts
+        run: node --test tests/favorites/test_favorites_universal_u2.cjs
+      - name: Original WORLD favorites contract
+        run: |
+          node tests/time/test_world_favorites_policy.cjs
+          python3 tests/time/test_clock_world_favorites_contract.py
+
+  native-readonly:
+    runs-on: ubuntu-latest
+    container:
+      image: fedora:44
+    timeout-minutes: 20
+    steps:
+      - name: Install Quickshell and Xvfb
+        run: |
+          dnf install -y --setopt=install_weak_deps=False dnf5-plugins
+          dnf copr enable -y errornointernet/quickshell
+          dnf install -y --setopt=install_weak_deps=False \
+            quickshell qt6-qtdeclarative qt6-qt5compat qt6-qtbase-gui \
+            qt6-qtsvg git nodejs coreutils findutils xorg-x11-server-Xvfb
+          quickshell --version
+      - uses: actions/checkout@v4
+      - name: Native read-only live-binding and preview smoke
+        run: bash scripts/favorites/verify_unified_catalog_fedora_u2.sh

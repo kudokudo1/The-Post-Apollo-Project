@@ -27,6 +27,7 @@ MODEL describes architecture, ownership, contracts, services, and subsystem rela
 
 - **Favorites++ U0 provider contract (draft, read-only):** [Stable identities, optional capabilities, and legacy projection without writer takeover](./contracts/favorites-universal-u0.md). No existing storage migration, global UI or runtime activation.
 - **Favorites++ U1 default store (draft, GitHub-only):** [Atomic local membership writer, rapid-save queue and reusable Favorite/Pin control](./contracts/favorites-universal-u1.md). Existing providers remain separate owners; no runtime activation.
+- **Favorites++ U2 read-only shared catalog (draft):** [Injected provider snapshots, redaction, and first Clock WORLD pilot](./contracts/favorites-universal-u2.md). Three existing owner families shown, no new writer or cross-widget action authority.
 
 - **TASKS / storage ownership architectural decision (operator-selected direction; design only):** [M12l local-first coordinator, separate GitHub/format adapters, and deferral of a privileged broker](./contracts/tasks-storage-ownership-adr-m12l.md). Evidence includes M12j's isolated native receipts, M12k's independently tested same-UID writer limitations, and official local-first/synchronization references. No production writer approval or activation.
 

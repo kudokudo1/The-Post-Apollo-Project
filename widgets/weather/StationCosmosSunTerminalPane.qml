@@ -469,7 +469,7 @@ Rectangle {
                     ]
                     delegate: ActionButton {
                         required property var modelData
-                        width: Math.max(1,(activityTabs.width-78)/3)
+                        width: Math.max(1,(activityTabs.width-82)/3)
                         height: activityTabs.height
                         label: modelData.title
                         labelPixelSize: 9

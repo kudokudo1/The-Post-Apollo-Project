@@ -154,3 +154,18 @@ test("C15 ACTIVITY uses source-backed nonuniform scientific representations",()=
  assert.doesNotMatch(terminal,/Flickable\s*\{|ScrollView\s*\{/);
 });
 
+
+test("C15 OBSERVATION distinguishes live class, source-backed meters, daylight and twilight",()=>{
+ for(const name of [
+  "cosmos-c14-suvi-hero","cosmos-c14-sun-path-hero",
+  "cosmos-c14-live-telemetry","cosmos-c15-space-context-meters",
+  "cosmos-c15-daylight-timeline","cosmos-c15-twilight-groups"
+ ]) assert.ok(terminal.includes(name),name);
+ for(const source of ["kpReady","solarWindReady","magneticFieldReady",
+                       "solarWindSpeed","magneticFieldBz"])
+   assert.ok(terminal.includes(source),source);
+ assert.match(terminal,/contextMeters:/);
+ assert.match(terminal,/highlights:/);
+ assert.doesNotMatch(terminal,/model: observation\.liveReadings/);
+ assert.doesNotMatch(terminal,/Flickable\s*\{|ScrollView\s*\{/);
+});

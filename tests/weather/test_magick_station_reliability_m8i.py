@@ -49,16 +49,17 @@ class StationReliabilityM8iTest(unittest.TestCase):
 
     def test_two_reversals_inside_thirty_minute_sample(self):
         def smaller(instant):
-            # Time-compressed trajectory, two changes at 10 and 20 minutes.
-            t = hours(instant) * 2
-            return (100 + 10 * (t ** 3 / 3 - t ** 2 / 2 + 2 * t / 9)) % 360
-        # The 20-minute centered rate derivative smooths the two turns;
-        # this test checks the *actual filtered-rate* reversals only.
-        times = multi.find_stations(
+            # Derivative has two roots at 5 and 25 min. The existing 20-min
+            # central difference shifts the observed zeroes inward a little.
+            t = hours(instant)
+            a, b = 5 / 60, 25 / 60
+            return (100 + 10 * (t**3 / 3 - (a+b)*t**2 / 2 + a*b*t)) % 360
+        events = multi.find_stations(
             smaller, BASE, BASE + timedelta(minutes=30), 30)
-        self.assertTrue(all(event["type"] == "station" for event in times))
-        self.assertLessEqual(len(times), 2)
-        self.assertEqual(len({event["utc"] for event in times}), len(times))
+        self.assertEqual(len(events), 2, events)
+        self.assertEqual([event["direction"] for event in events],
+                         ["retrograde", "direct"])
+        self.assertEqual(len({event["utc"] for event in events}), 2)
 
     def test_exact_grid_node_zero_reversal_retained(self):
         def turn(instant):

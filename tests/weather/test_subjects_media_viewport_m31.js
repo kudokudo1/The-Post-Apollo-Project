@@ -99,8 +99,9 @@ test("root exports only a bounded chassis-local rect, never native video/input a
   assert.match(station,/ViewportPolicy\.owner\(\s*menuOpen, subjectNavigationOpen, contextTerminalRequested,/);
   assert.match(station,/subjectNavigator\.mapToItem\(\s*stationBackground, bay\.x, bay\.y\)/);
   assert.match(station,/ViewportPolicy\.within\(\s*mapped, stationBackground\.width, stationBackground\.height\)/);
-  assert.match(station,/width: 1000/);
-  assert.match(station,/height: 700/);
+  // The viewport remains chassis-local, including after manual resizing.
+  assert.match(station,/id: stationBackground\s+width: weatherStation\.frameWidth\s+height: weatherStation\.frameHeight/);
+  assert.match(station,/property string chassisLevel: "compact"/);
   assert.equal((station.match(/StationTerminal\s*\{/g)||[]).length,1);
   for(const source of [media,workspace,navigator,station]) {
     assert.doesNotMatch(source,/^\s*import\s+QtWebEngine\b/m);

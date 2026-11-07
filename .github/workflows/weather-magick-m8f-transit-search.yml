@@ -1,0 +1,26 @@
+name: MAGICK M8f JPL transit timeline and aspect-crossing source tests
+
+on:
+  pull_request:
+    paths:
+      - 'scripts/weather/celestial_transit_timeline.py'
+      - 'tests/weather/test_magick_transit_timeline_m8f.py'
+      - '.github/workflows/weather-magick-m8f-transit-search.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  source-search:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Verify exact angular crossing geometry with synthetic functions
+        run: python3 -m unittest discover -s tests/weather -p 'test_magick_transit_timeline_m8f.py' -v
+      - name: Preserve private natal chart geometry calculations
+        run: python3 -m unittest discover -s tests/weather -p 'test_magick_natal_engine_m8b.py' -v

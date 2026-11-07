@@ -78,7 +78,7 @@ class CpuPlusLocalOrganizationLinksContracts(unittest.TestCase):
             "ASSOCIATION SAVE FAILED",
             "canSaveLink",
             "targetAlreadyLinked",
-            "editor.accountChoiceValid",
+            "accountChoiceValid",
             "+ LINK LOCAL ID",
             "+ LINK ACCOUNT NAME",
             "pendingIdentityId",

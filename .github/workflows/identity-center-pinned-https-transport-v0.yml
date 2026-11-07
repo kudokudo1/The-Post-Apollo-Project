@@ -37,6 +37,8 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
+      - name: Install existing offline verifier test requirements
+        run: python3 -m pip install -r services/identity/requirements-jwks-verifier-v0.txt
       - name: Confirm test-only OpenSSL support
         run: openssl version
       - name: Compile transport and test

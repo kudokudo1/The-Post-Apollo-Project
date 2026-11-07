@@ -33,7 +33,7 @@ required(
     "Doctor display names must remain distinct from Room identifiers",
 )
 required(
-    "REGISTERED WORKERS" in host
+    "WORKERS // " in host
     and "SHOW BRANCHES" in host
     and "SHOW WORKERS" in host,
     "The operator must be able to distinguish and switch views",

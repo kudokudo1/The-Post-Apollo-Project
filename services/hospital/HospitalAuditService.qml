@@ -18,6 +18,13 @@ Scope {
     }
 
     property string repository: ""
+    // Optional caller identity: a Floor may change while an old PX audit
+    // subprocess is still running. Never publish its result to a new Floor.
+    property string floorKey: ""
+    property string inFlightRepository: ""
+    property string inFlightFloorKey: ""
+    property string snapshotRepository: ""
+    property string snapshotFloorKey: ""
 
     property bool running: false
     property bool quietRun: false
@@ -60,6 +67,8 @@ Scope {
         latestRunBranch = "";
         rooms = [];
         lastAuditPayload = "";
+        snapshotRepository = "";
+        snapshotFloorKey = "";
         lastError = "";
     }
 
@@ -83,6 +92,8 @@ Scope {
             return;
         }
 
+        inFlightRepository = target;
+        inFlightFloorKey = String(floorKey || "");
         running = true;
         exitSeen = false;
         stdoutSeen = false;
@@ -202,6 +213,15 @@ Scope {
         quietRun = false;
         watchdog.stop();
 
+        // Floor discovery / selection may clear records while this scan is
+        // still running. Drop a late result instead of showing foreign Rooms.
+        if (inFlightRepository !== String(repository || "").trim()
+                || inFlightFloorKey !== String(floorKey || "")) {
+            available = false;
+            lastError = "AUDIT RESULT DISCARDED // FLOOR CHANGED";
+            return;
+        }
+
         if (exitCode !== 0) {
             available = false;
             lastError = String(stderrText || stdoutText || ("PX AUDIT EXIT " + exitCode)).trim();
@@ -212,6 +232,8 @@ Scope {
         // differs from the last published audit snapshot.
         if (wasQuiet
                 && available
+                && snapshotRepository === inFlightRepository
+                && snapshotFloorKey === inFlightFloorKey
                 && payload.length > 0
                 && payload === lastAuditPayload) {
             lastError = "";
@@ -223,6 +245,8 @@ Scope {
             parseAudit(payload);
             traceSubprocessLag("parse:end", rooms.length);
             lastAuditPayload = payload;
+            snapshotRepository = inFlightRepository;
+            snapshotFloorKey = inFlightFloorKey;
             available = true;
             lastError = "";
             traceSubprocessLag("audited:begin", rooms.length);

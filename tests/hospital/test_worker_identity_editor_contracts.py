@@ -5,6 +5,7 @@ from pathlib import Path
 root = Path(__file__).resolve().parents[2]
 host = (root / "widgets/HospitalW.qml").read_text(encoding="utf-8")
 service = (root / "services/hospital/HospitalRoomNameService.qml").read_text(encoding="utf-8")
+doctor_writer = (root / "services/hospital/HospitalDoctorNameService.qml").read_text(encoding="utf-8")
 projection = (root / "services/hospital/HospitalWorkforceRosterPolicy.js").read_text(encoding="utf-8")
 responsibility = (root / "services/hospital/HospitalResponsibilityService.qml").read_text(encoding="utf-8")
 failures = []
@@ -29,8 +30,10 @@ check("assignmentTitle: textValue(room.assignmentTitle)" in projection,
       "only real linked Assignment data")
 check("doctorService.doctorById(id)" in host,
       "Doctor must already be registered for rename")
-check("doctor.id, name, doctor.role, doctor.status" in host,
-      "Doctor rename preserves role/status")
+check("doctorNameService.saveName(doctor.id, name)" in host,
+      "Doctor rename must use the name-only PX service")
+check('"doctor-name-set"' in doctor_writer and '"doctor-put"' not in doctor_writer,
+      "Doctor name writer must not alter role/status")
 check('root.rosterEditingRoomId = ""' in host, "editor cancellation resets target")
 check("root.rosterIdentityRefreshPending" in host,
       "queued refresh prevents stale roster after successful edit")
@@ -42,10 +45,12 @@ check('repository !== selected' in host, "cross-Patient Git navigation remains g
 check("lastSavedRoom" in service and "result.id" in service,
       "PX reply checked for target Room ID")
 check("onNameSaved:" in host, "successful label write causes roster reload")
-check("PX V11" in service, "older PX runtime produces actionable error")
+check("PX V11" in service and "PX V11" in doctor_writer,
+      "older PX runtime produces actionable error")
 check("post-apollo-dev-runtime/bin/px" in responsibility
       and "post-apollo-dev-runtime/bin/px" in service,
       "registry and writes select same PX version")
+check("HospitalDoctorNameService {" in host, "independent Doctor name writer")
 check("function saveRosterDoctorName()" in host,
       "Doctor rename action explicitly named")
 

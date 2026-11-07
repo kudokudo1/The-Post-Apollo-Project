@@ -1,0 +1,52 @@
+name: MAGICK M8g JPL transit timeline interactive/native
+
+on:
+  pull_request:
+    paths:
+      - 'services/weather/CelestialTransitTimelineService.qml'
+      - 'widgets/weather/StationMagickTransitTimelinePolicy.js'
+      - 'widgets/weather/StationMagickTransitTimelinePane.qml'
+      - 'widgets/weather/StationMagickAstrologyPane.qml'
+      - 'widgets/weather/StationMagickTransitChartPane.qml'
+      - 'tests/weather/test_magick_transit_timeline_ui_m8g.js'
+      - 'tests/weather/fixtures/M8gNativeTransitShell.qml'
+      - 'scripts/weather/verify_magick_native_m8g.sh'
+      - '.github/workflows/weather-magick-m8g-transit-ui.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  js-contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Verify exact JPL provenance, chart/event handoff and bounded timeline
+        run: node --test tests/weather/test_magick_transit_timeline_ui_m8g.js
+      - name: Preserve original MAGICK natal/transit/date modes
+        run: |
+          node --test tests/weather/test_magick_transit_comparison_m8c.js
+          node --test tests/weather/test_magick_natal_integration_m8b.js
+          node --test tests/weather/test_magick_date_location_m8d.js
+  native-quickshell:
+    runs-on: ubuntu-latest
+    container:
+      image: debian:unstable
+    timeout-minutes: 15
+    steps:
+      - name: Install real disposable Quickshell/Qt modules
+        run: |
+          export DEBIAN_FRONTEND=noninteractive
+          apt-get update
+          apt-get install -y --no-install-recommends \
+            ca-certificates git nodejs quickshell qt6-qpa-plugins coreutils findutils \
+            qml6-module-qtquick-effects qml6-module-qt5compat-graphicaleffects
+          quickshell --version
+      - uses: actions/checkout@v4
+      - name: Native offscreen M8g source, chart and exact event callback
+        run: bash scripts/weather/verify_magick_native_m8g.sh

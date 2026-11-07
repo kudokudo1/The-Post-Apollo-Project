@@ -14,6 +14,7 @@ Rectangle {
     property var natalData: null
     property var transitData: null
     property string expectedUtc: ""
+    property string selectedContactUtc: ""
     property string statusText: ""
     property bool loading: false
     property string dateText: ""
@@ -346,6 +347,16 @@ Rectangle {
               ? "SIGNED SHIFT "+transits.selectedDelta.signed_delta_deg.toFixed(2)+
                 "° // CROSS-ASPECTS "+transits.relatedAspects.length
               : "SEPARATE UTC EPOCHS / SAME EXPLICIT OBSERVER AND JPL KERNEL"
+        }
+        QuietText {
+            width:parent.width
+            visible:transits.selectedContactUtc!==""
+            height:visible?18:0
+            font.pixelSize:9
+            color:Colors.magenta
+            elide:Text.ElideRight
+            text:"EXACT CROSSING "+transits.selectedContactUtc+
+                " // CHART NEAREST UTC MINUTE"
         }
         QuietText {
             width:parent.width;height:16;font.pixelSize:8

@@ -59,6 +59,12 @@ class CpuPlusLocalOrganizationLinksContracts(unittest.TestCase):
             self.assertIn(method, DIRECTORY)
             self.assertNotIn(method, ORGS)
         self.assertIn("SOCIAL // USER SETTINGS // ORGANIZATIONS", ORGS)
+        # The association panel starts collapsed so existing rename/contact
+        # controls retain their familiar positions in the fixed-size bay.
+        self.assertIn("property bool expanded: false", ORGS)
+        self.assertIn("EDIT ASSOCIATIONS // ", ORGS)
+        self.assertIn("HIDE ASSOCIATIONS", ORGS)
+        self.assertIn("visible: editor.expanded", ORGS)
 
     def test_explicit_user_link_and_unlink_calls_existing_owner_store(self):
         for expected in (

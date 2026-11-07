@@ -261,7 +261,7 @@ ShellRoot {
                     || count(moon,"cosmos-c8-moon-fact")!==9)
                     return root.fail("C21_LARGE_SIZE_MOON_SCALE_OR_SOURCE_LOSS");
                 root.done=true;
-                console.log("C8_MOON_PASS // C21_LARGE_DISK COMPACT+LARGE NO_SCROLL NINE_FACTS SOURCE_PRESERVED");
+                console.log("C8_MOON_PASS // NINE_FACTS COMPACT_PHASE NO_SCROLL PROVIDER_LIMITS C9_VISUAL_HIERARCHY C10_6PX_STAGE_GUTTER C21_LARGE_DISK COMPACT+LARGE SOURCE_PRESERVED");
                 Qt.quit();
             }
         }

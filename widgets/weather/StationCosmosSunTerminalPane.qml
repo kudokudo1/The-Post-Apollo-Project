@@ -407,19 +407,19 @@ Rectangle {
             readonly property int bottomHeight: Math.max(1,Math.round(height*0.40))
             readonly property var space: sunTerminal.spaceService
             readonly property var highlights: [
-                {name:"BLUE // AM",value:sunTerminal.interval(
+                {name:"BLUE AM",value:sunTerminal.interval(
                     sunTerminal.twilight ? sunTerminal.twilight.blueMorningStart : null,
                     sunTerminal.twilight ? sunTerminal.twilight.blueMorningEnd : null),
                  tint:Colors.cyan},
-                {name:"GOLDEN // AM",value:sunTerminal.interval(
+                {name:"GOLD AM",value:sunTerminal.interval(
                     sunTerminal.twilight ? sunTerminal.twilight.goldenMorningStart : null,
                     sunTerminal.twilight ? sunTerminal.twilight.goldenMorningEnd : null),
                  tint:Colors.yellow},
-                {name:"GOLDEN // PM",value:sunTerminal.interval(
+                {name:"GOLD PM",value:sunTerminal.interval(
                     sunTerminal.twilight ? sunTerminal.twilight.goldenEveningStart : null,
                     sunTerminal.twilight ? sunTerminal.twilight.goldenEveningEnd : null),
                  tint:Colors.yellow},
-                {name:"BLUE // PM",value:sunTerminal.interval(
+                {name:"BLUE PM",value:sunTerminal.interval(
                     sunTerminal.twilight ? sunTerminal.twilight.blueEveningStart : null,
                     sunTerminal.twilight ? sunTerminal.twilight.blueEveningEnd : null),
                  tint:Colors.cyan}
@@ -707,49 +707,62 @@ Rectangle {
                             anchors.left: parent.left
                             anchors.right: parent.right
                             anchors.top: parent.top
-                            anchors.margins: 2
-                            height: observation.roomy ? 16 : 11
+                            anchors.leftMargin: 3
+                            anchors.rightMargin: 3
+                            anchors.topMargin: 1
+                            height: observation.roomy ? 15 : 10
                             color: Colors.orange
-                            font.pixelSize: observation.labelSize
-                            text: "TWILIGHT // BLUE + GOLDEN HOURS"
+                            font.pixelSize: observation.roomy ? 10 : 8
+                            text: "TWILIGHT // BLUE + GOLDEN"
                             elide: Text.ElideRight
+                            wrapMode: Text.NoWrap
                         }
-                        Grid {
+                        Column {
                             id: twilightGroups
                             objectName: "cosmos-c15-twilight-groups"
+                            readonly property int shownRows: twilightRows.count
                             anchors.left: parent.left
                             anchors.right: parent.right
                             anchors.top: twilightTitle.bottom
                             anchors.bottom: parent.bottom
-                            anchors.margins: 2
-                            columns: 2
+                            anchors.leftMargin: 3
+                            anchors.rightMargin: 3
+                            anchors.bottomMargin: 2
                             spacing: 1
                             Repeater {
-                                model: observation.roomy ? sunTerminal.positionRows
-                                    : observation.highlights
-                                delegate: Item {
+                                id: twilightRows
+                                // Four complete, source-backed intervals at all chassis sizes.
+                                // Detailed dawn/dusk facts remain in INDEX, not a micro-grid.
+                                model: observation.highlights
+                                delegate: Row {
                                     required property var modelData
-                                    width: Math.max(1,(twilightGroups.width-1)/2)
+                                    objectName: "cosmos-c16-twilight-single-row"
+                                    width: twilightGroups.width
                                     height: Math.max(1,(twilightGroups.height
-                                        -(observation.roomy ? 3 : 1))
-                                        /(observation.roomy ? 4 : 2))
-                                    Column {
-                                        anchors.fill: parent
-                                        spacing: 0
-                                        QuietText {
-                                            width: parent.width
-                                            color: modelData.tint || Colors.cyan
-                                            font.pixelSize: observation.labelSize
-                                            text: modelData.name
-                                            elide: Text.ElideRight
-                                        }
-                                        GohuText {
-                                            width: parent.width
-                                            color: Colors.white
-                                            font.pixelSize: observation.roomy ? 11 : 8
-                                            text: modelData.value
-                                            elide: Text.ElideRight
-                                        }
+                                        -3*twilightGroups.spacing)/4)
+                                    spacing: 3
+                                    QuietText {
+                                        id: intervalLabel
+                                        width: Math.max(1,Math.round(parent.width*0.32))
+                                        height: parent.height
+                                        text: modelData.name
+                                        color: modelData.tint || Colors.cyan
+                                        font.pixelSize: observation.roomy ? 10 : 8
+                                        verticalAlignment: Text.AlignVCenter
+                                        elide: Text.ElideRight
+                                        wrapMode: Text.NoWrap
+                                    }
+                                    GohuText {
+                                        objectName: "cosmos-c16-twilight-one-line-time"
+                                        width: Math.max(1,parent.width-intervalLabel.width-parent.spacing)
+                                        height: parent.height
+                                        text: modelData.value
+                                        color: Colors.white
+                                        font.pixelSize: observation.roomy ? 11 : 8
+                                        horizontalAlignment: Text.AlignRight
+                                        verticalAlignment: Text.AlignVCenter
+                                        elide: Text.ElideRight
+                                        wrapMode: Text.NoWrap
                                     }
                                 }
                             }

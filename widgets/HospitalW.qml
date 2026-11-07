@@ -2219,8 +2219,11 @@ PanelWindow {
         });
 
         root.ensureFirstRoomSelected();
-        root.requestOpenAudit();
+
+        // Discovery owns the Floor selection. Mark it in flight first, so
+        // the open audit cannot race the old repository while Floors rebuild.
         floorService.discover();
+        root.requestOpenAudit();
     }
 
     onKeyboardActiveChanged: {
@@ -2890,6 +2893,13 @@ PanelWindow {
         function onRunningChanged() {
             if (auditService.running)
                 return;
+
+            // The initial audit may have been queued while the Floor was
+            // discovering or another Room audit owned the one audit slot.
+            // Retry the pending request after that slot becomes available.
+            if (root.openAuditPending && root.menuOpen
+                    && !floorService.discovering)
+                openAuditKick.restart();
 
             // A failed Room-entry audit does not count as fresh.
             if (root.roomAuditInFlightTeam && auditService.lastError)

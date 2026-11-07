@@ -19,6 +19,12 @@ ShellRoot {
     QtObject {
         id: mockSolar
         property string solarFluxText: "111 SFU"
+        property bool kpReady: true
+        property real kp: 3.2
+        property bool solarWindReady: true
+        property real solarWindSpeed: 473
+        property bool magneticFieldReady: true
+        property real magneticFieldBz: -6.5
     }
     QtObject {
         id: sky
@@ -175,6 +181,9 @@ ShellRoot {
             const obsLive=fixture.locate(observation,"cosmos-c14-live-telemetry");
             const obsSky=fixture.locate(observation,"cosmos-c14-position-live-strip");
             const obsLight=fixture.locate(observation,"cosmos-c14-twilight-ledger");
+            const obsMeters=fixture.locate(observation,"cosmos-c15-space-context-meters");
+            const obsTimeline=fixture.locate(observation,"cosmos-c15-daylight-timeline");
+            const obsTwilightGroups=fixture.locate(observation,"cosmos-c15-twilight-groups");
             const metrics=fixture.locate(activity,"cosmos-c12-activity-metrics");
             const trend=fixture.locate(activity,"cosmos-c12-xray-trend");
             const xray=fixture.locate(activity,"cosmos-c12-xray-facts");
@@ -189,7 +198,8 @@ ShellRoot {
             if(!hero||!side||!sun||!ledger||!strip||!metrics
                 ||!trend||!xray||!flare||!cycle||!cluster
                 ||!xrayBay||!flareBay||!cycleBay||!rangeChart||!historyGraph
-                ||!obsImage||!obsArc||!obsLive||!obsSky||!obsLight)return;
+                ||!obsImage||!obsArc||!obsLive||!obsSky||!obsLight
+                ||!obsMeters||!obsTimeline||!obsTwilightGroups)return;
             if(fixture.phase===0){
                 if(position.positionRows.length!==8||position.positionStrip.length!==5)
                     return fixture.stop("POSITION_DATA_MISSING");
@@ -202,8 +212,15 @@ ShellRoot {
                     ||obsSky.height<24||obsLight.height<40
                     ||obsLight.y+obsLight.height>observation.height+1
                     ||observation.positionRows.length!==8
-                    ||observation.positionStrip.length!==5)
+                    ||observation.positionStrip.length!==5
+                    ||obsMeters.width<200||obsTimeline.width<170
+                    ||obsTwilightGroups.width<170||obsLight.height<40)
                     return fixture.stop("OBSERVATION_INSTRUMENT_GEOMETRY_INVALID");
+                if(observation.contextMeters[0].value!=="3.2"
+                    ||observation.contextMeters[1].value!=="473 KM/S"
+                    ||observation.contextMeters[2].value!=="-6.5 NT"
+                    ||observation.highlights.length!==4)
+                    return fixture.stop("SHARED_SPACE_CONTEXT_MISSING");
                 if(hero.height>live.height+1||sun.height>position.height+1
                     ||strip.y+strip.height>position.height+1
                     ||cluster.y+cluster.height>activity.height+1

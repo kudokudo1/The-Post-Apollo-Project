@@ -57,10 +57,11 @@ var SUBJECTS = [
       {id:"flares",label:"INSPECT // FLARES"},
       {id:"cycle",label:"INSPECT // CYCLE"}]},
     {id:"moon",label:"MOON",children:[
-      {id:"ephemeris",label:"PHASE AND RISE/SET"},
+      {id:"ephemeris",label:"OVERVIEW // PHASE + LOCAL FORECAST"},
       {id:"position",label:"CURRENT POSITION"},
       {id:"year",label:"LUNAR YEAR // JPL WHEEL"},
-      {id:"forecast",label:"LUNAR + SOLAR // LOCAL FORECAST"}]},
+      // Preserve old forecast bookmarks as a detailed INDEX inspector.
+      {id:"forecast",label:"INSPECT // LOCAL LUNAR FORECAST"}]},
     {id:"planets-stars",label:"PLANETS AND STARS",children:[
       {id:"celestial-fix",label:"CURRENT SKY"},
       {id:"planet-clock",label:"PLANET RISE/SET"},

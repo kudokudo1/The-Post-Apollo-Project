@@ -133,7 +133,7 @@ ShellRoot {
             const forecastRail=find(forecast,"cosmos-c11-moon-year-mode-rail");
             const phaseTab=find(moon,"cosmos-c11-back-to-moon");
             const yearTab=find(moon,"cosmos-c17-moon-wheel-tab");
-            const forecastTab=find(forecast,"cosmos-c17-moon-forecast-tab");
+            const forecastOverview=find(forecast,"cosmos-c11-back-to-moon");
             if(root.phase===0){
                 if(ml.view!=="moon" || ml.lockedView!=="moon"
                     || sl.view!=="solar" || sl.lockedView!=="solar"
@@ -144,12 +144,12 @@ ShellRoot {
                     || forecastCanvas.visible)
                     return root.fail("REUSED_WHEEL_LOCK_OR_FORECAST_MISSING");
                 if(!yearRail || !forecastRail || !phaseTab
-                    || !yearTab || !forecastTab
+                    || !yearTab || !forecastOverview
                     || yearRail.height!==27 || forecastRail.height!==27
-                    || phaseTab.width<130 || yearTab.width<130
-                    || forecastTab.width<130 || phaseTab.height!==27
-                    || yearTab.height!==27 || forecastTab.height!==27
-                    || !yearTab.selected || !forecastTab.selected)
+                    || phaseTab.width<200 || yearTab.width<200
+                    || forecastOverview.width<200 || phaseTab.height!==27
+                    || yearTab.height!==27 || forecastOverview.height!==27
+                    || !yearTab.selected || forecastOverview.selected)
                     return root.fail("MOON_C18_FULL_WIDTH_MODE_RAIL_FAILED");
                 if(moonCanvas.width<400 || moonCanvas.height<220
                     || sunCanvas.width<400 || sunCanvas.height<250
@@ -208,15 +208,12 @@ ShellRoot {
                     || ml.calendarSource.loading || sl.calendarSource.loading
                     || fl.calendarSource.active)
                     return root.fail("RETURN_ROUTE_OR_JPL_LAZY_GATE_BROKEN");
-                const forward=find(moon,"cosmos-c17-moon-forecast-tab");
                 const backward=find(forecast,"cosmos-c17-moon-wheel-tab");
-                if(!forward||!backward) return root.fail("MOON_FORECAST_RAIL_MISSING");
-                forward.clicked(null);
-                if(root.lastMoonRoute!=="cosmos/moon/forecast")
-                    return root.fail("MOON_TO_FORECAST_ROUTE_BROKEN");
+                if(!backward || fl.view!=="forecast")
+                    return root.fail("INDEX_FORECAST_INSPECTOR_LOST");
                 backward.clicked(null);
                 if(root.lastMoonRoute!=="cosmos/moon/year")
-                    return root.fail("FORECAST_TO_WHEEL_ROUTE_BROKEN");
+                    return root.fail("INDEX_FORECAST_TO_YEAR_ROUTE_BROKEN");
                 root.done=true;
                 console.log("C11_ANNUAL_PASS // BOTH_WHEELS JPL_ATLAS MONTH SOLAR_TERMS ZOOM_PAN BACK + C17_MOON_FORECAST");
                 Qt.quit();

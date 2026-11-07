@@ -33,8 +33,8 @@ test("C17 Moon INDEX exposes original phase, annual JPL wheel and weather foreca
  }
  assert.match(subject,/cosmosPane\.subjectRoute === "cosmos\/moon\/forecast"\s*\? moonForecastComponent/);
  assert.match(subject,/id: moonForecastComponent\s*StationCosmosAnnualWheelPane\s*\{/);
- assert.match(compact,/objectName: "cosmos-c17-open-moon-forecast"/);
- assert.match(compact,/routeRequested\("cosmos\/moon\/forecast"\)/);
+ assert.match(compact,/StationCosmosMoonForecastStrip\s*\{/);
+ assert.doesNotMatch(compact,/routeRequested\("cosmos\/moon\/forecast"\)/);
 });
 
 test("C17 routes both screenshots to one original MAGICK renderer without new JPL fetchers",()=>{
@@ -44,10 +44,10 @@ test("C17 routes both screenshots to one original MAGICK renderer without new JP
  assert.match(reused,/view: annualFocus\.annualView/);
  assert.match(reused,/lockedView: annualFocus\.annualView/);
  assert.match(reused,/compactForecast: annualFocus\.isMoon && annualFocus\.moonView === "forecast"/);
- assert.match(reused,/objectName: "cosmos-c17-moon-forecast-tab"/);
+ assert.doesNotMatch(reused,/objectName: "cosmos-c17-moon-forecast-tab"/);
  assert.match(reused,/objectName: "cosmos-c17-moon-wheel-tab"/);
  assert.match(reused,/onClicked: annualFocus\.routeRequested\("cosmos\/moon\/year"\)/);
- assert.match(reused,/onClicked: annualFocus\.routeRequested\("cosmos\/moon\/forecast"\)/);
+ assert.doesNotMatch(reused,/onClicked: annualFocus\.routeRequested\("cosmos\/moon\/forecast"\)/);
  assert.match(annual,/active: annualPane\.visible && annualPane\.view!=="forecast"/);
  assert.match(annual,/compactLayout: annualPane\.compactForecast/);
  assert.match(annual,/readonly property var calendarSource: annualSource/);

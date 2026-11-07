@@ -81,8 +81,8 @@ test("COSMOS wheel mode is fixed and leaves MAGICK free to choose all three mode
  assert.doesNotMatch(original,/lockedView:/);
  assert.match(magick,/model:\s*\[\s*\{id:"moon",label:"LUNAR YEAR"\},[\s\S]*?\{id:"solar",label:"SOLAR YEAR"\},[\s\S]*?\{id:"forecast",label:"FORECAST"\}/);
  assert.match(host,/visible: annualFocus\.isMoon/);
- assert.match(host,/objectName: "cosmos-c17-moon-forecast-tab"/);
- assert.match(host,/onClicked: annualFocus\.routeRequested\("cosmos\/moon\/forecast"\)/);
+ assert.doesNotMatch(host,/objectName: "cosmos-c17-moon-forecast-tab"/);
+ assert.doesNotMatch(host,/onClicked: annualFocus\.routeRequested\("cosmos\/moon\/forecast"\)/);
  assert.match(host,/anchors\.leftMargin: annualFocus\.contentInset/);
  assert.match(host,/anchors\.rightMargin: annualFocus\.contentInset/);
  assert.match(host,/anchors\.bottomMargin: annualFocus\.contentInset/);
@@ -90,16 +90,16 @@ test("COSMOS wheel mode is fixed and leaves MAGICK free to choose all three mode
  assert.match(host,/objectName: "cosmos-c11-back-to-moon"/);
  assert.match(moon,/readonly property int contentInset: 6/);
 });
-test("C18 COSMOS lunar year and forecast keep identical full-width MOON tabs",()=>{
+test("C19 COSMOS year and INDEX forecast offer two full-width main Moon modes",()=>{
  assert.match(host,/objectName: "cosmos-c11-moon-year-mode-rail"/);
  assert.match(host,/height: visible \? 27 : 0/);
- for(const name of ["PHASE + POSITION","LUNAR WHEEL","FORECAST"])
+ for(const name of ["OVERVIEW","LUNAR YEAR"])
    assert.ok(host.includes('label: "'+name+'"'),name);
- assert.equal((host.match(/height: 27/g)||[]).length,3);
- assert.equal((host.match(/\(lunarModeRail\.width-2\*lunarModeRail\.spacing\)\/3/g)||[]).length,3);
+ assert.equal((host.match(/height: 27/g)||[]).length,2);
+ assert.equal((host.match(/\(lunarModeRail\.width-lunarModeRail\.spacing\)\/2/g)||[]).length,2);
  assert.match(host,/selected: annualFocus\.moonView !== "forecast"/);
- assert.match(host,/selected: annualFocus\.moonView === "forecast"/);
+ assert.doesNotMatch(host,/selected: annualFocus\.moonView === "forecast"/);
  assert.match(host,/onClicked: annualFocus\.routeRequested\("cosmos\/moon\/ephemeris"\)/);
  assert.match(host,/onClicked: annualFocus\.routeRequested\("cosmos\/moon\/year"\)/);
- assert.match(host,/onClicked: annualFocus\.routeRequested\("cosmos\/moon\/forecast"\)/);
+ assert.doesNotMatch(host,/onClicked: annualFocus\.routeRequested\("cosmos\/moon\/forecast"\)/);
 });

@@ -36,10 +36,10 @@ Rectangle {
 
         ActionButton {
             objectName: "cosmos-c11-back-to-moon"
-            width: Math.max(1,(lunarModeRail.width-2*lunarModeRail.spacing)/3)
+            width: Math.max(1,(lunarModeRail.width-lunarModeRail.spacing)/2)
             height: 27
-            label: "PHASE + POSITION"
-            labelPixelSize: 9
+            label: "OVERVIEW"
+            labelPixelSize: 10
             contentPadding: 1
             selected: false
             accentColor: Colors.cyan
@@ -47,25 +47,14 @@ Rectangle {
         }
         ActionButton {
             objectName: "cosmos-c17-moon-wheel-tab"
-            width: Math.max(1,(lunarModeRail.width-2*lunarModeRail.spacing)/3)
+            width: Math.max(1,(lunarModeRail.width-lunarModeRail.spacing)/2)
             height: 27
-            label: "LUNAR WHEEL"
-            labelPixelSize: 9
+            label: "LUNAR YEAR"
+            labelPixelSize: 10
             contentPadding: 1
             selected: annualFocus.moonView !== "forecast"
             accentColor: selected ? Colors.magenta : Colors.cyan
             onClicked: annualFocus.routeRequested("cosmos/moon/year")
-        }
-        ActionButton {
-            objectName: "cosmos-c17-moon-forecast-tab"
-            width: Math.max(1,(lunarModeRail.width-2*lunarModeRail.spacing)/3)
-            height: 27
-            label: "FORECAST"
-            labelPixelSize: 9
-            contentPadding: 1
-            selected: annualFocus.moonView === "forecast"
-            accentColor: selected ? Colors.magenta : Colors.cyan
-            onClicked: annualFocus.routeRequested("cosmos/moon/forecast")
         }
     }
 

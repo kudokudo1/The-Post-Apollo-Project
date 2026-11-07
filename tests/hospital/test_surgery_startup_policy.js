@@ -13,8 +13,8 @@ const now = 2000000;
 const past = now - 8000;
 const floor = (last, count, win=120000) =>
     policy.canReuseFloor(last, now, win, count);
-const audit = (last, available, error="", win=600000) =>
-    policy.canReuseAudit(last, now, win, available, error);
+const audit = (last, available, error="", win=600000, matching=true) =>
+    policy.canReuseAudit(last, now, win, available, error, matching);
 
 // A successfully discovered Floor is reused during rapid menu toggles.
 assert.equal(floor(past, 4), true);
@@ -31,6 +31,9 @@ assert.equal(audit(past, false, ""), false); // empty snapshot
 assert.equal(audit(past, false, "PX AUDIT TIMEOUT"), false);
 assert.equal(audit(past, true, "PX AUDIT PARSE FAILED"), false);
 assert.equal(audit(past, true, ""), true);
+assert.equal(audit(past, true, "", 600000, false), false); // foreign Floor
+assert.equal(policy.canReuseAudit(past, now, 600000, true, ""), false);
+
 assert.equal(audit(now - 601000, true), false);
 assert.equal(audit(now + 1000, true), false);
 assert.equal(audit(0, true), false);

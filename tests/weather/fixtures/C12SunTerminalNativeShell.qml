@@ -161,60 +161,48 @@ ShellRoot {
             const ledger=fixture.locate(position,"cosmos-c12-light-ledger");
             const strip=fixture.locate(position,"cosmos-c12-position-live-strip");
             const metrics=fixture.locate(activity,"cosmos-c12-activity-metrics");
-            const tabs=fixture.locate(activity,"cosmos-c12-activity-inner-modes");
-            if(!hero||!side||!sun||!ledger||!strip||!metrics||!tabs)return;
+            const trend=fixture.locate(activity,"cosmos-c12-xray-trend");
+            const xray=fixture.locate(activity,"cosmos-c12-xray-facts");
+            const flare=fixture.locate(activity,"cosmos-c12-flare-facts");
+            const cycle=fixture.locate(activity,"cosmos-c12-cycle-facts");
+            const cluster=fixture.locate(activity,"cosmos-c13-simultaneous-instruments");
+            const xrayBay=fixture.locate(activity,"cosmos-c13-xray-bay");
+            const flareBay=fixture.locate(activity,"cosmos-c13-flare-bay");
+            const cycleBay=fixture.locate(activity,"cosmos-c13-cycle-bay");
+            if(!hero||!side||!sun||!ledger||!strip||!metrics
+                ||!trend||!xray||!flare||!cycle||!cluster
+                ||!xrayBay||!flareBay||!cycleBay)return;
             if(fixture.phase===0){
                 if(position.positionRows.length!==8||position.positionStrip.length!==5)
                     return fixture.stop("POSITION_DATA_MISSING");
-                if(sun.width<220 || ledger.width<120 || strip.height<25
-                    || hero.width<230 || side.width<120
-                    || metrics.height!==61 || tabs.height!==24)
+                if(sun.width<220||ledger.width<120||strip.height<25
+                    ||hero.width<230||side.width<120
+                    ||metrics.height!==52)
                     return fixture.stop("TERMINAL_GEOMETRY_TOO_SMALL");
                 if(hero.height>live.height+1||sun.height>position.height+1
-                    || strip.y+strip.height>position.height+1)
+                    ||strip.y+strip.height>position.height+1
+                    ||cluster.y+cluster.height>activity.height+1
+                    ||cycleBay.y+cycleBay.height>cluster.height+1
+                    ||flareBay.y+flareBay.height>cluster.height+1)
                     return fixture.stop("TERMINAL_VIEWPORT_OVERFLOW");
                 if(activity.flareCount!==2
-                    || activity.xray.classEquivalent.label!=="C1.2"
-                    || activity.cycle.summary.predictedSsn!==83.2)
+                    ||activity.xray.classEquivalent.label!=="C1.2"
+                    ||activity.cycle.summary.predictedSsn!==83.2)
                     return fixture.stop("SOURCE_PRESENTATION_NOT_BOUND");
-                const x=fixture.locate(activity,"cosmos-c12-xray-trend");
-                if(!x) return fixture.stop("X_RAY_HISTORY_NOT_PRESENT");
-                activity.xraySourcePage=true;
+                if(activity.xrayFields.length!==8
+                    ||activity.flareFields.length!==8
+                    ||activity.cycleFields.length!==12)
+                    return fixture.stop("SIMULTANEOUS_FACTS_MISSING");
+                if(activity.xrayFields[4].value!=="2026-11-06 12:00 UTC"
+                    ||activity.cycleFields[10].value!=="185.0")
+                    return fixture.stop("HISTORY_OR_PREDICTION_MISSING");
+                activity.selectedFlareIndex=1;
                 fixture.phase=1;
             }else if(fixture.phase===1){
-                const x=fixture.locate(activity,"cosmos-c12-xray-facts");
-                if(!x||!activity.xraySourcePage
-                    ||activity.xrayFields.length!==4)
-                    return fixture.stop("X_RAY_SOURCE_INSPECTOR_MISSING");
-                activity.activityFocus=1;
-                fixture.phase=2;
-            }else if(fixture.phase===2){
-                const f=fixture.locate(activity,"cosmos-c12-flare-facts");
-                if(!f) return;
-                if(activity.flareFields.length!==4)
-                    return fixture.stop("FLARE_EVENT_FIELDS_MISSING");
-                activity.selectedFlareIndex=1;
-                activity.flareDetailPage=1;
-                fixture.phase=3;
-            }else if(fixture.phase===3){
                 if(activity.selectedFlare.classLabel!=="C2.1"
-                    ||activity.flareFields.length!==4)
-                    return fixture.stop("FLARE_NAVIGATION_BROKEN");
-                activity.activityFocus=2;
-                activity.cycleDetailPage=2;
-                fixture.phase=4;
-            }else if(fixture.phase===4){
-                const c=fixture.locate(activity,"cosmos-c12-cycle-facts");
-                if(!c) return;
-                if(activity.cycleFields.length!==4
-                    ||activity.cycleFields[2].value!=="185.0")
-                    return fixture.stop("CYCLE_OUTLOOK_FIELDS_MISSING");
-                activity.cycleDetailPage=1;
-                fixture.phase=5;
-            }else if(fixture.phase===5){
-                if(activity.cycleFields.length!==4
-                    ||activity.cycleFields[0].value!=="67.9 - 92.7")
-                    return fixture.stop("CYCLE_RANGES_FIELDS_MISSING");
+                    ||activity.flareFields[0].value!=="C2.1"
+                    ||activity.flareFields[5].value!=="0.000002100")
+                    return fixture.stop("FLARE_EVENT_PAGING_BROKEN");
                 if(noaa.solarImageUrl!=="")
                     return fixture.stop("UNEXPECTED_NETWORK_IMAGE");
                 fixture.finished=true;

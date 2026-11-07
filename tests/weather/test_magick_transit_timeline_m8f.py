@@ -103,7 +103,7 @@ class M8fTransitTest(unittest.TestCase):
         self.assertEqual(len(opposition), 1)
         self.assertEqual(opposition[0]["utc"], "2026-11-07T01:30:00Z")
         _, waning, _ = transit.search(
-            linear(304, -2), 10, ORIGIN, ORIGIN+timedelta(hours=5),
+            linear(306, 2), 10, ORIGIN, ORIGIN+timedelta(hours=5),
             60, [60])
         # -60° longitude difference is the other directed sextile.
         self.assertEqual(len(waning), 1)

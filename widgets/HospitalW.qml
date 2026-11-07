@@ -106,6 +106,11 @@ PanelWindow {
     property string operationsSurface: ""
     // Pilot display only: never confuse discovered Git branches with registered Doctors.
     property bool workforceRosterVisible: false
+    // WORKERS naming controls are operator actions, not provider instructions.
+    property string rosterEditingRoomId: ""
+    property string rosterEditingDoctorId: ""
+    property string rosterIdentityMessage: ""
+    property bool rosterIdentityRefreshPending: false
     readonly property var workforceRosterRows: WorkforceRosterPolicy.buildRoster(
         responsibilityService.durableRooms,
         responsibilityService.durableSessions,
@@ -217,6 +222,73 @@ PanelWindow {
             if (!doctorService.refreshing)
                 doctorService.refresh();
         }
+    }
+
+    function openRosterIdentityEditor(rosterValue) {
+        const room = rosterValue || {};
+        const id = String(room.roomId || "").trim();
+        if (!id)
+            return false;
+        root.rosterEditingRoomId = id;
+        root.rosterEditingDoctorId = String(room.doctorId || "").trim();
+        root.rosterIdentityMessage = "";
+        roomNameService.clearStatus();
+        Qt.callLater(function() {
+            if (root.rosterEditingRoomId !== id)
+                return;
+            rosterRoomNameField.text = room.nameIsFallback
+                ? "" : String(room.name || "");
+            const doctor = doctorService.doctorById(root.rosterEditingDoctorId);
+            rosterDoctorNameField.text = doctor
+                ? String(doctor.name || doctor.id || "")
+                : "";
+            rosterRoomNameField.forceActiveFocus();
+        });
+        return true;
+    }
+
+    function closeRosterIdentityEditor() {
+        if (roomNameService.saving || doctorService.saving)
+            return false;
+        root.rosterEditingRoomId = "";
+        root.rosterEditingDoctorId = "";
+        root.rosterIdentityMessage = "";
+        return true;
+    }
+
+    function saveRosterRoomName() {
+        if (!root.rosterEditingRoomId)
+            return false;
+        return roomNameService.saveName(
+            root.rosterEditingRoomId,
+            rosterRoomNameField.text
+        );
+    }
+
+    function saveRosterDoctorName() {
+        const id = String(root.rosterEditingDoctorId || "").trim();
+        const doctor = doctorService.doctorById(id);
+        if (!id || !doctor) {
+            root.rosterIdentityMessage =
+                "WORKER NAME // NO REGISTERED DOCTOR // NO CHANGE";
+            return false;
+        }
+        const name = String(rosterDoctorNameField.text || "").trim();
+        if (!name || name.length > 96) {
+            root.rosterIdentityMessage =
+                "WORKER NAME // ENTER 1 TO 96 CHARACTERS";
+            return false;
+        }
+        root.rosterIdentityMessage = "WORKER NAME // SAVING";
+        // Existing Doctor metadata is preserved: only the name is edited.
+        return doctorService.saveDoctor(
+            doctor.id, name, doctor.role, doctor.status
+        );
+    }
+
+    function refreshRosterAfterIdentitySave() {
+        if (!responsibilityService.refreshDurableGraph())
+            root.rosterIdentityRefreshPending = true;
     }
 
     function rosterCurrentRoomIndex(rosterValue) {
@@ -2141,12 +2213,32 @@ PanelWindow {
         registryService: specialistRegistryService
         assignmentService: assignmentService
         currentRoomId: root.selectedRoomTeam
+
+        onGraphRefreshed: {
+            if (root.rosterIdentityRefreshPending) {
+                root.rosterIdentityRefreshPending = false;
+                Qt.callLater(function() {
+                    responsibilityService.refreshDurableGraph();
+                });
+            }
+        }
+    }
+
+    HospitalRoomNameService {
+        id: roomNameService
+        onNameSaved: {
+            root.rosterIdentityMessage = "ROOM NAME // SAVED";
+            root.refreshRosterAfterIdentitySave();
+        }
     }
 
     HospitalDoctorService {
         id: doctorService
 
         onDoctorsRefreshed: root.syncRoomAISelection()
+        onDoctorSaved: {
+            root.rosterIdentityMessage = "WORKER NAME // SAVED";
+        }
     }
 
     HospitalProviderService {

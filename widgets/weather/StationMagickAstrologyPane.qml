@@ -1,5 +1,6 @@
 import QtQuick
 import "../../components"
+import "../../services/weather" as WeatherServices
 
 // M30-F // A standalone, no-outer-scroll source-verified astrology instrument.
 // All chart modes use the existing single on-demand JPL/CelestialVisualService
@@ -17,6 +18,14 @@ Rectangle {
     // A complete independent chart service will supply this in a later
     // verified milestone. The existing M4 two-body source is NOT substituted.
     property var fullChartData: null
+    WeatherServices.CelestialNatalChartService {
+        id: natalSource
+        active: astrology.visible
+        onReadyChanged: astrology.fullChartData=
+            ready?natalSource.chartData:null
+        onChartDataChanged: astrology.fullChartData=
+            ready?natalSource.chartData:null
+    }
 
     readonly property bool sourceIdle: !!celestialSource
         && !celestialSource.loading
@@ -65,22 +74,32 @@ Rectangle {
             height: parent.height
             verticalAlignment: Text.AlignVCenter
             font.pixelSize: 8
-            text: astrology.celestialSource
-                ? astrology.celestialSource.statusText
-                : "JPL UNAVAILABLE"
-            color: astrology.calculated ? Colors.cyan : Colors.orange
+            text: astrology.natalMode
+                ? natalSource.statusText
+                : astrology.celestialSource
+                  ? astrology.celestialSource.statusText
+                  : "JPL UNAVAILABLE"
+            color: astrology.natalMode
+                ? natalSource.ready?Colors.cyan:Colors.orange
+                : astrology.calculated?Colors.cyan:Colors.orange
             elide: Text.ElideRight
         }
         ActionButton {
             width: 96
             height: 25
-            label: astrology.celestialSource && astrology.celestialSource.loading
-                   ? "CALCULATING" : "CALCULATE"
+            label: astrology.natalMode
+                ? natalSource.loading?"CALCULATING":"SET EVENT"
+                : astrology.celestialSource && astrology.celestialSource.loading
+                  ? "CALCULATING" : "CALCULATE"
             labelPixelSize: 9
             accentColor: Colors.magenta
-            available: astrology.chartAvailable
-            // The only JPL launch point, controlled by explicit user click.
-            onClicked: astrology.celestialSource.refresh()
+            available: astrology.natalMode
+                ? !natalSource.loading : astrology.chartAvailable
+            // Separate owners: M4 selected pair vs private M8b event chart.
+            onClicked: {
+                if(astrology.natalMode)astrology.eventSetupOpen=true;
+                else astrology.celestialSource.refresh();
+            }
         }
         ActionButton {
             width: 61
@@ -326,5 +345,10 @@ Rectangle {
         z: 25
         visible: astrology.eventSetupOpen
         onCloseRequested: astrology.eventSetupOpen=false
+        onCalculateRequested: function(draft) {
+            astrology.natalMode=true;
+            astrology.eventSetupOpen=false;
+            natalSource.calculate(draft);
+        }
     }
 }

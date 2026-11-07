@@ -2,6 +2,7 @@ import QtQuick
 import "../../components"
 import "../../services/weather" as WeatherServices
 import "StationMagickTransitComparisonPolicy.js" as Transit
+import "StationMagickTransitTimelinePolicy.js" as Timeline
 
 // M30-F // A standalone, no-outer-scroll source-verified astrology instrument.
 // All chart modes use the existing single on-demand JPL/CelestialVisualService
@@ -19,8 +20,14 @@ Rectangle {
     // M8c // TRANSITS is a second verified M8b chart at an explicitly entered
     // UTC time, never a reinterpretation of the old selected-pair graph.
     property bool transitMode: false
+    property bool timelineMode: false
+    property string selectedContactUtc: ""
     property string transitExpectedUtc: ""
     onNatalModeChanged: if(!natalMode)transitMode=false
+    onTransitModeChanged: if(!transitMode){
+        timelineMode=false;
+        selectedContactUtc="";
+    }
     // A complete independent chart service will supply this in a later
     // verified milestone. The existing M4 two-body source is NOT substituted.
     property var fullChartData: null
@@ -33,13 +40,21 @@ Rectangle {
             astrology.fullChartData=ready?natalSource.chartData:null;
             // Every new natal input invalidates the comparison.
             astrology.transitExpectedUtc="";
+            astrology.selectedContactUtc="";
             transitSource.clearState();
+            timelineSource.clearState();
         }
     }
     WeatherServices.CelestialNatalChartService {
         id: transitSource
         active: astrology.visible && astrology.natalMode
             && astrology.transitMode && natalSource.ready
+    }
+    WeatherServices.CelestialTransitTimelineService {
+        id: timelineSource
+        active: astrology.visible && astrology.natalMode
+            && astrology.transitMode && natalSource.ready
+        natalChart: astrology.fullChartData
     }
     function requestTransit(instant){
         if(!natalSource.ready||!natalSource.chartData)return false;
@@ -328,21 +343,77 @@ Rectangle {
         chartData: astrology.fullChartData
     }
 
-    StationMagickTransitChartPane {
-        anchors.left: parent.left
-        anchors.right: parent.right
-        anchors.top: pairControls.bottom
-        anchors.topMargin: 3
-        anchors.bottom: eventAndTimeControls.top
-        anchors.bottomMargin: 2
+    Item {
+        id:transitDeck
+        anchors.left:parent.left
+        anchors.right:parent.right
+        anchors.top:pairControls.bottom
+        anchors.topMargin:3
+        anchors.bottom:eventAndTimeControls.top
+        anchors.bottomMargin:2
         visible: astrology.natalMode && astrology.transitMode
-        natalData: astrology.fullChartData
-        transitData: transitSource.ready?transitSource.chartData:null
-        expectedUtc: astrology.transitExpectedUtc
-        loading: transitSource.loading
-        statusText: transitSource.statusText
-        onCalculateRequested: function(instant){
-            astrology.requestTransit(instant);
+        clip:true
+
+        Row {
+            id:transitViewRow
+            anchors.top:parent.top
+            anchors.left:parent.left
+            anchors.right:parent.right
+            height:24
+            spacing:4
+            ActionButton {
+                width:Math.max(36,(transitViewRow.width-4)/2)
+                height:23;label:"WHEEL";labelPixelSize:9
+                selected:!astrology.timelineMode
+                accentColor:selected?Colors.magenta:Colors.cyan
+                onClicked:astrology.timelineMode=false
+            }
+            ActionButton {
+                width:Math.max(36,(transitViewRow.width-4)/2)
+                height:23;label:"TIMELINE";labelPixelSize:9
+                selected:astrology.timelineMode
+                accentColor:selected?Colors.magenta:Colors.cyan
+                onClicked:astrology.timelineMode=true
+            }
+        }
+
+        StationMagickTransitChartPane {
+            anchors.left:parent.left
+            anchors.right:parent.right
+            anchors.top:transitViewRow.bottom
+            anchors.topMargin:3
+            anchors.bottom:parent.bottom
+            visible: astrology.natalMode && astrology.transitMode
+                && !astrology.timelineMode
+            natalData: astrology.fullChartData
+            transitData: transitSource.ready?transitSource.chartData:null
+            expectedUtc: astrology.transitExpectedUtc
+            selectedContactUtc: astrology.selectedContactUtc
+            loading: transitSource.loading
+            statusText: transitSource.statusText
+            onCalculateRequested: function(instant){
+                astrology.selectedContactUtc="";
+                astrology.requestTransit(instant);
+            }
+        }
+
+        StationMagickTransitTimelinePane {
+            anchors.left:parent.left
+            anchors.right:parent.right
+            anchors.top:transitViewRow.bottom
+            anchors.topMargin:3
+            anchors.bottom:parent.bottom
+            visible: astrology.natalMode && astrology.transitMode
+                && astrology.timelineMode
+            natalData: astrology.fullChartData
+            finder: timelineSource
+            onContactRequested: function(exactUtc) {
+                const minute=Timeline.nearestMinute(exactUtc);
+                if(!minute)return;
+                astrology.selectedContactUtc=exactUtc;
+                astrology.timelineMode=false;
+                astrology.requestTransit(minute);
+            }
         }
     }
 

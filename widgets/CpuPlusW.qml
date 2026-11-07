@@ -211,6 +211,9 @@ PanelWindow {
         && !(selectedModeIndex === 4 && settingsLocationPane.editingText)
         && !(selectedModeIndex === 4 && settingsSubMode === "TIME"
              && settingsTimeBasicsPane.zoneSearchFocused)
+        && !(selectedModeIndex === 5
+             && (idManagementSelectorPane.editingText
+                 || idManagementDetailsPane.editingText))
 
     function cycleMainMode(direction) {
         const count = modes.length;

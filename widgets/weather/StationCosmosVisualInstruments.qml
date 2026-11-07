@@ -222,6 +222,7 @@ Rectangle {
                     Repeater {
                         model: VisualPolicy.PHASES
                         delegate: ActionButton {
+                            objectName: "cosmos-c22-moon-phase-choice"
                             required property var modelData
                             width: Math.max(1,
                                 (phaseButtonRow.width-7*phaseButtonRow.spacing)/8)

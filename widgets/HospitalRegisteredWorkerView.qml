@@ -102,6 +102,7 @@ Item {
 
     signal closeRequested()
     signal refreshRequested()
+    signal attachmentRegistered(string roomId, string sessionId)
 
     function reload() {
         if (!active)
@@ -229,7 +230,15 @@ Item {
     onPreviewAssignmentIdChanged: attachmentArmKey = ""
     onPreviewDoctorIdChanged: attachmentArmKey = ""
     onPreviewProviderIdChanged: attachmentArmKey = ""
-    onRoomDataChanged: attachmentArmKey = ""
+    onRoomDataChanged: {
+        attachmentArmKey = "";
+        // After the saved roster refreshes, status-read the newly pinned
+        // Session. The status result is not a provider heartbeat.
+        if (root.active && root.sessionMatches && !runtime.refreshing) {
+            runtimeStatusVerified = false;
+            runtime.refresh();
+        }
+    }
     onPinnedRoomIdChanged: {
         attachmentArmKey = "";
         runtimeStatusVerified = false;
@@ -251,6 +260,10 @@ Item {
                     + String(result.mode || "")
                     + " // " + String(result.sessionId || "")
                     + " // PROVIDER NOT LAUNCHED";
+                root.attachmentRegistered(
+                    String(result.roomId || ""),
+                    String(result.sessionId || "")
+                );
             }
             root.attachmentSessionId = "";
             root.attachmentArmKey = "";

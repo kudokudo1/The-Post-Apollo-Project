@@ -111,6 +111,7 @@ PanelWindow {
     property string rosterEditingDoctorId: ""
     property string rosterIdentityMessage: ""
     property bool rosterIdentityRefreshPending: false
+    property bool rosterDoctorRefreshPending: false
     readonly property var workforceRosterRows: WorkforceRosterPolicy.buildRoster(
         responsibilityService.durableRooms,
         responsibilityService.durableSessions,
@@ -248,7 +249,7 @@ PanelWindow {
     }
 
     function closeRosterIdentityEditor() {
-        if (roomNameService.saving || doctorService.saving)
+        if (roomNameService.saving || doctorNameService.saving || doctorService.saving)
             return false;
         root.rosterEditingRoomId = "";
         root.rosterEditingDoctorId = "";
@@ -280,10 +281,8 @@ PanelWindow {
             return false;
         }
         root.rosterIdentityMessage = "WORKER NAME // SAVING";
-        // Existing Doctor metadata is preserved: only the name is edited.
-        return doctorService.saveDoctor(
-            doctor.id, name, doctor.role, doctor.status
-        );
+        // Narrow PX name writer never re-saves role or status.
+        return doctorNameService.saveName(doctor.id, name);
     }
 
     function refreshRosterAfterIdentitySave() {
@@ -2235,9 +2234,21 @@ PanelWindow {
     HospitalDoctorService {
         id: doctorService
 
-        onDoctorsRefreshed: root.syncRoomAISelection()
-        onDoctorSaved: {
+        onDoctorsRefreshed: {
+            root.syncRoomAISelection();
+            if (root.rosterDoctorRefreshPending) {
+                root.rosterDoctorRefreshPending = false;
+                Qt.callLater(function() { doctorService.refresh(); });
+            }
+        }
+    }
+
+    HospitalDoctorNameService {
+        id: doctorNameService
+        onNameSaved: {
             root.rosterIdentityMessage = "WORKER NAME // SAVED";
+            if (!doctorService.refresh())
+                root.rosterDoctorRefreshPending = true;
         }
     }
 
@@ -3081,7 +3092,7 @@ PanelWindow {
             color: rosterEditMouse.pressed ? Colors.orange : Colors.black
             border.width: 1
             border.color: Colors.cyan
-            opacity: roomNameService.saving || doctorService.saving ? 0.45 : 1
+            opacity: roomNameService.saving || doctorNameService.saving || doctorService.saving ? 0.45 : 1
 
             GohuText {
                 anchors.centerIn: parent
@@ -3092,7 +3103,7 @@ PanelWindow {
             MouseArea {
                 id: rosterEditMouse
                 anchors.fill: parent
-                enabled: !roomNameService.saving && !doctorService.saving
+                enabled: !roomNameService.saving && !doctorNameService.saving && !doctorService.saving
                 hoverEnabled: true
                 cursorShape: enabled ? Qt.PointingHandCursor : Qt.ArrowCursor
                 onClicked: root.openRosterIdentityEditor(rosterRow.rosterData)
@@ -6019,7 +6030,7 @@ PanelWindow {
                         label: "CLOSE"
                         compactIcon: "X"
                         accent: Colors.red
-                        enabledAction: !roomNameService.saving && !doctorService.saving
+                        enabledAction: !roomNameService.saving && !doctorNameService.saving && !doctorService.saving
                         onTriggered: root.closeRosterIdentityEditor()
                     }
                 }
@@ -6110,17 +6121,17 @@ PanelWindow {
                         compactIcon: "✓"
                         label: roomNameService.saving ? "SAVING ROOM" : "SAVE ROOM"
                         accent: Colors.green
-                        enabledAction: !roomNameService.saving && !doctorService.saving
+                        enabledAction: !roomNameService.saving && !doctorNameService.saving && !doctorService.saving
                         onTriggered: root.saveRosterRoomName()
                     }
                     HospitalActionButton {
                         width: (parent.width - 8) / 2
                         height: 28
                         compactIcon: "✓"
-                        label: doctorService.saving ? "SAVING DOCTOR" : "SAVE DOCTOR"
+                        label: doctorNameService.saving ? "SAVING DOCTOR" : "SAVE DOCTOR"
                         accent: Colors.cyan
                         enabledAction: !!root.rosterEditingDoctorId
-                            && !roomNameService.saving && !doctorService.saving
+                            && !roomNameService.saving && !doctorNameService.saving && !doctorService.saving
                         onTriggered: root.saveRosterDoctorName()
                     }
                 }
@@ -6129,11 +6140,13 @@ PanelWindow {
                     width: parent.width
                     height: 36
                     text: roomNameService.lastError
+                        || doctorNameService.lastError
                         || doctorService.lastError
                         || root.rosterIdentityMessage
                         || "EMPTY ROOM NAME RESETS TO TECHNICAL LABEL // NO ID OR ROLE CHANGES"
                     font.pixelSize: 9
-                    color: roomNameService.lastError || doctorService.lastError
+                    color: roomNameService.lastError || doctorNameService.lastError
+                        || doctorService.lastError
                         ? Colors.red : Colors.orange
                     wrapMode: Text.Wrap
                     maximumLineCount: 3

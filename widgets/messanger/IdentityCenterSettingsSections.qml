@@ -40,6 +40,10 @@ Item {
     // Manual Social label associations only, not Identity Center grants.
     property var localLinksStore: null
     property var socialIdentitiesSnapshot: null
+    // Existing local Social ID labels. These are not verified login principals.
+    readonly property var localIdRows:
+        socialIdentitiesSnapshot && Array.isArray(socialIdentitiesSnapshot.identities)
+        ? socialIdentitiesSnapshot.identities : []
     property var socialAccountDetailsStore: null
     // Display-only input for a FUTURE approved privileged host.
     // No current host feeds this value; never treat it as authorization.
@@ -68,13 +72,15 @@ Item {
 
     readonly property var sectionsList: [
         { id: "PROFILE", label: "PROFILE" },
+        { id: "ID MANAGEMENT", label: "ID MANAGEMENT" },
         { id: "ORGANIZATIONS", label: "ORGANIZATIONS" },
         { id: "CONNECTED ACCOUNTS", label: "CONNECTED ACCOUNTS" },
         { id: "SECURITY", label: "SECURITY" },
         { id: "SOCIAL LAYOUT", label: "SOCIAL LAYOUT" }
     ]
 
-    readonly property bool isPreviewSection: activeSection !== "SOCIAL LAYOUT"
+    readonly property bool isPreviewSection:
+        activeSection !== "SOCIAL LAYOUT" && activeSection !== "ID MANAGEMENT"
 
     Rectangle {
         id: navigationBackground
@@ -117,6 +123,194 @@ Item {
                         softGlowEnabled: false
                         trackLabelGlowLocally: true
                         onTriggered: sections.sectionRequested(modelData.id)
+                    }
+                }
+            }
+        }
+    }
+
+
+    // Dedicated ID MANAGEMENT main mode. Uses the already-established
+    // three-column settings workspace without changing window dimensions or
+    // creating a new window. This first slice is intentionally read-only:
+    // local IDs are not sign-in identities or organization permissions.
+    Rectangle {
+        id: idManagementContent
+        anchors.top: navigationBackground.bottom
+        anchors.bottom: parent.bottom
+        anchors.left: parent.left
+        anchors.right: parent.right
+        visible: sections.activeSection === "ID MANAGEMENT"
+        color: Colors.black
+        clip: true
+
+        Row {
+            id: idManagementRow
+            anchors.fill: parent
+            spacing: 0
+
+            Rectangle {
+                id: idManagementListPane
+                width: Math.max(1, Math.min(idManagementRow.width / 3, 200))
+                height: parent.height
+                color: Colors.dark
+                border.width: 1
+                border.color: Colors.cyan
+
+                Flickable {
+                    anchors.fill: parent
+                    anchors.margins: 8
+                    clip: true
+                    contentWidth: width
+                    contentHeight: idManagementListColumn.height + 16
+                    flickableDirection: Flickable.VerticalFlick
+                    boundsBehavior: Flickable.StopAtBounds
+
+                    Column {
+                        id: idManagementListColumn
+                        width: parent.width
+                        spacing: 10
+
+                        Text {
+                            width: parent.width
+                            text: "LOCAL IDS"
+                            color: Colors.cyan
+                            font.pixelSize: 11
+                            font.bold: true
+                            wrapMode: Text.WordWrap
+                        }
+
+                        Text {
+                            width: parent.width
+                            visible: sections.localIdRows.length === 0
+                            text: "NO LOCAL IDS LOADED"
+                            color: Colors.orange
+                            font.pixelSize: 10
+                            wrapMode: Text.WordWrap
+                        }
+
+                        Repeater {
+                            model: sections.localIdRows
+                            delegate: Text {
+                                required property var modelData
+                                width: idManagementListColumn.width
+                                text: modelData.name
+                                      + (sections.socialIdentitiesSnapshot.activeId === modelData.id
+                                         ? " // ACTIVE" : "")
+                                color: sections.socialIdentitiesSnapshot.activeId === modelData.id
+                                       ? Colors.yellow : Colors.white
+                                font.pixelSize: 10
+                                wrapMode: Text.WordWrap
+                            }
+                        }
+                    }
+                }
+            }
+
+            Rectangle {
+                id: idManagementDetailsPane
+                width: Math.max(1, (idManagementRow.width - idManagementListPane.width) / 2)
+                height: parent.height
+                color: Colors.black
+                border.width: 1
+                border.color: Colors.cyan
+
+                Flickable {
+                    anchors.fill: parent
+                    anchors.margins: 10
+                    clip: true
+                    contentWidth: width
+                    contentHeight: idManagementDetailsColumn.height + 16
+                    flickableDirection: Flickable.VerticalFlick
+                    boundsBehavior: Flickable.StopAtBounds
+
+                    Column {
+                        id: idManagementDetailsColumn
+                        width: parent.width
+                        spacing: 12
+
+                        Text {
+                            width: parent.width
+                            text: "ID DETAILS"
+                            color: Colors.cyan
+                            font.pixelSize: 11
+                            font.bold: true
+                            wrapMode: Text.WordWrap
+                        }
+
+                        Text {
+                            width: parent.width
+                            text: sections.socialIdentitiesSnapshot
+                                  && sections.socialIdentitiesSnapshot.activeName
+                                  ? sections.socialIdentitiesSnapshot.activeName : "NONE SELECTED"
+                            color: Colors.white
+                            font.pixelSize: 12
+                            wrapMode: Text.WordWrap
+                        }
+
+                        Text {
+                            width: parent.width
+                            text: "ID editor foundation. Rename and contact editing will move here "
+                                  + "after the existing local save path is reused and tested."
+                            color: Colors.orange
+                            font.pixelSize: 10
+                            wrapMode: Text.WordWrap
+                        }
+
+                        ActionButton {
+                            width: parent.width
+                            height: 34
+                            label: "OPEN EXISTING ID EDITOR"
+                            labelPixelSize: 9
+                            contentPadding: 3
+                            accentColor: Colors.cyan
+                            onTriggered: sections.sectionRequested("SOCIAL LAYOUT")
+                        }
+                    }
+                }
+            }
+
+            Rectangle {
+                id: idManagementLinksPane
+                width: Math.max(1, idManagementRow.width - idManagementListPane.width
+                                - idManagementDetailsPane.width)
+                height: parent.height
+                color: Colors.dark
+                border.width: 1
+                border.color: Colors.cyan
+
+                Flickable {
+                    anchors.fill: parent
+                    anchors.margins: 10
+                    clip: true
+                    contentWidth: width
+                    contentHeight: idManagementLinksColumn.height + 16
+                    flickableDirection: Flickable.VerticalFlick
+                    boundsBehavior: Flickable.StopAtBounds
+
+                    Column {
+                        id: idManagementLinksColumn
+                        width: parent.width
+                        spacing: 12
+
+                        Text {
+                            width: parent.width
+                            text: "ID ASSOCIATIONS"
+                            color: Colors.cyan
+                            font.pixelSize: 11
+                            font.bold: true
+                            wrapMode: Text.WordWrap
+                        }
+
+                        Text {
+                            width: parent.width
+                            text: "Account names and local organization links will be edited here. "
+                                  + "Nothing in this mode changes provider sessions, "
+                                  + "enterprise memberships, or authorization."
+                            color: Colors.white
+                            font.pixelSize: 10
+                            wrapMode: Text.WordWrap
+                        }
                     }
                 }
             }

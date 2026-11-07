@@ -77,6 +77,8 @@ function buildRoster(rooms, sessions, doctors) {
                 (session && session.providerId) || room.providerId
             ),
             assignmentId: textValue(room.assignmentId),
+            assignmentTitle: textValue(room.assignmentTitle),
+            assignmentStatus: textValue(room.assignmentStatus).toUpperCase(),
             sessionId: session ? textValue(session.id || session.sessionId) : "",
             sessionStatus: rawStatus,
             hasActiveSession: !!activeSession,

@@ -6,6 +6,7 @@ import "../services/git"
 import "../services/hospital"
 import qs.services.notifications
 import "../services/notifications/HospitalCertificationNotificationPolicy.js" as CertificationNotificationPolicy
+import "../services/hospital/HospitalWorkforceRosterPolicy.js" as WorkforceRosterPolicy
 import "../services/github"
 import QtQuick.Effects
 import Qt5Compat.GraphicalEffects
@@ -103,6 +104,13 @@ PanelWindow {
     property string roomControlAction: ""
     property bool bedControlMode: false
     property string operationsSurface: ""
+    // Pilot display only: never confuse discovered Git branches with registered Doctors.
+    property bool workforceRosterVisible: false
+    readonly property var workforceRosterRows: WorkforceRosterPolicy.buildRoster(
+        responsibilityService.durableRooms,
+        responsibilityService.durableSessions,
+        doctorService.doctors
+    )
     property string attentionSubview: "triage"
     property string attentionQueueRepository: ""
     property string attentionQueueBranch: ""
@@ -197,6 +205,29 @@ PanelWindow {
                     root.selectedProviderId
                 ) || {}).available)
             root.selectedProviderId = root.firstAvailableProviderId();
+    }
+
+    // Work registry selection is separate from the repository audit.
+    // Switching views never dispatches, binds, or starts a worker.
+    function setWorkforceRosterVisible(nextValue) {
+        const enabled = !!nextValue;
+        workforceRosterVisible = enabled;
+        if (enabled) {
+            responsibilityService.refreshDurableGraph();
+            if (!doctorService.refreshing)
+                doctorService.refresh();
+        }
+    }
+
+    function rosterCurrentRoomIndex(rosterValue) {
+        const room = rosterValue || {};
+        const repository = String(room.repository || "").trim().toLowerCase();
+        const selected = String(githubService.repoSlug || "").trim().toLowerCase();
+        const team = String(room.team || "").trim();
+        // Same name on another Patient must never select the wrong Room.
+        if (!repository || !selected || repository !== selected || !team)
+            return -1;
+        return root.roomIndexOfTeam(team);
     }
 
     function openRoomQuick() {
@@ -2840,6 +2871,95 @@ PanelWindow {
             opacity: 0.48
             color: Colors.cyan
             transparentBorder: true
+        }
+    }
+
+    component WorkforceRosterRow: Rectangle {
+        id: rosterRow
+        property var rosterData: ({})
+        readonly property int linkedIndex:
+            root.rosterCurrentRoomIndex(rosterData)
+        readonly property bool selected:
+            linkedIndex >= 0 && root.selectedRoomTeam === rosterData.team
+        readonly property string sessionState:
+            String(rosterData.sessionStatus || "NO SESSION")
+        readonly property color sessionColor:
+            sessionState === "OPERATING" ? Colors.green
+            : sessionState === "FAILED" ? Colors.red
+            : sessionState === "PAUSED" ? Colors.orange
+            : rosterData.hasActiveSession ? Colors.cyan : Colors.magenta
+
+        width: roomsColumn.width
+        height: 82
+        color: Colors.dark
+        border.width: selected ? 2 : 1
+        border.color: selected ? Colors.orange : Colors.magenta
+        clip: true
+
+        Column {
+            anchors.fill: parent
+            anchors.margins: 8
+            spacing: 4
+
+            Row {
+                width: parent.width
+                height: 17
+                spacing: 6
+
+                GohuText {
+                    width: parent.width - 120
+                    text: String(rosterRow.rosterData.name || "UNNAMED ROOM")
+                    font.pixelSize: 12
+                    color: Colors.orange
+                    elide: Text.ElideRight
+                }
+                GohuText {
+                    width: 114
+                    text: rosterRow.sessionState
+                    font.pixelSize: 9
+                    color: rosterRow.sessionColor
+                    horizontalAlignment: Text.AlignRight
+                    elide: Text.ElideRight
+                }
+            }
+
+            GohuText {
+                width: parent.width
+                text: "WORKER // "
+                    + String(rosterRow.rosterData.doctorName || "UNASSIGNED")
+                    + "  //  " + String(rosterRow.rosterData.providerId || "NO PROVIDER")
+                font.pixelSize: 9
+                color: Colors.cyan
+                elide: Text.ElideRight
+            }
+            GohuText {
+                width: parent.width
+                text: "ASSIGNMENT // "
+                    + String(rosterRow.rosterData.assignmentId || "NONE")
+                    + "  //  PATIENT // "
+                    + String(rosterRow.rosterData.patientLabel
+                        || rosterRow.rosterData.repository || "UNKNOWN")
+                font.pixelSize: 9
+                color: Colors.white
+                elide: Text.ElideRight
+            }
+            GohuText {
+                width: parent.width
+                text: rosterRow.linkedIndex >= 0
+                    ? "REGISTERED PX ROOM // CLICK TO SELECT"
+                    : "REGISTERED PX ROOM // OTHER FLOOR OR NO GIT MATCH"
+                font.pixelSize: 8
+                color: rosterRow.linkedIndex >= 0 ? Colors.green : Colors.blue
+                elide: Text.ElideRight
+            }
+        }
+
+        MouseArea {
+            anchors.fill: parent
+            enabled: rosterRow.linkedIndex >= 0
+            hoverEnabled: true
+            cursorShape: enabled ? Qt.PointingHandCursor : Qt.ArrowCursor
+            onClicked: root.selectRoomIndex(rosterRow.linkedIndex)
         }
     }
 
@@ -5584,9 +5704,43 @@ PanelWindow {
 
             // ===== OPERATING ROOMS ==============================
 
-            SectionLabel {
+            Row {
                 visible: !root.operationsOpen
-                text: "OPERATING ROOMS"
+                width: parent.width
+                height: 22
+                spacing: 8
+
+                SectionLabel {
+                    width: parent.width - 143
+                    anchors.verticalCenter: parent.verticalCenter
+                    text: root.workforceRosterVisible
+                        ? "REGISTERED WORKERS // " + root.workforceRosterRows.length
+                        : "OPERATING ROOMS // GIT"
+                    elide: Text.ElideRight
+                }
+                Rectangle {
+                    width: 135
+                    height: 22
+                    color: rosterToggleMouse.pressed ? Colors.orange : Colors.black
+                    border.width: 1
+                    border.color: root.workforceRosterVisible ? Colors.magenta : Colors.cyan
+
+                    GohuText {
+                        anchors.centerIn: parent
+                        text: root.workforceRosterVisible ? "SHOW BRANCHES" : "SHOW WORKERS"
+                        font.pixelSize: 9
+                        color: rosterToggleMouse.pressed ? Colors.black : Colors.cyan
+                    }
+                    MouseArea {
+                        id: rosterToggleMouse
+                        anchors.fill: parent
+                        hoverEnabled: true
+                        cursorShape: Qt.PointingHandCursor
+                        onClicked: root.setWorkforceRosterVisible(
+                            !root.workforceRosterVisible
+                        )
+                    }
+                }
             }
 
             Rectangle {
@@ -5642,8 +5796,40 @@ PanelWindow {
                 width: parent.width
                 spacing: 7
 
+                GohuText {
+                    width: parent.width
+                    height: root.workforceRosterVisible ? 26 : 0
+                    visible: root.workforceRosterVisible
+                    text: "PX REGISTRY // NOT BROWSER CHATGPT TABS"
+                    font.pixelSize: 9
+                    color: Colors.cyan
+                    elide: Text.ElideRight
+                }
+
                 Repeater {
-                    model: auditService.rooms
+                    model: root.workforceRosterVisible
+                        ? root.workforceRosterRows : []
+                    WorkforceRosterRow {
+                        rosterData: modelData
+                    }
+                }
+
+                GohuText {
+                    width: parent.width
+                    height: 64
+                    visible: root.workforceRosterVisible
+                        && root.workforceRosterRows.length === 0
+                    text: responsibilityService.graphError
+                        || (responsibilityService.graphLoading
+                            ? "READING REGISTERED HOSPITAL ROOMS..."
+                            : "NO REGISTERED PX ROOMS // SHOW BRANCHES FOR GIT DISCOVERY")
+                    font.pixelSize: 10
+                    color: responsibilityService.graphError ? Colors.red : Colors.orange
+                    wrapMode: Text.Wrap
+                }
+
+                Repeater {
+                    model: root.workforceRosterVisible ? [] : auditService.rooms
 
                     RoomRow {
                         team: String(

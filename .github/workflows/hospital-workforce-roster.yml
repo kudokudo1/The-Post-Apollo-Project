@@ -1,0 +1,36 @@
+name: Hospital Workforce Roster Pilot
+
+on:
+  pull_request:
+    paths:
+      - "widgets/HospitalW.qml"
+      - "services/hospital/HospitalWorkforceRosterPolicy.js"
+      - "tests/hospital/test_workforce_roster_policy.js"
+      - "tests/hospital/test_workforce_roster_ui_contracts.py"
+      - ".github/workflows/hospital-workforce-roster.yml"
+  push:
+    branches:
+      - main
+    paths:
+      - "widgets/HospitalW.qml"
+      - "services/hospital/HospitalWorkforceRosterPolicy.js"
+      - "tests/hospital/test_workforce_roster_policy.js"
+      - "tests/hospital/test_workforce_roster_ui_contracts.py"
+      - ".github/workflows/hospital-workforce-roster.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  synthetic-contracts:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check JavaScript syntax
+        run: node --check services/hospital/HospitalWorkforceRosterPolicy.js
+      - name: Verify roster identity and no phantom workers
+        run: node tests/hospital/test_workforce_roster_policy.js
+      - name: Verify Surgery integration and legacy controls
+        run: |
+          python3 tests/hospital/test_workforce_roster_ui_contracts.py
+          python3 tests/hospital/test_main_mode_keyboard_contracts.py

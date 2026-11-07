@@ -29,6 +29,10 @@ Rectangle {
     readonly property var model:finder&&finder.ready?finder.result:null
     readonly property var eventPage:Matrix.page(
         model,filterNatal,filterTransit,filterKind,false,pageIndex)
+    readonly property var workload:Matrix.budget(
+        spanDays,natalBodies.length,transitBodies.length,sampleMinutes)
+    readonly property int suggestedSpan:Matrix.fittingSpan(
+        spanDays,natalBodies.length,transitBodies.length,sampleMinutes)
     readonly property bool canSearch:!busy&&Matrix.request(
         natalData,startDate,spanDays,natalBodies,
         transitBodies,aspectAngles,sampleMinutes)!==null
@@ -67,7 +71,7 @@ Rectangle {
             if(current.length===1)return;
             const updated=current.filter(function(x){return x!==id;});
             if(natal)natalBodies=updated;else transitBodies=updated;
-        }else if(current.length<3){
+        }else if(current.length<4){
             const updated=current.concat([id]);
             if(natal)natalBodies=updated;else transitBodies=updated;
         }
@@ -180,7 +184,7 @@ Rectangle {
                 height:23;label:Matrix.shortName(modelData);labelPixelSize:7
                 selected:atlas.natalBodies.indexOf(modelData)>=0
                 accentColor:selected?Colors.magenta:Colors.yellow
-                available:!atlas.busy&&(selected||atlas.natalBodies.length<3)
+                available:!atlas.busy&&(selected||atlas.natalBodies.length<4)
                 onClicked:atlas.toggleBody(true,modelData)
             }
         }
@@ -197,7 +201,7 @@ Rectangle {
                 height:23;label:Matrix.shortName(modelData);labelPixelSize:7
                 selected:atlas.transitBodies.indexOf(modelData)>=0
                 accentColor:selected?Colors.magenta:Colors.cyan
-                available:!atlas.busy&&(selected||atlas.transitBodies.length<3)
+                available:!atlas.busy&&(selected||atlas.transitBodies.length<4)
                 onClicked:atlas.toggleBody(false,modelData)
             }
         }
@@ -232,11 +236,39 @@ Rectangle {
              atlas.model.events.length+" SOURCE EVENTS"
             :atlas.finder&&atlas.finder.loading?atlas.finder.statusText
             :atlas.canSearch?"SOURCE-READY / EXPLICIT SEARCH"
-            :"REDUCE BODIES OR DATE RANGE / VERIFY NATAL"
+            :atlas.workload.valid?"VERIFY NATAL OR UTC DATE"
+            :"EXCEEDS SOURCE BUDGET / SELECT FIT RANGE"
+    }
+    Row {
+        id:budgetRow
+        anchors.top:status.bottom
+        anchors.left:parent.left;anchors.right:parent.right
+        height:23;spacing:3
+        QuietText {
+            width:Math.max(40,budgetRow.width-87-budgetRow.spacing)
+            height:23;font.pixelSize:9
+            verticalAlignment:Text.AlignVCenter
+            elide:Text.ElideRight
+            color:atlas.workload.valid?Colors.cyan:Colors.orange
+            text:atlas.workload.pairs+" PAIRS / "+
+                atlas.workload.pairSamples+"/"+atlas.workload.pairLimit+
+                " SAMPLES / STATIONS "+
+                atlas.workload.stationSamples+"/"+atlas.workload.stationLimit
+        }
+        ActionButton {
+            width:87;height:22
+            label:atlas.workload.valid?"IN BUDGET":
+                atlas.suggestedSpan>0?"FIT "+atlas.suggestedSpan+"D":"TOO MANY"
+            labelPixelSize:8
+            accentColor:atlas.workload.valid?Colors.cyan:Colors.orange
+            available:!atlas.busy&&!atlas.workload.valid&&
+                      atlas.suggestedSpan>0
+            onClicked:atlas.spanDays=atlas.suggestedSpan
+        }
     }
     Rectangle {
         id:cellGrid
-        anchors.top:status.bottom
+        anchors.top:budgetRow.bottom
         anchors.left:parent.left;anchors.right:parent.right
         anchors.bottom:browserBar.top
         anchors.bottomMargin:2

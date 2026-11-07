@@ -53,9 +53,39 @@ function sourceNatal(chart){
     return true;
 }
 function validBodies(items){
-    return Array.isArray(items)&&items.length>=1&&items.length<=3&&
+    return Array.isArray(items)&&items.length>=1&&items.length<=4&&
         new Set(items).size===items.length&&
         items.every(function(id){return TARGETS.indexOf(id)>=0;});
+}
+// M8l // Transparent cost model identical to Python normalize().
+// This is a preview and an explicit safer-range suggestion, NOT a new writer.
+function budget(spanDays,natalCount,transitCount,step){
+    if(SPANS.indexOf(spanDays)<0||!Number.isInteger(natalCount)||
+       !Number.isInteger(transitCount)||natalCount<1||natalCount>4||
+       transitCount<1||transitCount>4||(step!==30&&step!==60))
+       return {valid:false,reason:"INVALID SELECTION",pairs:0,
+           pairSamples:0,stationSamples:0,pairLimit:MAX_PAIR_SAMPLES,
+           stationLimit:MAX_STATION_SAMPLES};
+    var sampleCount=Math.ceil(spanDays*1440/step)+1;
+    var pairSamples=sampleCount*natalCount*transitCount;
+    var stationSamples=(spanDays*96+1)*transitCount;
+    var valid=pairSamples<=MAX_PAIR_SAMPLES&&
+              stationSamples<=MAX_STATION_SAMPLES;
+    return {valid:valid,
+        reason:pairSamples>MAX_PAIR_SAMPLES?"PAIR SAMPLE LIMIT"
+            :stationSamples>MAX_STATION_SAMPLES?"STATION SAMPLE LIMIT":"",
+        pairs:natalCount*transitCount,
+        pairSamples:pairSamples,stationSamples:stationSamples,
+        pairLimit:MAX_PAIR_SAMPLES,stationLimit:MAX_STATION_SAMPLES};
+}
+function fittingSpan(spanDays,natalCount,transitCount,step){
+    if(SPANS.indexOf(spanDays)<0)return 0;
+    for(var i=SPANS.length-1;i>=0;i--){
+        var span=SPANS[i];
+        if(span<=spanDays&&budget(span,natalCount,transitCount,step).valid)
+            return span;
+    }
+    return 0;
 }
 function request(chart,startDate,spanDays,natalBodies,transitBodies,aspects,step){
     if(!sourceNatal(chart)||!day(startDate)||SPANS.indexOf(spanDays)<0||
@@ -67,10 +97,8 @@ function request(chart,startDate,spanDays,natalBodies,transitBodies,aspects,step
     var start=startDate+"T00:00:00Z";
     var end=new Date(Date.parse(start)+spanDays*86400000);
     if(end.getUTCFullYear()>2099)return null;
-    var count=Math.ceil(spanDays*24*60/step)+1;
-    var stationCount=spanDays*24*4+1;
-    if(count*natalBodies.length*transitBodies.length>MAX_PAIR_SAMPLES||
-       stationCount*transitBodies.length>MAX_STATION_SAMPLES)return null;
+    if(!budget(spanDays,natalBodies.length,transitBodies.length,step).valid)
+        return null;
     return {format:REQUEST_FORMAT,natal_epoch_utc:chart.epoch_utc,
         start_utc:start,end_utc:end.toISOString().slice(0,19)+"Z",
         latitude_deg:chart.observer.latitude_deg,

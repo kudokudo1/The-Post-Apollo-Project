@@ -1,4 +1,4 @@
-"""MAGICK M8k // Bounded multi-natal-body x transit-body JPL event matrix.
+"""MAGICK M8k/M8l // Bounded multi-natal-body x transit-body JPL event matrix.
 
 One explicit request over stdin; no saved natal records, downloads,
 background searches, or observer inference. Reuses M8f angular crossings and
@@ -30,8 +30,8 @@ from celestial_transit_multi import (
 
 FORMAT = "post-apollo.weather.magick-natal-transit-matrix.m8k.v1"
 RESULT_FORMAT = "post-apollo.weather.magick-natal-transit-matrix-result.m8k.v1"
-MAX_NATAL = 3
-MAX_MOVING = 3
+MAX_NATAL = 4
+MAX_MOVING = 4
 MAX_PAIR_SAMPLES = 2200
 MAX_TOTAL_STATION_GRID = 3000
 MAX_EVENTS = 150

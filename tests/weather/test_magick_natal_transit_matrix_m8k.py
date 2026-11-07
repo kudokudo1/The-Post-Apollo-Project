@@ -44,7 +44,7 @@ class M8kTests(unittest.TestCase):
         self.assertEqual(req["sample_minutes"],60)
         bad=[
             {"natal_bodies":[]},
-            {"natal_bodies":["sun","venus","moon","mercury"]},
+            {"natal_bodies":["sun","venus","moon","mercury","jupiter_barycenter"]},
             {"natal_bodies":["sun","sun"]},
             {"natal_bodies":["mars"]},
             {"transit_bodies":[]},

@@ -1,0 +1,64 @@
+name: MAGICK M8l bounded 4x4 MATRIX and visible workload planner
+
+on:
+  pull_request:
+    paths:
+      - 'scripts/weather/celestial_transit_matrix.py'
+      - 'widgets/weather/StationMagickTransitMatrixPolicy.js'
+      - 'widgets/weather/StationMagickTransitMatrixPane.qml'
+      - 'tests/weather/test_magick_four_by_four_m8l.py'
+      - 'tests/weather/test_magick_four_by_four_ui_m8l.js'
+      - 'tests/weather/fixtures/M8lNativeMatrixBudgetShell.qml'
+      - 'scripts/weather/verify_magick_native_m8l.sh'
+      - '.github/workflows/weather-magick-m8l-four-by-four-budget.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  numerical:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Test bounded four by four numerical source and once-only station events
+        run: python3 -m unittest discover -s tests/weather -p 'test_magick_four_by_four_m8l.py' -v
+      - name: Preserve accepted M8k and M8i numerical gates
+        run: |
+          python3 -m unittest discover -s tests/weather -p 'test_magick_natal_transit_matrix_m8k.py' -v
+          python3 -m unittest discover -s tests/weather -p 'test_magick_station_reliability_m8i.py' -v
+  ui-contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Validate Python-equivalent workload math, FIT and source boundaries
+        run: node --test tests/weather/test_magick_four_by_four_ui_m8l.js
+      - name: Preserve accepted M8k and M8j browser contracts
+        run: |
+          node --test tests/weather/test_magick_natal_transit_matrix_ui_m8k.js
+          node --test tests/weather/test_magick_event_browser_m8j.js
+  native-quickshell:
+    runs-on: ubuntu-latest
+    container:
+      image: debian:unstable
+    timeout-minutes: 15
+    steps:
+      - name: Install real disposable Quickshell and Qt
+        run: |
+          export DEBIAN_FRONTEND=noninteractive
+          apt-get update
+          apt-get install -y --no-install-recommends \
+            ca-certificates git nodejs quickshell qt6-qpa-plugins coreutils findutils \
+            qml6-module-qtquick-effects qml6-module-qt5compat-graphicaleffects
+          quickshell --version
+      - uses: actions/checkout@v4
+      - name: Load actual 4x4 QML and exercise numerical budget and FIT range
+        run: bash scripts/weather/verify_magick_native_m8l.sh

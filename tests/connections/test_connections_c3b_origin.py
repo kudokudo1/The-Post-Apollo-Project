@@ -43,6 +43,10 @@ def valid():
             name: {"owner": 0, "mode": 0o644, "regular": True, "symlink": False}
             for name in m.FILES
         },
+        "protected_dirs": {
+            name: {"owner": 0, "mode": 0o755, "directory": True, "symlink": False}
+            for name in m.PROTECTED_DIRS
+        },
     }
 
 
@@ -93,6 +97,8 @@ class C3bOriginPolicyTests(unittest.TestCase):
             ("proc_args", ["/opt/postapollo-c2o-venv/bin/python3", m.HOST, "--approve"], "C3B_COMMAND_MISMATCH"),
             ("proc_args", ["/opt/postapollo-c2o-venv/bin/python3", m.HOST, "--read-only", "extra"], "C3B_COMMAND_MISMATCH"),
             ("proc_cgroup", "/user.slice/untrusted", "C3B_CGROUP_MISMATCH"),
+            ("proc_args", [m.INTERPRETER + "-replacement", m.HOST, "--read-only"], "C3B_COMMAND_MISMATCH"),
+            ("proc_args", [m.INTERPRETER + ".14", m.HOST, "--read-only"], "C3B_COMMAND_MISMATCH"),
         ]:
             snapshot = valid()
             snapshot[key] = value
@@ -131,6 +137,30 @@ class C3bOriginPolicyTests(unittest.TestCase):
         snapshot = valid()
         del snapshot["protected_files"][m.POLICY]
         self.denied(snapshot, "C3B_FILES_MISMATCH")
+
+    def test_07b_reject_matching_but_forged_unit_cgroup_suffix(self):
+        # Previous endswith check would have accepted these two false sources.
+        snapshot = valid()
+        snapshot["unit_cgroup"] = "/user.slice/fake" + m.EXPECTED_CGROUP
+        snapshot["proc_cgroup"] = snapshot["unit_cgroup"]
+        self.denied(snapshot, "C3B_CGROUP_MISMATCH")
+
+    def test_07c_reject_untrusted_parent_directory_paths(self):
+        for path in m.PROTECTED_DIRS:
+            for key, value in (
+                    ("owner", 1000), ("owner", True), ("mode", 0o775),
+                    ("directory", False), ("symlink", True)):
+                snapshot = valid()
+                snapshot["protected_dirs"][path][key] = value
+                self.denied(snapshot, "C3C_UNPROTECTED_DIRECTORY")
+        snapshot = valid()
+        del snapshot["protected_dirs"]["/opt"]
+        self.denied(snapshot, "C3C_DIRECTORIES_MISMATCH")
+        snapshot = valid()
+        snapshot["protected_dirs"]["/tmp"] = {
+            "owner": 0, "mode": 0o755, "directory": True, "symlink": False
+        }
+        self.denied(snapshot, "C3C_DIRECTORIES_MISMATCH")
 
     def test_08_reject_unexpected_evidence_fields(self):
         for snapshot in (None, [], {}, {"owner_first": ":1.2"}):

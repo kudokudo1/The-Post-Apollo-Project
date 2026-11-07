@@ -2,6 +2,7 @@ import QtQuick
 import qs.components
 import "../services/hospital"
 import "../services/hospital/HospitalWorkerSessionPolicy.js" as SessionPolicy
+import "../services/hospital/HospitalWorkerAttentionPolicy.js" as WorkerAttentionPolicy
 
 // Exact durable Room / pinned PX Session inspection. No room-bind,
 // no session-create, no browser-chat access and no automatic agent turns.
@@ -16,6 +17,13 @@ Item {
     property string viewMode: "chat"
     property bool runtimeStatusVerified: false
     property string actionError: ""
+    readonly property var recordedAttention:
+        WorkerAttentionPolicy.describe(root.roomData)
+    readonly property color recordedAttentionColor:
+        recordedAttention.severity >= 3 ? Colors.red
+        : recordedAttention.severity === 2 ? Colors.orange
+        : recordedAttention.severity === 1 ? Colors.yellow
+        : Colors.cyan
 
     readonly property bool roomMatches:
         SessionPolicy.roomMatches(roomData, pinnedRoomId)
@@ -189,6 +197,26 @@ Item {
             color: Colors.blue
             font.pixelSize: 9
             elide: Text.ElideMiddle
+        }
+        GohuText {
+            width: parent.width
+            text: "RECORDED ATTENTION // "
+                + root.recordedAttention.label + " // "
+                + root.recordedAttention.reason
+            color: root.recordedAttentionColor
+            font.pixelSize: 10
+            wrapMode: Text.Wrap
+            maximumLineCount: 2
+            elide: Text.ElideRight
+        }
+        GohuText {
+            width: parent.width
+            text: "SOURCE // " + root.recordedAttention.source
+                + "  //  UPDATED // "
+                + (root.recordedAttention.recordedAt || "UNKNOWN")
+            color: Colors.blue
+            font.pixelSize: 8
+            elide: Text.ElideRight
         }
         GohuText {
             width: parent.width

@@ -17,6 +17,7 @@ Scope {
     property string storageState: "loading"
     property string errorCode: ""
     property string familyActionError: ""
+    property string identityActionError: ""
     property var document: IdentityPolicy.initialDocument()
     property var pendingDocument: null
     readonly property var snapshot:
@@ -59,9 +60,30 @@ Scope {
         return true;
     }
 
+    // Expose validation codes to the CPU++ editor while retaining the same
+    // single atomic identity writer. No live account or tenant action.
+    function applyIdentityAction(result) {
+        if (storageState !== "ready" && storageState !== "empty") {
+            identityActionError = "STORAGE_UNAVAILABLE";
+            return false;
+        }
+        if (!result || result.ok !== true) {
+            identityActionError = result && result.reason
+                                  ? result.reason : "INVALID_ACTION";
+            return false;
+        }
+        identityActionError = "";
+        return stage(result);
+    }
+
     function createIdentity(name, mode, copyFromId) {
-        return stage(IdentityPolicy.create(
+        return applyIdentityAction(IdentityPolicy.create(
             document, name, mode, copyFromId));
+    }
+
+    function renameIdentity(id, name) {
+        return applyIdentityAction(IdentityPolicy.renameIdentity(
+            document, id, name));
     }
 
     // A UI layout preference only. The running service, native adapter and
@@ -159,6 +181,7 @@ Scope {
             identities.pendingDocument = null;
             identities.storageState = "ready";
             identities.errorCode = "";
+            identities.identityActionError = "";
         }
 
         onSaveFailed: function(error) {
@@ -166,6 +189,7 @@ Scope {
             identities.storageState = "error";
             identities.errorCode = "FILE_SAVE_FAILED";
             identities.familyActionError = "FILE_SAVE_FAILED";
+            identities.identityActionError = "FILE_SAVE_FAILED";
         }
     }
 }

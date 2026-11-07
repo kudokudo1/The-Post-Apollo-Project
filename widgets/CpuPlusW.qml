@@ -1442,10 +1442,10 @@ PanelWindow {
 
             // SETTINGS/TIME owns this left slot with the shared Clock basic
             // control pane, not the inert instrument placeholder.
-            visible: cpuPlusWindow.selectedModeIndex !== 5
-                     && !(cpuPlusWindow.selectedModeIndex === 4
-                          && (cpuPlusWindow.settingsSubMode === "TIME"
-                              || cpuPlusWindow.settingsSubMode === "CONNECTIONS"))
+            visible: !(cpuPlusWindow.selectedModeIndex === 4
+                       && (cpuPlusWindow.settingsSubMode === "TIME"
+                           || cpuPlusWindow.settingsSubMode === "CONNECTIONS"))
+                     && cpuPlusWindow.selectedModeIndex !== 5
             anchors.left: parent.left
             anchors.right: parent.right
             anchors.top: sharedStateHeader.bottom

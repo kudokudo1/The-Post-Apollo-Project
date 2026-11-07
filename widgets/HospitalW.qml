@@ -8,6 +8,7 @@ import qs.services.notifications
 import "../services/notifications/HospitalCertificationNotificationPolicy.js" as CertificationNotificationPolicy
 import "../services/hospital/HospitalWorkforceRosterPolicy.js" as WorkforceRosterPolicy
 import "../services/hospital/HospitalWorkerAttentionPolicy.js" as WorkerAttentionPolicy
+import "../services/hospital/HospitalSurgeryStartupPolicy.js" as SurgeryStartupPolicy
 import "../services/github"
 import QtQuick.Effects
 import Qt5Compat.GraphicalEffects
@@ -96,6 +97,10 @@ PanelWindow {
     property string selectedRoomTeam: ""
     property bool remoteRefreshPending: false
     property int openAuditStaleInterval: 600000
+    // Repeated menu toggles should not rescan every local Git worktree.
+    // Explicit LOCAL REFRESH still bypasses this short in-session window.
+    property int floorDiscoveryReuseInterval: 120000
+    property real lastFloorDiscoveryAt: 0
     property bool openAuditPending: false
     property var lastOpenAuditByFloor: ({})
     property string auditedRoomTeam: ""
@@ -106,7 +111,9 @@ PanelWindow {
     property bool bedControlMode: false
     property string operationsSurface: ""
     // Pilot display only: never confuse discovered Git branches with registered Doctors.
-    property bool workforceRosterVisible: false
+    // Surgery opens to registered workers. Git branch topology remains one
+    // click away, but technical branches are not stand-ins for AI workers.
+    property bool workforceRosterVisible: true
     // WORKERS naming controls are operator actions, not provider instructions.
     property string rosterEditingRoomId: ""
     property string rosterEditingDoctorId: ""
@@ -257,6 +264,9 @@ PanelWindow {
             responsibilityService.refreshDurableGraph();
             if (!doctorService.refreshing)
                 doctorService.refresh();
+        } else {
+            root.requestOpenAudit();
+            root.ensureFirstRoomSelected();
         }
     }
 
@@ -847,7 +857,9 @@ PanelWindow {
     function ensureFirstRoomSelected() {
         const rows = auditService.rooms || [];
 
-        if (!menuOpen
+        // The WORKERS view must never auto-select a guessed Git Room.
+        // This also avoids a second immediate Room audit on first opening.
+        if (root.workforceRosterVisible || !menuOpen
                 || selectedRoomTeam
                 || !Array.isArray(rows)
                 || rows.length === 0)
@@ -2147,7 +2159,13 @@ PanelWindow {
         const last = Number(stamps[key] || 0);
         const now = Date.now();
 
-        if (last > 0 && now - last < openAuditStaleInterval) {
+        // A timestamp is not a usable cache. Floor changes clear audit data;
+        // a failed/stalled scan must not suppress the next available scan.
+        if (SurgeryStartupPolicy.canReuseAudit(
+                last, now, openAuditStaleInterval,
+                auditService.available, auditService.lastError,
+                auditService.snapshotFloorKey === key
+                    && auditService.snapshotRepository === repo)) {
             openAuditPending = false;
             return;
         }
@@ -2164,13 +2182,26 @@ PanelWindow {
     }
 
     onOperationsSurfaceChanged: {
-        // Floor slider exists only on the Surgery surface. Returning to
-        // another Hospital surface always restores the legacy default.
+        // The slider is just a pointer-mode experiment, not a Floor-data gate.
         if (root.operationsOpen)
             root.floorIndexPilotEnabled = false;
         if (root.operationsSurface !== "reception"
                 && speechInputService.busy)
             speechInputService.cancel();
+
+        // Show the workforce right when Surgery becomes visible. Do not wait
+        // for the slower Git audit, and never dispatch or attach sessions.
+        if (root.operationsSurface === "" && root.workforceRosterVisible) {
+            Qt.callLater(function() {
+                if (!root.menuOpen || root.operationsSurface !== ""
+                        || !root.workforceRosterVisible)
+                    return;
+                if (!responsibilityService.graphLoading)
+                    responsibilityService.refreshDurableGraph();
+                if (!doctorService.refreshing)
+                    doctorService.refresh();
+            });
+        }
     }
 
     onMenuOpenChanged: {
@@ -2180,6 +2211,9 @@ PanelWindow {
             hospitalOpenFocusRetry.stop();
         if (!root.menuOpen) {
             root.floorIndexPilotEnabled = false;
+            // The next opening should start from the useful registered roster,
+            // not from an old Git branch-only inspection mode.
+            root.workforceRosterVisible = true;
             if (speechInputService.busy)
                 speechInputService.cancel();
 
@@ -2199,8 +2233,17 @@ PanelWindow {
         });
 
         root.ensureFirstRoomSelected();
+
+        // Discover on first open or after the lightweight reuse window.
+        // A known Floor stays visible instantly across rapid menu toggles.
+        // Explicit LOCAL REFRESH is never throttled by this startup policy.
+        if (!SurgeryStartupPolicy.canReuseFloor(
+                root.lastFloorDiscoveryAt, Date.now(),
+                root.floorDiscoveryReuseInterval, floorService.floorCount))
+            floorService.discover();
+
+        // Never launch a pre-discovery audit against an outdated Floor.
         root.requestOpenAudit();
-        floorService.discover();
     }
 
     onKeyboardActiveChanged: {
@@ -2247,6 +2290,7 @@ PanelWindow {
         }
 
         onFloorsChanged: {
+            root.lastFloorDiscoveryAt = Date.now();
             if (root.menuOpen)
                 openAuditKick.restart();
         }
@@ -2533,6 +2577,7 @@ PanelWindow {
     HospitalAuditService {
         id: auditService
         repository: githubService.repoSlug
+        floorKey: floorService.floorId
     }
 
     HospitalRoomService {
@@ -2870,6 +2915,13 @@ PanelWindow {
         function onRunningChanged() {
             if (auditService.running)
                 return;
+
+            // The initial audit may have been queued while the Floor was
+            // discovering or another Room audit owned the one audit slot.
+            // Retry the pending request after that slot becomes available.
+            if (root.openAuditPending && root.menuOpen
+                    && !floorService.discovering)
+                openAuditKick.restart();
 
             // A failed Room-entry audit does not count as fresh.
             if (root.roomAuditInFlightTeam && auditService.lastError)
@@ -4277,7 +4329,8 @@ PanelWindow {
                                 GohuText {
                                     anchors.centerIn: parent
                                     text: root.floorIndexPilotEnabled
-                                        ? "LIVE FLOOR // ON" : "LIVE FLOOR // OFF"
+                                        ? "FLOOR INPUT // PREVIEW"
+                                        : "FLOOR INPUT // STANDARD"
                                     font.pixelSize: 9
                                     color: root.floorIndexPilotEnabled
                                         ? Colors.orange : Colors.cyan
@@ -6121,6 +6174,34 @@ PanelWindow {
                     font.pixelSize: 10
                     color: responsibilityService.graphError ? Colors.red : Colors.orange
                     wrapMode: Text.Wrap
+                }
+
+                GohuText {
+                    width: parent.width
+                    visible: !root.workforceRosterVisible
+                        && (auditService.rooms || []).length === 0
+                    height: visible ? 64 : 0
+                    text: floorService.discovering
+                        ? "DISCOVERING LOCAL FLOORS // GIT ROOMS WILL LOAD AFTERWARD"
+                        : !floorService.floorId
+                        ? "NO LOCAL FLOOR DETECTED // USE LOCAL REFRESH"
+                        : auditService.running
+                        ? "READING GIT OPERATING ROOMS // PLEASE CHECK AUDIT STATUS"
+                        : auditService.lastError
+                        ? "ROOM AUDIT FAILED // " + auditService.lastError
+                            + " // USE AUDIT TO RETRY"
+                        : !auditService.repository
+                        ? "GIT REPOSITORY NOT RESOLVED // CHECK FLOOR SELECTION"
+                        : auditService.available
+                        ? "NO GIT OPERATING ROOMS RETURNED // SHOW WORKERS"
+                        : root.openAuditPending
+                        ? "WAITING FOR FLOOR / GIT AUDIT // NO ROOMS LOADED YET"
+                        : "GIT ROOM LIST NOT LOADED // PRESS AUDIT OR SHOW WORKERS"
+                    font.pixelSize: 10
+                    color: auditService.lastError ? Colors.red : Colors.orange
+                    wrapMode: Text.Wrap
+                    maximumLineCount: 4
+                    elide: Text.ElideRight
                 }
 
                 Repeater {

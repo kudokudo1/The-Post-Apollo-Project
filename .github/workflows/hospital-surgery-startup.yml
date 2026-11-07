@@ -1,0 +1,41 @@
+name: Hospital Surgery First-Open Visibility
+
+on:
+  pull_request:
+    paths:
+      - "widgets/HospitalW.qml"
+      - "services/hospital/HospitalSurgeryStartupPolicy.js"
+      - "services/hospital/HospitalAuditService.qml"
+      - "tests/hospital/test_surgery_startup_policy.js"
+      - "tests/hospital/test_surgery_first_open_contracts.py"
+      - ".github/workflows/hospital-surgery-startup.yml"
+  push:
+    branches:
+      - main
+    paths:
+      - "widgets/HospitalW.qml"
+      - "services/hospital/HospitalSurgeryStartupPolicy.js"
+      - "services/hospital/HospitalAuditService.qml"
+      - "tests/hospital/test_surgery_startup_policy.js"
+      - "tests/hospital/test_surgery_first_open_contracts.py"
+      - ".github/workflows/hospital-surgery-startup.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  source-only-regression:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify Floor and audit snapshot cache logic
+        run: |
+          node --check services/hospital/HospitalSurgeryStartupPolicy.js
+          node tests/hospital/test_surgery_startup_policy.js
+      - name: Guard visible Surgery startup and prior worker flows
+        run: |
+          python3 tests/hospital/test_surgery_first_open_contracts.py
+          python3 tests/hospital/test_workforce_roster_ui_contracts.py
+          python3 tests/hospital/test_registered_worker_routes.py
+          python3 tests/hospital/test_worker_attention_ui_contracts.py
+          python3 tests/hospital/test_main_mode_keyboard_contracts.py

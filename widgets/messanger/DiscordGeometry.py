@@ -43,6 +43,9 @@ HEADER = struct.Struct("=6sII")
 
 IPC_COMMAND = 0
 IPC_GET_TREE = 4
+IPC_SUBSCRIBE = 2
+IPC_EVENT_WINDOW = 0x80000003
+MAX_EVENT_BYTES = 4 * 1024 * 1024
 
 
 class SwayIPC:
@@ -123,6 +126,15 @@ class SwayIPC:
                 time.sleep(0.002)
 
         raise RuntimeError("unreachable")
+
+    def read_event(self) -> tuple[int, Any]:
+        """Read one frame from a dedicated, already subscribed Sway socket."""
+        raw_header = self._recv_exact(HEADER.size)
+        magic, length, message_type = HEADER.unpack(raw_header)
+        if magic != MAGIC or length > MAX_EVENT_BYTES:
+            raise ConnectionError("Invalid Sway subscription event")
+        payload = json.loads(self._recv_exact(length).decode("utf-8"))
+        return message_type, payload
 
 
 def walk_tree(node: dict[str, Any]):
@@ -339,6 +351,37 @@ def snapshot_from_tree(
     }
 
 
+def verified_external_vesktop_focus(event: Any, tree: Any) -> dict[str, Any] | None:
+    """Focus event is a hint, not authority: require one matching live main view.
+
+    Return only the exact container ID. Never forward titles, account data,
+    or arbitrary Sway event fields to the Quickshell controller.
+    """
+    if not isinstance(event, dict) or event.get("change") != "focus":
+        return None
+    container = event.get("container")
+    if not isinstance(container, dict):
+        return None
+    con_id = container.get("id")
+    if type(con_id) is not int or con_id <= 0 or not isinstance(tree, dict):
+        return None
+
+    candidates = []
+    for node in walk_tree(tree):
+        rect = compact_rect(node.get("rect"))
+        if (type(node.get("id")) is not int or node["id"] <= 0
+                or not is_vesktop_node(node)
+                or not (node.get("visible") is True and node.get("focused") is True)
+                or rect is None or rect["width"] <= 0 or rect["height"] <= 0
+                or vesktop_window_kind(rect, node.get("name")) != "main"):
+            continue
+        candidates.append(node["id"])
+
+    if len(candidates) != 1 or candidates[0] != con_id:
+        return None
+    return {"event": "externalDiscordFocus", "conId": con_id}
+
+
 def sway_criteria(
     target: str, con_id: int | None = None,
     browser_identity_id: str | None = None,
@@ -410,6 +453,11 @@ class Bridge:
 
         self.poll_ipc = SwayIPC()
         self.command_ipc = SwayIPC()
+        # Event subscription is separate from high-frequency geometry reads.
+        # It stays active when Social is closed, without polling get_tree.
+        self.event_ipc = SwayIPC()
+        self.focus_verify_ipc = SwayIPC()
+        self.stdout_lock = threading.Lock()
 
         self.stop_event = threading.Event()
         self.watch_event = threading.Event()
@@ -1043,11 +1091,43 @@ class Bridge:
         snapshot = self.fast_follow(snapshot)
 
         if force or snapshot != self.last_snapshot:
-            print(
-                json.dumps(snapshot, separators=(",", ":")),
-                flush=True,
-            )
+            with self.stdout_lock:
+                print(
+                    json.dumps(snapshot, separators=(",", ":")),
+                    flush=True,
+                )
             self.last_snapshot = snapshot
+
+    def external_activation_loop(self) -> None:
+        """Sway focus events work while Social is closed; no idle tree poll."""
+        try:
+            while not self.stop_event.is_set():
+                try:
+                    subscribed = self.event_ipc.request(IPC_SUBSCRIBE, '["window"]')
+                    if not isinstance(subscribed, dict) or subscribed.get("success") is not True:
+                        raise ValueError("Sway window subscription refused")
+                    while not self.stop_event.is_set():
+                        event_type, event = self.event_ipc.read_event()
+                        if (event_type != IPC_EVENT_WINDOW
+                                or not isinstance(event, dict)
+                                or event.get("change") != "focus"):
+                            continue
+                        # The event may describe a stale or spoofed container.
+                        # Re-read the compositor tree and require a unique
+                        # currently focused, visible Vesktop *main* window.
+                        tree = self.focus_verify_ipc.request(IPC_GET_TREE)
+                        activation = verified_external_vesktop_focus(event, tree)
+                        if activation is not None:
+                            with self.stdout_lock:
+                                print(json.dumps(activation, separators=(",", ":")),
+                                      flush=True)
+                except (OSError, ConnectionError, ValueError, json.JSONDecodeError):
+                    self.event_ipc.close()
+                    self.focus_verify_ipc.close()
+                    self.stop_event.wait(0.5)
+        finally:
+            self.event_ipc.close()
+            self.focus_verify_ipc.close()
 
     def poll_loop(self) -> None:
         next_sample = time.monotonic()
@@ -1097,9 +1177,15 @@ class Bridge:
             name="commands",
             daemon=True,
         )
+        activation_thread = threading.Thread(
+            target=self.external_activation_loop,
+            name="external-activation",
+            daemon=True,
+        )
 
         stdin_thread.start()
         command_thread.start()
+        activation_thread.start()
 
         try:
             self.poll_loop()
@@ -1108,6 +1194,8 @@ class Bridge:
             self.command_event.set()
             self.poll_ipc.close()
             self.command_ipc.close()
+            self.event_ipc.close()
+            self.focus_verify_ipc.close()
 
 
 def main() -> int:

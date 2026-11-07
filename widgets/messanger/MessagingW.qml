@@ -215,7 +215,11 @@ PanelWindow {
                     return;
 
                 try {
-                    messagingWindow.reconcileGroupGeometry(JSON.parse(raw));
+                    var packet = JSON.parse(raw);
+                    if (packet.event === "externalDiscordFocus")
+                        messagingWindow.openDiscordFromExternal(Number(packet.conId));
+                    else
+                        messagingWindow.reconcileGroupGeometry(packet);
                 } catch (e) {
                     console.log("MessagingW: failed to read helper geometry:", e);
                 }
@@ -344,6 +348,9 @@ PanelWindow {
     // Tab navigation belongs to the Social selector, not the external
     // Discord window. Only set while a keyboard Main Mode transition opens it.
     property bool restoreSelectorAfterDiscordShow: false
+    // Sway-native activation should dock an already focused Vesktop, not
+    // spawn a second instance or hide it during Social's open reset.
+    property bool discordExternalActivationPending: false
     property bool restoreSelectorAfterXShow: false
     property string xError: ""
 
@@ -1442,6 +1449,24 @@ PanelWindow {
         });
     }
 
+    function openDiscordFromExternal(conId) {
+        // Only the event bridge can request this path. The bridge verifies
+        // the exact focused Sway main-window con_id before emitting it.
+        if (!Number.isInteger(conId) || conId <= 0)
+            return;
+        if (menuOpen && discordSelected)
+            return;
+        discordExternalActivationPending = true;
+        if (!menuOpen)
+            menuOpen = true;
+        Qt.callLater(function () {
+            if (messagingWindow.menuOpen)
+                messagingWindow.activateApp(1);
+            else
+                messagingWindow.discordExternalActivationPending = false;
+        });
+    }
+
     function showDiscord() {
         if (!menuOpen || !discordSelected)
             return;
@@ -1464,16 +1489,20 @@ PanelWindow {
         // Arm the exact-window docking request before the single-instance
         // restore can publish a visible main BrowserWindow.
         helperShowDiscord(restoreSelectorAfterDiscordShow !== true);
+        var externallyActivated = discordExternalActivationPending;
+        discordExternalActivationPending = false;
 
         // Launch/restore the provider independently from geometry discovery.
         // setsid -f makes this short-lived Process return immediately instead
         // of staying attached to Vesktop for the lifetime of the application.
-        if (discordLaunchProcess.running)
-            discordLaunchProcess.running = false;
-        discordLaunchProcess.exec([
-            "bash", "-lc",
-            "setsid -f flatpak run dev.vencord.Vesktop >/dev/null 2>&1"
-        ]);
+        if (!externallyActivated) {
+            if (discordLaunchProcess.running)
+                discordLaunchProcess.running = false;
+            discordLaunchProcess.exec([
+                "bash", "-lc",
+                "setsid -f flatpak run dev.vencord.Vesktop >/dev/null 2>&1"
+            ]);
+        }
 
         // The helper consumes the armed request only for the discovered main
         // window; no desktop geometry is promoted before a verified dock.
@@ -2224,6 +2253,7 @@ PanelWindow {
 
     onMenuOpenChanged: {
         if (!menuOpen) {
+            discordExternalActivationPending = false;
             hideProviderDesktop();
             telegramAppKeyEditorOpen = false;
             telegramAppKeyEditorIdentityId = "";
@@ -2245,7 +2275,8 @@ PanelWindow {
             appSelector.selectedIndex = 0;
             Qt.callLater(function() { appSelector.ensureValidSelection(); });
 
-            messagingWindow.hideDiscord();
+            if (!discordExternalActivationPending)
+                messagingWindow.hideDiscord();
             messagingWindow.hideX();
 
             // sharedPanelX/Y/Width/Height are the canonical Social viewport

@@ -10,6 +10,8 @@ Rectangle {
     border.width: 1
     border.color: Colors.magenta
     clip: true
+    objectName: "magick-m7-forecast-outlook"
+    property bool compactLayout: false
     property var weatherService: null
     property string selectedDate: ""
     readonly property var model: Calendar.build(
@@ -26,11 +28,11 @@ Rectangle {
 
     Column {
         anchors.fill: parent
-        anchors.margins: 7
-        spacing: 5
+        anchors.margins: outlook.compactLayout ? 4 : 7
+        spacing: outlook.compactLayout ? 2 : 5
         GohuText {
             width: parent.width
-            height: 20
+            height: outlook.compactLayout ? 14 : 20
             text: "LUNAR + SOLAR // FORECAST OUTLOOK"
             color: Colors.magenta
             font.pixelSize: 12
@@ -38,7 +40,7 @@ Rectangle {
         }
         QuietText {
             width: parent.width
-            height: 16
+            height: outlook.compactLayout ? 12 : 16
             color: Colors.yellow
             font.pixelSize: 9
             elide: Text.ElideRight
@@ -51,13 +53,13 @@ Rectangle {
             id: daysGrid
             width: parent.width
             columns: 7
-            spacing: 3
+            spacing: outlook.compactLayout ? 2 : 3
             Repeater {
                 model: outlook.model.ready ? outlook.model.rows : []
                 delegate: ActionButton {
                     required property var modelData
                     width: Math.max(20,(daysGrid.width-6*daysGrid.spacing)/7)
-                    height: 32
+                    height: outlook.compactLayout ? 23 : 32
                     label: modelData.date.slice(8)+" "+modelData.weekday
                     labelPixelSize: 8
                     contentPadding: 1
@@ -70,7 +72,9 @@ Rectangle {
         Canvas {
             id: bars
             width: parent.width
-            height: Math.max(90,Math.min(178,outlook.height-190))
+            height: outlook.compactLayout
+                ? Math.max(36,Math.min(178,outlook.height-156))
+                : Math.max(90,Math.min(178,outlook.height-190))
             onPaint: {
                 const ctx=getContext("2d");
                 ctx.clearRect(0,0,width,height);
@@ -109,8 +113,8 @@ Rectangle {
         }
         QuietText {
             width: parent.width
-            height: 21
-            font.pixelSize: 11
+            height: outlook.compactLayout ? 15 : 21
+            font.pixelSize: outlook.compactLayout ? 10 : 11
             color: Colors.white
             elide: Text.ElideRight
             text: outlook.focusedDay
@@ -122,7 +126,7 @@ Rectangle {
         }
         QuietText {
             width: parent.width
-            height: 19
+            height: outlook.compactLayout ? 14 : 19
             color: Colors.cyan
             font.pixelSize: 9
             elide: Text.ElideRight
@@ -135,7 +139,7 @@ Rectangle {
         }
         QuietText {
             width: parent.width
-            height: 17
+            height: outlook.compactLayout ? 13 : 17
             font.pixelSize: 9
             color: Colors.orange
             elide: Text.ElideRight
@@ -143,7 +147,7 @@ Rectangle {
         }
         QuietText {
             width: parent.width
-            height: 16
+            height: outlook.compactLayout ? 13 : 16
             font.pixelSize: 9
             color: Colors.yellow
             elide: Text.ElideRight

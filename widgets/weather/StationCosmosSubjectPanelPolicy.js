@@ -37,6 +37,9 @@ var ROUTES = {
   // The bottom MOON landing pairs USNO ephemeris with its current sky fix.
   "cosmos/moon/ephemeris": {page:"sky",sky:["header","moon","moon-position"]},
   "cosmos/moon/year": {page:"sky",sky:[]},
+  // C17 forecast is an existing WeatherService outlook, never a JPL claim.
+  // Prevent USNO/SKY collectors from being started by this route.
+  "cosmos/moon/forecast": {page:"sky",sky:[]},
   "cosmos/moon/position": {page:"sky",sky:["header","moon-position"]},
   // Native ASTRONOMY landing keeps the planet/constellation instruments;
   // the original comprehensive SKY page remains in INDEX unchanged.

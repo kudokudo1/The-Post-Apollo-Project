@@ -20,6 +20,7 @@ jobs:
           node-version: '22'
       - run: |
           node --test tests/weather/test_cosmos_c11_annual_wheels.js
+          node --test tests/weather/test_cosmos_c17_moon_magick_reuse.js
           node --test tests/weather/test_cosmos_c8_moon_compact.js
           node --test tests/weather/test_cosmos_sun_instruments_c5c.js
           node --test tests/weather/test_magick_annual_wheels_m7b.js

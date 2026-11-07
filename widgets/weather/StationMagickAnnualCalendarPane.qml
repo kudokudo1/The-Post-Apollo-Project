@@ -18,6 +18,9 @@ Rectangle {
     // An embedded COSMOS wheel may lock the subject without changing MAGICK.
     // Empty preserves the original MOON / SOLAR YEAR / FORECAST selector.
     property string lockedView: ""
+    // COSMOS forecast fits a smaller no-scroll instrument viewport;
+    // MAGICK retains its original full-size layout.
+    property bool compactForecast: false
     readonly property var calendarSource: annualSource
     property string scopeMode: "year"
     property int selectedYear: runtimeNowMs>0
@@ -116,6 +119,7 @@ Rectangle {
     }
 
     StationMagickForecastCalendarPane {
+        compactLayout: annualPane.compactForecast
         anchors.top: topModes.bottom
         anchors.topMargin: 3
         anchors.left: parent.left

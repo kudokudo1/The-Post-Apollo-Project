@@ -30,6 +30,8 @@ Rectangle {
                          ? moonCompactComponent
                          : cosmosPane.subjectRoute === "cosmos/moon/year"
                          ? moonYearComponent
+                         : cosmosPane.subjectRoute === "cosmos/moon/forecast"
+                         ? moonForecastComponent
                          : cosmosPane.kind === "sky" ? skyComponent
                          : cosmosPane.subjectRoute === "cosmos/space-weather/overview"
                            ? spaceHubComponent
@@ -103,6 +105,21 @@ Rectangle {
         id: moonYearComponent
         StationCosmosAnnualWheelPane {
             subject: "moon"
+            weatherService: cosmosPane.weatherService
+            runtimeNowMs: cosmosPane.runtimeNowMs
+            onRouteRequested: function(path) {
+                cosmosPane.routeRequested(path)
+            }
+        }
+    }
+
+    // C17 // Forecast is a second view of MAGICK's existing annual
+    // calendar host, but it never activates the JPL annual calculation.
+    Component {
+        id: moonForecastComponent
+        StationCosmosAnnualWheelPane {
+            subject: "moon"
+            moonView: "forecast"
             weatherService: cosmosPane.weatherService
             runtimeNowMs: cosmosPane.runtimeNowMs
             onRouteRequested: function(path) {

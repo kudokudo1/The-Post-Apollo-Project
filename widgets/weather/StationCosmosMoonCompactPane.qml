@@ -95,6 +95,7 @@ Rectangle {
         height: 18
         spacing: 4
         GohuText {
+            id: moonHeading
             width: Math.min(155,Math.max(1,titleRail.width*0.38))
             height: parent.height
             text: "LUNAR // OBSERVATION"
@@ -104,7 +105,9 @@ Rectangle {
             elide: Text.ElideRight
         }
         QuietText {
-            width: Math.max(1,titleRail.width-159-54)
+            width: Math.max(1,titleRail.width-moonHeading.width
+                -moonYearButton.width-moonForecastButton.width
+                -3*titleRail.spacing)
             height: parent.height
             text: "USNO "+moonPane.moonStatus+" // SKY "+moonPane.positionStatus
             color: moonPane.moonStatus==="OFFLINE" || moonPane.positionStatus==="OFFLINE"
@@ -115,6 +118,7 @@ Rectangle {
             elide: Text.ElideRight
         }
         ActionButton {
+            id: moonYearButton
             objectName: "cosmos-c11-open-moon-year"
             width: 50
             height: 17
@@ -123,6 +127,17 @@ Rectangle {
             contentPadding: 1
             accentColor: Colors.cyan
             onClicked: moonPane.routeRequested("cosmos/moon/year")
+        }
+        ActionButton {
+            id: moonForecastButton
+            objectName: "cosmos-c17-open-moon-forecast"
+            width: 65
+            height: 17
+            label: "FORECAST"
+            labelPixelSize: 8
+            contentPadding: 1
+            accentColor: Colors.cyan
+            onClicked: moonPane.routeRequested("cosmos/moon/forecast")
         }
     }
 

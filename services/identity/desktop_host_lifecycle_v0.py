@@ -139,6 +139,9 @@ class DesktopHostLifecycle:
         Required directory MUST preexist and meet the existing private IPC
         checks; no mkdir, autostart, login or browser action occurs here.
         """
+        failure: Exception | None = None
+        socket: PrivateContextSocket | None = None
+        receiver: LoopbackCallbackReceiver | None = None
         with self._lock:
             if self._status != "NEW":
                 raise RuntimeError("Host lifecycle cannot be started twice")
@@ -167,7 +170,8 @@ class DesktopHostLifecycle:
                 self._socket = socket
                 socket.start()
                 self._status = "STARTED"
-            except Exception:
+            except Exception as exc:
+                failure = exc
                 self._status = "CLOSED"
                 if self._session is not None:
                     self._session.logout()
@@ -175,16 +179,15 @@ class DesktopHostLifecycle:
                 self._session = None
                 self._receiver = None
                 self._socket = None
-                # The failed startup is not visible as a running service.
-                # Cleanup happens once the lock is released below.
-        if self._status == "CLOSED":
+        if failure is not None:
+            # shutdown() waits for handler threads; never hold host lock here.
             try:
                 if socket is not None:
                     socket.close()
             finally:
                 if receiver is not None:
                     receiver.close()
-            raise RuntimeError("Identity host transports could not start")
+            raise failure
 
     def begin_login(self) -> dict[str, object]:
         """Host-only one-time login initiation, never a display IPC method."""

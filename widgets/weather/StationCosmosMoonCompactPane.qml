@@ -118,6 +118,8 @@ Rectangle {
         }
     }
 
+    // C19 // The detailed forecast remains in INDEX, not in the main rail.
+    // The current daily forecast now shares OVERVIEW with lunar observations.
     Row {
         id: moonModeRail
         objectName: "cosmos-c18-moon-fullwidth-mode-rail"
@@ -131,10 +133,10 @@ Rectangle {
         spacing: 4
         ActionButton {
             objectName: "cosmos-c18-moon-observation-tab"
-            width: Math.max(1,(moonModeRail.width-2*moonModeRail.spacing)/3)
+            width: Math.max(1,(moonModeRail.width-moonModeRail.spacing)/2)
             height: 27
-            label: "PHASE + POSITION"
-            labelPixelSize: 9
+            label: "OVERVIEW"
+            labelPixelSize: 10
             contentPadding: 1
             selected: true
             accentColor: Colors.magenta
@@ -142,24 +144,13 @@ Rectangle {
         ActionButton {
             id: moonYearButton
             objectName: "cosmos-c11-open-moon-year"
-            width: Math.max(1,(moonModeRail.width-2*moonModeRail.spacing)/3)
+            width: Math.max(1,(moonModeRail.width-moonModeRail.spacing)/2)
             height: 27
-            label: "LUNAR WHEEL"
-            labelPixelSize: 9
+            label: "LUNAR YEAR"
+            labelPixelSize: 10
             contentPadding: 1
             accentColor: Colors.cyan
             onClicked: moonPane.routeRequested("cosmos/moon/year")
-        }
-        ActionButton {
-            id: moonForecastButton
-            objectName: "cosmos-c17-open-moon-forecast"
-            width: Math.max(1,(moonModeRail.width-2*moonModeRail.spacing)/3)
-            height: 27
-            label: "FORECAST"
-            labelPixelSize: 9
-            contentPadding: 1
-            accentColor: Colors.cyan
-            onClicked: moonPane.routeRequested("cosmos/moon/forecast")
         }
     }
 
@@ -171,8 +162,9 @@ Rectangle {
         anchors.leftMargin: moonPane.contentInset
         anchors.rightMargin: moonPane.contentInset
         anchors.top: moonModeRail.bottom
-        // Keep the nine source-backed Moon readings within compact viewport.
-        height: Math.min(166,Math.max(0,moonPane.height-138))
+        // Primary Moon instruments are still largest, sharing space with
+        // the daily forecast strip and source-backed rise/transit/set ledger.
+        height: Math.min(166,Math.max(95,Math.round(moonPane.height*0.39)))
         spacing: 5
 
         // Identical interactive MAGICK phase instrument, not a duplicated canvas.
@@ -304,6 +296,19 @@ Rectangle {
         }
     }
 
+    StationCosmosMoonForecastStrip {
+        id: moonForecastStrip
+        objectName: "cosmos-c19-moon-forecast-strip"
+        anchors.left: parent.left
+        anchors.right: parent.right
+        anchors.top: heroRow.bottom
+        anchors.topMargin: 4
+        anchors.leftMargin: moonPane.contentInset
+        anchors.rightMargin: moonPane.contentInset
+        height: Math.max(43,Math.min(80,Math.round(moonPane.height*0.17)))
+        weatherService: moonPane.weatherService
+    }
+
     // One continuous event ribbon, with a brighter transit reading instead of
     // three identical cards. The dividers replace three enclosing borders.
     Rectangle {
@@ -313,8 +318,8 @@ Rectangle {
         anchors.right: parent.right
         anchors.leftMargin: moonPane.contentInset
         anchors.rightMargin: moonPane.contentInset
-        anchors.top: heroRow.bottom
-        anchors.topMargin: 4
+        anchors.top: moonForecastStrip.bottom
+        anchors.topMargin: 3
         anchors.bottom: parent.bottom
         anchors.bottomMargin: moonPane.contentInset
         color: Colors.black
@@ -327,7 +332,7 @@ Rectangle {
             anchors.left: parent.left
             anchors.right: parent.right
             anchors.top: parent.top
-            height: Math.min(51,Math.max(1,compactReadings.height-39))
+            height: Math.min(35,Math.max(19,Math.round(compactReadings.height*0.36)))
             color: Colors.dark
             border.width: 1
             border.color: Colors.yellow
@@ -353,23 +358,27 @@ Rectangle {
                             color: Colors.cyan
                             opacity: 0.58
                         }
-                        Column {
+                        Row {
                             anchors.fill: parent
-                            anchors.leftMargin: 7
-                            anchors.topMargin: 3
-                            spacing: 3
+                            anchors.leftMargin: 5
+                            anchors.rightMargin: 2
+                            spacing: 2
                             QuietText {
-                                width: parent.width
+                                width: Math.max(1,parent.width*0.47)
+                                height: parent.height
                                 text: eventData ? eventData.label : "--"
                                 font.pixelSize: 8
                                 color: index===1 ? Colors.yellow : Colors.cyan
+                                verticalAlignment: Text.AlignVCenter
                                 elide: Text.ElideRight
                             }
                             GohuText {
-                                width: parent.width
+                                width: Math.max(1,parent.width*0.53-2)
+                                height: parent.height
                                 text: eventData ? eventData.value : "--"
-                                font.pixelSize: index===1 ? 15 : 12
+                                font.pixelSize: 9
                                 color: index===1 ? Colors.yellow : Colors.white
+                                verticalAlignment: Text.AlignVCenter
                                 elide: Text.ElideRight
                             }
                         }

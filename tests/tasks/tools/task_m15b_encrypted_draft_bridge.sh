@@ -42,13 +42,29 @@ for directory in "$HOME" "$test_vault"; do
 done
 printf '%s' 'M15b-disposable-CI-password-only' |
     gnome-keyring-daemon --unlock --components=secrets >/dev/null 2>&1
-owner="$(gdbus call --session --dest org.freedesktop.DBus \
-    --object-path /org/freedesktop/DBus \
-    --method org.freedesktop.DBus.NameHasOwner \
-    org.freedesktop.secrets 2>/dev/null || true)"
-[[ "$owner" =~ ^\([[:space:]]*true[[:space:]]*,?[[:space:]]*\)$ ]] || {
-    printf '%s\n' "M15B_PRIVATE_SECRET_SERVICE_REFUSED"; exit 2;
-}
+owner=""
+owner_ready=0
+for attempt in $(seq 1 20); do
+    owner="$(gdbus call --session --dest org.freedesktop.DBus \
+        --object-path /org/freedesktop/DBus \
+        --method org.freedesktop.DBus.NameHasOwner \
+        org.freedesktop.secrets 2>/dev/null || true)"
+    if [[ "$owner" =~ ^\([[:space:]]*true[[:space:]]*,?[[:space:]]*\)$ ]]; then
+        owner_ready=1
+        break
+    fi
+    sleep 0.1
+done
+if [[ "$owner_ready" != "1" ]]; then
+    if [[ -z "$owner" ]]; then
+        printf '%s\n' "M15B_PRIVATE_SECRET_SERVICE_QUERY_FAILED"
+    elif [[ "$owner" =~ ^\([[:space:]]*false[[:space:]]*,?[[:space:]]*\)$ ]]; then
+        printf '%s\n' "M15B_PRIVATE_SECRET_SERVICE_NOT_RUNNING"
+    else
+        printf '%s\n' "M15B_PRIVATE_SECRET_SERVICE_UNRECOGNIZED"
+    fi
+    exit 2
+fi
 verify() {
     local action="$1" expected="$2" observed
     observed="$(node "$worker" "$action")" ||

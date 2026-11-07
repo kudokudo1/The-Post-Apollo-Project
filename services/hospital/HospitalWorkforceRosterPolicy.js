@@ -82,7 +82,11 @@ function buildRoster(rooms, sessions, doctors) {
             sessionId: session ? textValue(session.id || session.sessionId) : "",
             sessionStatus: rawStatus,
             hasActiveSession: !!activeSession,
-            statusRecordedAt: session ? textValue(session.updatedAt) : ""
+            statusRecordedAt: session ? textValue(session.updatedAt) : "",
+            sessionLastError: session ? textValue(session.lastError) : "",
+            sessionLastExitCode: session && session.lastExitCode !== undefined
+                ? session.lastExitCode : null,
+            sessionEndedAt: session ? textValue(session.endedAt) : ""
         });
     }
     out.sort(function(a, b) {

@@ -137,3 +137,20 @@ test("C13 ACTIVITY renders xray, flare and cycle in one non-scrolling instrument
  assert.match(focus,/id: solarDetails\s*StationCosmosSunInstrumentPane\s*\{/);
  assert.match(focus,/id: solarYear\s*StationCosmosAnnualWheelPane\s*\{/);
 });
+test("C15 ACTIVITY uses source-backed nonuniform scientific representations",()=>{
+ assert.match(terminal,/objectName: "cosmos-c13-xray-graph"/);
+ assert.match(terminal,/objectName: "cosmos-c15-cycle-range-chart"/);
+ assert.match(terminal,/objectName: "cosmos-c12-flare-facts"/);
+ assert.match(terminal,/xray\.trend/);
+ assert.match(terminal,/ssnRangeValid/);
+ assert.match(terminal,/fluxRangeValid/);
+ assert.match(terminal,/predictedSsn/);
+ assert.match(terminal,/selectedFlare\.peakUtc/);
+ assert.match(terminal,/selectedFlare\.flux/);
+ assert.match(terminal,/OBSERVED FLARES/);
+ assert.doesNotMatch(terminal,/model: sunTerminal\.cycleFields/);
+ assert.doesNotMatch(terminal,/model: sunTerminal\.flareFields/);
+ assert.doesNotMatch(terminal,/id: activityTabs\b|id: activityInstrument\b/);
+ assert.doesNotMatch(terminal,/Flickable\s*\{|ScrollView\s*\{/);
+});
+

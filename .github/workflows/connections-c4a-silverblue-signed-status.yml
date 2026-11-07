@@ -1,0 +1,91 @@
+name: Connections C4a signed fake-service Silverblue reboot and rollback (CI only)
+
+on:
+  pull_request:
+    paths:
+      - "tests/connections/c4a_silverblue/**"
+      - "tests/connections/test_connections_c4a_silverblue_contract.py"
+      - "tests/connections/c2v_silverblue/**"
+      - ".github/workflows/connections-c4a-silverblue-signed-status.yml"
+      - "docs/connections-c4a-silverblue-signed-status.md"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  signed-fake-silverblue-reboot-rollback:
+    # No fork-controlled runners, real credentials, production identity or UI.
+    if: github.actor == 'kudokudo1' && (github.event_name == 'workflow_dispatch' || github.event.pull_request.head.repo.full_name == github.repository)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 68
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Reject unsafe shell and deny-only contract changes
+        shell: bash
+        run: |
+          set -euo pipefail
+          bash -n tests/connections/c4a_silverblue/guest_signed_status_gate.sh
+          bash -n tests/connections/c3d_provenance/build_signed_ci_status.sh
+          bash -n tests/connections/c2t_signed_rpm/build_signed_test_rpms.sh
+          bash -n tests/connections/c2v_silverblue/boot_official_silverblue.sh
+          bash -n tests/connections/c2v_silverblue/guest_ostree_reboot_cycle.sh
+          python3 -B tests/connections/test_connections_c4a_silverblue_contract.py
+          python3 -B tests/connections/test_connections_c3d_provenance_contract.py
+          python3 -B tests/connections/test_connections_c2n_policy_contract.py
+          echo "C4A_PASS // STATIC_GATE_AND_DENY_ONLY_POLICY"
+      - name: Verify disposable KVM runner and spare disk
+        shell: bash
+        run: |
+          set -euo pipefail
+          [ -c /dev/kvm ] || { echo "C4A_BLOCKED // NO_KVM"; exit 2; }
+          sudo chmod a+rw /dev/kvm
+          [ -r /dev/kvm ] && [ -w /dev/kvm ] || exit 2
+          avail="$(df -B1 --output=avail / | tail -n 1)"
+          [ "$avail" -ge 12000000000 ] || { echo "C4A_BLOCKED // RUNNER_DISK_TOO_SMALL"; exit 2; }
+      - name: Build the existing C2t inert signed RPM without exporting private keys
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/c2t-rpms"
+          docker run --rm \
+            --mount "type=bind,src=$PWD,dst=/src,readonly" \
+            --mount "type=bind,src=$RUNNER_TEMP/c2t-rpms,dst=/out" \
+            fedora:44 /usr/bin/bash /src/tests/connections/c2t_signed_rpm/build_signed_test_rpms.sh
+          (cd "$RUNNER_TEMP/c2t-rpms" && sha256sum --check --status c2t-artifact-manifest.sha256)
+      - name: Build the existing signed fake C3d service with another ephemeral CI-only key
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/c4a-status-rpm"
+          docker run --rm \
+            --mount "type=bind,src=$PWD,dst=/src,readonly" \
+            --mount "type=bind,src=$RUNNER_TEMP/c4a-status-rpm,dst=/out" \
+            fedora:44 /usr/bin/bash /src/tests/connections/c3d_provenance/build_signed_ci_status.sh
+          (cd "$RUNNER_TEMP/c4a-status-rpm" && sha256sum --check --status c3d-artifact-manifest.sha256)
+          test "$(find "$RUNNER_TEMP/c4a-status-rpm" -maxdepth 1 -type f | wc -l)" = 4
+          echo "C4A_PASS // TWO_DISPOSABLE_BUILDERS_NO_PRIVATE_KEYS_EXPORTED"
+      - name: Install QEMU and ISO utilities on disposable runner only
+        shell: bash
+        run: |
+          set -euo pipefail
+          timeout 120s sudo apt-get -o Acquire::Retries=2 -o Acquire::http::Timeout=35 update ||
+            { echo "C4A_BLOCKED // RUNNER_APT_UPDATE"; exit 2; }
+          timeout 360s sudo apt-get -o Acquire::Retries=2 -o Acquire::http::Timeout=35 install -y --no-install-recommends \
+            qemu-system-x86 qemu-utils xorriso genisoimage ||
+            { echo "C4A_BLOCKED // RUNNER_APT_INSTALL"; exit 2; }
+      - name: Prove both signed fixtures enter the same real Silverblue layer then rollback
+        shell: bash
+        run: |
+          set -euo pipefail
+          C4A_SERVICE_RPM_DIR="$RUNNER_TEMP/c4a-status-rpm" \
+            timeout 3200s bash tests/connections/c2v_silverblue/boot_official_silverblue.sh
+      - name: Verify production host and credential grants remain disabled
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -B tests/connections/test_connections_c4a_silverblue_contract.py
+          python3 -B tests/connections/test_connections_c2n_policy_contract.py
+          echo "C4A_PASS // PRODUCTION_HOST_AND_CREDENTIAL_GRANTS_DISABLED"

@@ -118,6 +118,18 @@ for n in $(seq 1 72); do
       echo "C2V_PROBE_MONITOR_EXIT_FILE_BEGIN"
       tail -n 12 /var/tmp/c2v-monitor-exit.log || true
     fi
+    if [[ -f /var/tmp/c2v-monitor-shell-trace.log ]]; then
+      echo "C2V_PROBE_MONITOR_SHELL_TRACE_BEGIN"
+      tail -n 26 /var/tmp/c2v-monitor-shell-trace.log || true
+    fi
+    if (( n <= 12 || n % 6 == 0 )); then
+      echo "C2V_PROBE_MONITOR_SYSTEMD_PROPERTIES_BEGIN"
+      timeout --signal=TERM --kill-after=2s 6s systemctl show c2v-rpm-layer-monitor.service \
+        --property=Type --property=TimeoutStartUSec --property=RuntimeMaxUSec \
+        --property=ExecMainCode --property=ExecMainStatus --property=Result \
+        --property=KillMode --property=OOMPolicy --no-pager 2>&1 || \
+        echo "C2V_PROBE_MONITOR_PROPERTIES_UNAVAILABLE"
+    fi
     if (( n <= 12 || n % 6 == 0 )); then
       echo "C2V_PROBE_MONITOR_JOURNAL_BEGIN"
       timeout --signal=TERM --kill-after=2s 6s journalctl -b -u c2v-rpm-layer-monitor.service --no-pager -n 16 2>&1 ||
@@ -175,6 +187,12 @@ PROBE
 #!/usr/bin/bash
 set -Eeuo pipefail
 exec >/dev/ttyS0 2>&1
+# Trace to an independent guest-local file: stdout/ERR/EXIT traps have not
+# survived the observed first poll. The resource probe collects this file.
+exec 9>>/var/tmp/c2v-monitor-shell-trace.log
+export BASH_XTRACEFD=9
+PS4='+C2V_TRACE line=${LINENO} rc=$? '
+set -x
 # Preserve the exact first failing command and exit status; a successful
 # systemd-run start does not prove its later transient unit stayed healthy.
 trap 'rc=$?; msg="C2V_MONITOR_ERR // rc=$rc line=$LINENO command=$BASH_COMMAND"; echo "$msg"; printf "%s\n" "$msg" >> /var/tmp/c2v-monitor-exit.log' ERR

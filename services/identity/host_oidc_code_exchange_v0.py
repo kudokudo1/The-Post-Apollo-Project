@@ -13,6 +13,7 @@ logged, or used; an access token remains in the protected host memory only.
 from __future__ import annotations
 
 import base64
+import binascii
 from dataclasses import dataclass
 import hashlib
 import hmac
@@ -29,9 +30,9 @@ from cryptography.hazmat.primitives.asymmetric.rsa import RSAPublicKey
 
 from desktop_context_projection_v0 import _pairs_unique
 from desktop_session_host_v0 import VerifiedCodeExchange
-from pinned_https_identity_transport_v0 import _url
+from pinned_https_identity_transport_v0 import _url, HostPinnedHttpsTransport
 
-_CODE = re.compile(r"[A-Za-z0-9._~+/-]{1,2048}\Z", re.ASCII)
+_CODE = re.compile(r"[A-Za-z0-9._~+-]{1,2048}\Z", re.ASCII)
 _PKCE = re.compile(r"[A-Za-z0-9._~-]{43,128}\Z", re.ASCII)
 _CLIENT = re.compile(r"[A-Za-z0-9][A-Za-z0-9._:-]{0,127}\Z", re.ASCII)
 _MAX_BYTES = 65536
@@ -60,7 +61,7 @@ def _jwt_object(segment: str) -> dict:
     try:
         raw = base64.urlsafe_b64decode(segment + "=" * (-len(segment) % 4))
         return _strict_object(raw)
-    except (ValueError, UnicodeError) as exc:
+    except (ValueError, UnicodeError, binascii.Error) as exc:
         raise ValueError("Invalid signed identity") from exc
 
 
@@ -70,6 +71,7 @@ class HostOidcExchangeConfig:
 
     issuer: str
     token_endpoint: str
+    authorization_endpoint: str
     client_id: str
     timeout_seconds: float = 3.0
     ca_bundle: Path | None = None
@@ -77,9 +79,12 @@ class HostOidcExchangeConfig:
     def __post_init__(self) -> None:
         issuer_origin, _, _, issuer_path = _url(self.issuer)
         token_origin, _, _, token_path = _url(self.token_endpoint)
+        auth_origin, _, _, auth_path = _url(self.authorization_endpoint)
         if (self.issuer.endswith("/") or issuer_path == "/"
                 or token_origin != issuer_origin
+                or auth_origin != issuer_origin
                 or not token_path.startswith(issuer_path + "/")
+                or not auth_path.startswith(issuer_path + "/")
                 or _CLIENT.fullmatch(self.client_id) is None
                 or type(self.timeout_seconds) not in (int, float)
                 or not 0.5 <= self.timeout_seconds <= 10
@@ -131,6 +136,35 @@ class HostOidcCodeExchange:
         self._config = config
         self._keys = keys
         self._clock = clock
+
+    @classmethod
+    def from_pinned_transport(
+        cls, *, config: HostOidcExchangeConfig,
+        transport: HostPinnedHttpsTransport,
+        clock: Callable[[], int],
+    ) -> "HostOidcCodeExchange":
+        """Approve pinned issuer metadata/JWKS once inside host custody.
+
+        The discovery document may CONFIRM a host-pinned endpoint, never
+        select or redirect one. Rotation needs a fresh approved host session.
+        """
+        if (type(config) is not HostOidcExchangeConfig
+                or type(transport) is not HostPinnedHttpsTransport
+                or transport._config.issuer != config.issuer
+                or transport._config.ca_bundle != config.ca_bundle):
+            raise ValueError("Issuer HTTPS transport does not match host")
+        metadata = transport.fetch_json(transport._config.metadata_url)
+        if (metadata.get("issuer") != config.issuer
+                or metadata.get("jwks_uri") != transport._config.jwks_url
+                or metadata.get("token_endpoint") != config.token_endpoint
+                or metadata.get("authorization_endpoint") != config.authorization_endpoint
+                or type(metadata.get("response_types_supported")) is not list
+                or "code" not in metadata["response_types_supported"]
+                or type(metadata.get("code_challenge_methods_supported")) is not list
+                or "S256" not in metadata["code_challenge_methods_supported"]):
+            raise ValueError("Pinned issuer discovery does not match host policy")
+        keys = transport.fetch_json(transport._config.jwks_url)
+        return cls(config=config, trusted_jwks=keys, clock=clock)
 
     def _token_response(self, code: str, verifier: str,
                         redirect_uri: str) -> dict:

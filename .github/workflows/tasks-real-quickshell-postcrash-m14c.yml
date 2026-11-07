@@ -32,7 +32,7 @@ jobs:
     env:
       POST_APOLLO_M14C_DISPOSABLE_CI: '1'
     steps:
-      - name: Install Quickshell and offscreen Qt from Debian
+      - name: Install Quickshell and private Xvfb X11 backend from Debian
         run: |
           apt-get update -qq
           DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \

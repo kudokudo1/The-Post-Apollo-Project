@@ -48,14 +48,19 @@ assert "        top: panelTopMargin" in deck
 assert "    SurfaceFrame {\n        anchors.fill: parent" in deck
 assert "property int panelHeight: 850" in deck
 
-# Weather Station fills its own 1000x700 frame (no inner top gutter).
-# Shift the native weather window from 0px to the shared 9px visible line;
-# no changes to the frame size, side placement or terminal hole geometry.
-assert "implicitWidth: menuOpen ? 1000 : 0" in weather
-assert "implicitHeight: menuOpen ? 700 : 0" in weather
-assert "    margins {\n        top: 9\n        bottom: 0\n        right: 20\n        left: 0\n    }" in weather
-assert "width: weatherStation.menuOpen ? 1000 : 0" in weather
-assert "height: weatherStation.menuOpen ? 700 : 0" in weather
+# Weather Station still starts at its 1000x700 compact frame, with the same
+# visible 9px top inset. Manual arrows now own its optional larger sizes.
+weather_size = source("widgets/weather/StationChassisSizePolicy.js")
+assert 'var levels = ["compact", "medium", "large", "fullscreen"]' in weather_size
+assert ': mode === "medium" ? 1200 : 1000' in weather_size
+assert ': mode === "medium" ? 850 : 700' in weather_size
+assert "readonly property int chassisTopInset: 9" in weather
+assert "        top: chassisTopInset" in weather
+assert "        right: chassisRightMargin" in weather
+assert "implicitWidth: menuOpen ? frameWidth : 0" in weather
+assert "implicitHeight: menuOpen ? frameHeight : 0" in weather
+assert "width: weatherStation.menuOpen ? weatherStation.frameWidth : 0" in weather
+assert "height: weatherStation.menuOpen ? weatherStation.frameHeight : 0" in weather
 
 # Compact retains the 790px TASKS and TimeW visible heights on large outputs.
 # Expanded/Large grow without losing the common 9px visible top inset.

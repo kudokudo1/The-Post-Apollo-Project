@@ -25,18 +25,24 @@ Rectangle {
     readonly property var cycle: sourceSpace ? sourceSpace.cycleObservation : null
     readonly property int flareCount: SolarDetails.flareCount(flares)
     property int selectedFlareIndex: 0
-    property int flareDetailPage: 0
-    property int cycleDetailPage: 0
-    property int activityFocus: 0 // X-RAY | FLARES | CYCLE
-    property bool xraySourcePage: false
-
-    readonly property var selectedFlare: SolarDetails.flareAt(flares,selectedFlareIndex)
-    readonly property var flareFields: SolarDetails.flarePage(selectedFlare,flareDetailPage)
-    readonly property var cycleFields: SolarDetails.cyclePage(
-        cycle && cycle.ready ? cycle.summary : null,cycleDetailPage,
-        spaceService ? spaceService.solarFluxText : "")
-    readonly property var xrayFields: SolarDetails.xrayPage(
-        xray && xray.ready ? xray : null,xraySourcePage ? 1 : 0)
+    // One instrument board: keep all source facts visible at once, no
+    // X-RAY/FLARE/CYCLE submenu or time/detail/model page switches.
+    readonly property var selectedFlare: SolarDetails.flareAt(flares, selectedFlareIndex)
+    readonly property var flareFields:
+        SolarDetails.flarePage(selectedFlare, 0)
+        .concat(SolarDetails.flarePage(selectedFlare, 1))
+    readonly property var cycleFields:
+        SolarDetails.cyclePage(cycle && cycle.ready ? cycle.summary : null, 0,
+                              spaceService ? spaceService.solarFluxText : "")
+        .concat(SolarDetails.cyclePage(
+            cycle && cycle.ready ? cycle.summary : null, 1,
+            spaceService ? spaceService.solarFluxText : ""))
+        .concat(SolarDetails.cyclePage(
+            cycle && cycle.ready ? cycle.summary : null, 2,
+            spaceService ? spaceService.solarFluxText : ""))
+    readonly property var xrayFields:
+        SolarDetails.xrayPage(xray && xray.ready ? xray : null, 0)
+        .concat(SolarDetails.xrayPage(xray && xray.ready ? xray : null, 1))
 
     readonly property var positionRows: [
         {name:"ASTRONOMICAL DAWN",value:show(twilight ? twilight.astronomicalDawn : null)},
@@ -79,10 +85,12 @@ Rectangle {
         return raw !== null && raw !== undefined && raw !== ""
              && isFinite(Number(raw)) ? Number(raw).toFixed(digits) : "--";
     }
+    // A single explicit refresh button requests the same three existing
+    // NOAA owners. No hidden tab dictates which source is refreshed.
     function updateSource() {
-        if (activityFocus===0 && xray && !xray.loading) xray.refresh();
-        if (activityFocus===1 && flares && !flares.loading) flares.refresh();
-        if (activityFocus===2 && cycle && !cycle.loading) cycle.refresh(true);
+        if (xray && !xray.loading && xray.refresh) xray.refresh();
+        if (flares && !flares.loading && flares.refresh) flares.refresh();
+        if (cycle && !cycle.loading && cycle.refresh) cycle.refresh(true);
     }
 
     Loader {
@@ -384,21 +392,27 @@ Rectangle {
         }
     }
 
-    // ACTIVITY // summary stays in view. The instrument beneath is chosen
-    // within this same panel, not another bottom-route menu.
+    // ACTIVITY // X-RAY, FLARES and SOLAR CYCLE share one fixed viewport.
+    // The large history graph and two compact fact ledgers are simultaneous;
+    // only PREV/NEXT changes which observed flare occupies the event card.
     Component {
         id: activityBoard
         Item {
-            objectName: "cosmos-c12-activity-board"
+            id: allActivity
+            objectName: "cosmos-c13-activity-board"
             anchors.fill: parent
+            readonly property bool roomy: width >= 620 && height >= 330
+            readonly property int smallText: roomy ? 10 : 8
+            readonly property int valueText: roomy ? 12 : 9
+
             Row {
                 id: activityMetrics
                 objectName: "cosmos-c12-activity-metrics"
+                anchors.top: parent.top
                 anchors.left: parent.left
                 anchors.right: parent.right
-                anchors.top: parent.top
-                height: 61
-                spacing: 5
+                height: allActivity.roomy ? 66 : 52
+                spacing: 4
                 Repeater {
                     model: [
                         {label:"X-RAY // CLASS",value:sunTerminal.xray && sunTerminal.xray.ready
@@ -408,17 +422,17 @@ Rectangle {
                             ? sunTerminal.show(sunTerminal.flares.latest.classLabel) : "--",
                          note:sunTerminal.flares && sunTerminal.flares.ready
                             ? sunTerminal.flares.count24h+" / 24H" : "WAITING",
-                         color:Colors.magenta,weight:0.32},
+                         color:Colors.magenta,weight:0.30},
                         {label:"CYCLE // SSN",value:sunTerminal.cycle && sunTerminal.cycle.ready
                             ? sunTerminal.reading(sunTerminal.cycle.summary.predictedSsn,1) : "--",
-                         note:"PREDICTED",color:Colors.yellow,weight:0.19},
+                         note:"PREDICTED",color:Colors.yellow,weight:0.20},
                         {label:"F10.7 // SFU",value:sunTerminal.cycle && sunTerminal.cycle.ready
                             ? sunTerminal.reading(sunTerminal.cycle.summary.predictedFlux,1) : "--",
-                         note:"PREDICTED",color:Colors.orange,weight:0.19}
+                         note:"PREDICTED",color:Colors.orange,weight:0.20}
                     ]
                     delegate: Rectangle {
                         required property var modelData
-                        width: Math.max(1,(activityMetrics.width-15)*modelData.weight)
+                        width: Math.max(1,(activityMetrics.width-12)*modelData.weight)
                         height: activityMetrics.height
                         color: Colors.dark
                         border.width: 1
@@ -426,384 +440,160 @@ Rectangle {
                         Column {
                             anchors.fill: parent
                             anchors.margins: 4
-                            spacing: 3
+                            spacing: 2
                             QuietText {
                                 width: parent.width
                                 text: modelData.label
                                 color: modelData.color
-                                font.pixelSize: 8
+                                font.pixelSize: allActivity.smallText
                                 elide: Text.ElideRight
                             }
                             GohuText {
                                 width: parent.width
                                 text: modelData.value
                                 color: Colors.white
-                                font.pixelSize: 17
+                                font.pixelSize: allActivity.roomy ? 21 : 17
                                 elide: Text.ElideRight
                             }
                             QuietText {
                                 width: parent.width
                                 text: modelData.note
                                 color: Colors.cyan
-                                font.pixelSize: 8
+                                font.pixelSize: allActivity.smallText
                                 elide: Text.ElideRight
                             }
                         }
                     }
                 }
             }
+
             Row {
-                id: activityTabs
-                objectName: "cosmos-c12-activity-inner-modes"
+                id: activityInstruments
+                objectName: "cosmos-c13-simultaneous-instruments"
                 anchors.top: activityMetrics.bottom
                 anchors.topMargin: 5
                 anchors.left: parent.left
                 anchors.right: parent.right
-                height: 24
-                spacing: 4
-                Repeater {
-                    model: [
-                        {title:"X-RAY / HISTORY",idx:0},
-                        {title:"FLARE / LOG",idx:1},
-                        {title:"CYCLE / MODEL",idx:2}
-                    ]
-                    delegate: ActionButton {
-                        required property var modelData
-                        width: Math.max(1,(activityTabs.width-82)/3)
-                        height: activityTabs.height
-                        label: modelData.title
-                        labelPixelSize: 9
-                        contentPadding: 1
-                        selected: sunTerminal.activityFocus===modelData.idx
-                        accentColor: Colors.magenta
-                        onClicked: sunTerminal.activityFocus=modelData.idx
-                    }
-                }
-                ActionButton {
-                    width: 70
-                    height: activityTabs.height
-                    label: "REFRESH"
-                    labelPixelSize: 8
-                    contentPadding: 1
-                    accentColor: Colors.cyan
-                    onClicked: sunTerminal.updateSource()
-                }
-            }
-
-            Loader {
-                id: activityInstrument
-                objectName: "cosmos-c12-activity-instrument"
-                anchors.left: parent.left
-                anchors.right: parent.right
-                anchors.top: activityTabs.bottom
-                anchors.topMargin: 5
                 anchors.bottom: activityNote.top
-                anchors.bottomMargin: 3
-                sourceComponent: sunTerminal.activityFocus===0 ? xrayDetail
-                    : sunTerminal.activityFocus===1 ? flareDetail : cycleDetail
-            }
+                anchors.bottomMargin: 4
+                spacing: 5
 
-            QuietText {
-                id: activityNote
-                anchors.bottom: parent.bottom
-                anchors.left: parent.left
-                anchors.right: parent.right
-                height: 12
-                font.pixelSize: 8
-                color: Colors.orange
-                elide: Text.ElideRight
-                text: sunTerminal.activityFocus===2
-                    ? "NOAA SOLAR CYCLE // MONTHLY PREDICTION, NOT LIVE FLUX"
-                    : sunTerminal.activityFocus===1
-                    ? "GOES X-RAY FLARES // OBSERVED EVENT PEAKS, NOT ALERTS"
-                    : sunTerminal.xray && sunTerminal.xray.ready
-                    ? "GOES XRS SAMPLE "+sunTerminal.show(sunTerminal.xray.sampleUtc)
-                        +" // "+(sunTerminal.xray.sampleFresh ? "CURRENT" : "STALE")
-                    : "GOES XRS // WAITING OR UNAVAILABLE"
-            }
+                Rectangle {
+                    id: xrayBay
+                    objectName: "cosmos-c13-xray-bay"
+                    width: Math.max(1, Math.round((activityInstruments.width-5)*0.57))
+                    height: activityInstruments.height
+                    color: Colors.dark
+                    border.width: 1
+                    border.color: Colors.cyan
+                    clip: true
 
-            Component {
-                id: xrayDetail
-                Item {
-                    objectName: "cosmos-c12-xray-detail"
-                    anchors.fill: parent
-                    ActionButton {
-                        id: xraySwitch
-                        anchors.top: parent.top
-                        anchors.right: parent.right
-                        width: 77
-                        height: 20
-                        label: sunTerminal.xraySourcePage ? "TREND" : "SOURCE"
-                        labelPixelSize: 9
-                        contentPadding: 1
-                        selected: sunTerminal.xraySourcePage
-                        accentColor: Colors.cyan
-                        onClicked: sunTerminal.xraySourcePage = !sunTerminal.xraySourcePage
-                    }
                     Row {
-                        id: xrayData
-                        anchors.left: parent.left
-                        anchors.right: parent.right
-                        anchors.top: xraySwitch.bottom
-                        anchors.topMargin: 3
-                        anchors.bottom: parent.bottom
-                        spacing: 6
-                        Item {
-                            width: Math.max(1,(xrayData.width-6)*0.58)
-                            height: xrayData.height
-                            Row {
-                                objectName: "cosmos-c12-xray-trend"
-                                visible: !sunTerminal.xraySourcePage
-                                anchors.fill: parent
-                                spacing: 2
-                                Repeater {
-                                    model: sunTerminal.xray && sunTerminal.xray.ready
-                                        ? sunTerminal.xray.trend : []
-                                    delegate: Item {
-                                        required property var modelData
-                                        width: Math.max(1,(parent.width-22)/12)
-                                        height: parent.height
-                                        Rectangle {
-                                            anchors.left: parent.left
-                                            anchors.right: parent.right
-                                            anchors.bottom: parent.bottom
-                                            height: Math.max(3,(parent.height-4)*modelData.level)
-                                            color: modelData.classLetter==="X"
-                                                ? Colors.magenta : modelData.classLetter==="M"
-                                                ? Colors.orange : modelData.classLetter==="C"
-                                                ? Colors.yellow : Colors.cyan
-                                        }
-                                    }
-                                }
-                            }
-                            Column {
-                                visible: sunTerminal.xraySourcePage
-                                anchors.fill: parent
-                                spacing: 4
-                                QuietText {
-                                    text: "GOES // LONG + SHORT X-RAY BANDS"
-                                    color: Colors.magenta
-                                    font.pixelSize: 8
-                                }
-                                GohuText {
-                                    text: sunTerminal.xray && sunTerminal.xray.ready
-                                        ? sunTerminal.reading(sunTerminal.xray.fluxLong,9)+" W/M²"
-                                        : "-- W/M²"
-                                    font.pixelSize: 12
-                                    color: Colors.yellow
-                                }
-                                QuietText {
-                                    text: sunTerminal.xray && sunTerminal.xray.ready
-                                        ? sunTerminal.reading(sunTerminal.xray.fluxShort,9)+" W/M²"
-                                        : "-- W/M²"
-                                    font.pixelSize: 9
-                                }
-                            }
-                        }
-                        Grid {
-                            id: xrayFacts
-                            objectName: "cosmos-c12-xray-facts"
-                            width: Math.max(1,xrayData.width-6
-                                -Math.round((xrayData.width-6)*0.58))
-                            height: xrayData.height
-                            columns: 2
-                            spacing: 3
-                            Repeater {
-                                model: sunTerminal.xrayFields
-                                delegate: Rectangle {
-                                    required property var modelData
-                                    width: Math.max(1,(xrayFacts.width-3)/2)
-                                    height: Math.max(1,(xrayFacts.height-3)/2)
-                                    color: Colors.dark
-                                    border.width: 1
-                                    border.color: Colors.blue
-                                    Column {
-                                        anchors.fill: parent
-                                        anchors.margins: 3
-                                        spacing: 2
-                                        QuietText {
-                                            width: parent.width
-                                            text: modelData.label
-                                            color: Colors.cyan
-                                            font.pixelSize: 8
-                                            elide: Text.ElideRight
-                                        }
-                                        GohuText {
-                                            width: parent.width
-                                            text: modelData.value
-                                            color: Colors.white
-                                            font.pixelSize: 9
-                                            elide: Text.ElideRight
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-            Component {
-                id: flareDetail
-                Item {
-                    objectName: "cosmos-c12-flare-detail"
-                    anchors.fill: parent
-                    Row {
-                        id: flareBar
+                        id: xrayTitle
                         anchors.top: parent.top
                         anchors.left: parent.left
                         anchors.right: parent.right
-                        height: 21
-                        spacing: 4
-                        ActionButton {
-                            width: 48
-                            height: 21
-                            label: "PREV"
-                            labelPixelSize: 9
-                            available: sunTerminal.flareCount>1
-                            onClicked: sunTerminal.selectedFlareIndex =
-                                (sunTerminal.selectedFlareIndex-1
-                                +sunTerminal.flareCount)%sunTerminal.flareCount
-                        }
-                        ActionButton {
-                            width: 48
-                            height: 21
-                            label: "NEXT"
-                            labelPixelSize: 9
-                            available: sunTerminal.flareCount>1
-                            onClicked: sunTerminal.selectedFlareIndex =
-                                (sunTerminal.selectedFlareIndex+1)
-                                %sunTerminal.flareCount
-                        }
+                        anchors.margins: 3
+                        height: allActivity.roomy ? 25 : 19
+                        spacing: 3
                         QuietText {
-                            width: Math.max(1,flareBar.width-195)
-                            height: 21
-                            text: sunTerminal.flareCount
-                                ? "EVENT "+(sunTerminal.selectedFlareIndex+1)
-                                    +"/"+sunTerminal.flareCount
-                                : "NO EVENTS"
+                            width: Math.max(1,xrayTitle.width-65)
+                            height: parent.height
+                            text: "X-RAY // HISTORY + SOURCE"
                             color: Colors.cyan
-                            font.pixelSize: 9
+                            font.pixelSize: allActivity.smallText
                             verticalAlignment: Text.AlignVCenter
+                            elide: Text.ElideRight
                         }
                         ActionButton {
-                            width: 84
-                            height: 21
-                            label: sunTerminal.flareDetailPage===0 ? "TIMES" : "DETAIL"
-                            labelPixelSize: 9
-                            selected: true
-                            accentColor: Colors.magenta
-                            available: sunTerminal.flareCount>0
-                            onClicked: sunTerminal.flareDetailPage =
-                                sunTerminal.flareDetailPage===0 ? 1 : 0
+                            width: 60
+                            height: parent.height
+                            label: "REFRESH"
+                            labelPixelSize: 8
+                            contentPadding: 1
+                            accentColor: Colors.cyan
+                            onClicked: sunTerminal.updateSource()
                         }
                     }
-                    Row {
-                        id: flareFacts
-                        objectName: "cosmos-c12-flare-facts"
+
+                    Rectangle {
+                        id: xrayGraph
+                        objectName: "cosmos-c13-xray-graph"
+                        anchors.top: xrayTitle.bottom
+                        anchors.topMargin: 3
                         anchors.left: parent.left
                         anchors.right: parent.right
-                        anchors.top: flareBar.bottom
-                        anchors.topMargin: 4
+                        anchors.leftMargin: 3
+                        anchors.rightMargin: 3
+                        height: Math.max(40,Math.round((xrayBay.height-xrayTitle.height-8)*0.42))
+                        color: Colors.black
+                        border.width: 1
+                        border.color: Colors.blue
+                        clip: true
+                        Row {
+                            id: xrayTrend
+                            objectName: "cosmos-c12-xray-trend"
+                            anchors.fill: parent
+                            anchors.margins: 3
+                            spacing: 2
+                            Repeater {
+                                model: sunTerminal.xray && sunTerminal.xray.ready
+                                    ? sunTerminal.xray.trend : []
+                                delegate: Item {
+                                    required property var modelData
+                                    width: Math.max(1,(xrayTrend.width
+                                        -Math.max(0,xrayTrend.children.length-1)*2)/12)
+                                    height: xrayTrend.height
+                                    Rectangle {
+                                        anchors.left: parent.left
+                                        anchors.right: parent.right
+                                        anchors.bottom: parent.bottom
+                                        height: Math.max(2,(parent.height-2)*Math.max(0,
+                                            Math.min(1,Number(modelData.level)||0)))
+                                        color: modelData.classLetter==="X" ? Colors.magenta
+                                            : modelData.classLetter==="M" ? Colors.orange
+                                            : modelData.classLetter==="C" ? Colors.yellow : Colors.cyan
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    Grid {
+                        id: xrayFacts
+                        objectName: "cosmos-c12-xray-facts"
+                        anchors.top: xrayGraph.bottom
+                        anchors.topMargin: 3
+                        anchors.left: parent.left
+                        anchors.right: parent.right
                         anchors.bottom: parent.bottom
-                        spacing: 4
+                        anchors.margins: 3
+                        columns: 2
+                        spacing: 2
                         Repeater {
-                            model: sunTerminal.flareFields
+                            model: sunTerminal.xrayFields
                             delegate: Rectangle {
                                 required property var modelData
-                                width: Math.max(1,(flareFacts.width-12)/4)
-                                height: flareFacts.height
-                                color: Colors.dark
+                                width: Math.max(1,(xrayFacts.width-2)/2)
+                                height: Math.max(1,(xrayFacts.height-6)/4)
+                                color: Colors.black
                                 border.width: 1
-                                border.color: Colors.magenta
+                                border.color: Colors.blue
                                 Column {
                                     anchors.fill: parent
-                                    anchors.margins: 4
-                                    spacing: 5
+                                    anchors.margins: 2
+                                    spacing: 1
                                     QuietText {
                                         width: parent.width
                                         text: modelData.label
                                         color: Colors.cyan
-                                        font.pixelSize: 8
-                                        elide: Text.ElideRight
-                                    }
-                                    GohuText {
-                                        width: parent.width
-                                        text: modelData.value
-                                        color: Colors.yellow
-                                        font.pixelSize: 11
-                                        elide: Text.ElideRight
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-            Component {
-                id: cycleDetail
-                Item {
-                    objectName: "cosmos-c12-cycle-detail"
-                    anchors.fill: parent
-                    Row {
-                        id: cycleModes
-                        anchors.top: parent.top
-                        anchors.left: parent.left
-                        anchors.right: parent.right
-                        height: 21
-                        spacing: 4
-                        Repeater {
-                            model: [
-                                {label:"MODEL",idx:0},
-                                {label:"RANGES",idx:1},
-                                {label:"OUTLOOK",idx:2}
-                            ]
-                            delegate: ActionButton {
-                                required property var modelData
-                                width: Math.max(1,(cycleModes.width-8)/3)
-                                height: 21
-                                label: modelData.label
-                                labelPixelSize: 9
-                                contentPadding: 1
-                                selected: sunTerminal.cycleDetailPage===modelData.idx
-                                accentColor: Colors.orange
-                                onClicked: sunTerminal.cycleDetailPage=modelData.idx
-                            }
-                        }
-                    }
-                    Row {
-                        id: cycleFacts
-                        objectName: "cosmos-c12-cycle-facts"
-                        anchors.left: parent.left
-                        anchors.right: parent.right
-                        anchors.top: cycleModes.bottom
-                        anchors.topMargin: 4
-                        anchors.bottom: parent.bottom
-                        spacing: 4
-                        Repeater {
-                            model: sunTerminal.cycleFields
-                            delegate: Rectangle {
-                                required property var modelData
-                                width: Math.max(1,(cycleFacts.width-12)/4)
-                                height: cycleFacts.height
-                                color: Colors.dark
-                                border.width: 1
-                                border.color: Colors.yellow
-                                Column {
-                                    anchors.fill: parent
-                                    anchors.margins: 4
-                                    spacing: 5
-                                    QuietText {
-                                        width: parent.width
-                                        text: modelData.label
-                                        color: Colors.orange
-                                        font.pixelSize: 8
+                                        font.pixelSize: allActivity.smallText
                                         elide: Text.ElideRight
                                     }
                                     GohuText {
                                         width: parent.width
                                         text: modelData.value
                                         color: Colors.white
-                                        font.pixelSize: 11
+                                        font.pixelSize: allActivity.valueText
                                         elide: Text.ElideRight
                                     }
                                 }
@@ -811,6 +601,189 @@ Rectangle {
                         }
                     }
                 }
+
+                Column {
+                    id: activitySide
+                    width: Math.max(1,activityInstruments.width-xrayBay.width-5)
+                    height: activityInstruments.height
+                    spacing: 4
+
+                    Rectangle {
+                        id: flareBay
+                        objectName: "cosmos-c13-flare-bay"
+                        width: parent.width
+                        height: Math.max(1,Math.round((activitySide.height-4)*0.46))
+                        color: Colors.dark
+                        border.width: 1
+                        border.color: Colors.magenta
+                        clip: true
+                        Row {
+                            id: flareTitle
+                            anchors.top: parent.top
+                            anchors.left: parent.left
+                            anchors.right: parent.right
+                            anchors.margins: 3
+                            height: allActivity.roomy ? 25 : 19
+                            spacing: 3
+                            QuietText {
+                                width: Math.max(1,flareTitle.width-50)
+                                height: parent.height
+                                text: sunTerminal.flareCount
+                                    ? "FLARE "+(sunTerminal.selectedFlareIndex+1)
+                                        +"/"+sunTerminal.flareCount : "FLARES // NONE"
+                                color: Colors.magenta
+                                font.pixelSize: allActivity.smallText
+                                verticalAlignment: Text.AlignVCenter
+                                elide: Text.ElideRight
+                            }
+                            ActionButton {
+                                width: 21
+                                height: parent.height
+                                label: "‹"
+                                labelPixelSize: 14
+                                contentPadding: 1
+                                available: sunTerminal.flareCount>1
+                                accentColor: Colors.magenta
+                                onClicked: sunTerminal.selectedFlareIndex =
+                                    (sunTerminal.selectedFlareIndex-1+sunTerminal.flareCount)
+                                        %sunTerminal.flareCount
+                            }
+                            ActionButton {
+                                width: 21
+                                height: parent.height
+                                label: "›"
+                                labelPixelSize: 14
+                                contentPadding: 1
+                                available: sunTerminal.flareCount>1
+                                accentColor: Colors.magenta
+                                onClicked: sunTerminal.selectedFlareIndex =
+                                    (sunTerminal.selectedFlareIndex+1)%sunTerminal.flareCount
+                            }
+                        }
+                        Grid {
+                            id: flareFacts
+                            objectName: "cosmos-c12-flare-facts"
+                            anchors.top: flareTitle.bottom
+                            anchors.topMargin: 2
+                            anchors.left: parent.left
+                            anchors.right: parent.right
+                            anchors.bottom: parent.bottom
+                            anchors.margins: 3
+                            columns: 4
+                            spacing: 2
+                            Repeater {
+                                model: sunTerminal.flareFields
+                                delegate: Rectangle {
+                                    required property var modelData
+                                    width: Math.max(1,(flareFacts.width-6)/4)
+                                    height: Math.max(1,(flareFacts.height-2)/2)
+                                    color: Colors.black
+                                    border.width: 1
+                                    border.color: Colors.magenta
+                                    Column {
+                                        anchors.fill: parent
+                                        anchors.margins: 2
+                                        spacing: 1
+                                        QuietText {
+                                            width: parent.width
+                                            text: modelData.label
+                                            color: Colors.cyan
+                                            font.pixelSize: allActivity.roomy ? 9 : 7
+                                            elide: Text.ElideRight
+                                        }
+                                        GohuText {
+                                            width: parent.width
+                                            text: modelData.value
+                                            color: Colors.yellow
+                                            font.pixelSize: allActivity.valueText
+                                            elide: Text.ElideRight
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    Rectangle {
+                        id: cycleBay
+                        objectName: "cosmos-c13-cycle-bay"
+                        width: parent.width
+                        height: Math.max(1,activitySide.height-flareBay.height-4)
+                        color: Colors.dark
+                        border.width: 1
+                        border.color: Colors.yellow
+                        clip: true
+                        QuietText {
+                            id: cycleTitle
+                            anchors.top: parent.top
+                            anchors.left: parent.left
+                            anchors.right: parent.right
+                            anchors.margins: 3
+                            height: allActivity.roomy ? 25 : 19
+                            text: "CYCLE // MONTHLY MODEL"
+                            color: Colors.orange
+                            font.pixelSize: allActivity.smallText
+                            verticalAlignment: Text.AlignVCenter
+                            elide: Text.ElideRight
+                        }
+                        Grid {
+                            id: cycleFacts
+                            objectName: "cosmos-c12-cycle-facts"
+                            anchors.top: cycleTitle.bottom
+                            anchors.topMargin: 2
+                            anchors.left: parent.left
+                            anchors.right: parent.right
+                            anchors.bottom: parent.bottom
+                            anchors.margins: 3
+                            columns: 4
+                            spacing: 2
+                            Repeater {
+                                model: sunTerminal.cycleFields
+                                delegate: Rectangle {
+                                    required property var modelData
+                                    width: Math.max(1,(cycleFacts.width-6)/4)
+                                    height: Math.max(1,(cycleFacts.height-4)/3)
+                                    color: Colors.black
+                                    border.width: 1
+                                    border.color: Colors.yellow
+                                    Column {
+                                        anchors.fill: parent
+                                        anchors.margins: 2
+                                        spacing: 1
+                                        QuietText {
+                                            width: parent.width
+                                            text: modelData.label
+                                            color: Colors.orange
+                                            font.pixelSize: allActivity.roomy ? 9 : 7
+                                            elide: Text.ElideRight
+                                        }
+                                        GohuText {
+                                            width: parent.width
+                                            text: modelData.value
+                                            color: Colors.white
+                                            font.pixelSize: allActivity.valueText
+                                            elide: Text.ElideRight
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            QuietText {
+                id: activityNote
+                anchors.bottom: parent.bottom
+                anchors.left: parent.left
+                anchors.right: parent.right
+                height: 13
+                font.pixelSize: 8
+                color: Colors.orange
+                elide: Text.ElideRight
+                text: "GOES XRS "+(sunTerminal.xray && sunTerminal.xray.ready
+                    ? (sunTerminal.xray.sampleFresh ? "CURRENT" : "STALE")
+                    : "UNAVAILABLE")+" // OBSERVED EVENT PEAKS, NOT ALERTS"
+                    +" // NOAA SOLAR CYCLE // MONTHLY PREDICTION, NOT LIVE FLUX"
             }
         }
     }

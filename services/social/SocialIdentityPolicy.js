@@ -207,6 +207,24 @@ function create(doc, name, mode, copyFromId) {
     return {ok:true, reason:"", document:next};
 }
 
+// Rename one LOCAL Social layout display label. Never change stable IDs,
+// the selected layout, app relationships, or any provider session.
+function renameIdentity(doc, id, name) {
+    var check = validate(doc);
+    if (!check.ok) return check;
+    var current = doc.identities.find(function(item) { return item.id === id; });
+    if (!current) return {ok:false, reason:"INVALID_IDENTITY"};
+    var title = cleanName(name);
+    if (!title) return {ok:false, reason:"INVALID_NAME"};
+    if (title === current.name) return {ok:false, reason:"NO_CHANGE"};
+    if (doc.identities.some(function(item) {
+        return item.id !== id && item.name.toLowerCase() === title.toLowerCase();
+    })) return {ok:false, reason:"DUPLICATE_NAME"};
+    var next = clone(doc);
+    next.identities.find(function(item) { return item.id === id; }).name = title;
+    return {ok:true, reason:"", document:next};
+}
+
 function select(doc, id) {
     var check = validate(doc);
     if (!check.ok) return check;

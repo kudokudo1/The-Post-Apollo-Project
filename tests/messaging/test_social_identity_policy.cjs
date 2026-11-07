@@ -78,6 +78,30 @@ assert.equal(policy.view("error", blank, "INVALID_JSON").identities.length, 0);
 assert.equal(policy.view("unsupported", blank, "UNSUPPORTED_VERSION").error,
              "UNSUPPORTED_VERSION");
 
+// Rename is independent from the active layout and preserves stable keys,
+// family layouts, account bindings and source document.
+const renamed = policy.renameIdentity(blank, "identity-2", " Personal Two ");
+assert.equal(renamed.ok, true);
+assert.equal(renamed.document.identities[1].name, "Personal Two");
+assert.equal(renamed.document.identities[1].id, "identity-2");
+assert.equal(renamed.document.activeId, blank.activeId);
+assert.equal(renamed.document.nextIdentityId, blank.nextIdentityId);
+assert.equal(renamed.document.identities[1].layout.families[0].id, "family-1");
+assert.equal(blank.identities[1].name, "Personal");
+assert.equal(policy.validate(renamed.document).ok, true);
+assert.equal(policy.renameIdentity(blank, "identity-800", "Missing").reason,
+             "INVALID_IDENTITY");
+assert.equal(policy.renameIdentity(blank, "identity-2", "").reason,
+             "INVALID_NAME");
+assert.equal(policy.renameIdentity(blank, "identity-2", "default").reason,
+             "DUPLICATE_NAME");
+assert.equal(policy.renameIdentity(blank, "identity-2", "Personal").reason,
+             "NO_CHANGE");
+assert.equal(policy.renameIdentity(blank, "identity-2", "bad\nname").reason,
+             "INVALID_NAME");
+assert.equal(policy.renameIdentity(blank, "identity-2", "x".repeat(33)).reason,
+             "INVALID_NAME");
+
 const parsed = policy.parse(JSON.stringify(blank));
 assert.equal(parsed.ok, true);
 assert.equal(parsed.document.identities.length, 3);

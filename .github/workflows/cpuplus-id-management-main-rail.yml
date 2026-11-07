@@ -5,6 +5,14 @@ on:
     paths:
       - 'widgets/CpuPlusW.qml'
       - 'widgets/cpuplus/CpuPlusIdManagementPane.qml'
+      - 'widgets/cpuplus/CpuPlusIdDetailsEditor.qml'
+      - 'widgets/cpuplus/CpuPlusIdAccountEditor.qml'
+      - 'widgets/cpuplus/CpuPlusIdField.qml'
+      - 'services/social/SocialIdentityPolicy.js'
+      - 'services/social/SocialIdentityStore.qml'
+      - 'tests/messaging/test_social_identity_policy.cjs'
+      - 'tests/messaging/test_social_identity_store.py'
+      - 'tests/cpuplus/test_cpuplus_id_management_editor.py'
       - 'widgets/messanger/IdentityCenterSettingsSections.qml'
       - 'tests/cpuplus/test_cpuplus_id_management_main_mode.py'
       - 'tests/messaging/test_identity_center_settings_sections.py'
@@ -14,6 +22,14 @@ on:
     paths:
       - 'widgets/CpuPlusW.qml'
       - 'widgets/cpuplus/CpuPlusIdManagementPane.qml'
+      - 'widgets/cpuplus/CpuPlusIdDetailsEditor.qml'
+      - 'widgets/cpuplus/CpuPlusIdAccountEditor.qml'
+      - 'widgets/cpuplus/CpuPlusIdField.qml'
+      - 'services/social/SocialIdentityPolicy.js'
+      - 'services/social/SocialIdentityStore.qml'
+      - 'tests/messaging/test_social_identity_policy.cjs'
+      - 'tests/messaging/test_social_identity_store.py'
+      - 'tests/cpuplus/test_cpuplus_id_management_editor.py'
       - 'widgets/messanger/IdentityCenterSettingsSections.qml'
       - 'tests/cpuplus/test_cpuplus_id_management_main_mode.py'
       - 'tests/messaging/test_identity_center_settings_sections.py'
@@ -32,6 +48,10 @@ jobs:
       - name: Verify CPU++ ID mode and regressions
         run: |
           python3 -m unittest discover -s tests/cpuplus -p 'test_cpuplus_id_management_main_mode.py' -v
+          python3 -m unittest discover -s tests/cpuplus -p 'test_cpuplus_id_management_editor.py' -v
+          node tests/messaging/test_social_identity_policy.cjs
+          python3 -m unittest discover -s tests/messaging -p 'test_social_identity_store.py' -v
+          python3 -m unittest discover -s tests/messaging -p 'test_social_account_details.py' -v
           python3 tests/components/test_cpuplus_settings_mode_contracts.py
           python3 -m unittest discover -s tests/cpuplus -p 'test_cpuplus_time_three_bay_contract.py' -v
           python3 -m unittest discover -s tests/messaging -p 'test_identity_center_settings_sections.py' -v

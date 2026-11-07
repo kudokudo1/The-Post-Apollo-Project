@@ -1,6 +1,7 @@
 import QtQuick
 import "../../components"
 import "../../services/weather" as WeatherServices
+import "StationMagickTransitComparisonPolicy.js" as Transit
 
 // M30-F // A standalone, no-outer-scroll source-verified astrology instrument.
 // All chart modes use the existing single on-demand JPL/CelestialVisualService
@@ -15,6 +16,11 @@ Rectangle {
     // M7a // Input readiness only, not a computed full natal chart.
     property bool eventSetupOpen: false
     property bool natalMode: false
+    // M8c // TRANSITS is a second verified M8b chart at an explicitly entered
+    // UTC time, never a reinterpretation of the old selected-pair graph.
+    property bool transitMode: false
+    property string transitExpectedUtc: ""
+    onNatalModeChanged: if(!natalMode)transitMode=false
     // A complete independent chart service will supply this in a later
     // verified milestone. The existing M4 two-body source is NOT substituted.
     property var fullChartData: null
@@ -23,8 +29,24 @@ Rectangle {
         active: astrology.visible
         onReadyChanged: astrology.fullChartData=
             ready?natalSource.chartData:null
-        onChartDataChanged: astrology.fullChartData=
-            ready?natalSource.chartData:null
+        onChartDataChanged: {
+            astrology.fullChartData=ready?natalSource.chartData:null;
+            // Every new natal input invalidates the comparison.
+            astrology.transitExpectedUtc="";
+            transitSource.clearState();
+        }
+    }
+    WeatherServices.CelestialNatalChartService {
+        id: transitSource
+        active: astrology.visible && astrology.natalMode
+            && astrology.transitMode && natalSource.ready
+    }
+    function requestTransit(instant){
+        if(!natalSource.ready||!natalSource.chartData)return false;
+        const draft=Transit.makeDraft(natalSource.chartData,instant);
+        if(!draft)return false;
+        astrology.transitExpectedUtc=instant;
+        return transitSource.calculate(draft);
     }
 
     readonly property bool sourceIdle: !!celestialSource
@@ -74,12 +96,16 @@ Rectangle {
             height: parent.height
             verticalAlignment: Text.AlignVCenter
             font.pixelSize: 8
-            text: astrology.natalMode
+            text: astrology.transitMode
+                ? transitSource.statusText
+                : astrology.natalMode
                 ? natalSource.statusText
                 : astrology.celestialSource
                   ? astrology.celestialSource.statusText
                   : "JPL UNAVAILABLE"
-            color: astrology.natalMode
+            color: astrology.transitMode
+                ? transitSource.ready?Colors.cyan:Colors.orange
+                : astrology.natalMode
                 ? natalSource.ready?Colors.cyan:Colors.orange
                 : astrology.calculated?Colors.cyan:Colors.orange
             elide: Text.ElideRight
@@ -113,10 +139,17 @@ Rectangle {
         ActionButton {
             width: 88
             height: 25
-            label: "EVENT SETUP"
+            label: astrology.natalMode
+                ? astrology.transitMode?"NATAL":"TRANSITS"
+                : "EVENT SETUP"
             labelPixelSize: 9
-            accentColor: Colors.yellow
-            onClicked: astrology.eventSetupOpen=true
+            accentColor: astrology.transitMode?Colors.magenta:Colors.yellow
+            available: !astrology.natalMode || natalSource.ready
+            onClicked: {
+                if(astrology.natalMode)
+                    astrology.transitMode=!astrology.transitMode;
+                else astrology.eventSetupOpen=true;
+            }
         }
     }
 
@@ -291,8 +324,26 @@ Rectangle {
         anchors.topMargin: 3
         anchors.bottom: eventAndTimeControls.top
         anchors.bottomMargin: 2
-        visible: astrology.natalMode
+        visible: astrology.natalMode && !astrology.transitMode
         chartData: astrology.fullChartData
+    }
+
+    StationMagickTransitChartPane {
+        anchors.left: parent.left
+        anchors.right: parent.right
+        anchors.top: pairControls.bottom
+        anchors.topMargin: 3
+        anchors.bottom: eventAndTimeControls.top
+        anchors.bottomMargin: 2
+        visible: astrology.natalMode && astrology.transitMode
+        natalData: astrology.fullChartData
+        transitData: transitSource.ready?transitSource.chartData:null
+        expectedUtc: astrology.transitExpectedUtc
+        loading: transitSource.loading
+        statusText: transitSource.statusText
+        onCalculateRequested: function(instant){
+            astrology.requestTransit(instant);
+        }
     }
 
     Row {

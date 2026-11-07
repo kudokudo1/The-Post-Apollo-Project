@@ -145,7 +145,9 @@ test("M7a new routes, chart controls and privacy ownership are wired without new
  const uis=sources.map(read);
  assert.match(lunar,/StationMagickAnnualCalendarPane\s*\{/);
  assert.match(lunar,/weatherService: lunarSolarPane\.weatherService/);
- assert.match(astro,/label: "EVENT SETUP"/);
+ // EVENT SETUP remains available in PAIR; M8c reuses the control for NATAL/TRANSITS.
+ assert.match(astro,/: "EVENT SETUP"/);
+ assert.match(astro,/else astrology\.eventSetupOpen=true;/);
  assert.match(astro,/StationMagickEventChartSetupPane\s*\{/);
  assert.match(astro,/onCloseRequested: astrology\.eventSetupOpen=false/);
  assert.match(subject,/magick\/planetary\/timing/);

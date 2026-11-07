@@ -7,6 +7,7 @@ import "../services/hospital"
 import qs.services.notifications
 import "../services/notifications/HospitalCertificationNotificationPolicy.js" as CertificationNotificationPolicy
 import "../services/hospital/HospitalWorkforceRosterPolicy.js" as WorkforceRosterPolicy
+import "../services/hospital/HospitalWorkerAttentionPolicy.js" as WorkerAttentionPolicy
 import "../services/github"
 import QtQuick.Effects
 import Qt5Compat.GraphicalEffects
@@ -117,6 +118,8 @@ PanelWindow {
         responsibilityService.durableSessions,
         doctorService.doctors
     )
+    readonly property int workforceAttentionCount:
+        WorkerAttentionPolicy.countAttention(root.workforceRosterRows)
     // Exact durable Room and PX Session pinned when opening card actions.
     // A matching Git Team must never substitute for the registered Session.
     property string rosterFocusedRoomId: ""
@@ -229,6 +232,21 @@ PanelWindow {
 
     // Work registry selection is separate from the repository audit.
     // Switching views never dispatches, binds, or starts a worker.
+    // Read-only polling while the actual WORKERS list is visible.
+    // No dispatch, approval, or runtime heartbeat is implied.
+    Timer {
+        id: workforceRecordPoll
+        interval: 30000
+        repeat: true
+        running: root.menuOpen && root.workforceRosterVisible
+            && root.operationsSurface === ""
+            && root.rosterEditingRoomId.length === 0
+        onTriggered: {
+            if (!responsibilityService.graphLoading)
+                responsibilityService.refreshDurableGraph();
+        }
+    }
+
     function setWorkforceRosterVisible(nextValue) {
         const enabled = !!nextValue;
         if (!enabled && root.rosterEditingRoomId
@@ -3030,6 +3048,14 @@ PanelWindow {
             linkedIndex >= 0 && root.selectedRoomTeam === rosterData.team
         readonly property string sessionState:
             String(rosterData.sessionStatus || "NO SESSION")
+        readonly property var attention:
+            WorkerAttentionPolicy.describe(rosterData)
+        readonly property color attentionColor:
+            attention.severity >= 3 ? Colors.red
+            : attention.severity === 2 ? Colors.orange
+            : attention.severity === 1 ? Colors.yellow
+            : attention.label === "WORKING" ? Colors.green
+            : Colors.cyan
         readonly property color sessionColor:
             sessionState === "OPERATING" ? Colors.green
             : sessionState === "FAILED" ? Colors.red
@@ -3037,7 +3063,7 @@ PanelWindow {
             : rosterData.hasActiveSession ? Colors.cyan : Colors.magenta
 
         width: roomsColumn.width
-        height: 126
+        height: 153
         color: Colors.dark
         border.width: selected ? 2 : 1
         border.color: selected ? Colors.orange : Colors.magenta
@@ -3113,6 +3139,36 @@ PanelWindow {
                 color: Colors.blue
                 elide: Text.ElideRight
             }
+            Rectangle {
+                id: attentionStrip
+                width: parent.width
+                height: 20
+                color: Colors.black
+                border.width: 1
+                border.color: rosterRow.attentionColor
+
+                GohuText {
+                    anchors.fill: parent
+                    anchors.leftMargin: 6
+                    anchors.rightMargin: 6
+                    text: rosterRow.attention.label
+                        + " // " + rosterRow.attention.reason
+                    font.pixelSize: 9
+                    color: rosterRow.attentionColor
+                    verticalAlignment: Text.AlignVCenter
+                    elide: Text.ElideRight
+                }
+
+                MouseArea {
+                    anchors.fill: parent
+                    hoverEnabled: true
+                    cursorShape: Qt.PointingHandCursor
+                    onClicked: root.openRosterSession(
+                        rosterRow.rosterData, "quick"
+                    )
+                }
+            }
+
             GohuText {
                 width: parent.width - 92
                 text: rosterRow.linkedIndex >= 0
@@ -5938,7 +5994,8 @@ PanelWindow {
                     width: parent.width - 143
                     anchors.verticalCenter: parent.verticalCenter
                     text: root.workforceRosterVisible
-                        ? "REGISTERED WORKERS // " + root.workforceRosterRows.length
+                        ? "WORKERS // " + root.workforceRosterRows.length
+                            + "  ATTN // " + root.workforceAttentionCount
                         : "OPERATING ROOMS // GIT"
                     elide: Text.ElideRight
                 }
@@ -6019,6 +6076,20 @@ PanelWindow {
 
                 width: parent.width
                 spacing: 7
+
+                GohuText {
+                    width: parent.width
+                    visible: root.workforceRosterVisible
+                        && responsibilityService.graphError.length > 0
+                    text: "PX REGISTRY REFRESH ERROR // "
+                        + responsibilityService.graphError
+                        + " // DISPLAY MAY BE STALE"
+                    font.pixelSize: 9
+                    color: Colors.red
+                    wrapMode: Text.Wrap
+                    maximumLineCount: 2
+                    height: visible ? implicitHeight : 0
+                }
 
                 GohuText {
                     width: parent.width

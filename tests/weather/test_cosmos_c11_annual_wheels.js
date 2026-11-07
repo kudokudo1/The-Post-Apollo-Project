@@ -55,8 +55,8 @@ test("Both COSMOS wheels reuse the original MAGICK renderer and JPL actor",()=>{
  assert.match(host,/StationMagickAnnualCalendarPane\s*\{/);
  assert.match(host,/view: annualFocus\.annualView/);
  assert.match(host,/lockedView: annualFocus\.annualView/);
- assert.match(host,/readonly property string annualView: isMoon \? "moon" : "solar"/);
- assert.match(host,/objectName: annualFocus\.isMoon[\s\S]*?"cosmos-c11-moon-year-wheel" : "cosmos-c11-sun-year-wheel"/);
+ assert.match(host,/readonly property string annualView:[\s\S]*?moonView === "forecast" \? "forecast" : "moon"/);
+ assert.match(host,/objectName: annualFocus\.isMoon[\s\S]*?"cosmos-c11-moon-year-wheel"[\s\S]*?: "cosmos-c11-sun-year-wheel"/);
  assert.match(magick,/property string lockedView: ""/);
  assert.match(magick,/visible: annualPane\.lockedView === ""/);
  assert.match(magick,/height: visible \? 26 : 0/);
@@ -81,6 +81,8 @@ test("COSMOS wheel mode is fixed and leaves MAGICK free to choose all three mode
  assert.doesNotMatch(original,/lockedView:/);
  assert.match(magick,/model:\s*\[\s*\{id:"moon",label:"LUNAR YEAR"\},[\s\S]*?\{id:"solar",label:"SOLAR YEAR"\},[\s\S]*?\{id:"forecast",label:"FORECAST"\}/);
  assert.match(host,/visible: annualFocus\.isMoon/);
+ assert.match(host,/objectName: "cosmos-c17-moon-forecast-tab"/);
+ assert.match(host,/onClicked: annualFocus\.routeRequested\("cosmos\/moon\/forecast"\)/);
  assert.match(host,/anchors\.leftMargin: annualFocus\.contentInset/);
  assert.match(host,/anchors\.rightMargin: annualFocus\.contentInset/);
  assert.match(host,/anchors\.bottomMargin: annualFocus\.contentInset/);

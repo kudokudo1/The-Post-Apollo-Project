@@ -528,7 +528,7 @@ Item {
         GohuText {
             anchors.fill: parent
             anchors.margins: 7
-            text: "PX ONLY // Not a ChatGPT browser tab. CONNECTIONS reports saved links; Quick turns require exact Session and PX authority."
+            text: "PX ONLY // Not a ChatGPT browser tab. CHAT is read-only. CONNECTIONS are saved bindings; QUICK requires PX authority."
             font.pixelSize: 9
             color: Colors.cyan
             wrapMode: Text.Wrap

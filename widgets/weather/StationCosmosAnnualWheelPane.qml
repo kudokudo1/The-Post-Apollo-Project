@@ -58,6 +58,23 @@ Rectangle {
         }
     }
 
+    // C23 // All MOON views show the same cyan rule beneath the mode tabs.
+    // Reuse the original four-pixel YEAR gap: 2px spacing + 2px rule.
+    // SUN's original annual renderer still starts at y=0.
+    Rectangle {
+        id: moonHeaderDivider
+        objectName: "cosmos-c23-moon-year-divider"
+        visible: annualFocus.isMoon
+        anchors.top: lunarModeRail.bottom
+        anchors.topMargin: visible ? 2 : 0
+        anchors.left: parent.left
+        anchors.right: parent.right
+        anchors.leftMargin: annualFocus.contentInset
+        anchors.rightMargin: annualFocus.contentInset
+        height: visible ? 2 : 0
+        color: Colors.cyan
+    }
+
     // MAGICK remains the owning renderer for the wheel and its JPL service.
     // Locking the view only hides MAGICK's three-way subject switcher, which
     // would otherwise let a COSMOS Sun screen show Moon or a forecast.
@@ -71,11 +88,11 @@ Rectangle {
         anchors.left: parent.left
         anchors.right: parent.right
         anchors.bottom: parent.bottom
-        anchors.top: lunarModeRail.bottom
+        anchors.top: moonHeaderDivider.bottom
         anchors.leftMargin: annualFocus.contentInset
         anchors.rightMargin: annualFocus.contentInset
         anchors.bottomMargin: annualFocus.contentInset
-        anchors.topMargin: annualFocus.isMoon ? 4 : 0
+        anchors.topMargin: 0
 
         view: annualFocus.annualView
         lockedView: annualFocus.annualView

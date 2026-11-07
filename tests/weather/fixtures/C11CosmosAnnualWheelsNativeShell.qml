@@ -131,6 +131,9 @@ ShellRoot {
             const forecastCanvas=find(forecast,"magick-m7-annual-wheel-canvas");
             const yearRail=find(moon,"cosmos-c11-moon-year-mode-rail");
             const forecastRail=find(forecast,"cosmos-c11-moon-year-mode-rail");
+            const yearDivider=find(moon,"cosmos-c23-moon-year-divider");
+            const forecastDivider=find(forecast,"cosmos-c23-moon-year-divider");
+            const sunDivider=find(sun,"cosmos-c23-moon-year-divider");
             const phaseTab=find(moon,"cosmos-c11-back-to-moon");
             const yearTab=find(moon,"cosmos-c17-moon-wheel-tab");
             const forecastOverview=find(forecast,"cosmos-c11-back-to-moon");
@@ -151,6 +154,22 @@ ShellRoot {
                     || yearTab.height!==27 || forecastOverview.height!==27
                     || !yearTab.selected || forecastOverview.selected)
                     return root.fail("MOON_C18_FULL_WIDTH_MODE_RAIL_FAILED");
+                const yearRailAt=yearRail.mapToItem(moon,0,0);
+                const yearDividerAt=yearDivider
+                    ? yearDivider.mapToItem(moon,0,0) : null;
+                const forecastDividerAt=forecastDivider
+                    ? forecastDivider.mapToItem(forecast,0,0) : null;
+                const yearStageAt=ml.mapToItem(moon,0,0);
+                const forecastStageAt=fl.mapToItem(forecast,0,0);
+                if(!yearDivider || !forecastDivider || !sunDivider
+                    || !yearDivider.visible || !forecastDivider.visible
+                    || sunDivider.visible || sunDivider.height!==0
+                    || yearDivider.height!==2 || forecastDivider.height!==2
+                    || yearDividerAt.y!==yearRailAt.y+yearRail.height+2
+                    || yearStageAt.y!==yearDividerAt.y+2
+                    || forecastStageAt.y!==forecastDividerAt.y+2
+                    || yearDividerAt.x!==6 || forecastDividerAt.x!==6)
+                    return root.fail("C23_MOON_YEAR_HEADER_DIVIDER_BROKEN");
                 if(moonCanvas.width<400 || moonCanvas.height<220
                     || sunCanvas.width<400 || sunCanvas.height<250
                     || forecastOutlook.width<400 || forecastOutlook.height<215)

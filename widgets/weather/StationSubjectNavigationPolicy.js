@@ -46,7 +46,15 @@ var SUBJECTS = [
       {id:"live",label:"LIVE // SUVI + X-RAY + FLARES"},
       {id:"position",label:"POSITION + LIGHT // SKY + TWILIGHT"},
       {id:"activity",label:"ACTIVITY // X-RAY + FLARES + CYCLE"},
-      {id:"year",label:"YEAR // JPL SOLAR WHEEL"}]},
+      {id:"year",label:"YEAR // JPL SOLAR WHEEL"},
+      // Specialist source inspectors stay deep-linkable for old bookmarks and
+      // INDEX references, but no longer occupy the compact SUN mode rail.
+      {id:"twilight",label:"INSPECT // TWILIGHT"},
+      {id:"photo-light",label:"INSPECT // PHOTO LIGHT"},
+      {id:"suvi",label:"INSPECT // SUVI"},
+      {id:"xray",label:"INSPECT // X-RAY"},
+      {id:"flares",label:"INSPECT // FLARES"},
+      {id:"cycle",label:"INSPECT // CYCLE"}]},
     {id:"moon",label:"MOON",children:[
       {id:"ephemeris",label:"PHASE AND RISE/SET"},
       {id:"position",label:"CURRENT POSITION"},
@@ -196,7 +204,7 @@ var PANELS = {
   "space-kp-history":"cosmos/space-weather/history",
   "space-kp-forecast":"cosmos/space-weather/forecasts",
   "space-field-times":"tools/sources/provenance",
-  "space-suvi-imager":"cosmos/sun/activity",
+  "space-suvi-imager":"cosmos/sun/live",
   "space-aurora":"cosmos/space-weather/aurora",
   "space-xray-flux":"cosmos/sun/activity",
   "space-goes-flares":"cosmos/sun/activity",

@@ -121,8 +121,12 @@ function readRecord(root) {
     finally{if(fd!==undefined)fs.closeSync(fd);}
 }
 function capture(root){
+    const existing=getKey();
     if(storage.inspectFake({root}).status!=="SIMULATED_NO_CHECKPOINT"
-        ||getKey()!==null)return "M15B_PRIVATE_HOST_REFUSED";
+        ||existing!==null) {
+        if(existing)existing.fill(0);
+        return "M15B_PRIVATE_HOST_REFUSED";
+    }
     const key=crypto.randomBytes(32);
     try{
         if(secret(["store",

@@ -37,6 +37,24 @@ Item {
     property int previewDoctorPage: 0
     property int previewProviderPage: 0
     readonly property int previewPageSize: 10
+    property string attachmentArmKey: ""
+    property string attachmentSessionId: ""
+    property string attachmentOutcome: ""
+    readonly property string attachmentSelectionKey: JSON.stringify({
+        room: root.roomData, assignmentId: root.previewAssignmentId,
+        doctorId: root.previewDoctorId, providerId: root.previewProviderId,
+        plan: root.attachmentPreview,
+        roomsLoaded: root.roomsSnapshotLoaded,
+        sessionsLoaded: root.sessionsSnapshotLoaded,
+        doctorsLoaded: root.doctorDirectoryLoaded,
+        providersLoaded: root.providerDirectoryLoaded,
+        error: root.attachmentSourceError || assignmentPreview.lastError,
+        sessions: root.allSessions
+    })
+    readonly property bool attachmentArmed:
+        attachmentArmKey.length > 0
+        && attachmentArmKey === attachmentSelectionKey
+        && attachmentSessionId.length > 0
     readonly property var attachmentPreview: AttachPreviewPolicy.plan({
         room: root.roomData,
         rooms: root.allRooms,
@@ -108,9 +126,63 @@ Item {
         previewAssignmentPage = 0;
         previewDoctorPage = 0;
         previewProviderPage = 0;
+        attachmentArmKey = "";
+        attachmentSessionId = "";
+        attachmentOutcome = "";
         viewMode = "attachPreview";
         assignmentPreview.refresh();
         refreshRequested();
+        return true;
+    }
+
+    function armAttachment() {
+        if (!root.active || !root.roomMatches
+                || root.viewMode !== "attachPreview"
+                || !root.attachmentPreview.reviewable
+                || attachmentAction.running) {
+            attachmentOutcome = "ARM REFUSED // REVIEW CONNECTION BLOCKERS";
+            return false;
+        }
+        attachmentSessionId = root.attachmentPreview.sessionMode
+            === "REUSE_SESSION_REVIEW"
+            ? String(root.attachmentPreview.sessionId || "")
+            : "hospital-attach-" + Date.now().toString(36)
+              + "-" + Math.random().toString(36).slice(2, 12);
+        attachmentArmKey = root.attachmentSelectionKey;
+        attachmentOutcome = "ARMED // CONFIRM THE EXACT SESSION ID BELOW";
+        return root.attachmentArmed;
+    }
+
+    function confirmAttachment() {
+        if (!root.attachmentArmed || !root.active || !root.roomMatches
+                || root.viewMode !== "attachPreview"
+                || !root.attachmentPreview.reviewable
+                || attachmentAction.running) {
+            attachmentOutcome = "CONFIRM REFUSED // PREVIEW CHANGED OR BLOCKED";
+            attachmentArmKey = "";
+            return false;
+        }
+        const plan = root.attachmentPreview;
+        const room = root.roomData || {};
+        const candidate = {
+            roomId: root.pinnedRoomId,
+            sessionId: root.attachmentSessionId,
+            assignmentId: root.previewAssignmentId,
+            doctorId: root.previewDoctorId,
+            providerId: root.previewProviderId,
+            repository: String(room.repository || ""),
+            branch: String(room.branch || ""),
+            bedPath: String(room.bedPath || ""),
+            mode: plan.sessionMode === "REUSE_SESSION_REVIEW"
+                ? "reuse" : "create"
+        };
+        root.attachmentArmKey = "";
+        root.attachmentOutcome = "SUBMITTING // PX WILL REVALIDATE CURRENT RECORDS";
+        if (!attachmentAction.attach(candidate)) {
+            root.attachmentOutcome = attachmentAction.lastError
+                || "PX ATTACH REQUEST REFUSED";
+            return false;
+        }
         return true;
     }
 
@@ -144,13 +216,22 @@ Item {
             previewAssignmentId = "";
             previewDoctorId = "";
             previewProviderId = "";
+            attachmentArmKey = "";
+            attachmentSessionId = "";
+            attachmentOutcome = "";
             reload();
         } else {
+            attachmentArmKey = "";
             runtimeStatusVerified = false;
             actionError = "";
         }
     }
+    onPreviewAssignmentIdChanged: attachmentArmKey = ""
+    onPreviewDoctorIdChanged: attachmentArmKey = ""
+    onPreviewProviderIdChanged: attachmentArmKey = ""
+    onRoomDataChanged: attachmentArmKey = ""
     onPinnedRoomIdChanged: {
+        attachmentArmKey = "";
         runtimeStatusVerified = false;
         if (active)
             transcript.refresh();
@@ -159,6 +240,28 @@ Item {
         runtimeStatusVerified = false;
         if (active && sessionMatches)
             runtime.refresh();
+    }
+
+    HospitalWorkerAttachmentActionService {
+        id: attachmentAction
+        onAttached: function(result) {
+            // A registration is not a provider turn or browser connection.
+            if (root.active && String(result.roomId || "") === root.pinnedRoomId) {
+                root.attachmentOutcome = "PX SESSION REGISTERED // "
+                    + String(result.mode || "")
+                    + " // " + String(result.sessionId || "")
+                    + " // PROVIDER NOT LAUNCHED";
+            }
+            root.attachmentSessionId = "";
+            root.attachmentArmKey = "";
+            root.runtimeStatusVerified = false;
+            root.refreshRequested();
+        }
+        onRefused: function(reason) {
+            if (root.active)
+                root.attachmentOutcome = reason;
+            root.attachmentArmKey = "";
+        }
     }
 
     HospitalWorkerAttachmentPreviewService {
@@ -824,7 +927,7 @@ Item {
                 }
                 GohuText {
                     width: parent.width
-                    text: "No Bed edits or Session creation. The preview checks open Sessions across Rooms to avoid collisions."
+                    text: "No Bed edits here. PX admission can register an IDLE Session only after explicit confirmation and fresh backend checks."
                     color: Colors.blue
                     font.pixelSize: 9
                     wrapMode: Text.Wrap
@@ -868,13 +971,66 @@ Item {
                         wrapMode: Text.Wrap
                     }
                 }
+                GohuText {
+                    width: parent.width
+                    text: root.attachmentOutcome || attachmentAction.lastError
+                        || (attachmentAction.running
+                            ? "PX ATTACH IN PROGRESS // WAITING FOR VERIFICATION"
+                            : "NOT ATTACHED // SELECT REVIEW TO ARM")
+                    font.pixelSize: 9
+                    color: attachmentAction.lastError ? Colors.red : Colors.orange
+                    wrapMode: Text.Wrap
+                }
+                GohuText {
+                    width: parent.width
+                    visible: root.attachmentArmed
+                    text: "CONFIRM EXACT PX SESSION // " + root.attachmentSessionId
+                        + " // " + root.attachmentPreview.sessionMode
+                    font.pixelSize: 9
+                    color: Colors.cyan
+                    wrapMode: Text.Wrap
+                }
+                HospitalActionButton {
+                    width: parent.width
+                    height: 31
+                    label: attachmentAction.running
+                        ? "PX ATTACH IN PROGRESS"
+                        : "REVIEW ATTACHMENT"
+                    compactIcon: "LINK"
+                    accent: Colors.orange
+                    enabledAction: root.active && root.roomMatches
+                        && root.attachmentPreview.reviewable
+                        && !attachmentAction.running
+                    onTriggered: root.armAttachment()
+                }
+                HospitalActionButton {
+                    width: parent.width
+                    height: 33
+                    label: "CONFIRM ATTACH // REGISTER IDLE SESSION"
+                    compactIcon: "LINK"
+                    accent: Colors.green
+                    enabledAction: root.attachmentArmed
+                        && root.attachmentPreview.reviewable
+                        && !attachmentAction.running
+                    onTriggered: root.confirmAttachment()
+                }
+                GohuText {
+                    width: parent.width
+                    text: "CONFIRM writes PX Room/Session records only. No AI launch, no browser ChatGPT attachment, no role authorization granted."
+                    font.pixelSize: 9
+                    color: Colors.blue
+                    wrapMode: Text.Wrap
+                }
                 HospitalActionButton {
                     width: parent.width
                     height: 29
                     label: "BACK TO CONNECTIONS"
                     compactIcon: "LINK"
                     accent: Colors.cyan
-                    onTriggered: root.viewMode = "connections"
+                    onTriggered: {
+                        if (!attachmentAction.running)
+                            root.viewMode = "connections";
+                    }
                 }
             }
         }
@@ -956,7 +1112,7 @@ Item {
         GohuText {
             anchors.fill: parent
             anchors.margins: 7
-            text: "PX ONLY // Not a ChatGPT browser tab. CHAT is read-only. CONNECTIONS are saved bindings; QUICK requires PX authority."
+            text: "PX ONLY // Not a browser ChatGPT tab. Attachment registers a Session only; provider launch and role authority remain separate."
             font.pixelSize: 9
             color: Colors.cyan
             wrapMode: Text.Wrap

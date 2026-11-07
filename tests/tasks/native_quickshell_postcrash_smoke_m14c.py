@@ -11,6 +11,7 @@ import argparse
 import importlib.util
 import json
 import os
+import re
 from pathlib import Path
 import shutil
 import sqlite3
@@ -170,11 +171,17 @@ def run(scenario: str):
                         or "WARN" in line or "Failed" in line
                         or "file:" in line)
                 ]
-                # No raw process log, fixture path, usernames or JSON contents.
+                # Diagnostics only on a failed CI fixture, redact absolute
+                # paths and limit message sizes. Never print source JSON.
+                safe_tail = [
+                    re.sub(r"/[^\\s:]+", "[PATH]", line).strip()[-210:]
+                    for line in diagnostics[-6:]
+                ]
                 raise AssertionError(
                     "M14C_REAL_QUICKSHELL_FAILED "
                     + f"scenario={scenario} return={proc.returncode} "
-                    + f"marker={expected} diagnostic_count={len(diagnostics)}"
+                    + f"marker={expected} diagnostic_count={len(diagnostics)} "
+                    + f"diagnostic_tail={safe_tail}"
                 )
             if snapshot(db) != before_journal:
                 raise AssertionError("M14C_APPLICATION_JOURNAL_CHANGED")

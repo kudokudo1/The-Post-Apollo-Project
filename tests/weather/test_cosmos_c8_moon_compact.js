@@ -119,7 +119,7 @@ test("C20 instrument-first Moon overview has separate visual, forecast and event
    "cosmos-c9-moon-tall-position","cosmos-c9-moon-free-provenance",
    "cosmos-c20-moon-event-ledger","cosmos-c8-moon-source-note"])
    assert.ok(moon.includes(name),name);
- assert.match(moon,/moonMain\.height-2\*moonMain\.spacing\)\*0\.62/);
+ assert.match(moon,/moonMain\.height-positionColumn\.height/);
  assert.match(moon,/compactReadings\.height-2\*compactReadings\.spacing\)\*0\.65/);
  assert.match(strip,/property bool verticalMode: false/);
  assert.match(strip,/objectName: "cosmos-c20-moon-vertical-forecast"/);
@@ -132,4 +132,29 @@ test("C20 instrument-first Moon overview has separate visual, forecast and event
  assert.match(moon,/verticalMode: true/);
  assert.equal((moon.match(/objectName: "cosmos-c8-moon-fact"/g)||[]).length,3);
  assert.doesNotMatch(moon,/Flickable\s*\{|ScrollView\s*\{|Process\s*\{/);
+});
+
+test("C21 only COSMOS Moon overview magnifies the actual disk, not merely its container",()=>{
+ const visual=read("widgets/weather/StationCosmosVisualInstruments.qml");
+ assert.match(moon,/\(heroRow\.width-heroRow\.spacing\)\*0\.65/);
+ assert.match(moon,/prominentMoon: true/);
+ assert.match(moon,/moonMain\.height-positionColumn\.height/);
+ assert.match(moon,/height: Math\.max\(23,Math\.min\(30,/);
+ assert.match(visual,/property bool prominentMoon: false/);
+ assert.match(visual,/objectName: "cosmos-c21-moon-hero-disk"/);
+ assert.match(visual,/id: moonHeroRow/);
+ assert.match(visual,/width: visual\.prominentMoon[\s\S]*?Math\.min\(180,moonHeroRow\.height/);
+ assert.match(visual,/height: visual\.prominentMoon[\s\S]*?moonBay\.height/);
+ assert.match(visual,/visible: !visual\.prominentMoon/);
+ assert.match(visual,/onHeightChanged: moonCanvas\.requestPaint\(\)/);
+ assert.match(visual,/onProminentMoonChanged: moonCanvas\.requestPaint\(\)/);
+ assert.match(visual,/visual\.compactMode \? 73 : 120/);
+ // Shared MAGICK/SUN components opt out by default. Never scale every
+ // instrument just because the Moon landing page was redesigned.
+ assert.doesNotMatch(magick,/prominentMoon: true/);
+ const forecast=read("widgets/weather/StationCosmosMoonForecastStrip.qml");
+ assert.match(moon,/StationCosmosMoonForecastStrip\s*\{/);
+ assert.match(moon,/verticalMode: true/);
+ assert.match(forecast,/objectName: "cosmos-c20-moon-vertical-forecast"/);
+ assert.doesNotMatch(moon,/Flickable\s*\{|ScrollView\s*\{/);
 });

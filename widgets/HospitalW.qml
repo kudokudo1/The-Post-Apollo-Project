@@ -7230,6 +7230,22 @@ PanelWindow {
             pinnedSessionId: root.rosterFocusedSessionId
             initialMode: root.rosterFocusedMode
             roomData: root.rosterFocusedRoomData
+            // Reuse existing read-only Hospital directories and PX registry.
+            // This is a preview, not an additional staffing owner.
+            availableDoctors: doctorService.doctors
+            availableProviders: providerService.providers
+            allRooms: responsibilityService.durableRooms
+            allSessions: responsibilityService.durableSessions
+            roomsSnapshotLoaded: responsibilityService.roomsLoaded
+                && !responsibilityService.graphLoading
+            sessionsSnapshotLoaded: responsibilityService.sessionsLoaded
+                && !responsibilityService.graphLoading
+            doctorDirectoryLoaded: doctorService.loaded
+                && !doctorService.refreshing
+            providerDirectoryLoaded: providerService.loaded
+                && !providerService.refreshing
+            attachmentSourceError: responsibilityService.graphError
+                || doctorService.lastError || providerService.lastError
 
             anchors {
                 left: parent.left
@@ -7247,6 +7263,8 @@ PanelWindow {
                 responsibilityService.refreshDurableGraph();
                 if (!doctorService.refreshing)
                     doctorService.refresh();
+                if (!providerService.refreshing)
+                    providerService.refresh();
             }
         }
 

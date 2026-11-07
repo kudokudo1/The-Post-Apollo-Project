@@ -1,0 +1,93 @@
+name: TASKS M14c real Quickshell disposable postcrash review
+
+on:
+  pull_request:
+    paths:
+      - 'TaskPostCrashNativeSmokeM14c.qml'
+      - 'tests/tasks/native_quickshell_postcrash_smoke_m14c.py'
+      - 'tests/tasks/test_task_real_quickshell_postcrash_guard_m14c.py'
+      - 'docs/tasks-real-quickshell-postcrash-m14c.md'
+      - '.github/workflows/tasks-real-quickshell-postcrash-m14c.yml'
+      - 'TaskPostCrashReviewHarnessM14b.qml'
+      - 'tests/tasks/fixtures/TaskPostCrashReviewLabM14b.qml'
+      - 'tests/tasks/fixtures/TaskPostCrashSourceReviewM13y.py'
+  push:
+    branches: [main]
+    paths:
+      - 'TaskPostCrashNativeSmokeM14c.qml'
+      - 'tests/tasks/native_quickshell_postcrash_smoke_m14c.py'
+      - 'tests/tasks/test_task_real_quickshell_postcrash_guard_m14c.py'
+      - '.github/workflows/tasks-real-quickshell-postcrash-m14c.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  real-native-quickshell:
+    name: Real Debian Quickshell 0.3.2 reads only disposable M12h journal
+    runs-on: ubuntu-latest
+    timeout-minutes: 14
+    container:
+      image: debian:unstable-slim
+    env:
+      POST_APOLLO_M14C_DISPOSABLE_CI: '1'
+    steps:
+      - name: Install Quickshell and offscreen Qt from Debian
+        run: |
+          apt-get update -qq
+          DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+            git ca-certificates python3 quickshell=0.3.2-1 \
+            qt6-qpa-plugins qml6-module-qtquick \
+            qml6-module-qtquick-layouts qml6-module-qtqml
+      - uses: actions/checkout@v4
+      - name: Assert real native Quickshell and isolate nonproduction test root
+        run: |
+          command -v qs
+          python3 -m unittest discover -s tests/tasks \
+            -p 'test_task_real_quickshell_postcrash_guard_m14c.py' -v
+      - name: Real Qt Process + M13y source still at baseline after interruption
+        run: python3 tests/tasks/native_quickshell_postcrash_smoke_m14c.py --scenario baseline
+      - name: Real Qt Process + new source bytes and unsettled journal
+        run: python3 tests/tasks/native_quickshell_postcrash_smoke_m14c.py --scenario expected
+      - name: Real Qt Process + settled journal but lost UI acknowledgment
+        run: python3 tests/tasks/native_quickshell_postcrash_smoke_m14c.py --scenario settled
+      - name: Real Qt Process must refuse symlink and unsafe source
+        run: python3 tests/tasks/native_quickshell_postcrash_smoke_m14c.py --scenario unsafe
+      - name: Real Qt Process must refuse missing source
+        run: python3 tests/tasks/native_quickshell_postcrash_smoke_m14c.py --scenario missing
+      - name: Real Qt Process must refuse a live owner lock
+        run: python3 tests/tasks/native_quickshell_postcrash_smoke_m14c.py --scenario locked
+
+  security-regressions:
+    name: One writer, M14b/M14a, M13y/Z, C2 guards unchanged
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Standalone source and fixture-only protection
+        run: python3 -m unittest discover -s tests/tasks -p 'test_task_real_quickshell_postcrash_guard_m14c.py' -v
+      - name: Previous M14b source-to-display bridge and M14a hint policy
+        run: |
+          node --test tests/tasks/test_task_postcrash_native_review_bridge_m14b.cjs
+          node --test tests/tasks/test_task_live_native_save_observation_m14a.cjs
+      - name: M13y and M13z source state, draft preservation
+        run: |
+          python3 -B -m unittest discover -s tests/tasks \
+            -p 'test_task_postcrash_source_review_m13y.py' -v
+          node --test tests/tasks/test_task_operator_save_review_m13z.cjs
+      - name: Original production writer and Connections security boundaries
+        run: |
+          python3 tests/tasks/test_task_writer_gate_inventory_m11d.py
+          node tests/cpuplus/test_connections_broker_c2a.js
+      - name: No automatic mount and no new production writer
+        run: |
+          set -euo pipefail
+          ! grep -q 'TaskPostCrashNativeSmokeM14c' shell.qml
+          ! grep -q 'TaskPostCrashNativeSmokeM14c' services/hub/ApolloHubTodoStore.qml
+          ! grep -q 'TaskPostCrashNativeSmokeM14c' widgets/tasks/TaskRecoveryStatusPaneM13q.qml
+          test "$(grep -c 'todoFile.setText(' services/hub/ApolloHubTodoStore.qml)" = 1
+          ! grep -q 'FileView {' TaskPostCrashNativeSmokeM14c.qml
+          printf '%s\n' 'M14C_REAL_NATIVE_SYNTHETIC_ONLY_NO_WRITE_PASS'

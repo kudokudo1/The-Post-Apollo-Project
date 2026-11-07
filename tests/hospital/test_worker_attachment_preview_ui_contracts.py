@@ -70,9 +70,12 @@ check('root.attachmentPreview.facts' in view
 check('id: attachScroll' in view
       and 'flickable: attachScroll' in view,
       "Preview must scroll with existing Post-Apollo indicator")
-check('No attach command is exposed' in view
-      and 'NO ATTACHMENT MADE' in view,
-      "Preview may never claim it connected a worker")
+check('Selecting candidates is read-only' in view
+      and 'NOTHING SENT UNTIL CONFIRM ATTACH' in view,
+      "Selection/preview must not claim an attachment before explicit confirmation")
+check('label: "CONFIRM ATTACH // REGISTER IDLE SESSION"' in view
+      and 'onTriggered: root.confirmAttachment()' in view,
+      "Only a deliberate second click may submit Session registration")
 check('ConnectionPolicy.allowsCommand(root.roomData, command)' in view
       and 'SessionPolicy.canIssueQuick(' in view,
       "Existing Quick identity and authority gates retained")

@@ -265,6 +265,44 @@ class RememberedPersonalTests(unittest.TestCase):
                 self.assertEqual(self.action(*invalid)["state"], "REFUSED")
         self.assertFalse(self.path.exists())
 
+    def test_existing_shared_state_directory_0755_allows_saved_approval(self):
+        # Reproduce the operator's observed STORAGE_UNAVAILABLE with an
+        # existing, normally readable Post-Apollo state directory. The file
+        # and lock still stay owner-only; never chmod shared app state.
+        self.path.parent.mkdir(parents=True, mode=0o755)
+        os.chmod(self.path.parent, 0o755)
+        approved = self.action("--approve", "b")
+        self.assertEqual(approved["state"], "APPROVED")
+        self.assertEqual(stat.S_IMODE(self.path.parent.stat().st_mode), 0o755)
+        self.assertEqual(stat.S_IMODE(self.path.stat().st_mode), 0o600)
+        self.assertEqual(stat.S_IMODE(
+            Path(str(self.path) + ".lock").stat().st_mode), 0o600)
+        self.assertEqual(self.action("--status")["state"], "APPROVED")
+        self.assertEqual(self.action("--read", "messages.read")["state"],
+                         "SNAPSHOT")
+        self.assertEqual(self.action("--read", "contacts.read")["state"],
+                         "SNAPSHOT")
+        self.assertEqual(self.action("--revoke")["state"], "REVOKED")
+        self.assertEqual(stat.S_IMODE(self.path.parent.stat().st_mode), 0o755)
+
+    def test_group_or_other_writable_state_directory_still_denied(self):
+        self.path.parent.mkdir(parents=True, mode=0o700)
+        for unsafe in (0o775, 0o777):
+            os.chmod(self.path.parent, unsafe)
+            with self.subTest(directory_mode=oct(unsafe)):
+                result = self.action("--approve", "b")
+                self.assertEqual(result["state"], "STORAGE_UNAVAILABLE")
+                self.assertFalse(self.path.exists())
+                self.assertFalse(Path(str(self.path) + ".lock").exists())
+
+    def test_symlinked_state_directory_remains_denied(self):
+        target = Path(self.tmp.name) / "different-state"
+        target.mkdir(mode=0o700)
+        self.path.parent.symlink_to(target, target_is_directory=True)
+        result = self.action("--approve", "b")
+        self.assertEqual(result["state"], "STORAGE_UNAVAILABLE")
+        self.assertFalse((target / self.path.name).exists())
+
     def test_unsafe_files_and_symlink_fail_closed(self):
         self.assertEqual(self.action("--approve", "b")["state"], "APPROVED")
         os.chmod(self.path, 0o644)

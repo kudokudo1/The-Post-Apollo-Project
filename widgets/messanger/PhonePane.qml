@@ -22,6 +22,11 @@ Rectangle {
     property string personalConsentStatus: "IDLE"
     property bool personalApproved: false
     property bool personalPermissionOpen: false
+    // BlueFerry's encrypted history key is separate from Social consent.
+    // Never prompt the desktop wallet without an explicit user click.
+    property string phoneStorageState: "UNKNOWN"
+    property string phoneStoragePolicy: "unknown"
+    property int phoneStorageGeneration: 0
     // A local Social identity change must not auto-display Personal content.
     property bool personalNeedsExplicitReload: false
     // The QML tree must exist before lifecycle handlers reference children.
@@ -530,6 +535,8 @@ Rectangle {
     onSelectedSectionChanged: {
         if (!personalReadUiReady) return;
         if (selectedSection !== "DEVICE") closeStagedSetup();
+        if (visible && phoneStorageState === "UNKNOWN")
+            checkBlueFerryStorage();
         personalReadGeneration += 1;
         if (personalReadProcess.running)
             personalReadProcess.running = false;
@@ -620,15 +627,23 @@ Rectangle {
         if (!personalReadUiReady) return;
         if (!visible) {
             personalReadGeneration += 1;
+            phoneStorageGeneration += 1;
             if (personalReadProcess.running)
                 personalReadProcess.running = false;
             if (personalStatusProcess.running)
                 personalStatusProcess.running = false;
+            if (phoneStorageStatusProcess.running)
+                phoneStorageStatusProcess.running = false;
+            if (phoneStorageUnlockProcess.running)
+                phoneStorageUnlockProcess.running = false;
             phoneReadAdapter.forgetHostView();
             personalPermissionOpen = false;
             personalApproved = false;
         }
         if (visible) {
+            phoneStorageGeneration += 1;
+            phoneStorageState = "UNKNOWN";
+            phoneStoragePolicy = "unknown";
             personalReadStatus = "CHECKING_PERMISSION";
             personalReadOperation = "";
             personalConsentStatus = "IDLE";
@@ -667,8 +682,10 @@ Rectangle {
             // Only a previously remembered Personal consent may auto-read.
             // No pairing, new approval or device configuration on menu open.
             Qt.callLater(function() {
-                if (phonePane.visible)
+                if (phonePane.visible) {
+                    phonePane.checkBlueFerryStorage();
                     phonePane.checkPersonalApproval(!phonePane.personalNeedsExplicitReload, false);
+                }
             });
         }
     }
@@ -682,6 +699,12 @@ Rectangle {
     }
 
     function personalReadMessage() {
+        if (phoneStorageState === "LOCKED" || phoneStorageState === "UNLOCKING")
+            return phoneStorageMessage();
+        if (phoneStorageState === "UNLOCK_FAILED")
+            return phoneStorageMessage();
+        if (phoneStorageState === "NO_RETENTION")
+            return "BLUEFERRY DATA NOT RETAINED // History and contacts are not cached. Changing retention can erase existing cache.";
         switch (personalReadStatus) {
         case "READING": return "READING IPHONE // Checking the selected device and BlueFerry...";
         case "CHECKING_PERMISSION": return "CHECKING SAVED PERSONAL APPROVAL...";
@@ -757,6 +780,12 @@ Rectangle {
         if (!visible || personalPermissionOpen || personalReadProcess.running
                 || (selectedSection !== "MESSAGES" && selectedSection !== "CONTACTS"))
             return;
+        if (phoneStorageState === "LOCKED" || phoneStorageState === "UNLOCKING"
+                || phoneStorageState === "UNLOCK_FAILED"
+                || phoneStorageState === "NO_RETENTION") {
+            personalReadStatus = "LOCAL_STORAGE_LOCKED";
+            return;
+        }
         personalNeedsExplicitReload = false; // User explicitly requested Personal.
         if (!personalApproved) {
             // A click must never appear to do nothing. Restore an existing
@@ -798,6 +827,156 @@ Rectangle {
     function clearPersonalView() {
         phoneReadAdapter.forgetHostView();
         personalReadStatus = "VIEW_CLEARED";
+    }
+
+    function phoneStorageMessage() {
+        switch (phoneStorageState) {
+        case "READY":
+            return phoneStoragePolicy === "plaintext"
+                ? "BLUEFERRY LOCAL DATA // READY (NOT ENCRYPTED)."
+                : "BLUEFERRY ENCRYPTED LOCAL DATA // READY.";
+        case "LOCKED":
+            return "BLUEFERRY STORAGE LOCKED // Select UNLOCK DATA. Incoming notifications can still arrive.";
+        case "UNLOCKING":
+            return "UNLOCKING BLUEFERRY DATA // Use the desktop wallet prompt if shown...";
+        case "UNLOCK_FAILED":
+            return "BLUEFERRY UNLOCK FAILED // Retry UNLOCK DATA or check your desktop wallet.";
+        case "NO_RETENTION":
+            return "BLUEFERRY DOES NOT RETAIN LOCAL DATA // No saved history or contacts cache.";
+        case "UNAVAILABLE":
+            return "BLUEFERRY STORAGE STATE UNAVAILABLE // Check the running BlueFerry service.";
+        case "PROVIDER_UNAVAILABLE":
+            return "BLUEFERRY STORAGE SERVICE NOT AVAILABLE // Check the iPhone data service.";
+        default:
+            return "BLUEFERRY STORAGE // Checking local data availability...";
+        }
+    }
+
+    function checkBlueFerryStorage() {
+        if (!visible || !personalReadUiReady || phoneStorageStatusProcess.running
+                || phoneStorageUnlockProcess.running)
+            return;
+        phoneStorageStatusProcess.requestGeneration = phoneStorageGeneration;
+        phoneStorageStatusProcess.command = [
+            "python3", Quickshell.shellPath("services/phone/PhoneBlueFerryStorageUi.py"),
+            "--status"
+        ];
+        phoneStorageStatusProcess.running = true;
+    }
+
+    function unlockBlueFerryStorage() {
+        if (!visible || phoneStorageUnlockProcess.running
+                || (phoneStorageState !== "LOCKED"
+                    && phoneStorageState !== "UNLOCK_FAILED"))
+            return;
+        phoneStorageGeneration += 1;
+        if (phoneStorageStatusProcess.running)
+            phoneStorageStatusProcess.running = false;
+        phoneStorageState = "UNLOCKING";
+        phoneStorageUnlockProcess.requestGeneration = phoneStorageGeneration;
+        phoneStorageUnlockProcess.command = [
+            "python3", Quickshell.shellPath("services/phone/PhoneBlueFerryStorageUi.py"),
+            "--unlock"
+        ];
+        phoneStorageUnlockProcess.running = true;
+    }
+
+    Process {
+        id: phoneStorageStatusProcess
+        property int requestGeneration: 0
+        stdout: StdioCollector {
+            onStreamFinished: {
+                if (!phonePane.visible || phoneStorageUnlockProcess.running
+                        || phoneStorageStatusProcess.requestGeneration
+                           !== phonePane.phoneStorageGeneration)
+                    return;
+                try {
+                    var reply = JSON.parse(String(text || ""));
+                    if (reply.schema !== "post-apollo.phone.blueferry-storage-ui.v0"
+                            || reply.execution !== "EXPLICIT_BLUEFERRY_STORAGE_UNLOCK"
+                            || reply.contentsIncluded !== false
+                            || reply.credentialsIncluded !== false
+                            || ["READY", "LOCKED", "NO_RETENTION", "UNAVAILABLE",
+                                "PROVIDER_UNAVAILABLE"].indexOf(reply.state) < 0
+                            || ["encrypted", "plaintext", "none", "unknown"].indexOf(reply.storagePolicy) < 0)
+                        throw new Error("invalid storage state");
+                    var old = phonePane.phoneStorageState;
+                    phonePane.phoneStorageState = reply.state;
+                    phonePane.phoneStoragePolicy = reply.storagePolicy;
+                    if (reply.state !== "READY") {
+                        // A stale read must not repopulate the view after
+                        // locking the keyring or losing the provider.
+                        phonePane.personalReadGeneration += 1;
+                        if (personalReadProcess.running)
+                            personalReadProcess.running = false;
+                        phoneReadAdapter.forgetHostView();
+                    } else if (reply.state === "READY" && old === "LOCKED"
+                               && phonePane.personalApproved
+                               && !phonePane.personalNeedsExplicitReload)
+                        Qt.callLater(function() {
+                            if (phonePane.visible
+                                    && (phonePane.selectedSection === "MESSAGES"
+                                        || phonePane.selectedSection === "CONTACTS"))
+                                phonePane.loadPersonalSnapshot();
+                        });
+                } catch (error) {
+                    phonePane.phoneStorageState = "UNAVAILABLE";
+                }
+            }
+        }
+        onExited: function(code) {
+            if (phonePane.visible && code !== 0
+                    && requestGeneration === phonePane.phoneStorageGeneration)
+                phonePane.phoneStorageState = "UNAVAILABLE";
+        }
+    }
+
+    Process {
+        id: phoneStorageUnlockProcess
+        property int requestGeneration: 0
+        stdout: StdioCollector {
+            onStreamFinished: {
+                if (!phonePane.visible || phoneStorageUnlockProcess.requestGeneration
+                                            !== phonePane.phoneStorageGeneration)
+                    return;
+                try {
+                    var reply = JSON.parse(String(text || ""));
+                    if (reply.schema !== "post-apollo.phone.blueferry-storage-ui.v0"
+                            || reply.execution !== "EXPLICIT_BLUEFERRY_STORAGE_UNLOCK"
+                            || reply.contentsIncluded !== false
+                            || reply.credentialsIncluded !== false
+                            || ["READY", "UNLOCK_FAILED", "UNLOCK_UNAVAILABLE",
+                                "NO_RETENTION"].indexOf(reply.state) < 0)
+                        throw new Error("invalid unlock result");
+                    phonePane.phoneStorageState = reply.state === "READY"
+                                                 ? "READY" : "UNLOCK_FAILED";
+                    phonePane.phoneStoragePolicy = reply.storagePolicy;
+                    if (reply.state === "READY" && phonePane.personalApproved
+                            && !phonePane.personalNeedsExplicitReload)
+                        Qt.callLater(function() {
+                            if (phonePane.visible
+                                    && (phonePane.selectedSection === "MESSAGES"
+                                        || phonePane.selectedSection === "CONTACTS"))
+                                phonePane.loadPersonalSnapshot();
+                        });
+                } catch (error) {
+                    phonePane.phoneStorageState = "UNLOCK_FAILED";
+                }
+            }
+        }
+        onExited: function(code) {
+            if (phonePane.visible && code !== 0
+                    && requestGeneration === phonePane.phoneStorageGeneration)
+                phonePane.phoneStorageState = "UNLOCK_FAILED";
+        }
+    }
+
+    // Only metadata is polled. This never unlocks the wallet on its own.
+    Timer {
+        interval: 12500
+        repeat: true
+        running: phonePane.visible && !phoneStorageUnlockProcess.running
+        onTriggered: phonePane.checkBlueFerryStorage()
     }
 
     Process {
@@ -1737,14 +1916,27 @@ Rectangle {
                 width: Math.max(96, Math.min(150,
                            (personalReadBar.width - 30) / 3))
                 height: 31
-                label: phonePane.personalReadStatus === "READING"
-                       ? "LOADING..." : phonePane.personalApproved
-                         ? "REFRESH" : "LOAD PERSONAL"
+                label: phonePane.phoneStorageState === "UNLOCKING"
+                       ? "UNLOCKING..."
+                       : (phonePane.phoneStorageState === "LOCKED"
+                          || phonePane.phoneStorageState === "UNLOCK_FAILED")
+                         ? "UNLOCK DATA"
+                         : phonePane.personalReadStatus === "READING"
+                           ? "LOADING..." : phonePane.personalApproved
+                             ? "REFRESH" : "LOAD PERSONAL"
                 labelPixelSize: 9
-                accentColor: Colors.cyan
+                accentColor: phonePane.phoneStorageState === "LOCKED"
+                             ? Colors.magenta : Colors.cyan
                 interactive: !personalReadProcess.running
                              && !personalConsentProcess.running
-                onTriggered: phonePane.loadPersonalSnapshot()
+                             && !phoneStorageUnlockProcess.running
+                onTriggered: {
+                    if (phonePane.phoneStorageState === "LOCKED"
+                            || phonePane.phoneStorageState === "UNLOCK_FAILED")
+                        phonePane.unlockBlueFerryStorage();
+                    else
+                        phonePane.loadPersonalSnapshot();
+                }
             }
             ActionButton {
                 width: Math.max(96, Math.min(150,
@@ -2350,6 +2542,48 @@ Rectangle {
                     font.pixelSize: 11
                     wrapMode: Text.WordWrap
                     lineHeight: 1.3
+                }
+
+                // Show the actual BlueFerry history keyring state here,
+                // not just Bluetooth MAP/PBAP session health.
+                Column {
+                    id: phoneStorageSettings
+                    width: setupColumn.width
+                    spacing: 8
+                    visible: phonePane.setupState === "CHECKED"
+                             && !phonePane.stageWanted
+
+                    Text {
+                        width: parent.width
+                        text: "BLUEFERRY LOCAL DATA // " + phonePane.phoneStorageState
+                        textFormat: Text.PlainText
+                        color: phonePane.phoneStorageState === "READY"
+                               ? Colors.green : Colors.orange
+                        font.pixelSize: 12
+                        font.bold: true
+                        wrapMode: Text.WordWrap
+                    }
+                    Text {
+                        width: parent.width
+                        text: phonePane.phoneStorageMessage()
+                              + "\nThis is BlueFerry's encrypted history and contacts cache, separate from phone Bluetooth pairing and Social permission."
+                        textFormat: Text.PlainText
+                        color: Colors.white
+                        font.pixelSize: 11
+                        wrapMode: Text.WordWrap
+                    }
+                    ActionButton {
+                        width: Math.min(208, phoneStorageSettings.width)
+                        height: 34
+                        visible: phonePane.phoneStorageState === "LOCKED"
+                                 || phonePane.phoneStorageState === "UNLOCK_FAILED"
+                        label: phonePane.phoneStorageState === "UNLOCK_FAILED"
+                               ? "RETRY UNLOCK LOCAL DATA" : "UNLOCK LOCAL DATA"
+                        labelPixelSize: 9
+                        accentColor: Colors.magenta
+                        interactive: !phoneStorageUnlockProcess.running
+                        onTriggered: phonePane.unlockBlueFerryStorage()
+                    }
                 }
 
                 Column {

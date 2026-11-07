@@ -2,8 +2,8 @@ import QtQuick
 import Quickshell
 import Quickshell.Io
 
-// Operator-facing Doctor labels only. Never edits Doctor ID, Patient, Team,
-// Git branch, Doctor, Provider, Assignment, or live provider session.
+// Operator-facing Doctor labels only. Never edits Doctor ID, role,
+// staffing status, permissions, Room identity, or any provider session.
 Scope {
     id: root
 

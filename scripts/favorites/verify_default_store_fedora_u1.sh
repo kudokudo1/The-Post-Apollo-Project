@@ -40,13 +40,14 @@ kill -0 "$xpid" || { cat "$work/xvfb.log"; exit 1; }
 wait_for() {
   local marker="$1"
   for ((i=0;i<165;i++)); do
-    grep -F "$marker" "$log" >/dev/null 2>&1 && return 0
+    # Errors take precedence, even if a success marker already appeared.
     if grep -F "U1_FAIL" "$log" >/dev/null 2>&1 ||
        ! kill -0 "$pid" 2>/dev/null; then
       cat "$log"
       echo "U1_FAIL // exited before marker: $marker"
       return 1
     fi
+    grep -F "$marker" "$log" >/dev/null 2>&1 && return 0
     sleep 0.1
   done
   cat "$log"
@@ -86,6 +87,9 @@ run_phase() {
   set -e
   pid=""
   cat "$log"
+  if grep -F "U1_FAIL" "$log" >/dev/null 2>&1; then
+    echo "U1_FAIL // phase=$phase contained failure marker"; return 1;
+  fi
   [ "$rc" -eq 0 ] || { echo "U1_FAIL // phase=$phase rc=$rc"; return 1; }
 }
 

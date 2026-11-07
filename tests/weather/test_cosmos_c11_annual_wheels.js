@@ -18,12 +18,12 @@ const moon=read("widgets/weather/StationCosmosMoonCompactPane.qml");
 const magick=read("widgets/weather/StationMagickAnnualCalendarPane.qml");
 const service=read("services/weather/CelestialAnnualCalendarService.qml");
 
-test("Sun has a YEAR submode beside all six existing instruments",()=>{
+test("Sun retains its YEAR instrument alongside three composite terminal modes",()=>{
  assert.equal(modes.family("cosmos/sun/year"),"sun");
  assert.equal(modes.kind("cosmos/sun/year"),"annual-solar");
  assert.equal(modes.usesSky("cosmos/sun/year"),false);
- assert.equal(modes.modesFor("cosmos/sun/year").length,7);
- for(const name of ["PATH","LIGHT","SUVI","X-RAY","FLARES","CYCLE","YEAR"])
+ assert.equal(modes.modesFor("cosmos/sun/year").length,4);
+ for(const name of ["LIVE","POSITION + LIGHT","ACTIVITY","YEAR"])
    assert.ok(modes.modesFor("cosmos/sun/year").some(x=>x.label===name),name);
  assert.equal(routes.kindForRoute("cosmos/sun/year"),"sky");
  assert.equal(routes.needsSource("cosmos/sun/year","moon"),false);

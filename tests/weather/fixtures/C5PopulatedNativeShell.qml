@@ -185,7 +185,7 @@ ShellRoot {
                 root.route = "cosmos/sun/position";
             } else if (root.phase === 6) {
                 const sun = findNamed(focused.instrumentItem,
-                    "cosmos-c5-sun-path");
+                    "cosmos-c12-sun-path-hero");
                 if (!sun || !sun.solarData || !sun.solarData.ready
                         || sun.solarData.rows.length < 60)
                     return root.fail("SOURCE_BACKED_SOLAR_ARC_NOT_RENDERED");

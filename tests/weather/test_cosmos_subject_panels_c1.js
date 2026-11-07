@@ -35,11 +35,11 @@ vm.runInContext(weatherPolicy.replace(/^\.pragma library\s*$/m, ""), weather);
 vm.runInContext(workspaceSource.replace(/^\.pragma library\s*$/m, ""), workspace);
 const plain = obj => JSON.parse(JSON.stringify(obj));
 
-test("COSMOS retains 28 scoped routes plus two complete original SKY/SPACE views", () => {
+test("COSMOS retains 29 scoped routes plus two complete original SKY/SPACE views", () => {
   assert.equal(cosmos.FORMAT, "post-apollo.weather.cosmos-panels.c1.v1");
   const keys = Object.keys(cosmos.ROUTES);
-  assert.equal(keys.length, 30);
-  assert.equal(new Set(keys).size, 30);
+  assert.equal(keys.length, 31);
+  assert.equal(new Set(keys).size, 31);
   assert.deepEqual(keys.filter(k=>cosmos.ROUTES[k].full===true).sort(),
     ["cosmos/sky/full","cosmos/space-weather/full"]);
   for (const route of keys) {
@@ -268,7 +268,8 @@ test("C4 physical SUN activity and SPACE instruments have real native destinatio
     assert.equal(cosmos.kindForRoute(route),"space");
   }
   for (const [route,sections] of Object.entries({
-    "cosmos/sun/activity":["suvi","xray","flares"],
+    "cosmos/sun/live":["suvi","xray","flares"],
+    "cosmos/sun/activity":["xray","flares","cycle"],
     "cosmos/sun/cycle":["cycle"],
     "cosmos/space-weather/geomagnetic":["scales","kp-history"],
     "cosmos/space-weather/history":["relation","kp-history"]
@@ -428,7 +429,7 @@ test("COSMOS SUN, MOON and EVENTS bottom landings own their subject data", () =>
 
 test("C5 subject modes are distinct real routes and direct fixed-rail actions", () => {
   const families = {
-    sun:["PATH","LIGHT","SUVI","X-RAY","FLARES","CYCLE","YEAR"],
+    sun:["LIVE","POSITION + LIGHT","ACTIVITY","YEAR"],
     astronomy:["CLOCK","PLANETS","STARS"],
     events:["METEORS","ECLIPSES","ISS"]
   };
@@ -443,7 +444,7 @@ test("C5 subject modes are distinct real routes and direct fixed-rail actions", 
     }
   }
   assert.equal(focused.family("cosmos/moon/ephemeris"),"");
-  assert.equal(focused.canonical("cosmos/sun/activity"),"cosmos/sun/suvi");
+  assert.equal(focused.canonical("cosmos/sun/activity"),"cosmos/sun/activity");
   assert.equal(focused.canonical("cosmos/sun/photo-light"),"cosmos/sun/twilight");
   assert.equal(focused.canonical("cosmos/events/overview"),"cosmos/events/meteors");
   assert.equal(focused.kind("cosmos/planets-stars/planet-clock"),"planet-clock");

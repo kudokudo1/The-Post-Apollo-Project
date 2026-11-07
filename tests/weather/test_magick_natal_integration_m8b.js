@@ -84,7 +84,10 @@ test("M8b launches source only on deliberate event form submit, not on navigatio
  assert.match(setup,/label:"CALCULATE NATAL"/);
  assert.match(setup,/available:eventSetup\.draft\.valid&&eventSetup\.zodiac==="tropical"/);
  assert.match(setup,/SIDEREAL DISABLED \/\/ NO VERIFIED AYANAMSA/);
- assert.match(setup,/onVisibleChanged: if\(!visible\)clearInput\(\)/);
+ assert.match(setup,/onVisibleChanged: \{/);
+ assert.match(setup,/else clearInput\(\)/);
+ assert.match(setup,/StationMagickUtcDateField\s*\{/);
+ assert.match(setup,/Setup\.validate\(/);
  assert.match(astro,/WeatherServices\.CelestialNatalChartService\s*\{/);
  assert.match(astro,/onCalculateRequested: function\(draft\)/);
  assert.match(astro,/natalSource\.calculate\(draft\)/);

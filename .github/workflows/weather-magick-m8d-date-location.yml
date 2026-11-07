@@ -1,0 +1,33 @@
+name: MAGICK M8d TASKS dates and HOME location fallback
+
+on:
+  pull_request:
+    paths:
+      - 'widgets/weather/StationMagickUtcDateField.qml'
+      - 'widgets/weather/StationMagickDateLocationPolicy.js'
+      - 'widgets/weather/StationMagickEventChartSetupPane.qml'
+      - 'widgets/weather/StationMagickTransitChartPane.qml'
+      - 'tests/weather/test_magick_date_location_m8d.js'
+      - 'tests/weather/test_magick_natal_integration_m8b.js'
+      - '.github/workflows/weather-magick-m8d-date-location.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  date-location:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Verify UTC TODAY/NOW, TASKS segmented dates, and HOME-only fallback
+        run: node --test tests/weather/test_magick_date_location_m8d.js
+      - name: Preserve natal and transit contracts and prior MAGICK routes
+        run: |
+          node --test tests/weather/test_magick_natal_integration_m8b.js
+          node --test tests/weather/test_magick_transit_comparison_m8c.js
+          node --test tests/weather/test_magick_five_track_foundations_m7a.js

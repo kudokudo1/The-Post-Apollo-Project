@@ -191,6 +191,27 @@ Item {
                     font.pixelSize: 11
                     wrapMode: Text.WordWrap
                 }
+                GohuText {
+                    width: parent.width
+                    text: "LOCAL ORGANIZATIONS // "
+                          + (SocialOrganizationDirectoryStore.state === "ready"
+                             ? SocialOrganizationDirectoryStore.saved.organizations.length
+                             : "NOT LOADED")
+                    color: Colors.cyan
+                    font.pixelSize: 11
+                    wrapMode: Text.WordWrap
+                }
+                QuietText {
+                    width: parent.width
+                    text: "ID ASSOCIATIONS // "
+                          + (SocialOrganizationLinksStore.state === "ready"
+                             ? SocialOrganizationLinksStore.saved.links.filter(function(link) {
+                                   return link.identityId === pane.effectiveId;
+                               }).length : "NOT LOADED")
+                    color: Colors.white
+                    font.pixelSize: 10
+                    wrapMode: Text.WordWrap
+                }
                 QuietText {
                     width: parent.width
                     text: pane.snapshot && pane.snapshot.error

@@ -136,6 +136,19 @@ journalctl -u "$unit" --no-pager | grep -Fq 'C2R_PASS // SELINUX_REFUSED_WORLD_R
 echo "C2R_PASS // DEDICATED_CONFINED_SERVICE_DOMAIN_AND_NEGATIVE_ACCESS_DENIAL"
 [[ "$context" == *:*:*:* ]] || bad "service context not recorded"
 
+# C3b runs only when explicitly staged by C2r's dedicated boot driver.
+# C2s reuses this earlier C2r guest script without staging the new C3b probe.
+# C2r's host driver independently requires C3B_PASS in its serial evidence,
+# so missing staging can never silently pass the C3b gate.
+if [[ -f /root/c2q/C3bOriginCheck.py ]]; then
+  echo "C3B_VERIFY_BEGIN // REAL_ENFORCING_FEDORA_GUEST"
+  GITHUB_ACTIONS=true POST_APOLLO_C3B_TEST_GUEST=1 \
+    "$python" -I -B /root/c2q/C3bOriginCheck.py --verify-disposable \
+    || bad "C3b D-Bus / systemd / proc / SELinux origin mismatch"
+else
+  echo "C3B_NOT_STAGED // C2S_LEGACY_GUEST_REGRESSION_NO_ORIGIN_CLAIM"
+fi
+
 check c2q-reader status OBSERVED_UNVERIFIED
 check c2q-reader approve METHOD_REFUSED
 check c2q-reader claim OWN_REFUSED

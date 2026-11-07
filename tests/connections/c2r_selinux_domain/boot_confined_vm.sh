@@ -49,6 +49,7 @@ printf '%s\n' '#cloud-config' 'disable_root: true' 'ssh_pwauth: false' 'write_fi
   > "$tmp/user-data"
 add_file "$root/tests/connections/c2r_selinux_domain/guest_confined_smoke.sh" "guest_status_smoke.sh"
 add_file "$root/tests/connections/c2r_selinux_domain/C2rStatusHost.py" "FakeStatusHost.py"
+add_file "$root/tests/connections/c3b_origin/C3bOriginCheck.py" "C3bOriginCheck.py"
 add_file "$root/tests/connections/c2o_fedora/BusPolicyClient.py" "BusPolicyClient.py"
 add_file "$root/services/connections/experiments/c2n_package/postapollo-connections-status.service.template" "status.service"
 add_file "$root/services/connections/experiments/c2n_package/org.postapollo.ConnectionsStatus1.conf.template" "status.conf"
@@ -79,8 +80,13 @@ for i in $(seq 1 210); do
   if ! kill -0 "$vm_pid" 2>/dev/null; then result=VM_EXITED; break; fi
   sleep 2
 done
-grep -a -E 'C2R_|cloud-init.*(Error|FAIL)' "$tmp/serial.log" 2>/dev/null \
-  | tail -n 65 || true
+grep -a -E 'C2R_|C3B_|cloud-init.*(Error|FAIL)' "$tmp/serial.log" 2>/dev/null \
+  | tail -n 75 || true
+# The C3b guest proof is mandatory, never inferred from C2r's older success.
+if [[ "$result" == PASS ]] && \
+    ! grep -a -Fq 'C3B_PASS // OS_DBUS_PID_UID_SYSTEMD_SELINUX_ORIGIN_COHERENCE_TEST_ONLY' "$tmp/serial.log"; then
+  result=C3B_EVIDENCE_MISSING
+fi
 if [[ "$result" != PASS ]]; then
   echo "C2R_BLOCKED // GUEST_RESULT=$result"
   echo "C2R_GUEST_SERIAL_DIAGNOSTIC // last 140 lines"

@@ -4,6 +4,8 @@ on:
   pull_request:
     paths:
       - "tests/connections/c2r_selinux_domain/**"
+      - "tests/connections/c3b_origin/**"
+      - "tests/connections/test_connections_c3b_origin.py"
       - ".github/workflows/connections-c2r-confined-vm.yml"
       - "docs/connections-c2r-confined-status-host.md"
   workflow_dispatch:
@@ -33,7 +35,8 @@ jobs:
           set -euo pipefail
           bash -n tests/connections/c2r_selinux_domain/boot_confined_vm.sh
           bash -n tests/connections/c2r_selinux_domain/guest_confined_smoke.sh
-          python3 -m py_compile tests/connections/c2r_selinux_domain/C2rStatusHost.py
+          python3 -m py_compile tests/connections/c2r_selinux_domain/C2rStatusHost.py tests/connections/c3b_origin/C3bOriginCheck.py
+          python3 -B tests/connections/test_connections_c3b_origin.py
           python3 - <<'PY'
           from pathlib import Path
           policy=Path("tests/connections/c2r_selinux_domain/postapollo_connections.te").read_text()

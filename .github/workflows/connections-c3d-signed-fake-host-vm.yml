@@ -1,0 +1,92 @@
+name: Connections C3d signed fake status host and rpmdb provenance (CI only)
+
+on:
+  pull_request:
+    paths:
+      - "tests/connections/c3d_provenance/**"
+      - "tests/connections/test_connections_c3d_provenance_contract.py"
+      - "tests/connections/c2r_selinux_domain/boot_confined_vm.sh"
+      - "tests/connections/c2r_selinux_domain/guest_confined_smoke.sh"
+      - ".github/workflows/connections-c3d-signed-fake-host-vm.yml"
+      - "docs/connections-c3d-signed-fake-host-provenance.md"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  signed-fake-service-provenance:
+    # Signing and KVM are confined to the owning repository's operator-triggered CI.
+    if: github.actor == 'kudokudo1' && (github.event_name == 'workflow_dispatch' || github.event.pull_request.head.repo.full_name == github.repository)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 27
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Verify scripts and fail-closed production/fixture contracts
+        shell: bash
+        run: |
+          set -euo pipefail
+          bash -n tests/connections/c3d_provenance/build_signed_ci_status.sh
+          bash -n tests/connections/c3d_provenance/guest_signed_service_gate.sh
+          bash -n tests/connections/c2r_selinux_domain/boot_confined_vm.sh
+          bash -n tests/connections/c2r_selinux_domain/guest_confined_smoke.sh
+          python3 -B tests/connections/test_connections_c3d_provenance_contract.py
+          python3 -B tests/connections/test_connections_c3b_origin.py
+          python3 -B tests/connections/test_connections_c2n_policy_contract.py
+      - name: Ensure ephemeral runner KVM available
+        shell: bash
+        run: |
+          set -euo pipefail
+          [ -c /dev/kvm ] || { echo "C3D_BLOCKED // NO_HOST_KVM"; exit 2; }
+          sudo chmod a+rw /dev/kvm
+          [ -r /dev/kvm ] && [ -w /dev/kvm ] || exit 2
+      - name: Build only a fake, signed status RPM with a temporary CI key
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/c3d-status-rpm"
+          docker run --rm \
+            --mount "type=bind,src=$PWD,dst=/src,readonly" \
+            --mount "type=bind,src=$RUNNER_TEMP/c3d-status-rpm,dst=/out" \
+            fedora:44 /usr/bin/bash /src/tests/connections/c3d_provenance/build_signed_ci_status.sh
+          test "$(find "$RUNNER_TEMP/c3d-status-rpm" -maxdepth 1 -type f | wc -l)" = 4
+          (cd "$RUNNER_TEMP/c3d-status-rpm" && sha256sum --check --status c3d-artifact-manifest.sha256)
+          echo "C3D_PASS // PRIVATE_CI_SIGNING_KEY_DID_NOT_LEAVE_BUILDER"
+      - name: Build test-only SELinux domain in a separate Fedora builder
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/c2r-policy"
+          docker run --rm \
+            --mount "type=bind,src=$PWD/tests/connections/c2r_selinux_domain,dst=/src,readonly" \
+            --mount "type=bind,src=$RUNNER_TEMP/c2r-policy,dst=/out" \
+            fedora:44 /bin/bash -euc '
+              dnf -y --setopt=install_weak_deps=False install selinux-policy-devel make
+              mkdir -p /tmp/c2r-src
+              cp /src/postapollo_connections.te /src/postapollo_connections.fc /tmp/c2r-src/
+              cd /tmp/c2r-src
+              make -f /usr/share/selinux/devel/Makefile postapollo_connections.pp
+              cp postapollo_connections.pp /out/postapollo_connections.pp
+              test -s /out/postapollo_connections.pp
+            '
+          echo "C3D_PASS // CUSTOM_POLICY_BUILT_ONLY_FOR_EPHEMERAL_FEDORA_GUEST"
+      - name: Install QEMU on ephemeral GitHub runner only
+        shell: bash
+        run: |
+          set -euo pipefail
+          timeout 150s sudo apt-get -o Acquire::Retries=1 -o Acquire::http::Timeout=25 update || { echo "C3D_BLOCKED // RUNNER_APT_UPDATE"; exit 2; }
+          timeout 210s sudo apt-get -o Acquire::Retries=1 -o Acquire::http::Timeout=25 install -y --no-install-recommends qemu-system-x86 qemu-utils genisoimage python3-pip || { echo "C3D_BLOCKED // RUNNER_APT_INSTALL"; exit 2; }
+      - name: Prove signed fake RPM file ownership against running host in offline enforcing Fedora 44
+        shell: bash
+        run: |
+          set -euo pipefail
+          C3D_SERVICE_RPM_DIR="$RUNNER_TEMP/c3d-status-rpm" \
+            timeout 570s bash tests/connections/c2r_selinux_domain/boot_confined_vm.sh
+      - name: Recheck broker and real-provider permissions remain disabled
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -B tests/connections/test_connections_c3d_provenance_contract.py
+          echo "C3D_PASS // PRODUCTION_CREDENTIAL_AND_HOST_GRANTS_STILL_DISABLED"

@@ -64,12 +64,21 @@ mkdir -p "$site"
 "$python" -I -c 'import dbus_next; print("C2R_PYTHON_DBUS_PACKAGE_READY")' \
   || bad "offline dbus package unavailable"
 
-install -D -o root -g root -m 0555 /root/c2q/FakeStatusHost.py \
-  /usr/libexec/post-apollo/connections-status-host
-install -D -o root -g root -m 0644 /root/c2q/status.service \
-  /usr/lib/systemd/system/"$unit"
-install -D -o root -g root -m 0644 /root/c2q/status.conf \
-  /usr/share/dbus-1/system.d/"$name".conf
+if [[ -f /root/c2q/c3d-status.rpm ]]; then
+  # C3d test-only RPM must be signature-checked and installed by rpm itself.
+  # Never copy protected service files into place when RPM provenance is tested.
+  GITHUB_ACTIONS=true POST_APOLLO_C3D_DISPOSABLE_GUEST=1 \
+    bash /root/c2q/c3d-guest-gate.sh preinstall \
+    || bad "C3d signed fake service install or tamper gate failed"
+else
+  # Legacy C2r and C2s use the original reviewed manual fixture installation.
+  install -D -o root -g root -m 0555 /root/c2q/FakeStatusHost.py \
+    /usr/libexec/post-apollo/connections-status-host
+  install -D -o root -g root -m 0644 /root/c2q/status.service \
+    /usr/lib/systemd/system/"$unit"
+  install -D -o root -g root -m 0644 /root/c2q/status.conf \
+    /usr/share/dbus-1/system.d/"$name".conf
+fi
 install -D -o root -g root -m 0644 /root/c2q/BusPolicyClient.py \
   /opt/c2q/BusPolicyClient.py
 # World-readable dummy content; SELinux type, not Unix DAC, must deny it.
@@ -149,6 +158,13 @@ else
   echo "C3B_NOT_STAGED // C2S_LEGACY_GUEST_REGRESSION_NO_ORIGIN_CLAIM"
 fi
 
+if [[ -f /root/c2q/c3d-status.rpm ]]; then
+  # The running fake host must still match the signature-checked RPM in rpmdb.
+  GITHUB_ACTIONS=true POST_APOLLO_C3D_DISPOSABLE_GUEST=1 \
+    bash /root/c2q/c3d-guest-gate.sh installed \
+    || bad "C3d installed running host provenance mismatch"
+fi
+
 check c2q-reader status OBSERVED_UNVERIFIED
 check c2q-reader approve METHOD_REFUSED
 check c2q-reader claim OWN_REFUSED
@@ -164,5 +180,10 @@ if busctl --system --no-pager list | grep -Fq "$name"; then
   bad "D-Bus name persisted after service stop"
 fi
 echo "C2R_PASS // SERVICE_SHUTDOWN_RELEASES_DBUS_NAME"
+if [[ -f /root/c2q/c3d-status.rpm ]]; then
+  GITHUB_ACTIONS=true POST_APOLLO_C3D_DISPOSABLE_GUEST=1 \
+    bash /root/c2q/c3d-guest-gate.sh cleanup \
+    || bad "C3d RPM removal or disposable trust cleanup failed"
+fi
 echo "C2R_LIMITATION // CUSTOM_DOMAIN_EXPERIMENT_ONLY_NOT_SIGNED_PRODUCTION_PACKAGE"
 echo "C2R_PASS // NO_CREDENTIALS_NO_NASA_NO_PRODUCTION_GRANTS"

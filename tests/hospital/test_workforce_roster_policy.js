@@ -14,7 +14,8 @@ const rooms = [
     { id: "job-2", team: "finance", repository: "owner/finance",
       doctorId: "doc-2", providerId: "codex", assignmentId: "42" },
     { id: "job-1", team: "map", repository: "owner/company",
-      doctorId: "doc-1", assignmentId: "41" },
+      doctorId: "doc-1", assignmentId: "41",
+      assignmentTitle: "Integrate Company Map", assignmentStatus: "ACTIVE" },
     { id: "job-1", team: "DUPLICATE" },
     { id: "" }
 ];
@@ -40,6 +41,10 @@ assert.equal(roster[1].sessionId, "s-now");
 assert.equal(roster[1].sessionStatus, "IDLE");
 assert.equal(roster[1].hasActiveSession, true);
 assert.equal(roster[1].assignmentId, "41");
+assert.equal(roster[1].assignmentTitle, "Integrate Company Map");
+assert.equal(roster[1].assignmentStatus, "ACTIVE");
+assert.equal(roster[0].assignmentTitle, "");
+assert.equal(roster[0].assignmentStatus, "");
 assert.equal(roster[0].doctorName, "doc-2");
 assert.equal(roster[0].hasActiveSession, false);
 assert.equal(roster[0].sessionStatus, "FAILED");

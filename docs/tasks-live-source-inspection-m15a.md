@@ -62,7 +62,9 @@ The new Python unit suite opens **real, disposable** local files and checks legi
 
 The new Node/QML policy suite enforces exact status schema, fixed false authority flags, no data forwarding, canonical singleton source-path binding, click-only Process launch, stale-on-new-write handling, unchanged writer count and disabled Connections grants. CI reruns M13q/M13s/M13z/M14a/M13y, M11d and C2a, plus Qt 6 `qmlformat` syntax.
 
-**Status //** PR CI and any future real Fedora/native acceptance must be verified independently. Python and QML syntax tests cannot establish actual desktop visual/focus behavior.
+**Native CI evidence //** The separate `TaskLocalSourceNativeSmokeM15a.qml` root runs the **actual production-facing source-check pane**, not a screenshot or QML-only parser. Its CI-only timer calls the pane's existing `inspect()` method under an exact disposable marker. The Debian Quickshell 0.3.2 process uses a fresh `xvfb-run` virtual X11 display, private HOME/XDG directories and synthetic `apollo-hub-todo-v1.json` files. The real QML `Process` ran the Python inspector and verified each returned status and all false authority flags. The Python supervisor independently checked that source bytes and directory entries remained unchanged. Five cases passed: valid source, missing source, malformed JSON, mode 0644, and symlink refusal. This proves the native component and subprocess function in **CI X11**, not on the operator's Fedora Wayland/Quickshell build.
+
+**Status //** Final exact-commit CI and future local Fedora acceptance remain separate. Native CI does not establish task save provenance, actual draft restoration, encrypted checkpoint storage, current-user keyring authorization or physical-display geometry.
 
 ## WATCH OUT FOR
 
@@ -81,6 +83,7 @@ The new Node/QML policy suite enforces exact status schema, fixed false authorit
 - [x] Add finite UI projection and stale-on-next-write behavior
 - [x] Preserve all disabled recovery grants, separate Connections owner and sole JSON writer
 - [x] Add real-file tests, integration tests and scoped CI
+- [x] Run actual Quickshell 0.3.2 on a disposable Xvfb display for valid/missing/malformed/permissive/symlink cases; all five native steps passed on the pre-documentation PR revision
 - [ ] Final exact-head CI, independent Nurse 2 security review and operator merge
 - [ ] Separate authorized local Fedora visual/native execution and accurate-structure check
 - [ ] Opt-in encrypted draft capture/unlock/recovery under shared Connections permission authority

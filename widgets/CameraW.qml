@@ -66,9 +66,13 @@ PanelWindow {
     // Camera's Zoom guest has an independent frame-owned viewport. Do not
     // derive compositor placement from the shared Capture/Gallery page.
     // A single measured rectangle feeds host placement and the input hole.
+    // Browser gets near-full-width frame while the header's button row
+    // retains its own comfortable inset; no independent Sway coordinates.
+    readonly property int zoomWebEdgeInset: 2
     readonly property int zoomBayInset: Math.max(0, Math.round(zoomViewport.x))
     readonly property int zoomBayTop: Math.max(0, Math.round(zoomViewport.y))
-    readonly property int zoomBayBottom: 2
+    // Keep a 1px border while using the full remaining physical frame height.
+    readonly property int zoomBayBottom: 1
     readonly property int zoomBayWidth: Math.max(0, Math.round(zoomViewport.width))
     readonly property int zoomBayHeight: Math.max(0, Math.round(zoomViewport.height))
     // Sway measured the browser at 92,126 718x514, exactly the old
@@ -924,12 +928,13 @@ PanelWindow {
         // size/visibility, so the browser fills the body in every chassis.
         Item {
             id: zoomViewport
-            x: cameraBodyColumn.x
-            // Zoom starts below the full mode row. It must never overlap
-            // the default-sized mode buttons or rely on an invisible trim.
-            // Frame growth maintains room for the Zoom guest beneath it.
+            // Zoom is a separate physical Sway guest. Fit its client to the
+            // frame's inner edges rather than the narrower content Column,
+            // and keep the actual browser, mask and host on this one rect.
+            // Header/mode controls still own the full region above it.
+            x: camera.zoomWebEdgeInset
             y: cameraBodyColumn.y + cameraModes.y + cameraModes.height
-            width: Math.max(0, cameraBodyColumn.width)
+            width: Math.max(0, frame.width - 2 * camera.zoomWebEdgeInset)
             height: Math.max(0, frame.height - y - camera.zoomBayBottom)
             visible: camera.menuOpen && camera.activeView === "zoom"
 
@@ -1420,7 +1425,9 @@ PanelWindow {
             x: 0
             y: cameraBodyColumn.y + cameraModes.y
             width: frame.width
-            height: Math.max(0, zoomViewport.y - y + 4)
+            // Opaque unused mode-row space, with only a 1px seam seal.
+            // Do not cover the Zoom Workplace header.
+            height: Math.max(0, zoomViewport.y - y + 1)
             color: Colors.black
             visible: camera.menuOpen && camera.activeView === "zoom"
                      && camera.zoomWebVisualHeld
@@ -1429,8 +1436,11 @@ PanelWindow {
         Column {
             id: cameraBodyColumn
             anchors.fill: parent
-            anchors.margins: 18
-            spacing: 12
+            // Zoom has its own hosted browser body and can reclaim the
+            // unnecessary padding without shrinking any control buttons.
+            // Other Camera modes preserve their original layout.
+            anchors.margins: camera.activeView === "zoom" ? 12 : 18
+            spacing: camera.activeView === "zoom" ? 8 : 12
 
             Row {
                 id: cameraHeader

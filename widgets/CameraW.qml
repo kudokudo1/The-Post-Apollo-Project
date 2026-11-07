@@ -73,6 +73,9 @@ PanelWindow {
     readonly property int zoomBayTop: Math.max(0, Math.round(zoomViewport.y))
     // Keep a 1px border while using the full remaining physical frame height.
     readonly property int zoomBayBottom: 1
+    // Small visual alignment from the Nov 7 compact screenshot. Keep this
+    // separate from the Sway workarea transform and the panel's dimensions.
+    readonly property int zoomTopNudge: 4
     readonly property int zoomBayWidth: Math.max(0, Math.round(zoomViewport.width))
     readonly property int zoomBayHeight: Math.max(0, Math.round(zoomViewport.height))
     // Sway measured the browser at 92,126 718x514, exactly the old
@@ -931,9 +934,13 @@ PanelWindow {
             // Zoom is a separate physical Sway guest. Fit its client to the
             // frame's inner edges rather than the narrower content Column,
             // and keep the actual browser, mask and host on this one rect.
-            // Header/mode controls still own the full region above it.
+            // The guest starts just behind the lower mode-row chrome to
+            // close a narrow top seam. The input cutout remains clamped to
+            // the row's true bottom; buttons never become click-through.
+            // Height is frame-relative, so the lower edge stays fixed.
             x: camera.zoomWebEdgeInset
             y: cameraBodyColumn.y + cameraModes.y + cameraModes.height
+               - camera.zoomTopNudge
             width: Math.max(0, frame.width - 2 * camera.zoomWebEdgeInset)
             height: Math.max(0, frame.height - y - camera.zoomBayBottom)
             visible: camera.menuOpen && camera.activeView === "zoom"

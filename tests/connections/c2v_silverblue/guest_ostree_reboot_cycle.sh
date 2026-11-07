@@ -114,6 +114,10 @@ for n in $(seq 1 72); do
     # Independent evidence channel: the monitor's serial ERR/EXIT traps were
     # absent even though systemd recorded ExecMainStatus=1. Read its journal
     # and on-disk exit marker from the still-live resource probe.
+    if [[ -f /var/tmp/c2v-monitor-output.log ]]; then
+      echo "C2V_PROBE_MONITOR_OUTPUT_BEGIN"
+      tail -n 18 /var/tmp/c2v-monitor-output.log || true
+    fi
     if [[ -f /var/tmp/c2v-monitor-exit.log ]]; then
       echo "C2V_PROBE_MONITOR_EXIT_FILE_BEGIN"
       tail -n 12 /var/tmp/c2v-monitor-exit.log || true
@@ -186,7 +190,11 @@ PROBE
     cat > "$monitor" <<'C2V_MONITOR'
 #!/usr/bin/bash
 set -Eeuo pipefail
-exec >/dev/ttyS0 2>&1
+# Serial is diagnostic-only and can reject writes in the disposable VM.
+# A failed serial echo previously triggered errexit after the first sleep.
+# Persist monitor output independently; the guest probe relays it to serial
+# without making that channel part of reboot authorization.
+exec >>/var/tmp/c2v-monitor-output.log 2>&1
 # Trace to an independent guest-local file: stdout/ERR/EXIT traps have not
 # survived the observed first poll. The resource probe collects this file.
 exec 9>>/var/tmp/c2v-monitor-shell-trace.log

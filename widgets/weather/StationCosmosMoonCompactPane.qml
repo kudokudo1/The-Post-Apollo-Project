@@ -83,6 +83,7 @@ Rectangle {
         runtimeNowMs: moonPane.runtimeNowMs
     }
 
+    // C18 // MOON adopts the same top-spanning mode rail as COSMOS SUN.
     Row {
         id: titleRail
         objectName: "cosmos-c9-moon-free-header"
@@ -92,7 +93,7 @@ Rectangle {
         anchors.leftMargin: moonPane.contentInset
         anchors.rightMargin: moonPane.contentInset
         anchors.topMargin: moonPane.contentInset
-        height: 18
+        height: 16
         spacing: 4
         GohuText {
             id: moonHeading
@@ -105,9 +106,7 @@ Rectangle {
             elide: Text.ElideRight
         }
         QuietText {
-            width: Math.max(1,titleRail.width-moonHeading.width
-                -moonYearButton.width-moonForecastButton.width
-                -3*titleRail.spacing)
+            width: Math.max(1,titleRail.width-moonHeading.width-titleRail.spacing)
             height: parent.height
             text: "USNO "+moonPane.moonStatus+" // SKY "+moonPane.positionStatus
             color: moonPane.moonStatus==="OFFLINE" || moonPane.positionStatus==="OFFLINE"
@@ -117,13 +116,36 @@ Rectangle {
             horizontalAlignment: Text.AlignRight
             elide: Text.ElideRight
         }
+    }
+
+    Row {
+        id: moonModeRail
+        objectName: "cosmos-c18-moon-fullwidth-mode-rail"
+        anchors.left: parent.left
+        anchors.right: parent.right
+        anchors.top: titleRail.bottom
+        anchors.leftMargin: moonPane.contentInset
+        anchors.rightMargin: moonPane.contentInset
+        anchors.topMargin: 2
+        height: 27
+        spacing: 4
+        ActionButton {
+            objectName: "cosmos-c18-moon-observation-tab"
+            width: Math.max(1,(moonModeRail.width-2*moonModeRail.spacing)/3)
+            height: 27
+            label: "PHASE + POSITION"
+            labelPixelSize: 9
+            contentPadding: 1
+            selected: true
+            accentColor: Colors.magenta
+        }
         ActionButton {
             id: moonYearButton
             objectName: "cosmos-c11-open-moon-year"
-            width: 50
-            height: 17
-            label: "YEAR"
-            labelPixelSize: 8
+            width: Math.max(1,(moonModeRail.width-2*moonModeRail.spacing)/3)
+            height: 27
+            label: "LUNAR WHEEL"
+            labelPixelSize: 9
             contentPadding: 1
             accentColor: Colors.cyan
             onClicked: moonPane.routeRequested("cosmos/moon/year")
@@ -131,10 +153,10 @@ Rectangle {
         ActionButton {
             id: moonForecastButton
             objectName: "cosmos-c17-open-moon-forecast"
-            width: 65
-            height: 17
+            width: Math.max(1,(moonModeRail.width-2*moonModeRail.spacing)/3)
+            height: 27
             label: "FORECAST"
-            labelPixelSize: 8
+            labelPixelSize: 9
             contentPadding: 1
             accentColor: Colors.cyan
             onClicked: moonPane.routeRequested("cosmos/moon/forecast")
@@ -148,8 +170,9 @@ Rectangle {
         anchors.right: parent.right
         anchors.leftMargin: moonPane.contentInset
         anchors.rightMargin: moonPane.contentInset
-        anchors.top: titleRail.bottom
-        height: Math.min(166,Math.max(0,moonPane.height-112))
+        anchors.top: moonModeRail.bottom
+        // Keep the nine source-backed Moon readings within compact viewport.
+        height: Math.min(166,Math.max(0,moonPane.height-138))
         spacing: 5
 
         // Identical interactive MAGICK phase instrument, not a duplicated canvas.

@@ -54,6 +54,7 @@ ShellRoot {
     Connections {
         target: root.store
         function onFavoritesSaved(revision) {
+            if (root.done) return;
             if (root.phase !== "save") {
                 root.fail("UNEXPECTED_WRITE");
                 return;

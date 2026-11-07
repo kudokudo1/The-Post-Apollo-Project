@@ -160,7 +160,8 @@ Rectangle {
         id: moonHeaderDivider
         objectName: "cosmos-c23-moon-overview-divider"
         anchors.top: moonModeRail.bottom
-        anchors.topMargin: 2
+        // Match SUN's five-pixel tab-to-rule breathing room.
+        anchors.topMargin: 5
         anchors.left: parent.left
         anchors.right: parent.right
         anchors.leftMargin: moonPane.contentInset
@@ -178,6 +179,8 @@ Rectangle {
         anchors.left: parent.left
         anchors.right: parent.right
         anchors.top: moonHeaderDivider.bottom
+        // Keep the first instrument off the cyan rule.
+        anchors.topMargin: 3
         anchors.bottom: parent.bottom
         anchors.leftMargin: moonPane.contentInset
         anchors.rightMargin: moonPane.contentInset

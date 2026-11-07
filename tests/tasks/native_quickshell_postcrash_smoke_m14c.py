@@ -137,12 +137,13 @@ def run(scenario: str):
                 target.mkdir(mode=0o700)
                 env[key] = str(target)
             env.update({
-                "QT_QPA_PLATFORM": "offscreen",
+                "QT_QPA_PLATFORM": "xcb",
                 "QT_QUICK_BACKEND": "software",
                 "LIBGL_ALWAYS_SOFTWARE": "1",
                 "QS_DISABLE_FILE_WATCHER": "1",
                 "WAYLAND_DISPLAY": "",
-                "DISPLAY": "",
+                # The only display is xvfb-run inside the ephemeral CI VM.
+                "DISPLAY": os.environ.get("DISPLAY", ""),
                 "QT_LOGGING_RULES": "qt.qpa.*=false",
                 "POST_APOLLO_TASKS_M14C_NATIVE": "CI_DISPOSABLE_ONLY",
                 "POST_APOLLO_TASKS_M14C_SCENARIO": scenario,

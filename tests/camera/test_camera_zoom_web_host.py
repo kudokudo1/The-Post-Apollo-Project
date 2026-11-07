@@ -63,7 +63,7 @@ class ZoomWebHostTests(unittest.TestCase):
         self.assertNotIn('cameraPage.y + cameraPage.parent.y', QML)
         self.assertNotIn('cameraPage.x + cameraPage.parent.x', QML)
         self.assertNotIn('Math.round(cameraPage.width)', QML)
-        self.assertIn('readonly property int zoomBayBottom: 2', QML)
+        self.assertIn('readonly property int zoomBayBottom: 1', QML)
         self.assertIn('id: zoomViewport', QML)
         self.assertIn('id: cameraBodyColumn', QML)
         self.assertIn('cameraModes.y', QML)
@@ -77,8 +77,8 @@ class ZoomWebHostTests(unittest.TestCase):
         # Compact now makes room for its full-size control deck. The frame
         # grows by 24px; the browser starts 16px lower (no 12px overlap
         # and a 4px taller mode row), leaving MORE browser height than before.
-        compact_height, page_start, bottom = 699, 147, 2
-        self.assertEqual(compact_height - page_start - bottom, 550)
+        compact_height, page_start, bottom = 699, 133, 1
+        self.assertEqual(compact_height - page_start - bottom, 565)
         self.assertGreater(compact_height - page_start - bottom,
                            compact_height - 169)
 
@@ -112,24 +112,33 @@ class ZoomWebHostTests(unittest.TestCase):
         self.assertIn('Math.min(699, viewportHeight', QML)
         self.assertIn(
             'height: Math.max(0, frame.height - y - camera.zoomBayBottom)', QML)
-        self.assertIn('readonly property int zoomBayBottom: 2', QML)
-        self.assertIn('x: cameraBodyColumn.x', QML)
-        self.assertIn('width: Math.max(0, cameraBodyColumn.width)', QML)
+        self.assertIn('readonly property int zoomBayBottom: 1', QML)
+        self.assertIn('x: camera.zoomWebEdgeInset', QML)
+        self.assertIn(
+            'width: Math.max(0, frame.width - 2 * camera.zoomWebEdgeInset)', QML)
         self.assertIn('readonly property int zoomActorTop: zoomBayTop', QML)
         self.assertIn('readonly property int zoomActorHeight: zoomBayHeight', QML)
-        # 38px row -> 42px row, no -12px overlap, 24px taller frame.
-        # The guest moves 16px lower, gains 8px height, and keeps sides
-        # aligned to the widened compact body (not an arbitrary browser trim).
-        old_top, old_height, old_width = 131, 542, 734
-        new_top = old_top + 12 + 4
-        new_height = old_height + 24 - 16
-        new_width = old_width + 14
-        self.assertEqual((new_top,new_height,new_width), (147,550,748))
+        # Same compact frame, full-size buttons. Only Zoom's margins and
+        # deck spacing shrink; the browser's physical viewport expands.
+        # Before: inner 18px margins, 12px section spacing, 2px bottom.
+        # After: 12px margins, 8px spacing, 1px bottom. The x edges
+        # follow the frame, not the narrower button Column.
+        old_top, old_height, old_width = 147, 550, 748
+        new_top = old_top - (18 - 12) - 2 * (12 - 8)
+        new_height = old_height + (old_top - new_top) + (2 - 1)
+        new_width = 784 - 2 * 2
+        self.assertEqual((new_top,new_height,new_width), (133,565,780))
         self.assertGreaterEqual(42,34)
+        self.assertIn('anchors.margins: camera.activeView === "zoom" ? 12 : 18', QML)
+        self.assertIn('spacing: camera.activeView === "zoom" ? 8 : 12', QML)
+        self.assertIn('readonly property int zoomWebEdgeInset: 2', QML)
+        self.assertIn('x: camera.zoomWebEdgeInset', QML)
+        self.assertIn(
+            'width: Math.max(0, frame.width - 2 * camera.zoomWebEdgeInset)', QML)
 
     def test_opaque_zoom_deck_seals_spare_row_pixels_without_moving_browser(self):
         # Camera's transparent panel must not reveal underlying windows in
-        # the unused 8px of its 42px MODE row. A 4px visual-only underlap
+        # the unused 8px of its 42px MODE row. A 1px visual-only underlap
         # covers compositor seams, while the physical actor and its trusted
         # input hole remain precisely tied to the existing viewport.
         self.assertIn('id: zoomModeDeckMatte', QML)
@@ -144,7 +153,7 @@ class ZoomWebHostTests(unittest.TestCase):
             'x: 0',
             'y: cameraBodyColumn.y + cameraModes.y',
             'width: frame.width',
-            'height: Math.max(0, zoomViewport.y - y + 4)',
+            'height: Math.max(0, zoomViewport.y - y + 1)',
             'color: Colors.black',
             'visible: camera.menuOpen && camera.activeView === "zoom"',
             '&& camera.zoomWebVisualHeld'
@@ -159,6 +168,34 @@ class ZoomWebHostTests(unittest.TestCase):
             'y: cameraBodyColumn.y + cameraModes.y + cameraModes.height', QML)
         self.assertIn('readonly property int zoomActorTop: zoomBayTop', QML)
         self.assertIn('readonly property int zoomActorHeight: zoomBayHeight', QML)
+
+    def test_zoom_client_fills_frame_and_resizes_from_single_viewport(self):
+        # No screen-size-specific hardcoded actor dimensions or browser CSS
+        # tricks. This is the one frame-geometry source for host and follower.
+        self.assertIn('readonly property int zoomWebEdgeInset: 2',QML)
+        self.assertIn('x: camera.zoomWebEdgeInset',QML)
+        self.assertIn(
+            'width: Math.max(0, frame.width - 2 * camera.zoomWebEdgeInset)',QML)
+        self.assertIn('readonly property int zoomBayBottom: 1',QML)
+        self.assertIn('height: Math.max(0, frame.height - y - camera.zoomBayBottom)',QML)
+        self.assertIn('readonly property int zoomActorLeft: zoomBayInset',QML)
+        self.assertIn('readonly property int zoomActorTop: zoomBayTop',QML)
+        self.assertIn('readonly property int zoomActorWidth: zoomBayWidth',QML)
+        self.assertIn('readonly property int zoomActorHeight: zoomBayHeight',QML)
+        self.assertIn('width: zoomActorWidth, height: zoomActorHeight',QML)
+        self.assertIn('"--width", String(zoomActorWidth), "--height", String(zoomActorHeight)',QML)
+        self.assertIn('width: camera.zoomWebDocked ? camera.zoomActorWidth : 0',QML)
+        self.assertIn('height: camera.zoomWebDocked ? camera.zoomInputHeight : 0',QML)
+        for frame_width, frame_height, top in (
+                (784,699,133),(1000,900,133),(1920,1080,133)):
+            self.assertEqual(frame_width - 2 * 2,frame_width - 4)
+            self.assertEqual(frame_height - top - 1,frame_height - top - 1)
+            self.assertGreater(frame_height - top - 1,300)
+        # Preserve all four controls and the same header navigation.
+        self.assertIn('height: 34',QML)
+        self.assertIn('height: 42',QML)
+        self.assertIn('label: "↓ DOWNLOAD"',QML)
+        self.assertNotIn('--force-device-scale-factor',QML)
 
     def test_resize_retains_verified_visual_without_exposing_unverified_input(self):
         self.assertIn('property bool zoomWebVisualHeld: false', QML)

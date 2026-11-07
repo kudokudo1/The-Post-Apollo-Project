@@ -41,7 +41,7 @@ const reviewed=[
   ["space-solar-cycle","cosmos/sun/cycle","space","cycle"],
   ["space-kp-history","cosmos/space-weather/history","space","kp-history"],
   ["space-kp-forecast","cosmos/space-weather/forecasts","space","kp-forecast"],
-  ["space-suvi-imager","cosmos/sun/activity","space","suvi"],
+  ["space-suvi-imager","cosmos/sun/live","space","suvi"],
   ["space-aurora","cosmos/space-weather/aurora","space","aurora"],
   ["space-xray-flux","cosmos/sun/activity","space","xray"],
   ["space-goes-flares","cosmos/sun/activity","space","flares"],

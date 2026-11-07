@@ -8,6 +8,7 @@ import qs.services.notifications
 import "../services/notifications/HospitalCertificationNotificationPolicy.js" as CertificationNotificationPolicy
 import "../services/hospital/HospitalWorkforceRosterPolicy.js" as WorkforceRosterPolicy
 import "../services/hospital/HospitalWorkerAttentionPolicy.js" as WorkerAttentionPolicy
+import "../services/hospital/HospitalSurgeryStartupPolicy.js" as SurgeryStartupPolicy
 import "../services/github"
 import QtQuick.Effects
 import Qt5Compat.GraphicalEffects
@@ -96,6 +97,10 @@ PanelWindow {
     property string selectedRoomTeam: ""
     property bool remoteRefreshPending: false
     property int openAuditStaleInterval: 600000
+    // Repeated menu toggles should not rescan every local Git worktree.
+    // Explicit LOCAL REFRESH still bypasses this short in-session window.
+    property int floorDiscoveryReuseInterval: 120000
+    property real lastFloorDiscoveryAt: 0
     property bool openAuditPending: false
     property var lastOpenAuditByFloor: ({})
     property string auditedRoomTeam: ""
@@ -2151,10 +2156,9 @@ PanelWindow {
 
         // A timestamp is not a usable cache. Floor changes clear audit data;
         // a failed/stalled scan must not suppress the next available scan.
-        // Reuse the 10-minute window only when this Floor has a good snapshot.
-        if (last > 0 && now - last < openAuditStaleInterval
-                && auditService.available
-                && !auditService.lastError) {
+        if (SurgeryStartupPolicy.canReuseAudit(
+                last, now, openAuditStaleInterval,
+                auditService.available, auditService.lastError)) {
             openAuditPending = false;
             return;
         }
@@ -2200,6 +2204,9 @@ PanelWindow {
             hospitalOpenFocusRetry.stop();
         if (!root.menuOpen) {
             root.floorIndexPilotEnabled = false;
+            // The next opening should start from the useful registered roster,
+            // not from an old Git branch-only inspection mode.
+            root.workforceRosterVisible = true;
             if (speechInputService.busy)
                 speechInputService.cancel();
 
@@ -2220,9 +2227,15 @@ PanelWindow {
 
         root.ensureFirstRoomSelected();
 
-        // Discovery owns the Floor selection. Mark it in flight first, so
-        // the open audit cannot race the old repository while Floors rebuild.
-        floorService.discover();
+        // Discover on first open or after the lightweight reuse window.
+        // A known Floor stays visible instantly across rapid menu toggles.
+        // Explicit LOCAL REFRESH is never throttled by this startup policy.
+        if (!SurgeryStartupPolicy.canReuseFloor(
+                root.lastFloorDiscoveryAt, Date.now(),
+                root.floorDiscoveryReuseInterval, floorService.floorCount))
+            floorService.discover();
+
+        // Never launch a pre-discovery audit against an outdated Floor.
         root.requestOpenAudit();
     }
 
@@ -2270,6 +2283,7 @@ PanelWindow {
         }
 
         onFloorsChanged: {
+            root.lastFloorDiscoveryAt = Date.now();
             if (root.menuOpen)
                 openAuditKick.restart();
         }

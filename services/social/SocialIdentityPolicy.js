@@ -225,6 +225,23 @@ function renameIdentity(doc, id, name) {
     return {ok:true, reason:"", document:next};
 }
 
+// Permanently remove a LOCAL Social layout identity, retaining all other
+// stable ID numbers. Referenced contact/organization records are guarded in
+// the store before this pure policy is allowed to reach disk.
+function removeIdentity(doc, id) {
+    var check = validate(doc);
+    if (!check.ok) return check;
+    var index = doc.identities.findIndex(function(item) { return item.id === id; });
+    if (index < 0) return {ok:false, reason:"INVALID_IDENTITY"};
+    if (doc.identities.length <= 1)
+        return {ok:false, reason:"LAST_ID_REQUIRED"};
+    var next = clone(doc);
+    next.identities.splice(index, 1);
+    if (next.activeId === id)
+        next.activeId = next.identities[0].id;
+    return {ok:true, reason:"", document:next};
+}
+
 function select(doc, id) {
     var check = validate(doc);
     if (!check.ok) return check;

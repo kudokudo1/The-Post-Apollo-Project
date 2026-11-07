@@ -46,9 +46,38 @@ cp "$rpmfile" /out/c3d-status.rpm
   sha256sum c3d-status.rpm c3d-disposable-public.asc \
     c3d-public-fingerprint.txt > c3d-artifact-manifest.sha256
 )
-[[ "$(find /out -maxdepth 1 -type f | wc -l)" -eq 4 ]] ||
+# Opt-in C3e-B: the SAME temporary key signs a detached release manifest
+# for the RPM it signed, but cannot authorize that release; a separate root
+# policy, generated OUTSIDE this builder, must approve these exact bytes.
+expected_outputs=4
+if [[ "${POST_APOLLO_C3EB_EXPORT_MANIFEST:-0}" == 1 ]]; then
+  python3 - <<'PY'
+import hashlib, json
+from pathlib import Path
+rpm = Path("/out/c3d-status.rpm")
+manifest = {
+    "schema": "postapollo.connections.release-manifest.v1",
+    "release_id": "postapollo-connections-status",
+    "sequence": 1,
+    "sha256": hashlib.sha256(rpm.read_bytes()).hexdigest(),
+    "size": rpm.stat().st_size,
+}
+Path("/out/c3eb-release-manifest.json").write_text(
+    json.dumps(manifest, sort_keys=True, separators=(",", ":")), encoding="utf-8"
+)
+PY
+  gpg --homedir "$keydir" --batch --yes --pinentry-mode loopback \
+    --passphrase '' --local-user "$fingerprint" --detach-sign \
+    --output /out/c3eb-release-manifest.sig /out/c3eb-release-manifest.json
+  expected_outputs=6
+  echo "C3EB_PASS // RPM_SIGNER_DETACHED_MANIFEST_SAME_DISPOSABLE_KEY"
+fi
+[[ "$(find /out -maxdepth 1 -type f | wc -l)" -eq "$expected_outputs" ]] ||
   { echo "C3D_BUILDER_UNEXPECTED_OUTPUT"; exit 2; }
 chmod 0644 /out/c3d-status.rpm /out/c3d-disposable-public.asc \
   /out/c3d-public-fingerprint.txt /out/c3d-artifact-manifest.sha256
+if [[ "$expected_outputs" == 6 ]]; then
+  chmod 0644 /out/c3eb-release-manifest.json /out/c3eb-release-manifest.sig
+fi
 echo "C3D_PASS // EPHEMERAL_SIGNED_FAKE_HOST_RPM_BUILT"
 echo "C3D_LIMITATION // DISPOSABLE_SELF_SIGNED_KEY_NOT_PRODUCTION_TRUST"

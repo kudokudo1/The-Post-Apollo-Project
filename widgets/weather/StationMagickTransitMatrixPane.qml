@@ -323,9 +323,16 @@ Rectangle {
         anchors.bottomMargin:2
         color:Colors.black;border.width:1;border.color:Colors.blue
         clip:true
-        Column {
+        Flickable {
+            id:matrixScroll
             anchors.fill:parent;anchors.margins:2
-            spacing:2
+            contentWidth:width
+            contentHeight:matrixColumn.implicitHeight
+            clip:true;boundsBehavior:Flickable.StopAtBounds
+            Column {
+                id:matrixColumn
+                width:matrixScroll.width
+                spacing:2
             Row {
                 width:parent.width;height:19;spacing:2
                 QuietText {
@@ -369,7 +376,15 @@ Rectangle {
                             labelPixelSize:10
                             selected:atlas.filterNatal===parent.modelData &&
                                 atlas.filterTransit===modelData
-                            accentColor:selected?Colors.magenta:Colors.cyan
+                            accentColor:atlas.cellAccent(parent.modelData,modelData)
+                            idleFillColor:atlas.cellFill(parent.modelData,modelData)
+                            idleBorderColor:atlas.cellAccent(parent.modelData,modelData)
+                            idleForegroundColor:atlas.cellTier(parent.modelData,modelData)
+                                >0?Colors.white:Colors.cyan
+                            selectedFillColor:Colors.magenta
+                            selectedForegroundColor:Colors.black
+                            contentGlowEnabled:false
+                            softGlowEnabled:false
                             available:!!atlas.model
                             onClicked:atlas.selectPair(parent.modelData,modelData)
                         }
@@ -379,7 +394,80 @@ Rectangle {
             QuietText {
                 width:parent.width;height:15;font.pixelSize:8
                 color:Colors.orange;elide:Text.ElideRight
-                text:"CELL = ASPECT CONTACT COUNT / STATIONS LISTED ONCE"
+                text:"COUNT HEAT // 0 NONE · 1-2 CYAN · 3-4 YELLOW · 5+ ORANGE"
+            }
+            Canvas {
+                id:eventAxis
+                width:parent.width
+                height:80
+                clip:true
+                onWidthChanged:requestPaint()
+                onHeightChanged:requestPaint()
+                onPaint:{
+                    const ctx=getContext("2d");
+                    ctx.clearRect(0,0,width,height);
+                    ctx.fillStyle=String(Colors.black);
+                    ctx.fillRect(0,0,width,height);
+                    ctx.strokeStyle=String(Colors.blue);
+                    ctx.lineWidth=1;
+                    ctx.strokeRect(1,1,Math.max(2,width-2),Math.max(2,height-2));
+                    const g=atlas.timelineModel;
+                    ctx.textAlign="center";ctx.font="9px monospace";
+                    if(!g){
+                        ctx.fillStyle=String(Colors.orange);
+                        ctx.fillText("SEARCH JPL TO DRAW UTC EVENTS",width/2,height/2);
+                        return;
+                    }
+                    g.ticks.forEach(function(t){
+                        ctx.strokeStyle=String(Colors.blue);
+                        ctx.beginPath();ctx.moveTo(t.x,17);
+                        ctx.lineTo(t.x,height-3);ctx.stroke();
+                        ctx.fillStyle=String(Colors.cyan);
+                        ctx.fillText(t.label,t.x,11);
+                    });
+                    g.markers.forEach(function(mark){
+                        const active=atlas.inspectedEventKey===mark.key;
+                        ctx.fillStyle=String(active?Colors.magenta:
+                            mark.type==="station"?Colors.orange:Colors.yellow);
+                        if(mark.type==="station"){
+                            ctx.beginPath();ctx.arc(mark.x,mark.y,active?5:3,0,2*Math.PI);
+                            ctx.fill();
+                        }else{
+                            ctx.fillRect(mark.x-(active?3:2),
+                                mark.y-(active?7:5),active?6:4,active?14:10);
+                        }
+                    });
+                    if(g.markers.length===0){
+                        ctx.fillStyle=String(Colors.orange);
+                        ctx.fillText("NO SOURCE EVENTS FOR SELECTED FILTER",
+                            width/2,height/2);
+                    }
+                }
+                MouseArea {
+                    anchors.fill:parent
+                    cursorShape:Qt.PointingHandCursor
+                    onClicked:function(mouse){
+                        const g=atlas.timelineModel;
+                        if(!g||!atlas.model)return;
+                        let nearest=null,dist=13;
+                        g.markers.forEach(function(mark){
+                            const dx=mark.x-mouse.x,dy=mark.y-mouse.y;
+                            const d=Math.sqrt(dx*dx+dy*dy);
+                            if(d<dist){nearest=mark;dist=d;}
+                        });
+                        if(!nearest)return;
+                        const source=atlas.model.events.find(function(event){
+                            return Visual.eventKey(event)===nearest.key;
+                        });
+                        if(source)atlas.inspectEvent(source);
+                    }
+                }
+            }
+            QuietText {
+                width:parent.width;height:13
+                font.pixelSize:8;color:Colors.cyan;elide:Text.ElideRight
+                text:"UTC EVENT LANES // GOLD ASPECT · ORANGE STATION · CLICK TO INSPECT"
+            }
             }
         }
     }

@@ -23,7 +23,8 @@ jobs:
           export DEBIAN_FRONTEND=noninteractive
           apt-get update
           apt-get install -y --no-install-recommends \
-            ca-certificates git nodejs quickshell qt6-qpa-plugins coreutils findutils
+            ca-certificates git nodejs quickshell qt6-qpa-plugins coreutils findutils \
+            qml6-module-qtquick-effects qml6-module-qt5compat-graphicaleffects
           quickshell --version
       - uses: actions/checkout@v4
       - name: Load actual MAGICK QML and exercise UTC/TASKS/Home/transit with fake Home

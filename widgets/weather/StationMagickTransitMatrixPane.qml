@@ -56,6 +56,7 @@ Rectangle {
     function resetFilterPage(){
         pageIndex=0;
         resultList.contentY=0;
+        if(inspectorOpen)closeInspector();
         eventAxis.requestPaint();
     }
     function cellTier(natal,moving){
@@ -545,7 +546,10 @@ Rectangle {
                         border.color:atlas.selectedEventKey===Matrix.eventKey(modelData)
                             ?Colors.magenta:Colors.blue
                         QuietText {
-                            anchors.fill:parent;anchors.margins:3
+                            anchors.left:parent.left
+                            anchors.right:inspectButton.left
+                            anchors.top:parent.top;anchors.bottom:parent.bottom
+                            anchors.margins:3
                             color:modelData.type==="station"?Colors.orange:Colors.yellow
                             font.pixelSize:9;verticalAlignment:Text.AlignVCenter
                             elide:Text.ElideRight
@@ -559,9 +563,21 @@ Rectangle {
                                     " "+modelData.degrees+"°")
                         }
                         MouseArea {
-                            anchors.fill:parent
+                            anchors.left:parent.left
+                            anchors.right:inspectButton.left
+                            anchors.top:parent.top;anchors.bottom:parent.bottom
                             cursorShape:Qt.PointingHandCursor
                             onClicked:atlas.chooseEvent(modelData)
+                        }
+                        ActionButton {
+                            id:inspectButton
+                            anchors.right:parent.right
+                            width:48;height:21
+                            label:"INFO";labelPixelSize:8
+                            accentColor:Colors.magenta
+                            selected:atlas.inspectedEventKey===
+                                Visual.eventKey(modelData)&&atlas.inspectorOpen
+                            onClicked:atlas.inspectEvent(modelData)
                         }
                     }
                 }
@@ -572,6 +588,170 @@ Rectangle {
                     color:Colors.cyan;font.pixelSize:9
                 }
             }
+        }
+    }
+    Rectangle {
+        id:inspectorPanel
+        visible:atlas.inspectorOpen&&!!atlas.inspectedEvent
+        z:12
+        anchors.top:cellGrid.top
+        anchors.bottom:footer.top
+        anchors.left:parent.left;anchors.right:parent.right
+        clip:true
+        color:Colors.dark
+        border.width:2;border.color:Colors.magenta
+        Row {
+            id:inspectorHeader
+            anchors.top:parent.top;anchors.left:parent.left;anchors.right:parent.right
+            anchors.margins:5;height:25;spacing:4
+            QuietText {
+                width:Math.max(40,inspectorHeader.width-150-2*inspectorHeader.spacing)
+                height:25
+                color:Colors.magenta;font.pixelSize:11
+                verticalAlignment:Text.AlignVCenter
+                elide:Text.ElideRight
+                text:atlas.inspectedEvent?
+                    "SOURCE EVENT // "+
+                    Matrix.shortName(atlas.inspectedEvent.transit_body):
+                    "SOURCE EVENT"
+            }
+            ActionButton {
+                width:72;height:24
+                label:"WHEEL";labelPixelSize:9
+                accentColor:Colors.yellow
+                available:!!atlas.inspectedEvent
+                onClicked:{
+                    if(!atlas.inspectedEvent||!atlas.model)return;
+                    const e=atlas.model.events.find(function(row){
+                        return Visual.eventKey(row)===atlas.inspectedEventKey;
+                    });
+                    if(e)atlas.chooseEvent(e);
+                }
+            }
+            ActionButton {
+                width:74;height:24
+                label:"CLOSE";labelPixelSize:9
+                accentColor:Colors.magenta
+                onClicked:atlas.closeInspector()
+            }
+        }
+        QuietText {
+            id:inspectorTime
+            anchors.left:parent.left;anchors.right:parent.right
+            anchors.top:inspectorHeader.bottom
+            anchors.leftMargin:7;anchors.rightMargin:7
+            height:22;font.pixelSize:11;color:Colors.cyan
+            verticalAlignment:Text.AlignVCenter;elide:Text.ElideRight
+            text:atlas.inspectedEvent?
+                atlas.inspectedEvent.utc+" UTC / "+
+                (atlas.inspectedEvent.natal_body?
+                    Matrix.shortName(atlas.inspectedEvent.natal_body)+" × ":"")+
+                Matrix.shortName(atlas.inspectedEvent.transit_body):
+                ""
+        }
+        QuietText {
+            id:inspectorEvidence
+            anchors.left:parent.left;anchors.right:parent.right
+            anchors.top:inspectorTime.bottom
+            anchors.leftMargin:7;anchors.rightMargin:7
+            height:23;font.pixelSize:10;color:Colors.yellow
+            verticalAlignment:Text.AlignVCenter;elide:Text.ElideRight
+            text:!atlas.inspectedEvent?""
+                :atlas.inspectedEvent.type==="station"
+                    ?"ESTIMATED "+atlas.inspectedEvent.direction.toUpperCase()+
+                     " STATION / "+atlas.inspectedEvent.longitude_deg.toFixed(4)+
+                     "° / RATE "+atlas.inspectedEvent.velocity_deg_day.toFixed(5)+"°/D"
+                    :atlas.inspectedEvent.aspect.toUpperCase()+" "+
+                     atlas.inspectedEvent.angle_deg+"° / "+
+                     atlas.inspectedEvent.direction.toUpperCase()+
+                     " / RESIDUAL "+atlas.inspectedEvent.residual_deg.toFixed(6)+"°"
+        }
+        Row {
+            id:detailControls
+            anchors.top:inspectorEvidence.bottom
+            anchors.left:parent.left;anchors.right:parent.right
+            anchors.leftMargin:6;anchors.rightMargin:6
+            height:24;spacing:4
+            QuietText {
+                width:Math.max(30,detailControls.width-150-2*detailControls.spacing)
+                height:24;font.pixelSize:9;color:Colors.orange
+                verticalAlignment:Text.AlignVCenter;elide:Text.ElideRight
+                text:"JPL-SAMPLED ECLIPTIC LONGITUDE"
+            }
+            ActionButton {
+                width:46;height:23;label:"−";labelPixelSize:12
+                accentColor:Colors.cyan;available:atlas.detailZoom>1
+                onClicked:atlas.detailZoom=Math.max(1,atlas.detailZoom/1.5)
+            }
+            ActionButton {
+                width:46;height:23;label:"+";labelPixelSize:12
+                accentColor:Colors.cyan;available:atlas.detailZoom<8
+                onClicked:atlas.detailZoom=Math.min(8,atlas.detailZoom*1.5)
+            }
+            ActionButton {
+                width:50;height:23;label:"FIT";labelPixelSize:8
+                accentColor:Colors.yellow
+                onClicked:atlas.detailZoom=1
+            }
+        }
+        Canvas {
+            id:detailCanvas
+            anchors.left:parent.left;anchors.right:parent.right
+            anchors.top:detailControls.bottom
+            anchors.bottom:detailFooter.top
+            anchors.margins:7
+            clip:true
+            onWidthChanged:requestPaint()
+            onHeightChanged:requestPaint()
+            onPaint:{
+                const ctx=getContext("2d");
+                ctx.clearRect(0,0,width,height);
+                ctx.strokeStyle=String(Colors.blue);ctx.lineWidth=1;
+                ctx.strokeRect(1,1,Math.max(2,width-2),Math.max(2,height-2));
+                const g=atlas.detailGeometry;
+                if(!g){
+                    ctx.fillStyle=String(Colors.orange);
+                    ctx.font="9px monospace";ctx.textAlign="center";
+                    ctx.fillText("NO VERIFIED JPL SAMPLES",width/2,height/2);
+                    return;
+                }
+                if(g.referenceY!==null){
+                    ctx.strokeStyle=String(Colors.yellow);
+                    ctx.setLineDash([4,4]);
+                    ctx.beginPath();ctx.moveTo(0,g.referenceY);
+                    ctx.lineTo(width,g.referenceY);ctx.stroke();
+                    ctx.setLineDash([]);
+                }
+                ctx.strokeStyle=String(Colors.cyan);
+                ctx.lineWidth=2;
+                ctx.beginPath();
+                g.points.forEach(function(p,i){
+                    if(i===0)ctx.moveTo(p.x,p.y);
+                    else ctx.lineTo(p.x,p.y);
+                });
+                ctx.stroke();
+                ctx.strokeStyle=String(Colors.magenta);
+                ctx.lineWidth=1;
+                ctx.beginPath();ctx.moveTo(g.eventX,3);
+                ctx.lineTo(g.eventX,height-3);ctx.stroke();
+                ctx.fillStyle=String(Colors.yellow);
+                ctx.font="9px monospace";ctx.textAlign="left";
+                ctx.fillText(g.max.toFixed(2)+"°",5,12);
+                ctx.fillText(g.min.toFixed(2)+"°",5,height-6);
+            }
+        }
+        QuietText {
+            id:detailFooter
+            anchors.left:parent.left;anchors.right:parent.right
+            anchors.bottom:parent.bottom
+            anchors.leftMargin:7;anchors.rightMargin:7
+            height:25;font.pixelSize:9;color:Colors.orange
+            verticalAlignment:Text.AlignVCenter;elide:Text.ElideRight
+            text:atlas.inspectedEvent
+                ?"NUMERICAL BRACKET ≤"+
+                 atlas.inspectedEvent.numerical_bracket_seconds+
+                 "S / WHEEL NEAREST UTC MINUTE / NOT OBSERVATIONAL ACCURACY"
+                :"SOURCE-VERIFIED EVENT REQUIRED"
         }
     }
     QuietText {

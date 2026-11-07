@@ -1,0 +1,43 @@
+name: Hospital Guided Worker Attachment Preview
+
+on:
+  pull_request:
+    paths:
+      - "widgets/HospitalW.qml"
+      - "widgets/HospitalRegisteredWorkerView.qml"
+      - "services/hospital/HospitalWorkerAttachmentPreviewPolicy.js"
+      - "services/hospital/HospitalWorkerAttachmentPreviewService.qml"
+      - "tests/hospital/test_worker_attachment_preview_policy.js"
+      - "tests/hospital/test_worker_attachment_preview_ui_contracts.py"
+      - ".github/workflows/hospital-worker-attachment-preview.yml"
+  push:
+    branches:
+      - main
+    paths:
+      - "widgets/HospitalW.qml"
+      - "widgets/HospitalRegisteredWorkerView.qml"
+      - "services/hospital/HospitalWorkerAttachmentPreviewPolicy.js"
+      - "services/hospital/HospitalWorkerAttachmentPreviewService.qml"
+      - "tests/hospital/test_worker_attachment_preview_policy.js"
+      - "tests/hospital/test_worker_attachment_preview_ui_contracts.py"
+      - ".github/workflows/hospital-worker-attachment-preview.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  synthetic-preview:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate pure attachment preflight policy
+        run: |
+          node --check services/hospital/HospitalWorkerAttachmentPreviewPolicy.js
+          node tests/hospital/test_worker_attachment_preview_policy.js
+      - name: Preserve exact Room, Session and existing Hospital interfaces
+        run: |
+          python3 tests/hospital/test_worker_attachment_preview_ui_contracts.py
+          python3 tests/hospital/test_worker_connection_ui_contracts.py
+          python3 tests/hospital/test_registered_worker_routes.py
+          python3 tests/hospital/test_worker_attention_ui_contracts.py
+          python3 tests/hospital/test_main_mode_keyboard_contracts.py

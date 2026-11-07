@@ -552,6 +552,44 @@ Rectangle {
             }
         }
     }
+    Rectangle {
+        id:inspector
+        anchors.left:parent.left;anchors.right:parent.right
+        anchors.bottom:footer.top
+        height:visible?41:0
+        visible:!!atlas.inspectedEvent
+        color:Colors.dark
+        border.width:1;border.color:Colors.magenta
+        clip:true
+        QuietText {
+            anchors.left:parent.left;anchors.right:parent.right
+            anchors.top:parent.top;anchors.topMargin:3
+            anchors.leftMargin:5;anchors.rightMargin:5
+            height:17;font.pixelSize:9;color:Colors.magenta
+            elide:Text.ElideRight
+            text:!atlas.inspectedEvent?""
+                :atlas.inspectedEvent.utc+" / "+
+                 Multi.shortLabel(atlas.inspectedEvent.planet)+" / "+
+                 (atlas.inspectedEvent.type==="station"
+                     ?"STATION "+atlas.inspectedEvent.direction.toUpperCase()
+                     :atlas.inspectedEvent.aspect.toUpperCase()+" "+
+                        atlas.inspectedEvent.angle_deg+"°")
+        }
+        QuietText {
+            anchors.left:parent.left;anchors.right:parent.right
+            anchors.bottom:parent.bottom;anchors.bottomMargin:3
+            anchors.leftMargin:5;anchors.rightMargin:5
+            height:16;font.pixelSize:8;color:Colors.yellow
+            elide:Text.ElideRight
+            text:!atlas.inspectedEvent?""
+                :atlas.inspectedEvent.type==="station"
+                    ?"LONG "+atlas.inspectedEvent.longitude_deg.toFixed(4)+"°"+
+                     " / RATE "+atlas.inspectedEvent.velocity_deg_day.toFixed(5)+
+                     "°/DAY / NUMERICAL BRACKET ≤60S"
+                    :"ANGLE RESIDUAL "+atlas.inspectedEvent.residual_deg.toFixed(6)+
+                     "° / NUMERICAL BRACKET ≤1S"
+        }
+    }
     QuietText {
         id:footer
         anchors.left:parent.left;anchors.right:parent.right

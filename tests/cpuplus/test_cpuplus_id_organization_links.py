@@ -92,7 +92,7 @@ class CpuPlusLocalOrganizationLinksContracts(unittest.TestCase):
         self.assertIn("IdentityPolicy.APP_IDS", ORGS)
         self.assertIn("Object.keys(savedAccountRecord.accounts)", ORGS)
         self.assertIn("accountServices.indexOf(chosenServiceId)", ORGS)
-        self.assertIn("entry.id === editor.chosenAccountId", ORGS)
+        self.assertIn("account.id === editor.chosenAccountId", ORGS)
         self.assertIn("chosenBranchId || null", ORGS)
         self.assertIn("!targetAlreadyLinked", ORGS)
         self.assertIn("!entry.archived", ORGS)

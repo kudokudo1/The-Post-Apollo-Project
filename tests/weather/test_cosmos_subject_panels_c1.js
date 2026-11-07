@@ -429,7 +429,7 @@ test("COSMOS SUN, MOON and EVENTS bottom landings own their subject data", () =>
 
 test("C5 subject modes are distinct real routes and direct fixed-rail actions", () => {
   const families = {
-    sun:["LIVE","POSITION + LIGHT","ACTIVITY","YEAR"],
+    sun:["OBSERVATION","ACTIVITY","YEAR"],
     astronomy:["CLOCK","PLANETS","STARS"],
     events:["METEORS","ECLIPSES","ISS"]
   };

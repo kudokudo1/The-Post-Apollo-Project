@@ -186,11 +186,14 @@ class ZoomWebHostTests(unittest.TestCase):
         self.assertIn('"--width", String(zoomActorWidth), "--height", String(zoomActorHeight)',QML)
         self.assertIn('width: camera.zoomWebDocked ? camera.zoomActorWidth : 0',QML)
         self.assertIn('height: camera.zoomWebDocked ? camera.zoomInputHeight : 0',QML)
-        for frame_width, frame_height, top in (
-                (784,699,133),(1000,900,133),(1920,1080,133)):
-            self.assertEqual(frame_width - 2 * 2,frame_width - 4)
-            self.assertEqual(frame_height - top - 1,frame_height - top - 1)
-            self.assertGreater(frame_height - top - 1,300)
+        # Representative panels all obey the same fitted rectangle rule;
+        # this does not assert native Sway placement or browser page zoom.
+        for frame_width, frame_height, top, expect_width, expect_height in (
+                (784, 699, 133, 780, 565),
+                (1000, 900, 133, 996, 766),
+                (1920, 1080, 133, 1916, 946)):
+            self.assertEqual(frame_width - 2 * 2, expect_width)
+            self.assertEqual(frame_height - top - 1, expect_height)
         # Preserve all four controls and the same header navigation.
         self.assertIn('height: 34',QML)
         self.assertIn('height: 42',QML)

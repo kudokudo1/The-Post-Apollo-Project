@@ -249,9 +249,21 @@ pending=bool(d.get("staged") or d.get("pending")) or d.get("booted") is False
 package_refs=json.dumps({"requested-local-packages":d.get("requested-local-packages",[]),"packages":d.get("packages",[])})
 if not (pending and sys.argv[2] in package_refs):
     sys.exit(1)
-# C4a requires BOTH exact RPM names in the SAME pending deployment.
+# C4a requires BOTH exact signed-test NEVRAs as LOCAL requested layers,
+# never substring matches in unrelated package names or JSON fields.
 if os.path.isfile("/var/lib/c4a-signed-service-test"):
-    if "postapollo-connections-c3d-ci-status" not in package_refs:
+    import re
+    local_refs=d.get("requested-local-packages") or []
+    expected=(
+        "postapollo-connections-c2t-fixture-0.1-1.fc44.noarch",
+        "postapollo-connections-c3d-ci-status-0.1-1.fc44.noarch",
+    )
+    if not isinstance(local_refs,list) or not all(
+        any(isinstance(ref,str) and (
+            ref==nevra or
+            re.fullmatch(r"sha256:[a-fA-F0-9]{64}:"+re.escape(nevra),ref)
+        ) for ref in local_refs) for nevra in expected
+    ):
         sys.exit(1)
 print("C2V_PENDING_DEPLOYMENT_AUTHORITY // staged-or-pending, idle transaction, exact test RPM")
 C2V_PENDING_CHECK

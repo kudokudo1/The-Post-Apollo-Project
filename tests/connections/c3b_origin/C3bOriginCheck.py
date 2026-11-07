@@ -21,15 +21,25 @@ NAME = "org.postapollo.ConnectionsStatus1"
 UNIT = "postapollo-connections-status.service"
 USER = "postapollo-connections"
 HOST = "/usr/libexec/post-apollo/connections-status-host"
+INTERPRETER = "/opt/postapollo-c2o-venv/bin/python3"
+EXPECTED_CGROUP = "/system.slice/" + UNIT
 UNIT_PATH = "/usr/lib/systemd/system/" + UNIT
 POLICY = "/usr/share/dbus-1/system.d/" + NAME + ".conf"
 FILES = (HOST, UNIT_PATH, POLICY)
+# Every directory through which the OS reaches the fake executable, unit,
+# D-Bus policy and Python launcher. No writable or symlinked ancestors.
+PROTECTED_DIRS = (
+    "/", "/usr", "/usr/libexec", "/usr/libexec/post-apollo",
+    "/usr/lib", "/usr/lib/systemd", "/usr/lib/systemd/system",
+    "/usr/share", "/usr/share/dbus-1", "/usr/share/dbus-1/system.d",
+    "/opt", "/opt/postapollo-c2o-venv", "/opt/postapollo-c2o-venv/bin",
+)
 KEYS = {
     "owner_first", "owner_last", "bus_pid", "bus_uid", "main_pid",
     "systemd_user", "systemd_active", "unit_fragment", "unit_cgroup",
     "proc_uids", "proc_args", "proc_cgroup", "proc_context",
     "proc_no_new_privs", "expected_uid", "selinux_mode",
-    "kernel_enforcing", "protected_files",
+    "kernel_enforcing", "protected_files", "protected_dirs",
 }
 DENIED_FLAGS = {
     "hostAuthenticated": False,
@@ -68,13 +78,12 @@ def evaluate(evidence: object) -> dict:
             e["unit_fragment"] != UNIT_PATH):
         return refusal("C3B_UNIT_MISMATCH")
     if (type(e["unit_cgroup"]) is not str or
-            not e["unit_cgroup"].endswith("/" + UNIT) or
-            e["proc_cgroup"] != e["unit_cgroup"]):
+            e["unit_cgroup"] != EXPECTED_CGROUP or
+            e["proc_cgroup"] != EXPECTED_CGROUP):
         return refusal("C3B_CGROUP_MISMATCH")
     args = e["proc_args"]
     if (type(args) is not list or len(args) != 3 or
-            type(args[0]) is not str or
-            not args[0].startswith("/opt/postapollo-c2o-venv/bin/python") or
+            type(args[0]) is not str or args[0] != INTERPRETER or
             args[1:] != [HOST, "--read-only"]):
         return refusal("C3B_COMMAND_MISMATCH")
     if (e["selinux_mode"] != "Enforcing" or e["kernel_enforcing"] != "1" or
@@ -93,6 +102,17 @@ def evaluate(evidence: object) -> dict:
                 type(f["mode"]) is not int or f["mode"] & 0o022 or
                 f["regular"] is not True or f["symlink"] is not False):
             return refusal("C3B_UNPROTECTED_FILE")
+    dirs = e["protected_dirs"]
+    if type(dirs) is not dict or set(dirs) != set(PROTECTED_DIRS):
+        return refusal("C3C_DIRECTORIES_MISMATCH")
+    for path in PROTECTED_DIRS:
+        d = dirs[path]
+        if (type(d) is not dict or
+                set(d) != {"owner", "mode", "directory", "symlink"} or
+                type(d["owner"]) is not int or d["owner"] != 0 or
+                type(d["mode"]) is not int or d["mode"] & 0o022 or
+                d["directory"] is not True or d["symlink"] is not False):
+            return refusal("C3C_UNPROTECTED_DIRECTORY")
     return refusal("C3B_OS_ORIGIN_COHERENT_TEST_ONLY")
 
 
@@ -110,6 +130,16 @@ def _file_evidence(path: str) -> dict:
         "owner": info.st_uid,
         "mode": stat.S_IMODE(info.st_mode),
         "regular": stat.S_ISREG(info.st_mode),
+        "symlink": stat.S_ISLNK(info.st_mode),
+    }
+
+
+def _directory_evidence(path: str) -> dict:
+    info = os.lstat(path)  # Never follow a directory alias in our fake test tree.
+    return {
+        "owner": info.st_uid,
+        "mode": stat.S_IMODE(info.st_mode),
+        "directory": stat.S_ISDIR(info.st_mode),
         "symlink": stat.S_ISLNK(info.st_mode),
     }
 
@@ -187,6 +217,9 @@ async def _probe() -> dict:
             ).stdout.strip(),
             "kernel_enforcing": Path("/sys/fs/selinux/enforce").read_text().strip(),
             "protected_files": {path: _file_evidence(path) for path in FILES},
+            "protected_dirs": {
+                path: _directory_evidence(path) for path in PROTECTED_DIRS
+            },
         }
         e["owner_last"] = await query("GetNameOwner", NAME)
         return e

@@ -24,8 +24,8 @@ function clampPan(z, px, py, viewportWidth, viewportHeight,
     var maxX = Math.max(0, (cw * scale - vw) / 2);
     var maxY = Math.max(0, (ch * scale - vh) / 2);
     return {
-        x: Math.max(-maxX, Math.min(maxX, numberOr(px, 0))),
-        y: Math.max(-maxY, Math.min(maxY, numberOr(py, 0)))
+        x: maxX === 0 ? 0 : Math.max(-maxX, Math.min(maxX, numberOr(px, 0))),
+        y: maxY === 0 ? 0 : Math.max(-maxY, Math.min(maxY, numberOr(py, 0)))
     };
 }
 

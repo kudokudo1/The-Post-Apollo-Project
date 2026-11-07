@@ -64,17 +64,22 @@ class DesktopHostLifecycle:
         exchange_and_verify: Callable[[str, str, str, str], VerifiedCodeExchange],
         api_get: Callable[[str], HostContextReply],
         clock: Callable[[], int],
+        session_is_active: Callable[[], bool] | None = None,
     ) -> None:
-        if type(config) is not HostLifecycleConfig or not all(
+        if (type(config) is not HostLifecycleConfig or not all(
             callable(item) for item in
             (browser_open, exchange_and_verify, api_get, clock)
-        ):
+        ) or (session_is_active is not None and not callable(session_is_active))):
             raise ValueError("Trusted host-owned dependencies required")
         self._config = config
         self._browser_open = browser_open
         self._exchange = exchange_and_verify
         self._api_get = api_get
         self._clock = clock
+        # A real seat/logind adapter must be supplied by a separately
+        # approved isolated host. Legacy synthetic fixtures omit this gate.
+        self._session_is_active = session_is_active
+        self._revoked = threading.Event()
         self._lock = threading.RLock()
         self._status = "NEW"
         self._receiver: LoopbackCallbackReceiver | None = None
@@ -105,14 +110,51 @@ class DesktopHostLifecycle:
                 raise RuntimeError("Host lifecycle is not running")
             return self._socket.socket_path
 
+    def _seat_ok(self) -> bool:
+        """Only host-owned checks. Missing production probes remain a gap."""
+        if self._revoked.is_set():
+            return False
+        try:
+            accepted = (self._session_is_active is None
+                        or self._session_is_active() is True)
+            return accepted and not self._revoked.is_set()
+        except Exception:
+            return False
+
+    def _revoke_locked(self) -> None:
+        self._revoked.set()
+        self._allow_callback = False
+        self._signed_in = False
+        self._attempted = True
+        if self._session is not None:
+            self._session.logout()
+
+    def session_event(self, kind: str) -> None:
+        """Host-only seat event, NOT an IPC command or OS subscription.
+
+        Call on an actual trusted lock, suspend, user switch or end event.
+        The Event is set BEFORE waiting on the mutex; a pending HTTPS fetch
+        cannot publish an older organization preview after revocation.
+        """
+        if kind not in ("lock", "suspend", "user-switch", "session-end"):
+            raise ValueError("Unsupported trusted desktop session event")
+        self._revoked.set()
+        self.close()
+
     def _accept_callback(self, uri: str) -> dict[str, object]:
         # Invoked only by the fixed one-use numeric-loopback HTTP receiver.
         with self._lock:
+            if not self._seat_ok():
+                self._revoke_locked()
+                return {"status": "SIGNED_OUT"}
             if (self._status != "STARTED" or not self._allow_callback
                     or self._session is None):
                 return {"status": "SIGNED_OUT"}
             self._allow_callback = False
             answer = self._session.complete_callback(uri)
+            if not self._seat_ok():
+                self._revoke_locked()
+                return {"status": "SIGNED_OUT"}
             self._signed_in = (answer == {"status": "SIGNED_IN"})
             return answer
 
@@ -121,10 +163,17 @@ class DesktopHostLifecycle:
         with self._lock:
             if self._status != "STARTED" or self._session is None:
                 return empty_display("UNAVAILABLE")
+            if not self._seat_ok():
+                self._revoke_locked()
+                return empty_display("SIGNED_OUT")
             if not self._signed_in:
                 return empty_display("SIGNED_OUT" if self._attempted
                                      else "NOT_CONNECTED")
             view = self._session.refresh_context()
+            # Seat lock/session revocation may arrive DURING the HTTPS call.
+            if not self._seat_ok():
+                self._revoke_locked()
+                return empty_display("SIGNED_OUT")
             if view.get("status") not in ("READY", "NO_MEMBERSHIPS"):
                 # A failed/denied verified API fetch must not retain a bearer
                 # or preserve a previous company's display for future reads.
@@ -145,6 +194,10 @@ class DesktopHostLifecycle:
         with self._lock:
             if self._status != "NEW":
                 raise RuntimeError("Host lifecycle cannot be started twice")
+            if not self._seat_ok():
+                self._status = "CLOSED"
+                self._revoked.set()
+                raise RuntimeError("Trusted desktop session unavailable")
             self._status = "STARTING"
             try:
                 receiver = LoopbackCallbackReceiver(callback=self._accept_callback)
@@ -194,22 +247,26 @@ class DesktopHostLifecycle:
         with self._lock:
             if self._status != "STARTED" or self._session is None:
                 return {"status": "UNAVAILABLE"}
+            if not self._seat_ok():
+                self._revoke_locked()
+                return {"status": "UNAVAILABLE"}
             if self._attempted:
                 return {"status": "UNAVAILABLE"}
             self._attempted = True
             self._allow_callback = True
             result = self._session.start_login()
+            if not self._seat_ok():
+                self._revoke_locked()
+                return {"status": "UNAVAILABLE"}
             if result != {"status": "LOGIN_PENDING"}:
                 self._allow_callback = False
             return result
 
     def logout(self) -> dict[str, object]:
-        """Fail closed on local logout, including any in-flight callback."""
+        """Fail closed before any in-flight callback or HTTPS read finishes."""
+        self._revoked.set()
         with self._lock:
-            self._allow_callback = False
-            self._signed_in = False
-            if self._session is not None:
-                self._session.logout()
+            self._revoke_locked()
             return {"status": "SIGNED_OUT"}
 
     def close(self) -> None:
@@ -218,15 +275,14 @@ class DesktopHostLifecycle:
         Shutdown happens OUTSIDE the lock: server.shutdown() waits for handler
         threads, which may themselves be waiting to take this host lock.
         """
+        # Immediate revocation blocks an in-flight network reply from becoming
+        # a new display even while close is waiting for the host mutex.
+        self._revoked.set()
         with self._lock:
             if self._status == "CLOSED":
                 return
             self._status = "CLOSED"
-            self._allow_callback = False
-            self._signed_in = False
-            self._attempted = True
-            if self._session is not None:
-                self._session.logout()
+            self._revoke_locked()
             socket, receiver = self._socket, self._receiver
             self._socket = None
             self._receiver = None

@@ -99,7 +99,7 @@ ShellRoot {
 
     Window {
         visible: true
-        width: 1380
+        width: 1840
         height: 286
         color: "black"
         Row {
@@ -128,6 +128,16 @@ ShellRoot {
                 terminalMode: "activity"
                 sourceSpace: noaa
                 spaceService: mockSolar
+            }
+            Weather.StationCosmosSunTerminalPane {
+                id: observation
+                width: 450
+                height: 254
+                terminalMode: "observation"
+                sourceSpace: noaa
+                spaceService: mockSolar
+                skyFeed: sky
+                weatherService: mockLocation
             }
         }
     }
@@ -160,6 +170,11 @@ ShellRoot {
             const sun=fixture.locate(position,"cosmos-c12-sun-path-hero");
             const ledger=fixture.locate(position,"cosmos-c12-light-ledger");
             const strip=fixture.locate(position,"cosmos-c12-position-live-strip");
+            const obsImage=fixture.locate(observation,"cosmos-c14-suvi-hero");
+            const obsArc=fixture.locate(observation,"cosmos-c14-sun-path-hero");
+            const obsLive=fixture.locate(observation,"cosmos-c14-live-telemetry");
+            const obsSky=fixture.locate(observation,"cosmos-c14-position-live-strip");
+            const obsLight=fixture.locate(observation,"cosmos-c14-twilight-ledger");
             const metrics=fixture.locate(activity,"cosmos-c12-activity-metrics");
             const trend=fixture.locate(activity,"cosmos-c12-xray-trend");
             const xray=fixture.locate(activity,"cosmos-c12-xray-facts");
@@ -171,7 +186,8 @@ ShellRoot {
             const cycleBay=fixture.locate(activity,"cosmos-c13-cycle-bay");
             if(!hero||!side||!sun||!ledger||!strip||!metrics
                 ||!trend||!xray||!flare||!cycle||!cluster
-                ||!xrayBay||!flareBay||!cycleBay)return;
+                ||!xrayBay||!flareBay||!cycleBay
+                ||!obsImage||!obsArc||!obsLive||!obsSky||!obsLight)return;
             if(fixture.phase===0){
                 if(position.positionRows.length!==8||position.positionStrip.length!==5)
                     return fixture.stop("POSITION_DATA_MISSING");
@@ -179,6 +195,12 @@ ShellRoot {
                     ||hero.width<230||side.width<120
                     ||metrics.height!==52)
                     return fixture.stop("TERMINAL_GEOMETRY_TOO_SMALL");
+                if(obsImage.width<200||obsArc.width<200||obsLive.height<20
+                    ||obsSky.height<24||obsLight.height<40
+                    ||obsLight.y+obsLight.height>observation.height+1
+                    ||observation.positionRows.length!==8
+                    ||observation.positionStrip.length!==5)
+                    return fixture.stop("OBSERVATION_INSTRUMENT_GEOMETRY_INVALID");
                 if(hero.height>live.height+1||sun.height>position.height+1
                     ||strip.y+strip.height>position.height+1
                     ||cluster.y+cluster.height>activity.height+1

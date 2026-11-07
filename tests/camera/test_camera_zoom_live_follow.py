@@ -71,7 +71,10 @@ class FollowTests(unittest.TestCase):
         self.assertIn('zoomWebDocked = false;', QML)
         self.assertIn('intersection: Intersection.Subtract', QML)
         self.assertIn('width: camera.zoomWebDocked ? camera.zoomActorWidth : 0', QML)
-        self.assertIn('height: camera.zoomWebDocked ? camera.zoomActorHeight : 0', QML)
+        self.assertIn('height: camera.zoomWebDocked ? camera.zoomInputHeight : 0', QML)
+        self.assertIn('y: camera.zoomInputTop', QML)
+        self.assertIn('readonly property int zoomVisualTopOverlap: 12', QML)
+        self.assertIn('zoomActorTop, cameraBodyColumn.y + cameraModes.y + cameraModes.height)', QML)
         self.assertIn('zoomFollowProcess.running = true;', QML)
 
     def test_direct_ipc_reuses_social_bridge_and_existing_actor_validation(self):

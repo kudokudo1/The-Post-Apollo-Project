@@ -77,6 +77,17 @@ PanelWindow {
     readonly property int zoomActorTop: zoomBayTop
     readonly property int zoomActorWidth: zoomBayWidth
     readonly property int zoomActorHeight: zoomBayHeight
+    // Measured from the operator's cropped screenshot, the physical browser
+    // started about 12 logical px below the visible mode-button edge, while
+    // both client/outer Sway rectangles already matched. Extend the browser
+    // upward only; its bottom and side edges remain unchanged.
+    readonly property int zoomVisualTopOverlap: 12
+    // The browser can sit behind Camera chrome, but its input cutout must
+    // never cut through the row of live Camera mode buttons.
+    readonly property int zoomInputTop: Math.max(
+        zoomActorTop, cameraBodyColumn.y + cameraModes.y + cameraModes.height)
+    readonly property int zoomInputHeight: Math.max(
+        0, zoomActorHeight - (zoomInputTop - zoomActorTop))
     property bool zoomWebNeedsRealign: false
     property int zoomFollowRevision: 0
 
@@ -693,9 +704,9 @@ PanelWindow {
             // Coordinates relative to the enclosing frame input region.
             // No hole until the browser actor and exact bay are confirmed.
             x: camera.zoomActorLeft
-            y: camera.zoomActorTop
+            y: camera.zoomInputTop
             width: camera.zoomWebDocked ? camera.zoomActorWidth : 0
-            height: camera.zoomWebDocked ? camera.zoomActorHeight : 0
+            height: camera.zoomWebDocked ? camera.zoomInputHeight : 0
             intersection: Intersection.Subtract
         }
     }
@@ -890,12 +901,13 @@ PanelWindow {
         Item {
             id: zoomViewport
             x: cameraBodyColumn.x
-            // Zoom's guest starts immediately below the MODE row. The
-            // shared Column's 12px spacing was leaving a visible gap above
-            // this separately hosted browser, even though its bottom fitted.
-            // The existing height binding extends the guest upward without
-            // moving the viewport's bottom or changing left/right margins.
+            // The real Sway Zoom client starts about 12 logical pixels below
+            // Camera's visible button edge even with the normal Column gap
+            // removed. Overlap the visual chrome by that measured amount.
+            // Keep the input hole clamped below the mode row so its buttons
+            // remain clickable; the physical browser follows this rectangle.
             y: cameraBodyColumn.y + cameraModes.y + cameraModes.height
+               - camera.zoomVisualTopOverlap
             width: Math.max(0, cameraBodyColumn.width)
             height: Math.max(0, frame.height - y - camera.zoomBayBottom)
             visible: camera.menuOpen && camera.activeView === "zoom"

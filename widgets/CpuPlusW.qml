@@ -7,6 +7,7 @@ import "appcontrol"
 import "cpuplus"
 import qs.services.location
 import qs.services.time
+import qs.services.social
 import "thermal"
 
 PanelWindow {
@@ -46,6 +47,17 @@ PanelWindow {
     property string settingsSubMode: "LOCATION"
     // UI-only selection, not a provider login or permission grant.
     property string selectedConnectionId: "social"
+    // UI-only inspection selection; never changes the active Social layout.
+    property string selectedLocalIdForManagement: ""
+    readonly property var localIdManagementSnapshot: SocialIdentityStore.snapshot
+    readonly property string effectiveLocalIdForManagement: {
+        const snap = localIdManagementSnapshot;
+        const ids = snap && Array.isArray(snap.identities) ? snap.identities : [];
+        const chosen = ids.find(function(item) {
+            return item.id === selectedLocalIdForManagement;
+        });
+        return chosen ? chosen.id : String(snap ? snap.activeId : "");
+    }
 
     // A prepared resync is an explicit, view-scoped confirmation request.
     // Closing or leaving this CPU++ TIME surface must not leave it armed.
@@ -132,6 +144,11 @@ PanelWindow {
         {
             name: "SETTINGS",
             symbol: "⚙",
+            kind: "text"
+        },
+        {
+            name: "ID MANAGEMENT",
+            symbol: "󰀄",
             kind: "text"
         }
     ]
@@ -1075,7 +1092,8 @@ PanelWindow {
                    ? "TIME // BASIC CONTROLS"
                    : cpuPlusWindow.settingsSubMode === "CONNECTIONS"
                      ? "CONNECTIONS // OVERVIEW" : "SETTINGS // OVERVIEW")
-                : "SHARED INSTRUMENT"
+                : cpuPlusWindow.selectedModeIndex === 5
+                ? "ID MANAGEMENT // OVERVIEW" : "SHARED INSTRUMENT"
 
             font.pixelSize: 13
             color: Colors.magenta
@@ -1376,7 +1394,8 @@ PanelWindow {
                        ? "CLOCK // CONTROL"
                        : cpuPlusWindow.settingsSubMode === "CONNECTIONS"
                          ? "SHARED // STATUS" : "SETTINGS STATE")
-                    : "INSTRUMENT STATE"
+                    : cpuPlusWindow.selectedModeIndex === 5
+                    ? "IDENTITY // LOCAL STATUS" : "INSTRUMENT STATE"
 
                 font.pixelSize: 13
                 color:
@@ -1426,6 +1445,7 @@ PanelWindow {
             visible: !(cpuPlusWindow.selectedModeIndex === 4
                        && (cpuPlusWindow.settingsSubMode === "TIME"
                            || cpuPlusWindow.settingsSubMode === "CONNECTIONS"))
+                     && cpuPlusWindow.selectedModeIndex !== 5
             anchors.left: parent.left
             anchors.right: parent.right
             anchors.top: sharedStateHeader.bottom
@@ -1532,6 +1552,21 @@ PanelWindow {
             anchors.topMargin: 8
             anchors.bottomMargin: 9
         }
+
+        CpuPlusIdManagementPane {
+            id: idManagementOverviewPane
+            area: "overview"
+            selectedId: cpuPlusWindow.effectiveLocalIdForManagement
+            visible: cpuPlusWindow.selectedModeIndex === 5
+            anchors.left: parent.left
+            anchors.right: parent.right
+            anchors.top: sharedStateHeader.bottom
+            anchors.bottom: parent.bottom
+            anchors.leftMargin: 12
+            anchors.rightMargin: 12
+            anchors.topMargin: 9
+            anchors.bottomMargin: 9
+        }
     }
 
     // ============================================================
@@ -1579,7 +1614,8 @@ PanelWindow {
                    ? "TIME // ACTIVE"
                    : cpuPlusWindow.settingsSubMode === "CONNECTIONS"
                      ? "CONNECTIONS // SOURCES" : "SETTINGS // CATEGORIES")
-                : "TARGET"
+                : cpuPlusWindow.selectedModeIndex === 5
+                ? "ID MANAGEMENT // IDS" : "TARGET"
 
             font.pixelSize: 12
             color: Colors.magenta
@@ -1917,6 +1953,24 @@ PanelWindow {
             anchors.leftMargin: 10
             anchors.rightMargin: 10
             anchors.topMargin: 10
+            anchors.bottomMargin: 9
+        }
+
+        CpuPlusIdManagementPane {
+            id: idManagementSelectorPane
+            area: "selector"
+            selectedId: cpuPlusWindow.effectiveLocalIdForManagement
+            visible: cpuPlusWindow.selectedModeIndex === 5
+            onIdRequested: function(localId) {
+                cpuPlusWindow.selectedLocalIdForManagement = localId;
+            }
+            anchors.left: parent.left
+            anchors.right: parent.right
+            anchors.top: targetHeaderLine.bottom
+            anchors.bottom: parent.bottom
+            anchors.leftMargin: 10
+            anchors.rightMargin: 10
+            anchors.topMargin: 9
             anchors.bottomMargin: 9
         }
 
@@ -2317,7 +2371,8 @@ PanelWindow {
                      ? "TIME // ADVANCED"
                      : cpuPlusWindow.settingsSubMode === "CONNECTIONS"
                        ? "CONNECTIONS // ACCESS" : "LOCATION // SETTINGS")
-                  : "CPU++ ACTUATORS"
+                  : cpuPlusWindow.selectedModeIndex === 5
+                  ? "ID MANAGEMENT // DETAILS" : "CPU++ ACTUATORS"
 
             font.pixelSize: 12
             color: Colors.magenta
@@ -2379,6 +2434,21 @@ PanelWindow {
             visible: cpuPlusWindow.selectedModeIndex === 4
                      && cpuPlusWindow.settingsSubMode === "TIME"
             panelVisible: visible && cpuPlusWindow.menuOpen
+            anchors.left: parent.left
+            anchors.right: parent.right
+            anchors.top: actuatorHeader.bottom
+            anchors.bottom: parent.bottom
+            anchors.leftMargin: 10
+            anchors.rightMargin: 10
+            anchors.topMargin: 20
+            anchors.bottomMargin: 10
+        }
+
+        CpuPlusIdManagementPane {
+            id: idManagementDetailsPane
+            area: "details"
+            selectedId: cpuPlusWindow.effectiveLocalIdForManagement
+            visible: cpuPlusWindow.selectedModeIndex === 5
             anchors.left: parent.left
             anchors.right: parent.right
             anchors.top: actuatorHeader.bottom

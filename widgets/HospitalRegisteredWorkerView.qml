@@ -312,6 +312,12 @@ Item {
             }
         }
 
+        NeonScrollBar {
+            flickable: transcriptScroll
+            handleStyle: "star"
+            visible: root.viewMode === "chat" && scrollable
+        }
+
         Column {
             visible: root.viewMode === "quick"
             anchors.fill: parent

@@ -20,7 +20,7 @@ function empty() {
 }
 
 function checkKey(key) {
-    if (typeof key !== "string" || key.length < 18
+    if (typeof key !== "string" || key.length < 16
             || key.length > MAX_KEY_LENGTH)
         return {ok:false,reason:"INVALID_KEY"};
     const match = /^fav1:local:([a-z][a-z0-9-]{0,47}):([a-z][a-z0-9-]{0,47}):(.+)$/.exec(key);

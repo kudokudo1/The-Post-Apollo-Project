@@ -106,7 +106,9 @@ PanelWindow {
     property bool bedControlMode: false
     property string operationsSurface: ""
     // Pilot display only: never confuse discovered Git branches with registered Doctors.
-    property bool workforceRosterVisible: false
+    // Surgery opens to registered workers. Git branch topology remains one
+    // click away, but technical branches are not stand-ins for AI workers.
+    property bool workforceRosterVisible: true
     // WORKERS naming controls are operator actions, not provider instructions.
     property string rosterEditingRoomId: ""
     property string rosterEditingDoctorId: ""
@@ -2147,7 +2149,12 @@ PanelWindow {
         const last = Number(stamps[key] || 0);
         const now = Date.now();
 
-        if (last > 0 && now - last < openAuditStaleInterval) {
+        // A timestamp is not a usable cache. Floor changes clear audit data;
+        // a failed/stalled scan must not suppress the next available scan.
+        // Reuse the 10-minute window only when this Floor has a good snapshot.
+        if (last > 0 && now - last < openAuditStaleInterval
+                && auditService.available
+                && !auditService.lastError) {
             openAuditPending = false;
             return;
         }
@@ -2164,13 +2171,26 @@ PanelWindow {
     }
 
     onOperationsSurfaceChanged: {
-        // Floor slider exists only on the Surgery surface. Returning to
-        // another Hospital surface always restores the legacy default.
+        // The slider is just a pointer-mode experiment, not a Floor-data gate.
         if (root.operationsOpen)
             root.floorIndexPilotEnabled = false;
         if (root.operationsSurface !== "reception"
                 && speechInputService.busy)
             speechInputService.cancel();
+
+        // Show the workforce right when Surgery becomes visible. Do not wait
+        // for the slower Git audit, and never dispatch or attach sessions.
+        if (root.operationsSurface === "" && root.workforceRosterVisible) {
+            Qt.callLater(function() {
+                if (!root.menuOpen || root.operationsSurface !== ""
+                        || !root.workforceRosterVisible)
+                    return;
+                if (!responsibilityService.graphLoading)
+                    responsibilityService.refreshDurableGraph();
+                if (!doctorService.refreshing)
+                    doctorService.refresh();
+            });
+        }
     }
 
     onMenuOpenChanged: {
@@ -4277,7 +4297,8 @@ PanelWindow {
                                 GohuText {
                                     anchors.centerIn: parent
                                     text: root.floorIndexPilotEnabled
-                                        ? "LIVE FLOOR // ON" : "LIVE FLOOR // OFF"
+                                        ? "FLOOR INPUT // PREVIEW"
+                                        : "FLOOR INPUT // STANDARD"
                                     font.pixelSize: 9
                                     color: root.floorIndexPilotEnabled
                                         ? Colors.orange : Colors.cyan
@@ -6121,6 +6142,34 @@ PanelWindow {
                     font.pixelSize: 10
                     color: responsibilityService.graphError ? Colors.red : Colors.orange
                     wrapMode: Text.Wrap
+                }
+
+                GohuText {
+                    width: parent.width
+                    visible: !root.workforceRosterVisible
+                        && (auditService.rooms || []).length === 0
+                    height: visible ? 64 : 0
+                    text: floorService.discovering
+                        ? "DISCOVERING LOCAL FLOORS // GIT ROOMS WILL LOAD AFTERWARD"
+                        : !floorService.floorId
+                        ? "NO LOCAL FLOOR DETECTED // USE LOCAL REFRESH"
+                        : auditService.running
+                        ? "READING GIT OPERATING ROOMS // PLEASE CHECK AUDIT STATUS"
+                        : auditService.lastError
+                        ? "ROOM AUDIT FAILED // " + auditService.lastError
+                            + " // USE AUDIT TO RETRY"
+                        : !auditService.repository
+                        ? "GIT REPOSITORY NOT RESOLVED // CHECK FLOOR SELECTION"
+                        : auditService.available
+                        ? "NO GIT OPERATING ROOMS RETURNED // SHOW WORKERS"
+                        : root.openAuditPending
+                        ? "WAITING FOR FLOOR / GIT AUDIT // NO ROOMS LOADED YET"
+                        : "GIT ROOM LIST NOT LOADED // PRESS AUDIT OR SHOW WORKERS"
+                    font.pixelSize: 10
+                    color: auditService.lastError ? Colors.red : Colors.orange
+                    wrapMode: Text.Wrap
+                    maximumLineCount: 4
+                    elide: Text.ElideRight
                 }
 
                 Repeater {

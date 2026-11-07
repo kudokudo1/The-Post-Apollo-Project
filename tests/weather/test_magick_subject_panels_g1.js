@@ -367,9 +367,12 @@ test("M30-F ASTROLOGY is an independent, non-scrolling, source-owned instrument"
   assert.match(standaloneAstro,/anchors\.top: pairControls\.bottom/);
   assert.match(standaloneAstro,/anchors\.bottom: eventAndTimeControls\.top/);
   assert.match(standaloneAstro,/visualData: astrology\.calculated\s*\? astrology\.celestialSource\.visualData : null/);
-  assert.match(standaloneAstro,/label: astrology\.celestialSource && astrology\.celestialSource\.loading\s*\? "CALCULATING" : "CALCULATE"/);
-  assert.match(standaloneAstro,/available: astrology\.chartAvailable/);
-  assert.match(standaloneAstro,/onClicked: astrology\.celestialSource\.refresh\(\)/);
+  // M8b adds a distinct private natal service while preserving M4 pair launch.
+  assert.match(standaloneAstro,/label: astrology\.natalMode/);
+  assert.match(standaloneAstro,/: astrology\.celestialSource && astrology\.celestialSource\.loading/);
+  assert.match(standaloneAstro,/available: astrology\.natalMode/);
+  assert.match(standaloneAstro,/else astrology\.celestialSource\.refresh\(\)/);
+  assert.match(standaloneAstro,/natalSource\.calculate\(draft\)/);
   for(const control of ["jumpDate(-1)","jumpDate(1)","returnToToday()","adjustDateStepDays(-1)","adjustDateStepDays(1)","cyclePair(-1)","cyclePair(1)","cycleSpan()"])
     assert.ok(standaloneAstro.includes(control),"missing verified source control "+control);
   for(const control of ["◀ EVENT","EVENT ▶","◀ TIME","TIME ▶","UNLOCK","RESET"])

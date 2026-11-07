@@ -1,0 +1,39 @@
+name: MAGICK M8b private source-verified natal calculation
+
+on:
+  pull_request:
+    paths:
+      - 'scripts/weather/celestial_natal_chart.py'
+      - 'services/weather/CelestialNatalChartService.qml'
+      - 'widgets/weather/StationMagickNatalRequestPolicy.js'
+      - 'widgets/weather/StationMagickAstrologyPane.qml'
+      - 'widgets/weather/StationMagickEventChartSetupPane.qml'
+      - 'tests/weather/test_magick_natal_engine_m8b.py'
+      - 'tests/weather/test_magick_natal_integration_m8b.js'
+      - 'tests/weather/test_magick_five_track_foundations_m7a.js'
+      - '.github/workflows/weather-magick-m8b-natal.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  natal:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Test sidereal geometry, house cusps, UTC bounds and NAIF labeling
+        run: python -m unittest discover -s tests/weather -p 'test_magick_natal_engine_m8b.py' -v
+      - name: Test private event calculation wiring and source-only data
+        run: node --test tests/weather/test_magick_natal_integration_m8b.js
+      - name: Preserve M8a/M7a natal gate and prior MAGICK routes
+        run: |
+          node --test tests/weather/test_magick_three_instruments_m8a.js
+          node --test tests/weather/test_magick_five_track_foundations_m7a.js

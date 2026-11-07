@@ -159,7 +159,8 @@ test("M7a new routes, chart controls and privacy ownership are wired without new
  assert.match(uis[1],/Hours\.build\(daily,"",targetDate\)/);
  assert.match(uis[1],/DST ACTUAL ELAPSED TIME UNVERIFIED/);
  assert.match(uis[2],/SESSION-ONLY INPUT/);
- assert.match(uis[2],/FULL CHART ENGINE NOT CONNECTED/);
+ assert.match(uis[2],/CALCULATE NATAL/);
+ assert.match(uis[2],/SIDEREAL DISABLED \/\/ NO VERIFIED AYANAMSA/);
  assert.match(uis[3],/symbols?/i);
  assert.match(uis[3],/AGRIPPA BOOK I, 1651/);
  assert.match(uis[4],/TextEdit\.PlainText/);

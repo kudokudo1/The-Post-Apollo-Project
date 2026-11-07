@@ -110,7 +110,7 @@ class CpuPlusIdEditorContracts(unittest.TestCase):
                         'pane.idRequested("");',
                         "UNLINK ORGANIZATION LINKS FIRST",
                         "CLEAR CONTACT AND ACCOUNT NAMES FIRST",
-                        "NO BACKUP REQUIRED" if False else "LAST_ID_REQUIRED"):
+                        "LAST_ID_REQUIRED"):
             self.assertIn(snippet, PANE)
         for snippet in ("function removeIdentity(doc, id)",
                         "if (doc.identities.length <= 1)",

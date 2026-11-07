@@ -117,6 +117,20 @@ PanelWindow {
         responsibilityService.durableSessions,
         doctorService.doctors
     )
+    // Exact durable Room and PX Session pinned when opening card actions.
+    // A matching Git Team must never substitute for the registered Session.
+    property string rosterFocusedRoomId: ""
+    property string rosterFocusedSessionId: ""
+    property string rosterFocusedMode: "chat"
+    readonly property var rosterFocusedRoomData: {
+        const rooms = root.workforceRosterRows || [];
+        for (let i = 0; i < rooms.length; ++i) {
+            const row = rooms[i] || {};
+            if (String(row.roomId || "") === root.rosterFocusedRoomId)
+                return row;
+        }
+        return { roomId: root.rosterFocusedRoomId };
+    }
     property string attentionSubview: "triage"
     property string attentionQueueRepository: ""
     property string attentionQueueBranch: ""
@@ -291,6 +305,33 @@ PanelWindow {
     function refreshRosterAfterIdentitySave() {
         if (!responsibilityService.refreshDurableGraph())
             root.rosterIdentityRefreshPending = true;
+    }
+
+    function openRosterSession(rosterValue, modeValue) {
+        const room = rosterValue || {};
+        const id = String(room.roomId || "").trim();
+        if (!id || !root.workforceRosterVisible)
+            return false;
+        const rows = root.workforceRosterRows || [];
+        let current = null;
+        for (let i = 0; i < rows.length; ++i) {
+            if (String((rows[i] || {}).roomId || "") === id) {
+                current = rows[i];
+                break;
+            }
+        }
+        if (!current)
+            return false;
+
+        root.leaveRoomControls();
+        root.leaveBedControls();
+        root.phoneMenuOpen = false;
+        root.intercomMenuOpen = false;
+        root.rosterFocusedRoomId = id;
+        root.rosterFocusedSessionId = String(current.sessionId || "");
+        root.rosterFocusedMode = modeValue === "quick" ? "quick" : "chat";
+        root.operationsSurface = "registeredWorker";
+        return true;
     }
 
     function rosterCurrentRoomIndex(rosterValue) {
@@ -2996,7 +3037,7 @@ PanelWindow {
             : rosterData.hasActiveSession ? Colors.cyan : Colors.magenta
 
         width: roomsColumn.width
-        height: 103
+        height: 126
         color: Colors.dark
         border.width: selected ? 2 : 1
         border.color: selected ? Colors.orange : Colors.magenta
@@ -3031,7 +3072,7 @@ PanelWindow {
                 }
                 GohuText {
                     width: 114
-                    text: rosterRow.sessionState
+                    text: "REC // " + rosterRow.sessionState
                     font.pixelSize: 9
                     color: rosterRow.sessionColor
                     horizontalAlignment: Text.AlignRight
@@ -3080,6 +3121,38 @@ PanelWindow {
                 font.pixelSize: 8
                 color: rosterRow.linkedIndex >= 0 ? Colors.green : Colors.blue
                 elide: Text.ElideRight
+            }
+        }
+
+        // These direct actions use the registered Room ID, not a branch.
+        Row {
+            z: 2
+            anchors {
+                left: parent.left
+                bottom: parent.bottom
+                leftMargin: 8
+                bottomMargin: 7
+            }
+            height: 22
+            spacing: 6
+
+            HospitalActionButton {
+                width: 64
+                height: parent.height
+                label: "CHAT"
+                compactIcon: "CHAT"
+                accent: Colors.cyan
+                actionDescription: "Read the saved Room transcript"
+                onTriggered: root.openRosterSession(rosterRow.rosterData, "chat")
+            }
+            HospitalActionButton {
+                width: 67
+                height: parent.height
+                label: "QUICK"
+                compactIcon: "QUICK"
+                accent: Colors.orange
+                actionDescription: "Inspect exact PX Session and Quick commands"
+                onTriggered: root.openRosterSession(rosterRow.rosterData, "quick")
             }
         }
 
@@ -6945,6 +7018,35 @@ PanelWindow {
 
             onCloseRequested: root.showSurgery()
             onChatRequested: root.openRoomChat()
+        }
+
+        HospitalRegisteredWorkerView {
+            id: registeredWorkerView
+            z: 700
+            visible: root.operationsSurface === "registeredWorker"
+            active: visible
+            pinnedRoomId: root.rosterFocusedRoomId
+            pinnedSessionId: root.rosterFocusedSessionId
+            initialMode: root.rosterFocusedMode
+            roomData: root.rosterFocusedRoomData
+
+            anchors {
+                left: parent.left
+                right: parent.right
+                top: fixedTop.bottom
+                bottom: actionBay.top
+                leftMargin: 18
+                rightMargin: 18
+                topMargin: 8
+                bottomMargin: 10
+            }
+
+            onCloseRequested: root.showSurgery()
+            onRefreshRequested: {
+                responsibilityService.refreshDurableGraph();
+                if (!doctorService.refreshing)
+                    doctorService.refresh();
+            }
         }
 
         HospitalRoomChatView {

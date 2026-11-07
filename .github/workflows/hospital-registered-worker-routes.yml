@@ -1,0 +1,41 @@
+name: Hospital Registered Worker Session Routes
+
+on:
+  pull_request:
+    paths:
+      - "widgets/HospitalW.qml"
+      - "widgets/HospitalRegisteredWorkerView.qml"
+      - "services/hospital/HospitalWorkerTranscriptService.qml"
+      - "services/hospital/HospitalWorkerSessionPolicy.js"
+      - "tests/hospital/test_worker_session_policy.js"
+      - "tests/hospital/test_registered_worker_routes.py"
+      - ".github/workflows/hospital-registered-worker-routes.yml"
+  push:
+    branches:
+      - main
+    paths:
+      - "widgets/HospitalW.qml"
+      - "widgets/HospitalRegisteredWorkerView.qml"
+      - "services/hospital/HospitalWorkerTranscriptService.qml"
+      - "services/hospital/HospitalWorkerSessionPolicy.js"
+      - "tests/hospital/test_worker_session_policy.js"
+      - "tests/hospital/test_registered_worker_routes.py"
+      - ".github/workflows/hospital-registered-worker-routes.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  identity-and-source-contracts:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check worker identity policy syntax
+        run: node --check services/hospital/HospitalWorkerSessionPolicy.js
+      - name: Test foreign, stale and missing PX sessions
+        run: node tests/hospital/test_worker_session_policy.js
+      - name: Test safe Room transcript and exact Session routing
+        run: |
+          python3 tests/hospital/test_registered_worker_routes.py
+          python3 tests/hospital/test_main_mode_keyboard_contracts.py
+          python3 tests/hospital/test_workforce_roster_ui_contracts.py

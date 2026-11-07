@@ -17,6 +17,7 @@ ShellRoot {
         property var latitude: ""
         property var longitude: ""
         property var dailyForecast: []
+        property bool forecastReady: false
         property int airQualityUtcOffsetMinutes: -300
         property bool ready: false
         property bool loading: false
@@ -74,6 +75,16 @@ ShellRoot {
                 sky.celestialObservation.active=false;
                 fakeWeather.latitude=38.9;
                 fakeWeather.longitude=-76.7;
+                fakeWeather.localObservationDateTime="2026-11-06T12:00:00";
+                fakeWeather.dailyForecast=[
+                    {date:"2026-11-06",moonPhase:"waning crescent",
+                     moonIllumination:23,sunrise:"6:45 AM",sunset:"5:04 PM"},
+                    {date:"2026-11-07",moonPhase:"new moon",
+                     moonIllumination:3,sunrise:"6:46 AM",sunset:"5:03 PM"},
+                    {date:"2026-11-08",moonPhase:"waxing crescent",
+                     moonIllumination:9,sunrise:"6:47 AM",sunset:"5:02 PM"}
+                ];
+                fakeWeather.forecastReady=true;
                 root.step=1;
             } else if(root.step===1) {
                 sky.moonObservation.ephemeris={
@@ -120,7 +131,8 @@ ShellRoot {
                 const rail=find(moon,"cosmos-c18-moon-fullwidth-mode-rail");
                 const phaseTab=find(moon,"cosmos-c18-moon-observation-tab");
                 const yearTab=find(moon,"cosmos-c11-open-moon-year");
-                const forecastTab=find(moon,"cosmos-c17-open-moon-forecast");
+                const forecastStrip=find(moon,"cosmos-c19-moon-forecast-strip");
+                const forecastDay=find(moon,"cosmos-c19-forecast-day");
                 const railAt=rail ? rail.mapToItem(moon,0,0) : null;
                 const inset=moon.contentInset;
                 if(inset!==6 || !headerAt
@@ -134,29 +146,34 @@ ShellRoot {
                    || rack.y+rack.height>moon.height-inset+1)
                     return root.fail("MOON_C10_STAGE_GUTTER_NOT_PRESERVED");
                 // All three MOON modes occupy a single full-width top rail.
-                if(!railAt || !phaseTab || !yearTab || !forecastTab
+                if(!railAt || !phaseTab || !yearTab || !forecastStrip || !forecastDay
                     || railAt.x<inset || railAt.y<headerAt.y+header.height
                     || railAt.x+rail.width>moon.width-inset+1
                     || rail.height!==27
                     || phaseTab.height!==27 || yearTab.height!==27
-                    || forecastTab.height!==27
-                    || phaseTab.width<130 || yearTab.width<130
-                    || forecastTab.width<130 || !phaseTab.selected
+                    || phaseTab.width<200 || yearTab.width<200
+                    || !phaseTab.selected
                     || phaseAt.y<railAt.y+rail.height)
                     return root.fail("MOON_SUN_STYLE_MODE_RAIL_FAILED");
                 yearTab.clicked(null);
                 if(root.lastMoonRoute!=="cosmos/moon/year")
                     return root.fail("MOON_YEAR_MODE_ROUTE_BROKEN");
-                forecastTab.clicked(null);
-                if(root.lastMoonRoute!=="cosmos/moon/forecast")
-                    return root.fail("MOON_FORECAST_MODE_ROUTE_BROKEN");
+                if(!forecastStrip.model.ready
+                    || forecastStrip.rows.length!==3
+                    || forecastStrip.focusedDay.date!=="2026-11-06"
+                    || forecastStrip.focusedDay.illumination!==23
+                    || forecastStrip.height<43
+                    || forecastStrip.y<phaseAt.y+phase.height
+                    || forecastStrip.y+forecastStrip.height>ribbonAt.y)
+                    return root.fail("C19_MOON_FORECAST_STRIP_MISSING");
+                forecastStrip.selectedDate="2026-11-07";
                 if(positionAt.x < phaseAt.x+phase.width-1
                     || Math.abs(positionAt.y-phaseAt.y)>1
                     || ribbonAt.y<phaseAt.y+phase.height-1
                     || ribbon.width<position.width*2
                     || provenanceAt.y<ribbonAt.y+ribbon.height-1
                     || rack.y+rack.height>moon.height+1
-                    || rack.height<70)
+                    || rack.height<50)
                     return root.fail("C9_ASYMMETRIC_VIEWPORT_OVERFLOW");
                 if(count(position,"cosmos-c8-moon-fact")!==3
                    || count(ribbon,"cosmos-c8-moon-fact")!==3
@@ -164,6 +181,12 @@ ShellRoot {
                     return root.fail("C9_FACT_GROUPING_LOST");
                 root.step=3;
             } else if(root.step===3) {
+                const forecast=find(moon,"cosmos-c19-moon-forecast-strip");
+                if(!forecast || !forecast.focusedDay
+                    || forecast.focusedDay.date!=="2026-11-07"
+                    || forecast.focusedDay.phase!=="NEW"
+                    || forecast.focusedDay.illumination!==3)
+                    return root.fail("C19_FORECAST_DAY_SELECTION_FAILED");
                 const eph=sky.moonObservation.ephemeris;
                 sky.moonObservation.ephemeris={
                     available:true,rise:"--",transit:eph.transit,set:"--",

@@ -75,8 +75,10 @@ end = host.index("onOperationsSurfaceChanged: {", start)
 audit_fn = host[start:end]
 require("SurgeryStartupPolicy.canReuseAudit(" in audit_fn
         and "auditService.available" in audit_fn
-        and "auditService.lastError" in audit_fn,
-        "Timestamp may suppress retry only with a usable successful audit")
+        and "auditService.lastError" in audit_fn
+        and "auditService.snapshotFloorKey === key" in audit_fn
+        and "auditService.snapshotRepository === repo" in audit_fn,
+        "Timestamp may suppress retry only with a matching successful Floor audit")
 require("auditService.runAudit(false);" in audit_fn,
         "Existing first-open audit execution remains available")
 require("auditService.runAudit(false);" in host
@@ -102,6 +104,21 @@ require("function canReuseAudit(" in policy
 require("property var rooms: []" in audit
         and "function resetResult()" in audit,
         "Original audit owns Git Rooms and reset boundaries")
+require("floorKey: floorService.floorId" in host
+        and "property string inFlightRepository:" in audit
+        and "property string inFlightFloorKey:" in audit,
+        "Audit records the target Floor and repository at process launch")
+require("inFlightRepository !== String(repository ||" in audit
+        and "inFlightFloorKey !== String(floorKey ||" in audit
+        and "AUDIT RESULT DISCARDED // FLOOR CHANGED" in audit,
+        "Late scan for another Floor must be discarded rather than published")
+require("snapshotRepository = inFlightRepository;" in audit
+        and "snapshotFloorKey = inFlightFloorKey;" in audit,
+        "Successful audit snapshot records the identity it actually scanned")
+require("snapshotRepository = \"\";" in audit
+        and "snapshotFloorKey = \"\";" in audit,
+        "Changing Floor invalidates snapshot provenance")
+
 
 if problems:
     print("HOSPITAL SURGERY FIRST-OPEN CONTRACT // FAIL")

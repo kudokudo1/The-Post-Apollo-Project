@@ -18,7 +18,9 @@ function findById(rows, wanted) {
     return null;
 }
 function openSession(s) {
-    return !!s && !textValue(s.endedAt) && !terminal(s.status);
+    // A terminal record does not release a Bed if an active PID is recorded.
+    return !!s && (Number(s.activePid || 0) > 0
+        || (!textValue(s.endedAt) && !terminal(s.status)));
 }
 function plan(input) {
     const a = input || {};

@@ -85,6 +85,21 @@ blocked({sessions:[{...session,activePid:45}]}, "active process");
 const historical=run({sessions:[{...session,status:"COMPLETE",endedAt:"yesterday"}]});
 assert.equal(historical.sessionMode,"NEW_SESSION_REVIEW");
 assert.equal(historical.reviewable,true);
+const terminalPid = run({sessions:[{
+  ...session,status:"FAILED",endedAt:"yesterday",activePid:12345
+}]});
+assert.equal(terminalPid.reviewable,false);
+assert.equal(terminalPid.sessionMode,"REUSE_SESSION_REVIEW");
+assert(terminalPid.blockers.some(x => x.includes("not IDLE")));
+const terminalPidOtherRoom = run({
+  rooms:[{id:"room-map",bedPath:room.bedPath},
+         {id:"room-other",bedPath:room.bedPath}],
+  sessions:[{...session,id:"old-pid",roomId:"room-other",
+             status:"FAILED",endedAt:"yesterday",activePid:12345}]
+});
+assert.equal(terminalPidOtherRoom.reviewable,false);
+assert(terminalPidOtherRoom.blockers.some(x => x.includes("Another Room")));
+
 blocked({
   rooms:[{id:"room-map",bedPath:room.bedPath},{id:"room-other",bedPath:room.bedPath}],
   sessions:[{...session,id:"foreign",roomId:"room-other"}]

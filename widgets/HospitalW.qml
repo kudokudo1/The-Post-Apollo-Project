@@ -7259,6 +7259,14 @@ PanelWindow {
             }
 
             onCloseRequested: root.showSurgery()
+            onAttachmentRegistered: function(roomId, sessionId) {
+                // Follow only the exact Room for which PX confirmed the
+                // durable registration; never follow a guessed Git Team.
+                if (root.operationsSurface === "registeredWorker"
+                        && String(roomId || "") === root.rosterFocusedRoomId
+                        && String(sessionId || "").length > 0)
+                    root.rosterFocusedSessionId = String(sessionId);
+            }
             onRefreshRequested: {
                 responsibilityService.refreshDurableGraph();
                 if (!doctorService.refreshing)

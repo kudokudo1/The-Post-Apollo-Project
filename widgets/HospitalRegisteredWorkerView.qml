@@ -33,6 +33,10 @@ Item {
     property string previewAssignmentId: ""
     property string previewDoctorId: ""
     property string previewProviderId: ""
+    property int previewAssignmentPage: 0
+    property int previewDoctorPage: 0
+    property int previewProviderPage: 0
+    readonly property int previewPageSize: 10
     readonly property var attachmentPreview: AttachPreviewPolicy.plan({
         room: root.roomData,
         rooms: root.allRooms,
@@ -101,6 +105,9 @@ Item {
         previewAssignmentId = String(root.roomData.assignmentId || "").trim();
         previewDoctorId = String(root.roomData.roomDoctorId || "").trim();
         previewProviderId = String(root.roomData.roomProviderId || "").trim();
+        previewAssignmentPage = 0;
+        previewDoctorPage = 0;
+        previewProviderPage = 0;
         viewMode = "attachPreview";
         assignmentPreview.refresh();
         refreshRequested();
@@ -585,7 +592,9 @@ Item {
                     wrapMode: Text.Wrap
                 }
                 Repeater {
-                    model: assignmentPreview.assignments
+                    model: assignmentPreview.assignments.slice(
+                        root.previewAssignmentPage * root.previewPageSize,
+                        (root.previewAssignmentPage + 1) * root.previewPageSize)
                     Rectangle {
                         required property var modelData
                         width: attachRows.width
@@ -613,6 +622,41 @@ Item {
                         }
                     }
                 }
+                Row {
+                    width: parent.width
+                    height: 27
+                    spacing: 5
+                    HospitalActionButton {
+                        width: 76
+                        height: 26
+                        label: "PREV"
+                        compactIcon: "<"
+                        accent: Colors.cyan
+                        enabledAction: root.previewAssignmentPage > 0
+                        onTriggered: root.previewAssignmentPage--
+                    }
+                    GohuText {
+                        width: parent.width - 157
+                        height: parent.height
+                        text: "ASSIGNMENTS // " + assignmentPreview.assignments.length
+                            + " // PAGE " + (root.previewAssignmentPage + 1)
+                        font.pixelSize: 8
+                        color: Colors.blue
+                        horizontalAlignment: Text.AlignHCenter
+                        verticalAlignment: Text.AlignVCenter
+                        elide: Text.ElideRight
+                    }
+                    HospitalActionButton {
+                        width: 76
+                        height: 26
+                        label: "NEXT"
+                        compactIcon: ">"
+                        accent: Colors.cyan
+                        enabledAction: (root.previewAssignmentPage + 1)
+                            * root.previewPageSize < assignmentPreview.assignments.length
+                        onTriggered: root.previewAssignmentPage++
+                    }
+                }
                 GohuText {
                     width: parent.width
                     text: "DOCTOR // CHOOSE REGISTERED STAFF"
@@ -627,7 +671,9 @@ Item {
                     color: Colors.orange
                 }
                 Repeater {
-                    model: root.availableDoctors
+                    model: root.availableDoctors.slice(
+                        root.previewDoctorPage * root.previewPageSize,
+                        (root.previewDoctorPage + 1) * root.previewPageSize)
                     Rectangle {
                         required property var modelData
                         width: attachRows.width
@@ -655,6 +701,41 @@ Item {
                         }
                     }
                 }
+                Row {
+                    width: parent.width
+                    height: 27
+                    spacing: 5
+                    HospitalActionButton {
+                        width: 76
+                        height: 26
+                        label: "PREV"
+                        compactIcon: "<"
+                        accent: Colors.cyan
+                        enabledAction: root.previewDoctorPage > 0
+                        onTriggered: root.previewDoctorPage--
+                    }
+                    GohuText {
+                        width: parent.width - 157
+                        height: parent.height
+                        text: "DOCTORS // " + root.availableDoctors.length
+                            + " // PAGE " + (root.previewDoctorPage + 1)
+                        font.pixelSize: 8
+                        color: Colors.blue
+                        horizontalAlignment: Text.AlignHCenter
+                        verticalAlignment: Text.AlignVCenter
+                        elide: Text.ElideRight
+                    }
+                    HospitalActionButton {
+                        width: 76
+                        height: 26
+                        label: "NEXT"
+                        compactIcon: ">"
+                        accent: Colors.cyan
+                        enabledAction: (root.previewDoctorPage + 1)
+                            * root.previewPageSize < root.availableDoctors.length
+                        onTriggered: root.previewDoctorPage++
+                    }
+                }
                 GohuText {
                     width: parent.width
                     text: "PROVIDER // CHOOSE PX RUNTIME"
@@ -669,7 +750,9 @@ Item {
                     color: Colors.orange
                 }
                 Repeater {
-                    model: root.availableProviders
+                    model: root.availableProviders.slice(
+                        root.previewProviderPage * root.previewPageSize,
+                        (root.previewProviderPage + 1) * root.previewPageSize)
                     Rectangle {
                         required property var modelData
                         width: attachRows.width
@@ -696,6 +779,41 @@ Item {
                             onClicked: root.previewProviderId =
                                 String(modelData.id || "")
                         }
+                    }
+                }
+                Row {
+                    width: parent.width
+                    height: 27
+                    spacing: 5
+                    HospitalActionButton {
+                        width: 76
+                        height: 26
+                        label: "PREV"
+                        compactIcon: "<"
+                        accent: Colors.cyan
+                        enabledAction: root.previewProviderPage > 0
+                        onTriggered: root.previewProviderPage--
+                    }
+                    GohuText {
+                        width: parent.width - 157
+                        height: parent.height
+                        text: "PROVIDERS // " + root.availableProviders.length
+                            + " // PAGE " + (root.previewProviderPage + 1)
+                        font.pixelSize: 8
+                        color: Colors.blue
+                        horizontalAlignment: Text.AlignHCenter
+                        verticalAlignment: Text.AlignVCenter
+                        elide: Text.ElideRight
+                    }
+                    HospitalActionButton {
+                        width: 76
+                        height: 26
+                        label: "NEXT"
+                        compactIcon: ">"
+                        accent: Colors.cyan
+                        enabledAction: (root.previewProviderPage + 1)
+                            * root.previewPageSize < root.availableProviders.length
+                        onTriggered: root.previewProviderPage++
                     }
                 }
                 GohuText {

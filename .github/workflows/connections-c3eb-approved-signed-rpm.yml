@@ -1,0 +1,186 @@
+name: Connections C3e-B root-policy-approved fake signed RPM (CI only)
+
+on:
+  pull_request:
+    paths:
+      - "tests/connections/c3e_release_trust/**"
+      - "tests/connections/c3d_provenance/**"
+      - "tests/connections/test_connections_c3eb_bridge_contract.py"
+      - "tests/connections/c2r_selinux_domain/boot_confined_vm.sh"
+      - ".github/workflows/connections-c3eb-approved-signed-rpm.yml"
+      - "docs/connections-c3eb-root-policy-rpm-guest.md"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  root-approved-fake-rpm-in-fedora:
+    if: github.actor == 'kudokudo1' && (github.event_name == 'workflow_dispatch' || github.event.pull_request.head.repo.full_name == github.repository)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 28
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Validate test-only binding and deny-only production gates
+        shell: bash
+        run: |
+          set -euo pipefail
+          bash -n tests/connections/c3e_release_trust/build_c3eb_policy_ci.sh
+          bash -n tests/connections/c3d_provenance/build_signed_ci_status.sh
+          bash -n tests/connections/c3d_provenance/guest_signed_service_gate.sh
+          bash -n tests/connections/c2r_selinux_domain/boot_confined_vm.sh
+          python3 -B tests/connections/test_connections_c3eb_bridge_contract.py
+          python3 -B tests/connections/test_connections_c3d_provenance_contract.py
+          python3 -B tests/connections/test_connections_c3e_release_trust.py
+          python3 -B tests/connections/test_connections_c2n_policy_contract.py
+      - name: Fail closed without isolated KVM
+        shell: bash
+        run: |
+          set -euo pipefail
+          [ -c /dev/kvm ] || { echo "C3EB_BLOCKED // KVM_MISSING"; exit 2; }
+          sudo chmod a+rw /dev/kvm
+          test -r /dev/kvm && test -w /dev/kvm
+      - name: Build fake RPM and detached manifest under one ephemeral delegated signer
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/c3eb-candidate"
+          docker run --rm -e POST_APOLLO_C3EB_EXPORT_MANIFEST=1 \
+            --mount "type=bind,src=$PWD,dst=/src,readonly" \
+            --mount "type=bind,src=$RUNNER_TEMP/c3eb-candidate,dst=/out" \
+            fedora:44 /usr/bin/bash /src/tests/connections/c3d_provenance/build_signed_ci_status.sh
+          test "$(find "$RUNNER_TEMP/c3eb-candidate" -maxdepth 1 -type f | wc -l)" -eq 6
+          (cd "$RUNNER_TEMP/c3eb-candidate" && sha256sum --check --status c3d-artifact-manifest.sha256)
+          echo "C3EB_PASS // SAME_DISPOSABLE_KEY_SIGNED_RPM_AND_RELEASE_MANIFEST"
+      - name: Independently sign root policy, refuse substitutions, then stage fixed RPM bytes
+        shell: bash
+        run: |
+          set -euo pipefail
+          candidate="$RUNNER_TEMP/c3eb-candidate"
+          root="$RUNNER_TEMP/c3eb-trust"
+          approved="$RUNNER_TEMP/c3eb-approved"
+          mkdir -m 0700 "$root" "$approved"
+          GITHUB_ACTIONS=true bash tests/connections/c3e_release_trust/build_c3eb_policy_ci.sh \
+            "$candidate" "$root"
+          root_pin="$(cat "$root/root-pin.txt")"
+          verify() {
+            python3 -B tests/connections/c3e_release_trust/C3eReleaseAdmission.py \
+              --root-public "$root/root-public.asc" \
+              --root-fingerprint "$1" \
+              --policy "$2" \
+              --policy-signature "$3" \
+              --delegated-public "$candidate/c3d-disposable-public.asc" \
+              --manifest "$candidate/c3eb-release-manifest.json" \
+              --manifest-signature "$candidate/c3eb-release-manifest.sig" \
+              --artifact "$4" \
+              --minimum-policy-epoch 1 --minimum-release-sequence "$5"
+          }
+          verify "$root_pin" "$root/root-policy.json" "$root/root-policy.sig" \
+            "$candidate/c3d-status.rpm" 1 | tee "$RUNNER_TEMP/c3eb-admitted.log"
+          grep -Fxq 'C3E_PASS // C3E_TEST_POLICY_ACCEPTED_NO_PRODUCTION_AUTH' "$RUNNER_TEMP/c3eb-admitted.log"
+
+          # A candidate cannot swap its purported root key or self-authorize.
+          bad_pin="$(printf '%040d' 0)"
+          if verify "$bad_pin" "$root/root-policy.json" "$root/root-policy.sig" \
+               "$candidate/c3d-status.rpm" 1 > "$RUNNER_TEMP/c3eb-wrong-root.log"; then
+            echo "C3EB_FAIL // BAD_ROOT_WAS_ACCEPTED"; exit 1
+          fi
+          grep -Fxq 'C3E_REFUSED // ROOT_PIN_MISMATCH' "$RUNNER_TEMP/c3eb-wrong-root.log"
+
+          cp "$candidate/c3d-status.rpm" "$RUNNER_TEMP/c3eb-tampered.rpm"
+          printf 'X' >> "$RUNNER_TEMP/c3eb-tampered.rpm"
+          if verify "$root_pin" "$root/root-policy.json" "$root/root-policy.sig" \
+               "$RUNNER_TEMP/c3eb-tampered.rpm" 1 > "$RUNNER_TEMP/c3eb-tampered.log"; then
+            echo "C3EB_FAIL // REPLACED_RPM_WAS_ACCEPTED"; exit 1
+          fi
+          grep -Fxq 'C3E_REFUSED // ARTIFACT_SIZE_MISMATCH' "$RUNNER_TEMP/c3eb-tampered.log"
+
+          # Even a correctly signed older release is refused by external floor.
+          if verify "$root_pin" "$root/root-policy.json" "$root/root-policy.sig" \
+               "$candidate/c3d-status.rpm" 2 > "$RUNNER_TEMP/c3eb-rollback.log"; then
+            echo "C3EB_FAIL // ROLLBACK_WAS_ACCEPTED"; exit 1
+          fi
+          grep -Fxq 'C3E_REFUSED // RELEASE_ROLLBACK_REFUSED' "$RUNNER_TEMP/c3eb-rollback.log"
+
+          python3 - "$root" <<'PY'
+          import json, pathlib, sys
+          root = pathlib.Path(sys.argv[1])
+          policy = json.loads((root/"root-policy.json").read_text())
+          for entry in policy["signers"]:
+              entry["state"] = "revoked"
+          (root/"root-policy-revoked.json").write_text(json.dumps(
+              policy, sort_keys=True, separators=(",", ":")
+          ), encoding="utf-8")
+          PY
+          gpg --homedir "$root/isolated-root-private" --batch --yes \
+            --pinentry-mode loopback --passphrase '' --detach-sign \
+            --output "$root/root-policy-revoked.sig" "$root/root-policy-revoked.json"
+          if verify "$root_pin" "$root/root-policy-revoked.json" \
+               "$root/root-policy-revoked.sig" "$candidate/c3d-status.rpm" 1 \
+               > "$RUNNER_TEMP/c3eb-revoked.log"; then
+            echo "C3EB_FAIL // REVOKED_SIGNER_WAS_ACCEPTED"; exit 1
+          fi
+          grep -Fxq 'C3E_REFUSED // REVOKED_SIGNER' "$RUNNER_TEMP/c3eb-revoked.log"
+          echo "C3EB_PASS // ROOT_SWAP_TAMPER_REVOKED_AND_ROLLBACK_ALL_REFUSED"
+
+          # Approval is of specific RPM bytes. Copy and verify a fixed,
+          # separately staged snapshot, not a mutable candidate re-resolved
+          # by the VM step. No root private/public key enters the guest.
+          for f in c3d-status.rpm c3d-disposable-public.asc \
+                   c3d-public-fingerprint.txt c3d-artifact-manifest.sha256; do
+            install -m 0444 "$candidate/$f" "$approved/$f"
+          done
+          (cd "$approved" && sha256sum --check --status c3d-artifact-manifest.sha256)
+          digest="$(python3 - "$candidate/c3eb-release-manifest.json" <<'PY'
+          import json,sys
+          print(json.load(open(sys.argv[1]))["sha256"])
+          PY
+          )"
+          echo "$digest  $approved/c3d-status.rpm" | sha256sum --check --status
+          test "$(find "$approved" -maxdepth 1 -type f | wc -l)" -eq 4
+          echo "C3EB_APPROVED_SHA256=$digest" >> "$GITHUB_ENV"
+          echo "C3EB_APPROVED_DIR=$approved" >> "$GITHUB_ENV"
+          echo "C3EB_PASS // ROOT_POLICY_ADMITTED_STAGED_RPM_SNAPSHOT"
+      - name: Build SELinux reference-policy module in disposable Fedora builder
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/c2r-policy"
+          docker run --rm \
+            --mount "type=bind,src=$PWD/tests/connections/c2r_selinux_domain,dst=/src,readonly" \
+            --mount "type=bind,src=$RUNNER_TEMP/c2r-policy,dst=/out" \
+            fedora:44 /bin/bash -euc '
+              dnf -y --setopt=install_weak_deps=False install selinux-policy-devel make
+              mkdir -p /tmp/c2r-src
+              cp /src/postapollo_connections.te /src/postapollo_connections.fc /tmp/c2r-src/
+              cd /tmp/c2r-src
+              make -f /usr/share/selinux/devel/Makefile postapollo_connections.pp
+              cp postapollo_connections.pp /out/postapollo_connections.pp
+              test -s /out/postapollo_connections.pp
+            '
+          echo "C3EB_PASS // ENFORCING_GUEST_POLICY_BUILT"
+      - name: Install QEMU only on ephemeral CI runner
+        shell: bash
+        run: |
+          set -euo pipefail
+          timeout 150s sudo apt-get -o Acquire::Retries=1 -o Acquire::http::Timeout=25 update || exit 2
+          timeout 210s sudo apt-get -o Acquire::Retries=1 -o Acquire::http::Timeout=25 install -y --no-install-recommends qemu-system-x86 qemu-utils genisoimage python3-pip || exit 2
+      - name: Install only root-approved RPM bytes in offline enforcing Fedora guest
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -n "$C3EB_APPROVED_SHA256" && test -d "$C3EB_APPROVED_DIR"
+          echo "$C3EB_APPROVED_SHA256  $C3EB_APPROVED_DIR/c3d-status.rpm" | sha256sum --check --status
+          C3D_SERVICE_RPM_DIR="$C3EB_APPROVED_DIR" \
+          C3EB_APPROVED_SHA256="$C3EB_APPROVED_SHA256" \
+            timeout 570s bash tests/connections/c2r_selinux_domain/boot_confined_vm.sh
+          echo "C3EB_PASS // GUEST_ACCEPTED_EXACT_ROOT_POLICY_RPM_BYTES"
+      - name: Reconfirm production broker remains deny-only
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -B tests/connections/test_connections_c3eb_bridge_contract.py
+          python3 -B tests/connections/test_connections_c2n_policy_contract.py
+          echo "C3EB_PASS // NO_REAL_CREDENTIALS_OR_AUTHORITY"

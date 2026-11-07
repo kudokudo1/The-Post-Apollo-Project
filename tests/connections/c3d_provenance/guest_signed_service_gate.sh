@@ -49,6 +49,17 @@ case "$phase" in
       die "package unexpectedly preinstalled"
     sha256sum --check --status c3d-artifact-manifest.sha256 ||
       die "signed fixture artifact digest mismatch"
+    # C3e-B independently root-authorized the RPM outside this guest.
+    # The guest must verify those same bytes BEFORE any key import or install.
+    if [[ -f c3eb-approved.sha256 ]]; then
+      [[ "$(wc -l <c3eb-approved.sha256)" -eq 1 ]] ||
+        die "root-approved RPM digest was not a single entry"
+      grep -Eq '^[0-9a-f]{64}  c3d-status[.]rpm$' c3eb-approved.sha256 ||
+        die "root-approved RPM digest had unexpected shape"
+      sha256sum --check --status c3eb-approved.sha256 ||
+        die "staged RPM was not the root-authorized candidate"
+      echo "C3EB_PASS // GUEST_RPM_DIGEST_MATCHES_ROOT_ADMITTED_BYTES"
+    fi
     [[ "$(wc -l <c3d-public-fingerprint.txt)" -eq 1 ]] ||
       die "bad public signer fingerprint format"
     [[ "$(cat c3d-public-fingerprint.txt)" =~ ^[A-Fa-f0-9]{40}$ ]] ||

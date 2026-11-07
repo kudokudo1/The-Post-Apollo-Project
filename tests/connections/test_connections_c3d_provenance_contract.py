@@ -38,7 +38,10 @@ class C3dContract(unittest.TestCase):
         self.assertIn('gpg --homedir "$keydir"', source)
         self.assertNotIn("--export-secret-keys", source)
         self.assertNotIn("private.key", source)
-        self.assertIn('"$(find /out -maxdepth 1 -type f | wc -l)" -eq 4', source)
+        self.assertIn('expected_outputs=4', source)
+        self.assertIn('expected_outputs=6', source)
+        self.assertIn('POST_APOLLO_C3EB_EXPORT_MANIFEST', source)
+        self.assertIn('"$(find /out -maxdepth 1 -type f | wc -l)" -eq "$expected_outputs"', source)
         self.assertIn("C3D_LIMITATION // DISPOSABLE_SELF_SIGNED_KEY_NOT_PRODUCTION_TRUST", source)
 
     def test_03_guest_requires_native_signature_rpmdb_and_negative_tamper(self):

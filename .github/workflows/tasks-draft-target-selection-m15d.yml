@@ -1,0 +1,110 @@
+name: TASKS M15d explicit unsaved editor target selection
+
+on:
+  pull_request:
+    paths:
+      - 'widgets/tasks/TaskDraftTargetPolicyM15d.js'
+      - 'widgets/tasks/TaskEncryptedDraftAccessPaneM15c.qml'
+      - 'widgets/tasks/TaskRecoveryStatusPaneM13q.qml'
+      - 'tests/tasks/test_task_draft_target_selection_m15d.cjs'
+      - 'TaskDraftTargetSmokeM15d.qml'
+      - 'docs/tasks-draft-target-selection-m15d.md'
+      - '.github/workflows/tasks-draft-target-selection-m15d.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'widgets/tasks/TaskDraftTargetPolicyM15d.js'
+      - 'widgets/tasks/TaskEncryptedDraftAccessPaneM15c.qml'
+      - 'widgets/tasks/TaskRecoveryStatusPaneM13q.qml'
+      - 'tests/tasks/test_task_draft_target_selection_m15d.cjs'
+      - 'TaskDraftTargetSmokeM15d.qml'
+      - '.github/workflows/tasks-draft-target-selection-m15d.yml'
+permissions:
+  contents: read
+
+jobs:
+  guarded-selection:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: No-text editor choice and pending-save/source-conflict refusals
+        run: node --test tests/tasks/test_task_draft_target_selection_m15d.cjs
+      - name: Existing M15c capture/preview/clear access gates
+        run: node --test tests/tasks/test_task_encrypted_draft_access_m15c.cjs
+      - name: M13s live editor and M13q read-only broker contracts
+        run: |
+          node --test tests/tasks/test_task_live_draft_presence_m13s.cjs
+          node --test tests/tasks/test_task_recovery_status_m13q.cjs
+      - name: Older recovery examples, native callback observation and local source
+        run: |
+          node --test tests/tasks/test_task_operator_save_review_m13z.cjs
+          node --test tests/tasks/test_task_live_native_save_observation_m14a.cjs
+          python3 -B -m unittest discover -s tests/tasks \
+            -p 'test_task_local_source_inspect_m15a.py' -v
+      - name: C2a credential denial and M11d sole writer remain
+        run: |
+          python3 tests/tasks/test_task_writer_gate_inventory_m11d.py
+          node tests/cpuplus/test_connections_broker_c2a.js
+      - name: Qt 6 QML syntax of existing recovery and newly selected editor
+        run: |
+          sudo apt-get update -qq
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends qt6-declarative-dev-tools
+          QT_QPA_PLATFORM=offscreen /usr/lib/qt6/bin/qmlformat widgets/tasks/TaskEncryptedDraftAccessPaneM15c.qml >/dev/null
+          QT_QPA_PLATFORM=offscreen /usr/lib/qt6/bin/qmlformat widgets/tasks/TaskRecoveryStatusPaneM13q.qml >/dev/null
+          QT_QPA_PLATFORM=offscreen /usr/lib/qt6/bin/qmlformat TaskDraftTargetSmokeM15d.qml >/dev/null
+      - name: No new writer, keyring actor or plain-draft transfer
+        run: |
+          set -euo pipefail
+          test "$(grep -c 'todoFile.setText(' services/hub/ApolloHubTodoStore.qml)" = 1
+          ! grep -Eq 'FileView *\{|Process *\{|secret-tool|Qt.openUrlExternally|ConnectionsBroker\.authorize|ConnectionsBroker\.requirement' \
+            widgets/tasks/TaskDraftTargetPolicyM15d.js widgets/tasks/TaskEncryptedDraftAccessPaneM15c.qml
+          ! grep -q 'TaskDraftTargetSmokeM15d' shell.qml
+          printf '%s\n' 'M15D_ONE_EDITOR_CHOICE_ONLY_NO_PLAINTEXT_OR_GRANT_PASS'
+
+  native-editor-selection:
+    runs-on: ubuntu-latest
+    timeout-minutes: 14
+    container:
+      image: debian:unstable-slim
+    steps:
+      - name: Install real Quickshell and disposable X11 display
+        run: |
+          apt-get update -qq
+          DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+            git ca-certificates quickshell=0.3.2-1 python3 \
+            qt6-qpa-plugins xvfb xauth libxcb-cursor0 libxkbcommon-x11-0 \
+            qml6-module-qtquick qml6-module-qtquick-layouts \
+            qml6-module-qtquick-effects qml6-module-qt5compat-graphicaleffects \
+            qml6-module-qtqml
+      - uses: actions/checkout@v4
+      - name: Real Quickshell selection, two dirty drafts, save pending, stale choice
+        shell: bash
+        run: |
+          set -euo pipefail
+          scratch="$(mktemp -d /tmp/postapollo-m15d-native-XXXXXXXX)"
+          trap 'rm -rf -- "$scratch"' EXIT
+          chmod 700 "$scratch"
+          export HOME="$scratch"
+          export XDG_CONFIG_HOME="$scratch/config"
+          export XDG_DATA_HOME="$scratch/data"
+          export XDG_STATE_HOME="$scratch/state"
+          export XDG_CACHE_HOME="$scratch/cache"
+          export XDG_RUNTIME_DIR="$scratch/runtime"
+          mkdir -p -m 700 "$XDG_CONFIG_HOME" "$XDG_DATA_HOME" \
+            "$XDG_STATE_HOME" "$XDG_CACHE_HOME" "$XDG_RUNTIME_DIR"
+          export POST_APOLLO_TASKS_M15D_NATIVE=CI_DISPOSABLE_ONLY
+          export QT_QPA_PLATFORM=xcb
+          export QT_QUICK_BACKEND=software
+          export LIBGL_ALWAYS_SOFTWARE=1
+          export QS_DISABLE_FILE_WATCHER=1
+          export WAYLAND_DISPLAY=
+          xvfb-run -a -s "-screen 0 1024x768x24 -nolisten tcp" \
+            qs -p "$PWD/TaskDraftTargetSmokeM15d.qml" --no-color \
+            > "$scratch/log" 2>&1
+          grep -q 'M15D_NATIVE_EXPLICIT_EDITOR_SELECTION_NO_CAPTURE_PASS' "$scratch/log"
+          ! grep -Eq 'M15D_NATIVE_.*(FAIL|REFUSED|TIMEOUT|BYPASS|NOT_ARMED)' "$scratch/log"
+          printf '%s\n' 'M15D_REAL_QUICKSHELL_EXPLICIT_TARGET_NO_AUTHORITY_PASS'

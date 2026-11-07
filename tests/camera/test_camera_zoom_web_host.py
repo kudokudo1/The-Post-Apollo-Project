@@ -127,6 +127,39 @@ class ZoomWebHostTests(unittest.TestCase):
         self.assertEqual((new_top,new_height,new_width), (147,550,748))
         self.assertGreaterEqual(42,34)
 
+    def test_opaque_zoom_deck_seals_spare_row_pixels_without_moving_browser(self):
+        # Camera's transparent panel must not reveal underlying windows in
+        # the unused 8px of its 42px MODE row. A 4px visual-only underlap
+        # covers compositor seams, while the physical actor and its trusted
+        # input hole remain precisely tied to the existing viewport.
+        self.assertIn('id: zoomModeDeckMatte', QML)
+        self.assertEqual(QML.count('id: zoomModeDeckMatte'), 1)
+        view = QML.index('id: zoomViewport')
+        matte = QML.index('id: zoomModeDeckMatte')
+        controls = QML.index('id: cameraBodyColumn')
+        self.assertLess(view, matte)
+        self.assertLess(matte, controls)
+        deck = QML[matte:controls]
+        for token in (
+            'x: 0',
+            'y: cameraBodyColumn.y + cameraModes.y',
+            'width: frame.width',
+            'height: Math.max(0, zoomViewport.y - y + 4)',
+            'color: Colors.black',
+            'visible: camera.menuOpen && camera.activeView === "zoom"',
+            '&& camera.zoomWebVisualHeld'
+        ):
+            self.assertIn(token, deck)
+        self.assertNotIn('MouseArea', deck)
+        self.assertNotIn('TapHandler', deck)
+        self.assertNotIn('Region.Intersection.Subtract', deck)
+        self.assertIn('height: 42', QML)
+        self.assertIn('height: 34', QML)
+        self.assertIn(
+            'y: cameraBodyColumn.y + cameraModes.y + cameraModes.height', QML)
+        self.assertIn('readonly property int zoomActorTop: zoomBayTop', QML)
+        self.assertIn('readonly property int zoomActorHeight: zoomBayHeight', QML)
+
     def test_resize_retains_verified_visual_without_exposing_unverified_input(self):
         self.assertIn('property bool zoomWebVisualHeld: false', QML)
         self.assertIn('zoomWebDocked = aligned;', QML)

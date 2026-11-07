@@ -1409,6 +1409,23 @@ PanelWindow {
 
         }
 
+        // The Zoom browser is a separate Sway client behind a transparent
+        // Quickshell panel. The 42px MODE row contains 34px ActionButtons;
+        // their remaining 8px must still be opaque, not a view of the
+        // browser/desktop under the frame. A 4px underlap seals the small
+        // compositor rounding seam without moving, resizing or intercepting
+        // input from Zoom. Keep this behind the actual Camera controls.
+        Rectangle {
+            id: zoomModeDeckMatte
+            x: 0
+            y: cameraBodyColumn.y + cameraModes.y
+            width: frame.width
+            height: Math.max(0, zoomViewport.y - y + 4)
+            color: Colors.black
+            visible: camera.menuOpen && camera.activeView === "zoom"
+                     && camera.zoomWebVisualHeld
+        }
+
         Column {
             id: cameraBodyColumn
             anchors.fill: parent

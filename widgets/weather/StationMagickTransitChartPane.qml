@@ -15,6 +15,12 @@ Rectangle {
     property var transitData: null
     property string expectedUtc: ""
     property string selectedContactUtc: ""
+    property string selectedEventKind: "aspect"
+    property string inspectionTarget: ""
+    onInspectionTargetChanged: {
+        if(Transit.TARGETS.indexOf(inspectionTarget)>=0)
+            selectedTarget=inspectionTarget;
+    }
     property string statusText: ""
     property bool loading: false
     property string dateText: ""
@@ -60,7 +66,8 @@ Rectangle {
     onNatalDataChanged: {
         clearEntry();
         if(visible)dateText=Defaults.utcDay();
-        selectedTarget="sun";
+        selectedTarget=Transit.TARGETS.indexOf(inspectionTarget)>=0
+            ?inspectionTarget:"sun";
         wheel.requestPaint();
     }
     onComparisonChanged:wheel.requestPaint()
@@ -355,7 +362,9 @@ Rectangle {
             font.pixelSize:9
             color:Colors.magenta
             elide:Text.ElideRight
-            text:"EXACT CROSSING "+transits.selectedContactUtc+
+            text:(transits.selectedEventKind==="station"
+                    ?"ESTIMATED STATION ":"EXACT CROSSING ")+
+                transits.selectedContactUtc+
                 " // CHART NEAREST UTC MINUTE"
         }
         QuietText {

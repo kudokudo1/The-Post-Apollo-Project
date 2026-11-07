@@ -48,6 +48,34 @@ jobs:
           assert 'REAL_SILVERBLUE_FIRST_BOOT_BASELINE' in guest
           assert 'LAYER_ACTIVE_ONLY_AFTER_REAL_REBOOT' in guest
           assert 'C2V_INSTALL_WATCHDOG' in guest
+          assert 'C2V_GUEST_PROBE_READY' in guest
+          assert 'C2V_GUEST_PROBE_TICK' in guest
+          assert 'C2V_PROBE_UNIT_STATE_BEGIN' in guest
+          assert 'C2V_PROBE_CGROUP_ABSENT' in guest
+          assert 'C2V_PROBE_OSTREE_ADMIN_STATUS_BEGIN' in guest
+          assert 'ostree admin status --json' in guest
+          assert 'timeout --signal=TERM --kill-after=2s 6s' in guest
+          assert 'C2V_INSTALL_WORKER_STARTED_IN_SEPARATE_CGROUP' in guest
+          assert 'C2V_MONITOR_STARTED_IN_SEPARATE_CGROUP' in guest
+          assert 'C2V_MONITOR_HANDOFF_COMPLETE' in guest
+          assert 'C2V_MONITOR_ERR' in guest
+          assert 'C2V_MONITOR_EXIT' in guest
+          assert 'C2V_MONITOR_ITERATION_DONE' in guest
+          assert 'C2V_MONITOR_STATUS_QUERY_FAILED' in guest
+          assert 'C2V_HOST_MONITOR_EVIDENCE' in host
+          assert 'C2V_MONITOR_REBOOT_REQUESTED' in guest
+          assert '--unit=c2v-rpm-layer-monitor' in guest
+          assert '[[ "$monitor_ready" == 1 ]]' in guest
+          assert 'C2V_PENDING_DEPLOYMENT_AUTHORITY' in guest
+          assert 'status.get("transaction") is not None' in guest
+          assert 'C2V_PROBE_CGROUP_FIELD' in guest
+          assert 'TimeoutStartSec=1400' in host
+          assert 'C2V_PASS // RPM_OSTREE_LAYER_STAGED_REBOOT_REQUIRED' in guest
+          assert 'C2V_PASS // LAYER_ACTIVE_ONLY_AFTER_REAL_REBOOT' in guest
+          assert 'C2V_PASS // REAL_SILVERBLUE_BOOTED_ROLLBACK_REMOVED_LAYER' in guest
+          assert 'systemd-run --quiet --unit=c2v-guest-probe' in guest
+          assert 'C2V_HOST_SERIAL_BYTES' in host
+          assert 'C2V_HOST_VM_LAST_PROCESS_STATE' in host
           assert 'timeout --signal=TERM --kill-after=20s 480s' in guest
           # Verify the volume in QEMU equals the label mounted inside guest.
           volume_lines = [line for line in host.splitlines() if '-volid C2' in line]

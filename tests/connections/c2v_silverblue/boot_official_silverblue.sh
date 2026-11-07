@@ -91,7 +91,7 @@ ConditionPathExists=/run/ostree-booted
 [Service]
 Type=oneshot
 ExecStart=/usr/bin/bash /usr/local/libexec/c2v-ostree-cycle.sh
-TimeoutStartSec=900
+TimeoutStartSec=1400
 
 [Install]
 WantedBy=multi-user.target
@@ -152,10 +152,18 @@ qemu-system-x86_64 \
   -nic none > "$tmp/guest-qemu.log" 2>&1 &
 pid="$!"
 result=""
-for i in $(seq 1 450); do
+last_serial_bytes=0
+for i in $(seq 1 700); do
   if (( i % 20 == 0 )); then
     echo "C2V_HOST_GUEST_HEARTBEAT // $i"
-    grep -a -E 'C2V_(PASS|FAIL|INSTALL_|BLOCKED)' "$tmp/guest-serial.log" 2>/dev/null | tail -n 12 || true
+    ps -p "$pid" -o pid=,stat=,etime=,%cpu=,%mem=,rss=,vsz=,comm= || true
+    free -m | head -n 3 || true
+    if [[ -f "$tmp/guest-serial.log" ]]; then
+      current_serial_bytes="$(wc -c < "$tmp/guest-serial.log")"
+      echo "C2V_HOST_SERIAL_BYTES // current=$current_serial_bytes previous=$last_serial_bytes"
+      last_serial_bytes="$current_serial_bytes"
+      grep -a -E 'C2V_(PASS|FAIL|INSTALL_|MONITOR_|PENDING_|BLOCKED|GUEST_PROBE)' "$tmp/guest-serial.log" 2>/dev/null | tail -n 12 || true
+    fi
   fi
   if [[ -f "$tmp/guest-serial.log" ]]; then
     if grep -q 'C2V_PASS // REAL_SILVERBLUE_BOOTED_ROLLBACK_REMOVED_LAYER' \
@@ -171,9 +179,17 @@ for i in $(seq 1 450); do
   fi
   sleep 2
 done
+echo "C2V_HOST_MONITOR_EVIDENCE // from complete guest serial"
+grep -a -E 'C2V_(MONITOR_|PENDING_DEPLOYMENT_AUTHORITY|INSTALL_FAILED_EXIT|PROBE_OSTREE_ADMIN_STATUS)' \
+  "$tmp/guest-serial.log" 2>/dev/null | tail -n 72 || true
 grep -a 'C2V_' "$tmp/guest-serial.log" 2>/dev/null | tail -n 70 || true
 if [[ "$result" != PASS ]]; then
   echo "C2V_BLOCKED // SILVERBLUE_LAYER_REBOOT_ROLLBACK_RESULT=$result"
+  echo "C2V_HOST_VM_LAST_PROCESS_STATE"
+  ps -p "$pid" -o pid=,stat=,etime=,%cpu=,%mem=,rss=,vsz=,comm= || true
+  echo "C2V_HOST_MEMORY_STATE"
+  free -m | head -n 4 || true
+  echo "C2V_HOST_SERIAL_BYTES // $(wc -c < "$tmp/guest-serial.log" 2>/dev/null || echo missing)"
   tail -n 130 "$tmp/guest-serial.log" 2>/dev/null || true
   tail -n 45 "$tmp/guest-qemu.log" || true
   exit 1

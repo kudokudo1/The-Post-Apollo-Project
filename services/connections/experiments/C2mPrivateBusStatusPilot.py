@@ -103,7 +103,7 @@ async def _inspect(address):
         # Name ownership is a moving pointer. Bind the read to the unique
         # connection returned by the daemon, not the replaceable public name.
         if not isinstance(owner, str) or not re.fullmatch(
-                r":[0-9]+(?:\\.[0-9]+)+", owner):
+                r":[0-9]+(?:\.[0-9]+)+", owner):
             return denied("RESPONSE_INVALID")
         try:
             # The UID comes from the daemon, not the service's JSON payload.

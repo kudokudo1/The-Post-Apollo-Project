@@ -165,9 +165,9 @@ ShellRoot {
                     || !yearDivider.visible || !forecastDivider.visible
                     || sunDivider.visible || sunDivider.height!==0
                     || yearDivider.height!==2 || forecastDivider.height!==2
-                    || yearDividerAt.y!==yearRailAt.y+yearRail.height+2
-                    || yearStageAt.y!==yearDividerAt.y+2
-                    || forecastStageAt.y!==forecastDividerAt.y+2
+                    || yearDividerAt.y!==yearRailAt.y+yearRail.height+5
+                    || yearStageAt.y!==yearDividerAt.y+2+3
+                    || forecastStageAt.y!==forecastDividerAt.y+2+3
                     || yearDividerAt.x!==6 || forecastDividerAt.x!==6)
                     return root.fail("C23_MOON_YEAR_HEADER_DIVIDER_BROKEN");
                 if(moonCanvas.width<400 || moonCanvas.height<220

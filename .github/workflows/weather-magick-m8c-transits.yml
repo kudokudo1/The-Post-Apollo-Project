@@ -1,0 +1,32 @@
+name: MAGICK M8c source-bound natal transit comparison
+
+on:
+  pull_request:
+    paths:
+      - 'widgets/weather/StationMagickTransitComparisonPolicy.js'
+      - 'widgets/weather/StationMagickTransitChartPane.qml'
+      - 'widgets/weather/StationMagickAstrologyPane.qml'
+      - 'tests/weather/test_magick_transit_comparison_m8c.js'
+      - '.github/workflows/weather-magick-m8c-transits.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  transit-contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Validate two verified JPL epochs and cross-aspect angular geometry
+        run: node --test tests/weather/test_magick_transit_comparison_m8c.js
+      - name: Preserve natal engine, historical clock and older MAGICK routes
+        run: |
+          node --test tests/weather/test_magick_natal_integration_m8b.js
+          node --test tests/weather/test_magick_three_instruments_m8a.js
+          node --test tests/weather/test_magick_five_track_foundations_m7a.js
+          node --test tests/weather/test_magick_subject_panels_g1.js

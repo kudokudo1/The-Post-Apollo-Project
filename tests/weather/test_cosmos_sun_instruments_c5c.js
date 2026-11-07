@@ -33,7 +33,7 @@ test("C5c uses the single original NOAA collector and does not create an indepen
   assert.match(space,/id: spaceScroll\s*visible: !space\.sourceOnly/);
   assert.match(space,/source: space\.sourceOnly \? "" : space\.solarImageUrl/);
   assert.match(modePane,/id: spaceSourceLoader/);
-  assert.match(modePane,/active: cosmosModePane\.visible && cosmosModePane\.kind === "solar-section"/);
+  assert.match(modePane,/active: cosmosModePane\.visible && \(cosmosModePane\.kind === "solar-section"/);
   assert.match(modePane,/sourceOnly: true/);
   assert.match(modePane,/id: solarDetails\s*StationCosmosSunInstrumentPane\s*\{/);
   assert.match(modePane,/sourceSpace: cosmosModePane\.spaceFeed/);

@@ -42,7 +42,7 @@ check_inactive() {
 }
 
 check_installed() {
-  [[ "$(rpm -q --qf '%{NAME} %{VERSION} %{ARCH}\n' "$pkg")" ==
+  [[ "$(rpm -q --qf '%{NAME} %{VERSION} %{ARCH}\n' "$pkg")" == \
      "$pkg 0.1 noarch" ]] ||
     die "WRONG_INSTALLED_PACKAGE"
   rpm -V "$pkg" || die "RPMDB_CONTENT_INTEGRITY_FAILED"
@@ -73,7 +73,7 @@ case "$phase" in
       die "SIGNED_ARTIFACT_MANIFEST_MISMATCH"
     [[ "$(cat "$root/c3d-public-fingerprint.txt")" =~ ^[A-Fa-f0-9]{40}$ ]] ||
       die "BAD_DISPOSABLE_SIGNER_FINGERPRINT"
-    [[ "$(rpm -qp --qf '%{NAME} %{VERSION} %{ARCH}\n' "$rpmfile")" ==
+    [[ "$(rpm -qp --qf '%{NAME} %{VERSION} %{ARCH}\n' "$rpmfile")" == \
        "$pkg 0.1 noarch" ]] || die "UNRECOGNIZED_SIGNED_FIXTURE"
     [[ -z "$(rpm -qp --scripts "$rpmfile")" &&
        -z "$(rpm -qp --triggers "$rpmfile")" ]] ||

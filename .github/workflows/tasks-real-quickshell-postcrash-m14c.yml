@@ -37,7 +37,8 @@ jobs:
           apt-get update -qq
           DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
             git ca-certificates python3 quickshell=0.3.2-1 \
-            qt6-qpa-plugins qml6-module-qtquick \
+            qt6-qpa-plugins xvfb xauth libxcb-cursor0 libxkbcommon-x11-0 \
+            qml6-module-qtquick \
             qml6-module-qtquick-layouts qml6-module-qtqml
       - uses: actions/checkout@v4
       - name: Assert real native Quickshell and isolate nonproduction test root
@@ -46,17 +47,17 @@ jobs:
           python3 -m unittest discover -s tests/tasks \
             -p 'test_task_real_quickshell_postcrash_guard_m14c.py' -v
       - name: Real Qt Process + M13y source still at baseline after interruption
-        run: python3 tests/tasks/native_quickshell_postcrash_smoke_m14c.py --scenario baseline
+        run: xvfb-run -a -s "-screen 0 1024x768x24 -nolisten tcp" python3 tests/tasks/native_quickshell_postcrash_smoke_m14c.py --scenario baseline
       - name: Real Qt Process + new source bytes and unsettled journal
-        run: python3 tests/tasks/native_quickshell_postcrash_smoke_m14c.py --scenario expected
+        run: xvfb-run -a -s "-screen 0 1024x768x24 -nolisten tcp" python3 tests/tasks/native_quickshell_postcrash_smoke_m14c.py --scenario expected
       - name: Real Qt Process + settled journal but lost UI acknowledgment
-        run: python3 tests/tasks/native_quickshell_postcrash_smoke_m14c.py --scenario settled
+        run: xvfb-run -a -s "-screen 0 1024x768x24 -nolisten tcp" python3 tests/tasks/native_quickshell_postcrash_smoke_m14c.py --scenario settled
       - name: Real Qt Process must refuse symlink and unsafe source
-        run: python3 tests/tasks/native_quickshell_postcrash_smoke_m14c.py --scenario unsafe
+        run: xvfb-run -a -s "-screen 0 1024x768x24 -nolisten tcp" python3 tests/tasks/native_quickshell_postcrash_smoke_m14c.py --scenario unsafe
       - name: Real Qt Process must refuse missing source
-        run: python3 tests/tasks/native_quickshell_postcrash_smoke_m14c.py --scenario missing
+        run: xvfb-run -a -s "-screen 0 1024x768x24 -nolisten tcp" python3 tests/tasks/native_quickshell_postcrash_smoke_m14c.py --scenario missing
       - name: Real Qt Process must refuse a live owner lock
-        run: python3 tests/tasks/native_quickshell_postcrash_smoke_m14c.py --scenario locked
+        run: xvfb-run -a -s "-screen 0 1024x768x24 -nolisten tcp" python3 tests/tasks/native_quickshell_postcrash_smoke_m14c.py --scenario locked
 
   security-regressions:
     name: One writer, M14b/M14a, M13y/Z, C2 guards unchanged

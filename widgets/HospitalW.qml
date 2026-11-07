@@ -8,6 +8,7 @@ import qs.services.notifications
 import "../services/notifications/HospitalCertificationNotificationPolicy.js" as CertificationNotificationPolicy
 import "../services/hospital/HospitalWorkforceRosterPolicy.js" as WorkforceRosterPolicy
 import "../services/hospital/HospitalWorkerAttentionPolicy.js" as WorkerAttentionPolicy
+import "../services/hospital/HospitalWorkerConnectionPolicy.js" as WorkerConnectionPolicy
 import "../services/hospital/HospitalSurgeryStartupPolicy.js" as SurgeryStartupPolicy
 import "../services/github"
 import QtQuick.Effects
@@ -127,6 +128,8 @@ PanelWindow {
     )
     readonly property int workforceAttentionCount:
         WorkerAttentionPolicy.countAttention(root.workforceRosterRows)
+    readonly property int workforceConnectionGaps:
+        WorkerConnectionPolicy.countPending(root.workforceRosterRows)
     // Exact durable Room and PX Session pinned when opening card actions.
     // A matching Git Team must never substitute for the registered Session.
     property string rosterFocusedRoomId: ""
@@ -357,7 +360,8 @@ PanelWindow {
         root.intercomMenuOpen = false;
         root.rosterFocusedRoomId = id;
         root.rosterFocusedSessionId = String(current.sessionId || "");
-        root.rosterFocusedMode = modeValue === "quick" ? "quick" : "chat";
+        root.rosterFocusedMode = modeValue === "connections" ? "connections"
+            : modeValue === "quick" ? "quick" : "chat";
         root.operationsSurface = "registeredWorker";
         return true;
     }
@@ -3102,6 +3106,14 @@ PanelWindow {
             String(rosterData.sessionStatus || "NO SESSION")
         readonly property var attention:
             WorkerAttentionPolicy.describe(rosterData)
+        readonly property var connection:
+            WorkerConnectionPolicy.inspect(rosterData)
+        readonly property color connectionColor:
+            connection.canRequestTurn ? Colors.cyan
+            : connection.code === "DOCTOR_MISMATCH"
+              || connection.code === "PROVIDER_MISMATCH"
+              || connection.code === "BED_MISMATCH" ? Colors.red
+            : Colors.orange
         readonly property color attentionColor:
             attention.severity >= 3 ? Colors.red
             : attention.severity === 2 ? Colors.orange
@@ -3115,7 +3127,7 @@ PanelWindow {
             : rosterData.hasActiveSession ? Colors.cyan : Colors.magenta
 
         width: roomsColumn.width
-        height: 153
+        height: 175
         color: Colors.dark
         border.width: selected ? 2 : 1
         border.color: selected ? Colors.orange : Colors.magenta
@@ -3221,6 +3233,31 @@ PanelWindow {
                 }
             }
 
+            Rectangle {
+                width: parent.width
+                height: 18
+                color: Colors.black
+                border.width: 1
+                border.color: rosterRow.connectionColor
+                GohuText {
+                    anchors.fill: parent
+                    anchors.leftMargin: 6
+                    anchors.rightMargin: 6
+                    text: "LINK // " + rosterRow.connection.label
+                        + " // " + rosterRow.connection.next
+                    font.pixelSize: 8
+                    color: rosterRow.connectionColor
+                    verticalAlignment: Text.AlignVCenter
+                    elide: Text.ElideRight
+                }
+                MouseArea {
+                    anchors.fill: parent
+                    hoverEnabled: true
+                    cursorShape: Qt.PointingHandCursor
+                    onClicked: root.openRosterSession(
+                        rosterRow.rosterData, "connections")
+                }
+            }
             GohuText {
                 width: parent.width - 92
                 text: rosterRow.linkedIndex >= 0
@@ -3261,6 +3298,16 @@ PanelWindow {
                 accent: Colors.orange
                 actionDescription: "Inspect exact PX Session and Quick commands"
                 onTriggered: root.openRosterSession(rosterRow.rosterData, "quick")
+            }
+            HospitalActionButton {
+                width: 66
+                height: parent.height
+                label: "LINKS"
+                compactIcon: "LINK"
+                accent: rosterRow.connectionColor
+                actionDescription: "Inspect Room / Doctor / Provider / Assignment bindings"
+                onTriggered: root.openRosterSession(
+                    rosterRow.rosterData, "connections")
             }
         }
 
@@ -6148,7 +6195,9 @@ PanelWindow {
                     width: parent.width
                     height: root.workforceRosterVisible ? 26 : 0
                     visible: root.workforceRosterVisible
-                    text: "PX REGISTRY // NOT BROWSER CHATGPT TABS"
+                    text: "PX REGISTRY // LINK GAPS "
+                        + root.workforceConnectionGaps
+                        + " // NOT BROWSER CHATGPT TABS"
                     font.pixelSize: 9
                     color: Colors.cyan
                     elide: Text.ElideRight

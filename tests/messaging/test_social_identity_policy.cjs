@@ -102,6 +102,28 @@ assert.equal(policy.renameIdentity(blank, "identity-2", "bad\nname").reason,
 assert.equal(policy.renameIdentity(blank, "identity-2", "x".repeat(33)).reason,
              "INVALID_NAME");
 
+// Permanent local ID removal retains all surviving keys and sequence.
+// Active selection falls back deterministically, without authentication.
+const removedInactive = policy.removeIdentity(blank, "identity-2");
+assert.equal(removedInactive.ok, true);
+assert.equal(removedInactive.document.identities.length, 2);
+assert.equal(removedInactive.document.activeId, blank.activeId);
+assert.equal(removedInactive.document.nextIdentityId, blank.nextIdentityId);
+assert.equal(removedInactive.document.identities[0].id, "identity-1");
+assert.equal(removedInactive.document.identities[1].id, "identity-3");
+assert.equal(blank.identities.length, 3);
+assert.equal(policy.validate(removedInactive.document).ok, true);
+const removedActive = policy.removeIdentity(blank, blank.activeId);
+assert.equal(removedActive.ok, true);
+assert.equal(removedActive.document.activeId, "identity-1");
+assert.equal(removedActive.document.identities[0].name, "Default");
+assert.equal(policy.validate(removedActive.document).ok, true);
+assert.equal(policy.removeIdentity(blank, "identity-999").reason, "INVALID_IDENTITY");
+assert.equal(policy.removeIdentity(initial, initial.activeId).reason,
+             "LAST_ID_REQUIRED");
+assert.equal(policy.removeIdentity(removedActive.document, "identity-2").ok, true);
+assert.equal(policy.removeIdentity(removedActive.document, "identity-1").ok, true);
+
 const parsed = policy.parse(JSON.stringify(blank));
 assert.equal(parsed.ok, true);
 assert.equal(parsed.document.identities.length, 3);

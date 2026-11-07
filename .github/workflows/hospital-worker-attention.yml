@@ -1,0 +1,48 @@
+name: Hospital Recorded Worker Attention
+
+on:
+  pull_request:
+    paths:
+      - "widgets/HospitalW.qml"
+      - "widgets/HospitalRegisteredWorkerView.qml"
+      - "services/hospital/HospitalWorkerAttentionPolicy.js"
+      - "services/hospital/HospitalWorkforceRosterPolicy.js"
+      - "tests/hospital/test_worker_attention_policy.js"
+      - "tests/hospital/test_worker_attention_ui_contracts.py"
+      - "tests/hospital/test_workforce_roster_policy.js"
+      - "tests/hospital/test_workforce_roster_ui_contracts.py"
+      - ".github/workflows/hospital-worker-attention.yml"
+  push:
+    branches:
+      - main
+    paths:
+      - "widgets/HospitalW.qml"
+      - "widgets/HospitalRegisteredWorkerView.qml"
+      - "services/hospital/HospitalWorkerAttentionPolicy.js"
+      - "services/hospital/HospitalWorkforceRosterPolicy.js"
+      - "tests/hospital/test_worker_attention_policy.js"
+      - "tests/hospital/test_worker_attention_ui_contracts.py"
+      - "tests/hospital/test_workforce_roster_policy.js"
+      - "tests/hospital/test_workforce_roster_ui_contracts.py"
+      - ".github/workflows/hospital-worker-attention.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  worker-attention:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: JavaScript syntax and recorded-session classifications
+        run: |
+          node --check services/hospital/HospitalWorkerAttentionPolicy.js
+          node --check services/hospital/HospitalWorkforceRosterPolicy.js
+          node tests/hospital/test_worker_attention_policy.js
+          node tests/hospital/test_workforce_roster_policy.js
+      - name: Worker status UI and existing command guards
+        run: |
+          python3 tests/hospital/test_worker_attention_ui_contracts.py
+          python3 tests/hospital/test_workforce_roster_ui_contracts.py
+          python3 tests/hospital/test_registered_worker_routes.py
+          python3 tests/hospital/test_main_mode_keyboard_contracts.py

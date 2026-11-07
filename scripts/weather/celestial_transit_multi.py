@@ -95,57 +95,94 @@ def _speed(sampler, instant):
     return signed_step(left, right) * 72.0
 
 
-def find_stations(sampler, start, end, minutes):
-    """Bracketing-only direct/retrograde turns in one bounded UTC interval.
+MAX_STATION_RATE_SAMPLES = 3000
+STATION_RATE_STEP = timedelta(minutes=15)
+STATION_VERIFY_STEP = timedelta(minutes=5)
 
-    This cannot find a pair of turns fully inside one sampling interval.
-    The rate is a 20-minute central difference, not exact instantaneous speed.
+
+def find_stations(sampler, start, end, minutes):
+    """Scan a bounded 15-min velocity grid, refining true sign reversals.
+
+    M8h examined only the 30/60-minute request endpoints. That can miss a
+    retrograde-then-direct pair entirely inside one coarse interval. M8i adds
+    intervening velocity checks at most 15 minutes apart and independently
+    confirms the sign change around the refined station.
+
+    This is NOT guaranteed to detect two reversals confined to <15 minutes,
+    nor does a 60-second numerical bracket imply physical 60-second accuracy.
     """
     if not callable(sampler) or end <= start or minutes not in STEPS:
         raise ContractError("invalid station search")
-    current = start
-    previous = _speed(sampler, current)
-    found = []
-    stride = timedelta(minutes=minutes)
-    while current < end:
-        nxt = min(end, current + stride)
-        after = _speed(sampler, nxt)
-        bracket = None
-        if previous * after < 0:
-            bracket = (current, nxt, previous, after)
-        elif abs(previous) < 1e-10 and start < current < end:
-            before = _speed(sampler, current - timedelta(minutes=5))
-            later = _speed(sampler, current + timedelta(minutes=5))
-            if before * later < 0:
-                bracket = (current - timedelta(minutes=5),
-                           current + timedelta(minutes=5), before, later)
-        if bracket:
-            left, right, vl, vr = bracket
-            direction = "direct" if vl < 0 < vr else "retrograde"
-            for _ in range(18):
-                if (right - left).total_seconds() <= 60:
-                    break
-                middle = left + (right - left) / 2
-                vm = _speed(sampler, middle)
-                if vl * vm <= 0:
-                    right = middle
-                else:
-                    left, vl = middle, vm
-            root = left + (right - left) / 2
-            if start <= root <= end and all(
-                abs((root - event["instant"]).total_seconds()) > 120
-                for event in found
-            ):
-                found.append({
-                    "instant": root, "utc": _timestamp(root),
-                    "type": "station", "direction": direction,
-                    "longitude_deg": round(sampler(root), 8),
-                    "velocity_deg_day": round(_speed(sampler, root), 8),
-                    "uncertainty_seconds": 60,
-                })
-        current, previous = nxt, after
-    return [{k: v for k, v in row.items() if k != "instant"} for row in found]
+    duration = (end - start).total_seconds()
+    slots = math.ceil(duration / STATION_RATE_STEP.total_seconds())
+    if slots < 1 or slots + 1 > MAX_STATION_RATE_SAMPLES:
+        raise ContractError("station search rate-sample budget exceeded")
 
+    # Keep each source rate and timestamp once, even when an exact zero lies
+    # on a 30/60-minute request boundary. No implicit extra time horizon.
+    samples = []
+    for index in range(slots + 1):
+        when = min(end, start + index * STATION_RATE_STEP)
+        samples.append((when, _speed(sampler, when)))
+
+    candidates = []
+    for index in range(1, len(samples)):
+        left, vl = samples[index - 1]
+        right, vr = samples[index]
+        if vl * vr < 0:
+            lo, hi, v_lo = left, right, vl
+            for _ in range(32):
+                if (hi - lo).total_seconds() <= 60:
+                    break
+                mid = lo + (hi - lo) / 2
+                vm = _speed(sampler, mid)
+                if vm == 0:
+                    lo = max(lo, mid - timedelta(seconds=15))
+                    hi = min(hi, mid + timedelta(seconds=15))
+                    break
+                if v_lo * vm < 0:
+                    hi = mid
+                else:
+                    lo, v_lo = mid, vm
+            candidates.append(lo + (hi - lo) / 2)
+
+    # At an exact sampled zero, neither adjacent pair has a strict sign
+    # change. Verify the neighbors rather than silently dropping the station.
+    for index in range(1, len(samples) - 1):
+        when, value = samples[index]
+        if value == 0 and samples[index-1][1] * samples[index+1][1] < 0:
+            candidates.append(when)
+
+    found = []
+    for root in sorted(candidates):
+        if not start <= root <= end:
+            continue
+        if any(abs((root - event["instant"]).total_seconds()) <= 120
+               for event in found):
+            continue
+        before = max(start, root - STATION_VERIFY_STEP)
+        after = min(end, root + STATION_VERIFY_STEP)
+        if before >= root or after <= root:
+            continue
+        v_before, v_after = _speed(sampler, before), _speed(sampler, after)
+        if v_before * v_after >= 0:
+            continue
+        direction = "direct" if v_before < 0 < v_after else "retrograde"
+        value = sampler(root)
+        if (type(value) not in (int, float) or not math.isfinite(value)
+                or not 0 <= value < 360):
+            raise ContractError("invalid source longitude at station")
+        found.append({
+            "instant": root,
+            "utc": _timestamp(root),
+            "type": "station",
+            "direction": direction,
+            "longitude_deg": round(value, 8),
+            "velocity_deg_day": round(_speed(sampler, root), 8),
+            "uncertainty_seconds": 60,
+        })
+    return [{k: v for k, v in event.items() if k != "instant"}
+            for event in found]
 
 def aggregate(req, natal, source_for_body, start, end):
     """Pure aggregation from validated source-callables, useful for regression."""
@@ -242,6 +279,7 @@ def compute(raw, kernel_path):
                 "crossing_search_not_tangency_complete": True,
                 "station_search_not_all_turns_guaranteed": True,
                 "station_velocity_central_difference_minutes": 20,
+                "station_rate_scan_interval_minutes_max": 15,
                 "station_time_bracket_seconds": 60,
                 "contact_time_precision_seconds": 1,
                 "chart_uses_respective_equinoxes_of_date": True,

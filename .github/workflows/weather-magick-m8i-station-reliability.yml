@@ -1,0 +1,30 @@
+name: MAGICK M8i station reversal reliability
+
+on:
+  pull_request:
+    paths:
+      - 'scripts/weather/celestial_transit_multi.py'
+      - 'tests/weather/test_magick_station_reliability_m8i.py'
+      - 'tests/weather/test_magick_transit_multi_m8h.py'
+      - '.github/workflows/weather-magick-m8i-station-reliability.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  numerical-stations:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Detect double stations in 30/60-minute coarse intervals
+        run: python3 -m unittest discover -s tests/weather -p 'test_magick_station_reliability_m8i.py' -v
+      - name: Preserve accepted M8h/M8f/M8b numerical calculation contracts
+        run: |
+          python3 -m unittest discover -s tests/weather -p 'test_magick_transit_multi_m8h.py' -v
+          python3 -m unittest discover -s tests/weather -p 'test_magick_transit_timeline_m8f.py' -v
+          python3 -m unittest discover -s tests/weather -p 'test_magick_natal_engine_m8b.py' -v

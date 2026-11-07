@@ -83,12 +83,12 @@ class PhoneStorageUnlockUiContract(unittest.TestCase):
         for marker in (
             'property string phoneStorageState: "UNKNOWN"',
             'property string phoneStoragePolicy: "unknown"',
-            '"STORAGE LOCKED"',
+            '"BLUEFERRY STORAGE LOCKED //',
             '"NO_RETENTION"',
             '"BLUEFERRY ENCRYPTED LOCAL DATA // READY."',
             '"BLUEFERRY STORAGE SERVICE NOT AVAILABLE',
             '"BLUEFERRY DOES NOT RETAIN LOCAL DATA',
-            '"Other apps running as your Linux user',
+            'Other apps running as your Linux user',
         ):
             self.assertIn(marker, self.pane)
         self.assertIn('contactCards', self.pane)

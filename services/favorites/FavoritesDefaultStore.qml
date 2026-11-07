@@ -52,7 +52,9 @@ Scope {
         queuedDocument = null;
         storageState = "saving";
         lastResultCode = "SAVING";
-        preferencesFile.setText(JSON.stringify(next,null,2) + "\n");
+        // Dispatch in the next event-loop turn, not from FileView.onSaved or
+        // a nested consumer callback. Rapid taps coalesce before this write.
+        writeDispatchTimer.start();
     }
 
     function requestFeature(feature,key,enabled) {
@@ -119,6 +121,19 @@ Scope {
         lastResultCode = "";
         storageState = "ready";
         favoritesLoaded();
+    }
+
+    Timer {
+        id: writeDispatchTimer
+        interval: 0
+        repeat: false
+        onTriggered: {
+            if (root.storageState !== "saving"
+                    || root.pendingDocument === null)
+                return;
+            preferencesFile.setText(JSON.stringify(root.pendingDocument,null,2)
+                                    + "\n");
+        }
     }
 
     FileView {

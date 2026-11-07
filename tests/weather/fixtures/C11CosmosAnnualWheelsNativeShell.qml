@@ -12,9 +12,24 @@ ShellRoot {
     property int ticks: 0
     property string lastMoonRoute: ""
 
+    // Forecast model is provider-local and synthetic; it is NOT JPL data.
+    QtObject {
+        id: mockWeather
+        property bool forecastReady: true
+        property string localObservationDateTime: "2026-11-06T12:00:00"
+        property var dailyForecast: [
+            {date:"2026-11-06",moonPhase:"waning crescent",
+             moonIllumination:23,sunrise:"6:45 AM",sunset:"5:04 PM"},
+            {date:"2026-11-07",moonPhase:"new moon",
+             moonIllumination:3,sunrise:"6:46 AM",sunset:"5:03 PM"},
+            {date:"2026-11-08",moonPhase:"waxing crescent",
+             moonIllumination:9,sunrise:"6:47 AM",sunset:"5:02 PM"}
+        ]
+    }
+
     Window {
         visible: true
-        width: 930
+        width: 1390
         height: 288
         color: "black"
         Row {
@@ -36,6 +51,18 @@ ShellRoot {
                 height: 276
                 subject: "sun"
                 runtimeNowMs: Date.UTC(2026,10,6,20,0)
+            }
+            Weather.StationCosmosAnnualWheelPane {
+                id: forecast
+                width: 450
+                height: 276
+                subject: "moon"
+                moonView: "forecast"
+                weatherService: mockWeather
+                runtimeNowMs: Date.UTC(2026,10,6,20,0)
+                onRouteRequested: function(path) {
+                    root.lastMoonRoute=path;
+                }
             }
         }
     }
@@ -93,23 +120,36 @@ ShellRoot {
         onTriggered: {
             root.ticks++;
             if(root.ticks>35) return root.fail("TIMEOUT");
-            const ml=moon.wheelItem,sl=sun.wheelItem;
-            if(!ml || !sl) return;
+            const ml=moon.wheelItem,sl=sun.wheelItem,fl=forecast.wheelItem;
+            if(!ml || !sl || !fl) return;
             const moonCanvas=find(moon,"magick-m7-annual-wheel-canvas");
             const sunCanvas=find(sun,"magick-m7-annual-wheel-canvas");
             const moonModes=find(moon,"magick-m7-annual-subject-tabs");
             const sunModes=find(sun,"magick-m7-annual-subject-tabs");
+            const forecastModes=find(forecast,"magick-m7-annual-subject-tabs");
+            const forecastOutlook=find(forecast,"magick-m7-forecast-outlook");
+            const forecastCanvas=find(forecast,"magick-m7-annual-wheel-canvas");
             if(root.phase===0){
                 if(ml.view!=="moon" || ml.lockedView!=="moon"
                     || sl.view!=="solar" || sl.lockedView!=="solar"
+                    || fl.view!=="forecast" || fl.lockedView!=="forecast"
                     || !moonCanvas || !sunCanvas || !moonModes || !sunModes
-                    || moonModes.visible || sunModes.visible)
-                    return root.fail("REUSED_WHEEL_LOCK_OR_CANVAS_MISSING");
+                    || !forecastModes || !forecastOutlook || !forecastCanvas
+                    || moonModes.visible || sunModes.visible || forecastModes.visible
+                    || forecastCanvas.visible)
+                    return root.fail("REUSED_WHEEL_LOCK_OR_FORECAST_MISSING");
                 if(moonCanvas.width<400 || moonCanvas.height<220
-                    || sunCanvas.width<400 || sunCanvas.height<250)
-                    return root.fail("SMALL_OR_CLIPPED_WHEEL_CANVAS");
-                if(ml.calendarSource.loading || sl.calendarSource.loading)
-                    return root.fail("ANNUAL_JPL_CALCULATED_WITHOUT_CONSENT");
+                    || sunCanvas.width<400 || sunCanvas.height<250
+                    || forecastOutlook.width<400 || forecastOutlook.height<215)
+                    return root.fail("SMALL_OR_CLIPPED_MOON_INSTRUMENT");
+                if(ml.calendarSource.loading || sl.calendarSource.loading
+                    || fl.calendarSource.active || fl.calendarSource.loading)
+                    return root.fail("FORECAST_MUST_NOT_START_JPL_SERVICE");
+                if(!forecastOutlook.compactLayout
+                    || !forecastOutlook.model.ready
+                    || forecastOutlook.model.rows.length!==3
+                    || forecastOutlook.focusedDay.date!=="2026-11-06")
+                    return root.fail("FORECAST_DAILY_WEATHER_BINDING_MISSING");
                 const atlas=root.sampleAtlas();
                 ml.calendarSource.atlas=atlas;
                 sl.calendarSource.atlas=atlas;
@@ -122,14 +162,18 @@ ShellRoot {
                     || ml.model.lunar_events.length!==2
                     || ml.selectedYear!==2026 || sl.selectedYear!==2026)
                     return root.fail("ANNUAL_LUNAR_SOLAR_DATA_LOST");
+                forecastOutlook.selectedDate="2026-11-07";
                 ml.scopeMode="month";
                 ml.selectedMonth=2;
                 sl.selectedSolar=sl.model.solar_terms[10].id;
                 root.phase=2;
             } else if(root.phase===2){
                 if(ml.moonMonth.length!==28
-                    || !sl.currentTerm || sl.currentTerm.id!=="solar-term-10")
-                    return root.fail("MONTH_OR_SOLAR_TERM_SELECTION_BROKEN");
+                    || !sl.currentTerm || sl.currentTerm.id!=="solar-term-10"
+                    || !forecastOutlook.focusedDay
+                    || forecastOutlook.focusedDay.date!=="2026-11-07"
+                    || forecastOutlook.focusedDay.illumination!==3)
+                    return root.fail("MONTH_SOLAR_TERM_OR_FORECAST_SELECTION_BROKEN");
                 ml.fitWheel();
                 sl.fitWheel();
                 ml.zoomAt(1.25,200,120);
@@ -148,10 +192,20 @@ ShellRoot {
             } else if(root.phase===4){
                 if(root.lastMoonRoute!=="cosmos/moon/ephemeris"
                     || ml.wheelZoom!==1.6
-                    || ml.calendarSource.loading || sl.calendarSource.loading)
+                    || ml.calendarSource.loading || sl.calendarSource.loading
+                    || fl.calendarSource.active)
                     return root.fail("RETURN_ROUTE_OR_JPL_LAZY_GATE_BROKEN");
+                const forward=find(moon,"cosmos-c17-moon-forecast-tab");
+                const backward=find(forecast,"cosmos-c17-moon-wheel-tab");
+                if(!forward||!backward) return root.fail("MOON_FORECAST_RAIL_MISSING");
+                forward.clicked(null);
+                if(root.lastMoonRoute!=="cosmos/moon/forecast")
+                    return root.fail("MOON_TO_FORECAST_ROUTE_BROKEN");
+                backward.clicked(null);
+                if(root.lastMoonRoute!=="cosmos/moon/year")
+                    return root.fail("FORECAST_TO_WHEEL_ROUTE_BROKEN");
                 root.done=true;
-                console.log("C11_ANNUAL_PASS // BOTH_WHEELS JPL_ATLAS MONTH SOLAR_TERMS ZOOM_PAN BACK");
+                console.log("C11_ANNUAL_PASS // BOTH_WHEELS JPL_ATLAS MONTH SOLAR_TERMS ZOOM_PAN BACK + C17_MOON_FORECAST");
                 Qt.quit();
             }
         }

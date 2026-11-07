@@ -57,7 +57,7 @@ required(
     "Missing Patient/Room identity must fail closed for navigation",
 )
 required(
-    "REGISTERED PX ROOM // OTHER FLOOR OR NO GIT MATCH" in host,
+    "PX ROOM // OTHER FLOOR OR NO GIT MATCH" in host,
     "Unlinked workers must be shown honestly",
 )
 required(

@@ -1,0 +1,56 @@
+name: Identity Center Pinned HTTPS Context Transport V0
+
+on:
+  pull_request:
+    paths:
+      - 'services/identity/pinned_https_identity_transport_v0.py'
+      - 'tests/identity/test_pinned_https_identity_transport_v0.py'
+      - 'services/identity/desktop_context_projection_v0.py'
+      - 'services/identity/desktop_host_lifecycle_v0.py'
+      - 'services/identity/trusted_oidc_discovery_v0.py'
+      - 'MODEL/contracts/identity-center-pinned-https-transport-v0.md'
+      - 'MODEL/README.md'
+      - '.github/workflows/identity-center-pinned-https-transport-v0.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'services/identity/pinned_https_identity_transport_v0.py'
+      - 'tests/identity/test_pinned_https_identity_transport_v0.py'
+      - 'services/identity/desktop_context_projection_v0.py'
+      - 'services/identity/desktop_host_lifecycle_v0.py'
+      - 'services/identity/trusted_oidc_discovery_v0.py'
+      - 'MODEL/contracts/identity-center-pinned-https-transport-v0.md'
+      - 'MODEL/README.md'
+      - '.github/workflows/identity-center-pinned-https-transport-v0.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  pinned-https:
+    name: Real loopback TLS, strict host requests and fail-closed identity view
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install existing offline verifier test requirements
+        run: python3 -m pip install -r services/identity/requirements-jwks-verifier-v0.txt
+      - name: Confirm test-only OpenSSL support
+        run: openssl version
+      - name: Compile transport and test
+        run: |
+          python3 -m py_compile services/identity/pinned_https_identity_transport_v0.py
+          python3 -m py_compile tests/identity/test_pinned_https_identity_transport_v0.py
+      - name: Run disposable HTTPS integration with certificate verification
+        run: |
+          python3 -m unittest discover -s tests/identity -p 'test_pinned_https_identity_transport_v0.py' -v
+      - name: Preserve existing host context, metadata and CPU++ safety
+        run: |
+          python3 -m unittest discover -s tests/identity -p 'test_desktop_context_projection_v0.py' -v
+          python3 -m unittest discover -s tests/identity -p 'test_desktop_host_lifecycle_v0.py' -v
+          python3 -m unittest discover -s tests/identity -p 'test_trusted_oidc_discovery_v0.py' -v
+          python3 -m unittest discover -s tests/cpuplus -p 'test_cpuplus_identity_host_context_v0.py' -v

@@ -1,0 +1,65 @@
+name: TASKS M15b isolated keyring encrypted draft restart
+
+on:
+  pull_request:
+    paths:
+      - 'tests/tasks/fixtures/TaskEncryptedDraftPrivateBridgeM15b.cjs'
+      - 'tests/tasks/tools/task_m15b_encrypted_draft_bridge.sh'
+      - 'tests/tasks/test_task_encrypted_private_restart_m15b.cjs'
+      - 'docs/tasks-encrypted-private-restart-m15b.md'
+      - '.github/workflows/tasks-encrypted-private-restart-m15b.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'tests/tasks/fixtures/TaskEncryptedDraftPrivateBridgeM15b.cjs'
+      - 'tests/tasks/tools/task_m15b_encrypted_draft_bridge.sh'
+      - 'tests/tasks/test_task_encrypted_private_restart_m15b.cjs'
+      - '.github/workflows/tasks-encrypted-private-restart-m15b.yml'
+permissions:
+  contents: read
+
+jobs:
+  disposable-keyring-vault:
+    runs-on: ubuntu-latest
+    timeout-minutes: 14
+    env:
+      POST_APOLLO_M15B_DISPOSABLE_CI: '1'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: M15b source and explicit private-session refusal checks
+        run: node --test tests/tasks/test_task_encrypted_private_restart_m15b.cjs
+      - name: Install disposable runner Secret Service, never operator keyring
+        run: |
+          sudo apt-get update -qq
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+            dbus dbus-x11 gnome-keyring libsecret-tools libglib2.0-bin
+      - name: Actual private Secret Service, ciphertext checkpoint and fresh-process unlock
+        run: dbus-run-session -- bash tests/tasks/tools/task_m15b_encrypted_draft_bridge.sh --run
+      - name: M13f AES-GCM tamper/mismatched-key and M13m source-binding regressions
+        run: |
+          node --test tests/tasks/test_task_encrypted_recovery_m13f.cjs
+          node --test tests/tasks/test_task_encrypted_draft_transaction_m13m.cjs
+      - name: M13o private filesystem locks and atomic checkpoint persistence
+        run: node --test tests/tasks/test_task_encrypted_draft_private_storage_m13o.cjs
+      - name: M13p/M13t consent remains simulated and cannot grant real keys
+        run: |
+          node --test tests/tasks/test_task_connections_permission_m13p.cjs
+          node --test tests/tasks/test_task_recovery_consent_source_m13t.cjs
+      - name: Existing M15a source check and single TASKS writer stay separate
+        run: |
+          python3 -B -m unittest discover -s tests/tasks \
+            -p 'test_task_local_source_inspect_m15a.py' -v
+          python3 tests/tasks/test_task_writer_gate_inventory_m11d.py
+          node tests/cpuplus/test_connections_broker_c2a.js
+      - name: No production import, actual draft capture or key-release activation
+        run: |
+          set -euo pipefail
+          ! grep -Eq 'TaskEncryptedDraftPrivateBridgeM15b|task_m15b_encrypted_draft_bridge' \
+            shell.qml services/hub/ApolloHubTodoStore.qml \
+            widgets/tasks/TaskRecoveryStatusPaneM13q.qml \
+            services/connections/ConnectionsBroker.qml
+          test "$(grep -c 'todoFile.setText(' services/hub/ApolloHubTodoStore.qml)" = 1
+          printf '%s\n' 'M15B_REAL_PRIVATE_ENCRYPTION_NO_PRODUCTION_ACTIVATION_PASS'

@@ -385,6 +385,34 @@ Rectangle {
         }
     }
     Row {
+        id:advancedFilters
+        anchors.left:parent.left;anchors.right:parent.right
+        anchors.bottom:eventHeader.top
+        height:23;spacing:3
+        ActionButton {
+            width:Math.max(50,(advancedFilters.width-85-2*advancedFilters.spacing)/2)
+            height:22;label:"ASPECT "+atlas.browserAspect.toUpperCase()
+            labelPixelSize:8;accentColor:Colors.yellow
+            available:!!atlas.model
+            onClicked:atlas.browserAspect=Browser.nextOption(
+                Browser.ASPECTS,atlas.browserAspect)
+        }
+        ActionButton {
+            width:Math.max(50,(advancedFilters.width-85-2*advancedFilters.spacing)/2)
+            height:22;label:"MOTION "+atlas.browserMotion.toUpperCase()
+            labelPixelSize:8;accentColor:Colors.cyan
+            available:!!atlas.model
+            onClicked:atlas.browserMotion=Browser.nextOption(
+                Browser.MOTIONS,atlas.browserMotion)
+        }
+        QuietText {
+            width:85;height:22;font.pixelSize:8
+            color:Colors.magenta
+            verticalAlignment:Text.AlignVCenter
+            text:atlas.pageData.total+" / "+(atlas.model?atlas.model.events.length:0)
+        }
+    }
+    Row {
         id:eventHeader
         anchors.left:parent.left;anchors.right:parent.right
         anchors.bottom:eventPanel.top
@@ -429,13 +457,42 @@ Rectangle {
     Rectangle {
         id:eventPanel
         anchors.left:parent.left;anchors.right:parent.right
-        anchors.bottom:footer.top
-        height:Math.max(52,Math.min(118,parent.height*.26))
+        anchors.bottom:inspector.top
+        height:Math.max(54,Math.min(138,parent.height*.27))
         border.width:1;border.color:Colors.blue
         color:Colors.black;clip:true
+        Row {
+            id:pageControls
+            anchors.top:parent.top
+            anchors.left:parent.left;anchors.right:parent.right
+            anchors.margins:2;height:22;spacing:3
+            QuietText {
+                width:Math.max(50,pageControls.width-94-2*pageControls.spacing)
+                height:22;font.pixelSize:9;color:Colors.cyan
+                verticalAlignment:Text.AlignVCenter;elide:Text.ElideRight
+                text:atlas.pageData.first+"-"+atlas.pageData.last+
+                    " / "+atlas.pageData.total+
+                    "   PAGE "+(atlas.pageData.index+1)+"/"+atlas.pageData.pages
+            }
+            ActionButton {
+                width:47;height:22;label:"PREV";labelPixelSize:8
+                accentColor:Colors.cyan
+                available:atlas.pageData.index>0
+                onClicked:atlas.goPage(-1)
+            }
+            ActionButton {
+                width:47;height:22;label:"NEXT";labelPixelSize:8
+                accentColor:Colors.cyan
+                available:atlas.pageData.index+1<atlas.pageData.pages
+                onClicked:atlas.goPage(1)
+            }
+        }
         Flickable {
             id:eventScroll
-            anchors.fill:parent;anchors.margins:2
+            anchors.top:pageControls.bottom
+            anchors.bottom:parent.bottom
+            anchors.left:parent.left;anchors.right:parent.right
+            anchors.margins:2
             contentWidth:width
             contentHeight:eventRows.implicitHeight
             boundsBehavior:Flickable.StopAtBounds;clip:true
@@ -443,7 +500,7 @@ Rectangle {
                 id:eventRows
                 width:eventScroll.width;spacing:2
                 Repeater {
-                    model:atlas.visibleEvents
+                    model:atlas.pageData.items
                     delegate:Rectangle {
                         required property var modelData
                         width:eventRows.width;height:22
@@ -453,7 +510,10 @@ Rectangle {
                         border.width:1
                         border.color:selected?Colors.magenta:Colors.blue
                         QuietText {
-                            anchors.fill:parent;anchors.margins:3
+                            anchors.left:parent.left
+                            anchors.right:inspectButton.left
+                            anchors.top:parent.top;anchors.bottom:parent.bottom
+                            anchors.margins:3
                             color:modelData.type==="station"?Colors.orange:Colors.yellow
                             font.pixelSize:9;verticalAlignment:Text.AlignVCenter
                             elide:Text.ElideRight
@@ -467,14 +527,24 @@ Rectangle {
                                      " ERR "+modelData.residual_deg.toFixed(5)+"°")
                         }
                         MouseArea {
-                            anchors.fill:parent
+                            anchors.top:parent.top;anchors.bottom:parent.bottom
+                            anchors.left:parent.left;anchors.right:inspectButton.left
                             cursorShape:Qt.PointingHandCursor
                             onClicked:atlas.chooseEvent(modelData)
+                        }
+                        ActionButton {
+                            id:inspectButton
+                            anchors.right:parent.right
+                            width:42;height:21
+                            label:"INFO";labelPixelSize:8
+                            accentColor:Colors.magenta
+                            selected:atlas.inspectedEventKey===atlas.eventKey(modelData)
+                            onClicked:atlas.inspectEvent(modelData)
                         }
                     }
                 }
                 QuietText {
-                    visible:!!atlas.model&&atlas.visibleEvents.length===0
+                    visible:!!atlas.model&&atlas.pageData.total===0
                     width:eventRows.width;height:22
                     color:Colors.cyan;font.pixelSize:9
                     text:"NO MATCHING EVENTS IN SELECTED FILTERS"

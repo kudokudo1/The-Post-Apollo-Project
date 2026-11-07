@@ -141,8 +141,10 @@ test("production mount uses existing store/editor metadata only",()=>{
         <parent.indexOf("TaskEncryptedDraftAccessPaneM15c"));
     assert.ok(parent.indexOf("TaskEncryptedDraftAccessPaneM15c")
         <parent.indexOf("TaskLocalSourceInspectPaneM15a"));
-    assert.match(parent,/ConnectionsBroker\.requirement\("tasks-draft"\)/);
-    assert.match(parent,/brokerKnown: recoveryStatus\.draftCredentialCatalog\.known === true/);
+    assert.doesNotMatch(parent,/ConnectionsBroker\.requirement\(/);
+    assert.doesNotMatch(parent,/ConnectionsBroker\.authorize\(/);
+    assert.match(parent,/brokerKnown: false/);
+    assert.match(parent,/brokerGrantEnabled: false/);
     assert.match(parent,/credentialActionsEnabled: ConnectionsBroker\.credentialActionsEnabled/);
     assert.match(parent,/editorStatus: recoveryStatus\.draftReport\.status/);
     assert.match(parent,/recoveryEnabled: ApolloHubTodoStore\.encryptedRecoveryEnabled/);
@@ -151,7 +153,7 @@ test("production mount uses existing store/editor metadata only",()=>{
     assert.match(qml,/onLeftClicked: access\.requirementsChecked = true/);
     assert.match(qml,/available: false/);
     assert.equal((qml.match(/\bActionButton\s*\{/g)||[]).length,2);
-    assert.equal((qml.match(/onLeftClicked:/g)||[]).length,1);
+    assert.equal((qml.match(/^\s*onLeftClicked:/gm)||[]).length,1);
     assert.match(qml,/readonly property bool canCaptureDraft: false/);
     assert.match(qml,/readonly property bool canUnlockPreview: false/);
     assert.match(qml,/readonly property bool canDeleteCheckpoint: false/);

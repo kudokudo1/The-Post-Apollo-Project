@@ -176,6 +176,7 @@ ShellRoot {
             const sun=fixture.locate(position,"cosmos-c12-sun-path-hero");
             const ledger=fixture.locate(position,"cosmos-c12-light-ledger");
             const strip=fixture.locate(position,"cosmos-c12-position-live-strip");
+            const obsBoard=fixture.locate(observation,"cosmos-c14-observation-board");
             const obsImage=fixture.locate(observation,"cosmos-c14-suvi-hero");
             const obsArc=fixture.locate(observation,"cosmos-c14-sun-path-hero");
             const obsLive=fixture.locate(observation,"cosmos-c14-live-telemetry");
@@ -198,7 +199,7 @@ ShellRoot {
             if(!hero||!side||!sun||!ledger||!strip||!metrics
                 ||!trend||!xray||!flare||!cycle||!cluster
                 ||!xrayBay||!flareBay||!cycleBay||!rangeChart||!historyGraph
-                ||!obsImage||!obsArc||!obsLive||!obsSky||!obsLight
+                ||!obsBoard||!obsImage||!obsArc||!obsLive||!obsSky||!obsLight
                 ||!obsMeters||!obsTimeline||!obsTwilightGroups)return;
             if(fixture.phase===0){
                 if(position.positionRows.length!==8||position.positionStrip.length!==5)
@@ -216,10 +217,10 @@ ShellRoot {
                     ||obsMeters.width<200||obsTimeline.width<170
                     ||obsTwilightGroups.width<170||obsLight.height<40)
                     return fixture.stop("OBSERVATION_INSTRUMENT_GEOMETRY_INVALID");
-                if(observation.contextMeters[0].value!=="3.2"
-                    ||observation.contextMeters[1].value!=="473 KM/S"
-                    ||observation.contextMeters[2].value!=="-6.5 NT"
-                    ||observation.highlights.length!==4)
+                if(obsBoard.contextMeters[0].value!=="3.2"
+                    ||obsBoard.contextMeters[1].value!=="473 KM/S"
+                    ||obsBoard.contextMeters[2].value!=="-6.5 NT"
+                    ||obsBoard.highlights.length!==4)
                     return fixture.stop("SHARED_SPACE_CONTEXT_MISSING");
                 if(hero.height>live.height+1||sun.height>position.height+1
                     ||strip.y+strip.height>position.height+1

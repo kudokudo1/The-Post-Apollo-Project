@@ -19,6 +19,12 @@ ShellRoot {
     QtObject {
         id: mockSolar
         property string solarFluxText: "111 SFU"
+        property bool kpReady: true
+        property real kp: 3.2
+        property bool solarWindReady: true
+        property real solarWindSpeed: 473
+        property bool magneticFieldReady: true
+        property real magneticFieldBz: -6.5
     }
     QtObject {
         id: sky
@@ -170,11 +176,15 @@ ShellRoot {
             const sun=fixture.locate(position,"cosmos-c12-sun-path-hero");
             const ledger=fixture.locate(position,"cosmos-c12-light-ledger");
             const strip=fixture.locate(position,"cosmos-c12-position-live-strip");
+            const obsBoard=fixture.locate(observation,"cosmos-c14-observation-board");
             const obsImage=fixture.locate(observation,"cosmos-c14-suvi-hero");
             const obsArc=fixture.locate(observation,"cosmos-c14-sun-path-hero");
             const obsLive=fixture.locate(observation,"cosmos-c14-live-telemetry");
             const obsSky=fixture.locate(observation,"cosmos-c14-position-live-strip");
             const obsLight=fixture.locate(observation,"cosmos-c14-twilight-ledger");
+            const obsMeters=fixture.locate(observation,"cosmos-c15-space-context-meters");
+            const obsTimeline=fixture.locate(observation,"cosmos-c15-daylight-timeline");
+            const obsTwilightGroups=fixture.locate(observation,"cosmos-c15-twilight-groups");
             const metrics=fixture.locate(activity,"cosmos-c12-activity-metrics");
             const trend=fixture.locate(activity,"cosmos-c12-xray-trend");
             const xray=fixture.locate(activity,"cosmos-c12-xray-facts");
@@ -184,27 +194,38 @@ ShellRoot {
             const xrayBay=fixture.locate(activity,"cosmos-c13-xray-bay");
             const flareBay=fixture.locate(activity,"cosmos-c13-flare-bay");
             const cycleBay=fixture.locate(activity,"cosmos-c13-cycle-bay");
+            const rangeChart=fixture.locate(activity,"cosmos-c15-cycle-range-chart");
+            const historyGraph=fixture.locate(activity,"cosmos-c13-xray-graph");
             if(!hero||!side||!sun||!ledger||!strip||!metrics
                 ||!trend||!xray||!flare||!cycle||!cluster
-                ||!xrayBay||!flareBay||!cycleBay
-                ||!obsImage||!obsArc||!obsLive||!obsSky||!obsLight)return;
+                ||!xrayBay||!flareBay||!cycleBay||!rangeChart||!historyGraph
+                ||!obsBoard||!obsImage||!obsArc||!obsLive||!obsSky||!obsLight
+                ||!obsMeters||!obsTimeline||!obsTwilightGroups)return;
             if(fixture.phase===0){
                 if(position.positionRows.length!==8||position.positionStrip.length!==5)
                     return fixture.stop("POSITION_DATA_MISSING");
                 if(sun.width<220||ledger.width<120||strip.height<25
                     ||hero.width<230||side.width<120
-                    ||metrics.height!==52)
+                    ||metrics.height!==39||historyGraph.height<40
+                    ||rangeChart.width<90||flareBay.height<120)
                     return fixture.stop("TERMINAL_GEOMETRY_TOO_SMALL");
                 if(obsImage.width<200||obsArc.width<200||obsLive.height<20
                     ||obsSky.height<24||obsLight.height<40
                     ||obsLight.y+obsLight.height>observation.height+1
                     ||observation.positionRows.length!==8
-                    ||observation.positionStrip.length!==5)
+                    ||observation.positionStrip.length!==5
+                    ||obsMeters.width<200||obsTimeline.width<170
+                    ||obsTwilightGroups.width<170||obsLight.height<40)
                     return fixture.stop("OBSERVATION_INSTRUMENT_GEOMETRY_INVALID");
+                if(obsBoard.contextMeters[0].value!=="3.2"
+                    ||obsBoard.contextMeters[1].value!=="473 KM/S"
+                    ||obsBoard.contextMeters[2].value!=="-6.5 NT"
+                    ||obsBoard.highlights.length!==4)
+                    return fixture.stop("SHARED_SPACE_CONTEXT_MISSING");
                 if(hero.height>live.height+1||sun.height>position.height+1
                     ||strip.y+strip.height>position.height+1
                     ||cluster.y+cluster.height>activity.height+1
-                    ||cycleBay.y+cycleBay.height>cluster.height+1
+                    ||cycleBay.y+cycleBay.height>activity.height-8
                     ||flareBay.y+flareBay.height>cluster.height+1)
                     return fixture.stop("TERMINAL_VIEWPORT_OVERFLOW");
                 if(activity.flareCount!==2

@@ -130,10 +130,42 @@ test("C13 ACTIVITY renders xray, flare and cycle in one non-scrolling instrument
  assert.match(terminal,/cycle\.refresh\(true\)/);
  assert.match(terminal,/flares\.refresh\(\)/);
  assert.match(terminal,/xray\.refresh\(\)/);
- assert.match(terminal,/NOAA SOLAR CYCLE \/\/ MONTHLY PREDICTION, NOT LIVE FLUX/);
- assert.match(terminal,/OBSERVED EVENT PEAKS, NOT ALERTS/);
+ assert.match(terminal,/SOLAR CYCLE \/\/ MONTHLY MODEL \+ RANGES \/\/ NOT LIVE/);
+ assert.match(terminal,/OBSERVED FLARES/);
  assert.doesNotMatch(terminal,/id: activityTabs\b|id: activityInstrument\b/);
  assert.doesNotMatch(terminal,/activityFocus===|cycleDetailPage|flareDetailPage|xraySourcePage/);
  assert.match(focus,/id: solarDetails\s*StationCosmosSunInstrumentPane\s*\{/);
  assert.match(focus,/id: solarYear\s*StationCosmosAnnualWheelPane\s*\{/);
+});
+test("C15 ACTIVITY uses source-backed nonuniform scientific representations",()=>{
+ assert.match(terminal,/objectName: "cosmos-c13-xray-graph"/);
+ assert.match(terminal,/objectName: "cosmos-c15-cycle-range-chart"/);
+ assert.match(terminal,/objectName: "cosmos-c12-flare-facts"/);
+ assert.match(terminal,/xray\.trend/);
+ assert.match(terminal,/ssnRangeValid/);
+ assert.match(terminal,/fluxRangeValid/);
+ assert.match(terminal,/predictedSsn/);
+ assert.match(terminal,/selectedFlare\.peakUtc/);
+ assert.match(terminal,/selectedFlare\.flux/);
+ assert.match(terminal,/OBSERVED FLARES/);
+ assert.doesNotMatch(terminal,/model: sunTerminal\.cycleFields/);
+ assert.doesNotMatch(terminal,/model: sunTerminal\.flareFields/);
+ assert.doesNotMatch(terminal,/id: activityTabs\b|id: activityInstrument\b/);
+ assert.doesNotMatch(terminal,/Flickable\s*\{|ScrollView\s*\{/);
+});
+
+
+test("C15 OBSERVATION distinguishes live class, source-backed meters, daylight and twilight",()=>{
+ for(const name of [
+  "cosmos-c14-suvi-hero","cosmos-c14-sun-path-hero",
+  "cosmos-c14-live-telemetry","cosmos-c15-space-context-meters",
+  "cosmos-c15-daylight-timeline","cosmos-c15-twilight-groups"
+ ]) assert.ok(terminal.includes(name),name);
+ for(const source of ["kpReady","solarWindReady","magneticFieldReady",
+                       "solarWindSpeed","magneticFieldBz"])
+   assert.ok(terminal.includes(source),source);
+ assert.match(terminal,/contextMeters:/);
+ assert.match(terminal,/highlights:/);
+ assert.doesNotMatch(terminal,/model: observation\.liveReadings/);
+ assert.doesNotMatch(terminal,/Flickable\s*\{|ScrollView\s*\{/);
 });

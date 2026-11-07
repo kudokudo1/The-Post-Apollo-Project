@@ -17,6 +17,9 @@ Rectangle {
     // M30-D // Existing full COSMOS V2 visual remains unchanged by default.
     // MAGICK lunar/solar explicitly chooses the fixed-viewport presentation.
     property bool compactMode: false
+    // Opt-in C21 presentation used only by COSMOS > MOON > OVERVIEW.
+    // Other MAGICK/COSMOS instruments keep their original 73px compact disk.
+    property bool prominentMoon: false
     property bool showMoon: true
     property bool showSun: true
     property bool moonReady: false
@@ -63,6 +66,8 @@ Rectangle {
 
     onMoonDataChanged: moonCanvas.requestPaint()
     onInspectedPhaseIdChanged: moonCanvas.requestPaint()
+    onProminentMoonChanged: moonCanvas.requestPaint()
+    onHeightChanged: moonCanvas.requestPaint()
     onSolarDataChanged: solarCanvas.requestPaint()
     onSelectedMinuteChanged: solarCanvas.requestPaint()
     onWidthChanged: {
@@ -94,19 +99,29 @@ Rectangle {
                 GohuText {
                     width: parent.width
                     text: "MOON // PHASE ILLUMINATION"
+                    visible: !visual.prominentMoon
                     font.pixelSize: visual.compactMode ? 10 : 12
                     color: Colors.magenta
                     elide: Text.ElideRight
                 }
 
                 Row {
-                    height: visual.compactMode ? 75 : 124
+                    id: moonHeroRow
+                    // In the Moon-only hero, phase buttons remain beneath the
+                    // image, but the disk consumes almost the entire panel.
+                    height: visual.prominentMoon
+                        ? Math.max(75,moonBay.height-(visual.compactMode ? 36 : 49))
+                        : (visual.compactMode ? 75 : 124)
                     width: parent.width
                     spacing: visual.compactMode ? 7 : 12
 
                     Canvas {
                         id: moonCanvas
-                        width: visual.compactMode ? 73 : 120
+                        objectName: "cosmos-c21-moon-hero-disk"
+                        width: visual.prominentMoon
+                            ? Math.max(73,Math.min(180,moonHeroRow.height,
+                                moonHeroRow.width*0.63))
+                            : (visual.compactMode ? 73 : 120)
                         height: width
                         onPaint: {
                             const ctx=getContext("2d");
@@ -217,8 +232,13 @@ Rectangle {
                 }
 
                 Row {
+                    // The Moon-only hero already shows phase, illumination,
+                    // and the eight phase controls above: reclaim explanatory
+                    // prose for the disk instead of clipping it below.
+                    visible: !visual.prominentMoon
                     width: parent.width
-                    height: visual.compactMode ? 33 : 51
+                    height: visual.prominentMoon ? 0
+                        : (visual.compactMode ? 33 : 51)
                     spacing: visual.compactMode ? 4 : 5
 
                     QuietText {

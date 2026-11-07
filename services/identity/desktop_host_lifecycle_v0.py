@@ -44,7 +44,7 @@ class HostLifecycleConfig:
             api_audience=self.api_audience,
             redirect_uri="http://127.0.0.1:8765/callback",
         )
-        if type(self.runtime_directory) is not Path or not self.runtime_directory.is_absolute():
+        if not isinstance(self.runtime_directory, Path) or not self.runtime_directory.is_absolute():
             raise ValueError("An explicit absolute host runtime directory is required")
 
 
@@ -171,14 +171,20 @@ class DesktopHostLifecycle:
                 self._status = "CLOSED"
                 if self._session is not None:
                     self._session.logout()
-                if self._socket is not None:
-                    self._socket.close()
-                if self._receiver is not None:
-                    self._receiver.close()
+                socket, receiver = self._socket, self._receiver
                 self._session = None
                 self._receiver = None
                 self._socket = None
-                raise
+                # The failed startup is not visible as a running service.
+                # Cleanup happens once the lock is released below.
+        if self._status == "CLOSED":
+            try:
+                if socket is not None:
+                    socket.close()
+            finally:
+                if receiver is not None:
+                    receiver.close()
+            raise RuntimeError("Identity host transports could not start")
 
     def begin_login(self) -> dict[str, object]:
         """Host-only one-time login initiation, never a display IPC method."""

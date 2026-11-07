@@ -3,7 +3,7 @@
 set -Eeuo pipefail
 [[ "$(id -u)" == 0 && -d /src/tests/connections/c3d_provenance && -d /out ]] ||
   { echo "C3D_BUILDER_REFUSED_NOT_DISPOSABLE"; exit 2; }
-dnf -y --setopt=install_weak_deps=False install rpm-build rpm-sign gnupg2
+dnf -y --setopt=install_weak_deps=False install rpm-build rpm-sign gnupg2 python3
 umask 077
 work="$(mktemp -d /tmp/c3d-build-XXXXXX)"
 trap 'rm -rf "$work"' EXIT

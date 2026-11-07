@@ -90,19 +90,31 @@ class ZoomWebHostTests(unittest.TestCase):
         self.assertIn('visible: camera.activeView === "zoom" && !camera.zoomWebDocked', QML)
         self.assertIn('intersection: Intersection.Subtract', QML)
         self.assertIn('width: camera.zoomWebDocked ? camera.zoomActorWidth : 0', QML)
-        self.assertIn('height: camera.zoomWebDocked ? camera.zoomActorHeight : 0', QML)
+        self.assertIn('height: camera.zoomWebDocked ? camera.zoomInputHeight : 0', QML)
         self.assertIn('menuOpen && !zoomWebDocked ? WlrKeyboardFocus.OnDemand', QML)
         # The fallback instructions are scrollable only when the web actor is
         # absent. A QML Flickable must not intercept Zoom's native mouse wheel.
         self.assertIn('id: zoomPage', QML)
         self.assertIn('visible: camera.activeView === "zoom" && !camera.zoomWebDocked', QML)
 
-    def test_zoom_starts_at_mode_row_bottom_without_changing_bottom_edge(self):
-        # After verified live deployment, the last screenshot still showed
-        # ~6 scaled px of empty space between mode row and browser. This was
-        # exactly the 12 logical px shared Column spacing, not Sway resizing.
+    def test_measured_zoom_visual_top_overlap_preserves_mode_button_input(self):
+        # After the old Column spacing removal, an enlarged screenshot still
+        # showed about 12 logical px of transparent top strip. Sway reported
+        # a full-size client at Y=210, with no internal titlebar offset.
+        # Move the actual browser top upward 12px, extend height 12px and
+        # keep the mode-button controls outside the input subtraction.
         self.assertIn(
             'y: cameraBodyColumn.y + cameraModes.y + cameraModes.height', QML)
+        self.assertIn('               - camera.zoomVisualTopOverlap', QML)
+        self.assertIn('readonly property int zoomVisualTopOverlap: 12', QML)
+        self.assertIn('readonly property int zoomInputTop: Math.max(', QML)
+        self.assertIn(
+            'zoomActorTop, cameraBodyColumn.y + cameraModes.y + cameraModes.height)', QML)
+        self.assertIn(
+            '0, zoomActorHeight - (zoomInputTop - zoomActorTop))', QML)
+        self.assertIn('y: camera.zoomInputTop', QML)
+        self.assertIn(
+            'height: camera.zoomWebDocked ? camera.zoomInputHeight : 0', QML)
         self.assertNotIn('cameraModes.height + cameraBodyColumn.spacing', QML)
         self.assertIn(
             'height: Math.max(0, frame.height - y - camera.zoomBayBottom)', QML)
@@ -113,8 +125,8 @@ class ZoomWebHostTests(unittest.TestCase):
             'readonly property int zoomActorTop: zoomBayTop', QML)
         self.assertIn(
             'readonly property int zoomActorHeight: zoomBayHeight', QML)
-        # Fixed bottom: reducing top by 12 grows height by 12. Same at all
-        # sizes, without another synthetic actor offset or new Sway command.
+        # Fixed bottom: lowering the actual browser top by 12 extends its
+        # height by 12 without moving the bottom or disturbing side margins.
         for old_top, old_height in ((131, 542), (131, 875), (131, 1200)):
             new_top = old_top - 12
             new_height = old_height + 12
@@ -152,7 +164,7 @@ class ZoomWebHostTests(unittest.TestCase):
         self.assertIn('zoomWebProcess.exec(zoomWebArgs("enter"))', QML)
         self.assertIn('"--width", String(zoomActorWidth), "--height", String(zoomActorHeight)', QML)
         self.assertIn('x: camera.zoomActorLeft', QML)
-        self.assertIn('y: camera.zoomActorTop', QML)
+        self.assertIn('y: camera.zoomInputTop', QML)
         self.assertIn('intersection: Intersection.Subtract', QML)
         # A verified browser has no overlapping QML fallback controls.
         self.assertIn('visible: camera.activeView === "zoom" && !camera.zoomWebDocked', QML)

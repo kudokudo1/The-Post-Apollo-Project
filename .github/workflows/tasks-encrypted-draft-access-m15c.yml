@@ -1,0 +1,112 @@
+name: TASKS M15c encrypted draft access review (default deny)
+
+on:
+  pull_request:
+    paths:
+      - 'widgets/tasks/TaskEncryptedDraftAccessPolicyM15c.js'
+      - 'widgets/tasks/TaskEncryptedDraftAccessPaneM15c.qml'
+      - 'widgets/tasks/TaskRecoveryStatusPaneM13q.qml'
+      - 'tests/tasks/test_task_encrypted_draft_access_m15c.cjs'
+      - 'TaskEncryptedDraftAccessSmokeM15c.qml'
+      - 'docs/tasks-encrypted-draft-access-m15c.md'
+      - '.github/workflows/tasks-encrypted-draft-access-m15c.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'widgets/tasks/TaskEncryptedDraftAccessPolicyM15c.js'
+      - 'widgets/tasks/TaskEncryptedDraftAccessPaneM15c.qml'
+      - 'widgets/tasks/TaskRecoveryStatusPaneM13q.qml'
+      - 'tests/tasks/test_task_encrypted_draft_access_m15c.cjs'
+      - 'TaskEncryptedDraftAccessSmokeM15c.qml'
+      - '.github/workflows/tasks-encrypted-draft-access-m15c.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  access-contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: M15c three protected scope controls never grant real authority
+        run: node --test tests/tasks/test_task_encrypted_draft_access_m15c.cjs
+      - name: Existing M13p and M13t scoped permission refusal
+        run: |
+          node --test tests/tasks/test_task_connections_permission_m13p.cjs
+          node --test tests/tasks/test_task_recovery_consent_source_m13t.cjs
+      - name: Previous live recovery and unsaved editor status
+        run: |
+          node --test tests/tasks/test_task_recovery_status_m13q.cjs
+          node --test tests/tasks/test_task_live_draft_presence_m13s.cjs
+          node --test tests/tasks/test_task_operator_save_review_m13z.cjs
+          node --test tests/tasks/test_task_live_native_save_observation_m14a.cjs
+      - name: Real-source checker and single writer unchanged
+        run: |
+          python3 -B -m unittest discover -s tests/tasks \
+            -p 'test_task_local_source_inspect_m15a.py' -v
+          python3 tests/tasks/test_task_writer_gate_inventory_m11d.py
+          node tests/cpuplus/test_connections_broker_c2a.js
+      - name: Parse mounted QML with Qt 6
+        run: |
+          sudo apt-get update -qq
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends qt6-declarative-dev-tools
+          QT_QPA_PLATFORM=offscreen /usr/lib/qt6/bin/qmlformat widgets/tasks/TaskEncryptedDraftAccessPaneM15c.qml >/dev/null
+          QT_QPA_PLATFORM=offscreen /usr/lib/qt6/bin/qmlformat widgets/tasks/TaskRecoveryStatusPaneM13q.qml >/dev/null
+          QT_QPA_PLATFORM=offscreen /usr/lib/qt6/bin/qmlformat TaskEncryptedDraftAccessSmokeM15c.qml >/dev/null
+      - name: No imported credential host, local draft writer or synthetic grant
+        run: |
+          set -euo pipefail
+          test "$(grep -c 'todoFile.setText(' services/hub/ApolloHubTodoStore.qml)" = 1
+          ! grep -Eq 'FileView *\{|Process *\{|secret-tool|Qt.openUrlExternally|ConnectionsBroker\.authorize' \
+            widgets/tasks/TaskEncryptedDraftAccessPaneM15c.qml \
+            widgets/tasks/TaskEncryptedDraftAccessPolicyM15c.js
+          ! grep -q 'TaskEncryptedDraftAccessSmokeM15c' shell.qml
+          printf '%s\n' 'M15C_ENCRYPTED_DRAFT_UI_DEFAULT_DENY_NO_SOURCE_WRITE_PASS'
+
+  native-qml-access:
+    runs-on: ubuntu-latest
+    timeout-minutes: 14
+    container:
+      image: debian:unstable-slim
+    steps:
+      - name: Install real Quickshell with ephemeral X11 display
+        run: |
+          apt-get update -qq
+          DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+            git ca-certificates quickshell=0.3.2-1 python3 \
+            qt6-qpa-plugins xvfb xauth libxcb-cursor0 libxkbcommon-x11-0 \
+            qml6-module-qtquick qml6-module-qtquick-layouts \
+            qml6-module-qtquick-effects qml6-module-qt5compat-graphicaleffects \
+            qml6-module-qtqml
+      - uses: actions/checkout@v4
+      - name: Actual Quickshell three scopes remain disabled on private display
+        shell: bash
+        run: |
+          set -euo pipefail
+          scratch="$(mktemp -d /tmp/postapollo-m15c-native-XXXXXXXX)"
+          trap 'rm -rf -- "$scratch"' EXIT
+          chmod 700 "$scratch"
+          export HOME="$scratch"
+          export XDG_CONFIG_HOME="$scratch/config"
+          export XDG_DATA_HOME="$scratch/data"
+          export XDG_STATE_HOME="$scratch/state"
+          export XDG_CACHE_HOME="$scratch/cache"
+          export XDG_RUNTIME_DIR="$scratch/runtime"
+          mkdir -p -m 700 "$XDG_CONFIG_HOME" "$XDG_DATA_HOME" \
+            "$XDG_STATE_HOME" "$XDG_CACHE_HOME" "$XDG_RUNTIME_DIR"
+          export POST_APOLLO_TASKS_M15C_NATIVE=CI_DISPOSABLE_ONLY
+          export QT_QPA_PLATFORM=xcb
+          export QT_QUICK_BACKEND=software
+          export LIBGL_ALWAYS_SOFTWARE=1
+          export QS_DISABLE_FILE_WATCHER=1
+          export WAYLAND_DISPLAY=
+          xvfb-run -a -s "-screen 0 1024x768x24 -nolisten tcp" \
+            qs -p "$PWD/TaskEncryptedDraftAccessSmokeM15c.qml" --no-color \
+            > "$scratch/log" 2>&1
+          grep -q '^.*M15C_NATIVE_THREE_SCOPES_DEFAULT_DENY_PASS' "$scratch/log"
+          ! grep -Eq 'M15C_NATIVE_.*(FAILURE|NOT_REFUSED|TIMEOUT|NOT_ARMED)' "$scratch/log"
+          printf '%s\n' 'M15C_REAL_QUICKSHELL_THREE_SCOPES_NO_AUTHORITY_PASS'

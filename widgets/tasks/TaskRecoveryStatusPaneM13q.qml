@@ -153,6 +153,33 @@ Item {
                 opacity: 0.7
             }
 
+            // M15c // Fixed-scope encrypted draft review. Exactly the
+            // existing live M13s metadata, no task text or credentials.
+            TaskEncryptedDraftAccessPaneM15c {
+                width: parent.width
+                providerStatus: ConnectionsBroker.status
+                providerChecking: ConnectionsBroker.checking
+                credentialActionsEnabled: ConnectionsBroker.credentialActionsEnabled
+                // Do not call shared broker requirement/authorize here.
+                // M13q's status-only boundary forbids catalog/credential calls.
+                // The TASKS draft provider has no registered production host.
+                brokerKnown: false
+                brokerGrantEnabled: false
+                recoveryEnabled: ApolloHubTodoStore.encryptedRecoveryEnabled
+                storageAuthorized: ApolloHubTodoStore.encryptedRecoveryStorageAuthorized
+                unlockAuthorized: ApolloHubTodoStore.encryptedRecoveryUnlockAuthorized
+                draftHostEnabled: ApolloHubTodoStore.encryptedDraftHostEnabled
+                draftHostWriteAuthorized: ApolloHubTodoStore.encryptedDraftHostWriteAuthorized
+                editorStatus: recoveryStatus.draftReport.status
+            }
+
+            Rectangle {
+                width: parent.width
+                height: 1
+                color: Colors.cyan
+                opacity: 0.7
+            }
+
             // M15a // Real, point-in-time structural source check invoked
             // ONLY by an operator click; no new FileView or writer.
             TaskLocalSourceInspectPaneM15a {

@@ -1,0 +1,57 @@
+name: Identity Center Pinned OIDC Code Exchange V0
+
+on:
+  pull_request:
+    paths:
+      - 'services/identity/host_oidc_code_exchange_v0.py'
+      - 'tests/identity/test_host_oidc_code_exchange_v0.py'
+      - 'services/identity/pinned_https_identity_transport_v0.py'
+      - 'services/identity/desktop_host_lifecycle_v0.py'
+      - 'services/identity/desktop_session_host_v0.py'
+      - 'MODEL/contracts/identity-center-host-oidc-code-exchange-v0.md'
+      - 'MODEL/README.md'
+      - '.github/workflows/identity-center-host-oidc-code-exchange-v0.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'services/identity/host_oidc_code_exchange_v0.py'
+      - 'tests/identity/test_host_oidc_code_exchange_v0.py'
+      - 'services/identity/pinned_https_identity_transport_v0.py'
+      - 'services/identity/desktop_host_lifecycle_v0.py'
+      - 'services/identity/desktop_session_host_v0.py'
+      - 'MODEL/contracts/identity-center-host-oidc-code-exchange-v0.md'
+      - 'MODEL/README.md'
+      - '.github/workflows/identity-center-host-oidc-code-exchange-v0.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  code-exchange:
+    name: Real HTTPS PKCE code POST, signed RS256 ID-token and tokenless host context
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install existing vetted JWT and crypto library
+        run: python3 -m pip install -r services/identity/requirements-jwks-verifier-v0.txt
+      - name: Verify isolated OpenSSL certificate fixture
+        run: openssl version
+      - name: Compile host-only verification implementation and tests
+        run: |
+          python3 -m py_compile services/identity/host_oidc_code_exchange_v0.py
+          python3 -m py_compile tests/identity/test_host_oidc_code_exchange_v0.py
+      - name: Execute HTTPS exchange, real JWT and complete host lifecycle
+        run: |
+          python3 -m unittest discover -s tests/identity -p 'test_host_oidc_code_exchange_v0.py' -v
+      - name: Preserve private IPC, HTTPS and local ID boundaries
+        run: |
+          python3 -m unittest discover -s tests/identity -p 'test_pinned_https_identity_transport_v0.py' -v
+          python3 -m unittest discover -s tests/identity -p 'test_desktop_host_lifecycle_v0.py' -v
+          python3 -m unittest discover -s tests/identity -p 'test_desktop_session_host_v0.py' -v
+          python3 -m unittest discover -s tests/identity -p 'test_trusted_oidc_discovery_v0.py' -v
+          python3 -m unittest discover -s tests/cpuplus -p 'test_cpuplus_identity_host_context_v0.py' -v

@@ -251,7 +251,7 @@ Rectangle {
         QuietText {
             width:parent.width;height:14
             color:Colors.cyan;font.pixelSize:8
-            text:"SESSION ONLY // NO PROFILE OR BIRTH DATA SAVED"
+            text:"SESSION-ONLY INPUT // NO PROFILE OR BIRTH DATA SAVED"
             elide:Text.ElideRight
         }
     }

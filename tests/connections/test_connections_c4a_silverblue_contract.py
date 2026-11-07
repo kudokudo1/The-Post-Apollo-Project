@@ -44,7 +44,8 @@ class C4aContract(unittest.TestCase):
         self.assertIn('set -- /mnt/c2v-offline/c2t-0.1.rpm', guest)
         self.assertIn('set -- "$@" /mnt/c2v-offline/c3d-status.rpm', guest)
         self.assertIn('if [[ -f /var/lib/c4a-signed-service-test ]]; then', guest)
-        self.assertIn('if "postapollo-connections-c3d-ci-status" not in package_refs:', guest)
+        self.assertIn('local_refs=d.get("requested-local-packages") or []', guest)
+        self.assertIn('re.fullmatch(r"sha256:[a-fA-F0-9]{64}:"+re.escape(nevra),ref)', guest)
         self.assertIn('if not (pending and sys.argv[2] in package_refs):', guest)
         self.assertIn('C4A_SIGNED_SERVICE_NOT_VALID_AFTER_REBOOT', guest)
         self.assertIn('C4A_SIGNED_SERVICE_ROLLBACK_NOT_VERIFIED', guest)
@@ -113,6 +114,58 @@ class C4aContract(unittest.TestCase):
                            "http://", "https://", "curl ", "wget "):
             self.assertNotIn(prohibited, gate)
         self.assertIn("EPHEMERAL_SIGNER_NOT_INDEPENDENT_PRODUCTION_TRUST", gate)
+
+
+    def test_06_c4a_pending_package_authority_rejects_lookalikes(self):
+        # Exercise the literal embedded monitor verifier, not a rewritten
+        # imitation, using only synthetic disposable JSON inputs.
+        import json
+        import subprocess
+        import sys
+        import tempfile
+
+        guest = GUEST.read_text()
+        source = guest.split("<<'C2V_PENDING_CHECK'\n", 1)[1].split(
+            "\nC2V_PENDING_CHECK", 1
+        )[0]
+        import ast
+        ast.parse(source)
+
+        c2t = "postapollo-connections-c2t-fixture-0.1-1.fc44.noarch"
+        c3d = "postapollo-connections-c3d-ci-status-0.1-1.fc44.noarch"
+        base = "postapollo-connections-c2t-fixture"
+
+        def check(refs, packages=(), pending=True, transaction=None):
+            doc = {
+                "transaction": transaction,
+                "deployments": [
+                    {"pending": pending, "booted": False,
+                     "requested-local-packages": refs,
+                     "packages": list(packages)},
+                    {"booted": True},
+                ],
+            }
+            with tempfile.TemporaryDirectory() as tmp:
+                p = Path(tmp) / "pending.json"
+                p.write_text(json.dumps(doc))
+                # Simulate the test-only marker without creating host files.
+                mock = ('import os\nos.path.isfile = '
+                        'lambda path: path == "/var/lib/c4a-signed-service-test"\n')
+                return subprocess.run(
+                    [sys.executable, "-c", mock + source, str(p), base],
+                    capture_output=True, text=True, check=False,
+                ).returncode
+
+        self.assertEqual(check([c2t, c3d]), 0)
+        self.assertEqual(
+            check(["sha256:" + "a" * 64 + ":" + c2t,
+                   "sha256:" + "b" * 64 + ":" + c3d]), 0
+        )
+        self.assertNotEqual(check([c2t, c3d.replace("-0.1", "-evil-0.1")]), 0)
+        self.assertNotEqual(check([c2t], packages=[c3d]), 0)
+        self.assertNotEqual(check([c3d], packages=[c2t]), 0)
+        self.assertNotEqual(check([c2t, c3d], pending=False), 0)
+        self.assertNotEqual(check([c2t, c3d], transaction="busy"), 0)
 
 
 if __name__ == "__main__":

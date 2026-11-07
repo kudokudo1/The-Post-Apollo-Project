@@ -119,7 +119,7 @@ Rectangle {
                 id: imageBody
                 width: parent.width
                 height: Math.max(0,parent.height-imageControls.height-6)
-                spacing: 8
+                spacing: solarFocus.imageInteractive && solarFocus.imageExpanded ? 0 : 8
                 Rectangle {
                     id: imageFrame
                     objectName: "cosmos-c16-suvi-viewport"
@@ -134,6 +134,7 @@ Rectangle {
                     readonly property real currentZoom: solarFocus.suviZoom
 
                     function constrainPan() {
+                        if (!imageViewport || !focusedSuviImage) return;
                         var pan = ImageViewportPolicy.clampPan(
                             solarFocus.suviZoom, solarFocus.suviPanX,
                             solarFocus.suviPanY, imageViewport.width,

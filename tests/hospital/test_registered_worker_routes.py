@@ -60,8 +60,8 @@ check("runtime.refresh()" in view, "exact Session runtime refreshed")
 check("No command is sent by opening this panel." in view,
       "no automatic GO/CONTINUE when opening view")
 check("CHAT is read-only" in view, "operator told this is a read-only transcript")
-check("not a ChatGPT browser tab" in view, "browser session not falsely connected")
-check('["GO", "CONTINUE", "STATUS", "REPORT",' in policy,
+check("Not a ChatGPT browser tab" in view, "browser session not falsely connected")
+check('"GO", "CONTINUE", "STATUS", "REPORT",' in policy,
       "narrow command allowlist")
 check('state.runtimeSessionMatches' in policy, "status payload identity gate")
 check('state.runtimeStatusVerified' in policy, "verified status gate")

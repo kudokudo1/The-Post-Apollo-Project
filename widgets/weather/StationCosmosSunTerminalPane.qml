@@ -456,6 +456,9 @@ Rectangle {
                     width: Math.max(1,Math.round((observationHeroes.width-5)*0.53))
                     height: observationHeroes.height
                     modeRoute: "cosmos/sun/suvi"
+                    // Keep the INDEX inspector unchanged. SUN OBSERVATION owns
+                    // the direct image gestures and explicitly scoped EXP view.
+                    imageInteractive: true
                     sourceSpace: sunTerminal.sourceSpace
                     spaceService: sunTerminal.spaceService
                 }

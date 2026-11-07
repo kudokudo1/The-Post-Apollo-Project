@@ -162,7 +162,7 @@ for i in $(seq 1 700); do
       current_serial_bytes="$(wc -c < "$tmp/guest-serial.log")"
       echo "C2V_HOST_SERIAL_BYTES // current=$current_serial_bytes previous=$last_serial_bytes"
       last_serial_bytes="$current_serial_bytes"
-      grep -a -E 'C2V_(PASS|FAIL|INSTALL_|BLOCKED|GUEST_PROBE)' "$tmp/guest-serial.log" 2>/dev/null | tail -n 12 || true
+      grep -a -E 'C2V_(PASS|FAIL|INSTALL_|MONITOR_|PENDING_|BLOCKED|GUEST_PROBE)' "$tmp/guest-serial.log" 2>/dev/null | tail -n 12 || true
     fi
   fi
   if [[ -f "$tmp/guest-serial.log" ]]; then
@@ -179,6 +179,9 @@ for i in $(seq 1 700); do
   fi
   sleep 2
 done
+echo "C2V_HOST_MONITOR_EVIDENCE // from complete guest serial"
+grep -a -E 'C2V_(MONITOR_|PENDING_DEPLOYMENT_AUTHORITY|INSTALL_FAILED_EXIT|PROBE_OSTREE_ADMIN_STATUS)' \
+  "$tmp/guest-serial.log" 2>/dev/null | tail -n 72 || true
 grep -a 'C2V_' "$tmp/guest-serial.log" 2>/dev/null | tail -n 70 || true
 if [[ "$result" != PASS ]]; then
   echo "C2V_BLOCKED // SILVERBLUE_LAYER_REBOOT_ROLLBACK_RESULT=$result"
